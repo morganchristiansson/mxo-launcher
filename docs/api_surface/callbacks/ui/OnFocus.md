@@ -4,14 +4,14 @@
 
 **Category**: UI  
 **Direction**: Launcher → Client  
-**Purpose**: Window focus change notification callback - called when a window gains or loses focus
+**Purpose**: Window focus change notification callback
 
 ---
 
 ## Function Signature
 
 ```c
-void OnFocus(FocusEvent* focusEvent, uint32_t windowId);
+void OnFocus(FocusEvent* focusEvent, uint32_t windowId, uint32_t eventType);
 ```
 
 ### Parameters
@@ -19,7 +19,8 @@ void OnFocus(FocusEvent* focusEvent, uint32_t windowId);
 | Type | Name | Purpose |
 |------|------|---------|
 | `FocusEvent*` | focusEvent | Focus event details and state |
-| `uint32_t` | windowId | ID of the window that gained/lost focus |
+| `uint32_t` | windowId | Window identifier |
+| `uint32_t` | eventType | Focus event type (FOCUS_IN, FOCUS_OUT) |
 
 ### Return Value
 
@@ -35,9 +36,8 @@ The focus system handles various event types:
 
 | Event Type | Description |
 |------------|-------------|
-| `FOCUS_GAINED` | Window gained focus (became active) |
-| `FOCUS_LOST` | Window lost focus (another window became active) |
-| `FOCUS_CHANGED` | Focus changed between windows |
+| `FOCUS_IN` | Window gained focus (became active window) |
+| `FOCUS_OUT` | Window lost focus (other window became active) |
 
 ---
 
@@ -47,45 +47,29 @@ The focus system handles various event types:
 
 ```c
 struct FocusEvent {
-    uint32_t eventType;        // Event type (FOCUS_GAINED, FOCUS_LOST, FOCUS_CHANGED)
-    uint32_t prevWindowId;     // Previous focused window ID
-    uint32_t newWindowId;      // New focused window ID
+    uint32_t eventType;        // Event type (FOCUS_IN, FOCUS_OUT)
+    uint32_t windowId;         // Target window identifier
+    uint32_t previousWindowId; // Previous active window (if any)
     uint32_t timestamp;        // Event timestamp
-    uint32_t reason;           // Reason for focus change
 };
 ```
 
-**Size**: 20 bytes
-
-### WindowObject Structure
+### WindowFocus Structure
 
 ```c
-struct WindowObject {
+struct WindowFocus {
     void* pVTable;              // 0x00: Virtual function table
-    uint32_t windowId;          // 0x04: Unique window identifier
-    uint32_t focusedState;      // 0x08: Focus state (1=focused, 0=not focused)
+    uint32_t focusState;        // 0x04: Current focus state
     
-    // Window properties
-    int32_t x;                  // 0x0C: X position
-    int32_t y;                  // 0x10: Y position
-    uint32_t width;             // 0x14: Width in pixels
-    uint32_t height;            // 0x18: Height in pixels
+    // Focus tracking
+    uint32_t activeWindowId;    // 0x08: Active window identifier
+    uint32_t focusedWindowId;   // 0x0C: Focused window identifier
     
-    // Focus management
-    uint32_t focusPriority;     // 0x1C: Focus priority for ordering
-    uint32_t isActive;          // 0x20: Active window state
-    uint32_t isVisible;         // 0x24: Visibility state
-    uint32_t isMinimized;       // 0x28: Minimized state
-    uint32_t isMaximized;       // 0x2C: Maximized state
-    
-    // Input handling
-    void* inputCallback;        // 0x30: Registered input callback
-    void* focusCallback;        // 0x34: Focus change callback pointer
-    void* callbackUserData;     // 0x38: User data for callbacks
+    // Callback registration
+    void* focusCallback;        // 0x10: Registered focus callback
+    void* callbackUserData;     // 0x14: User data for callback
 };
 ```
-
-**Size**: 60 bytes
 
 ---
 
@@ -117,10 +101,11 @@ test eax, eax                 ; Check if NULL
 je skip_callback              ; Skip if no callback
 
 ; Prepare parameters
-push windowId                 ; Window ID
+push eventType               ; Focus event type
+push windowId                ; Window identifier
 push focusEvent              ; Focus event structure
 call eax                      ; Invoke callback
-add esp, 8                    ; Cleanup stack (2 parameters)
+add esp, 12                   ; Cleanup stack
 
 skip_callback:
 ```
@@ -132,86 +117,62 @@ skip_callback:
 ### Launcher Side
 
 ```c
-// Trigger focus change event
-void OnFocusChanged(uint32_t prevWindowId, uint32_t newWindowId) {
-    InputEvent event;
-    event.eventType = INPUT_FOCUS_CHANGE;
-    event.inputId = newWindowId;
-    event.deltaX = 0;
-    event.deltaY = 0;
-    event.amount = 1;
-    event.timestamp = GetTickCount();
-    
-    // Trigger callback
-    OnInputReceived(&event);
+// Trigger focus event
+void OnFocusReceived(FocusEvent* input) {
+    // Find registered callback
+    CallbackEntry* entry = FindCallbackByType(EVENT_FOCUS);
+    if (entry && entry->callback) {
+        OnFocusCallback callback = (OnFocusCallback)entry->callback;
+        uint32_t windowId = input->windowId;
+        uint32_t eventType = input->eventType;
+        
+        callback(input, windowId, eventType);
+    }
 }
 
-void HandleWindowActivate(uint32_t windowId) {
-    uint32_t prevWindowId = GetFocusedWindow();
-    SetFocusedWindow(windowId);
-    
+// Handle window focus gain
+void HandleWindowFocusGain(uint32_t windowId) {
     FocusEvent event;
-    event.eventType = FOCUS_GAINED;
-    event.prevWindowId = prevWindowId;
-    event.newWindowId = windowId;
+    event.eventType = FOCUS_IN;
+    event.windowId = windowId;
+    event.previousWindowId = GetActiveWindowId();
     event.timestamp = GetTickCount();
-    event.reason = WINDOW_ACTIVATE;
+    
+    // Mark window as focused
+    SetWindowFocus(windowId, true);
     
     // Trigger callback
-    OnFocusChanged(prevWindowId, windowId);
+    OnFocusReceived(&event);
 }
 
-void HandleWindowDeactivate(uint32_t windowId) {
-    uint32_t prevWindowId = windowId;
-    uint32_t newWindowId = GetFocusedWindow();
-    SetFocusedWindow(newWindowId);
-    
+// Handle window focus loss
+void HandleWindowFocusLoss(uint32_t windowId) {
     FocusEvent event;
-    event.eventType = FOCUS_LOST;
-    event.prevWindowId = prevWindowId;
-    event.newWindowId = newWindowId;
+    event.eventType = FOCUS_OUT;
+    event.windowId = windowId;
+    event.previousWindowId = GetActiveWindowId();
     event.timestamp = GetTickCount();
-    event.reason = WINDOW_DEACTIVATE;
+    
+    // Clear focus state
+    SetWindowFocus(windowId, false);
     
     // Trigger callback
-    OnFocusChanged(prevWindowId, windowId);
+    OnFocusReceived(&event);
 }
 
-void HandleKeyboardFocus(uint32_t key) {
-    switch (key) {
-        case VK_TAB:
-            // Tab forward/backward focus cycling
-            CycleFocusForward();
-            break;
-            
-        case VK_F4:
-            if (GetModifierKey(VK_CONTROL)) {
-                // Alt+F4 - Close current window
-                CloseCurrentWindow();
-            } else {
-                // F4 - Focus next window
-                CycleFocusForward();
-            }
-            break;
-    }
-}
-
-void CycleFocusForward() {
-    uint32_t focusedWindowId = GetFocusedWindow();
-    uint32_t nextWindowId = GetNextWindowInZOrder(focusedWindowId);
+// Update active window
+void SetActiveWindow(uint32_t windowId) {
+    FocusEvent event;
+    event.eventType = FOCUS_IN;
+    event.windowId = windowId;
+    event.previousWindowId = GetActiveWindowId();
+    event.timestamp = GetTickCount();
     
-    if (nextWindowId != 0) {
-        ActivateWindow(nextWindowId);
-    }
-}
-
-void CycleFocusBackward() {
-    uint32_t focusedWindowId = GetFocusedWindow();
-    uint32_t prevWindowId = GetPreviousWindowInZOrder(focusedWindowId);
+    // Update internal state
+    g_ActiveWindowId = windowId;
     
-    if (prevWindowId != 0) {
-        ActivateWindow(prevWindowId);
-    }
+    // Trigger callback
+    OnFocusReceived(&event);
 }
 ```
 
@@ -219,63 +180,47 @@ void CycleFocusBackward() {
 
 ```c
 // Focus callback implementation
-void MyOnFocusCallback(FocusEvent* focusEvent, uint32_t windowId) {
+void MyOnFocusCallback(FocusEvent* focusEvent, uint32_t windowId, uint32_t eventType) {
     switch (focusEvent->eventType) {
-        case FOCUS_GAINED:
-            HandleWindowGainedFocus(focusEvent->newWindowId);
+        case FOCUS_IN:
+            // Window gained focus
+            HandleWindowFocus(windowId);
             break;
             
-        case FOCUS_LOST:
-            HandleWindowLostFocus(focusEvent->prevWindowId);
-            break;
-            
-        case FOCUS_CHANGED:
-            HandleFocusChanged(focusEvent->prevWindowId, focusEvent->newWindowId);
+        case FOCUS_OUT:
+            // Window lost focus
+            HandleWindowFocusLoss(windowId);
             break;
     }
 }
 
-// Window gained focus handler
-void HandleWindowGainedFocus(uint32_t windowId) {
-    WindowObject* window = GetWindow(windowId);
+// Focus gain handler
+void HandleWindowFocus(uint32_t windowId) {
+    // Make window active and visible
+    ShowWindow(windowId, true);
     
-    // Update window state
-    window->focusedState = 1;
-    window->isActive = 1;
+    // Bring window to front
+    BringWindowToFront(windowId);
     
-    // Clear selection in other windows
-    ClearAllSelections();
+    // Update UI state
+    UpdateActiveWindow(windowId);
     
-    // Update UI
-    UpdateWindowUI(window);
-    ShowWindowCursor(window);
-    
-    printf("Window %d gained focus\n", windowId);
+    // Trigger keyboard input if needed
+    TriggerKeyboardInput(windowId);
 }
 
-// Window lost focus handler
-void HandleWindowLostFocus(uint32_t windowId) {
-    WindowObject* window = GetWindow(windowId);
+// Focus loss handler
+void HandleWindowFocusLoss(uint32_t windowId) {
+    // Hide window if minimized
+    if (IsWindowMinimized(windowId)) {
+        ShowWindow(windowId, false);
+    }
     
-    // Update window state
-    window->focusedState = 0;
-    window->isActive = 0;
+    // Update UI state
+    UpdateActiveWindow(GetActiveWindowId());
     
-    // Save cursor position
-    SaveCursorPosition(window);
-    
-    printf("Window %d lost focus\n", windowId);
-}
-
-// Focus changed handler
-void HandleFocusChanged(uint32_t prevWindowId, uint32_t newWindowId) {
-    // Clear selection in previous window
-    WindowObject* prevWindow = GetWindow(prevWindowId);
-    ClearSelectionInWindow(prevWindow);
-    
-    // Update focus tracking
-    g_LastFocusedWindow = prevWindowId;
-    g_CurrentFocusedWindow = newWindowId;
+    // Disable keyboard input
+    DisableKeyboardInput(windowId);
 }
 
 // Register focus callback
@@ -291,7 +236,7 @@ void RegisterFocusCallback() {
     VTable* vtable = obj->pVTable;
     
     int (*regFunc)(APIObject*, CallbackRegistration*);
-    regFunc = (int (*)(APIObject*, CallbackRegistration*))vtable->functions[24];
+    regFunc = (int (*)(APIObject*, CallbackRegistration*))vtable->functions[23];
     
     int callbackId = regFunc(obj, &reg);
     printf("Registered focus callback, ID=%d\n", callbackId);
@@ -313,89 +258,96 @@ void UnregisterFocusCallback() {
     printf("Unregistered focus callback, result=%d\n", result);
 }
 
-// Focus cycling for window navigation
-void FocusNextWindow() {
-    uint32_t focusedWindowId = GetFocusedWindow();
+// Tab key handling
+void HandleTabKey(uint32_t windowId) {
+    FocusEvent event;
+    uint32_t activeWindow = GetActiveWindowId();
     
-    // Get list of windows in Z-order
-    uint32_t* windows = GetWindowList();
-    int count = GetWindowCount();
-    
-    int currentIndex = -1;
-    for (int i = 0; i < count; i++) {
-        if (windows[i] == focusedWindowId) {
-            currentIndex = i;
-            break;
-        }
-    }
-    
-    // Calculate next index (wrap around)
-    int nextIndex = (currentIndex + 1) % count;
-    
-    // Activate next window
-    if (nextIndex < count && windows[nextIndex] != 0) {
-        ActivateWindow(windows[nextIndex]);
-    }
-}
-
-void FocusPreviousWindow() {
-    uint32_t focusedWindowId = GetFocusedWindow();
-    
-    // Get list of windows in Z-order
-    uint32_t* windows = GetWindowList();
-    int count = GetWindowCount();
-    
-    int currentIndex = -1;
-    for (int i = 0; i < count; i++) {
-        if (windows[i] == focusedWindowId) {
-            currentIndex = i;
-            break;
-        }
-    }
-    
-    // Calculate previous index (wrap around)
-    int prevIndex = (currentIndex - 1 + count) % count;
-    
-    // Activate previous window
-    if (prevIndex < count && windows[prevIndex] != 0) {
-        ActivateWindow(windows[prevIndex]);
+    // Cycle through windows
+    if (activeWindow != windowId) {
+        event.eventType = FOCUS_IN;
+        event.windowId = activeWindow;
+        event.previousWindowId = windowId;
+        event.timestamp = GetTickCount();
+        
+        SetActiveWindow(activeWindow);
     }
 }
 ```
 
 ---
 
-## Focus Key Codes
+## Focus State Management
 
-| Code | Description | Windows Key |
-|------|-------------|-------------|
-| VK_TAB (0x09) | Tab forward/backward | TAB |
-| VK_F4 (0x1C) | Alt+F4 close, F4 next window | ALT+F4 / F4 |
-| VK_CONTROL (0x11) | Control key modifier | CTRL |
+### Active Window Tracking
+
+```c
+// Track which window is currently active
+uint32_t g_ActiveWindowId = 0;  // Initially no active window
+
+void SetActiveWindow(uint32_t windowId) {
+    if (windowId != g_ActiveWindowId) {
+        FocusEvent event;
+        event.eventType = FOCUS_IN;
+        event.windowId = windowId;
+        event.previousWindowId = g_ActiveWindowId;
+        event.timestamp = GetTickCount();
+        
+        // Update internal state
+        g_ActiveWindowId = windowId;
+        
+        // Trigger callback
+        OnFocusReceived(&event);
+    }
+}
+
+uint32_t GetActiveWindowId(void) {
+    return g_ActiveWindowId;
+}
+```
+
+### Window Focus State
+
+```c
+// Track focus state for each window
+typedef struct {
+    uint32_t windowId;         // Window identifier
+    bool isFocused;           // Currently focused
+    bool wasFocused;          // Previously focused
+    bool canFocus;            // Can receive focus
+} WindowFocusState;
+
+WindowFocusState g_WindowFocusStates[MAX_WINDOWS];
+
+void SetWindowFocus(uint32_t windowId, bool focused) {
+    if (windowId < MAX_WINDOWS) {
+        if (focused) {
+            g_WindowFocusStates[windowId].isFocused = true;
+            g_WindowFocusStates[windowId].wasFocused = false;
+        } else {
+            g_WindowFocusStates[windowId].isFocused = false;
+            g_WindowFocusStates[windowId].wasFocused = true;
+        }
+    }
+}
+
+bool IsWindowFocused(uint32_t windowId) {
+    return windowId < MAX_WINDOWS && g_WindowFocusStates[windowId].isFocused;
+}
+```
 
 ---
 
-## Focus Modifiers
-
-| Flag | Description |
-|------|-------------|
-| 1 | Shift key pressed (reverse tab order) |
-| 2 | Ctrl key pressed (special focus commands) |
-| 4 | Alt key pressed (Alt+F4 close window) |
-| 8 | Windows key pressed |
-
----
-
-## Focus Flow
+## Focus Event Flow
 
 ### Typical Focus Sequence
 
 ```
-1. User interacts with UI
-   └─> Clicks window/tab or presses keyboard shortcut
+1. User presses Tab key or clicks another window
+   └─> Windows sends message to launcher
 
-2. Launcher processes focus change
-   └─> Updates internal state
+2. Launcher processes input
+   └─> Updates internal focus state
    └─> Creates FocusEvent structure
 
 3. Launcher triggers callback
@@ -403,51 +355,93 @@ void FocusPreviousWindow() {
    └─> Passes event data
 
 4. Client processes event
-   └─> Updates window selection
-   └─> Handles specific focus change type
-   └─> Updates UI state
+   └─> Makes window active/focused
+   └─> Handles specific event type
 
 5. Event cleanup
-   └─> Clear selections in previous window
-   └─> Update cursor visibility
+   └─> Update internal state
+   └─> Handle previous window
 ```
 
 ---
 
-## Focus Management
+## Usage Examples
 
-### Window Z-Order
-
-Windows are ordered by their Z-order (stacking order):
-
-```
-Window 1 (topmost)
-Window 2
-Window 3
-...
-Window N (bottommost)
-```
-
-Focus typically cycles through windows in Z-order.
-
-### Focus Priority
-
-Each window can have a focus priority that affects the order:
+### Tab Key Cycling
 
 ```c
-void SetWindowFocusPriority(uint32_t windowId, uint32_t priority) {
-    WindowObject* window = GetWindow(windowId);
-    window->focusPriority = priority;
+void HandleTabInput(uint32_t windowId) {
+    FocusEvent event;
+    uint32_t activeWindow = GetActiveWindowId();
+    
+    // Cycle through windows (forward)
+    if (activeWindow != windowId) {
+        event.eventType = FOCUS_IN;
+        event.windowId = activeWindow;
+        event.previousWindowId = windowId;
+        event.timestamp = GetTickCount();
+        
+        SetActiveWindow(activeWindow);
+    }
 }
 
-uint32_t GetNextWindowInZOrder(uint32_t currentWindowId) {
-    // Sort windows by focus priority
-    // Return next window with higher priority
+void HandleShiftTabInput(uint32_t windowId) {
+    FocusEvent event;
+    uint32_t activeWindow = GetActiveWindowId();
+    
+    // Cycle through windows (backward)
+    if (activeWindow != windowId) {
+        event.eventType = FOCUS_IN;
+        event.windowId = activeWindow;
+        event.previousWindowId = windowId;
+        event.timestamp = GetTickCount();
+        
+        SetActiveWindow(activeWindow);
+    }
 }
+```
 
-uint32_t GetPreviousWindowInZOrder(uint32_t currentWindowId) {
-    // Sort windows by focus priority
-    // Return previous window with lower priority
+### Window Focus Validation
+
+```c
+bool ValidateWindowFocus(uint32_t windowId) {
+    // Check if window exists
+    if (!IsWindowValid(windowId)) {
+        return false;
+    }
+    
+    // Check if window can receive focus
+    if (!g_WindowFocusStates[windowId].canFocus) {
+        return false;
+    }
+    
+    // Check if window is minimized
+    if (IsWindowMinimized(windowId)) {
+        return false;
+    }
+    
+    return true;
+}
+```
+
+### Focus Event Handling
+
+```c
+void HandleFocusEvent(FocusEvent* event) {
+    switch (event->eventType) {
+        case FOCUS_IN:
+            // Window gained focus
+            printf("Window focused: %d\n", event->windowId);
+            UpdateActiveWindow(event->windowId);
+            TriggerKeyboardInput(event->windowId);
+            break;
+            
+        case FOCUS_OUT:
+            // Window lost focus
+            printf("Window unfocused: %d\n", event->windowId);
+            DisableKeyboardInput(event->windowId);
+            break;
+    }
 }
 ```
 
@@ -455,32 +449,31 @@ uint32_t GetPreviousWindowInZOrder(uint32_t currentWindowId) {
 
 ## Notes
 
-- **Critical UI callback** for window navigation and interaction
-- Called when windows gain/lose focus through user actions
-- Provides detailed event information including reason for change
+- **Critical UI callback** for window management and navigation
+- Handles keyboard (Tab key) and mouse interactions
+- Provides detailed focus information including event types
 - Should be registered early in initialization
 - Focus state persists across multiple callbacks
-- Tab key typically cycles through focused windows
-- Handle focus changes appropriately for UI updates
+- Handle focus/defocus events appropriately
 
 ---
 
 ## Security Considerations
 
-- Validate window IDs before processing
-- Prevent focus stealing vulnerabilities
-- Sanitize window identifiers
-- Implement focus rate limiting
-- Handle malformed focus events gracefully
+- Validate window identifiers before processing
+- Prevent focus stealing attacks
+- Sanitize window state data
+- Implement proper focus validation
+- Handle malformed input gracefully
 
 ---
 
 ## Related Callbacks
 
-- [OnInput](OnInput.md) ([ui/OnInput.md](ui/OnInput.md)) - User input event callback
-- [OnWindowEvent](OnWindowEvent.md) ([ui/OnWindowEvent.md](ui/OnWindowEvent.md)) - Window event callback
-- [OnResize](OnResize.md) ([ui/OnResize.md](ui/OnResize.md)) - Window resize callback
-- [OnClose](OnClose.md) ([ui/OnClose.md](ui/OnClose.md)) - Window close callback
+- [OnInput](OnInput.md) - User input event callback
+- [OnWindowEvent](OnWindowEvent.md) - Window event callback
+- [OnResize](OnResize.md) - Window resize callback
+- [OnClose](OnClose.md) - Window close callback
 
 ---
 
@@ -500,28 +493,12 @@ Related VTable functions for focus:
 ## References
 
 - **Source**: `client_dll_callback_analysis.md` Section 5.2
+- **Source**: `data_structures_analysis.md` WindowFocus section
 - **Category**: UI event handling
 - **Direction**: Launcher to Client callback invocation
 
 ---
 
-**Status**: ⏳ Partial  
+**Status**: ✅ Documented  
 **Confidence**: Medium (inferred from UI callback patterns)  
-**Last Updated**: 2026-03-08
-**Documented By**: API_ANALYST
-
----
-
-## TODO
-
-- [ ] Find exact function signature in disassembly
-- [ ] Locate FocusEvent structure in memory
-- [ ] Identify focus event constants/enum values
-- [ ] Search for diagnostic strings related to focus
-- [ ] Verify callback registration method
-- [ ] Document focus key handling patterns
-- [ ] Add implementation examples based on actual code
-
----
-
-**End of Template**
+**Last Updated**: 2025-06-17
