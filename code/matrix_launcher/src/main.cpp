@@ -8,40 +8,6 @@
 #include <iostream>
 #include <windows.h>
 
-// Windows DLL Loading Function Pointers
-typedef HMODULE (__stdcall *LoadLibraryW_t)(LPCWSTR);
-typedef FARPROC (__stdcall *GetProcAddress_t)(HMODULE, LPCSTR);
-typedef BOOL (__stdcall *FreeLibrary_t)(HMODULE);
-
-// Global DLL Loaders
-static LoadLibraryW_t g_LoadLibraryW = nullptr;
-static GetProcAddress_t g_GetProcAddress = nullptr;
-static FreeLibrary_t g_FreeLibrary = nullptr;
-
-/**
- * Initialize Windows DLL loading functions.
- * Called before loading any external DLLs.
- */
-bool InitializeDllLoaders()
-{
-    // Load user32.dll for basic Windows API calls
-    HMODULE hUser32 = g_LoadLibraryW(L"user32.dll");
-    if (!hUser32)
-        return false;
-    
-    // Get function pointers from user32.dll
-    g_GetProcAddress = (GetProcAddress_t)g_GetProcAddress(hUser32, "GetProcAddress");
-    g_FreeLibrary = (FreeLibrary_t)g_GetProcAddress(hUser32, "FreeLibrary");
-    
-    if (!g_GetProcAddress || !g_FreeLibrary)
-    {
-        g_FreeLibrary(hUser32);
-        return false;
-    }
-    
-    return true;
-}
-
 /**
  * Load and execute external client.dll.
  * 
@@ -56,8 +22,8 @@ bool LoadClientDll(const char* dllPath)
     if (len == 0)
         return false;
     
-    // Load the external DLL
-    HMODULE hClient = g_LoadLibraryW(widePath);
+    // Load the external DLL using standard Windows API
+    HMODULE hClient = LoadLibraryW(widePath);
     if (!hClient)
     {
         std::cout << "Failed to load client.dll: " << dllPath << std::endl;
@@ -69,7 +35,7 @@ bool LoadClientDll(const char* dllPath)
     // Call the DLL's main function if available
     // The client.dll should export a function named "DllMain"
     typedef BOOL (__stdcall *DllMain_t)(HMODULE, DWORD, LPVOID);
-    DllMain_t pDllMain = (DllMain_t)g_GetProcAddress(hClient, "DllMain");
+    DllMain_t pDllMain = (DllMain_t)GetProcAddress(hClient, "DllMain");
     
     if (pDllMain)
     {
@@ -79,7 +45,7 @@ bool LoadClientDll(const char* dllPath)
     }
     
     // Free the DLL when done
-    g_FreeLibrary(hClient);
+    FreeLibrary(hClient);
     return true;
 }
 
@@ -93,18 +59,10 @@ int main(int argc, char* argv[])
     std::cout << "Version: 1.0.0" << std::endl;
     std::cout << "=========================================" << std::endl;
     
-    std::cout << "\nInitializing Windows DLL Loading..." << std::endl;
+    std::cout << "\nLoading external client.dll..." << std::endl;
     
-    if (!InitializeDllLoaders())
-    {
-        std::cout << "Failed to initialize DLL loaders." << std::endl;
-        return 1;
-    }
-    
-    std::cout << "Loading external client.dll..." << std::endl;
-    
-    // Load the client.dll from the parent directory
-    if (!LoadClientDll("../../client.dll"))
+    // Load the client.dll from the current directory
+    if (!LoadClientDll("client.dll"))
     {
         std::cout << "Failed to load client.dll. Exiting." << std::endl;
         return 1;
