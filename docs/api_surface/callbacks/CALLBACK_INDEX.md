@@ -2,7 +2,7 @@
 
 ## Quick Reference
 
-### Fully Documented Callbacks (12)
+### Fully Documented Callbacks (18)
 
 | Callback | Category | File | Status |
 |----------|----------|------|--------|
@@ -11,8 +11,14 @@
 | RegisterCallback2 | Registration | [registration/RegisterCallback2.md](registration/RegisterCallback2.md) | ✅ Complete |
 | OnException | Lifecycle | [lifecycle/OnException.md](lifecycle/OnException.md) | ✅ Complete |
 | OnConnect | Network | [network/OnConnect.md](network/OnConnect.md) | ✅ Complete |
+| OnDisconnect | Network | [network/OnDisconnect.md](network/OnDisconnect.md) | ✅ Complete |
+| OnConnectionError | Network | [network/OnConnectionError.md](network/OnConnectionError.md) | ✅ Complete |
+| OnTimeout | Network | [network/OnTimeout.md](network/OnTimeout.md) | ✅ Complete |
 | OnPacket | Network | [network/OnPacket.md](network/OnPacket.md) | ✅ Complete |
 | OnDistributeMonitor | Network | [network/OnDistributeMonitor.md](network/OnDistributeMonitor.md) | ✅ Complete |
+| OnPacketSend | Network | [network/OnPacketSend.md](network/OnPacketSend.md) | ✅ Complete |
+| OnClientIPRequest | Network | [network/OnClientIPRequest.md](network/OnClientIPRequest.md) | ✅ Complete |
+| OnClientIPReply | Network | [network/OnClientIPReply.md](network/OnClientIPReply.md) | ✅ Complete |
 | OnDeleteCallback | Monitor | [monitor/OnDeleteCallback.md](monitor/OnDeleteCallback.md) | ✅ Complete |
 | OnMonitorEvent | Monitor | [monitor/OnMonitorEvent.md](monitor/OnMonitorEvent.md) | ✅ Complete |
 | OnInput | UI | [ui/OnInput.md](ui/OnInput.md) | ✅ Complete |
@@ -31,11 +37,11 @@
 |----------|------------|-----------------|----------|
 | Registration | 3 | 3 | ✅ 100% |
 | Lifecycle | 3 | 5 | ⏳ 60% |
-| Network | 3 | 12 | ⏳ 25% |
+| Network | 9 | 12 | ⏳ 75% |
 | Game | 0 | 10 | ❌ 0% |
 | UI | 2 | 5 | ⏳ 40% |
 | Monitor | 2 | 4 | ⏳ 50% |
-| **Total** | **13** | **39+** | **⏳ 33%** |
+| **Total** | **19** | **39+** | **⏳ 49%** |
 
 ---
 
@@ -77,7 +83,7 @@ Event callbacks for application lifecycle:
 - **OnReset** - Reset notification
   - Status: ❌ Not documented
 
-### Network Callbacks (3/12) ⏳
+### Network Callbacks (9/12) ⏳
 
 Event callbacks for network operations:
 
@@ -93,30 +99,45 @@ Event callbacks for network operations:
   - Complete packet flow and buffer management
   - **Validated against assembly code**
 
+- **[OnDisconnect](network/OnDisconnect.md)** - Connection closed
+  - Status: ✅ Fully documented
+  - Connection lifecycle management, disconnect reasons, statistics
+  - Includes DisconnectEvent structure, reason codes, cleanup procedures
+  - Connection state: LTTCP_AlreadyConnected → LTTCP_NOTCONNECTED
+
+- **[OnConnectionError](network/OnConnectionError.md)** - Connection error
+  - Status: ✅ Fully documented
+  - Error notification with detailed context, retry/recovery support
+  - Includes ConnectionErrorEvent structure, error codes, socket error mapping
+  - Supports recoverable, retryable, and fatal error handling
+
+- **[OnTimeout](network/OnTimeout.md)** - Connection timeout
+  - Status: ✅ Fully documented
+  - Timeout detection and notification for various operations
+  - Includes TimeoutEvent structure, timeout types, default values
+  - Supports retry mechanism with exponential backoff
+
 - **[OnDistributeMonitor](network/OnDistributeMonitor.md)** - Distributed monitor
   - Status: ✅ Fully documented
   - String: "Delete callback for distribute monitor id %d\n" (0x6289f580)
 
-- **OnDisconnect** - Connection closed
-  - Status: ❌ Not documented
+- **[OnPacketSend](network/OnPacketSend.md)** - Packet sent notification
+  - Status: ✅ Fully documented
+  - Outbound packet monitoring and logging
+  - Includes PacketSendEvent structure, send status codes, performance tracking
+  - Supports bandwidth monitoring and send error handling
 
-- **OnPacketSend** - Packet sent
-  - Status: ❌ Not documented
+- **[OnClientIPRequest](network/OnClientIPRequest.md)** - Client IP address request
+  - Status: ✅ Fully documented
+  - External IP address request monitoring and modification
+  - Message type: MS_GetClientIPRequest (0x0103)
+  - Supports caching, timeout control, and request cancellation
 
-- **OnConnectionError** - Connection error
-  - Status: ❌ Not documented
-
-- **OnTimeout** - Connection timeout
-  - Status: ❌ Not documented
-
-- **OnMonitorEvent** - Monitor event
-  - Status: ❌ Not documented
-
-- **OnClientIPRequest** - Client IP request
-  - Status: ❌ Not documented
-
-- **OnClientIPReply** - Client IP response
-  - Status: ❌ Not documented
+- **[OnClientIPReply](network/OnClientIPReply.md)** - Client IP address response
+  - Status: ✅ Fully documented
+  - External IP address response handling and storage
+  - Message type: MS_GetClientIPReply (0x0104)
+  - NAT detection, IP caching, P2P connectivity support
 
 - **OnSessionPenalty** - Session penalty
   - Status: ❌ Not documented
@@ -251,5 +272,5 @@ To document a callback:
 
 ---
 
-**Last Updated**: 2025-06-17  
-**Progress**: 13/39+ callbacks documented (33%)
+**Last Updated**: 2025-06-18
+**Progress**: 19/39+ callbacks documented (49%)
