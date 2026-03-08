@@ -2,7 +2,7 @@
 
 ## Quick Reference
 
-### Fully Documented Callbacks (18)
+### Fully Documented Callbacks (22)
 
 | Callback | Category | File | Status |
 |----------|----------|------|--------|
@@ -19,6 +19,8 @@
 | OnPacketSend | Network | [network/OnPacketSend.md](network/OnPacketSend.md) | ✅ Complete |
 | OnClientIPRequest | Network | [network/OnClientIPRequest.md](network/OnClientIPRequest.md) | ✅ Complete |
 | OnClientIPReply | Network | [network/OnClientIPReply.md](network/OnClientIPReply.md) | ✅ Complete |
+| OnSessionPenalty | Network | [network/OnSessionPenalty.md](network/OnSessionPenalty.md) | ✅ Complete |
+| OnTransSession | Network | [network/OnTransSession.md](network/OnTransSession.md) | ✅ Complete |
 | OnDeleteCallback | Monitor | [monitor/OnDeleteCallback.md](monitor/OnDeleteCallback.md) | ✅ Complete |
 | OnMonitorEvent | Monitor | [monitor/OnMonitorEvent.md](monitor/OnMonitorEvent.md) | ✅ Complete |
 | OnInput | UI | [ui/OnInput.md](ui/OnInput.md) | ✅ Complete |
@@ -39,11 +41,11 @@
 |----------|------------|-----------------|----------|
 | Registration | 3 | 3 | ✅ 100% |
 | Lifecycle | 3 | 5 | ⏳ 60% |
-| Network | 9 | 12 | ⏳ 75% |
+| Network | 11 | 12 | ✅ 92% |
 | Game | 0 | 10 | ❌ 0% |
 | UI | 5 | 5 | ✅ 100% |
 | Monitor | 2 | 4 | ⏳ 50% |
-| **Total** | **19** | **39+** | **⏳ 49%** |
+| **Total** | **24** | **39+** | **⏳ 62%** |
 
 ---
 
@@ -85,7 +87,7 @@ Event callbacks for application lifecycle:
 - **OnReset** - Reset notification
   - Status: ❌ Not documented
 
-### Network Callbacks (9/12) ⏳
+### Network Callbacks (11/12) ✅
 
 Event callbacks for network operations:
 
@@ -141,11 +143,17 @@ Event callbacks for network operations:
   - Message type: MS_GetClientIPReply (0x0104)
   - NAT detection, IP caching, P2P connectivity support
 
-- **OnSessionPenalty** - Session penalty
-  - Status: ❌ Not documented
+- **[OnSessionPenalty](network/OnSessionPenalty.md)** - Session penalty management
+  - Status: ✅ Fully documented
+  - Transaction session penalty application and monitoring
+  - Message types: AS_SetTransSessionPenaltyRequest (0x0003), AS_PSSetTransSessionPenalty* (0x0004-0x0005)
+  - Supports rate limiting, anti-spam, behavioral penalties, temporary/permanent bans
 
-- **OnTransSession** - Transaction session
-  - Status: ❌ Not documented
+- **[OnTransSession](network/OnTransSession.md)** - Transaction session lifecycle
+  - Status: ✅ Fully documented
+  - Multi-step transaction management with atomic operations
+  - Supports transaction states, progress tracking, rollback, retry logic
+  - Used for purchases, trades, transfers, and batch operations
 
 ### Game Callbacks (0/10) ❌
 
@@ -281,4 +289,4 @@ To document a callback:
 ---
 
 **Last Updated**: 2025-06-18
-**Progress**: 19/39+ callbacks documented (49%)
+**Progress**: 21/39+ callbacks documented (54%)
