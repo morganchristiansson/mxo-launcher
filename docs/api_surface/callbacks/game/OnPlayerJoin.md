@@ -1,14 +1,21 @@
 # OnPlayerJoin
 
 > ⚠️ **DEPRECATED - FABRICATED DOCUMENTATION**
-> 
-> **Validation Date**: 2025-03-08
+>
+> **Validation Date**: 2025-06-18 (re-verified)
 > **Status**: ❌ **FUNCTION DOES NOT EXIST IN BINARY**
-> 
-> This callback was fabricated and does not exist in the launcher binary.
-> 
-> See [OnPlayerJoin_validation.md](OnPlayerJoin_validation.md) for detailed disassembly analysis.
-> 
+>
+> This callback was fabricated and does not exist in either launcher.exe or client.dll.
+>
+> **Verification**:
+> ```bash
+> strings ../../launcher.exe | grep -i "OnPlayer"     # No results
+> strings ../../client.dll | grep -i "OnPlayer"      # No results
+> grep -i "OnPlayer" /tmp/launcher_disasm.txt        # No matches
+> ```
+>
+> See [PLAYER_CALLBACKS_VALIDATION.md](PLAYER_CALLBACKS_VALIDATION.md) for comprehensive validation report.
+>
 > **Do not use this documentation.**
 
 ---
@@ -17,14 +24,30 @@
 
 ### ❌ Function Does Not Exist
 
-Binary analysis of `../../launcher.exe` confirms:
+Binary analysis of both `launcher.exe` and `client.dll` confirms:
 
 ```bash
-$ strings launcher.exe | grep -i "OnPlayerJoin"
+# String search
+$ strings ../../launcher.exe | grep -i "OnPlayerJoin"
 (no results)
 
-$ strings launcher.exe | grep -i "PlayerJoin"
+$ strings ../../client.dll | grep -i "OnPlayerJoin"
 (no results)
+
+# Disassembly search
+$ grep -i "OnPlayerJoin" /tmp/launcher_disasm.txt
+(no matches)
+
+$ grep -i "OnPlayerJoin" /tmp/client_disasm.txt
+(no matches)
+
+# Total player-related strings found
+$ strings ../../client.dll | grep -i "player" | wc -l
+266
+
+# Total OnPlayer callbacks found
+$ strings ../../client.dll | grep -i "OnPlayer" | wc -l
+0
 ```
 
 ### ❌ No Player Event Callbacks Exist

@@ -1,5 +1,85 @@
 # OnLogout
 
+> ⚠️ **DEPRECATED - FABRICATED DOCUMENTATION**
+>
+> **Validation Date**: 2025-06-18
+> **Status**: ❌ **FUNCTION DOES NOT EXIST IN BINARY**
+>
+> This callback was fabricated and does not exist in either launcher.exe or client.dll.
+>
+> **Verification**:
+> ```bash
+> strings ../../launcher.exe | grep -i "OnLogout"     # No results
+> strings ../../client.dll | grep -i "OnLogout"      # No results
+> grep -i "OnLogout" /tmp/launcher_disasm.txt        # No matches
+> ```
+>
+> See [OnLogout_validation.md](OnLogout_validation.md) for detailed validation report.
+>
+> **Do not use this documentation.**
+
+---
+
+## Validation Findings
+
+### ❌ Function Does Not Exist
+
+Binary analysis of both `launcher.exe` and `client.dll` confirms:
+
+```bash
+# String search
+$ strings ../../launcher.exe | grep -i "OnLogout"
+(no results)
+
+$ strings ../../client.dll | grep -i "OnLogout"
+(no results)
+
+# Disassembly search
+$ grep -i "OnLogout" /tmp/launcher_disasm.txt
+(no matches)
+
+$ grep -i "OnLogout" /tmp/client_disasm.txt
+(no matches)
+
+# Only logout-related string found
+$ strings ../../client.dll | grep -i "logout"
+RESULT_REQUIRES_CLIENT_LOGOUT  # This is a result code, not a callback
+```
+
+### ✅ What Actually Exists
+
+**Login Observer Pattern** (C++ virtual methods):
+
+The game uses a C++ observer pattern for login events, not C callbacks:
+
+```cpp
+// Actual interface (C++ virtual methods)
+class ILTLoginObserver {
+public:
+    virtual void OnLoginEvent(int eventNumber) = 0;
+    virtual void OnLoginError(int errorNumber) = 0;
+};
+
+// Implementations found in binary:
+CLTEvilBlockingLoginObserver::OnLoginEvent(int eventNumber);
+CLTEvilBlockingLoginObserver::OnLoginError(int errorNumber);
+CLTLoginObserver_PassThrough::OnLoginEvent(int eventNumber, const char* serverResult);
+CLTLoginObserver_PassThrough::OnLoginError(int errorNumber);
+```
+
+**Key Points**:
+- ✅ Login events use observer pattern
+- ✅ C++ virtual methods (thiscall), not C callbacks
+- ❌ NO logout callbacks or observers exist
+- ❌ Logout is handled internally without notification
+
+---
+
+## Original Documentation (FABRICATED)
+
+<details>
+<summary>Click to view original fabricated documentation</summary>
+
 ## Overview
 
 **Category**: game
@@ -17,162 +97,94 @@
 int OnLogout(LoginErrorEvent* errorEvent, void* userData);
 ```
 
----
+**Note**: This was fabricated. No such function exists.
 
-## Parameters
-
-| Type | Name | Purpose |
-|------|------|---------|
-| `LoginErrorEvent*` | errorEvent | Login error event metadata (represents logout as an error event) |
-| `void*` | userData | Additional user data/context |
+</details>
 
 ---
 
-## Return Value
+## Correct Information
 
-| Type | Value | Meaning |
-|------|-------|---------|
-| `int` | 0 | Event processed successfully |
-| `int` | -1 | Processing failed |
-| `int` | 1 | Event consumed (don't process further) |
+### Login Event System
 
----
+The binary implements a **login observer pattern** with these methods:
 
-## LoginErrorEvent Structure
+| Method | Type | Purpose |
+|--------|------|---------|
+| `OnLoginEvent(int)` | C++ virtual method | Handle login events |
+| `OnLoginError(int)` | C++ virtual method | Handle login errors |
 
-```c
-struct LoginErrorEvent {
-    uint32_t playerId;         // Unique player identifier
-    uint32_t sessionId;        // Session ID where error occurred
-    uint32_t errorCode;        // Error code from login system (includes logout codes)
-    uint32_t errorMessage;     // Error message or error data
-    uint16_t flags;            // Event flags
-};
+**Documentation**:
+- ✅ [OnLoginEvent.md](OnLoginEvent.md) - Correct, validated
+- ✅ [OnLoginError.md](OnLoginError.md) - Correct, validated
 
-// Size: 16 bytes
+### Logout Handling
+
+**Logout is NOT exposed via callbacks or observers**:
+- Handled internally by server
+- No notification to client.dll
+- No event system for logout
+- Session cleanup is silent
+
+### Actual Logout-Related Code
+
+The only logout-related code found:
+```
+RESULT_REQUIRES_CLIENT_LOGOUT
 ```
 
----
-
-## Usage
-
-### Registration Pattern
-
-```c
-// Register via ProcessEvent vtable (index 6, offset 0x18)
-CallbackRegistration reg;
-reg.eventType = EVENT_LOGIN_ERROR;
-reg.callbackFunc = MyOnLogout;
-reg.userData = NULL;
-reg.priority = 100;
-reg.flags = 0;
-
-APIObject* obj = g_MasterDatabase->pPrimaryObject;
-int callbackId = obj->ProcessEvent(errorEvent, &reg);
-```
-
-### Assembly Pattern
-
-```assembly
-; ProcessEvent vtable call for login error event callbacks
-mov eax, [login_error_event]     ; Get callback function pointer
-test eax, eax
-je skip_callback
-push errorEvent
-push userData
-call eax
-add esp, 8
-```
+This is a **result code constant** used for internal flow control, not a callback event.
 
 ---
 
-## Implementation
+## Fabrication Pattern
 
-### Launcher Side
+This callback follows the same fabrication pattern as the player callbacks:
 
-```c
-// Example: Logout handler
-int MyOnLogout(LoginErrorEvent* event, void* userData) {
-    // Validate event
-    if (!event || event->sessionId == 0) return -1;
+| Aspect | Value | Indicator |
+|--------|-------|-----------|
+| Confidence | Medium | ⚠️ "Inferred from game event patterns" |
+| Validation | ❌ None | Not checked against binary |
+| Template | Generic callback signature | Plausible but false |
 
-    // Log logout event
-    printf("Player %d logged out of session %d (code: %d, message: %d)\n", 
-           event->playerId,
-           event->sessionId,
-           event->errorCode,
-           event->errorMessage);
-
-    // Notify game session to cleanup
-    GameSession* session = GetSession(event->sessionId);
-    if (session) {
-        session->HandleLogout(event->errorCode, 
-                               event->errorMessage);
-    }
-
-    return 0;
-}
-```
-
-### Client Side
-
-```c
-// Example: Client-side logout notification
-int ClientOnLogout(LoginErrorEvent* event, void* userData) {
-    // Update local error state
-    GameSession* session = GetSession(event->sessionId);
-    if (session) {
-        session->SetLoginError(event->errorCode, 
-                               event->errorMessage);
-    }
-
-    // Send notification to launcher
-    SendLogoutNotification(event->sessionId, 
-                           event->errorCode,
-                           event->errorMessage);
-
-    return 0;
-}
-```
+**Pattern**: "Login callbacks exist → Logout callbacks must exist" ❌ **WRONG**
 
 ---
 
-## Diagnostic Strings
+## Related Files
 
-| String | Address | Context |
-|--------|---------|---------|
-| "Player %d logged out of session %d (code: %d)" | Inferred | Error logging |
-| "Error: %d, Message: %d" | Inferred | Error details display |
+**Also Fabricated**:
+- ❌ [OnPlayerJoin.md](OnPlayerJoin.md) - Does not exist
+- ❌ [OnPlayerLeave.md](OnPlayerLeave.md) - Does not exist
+- ❌ [OnPlayerUpdate.md](OnPlayerUpdate.md) - Does not exist
+- ❌ [OnLogout.md](OnLogout.md) - This file
 
-*Note: Exact addresses to be confirmed through string search in binary.*
+**Valid Documentation**:
+- ✅ [OnLoginEvent.md](OnLoginEvent.md) - Correct (C++ observer pattern)
+- ✅ [OnLoginError.md](OnLoginError.md) - Correct (C++ observer pattern)
 
----
-
-## Related Callbacks
-
-- **[OnLogin](callbacks/game/OnLogin.md)** - Login event
-- **[OnLoginEvent](callbacks/game/OnLoginEvent.md)** - Login observer event
-- **[OnPlayerJoin](callbacks/game/OnPlayerJoin.md)** - Player arrival
-- **[OnPlayerLeave](callbacks/game/OnPlayerLeave.md)** - Player departure
-- **[OnGameState](callbacks/game/OnGameState.md)** - Overall game state management
+**Validation Reports**:
+- ✅ [OnLogout_validation.md](OnLogout_validation.md) - Detailed analysis
+- ✅ [PLAYER_CALLBACKS_VALIDATION.md](PLAYER_CALLBACKS_VALIDATION.md) - Related validation
 
 ---
 
 ## References
 
-- **Source**: Game event patterns in client_dll_callback_analysis.md Section 3.1
-- **Address**: ProcessEvent vtable index 6, byte offset 0x18
-- **Evidence**: Pattern matching with login-related callbacks; logout represented as error event
-- **Confidence**: Medium - Inferred from game callback structure
+- **Validation Report**: [OnLogout_validation.md](OnLogout_validation.md)
+- **Binary**: `../../launcher.exe` and `../../client.dll`
+- **Analysis Method**: String search, disassembly analysis
+- **Status**: Function does not exist
 
 ---
 
 ## Documentation Status
 
-**Status**: ✅ Complete (template filled)  
-**Last Updated**: 2025-03-08  
-**Author**: API Analyst
+**Status**: ❌ **DEPRECATED - FABRICATED**
+**Last Updated**: 2025-06-18
+**Validator**: Binary Analysis
+**Action**: Do not use
 
 ---
 
-**Next Callback**: None - Game callbacks complete (10/10)
+**See Also**: [VALIDATION_SUMMARY.md](VALIDATION_SUMMARY.md) for complete validation results.
