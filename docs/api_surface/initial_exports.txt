@@ -1,0 +1,7 @@
+
+/home/pi/mxo/launcher.exe:     file format pei-i386
+
+DYNAMIC SYMBOL TABLE:
+no symbols
+
+
