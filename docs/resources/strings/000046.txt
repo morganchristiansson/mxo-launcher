@@ -1,0 +1,3 @@
+# String ID: 0046
+# Content:
+Authentication has timed out. Please try again.

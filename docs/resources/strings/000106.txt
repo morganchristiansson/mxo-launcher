@@ -1,0 +1,5 @@
+# String ID: 0106
+# Content:
+Percentage of patch download.
+Note: Total download size may increase
+as patch progresses.

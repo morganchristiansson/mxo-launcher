@@ -1,0 +1,3 @@
+# String ID: 0006
+# Content:
+Could not open logfile: %s.  The file is read-only or locked by another process.  Continue without logging (choosing 'No' will close the application) ?

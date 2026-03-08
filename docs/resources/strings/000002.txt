@@ -1,0 +1,3 @@
+# String ID: 0002
+# Content:
+ZionOS ccc9 (release 2.4.20-13.7smp #1 SMP)

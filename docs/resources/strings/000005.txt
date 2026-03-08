@@ -1,0 +1,3 @@
+# String ID: 0005
+# Content:
+Failed to create a copy of the launcher or a critical support library for patching.  If you have a file called Matrix.exe in your game directory, please make sure it is writable.

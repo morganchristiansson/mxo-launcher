@@ -1,0 +1,5 @@
+# String ID: 0105
+# Content:
+This column indicates the server names.
+A PVP icon to the left of the server name indicates that
+ the server allows increased levels of player vs. player combat.

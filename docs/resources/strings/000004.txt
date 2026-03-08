@@ -1,0 +1,3 @@
+# String ID: 0004
+# Content:
+To enter The Matrix Online, please run the game from the shortcut created for you when the program was installed.

@@ -1,0 +1,3 @@
+# String ID: 0012
+# Content:
+New game version is %s

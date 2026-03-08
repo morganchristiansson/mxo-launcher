@@ -1,0 +1,3 @@
+# String ID: 0080
+# Content:
+Login request not sent - bad parameters?

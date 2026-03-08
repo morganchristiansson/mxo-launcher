@@ -1,0 +1,3 @@
+# String ID: 0007
+# Content:
+Cannot create unique event.  GetLastError() returned %d.  The application will now close.

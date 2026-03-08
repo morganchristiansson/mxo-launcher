@@ -1,0 +1,3 @@
+# String ID: 0121
+# Content:
+Client/auth server incompatibility. Please quit, restart, and retry with "Full System Check." DevTeam, you may be connecting to the wrong internal authentication server.

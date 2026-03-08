@@ -1,0 +1,7 @@
+# String ID: 0074
+# Content:
+The file %s could not be setup properly.
+
+%s
+
+The application is now shutting down.

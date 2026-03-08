@@ -1,0 +1,3 @@
+# String ID: 0003
+# Content:
+ZION01% ssh matrix

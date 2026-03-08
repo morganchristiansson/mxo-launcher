@@ -1,0 +1,3 @@
+# String ID: 0126
+# Content:
+Your Station account doesn’t include a subscription to the Matrix Online. Click the "Account" button below for subscription information.

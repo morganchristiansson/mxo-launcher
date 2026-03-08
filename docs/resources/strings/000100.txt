@@ -1,0 +1,4 @@
+# String ID: 0100
+# Content:
+Select this character and server
+for this play session.

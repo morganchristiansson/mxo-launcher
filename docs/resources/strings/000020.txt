@@ -1,0 +1,6 @@
+# String ID: 0020
+# Content:
+A full system check is required.
+
+This may be due to a previous interruption or because you haven't patched recently.
+

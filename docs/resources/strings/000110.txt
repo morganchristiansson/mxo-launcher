@@ -1,0 +1,4 @@
+# String ID: 0110
+# Content:
+This column Indicates the current load on the server.
+You may want to select a server with a lower load.

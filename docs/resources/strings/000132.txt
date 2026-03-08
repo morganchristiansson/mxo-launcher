@@ -1,0 +1,3 @@
+# String ID: 0132
+# Content:
+The character could not be deleted.  A deletion of this character is already in progress.

@@ -1,0 +1,3 @@
+# String ID: 0133
+# Content:
+The character could not be deleted.  This character is in use according to the Object Server supervisor.

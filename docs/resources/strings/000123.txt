@@ -1,0 +1,3 @@
+# String ID: 0123
+# Content:
+The character could not be deleted.  This account is already in use.

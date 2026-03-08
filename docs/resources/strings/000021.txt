@@ -1,0 +1,5 @@
+# String ID: 0021
+# Content:
+Patch system error (result code %i):
+
+%s

@@ -1,0 +1,3 @@
+# String ID: 0028
+# Content:
+Your account has been disabled. For additional account information, click on the Account button.

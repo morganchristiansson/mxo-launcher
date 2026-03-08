@@ -1,0 +1,3 @@
+# String ID: 0018
+# Content:
+patchctl DLL version is too old: %i  (Version %i or later is required.)

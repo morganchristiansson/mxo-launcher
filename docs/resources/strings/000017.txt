@@ -1,0 +1,3 @@
+# String ID: 0017
+# Content:
+Incompatible client version. Please quit, restart, and retry with "Full System Check." If problem persists, click on the Support button.

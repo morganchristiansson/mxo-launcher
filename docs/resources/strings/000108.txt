@@ -1,0 +1,4 @@
+# String ID: 0108
+# Content:
+This column indicates your character's
+name on this server.

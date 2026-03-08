@@ -1,0 +1,3 @@
+# String ID: 0127
+# Content:
+The character could not be deleted.  The login servers were unable to validate your session.

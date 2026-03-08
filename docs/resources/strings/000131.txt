@@ -1,0 +1,6 @@
+# String ID: 0131
+# Content:
+
+The LaunchPad server has rejected your new PIN. (Invalid format?)
+Please log in again entering ONLY a new PIN in the password field.
+(Do not include a passcode.)

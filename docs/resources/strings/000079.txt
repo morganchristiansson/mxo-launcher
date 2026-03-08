@@ -1,0 +1,3 @@
+# String ID: 0079
+# Content:
+Launcher clone could not be started.  GetLastError() returned error code %d.

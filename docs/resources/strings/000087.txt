@@ -1,0 +1,3 @@
+# String ID: 0087
+# Content:
+Patching v%s: %4.1fMB, %d Files...

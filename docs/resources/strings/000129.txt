@@ -1,0 +1,6 @@
+# String ID: 0129
+# Content:
+
+The LaunchPad server wants you to input a new secure PIN.
+Please log in again entering ONLY a new PIN in the password field.
+(Do not include a passcode.)

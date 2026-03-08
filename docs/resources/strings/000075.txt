@@ -1,0 +1,7 @@
+# String ID: 0075
+# Content:
+An error occured while running %s.
+
+%s
+
+The application is now shutting down.

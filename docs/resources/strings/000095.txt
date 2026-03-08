@@ -1,0 +1,3 @@
+# String ID: 0095
+# Content:
+Game patch required. Patching process initiated...

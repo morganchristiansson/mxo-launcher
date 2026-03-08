@@ -1,0 +1,3 @@
+# String ID: 0078
+# Content:
+patching (%i%%)	: %s

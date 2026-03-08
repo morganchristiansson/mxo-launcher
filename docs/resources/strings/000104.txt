@@ -1,0 +1,6 @@
+# String ID: 0104
+# Content:
+When enabled, the patching system will validate all patched
+system files. Only enable this check if you suspect that
+some of your files have been compromised as it can take
+significantly longer to run.

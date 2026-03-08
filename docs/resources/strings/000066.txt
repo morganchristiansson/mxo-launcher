@@ -1,0 +1,3 @@
+# String ID: 0066
+# Content:
+Error: Could not find version or version is invalid. Check your starting directory.

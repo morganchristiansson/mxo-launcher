@@ -1,0 +1,3 @@
+# String ID: 0119
+# Content:
+The client has already authenticated. Click on the Support button for additional assistance.

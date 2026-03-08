@@ -1,0 +1,3 @@
+# String ID: 0120
+# Content:
+Auth server's public key is invalid. Please quit, restart, and retry with "Full System Check." If problem persists, click on the Support button.

@@ -1,0 +1,3 @@
+# String ID: 0064
+# Content:
+Number of files to patch: %i.

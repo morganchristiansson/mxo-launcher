@@ -1,0 +1,3 @@
+# String ID: 0029
+# Content:
+Unable to delete %s from disk.  To completely erase your character, please remove this directory manually.

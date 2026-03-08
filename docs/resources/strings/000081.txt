@@ -1,0 +1,3 @@
+# String ID: 0081
+# Content:
+The character could not be deleted due to server error %s.

@@ -1,0 +1,5 @@
+# String ID: 0130
+# Content:
+
+The LaunchPad server has accepted your new PIN.
+Log on again using the new PIN and a secure passcode normally.

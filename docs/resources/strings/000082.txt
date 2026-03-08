@@ -1,0 +1,3 @@
+# String ID: 0082
+# Content:
+Auth server inaccessible. Check your Internet connection and try again. Auth servers may also be unavailable or restarting.

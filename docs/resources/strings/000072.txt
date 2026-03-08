@@ -1,0 +1,4 @@
+# String ID: 0072
+# Content:
+The file %s could not be found, or an error occured while loading it!
+The application is now shutting down.

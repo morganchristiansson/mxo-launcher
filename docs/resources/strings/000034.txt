@@ -1,0 +1,3 @@
+# String ID: 0034
+# Content:
+scan (100%)    	: %s

@@ -1,0 +1,7 @@
+# String ID: 0026
+# Content:
+An error has occurred while connecting to the patch download server.
+
+%s
+
+Keep retrying?

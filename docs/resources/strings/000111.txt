@@ -1,0 +1,3 @@
+# String ID: 0111
+# Content:
+Please run the game by using %s. Running %s directly or using -clone is deprecated. Multiple instances are now supported without using -clone.

@@ -1,0 +1,5 @@
+# String ID: 0030
+# Content:
+A new version appears to be available.
+
+Restart required.

@@ -1,0 +1,3 @@
+# String ID: 0113
+# Content:
+You are attempting to use an Admin account from an invalid location.

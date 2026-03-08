@@ -1,0 +1,3 @@
+# String ID: 0107
+# Content:
+Percentage of files patched.

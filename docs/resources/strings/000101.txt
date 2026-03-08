@@ -1,0 +1,3 @@
+# String ID: 0101
+# Content:
+View account details in your web browser.

@@ -1,0 +1,13 @@
+# String ID: 0109
+# Content:
+This column indicates the current status of the server:
+  Open : Server is currently open for play.
+  Closed: Server is running, but is currently closed.
+  Full: Server has reached max capacity, try back later.
+  Down: Server is currently down, try back later.
+  Admins Only: Only administrators are allowed in at this time.
+  Banned: Your character is banned from the server.
+  Char In Transit: Your character is being transfered to another server
+     and is currently locked.
+  Char Incomplete: Your character is in an incomplete state, you may
+     delete and re-create.

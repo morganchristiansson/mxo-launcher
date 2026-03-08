@@ -1,0 +1,3 @@
+# String ID: 0032
+# Content:
+scanning...    	: %s

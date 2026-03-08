@@ -1,0 +1,3 @@
+# String ID: 0008
+# Content:
+Deleted characters cannot be recovered.  Are you certain you wish to delete the character '%s'?

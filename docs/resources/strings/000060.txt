@@ -1,0 +1,3 @@
+# String ID: 0060
+# Content:
+Received unexpected result code from patcher (%i).

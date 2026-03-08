@@ -1,0 +1,3 @@
+# String ID: 0065
+# Content:
+Matrix server is version %s

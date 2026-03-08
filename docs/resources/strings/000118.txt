@@ -1,0 +1,3 @@
+# String ID: 0118
+# Content:
+SecurID support disabled, probable auth server error. Contact Technical Operations.

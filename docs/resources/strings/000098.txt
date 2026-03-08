@@ -1,0 +1,3 @@
+# String ID: 0098
+# Content:
+Create a new character on this server.

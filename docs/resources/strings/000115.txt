@@ -1,0 +1,3 @@
+# String ID: 0115
+# Content:
+Your SecurID tokencode was missing or invalid. Enter as <password>/<SecurID tokencode> (Ex: p@ssw0rd/123456). If this persists, contact Technical Operations.

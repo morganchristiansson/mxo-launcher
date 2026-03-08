@@ -1,0 +1,3 @@
+# String ID: 0102
+# Content:
+Open support site in your web browser.

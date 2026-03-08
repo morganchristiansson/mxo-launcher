@@ -1,0 +1,3 @@
+# String ID: 0013
+# Content:
+Error: Could not initialize internet connection.  You must be connected to the internet to play.  The application will now close.

@@ -1,0 +1,3 @@
+# String ID: 0009
+# Content:
+Your client has successfully patched however the server is not open for play or new character creation.

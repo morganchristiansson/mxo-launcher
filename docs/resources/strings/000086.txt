@@ -1,0 +1,3 @@
+# String ID: 0086
+# Content:
+System update failure - Restart required...

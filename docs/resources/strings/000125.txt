@@ -1,0 +1,3 @@
+# String ID: 0125
+# Content:
+Your username or password is incorrect. *CAPS LOCK* is on, remember that passwords are case-sensitive.  Please try again. If the error persists, please click the “Support” button below.

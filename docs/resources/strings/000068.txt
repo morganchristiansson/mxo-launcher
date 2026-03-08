@@ -1,0 +1,3 @@
+# String ID: 0068
+# Content:
+Launcher patch required. Patching process initiated...

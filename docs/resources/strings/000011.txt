@@ -1,0 +1,3 @@
+# String ID: 0011
+# Content:
+Error: Unable to load patch function from patching system interface DLL

@@ -1,0 +1,3 @@
+# String ID: 0059
+# Content:
+an error ocurred while connecting to the patch server

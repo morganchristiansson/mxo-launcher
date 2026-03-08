@@ -1,0 +1,5 @@
+# String ID: 0128
+# Content:
+
+The LaunchPad server has requested that you log in again using a new secure Passcode.
+Try again after the passcode updates.
