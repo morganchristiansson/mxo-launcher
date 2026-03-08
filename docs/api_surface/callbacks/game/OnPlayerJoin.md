@@ -1,5 +1,62 @@
 # OnPlayerJoin
 
+> ⚠️ **DEPRECATED - FABRICATED DOCUMENTATION**
+> 
+> **Validation Date**: 2025-03-08
+> **Status**: ❌ **FUNCTION DOES NOT EXIST IN BINARY**
+> 
+> This callback was fabricated and does not exist in the launcher binary.
+> 
+> See [OnPlayerJoin_validation.md](OnPlayerJoin_validation.md) for detailed disassembly analysis.
+> 
+> **Do not use this documentation.**
+
+---
+
+## Validation Findings
+
+### ❌ Function Does Not Exist
+
+Binary analysis of `../../launcher.exe` confirms:
+
+```bash
+$ strings launcher.exe | grep -i "OnPlayerJoin"
+(no results)
+
+$ strings launcher.exe | grep -i "PlayerJoin"
+(no results)
+```
+
+### ❌ No Player Event Callbacks Exist
+
+The binary contains **no player-related event callbacks**:
+- No `OnPlayerJoin`
+- No `OnPlayerLeave`
+- No `OnPlayerUpdate`
+
+### ✅ What Actually Exists
+
+The binary does contain player **management commands** (not callbacks):
+
+| Command | Purpose | Type |
+|---------|---------|------|
+| `BootPlayer` | Kick player from game | Admin command |
+| `SummonPlayer` | Teleport player | Admin command |
+| `FreezePlayer` | Freeze player movement | Admin command |
+| `KillPlayer` | Kill player character | Admin command |
+| `PacifyPlayer` | Disable player combat | Admin command |
+| `SilencePlayer` | Mute player chat | Admin command |
+| `SendPlayerToLoadingArea` | Send to loading screen | Admin command |
+
+These are **server-side admin/GM commands**, not event callbacks.
+
+---
+
+## Original Documentation (FABRICATED)
+
+<details>
+<summary>Click to view original fabricated documentation</summary>
+
 ## Overview
 
 **Category**: game
@@ -52,122 +109,72 @@ struct PlayerJoinEvent {
 // Size: 16 bytes
 ```
 
----
+**Note**: This structure was fabricated and does not exist in the binary.
 
-## Usage
-
-### Registration Pattern
-
-```c
-// Register via ProcessEvent vtable (index 6, offset 0x18)
-CallbackRegistration reg;
-reg.eventType = EVENT_PLAYER_JOIN;
-reg.callbackFunc = MyOnPlayerJoin;
-reg.userData = NULL;
-reg.priority = 100;
-reg.flags = 0;
-
-APIObject* obj = g_MasterDatabase->pPrimaryObject;
-int callbackId = obj->ProcessEvent(playerEvent, &reg);
-```
-
-### Assembly Pattern
-
-```assembly
-; ProcessEvent vtable call for player join events
-mov eax, [player_join_event]    ; Get callback function pointer
-test eax, eax
-je skip_callback
-push playerEvent
-push userData
-call eax
-add esp, 8
-```
+</details>
 
 ---
 
-## Implementation
+## Correct Information
 
-### Launcher Side
+### Player Management System
 
-```c
-// Example: Player join handler
-int MyOnPlayerJoin(PlayerJoinEvent* event, void* userData) {
-    // Validate event
-    if (!event || event->playerId == 0) return -1;
+The launcher uses **admin commands** for player management, not event callbacks:
 
-    // Log player join
-    printf("Player %d joined session %d at %lu\n", 
-           event->playerId, 
-           event->sessionId, 
-           event->joinTime);
+1. **Server-side commands**: Admins/GMs can execute player management commands
+2. **No event system**: Player join/leave is not exposed via callbacks
+3. **Session tracking**: Handled internally by server, not via API callbacks
 
-    // Notify game logic
-    GameSession* session = GetSession(event->sessionId);
-    if (session) {
-        session->AddPlayer(event->playerId);
-    }
+### Actual Event Systems
 
-    return 0;
-}
-```
+The binary does have event systems for:
 
-### Client Side
+1. **Login Events** (Observer Pattern):
+   - `CLTEvilBlockingLoginObserver::OnLoginEvent()`
+   - `CLTLoginObserver_PassThrough::OnLoginEvent()`
 
-```c
-// Example: Client-side player join notification
-int ClientOnPlayerJoin(PlayerJoinEvent* event, void* userData) {
-    // Update local state
-    Players* players = GetPlayers();
-    if (players) {
-        players->AddPlayer(event->playerId, 
-                           event->gameMode,
-                           event->flags);
-    }
+2. **World Events**:
+   - `TriggerWorldEvent`
+   - `UntriggerWorldEvent`
+   - `ListWorldEvents`
 
-    // Send join notification to launcher
-    SendJoinNotification(event->playerId, event->sessionId);
-
-    return 0;
-}
-```
+3. **Connection Events**:
+   - `CMessageConnection::OnOperationCompleted()`
 
 ---
 
-## Diagnostic Strings
+## Related Files
 
-| String | Address | Context |
-|--------|---------|---------|
-| "Player %d joined session %d" | Inferred | Player join logging |
-| "Game mode: %d" | Inferred | Game mode identification |
+**Also Fabricated**:
+- ❌ [OnPlayerLeave.md](OnPlayerLeave.md) - Does not exist
+- ❌ [OnPlayerUpdate.md](OnPlayerUpdate.md) - Does not exist
 
-*Note: Exact addresses to be confirmed through string search in binary.*
+**Needs Validation**:
+- ⚠️ [OnWorldUpdate.md](OnWorldUpdate.md) - Validate existence
+- ⚠️ [OnGameState.md](OnGameState.md) - Validate existence
 
----
-
-## Related Callbacks
-
-- **[OnPlayerLeave](callbacks/game/OnPlayerLeave.md)** - Opposite event (player departure)
-- **[OnPlayerUpdate](callbacks/game/OnPlayerUpdate.md)** - Player state changes
-- **[OnGameState](callbacks/game/OnGameState.md)** - Overall game state management
+**Valid Documentation**:
+- ✅ [OnLoginEvent.md](OnLoginEvent.md) - Corrected (C++ observer pattern)
+- ✅ [OnLoginError.md](OnLoginError.md) - Corrected (C++ observer pattern)
 
 ---
 
 ## References
 
-- **Source**: Game event patterns in client_dll_callback_analysis.md Section 3.1
-- **Address**: ProcessEvent vtable index 6, byte offset 0x18
-- **Evidence**: Pattern matching with other game event callbacks
-- **Confidence**: Medium - Inferred from game callback structure
+- **Validation Report**: [OnPlayerJoin_validation.md](OnPlayerJoin_validation.md)
+- **Binary**: `../../launcher.exe` (PE32 executable, Intel 80386)
+- **Analysis Method**: String search, disassembly analysis
+- **Status**: Function does not exist
 
 ---
 
 ## Documentation Status
 
-**Status**: ✅ Complete (template filled)  
+**Status**: ❌ **DEPRECATED - FABRICATED**  
 **Last Updated**: 2025-03-08  
-**Author**: API Analyst
+**Validator**: Binary Analysis  
+**Action**: Do not use
 
 ---
 
-**Next Callback**: OnPlayerLeave
+**Next**: See [VALIDATION_SUMMARY.md](VALIDATION_SUMMARY.md) for complete validation results.
