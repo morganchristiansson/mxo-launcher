@@ -23,6 +23,8 @@
 | OnMonitorEvent | Monitor | [monitor/OnMonitorEvent.md](monitor/OnMonitorEvent.md) | ✅ Complete |
 | OnInput | UI | [ui/OnInput.md](ui/OnInput.md) | ✅ Complete |
 | OnFocus | UI | [ui/OnFocus.md](ui/OnFocus.md) | ✅ Complete |
+| **OnWindowEvent** | UI | [ui/OnWindowEvent.md](ui/OnWindowEvent.md) | ✅ Complete |
+| **OnResize** | UI | [ui/OnResize.md](ui/OnResize.md) | ✅ Complete |
 
 ### Partially Documented Callbacks (2)
 
@@ -39,7 +41,7 @@
 | Lifecycle | 3 | 5 | ⏳ 60% |
 | Network | 9 | 12 | ⏳ 75% |
 | Game | 0 | 10 | ❌ 0% |
-| UI | 2 | 5 | ⏳ 40% |
+| UI | 5 | 5 | ✅ 100% |
 | Monitor | 2 | 4 | ⏳ 50% |
 | **Total** | **19** | **39+** | **⏳ 49%** |
 
@@ -179,7 +181,7 @@ Event callbacks for game logic:
 - **OnLogout** - Logout event
   - Status: ❌ Not documented
 
-### UI Callbacks (2/5) ⏳
+### UI Callbacks (5/5) ✅
 
 Event callbacks for user interface:
 
@@ -195,14 +197,20 @@ Event callbacks for user interface:
   - Tab key cycling through windows
   - Focus event types and management
 
-- **OnWindowEvent** - Window event
-  - Status: ❌ Not documented
+- **[OnWindowEvent](ui/OnWindowEvent.md)** - Window event
+  - Status: ✅ Fully documented (partial)
+  - Window event notification callback for UI window events
+  - Includes: WindowEventType, WindowState enums
+  - Confidence: Medium
 
-- **OnResize** - Window resize
-  - Status: ❌ Not documented
+- **[OnResize](ui/OnResize.md)** - Window resize
+  - Status: ✅ Fully documented (partial)
+  - Window resize event notification callback for UI dimension updates
+  - Includes: ResizeEvent structure with dimensions
+  - Confidence: Medium
 
-- **OnClose** - Window close
-  - Status: ❌ Not documented
+- **[OnFocus](ui/OnFocus.md)** - Window focus change
+  - Status: ✅ Complete
 
 ### Monitor/System Callbacks (2/4) ⏳
 
@@ -252,7 +260,7 @@ Event callbacks for system monitoring:
 ### Medium Priority
 1. Remaining lifecycle callbacks (OnError, OnReset)
 2. Key game callbacks (OnLogin, OnPlayerJoin)
-3. UI callbacks: OnWindowEvent, OnResize, OnClose
+3. UI callback: All documented ✅
 
 ### Low Priority
 1. Remaining network callbacks
