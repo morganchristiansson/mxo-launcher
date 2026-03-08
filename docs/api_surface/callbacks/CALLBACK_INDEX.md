@@ -224,20 +224,21 @@ Event callbacks for user interface:
 
 Event callbacks for system monitoring:
 
-- **[OnDeleteCallback](monitor/OnDeleteCallback.md)** - Callback deletion
+- **[OnCapsValidation](monitor/OnCapsValidation.md)** - Capability validation
   - Status: ✅ Fully documented
-  - String: "Delete callback - ID %d\n" (0x6289f21c)
+  - Purpose: Validate capability bits passed to callback
 
-- **[OnMonitorEvent](monitor/OnMonitorEvent.md)** - Monitor event
+- **OnDeleteCallback** - Callback deletion notification
   - Status: ✅ Fully documented
-  - Related to distributed monitor system
-  - Complete structures, usage examples, and references
+  - Purpose: Callback cleanup and removal
 
-- **OnCapsValidation** - Capability validation
-  - Status: ❌ Not documented
-  - String: "One or more of the caps bits passed to the callback are incorrect." (0x6293f630)
+- **[OnDistributeMonitor](monitor/OnDistributeMonitor.md)** - Distributed monitor state
+  - Status: ✅ Fully documented
+  - String: "Delete callback for distribute monitor id %d\n" (0x6289f580)
 
----
+- **OnMonitorEvent** - General monitor event notification
+  - Status: ✅ Fully documented
+  - String: "Delete callback for distribute monitor id %d\n" (0x6289f580)
 
 ## VTable Quick Reference
 
