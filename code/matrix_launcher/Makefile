@@ -18,7 +18,7 @@ all: $(TARGET)
 # Produces a proper win32 console executable for Wine compatibility
 $(TARGET): $(SRC)
 	$(CXX) -O2 -static -o $(TARGET) $(SRC) \
-		-Wl,--subsystem,console
+		-static -mwindows
 # Clean build artifacts
 clean:
 	rm -f $(TARGET)

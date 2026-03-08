@@ -1,76 +1,73 @@
 /**
- * Matrix Online Launcher - Proof of Concept
- * 
- * A Windows executable launcher that loads external client.dll.
- * Built for cross-compilation from Linux using MinGW-w64.
+ * Matrix Online Launcher - Improved POC
+ * Cross-compile from Linux: x86_64-w64-mingw32-g++ -o launcher.exe launcher.cpp -static -mwindows
  */
 
-#include <iostream>
 #include <windows.h>
+#include <iostream>
+#include <string>
 
-/**
- * Load and execute external client.dll.
- * 
- * @param dllPath Path to the client DLL (relative or absolute)
- * @return true if DLL loaded successfully, false otherwise
- */
-bool LoadClientDll(const char* dllPath)
-{
-    // Convert path to wide string for Windows API
-    wchar_t widePath[4096];
-    int len = MultiByteToWideChar(CP_UTF8, 0, dllPath, -1, widePath, sizeof(widePath) / sizeof(wchar_t));
-    if (len == 0)
-        return false;
-    
-    // Load the external DLL using standard Windows API
-    HMODULE hClient = LoadLibraryW(widePath);
-    if (!hClient)
-    {
-        std::cout << "Failed to load client.dll: " << dllPath << std::endl;
-        return false;
-    }
-    
-    std::cout << "Successfully loaded client.dll" << std::endl;
-    
-    // Call the DLL's main function if available
-    // The client.dll should export a function named "DllMain"
-    typedef BOOL (__stdcall *DllMain_t)(HMODULE, DWORD, LPVOID);
-    DllMain_t pDllMain = (DllMain_t)GetProcAddress(hClient, "DllMain");
-    
-    if (pDllMain)
-    {
-        std::cout << "Found DllMain function in client.dll" << std::endl;
-        // Execute the DLL's main function
-        pDllMain(hClient, DLL_PROCESS_ATTACH, nullptr);
-    }
-    
-    // Free the DLL when done
-    FreeLibrary(hClient);
-    return true;
+bool AddDllSearchPath(const wchar_t* subfolder) {
+    wchar_t exePath[MAX_PATH];
+    if (GetModuleFileNameW(NULL, exePath, MAX_PATH) == 0) return false;
+
+    std::wstring dir = exePath;
+    size_t pos = dir.find_last_of(L"\\/");
+    if (pos == std::wstring::npos) return false;
+    dir = dir.substr(0, pos);
+
+    std::wstring fullPath = dir + L"\\" + subfolder;
+    return SetDllDirectoryW(fullPath.c_str()) != 0;  // or use AddDllDirectory
 }
 
-/**
- * Main entry point for the launcher.
- */
-int main(int argc, char* argv[])
-{
-    std::cout << "=========================================" << std::endl;
-    std::cout << "Matrix Online Launcher" << std::endl;
-    std::cout << "Version: 1.0.0" << std::endl;
-    std::cout << "=========================================" << std::endl;
-    
-    std::cout << "\nLoading external client.dll..." << std::endl;
-    
-    // Load the client.dll from the current directory
-    if (!LoadClientDll("client.dll"))
-    {
-        std::cout << "Failed to load client.dll. Exiting." << std::endl;
+int main(int argc, char* argv[]) {
+    std::cout << "Matrix Online Launcher POC\n";
+
+    // 1. Add p_dlls to DLL search path (critical!)
+    if (!AddDllSearchPath(L"p_dlls")) {
+        std::cerr << "Warning: Failed to add p_dlls to search path\n";
+        // continue anyway — may still work if deps are elsewhere
+    }
+
+    // 2. Load client.dll
+    HMODULE hClient = LoadLibraryW(L"client.dll");
+    if (!hClient) {
+        DWORD err = GetLastError();
+        std::cerr << "LoadLibrary failed: " << err << " (0x" << std::hex << err << ")\n";
         return 1;
     }
-    
-    std::cout << "=========================================" << std::endl;
-    std::cout << "Matrix Online Launcher completed." << std::endl;
-    std::cout << "=========================================" << std::endl;
-    
+    std::cout << "client.dll loaded successfully\n";
+
+    // 3. Get the real entry points (from MxOemu forum knowledge)
+    using InitClientDLL_t   = void (*)(void* /* interface1 */, void* /* interface2 */, ... /* many more */);
+    using RunClientDLL_t    = void (*)();
+    using TermClientDLL_t   = void (*)();
+
+    auto pInit = (InitClientDLL_t)  GetProcAddress(hClient, "InitClientDLL");
+    auto pRun  = (RunClientDLL_t)   GetProcAddress(hClient, "RunClientDLL");
+    auto pTerm = (TermClientDLL_t)  GetProcAddress(hClient, "TermClientDLL");
+
+    if (!pInit || !pRun) {
+        std::cerr << "Missing required exports (InitClientDLL / RunClientDLL)\n";
+        FreeLibrary(hClient);
+        return 1;
+    }
+
+    std::cout << "Found InitClientDLL and RunClientDLL\n";
+
+    // 4. Call Init (with dummies — will crash until you RE the real params!)
+    std::cout << "Calling InitClientDLL (dummy pointers)...\n";
+    pInit(nullptr, nullptr /* placeholder — crash expected here until RE */);
+
+    // 5. Run the game loop
+    std::cout << "Entering RunClientDLL (game should appear)...\n";
+    pRun();  // This should block until game exit
+
+    // 6. Cleanup
+    std::cout << "Game exited — calling TermClientDLL\n";
+    if (pTerm) pTerm();
+
+    FreeLibrary(hClient);
+    std::cout << "Done.\n";
     return 0;
 }
