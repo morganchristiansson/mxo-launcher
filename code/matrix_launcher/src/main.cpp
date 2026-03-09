@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <iostream>
 #include <string>
+#include "dll_deployer.h"
 
 bool AddDllSearchPath(const wchar_t* subfolder) {
     wchar_t exePath[MAX_PATH];
@@ -29,7 +30,18 @@ int main(int argc, char* argv[]) {
         // continue anyway — may still work if deps are elsewhere
     }
 
-    // 2. Load client.dll
+    // 2. Deploy DLLs from p_dlls/ to game root
+    std::cout << "Deploying DLLs...\n";
+    int deployed = deploy_standard_dlls();
+    if (deployed == 3) {
+        std::cout << "All DLLs deployed successfully\n";
+    } else if (deployed > 0) {
+        std::cout << "Some DLLs deployed, some failed\n";
+    } else {
+        std::cerr << "DLL deployment failed!\n";
+    }
+
+    // 3. Load client.dll
     HMODULE hClient = LoadLibraryW(L"client.dll");
     if (!hClient) {
         DWORD err = GetLastError();

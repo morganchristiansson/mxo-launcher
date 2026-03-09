@@ -7,7 +7,10 @@ CXX = i686-w64-mingw32-g++
 # Project name
 TARGET_DIR = ~/MxO_7.6005
 TARGET = $(TARGET_DIR)/resurrections.exe
-SRC = src/main.cpp
+SRC = src/main.cpp src/dll_deployer.c
+
+# Include path for header files
+INCLUDE = -Iinclude
 
 # Default target
 all: $(TARGET)
@@ -17,7 +20,7 @@ all: $(TARGET)
 # -Wl,--subsystem,console: Pure console application (no GUI)
 # Produces a proper win32 console executable for Wine compatibility
 $(TARGET): $(SRC)
-	$(CXX) -O2 -static -o $(TARGET) $(SRC) \
+	$(CXX) -O2 $(INCLUDE) -static -o $(TARGET) $(SRC) \
 		-static -mwindows
 # Clean build artifacts
 clean:
@@ -31,6 +34,6 @@ debug: $(TARGET)
 # Run with Wine (if available)
 run: $(TARGET)
 	@echo "Running with Wine..."
-	cd $(TARGET_DIR) && wine $(TARGET)
+	cd $(TARGET_DIR) && xvfb-run wine $(TARGET)
 
 .PHONY: all clean debug run-wine
