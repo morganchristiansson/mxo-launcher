@@ -16,12 +16,10 @@ INCLUDE = -Iinclude
 all: $(TARGET)
 
 # Build the executable
-# -static: Static linking (includes all dependencies)
-# -Wl,--subsystem,console: Pure console application (no GUI)
-# Produces a proper win32 console executable for Wine compatibility
+# Note: We DON'T use -static because the original launcher uses MSVCR71.dll
+# and the C runtime needs to be shared with client.dll
 $(TARGET): $(SRC)
-	$(CXX) -O2 $(INCLUDE) -static -o $(TARGET) $(SRC) \
-		-static -mwindows
+	$(CXX) -O2 $(INCLUDE) -o $(TARGET) $(SRC) -mwindows
 # Clean build artifacts
 clean:
 	rm -f $(TARGET)
