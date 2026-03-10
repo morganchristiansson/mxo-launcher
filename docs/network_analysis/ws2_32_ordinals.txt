@@ -1,0 +1,29 @@
+# WS2_32.dll Ordinal to Function Name Mapping
+# Based on Windows Sockets 2 API
+
+Ordinal 1   = bind
+Ordinal 2   = closesocket
+Ordinal 3   = connect
+Ordinal 4   = getpeername
+Ordinal 6   = getsockname
+Ordinal 7   = getsockopt
+Ordinal 8   = htonl
+Ordinal 9   = htons
+Ordinal 10  = inet_addr
+Ordinal 11  = inet_ntoa
+Ordinal 12  = ioctlsocket
+Ordinal 13  = listen
+Ordinal 15  = ntohl
+Ordinal 16  = ntohs
+Ordinal 17  = recv
+Ordinal 18  = recvfrom
+Ordinal 19  = select
+Ordinal 20  = send
+Ordinal 21  = sendto
+Ordinal 22  = setsockopt
+Ordinal 23  = shutdown
+Ordinal 52  = gethostbyname
+Ordinal 111 = WSACleanup
+Ordinal 115 = WSAStartup
+Ordinal 116 = WSAGetLastError
+Ordinal 151 = WSASocketA
