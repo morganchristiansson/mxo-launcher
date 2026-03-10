@@ -68,7 +68,8 @@ typedef uint32_t (__thiscall *GetApplicationStateFunc)(APIObject* obj);
 
 typedef void (*ErrorClientDLL_t)(const char* message, int severity);
 typedef int (*InitClientDLL_t)(void* param1, void* param2, void* param3, 
-                                void* param4, void* param5, void* param6);
+                                void* param4, void* param5, int param6, 
+                                int param7, void* param8);
 typedef void (*RunClientDLL_t)(void);
 typedef void (*SetMasterDatabase_t)(void* pMasterDatabase);
 typedef void (*TermClientDLL_t)(void);
