@@ -68,25 +68,29 @@ int main(int argc, char* argv[]) {
     // Check dependencies first
     check_dependencies();
 
-    // 0. Pre-load MSVCR71.dll and MFC71.dll to initialize their state
-    // client.dll's DllMain calls malloc() from MSVCR71.dll, which needs the heap initialized
-    // The original launcher links to both, so we need to load them in the right order
-    std::cout << "\n=== Pre-loading runtime DLLs ===\n";
+    // 0. Pre-load ALL dependencies before client.dll
+    // This prevents hangs during client.dll's DllMain
+    std::cout << "\n=== Pre-loading all dependencies ===\n";
     
-    HMODULE hMfc71 = LoadLibraryA("MFC71.dll");
-    if (hMfc71) {
-        std::cout << "MFC71.dll loaded at: " << hMfc71 << "\n";
-    } else {
-        std::cerr << "Warning: Could not load MFC71.dll (error " << GetLastError() << ")\n";
-    }
+    const char* preload_dlls[] = {
+        "MFC71.dll",
+        "MSVCR71.dll",
+        "dbghelp.dll",
+        "r3d9.dll",
+        "binkw32.dll",
+        "pythonMXO.dll",
+        "dllMediaPlayer.dll",
+        "dllWebBrowser.dll",
+        NULL
+    };
     
-    HMODULE hMsvcr71 = LoadLibraryA("MSVCR71.dll");
-    if (hMsvcr71) {
-        std::cout << "MSVCR71.dll loaded at: " << hMsvcr71 << "\n";
-    } else {
-        std::cerr << "ERROR: Could not load MSVCR71.dll (error " << GetLastError() << ")\n";
-        std::cerr << "client.dll requires MSVCR71.dll for malloc() in DllMain!\n";
-        return 1;
+    for (int i = 0; preload_dlls[i]; i++) {
+        HMODULE h = LoadLibraryA(preload_dlls[i]);
+        if (h) {
+            std::cout << "  " << preload_dlls[i] << " loaded at: " << h << "\n";
+        } else {
+            std::cerr << "  WARNING: Could not load " << preload_dlls[i] << " (error " << GetLastError() << ")\n";
+        }
     }
 
     // 1. Deploy DLLs from p_dlls/ to game root (matches original launcher behavior)
@@ -103,53 +107,20 @@ int main(int argc, char* argv[]) {
     // 2. Load client.dll with detailed debugging
     std::cout << "\n=== Loading client.dll ===\n";
 
-    // Debug: Check what malloc resolves to in the process
-    typedef void* (*malloc_t)(size_t);
-    malloc_t pMalloc = (malloc_t)GetProcAddress(hMsvcr71, "malloc");
-    std::cout << "malloc from MSVCR71.dll: " << (void*)pMalloc << "\n";
-
-    // Try a test malloc to see if the heap is working
-    if (pMalloc) {
-        void* test = pMalloc(128);
-        std::cout << "Test malloc(128): " << test << "\n";
-        if (test) {
-            typedef void (*free_t)(void*);
-            free_t pFree = (free_t)GetProcAddress(hMsvcr71, "free");
-            if (pFree) pFree(test);
-        } else {
-            std::cerr << "WARNING: malloc(128) returned NULL! Heap may not be initialized.\n";
-        }
-    }
-
-    // Load with LOAD_LIBRARY_AS_DATAFILE first to check base address
-    HMODULE hClientData = LoadLibraryExW(L"client.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
-    if (hClientData) {
-        std::cout << "LOAD_LIBRARY_AS_DATAFILE: " << hClientData << "\n";
-        // The actual load address is the low 32 bits
-        HMODULE actualBase = (HMODULE)((DWORD_PTR)hClientData & 0x7FFFFFFF);
-        std::cout << "Actual base address: " << actualBase << "\n";
-        std::cout << "Expected base: 0x62000000\n";
-        if ((DWORD_PTR)actualBase != 0x62000000) {
-            std::cout << "DLL was relocated from preferred base!\n";
-        }
-        FreeLibrary(hClientData);
-    }
-
-    // Now try normal load
-    std::cout << "\nCalling LoadLibraryW...\n";
-
-    // Debug: Check the IAT entry for malloc before loading client.dll
-    // This is what client.dll's DllMain will call
-    typedef void* (*malloc_t)(size_t);
-    malloc_t clientMalloc = (malloc_t)GetProcAddress(hMsvcr71, "malloc");
-    std::cout << "MSVCR71 malloc address: " << (void*)clientMalloc << "\n";
+    // Now load client.dll (should work after pre-loading dependencies)
+    std::cout << "\n=== ATTEMPTING LoadLibraryW(\"client.dll\") ===\n";
+    std::cout << "This is where client.dll's DllMain will execute...\n";
+    std::cout.flush();
 
     HMODULE hClient = LoadLibraryW(L"client.dll");
+    
+    std::cout << "=== LoadLibraryW RETURNED: " << (hClient ? "SUCCESS" : "FAILED") << " ===\n";
+    std::cout.flush();
+    
     if (!hClient) {
         DWORD err = GetLastError();
         std::cerr << "LoadLibraryW failed with error: " << err << " (0x" << std::hex << err << ")\n";
 
-        // Decode common error codes
         switch (err) {
             case 126:
                 std::cerr << "ERROR 126: DLL or one of its dependencies not found.\n";
@@ -162,42 +133,20 @@ int main(int argc, char* argv[]) {
             case 1114:
                 std::cerr << "ERROR 1114: DllMain returned FALSE.\n";
                 std::cerr << "  -> DllMain initialization failed!\n";
-                std::cerr << "  -> The DLL loaded, but DllMain returned FALSE during PROCESS_ATTACH.\n";
                 break;
             case 193:
                 std::cerr << "ERROR 193: Bad EXE format.\n";
                 std::cerr << "  -> Wrong architecture (32-bit vs 64-bit)?\n";
                 break;
-            default:
-                break;
         }
 
         std::cerr << "\nTIP: Run from game directory: cd ~/MxO_7.6005 && wine launcher.exe\n";
-
-        // Try to get more info: can we load the DLL with DONT_RESOLVE_DLL_REFERENCES?
-        // This loads the DLL but doesn't call DllMain or resolve imports
-        std::cout << "\nAttempting diagnostic load (DONT_RESOLVE_DLL_REFERENCES)...\n";
-        HMODULE hClientNoResolve = LoadLibraryExW(L"client.dll", NULL, DONT_RESOLVE_DLL_REFERENCES);
-        if (hClientNoResolve) {
-            std::cout << "  DLL loaded at: " << hClientNoResolve << "\n";
-            std::cout << "  Expected base: 0x62000000\n";
-            if ((DWORD_PTR)hClientNoResolve != 0x62000000) {
-                std::cout << "  WARNING: DLL was relocated! (not at preferred base)\n";
-            }
-
-            // Check what's in the IAT for malloc (RVA 0x868278)
-            DWORD_PTR* pIatMalloc = (DWORD_PTR*)((char*)hClientNoResolve + 0x868278);
-            std::cout << "  IAT entry for malloc (RVA 0x868278): " << (void*)*pIatMalloc << "\n";
-            std::cout << "  (Should be 0 or a pointer to hint/name table before resolution)\n";
-
-            FreeLibrary(hClientNoResolve);
-        } else {
-            std::cerr << "  Even DONT_RESOLVE_DLL_REFERENCES failed: " << GetLastError() << "\n";
-        }
-
         return 1;
     }
+    std::cout << "=== LoadLibraryW SUCCESS ===\n";
     std::cout << "client.dll loaded at: " << hClient << "\n";
+    std::cout << "\n=== GETTING EXPORTS ===\n";
+    std::cout.flush();
 
     // 3. Get the real entry points (from MxOemu forum knowledge)
     using InitClientDLL_t   = void (*)(void* /* interface1 */, void* /* interface2 */, ... /* many more */);
@@ -207,24 +156,26 @@ int main(int argc, char* argv[]) {
     auto pInit = (InitClientDLL_t)  GetProcAddress(hClient, "InitClientDLL");
     auto pRun  = (RunClientDLL_t)   GetProcAddress(hClient, "RunClientDLL");
     auto pTerm = (TermClientDLL_t)  GetProcAddress(hClient, "TermClientDLL");
+    
+    std::cout << "InitClientDLL: " << (void*)pInit << "\n";
+    std::cout << "RunClientDLL: " << (void*)pRun << "\n";
+    std::cout << "TermClientDLL: " << (void*)pTerm << "\n";
+    std::cout.flush();
 
     if (!pInit || !pRun) {
-        std::cerr << "Missing required exports (InitClientDLL / RunClientDLL)\n";
+        std::cerr << "ERROR: Missing required exports (InitClientDLL / RunClientDLL)\n";
         FreeLibrary(hClient);
         return 1;
     }
 
-    std::cout << "Found InitClientDLL at: " << (void*)pInit << "\n";
-    std::cout << "Found RunClientDLL at: " << (void*)pRun << "\n";
-
-    // 4. Call Init (with dummies — will crash until you RE the real params!)
-    std::cout << "\n=== Calling InitClientDLL ===\n";
-    std::cout << "WARNING: Using dummy parameters - crash likely!\n";
+    std::cout << "\n=== CALLING InitClientDLL ===\n";
+    std::cout << "WARNING: Using dummy parameters - may crash!\n";
+    std::cout.flush();
     pInit(nullptr, nullptr /* placeholder — crash expected here until RE */);
 
-    // 5. Run the game loop
-    std::cout << "\n=== Entering RunClientDLL ===\n";
+    std::cout << "\n=== CALLING RunClientDLL ===\n";
     std::cout << "Game window should appear...\n";
+    std::cout.flush();
     pRun();  // This should block until game exit
 
     // 6. Cleanup
