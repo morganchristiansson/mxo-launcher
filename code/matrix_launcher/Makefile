@@ -20,9 +20,21 @@ all: $(TARGET)
 # and the C runtime needs to be shared with client.dll
 $(TARGET): $(SRC)
 	$(CXX) -O2 $(INCLUDE) -o $(TARGET) $(SRC) -mwindows
+
+# Build the proper launcher with master database support
+launcher_proper.exe: launcher_proper.cpp master_database.h
+	$(CXX) -Wall -Wextra -O2 -o $@ $< -Wl,--export-all-symbols
+
+# Build test executables
+test_mxowrap.exe: test_mxowrap.cpp
+	$(CXX) -Wall -Wextra -O2 -o $@ $<
+
+test_mxowrap_import.exe: test_mxowrap_import.cpp
+	$(CXX) -Wall -Wextra -O2 -o $@ $< -L~/MxO_7.6005 -lmxowrap
+
 # Clean build artifacts
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) launcher_proper.exe test_mxowrap.exe test_mxowrap_import.exe
 
 # Debug build (with symbols)
 debug: CXXFLAGS = -Wall -Wextra -g -DDEBUG
@@ -34,4 +46,4 @@ run: $(TARGET)
 	@echo "Running with Wine..."
 	cd $(TARGET_DIR) && xvfb-run wine $(TARGET)
 
-.PHONY: all clean debug run-wine
+.PHONY: all clean debug run launcher_proper.exe test_mxowrap.exe test_mxowrap_import.exe
