@@ -13,6 +13,12 @@ Its purpose is to reproduce the original startup behavior closely enough to laun
 - project notes: `AGENTS.md`
 - canonical docs: `../../docs/`
 
+Current runtime note:
+- for now, active progress runs use the hex-edited `~/MxO_7.6005/client.dll` variant that imports `dbghelp.dll`
+- backup copies are kept as `client.dll.original` and `client.dll.patched`
+- the original import-layout client still pulls us back into the old `mxowrap.dll` problem
+- this is a pragmatic progress choice, not the final faithful endpoint
+
 ## Current State
 
 The current scaffold already:
@@ -24,18 +30,24 @@ The current scaffold already:
 
 Current blocker:
 - launcher-owned startup state is still incomplete
-- faithful current result is `InitClientDLL = -7`
+- faithful current result is still blocked before a real original-equivalent startup
 
-Diagnostic-only forced runtime can still reproduce the known crash:
+Current practical progress path with patched client:
+- real-user `/home/morgan` runs now create a visible `MATRIX_ONLINE` window and proceed well past the old immediate mediator gate
+- current deep path reaches mediator calls at `+0x48`, `+0x4c`, `+0x170`, and `+0x124`
+- latest practical progress dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_2.dmp`
+- current crash no longer looks like a simple null-vtable call; latest dump lands at `EIP=0x003e3b90`
+
+Diagnostic-only forced runtime can still reproduce the older known crash:
 - `client.dll+0x3b3573`
-- fresh dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
+- reference dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
 
 That forced crash is useful for analysis, but it is **not** original-equivalent behavior.
 
 ## Build
 
 ```bash
-cd /home/pi/mxo/code/matrix_launcher
+cd /home/morgan/mxo/code/matrix_launcher
 make
 ```
 
@@ -48,7 +60,7 @@ This builds the active launcher directly to:
 Safe default run:
 
 ```bash
-cd /home/pi/mxo/code/matrix_launcher
+cd /home/morgan/mxo/code/matrix_launcher
 make run
 ```
 
@@ -69,11 +81,26 @@ Optional diagnostic arg7/arg8 overrides for post-`IsReady()` experiments:
 MXO_ARG7_SELECTION=0x01000000 MXO_ARG8_FLAG=0 make run_stub_both
 ```
 
+You can also mirror the original launcher split fields directly:
+
+```bash
+MXO_CLAUNCHER_A8=1 MXO_CLAUNCHER_AC=0 make run_stub_both
+```
+
+`resurrections.exe` now rebuilds arg7 the same way the original launcher does:
+- high 8 bits from `CLauncher+0xa8`
+- low 24 bits from `CLauncher+0xac`
+
 Optional mediator selection name override:
 
 ```bash
 MXO_MEDIATOR_SELECTION_NAME=Vector make run_stub_both
 ```
+
+By default the launcher now also probes the original registry location for:
+- `HKLM\\Software\\Monolith Productions\\The Matrix Online\\Last_WorldName`
+
+and reuses that string as the diagnostic mediator selection name when no explicit override is provided.
 
 Forced incomplete-init experiment:
 
@@ -105,6 +132,26 @@ Latest crash dump summary:
 ```bash
 make crashdump
 ```
+
+Optional iteration helper to avoid the interactive crash reporter GUI during diagnostic crash loops:
+
+```bash
+make install_crashreporter_stub
+```
+
+That target:
+- builds a tiny no-op `crashreporter.exe` replacement
+- preserves the original as `~/MxO_7.6005/crashreporter.exe.original`
+- replaces the active runtime copy with the stub
+- logs invocations to `~/MxO_7.6005/crashreporter_stub.log`
+
+Restore the original reporter with:
+
+```bash
+make restore_crashreporter
+```
+
+This is only a workflow aid for crash iteration. It is not part of the launcher reimplementation itself.
 
 ## Documentation
 

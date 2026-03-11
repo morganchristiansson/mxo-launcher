@@ -47,10 +47,14 @@ static ErrorClientDLLFunc g_ErrorClientDLL = NULL;
 static uint32_t g_FilteredArgCount = 0;
 static char** g_FilteredArgv = NULL;
 static char** g_FilteredArgvOwned = NULL;
+static const char* g_AuthUsername = NULL;
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
 static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
-static uint32_t g_PackedArg7Selection = 0;       // original: [this+0xa8]/[this+0xac]
+static uint32_t g_CLauncherFieldA8 = 0;          // original: [CLauncher+0xa8], high 8 bits used
+static uint32_t g_CLauncherFieldAC = 0;          // original: [CLauncher+0xac], low 24 bits used
+static uint32_t g_PackedArg7Selection = 0;       // packed from [this+0xa8]/[this+0xac]
 static uint32_t g_FlagByte = 0;                  // original: [0x4d2c69]
+static char g_LastWorldName[256] = {0};         // original registry value: Last_WorldName
 static void* g_pClientDBFromCallback = NULL;
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase);
@@ -170,6 +174,46 @@ static bool ResolveClientExports() {
     return g_InitClientDLL && g_RunClientDLL && g_TermClientDLL && g_ErrorClientDLL;
 }
 
+static bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
+    if (!out || outSize < 2) return false;
+    out[0] = '\0';
+
+    HKEY key = NULL;
+    LONG openResult = RegOpenKeyExA(
+        HKEY_LOCAL_MACHINE,
+        "Software\\Monolith Productions\\The Matrix Online\\",
+        0,
+        KEY_QUERY_VALUE,
+        &key);
+    if (openResult != ERROR_SUCCESS) {
+        Log("DIAGNOSTIC: HKLM Last_WorldName key open failed (%ld)", (long)openResult);
+        return false;
+    }
+
+    DWORD type = 0;
+    DWORD size = outSize;
+    LONG queryResult = RegQueryValueExA(key, "Last_WorldName", NULL, &type, reinterpret_cast<LPBYTE>(out), &size);
+    RegCloseKey(key);
+    if (queryResult != ERROR_SUCCESS) {
+        Log("DIAGNOSTIC: HKLM Last_WorldName query failed (%ld)", (long)queryResult);
+        out[0] = '\0';
+        return false;
+    }
+    if (type != REG_SZ && type != REG_EXPAND_SZ) {
+        Log("DIAGNOSTIC: HKLM Last_WorldName unexpected registry type %lu", (unsigned long)type);
+        out[0] = '\0';
+        return false;
+    }
+
+    out[outSize - 1] = '\0';
+    Log("DIAGNOSTIC: loaded HKLM Last_WorldName='%s'", out);
+    return out[0] != '\0';
+}
+
+static uint32_t BuildPackedArg7Selection() {
+    return (g_CLauncherFieldAC & 0x00ffffffu) | ((g_CLauncherFieldA8 & 0xffu) << 24);
+}
+
 static void LogKnownStartupState() {
     Log("=== Known startup frame ===");
     Log("arg1 filteredArgCount         = 0x%08x", g_FilteredArgCount);
@@ -178,12 +222,17 @@ static void LogKnownStartupState() {
     Log("arg4 hCresDll                = %p", g_hCres);
     Log("arg5 launcherNetworkObject   = %p", g_pLauncherObject6304);
     Log("arg6 ILTLoginMediatorDefault = %p", g_pILTLoginMediatorDefault);
+    Log("CLauncher+0xa8 placeholder   = 0x%08x", g_CLauncherFieldA8);
+    Log("CLauncher+0xac placeholder   = 0x%08x", g_CLauncherFieldAC);
+    Log("Last_WorldName               = %s", g_LastWorldName[0] ? g_LastWorldName : "<unavailable>");
     Log("arg7 packedArg7Selection    = 0x%08x", g_PackedArg7Selection);
     Log("arg8 flagByte                = 0x%08x", g_FlagByte);
 }
 
 static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     const bool hasLauncherAuthArgs = (argc >= 3 && argv[1] && argv[1][0] && argv[2] && argv[2][0]);
+
+    g_AuthUsername = (argc >= 2 && argv[1] && argv[1][0]) ? argv[1] : NULL;
 
     Log("=== Placeholder auth argv ===");
     Log("username argv[1] = %s", MaskedArgValue((argc >= 2) ? argv[1] : NULL));
@@ -241,12 +290,38 @@ int main(int argc, char* argv[]) {
     const bool useLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
     const bool traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
 
+    LoadLastWorldNameFromRegistry(g_LastWorldName, sizeof(g_LastWorldName));
+
     char mediatorSelectionName[64] = {0};
-    if (!EnvStringValue("MXO_MEDIATOR_SELECTION_NAME", mediatorSelectionName, sizeof(mediatorSelectionName))) {
+    if (EnvStringValue("MXO_MEDIATOR_SELECTION_NAME", mediatorSelectionName, sizeof(mediatorSelectionName))) {
+        Log("DIAGNOSTIC: mediator selection name overridden from env = '%s'", mediatorSelectionName);
+    } else if (g_LastWorldName[0]) {
+        std::strncpy(mediatorSelectionName, g_LastWorldName, sizeof(mediatorSelectionName) - 1);
+        mediatorSelectionName[sizeof(mediatorSelectionName) - 1] = '\0';
+        Log("DIAGNOSTIC: using Last_WorldName as mediator selection name = '%s'", mediatorSelectionName);
+    } else {
         std::strcpy(mediatorSelectionName, "standalone");
     }
-    if (EnvUint32Value("MXO_ARG7_SELECTION", &g_PackedArg7Selection)) {
-        Log("DIAGNOSTIC: overridden arg7 packed selection from env = 0x%08x", g_PackedArg7Selection);
+
+    uint32_t packedArg7Override = 0;
+    if (EnvUint32Value("MXO_ARG7_SELECTION", &packedArg7Override)) {
+        g_CLauncherFieldA8 = (packedArg7Override >> 24) & 0xffu;
+        g_CLauncherFieldAC = packedArg7Override & 0x00ffffffu;
+        Log(
+            "DIAGNOSTIC: overridden arg7 packed selection from env = 0x%08x -> a8=0x%08x ac=0x%08x",
+            packedArg7Override,
+            g_CLauncherFieldA8,
+            g_CLauncherFieldAC);
+    }
+    if (EnvUint32Value("MXO_CLAUNCHER_A8", &g_CLauncherFieldA8)) {
+        Log("DIAGNOSTIC: overridden CLauncher+0xa8 from env = 0x%08x", g_CLauncherFieldA8);
+    }
+    if (EnvUint32Value("MXO_CLAUNCHER_AC", &g_CLauncherFieldAC)) {
+        Log("DIAGNOSTIC: overridden CLauncher+0xac from env = 0x%08x", g_CLauncherFieldAC);
+    }
+    g_PackedArg7Selection = BuildPackedArg7Selection();
+    if ((g_CLauncherFieldA8 | g_CLauncherFieldAC) != 0) {
+        Log("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x%08x", g_PackedArg7Selection);
     }
     if (EnvUint32Value("MXO_ARG8_FLAG", &g_FlagByte)) {
         Log("DIAGNOSTIC: overridden arg8 flag from env = 0x%08x", g_FlagByte);
@@ -263,6 +338,7 @@ int main(int argc, char* argv[]) {
 
     if (useMediatorBinderScaffold || useMediatorStub) {
         DiagnosticConfigureMediatorSelection(g_PackedArg7Selection >> 24, mediatorSelectionName);
+        DiagnosticConfigureMediatorProfileName(g_AuthUsername);
     }
 
     if (useMediatorBinderScaffold) {

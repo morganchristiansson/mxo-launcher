@@ -26,6 +26,8 @@ Current active sources:
   - `TermClientDLL`
   - `ErrorClientDLL`
 - uses the correct original **8-argument** `InitClientDLL` frame shape
+- strips launcher-only auth argv back out before `InitClientDLL`
+- models arg7 the same packed way as original launcher from `CLauncher+0xa8/+0xac`
 - refuses incomplete `InitClientDLL` by default
 
 ### Current blocker
@@ -38,17 +40,39 @@ Current unresolved inputs:
 - pre-client environment setup at `0x402ec0`
 
 Current faithful experiment result:
-- `InitClientDLL = -7`
+- with original `client.dll` restored, we fall back to the old import/wrapper problem (`mxowrap.dll`) and do **not** keep the deeper progress path alive yet
+- faithful launcher-owned startup state is still incomplete regardless
 
-Diagnostic mediator-stub result:
-- with `MXO_STUB_LOGIN_MEDIATOR=1` on `DISPLAY=:1`, the game now progresses far enough to open a visible game window
-- observed behavior: black window / black frame
-- DXVK logs show device creation, display-mode switch, and swapchain/presenter setup
-- this is strong evidence that arg6 reconstruction moves startup into real rendering/window creation territory
-- this is still a **diagnostic** path, not original-equivalent behavior
+Current practical runtime note:
+- active progress runs now intentionally use the hex-edited `client.dll` import variant (`dbghelp.dll` instead of `mxowrap.dll`)
+- current file layout in `~/MxO_7.6005/`:
+  - `client.dll` = active patched runtime binary
+  - `client.dll.original` = original import layout backup
+  - `client.dll.patched` = patched backup copy
+- treat this as a pragmatic progress choice, not final faithful equivalence
+
+Current deep diagnostic progress with patched client:
+- under the `/home/morgan` user with working video/audio permissions, the game creates a real `MATRIX_ONLINE` window and reaches much deeper client startup
+- current observed mediator surface on that path includes:
+  - `+0x48`
+  - `+0x4c`
+  - `+0x170`
+  - `+0x124`
+- current logged sequence reaches:
+  - `GetWorldOrSelectionName()`
+  - `GetProfileOrSessionName()`
+  - `AttachStartupContext(629ddfc8)`
+  - `ProvideStartupTriple(netShell=6298a288 netMgr=62999968 distrObjExecutive=629e9dbc)`
+  - `AttachStartupContext(6298a760)`
+
+Current practical crash state:
+- latest patched-client progress dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_2.dmp`
+- current crash is no longer a simple missing-vtable-slot `EIP=0` case
+- current dump lands at `EIP=0x003e3b90`, which looks more like data / corrupted state than a direct null vtable call
+- likely next focus: verify post-`+170` / post-`+124` expectations rather than only adding more stub slots
 
 Diagnostic-only forced runtime result:
-- fresh dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
+- older forced-runtime reference dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
 - crash: `client.dll+0x3b3573`
 
 That forced crash is useful for diagnostics, but it is **not** original-equivalent behavior.
@@ -57,7 +81,7 @@ That forced crash is useful for diagnostics, but it is **not** original-equivale
 
 Build:
 ```bash
-cd /home/pi/mxo/code/matrix_launcher
+cd /home/morgan/mxo/code/matrix_launcher
 make
 ```
 

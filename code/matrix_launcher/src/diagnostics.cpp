@@ -51,6 +51,27 @@ struct DiagnosticBinderWrapper {
     DiagnosticMediatorResolverNode* lastResolvedNode;
 };
 
+struct DiagnosticMediatorRuntimeState {
+    void* registeredLauncherObject;
+    const void* lastNopatchValue1Ptr;
+    const void* lastNopatchValue2Ptr;
+    void* firstContext170;
+    void* latestContext170;
+    void* netShell124;
+    void* netMgr124;
+    void* distrObjExecutive124;
+    void* selectionContext0ec;
+    void* runtimeObject148;
+    void* runtimeObject174;
+    void* runtimeDescriptor178;
+    uint32_t attach170Count;
+    uint32_t provide124Count;
+    uint32_t selection0ecCount;
+    uint32_t runtime148Count;
+    uint32_t runtime174Count;
+    uint32_t descriptor178Count;
+};
+
 static DWORD g_MainProcessId = 0;
 static HANDLE g_hWindowTraceThread = NULL;
 static volatile LONG g_WindowTraceRunning = 0;
@@ -63,6 +84,7 @@ static DiagnosticLauncherObjectBuildState g_LauncherObjectBuildState = {};
 static DiagnosticMediatorResolverNode g_DiagnosticMediatorResolver = {};
 static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
 static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
+static DiagnosticMediatorRuntimeState g_MediatorRuntimeState = {};
 static void* g_LoginMediatorVtable[96] = {0};
 static void* g_LauncherObjectVtable[8] = {0};
 static const char g_MediatorName[] = "ILTLoginMediator.Default";
@@ -71,6 +93,7 @@ static const char g_MediatorStringB[] = "nopatch";
 static const char g_MediatorStringC[] = "standalone";
 static uint32_t g_MediatorSelectionHighByteFloor = 0;
 static const char* g_MediatorMappedSelectionName = g_MediatorStringC;
+static const char* g_MediatorProfileName = g_MediatorStringA;
 
 static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
     (void)self;
@@ -79,6 +102,7 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 
 static int __thiscall Mediator_RegisterEngine(MinimalLoginMediatorStub* self, void* object) {
     (void)self;
+    g_MediatorRuntimeState.registeredLauncherObject = object;
     Log("MediatorStub::RegisterEngine(%p)", object);
     return 1;
 }
@@ -96,6 +120,11 @@ static uint32_t __thiscall Mediator_IsReady(MinimalLoginMediatorStub* self) {
 
 static void __thiscall Mediator_SetValue1(MinimalLoginMediatorStub* self, void* value) {
     (void)self;
+    if (!g_MediatorRuntimeState.lastNopatchValue1Ptr) {
+        g_MediatorRuntimeState.lastNopatchValue1Ptr = value;
+    } else {
+        g_MediatorRuntimeState.lastNopatchValue2Ptr = value;
+    }
     Log("MediatorStub::SetValue1(%p)", value);
 }
 
@@ -108,6 +137,18 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* self) {
     (void)self;
     return g_MediatorStringA;
+}
+
+static const char* __thiscall Mediator_GetWorldOrSelectionName(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log("MediatorStub::GetWorldOrSelectionName() -> '%s'", g_MediatorMappedSelectionName);
+    return g_MediatorMappedSelectionName;
+}
+
+static const char* __thiscall Mediator_GetProfileOrSessionName(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log("MediatorStub::GetProfileOrSessionName() -> '%s'", g_MediatorProfileName);
+    return g_MediatorProfileName;
 }
 
 static const char* __thiscall Mediator_GetString0(MinimalLoginMediatorStub* self) {
@@ -133,6 +174,107 @@ static uint32_t __thiscall Mediator_GetArg7HighByteFloor(MinimalLoginMediatorStu
     return g_MediatorSelectionHighByteFloor;
 }
 
+static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub* self, uint32_t selectionHighByte) {
+    (void)self;
+    Log(
+        "MediatorStub::MapSelectionName(selectionHighByte=%u) -> '%s'",
+        (unsigned)selectionHighByte,
+        g_MediatorMappedSelectionName);
+    return g_MediatorMappedSelectionName;
+}
+
+static void __thiscall Mediator_ConsumeSelectionContext(MinimalLoginMediatorStub* self, void* selectionContext) {
+    (void)self;
+    g_MediatorRuntimeState.selectionContext0ec = selectionContext;
+    ++g_MediatorRuntimeState.selection0ecCount;
+    Log(
+        "MediatorStub::ConsumeSelectionContext(%p) [count=%u]",
+        selectionContext,
+        (unsigned)g_MediatorRuntimeState.selection0ecCount);
+}
+
+static void __thiscall Mediator_ProvideStartupTriple(
+    MinimalLoginMediatorStub* self,
+    void* pNetShell,
+    void* pNetMgr,
+    void* pDistrObjExecutive) {
+    (void)self;
+    g_MediatorRuntimeState.netShell124 = pNetShell;
+    g_MediatorRuntimeState.netMgr124 = pNetMgr;
+    g_MediatorRuntimeState.distrObjExecutive124 = pDistrObjExecutive;
+    ++g_MediatorRuntimeState.provide124Count;
+    Log(
+        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p) [count=%u]",
+        pNetShell,
+        pNetMgr,
+        pDistrObjExecutive,
+        (unsigned)g_MediatorRuntimeState.provide124Count);
+}
+
+static void __thiscall Mediator_AttachStartupContext(MinimalLoginMediatorStub* self, void* startupContext) {
+    (void)self;
+    if (!g_MediatorRuntimeState.firstContext170) {
+        g_MediatorRuntimeState.firstContext170 = startupContext;
+    }
+    g_MediatorRuntimeState.latestContext170 = startupContext;
+    ++g_MediatorRuntimeState.attach170Count;
+
+    const bool sawTriple =
+        g_MediatorRuntimeState.netShell124 ||
+        g_MediatorRuntimeState.netMgr124 ||
+        g_MediatorRuntimeState.distrObjExecutive124;
+    const char* relation = "before-124";
+    if (sawTriple) {
+        relation = (startupContext == g_MediatorRuntimeState.firstContext170) ? "repeat-first-after-124" : "post-124";
+    }
+
+    Log(
+        "MediatorStub::AttachStartupContext(%p) [count=%u relation=%s first=%p latest124=(%p,%p,%p)]",
+        startupContext,
+        (unsigned)g_MediatorRuntimeState.attach170Count,
+        relation,
+        g_MediatorRuntimeState.firstContext170,
+        g_MediatorRuntimeState.netShell124,
+        g_MediatorRuntimeState.netMgr124,
+        g_MediatorRuntimeState.distrObjExecutive124);
+}
+
+static const char* __thiscall Mediator_GetProfilePathComponent(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log("MediatorStub::GetProfilePathComponent() -> '%s'", g_MediatorProfileName);
+    return g_MediatorProfileName;
+}
+
+static void __thiscall Mediator_AttachRuntimeObject(MinimalLoginMediatorStub* self, void* runtimeObject) {
+    (void)self;
+    if (g_MediatorRuntimeState.provide124Count == 0) {
+        g_MediatorRuntimeState.runtimeObject148 = runtimeObject;
+        ++g_MediatorRuntimeState.runtime148Count;
+        Log(
+            "MediatorStub::AttachRuntimeObject(+0x148 guess=%p) [count=%u]",
+            runtimeObject,
+            (unsigned)g_MediatorRuntimeState.runtime148Count);
+        return;
+    }
+
+    g_MediatorRuntimeState.runtimeObject174 = runtimeObject;
+    ++g_MediatorRuntimeState.runtime174Count;
+    Log(
+        "MediatorStub::AttachRuntimeObject(+0x174 guess=%p) [count=%u]",
+        runtimeObject,
+        (unsigned)g_MediatorRuntimeState.runtime174Count);
+}
+
+static void __thiscall Mediator_ConsumeRuntimeDescriptor(MinimalLoginMediatorStub* self, void* runtimeDescriptor) {
+    (void)self;
+    g_MediatorRuntimeState.runtimeDescriptor178 = runtimeDescriptor;
+    ++g_MediatorRuntimeState.descriptor178Count;
+    Log(
+        "MediatorStub::ConsumeRuntimeDescriptor(%p) [count=%u]",
+        runtimeDescriptor,
+        (unsigned)g_MediatorRuntimeState.descriptor178Count);
+}
+
 static uint32_t __thiscall Mediator_ShouldExportA(MinimalLoginMediatorStub* self) {
     (void)self;
     return 0;
@@ -153,6 +295,7 @@ static void InitializeMediatorStub() {
     if (initialized) return;
     initialized = true;
 
+    std::memset(&g_MediatorRuntimeState, 0, sizeof(g_MediatorRuntimeState));
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
     g_LoginMediatorVtable[2] = (void*)Mediator_RegisterEngine;   // +0x08
@@ -162,12 +305,22 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[9] = (void*)Mediator_SetValue1;        // +0x24
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[14] = (void*)Mediator_GetDisplayName;  // +0x38
+    g_LoginMediatorVtable[18] = (void*)Mediator_GetWorldOrSelectionName; // +0x48
+    g_LoginMediatorVtable[19] = (void*)Mediator_GetProfileOrSessionName; // +0x4c
     g_LoginMediatorVtable[22] = (void*)Mediator_GetString0;      // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetString2;      // +0x5c
     g_LoginMediatorVtable[24] = (void*)Mediator_GetString1;      // +0x60
     g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7HighByteFloor; // +0xd8
+    g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc
+    g_LoginMediatorVtable[59] = (void*)Mediator_ConsumeSelectionContext; // +0xec
+    g_LoginMediatorVtable[61] = (void*)Mediator_GetProfilePathComponent; // +0xf4
+    g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
+    g_LoginMediatorVtable[82] = (void*)Mediator_AttachRuntimeObject; // +0x148
     g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164
     g_LoginMediatorVtable[91] = (void*)Mediator_ShouldExportB;   // +0x16c
+    g_LoginMediatorVtable[92] = (void*)Mediator_AttachStartupContext; // +0x170
+    g_LoginMediatorVtable[93] = (void*)Mediator_AttachRuntimeObject; // +0x174
+    g_LoginMediatorVtable[94] = (void*)Mediator_ConsumeRuntimeDescriptor; // +0x178
 
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
@@ -341,6 +494,13 @@ void DiagnosticConfigureMediatorSelection(uint32_t highByteFloor, const char* ma
         "DIAGNOSTIC: mediator selection configured highByteFloor=%u mappedSelection='%s'",
         (unsigned)g_MediatorSelectionHighByteFloor,
         g_MediatorMappedSelectionName);
+}
+
+void DiagnosticConfigureMediatorProfileName(const char* profileName) {
+    g_MediatorProfileName =
+        (profileName && profileName[0]) ? profileName : g_MediatorStringA;
+
+    Log("DIAGNOSTIC: mediator profile/session name configured as '%s'", g_MediatorProfileName);
 }
 
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr) {

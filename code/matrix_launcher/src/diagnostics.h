@@ -8,6 +8,7 @@ void Log(const char* fmt, ...);
 void DiagnosticInstallMediatorStub(void** outMediatorPtr);
 void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr);
 void DiagnosticConfigureMediatorSelection(uint32_t highByteFloor, const char* mappedSelectionName);
+void DiagnosticConfigureMediatorProfileName(const char* profileName);
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr);
 void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr);
 void DiagnosticStartWindowTrace();

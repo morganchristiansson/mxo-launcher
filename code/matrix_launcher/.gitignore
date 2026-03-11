@@ -1,3 +1,6 @@
+ClientErrors*.txt
+MatrixOnline_0.0_crash_*.dmp
+
 # Local credentials / secrets
 secrets/
 *.local.json

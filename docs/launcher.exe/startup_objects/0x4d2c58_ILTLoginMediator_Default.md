@@ -134,14 +134,20 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x10` | readiness / availability gate; this is part of the old `-7` barrier | high |
 | `+0x2c` | additional runtime readiness gate before arg5-related runtime work | medium |
 | `+0x38` | returns C-string used by client formatting path | high |
+| `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
+| `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
 | `+0x58` | string-producing helper in early init logging/config path | medium |
 | `+0x5c` | chained string-producing helper | medium |
 | `+0x60` | chained string-producing helper | medium |
 | `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
 | `+0xec` | consumes assembled selection/config structure in deeper init | medium |
+| `+0xf4` | returns a profile/path-style string in later runtime/config setup paths | medium |
 | `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
+| `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
 | `+0x170` | consumes client startup context object in deeper init | medium |
+| `+0x174` | accepts runtime object handles in later setup paths | medium |
+| `+0x178` | consumes runtime descriptor object in later setup paths | medium |
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
 
@@ -152,6 +158,51 @@ The opt-in mediator stub in the custom launcher showed this progression:
 1. with arg6 = `NULL`, `InitClientDLL` hit the old `-7` path,
 2. after supplying minimal arg6 methods (`+0x00`, `+0x10`, then `+0xd8`, `+0x38`),
 3. startup moved past the old immediate `-7` barrier and into deeper post-network-shell / rendering startup.
+4. on a real user run with correct audio/video permissions, startup progressed further again, created a real Matrix Online window, and then crashed on missing mediator slots `+0x48` and later `+0x4c` in the post-`IsReady()` path.
+5. after adding diagnostic implementations for `+0x48` and `+0x4c`, startup advanced again into the post-selection path and hit `+0x170` / `+0x124` with concrete objects (`startupContext`, `INetShell`, `INetMgr`, `ILTDistrObjExecutive`) before the next crash.
+6. the latest patched-client progress dump no longer shows `EIP=0`; it lands at `EIP=0x003e3b90`, which suggests later bad state / signature mismatch is now more likely than a simple missing-slot crash.
+
+## New clarification: current post-`+170` / post-`+124` evidence
+
+Static analysis of `client.dll` around `0x62170d6a..0x62170f48` now gives a tighter interpretation of the observed deep path.
+
+Observed order:
+
+1. `arg6->+0x10` readiness gate must succeed,
+2. `arg6->+0x170(startupContext)` is called first,
+3. `arg6->+0x124(netShell, netMgr, distrObjExecutive)` is called second,
+4. arg7 high-byte handling continues (`+0xd8`, `+0xdc`),
+5. and only later does the client hand a stack-built selection/config object into `arg6->+0xec`.
+
+What this proves:
+
+- `+0x170` is reached **before** the deeper arg7-selection object assembly is finished,
+- `+0x124` is not the last mediator handoff in this phase,
+- so the current crash after our logged `+0x170` / `+0x124` sequence does **not** by itself prove those two slots are missing.
+
+Current best interpretation:
+
+- `+0x170` likely records or adopts a startup context pointer for later use,
+- `+0x124` likely records the startup network triple into mediator-owned state,
+- and the next meaningful state transfer in this same path is `+0xec`, which consumes a locally assembled selection/config structure.
+
+A fresh rerun with an instrumented mediator probe still crashed before any observed `+0xec` log, but it tightened one important detail:
+
+- latest dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_3.dmp`
+- logged sequence still reached:
+  - `AttachStartupContext(01f7dfc8)`
+  - `ProvideStartupTriple(netShell=01f2a288 netMgr=01f39968 distrObjExecutive=01f89dbc)`
+  - `AttachStartupContext(01f2a760)`
+- dump `EIP` landed at `0x003e3bb0`
+- that value matched the launcher's current `arg2 filteredArgv` pointer for the same run
+
+That correlation makes **stack/return-address corruption or another calling/retention mismatch** more plausible than a plain missing-vtable-slot crash.
+
+Practical implication for the diagnostic scaffold:
+
+- keep `+0x170` / `+0x124` as **state-capturing probes**,
+- log ordering and repeated calls,
+- and prioritize verifying whether the client later expects the mediator to retain and expose that captured state rather than immediately inventing more unrelated vtable slots.
 
 This is the strongest current evidence that:
 
