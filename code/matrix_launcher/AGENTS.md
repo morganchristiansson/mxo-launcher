@@ -84,6 +84,12 @@ Arg6 stub experiment:
 make run_stub_mediator
 ```
 
+Combined arg5+arg6 diagnostic experiments:
+```bash
+make run_stub_both
+make run_binder_both
+```
+
 Latest crash dump summary:
 ```bash
 make crashdump

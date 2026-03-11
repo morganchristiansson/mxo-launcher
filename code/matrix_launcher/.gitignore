@@ -1,0 +1,8 @@
+# Local credentials / secrets
+secrets/
+*.local.json
+*.local.ini
+*.local.env
+
+# Local logs / scratch
+*.log

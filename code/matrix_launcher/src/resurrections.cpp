@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdarg>
+#include <cstdlib>
 
 #include "diagnostics.h"
 
@@ -45,6 +46,7 @@ static ErrorClientDLLFunc g_ErrorClientDLL = NULL;
 // filtered storage path is reconstructed.
 static uint32_t g_FilteredArgCount = 0;
 static char** g_FilteredArgv = NULL;
+static char** g_FilteredArgvOwned = NULL;
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
 static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
 static uint32_t g_PackedArg7Selection = 0;       // original: [this+0xa8]/[this+0xac]
@@ -79,8 +81,35 @@ static bool EnvFlagEnabled(const char* name) {
     return len > 0;
 }
 
+static bool EnvStringValue(const char* name, char* out, DWORD outSize) {
+    if (!out || outSize == 0) return false;
+    out[0] = '\0';
+    DWORD len = GetEnvironmentVariableA(name, out, outSize);
+    return len > 0 && len < outSize;
+}
+
+static bool EnvUint32Value(const char* name, uint32_t* outValue) {
+    char buffer[64] = {0};
+    if (!outValue || !EnvStringValue(name, buffer, sizeof(buffer))) return false;
+
+    char* end = NULL;
+    unsigned long parsed = std::strtoul(buffer, &end, 0);
+    if (end == buffer) return false;
+    *outValue = static_cast<uint32_t>(parsed);
+    return true;
+}
+
+static const char* MaskedArgValue(const char* value) {
+    if (!value || !value[0]) return "<empty>";
+    return "<provided>";
+}
+
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
+    if (g_FilteredArgvOwned) {
+        std::free(g_FilteredArgvOwned);
+        g_FilteredArgvOwned = NULL;
+    }
     if (g_LogFile) {
         fclose(g_LogFile);
         g_LogFile = NULL;
@@ -153,6 +182,41 @@ static void LogKnownStartupState() {
     Log("arg8 flagByte                = 0x%08x", g_FlagByte);
 }
 
+static bool ConfigureFilteredArgv(int argc, char* argv[]) {
+    const bool hasLauncherAuthArgs = (argc >= 3 && argv[1] && argv[1][0] && argv[2] && argv[2][0]);
+
+    Log("=== Placeholder auth argv ===");
+    Log("username argv[1] = %s", MaskedArgValue((argc >= 2) ? argv[1] : NULL));
+    Log("password argv[2] = %s", MaskedArgValue((argc >= 3) ? argv[2] : NULL));
+
+    if (!hasLauncherAuthArgs) {
+        g_FilteredArgCount = static_cast<uint32_t>(argc);
+        g_FilteredArgv = argv;
+        return true;
+    }
+
+    const int filteredCount = 1 + ((argc > 3) ? (argc - 3) : 0);
+    g_FilteredArgvOwned = static_cast<char**>(std::calloc(filteredCount + 1, sizeof(char*)));
+    if (!g_FilteredArgvOwned) {
+        Log("ERROR: failed to allocate filtered argv storage");
+        return false;
+    }
+
+    g_FilteredArgvOwned[0] = argv[0];
+    for (int src = 3, dst = 1; src < argc; ++src, ++dst) {
+        g_FilteredArgvOwned[dst] = argv[src];
+    }
+
+    g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
+    g_FilteredArgv = g_FilteredArgvOwned;
+
+    Log("launcher-only auth args detected; stripped 2 argv entries before InitClientDLL");
+    if (argc > 3) {
+        Log("forwarded extra launcher argv count = %d", argc - 3);
+    }
+    return true;
+}
+
 int main(int argc, char* argv[]) {
     g_LogFile = fopen("resurrections.log", "w");
 
@@ -162,26 +226,49 @@ int main(int argc, char* argv[]) {
     Log("Default branch target: nopatch path");
     Log("");
 
-    g_FilteredArgCount = static_cast<uint32_t>(argc);
-    g_FilteredArgv = argv;
-
     Log("NOTE: arg1/arg2 still reuse process argc/argv as placeholders.");
     Log("NOTE: launcher-owned nopatch setup, filtered argv storage, arg5, arg6, arg7, and arg8 remain incomplete.");
+    if (!ConfigureFilteredArgv(argc, argv)) {
+        return FinishAndReturn(1);
+    }
     Log("");
 
     const bool forceIncompleteInit = EnvFlagEnabled("MXO_FORCE_INCOMPLETE_INIT");
     const bool forceRunClient = EnvFlagEnabled("MXO_FORCE_RUNCLIENT");
     const bool forceRunAfterInitFailure = EnvFlagEnabled("MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE");
     const bool useMediatorStub = EnvFlagEnabled("MXO_STUB_LOGIN_MEDIATOR");
+    const bool useMediatorBinderScaffold = EnvFlagEnabled("MXO_BINDER_LOGIN_MEDIATOR");
     const bool useLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
     const bool traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
+
+    char mediatorSelectionName[64] = {0};
+    if (!EnvStringValue("MXO_MEDIATOR_SELECTION_NAME", mediatorSelectionName, sizeof(mediatorSelectionName))) {
+        std::strcpy(mediatorSelectionName, "standalone");
+    }
+    if (EnvUint32Value("MXO_ARG7_SELECTION", &g_PackedArg7Selection)) {
+        Log("DIAGNOSTIC: overridden arg7 packed selection from env = 0x%08x", g_PackedArg7Selection);
+    }
+    if (EnvUint32Value("MXO_ARG8_FLAG", &g_FlagByte)) {
+        Log("DIAGNOSTIC: overridden arg8 flag from env = 0x%08x", g_FlagByte);
+    }
 
     if (!PreloadDependencies()) {
         Log("ERROR: preload failed");
         return FinishAndReturn(1);
     }
 
-    if (useMediatorStub) {
+    if (useMediatorBinderScaffold && useMediatorStub) {
+        Log("WARNING: both MXO_BINDER_LOGIN_MEDIATOR and MXO_STUB_LOGIN_MEDIATOR set; binder scaffold wins.");
+    }
+
+    if (useMediatorBinderScaffold || useMediatorStub) {
+        DiagnosticConfigureMediatorSelection(g_PackedArg7Selection >> 24, mediatorSelectionName);
+    }
+
+    if (useMediatorBinderScaffold) {
+        DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
+        DiagnosticApplyDefaultNopatchMediatorConfig(g_pILTLoginMediatorDefault);
+    } else if (useMediatorStub) {
         DiagnosticInstallMediatorStub(&g_pILTLoginMediatorDefault);
         DiagnosticApplyDefaultNopatchMediatorConfig(g_pILTLoginMediatorDefault);
     }
@@ -203,8 +290,18 @@ int main(int argc, char* argv[]) {
 
     Log("=== Original-path gaps still missing ===");
     Log("missing: launcher-owned filtered argv storage / nopatch state setup");
-    Log("missing: build/register launcher object at 0x4d6304");
-    Log("missing: resolve ILTLoginMediator.Default into 0x4d2c58");
+    if (useLauncherObjectStub) {
+        Log("arg5 status: diagnostic launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
+    } else {
+        Log("missing: build/register launcher object at 0x4d6304");
+    }
+    if (useMediatorBinderScaffold) {
+        Log("arg6 status: diagnostic binder scaffold materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
+    } else if (useMediatorStub) {
+        Log("arg6 status: direct diagnostic stub materialized ILTLoginMediator.Default (bypasses binder path)");
+    } else {
+        Log("missing: resolve ILTLoginMediator.Default into 0x4d2c58");
+    }
     Log("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     Log("");
 

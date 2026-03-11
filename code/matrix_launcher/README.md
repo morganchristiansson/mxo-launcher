@@ -52,6 +52,29 @@ cd /home/pi/mxo/code/matrix_launcher
 make run
 ```
 
+Optional local credentials:
+
+```make
+# secrets/launcher_login.local.mk
+MXO_USER := your-username
+MXO_PASS := your-password
+```
+
+If that file exists, the Makefile appends those two values as argv to `resurrections.exe`.
+The launcher currently treats them as launcher-only placeholder auth argv, strips them back out before `InitClientDLL`, and logs only whether they were provided, not the raw values.
+
+Optional diagnostic arg7/arg8 overrides for post-`IsReady()` experiments:
+
+```bash
+MXO_ARG7_SELECTION=0x01000000 MXO_ARG8_FLAG=0 make run_stub_both
+```
+
+Optional mediator selection name override:
+
+```bash
+MXO_MEDIATOR_SELECTION_NAME=Vector make run_stub_both
+```
+
 Forced incomplete-init experiment:
 
 ```bash
@@ -68,6 +91,13 @@ Arg6 stub experiment:
 
 ```bash
 make run_stub_mediator
+```
+
+Combined arg5+arg6 diagnostic experiments:
+
+```bash
+make run_stub_both
+make run_binder_both
 ```
 
 Latest crash dump summary:

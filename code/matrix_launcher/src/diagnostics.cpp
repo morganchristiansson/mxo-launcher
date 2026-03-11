@@ -1,6 +1,7 @@
 #include "diagnostics.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 struct WindowTraceEntry {
@@ -21,6 +22,35 @@ struct MinimalLauncherObjectStub {
     unsigned char payload[0xb0];
 };
 
+struct DiagnosticLauncherObjectBuildState {
+    MinimalLauncherObjectStub* currentObject;
+    uint32_t buildGeneration;
+};
+
+struct DiagnosticMediatorResolverNode {
+    DiagnosticMediatorResolverNode* next;
+    const char* serviceName;
+    void* resolvedObject;
+};
+
+struct DiagnosticBinderRegistry {
+    void* reserved0;
+    void* reserved4;
+    void* reserved8;
+    void* reservedC;
+    void* reserved10;
+    void* reserved14;
+    DiagnosticMediatorResolverNode* resolverList; // mirrors interest in launcher.exe registry+0x18
+};
+
+struct DiagnosticBinderWrapper {
+    const char* serviceName;
+    uint32_t mode;
+    void** outSlot;
+    DiagnosticBinderRegistry* registry;
+    DiagnosticMediatorResolverNode* lastResolvedNode;
+};
+
 static DWORD g_MainProcessId = 0;
 static HANDLE g_hWindowTraceThread = NULL;
 static volatile LONG g_WindowTraceRunning = 0;
@@ -29,13 +59,18 @@ static int g_WindowTraceEntryCount = 0;
 static int g_LastWindowTraceCount = -1;
 
 static MinimalLoginMediatorStub g_LoginMediatorStub = {};
-static MinimalLauncherObjectStub g_LauncherObjectStub = {};
+static DiagnosticLauncherObjectBuildState g_LauncherObjectBuildState = {};
+static DiagnosticMediatorResolverNode g_DiagnosticMediatorResolver = {};
+static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
+static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
 static void* g_LoginMediatorVtable[96] = {0};
 static void* g_LauncherObjectVtable[8] = {0};
 static const char g_MediatorName[] = "ILTLoginMediator.Default";
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringB[] = "nopatch";
 static const char g_MediatorStringC[] = "standalone";
+static uint32_t g_MediatorSelectionHighByteFloor = 0;
+static const char* g_MediatorMappedSelectionName = g_MediatorStringC;
 
 static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
     (void)self;
@@ -89,12 +124,13 @@ static const char* __thiscall Mediator_GetString1(MinimalLoginMediatorStub* self
 static const char* __thiscall Mediator_GetString2(MinimalLoginMediatorStub* self, const char* value) {
     (void)self;
     (void)value;
-    return g_MediatorStringC;
+    return g_MediatorMappedSelectionName;
 }
 
 static uint32_t __thiscall Mediator_GetArg7HighByteFloor(MinimalLoginMediatorStub* self) {
     (void)self;
-    return 0;
+    Log("MediatorStub::GetArg7HighByteFloor() -> %u", (unsigned)g_MediatorSelectionHighByteFloor);
+    return g_MediatorSelectionHighByteFloor;
 }
 
 static uint32_t __thiscall Mediator_ShouldExportA(MinimalLoginMediatorStub* self) {
@@ -141,10 +177,115 @@ static void InitializeLauncherObjectStub() {
     if (initialized) return;
     initialized = true;
 
-    std::memset(&g_LauncherObjectStub, 0, sizeof(g_LauncherObjectStub));
+    std::memset(&g_LauncherObjectBuildState, 0, sizeof(g_LauncherObjectBuildState));
     std::memset(g_LauncherObjectVtable, 0, sizeof(g_LauncherObjectVtable));
     g_LauncherObjectVtable[0] = (void*)LauncherObject_Release;
-    g_LauncherObjectStub.vtable = g_LauncherObjectVtable;
+}
+
+static void DiagnosticInitializeBinderScaffold(void** outMediatorPtr) {
+    InitializeMediatorStub();
+
+    std::memset(&g_DiagnosticMediatorResolver, 0, sizeof(g_DiagnosticMediatorResolver));
+    std::memset(&g_DiagnosticBinderRegistry, 0, sizeof(g_DiagnosticBinderRegistry));
+    std::memset(&g_DiagnosticBinderWrapper, 0, sizeof(g_DiagnosticBinderWrapper));
+
+    g_DiagnosticMediatorResolver.serviceName = g_MediatorName;
+    g_DiagnosticMediatorResolver.resolvedObject = &g_LoginMediatorStub;
+
+    g_DiagnosticBinderRegistry.resolverList = &g_DiagnosticMediatorResolver;
+
+    g_DiagnosticBinderWrapper.serviceName = g_MediatorName;
+    g_DiagnosticBinderWrapper.mode = 0;
+    g_DiagnosticBinderWrapper.outSlot = outMediatorPtr;
+    g_DiagnosticBinderWrapper.registry = &g_DiagnosticBinderRegistry;
+}
+
+static DiagnosticMediatorResolverNode* DiagnosticLookupResolverNode(
+    DiagnosticBinderRegistry* registry,
+    const char* serviceName) {
+    if (!registry || !serviceName) return NULL;
+
+    for (DiagnosticMediatorResolverNode* node = registry->resolverList; node; node = node->next) {
+        Log(
+            "DIAGNOSTIC: registry node %p service='%s' object=%p next=%p",
+            node,
+            node->serviceName ? node->serviceName : "<null>",
+            node->resolvedObject,
+            node->next);
+
+        if (node->serviceName && std::strcmp(node->serviceName, serviceName) == 0) {
+            return node;
+        }
+    }
+
+    return NULL;
+}
+
+static bool DiagnosticResolveBinderWrapper(DiagnosticBinderWrapper* wrapper) {
+    if (!wrapper || !wrapper->outSlot || !wrapper->registry) return false;
+
+    Log(
+        "DIAGNOSTIC: binder wrapper lookup(service='%s', mode=%u, outSlot=%p)",
+        wrapper->serviceName ? wrapper->serviceName : "<null>",
+        (unsigned)wrapper->mode,
+        wrapper->outSlot);
+    Log(
+        "DIAGNOSTIC: binder registry=%p resolverList(registry+0x18)=%p",
+        wrapper->registry,
+        wrapper->registry->resolverList);
+
+    DiagnosticMediatorResolverNode* node =
+        DiagnosticLookupResolverNode(wrapper->registry, wrapper->serviceName);
+    wrapper->lastResolvedNode = node;
+    if (!node) {
+        Log("DIAGNOSTIC: binder lookup failed for '%s'", wrapper->serviceName ? wrapper->serviceName : "<null>");
+        return false;
+    }
+
+    *wrapper->outSlot = node->resolvedObject;
+    Log(
+        "DIAGNOSTIC: binder resolved '%s' via node %p -> wrote %p to slot %p",
+        wrapper->serviceName,
+        node,
+        node->resolvedObject,
+        wrapper->outSlot);
+    return true;
+}
+
+static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
+    InitializeLauncherObjectStub();
+
+    if (g_LauncherObjectBuildState.currentObject) {
+        Log(
+            "DIAGNOSTIC: replacing prior launcher object scaffold generation=%u ptr=%p",
+            (unsigned)g_LauncherObjectBuildState.buildGeneration,
+            g_LauncherObjectBuildState.currentObject);
+        std::free(g_LauncherObjectBuildState.currentObject);
+        g_LauncherObjectBuildState.currentObject = NULL;
+    }
+
+    MinimalLauncherObjectStub* object =
+        static_cast<MinimalLauncherObjectStub*>(std::malloc(sizeof(MinimalLauncherObjectStub)));
+    if (!object) {
+        Log("DIAGNOSTIC: failed to allocate launcher object scaffold (size=0x%zx)", sizeof(MinimalLauncherObjectStub));
+        return NULL;
+    }
+
+    std::memset(object, 0, sizeof(*object));
+    object->vtable = g_LauncherObjectVtable;
+
+    ++g_LauncherObjectBuildState.buildGeneration;
+    g_LauncherObjectBuildState.currentObject = object;
+
+    Log(
+        "DIAGNOSTIC: built launcher object scaffold like 0x40a380/0x431c30 ptr=%p size=0x%zx generation=%u",
+        object,
+        sizeof(MinimalLauncherObjectStub),
+        (unsigned)g_LauncherObjectBuildState.buildGeneration);
+    Log(
+        "DIAGNOSTIC: launcher object scaffold notes: CLTThreadPerClientTCPEngine-family placeholder, vtbl[0]=Release, payload zeroed");
+
+    return object;
 }
 
 static void DiagnosticRegisterLauncherObjectWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
@@ -173,6 +314,35 @@ void DiagnosticInstallMediatorStub(void** outMediatorPtr) {
     Log("DIAGNOSTIC: using MinimalLoginMediatorStub for arg6 (%p)", &g_LoginMediatorStub);
 }
 
+void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr) {
+    DiagnosticInitializeBinderScaffold(outMediatorPtr);
+
+    Log(
+        "DIAGNOSTIC: binder scaffold prepared wrapper=%p registry=%p resolver=%p targetSlot=%p",
+        &g_DiagnosticBinderWrapper,
+        &g_DiagnosticBinderRegistry,
+        &g_DiagnosticMediatorResolver,
+        outMediatorPtr);
+
+    if (!DiagnosticResolveBinderWrapper(&g_DiagnosticBinderWrapper)) {
+        Log("DIAGNOSTIC: binder scaffold failed to materialize arg6");
+        return;
+    }
+
+    Log("DIAGNOSTIC: binder scaffold materialized arg6 as %p", outMediatorPtr ? *outMediatorPtr : NULL);
+}
+
+void DiagnosticConfigureMediatorSelection(uint32_t highByteFloor, const char* mappedSelectionName) {
+    g_MediatorSelectionHighByteFloor = highByteFloor;
+    g_MediatorMappedSelectionName =
+        (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : g_MediatorStringC;
+
+    Log(
+        "DIAGNOSTIC: mediator selection configured highByteFloor=%u mappedSelection='%s'",
+        (unsigned)g_MediatorSelectionHighByteFloor,
+        g_MediatorMappedSelectionName);
+}
+
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr) {
     if (!mediatorPtr) return;
 
@@ -197,18 +367,19 @@ void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr) {
 }
 
 void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr) {
-    InitializeLauncherObjectStub();
+    MinimalLauncherObjectStub* object = DiagnosticBuildLauncherObjectLike40A380();
     if (outLauncherObjectPtr) {
-        *outLauncherObjectPtr = &g_LauncherObjectStub;
+        *outLauncherObjectPtr = object;
     }
 
     Log(
-        "DIAGNOSTIC: using MinimalLauncherObjectStub for arg5 (%p, size=0x%zx)",
-        &g_LauncherObjectStub,
-        sizeof(g_LauncherObjectStub));
+        "DIAGNOSTIC: using launcher object scaffold for arg5 (%p, size=0x%zx)",
+        object,
+        sizeof(MinimalLauncherObjectStub));
 
-    if (mediatorPtr) {
-        DiagnosticRegisterLauncherObjectWithMediator(mediatorPtr, &g_LauncherObjectStub);
+    if (mediatorPtr && object) {
+        Log("DIAGNOSTIC: mirroring original handoff: registering arg5 through arg6 before InitClientDLL");
+        DiagnosticRegisterLauncherObjectWithMediator(mediatorPtr, object);
     }
 }
 
