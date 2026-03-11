@@ -7,8 +7,20 @@ This folder documents launcher-owned globals and heap objects that are part of t
 - `0x4d2c58_ILTLoginMediator_Default.md`
   - runtime interface pointer used by nopatch setup, client startup, and teardown
 
+- `0x4d2c58_RESOLUTION_MECHANISM.md`
+  - how the launcher resolves and fills the `ILTLoginMediator.Default` pointer slot through registry state
+
 - `0x4d6304_network_engine.md`
   - heap-allocated launcher object built at startup and passed both to the mediator and to `InitClientDLL`
+
+- `0x4d3368_CLauncher.md`
+  - global main launcher object whose methods drive the original startup path and supply arg7 fields
+
+- `0x4d3d54_INTERFACE_REGISTRY.md`
+  - global registry object used to resolve named interface binders into live pointer slots
+
+- `0x4d3d54_SERVICE_NODE_4ADD34.md`
+  - resolver/service node class used by the registry list at `+0x18`
 
 ## Why this matters
 

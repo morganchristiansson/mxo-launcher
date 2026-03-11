@@ -134,3 +134,12 @@ So startup and teardown mirror each other around this object.
 ## Current implication for reimplementation
 
 The next correct experiments should try to reproduce the original launcher-owned creation path for this object and its registration through `0x4d2c58`, rather than seeding unrelated objects inside `client.dll`.
+
+## Updated priority note
+
+New `InitClientDLL` analysis indicates arg5 (`0x4d6304`) is stored immediately by the client at startup, but the older `-7` failure path is more directly gated by arg6 (`ILTLoginMediator.Default`).
+
+So for the current reimplementation order of work:
+
+1. fix / reconstruct arg6 first,
+2. then revisit arg5 for later runtime correctness.

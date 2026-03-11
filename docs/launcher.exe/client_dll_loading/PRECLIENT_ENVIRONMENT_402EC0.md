@@ -85,3 +85,9 @@ So a launcher that skips `0x402ec0` is still missing part of the original path.
 - What exact concrete class is returned by `0x48b970` here?
 - Which import functions in the loops correspond to message retrieval / dispatch / wait operations?
 - Is this environment required by `InitClientDLL` directly, or by later launcher/client interaction during `RunClientDLL`?
+
+## Updated priority note
+
+New `InitClientDLL` experiments suggest the old immediate `-7` barrier is more directly explained by arg6 (`ILTLoginMediator.Default`) than by `0x402ec0`.
+
+So `0x402ec0` remains important for original-faithful startup, but it is no longer the leading explanation for the first observed `InitClientDLL = -7` failure.

@@ -48,6 +48,20 @@ This is good evidence that the real blocker is still launcher-owned setup, espec
 2. the heap object at `0x4d6304`
 3. the pre-client environment setup around `0x402ec0`
 
+## Follow-up diagnostic continuation
+
+A later 2026-03-11 diagnostic run of the **current project-local** `launcher_proper.exe` intentionally continued into `RunClientDLL` even after this `InitClientDLL = -7` result.
+That produced a fresh crash dump:
+
+- `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
+
+with the familiar runtime fault:
+
+- `client.dll+0x3b3573`
+
+This does **not** mean the original launcher would take that path.
+It means the missing launcher-owned state is severe enough that if runtime is forced after failed init, `client.dll` later null-dereferences expected subordinate state.
+
 ## Related docs
 
 - `README.md`

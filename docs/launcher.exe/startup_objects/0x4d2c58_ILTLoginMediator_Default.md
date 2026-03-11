@@ -114,3 +114,6 @@ At `0x40b360..0x40b409` the launcher uses the same interface during cleanup, inc
 
 The current custom launcher should stop treating arg6 as a vague `master database` or arbitrary placeholder.
 It is much more likely a launcher-resolved `ILTLoginMediator.Default`-style interface pointer that must already be live by the time `InitClientDLL` is called.
+
+See also:
+- `0x4d2c58_RESOLUTION_MECHANISM.md`

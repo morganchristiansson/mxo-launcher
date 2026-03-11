@@ -93,3 +93,13 @@ In this traced startup path, `launcher.exe`:
 ## Current implication
 
 The current custom launcher is still missing launcher-owned setup that happens before `RunClientDLL`. That is the primary line of investigation.
+
+A fresh 2026-03-11 diagnostic dump from the project-local `launcher_proper.exe` confirms:
+
+- `cres.dll` can be present on the crashing path,
+- the real 8-argument `InitClientDLL` frame shape can be used,
+- but if `InitClientDLL` still returns `-7` and runtime is forced anyway,
+- `client.dll` later crashes at `0x623b3573`.
+
+So the remaining mismatch versus original `launcher.exe` is not just module load order.
+It is the missing launcher-owned state established before a legitimate `RunClientDLL` call.
