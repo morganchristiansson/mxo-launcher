@@ -1,95 +1,42 @@
-# client.dll!SetMasterDatabase - CORRECT Usage
+# SetMasterDatabase
 
-## Date: 2025-03-11
-## Status: CORRECTED
+## Two functions share this name
 
----
+### launcher.exe
+- export: `SetMasterDatabase`
+- address: `0x4143f0`
 
-## CRITICAL: Pass NULL to SetMasterDatabase
+### client.dll
+- export: `SetMasterDatabase`
+- address: `0x6229d760`
 
-### ❌ WRONG (Old Documentation)
-```c
-MasterDatabase db;
-// ... initialize all fields ...
-SetMasterDatabase(&db);  // CRASHES!
-```
+They should be documented separately in our reasoning, even when kept in the same topic folder.
 
-### ✅ CORRECT (Validated via Disassembly)
-```c
-SetMasterDatabase(NULL);   // Works!
-```
+## Hard boundary from static analysis
 
----
+In the launcher startup path currently traced (`0x40b739..0x40b7d5` and `0x40a4d0..0x40a6fb`), `launcher.exe` does **not** directly call `client.dll!SetMasterDatabase()`.
 
-## Why Non-NULL Crashes
-
-From disassembly at `client.dll+0x6229d760`:
-
-1. **If param != NULL**: Treats it as linked-list node, modifies offsets 0x00-0x08
-2. **Corrupts structure**: Overwrites pPrimaryObject at offset 0x0C
-3. **Crashes**: When it tries to call vtable[0] on corrupted pointer
-
-The offsets 0x00, 0x04, 0x08 are treated as linked-list pointers:
-- `next` node pointer
-- `prev` node pointer  
-- list data
-
-Not as MasterDatabase fields!
-
----
-
-## Correct Initialization Sequence
+That means the following should **not** be documented as original-launcher behavior:
 
 ```c
-// 1. Pre-load dependencies
-LoadLibraryA("MFC71.dll");
-LoadLibraryA("MSVCR71.dll");
-LoadLibraryA("dbghelp.dll");
-LoadLibraryA("r3d9.dll");
-LoadLibraryA("binkw32.dll");
-
-// 2. Load client.dll
-HMODULE hClient = LoadLibraryA("client.dll");
-
-// 3. Get exports
-auto setMasterDB = GetProcAddress(hClient, "SetMasterDatabase");
-auto init = GetProcAddress(hClient, "InitClientDLL");
-auto run = GetProcAddress(hClient, "RunClientDLL");
-
-// 4. Call SetMasterDatabase with NULL
-setMasterDB(NULL);  // ✅ Creates internal MasterDatabase at 0x629f14a0
-
-// 5. Init client
-int result = init(argc, argv, hClient, NULL, NULL, 0, 0, NULL);
-
-// 6. Inject global objects (see GLOBAL_OBJECTS.md)
-// - TimerObject at 0x629f1748
-// - StateObject at 0x62999968
-
-// 7. Run
-if (result == 0) {
-    run();
-}
+client_SetMasterDatabase(NULL);
+InitClientDLL(...);
+RunClientDLL();
 ```
 
----
+That sequence is test-harness behavior only.
 
-## Key Files
+## Current canonical understanding
 
-| File | Description | Status |
-|------|-------------|--------|
-| `CORRECT_USAGE.md` | This document | ✅ Current |
-| `MASTER_DATABASE.md` | OLD - says pass structure | ❌ Superceded |
-| `GLOBAL_OBJECTS.md` | Objects to inject after init | ✅ Current |
-| `TEST_RESULTS.md` | Actual test results | ✅ Current |
+1. `launcher.exe!SetMasterDatabase` is a real launcher export.
+2. `client.dll!SetMasterDatabase` is also a real client export.
+3. The original launcher startup path we have statically traced does not show a direct launcher-to-client call into `client.dll!SetMasterDatabase`.
+4. Therefore the reimplementation should not be built around that direct call unless new binary evidence proves it.
 
----
+## Reimplementation implication
 
-## Related
+The current problem is more likely that we have not yet reproduced the launcher-owned objects and call frame that surround `InitClientDLL`, rather than that we forgot to manually call `client.dll!SetMasterDatabase()`.
 
-- `../../launcher.exe/SetMasterDatabase/` - Launcher side docs
-- Source of truth: disassembly `client.dll+0x6229d760`
+## Open question
 
----
-
-**Status**: Documentation corrected based on runtime validation
+Whether `client.dll` later discovers or uses `launcher.exe!SetMasterDatabase` through another path is still a separate question, but it must be answered from binary evidence, not promoted from harness behavior.

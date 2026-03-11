@@ -1,149 +1,95 @@
-# launcher.exe → client.dll Loading Sequence
+# launcher.exe -> client.dll loading sequence
 
-## Date: 2025-03-11
-## Status: INVESTIGATION COMPLETE
+## Source of truth
 
----
+- startup driver around `launcher.exe:0x40b739..0x40b7d5`
+- client export resolution/calls at `launcher.exe:0x40a4d0..0x40a6fb`
+- helper loaders at `0x40a380`, `0x40a420`, `0x40a780`
 
-## Overview
+## Canonical sequence
 
-launcher.exe loads client.dll and calls its exports. Both files export `SetMasterDatabase()` - it's a **bidirectional callback mechanism**.
+### 1. Build launcher object at `0x4d6304`
+Call site:
+- `0x40b740 -> 0x40a380`
 
----
+What `0x40a380` does:
+- allocates `0xb4` bytes
+- constructs a launcher-owned object
+- stores it at `0x4d6304`
+- registers / hands it through the runtime interface pointer stored at `0x4d2c58`
 
-## Step-by-Step Loading Sequence (Disassembly Analysis)
+Canonical object docs:
+- `../startup_objects/0x4d6304_network_engine.md`
+- `../startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
 
-### Phase 1: Load client.dll Module
+### 2. Perform additional launcher environment setup
+Call site:
+- `0x40b74d -> 0x402ec0`
 
-**Status**: Location found but not fully traced
+This happens before any `client.dll` entry point is called.
 
-From symbol analysis:
-- "client.dll" string at `0x4ac160`
-- LoadLibraryA used (import at `0x4a907c`)
-- Module handle stored at global `0x4d2c50`
+Canonical note:
+- `PRECLIENT_ENVIRONMENT_402EC0.md`
 
-### Phase 2: Get Function Pointers via GetProcAddress
+Current best interpretation:
+- launcher thread / message / event environment setup that blocks until ready
 
-**Location**: `0x40a4f0 - 0x40a540` in launcher.exe
+### 3. Load `cres.dll`
+Call site:
+- `0x40b7b1 -> 0x40a780`
 
-#### 2.1 Get InitClientDLL
-```asm
-0x0040a4f2: mov esi, dword [0x4d2530]  ; ESI = GetProcAddress
-0x0040a4f8: push edi
-0x0040a4f9: push str.InitClientDLL      ; "InitClientDLL" at 0x4ac1e8
-0x0040a4fe: push eax                    ; hClient
-0x0040a511: call esi                    ; GetProcAddress
-```
+What `0x40a780` does:
+- `LoadLibraryA("cres.dll")`
+- stores the handle at `0x4d2c4c`
 
-#### 2.2 Get RunClientDLL
-```asm
-0x0040a509: push str.RunClientDLL       ; "RunClientDLL" at 0x4ac1d8
-0x0040a50e: push [0x4d2c50]             ; hClient
-0x0040a511: call esi                    ; GetProcAddress
-0x0040a50f: mov edi, eax                ; RunClientDLL pointer in EDI
-```
+### 4. Load `client.dll`
+Call site:
+- `0x40b7bc -> 0x40a420`
 
-#### 2.3 Get TermClientDLL
-```asm
-0x0040a519: push str.TermClientDLL      ; "TermClientDLL" at 0x4ac1c8
-0x0040a51e: push [0x4d2c50]             ; hClient
-0x0040a522: call esi                    ; GetProcAddress
-0x0040a51f: mov [ebp-0x18], eax         ; Store TermClientDLL
-```
+What `0x40a420` does:
+- `LoadLibraryA("client.dll")`
+- stores the handle at `0x4d2c50`
 
-#### 2.4 Get ErrorClientDLL
-```asm
-0x0040a52c: push str.ErrorClientDLL     ; "ErrorClientDLL" at 0x4ac1b8
-0x0040a531: push eax                    ; hClient
-0x0040a532: call esi                    ; GetProcAddress
-0x0040a534: mov esi, eax                ; ErrorClientDLL in ESI
-```
+### 5. Resolve client exports
+Call site:
+- `0x40b7c7 -> 0x40a4d0`
 
-### Phase 3: Call InitClientDLL
+Resolved in order:
+- `InitClientDLL`
+- `RunClientDLL`
+- `TermClientDLL`
+- `ErrorClientDLL`
 
-**Status**: Need to find actual call site
+### 6. Call `InitClientDLL`
+Still inside `0x40a4d0`:
+- arguments prepared at `0x40a55c..0x40a5a4`
+- exact mapping documented in `../../client.dll/InitClientDLL/README.md`
 
-Expected pattern after function discovery:
-```asm
-; push parameters
-; call InitClientDLL  ; Find this address
-; test result
-; jump if failed
-```
+### 7. Call `RunClientDLL`
+On the successful path inside `0x40a4d0`:
+- `call [ebp-0x14]` invokes `RunClientDLL`
 
-### Phase 4: Call RunClientDLL
+### 8. Cleanup after the client phase
+After the main client path returns:
+- `0x40b88a -> 0x40b360` tears down `0x4d6304` / `0x4d2c58` related state
+- `0x40b88f -> 0x40a000` frees parsed-argument storage from `0x4d2c60`
 
-**Status**: Need to find actual call site
+## Hard boundary from static analysis
 
-Expected to call RunClientDLL (stored in EDI) after successful Init.
+In this traced startup path, `launcher.exe`:
+- loads modules,
+- resolves exports,
+- calls `InitClientDLL`,
+- calls `RunClientDLL`,
+- but does **not** directly call `client.dll!SetMasterDatabase()`.
 
----
+## High-confidence conclusions
 
-## String Addresses (Confirmed)
+1. `cres.dll` is part of the original startup path and is passed to `InitClientDLL`.
+2. The launcher does significant work before calling `InitClientDLL`.
+3. A minimal host that only loads `client.dll` and passes mostly `NULL` arguments is not equivalent to the original launcher.
+4. No client-memory injection is required by the original launcher path we are trying to reproduce.
 
-| String | Virtual Address | Usage |
-|--------|-----------------|-------|
-| InitClientDLL | 0x4ac1e8 | GetProcAddress |
-| RunClientDLL | 0x4ac1d8 | GetProcAddress |
-| TermClientDLL | 0x4ac1c8 | GetProcAddress |
-| ErrorClientDLL | 0x4ac1b8 | GetProcAddress |
-| client.dll | 0x4ac160 | LoadLibrary |
-| SetMasterDatabase | 0x4c5a0f | launcher.exe EXPORT |
+## Current implication
 
----
-
-## SetMasterDatabase Direction - VERIFIED
-
-**launcher.exe(EXPORTS)**: `SetMasterDatabase(void*)` 
-**client.dll(IMPORTS)**: Calls launcher!SetMasterDatabase during InitClientDLL
-
-**VERIFIED**: launcher.exe does NOT call client.dll!SetMasterDatabase
-
-See `SETMASTER_DATABASE_VERIFICATION.md` for complete verification evidence.
-
-### Sequence:
-1. launcher exports SetMasterDatabase
-2. launcher calls client.dll!InitClientDLL
-3. InitClientDLL internally discovers launcher!SetMasterDatabase via GetProcAddress
-4. InitClientDLL calls launcher.SetMasterDatabase(clientDB)
-5. launcher receives callback and sets up internal state
-6. InitClientDLL returns success
-7. launcher calls client.dll!RunClientDLL
-
----
-
-## Key Globals Found
-
-| Address | Purpose |
-|---------|---------|
-| 0x4d2530 | GetProcAddress import pointer |
-| 0x4d2c50 | hModule (client.dll handle) |
-
----
-
-## Disassembly Commands
-
-```bash
-# Find function discovery block
-r2 -qc 's 0x40a500; pd 60' launcher.exe
-
-# Find references to InitClientDLL string
-r2 -qc '/x 68e8c14a00' launcher.exe
-
-# Find where hClient is loaded
-r2 -qc '/x 68c04a00' launcher.exe  # push str.client.dll
-```
-
----
-
-## Related Documentation
-
-- `../client_dll/` - client.dll documentation
-- `CORE_INVESTIGATION.md` - High-level questions
-- `../client.dll/SetMasterDatabase/` - SetMasterDatabase documentation
-
----
-
-**Status**: Function discovery block located. Need to trace actual call sites for InitClientDLL and RunClientDLL.
-
-**Next**: Find the code that actually calls InitClientDLL after GetProcAddress.
+The current custom launcher is still missing launcher-owned setup that happens before `RunClientDLL`. That is the primary line of investigation.
