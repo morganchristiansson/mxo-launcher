@@ -1,49 +1,44 @@
-# Matrix Online Launcher Makefile
-# Build configuration for Windows executables
+# Matrix Online launcher reimplementation Makefile
 
-# Compiler settings (MinGW-w64) - 32-bit for Wine compatibility
 CXX = i686-w64-mingw32-g++
+GAME_DIR = ~/MxO_7.6005
+TARGET = $(GAME_DIR)/resurrections.exe
+SRC = src/resurrections.cpp
 
-# Project name
-TARGET_DIR = ~/MxO_7.6005
-TARGET = $(TARGET_DIR)/resurrections.exe
-SRC = src/main.cpp src/dll_deployer.c
-
-# Include path for header files
-INCLUDE = -Iinclude
-
-# Default target
 all: $(TARGET)
 
-# Build the executable
-# Note: We DON'T use -static because the original launcher uses MSVCR71.dll
-# and the C runtime needs to be shared with client.dll
 $(TARGET): $(SRC)
-	$(CXX) -O2 $(INCLUDE) -o $(TARGET) $(SRC) -mwindows
-
-# Build the proper launcher with master database support
-launcher_proper.exe: launcher_proper.cpp master_database.h
 	$(CXX) -Wall -Wextra -O2 -o $@ $< -Wl,--export-all-symbols
 
-# Build test executables
-test_mxowrap.exe: test_mxowrap.cpp
-	$(CXX) -Wall -Wextra -O2 -o $@ $<
-
-test_mxowrap_import.exe: test_mxowrap_import.cpp
-	$(CXX) -Wall -Wextra -O2 -o $@ $< -L~/MxO_7.6005 -lmxowrap
-
-# Clean build artifacts
-clean:
-	rm -f $(TARGET) launcher_proper.exe test_mxowrap.exe test_mxowrap_import.exe
-
-# Debug build (with symbols)
-debug: CXXFLAGS = -Wall -Wextra -g -DDEBUG
-debug: LDFLAGS = -mwindows
-debug: $(TARGET)
-
-# Run with Wine (if available)
 run: $(TARGET)
-	@echo "Running with Wine..."
-	cd $(TARGET_DIR) && xvfb-run wine $(TARGET)
+	cd $(GAME_DIR) && xvfb-run -a wine ./resurrections.exe
 
-.PHONY: all clean debug run launcher_proper.exe test_mxowrap.exe test_mxowrap_import.exe
+crashdump:
+	@latest=$$(cd $(GAME_DIR) && ls -t MatrixOnline_0.0_crash_*.dmp 2>/dev/null | head -1); \
+	if [ -z "$$latest" ]; then \
+		echo "No crash dump found in $(GAME_DIR)"; \
+		exit 1; \
+	fi; \
+	echo "Latest crash dump: $(GAME_DIR)/$$latest"; \
+	cd $(GAME_DIR) && printf 'info reg\nbt\ninfo share\nquit\n' | xvfb-run -a winedbg "$$latest"
+
+run_incomplete_init: $(TARGET)
+	cd $(GAME_DIR) && MXO_FORCE_INCOMPLETE_INIT=1 xvfb-run -a wine ./resurrections.exe
+
+run_forced_runtime: $(TARGET)
+	cd $(GAME_DIR) && \
+		MXO_FORCE_INCOMPLETE_INIT=1 \
+		MXO_FORCE_RUNCLIENT=1 \
+		MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE=1 \
+		xvfb-run -a wine ./resurrections.exe
+
+run_stub_mediator: $(TARGET)
+	cd $(GAME_DIR) && \
+		MXO_STUB_LOGIN_MEDIATOR=1 \
+		MXO_FORCE_INCOMPLETE_INIT=1 \
+		xvfb-run -a wine ./resurrections.exe
+
+clean:
+	rm -f $(TARGET)
+
+.PHONY: all run crashdump run_incomplete_init run_forced_runtime run_stub_mediator clean
