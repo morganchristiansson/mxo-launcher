@@ -3,15 +3,15 @@
 CXX = i686-w64-mingw32-g++
 GAME_DIR = ~/MxO_7.6005
 TARGET = $(GAME_DIR)/resurrections.exe
-SRC = src/resurrections.cpp
+SRC = src/resurrections.cpp src/diagnostics.cpp
 
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CXX) -Wall -Wextra -O2 -o $@ $< -Wl,--export-all-symbols
+	$(CXX) -Wall -Wextra -O2 -o $@ $^ -Wl,--export-all-symbols
 
 run: $(TARGET)
-	cd $(GAME_DIR) && xvfb-run -a wine ./resurrections.exe
+	cd $(GAME_DIR) && DISPLAY=:1 wine ./resurrections.exe
 
 crashdump:
 	@latest=$$(cd $(GAME_DIR) && ls -t MatrixOnline_0.0_crash_*.dmp 2>/dev/null | head -1); \
@@ -20,23 +20,23 @@ crashdump:
 		exit 1; \
 	fi; \
 	echo "Latest crash dump: $(GAME_DIR)/$$latest"; \
-	cd $(GAME_DIR) && printf 'info reg\nbt\ninfo share\nquit\n' | xvfb-run -a winedbg "$$latest"
+	cd $(GAME_DIR) && printf 'info reg\nbt\ninfo share\nquit\n' | DISPLAY=:1 winedbg "$$latest"
 
 run_incomplete_init: $(TARGET)
-	cd $(GAME_DIR) && MXO_FORCE_INCOMPLETE_INIT=1 xvfb-run -a wine ./resurrections.exe
+	cd $(GAME_DIR) && MXO_FORCE_INCOMPLETE_INIT=1 DISPLAY=:1 wine ./resurrections.exe
 
 run_forced_runtime: $(TARGET)
 	cd $(GAME_DIR) && \
 		MXO_FORCE_INCOMPLETE_INIT=1 \
 		MXO_FORCE_RUNCLIENT=1 \
 		MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE=1 \
-		xvfb-run -a wine ./resurrections.exe
+		DISPLAY=:1 wine ./resurrections.exe
 
 run_stub_mediator: $(TARGET)
 	cd $(GAME_DIR) && \
 		MXO_STUB_LOGIN_MEDIATOR=1 \
 		MXO_FORCE_INCOMPLETE_INIT=1 \
-		xvfb-run -a wine ./resurrections.exe
+		DISPLAY=:1 wine ./resurrections.exe
 
 clean:
 	rm -f $(TARGET)

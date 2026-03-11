@@ -1,7 +1,7 @@
 # Matrix Online Launcher - Agent Development Notes
 
 For generic workflow and documentation policy, see:
-- `../AGENTS.md`
+- `../../AGENTS.md`
 
 ## Current Goal
 
@@ -10,8 +10,10 @@ Reimplement the original Matrix Online `launcher.exe` startup path as faithfully
 Source of truth:
 - `~/MxO_7.6005/launcher.exe`
 
-Current active source:
+Current active sources:
 - `src/resurrections.cpp`
+- `src/diagnostics.cpp`
+- `src/diagnostics.h`
 
 ## Current Status (2026-03-11)
 
@@ -37,6 +39,13 @@ Current unresolved inputs:
 
 Current faithful experiment result:
 - `InitClientDLL = -7`
+
+Diagnostic mediator-stub result:
+- with `MXO_STUB_LOGIN_MEDIATOR=1` on `DISPLAY=:1`, the game now progresses far enough to open a visible game window
+- observed behavior: black window / black frame
+- DXVK logs show device creation, display-mode switch, and swapchain/presenter setup
+- this is strong evidence that arg6 reconstruction moves startup into real rendering/window creation territory
+- this is still a **diagnostic** path, not original-equivalent behavior
 
 Diagnostic-only forced runtime result:
 - fresh dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
@@ -83,7 +92,9 @@ make crashdump
 ## Key Files
 
 Code:
-- `src/resurrections.cpp`
+- `src/resurrections.cpp` - startup orchestration / DLL loading / InitClientDLL frame
+- `src/diagnostics.cpp` - mediator stub, launcher-object stub, window tracing
+- `src/diagnostics.h`
 - `Makefile`
 - runtime executable: `resurrections.exe`
 

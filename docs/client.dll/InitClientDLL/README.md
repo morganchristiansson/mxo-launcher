@@ -61,12 +61,50 @@ Names after arg4 are still provisional, but the sources and order are not.
 
 Before the call, the original launcher has already:
 
-1. parsed command-line state into `0x4d2c5c` / `0x4d2c60`
+1. parsed launcher-filtered command-line state into `0x4d2c5c` / `0x4d2c60`
 2. built a launcher-owned object and stored it at `0x4d6304`
 3. loaded `cres.dll` into `0x4d2c4c`
 4. loaded `client.dll` into `0x4d2c50`
 5. resolved the runtime interface pointer at `0x4d2c58` (`ILTLoginMediator.Default`)
 6. selected nopatch-related state reflected in `0x4d2c69`
+
+### New clarification: arg1/arg2 are filtered launcher-owned argv storage
+
+Static analysis of `launcher.exe:0x409950` now tightens the meaning of `0x4d2c5c` / `0x4d2c60`.
+
+That function:
+- allocates a pointer array sized from CRT `argc`
+- stores the array pointer at `0x4d2c60`
+- zeroes it
+- initializes `0x4d2c5c = 0`
+- walks CRT `argv`
+- consumes launcher-owned switches like `-clone`, `-silent`, and `-nopatch`
+- duplicates surviving / forwarded entries into fresh heap strings
+- stores those duplicated pointers into the `0x4d2c60` array
+- increments `0x4d2c5c` for each forwarded entry
+- later frees that array through `0x40a000`
+
+So arg1/arg2 to `InitClientDLL` are **not simply raw CRT `argc` / `argv`**.
+They are a launcher-built filtered argv-like pair backed by launcher-owned duplicated strings.
+
+### New clarification: `options.cfg` is probed during the arg-filtering phase
+
+The same `0x409950` path also probes `options.cfg` via `_stat` and date checks before the later client-loading sequence proceeds.
+This establishes that temporary config handling is part of launcher-side startup preparation that happens before `InitClientDLL`.
+
+What is currently supported with high confidence:
+- `options.cfg` is consulted during the launcher-side preprocessing path
+- that probe can set launcher-global flag `0x4d2c64`
+- startup later checks `0x4d2c64` at `0x40b75a` and runs an extra launcher-side branch before client loading continues
+- that branch constructs a helper object and calls `0x401520`
+- `0x401520` launches `autodetect_settings.exe setopts hide`, waits up to 60 seconds, records result bytes, and calls `0x4013c0` to populate launcher UI text such as `Default Settings:`, `Detail:`, `Memory:`, and `Continue`
+- `options.cfg` is deleted later by `0x4012e0`
+- this preprocessing occurs before the `client.dll` startup handoff
+
+What is **not** yet proven:
+- that `+Windowed 1` is literally injected by this path into `0x4d2c60`
+- the exact writer/consumer step that materializes windowed/fullscreen behavior from launcher state into client-visible config
+- whether windowed behavior is conveyed through forwarded argv, `options.cfg` contents, child-process result bytes, or some combination of those
 
 Relevant launcher-side object docs:
 - `../../launcher.exe/startup_objects/0x4d6304_network_engine.md`
@@ -74,6 +112,9 @@ Relevant launcher-side object docs:
 - `../../launcher.exe/startup_objects/0x4d2c58_RESOLUTION_MECHANISM.md`
 - `../../launcher.exe/startup_objects/0x4d3368_CLauncher.md`
 - `ARG7_0x4D3410_0x4D3414.md`
+
+For the growing mediator method surface itself, see:
+- `../../launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
 
 ## Validation result from a closer original-path experiment
 

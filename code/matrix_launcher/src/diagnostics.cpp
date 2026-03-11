@@ -1,0 +1,382 @@
+#include "diagnostics.h"
+
+#include <cstdint>
+#include <cstring>
+
+struct WindowTraceEntry {
+    HWND hwnd;
+    LONG style;
+    LONG exStyle;
+    RECT rect;
+    BOOL visible;
+    BOOL iconic;
+};
+
+struct MinimalLoginMediatorStub {
+    void** vtable;
+};
+
+struct MinimalLauncherObjectStub {
+    void** vtable;
+    unsigned char payload[0xb0];
+};
+
+static DWORD g_MainProcessId = 0;
+static HANDLE g_hWindowTraceThread = NULL;
+static volatile LONG g_WindowTraceRunning = 0;
+static WindowTraceEntry g_WindowTraceEntries[32] = {};
+static int g_WindowTraceEntryCount = 0;
+static int g_LastWindowTraceCount = -1;
+
+static MinimalLoginMediatorStub g_LoginMediatorStub = {};
+static MinimalLauncherObjectStub g_LauncherObjectStub = {};
+static void* g_LoginMediatorVtable[96] = {0};
+static void* g_LauncherObjectVtable[8] = {0};
+static const char g_MediatorName[] = "ILTLoginMediator.Default";
+static const char g_MediatorStringA[] = "resurrections";
+static const char g_MediatorStringB[] = "nopatch";
+static const char g_MediatorStringC[] = "standalone";
+
+static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return g_MediatorName;
+}
+
+static int __thiscall Mediator_RegisterEngine(MinimalLoginMediatorStub* self, void* object) {
+    (void)self;
+    Log("MediatorStub::RegisterEngine(%p)", object);
+    return 1;
+}
+
+static void __thiscall Mediator_ClearEngine(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log("MediatorStub::ClearEngine()");
+}
+
+static uint32_t __thiscall Mediator_IsReady(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log("MediatorStub::IsReady() -> 1");
+    return 1;
+}
+
+static void __thiscall Mediator_SetValue1(MinimalLoginMediatorStub* self, void* value) {
+    (void)self;
+    Log("MediatorStub::SetValue1(%p)", value);
+}
+
+static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log("MediatorStub::IsConnected() -> 1");
+    return 1;
+}
+
+static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return g_MediatorStringA;
+}
+
+static const char* __thiscall Mediator_GetString0(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return g_MediatorStringA;
+}
+
+static const char* __thiscall Mediator_GetString1(MinimalLoginMediatorStub* self, const char* value) {
+    (void)self;
+    (void)value;
+    return g_MediatorStringB;
+}
+
+static const char* __thiscall Mediator_GetString2(MinimalLoginMediatorStub* self, const char* value) {
+    (void)self;
+    (void)value;
+    return g_MediatorStringC;
+}
+
+static uint32_t __thiscall Mediator_GetArg7HighByteFloor(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return 0;
+}
+
+static uint32_t __thiscall Mediator_ShouldExportA(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return 0;
+}
+
+static uint32_t __thiscall Mediator_ShouldExportB(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return 0;
+}
+
+static int __thiscall LauncherObject_Release(MinimalLauncherObjectStub* self, uint32_t flags) {
+    Log("LauncherObjectStub::Release(flags=%u self=%p)", flags, self);
+    return 1;
+}
+
+static void InitializeMediatorStub() {
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+
+    std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
+    g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
+    g_LoginMediatorVtable[2] = (void*)Mediator_RegisterEngine;   // +0x08
+    g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
+    g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
+    g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c
+    g_LoginMediatorVtable[9] = (void*)Mediator_SetValue1;        // +0x24
+    g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
+    g_LoginMediatorVtable[14] = (void*)Mediator_GetDisplayName;  // +0x38
+    g_LoginMediatorVtable[22] = (void*)Mediator_GetString0;      // +0x58
+    g_LoginMediatorVtable[23] = (void*)Mediator_GetString2;      // +0x5c
+    g_LoginMediatorVtable[24] = (void*)Mediator_GetString1;      // +0x60
+    g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7HighByteFloor; // +0xd8
+    g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164
+    g_LoginMediatorVtable[91] = (void*)Mediator_ShouldExportB;   // +0x16c
+
+    g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
+}
+
+static void InitializeLauncherObjectStub() {
+    static bool initialized = false;
+    if (initialized) return;
+    initialized = true;
+
+    std::memset(&g_LauncherObjectStub, 0, sizeof(g_LauncherObjectStub));
+    std::memset(g_LauncherObjectVtable, 0, sizeof(g_LauncherObjectVtable));
+    g_LauncherObjectVtable[0] = (void*)LauncherObject_Release;
+    g_LauncherObjectStub.vtable = g_LauncherObjectVtable;
+}
+
+static void DiagnosticRegisterLauncherObjectWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
+    if (!launcherObjectPtr || !mediatorPtr) return;
+
+    void** vtable = *(void***)mediatorPtr;
+    if (!vtable || !vtable[2]) {
+        Log("DIAGNOSTIC: mediator register slot unavailable for launcher object handoff");
+        return;
+    }
+
+    typedef int (__thiscall *RegisterEngineFn)(void*, void*);
+    RegisterEngineFn fn = (RegisterEngineFn)vtable[2];
+    int result = fn(mediatorPtr, launcherObjectPtr);
+    Log(
+        "DIAGNOSTIC: mediator +0x08 register launcher object(%p) -> %d",
+        launcherObjectPtr,
+        result);
+}
+
+void DiagnosticInstallMediatorStub(void** outMediatorPtr) {
+    InitializeMediatorStub();
+    if (outMediatorPtr) {
+        *outMediatorPtr = &g_LoginMediatorStub;
+    }
+    Log("DIAGNOSTIC: using MinimalLoginMediatorStub for arg6 (%p)", &g_LoginMediatorStub);
+}
+
+void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr) {
+    if (!mediatorPtr) return;
+
+    void** vtable = *(void***)mediatorPtr;
+    if (!vtable || !vtable[7] || !vtable[9]) {
+        Log("DIAGNOSTIC: mediator nopatch slots unavailable");
+        return;
+    }
+
+    const uint32_t parsedNoPatchValue = 0x3dcccccd; // diagnostic placeholder for parsed "0.1"
+    const uint32_t clientVersionValue = 0x3dcccccd; // original source value still unresolved
+
+    typedef void (__thiscall *SetValueFn)(void*, void*);
+    SetValueFn setValue1 = (SetValueFn)vtable[7];
+    SetValueFn setValue2 = (SetValueFn)vtable[9];
+
+    setValue1(mediatorPtr, (void*)&parsedNoPatchValue);
+    Log("DIAGNOSTIC: applied default nopatch mediator +0x1c with placeholder 0x%08x", parsedNoPatchValue);
+
+    setValue2(mediatorPtr, (void*)&clientVersionValue);
+    Log("DIAGNOSTIC: applied default nopatch mediator +0x24 with placeholder 0x%08x", clientVersionValue);
+}
+
+void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr) {
+    InitializeLauncherObjectStub();
+    if (outLauncherObjectPtr) {
+        *outLauncherObjectPtr = &g_LauncherObjectStub;
+    }
+
+    Log(
+        "DIAGNOSTIC: using MinimalLauncherObjectStub for arg5 (%p, size=0x%zx)",
+        &g_LauncherObjectStub,
+        sizeof(g_LauncherObjectStub));
+
+    if (mediatorPtr) {
+        DiagnosticRegisterLauncherObjectWithMediator(mediatorPtr, &g_LauncherObjectStub);
+    }
+}
+
+static void LogCurrentDisplayMode(const char* prefix) {
+    DEVMODEA mode = {};
+    mode.dmSize = sizeof(mode);
+    if (!EnumDisplaySettingsA(NULL, ENUM_CURRENT_SETTINGS, &mode)) {
+        Log("%s: EnumDisplaySettingsA failed", prefix);
+        return;
+    }
+
+    Log(
+        "%s: %lux%lu %lu-bpp @%luHz",
+        prefix,
+        (unsigned long)mode.dmPelsWidth,
+        (unsigned long)mode.dmPelsHeight,
+        (unsigned long)mode.dmBitsPerPel,
+        (unsigned long)mode.dmDisplayFrequency);
+}
+
+static void UpsertWindowTraceEntry(
+    HWND hwnd,
+    LONG style,
+    LONG exStyle,
+    const RECT& rect,
+    BOOL visible,
+    BOOL iconic,
+    const char* className,
+    const char* title) {
+
+    int index = -1;
+    for (int i = 0; i < g_WindowTraceEntryCount; ++i) {
+        if (g_WindowTraceEntries[i].hwnd == hwnd) {
+            index = i;
+            break;
+        }
+    }
+
+    const bool isNew = (index < 0);
+    WindowTraceEntry previous = {};
+    if (!isNew) previous = g_WindowTraceEntries[index];
+
+    const bool changed = isNew ||
+        previous.style != style ||
+        previous.exStyle != exStyle ||
+        previous.rect.left != rect.left ||
+        previous.rect.top != rect.top ||
+        previous.rect.right != rect.right ||
+        previous.rect.bottom != rect.bottom ||
+        previous.visible != visible ||
+        previous.iconic != iconic;
+
+    if (changed) {
+        Log(
+            "WindowTrace hwnd=%p visible=%d iconic=%d class='%s' title='%s' style=0x%08lx exStyle=0x%08lx rect=(%ld,%ld)-(%ld,%ld)",
+            hwnd,
+            visible ? 1 : 0,
+            iconic ? 1 : 0,
+            className,
+            title,
+            (unsigned long)style,
+            (unsigned long)exStyle,
+            (long)rect.left,
+            (long)rect.top,
+            (long)rect.right,
+            (long)rect.bottom);
+    }
+
+    if (isNew) {
+        if (g_WindowTraceEntryCount >= (int)(sizeof(g_WindowTraceEntries) / sizeof(g_WindowTraceEntries[0]))) {
+            return;
+        }
+        index = g_WindowTraceEntryCount++;
+    }
+
+    g_WindowTraceEntries[index].hwnd = hwnd;
+    g_WindowTraceEntries[index].style = style;
+    g_WindowTraceEntries[index].exStyle = exStyle;
+    g_WindowTraceEntries[index].rect = rect;
+    g_WindowTraceEntries[index].visible = visible;
+    g_WindowTraceEntries[index].iconic = iconic;
+}
+
+static BOOL CALLBACK WindowTraceEnumProc(HWND hwnd, LPARAM lParam) {
+    int* count = reinterpret_cast<int*>(lParam);
+
+    DWORD pid = 0;
+    GetWindowThreadProcessId(hwnd, &pid);
+    if (pid != g_MainProcessId) return TRUE;
+
+    ++(*count);
+
+    char className[256] = {0};
+    char title[256] = {0};
+    GetClassNameA(hwnd, className, sizeof(className));
+    GetWindowTextA(hwnd, title, sizeof(title));
+
+    RECT rect = {};
+    GetWindowRect(hwnd, &rect);
+
+    UpsertWindowTraceEntry(
+        hwnd,
+        GetWindowLongA(hwnd, GWL_STYLE),
+        GetWindowLongA(hwnd, GWL_EXSTYLE),
+        rect,
+        IsWindowVisible(hwnd),
+        IsIconic(hwnd),
+        className,
+        title);
+
+    return TRUE;
+}
+
+static DWORD WINAPI WindowTraceThreadProc(LPVOID) {
+    DWORD lastWidth = 0;
+    DWORD lastHeight = 0;
+    DWORD lastBpp = 0;
+    DWORD lastHz = 0;
+
+    Log("WindowTrace: started for pid %lu", (unsigned long)g_MainProcessId);
+    LogCurrentDisplayMode("WindowTrace display mode");
+
+    while (InterlockedCompareExchange(&g_WindowTraceRunning, 0, 0) != 0) {
+        DEVMODEA mode = {};
+        mode.dmSize = sizeof(mode);
+        if (EnumDisplaySettingsA(NULL, ENUM_CURRENT_SETTINGS, &mode)) {
+            if (mode.dmPelsWidth != lastWidth ||
+                mode.dmPelsHeight != lastHeight ||
+                mode.dmBitsPerPel != lastBpp ||
+                mode.dmDisplayFrequency != lastHz) {
+                lastWidth = mode.dmPelsWidth;
+                lastHeight = mode.dmPelsHeight;
+                lastBpp = mode.dmBitsPerPel;
+                lastHz = mode.dmDisplayFrequency;
+                LogCurrentDisplayMode("WindowTrace display mode");
+            }
+        }
+
+        int count = 0;
+        EnumWindows(WindowTraceEnumProc, reinterpret_cast<LPARAM>(&count));
+        if (count != g_LastWindowTraceCount) {
+            g_LastWindowTraceCount = count;
+            Log("WindowTrace top-level window count: %d", count);
+        }
+
+        Sleep(250);
+    }
+
+    Log("WindowTrace: stopped");
+    return 0;
+}
+
+void DiagnosticStartWindowTrace() {
+    if (g_hWindowTraceThread) return;
+
+    g_MainProcessId = GetCurrentProcessId();
+    InterlockedExchange(&g_WindowTraceRunning, 1);
+    g_hWindowTraceThread = CreateThread(NULL, 0, WindowTraceThreadProc, NULL, 0, NULL);
+    if (!g_hWindowTraceThread) {
+        InterlockedExchange(&g_WindowTraceRunning, 0);
+        Log("WindowTrace: CreateThread failed (%lu)", (unsigned long)GetLastError());
+    }
+}
+
+void DiagnosticStopWindowTrace() {
+    if (!g_hWindowTraceThread) return;
+    InterlockedExchange(&g_WindowTraceRunning, 0);
+    WaitForSingleObject(g_hWindowTraceThread, 1000);
+    CloseHandle(g_hWindowTraceThread);
+    g_hWindowTraceThread = NULL;
+}

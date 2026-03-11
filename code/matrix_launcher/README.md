@@ -8,7 +8,7 @@ Its purpose is to reproduce the original startup behavior closely enough to laun
 ## Source of Truth
 
 - original binary: `~/MxO_7.6005/launcher.exe`
-- active implementation: `src/resurrections.cpp`
+- active implementation: `src/resurrections.cpp` + `src/diagnostics.cpp`
 - active executable name: `resurrections.exe`
 - project notes: `AGENTS.md`
 - canonical docs: `../../docs/`
@@ -86,7 +86,8 @@ Start here:
 
 ## Next Work
 
-- reconstruct `0x4d6304`
 - make `0x4d2c58` resolve non-NULL on the original path
+- reconstruct enough of the real launcher-side binder/registry path behind `ILTLoginMediator.Default`
+- then revisit `0x4d6304`
 - understand what `0x402ec0` minimally provides
 - get the faithful path past `InitClientDLL` before treating `RunClientDLL` as canonical

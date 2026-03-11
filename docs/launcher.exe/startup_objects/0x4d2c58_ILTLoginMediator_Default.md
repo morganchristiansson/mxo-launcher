@@ -110,6 +110,68 @@ At `0x40b360..0x40b409` the launcher uses the same interface during cleanup, inc
 4. The launcher passes the resolved pointer value to `InitClientDLL`.
 5. A replacement launcher that skips this acquisition/registration path is not equivalent to the original.
 
+## Early method surface observed so far
+
+### Launcher-observed offsets on `0x4d2c58`
+
+From original `launcher.exe` startup/teardown:
+
+| Offset | Current use | Confidence |
+|---:|---|---|
+| `+0x08` | launcher hands newly built `0x4d6304` object into mediator | high |
+| `+0x0c` | teardown / cleanup path | medium |
+| `+0x1c` | nopatch path passes parsed `"0.1"`-derived value | medium |
+| `+0x24` | nopatch path passes client-version-derived value | medium |
+| `+0x164` | teardown conditional check | medium |
+| `+0x16c` | teardown conditional check | medium |
+
+### Client-observed offsets on arg6-resolved `ILTLoginMediator.Default`
+
+From `client.dll` static init and early `InitClientDLL` analysis:
+
+| Offset | Earliest observed role | Confidence |
+|---:|---|---|
+| `+0x10` | readiness / availability gate; this is part of the old `-7` barrier | high |
+| `+0x2c` | additional runtime readiness gate before arg5-related runtime work | medium |
+| `+0x38` | returns C-string used by client formatting path | high |
+| `+0x58` | string-producing helper in early init logging/config path | medium |
+| `+0x5c` | chained string-producing helper | medium |
+| `+0x60` | chained string-producing helper | medium |
+| `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
+| `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
+| `+0xec` | consumes assembled selection/config structure in deeper init | medium |
+| `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
+| `+0x170` | consumes client startup context object in deeper init | medium |
+
+Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
+
+## What the stub experiments proved
+
+The opt-in mediator stub in the custom launcher showed this progression:
+
+1. with arg6 = `NULL`, `InitClientDLL` hit the old `-7` path,
+2. after supplying minimal arg6 methods (`+0x00`, `+0x10`, then `+0xd8`, `+0x38`),
+3. startup moved past the old immediate `-7` barrier and into deeper post-network-shell / rendering startup.
+
+This is the strongest current evidence that:
+
+- arg6 is the highest-priority missing launcher-owned state,
+- and the old `-7` barrier is more directly about `ILTLoginMediator.Default` than about arg5 or `0x402ec0`.
+
+## Decision for reimplementation direction
+
+The stub should be kept only as a **differential probe**.
+It is useful because it reveals which vtable slots are touched and how far startup advances.
+
+However, the growing method surface strongly suggests that the real fix should prioritize reconstructing the original launcher-side acquisition path for `0x4d2c58`, namely:
+
+- wrapper/binder object,
+- registry object,
+- resolver/service node path,
+- and materialization of the real interface pointer,
+
+rather than continuing to grow a fake mediator into a large hand-emulated interface.
+
 ## Current implication for reimplementation
 
 The current custom launcher should stop treating arg6 as a vague `master database` or arbitrary placeholder.
