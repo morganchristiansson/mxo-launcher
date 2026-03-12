@@ -186,17 +186,26 @@ Current best interpretation:
 - `+0x124` likely records the startup network triple into mediator-owned state,
 - and the next meaningful state transfer in this same path is `+0xec`, which consumes a locally assembled selection/config structure.
 
-A fresh rerun with an instrumented mediator probe still crashed before any observed `+0xec` log, but it tightened one important detail:
+A fresh rerun with an instrumented mediator probe still crashed before any observed `+0xec` log, but it tightened several important details:
 
-- latest dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_3.dmp`
+- latest dumps: `~/MxO_7.6005/MatrixOnline_0.0_crash_3.dmp`, `..._4.dmp`, `..._5.dmp`
 - logged sequence still reached:
-  - `AttachStartupContext(01f7dfc8)`
-  - `ProvideStartupTriple(netShell=01f2a288 netMgr=01f39968 distrObjExecutive=01f89dbc)`
-  - `AttachStartupContext(01f2a760)`
+  - `AttachStartupContext(01f7dfc8)` / `AttachStartupContext(629ddfc8)`
+  - `ProvideStartupTriple(netShell=01f2a288 netMgr=01f39968 distrObjExecutive=01f89dbc)` / same addresses on later run family
+  - `AttachStartupContext(01f2a760)` / `AttachStartupContext(6298a760)`
 - dump `EIP` landed at `0x003e3bb0`
 - that value matched the launcher's current `arg2 filteredArgv` pointer for the same run
+- additional probe logging captured the actual client return sites for the mediator calls we do see:
+  - first `+0x170` returned to `client.dll:0x62170da1`
+  - `+0x124` returned to `client.dll:0x62170dc1`
+  - later `+0x170` returned to `client.dll:0x62056590`
 
-That correlation makes **stack/return-address corruption or another calling/retention mismatch** more plausible than a plain missing-vtable-slot crash.
+This materially weakens the narrow theory that our current `+0x170` / `+0x124` probes are simply using the wrong stack cleanup:
+
+- the custom launcher's compiled mediator methods currently emit callee-cleanup returns consistent with the observed client call shapes (`ret 4` for `+0x170`, `ret 0xc` for `+0x124`, `ret 4` for `+0xec`),
+- and the logged caller addresses show that both observed `+0x170` calls and the observed `+0x124` call returned to valid client code before the later crash.
+
+So while the crash still smells like corrupted or misinterpreted state, the evidence now points more toward a **state/ownership/signature expectation beyond simple stack-pop mismatch** than toward those two slots immediately smashing the return address on exit.
 
 Practical implication for the diagnostic scaffold:
 

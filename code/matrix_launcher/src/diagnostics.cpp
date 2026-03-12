@@ -185,12 +185,14 @@ static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub
 
 static void __thiscall Mediator_ConsumeSelectionContext(MinimalLoginMediatorStub* self, void* selectionContext) {
     (void)self;
+    void* returnAddress = __builtin_return_address(0);
     g_MediatorRuntimeState.selectionContext0ec = selectionContext;
     ++g_MediatorRuntimeState.selection0ecCount;
     Log(
-        "MediatorStub::ConsumeSelectionContext(%p) [count=%u]",
+        "MediatorStub::ConsumeSelectionContext(%p) [count=%u caller=%p]",
         selectionContext,
-        (unsigned)g_MediatorRuntimeState.selection0ecCount);
+        (unsigned)g_MediatorRuntimeState.selection0ecCount,
+        returnAddress);
 }
 
 static void __thiscall Mediator_ProvideStartupTriple(
@@ -199,20 +201,23 @@ static void __thiscall Mediator_ProvideStartupTriple(
     void* pNetMgr,
     void* pDistrObjExecutive) {
     (void)self;
+    void* returnAddress = __builtin_return_address(0);
     g_MediatorRuntimeState.netShell124 = pNetShell;
     g_MediatorRuntimeState.netMgr124 = pNetMgr;
     g_MediatorRuntimeState.distrObjExecutive124 = pDistrObjExecutive;
     ++g_MediatorRuntimeState.provide124Count;
     Log(
-        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p) [count=%u]",
+        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p) [count=%u caller=%p]",
         pNetShell,
         pNetMgr,
         pDistrObjExecutive,
-        (unsigned)g_MediatorRuntimeState.provide124Count);
+        (unsigned)g_MediatorRuntimeState.provide124Count,
+        returnAddress);
 }
 
 static void __thiscall Mediator_AttachStartupContext(MinimalLoginMediatorStub* self, void* startupContext) {
     (void)self;
+    void* returnAddress = __builtin_return_address(0);
     if (!g_MediatorRuntimeState.firstContext170) {
         g_MediatorRuntimeState.firstContext170 = startupContext;
     }
@@ -229,14 +234,15 @@ static void __thiscall Mediator_AttachStartupContext(MinimalLoginMediatorStub* s
     }
 
     Log(
-        "MediatorStub::AttachStartupContext(%p) [count=%u relation=%s first=%p latest124=(%p,%p,%p)]",
+        "MediatorStub::AttachStartupContext(%p) [count=%u relation=%s first=%p latest124=(%p,%p,%p) caller=%p]",
         startupContext,
         (unsigned)g_MediatorRuntimeState.attach170Count,
         relation,
         g_MediatorRuntimeState.firstContext170,
         g_MediatorRuntimeState.netShell124,
         g_MediatorRuntimeState.netMgr124,
-        g_MediatorRuntimeState.distrObjExecutive124);
+        g_MediatorRuntimeState.distrObjExecutive124,
+        returnAddress);
 }
 
 static const char* __thiscall Mediator_GetProfilePathComponent(MinimalLoginMediatorStub* self) {
@@ -247,32 +253,37 @@ static const char* __thiscall Mediator_GetProfilePathComponent(MinimalLoginMedia
 
 static void __thiscall Mediator_AttachRuntimeObject(MinimalLoginMediatorStub* self, void* runtimeObject) {
     (void)self;
+    void* returnAddress = __builtin_return_address(0);
     if (g_MediatorRuntimeState.provide124Count == 0) {
         g_MediatorRuntimeState.runtimeObject148 = runtimeObject;
         ++g_MediatorRuntimeState.runtime148Count;
         Log(
-            "MediatorStub::AttachRuntimeObject(+0x148 guess=%p) [count=%u]",
+            "MediatorStub::AttachRuntimeObject(+0x148 guess=%p) [count=%u caller=%p]",
             runtimeObject,
-            (unsigned)g_MediatorRuntimeState.runtime148Count);
+            (unsigned)g_MediatorRuntimeState.runtime148Count,
+            returnAddress);
         return;
     }
 
     g_MediatorRuntimeState.runtimeObject174 = runtimeObject;
     ++g_MediatorRuntimeState.runtime174Count;
     Log(
-        "MediatorStub::AttachRuntimeObject(+0x174 guess=%p) [count=%u]",
+        "MediatorStub::AttachRuntimeObject(+0x174 guess=%p) [count=%u caller=%p]",
         runtimeObject,
-        (unsigned)g_MediatorRuntimeState.runtime174Count);
+        (unsigned)g_MediatorRuntimeState.runtime174Count,
+        returnAddress);
 }
 
 static void __thiscall Mediator_ConsumeRuntimeDescriptor(MinimalLoginMediatorStub* self, void* runtimeDescriptor) {
     (void)self;
+    void* returnAddress = __builtin_return_address(0);
     g_MediatorRuntimeState.runtimeDescriptor178 = runtimeDescriptor;
     ++g_MediatorRuntimeState.descriptor178Count;
     Log(
-        "MediatorStub::ConsumeRuntimeDescriptor(%p) [count=%u]",
+        "MediatorStub::ConsumeRuntimeDescriptor(%p) [count=%u caller=%p]",
         runtimeDescriptor,
-        (unsigned)g_MediatorRuntimeState.descriptor178Count);
+        (unsigned)g_MediatorRuntimeState.descriptor178Count,
+        returnAddress);
 }
 
 static uint32_t __thiscall Mediator_ShouldExportA(MinimalLoginMediatorStub* self) {
