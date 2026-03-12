@@ -71,7 +71,9 @@ struct DiagnosticLauncherObjectBuildState {
     uint32_t slot4CallCount;
     uint32_t subobject5CSlot1CallCount;
     uint32_t subobject60Slot0CallCount;
+    uint32_t subobject60Slot1CallCount;
     uint32_t subobject98Slot0CallCount;
+    uint32_t subobject98Slot1CallCount;
 };
 
 struct DiagnosticMediatorResolverNode {
@@ -582,12 +584,32 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     return 0;
 }
 
+static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self) {
+    ++g_LauncherObjectBuildState.subobject60Slot1CallCount;
+    Log(
+        "LauncherObjectStub::Subobject60::Slot1(self=%p) [count=%u]",
+        self,
+        (unsigned)g_LauncherObjectBuildState.subobject60Slot1CallCount);
+    LogPointerWords("LauncherObject subobject60 self", self, 4);
+    return 0;
+}
+
 static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self) {
     ++g_LauncherObjectBuildState.subobject98Slot0CallCount;
     Log(
         "LauncherObjectStub::Subobject98::Slot0(self=%p) [count=%u]",
         self,
         (unsigned)g_LauncherObjectBuildState.subobject98Slot0CallCount);
+    LogPointerWords("LauncherObject subobject98 self", self, 4);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self) {
+    ++g_LauncherObjectBuildState.subobject98Slot1CallCount;
+    Log(
+        "LauncherObjectStub::Subobject98::Slot1(self=%p) [count=%u]",
+        self,
+        (unsigned)g_LauncherObjectBuildState.subobject98Slot1CallCount);
     LogPointerWords("LauncherObject subobject98 self", self, 4);
     return 0;
 }
@@ -643,8 +665,10 @@ static void InitializeLauncherObjectStub() {
     g_LauncherObjectVtable[3] = (void*)LauncherObject_Slot3_436000;   // 0x436000
     g_LauncherObjectVtable[4] = (void*)LauncherObject_Slot4_42F7C0;   // 0x42f7c0
     g_LauncherObjectSubVtable5C[1] = (void*)LauncherObject_Subobject5C_Slot1; // base +0x5c helper slot
-    g_LauncherObjectSubVtable60[0] = (void*)LauncherObject_Subobject60_Slot0; // base +0x60 helper slot
+    g_LauncherObjectSubVtable60[0] = (void*)LauncherObject_Subobject60_Slot0; // base +0x60 helper slot 0x4147b0
+    g_LauncherObjectSubVtable60[1] = (void*)LauncherObject_Subobject60_Slot1; // base +0x60 helper slot 0x4147c0
     g_LauncherObjectSubVtable98[0] = (void*)LauncherObject_Subobject98_Slot0; // derived +0x98 helper slot
+    g_LauncherObjectSubVtable98[1] = (void*)LauncherObject_Subobject98_Slot1; // derived +0x98 helper slot
 }
 
 static void DiagnosticInitializeBinderScaffold(void** outMediatorPtr) {

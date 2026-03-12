@@ -187,8 +187,8 @@ Current diagnostic scaffold now mirrors these constructor facts from `0x431c30` 
   - `+0x8c` -> allocated `0x18` block with self-linked `next/prev`
 - helper-object roots now seeded at:
   - `+0x5c` -> placeholder helper vtable with logged slot `+0x04`
-  - `+0x60` -> placeholder helper vtable with logged slot `+0x00`
-  - `+0x98` -> placeholder helper vtable with logged slot `+0x00`
+  - `+0x60` -> placeholder helper vtable with logged slots `+0x00` / `+0x04`, matching the two earliest client-observed calls on the original `0x4add70` helper root (`0x4147b0` / `0x4147c0`)
+  - `+0x98` -> placeholder helper vtable with logged slots `+0x00` / `+0x04`, mirroring the derived ctor's reuse of the same `0x4add70`-style helper root before initializing `+0x9c`
 
 This is still **not** a faithful reimplementation of the real `CLTThreadPerClientTCPEngine` object:
 
@@ -235,10 +235,31 @@ Practical result from the latest deep patched-client runs:
 
 So, in the current practical path, merely exposing the first original arg5 vtable entries did **not** shift the crash and did **not** yet show evidence that those early arg5 methods are being exercised before the current failure point.
 
+A follow-up faithfulness pass then widened the embedded-helper probe surface slightly further:
+
+- `+0x60` now exposes placeholder slots `+0x00` and `+0x04`
+- `+0x98` now exposes placeholder slots `+0x00` and `+0x04`
+- this matches the earliest static launcher-side evidence around the shared `0x4add70` helper root used by both base and derived ctors
+
+Current practical result after that follow-up:
+
+- deep startup still reaches the stable mediator sequence
+  - `AttachStartupContext(first)`
+  - `ProvideStartupTriple(...)`
+  - `AttachStartupContext(second)`
+- the latest dump still lands in launcher-owned arg2 storage
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_19.dmp`
+  - `EIP=0x003e3bb2`
+- and no new logs from:
+  - arg5 primary vtable slots `1..4`
+  - arg5 embedded helper slots at `+0x60/+0x98`
+  appeared before that crash
+
 That is useful narrowing evidence:
 
-- making arg5's vtable less fake is the correct faithfulness direction,
-- but the present late failure is still not explained by the absence of only those first few slots.
+- making arg5's helper/vtable surface less fake is still the correct faithfulness direction,
+- but the present late failure is still not explained by the absence of only those earliest arg5 slots,
+- so the current remaining launcher-owned risk is more likely in deeper arg5 state, the still-incomplete `0x409950` preprocessing path, or another later launcher/client ownership mismatch.
 
 ## Updated priority note
 

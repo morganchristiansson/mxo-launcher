@@ -74,6 +74,7 @@ MXO_PASS := your-password
 
 If that file exists, the Makefile appends those two values as argv to `resurrections.exe`.
 The launcher currently treats them as launcher-only placeholder auth argv, strips them back out before `InitClientDLL`, and logs only whether they were provided, not the raw values.
+It also now consumes known launcher-only switches like `-clone`, `-silent`, and `-nopatch` during filtered argv construction instead of forwarding them blindly into `InitClientDLL`.
 
 Optional diagnostic arg7/arg8 overrides for post-`IsReady()` experiments:
 

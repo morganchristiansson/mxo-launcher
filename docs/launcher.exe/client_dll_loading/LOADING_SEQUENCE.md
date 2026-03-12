@@ -52,6 +52,10 @@ It is a launcher-built filtered argv array containing **fresh duplicated strings
 
 This is the strongest current evidence that `InitClientDLL` arg1/arg2 are **filtered launcher-owned storage**, not raw CRT `argc` / `argv`.
 
+Current scaffold note:
+- the custom launcher now mirrors one small but evidence-backed part of this path by consuming known launcher-only switches (`-clone`, `-silent`, `-nopatch`) during filtered argv construction instead of forwarding them blindly
+- however, the broader `0x409950` behavior is still incomplete, especially the surrounding launcher-global side effects and `options.cfg` / autodetect branch
+
 ### New clarification: `options.cfg` is not just probed, it gates a pre-client launcher step
 
 Static tracing now shows this relationship:

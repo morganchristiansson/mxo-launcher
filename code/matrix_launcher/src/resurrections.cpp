@@ -357,6 +357,14 @@ static void LogKnownStartupState() {
     Log("arg8 flagByte                = 0x%08x", g_FlagByte);
 }
 
+static bool IsLauncherOnlySwitch(const char* value) {
+    if (!value || !value[0]) return false;
+    return
+        lstrcmpiA(value, "-clone") == 0 ||
+        lstrcmpiA(value, "-silent") == 0 ||
+        lstrcmpiA(value, "-nopatch") == 0;
+}
+
 static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     const bool hasLauncherAuthArgs = (argc >= 3 && argv[1] && argv[1][0] && argv[2] && argv[2][0]);
 
@@ -366,30 +374,50 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     Log("username argv[1] = %s", MaskedArgValue((argc >= 2) ? argv[1] : NULL));
     Log("password argv[2] = %s", MaskedArgValue((argc >= 3) ? argv[2] : NULL));
 
-    const int filteredCount = hasLauncherAuthArgs ? (1 + ((argc > 3) ? (argc - 3) : 0)) : argc;
-    if (filteredCount < 0) {
-        Log("ERROR: filtered argv count %d is invalid", filteredCount);
+    const int firstForwardedSrc = hasLauncherAuthArgs ? 3 : 1;
+    const int maxForwardedCount = 1 + ((argc > firstForwardedSrc) ? (argc - firstForwardedSrc) : 0);
+    if (maxForwardedCount < 1) {
+        Log("ERROR: filtered argv capacity %d is invalid", maxForwardedCount);
         return false;
     }
 
     FreeFilteredArgvOwned();
-    g_FilteredArgvOwned = static_cast<char**>(std::calloc(filteredCount + 1, sizeof(char*)));
+    g_FilteredArgvOwned = static_cast<char**>(std::calloc(maxForwardedCount + 1, sizeof(char*)));
     if (!g_FilteredArgvOwned) {
         Log("ERROR: failed to allocate launcher-owned filtered argv pointer array");
         return false;
     }
-    g_FilteredArgvOwnedCapacity = static_cast<uint32_t>(filteredCount + 1);
+    g_FilteredArgvOwnedCapacity = static_cast<uint32_t>(maxForwardedCount + 1);
 
-    for (int dst = 0; dst < filteredCount; ++dst) {
-        const int src = hasLauncherAuthArgs ? ((dst == 0) ? 0 : (dst + 2)) : dst;
-        const char* value = (src < argc && argv[src]) ? argv[src] : "";
-        g_FilteredArgvOwned[dst] = DuplicateArgString(value);
-        if (!g_FilteredArgvOwned[dst]) {
-            Log("ERROR: failed to duplicate filtered argv[%d]", dst);
+    g_FilteredArgvOwned[0] = DuplicateArgString((argc > 0 && argv[0]) ? argv[0] : "");
+    if (!g_FilteredArgvOwned[0]) {
+        Log("ERROR: failed to duplicate filtered argv[0]");
+        FreeFilteredArgvOwned();
+        return false;
+    }
+    Log("DIAGNOSTIC: filtered argv[0] duplicated at %p -> '%s'", g_FilteredArgvOwned[0], g_FilteredArgvOwned[0]);
+
+    int filteredCount = 1;
+    for (int src = firstForwardedSrc; src < argc; ++src) {
+        const char* value = argv[src] ? argv[src] : "";
+        if (IsLauncherOnlySwitch(value)) {
+            Log("DIAGNOSTIC: consumed launcher-only switch '%s' during filtered argv build", value);
+            continue;
+        }
+
+        g_FilteredArgvOwned[filteredCount] = DuplicateArgString(value);
+        if (!g_FilteredArgvOwned[filteredCount]) {
+            Log("ERROR: failed to duplicate filtered argv[%d] from src argv[%d]", filteredCount, src);
             FreeFilteredArgvOwned();
             return false;
         }
-        Log("DIAGNOSTIC: filtered argv[%d] duplicated at %p -> '%s'", dst, g_FilteredArgvOwned[dst], g_FilteredArgvOwned[dst]);
+        Log(
+            "DIAGNOSTIC: filtered argv[%d] duplicated at %p from src argv[%d] -> '%s'",
+            filteredCount,
+            g_FilteredArgvOwned[filteredCount],
+            src,
+            g_FilteredArgvOwned[filteredCount]);
+        ++filteredCount;
     }
 
     g_FilteredArgvOwned[filteredCount] = NULL;
@@ -398,12 +426,10 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
 
     if (hasLauncherAuthArgs) {
         Log("launcher-only auth args detected; stripped 2 argv entries before InitClientDLL");
-        if (argc > 3) {
-            Log("forwarded extra launcher argv count = %d", argc - 3);
-        }
     } else {
-        Log("DIAGNOSTIC: duplicated raw argv into launcher-owned heap-backed filtered storage");
+        Log("DIAGNOSTIC: no launcher-only auth argv detected");
     }
+    Log("DIAGNOSTIC: filtered argv final count = %d", filteredCount);
     return true;
 }
 

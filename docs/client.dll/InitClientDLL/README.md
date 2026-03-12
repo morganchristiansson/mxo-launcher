@@ -87,6 +87,10 @@ That function:
 So arg1/arg2 to `InitClientDLL` are **not simply raw CRT `argc` / `argv`**.
 They are a launcher-built filtered argv-like pair backed by launcher-owned duplicated strings.
 
+Current scaffold note:
+- the custom launcher now consumes known launcher-only switches (`-clone`, `-silent`, `-nopatch`) while building its duplicated arg1/arg2 storage
+- but the original `0x409950` preprocessing path is still broader than that, especially around launcher-global side effects and the `options.cfg` / autodetect branch
+
 ### New clarification: `options.cfg` is probed during the arg-filtering phase
 
 The same `0x409950` path also probes `options.cfg` via `_stat` and date checks before the later client-loading sequence proceeds.
