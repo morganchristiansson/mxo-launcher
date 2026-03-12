@@ -181,6 +181,14 @@ Current practical crash state:
     - when queue work is present, client `0x62531e31..0x62531fe7` mirrors launcher `0x436d31..0x436ee7` and then calls arg5 primary vtable offset `+0x30` (slot `12`)
     - so the current absence of arg5 slot-12 runtime traffic is now best explained by **empty queue state**, not by slot 12 being irrelevant
   - current best reading is that the binder/scaffold path now reaches a real runtime idle/poll loop rather than an immediate post-init crash, and the next blocker is missing launcher-owned work/state that should drive arg5 queue activity beyond the current empty-loop path
+  - newer startup-side owner-path review now makes that indirect activation path more concrete than a generic suspicion:
+    - `0x41d170` constructs a `CMessageConnection`-family object, stores it at owner `+0x18`, builds endpoint state into owner `+0x5c`, then immediately calls `connection->+0x1c(owner+0x5c)`
+    - `0x41e500` constructs another `CMessageConnection`-family object, stores it at owner `+0x1c`, builds endpoint state into owner `+0x6c`, then immediately calls `connection->+0x1c(owner+0x6c)`
+    - current best mapping still reads that virtual `+0x1c` as the connection-oriented ensure-connected / engine-`Connect` wrapper
+    - current xrefs for those owner methods are now concrete next targets:
+      - `0x43909f -> 0x41d170`
+      - `0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500`
+      - with the latter set hanging off higher-level owner state rooted at `0x4f78b8`
   - newer deliberate rerun after partially wiring slots `1/2/6/7/8/12` into `src/liblttcp/` did **not** change the observed runtime surface yet:
     - still only mediator `+0x2c`
     - still only arg5 helper `+0x60` slot `0/1`
@@ -269,6 +277,21 @@ Current practical crash state:
   - the launcher-owned arg7 selection-resolution chain around `0x40d763..0x40d810`
   - broader launcher-owned preprocessing / globals from `0x409950`
   - another later launcher/client ownership mismatch that redirects control into current arg2 storage
+  - launcher-owned auth/crashreporter state is also now more concretely split than before:
+    - original launcher `0x409220..0x409254` seeds crashreporter defaults from mediator methods individually
+    - `+0x5c -> 0x42ee50 -> 0x4d7418` = crashreporter username
+    - `+0x60 -> 0x42ee80 -> 0x4d7424` = crashreporter password
+    - `+0x58 -> 0x42ede0 -> 0x4d73b8` = crashreporter `PromptForSecurId` byte-ish flag
+    - newer scaffold cleanup removes the fake launcher/auth split for username/password storage, now keeps auth values directly as auth-owned state, and wires mediator `+0x60` from configured auth password while preserving the caller-clean wrapper shape
+    - new disposable-credential validation now confirms that path end-to-end on the binder/scaffold init-success branch:
+      - with username `pwcheck`
+      - with password `PW_TEST_7Q9X2M4K`
+      - and deliberate post-init crash `MXO_DIAGNOSTIC_CRASH_AFTER_INIT_SUCCESS=1`
+      - `crashreporter_stub.log` recorded exactly:
+        - `+Username "pwcheck"`
+        - `+Password "PW_TEST_7Q9X2M4K"`
+        - `+PromptForSecurId "1"`
+    - so crashreporter-side auth propagation is no longer the active blocker
 - important newer arg7 clarification from static review remains:
   - the launcher-global root at `0x4d3584` is not just an unknown generic service object
   - initializer `0x496480..0x496491` registers `0x4d3584` through the same `0x4030d0` wrapper using the same string `"ILTLoginMediator.Default"`

@@ -994,6 +994,38 @@ Current best reading from that absence:
 - they are more likely reached indirectly through engine-owned connection/worker/helper objects, or through later launcher subsystems after the engine object has already been registered and handed off
 - that fits the current evidence better than assuming the remaining missing startup work is a single direct `g_4d6304->Connect(...)` call that we simply have not noticed yet
 
+Newer startup-side owner-path review now makes that indirect reading substantially more concrete.
+There is now a specific original launcher path where higher-level owner objects construct `CMessageConnection`-family instances and immediately drive their connect wrapper, rather than calling raw engine `Connect` on the global directly.
+
+Concrete evidence:
+- `launcher.exe:0x41d170`
+  - allocates / constructs a `CMessageConnection`-family object through `0x4417e0 -> 0x448b40`
+  - stores it at owner `+0x18`
+  - builds endpoint data into owner `+0x5c`
+  - immediately calls `connection->+0x1c(owner+0x5c)`
+- `launcher.exe:0x41e500`
+  - allocates / constructs another `CMessageConnection`-family object through the same `0x4417e0 -> 0x448b40`
+  - stores it at owner `+0x1c`
+  - builds endpoint data into owner `+0x6c`
+  - immediately calls `connection->+0x1c(owner+0x6c)`
+- those calls match the current best `CMessageConnection` mapping where virtual `+0x1c` is the connection-oriented ensure-connected / engine-`Connect` wrapper
+
+This also gives a more concrete startup owner for the previously abstract “indirect engine entry” model.
+Current xrefs show:
+- `launcher.exe:0x43909f -> 0x41d170`
+- `launcher.exe:0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500`
+- the latter set is preceded by mediator-derived fetches from a higher-level owner rooted at `0x4f78b8`, including methods at offsets such as `+0xe0`, `+0xfc`, and `+0x10c`
+
+So the current best concrete startup/runtime reading is now:
+- the original launcher really does seem to activate network connection work **indirectly**
+- through higher-level owner objects that create `CMessageConnection` children, populate endpoint/config state, and then immediately invoke `connection->+0x1c(...)`
+- not through one trivial raw `g_4d6304->Connect(...)` call sitting in launcher mainline
+
+That narrowing materially raises the priority of tracing these owner paths:
+- `0x439090 -> 0x41d170`
+- `0x439300 -> 0x41e500`
+- and the higher-level object rooted at `0x4f78b8`
+
 
 Important limitation:
 - those new source files are still **not** a faithful full arg5 runtime implementation inside the launcher scaffold

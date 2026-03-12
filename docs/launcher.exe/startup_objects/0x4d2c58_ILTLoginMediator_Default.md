@@ -133,6 +133,9 @@ From original `launcher.exe` startup/teardown:
 | `+0x0c` | teardown / cleanup path | medium |
 | `+0x1c` | nopatch path passes parsed `"0.1"`-derived value | medium |
 | `+0x24` | nopatch path passes client-version-derived value | medium |
+| `+0x58` | launcher crashreporter/auth seeding path reads a byte-ish flag and stores it to crashreporter prompt state | medium |
+| `+0x5c` | launcher crashreporter/auth seeding path reads the value later used as crashreporter **username** | high |
+| `+0x60` | launcher crashreporter/auth seeding path reads the value later used as crashreporter **password** | high |
 | `+0x164` | teardown conditional check | medium |
 | `+0x16c` | teardown conditional check | medium |
 
@@ -140,6 +143,61 @@ Current scaffold note:
 - the replacement launcher now still uses parsed `"0.1"` for `+0x1c`,
 - and it now rebuilds the `+0x24` value from the on-disk `client.dll` version resource using the same `%d.%d%d%d%d`-style float-string shaping recovered from the original nopatch path,
 - instead of using the older identical `0.1` placeholder for both slots.
+
+### New crashreporter/auth-default seeding clarification
+
+Fresh static comparison now shows that the original launcher and client both contain a parallel crashreporter-default string/config surface, and that the launcher seeds it from `ILTLoginMediator.Default` through a path that is **distinct** from the early `InitClientDLL` chained auth-name call site.
+
+Original launcher path:
+- `launcher.exe:0x409220..0x409254`
+- calls mediator methods individually, not as the `+0x58 -> +0x60 -> +0x5c` chain used by the early client init path:
+  - `+0x5c`, then `call 0x42ee50`
+  - `+0x60`, then `call 0x42ee80`
+  - `+0x58`, then `call 0x42ede0`
+
+Those launcher helpers seed these launcher globals:
+- `0x42ee50(value)` -> copies string into `0x4d7418`
+- `0x42ee80(value)` -> copies string into `0x4d7424`
+- `0x42ede0(value)` -> stores low byte to `0x4d73b8`
+
+Original launcher crashreporter builder `0x42ef70` then uses those globals as:
+- `0x4d7418` -> crashreporter `+Username`
+- `0x4d7424` -> crashreporter `+Password`
+- `0x4d73b8` -> crashreporter `+PromptForSecurId`
+
+Client-side mirrored surface:
+- individual setters:
+  - `client.dll:0x6236fa01(value)` -> `0x62a27568`
+  - `client.dll:0x6236fa10(value)` -> `0x62a27574`
+  - `client.dll:0x6236f980/0x6236f9b0` fill the parallel app-name / intro globals `0x62a27550 / 0x62a2755c`
+  - `client.dll:0x6236fa40(a,b,c,d,flag)` seeds the whole group at once
+- client crashreporter builder `0x6236fb00` then uses:
+  - `0x62a27568` -> `+Username`
+  - `0x62a27574` -> `+Password`
+  - `0x62a27508` -> `+PromptForSecurId`
+
+Important implication for the replacement launcher:
+- the current scaffold already propagates username strongly enough that downstream crashreporter args can show `morgan`
+- newer scaffold cleanup now also wires mediator `+0x60` from explicit auth-password state while preserving the caller-clean wrapper shape and masking password values in logs
+- the highest-value current reconstruction target became the mediator-backed **password** path corresponding to original launcher `+0x60 -> 0x42ee80 -> 0x4d7424`, not only the already-studied early client `+0x58/+0x60/+0x5c` chain at `0x62001325..0x62001362`
+
+New runtime validation with a disposable test credential now confirms that this password path is materially working on the binder/scaffold init-success path.
+Representative diagnostic run:
+- binder mediator + stub launcher object
+- disposable auth:
+  - username = `pwcheck`
+  - password = `PW_TEST_7Q9X2M4K`
+- deliberate post-init crash via replacement-launcher env knob `MXO_DIAGNOSTIC_CRASH_AFTER_INIT_SUCCESS=1`
+
+Observed `crashreporter_stub.log` result:
+- `+Username "pwcheck"`
+- `+Password "PW_TEST_7Q9X2M4K"`
+- `+PromptForSecurId "1"`
+
+So, on that path:
+- crashreporter username propagation is now confirmed end-to-end
+- crashreporter password propagation is now also confirmed end-to-end
+- and the current scaffold's mediator-backed auth seeding is now much closer to the original launcher's `+0x5c/+0x60/+0x58` crashreporter-default behavior than before
 
 ### Client-observed offsets on arg6-resolved `ILTLoginMediator.Default`
 

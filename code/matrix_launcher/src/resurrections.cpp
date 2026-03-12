@@ -32,8 +32,8 @@ using InitClientDLLFunc = int (*)(
     uint32_t packedArg7Selection,
     uint32_t flagByte);
 
-using RunClientDLLFunc = void (*)();
-using TermClientDLLFunc = void (*)();
+using RunClientDLLFunc = int (*)();
+using TermClientDLLFunc = int (*)();
 using ErrorClientDLLFunc = void (*)();
 
 static FILE* g_LogFile = NULL;
@@ -100,7 +100,8 @@ static void* g_LastMediatorSelf = NULL;
 // Buffer to store raw bytes around potential crash points for pattern matching
 static uint8_t g_ArgvSnapshot[64] = {0};
 static bool g_ArgvSnapshotValid = false;
-static const char* g_AuthUsername = NULL;
+static char g_AuthUsername[256] = {};
+static char g_AuthPassword[256] = {};
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
 static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
 static void* g_pILTLoginMediatorSelection3584 = NULL; // original sibling slot: [0x4d3584]
@@ -109,8 +110,6 @@ static uint32_t g_CLauncherFieldAC = 0;          // original: [CLauncher+0xac], 
 static uint32_t g_PackedArg7Selection = 0;       // packed from [this+0xa8]/[this+0xac]
 static uint32_t g_FlagByte = 0;                  // original: [0x4d2c69]
 static char g_LastWorldName[256] = {0};         // original registry value: Last_WorldName
-static char g_LauncherUser[256] = {};
-static char g_LauncherPassword[256] = {};
 static char g_LauncherCharacter[256] = {};
 static char g_LauncherSession[256] = {};
 static char g_LauncherQlVersion[256] = {};
@@ -496,8 +495,8 @@ static bool TryBuildOriginalClientVersionFloatString(char* out, size_t outSize, 
 }
 
 static void ResetLauncherPreprocessingState() {
-    std::memset(g_LauncherUser, 0, sizeof(g_LauncherUser));
-    std::memset(g_LauncherPassword, 0, sizeof(g_LauncherPassword));
+    std::memset(g_AuthUsername, 0, sizeof(g_AuthUsername));
+    std::memset(g_AuthPassword, 0, sizeof(g_AuthPassword));
     std::memset(g_LauncherCharacter, 0, sizeof(g_LauncherCharacter));
     std::memset(g_LauncherSession, 0, sizeof(g_LauncherSession));
     std::memset(g_LauncherQlVersion, 0, sizeof(g_LauncherQlVersion));
@@ -573,9 +572,9 @@ static bool ConsumeLauncherBooleanSwitch(const char* value) {
 static bool ConsumeLauncherValueSwitch(LauncherValueTarget target, const char* value) {
     switch (target) {
         case LauncherValueTarget::User:
-            return CopyLauncherString(g_LauncherUser, sizeof(g_LauncherUser), value);
+            return CopyLauncherString(g_AuthUsername, sizeof(g_AuthUsername), value);
         case LauncherValueTarget::Password:
-            return CopyLauncherString(g_LauncherPassword, sizeof(g_LauncherPassword), value);
+            return CopyLauncherString(g_AuthPassword, sizeof(g_AuthPassword), value);
         case LauncherValueTarget::Character:
             return CopyLauncherString(g_LauncherCharacter, sizeof(g_LauncherCharacter), value);
         case LauncherValueTarget::Session:
@@ -590,8 +589,8 @@ static bool ConsumeLauncherValueSwitch(LauncherValueTarget target, const char* v
 
 static void LogLauncherPreprocessingState() {
     Log("=== Launcher switch preprocessing ===");
-    Log("launcher user       = %s", MaskedArgValue(g_LauncherUser));
-    Log("launcher password   = %s", MaskedArgValue(g_LauncherPassword));
+    Log("auth username      = %s", MaskedArgValue(g_AuthUsername));
+    Log("auth password      = %s", MaskedArgValue(g_AuthPassword));
     Log("launcher character  = %s", MaskedArgValue(g_LauncherCharacter));
     Log("launcher session    = %s", MaskedArgValue(g_LauncherSession));
     Log("launcher qlver      = %s", MaskedArgValue(g_LauncherQlVersion));
@@ -1002,7 +1001,6 @@ static void LogKnownStartupState() {
 
 static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     ResetLauncherPreprocessingState();
-    g_AuthUsername = NULL;
 
     Log("=== Launcher argv preprocessing ===");
     Log("DIAGNOSTIC: launcher auth/state expected through launcher-style switches (e.g. -user / -pwd)");
@@ -1156,7 +1154,6 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
   if (!useCallbackTestFinal && !useStaticArgvFinal) {
     g_FilteredArgv = g_FilteredArgvOwned;
   }
-    g_AuthUsername = g_LauncherUser[0] ? g_LauncherUser : NULL;
 
     if (!g_LauncherSwitchNoPatch) {
         g_LauncherSwitchNoPatch = true;
@@ -1297,8 +1294,9 @@ int main(int argc, char* argv[]) {
             selectedHighByte,
             mediatorSelectedWorldType,
             mediatorSelectedVariantState);
-        DiagnosticConfigureMediatorProfileName(g_AuthUsername);
-        DiagnosticConfigureMediatorAuthName(g_AuthUsername);
+        DiagnosticConfigureMediatorProfileName(g_AuthUsername[0] ? g_AuthUsername : NULL);
+        DiagnosticConfigureMediatorAuthName(g_AuthUsername[0] ? g_AuthUsername : NULL);
+        DiagnosticConfigureMediatorAuthPassword(g_AuthPassword[0] ? g_AuthPassword : NULL);
         DiagnosticApplyDefaultNopatchMediatorConfig(
             g_pILTLoginMediatorDefault,
             nopatchParsedValue,
@@ -1438,6 +1436,12 @@ int main(int argc, char* argv[]) {
         Log("DIAGNOSTIC OVERRIDE: continuing to RunClientDLL despite InitClientDLL failure.");
     }
 
+    if (initSucceeded && EnvFlagEnabled("MXO_DIAGNOSTIC_CRASH_AFTER_INIT_SUCCESS")) {
+        Log("DIAGNOSTIC: deliberately crashing after successful InitClientDLL for crashreporter/auth validation");
+        volatile uint32_t* crashPtr = reinterpret_cast<volatile uint32_t*>(0);
+        *crashPtr = 0xdeadbeef;
+    }
+
     if (!forceRunClient) {
         Log("InitClientDLL succeeded, but RunClientDLL is gated.");
         Log("Set MXO_FORCE_RUNCLIENT=1 for a deliberate runtime experiment.");
@@ -1445,8 +1449,8 @@ int main(int argc, char* argv[]) {
     }
 
     Log("=== Forced experiment: calling RunClientDLL ===");
-    g_RunClientDLL();
-    Log("RunClientDLL returned");
+    const int runResult = g_RunClientDLL();
+    Log("RunClientDLL returned: %d", runResult);
 
     return FinishAndReturn(0);
 }

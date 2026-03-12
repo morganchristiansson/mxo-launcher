@@ -183,8 +183,8 @@ static void* g_LauncherObjectSubVtable98[8] = {0};
 static const char g_LauncherObjectConstTable[] = "diagnostic-launcher-object";
 static const char g_MediatorName[] = "ILTLoginMediator.Default";
 static const char g_MediatorStringA[] = "resurrections";
-static const char g_MediatorStringB[] = "nopatch";
 static const char g_MediatorStringC[] = "standalone";
+static const char g_MediatorEmptyString[] = "";
 static uint32_t g_MediatorWorldUpperBoundExclusive = 1;
 static uint32_t g_MediatorVariantUpperBoundExclusive = 1;
 static uint32_t g_MediatorSelectedWorldIndexLow24 = 0;
@@ -196,6 +196,7 @@ static const char* g_MediatorMappedSelectionName = g_MediatorStringC;
 static const char* g_MediatorMappedVariantName = g_MediatorStringC;
 static const char* g_MediatorProfileName = g_MediatorStringA;
 static const char* g_MediatorAuthName = g_MediatorStringA;
+static const char* g_MediatorAuthPassword = g_MediatorEmptyString;
 
 struct __attribute__((packed)) DiagnosticMediatorSelectionPacked {
     uint8_t reserved0;
@@ -219,6 +220,19 @@ static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, g
 static DiagnosticMediatorSelectionObject g_MediatorSelectionObject = {};
 static DiagnosticMediatorSelectionContextCopy g_MediatorSelectionContextCopy = {};
 static bool g_MediatorSelectionContextCopyValid = false;
+
+static const char* MaskedSensitiveValue(const char* value) {
+    if (!value || !value[0]) return "<empty>";
+    return "<provided>";
+}
+
+static const char* MaskIfMediatorPassword(const char* value) {
+    if (!value) return "<null>";
+    if (g_MediatorAuthPassword && g_MediatorAuthPassword[0] && std::strcmp(value, g_MediatorAuthPassword) == 0) {
+        return "<provided>";
+    }
+    return value;
+}
 
 static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
@@ -337,6 +351,7 @@ static void ResetMediatorObjectState() {
     g_MediatorMappedVariantName = g_MediatorStringC;
     g_MediatorProfileName = g_MediatorStringA;
     g_MediatorAuthName = g_MediatorStringA;
+    g_MediatorAuthPassword = g_MediatorEmptyString;
     g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
@@ -517,10 +532,10 @@ static const char* __thiscall Mediator_GetString0(MinimalLoginMediatorStub* self
 extern "C" const char* Mediator_GetString1_Impl(MinimalLoginMediatorStub* self, const char* value) {
     (void)self;
     Log(
-        "MediatorStub::GetString1(+0x60 value='%s') -> '%s'",
+        "MediatorStub::GetString1(+0x60 value='%s') -> %s",
         value ? value : "<null>",
-        g_MediatorStringB);
-    return g_MediatorStringB;
+        MaskedSensitiveValue(g_MediatorAuthPassword));
+    return g_MediatorAuthPassword;
 }
 
 __attribute__((naked)) static void Mediator_GetString1() {
@@ -542,7 +557,7 @@ extern "C" const char* Mediator_GetString2_Impl(MinimalLoginMediatorStub* self, 
     (void)self;
     Log(
         "MediatorStub::GetString2(+0x5c value='%s') -> '%s'",
-        value ? value : "<null>",
+        MaskIfMediatorPassword(value),
         g_MediatorAuthName);
     return g_MediatorAuthName;
 }
@@ -2156,6 +2171,15 @@ void DiagnosticConfigureMediatorAuthName(const char* authName) {
         (authName && authName[0]) ? authName : g_MediatorProfileName;
 
     Log("DIAGNOSTIC: mediator auth-name chain (+0x5c) configured as '%s'", g_MediatorAuthName);
+}
+
+void DiagnosticConfigureMediatorAuthPassword(const char* authPassword) {
+    g_MediatorAuthPassword =
+        (authPassword && authPassword[0]) ? authPassword : g_MediatorEmptyString;
+
+    Log(
+        "DIAGNOSTIC: mediator auth-password chain (+0x60) configured as %s",
+        MaskedSensitiveValue(g_MediatorAuthPassword));
 }
 
 void DiagnosticApplyDefaultNopatchMediatorConfig(

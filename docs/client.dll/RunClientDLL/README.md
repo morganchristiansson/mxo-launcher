@@ -107,7 +107,24 @@ No new crash dump was produced on that run family.
 62001192: ret
 ```
 
-The real work is inside `0x62006c30`.
+So if the internal runtime loop ever returns normally, the exported `RunClientDLL` return observed by the launcher should be **`1`**.
+That matches the original launcher success contract already recovered statically.
+
+`TermClientDLL` now shows the same top-level success shape:
+
+```asm
+620011a0: mov  ecx,0x629ddfc8
+620011a5: call 0x6216a2f0
+620011aa: call 0x62002f30
+620011af: mov  eax,[0x629df7f0]
+...
+620011c7: mov  eax,0x1
+620011cc: ret
+```
+
+So if `TermClientDLL` returns normally, the exported return presented back to the launcher should also be **`1`**.
+
+The real `RunClientDLL` work is inside `0x62006c30`.
 On the current path, the important runtime branch is:
 
 ```asm
