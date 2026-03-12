@@ -2,119 +2,302 @@
 
 ## Current status
 
-There are now **two distinct states** for the project-local launcher:
+There are now **three distinct runtime states** worth keeping separate:
 
-1. **More faithful default scaffold**
-   - loads `cres.dll` before `client.dll`
-   - uses the correct 8-argument `InitClientDLL` frame shape
-   - currently gets `InitClientDLL = -7`
-   - stops safely by default
+1. **Safe default scaffold**
+   - uses the faithful launcher-side startup order
+   - currently reaches clean `InitClientDLL = 1`
+   - stops before runtime by default
 
-2. **Diagnostic forced-runtime path**
-   - same launcher as above
-   - but with `MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE=1`
-   - continues into `RunClientDLL` even after `InitClientDLL` fails
-   - crashes at `client.dll+0x3b3573`
+2. **Deliberate binder/scaffold `RunClientDLL` experiment on the clean path**
+   - same binder/scaffold setup
+   - but with `MXO_FORCE_RUNCLIENT=1`
+   - now reaches a stable runtime loop instead of immediately crashing
 
-So the current crash is best understood as a **deliberate diagnostic continuation after failed initialization**, not as an original-equivalent startup path.
+3. **Older diagnostic forced-runtime-after-failed-init path**
+   - entered `RunClientDLL` after `InitClientDLL = -7`
+   - crashed at `client.dll+0x3b3573`
+   - still useful as historical evidence, but no longer the best description of the current binder path
 
-## Fresh canonical crash reference
+## Original launcher success contract
 
-Fresh dump from the current scaffold:
+Static review of `launcher.exe:0x40a4d0` now makes the return-value contract explicit.
 
-- dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
-- binary: `launcher_proper.exe`
-- `InitClientDLL` result before the crash path: **`-7`**
-- `RunClientDLL` was entered only because of the explicit diagnostic override
-
-Crash site:
-
-- `EIP = 0x623b3573`
-- `client.dll+0x3b3573`
-
-Observed registers:
-
-- `EBX = 0x62999968`
-- `ECX = 0x00000000`
-
-Faulting instruction:
+After the three client exports, the original launcher does:
 
 ```asm
-623b3570: mov ecx, [ebx+0x04]
-623b3573: mov eax, [ecx]
+40a5a9: test eax,eax    ; InitClientDLL result
+40a5ab: jg   0x40a61f
+
+40a622: test eax,eax    ; RunClientDLL result
+40a624: jg   0x40a698
+
+40a6bc: test eax,eax    ; TermClientDLL result
+40a6be: jg   0x40a6fb
 ```
 
-## What the fresh dump proves
+And the wrapper returns overall success via:
 
-### 1. `cres.dll` is now definitely present on the crashing current path
-The fresh dump shows:
+```asm
+40a6fd: mov al,0x1
+```
 
-- `cres` loaded at `0x10000000`
-- `client` loaded at `0x62000000`
+So on this startup path the original launcher treats:
+- **positive** `InitClientDLL` / `RunClientDLL` / `TermClientDLL` returns as success
+- `0` or negative values as failure / error-reporting paths
 
-So this crash is **not** explained by "we forgot to load `cres.dll`" on the current project-local launcher path.
+That means the current binder result:
+- `InitClientDLL returned: 1`
 
-### 2. The remaining mismatch is launcher-owned startup state
-The current launcher log immediately before the crash shows:
+is now evidence-backed **success**, not a local guess.
 
-- `arg5 launcherNetworkObject   = 0`
-- `arg6 ILTLoginMediatorDefault = 0`
-- `arg7 packedArg7Selection     = 0`
-- `arg8 flagByte                = 0`
-- `SetMasterDatabase` callback not observed
-- `InitClientDLL returned: -7`
+## Current high-value deliberate runtime experiment
 
-That is the strongest current explanation for the later null dereference.
+Command:
 
-### 3. This differs from original `launcher.exe`
-The original launcher path in `../../launcher.exe` is the source of truth.
-From static analysis, original `launcher.exe`:
+```bash
+cd /home/morgan/mxo/code/matrix_launcher && \
+  MXO_TRACE_WINDOWS=1 \
+  MXO_FORCE_RUNCLIENT=1 \
+  MXO_ARG7_SELECTION=0x0500002a \
+  MXO_MEDIATOR_SELECTION_NAME=Vector \
+  make run_binder_both
+```
 
-- builds launcher object `0x4d6304`
-- performs pre-client environment setup at `0x402ec0`
-- loads `cres.dll`
-- loads `client.dll`
-- resolves exports
-- calls `InitClientDLL` with non-placeholder launcher-owned state
-- only then calls `RunClientDLL`
+Observed result on the current binder/scaffold path:
+- `InitClientDLL` still returns cleanly with `1`
+- `RunClientDLL` is entered deliberately
+- no fresh crash dump is produced during timed runs
+- `RunClientDLL` does **not** return within the timed run window
+- the process reaches a real visible runtime window instead of dying immediately
 
-Our diagnostic crash path differs in a critical way:
+Window-trace evidence from `resurrections.log`:
+- `WindowTrace hwnd=00030058 visible=1 iconic=0 class='MATRIX_ONLINE' title='The Matrix Online' style=0x96ca0000 exStyle=0x00000100 rect=(200,150)-(600,450)`
+- later on the same run:
+  - `WindowTrace hwnd=00030058 visible=1 iconic=0 class='MATRIX_ONLINE' title='The Matrix Online' style=0x96000000 exStyle=0x00000008 rect=(0,0)-(800,600)`
 
-- it calls `RunClientDLL` **after `InitClientDLL` already reported failure**
+So the deliberate runtime experiment now progresses at least this far:
+- creates a real `MATRIX_ONLINE` window
+- transitions it into fullscreen `800x600`
+- stays alive in runtime long enough to keep polling rather than immediately faulting
 
-That is not original behavior.
+## What is dynamically live now
 
-## Relationship to older dumps
+Current `resurrections.log` on that deliberate runtime path shows repeated traffic from exactly three surfaces:
 
-Older dumps (`68`-`71`) from less-faithful launcher variants also crashed at:
+- `MediatorStub::IsConnected() -> 1`
+- `LauncherObjectStub::Subobject60::Slot0(...)`
+- `LauncherObjectStub::Subobject60::Slot1(...)`
 
-- `client.dll+0x3b3573`
+Representative counts from a timed run:
+- `MediatorStub::IsConnected` -> `10917`
+- `LauncherObjectStub::Subobject60::Slot0` -> `10917`
+- `LauncherObjectStub::Subobject60::Slot1` -> `10917`
 
-and the injection experiment (`72`) moved the crash to:
+No new crash dump was produced on that run family.
 
-- `EIP = 0x00000000`
+## Static explanation of the current runtime loop
 
-The fresh dump (`73`) is more useful than those older dumps because it comes from the current project-local launcher and confirms:
+`RunClientDLL` export itself is tiny:
 
-- `cres.dll` is present,
-- the 8-argument `InitClientDLL` frame shape is used,
-- and the remaining problem is still missing launcher-owned setup.
+```asm
+62001180: push 0x629ddfc8
+62001185: call 0x62006c30
+6200118d: mov  eax,0x1
+62001192: ret
+```
 
-## High-confidence interpretation
+The real work is inside `0x62006c30`.
+On the current path, the important runtime branch is:
 
-The crash is evidence that `client.dll` runtime reaches a state-management path that expects additional objects to have been established earlier.
-The best current explanation remains:
+```asm
+62006cb1: mov ecx, [0x629df7f0]
+62006cb7: call [edx+0x2c]      ; mediator runtime gate
+62006cbc: test al, al
+62006cbe: je   0x62006ccf
+62006cc0: mov ecx, [0x62b073e4] ; stored InitClientDLL arg5
+62006cc6: test ecx, ecx
+62006cc8: je   0x62006ccf
+62006cca: call 0x62532130
+```
 
-- missing launcher-side prerequisites,
-- especially `0x4d6304`, `0x4d2c58`, arg7 selection state, and pre-client setup around `0x402ec0`.
+That means two now-live facts matter:
 
-It is **not** evidence that the final solution requires client-memory injection.
+1. mediator `+0x2c` is a real runtime gate on the `RunClientDLL` path
+2. stored `InitClientDLL` arg5 is then fed into deeper runtime work
+
+The arg5-side helper `0x62532130` immediately checks `[ecx+0x04]` and, on the current scaffold, falls into `0x62531c10(1)`.
+That helper then does:
+
+```asm
+62531c20: mov eax, [esi+0x60]
+62531c26: mov ecx, edi
+62531c28: call [eax]           ; arg5 +0x60 slot 0
+62531c2a: mov ecx, [esi+0x1c]
+62531c2d: cmp ecx, [esi+0x0c]
+62531c36: mov edx, [esi+0x44]
+62531c39: cmp edx, [esi+0x34]
+...
+62532046: mov edx, [edi]
+6253204a: call [edx+0x4]       ; arg5 +0x60 slot 1
+62532053: ret 4
+```
+
+With the current queue layout this is now interpreted more precisely as:
+- `+0x0c` = queue0C `current0`
+- `+0x1c` = queue0C `current1`
+- `+0x34` = queue34 `current0`
+- `+0x44` = queue34 `current1`
+
+A newer static comparison also shows that this client path is not some unrelated ad-hoc poll.
+`client.dll:0x62531c10` is structurally the same queue-consumer family as original `launcher.exe:0x436b10`:
+- both acquire arg5 helper `+0x60`
+- both compare queue0C `current1/current0`
+- both compare queue34 `current1/current0`
+- both use arg5 helper `+0x5c` as the wait/signal helper when the queues are empty
+- both release arg5 helper `+0x60` before returning
+
+That comparison also tightens one important behavioral detail:
+- `RunClientDLL` reaches `0x62532130`
+- `0x62532130` calls `0x62531c10(1)`
+- so the current runtime path is executing the **non-blocking poll variant** of this shared arg5 queue-consumer logic, not the blocking wait variant
+
+So the current deliberate runtime experiment proves that all of these are now dynamically live on the runtime path:
+- arg5 helper subobject at `+0x60`
+- the surrounding shared queue-consumer logic at `0x62531c10`
+- arg5 queue cursor comparisons at:
+  - queue0C `current1` vs `current0`
+  - queue34 `current1` vs `current0`
+
+New runtime logging on the same path shows those queue cursors remain unchanged through repeated polling:
+- queue0C: `current0 == current1 == block0 == block1`
+- queue34: `current0 == current1 == block0 == block1`
+- that remained true through at least count `1024` in the sampled run
+
+A newer static pass on the original launcher side now explains what is missing behind that idle state.
+The original arg5 producer path is `launcher.exe:0x436820 -> 0x436670`:
+- `0x436820` acquires arg5 helper `+0x60`
+- snapshots whether both queues were empty before enqueue
+- calls `0x436670(argA, argB, queueSelect)` to push an **8-byte pair** into one of the two queues
+- `queueSelect = 0` uses queue0C
+- `queueSelect != 0` uses queue34
+- then releases arg5 helper `+0x60`
+- and if both queues were previously empty, signals arg5 helper `+0x5c` slot `0`
+
+Representative original xrefs to that producer helper now identified statically include:
+- `launcher.exe:0x4302d5`
+- `launcher.exe:0x4325aa`
+- `launcher.exe:0x4329cc`
+- `launcher.exe:0x449d8a`
+
+A newer pass over those concrete xrefs tightens one more detail.
+In the currently identified producer callsites, the third argument to `0x436820` is always `0`, so the observed startup/runtime producer traffic is currently only evidenced for **queue0C**, not queue34.
+That means:
+- queue34 is definitely part of the shared consumer logic
+- but no equally concrete startup-era producer xref has yet been identified for queue34 specifically
+
+Those same xrefs also show the queued 8-byte pair shape more narrowly than before:
+- first dword: typically a freshly allocated small work-item-like object
+  - examples built through:
+    - `0x435090` (`0x2c` allocation)
+    - `0x435010` (`0x20` allocation)
+    - `0x435050` (`0x0c` allocation with immediate code/value payload such as `0x7000001`)
+    - `0x435070` (`0x0c` allocation with `[obj+0x04]=1`, `[obj+0x08]=0`)
+- second dword: typically a stable owner/context pointer or paired object
+  - examples include `[esi+0x38]`, `edi`, or other caller-held context values depending on the producer path
+
+A broader pass over the remaining producer xrefs now shows they are not all the same one-shot shape.
+Current observed queue0C producer families include:
+- enqueue existing object + stable context
+- enqueue freshly allocated `0x0c` / `0x20` / `0x2c` work-item object + stable context
+- paired back-to-back submissions in the same function
+- fallback/null submissions such as `(work=0, context=0)` or `(work=0, context=stable)`
+- at least one looped submit-and-wait style path at `launcher.exe:0x449d8a`
+
+So the next missing launcher-owned state is unlikely to be a single magic boolean alone.
+The original launcher appears to drive arg5 through a **family of queue0C submissions** with multiple work-item shapes and some multi-step submission patterns.
+
+A newer import-backed pass also tightens what kind of work those submissions represent.
+The currently documented queue0C producer family is now best interpreted as a **network-engine event / status queue**, not a generic launcher task list:
+- `0x4302d5` sits in a function that later calls `WS2_32!recvfrom`, so that producer is best read as receive-side / packet-side work submission
+- helper `0x449b40` now resolves as a socket factory around `WS2_32!socket(AF_INET, type, protocol)` plus option setup
+- `0x4328a0` uses that helper as `socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)` and later calls `WS2_32!connect`, so its queue submissions are part of a TCP connect / connect-status family
+- `0x4325d0` uses the same helper as `socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)`, then `setsockopt(...SO_REUSEADDR...)`, then `bind`, which identifies that method as a UDP bind/setup path in the same engine family
+- coded `0x435050(payload)` work items now look even more status-like because later wait logic at `0x449d40` checks values in the same `0x700000x` family (`0x7000000`, `0x700000b`) seen near `0x4329cc`
+
+That makes the current runtime idle loop more specific than before:
+- the scaffold is not merely missing “some arbitrary producer activity”
+- it is currently missing the launcher-owned state and/or earlier socket-driving steps that should populate arg5's **network-engine queue0C** path before the client-side consumer poll begins
+
+A further client/launcher comparison now explains why current `RunClientDLL` logs still never show arg5 primary slot `12` traffic.
+When the queue is **not** empty, client `0x62531e31..0x62531fe7` mirrors launcher `0x436d31..0x436ee7`:
+- it dequeues one 8-byte pair
+- interprets the first dword as a queued work-item object
+- interprets the second dword as an associated context/owner object
+- and then calls arg5 primary vtable offset `+0x30`
+
+On the client path that call is:
+
+```asm
+62531fb8: mov edx, [esi]
+62531fba: push edi
+62531fbb: mov ecx, esi
+62531fbd: call [edx+0x30]   ; arg5 primary slot 12
+```
+
+A newer original-launcher pass now clarifies what happens around that milestone.
+Launcher consumer `0x436d31..0x436ee7` does not simply dequeue and call slot `12` in isolation.
+It:
+- dequeues one `(workItem, context)` pair
+- uses `0x4816f0(workItem)` to read `[workItem+0x04]` for logging / dispatch context
+- calls arg5 primary slot `12` with the dequeued `context`
+- then calls `context->+0x10(workItem)`
+
+And static recovery of original slot `12` (`0x4316a0`) now shows that it:
+- acquires arg5 helper `+0x98`
+- searches arg5 `+0x8c` by the raw context pointer as key
+- consumes/removes a payload object from that pointer-keyed container
+- performs teardown / state-transition work on that payload object
+- and then calls `0x44ab60(context)` before releasing the lock
+
+So the current runtime loop is not merely touching arg5 in the abstract.
+It is repeatedly executing the **non-blocking consumer side** of a real queue engine, while the scaffold still has no evidence-backed producer traffic feeding even the now-best-understood queue0C startup path.
+That also now explains why current deliberate `RunClientDLL` runs never reach arg5 primary slot `12`: with queue0C still empty, the consumer never advances into the queued-work branch that would call it.
+
+## Current interpretation
+
+The current binder/scaffold path is no longer best described as:
+- "forced `RunClientDLL` immediately crashes"
+
+It is now better described as:
+- `InitClientDLL` succeeds cleanly with positive return `1`
+- a deliberate `RunClientDLL` experiment reaches the actual runtime loop
+- that loop repeatedly polls mediator `+0x2c` and runs the **non-blocking arg5 queue-consumer path** rooted at `0x62532130 -> 0x62531c10(1)`
+- runtime logging now shows both arg5 queues staying in the same empty cursor state (`queue0C current0==current1`, `queue34 current0==current1`)
+- the current scaffold therefore appears to stay on an **empty-work / idle-loop** path rather than progressing into richer runtime activity because the original arg5 producer side (`0x436820 -> 0x436670`) is still not being driven faithfully
+
+That shifts the next runtime question again.
+The most likely blocker is now:
+- not an immediate runtime null dereference,
+- but missing launcher-owned state that should populate or advance the arg5-owned work path beyond the current empty-loop behavior.
+
+## Relationship to the older `client.dll+0x3b3573` crash
+
+The older forced-runtime crash remains useful historical evidence:
+- it came from running `RunClientDLL` after failed `InitClientDLL = -7`
+- it still documents what happened on that intentionally invalid path
+
+But it is no longer the best canonical description of the current binder/scaffold runtime state.
+The current clean-init deliberate runtime path now has a more valuable signature:
+- stable fullscreen window
+- repeated mediator `+0x2c`
+- repeated arg5 `+0x60`
+- no immediate crash during timed runs
 
 ## Related docs
 
-- `CRASH_623B3573.md`
 - `../InitClientDLL/README.md`
-- `../InitClientDLL/INCOMPLETE_ORIGINAL_PATH_EXPERIMENT.md`
+- `CRASH_623B3573.md`
 - `../../launcher.exe/client_dll_loading/LOADING_SEQUENCE.md`
 - `../../launcher.exe/startup_objects/0x4d6304_network_engine.md`
-- `../../launcher.exe/startup_objects/0x4d2c58_RESOLUTION_MECHANISM.md`
+- `../../launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`

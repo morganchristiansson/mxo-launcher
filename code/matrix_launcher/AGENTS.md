@@ -86,6 +86,67 @@ Current practical crash state:
   - current `resurrections.log` now ends with:
     - `InitClientDLL returned: 1`
     - `InitClientDLL succeeded, but RunClientDLL is gated.`
+- new deliberate `RunClientDLL` experiment on that same clean binder path:
+  - `MXO_TRACE_WINDOWS=1 MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+  - original launcher static review now confirms `0x40a5a9`, `0x40a624`, and `0x40a6be` all use `test eax,eax ; jg ...`, so positive `InitClientDLL` / `RunClientDLL` / `TermClientDLL` returns are the original success contract
+  - the deliberate run now does **not** reproduce the old forced-runtime crash at `client.dll+0x3b3573`
+  - no fresh crash dump was produced during timed runs
+  - window tracing shows a real `MATRIX_ONLINE` window first appears centered, then flips to fullscreen `800x600`
+  - the current stable `RunClientDLL` loop repeatedly hits:
+    - mediator `+0x2c` (`IsConnected()` in the scaffold)
+    - arg5 helper `+0x60` slot `0` / slot `1` (`EnterCriticalSection` / `LeaveCriticalSection`)
+  - newer throttled queue-state logging now also shows the exact arg5 cursor state observed by that loop:
+    - queue0C `current0 == current1 == block0 == block1`
+    - queue34 `current0 == current1 == block0 == block1`
+    - that remained unchanged through sampled counts `1 .. 1024`
+  - newer static comparison now shows this is not just a loose resemblance:
+    - client `0x62532130 -> 0x62531c10(1)` is the **non-blocking poll variant** of the same shared arg5 queue-consumer family seen in original launcher `0x436b10`
+    - original launcher producer helper `0x436820 -> 0x436670` acquires `+0x60`, enqueues an 8-byte pair into queue0C/queue34, releases `+0x60`, and signals `+0x5c` when transitioning from empty to non-empty
+    - in the currently identified concrete producer xrefs (`0x4302d5`, `0x4325aa`, `0x4329cc`, `0x449d8a`), the third arg to `0x436820` is always `0`, so present startup/runtime producer evidence is currently specific to **queue0C**
+    - those xrefs also narrow the queued pair shape to:
+      - first dword = small freshly allocated work-item-like object (`0x2c`/`0x20`/`0x0c` families via `0x435090` / `0x435010` / `0x435050` / `0x435070`)
+      - second dword = stable owner/context pointer or associated object (for example `[esi+0x38]`, `edi`, or similar caller-held context)
+    - the remaining concrete producer xrefs now read so far fall into several queue0C families:
+      - existing-object + context submissions
+      - fresh `0x0c` / `0x20` / `0x2c` work-item submissions
+      - back-to-back multi-submit paths
+      - null/fallback submissions
+      - one looped submit-and-wait style path at `0x449d8a`
+    - all currently identified concrete `0x436820` producer xrefs have now been read/documented:
+      - `0x4302d5`
+      - `0x43051f`
+      - `0x43067f`
+      - `0x4306a7`
+      - `0x4309da`
+      - `0x4309ef`
+      - `0x430c25`
+      - `0x430d71`
+      - `0x430d94`
+      - `0x430da8`
+      - `0x4315b0`
+      - `0x4325aa`
+      - `0x4329cc`
+      - `0x432d86`
+      - `0x432dc1`
+      - `0x432dd7`
+      - internal self-calls: `0x436a0e`, `0x436fa8`
+      - looped submit-and-wait path: `0x449d8a`
+    - newer import-backed narrowing now makes the producer family more concrete than “generic queued work”:
+      - `0x4302d5` sits on a later `recvfrom` path, so it now looks like receive/packet-side event submission
+      - helper `0x449b40` is a socket factory around `socket(AF_INET, type, protocol)` plus option setup
+      - `0x4328a0` uses that helper as `SOCK_STREAM` / `IPPROTO_TCP` and later calls `connect`, so its queue submissions now look like TCP connect / connect-status work
+      - `0x4325d0` uses that helper as `SOCK_DGRAM` / `IPPROTO_UDP`, then `setsockopt(...SO_REUSEADDR...)`, then `bind`, so that method now reads as UDP bind/setup in the same engine family
+      - coded `0x435050(payload)` items now look like network status/result objects, not generic integer blobs
+    - current best reading is therefore that queue0C is a launcher-owned **network-engine event/status queue**, not a generic task list
+    - newer container/dispatch narrowing now also shows:
+      - arg5 `+0x80` is an endpoint-keyed container (sockaddr/port-style key)
+      - arg5 `+0x8c` is a pointer-keyed container (context/owner dword key)
+      - arg5 slot `5` (`0x431840`) is now best read as an endpoint-removal / teardown / handle-extraction path with miss result `0x7000004`
+      - arg5 slot `12` (`0x4316a0`) acquires helper `+0x98`, looks up the dequeued context in `+0x8c`, consumes/removes a payload object there, performs teardown/state-transition work, and then calls `0x44ab60(context)`
+      - launcher consumer `0x436d31..0x436ee7` dequeues `(workItem, context)`, reads `[workItem+0x04]` through `0x4816f0`, calls arg5 slot `12(context)`, then calls `context->+0x10(workItem)`
+    - when queue work is present, client `0x62531e31..0x62531fe7` mirrors launcher `0x436d31..0x436ee7` and then calls arg5 primary vtable offset `+0x30` (slot `12`)
+    - so the current absence of arg5 slot-12 runtime traffic is now best explained by **empty queue state**, not by slot 12 being irrelevant
+  - current best reading is that the binder/scaffold path now reaches a real runtime idle/poll loop rather than an immediate post-init crash, and the next blocker is missing launcher-owned work/state that should drive arg5 queue activity beyond the current empty-loop path
 - visible current runtime state still includes an in-game **Loading Character** phase with loading bar / status text on the deeper path
 - static ordering still explains why that UI is compatible with the currently logged mediator depth:
   - `client.dll:0x62170f2a` pushes the string `"Loading Character"`
@@ -264,11 +325,68 @@ Canonical docs:
    - stop assuming that accepting the scratch-shaped request alone is enough
 3. Reconstruct more of `0x409950` launcher-side preprocessing, especially `options.cfg` side effects and launcher-global state derived before `InitClientDLL`
 4. Follow the **new post-fix blocker** now that the old late `arg2+2` crash family no longer reproduces on the current binder path:
-   - confirm the exact original success contract around positive `InitClientDLL` return `1`
-   - trace what the legitimate next phase should be after the already-reached `+0xec` / `0x6216a1c0` path now that control returns cleanly to the launcher
-5. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the loading-character path around `0x620547c0..0x62054eac`) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
-6. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
-7. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently recovered arg5 slots alone explain the late crash
-8. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
-9. Keep tracing what `0x402ec0` minimally sets up
-10. Revisit legitimate `RunClientDLL` on the now-clean positive-return path, but keep it clearly labeled as binder/scaffold progress rather than faithful original-equivalent success until the launcher-owned arg5/arg6/arg7/pre-client state is reconstructed more faithfully
+   - preserve the now-confirmed original success contract from `launcher.exe:0x40a5a9 / 0x40a624 / 0x40a6be` (`test eax,eax ; jg ...`) and `0x40a6fd` (`al = 1` on overall success)
+   - treat positive `InitClientDLL` / `RunClientDLL` / `TermClientDLL` returns as the original success shape, not an anomaly
+5. Trace the stable deliberate `RunClientDLL` loop now reachable on the clean binder path:
+   - `RunClientDLL -> 0x62006c30` repeatedly polls mediator `+0x2c`
+   - then drives arg5 through `0x62532130 -> 0x62531c10(1)`
+   - treat that as the **non-blocking consumer** side of the same engine-family logic seen in launcher `0x436b10`, not merely as arbitrary queue comparisons
+   - keep the queue-field mapping precise there:
+     - `+0x0c` = queue0C `current0`
+     - `+0x1c` = queue0C `current1`
+     - `+0x34` = queue34 `current0`
+     - `+0x44` = queue34 `current1`
+   - follow the original producer side now identified at `0x436820 -> 0x436670`:
+     - acquires `+0x60`
+     - enqueues an 8-byte pair into queue0C / queue34
+     - releases `+0x60`
+     - signals `+0x5c` on empty->non-empty transition
+   - the representative set is no longer enough; all currently identified concrete producer xrefs have now been read and should be treated as the active reference set:
+     - `0x4302d5`
+     - `0x43051f`
+     - `0x43067f`
+     - `0x4306a7`
+     - `0x4309da`
+     - `0x4309ef`
+     - `0x430c25`
+     - `0x430d71`
+     - `0x430d94`
+     - `0x430da8`
+     - `0x4315b0`
+     - `0x4325aa`
+     - `0x4329cc`
+     - `0x432d86`
+     - `0x432dc1`
+     - `0x432dd7`
+     - internal lifecycle/self-calls: `0x436a0e`, `0x436fa8`
+     - looped submit-and-wait path: `0x449d8a`
+   - current concrete startup/runtime producer evidence passes third-arg `0`, so prioritize understanding the **queue0C** feed path first
+   - keep the newer semantic narrowing in mind while doing that:
+     - queue0C now looks like a launcher-owned **network-engine event/status queue**
+     - not a generic arbitrary job list
+     - concrete recovered producer families now already touch `recvfrom`, `socket`, `setsockopt`, `bind`, and `connect`
+   - determine what the queued pair means semantically:
+     - first dword = work-item-like object (`0x435090` / `0x435010` / `0x435050` / `0x435070` families)
+     - second dword = owner/context pointer or paired object
+   - keep the current concrete xref taxonomy straight while doing that:
+     - some producers enqueue existing objects
+     - some enqueue fresh small command/status objects
+     - some do paired multi-submit sequences
+     - some fall back to null submissions
+     - `0x449d8a` currently looks like a submit-and-wait loop
+   - current highest-value semantic anchors inside that taxonomy are now:
+     - `0x4302d5` = recvfrom-adjacent / packet-side producer
+     - arg5 primary slot `6` / `0x4328a0` = TCP socket/connect family producer path
+     - arg5 primary slot `2` / `0x4325d0` = UDP socket/bind family path in the same engine
+     - `0x435050(payload)` = coded status/result item family (`0x700000x`-style)
+   - keep the now-identified next consumer milestone in mind:
+     - once queue work exists, client `0x62531e31..0x62531fe7` should reach arg5 primary slot `12` at vtable offset `+0x30`
+     - original launcher consumer `0x436d31..0x436ee7` then treats the dequeued pair as `(workItem, context)`, reads `[workItem+0x04]`, calls slot `12(context)`, and then calls `context->+0x10(workItem)`
+     - that means the next fidelity gap is not just “feed any queue entry” but “feed the right **workItem + context** pair family so the later slot-12 / context callback chain is meaningful”
+   - determine which launcher-owned startup/runtime state should cause those producer paths to become live beyond the present idle loop where both queues still show `current0 == current1`
+6. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the loading-character path around `0x620547c0..0x62054eac`) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
+7. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
+8. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently recovered arg5 slots alone explain the late crash
+9. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
+10. Keep tracing what `0x402ec0` minimally sets up
+11. Continue deliberate `RunClientDLL` experiments on the now-clean positive-return path, but keep them clearly labeled as binder/scaffold progress rather than faithful original-equivalent success until the launcher-owned arg5/arg6/arg7/pre-client state is reconstructed more faithfully

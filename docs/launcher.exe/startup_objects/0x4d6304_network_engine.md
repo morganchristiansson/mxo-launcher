@@ -446,6 +446,82 @@ So the scaffold has now been corrected to treat emptiness as:
 
 rather than as a guessed count-based condition.
 
+### New clarification: `+0x80` and `+0x8c` are not the same kind of key space
+
+A newer static pass tightens the semantic split between the two containers.
+
+Recovered helper meaning:
+- `0x44b090` builds a `sockaddr_in`-shaped 16-byte key from IPv4 + port
+- `0x44b040` compares two such keys by:
+  - port at `+0x02`
+  - then address at `+0x04`
+- `0x42fdb0` uses that comparator over the `+0x80` tree
+- `0x42fe10` is a simpler dword-key tree walk over the `+0x8c` tree
+
+That means the two arg5 containers are now best read as:
+- `+0x80` = endpoint-keyed container (network address / port)
+- `+0x8c` = pointer-keyed container (dword context/owner key)
+
+### New clarification: slot `5` is an endpoint-removal / handle-extraction path
+
+Static disassembly of `0x431840` now supports a stronger reading than only “empty-path returns `0x7000004`.”
+
+Recovered behavior:
+- builds a `sockaddr_in`-style lookup key through `0x44b090`
+- searches arg5 `+0x80` through `0x42fdb0`
+- on miss:
+  - writes `0` to caller out-pointer
+  - returns `0x7000004`
+- on hit:
+  - removes the matched node from the `+0x80` container
+  - decrements the container count
+  - loads payload object from `[node+0x20]`
+  - writes `[payload+0x38]` to the caller out-pointer
+  - calls `send/recv`-adjacent cleanup helpers on payload state including:
+    - `0x452320` on `payload+0x40`
+    - payload virtual `+0x14`
+    - `closesocket([payload+0x3c])`
+    - payload virtual `+0x2c(1)`
+- then returns `0`
+
+Current best interpretation:
+- slot `5` is an **endpoint-keyed removal / teardown / handle-extraction** method in the network-engine family, not a generic opaque callback
+
+### New clarification: slot `12` is part of the non-empty queue-dispatch continuation
+
+Static disassembly of `0x4316a0` now also explains the later `slot 12` milestone more concretely.
+
+Recovered behavior:
+- acquires arg5 helper `+0x98`
+- searches arg5 `+0x8c` using the raw dword argument as key via `0x42fe10`
+- on hit:
+  - loads payload object from `[node+0x14]`
+  - sets `[payload+0x44] = 1`
+  - calls `0x452320(payload+0x40)`
+  - calls payload virtual `+0x14`
+  - calls payload virtual `+0x2c(1)` if non-NULL
+  - removes the matched node from `+0x8c`
+  - decrements the container count
+  - calls `0x44ab60(arg)` before releasing the helper lock
+- on miss:
+  - logs the miss path
+  - still calls `0x44ab60(arg)` before releasing the helper lock
+
+That matters because launcher consumer `0x436d31..0x436ee7` now reads more concretely too.
+On the non-empty dequeue branch it:
+- pops one queued pair:
+  - first dword = `workItem`
+  - second dword = `context`
+- logs/debug-prints using `0x4816f0(workItem)`, which simply returns `[workItem+0x04]`
+- if both work item and context are present, calls arg5 primary slot `12` with the dequeued `context`
+- then calls `context->+0x10(workItem)`
+- and later releases both objects as needed
+
+That ties several earlier partial observations together:
+- the queued first-dword object really is a **work/status item** rather than only arbitrary pointer noise
+- the queued second-dword object is a real paired **context/owner** pointer
+- and arg5 primary slot `12` is part of the **non-empty queue dispatch / teardown / state-transition path**, not just an arbitrary later method
+
 Practical status of this update:
 
 - the widened arg5 vtable scaffold built successfully
@@ -502,3 +578,272 @@ Interpretation:
 - so the current arg5 reconstruction remains only partially runtime-validated:
   - object creation / registration / passing are live
   - deeper arg5 method behavior is still not observed before the current corruption wins
+
+## New runtime validation after clean `InitClientDLL = 1` and deliberate `RunClientDLL`
+
+A newer binder/scaffold experiment changed that runtime picture materially.
+
+Command:
+
+```bash
+cd /home/morgan/mxo/code/matrix_launcher && \
+  MXO_TRACE_WINDOWS=1 \
+  MXO_FORCE_RUNCLIENT=1 \
+  MXO_ARG7_SELECTION=0x0500002a \
+  MXO_MEDIATOR_SELECTION_NAME=Vector \
+  make run_binder_both
+```
+
+What is now statically confirmed first:
+- original launcher helper `0x40a4d0` treats positive export returns as success on this path:
+  - after `InitClientDLL`: `0x40a5a9..0x40a5ab` -> `test eax,eax ; jg ...`
+  - after `RunClientDLL`: `0x40a622..0x40a624` -> `test eax,eax ; jg ...`
+  - after `TermClientDLL`: `0x40a6bc..0x40a6be` -> `test eax,eax ; jg ...`
+  - overall success return: `0x40a6fd` -> `al = 1`
+- so the current clean `InitClientDLL returned: 1` binder result is now evidence-backed success, not only a local launcher heuristic
+
+What the deliberate runtime experiment then shows:
+- `RunClientDLL` no longer immediately reproduces the old forced-runtime crash at `client.dll+0x3b3573`
+- no fresh crash dump was produced during timed runs
+- window tracing shows a real `MATRIX_ONLINE` window appears and then transitions to fullscreen `800x600`
+- the stable runtime loop now repeatedly hits:
+  - mediator `+0x2c`
+  - arg5 helper `+0x60` slot `0`
+  - arg5 helper `+0x60` slot `1`
+
+Representative in-log evidence:
+- `WindowTrace hwnd=00030058 visible=1 iconic=0 class='MATRIX_ONLINE' title='The Matrix Online' ... rect=(200,150)-(600,450)`
+- later on the same run:
+  - `WindowTrace hwnd=00030058 visible=1 iconic=0 class='MATRIX_ONLINE' title='The Matrix Online' ... rect=(0,0)-(800,600)`
+- repeated runtime traffic:
+  - `MediatorStub::IsConnected() -> 1`
+  - `LauncherObjectStub::Subobject60::Slot0(...)`
+  - `LauncherObjectStub::Subobject60::Slot1(...)`
+
+Static explanation of that loop:
+- `RunClientDLL` export `0x62001180` just calls `0x62006c30`
+- inside `0x62006cb1..0x62006cca`, the client:
+  - calls mediator `+0x2c`
+  - tests `al`
+  - loads stored `InitClientDLL` arg5 from `0x62b073e4`
+  - and calls `0x62532130`
+- inside `0x62531c20..0x62532053`, the arg5-driven helper:
+  - calls arg5 subobject `+0x60` slot `0`
+  - compares queue cursor state at `+0x1c` vs `+0x0c`
+  - compares queue cursor state at `+0x44` vs `+0x34`
+  - then releases arg5 subobject `+0x60` through slot `1`
+
+With the current recovered queue layout, those compared fields now map more precisely as:
+- `+0x0c` = queue0C `current0`
+- `+0x1c` = queue0C `current1`
+- `+0x34` = queue34 `current0`
+- `+0x44` = queue34 `current1`
+
+A newer static comparison now tightens the meaning of that client runtime path.
+The client helper `client.dll:0x62531c10` is structurally the same consumer-family logic as original `launcher.exe:0x436b10`:
+- both acquire arg5 helper `+0x60`
+- both compare queue0C `current1` vs `current0`
+- both compare queue34 `current1` vs `current0`
+- both use arg5 helper `+0x5c` as the event/wait helper when no work is present
+- both release arg5 helper `+0x60` before returning
+
+That comparison also explains an important runtime detail on the current client path:
+- `client.dll:0x62532130` calls `0x62531c10(1)`
+- so `RunClientDLL` is currently driving the **non-blocking poll variant** of this shared arg5 queue-consumer logic
+
+A newer throttled runtime log on the same deliberate path now shows that state staying unchanged through repeated polling:
+- queue0C: `current0 == current1 == block0 == block1`
+- queue34: `current0 == current1 == block0 == block1`
+- representative sampled counts still showing that exact state: `1`, `2`, `4`, `8`, `16`, `32`, `64`, `128`, `256`, `512`, `1024`
+
+A newer original-launcher static pass now also identifies the corresponding producer side more concretely.
+Original enqueue helper `launcher.exe:0x436820`:
+- acquires arg5 helper `+0x60`
+- snapshots whether both queues were empty before enqueue
+- calls `0x436670(argA, argB, queueSelect)` to push an **8-byte pair** into one of the two queues
+- `queueSelect = 0` uses queue0C
+- `queueSelect != 0` uses queue34
+- releases arg5 helper `+0x60`
+- and if both queues were previously empty, signals arg5 helper `+0x5c` slot `0`
+
+Representative original xrefs to that producer helper now identified statically include:
+- `launcher.exe:0x4302d5`
+- `launcher.exe:0x4325aa`
+- `launcher.exe:0x4329cc`
+- `launcher.exe:0x449d8a`
+
+A newer pass over those producer xrefs tightens the currently evidenced traffic shape further.
+In the identified callsites so far, the third argument passed to `0x436820` is always `0`, which means the current concrete startup/runtime producer evidence is specifically for **queue0C** rather than queue34.
+That does **not** prove queue34 is unused in the wider program.
+It only means the currently recovered producer xrefs feeding arg5 during this startup/runtime family all target queue0C.
+
+Those same xrefs also narrow the queued pair shape:
+- first dword = a freshly allocated small work-item-like object in many paths
+  - representative constructors / shapes seen at current producer xrefs:
+    - `0x435090` on a `0x2c` allocation
+    - `0x435010` on a `0x20` allocation
+    - `0x435050` on a `0x0c` allocation with immediate payload value such as `0x7000001`
+- second dword = a stable owner/context pointer or associated object
+  - representative sources seen so far:
+    - `[esi+0x38]`
+    - `edi`
+
+## Remaining concrete `0x436820` producer xrefs read so far
+
+The currently read xrefs now fall into several concrete families.
+This is still not a full semantic decode of each work item, but it is enough to tighten the queue/work picture beyond a generic “producer exists” statement.
+
+### Work-item constructor families now concretely seen
+
+The queued first-dword object families currently evidenced are:
+- `0x435db0 -> 0x435090`
+  - allocation size `0x2c`
+  - constructor sets vtable `0x4b3e08`
+  - later producer example also sets `[obj+0x08] = 1` through `0x4444e0`
+- `0x435d80 -> 0x435010`
+  - allocation size `0x20`
+  - constructor sets vtable `0x4b3df0`
+- `0x435d90 -> 0x435050`
+  - allocation size `0x0c`
+  - constructor sets vtable `0x4b3df8`
+  - stores an immediate payload/code in `[obj+0x08]`
+- `0x435da0 -> 0x435070`
+  - allocation size `0x0c`
+  - constructor sets vtable `0x4b3e00`
+  - seeds `[obj+0x04] = 1`, `[obj+0x08] = 0`
+
+Those constructors all belong to the same nearby vtable family around `0x4b3df0..0x4b3e10`, which is strong evidence that the queue is carrying a small launcher-defined work-item class family rather than arbitrary raw integers.
+
+### Xref taxonomy
+
+#### `launcher.exe:0x4302d5`
+- allocates `0x2c` via `0x435db0`
+- constructs via `0x435090`
+- sets `[work+0x08] = 1` through `0x4444e0`
+- enqueues `(work=ebx, context=[esi+0x38], queueSelect=0)`
+- newer import-backed review tightens this substantially beyond generic “I/O-adjacent” wording:
+  - the same surrounding function later calls `recvfrom` (`WS2_32!recvfrom` via `0x4a9840`) on a `0x1000` buffer
+  - so this producer is now best read as part of a **UDP receive / packet-available** path rather than a generic launcher task submission
+
+#### `launcher.exe:0x43051f`
+- does **not** allocate a fresh queued object on this branch
+- sets `[context+0x34] = 2` first
+- then enqueues `(work=edi, context=[esi+0x38], queueSelect=0)`
+
+#### `launcher.exe:0x43067f` and `0x4306a7`
+- same function, two producer calls
+- first enqueues `(work=edi, context=[esi+0x38], queueSelect=0)`
+- then allocates `0x0c` via `0x435da0`, constructs via `0x435070`, and enqueues `(work=eax, context=[esi+0x38], queueSelect=0)`
+- so this path clearly shows **back-to-back queue0C submissions** of two different work-item shapes
+
+#### `launcher.exe:0x4309da` and `0x4309ef`
+- same function, two producer calls
+- first fills `edi+0x0c .. +0x18` with four dwords and then enqueues `(work=edi, context=[esi+0x38], queueSelect=0)`
+- second immediately enqueues `(work=0, context=0, queueSelect=0)`
+- current best reading is that this is a deliberate paired submission pattern, but its exact sentinel/flush semantics are still unresolved
+
+#### `launcher.exe:0x430c25`
+- allocates `0x0c` via `0x435da0`
+- constructs via `0x435070`
+- enqueues `(work=eax-or-NULL, context=[esi+0x38], queueSelect=0)`
+- this is one of the clearest “simple queue0C command object” producer cases
+
+#### `launcher.exe:0x430d71`, `0x430d94`, and `0x430da8`
+- same function, up to three producer calls
+- first enqueues `(work=edi, context=[esi+0x38], queueSelect=0)`
+- then either:
+  - allocates `0x0c` via `0x435da0`, constructs via `0x435070`, and enqueues that new work object with the same context, or
+  - falls back to `(work=0, context=[esi+0x38], queueSelect=0)`
+- like `0x43067f/0x4306a7`, this is another concrete multi-submit queue0C path
+
+#### `launcher.exe:0x4315b0`
+- allocates `0x0c` via `0x435da0`
+- constructs via `0x435070`
+- enqueues `(work=eax-or-NULL, context=[ebp-0x08], queueSelect=0)`
+- the same function later calls `0x436920` and then tears down queue-related state, so this producer path currently looks more teardown-oriented than the others
+
+#### `launcher.exe:0x4325aa`
+- allocates `0x20` via `0x435d80`
+- constructs via `0x435010`
+- enqueues `(work=eax, context=edi, queueSelect=0)`
+- this still needs fuller semantic decoding, but the surrounding function family is clearly socket-facing rather than arbitrary UI work
+
+#### `launcher.exe:0x4329cc`
+- allocates `0x0c` via `0x435d90`
+- constructs via `0x435050(0x7000001)`
+- enqueues `(work=eax, context=edi, queueSelect=0)`
+- this is the clearest currently read path proving that some queue items carry an immediate status/code payload rather than only pointer state
+- newer import-backed review also tightens the enclosing function meaning:
+  - enclosing method `0x4328a0` creates a socket through helper `0x449b40(1, 6, 0)`
+  - `0x449b40` wraps `WS2_32!socket(AF_INET, type, protocol)` and option setup
+  - later in the same `0x4328a0` method the launcher calls `WS2_32!connect`
+  - so `0x4329cc` is now best read as part of a **TCP connect / connect-status** producer path
+
+#### `launcher.exe:0x432d86`, `0x432dc1`, and `0x432dd7`
+- same function, several queue0C variants
+- one branch enqueues `(work=eax-or-NULL, context=edi, queueSelect=0)` where work may come from a `0x0c` / `0x4b3e00` object family
+- another branch allocates `0x0c` via `0x435d90`, constructs via `0x435050(1)`, and enqueues that coded object with `context=edi`
+- allocation failure path falls back to `(work=0, context=edi, queueSelect=0)`
+- because these branches sit in the same `0x4328a0` socket/connect method, they are now best treated as **TCP connect follow-up / completion-status queue submissions**, not just anonymous queue variants
+
+#### `launcher.exe:0x449d8a`
+- sits inside a loop
+- repeatedly enqueues `(work=[ebp-0x08], context=edi, queueSelect=0)`
+- then polls another object at `[edi+0x6c]` until that helper returns non-zero
+- current best reading is that this is a submit-and-wait style queue0C interaction rather than a one-shot fire-and-forget producer
+- newer static narrowing adds one useful detail:
+  - after the wait loop, this function checks return/status values in the `0x700000x` family (`0x7000000`, `0x700000b`)
+  - that makes the coded `0x435050(payload)` queue objects from `0x4329cc` / `0x432dc1` look even more like **network status/result items** rather than generic integers
+
+#### Internal self-calls: `launcher.exe:0x436a0e` and `0x436fa8`
+- both call `0x436820(this, 0, 0, 0)` from inside the queue/engine family itself
+- these are **not** external launcher feature producers like the others
+- they appear in internal lifecycle / drain / teardown-style paths (`0x436920`, `0x436fd0`) and should be treated separately from the externally interesting producer xrefs above
+
+### New high-confidence interpretation of queue0C producer meaning
+
+The current concrete xref set now supports a stronger claim than “some launcher work queue exists.”
+Queue0C now looks specifically like a **network-engine async work / status queue**.
+
+Evidence supporting that tighter read:
+- `0x4302d5` sits in a function that later calls `WS2_32!recvfrom`, so that producer is best read as a receive-side / packet-side event submission
+- helper `0x449b40` now resolves cleanly as a socket factory around `WS2_32!socket(AF_INET, type, protocol)` plus option setup
+- `0x4328a0` (arg5 primary vtable slot `6`) calls `0x449b40(1, 6, 0)` and later `WS2_32!connect`, so its queue submissions are part of a **TCP connect / connect-result** family
+- `0x4325d0` (arg5 primary vtable slot `2`) calls `0x449b40(2, 0x11, 0)`, then `WS2_32!setsockopt(..., SOL_SOCKET, SO_REUSEADDR, ...)`, then `WS2_32!bind`, so that method is best read as a **UDP bind/setup** path inside the same engine family
+- coded `0x435050(payload)` objects carry literals like `0x7000001`
+- later wait/submit logic at `0x449d40` checks return/status values in that same `0x700000x` family (`0x7000000`, `0x700000b`)
+
+Current best reading from that combination:
+- queue0C is not a generic launcher job queue
+- it is a launcher-owned **network-engine event/work channel** carrying packet-side events, connect/setup commands, and coded network-status results between socket-facing producer code and the later shared consumer logic
+
+A further client/launcher comparison now explains the next branch after dequeue more concretely.
+When work is present, launcher consumer `0x436d31..0x436ee7` and client consumer `0x62531e31..0x62531fe7` both:
+- dequeue one 8-byte pair
+- treat the first dword as a queued work-item object
+- treat the second dword as a paired context/owner object
+- and then call arg5 primary vtable offset `+0x30`
+
+On the client side that is:
+
+```asm
+62531fb8: mov edx, [esi]
+62531fba: push edi
+62531fbb: mov ecx, esi
+62531fbd: call [edx+0x30]   ; arg5 primary slot 12
+```
+
+That means the current absence of arg5 slot-12 runtime traffic on deliberate `RunClientDLL` runs is now explained more narrowly than before:
+- not because slot 12 is irrelevant,
+- but because the current scaffold never feeds the queue branch that would reach it.
+
+Current best interpretation:
+- arg5 is now runtime-validated more concretely than before
+- the helper/lock surface at `+0x60` is definitely live on the `RunClientDLL` path
+- the queue cursor fields around `+0x0c/+0x1c` and `+0x34/+0x44` are also definitely live on that path
+- `RunClientDLL` is repeatedly exercising the **consumer** side of this engine in non-blocking poll mode
+- the original launcher producer side now has concrete xrefs and concrete queued pair shapes
+- and if queue0C were actually being fed, the next observable arg5 step would likely be primary slot `12` (`+0x30`)
+- but on the current scaffold that producer side still does not appear to be feeding even the now-best-understood queue0C path, so both queues remain in a stable **empty cursor** state rather than advancing
+- so the next arg5 problem is no longer just “which missing slot causes the old late crash?”
+- it is now more specifically “which missing launcher-owned state should populate or advance this arg5-owned runtime work path beyond the current empty-loop behavior?”

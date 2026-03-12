@@ -148,7 +148,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | Offset | Earliest observed role | Confidence |
 |---:|---|---|
 | `+0x10` | readiness / availability gate; this is part of the old `-7` barrier | high |
-| `+0x2c` | additional runtime readiness gate before arg5-related runtime work | medium |
+| `+0x2c` | repeated `RunClientDLL` runtime gate before arg5-owned work at `0x62006cb9..0x62006cca` (`IsConnected()` in the current scaffold) | high |
 | `+0x38` | returns profile-root string used by client `Profiles\\%s\\...` formatting path | high |
 | `+0x3c` | returns default selection index when the client asks for `0xff` fallback selection | medium |
 | `+0x40` | returns selection-descriptor object for the arg7-derived selection index, including name + low-24-bit id data | medium |
@@ -182,6 +182,10 @@ Current practical note on `+0x120`:
   - fixing those two offsets to caller-clean wrappers stopped reproducing the old late `EIP=arg2+2` crash family on the current binder path
   - the deeper path now returns `InitClientDLL = 1` instead of crashing
   - and after correcting launcher-side interpretation of positive return values, the current run now cleanly logs `InitClientDLL succeeded, but RunClientDLL is gated.`
+- newer deliberate `RunClientDLL` runs on that same clean binder path now also prove that arg6 `+0x2c` is not merely an init-side readiness guess:
+  - static runtime loop at `0x62006cb1..0x62006cca` calls `arg6->+0x2c`, tests `al`, and only then feeds stored arg5 into `0x62532130`
+  - current runtime logs show repeated `MediatorStub::IsConnected() -> 1` traffic on that loop
+  - so `+0x2c` is now high-confidence live on the `RunClientDLL` path as a repeated runtime gate before arg5-owned work
 
 ## What the stub experiments proved
 

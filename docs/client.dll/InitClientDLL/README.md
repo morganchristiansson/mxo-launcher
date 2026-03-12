@@ -209,6 +209,17 @@ A follow-up launcher-side correction also matters here:
   - `InitClientDLL returned: 1`
   - `InitClientDLL succeeded, but RunClientDLL is gated.`
 
+Original launcher static review now confirms that this is not just a local heuristic.
+Inside `launcher.exe:0x40a4d0`:
+- after `InitClientDLL`, `0x40a5a9..0x40a5ab` does `test eax,eax ; jg 0x40a61f`
+- after `RunClientDLL`, `0x40a622..0x40a624` does `test eax,eax ; jg 0x40a698`
+- after `TermClientDLL`, `0x40a6bc..0x40a6be` does `test eax,eax ; jg 0x40a6fb`
+- and the overall launcher helper returns success with `al = 1` at `0x40a6fd`
+
+So the original launcher success contract on this path is now high-confidence:
+- **positive return values are the success condition** for `InitClientDLL`, `RunClientDLL`, and `TermClientDLL`
+- zero / negative returns go down the launcher's error-reporting path
+
 So the old late `arg2` family is now best understood as a **resolved scaffold calling-convention bug** in the early mediator string chain, not an irreducible mystery in the later `+0xec` path itself.
 The active blocker has therefore shifted again:
 - not "why does `InitClientDLL` crash into argv?"

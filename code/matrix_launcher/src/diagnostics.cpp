@@ -128,6 +128,8 @@ struct DiagnosticBinderWrapper {
 
 static_assert(sizeof(DiagnosticLauncherLockHelper) == 0x1c, "launcher lock helper size mismatch");
 static_assert(sizeof(MinimalLauncherObjectStub) == 0xb4, "launcher object scaffold size must match original allocation");
+
+static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count);
 static_assert(sizeof(DiagnosticIntrusiveListHead) == 0x24, "list80 scaffold size mismatch");
 static_assert(sizeof(DiagnosticIntrusiveListHeadSmall) == 0x18, "list8C scaffold size mismatch");
 
@@ -371,8 +373,14 @@ static void __thiscall Mediator_SetValue1(MinimalLoginMediatorStub* self, void* 
 }
 
 static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) {
-    (void)self;
-    Log("MediatorStub::IsConnected() -> 1");
+    static uint32_t s_IsConnectedCount = 0;
+    ++s_IsConnectedCount;
+    if (DiagnosticShouldLogRepeatedRuntimeCount(s_IsConnectedCount)) {
+        Log("MediatorStub::IsConnected() -> 1 [count=%u self=%p registeredEngine=%p]",
+            (unsigned)s_IsConnectedCount,
+            self,
+            self ? self->field04 : NULL);
+    }
     return 1;
 }
 
@@ -1424,6 +1432,53 @@ static CRITICAL_SECTION* DiagnosticLauncherCritFromHelper(void* self) {
     return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
 }
 
+static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
+    return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
+}
+
+static MinimalLauncherObjectStub* DiagnosticLauncherObjectFromHelper(void* helperSelf, size_t helperOffset) {
+    return helperSelf
+        ? reinterpret_cast<MinimalLauncherObjectStub*>(static_cast<unsigned char*>(helperSelf) - helperOffset)
+        : NULL;
+}
+
+static void DiagnosticLogLauncherRuntimeQueueState(
+    const char* source,
+    MinimalLauncherObjectStub* object,
+    uint32_t count) {
+    if (!object) return;
+
+    const bool queue0CursorEqual = (object->queue0C.current1 == object->queue0C.current0);
+    const bool queue34CursorEqual = (object->queue34.current1 == object->queue34.current0);
+    const bool queue0SameBlock = (object->queue0C.block0 == object->queue0C.block1);
+    const bool queue34SameBlock = (object->queue34.block0 == object->queue34.block1);
+
+    Log(
+        "LauncherObject runtime state[%s count=%u]: self=%p field04=%u field08=%p field7C=%p q0(current0=%p current1=%p block0=%p block1=%p slotsCurrent=%p slotsLast=%p sameCursor=%u sameBlock=%u) q34(current0=%p current1=%p block0=%p block1=%p slotsCurrent=%p slotsLast=%p sameCursor=%u sameBlock=%u)",
+        source,
+        (unsigned)count,
+        object,
+        (unsigned)object->field04,
+        object->field08,
+        object->field7C,
+        object->queue0C.current0,
+        object->queue0C.current1,
+        object->queue0C.block0,
+        object->queue0C.block1,
+        object->queue0C.slotsCurrent,
+        object->queue0C.slotsLast,
+        queue0CursorEqual ? 1u : 0u,
+        queue0SameBlock ? 1u : 0u,
+        object->queue34.current0,
+        object->queue34.current1,
+        object->queue34.block0,
+        object->queue34.block1,
+        object->queue34.slotsCurrent,
+        object->queue34.slotsLast,
+        queue34CursorEqual ? 1u : 0u,
+        queue34SameBlock ? 1u : 0u);
+}
+
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
     ++g_LauncherObjectBuildState.subobject5CSlot0CallCount;
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
@@ -1479,12 +1534,19 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     if (crit) {
         EnterCriticalSection(crit);
     }
-    Log(
-        "LauncherObjectStub::Subobject60::Slot0(self=%p crit=%p EnterCriticalSection) [count=%u]",
-        self,
-        crit,
-        (unsigned)g_LauncherObjectBuildState.subobject60Slot0CallCount);
-    LogPointerWords("LauncherObject subobject60 self", self, 4);
+    const uint32_t count = g_LauncherObjectBuildState.subobject60Slot0CallCount;
+    if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
+        Log(
+            "LauncherObjectStub::Subobject60::Slot0(self=%p crit=%p EnterCriticalSection) [count=%u]",
+            self,
+            crit,
+            (unsigned)count);
+        LogPointerWords("LauncherObject subobject60 self", self, 4);
+        DiagnosticLogLauncherRuntimeQueueState(
+            "sub60.enter",
+            DiagnosticLauncherObjectFromHelper(self, 0x60),
+            count);
+    }
     return 0;
 }
 
@@ -1494,12 +1556,19 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self) {
     if (crit) {
         LeaveCriticalSection(crit);
     }
-    Log(
-        "LauncherObjectStub::Subobject60::Slot1(self=%p crit=%p LeaveCriticalSection) [count=%u]",
-        self,
-        crit,
-        (unsigned)g_LauncherObjectBuildState.subobject60Slot1CallCount);
-    LogPointerWords("LauncherObject subobject60 self", self, 4);
+    const uint32_t count = g_LauncherObjectBuildState.subobject60Slot1CallCount;
+    if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
+        Log(
+            "LauncherObjectStub::Subobject60::Slot1(self=%p crit=%p LeaveCriticalSection) [count=%u]",
+            self,
+            crit,
+            (unsigned)count);
+        LogPointerWords("LauncherObject subobject60 self", self, 4);
+        DiagnosticLogLauncherRuntimeQueueState(
+            "sub60.leave",
+            DiagnosticLauncherObjectFromHelper(self, 0x60),
+            count);
+    }
     return 0;
 }
 
