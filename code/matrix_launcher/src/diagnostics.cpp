@@ -502,7 +502,7 @@ static const char* __thiscall Mediator_GetString0(MinimalLoginMediatorStub* self
     return g_MediatorStringA;
 }
 
-static const char* __thiscall Mediator_GetString1(MinimalLoginMediatorStub* self, const char* value) {
+extern "C" const char* Mediator_GetString1_Impl(MinimalLoginMediatorStub* self, const char* value) {
     (void)self;
     Log(
         "MediatorStub::GetString1(+0x60 value='%s') -> '%s'",
@@ -511,13 +511,43 @@ static const char* __thiscall Mediator_GetString1(MinimalLoginMediatorStub* self
     return g_MediatorStringB;
 }
 
-static const char* __thiscall Mediator_GetString2(MinimalLoginMediatorStub* self, const char* value) {
+__attribute__((naked)) static void Mediator_GetString1() {
+    __asm__ volatile(
+        "push %%ebx\n\t"
+        "mov 8(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "call *%%ebx\n\t"
+        "add $8, %%esp\n\t"
+        "pop %%ebx\n\t"
+        "ret\n\t"
+        :
+        : "b"(Mediator_GetString1_Impl)
+        : "eax");
+}
+
+extern "C" const char* Mediator_GetString2_Impl(MinimalLoginMediatorStub* self, const char* value) {
     (void)self;
     Log(
         "MediatorStub::GetString2(+0x5c value='%s') -> '%s'",
         value ? value : "<null>",
         g_MediatorAuthName);
     return g_MediatorAuthName;
+}
+
+__attribute__((naked)) static void Mediator_GetString2() {
+    __asm__ volatile(
+        "push %%ebx\n\t"
+        "mov 8(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "call *%%ebx\n\t"
+        "add $8, %%esp\n\t"
+        "pop %%ebx\n\t"
+        "ret\n\t"
+        :
+        : "b"(Mediator_GetString2_Impl)
+        : "eax");
 }
 
 static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalLoginMediatorStub* self) {

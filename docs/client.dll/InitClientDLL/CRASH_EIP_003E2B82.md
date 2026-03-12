@@ -2,12 +2,37 @@
 
 ## Why this document exists
 
-This is the current canonical note for the newest late-startup crash family where the faulting `EIP` lands inside launcher-owned `arg2 filteredArgv` storage.
+This is the canonical note for the late-startup crash family where the faulting `EIP` lands inside launcher-owned `arg2 filteredArgv` storage.
 
-Even though nearby runs may land at slightly different heap addresses (`0x003e2b62`, `0x003e2b82`, etc.), the important stable pattern is the same:
+Even though nearby runs may land at slightly different heap addresses (`0x003e2b62`, `0x003e2b82`, etc.), the important stable pattern was the same:
 
-- the client reaches the deeper mediator `+0xec` handoff,
-- and control later redirects to **current `arg2 filteredArgv + 2`**.
+- the client reached the deeper mediator `+0xec` handoff,
+- and control later redirected to **current `arg2 filteredArgv + 2`**.
+
+## Current status
+
+This family is now best treated as **historically canonical, but resolved on the current binder/scaffold path**.
+
+Newer static + debugger work identified a concrete root cause in the replacement launcher:
+- mediator slots `+0x60` and `+0x5c` were exposed as callee-clean `ret 4` wrappers
+- but the client call site at `0x62001325..0x62001362` expects those single-arg methods to be caller-clean and later does `add esp, 0x14`
+- that over-cleaned the stack by 8 bytes
+- so `client.dll:0x62001365` then overwrote the saved `InitClientDLL` return address with stale `esi = arg2 filteredArgv + 0x0c`
+- later returns consequently landed inside current `arg2` storage
+
+After replacing `+0x60` / `+0x5c` with caller-clean naked wrappers (`ret`, not `ret 4`):
+- the old late `EIP=arg2+2` crash family no longer reproduced on the current binder rerun
+- the client still reached `+0xec`
+- and `InitClientDLL` returned cleanly to the launcher with value `1` instead of crashing
+
+A follow-up launcher-side correction then fixed our own interpretation of that result:
+- the replacement launcher had still been treating any non-zero `InitClientDLL` result as failure
+- on the observed current client path, positive return `1` is the success result we now actually see
+- after correcting that local handling, the run now ends with launcher log lines:
+  - `InitClientDLL returned: 1`
+  - `InitClientDLL succeeded, but RunClientDLL is gated.`
+
+The remainder of this document is retained as the historical evidence trail for how that family was narrowed before the calling-convention bug was identified.
 
 ## Representative dumps
 
@@ -110,6 +135,21 @@ So on the current proven path there is **no additional mediator traffic after `+
 That makes the visible late `arg2+2` landing even more consistent with the existing corrupted-return-chain interpretation:
 - the loading/selection helper itself appears to complete successfully,
 - and the observed failure may therefore be happening during or immediately after the enclosing `InitClientDLL` success return / unwind.
+
+Newer debugger-assisted confirmation tightens this still further.
+In winedbg on the current binder/scaffold run:
+- break at launcher call site `resurrections.exe:0x411181`
+- step into `client.dll:0x620012a0` (`InitClientDLL`)
+- use `finish`
+
+Observed result:
+- execution does **not** return to launcher `0x411187`
+- instead, the function-level return target resolves directly into current `arg2 filteredArgv` base (`0x003e5d88` on the traced run)
+- and a single instruction step advances to `0x003e5d8a`, which matches the familiar late crash family
+
+So this crash family is now better described as:
+- `InitClientDLL` itself eventually returning/unwinding into corrupted `arg2` storage,
+- not a clean return to the launcher followed by some later separate launcher-side failure.
 
 ### 2. Correcting the obvious `+0x38` path-root meaning did not move the crash either
 

@@ -155,8 +155,8 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
 | `+0x58` | string-producing helper in early init logging/config path | medium |
-| `+0x5c` | chained string-producing helper | medium |
-| `+0x60` | chained string-producing helper | medium |
+| `+0x5c` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
+| `+0x60` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
 | `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
 | `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
@@ -175,6 +175,13 @@ Current practical note on `+0x120`:
 - but the currently visible `"Loading Character"` status text on patched-client runs is already explained earlier by `client.dll:0x62170f2a`, immediately before the already-observed `+0xec` handoff at `0x62170f48`
 - and a follow-up diagnostic rerun with mediator slot `+0x120` instrumented still showed no `+0x120` traffic before the same late `EIP=0x003e5e8a` crash (`crash_62`)
 - newer post-`+0xec` static review also shows that the already-reached `0x62170b00` helper performs no further mediator calls after `+0xec` before returning success through `0x620015fd` / `0x62001634`
+- newer debugger + static review then resolved the old late `arg2` crash family to an early arg6 contract bug in the replacement launcher:
+  - client auth-name chain `0x62001325..0x62001362` calls `+0x58`, `+0x60`, `+0x5c`, then does `add esp, 0x14`
+  - that proves `+0x60` / `+0x5c` are caller-clean on this path
+  - the scaffold had exposed them as callee-clean `ret 4` methods
+  - fixing those two offsets to caller-clean wrappers stopped reproducing the old late `EIP=arg2+2` crash family on the current binder path
+  - the deeper path now returns `InitClientDLL = 1` instead of crashing
+  - and after correcting launcher-side interpretation of positive return values, the current run now cleanly logs `InitClientDLL succeeded, but RunClientDLL is gated.`
 
 ## What the stub experiments proved
 
@@ -339,10 +346,16 @@ At this point the best current read is:
 
 - the crash is still happening **after** the deeper `+0xec` selection/config handoff,
 - but **before** later observed `+0xf4` probe traffic from this scaffold family,
+- and newer winedbg tracing tightens the return-chain failure point further:
+  - breaking at launcher `call g_InitClientDLL` site `resurrections.exe:0x411181`
+  - stepping into `client.dll:0x620012a0`
+  - and using `finish`
+  - does **not** return to launcher `0x411187`
+  - it returns directly into current `arg2 filteredArgv` base instead
 - so the remaining mismatch is more likely tied to:
   - still-incomplete arg7 low-24-bit / selection-id state,
   - another launcher-owned client-config expectation inside the same `0x62170b00` / `0x622a39d0` family,
-  - or a later ownership/call-path mismatch that still poisons control flow with the current `arg2` pointer.
+  - or an internal `InitClientDLL` return/unwind corruption that still poisons control flow with the current `arg2` pointer before the launcher regains control.
 
 ## New diagnostic tightening after this pass
 

@@ -67,20 +67,30 @@ Current deep diagnostic progress with patched client:
 
 Current practical crash state:
 - current patched-client scaffold no longer dies on a simple missing-vtable-slot `EIP=0` case
-- visible current runtime state also now includes an in-game **Loading Character** phase with loading bar / status text before the crash
-- static ordering now explains why that is compatible with the currently logged mediator depth:
+- newer debugger + static narrowing identified a concrete stack-cleanup mismatch in the early mediator auth-name chain:
+  - `client.dll:0x62001325..0x62001362` calls mediator `+0x58`, then passes that result to `+0x60`, then passes that result to `+0x5c`, then calls a formatter and finally does `add esp, 0x14`
+  - that caller cleanup means mediator `+0x60` and `+0x5c` are expected to be **caller-clean single-arg methods**, not callee-clean `ret 4` methods
+  - the scaffold had exposed both as normal `__thiscall` methods, so our replacement launcher was incorrectly popping 8 bytes too many before `client.dll:0x62001365`
+- newer debugger-assisted proof of the overwrite mechanism:
+  - at `client.dll:0x62001319`, the top-level `InitClientDLL` saved return address at `[ebp+4]` is still launcher `0x411187`
+  - by `client.dll:0x62001365`, `esp` has drifted to `ebp+8`
+  - so the next `push esi` writes current stale `esi = arg2 filteredArgv + 0x0c` directly over the saved return address slot
+  - later returns then land in current `arg2` storage and produce the familiar late crash family
+- the diagnostic mediator now exposes `+0x60` / `+0x5c` through naked caller-clean wrappers (`ret`, not `ret 4`)
+- current highest-value rerun after that fix:
+  - `MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+  - the client still reaches the deeper mediator path through `ConsumeSelectionContext(...)` at `+0xec`
+  - but the old late `EIP=arg2+2` crash family no longer reproduces on that run
+  - `InitClientDLL` now returns cleanly to the launcher with value **`1`** instead of crashing
+  - newer launcher-side handling now also treats this positive return as success rather than generically treating every non-zero return as failure
+  - current `resurrections.log` now ends with:
+    - `InitClientDLL returned: 1`
+    - `InitClientDLL succeeded, but RunClientDLL is gated.`
+- visible current runtime state still includes an in-game **Loading Character** phase with loading bar / status text on the deeper path
+- static ordering still explains why that UI is compatible with the currently logged mediator depth:
   - `client.dll:0x62170f2a` pushes the string `"Loading Character"`
   - and the same block then calls `arg6->+0xec` at `0x62170f48`
   - so seeing that UI proves the client reached the pre-`+0xec` loading/status phase, but does **not** yet prove later loading-character consumers such as the `CreateCharacterWorldIndex` read at `0x62054cbd`
-  - newer post-`+0xec` static review now tightens the immediate continuation:
-    - after `arg6->+0xec`, control just jumps to `0x62170f62`
-    - calls `0x6216a1c0`
-    - and `0x62170b00` then returns success back to its caller at `0x620015fd`
-    - the surrounding helper returns success directly at `0x62001634`
-  - so the currently confirmed path has **no additional mediator traffic after `+0xec` inside `0x62170b00` itself** before returning success to the enclosing `InitClientDLL` logic
-  - that makes the current late `arg2+2` crash even more consistent with the existing corrupted-return-chain model:
-    - the already-reached loading/selection helper appears to complete successfully
-    - and the visible failure may therefore be happening during or immediately after the enclosing `InitClientDLL` success return / unwind rather than inside another unseen mediator callback in that helper
 - the deepest stable logged mediator sequence now reaches:
   - `GetWorldOrSelectionName()`
   - `GetProfileOrSessionName()`
@@ -88,38 +98,9 @@ Current practical crash state:
   - `AttachStartupContext(first)`
   - `ProvideStartupTriple(netShell, netMgr, distrObjExecutive)`
   - `ConsumeSelectionContext(...)` at `+0xec`
-- current latest crash family is now tracked canonically in:
+- the old late `arg2+2` family remains canonically documented in:
   - `../../docs/client.dll/InitClientDLL/CRASH_EIP_003E2B82.md`
-- representative current dumps:
-  - `~/MxO_7.6005/MatrixOnline_0.0_crash_35.dmp`
-    - with `MXO_MEDIATOR_SELECTION_NAME=Vector`
-    - `EIP=0x003e2b82`
-    - current `arg2 filteredArgv = 0x003e2b80`
-  - `~/MxO_7.6005/MatrixOnline_0.0_crash_54.dmp`
-    - after widening arg5 to the full recovered 13-slot primary vtable surface
-    - `EIP=0x003e5e4a`
-    - current `arg2 filteredArgv = 0x003e5e48`
-  - `~/MxO_7.6005/MatrixOnline_0.0_crash_57.dmp`
-    - with in-launcher `MXO_ARG2_RET_BYPASS=1`
-    - second fault after simulated `ret`
-    - `EIP=0x62000003` (`client.dll+0x3`)
-  - `~/MxO_7.6005/MatrixOnline_0.0_crash_60.dmp`
-    - non-zero arg7 probe with scratch-shaped `+0x40` acceptance
-    - `EIP=0x003e5e8a`
-  - `~/MxO_7.6005/MatrixOnline_0.0_crash_61.dmp`
-    - follow-up rerun after explicit `selectionContext[0]` logging
-    - `EIP=0x003e5e8a`
-  - `~/MxO_7.6005/MatrixOnline_0.0_crash_62.dmp`
-    - follow-up rerun after adding diagnostic mediator slot `+0x120`
-    - still no observed `+0x120` log before failure
-    - `EIP=0x003e5e8a`
-- the stable higher-level signature across the unfixed runs is still:
-  - control later redirects into **current `arg2 filteredArgv + 2`**
-- the arg2 investigation is complete enough to treat `arg2` as a symptom:
-  - the late landing in argv storage is downstream corruption, not the root bug
-  - current canonical references:
-    - `../../docs/client.dll/InitClientDLL/FINAL_INVESTIGATION_SUMMARY.md`
-    - `../../docs/client.dll/InitClientDLL/RET_BYPASS_HACK.md`
+- but it is now best treated as a **resolved scaffold bug** in the current path, caused by the mediator `+0x5c` / `+0x60` cleanup mismatch rather than by an unresolved mysterious late unwind alone
 - widening arg5 reconstruction now includes:
   - full recovered primary vtable surface `0x4b2768` slots `0..12`
   - evidence-backed empty-path modeling for slot `5` (`0x431840`)
@@ -282,10 +263,12 @@ Canonical docs:
    - determine how the client expects the mutated arg7 scratch request to map back to persisted low-24-bit selection id / descriptor data after `0x62170dc1..0x62170e59`
    - stop assuming that accepting the scratch-shaped request alone is enough
 3. Reconstruct more of `0x409950` launcher-side preprocessing, especially `options.cfg` side effects and launcher-global state derived before `InitClientDLL`
-4. Follow the enclosing `InitClientDLL` logic immediately **after** the confirmed-success `0x62170b00` / `0x620015fd` return, because current static evidence now says the already-reached `+0xec` path itself returns success without any further mediator calls inside that helper
+4. Follow the **new post-fix blocker** now that the old late `arg2+2` crash family no longer reproduces on the current binder path:
+   - confirm the exact original success contract around positive `InitClientDLL` return `1`
+   - trace what the legitimate next phase should be after the already-reached `+0xec` / `0x6216a1c0` path now that control returns cleanly to the launcher
 5. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the loading-character path around `0x620547c0..0x62054eac`) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
 6. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
 7. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently recovered arg5 slots alone explain the late crash
 8. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
 9. Keep tracing what `0x402ec0` minimally sets up
-10. Revisit legitimate `RunClientDLL` only after the faithful path gets past the current late `EIP=arg2+2` crash
+10. Revisit legitimate `RunClientDLL` on the now-clean positive-return path, but keep it clearly labeled as binder/scaffold progress rather than faithful original-equivalent success until the launcher-owned arg5/arg6/arg7/pre-client state is reconstructed more faithfully

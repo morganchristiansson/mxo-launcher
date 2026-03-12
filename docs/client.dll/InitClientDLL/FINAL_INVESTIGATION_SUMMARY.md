@@ -187,7 +187,32 @@ And a newer post-`+0xec` static pass narrows the immediate continuation further:
 - and that enclosing helper returns success directly at `0x62001634`
 So the already-reached `+0xec` helper itself currently shows **no further mediator traffic after `+0xec`** before success returns to the enclosing `InitClientDLL` logic.
 That in turn strengthens the current corrupted-return-chain interpretation: the loading/selection helper appears to finish successfully, so the visible late `arg2+2` failure may be occurring during or immediately after the enclosing `InitClientDLL` success return / unwind rather than inside another unseen mediator callback in that helper.
-That keeps arg7 / sibling-selection reconstruction as the highest-value unresolved pre-crash target, but also raises the priority of tracing the enclosing `InitClientDLL` logic immediately after this successful helper return.
+A newer debugger-assisted trace sharpens that further:
+- break at launcher `call g_InitClientDLL` site `resurrections.exe:0x411181`
+- step into `client.dll:0x620012a0`
+- use `finish`
+- the function does **not** return to launcher `0x411187`
+- instead it resolves directly into current `arg2 filteredArgv` base (`0x003e5d88` on that run)
+- and one more instruction step advances to `0x003e5d8a`, matching the familiar crash family
+So the current best model was that `InitClientDLL` itself was eventually unwinding/returning into corrupted argv storage before control got back to the launcher call site.
+
+A newer static + debugger pass then resolved that corruption more concretely:
+- the early mediator auth-name chain at `client.dll:0x62001325..0x62001362` calls `+0x58`, then `+0x60`, then `+0x5c`, and finally does `add esp, 0x14`
+- that proves the single-arg mediator slots `+0x60` and `+0x5c` are expected to be **caller-clean** on this path
+- the scaffold had exposed both as normal `__thiscall` methods compiled as `ret 4`
+- debugger inspection then showed the exact overwrite:
+  - at `0x62001319`, saved top-level return address `[ebp+4]` was still launcher `0x411187`
+  - by `0x62001365`, `esp` had drifted to `ebp+8`
+  - so `push esi` at `0x62001365` overwrote the saved return address with stale `esi = arg2 filteredArgv + 0x0c`
+- replacing `+0x60` / `+0x5c` with caller-clean naked wrappers (`ret`, not `ret 4`) stopped reproducing the old late `arg2+2` crash family on the current binder path
+- the same path still reaches `+0xec`, and `InitClientDLL` now returns cleanly to the launcher with value `1`
+- a follow-up launcher-side correction then fixed our own local interpretation of that result:
+  - the replacement launcher had been treating any non-zero `InitClientDLL` return as failure
+  - on the observed current client success path, positive return `1` is the relevant success result
+  - after correcting that handling, the same run now logs `InitClientDLL succeeded, but RunClientDLL is gated.`
+
+So the old late `arg2` crash family is now best treated as a **resolved scaffold calling-convention bug**.
+That shifts the active next step away from tracing an unexplained corrupted return chain and toward the legitimate post-success question: how to continue faithfully from the now-clean positive-return `InitClientDLL` result into the next startup phase.
 
 ## Final Takeaway
 

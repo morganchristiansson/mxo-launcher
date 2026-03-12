@@ -150,6 +150,70 @@ This matters because:
 So the current late crash is no longer well-explained by a trivial `+0xec` lifetime bug alone, and the next likely gap is now the enclosing `InitClientDLL` logic **after** this already-confirmed-success helper returns.
 That also fits the current corrupted-return-chain model better than before: the already-reached loading/selection helper appears to complete successfully, so the visible late `arg2+2` failure may be happening during or immediately after the enclosing `InitClientDLL` success return / unwind rather than inside another unseen mediator callback in that helper.
 
+A newer debugger-assisted trace tightens that claim further.
+In winedbg on the current binder/scaffold run:
+- break at launcher call site `resurrections.exe:0x411181`
+- step into `client.dll:0x620012a0` (`InitClientDLL`)
+- then use `finish`
+
+Result:
+- execution does **not** return to launcher `0x411187`
+- instead, the function-level return target lands directly in current `arg2 filteredArgv` base (`0x003e5d88` on that run)
+- and a single instruction step advances to `0x003e5d8a`, matching the familiar late crash family
+
+So the current best reading is no longer merely that some later post-return launcher logic goes wrong.
+It is now stronger evidence that `InitClientDLL` itself is unwinding/returning to corrupted launcher-owned argv storage before control ever gets back to the launcher call site.
+
+## New concrete root cause for the old late `arg2` crash family: `+0x5c` / `+0x60` cleanup mismatch
+
+A newer static + debugger pass finally narrowed the old corrupted-return-chain bug to a specific early mediator contract mismatch.
+
+Inside `client.dll:0x62001325..0x62001362`, the client does this early auth-name chain:
+
+```asm
+call [eax+0x58]   ; returns first string
+push eax
+call [edx+0x60]   ; consumes previous string, returns next string
+push eax
+call [eax+0x5c]   ; consumes previous string, returns next string
+push eax
+push 0x628689dc
+push 0x628689d4
+call 0x6236fa40
+add  esp, 0x14
+```
+
+That final `add esp, 0x14` is the key clue.
+It means the single-stack-argument mediator slots `+0x60` and `+0x5c` are expected to be **caller-clean** on this path.
+
+The scaffold had been exposing both as ordinary `__thiscall` methods, and the generated code in `resurrections.exe` used `ret 4` for both.
+That over-cleaned the stack by 8 bytes before `client.dll:0x62001365`.
+
+Debugger narrowing then showed the exact overwrite mechanism:
+- at `client.dll:0x62001319`, the top-level `InitClientDLL` saved return address at `[ebp+4]` is still launcher `0x411187`
+- by `client.dll:0x62001365`, `esp` has drifted to `ebp+8`
+- so the next `push esi` writes stale `esi = arg2 filteredArgv + 0x0c` directly over the saved return address slot
+- later returns therefore land in current `arg2` storage and produce the old `EIP=arg2+2` crash family
+
+The replacement launcher now exposes `+0x60` and `+0x5c` through naked caller-clean wrappers (`ret`, not `ret 4`).
+
+Current result after that fix on the same binder path:
+- the client still reaches `MediatorStub::ConsumeSelectionContext(...)` at `+0xec`
+- the old late `EIP=arg2+2` crash family no longer reproduces on that run
+- and `InitClientDLL` now returns cleanly to the launcher with value **`1`** instead of crashing
+
+A follow-up launcher-side correction also matters here:
+- the replacement launcher had still been treating any non-zero `InitClientDLL` return as failure
+- on the observed original client path, positive return `1` is the current success result
+- after correcting that local launcher interpretation, the same run now logs:
+  - `InitClientDLL returned: 1`
+  - `InitClientDLL succeeded, but RunClientDLL is gated.`
+
+So the old late `arg2` family is now best understood as a **resolved scaffold calling-convention bug** in the early mediator string chain, not an irreducible mystery in the later `+0xec` path itself.
+The active blocker has therefore shifted again:
+- not "why does `InitClientDLL` crash into argv?"
+- but rather how to proceed faithfully from the now-clean positive-return `InitClientDLL` result into the legitimate next startup phase.
+
 ### Diagnostic-only note: the current `arg2` landing can be stepped past with `ret`
 
 A newer interactive debugging result is that the immediate late `arg2` crash can be bypassed temporarily by forcing the bad landing site to execute a single x86 `ret` (`0xc3`).

@@ -1426,7 +1426,10 @@ int main(int argc, char* argv[]) {
     Log("InitClientDLL returned: %d", initResult);
     Log("launcher export SetMasterDatabase observed: %p", g_pClientDBFromCallback);
 
-    if (initResult != 0) {
+    // Original client code returns 1 on the observed success path and 0 / negative values on failure paths.
+    // Do not treat non-zero generically as failure here.
+    const bool initSucceeded = (initResult > 0);
+    if (!initSucceeded) {
         Log("InitClientDLL failed.");
         if (!forceRunAfterInitFailure) {
             Log("Stopping. Set MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE=1 for a diagnostic-only crash experiment.");

@@ -16,6 +16,7 @@ Documentation should mirror that layout as closely as possible:
 - `launcher.exe/README.md`
 - `launcher.exe/client_dll_loading/LOADING_SEQUENCE.md`
 - `launcher.exe/nopatch/README.md`
+- `launcher.exe/WINEDBG.md`
 
 ### client.dll
 - `client.dll/README.md`

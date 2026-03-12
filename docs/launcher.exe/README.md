@@ -13,6 +13,9 @@ Canonical launcher-side documentation lives in component folders.
 - `startup_objects/README.md`
   - Canonical docs for launcher-owned globals and heap objects used before `InitClientDLL`.
 
+- `WINEDBG.md`
+  - Practical `winedbg` workflow for dump triage and live startup tracing around `InitClientDLL`.
+
 - `SetMasterDatabase/`
   - Launcher-side `SetMasterDatabase` export and related notes.
 
