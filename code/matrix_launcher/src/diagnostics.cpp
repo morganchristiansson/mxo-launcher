@@ -169,9 +169,25 @@ static const char g_MediatorName[] = "ILTLoginMediator.Default";
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringB[] = "nopatch";
 static const char g_MediatorStringC[] = "standalone";
-static uint32_t g_MediatorSelectionHighByteFloor = 0;
+static uint32_t g_MediatorSelectionUpperBoundExclusive = 1;
 static const char* g_MediatorMappedSelectionName = g_MediatorStringC;
 static const char* g_MediatorProfileName = g_MediatorStringA;
+
+struct __attribute__((packed)) DiagnosticMediatorSelectionPacked {
+    uint8_t reserved0;
+    uint8_t reserved1;
+    uint8_t reserved2;
+    const char* mappedName; // read by client as dword at +0x03
+    uint32_t selectionId;   // read by client as dword at +0x07
+};
+
+struct DiagnosticMediatorSelectionObject {
+    uint8_t reserved[0x10];
+    DiagnosticMediatorSelectionPacked* packed; // read by client as dword at +0x10
+};
+
+static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
+static DiagnosticMediatorSelectionObject g_MediatorSelectionObject = {};
 
 static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
@@ -249,6 +265,35 @@ static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* 
     return g_MediatorStringA;
 }
 
+static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log("MediatorStub::GetDefaultSelectionIndex() -> 0");
+    return 0;
+}
+
+static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub* self, uint32_t selectionIndex) {
+    (void)self;
+    g_MediatorSelectionPacked.mappedName = g_MediatorMappedSelectionName;
+    g_MediatorSelectionPacked.selectionId = selectionIndex;
+    g_MediatorSelectionObject.packed = &g_MediatorSelectionPacked;
+
+    if (selectionIndex >= g_MediatorSelectionUpperBoundExclusive) {
+        Log(
+            "MediatorStub::GetSelectionDescriptor(selectionIndex=%u) -> NULL (upperBoundExclusive=%u)",
+            (unsigned)selectionIndex,
+            (unsigned)g_MediatorSelectionUpperBoundExclusive);
+        return NULL;
+    }
+
+    Log(
+        "MediatorStub::GetSelectionDescriptor(selectionIndex=%u) -> %p (mappedName='%s' selectionId=%u)",
+        (unsigned)selectionIndex,
+        &g_MediatorSelectionObject,
+        g_MediatorMappedSelectionName,
+        (unsigned)g_MediatorSelectionPacked.selectionId);
+    return &g_MediatorSelectionObject;
+}
+
 static const char* __thiscall Mediator_GetWorldOrSelectionName(MinimalLoginMediatorStub* self) {
     (void)self;
     Log("MediatorStub::GetWorldOrSelectionName() -> '%s'", g_MediatorMappedSelectionName);
@@ -278,10 +323,12 @@ static const char* __thiscall Mediator_GetString2(MinimalLoginMediatorStub* self
     return g_MediatorMappedSelectionName;
 }
 
-static uint32_t __thiscall Mediator_GetArg7HighByteFloor(MinimalLoginMediatorStub* self) {
+static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::GetArg7HighByteFloor() -> %u", (unsigned)g_MediatorSelectionHighByteFloor);
-    return g_MediatorSelectionHighByteFloor;
+    Log(
+        "MediatorStub::GetArg7SelectionUpperBoundExclusive() -> %u",
+        (unsigned)g_MediatorSelectionUpperBoundExclusive);
+    return g_MediatorSelectionUpperBoundExclusive;
 }
 
 static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub* self, uint32_t selectionHighByte) {
@@ -794,6 +841,11 @@ static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
     return 0;
 }
 
+static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self);
+static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self);
+static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self);
+static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self);
+
 static uint32_t __thiscall LauncherObject_Slot11_431670(
     MinimalLauncherObjectStub* self,
     void* arg1,
@@ -827,11 +879,6 @@ static uint32_t __thiscall LauncherObject_Slot12_4316A0(
     LauncherObject_Subobject98_Slot1(&self->helper98);
     return 0;
 }
-
-static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self);
-static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self);
-static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self);
-static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self);
 
 static CRITICAL_SECTION* DiagnosticLauncherCritFromHelper(void* self) {
     return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
@@ -961,12 +1008,14 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[9] = (void*)Mediator_SetValue1;        // +0x24
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[14] = (void*)Mediator_GetDisplayName;  // +0x38
+    g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
+    g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor; // +0x40
     g_LoginMediatorVtable[18] = (void*)Mediator_GetWorldOrSelectionName; // +0x48
     g_LoginMediatorVtable[19] = (void*)Mediator_GetProfileOrSessionName; // +0x4c
     g_LoginMediatorVtable[22] = (void*)Mediator_GetString0;      // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetString2;      // +0x5c
     g_LoginMediatorVtable[24] = (void*)Mediator_GetString1;      // +0x60
-    g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7HighByteFloor; // +0xd8
+    g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7SelectionUpperBoundExclusive; // +0xd8
     g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc
     g_LoginMediatorVtable[59] = (void*)Mediator_ConsumeSelectionContext; // +0xec
     g_LoginMediatorVtable[61] = (void*)Mediator_GetProfilePathComponent; // +0xf4
@@ -1208,14 +1257,15 @@ void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr) {
     Log("DIAGNOSTIC: binder scaffold materialized arg6 as %p", outMediatorPtr ? *outMediatorPtr : NULL);
 }
 
-void DiagnosticConfigureMediatorSelection(uint32_t highByteFloor, const char* mappedSelectionName) {
-    g_MediatorSelectionHighByteFloor = highByteFloor;
+void DiagnosticConfigureMediatorSelection(uint32_t selectionUpperBoundExclusive, const char* mappedSelectionName) {
+    g_MediatorSelectionUpperBoundExclusive = selectionUpperBoundExclusive ? selectionUpperBoundExclusive : 1;
     g_MediatorMappedSelectionName =
         (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : g_MediatorStringC;
+    g_MediatorSelectionPacked.mappedName = g_MediatorMappedSelectionName;
 
     Log(
-        "DIAGNOSTIC: mediator selection configured highByteFloor=%u mappedSelection='%s'",
-        (unsigned)g_MediatorSelectionHighByteFloor,
+        "DIAGNOSTIC: mediator selection configured upperBoundExclusive=%u mappedSelection='%s'",
+        (unsigned)g_MediatorSelectionUpperBoundExclusive,
         g_MediatorMappedSelectionName);
 }
 
@@ -1226,7 +1276,10 @@ void DiagnosticConfigureMediatorProfileName(const char* profileName) {
     Log("DIAGNOSTIC: mediator profile/session name configured as '%s'", g_MediatorProfileName);
 }
 
-void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr) {
+void DiagnosticApplyDefaultNopatchMediatorConfig(
+    void* mediatorPtr,
+    uint32_t parsedNoPatchValue,
+    uint32_t clientVersionValue) {
     if (!mediatorPtr) return;
 
     void** vtable = *(void***)mediatorPtr;
@@ -1235,18 +1288,15 @@ void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr) {
         return;
     }
 
-    const uint32_t parsedNoPatchValue = 0x3dcccccd; // diagnostic placeholder for parsed "0.1"
-    const uint32_t clientVersionValue = 0x3dcccccd; // original source value still unresolved
-
     typedef void (__thiscall *SetValueFn)(void*, void*);
     SetValueFn setValue1 = (SetValueFn)vtable[7];
     SetValueFn setValue2 = (SetValueFn)vtable[9];
 
     setValue1(mediatorPtr, (void*)&parsedNoPatchValue);
-    Log("DIAGNOSTIC: applied default nopatch mediator +0x1c with placeholder 0x%08x", parsedNoPatchValue);
+    Log("DIAGNOSTIC: applied default nopatch mediator +0x1c with value 0x%08x", parsedNoPatchValue);
 
     setValue2(mediatorPtr, (void*)&clientVersionValue);
-    Log("DIAGNOSTIC: applied default nopatch mediator +0x24 with placeholder 0x%08x", clientVersionValue);
+    Log("DIAGNOSTIC: applied default nopatch mediator +0x24 with value 0x%08x", clientVersionValue);
 }
 
 void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr) {

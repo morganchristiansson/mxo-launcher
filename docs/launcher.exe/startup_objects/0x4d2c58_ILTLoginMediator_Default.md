@@ -125,6 +125,11 @@ From original `launcher.exe` startup/teardown:
 | `+0x164` | teardown conditional check | medium |
 | `+0x16c` | teardown conditional check | medium |
 
+Current scaffold note:
+- the replacement launcher now still uses parsed `"0.1"` for `+0x1c`,
+- and it now rebuilds the `+0x24` value from the on-disk `client.dll` version resource using the same `%d.%d%d%d%d`-style float-string shaping recovered from the original nopatch path,
+- instead of using the older identical `0.1` placeholder for both slots.
+
 ### Client-observed offsets on arg6-resolved `ILTLoginMediator.Default`
 
 From `client.dll` static init and early `InitClientDLL` analysis:
@@ -134,6 +139,8 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x10` | readiness / availability gate; this is part of the old `-7` barrier | high |
 | `+0x2c` | additional runtime readiness gate before arg5-related runtime work | medium |
 | `+0x38` | returns C-string used by client formatting path | high |
+| `+0x3c` | returns default selection index when the client asks for `0xff` fallback selection | medium |
+| `+0x40` | returns selection-descriptor object for the arg7-derived selection index | medium |
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
 | `+0x58` | string-producing helper in early init logging/config path | medium |

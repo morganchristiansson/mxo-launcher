@@ -23,6 +23,8 @@ Canonical launcher-side documentation lives in component folders.
 3. The launcher's **nopatch path still performs launcher-side setup** before calling `InitClientDLL`.
 4. **launcher.exe does not call `client.dll!SetMasterDatabase()` in the traced startup path**.
 5. The current custom launcher crashes are more consistent with **missing launcher-owned state** than with a need to patch `client.dll` memory.
+6. For current same-machine runtime validation notes, keep the canonical record in:
+   - `client_dll_loading/LOADING_SEQUENCE.md`
 
 ## Active focus
 

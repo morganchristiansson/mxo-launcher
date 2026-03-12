@@ -14,7 +14,7 @@ LAUNCHER_ARGS = $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CXX) -Wall -Wextra -O2 -o $@ $^ -Wl,--export-all-symbols
+	$(CXX) -Wall -Wextra -O2 -o $@ $^ -Wl,--export-all-symbols -lversion
 
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
 	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^

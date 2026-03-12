@@ -16,7 +16,7 @@ The original launcher passes an 8-argument frame into `client.dll!InitClientDLL`
 - `client.dll` handle (`0x4d2c50`)
 - `cres.dll` handle (`0x4d2c4c`)
 - launcher-owned objects (`0x4d6304`, `0x4d2c58`)
-- packed version/build info (`[this+0xa8]`, `[this+0xac]`)
+- packed launcher selection / saved-world state from `CLauncher+0xa8/+0xac`
 - flag byte (`0x4d2c69`)
 
 The older sprawling version of this document was archived to `../slopdocs/launcher.exe/data_passing_mechanisms.md`.

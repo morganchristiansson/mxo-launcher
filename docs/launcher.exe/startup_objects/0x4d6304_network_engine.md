@@ -293,7 +293,7 @@ Current practical result after landing that queue reconstruction:
   - `ProvideStartupTriple(...)`
   - `AttachStartupContext(second)`
 - the latest practical crash still lands in launcher-owned arg2 storage rather than moving to a fresh arg5-observed call site
-  - latest reference dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_22.dmp`
+  - earlier reference dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_22.dmp`
   - `EIP=0x003e2b80`
   - current `arg2 filteredArgv = 0x003e2b80`
 
@@ -304,3 +304,67 @@ So the remaining likely suspects stay roughly the same:
 - deeper arg5 behavior beyond queue initialization alone,
 - still-incomplete launcher-owned preprocessing / side effects around `0x409950`,
 - or another later launcher/client ownership mismatch that still turns current arg2 memory into a bad control-flow target.
+
+## New clarification from faithful helper semantics and wider arg5 probes
+
+The arg5 scaffold has now been tightened one step further to match more of the original helper behavior recovered from `launcher.exe`:
+
+- `+0x60` is now modeled as a helper object with:
+  - vtable root at `+0x60`
+  - real `CRITICAL_SECTION` storage at `+0x64`
+- `+0x7c` is now backed by a real event created via:
+  - `CreateEventA(NULL, FALSE, FALSE, NULL)`
+- `+0x98` is now modeled as another helper object with:
+  - vtable root at `+0x98`
+  - real `CRITICAL_SECTION` storage at `+0x9c`
+- the `+0x5c` helper now follows the recovered Win32 intent more closely:
+  - slot `+0x00` -> `SetEvent(field7C)`
+  - slot `+0x04` -> leave lock, `WaitForSingleObject(field7C, timeout)`, then reacquire on success/timeout
+- the shared helper vtable family behind `+0x60` / `+0x98` is now modeled as:
+  - slot `+0x00` -> `EnterCriticalSection`
+  - slot `+0x04` -> `LeaveCriticalSection`
+
+This was driven by static recovery of the original imported helper calls:
+
+- `0x4a9094 = InitializeCriticalSection`
+- `0x4a9090 = EnterCriticalSection`
+- `0x4a908c = LeaveCriticalSection`
+- `0x4a9110 = CreateEventA`
+- `0x4a910c = SetEvent`
+- `0x4a9180 = WaitForSingleObject`
+
+The primary arg5 vtable probe was also widened slightly again:
+
+- slot 11 -> `0x431670`-shaped logging placeholder
+- slot 12 -> `0x4316a0`-shaped logging placeholder
+
+## Current experiment result after those deeper arg5 updates
+
+After rebuilding with the new helper semantics and the extra slot-11/12 probes, the launcher still behaved the same in the important ways:
+
+- deep patched-client startup again reached the stable mediator sequence
+  - `AttachStartupContext(first)`
+  - `ProvideStartupTriple(...)`
+  - `AttachStartupContext(second)`
+- no new arg5 logs appeared before the crash from:
+  - primary vtable slots `1..4`
+  - primary vtable slots `11..12`
+  - helper slots at `+0x5c`
+  - helper slots at `+0x60`
+  - helper slots at `+0x98`
+- the newest dump still landed inside launcher-owned arg2 storage:
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_24.dmp`
+  - `EIP=0x003e2b62`
+  - current `arg2 filteredArgv = 0x003e2b60`
+
+That is useful narrowing evidence.
+The more faithful arg5 event/lock helper reconstruction did **not** move the crash and still did **not** surface any observed arg5 method traffic before failure.
+
+So the current best reading is still:
+
+- arg5 remains important and still should be reconstructed faithfully,
+- but the present late crash is not yet explained by the absence of only the currently instrumented arg5 helper/vtable behavior,
+- and the most likely remaining launcher-owned gaps are still:
+  - deeper arg5 state not yet reconstructed,
+  - broader `0x409950` launcher preprocessing / `options.cfg` side effects,
+  - or another later ownership mismatch that converts the launcher-owned arg2 area into control flow.

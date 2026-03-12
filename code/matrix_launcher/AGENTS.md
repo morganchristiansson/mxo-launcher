@@ -15,7 +15,7 @@ Current active sources:
 - `src/diagnostics.cpp`
 - `src/diagnostics.h`
 
-## Current Status (2026-03-11)
+## Current Status (2026-03-12)
 
 ### Faithful path now implemented in the scaffold
 - preloads support DLLs
@@ -58,18 +58,44 @@ Current deep diagnostic progress with patched client:
   - `+0x4c`
   - `+0x170`
   - `+0x124`
-- current logged sequence reaches:
+- current logged sequence still stably reaches:
   - `GetWorldOrSelectionName()`
   - `GetProfileOrSessionName()`
-  - `AttachStartupContext(629ddfc8)`
-  - `ProvideStartupTriple(netShell=6298a288 netMgr=62999968 distrObjExecutive=629e9dbc)`
-  - `AttachStartupContext(6298a760)`
+  - `AttachStartupContext(first)`
+  - `ProvideStartupTriple(netShell, netMgr, distrObjExecutive)`
+  - `AttachStartupContext(second)`
 
 Current practical crash state:
-- latest patched-client progress dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_2.dmp`
-- current crash is no longer a simple missing-vtable-slot `EIP=0` case
-- current dump lands at `EIP=0x003e3b90`, which looks more like data / corrupted state than a direct null vtable call
-- likely next focus: verify post-`+170` / post-`+124` expectations rather than only adding more stub slots
+- latest patched-client scaffold dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_25.dmp`
+- current crash is still not a simple missing-vtable-slot `EIP=0` case
+- latest dump lands at `EIP=0x003e2b62` while current `arg2 filteredArgv = 0x003e2b60`
+- widening arg5 helper/vtable probes through:
+  - primary slots `1..4`
+  - primary slots `11..12`
+  - embedded helper surfaces at `+0x5c`, `+0x60`, `+0x98`
+  has still produced no observed arg5 traffic before the late crash
+- rerunning the scaffold after a successful original `launcher.exe` login / EULA acceptance did **not** change this crash signature
+- current best remaining launcher-owned suspects are:
+  - deeper arg5 state beyond the current faithful helper probes
+  - still-incomplete `0x409950` preprocessing / `options.cfg` side effects
+  - arg7 / arg8 / saved-world selection state
+  - another later launcher/client ownership mismatch that redirects control into current arg2 storage
+- newer larger-step launcher-side reconstruction now landed for `0x409950` / nopatch behavior:
+  - exact switch-state map is now better recovered from original `0x409950`
+  - replacement launcher now forces its advertised default nopatch branch semantics into internal launcher state (`4c8b1d=0`) instead of only saying "nopatch" in logs
+  - replacement launcher now rebuilds the nopatch mediator `+0x24` value from the on-disk `client.dll` version resource (`'7.6005'` -> `0x40f3374c`) instead of reusing the old `0.1` placeholder
+- practical result of that larger-step reconstruction:
+  - latest dumps `~/MxO_7.6005/MatrixOnline_0.0_crash_27.dmp` and `..._28.dmp` still land at the same late signature (`EIP=0x003e2b62`, current `arg2=0x003e2b60`)
+  - so this bigger `0x409950` / nopatch pass improved faithfulness but did **not** yet move the crash
+- important arg7 correction from fresh disassembly:
+  - the writer path around `0x40d763..0x40d810` appears to **write back** `Last_WorldName` via registry after selection resolution, not simply read it as the full arg7 source
+  - current next arg7 focus should therefore be the launcher-owned selection/service chain rooted near `0x4d3584`, not only registry fallback
+
+Current original-launcher runtime validation note:
+- the original `~/MxO_7.6005/launcher.exe` now successfully logs into the live game on this machine after manual EULA acceptance
+- user also switched it to enter the loading area instead of the live game world
+- that is useful differential evidence that the current host Wine/DXVK/runtime environment can support a successful launcher-driven login path
+- practical caveat: original-launcher runs are manual and may block on UI/EULA interaction, so they are not suitable as unattended automation steps
 
 Diagnostic-only forced runtime result:
 - older forced-runtime reference dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
@@ -139,10 +165,15 @@ Canonical docs:
 - Do not treat old test harnesses as the solution architecture
 - Do not add `client.dll` memory injection to the intended path
 - Do not treat a forced `RunClientDLL` after failed `InitClientDLL` as original-equivalent behavior
+- Be diligent about experiment documentation: every meaningful rerun, crash change, stable non-change, or new disassembly-backed interpretation must update the relevant canonical docs in `../../docs/` as part of the same work, not later
+- Record negative results too when they narrow the search, but keep them in canonical component docs rather than scattered duplicate notes
+- When a crash becomes a recurring reference, prefer canonical doc names keyed by a stable signature such as faulting `EIP` / `module+offset` rather than transient dump numbers alone; record the specific dump filenames inside the doc body
 
 ## Immediate Next Work
 
-1. Reconstruct `0x4d6304` on the original path
-2. Reconstruct enough binder/registry state for `0x4d2c58` to become non-NULL
-3. Keep tracing what `0x402ec0` minimally sets up
-4. Revisit legitimate `RunClientDLL` only after the faithful path gets past `InitClientDLL`
+1. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently probed arg5 slots alone explain the late crash
+2. Reconstruct more of `0x409950` launcher-side preprocessing, especially `options.cfg` side effects and launcher-global state derived before `InitClientDLL`
+3. Recover the arg7 selection-resolution chain around `0x40d763..0x40d810`, `0x48baea`, and the launcher-owned service object near `0x4d3584` instead of treating `Last_WorldName` alone as the derivation
+4. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
+5. Keep tracing what `0x402ec0` minimally sets up
+6. Revisit legitimate `RunClientDLL` only after the faithful path gets past the current late `EIP=arg2+2` crash

@@ -28,7 +28,7 @@ Static tracing of `0x409950` now supports this more precise model:
 2. allocate a new pointer array sized from CRT `argc`
 3. zero that array
 4. initialize `0x4d2c5c = 0`
-5. walk original CRT argv one entry at a time
+5. walk original CRT argv one entry at a time, starting at CRT index `0`
 6. for each entry:
    - compare against launcher-owned switches via `_stricmp`
    - if matched, consume it into launcher-global state instead of forwarding it
@@ -49,6 +49,7 @@ inc dword [0x4d2c5c]       ; increment filtered count
 
 So the client-facing argv passed to `InitClientDLL` is **not raw CRT argv and not just a borrowed pointer list**.
 It is a launcher-built filtered argv array containing **fresh duplicated strings** for forwarded entries.
+Current static evidence also indicates that this walk begins at CRT `argv[0]`, so the program path remains part of the filtered array unless some earlier launcher-side rule consumes it.
 
 This is the strongest current evidence that `InitClientDLL` arg1/arg2 are **filtered launcher-owned storage**, not raw CRT `argc` / `argv`.
 
@@ -63,6 +64,32 @@ Current scaffold note:
   - `-recover`, `-deletechar`, `-justpatch`, `-noeula`, `-skiplaunch`, `-lptest`
 - it now stores launcher-owned copies for the user/password/character/session-style values instead of treating all non-client args as generic placeholders
 - however, the broader `0x409950` behavior is still incomplete, especially the surrounding launcher-global side effects, exact per-switch state meaning, and the `options.cfg` / autodetect branch
+
+### New clarification: exact switch/state handling is now better mapped
+
+Static tracing of `0x409950` now supports this tighter switch map:
+
+- `-clone` -> sets launcher byte `0x4d2c6a = 1`
+- `-silent` -> consumed with no direct retained-byte write recovered yet
+- `-nopatch` -> clears launcher byte `0x4c8b1d = 0` and runs the nopatch mediator setup path
+- `-recover` -> sets launcher byte `0x4d2c65 = 1`
+- `-justpatch` -> sets launcher byte `0x4d2c66 = 1` and clears `0x4c8b1c = 0`
+- `-noeula` -> clears launcher byte `0x4c8b1c = 0`
+- `-deletechar`, `-skiplaunch`, `-lptest` -> currently observed as consumed without an immediately recovered retained-byte write in `0x409950`
+- value-bearing switches are handled by a small pending-state machine:
+  - `-user` / `-qluser` -> copy next token to `0x4d2c70`
+  - `-pwd` / `-qlpwd` -> copy next token to `0x4d2d70`
+  - `-char` / `-qlchar` -> copy next token to `0x4d2e70`
+  - `-session` / `-qlsession` -> copy next token to `0x4d3070`
+  - `-qlver` -> consumes the next token, but the current state-table recovery does **not** show a retained destination buffer write for that value
+
+Also important from `.data` initialization:
+
+- `0x4c8b1c` starts as `1`
+- `0x4c8b1d` starts as `1`
+- `0x4d2c69` starts as `0`
+
+This is useful because it lets the replacement launcher reconstruct bigger chunks of original preprocessing state at once instead of only mirroring "stripped vs forwarded argv" behavior.
 
 ### New clarification: `options.cfg` is not just probed, it gates a pre-client launcher step
 
@@ -196,3 +223,25 @@ A fresh 2026-03-11 diagnostic dump from the project-local `launcher_proper.exe` 
 
 So the remaining mismatch versus original `launcher.exe` is not just module load order.
 It is the missing launcher-owned state established before a legitimate `RunClientDLL` call.
+
+## New runtime validation note
+
+The original `~/MxO_7.6005/launcher.exe` has now also been manually validated on this same machine to:
+
+- get through its UI / EULA flow,
+- log into the live game successfully,
+- and continue through the launcher-owned path rather than failing in the same early way as `resurrections.exe`.
+
+Practical consequence:
+
+- the current scaffold crash is even less likely to be explained by Wine / DXVK / basic account / simple host-environment breakage,
+- and even more likely to be caused by launcher-owned state our reimplementation still has not reconstructed.
+
+A follow-up sanctioned rerun of `resurrections.exe` after that successful original-launcher session still crashed at the same late signature:
+
+- latest dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_25.dmp`
+- `EIP=0x003e2b62`
+- current `arg2 filteredArgv = 0x003e2b60`
+
+So the manual original-launcher success did **not** remove or shift the current scaffold failure.
+That is narrowing evidence against simple EULA-only or one-time environment-initialization explanations.
