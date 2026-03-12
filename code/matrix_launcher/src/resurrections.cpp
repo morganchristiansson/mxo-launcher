@@ -56,6 +56,20 @@ static uint32_t g_CLauncherFieldAC = 0;          // original: [CLauncher+0xac], 
 static uint32_t g_PackedArg7Selection = 0;       // packed from [this+0xa8]/[this+0xac]
 static uint32_t g_FlagByte = 0;                  // original: [0x4d2c69]
 static char g_LastWorldName[256] = {0};         // original registry value: Last_WorldName
+static char g_LauncherUser[256] = {};
+static char g_LauncherPassword[256] = {};
+static char g_LauncherCharacter[256] = {};
+static char g_LauncherSession[256] = {};
+static char g_LauncherQlVersion[256] = {};
+static bool g_LauncherSwitchClone = false;
+static bool g_LauncherSwitchSilent = false;
+static bool g_LauncherSwitchNoPatch = false;
+static bool g_LauncherSwitchRecover = false;
+static bool g_LauncherSwitchDeleteChar = false;
+static bool g_LauncherSwitchJustPatch = false;
+static bool g_LauncherSwitchNoEula = false;
+static bool g_LauncherSwitchSkipLaunch = false;
+static bool g_LauncherSwitchLPTest = false;
 static void* g_pClientDBFromCallback = NULL;
 
 struct DiagnosticPreclientEnvironmentState {
@@ -119,6 +133,129 @@ static bool EnvUint32Value(const char* name, uint32_t* outValue) {
 static const char* MaskedArgValue(const char* value) {
     if (!value || !value[0]) return "<empty>";
     return "<provided>";
+}
+
+enum class LauncherValueTarget {
+    None,
+    User,
+    Password,
+    Character,
+    Session,
+    QlVersion,
+};
+
+static bool CopyLauncherString(char* destination, size_t destinationSize, const char* value) {
+    if (!destination || destinationSize < 2) return false;
+    if (!value) value = "";
+    std::strncpy(destination, value, destinationSize - 1);
+    destination[destinationSize - 1] = '\0';
+    return true;
+}
+
+static void ResetLauncherPreprocessingState() {
+    std::memset(g_LauncherUser, 0, sizeof(g_LauncherUser));
+    std::memset(g_LauncherPassword, 0, sizeof(g_LauncherPassword));
+    std::memset(g_LauncherCharacter, 0, sizeof(g_LauncherCharacter));
+    std::memset(g_LauncherSession, 0, sizeof(g_LauncherSession));
+    std::memset(g_LauncherQlVersion, 0, sizeof(g_LauncherQlVersion));
+    g_LauncherSwitchClone = false;
+    g_LauncherSwitchSilent = false;
+    g_LauncherSwitchNoPatch = false;
+    g_LauncherSwitchRecover = false;
+    g_LauncherSwitchDeleteChar = false;
+    g_LauncherSwitchJustPatch = false;
+    g_LauncherSwitchNoEula = false;
+    g_LauncherSwitchSkipLaunch = false;
+    g_LauncherSwitchLPTest = false;
+}
+
+static LauncherValueTarget LauncherValueTargetForSwitch(const char* value) {
+    if (!value || !value[0]) return LauncherValueTarget::None;
+    if (lstrcmpiA(value, "-user") == 0 || lstrcmpiA(value, "-qluser") == 0) return LauncherValueTarget::User;
+    if (lstrcmpiA(value, "-pwd") == 0 || lstrcmpiA(value, "-qlpwd") == 0) return LauncherValueTarget::Password;
+    if (lstrcmpiA(value, "-char") == 0 || lstrcmpiA(value, "-qlchar") == 0) return LauncherValueTarget::Character;
+    if (lstrcmpiA(value, "-session") == 0 || lstrcmpiA(value, "-qlsession") == 0) return LauncherValueTarget::Session;
+    if (lstrcmpiA(value, "-qlver") == 0) return LauncherValueTarget::QlVersion;
+    return LauncherValueTarget::None;
+}
+
+static bool ConsumeLauncherBooleanSwitch(const char* value) {
+    if (!value || !value[0]) return false;
+    if (lstrcmpiA(value, "-clone") == 0) {
+        g_LauncherSwitchClone = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-silent") == 0) {
+        g_LauncherSwitchSilent = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-nopatch") == 0) {
+        g_LauncherSwitchNoPatch = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-recover") == 0) {
+        g_LauncherSwitchRecover = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-deletechar") == 0) {
+        g_LauncherSwitchDeleteChar = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-justpatch") == 0) {
+        g_LauncherSwitchJustPatch = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-noeula") == 0) {
+        g_LauncherSwitchNoEula = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-skiplaunch") == 0) {
+        g_LauncherSwitchSkipLaunch = true;
+        return true;
+    }
+    if (lstrcmpiA(value, "-lptest") == 0) {
+        g_LauncherSwitchLPTest = true;
+        return true;
+    }
+    return false;
+}
+
+static bool ConsumeLauncherValueSwitch(LauncherValueTarget target, const char* value) {
+    switch (target) {
+        case LauncherValueTarget::User:
+            return CopyLauncherString(g_LauncherUser, sizeof(g_LauncherUser), value);
+        case LauncherValueTarget::Password:
+            return CopyLauncherString(g_LauncherPassword, sizeof(g_LauncherPassword), value);
+        case LauncherValueTarget::Character:
+            return CopyLauncherString(g_LauncherCharacter, sizeof(g_LauncherCharacter), value);
+        case LauncherValueTarget::Session:
+            return CopyLauncherString(g_LauncherSession, sizeof(g_LauncherSession), value);
+        case LauncherValueTarget::QlVersion:
+            return CopyLauncherString(g_LauncherQlVersion, sizeof(g_LauncherQlVersion), value);
+        case LauncherValueTarget::None:
+        default:
+            return false;
+    }
+}
+
+static void LogLauncherPreprocessingState() {
+    Log("=== Launcher switch preprocessing ===");
+    Log("launcher user       = %s", MaskedArgValue(g_LauncherUser));
+    Log("launcher password   = %s", MaskedArgValue(g_LauncherPassword));
+    Log("launcher character  = %s", MaskedArgValue(g_LauncherCharacter));
+    Log("launcher session    = %s", MaskedArgValue(g_LauncherSession));
+    Log("launcher qlver      = %s", MaskedArgValue(g_LauncherQlVersion));
+    Log(
+        "launcher flags      = clone:%d silent:%d nopatch:%d recover:%d deletechar:%d justpatch:%d noeula:%d skiplaunch:%d lptest:%d",
+        g_LauncherSwitchClone ? 1 : 0,
+        g_LauncherSwitchSilent ? 1 : 0,
+        g_LauncherSwitchNoPatch ? 1 : 0,
+        g_LauncherSwitchRecover ? 1 : 0,
+        g_LauncherSwitchDeleteChar ? 1 : 0,
+        g_LauncherSwitchJustPatch ? 1 : 0,
+        g_LauncherSwitchNoEula ? 1 : 0,
+        g_LauncherSwitchSkipLaunch ? 1 : 0,
+        g_LauncherSwitchLPTest ? 1 : 0);
 }
 
 static char* DuplicateArgString(const char* value) {
@@ -357,37 +494,30 @@ static void LogKnownStartupState() {
     Log("arg8 flagByte                = 0x%08x", g_FlagByte);
 }
 
-static bool IsLauncherOnlySwitch(const char* value) {
-    if (!value || !value[0]) return false;
-    return
-        lstrcmpiA(value, "-clone") == 0 ||
-        lstrcmpiA(value, "-silent") == 0 ||
-        lstrcmpiA(value, "-nopatch") == 0;
-}
-
 static bool ConfigureFilteredArgv(int argc, char* argv[]) {
-    const bool hasLauncherAuthArgs = (argc >= 3 && argv[1] && argv[1][0] && argv[2] && argv[2][0]);
+    ResetLauncherPreprocessingState();
+    g_AuthUsername = NULL;
 
-    g_AuthUsername = (argc >= 2 && argv[1] && argv[1][0]) ? argv[1] : NULL;
+    const bool hasLegacyAuthPair =
+        (argc >= 3) && argv[1] && argv[1][0] && argv[2] && argv[2][0] && argv[1][0] != '-';
 
-    Log("=== Placeholder auth argv ===");
-    Log("username argv[1] = %s", MaskedArgValue((argc >= 2) ? argv[1] : NULL));
-    Log("password argv[2] = %s", MaskedArgValue((argc >= 3) ? argv[2] : NULL));
+    Log("=== Launcher argv preprocessing ===");
+    Log("legacy username argv[1] = %s", MaskedArgValue((argc >= 2) ? argv[1] : NULL));
+    Log("legacy password argv[2] = %s", MaskedArgValue((argc >= 3) ? argv[2] : NULL));
 
-    const int firstForwardedSrc = hasLauncherAuthArgs ? 3 : 1;
-    const int maxForwardedCount = 1 + ((argc > firstForwardedSrc) ? (argc - firstForwardedSrc) : 0);
-    if (maxForwardedCount < 1) {
-        Log("ERROR: filtered argv capacity %d is invalid", maxForwardedCount);
-        return false;
+    if (hasLegacyAuthPair) {
+        CopyLauncherString(g_LauncherUser, sizeof(g_LauncherUser), argv[1]);
+        CopyLauncherString(g_LauncherPassword, sizeof(g_LauncherPassword), argv[2]);
+        Log("DIAGNOSTIC: accepted legacy bare auth argv pair for compatibility; treating them as launcher-only state");
     }
 
     FreeFilteredArgvOwned();
-    g_FilteredArgvOwned = static_cast<char**>(std::calloc(maxForwardedCount + 1, sizeof(char*)));
+    g_FilteredArgvOwned = static_cast<char**>(std::calloc(argc + 1, sizeof(char*)));
     if (!g_FilteredArgvOwned) {
         Log("ERROR: failed to allocate launcher-owned filtered argv pointer array");
         return false;
     }
-    g_FilteredArgvOwnedCapacity = static_cast<uint32_t>(maxForwardedCount + 1);
+    g_FilteredArgvOwnedCapacity = static_cast<uint32_t>(argc + 1);
 
     g_FilteredArgvOwned[0] = DuplicateArgString((argc > 0 && argv[0]) ? argv[0] : "");
     if (!g_FilteredArgvOwned[0]) {
@@ -397,11 +527,36 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     }
     Log("DIAGNOSTIC: filtered argv[0] duplicated at %p -> '%s'", g_FilteredArgvOwned[0], g_FilteredArgvOwned[0]);
 
+    LauncherValueTarget pendingValueTarget = LauncherValueTarget::None;
     int filteredCount = 1;
-    for (int src = firstForwardedSrc; src < argc; ++src) {
+
+    for (int src = 1; src < argc; ++src) {
         const char* value = argv[src] ? argv[src] : "";
-        if (IsLauncherOnlySwitch(value)) {
-            Log("DIAGNOSTIC: consumed launcher-only switch '%s' during filtered argv build", value);
+
+        if (hasLegacyAuthPair && (src == 1 || src == 2)) {
+            continue;
+        }
+
+        if (pendingValueTarget != LauncherValueTarget::None) {
+            if (!ConsumeLauncherValueSwitch(pendingValueTarget, value)) {
+                Log("ERROR: failed to consume launcher switch value from argv[%d]", src);
+                FreeFilteredArgvOwned();
+                return false;
+            }
+            Log("DIAGNOSTIC: consumed launcher switch value argv[%d] = %s", src, MaskedArgValue(value));
+            pendingValueTarget = LauncherValueTarget::None;
+            continue;
+        }
+
+        LauncherValueTarget newTarget = LauncherValueTargetForSwitch(value);
+        if (newTarget != LauncherValueTarget::None) {
+            pendingValueTarget = newTarget;
+            Log("DIAGNOSTIC: consumed launcher switch '%s' during filtered argv build", value);
+            continue;
+        }
+
+        if (ConsumeLauncherBooleanSwitch(value)) {
+            Log("DIAGNOSTIC: consumed launcher switch '%s' during filtered argv build", value);
             continue;
         }
 
@@ -420,15 +575,16 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
         ++filteredCount;
     }
 
+    if (pendingValueTarget != LauncherValueTarget::None) {
+        Log("WARNING: final launcher switch expected a value but argv ended early");
+    }
+
     g_FilteredArgvOwned[filteredCount] = NULL;
     g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
     g_FilteredArgv = g_FilteredArgvOwned;
+    g_AuthUsername = g_LauncherUser[0] ? g_LauncherUser : NULL;
 
-    if (hasLauncherAuthArgs) {
-        Log("launcher-only auth args detected; stripped 2 argv entries before InitClientDLL");
-    } else {
-        Log("DIAGNOSTIC: no launcher-only auth argv detected");
-    }
+    LogLauncherPreprocessingState();
     Log("DIAGNOSTIC: filtered argv final count = %d", filteredCount);
     return true;
 }

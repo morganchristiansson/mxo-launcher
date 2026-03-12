@@ -25,11 +25,25 @@ struct MinimalLoginMediatorStub {
     unsigned char payload[0x100];
 };
 
+struct DiagnosticLauncherQueue {
+    void* current0;        // +0x00
+    void* block0;          // +0x04
+    void* end0;            // +0x08
+    void* slotsCurrent;    // +0x0c
+    void* current1;        // +0x10
+    void* block1;          // +0x14
+    void* end1;            // +0x18
+    void* slotsLast;       // +0x1c
+    void* slotsBase;       // +0x20
+    uint32_t slotCapacity; // +0x24
+};
+
 struct MinimalLauncherObjectStub {
     void** vtable;              // +0x00
     uint32_t field04;           // +0x04 ctor arg in original (0 from 0x40a380)
     void* field08;              // +0x08 pointer array in base ctor (NULL when field04==0)
-    unsigned char subobject0C[0x50]; // +0x0c..+0x5b base state from 0x436610
+    DiagnosticLauncherQueue queue0C; // +0x0c..+0x33 base queue state from 0x436610/0x436340
+    DiagnosticLauncherQueue queue34; // +0x34..+0x5b second base queue from 0x436610/0x436340
     void** subVtable5C;         // +0x5c base subobject vtable / state tag
     const void* field60;        // +0x60 constant table pointer in base ctor
     unsigned char subobject64[0x18]; // +0x64..+0x7b initialized by imported helper

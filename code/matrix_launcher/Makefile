@@ -9,7 +9,7 @@ CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 
 -include secrets/launcher_login.local.mk
 
-LAUNCHER_ARGS = $(if $(MXO_USER),$(MXO_USER)) $(if $(MXO_PASS),$(MXO_PASS))
+LAUNCHER_ARGS = $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_PASS)) $(if $(MXO_SESSION),-session $(MXO_SESSION)) $(if $(MXO_CHAR),-char $(MXO_CHAR))
 
 all: $(TARGET)
 

@@ -70,11 +70,36 @@ Optional local credentials:
 # secrets/launcher_login.local.mk
 MXO_USER := your-username
 MXO_PASS := your-password
+# optional:
+# MXO_SESSION := your-session-token
+# MXO_CHAR := your-character-name
 ```
 
-If that file exists, the Makefile appends those two values as argv to `resurrections.exe`.
-The launcher currently treats them as launcher-only placeholder auth argv, strips them back out before `InitClientDLL`, and logs only whether they were provided, not the raw values.
-It also now consumes known launcher-only switches like `-clone`, `-silent`, and `-nopatch` during filtered argv construction instead of forwarding them blindly into `InitClientDLL`.
+If that file exists, the Makefile now passes launcher-style switches to `resurrections.exe`, e.g.:
+- `-user <name>`
+- `-pwd <password>`
+- optional `-session <token>`
+- optional `-char <name>`
+
+The launcher consumes those switches into launcher-owned preprocessing state and strips them back out before `InitClientDLL`.
+For compatibility during experiments, it still accepts the older bare `username password` argv pair, but that is no longer the preferred path.
+It also now consumes known launcher-only switches like:
+- `-clone`
+- `-silent`
+- `-nopatch`
+- `-recover`
+- `-deletechar`
+- `-justpatch`
+- `-noeula`
+- `-skiplaunch`
+- `-lptest`
+- `-qluser`
+- `-qlpwd`
+- `-qlchar`
+- `-qlsession`
+- `-qlver`
+
+instead of forwarding them blindly into `InitClientDLL`.
 
 Optional diagnostic arg7/arg8 overrides for post-`IsReady()` experiments:
 

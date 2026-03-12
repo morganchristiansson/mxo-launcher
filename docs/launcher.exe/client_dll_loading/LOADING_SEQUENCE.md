@@ -53,8 +53,16 @@ It is a launcher-built filtered argv array containing **fresh duplicated strings
 This is the strongest current evidence that `InitClientDLL` arg1/arg2 are **filtered launcher-owned storage**, not raw CRT `argc` / `argv`.
 
 Current scaffold note:
-- the custom launcher now mirrors one small but evidence-backed part of this path by consuming known launcher-only switches (`-clone`, `-silent`, `-nopatch`) during filtered argv construction instead of forwarding them blindly
-- however, the broader `0x409950` behavior is still incomplete, especially the surrounding launcher-global side effects and `options.cfg` / autodetect branch
+- the custom launcher now mirrors more of this path by consuming a broader evidence-backed set of launcher-only switches during filtered argv construction instead of forwarding them blindly, including:
+  - `-clone`, `-silent`, `-nopatch`
+  - `-user` / `-qluser`
+  - `-pwd` / `-qlpwd`
+  - `-char` / `-qlchar`
+  - `-session` / `-qlsession`
+  - `-qlver`
+  - `-recover`, `-deletechar`, `-justpatch`, `-noeula`, `-skiplaunch`, `-lptest`
+- it now stores launcher-owned copies for the user/password/character/session-style values instead of treating all non-client args as generic placeholders
+- however, the broader `0x409950` behavior is still incomplete, especially the surrounding launcher-global side effects, exact per-switch state meaning, and the `options.cfg` / autodetect branch
 
 ### New clarification: `options.cfg` is not just probed, it gates a pre-client launcher step
 
