@@ -82,7 +82,6 @@ If that file exists, the Makefile now passes launcher-style switches to `resurre
 - optional `-char <name>`
 
 The launcher consumes those switches into launcher-owned preprocessing state and strips them back out before `InitClientDLL`.
-For compatibility during experiments, it still accepts the older bare `username password` argv pair, but that is no longer the preferred path.
 It also now consumes known launcher-only switches like:
 - `-clone`
 - `-silent`

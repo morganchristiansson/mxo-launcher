@@ -800,18 +800,8 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     ResetLauncherPreprocessingState();
     g_AuthUsername = NULL;
 
-    const bool hasLegacyAuthPair =
-        (argc >= 3) && argv[1] && argv[1][0] && argv[2] && argv[2][0] && argv[1][0] != '-';
-
     Log("=== Launcher argv preprocessing ===");
-    Log("legacy username argv[1] = %s", MaskedArgValue((argc >= 2) ? argv[1] : NULL));
-    Log("legacy password argv[2] = %s", MaskedArgValue((argc >= 3) ? argv[2] : NULL));
-
-    if (hasLegacyAuthPair) {
-        CopyLauncherString(g_LauncherUser, sizeof(g_LauncherUser), argv[1]);
-        CopyLauncherString(g_LauncherPassword, sizeof(g_LauncherPassword), argv[2]);
-        Log("DIAGNOSTIC: accepted legacy bare auth argv pair for compatibility; treating them as launcher-only state");
-    }
+    Log("DIAGNOSTIC: launcher auth/state expected through launcher-style switches (e.g. -user / -pwd)");
 
     FreeFilteredArgvOwned();
     g_FilteredArgvOwned = static_cast<char**>(std::calloc(argc + 1, sizeof(char*)));
@@ -834,10 +824,6 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
 
     for (int src = 1; src < argc; ++src) {
         const char* value = argv[src] ? argv[src] : "";
-
-        if (hasLegacyAuthPair && (src == 1 || src == 2)) {
-            continue;
-        }
 
         if (pendingValueTarget != LauncherValueTarget::None) {
             LauncherValueTarget consumedTarget = pendingValueTarget;

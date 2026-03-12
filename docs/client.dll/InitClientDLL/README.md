@@ -96,7 +96,7 @@ Current scaffold note:
   - `-session` / `-qlsession`
   - `-qlver`
   - `-recover`, `-deletechar`, `-justpatch`, `-noeula`, `-skiplaunch`, `-lptest`
-- it also now keeps launcher-owned copies of the user/password/character/session-style values instead of only stripping a generic placeholder auth pair
+- it also now keeps launcher-owned copies of the user/password/character/session-style values as explicit launcher preprocessing state
 - but the original `0x409950` preprocessing path is still broader than that, especially around launcher-global side effects, exact flag derivation, and the `options.cfg` / autodetect branch
 
 ### New clarification: `options.cfg` is probed during the arg-filtering phase
