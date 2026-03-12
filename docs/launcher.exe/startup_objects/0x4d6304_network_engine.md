@@ -269,3 +269,38 @@ So for the current reimplementation order of work:
 
 1. fix / reconstruct arg6 first,
 2. then revisit arg5 for later runtime correctness.
+
+## New clarification from explicit base-queue reconstruction
+
+The custom launcher now initializes the two base queue subobjects inside arg5 much closer to the original `0x436610 -> 0x436340(size=0)` path instead of leaving them zeroed:
+
+- `+0x0c` and `+0x34` are each built as a `0x28` queue object
+- each queue now gets:
+  - a slot-pointer array with minimum capacity `8`
+  - one initial `0x80` block centered in that slot array
+  - `current0/block0/end0/slotsCurrent`
+  - `current1/block1/end1/slotsLast`
+  - `slotsBase/slotCapacity`
+- the diagnostic scaffold also now has matching cleanup for:
+  - queue slot arrays
+  - queue-owned `0x80` blocks
+- helper implementations for the original queue-style grow/pop behavior were also added so later arg5 work can use the same recovered model instead of ad-hoc blobs
+
+Current practical result after landing that queue reconstruction:
+
+- deep patched-client startup still reaches the same stable mediator sequence
+  - `AttachStartupContext(first)`
+  - `ProvideStartupTriple(...)`
+  - `AttachStartupContext(second)`
+- the latest practical crash still lands in launcher-owned arg2 storage rather than moving to a fresh arg5-observed call site
+  - latest reference dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_22.dmp`
+  - `EIP=0x003e2b80`
+  - current `arg2 filteredArgv = 0x003e2b80`
+
+That means the earlier zeroed queue mismatch was real and worth correcting for faithfulness, but this queue fix by itself still does **not** explain the current late crash.
+
+So the remaining likely suspects stay roughly the same:
+
+- deeper arg5 behavior beyond queue initialization alone,
+- still-incomplete launcher-owned preprocessing / side effects around `0x409950`,
+- or another later launcher/client ownership mismatch that still turns current arg2 memory into a bad control-flow target.
