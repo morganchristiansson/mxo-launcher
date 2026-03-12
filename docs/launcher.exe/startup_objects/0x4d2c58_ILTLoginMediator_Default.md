@@ -207,6 +207,24 @@ This materially weakens the narrow theory that our current `+0x170` / `+0x124` p
 
 So while the crash still smells like corrupted or misinterpreted state, the evidence now points more toward a **state/ownership/signature expectation beyond simple stack-pop mismatch** than toward those two slots immediately smashing the return address on exit.
 
+A later differential run strengthened one specific part of that conclusion.
+
+The launcher's filtered argv storage was moved from heap-allocated copies to a more launcher-owned static/global buffer in `resurrections.exe`.
+That is still not full original reconstruction, but it is closer to launcher-global lifetime than transient heap storage.
+
+Result:
+
+- previous crash family: `EIP` landed at the heap-backed `arg2 filteredArgv` area (`0x003e3bb0` / nearby)
+- after moving `arg2` into static launcher-owned storage, latest crash landed at `EIP=0x00413183`
+- current `arg2 filteredArgv` for that same run was `0x00413180`
+
+That means the bad control transfer still **tracks arg2 itself**, not merely the old heap location.
+So the current best interpretation is now even narrower:
+
+- some later path is still treating `arg2 filteredArgv` like a code pointer / callback / return target,
+- or a later stack/call-convention corruption is overwriting control flow with the current arg2 value,
+- and this behavior survives even when arg2 storage is moved closer to launcher-owned global memory.
+
 Practical implication for the diagnostic scaffold:
 
 - keep `+0x170` / `+0x124` as **state-capturing probes**,

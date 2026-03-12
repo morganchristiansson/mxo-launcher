@@ -15,6 +15,14 @@ struct WindowTraceEntry {
 
 struct MinimalLoginMediatorStub {
     void** vtable;
+    void* field04;
+    void* field08;
+    void* field0C;
+    void* field10;
+    void* field14;
+    void* field18;
+    void* field1C;
+    unsigned char payload[0x100];
 };
 
 struct MinimalLauncherObjectStub {
@@ -95,14 +103,46 @@ static uint32_t g_MediatorSelectionHighByteFloor = 0;
 static const char* g_MediatorMappedSelectionName = g_MediatorStringC;
 static const char* g_MediatorProfileName = g_MediatorStringA;
 
+static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
+    if (!ptr || !wordCount) {
+        Log("%s: <null>", label ? label : "PointerWords");
+        return;
+    }
+
+    const uint32_t* words = static_cast<const uint32_t*>(ptr);
+    Log("%s @ %p [+0x00]=%08x [+0x04]=%08x [+0x08]=%08x [+0x0c]=%08x",
+        label,
+        ptr,
+        words[0],
+        (wordCount > 1) ? words[1] : 0,
+        (wordCount > 2) ? words[2] : 0,
+        (wordCount > 3) ? words[3] : 0);
+    if (wordCount > 4) {
+        Log("%s @ %p [+0x10]=%08x [+0x14]=%08x [+0x18]=%08x [+0x1c]=%08x",
+            label,
+            ptr,
+            words[4],
+            (wordCount > 5) ? words[5] : 0,
+            (wordCount > 6) ? words[6] : 0,
+            (wordCount > 7) ? words[7] : 0);
+    }
+}
+
+static void ResetMediatorObjectState() {
+    std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
+    g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
+}
+
 static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
     (void)self;
     return g_MediatorName;
 }
 
 static int __thiscall Mediator_RegisterEngine(MinimalLoginMediatorStub* self, void* object) {
-    (void)self;
     g_MediatorRuntimeState.registeredLauncherObject = object;
+    if (self) {
+        self->field04 = object;
+    }
     Log("MediatorStub::RegisterEngine(%p)", object);
     return 1;
 }
@@ -183,10 +223,14 @@ static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub
     return g_MediatorMappedSelectionName;
 }
 
-static void __thiscall Mediator_ConsumeSelectionContext(MinimalLoginMediatorStub* self, void* selectionContext) {
-    (void)self;
-    void* returnAddress = __builtin_return_address(0);
+extern "C" void Mediator_ConsumeSelectionContext_Impl(
+    MinimalLoginMediatorStub* self,
+    void* selectionContext,
+    void* returnAddress) {
     g_MediatorRuntimeState.selectionContext0ec = selectionContext;
+    if (self) {
+        self->field1C = selectionContext;
+    }
     ++g_MediatorRuntimeState.selection0ecCount;
     Log(
         "MediatorStub::ConsumeSelectionContext(%p) [count=%u caller=%p]",
@@ -195,33 +239,87 @@ static void __thiscall Mediator_ConsumeSelectionContext(MinimalLoginMediatorStub
         returnAddress);
 }
 
-static void __thiscall Mediator_ProvideStartupTriple(
+__attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
+    __asm__ volatile(
+        "push %%ebx\n\t"
+        "mov 8(%%esp), %%eax\n\t"
+        "mov 4(%%esp), %%edx\n\t"
+        "push %%edx\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "call *%%ebx\n\t"
+        "add $12, %%esp\n\t"
+        "pop %%ebx\n\t"
+        "ret $4\n\t"
+        :
+        : "b"(Mediator_ConsumeSelectionContext_Impl)
+        : "eax", "edx");
+}
+
+extern "C" void Mediator_ProvideStartupTriple_Impl(
     MinimalLoginMediatorStub* self,
     void* pNetShell,
     void* pNetMgr,
-    void* pDistrObjExecutive) {
-    (void)self;
-    void* returnAddress = __builtin_return_address(0);
+    void* pDistrObjExecutive,
+    void* returnAddress) {
     g_MediatorRuntimeState.netShell124 = pNetShell;
     g_MediatorRuntimeState.netMgr124 = pNetMgr;
     g_MediatorRuntimeState.distrObjExecutive124 = pDistrObjExecutive;
+    if (self) {
+        self->field0C = pNetShell;
+        self->field10 = pNetMgr;
+        self->field14 = pDistrObjExecutive;
+    }
     ++g_MediatorRuntimeState.provide124Count;
     Log(
-        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p) [count=%u caller=%p]",
+        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p self=%p) [count=%u caller=%p]",
         pNetShell,
         pNetMgr,
         pDistrObjExecutive,
+        self,
         (unsigned)g_MediatorRuntimeState.provide124Count,
         returnAddress);
+    LogPointerWords("ProvideStartupTriple self", self, 8);
+    LogPointerWords("ProvideStartupTriple netShell", pNetShell, 8);
+    LogPointerWords("ProvideStartupTriple netMgr", pNetMgr, 8);
+    LogPointerWords("ProvideStartupTriple distrObjExecutive", pDistrObjExecutive, 8);
 }
 
-static void __thiscall Mediator_AttachStartupContext(MinimalLoginMediatorStub* self, void* startupContext) {
-    (void)self;
-    void* returnAddress = __builtin_return_address(0);
+__attribute__((naked)) static void Mediator_ProvideStartupTriple() {
+    __asm__ volatile(
+        "push %%ebx\n\t"
+        "mov 4(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "mov 20(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "mov 20(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "mov 20(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "call *%%ebx\n\t"
+        "add $20, %%esp\n\t"
+        "pop %%ebx\n\t"
+        "ret $12\n\t"
+        :
+        : "b"(Mediator_ProvideStartupTriple_Impl)
+        : "eax");
+}
+
+extern "C" void Mediator_AttachStartupContext_Impl(
+    MinimalLoginMediatorStub* self,
+    void* startupContext,
+    void* returnAddress) {
     if (!g_MediatorRuntimeState.firstContext170) {
         g_MediatorRuntimeState.firstContext170 = startupContext;
     }
     g_MediatorRuntimeState.latestContext170 = startupContext;
+    if (self) {
+        if (!self->field08) {
+            self->field08 = startupContext;
+        }
+        self->field18 = startupContext;
+    }
     ++g_MediatorRuntimeState.attach170Count;
 
     const bool sawTriple =
@@ -234,8 +332,9 @@ static void __thiscall Mediator_AttachStartupContext(MinimalLoginMediatorStub* s
     }
 
     Log(
-        "MediatorStub::AttachStartupContext(%p) [count=%u relation=%s first=%p latest124=(%p,%p,%p) caller=%p]",
+        "MediatorStub::AttachStartupContext(%p self=%p) [count=%u relation=%s first=%p latest124=(%p,%p,%p) caller=%p]",
         startupContext,
+        self,
         (unsigned)g_MediatorRuntimeState.attach170Count,
         relation,
         g_MediatorRuntimeState.firstContext170,
@@ -243,6 +342,25 @@ static void __thiscall Mediator_AttachStartupContext(MinimalLoginMediatorStub* s
         g_MediatorRuntimeState.netMgr124,
         g_MediatorRuntimeState.distrObjExecutive124,
         returnAddress);
+    LogPointerWords("AttachStartupContext self", self, 8);
+    LogPointerWords("AttachStartupContext context", startupContext, 8);
+}
+
+__attribute__((naked)) static void Mediator_AttachStartupContext() {
+    __asm__ volatile(
+        "push %%ebx\n\t"
+        "mov 8(%%esp), %%eax\n\t"
+        "mov 4(%%esp), %%edx\n\t"
+        "push %%edx\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "call *%%ebx\n\t"
+        "add $12, %%esp\n\t"
+        "pop %%ebx\n\t"
+        "ret $4\n\t"
+        :
+        : "b"(Mediator_AttachStartupContext_Impl)
+        : "eax", "edx");
 }
 
 static const char* __thiscall Mediator_GetProfilePathComponent(MinimalLoginMediatorStub* self) {
@@ -333,7 +451,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[93] = (void*)Mediator_AttachRuntimeObject; // +0x174
     g_LoginMediatorVtable[94] = (void*)Mediator_ConsumeRuntimeDescriptor; // +0x178
 
-    g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
+    ResetMediatorObjectState();
 }
 
 static void InitializeLauncherObjectStub() {

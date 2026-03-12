@@ -46,7 +46,9 @@ static ErrorClientDLLFunc g_ErrorClientDLL = NULL;
 // filtered storage path is reconstructed.
 static uint32_t g_FilteredArgCount = 0;
 static char** g_FilteredArgv = NULL;
-static char** g_FilteredArgvOwned = NULL;
+static char* g_FilteredArgvOwned[16] = {0};
+static char g_FilteredArgStorage[16][512] = {};
+static uint32_t g_FilteredArgvOwnedCapacity = 0;
 static const char* g_AuthUsername = NULL;
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
 static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
@@ -108,12 +110,17 @@ static const char* MaskedArgValue(const char* value) {
     return "<provided>";
 }
 
+static void FreeFilteredArgvOwned() {
+    for (uint32_t i = 0; i < g_FilteredArgvOwnedCapacity && i < 16; ++i) {
+        g_FilteredArgvOwned[i] = NULL;
+        g_FilteredArgStorage[i][0] = '\0';
+    }
+    g_FilteredArgvOwnedCapacity = 0;
+}
+
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
-    if (g_FilteredArgvOwned) {
-        std::free(g_FilteredArgvOwned);
-        g_FilteredArgvOwned = NULL;
-    }
+    FreeFilteredArgvOwned();
     if (g_LogFile) {
         fclose(g_LogFile);
         g_LogFile = NULL;
@@ -238,30 +245,35 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     Log("username argv[1] = %s", MaskedArgValue((argc >= 2) ? argv[1] : NULL));
     Log("password argv[2] = %s", MaskedArgValue((argc >= 3) ? argv[2] : NULL));
 
-    if (!hasLauncherAuthArgs) {
-        g_FilteredArgCount = static_cast<uint32_t>(argc);
-        g_FilteredArgv = argv;
-        return true;
-    }
-
-    const int filteredCount = 1 + ((argc > 3) ? (argc - 3) : 0);
-    g_FilteredArgvOwned = static_cast<char**>(std::calloc(filteredCount + 1, sizeof(char*)));
-    if (!g_FilteredArgvOwned) {
-        Log("ERROR: failed to allocate filtered argv storage");
+    const int filteredCount = hasLauncherAuthArgs ? (1 + ((argc > 3) ? (argc - 3) : 0)) : argc;
+    if (filteredCount < 0 || filteredCount > 15) {
+        Log("ERROR: filtered argv count %d exceeds static launcher storage", filteredCount);
         return false;
     }
 
-    g_FilteredArgvOwned[0] = argv[0];
-    for (int src = 3, dst = 1; src < argc; ++src, ++dst) {
-        g_FilteredArgvOwned[dst] = argv[src];
+    FreeFilteredArgvOwned();
+    g_FilteredArgvOwnedCapacity = 16;
+
+    for (int dst = 0; dst < filteredCount; ++dst) {
+        const int src = hasLauncherAuthArgs ? ((dst == 0) ? 0 : (dst + 2)) : dst;
+        const char* value = (src < argc && argv[src]) ? argv[src] : "";
+        std::strncpy(g_FilteredArgStorage[dst], value, sizeof(g_FilteredArgStorage[dst]) - 1);
+        g_FilteredArgStorage[dst][sizeof(g_FilteredArgStorage[dst]) - 1] = '\0';
+        g_FilteredArgvOwned[dst] = g_FilteredArgStorage[dst];
+        Log("DIAGNOSTIC: filtered argv[%d] stored at %p -> '%s'", dst, g_FilteredArgvOwned[dst], g_FilteredArgvOwned[dst]);
     }
 
+    g_FilteredArgvOwned[filteredCount] = NULL;
     g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
     g_FilteredArgv = g_FilteredArgvOwned;
 
-    Log("launcher-only auth args detected; stripped 2 argv entries before InitClientDLL");
-    if (argc > 3) {
-        Log("forwarded extra launcher argv count = %d", argc - 3);
+    if (hasLauncherAuthArgs) {
+        Log("launcher-only auth args detected; stripped 2 argv entries before InitClientDLL");
+        if (argc > 3) {
+            Log("forwarded extra launcher argv count = %d", argc - 3);
+        }
+    } else {
+        Log("DIAGNOSTIC: duplicated raw argv into launcher-owned filtered storage");
     }
     return true;
 }
