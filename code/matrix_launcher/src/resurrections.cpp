@@ -73,6 +73,16 @@ static uint8_t g_vtableSlot1[8] = {0xeb, 0xfe, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xc
 static uint8_t g_vtableSlot2[8] = {0xf4, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // halt
 static uint8_t g_vtableSlot3[8] = {0xcd, 0x03, 0xc3, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // int3 + ret
 
+// Static fake argv: if crash follows this address, confirms arg2 is stored as callback
+// The special recognizable pattern will appear in crash dump
+static void* g_FakeArgv[8] = {
+    reinterpret_cast<void*>(0xDEADDEAD),  // slot 0: recognizable
+    reinterpret_cast<void*>(0xBEEFF00D),  // slot 1
+    reinterpret_cast<void*>(0xCAFEBABE),  // slot 2
+    reinterpret_cast<void*>(0x11223344),  // slot 3: ESI target
+    nullptr, nullptr, nullptr, nullptr    // padding
+};
+
 // Diagnostic state tracking for pre-crash analysis
 static const char* g_LastMediatorMethod = NULL;
 static uint32_t g_LastMediatorCallCount = 0;
@@ -954,11 +964,30 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
   // Padding experiment: Add sentinel values to detect if client iterates past argv
   // These magic values will appear in crash dumps if code reads past NULL terminator
   if (g_FilteredArgvOwnedCapacity > static_cast<uint32_t>(filteredCount + 4)) {
-    // Experiment: Try alternate arg2 interpretation
-    // If client treats arg2 as a vtable instead of argv, use executable slot addresses
+    // Experiment levels:
+    // Level 1: Vtable slots (arg2[0]..[3] = code addresses)
+    // Level 2: Static fake argv (entire arg2 array is at known static address)
     static bool useVtableExperiment = EnvFlagEnabled("MXO_ARG2_AS_VTABLE");
-    if (useVtableExperiment) {
-      Log("DIAGNOSTIC: EXPERIMENT - treating arg2 as vtable with executable slots");
+    static bool useStaticArgv = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
+    if (useStaticArgv) {
+      Log("DIAGNOSTIC: EXPERIMENT LEVEL 2 - using static fake argv at %p", g_FakeArgv);
+      // DON'T use heap argv - use static global instead
+      g_FilteredArgv = reinterpret_cast<char**>(g_FakeArgv);
+      // Free the heap allocation since we're not using it
+      for (uint32_t i = 0; i < g_FilteredArgvOwnedCapacity; ++i) {
+        if (g_FilteredArgvOwned[i]) {
+          std::free(g_FilteredArgvOwned[i]);
+          g_FilteredArgvOwned[i] = nullptr;
+        }
+      }
+      std::free(g_FilteredArgvOwned);
+      g_FilteredArgvOwned = nullptr;
+      // Update static fake argv with actual exe path (first slot needs to be valid string)
+      // We keep the magic values to see if they appear in crash
+      Log("DIAGNOSTIC: fake argv slots: [0]=%p [1]=%p [2]=%p [3]=%p",
+          g_FakeArgv[0], g_FakeArgv[1], g_FakeArgv[2], g_FakeArgv[3]);
+    } else if (useVtableExperiment) {
+      Log("DIAGNOSTIC: EXPERIMENT LEVEL 1 - treating arg2 as vtable with executable slots");
       // Replace argv[0] with slot0 (nop+ret), fill in other slots
       if (g_FilteredArgvOwned[0]) {
         std::free(g_FilteredArgvOwned[0]);
@@ -980,7 +1009,10 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     }
   }
     g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
+  static bool useStaticArgvFinal = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
+  if (!useStaticArgvFinal) {
     g_FilteredArgv = g_FilteredArgvOwned;
+  }
     g_AuthUsername = g_LauncherUser[0] ? g_LauncherUser : NULL;
 
     if (!g_LauncherSwitchNoPatch) {
