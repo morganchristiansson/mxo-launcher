@@ -51,6 +51,29 @@ static uint32_t g_FilteredArgCount = 0;
 static char** g_FilteredArgv = NULL;
 static char** g_FilteredArgvOwned = NULL;
 static uint32_t g_FilteredArgvOwnedCapacity = 0;
+
+// Diagnostic: track which argv indices are most likely to be corrupted
+// The arg2+2 crash pattern suggests something reads filteredArgv[2] as a code pointer
+static const char* g_ArgvSentinel0 = "ARGV_SENTINEL_0";
+static const char* g_ArgvSentinel1 = "ARGV_SENTINEL_1";
+static const char* g_ArgvSentinel2 = "ARGV_SENTINEL_2_CRASH_TARGET";
+static const char* g_ArgvSentinel3 = "ARGV_SENTINEL_3";
+static const char* g_ArgvSentinel4 = "ARGV_SENTINEL_4";
+
+// Memory pattern sentinels to identify when client treats argv array as code
+// These are placed at indices likely to be dereferenced as function pointers
+static void* g_CodeSentinel0 = NULL;  // Will be set to recognizable pattern
+static void* g_CodeSentinel1 = NULL;
+static void* g_CodeSentinel2 = NULL;
+
+// Diagnostic state tracking for pre-crash analysis
+static const char* g_LastMediatorMethod = NULL;
+static uint32_t g_LastMediatorCallCount = 0;
+static void* g_LastMediatorSelf = NULL;
+
+// Buffer to store raw bytes around potential crash points for pattern matching
+static uint8_t g_ArgvSnapshot[64] = {0};
+static bool g_ArgvSnapshotValid = false;
 static const char* g_AuthUsername = NULL;
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
 static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
@@ -136,6 +159,16 @@ static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
     }
 }
 
+static void DiagnosticSnapshotArgvMemory() {
+  if (!g_FilteredArgv || !g_FilteredArgvOwned) return;
+  // Take a snapshot of argv array memory for post-crash analysis
+  std::memcpy(g_ArgvSnapshot, &g_FilteredArgv[0], 
+              (g_FilteredArgCount + 2) * sizeof(char*) > sizeof(g_ArgvSnapshot) 
+                  ? sizeof(g_ArgvSnapshot) 
+                  : (g_FilteredArgCount + 2) * sizeof(char*));
+  g_ArgvSnapshotValid = true;
+}
+
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
     if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
         Log("DIAGNOSTIC: unhandled exception filter invoked with incomplete state");
@@ -188,12 +221,31 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
     LogWordSpan("crash stack", reinterpret_cast<const void*>(context->Esp), 8);
     if (g_FilteredArgv) {
         LogWordSpan("current arg2 filteredArgv", g_FilteredArgv, 4);
+      
+      // Analyze if crash is in argv memory (arg2+2 pattern detection)
+      uintptr_t eip = static_cast<uintptr_t>(context->Eip);
+      uintptr_t argvStart = reinterpret_cast<uintptr_t>(g_FilteredArgv);
+      size_t argvSize = (g_FilteredArgCount + 1) * sizeof(char*);
+      if (eip >= argvStart && eip < argvStart + argvSize) {
+        Log("!!! CRASH IN ARGV MEMORY !!!");
+        Log("    eip=%p is at argv+%zu (argv[%zu])", 
+            reinterpret_cast<void*>(eip),
+            eip - argvStart,
+            (eip - argvStart) / sizeof(char*));
+      }
+      if (g_ArgvSnapshotValid) {
+        LogWordSpan("argv memory snapshot", g_ArgvSnapshot, 8);
+      }
     }
     if (g_pLauncherObject6304) {
         LogWordSpan("current arg5 launcherObject", g_pLauncherObject6304, 8);
     }
     if (g_pILTLoginMediatorDefault) {
         LogWordSpan("current arg6 mediator", g_pILTLoginMediatorDefault, 8);
+    }
+    if (g_LastMediatorMethod) {
+      Log("last mediator method: %s (call#%u, self=%p)", 
+          g_LastMediatorMethod, g_LastMediatorCallCount, g_LastMediatorSelf);
     }
 
     return EXCEPTION_CONTINUE_SEARCH;
@@ -782,10 +834,27 @@ static uint32_t BuildPackedArg7Selection() {
     return (g_CLauncherFieldAC & 0x00ffffffu) | ((g_CLauncherFieldA8 & 0xffu) << 24);
 }
 
+
+static void LogArgvContentsAsBytes(const char* label, char** argv, uint32_t count) {
+  if (!argv || count == 0) return;
+  Log("%s pointer array @ %p:", label, argv);
+  for (uint32_t i = 0; i < count + 3 && i < 8; ++i) {
+    Log("  argv[%u] = %p", i, argv[i]);
+  }
+  if (argv[0]) {
+    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(argv[0]);
+    Log("%s argv[0] data @ %p: %02x %02x %02x %02x %02x %02x %02x %02x",
+        label, argv[0],
+        bytes[0], bytes[1], bytes[2], bytes[3],
+        bytes[4], bytes[5], bytes[6], bytes[7]);
+    Log("%s argv[0] as string: \'%s\'", label, argv[0]);
+  }
+}
 static void LogKnownStartupState() {
     Log("=== Known startup frame ===");
     Log("arg1 filteredArgCount         = 0x%08x", g_FilteredArgCount);
     Log("arg2 filteredArgv            = %p", g_FilteredArgv);
+  if (g_FilteredArgv) { LogArgvContentsAsBytes("arg2", g_FilteredArgv, g_FilteredArgCount); }
     Log("arg3 hClientDll              = %p", g_hClient);
     Log("arg4 hCresDll                = %p", g_hCres);
     Log("arg5 launcherNetworkObject   = %p", g_pLauncherObject6304);
@@ -874,6 +943,16 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     }
 
     g_FilteredArgvOwned[filteredCount] = NULL;
+  
+  // Padding experiment: Add sentinel values to detect if client iterates past argv
+  // These magic values will appear in crash dumps if code reads past NULL terminator
+  if (g_FilteredArgvOwnedCapacity > static_cast<uint32_t>(filteredCount + 4)) {
+    Log("DIAGNOSTIC: adding argv padding sentinels after terminator");
+    g_FilteredArgvOwned[filteredCount + 1] = reinterpret_cast<char*>(0xDEADC0DE);
+    g_FilteredArgvOwned[filteredCount + 2] = reinterpret_cast<char*>(0xCAFEBABE);
+    g_FilteredArgvOwned[filteredCount + 3] = reinterpret_cast<char*>(0xBEEFCAFE);
+    g_FilteredArgvOwned[filteredCount + 4] = NULL;  // Second NULL for safety
+  }
     g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
     g_FilteredArgv = g_FilteredArgvOwned;
     g_AuthUsername = g_LauncherUser[0] ? g_LauncherUser : NULL;
@@ -1111,6 +1190,8 @@ int main(int argc, char* argv[]) {
     }
 
     Log("=== Forced experiment: calling InitClientDLL with incomplete original-path state ===");
+  DiagnosticSnapshotArgvMemory();
+  Log("DIAGNOSTIC: argv memory snapshotted for crash analysis");
     int initResult = g_InitClientDLL(
         g_FilteredArgCount,
         g_FilteredArgv,
