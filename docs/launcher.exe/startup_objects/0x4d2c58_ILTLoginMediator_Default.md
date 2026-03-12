@@ -207,23 +207,25 @@ This materially weakens the narrow theory that our current `+0x170` / `+0x124` p
 
 So while the crash still smells like corrupted or misinterpreted state, the evidence now points more toward a **state/ownership/signature expectation beyond simple stack-pop mismatch** than toward those two slots immediately smashing the return address on exit.
 
-A later differential run strengthened one specific part of that conclusion.
+Later differential runs strengthened one specific part of that conclusion.
 
-The launcher's filtered argv storage was moved from heap-allocated copies to a more launcher-owned static/global buffer in `resurrections.exe`.
-That is still not full original reconstruction, but it is closer to launcher-global lifetime than transient heap storage.
+Two contrasting launcher-side arg2 experiments now exist:
 
-Result:
+1. a temporary diagnostic run where filtered argv storage was moved into more static/global launcher-owned memory in `resurrections.exe`, and
+2. a later faithfulness pass that restored arg1/arg2 to heap-backed duplicated storage closer to original `0x409950` behavior.
 
-- previous crash family: `EIP` landed at the heap-backed `arg2 filteredArgv` area (`0x003e3bb0` / nearby)
-- after moving `arg2` into static launcher-owned storage, latest crash landed at `EIP=0x00413183`
-- current `arg2 filteredArgv` for that same run was `0x00413180`
+Results across those runs:
 
-That means the bad control transfer still **tracks arg2 itself**, not merely the old heap location.
-So the current best interpretation is now even narrower:
+- earlier heap-backed crash family: `EIP` landed at the heap-backed `arg2 filteredArgv` area (`0x003e3bb0` / nearby)
+- after moving `arg2` into static launcher-owned storage, a later crash landed at `EIP=0x00413183` while current `arg2 filteredArgv = 0x00413180`
+- after restoring heap-backed launcher-owned argv again for faithfulness, latest crash `~/MxO_7.6005/MatrixOnline_0.0_crash_17.dmp` landed at `EIP=0x003e3bb2` while current `arg2 filteredArgv = 0x003e3bb0`
+
+That means the bad control transfer still **tracks arg2 itself**, not merely one specific storage strategy.
+So the current best interpretation remains narrow:
 
 - some later path is still treating `arg2 filteredArgv` like a code pointer / callback / return target,
 - or a later stack/call-convention corruption is overwriting control flow with the current arg2 value,
-- and this behavior survives even when arg2 storage is moved closer to launcher-owned global memory.
+- and this behavior survives across both static-buffer and heap-backed launcher-owned arg2 experiments.
 
 Practical implication for the diagnostic scaffold:
 

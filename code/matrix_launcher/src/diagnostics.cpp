@@ -26,13 +26,52 @@ struct MinimalLoginMediatorStub {
 };
 
 struct MinimalLauncherObjectStub {
-    void** vtable;
-    unsigned char payload[0xb0];
+    void** vtable;              // +0x00
+    uint32_t field04;           // +0x04 ctor arg in original (0 from 0x40a380)
+    void* field08;              // +0x08 pointer array in base ctor (NULL when field04==0)
+    unsigned char subobject0C[0x50]; // +0x0c..+0x5b base state from 0x436610
+    void** subVtable5C;         // +0x5c base subobject vtable / state tag
+    const void* field60;        // +0x60 constant table pointer in base ctor
+    unsigned char subobject64[0x18]; // +0x64..+0x7b initialized by imported helper
+    void* field7C;              // +0x7c handle/result from imported helper
+    void* list80;               // +0x80 allocated 0x24 list head
+    uint32_t field84;           // +0x84 zeroed in derived ctor
+    uint32_t field88;           // +0x88 left generic for now
+    void* list8C;               // +0x8c allocated 0x18 list head
+    uint32_t field90;           // +0x90 zeroed in derived ctor
+    uint32_t field94;           // +0x94 left generic for now
+    const void* field98;        // +0x98 constant table pointer in derived ctor
+    unsigned char subobject9C[0x18]; // +0x9c..+0xb3 initialized by imported helper
+};
+
+struct DiagnosticIntrusiveListHead {
+    unsigned char firstByte;
+    unsigned char padding[3];
+    uint32_t count;
+    void* next;
+    void* prev;
+    unsigned char payload[0x14];
+};
+
+struct DiagnosticIntrusiveListHeadSmall {
+    unsigned char firstByte;
+    unsigned char padding[3];
+    uint32_t count;
+    void* next;
+    void* prev;
+    unsigned char payload[0x8];
 };
 
 struct DiagnosticLauncherObjectBuildState {
     MinimalLauncherObjectStub* currentObject;
     uint32_t buildGeneration;
+    uint32_t slot1CallCount;
+    uint32_t slot2CallCount;
+    uint32_t slot3CallCount;
+    uint32_t slot4CallCount;
+    uint32_t subobject5CSlot1CallCount;
+    uint32_t subobject60Slot0CallCount;
+    uint32_t subobject98Slot0CallCount;
 };
 
 struct DiagnosticMediatorResolverNode {
@@ -58,6 +97,10 @@ struct DiagnosticBinderWrapper {
     DiagnosticBinderRegistry* registry;
     DiagnosticMediatorResolverNode* lastResolvedNode;
 };
+
+static_assert(sizeof(MinimalLauncherObjectStub) == 0xb4, "launcher object scaffold size must match original allocation");
+static_assert(sizeof(DiagnosticIntrusiveListHead) == 0x24, "list80 scaffold size mismatch");
+static_assert(sizeof(DiagnosticIntrusiveListHeadSmall) == 0x18, "list8C scaffold size mismatch");
 
 struct DiagnosticMediatorRuntimeState {
     void* registeredLauncherObject;
@@ -94,7 +137,11 @@ static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
 static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
 static DiagnosticMediatorRuntimeState g_MediatorRuntimeState = {};
 static void* g_LoginMediatorVtable[96] = {0};
-static void* g_LauncherObjectVtable[8] = {0};
+static void* g_LauncherObjectVtable[16] = {0};
+static void* g_LauncherObjectSubVtable5C[8] = {0};
+static void* g_LauncherObjectSubVtable60[8] = {0};
+static void* g_LauncherObjectSubVtable98[8] = {0};
+static const char g_LauncherObjectConstTable[] = "diagnostic-launcher-object";
 static const char g_MediatorName[] = "ILTLoginMediator.Default";
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringB[] = "nopatch";
@@ -414,9 +461,135 @@ static uint32_t __thiscall Mediator_ShouldExportB(MinimalLoginMediatorStub* self
     return 0;
 }
 
+static void InitializeDiagnosticIntrusiveListHead(DiagnosticIntrusiveListHead* head) {
+    if (!head) return;
+    std::memset(head, 0, sizeof(*head));
+    head->firstByte = 0;
+    head->count = 0;
+    head->next = head;
+    head->prev = head;
+}
+
+static void InitializeDiagnosticIntrusiveListHeadSmall(DiagnosticIntrusiveListHeadSmall* head) {
+    if (!head) return;
+    std::memset(head, 0, sizeof(*head));
+    head->firstByte = 0;
+    head->count = 0;
+    head->next = head;
+    head->prev = head;
+}
+
+static void DiagnosticFreeLauncherObjectInternals(MinimalLauncherObjectStub* self) {
+    if (!self) return;
+    if (self->list80) {
+        std::free(self->list80);
+        self->list80 = NULL;
+    }
+    if (self->list8C) {
+        std::free(self->list8C);
+        self->list8C = NULL;
+    }
+}
+
 static int __thiscall LauncherObject_Release(MinimalLauncherObjectStub* self, uint32_t flags) {
     Log("LauncherObjectStub::Release(flags=%u self=%p)", flags, self);
+    DiagnosticFreeLauncherObjectInternals(self);
     return 1;
+}
+
+static uint32_t __thiscall LauncherObject_Slot1_431CE0(
+    MinimalLauncherObjectStub* self,
+    void* arg1,
+    void* arg2,
+    void* arg3) {
+    ++g_LauncherObjectBuildState.slot1CallCount;
+    Log(
+        "LauncherObjectStub::Slot1_431CE0(self=%p arg1=%p arg2=%p arg3=%p) [count=%u]",
+        self,
+        arg1,
+        arg2,
+        arg3,
+        (unsigned)g_LauncherObjectBuildState.slot1CallCount);
+    LogPointerWords("LauncherObject slot1 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot2_4325D0(
+    MinimalLauncherObjectStub* self,
+    void* arg1,
+    void* arg2,
+    void* arg3) {
+    ++g_LauncherObjectBuildState.slot2CallCount;
+    Log(
+        "LauncherObjectStub::Slot2_4325D0(self=%p arg1=%p arg2=%p arg3=%p) [count=%u]",
+        self,
+        arg1,
+        arg2,
+        arg3,
+        (unsigned)g_LauncherObjectBuildState.slot2CallCount);
+    LogPointerWords("LauncherObject slot2 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot3_436000(
+    MinimalLauncherObjectStub* self,
+    void* arg1,
+    void* arg2,
+    void* arg3) {
+    ++g_LauncherObjectBuildState.slot3CallCount;
+    Log(
+        "LauncherObjectStub::Slot3_436000(self=%p arg1=%p arg2=%p arg3=%p) [count=%u]",
+        self,
+        arg1,
+        arg2,
+        arg3,
+        (unsigned)g_LauncherObjectBuildState.slot3CallCount);
+    LogPointerWords("LauncherObject slot3 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
+    MinimalLauncherObjectStub* self,
+    void* arg1) {
+    ++g_LauncherObjectBuildState.slot4CallCount;
+    Log(
+        "LauncherObjectStub::Slot4_42F7C0(self=%p arg1=%p) [count=%u]",
+        self,
+        arg1,
+        (unsigned)g_LauncherObjectBuildState.slot4CallCount);
+    LogPointerWords("LauncherObject slot4 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reason) {
+    ++g_LauncherObjectBuildState.subobject5CSlot1CallCount;
+    Log(
+        "LauncherObjectStub::Subobject5C::Slot1(self=%p reason=%d) [count=%u]",
+        self,
+        reason,
+        (unsigned)g_LauncherObjectBuildState.subobject5CSlot1CallCount);
+    LogPointerWords("LauncherObject subobject5C self", self, 4);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
+    ++g_LauncherObjectBuildState.subobject60Slot0CallCount;
+    Log(
+        "LauncherObjectStub::Subobject60::Slot0(self=%p) [count=%u]",
+        self,
+        (unsigned)g_LauncherObjectBuildState.subobject60Slot0CallCount);
+    LogPointerWords("LauncherObject subobject60 self", self, 4);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self) {
+    ++g_LauncherObjectBuildState.subobject98Slot0CallCount;
+    Log(
+        "LauncherObjectStub::Subobject98::Slot0(self=%p) [count=%u]",
+        self,
+        (unsigned)g_LauncherObjectBuildState.subobject98Slot0CallCount);
+    LogPointerWords("LauncherObject subobject98 self", self, 4);
+    return 0;
 }
 
 static void InitializeMediatorStub() {
@@ -461,7 +634,17 @@ static void InitializeLauncherObjectStub() {
 
     std::memset(&g_LauncherObjectBuildState, 0, sizeof(g_LauncherObjectBuildState));
     std::memset(g_LauncherObjectVtable, 0, sizeof(g_LauncherObjectVtable));
-    g_LauncherObjectVtable[0] = (void*)LauncherObject_Release;
+    std::memset(g_LauncherObjectSubVtable5C, 0, sizeof(g_LauncherObjectSubVtable5C));
+    std::memset(g_LauncherObjectSubVtable60, 0, sizeof(g_LauncherObjectSubVtable60));
+    std::memset(g_LauncherObjectSubVtable98, 0, sizeof(g_LauncherObjectSubVtable98));
+    g_LauncherObjectVtable[0] = (void*)LauncherObject_Release;        // 0x4319a0
+    g_LauncherObjectVtable[1] = (void*)LauncherObject_Slot1_431CE0;   // 0x431ce0
+    g_LauncherObjectVtable[2] = (void*)LauncherObject_Slot2_4325D0;   // 0x4325d0
+    g_LauncherObjectVtable[3] = (void*)LauncherObject_Slot3_436000;   // 0x436000
+    g_LauncherObjectVtable[4] = (void*)LauncherObject_Slot4_42F7C0;   // 0x42f7c0
+    g_LauncherObjectSubVtable5C[1] = (void*)LauncherObject_Subobject5C_Slot1; // base +0x5c helper slot
+    g_LauncherObjectSubVtable60[0] = (void*)LauncherObject_Subobject60_Slot0; // base +0x60 helper slot
+    g_LauncherObjectSubVtable98[0] = (void*)LauncherObject_Subobject98_Slot0; // derived +0x98 helper slot
 }
 
 static void DiagnosticInitializeBinderScaffold(void** outMediatorPtr) {
@@ -542,6 +725,7 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
             "DIAGNOSTIC: replacing prior launcher object scaffold generation=%u ptr=%p",
             (unsigned)g_LauncherObjectBuildState.buildGeneration,
             g_LauncherObjectBuildState.currentObject);
+        DiagnosticFreeLauncherObjectInternals(g_LauncherObjectBuildState.currentObject);
         std::free(g_LauncherObjectBuildState.currentObject);
         g_LauncherObjectBuildState.currentObject = NULL;
     }
@@ -555,6 +739,37 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
 
     std::memset(object, 0, sizeof(*object));
     object->vtable = g_LauncherObjectVtable;
+    object->field04 = 0; // 0x40a380 passes ctor arg 0
+    object->field08 = NULL;
+    object->subVtable5C = g_LauncherObjectSubVtable5C;
+    object->field60 = g_LauncherObjectSubVtable60;
+    object->field7C = NULL;
+    object->field84 = 0;
+    object->field88 = 0;
+    object->field90 = 0;
+    object->field94 = 0;
+    object->field98 = g_LauncherObjectSubVtable98;
+
+    DiagnosticIntrusiveListHead* list80 =
+        static_cast<DiagnosticIntrusiveListHead*>(std::malloc(sizeof(DiagnosticIntrusiveListHead)));
+    if (!list80) {
+        Log("DIAGNOSTIC: failed to allocate launcher object +0x80 list head");
+        std::free(object);
+        return NULL;
+    }
+    InitializeDiagnosticIntrusiveListHead(list80);
+    object->list80 = list80;
+
+    DiagnosticIntrusiveListHeadSmall* list8C =
+        static_cast<DiagnosticIntrusiveListHeadSmall*>(std::malloc(sizeof(DiagnosticIntrusiveListHeadSmall)));
+    if (!list8C) {
+        Log("DIAGNOSTIC: failed to allocate launcher object +0x8c list head");
+        std::free(list80);
+        std::free(object);
+        return NULL;
+    }
+    InitializeDiagnosticIntrusiveListHeadSmall(list8C);
+    object->list8C = list8C;
 
     ++g_LauncherObjectBuildState.buildGeneration;
     g_LauncherObjectBuildState.currentObject = object;
@@ -565,7 +780,10 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
         sizeof(MinimalLauncherObjectStub),
         (unsigned)g_LauncherObjectBuildState.buildGeneration);
     Log(
-        "DIAGNOSTIC: launcher object scaffold notes: CLTThreadPerClientTCPEngine-family placeholder, vtbl[0]=Release, payload zeroed");
+        "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to faithful placeholders, vtable slots 0-4 now mapped to logging probes with original function indices");
+    LogPointerWords("LauncherObject self", object, 8);
+    LogPointerWords("LauncherObject +0x80 list", object->list80, 4);
+    LogPointerWords("LauncherObject +0x8c list", object->list8C, 4);
 
     return object;
 }

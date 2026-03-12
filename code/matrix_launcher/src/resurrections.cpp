@@ -42,12 +42,11 @@ static TermClientDLLFunc g_TermClientDLL = NULL;
 static ErrorClientDLLFunc g_ErrorClientDLL = NULL;
 
 // Launcher-owned runtime values mirrored from the original startup path.
-// arg1/arg2 are still placeholder process argc/argv until the launcher-owned
-// filtered storage path is reconstructed.
+// arg1/arg2 now use launcher-owned filtered storage again, but the original
+// 0x409950 switch-consumption/options.cfg preprocessing path is still incomplete.
 static uint32_t g_FilteredArgCount = 0;
 static char** g_FilteredArgv = NULL;
-static char* g_FilteredArgvOwned[16] = {0};
-static char g_FilteredArgStorage[16][512] = {};
+static char** g_FilteredArgvOwned = NULL;
 static uint32_t g_FilteredArgvOwnedCapacity = 0;
 static const char* g_AuthUsername = NULL;
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
@@ -58,6 +57,18 @@ static uint32_t g_PackedArg7Selection = 0;       // packed from [this+0xa8]/[thi
 static uint32_t g_FlagByte = 0;                  // original: [0x4d2c69]
 static char g_LastWorldName[256] = {0};         // original registry value: Last_WorldName
 static void* g_pClientDBFromCallback = NULL;
+
+struct DiagnosticPreclientEnvironmentState {
+    HANDLE threadHandle;
+    DWORD threadId;
+    HANDLE readyEvent;
+    HANDLE stopEvent;
+    volatile LONG readyFlag44;
+    volatile LONG readyFlag45;
+    void* readyPointer48;
+};
+
+static DiagnosticPreclientEnvironmentState g_PreclientEnvironment = {};
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase);
 void Log(const char* fmt, ...);
@@ -110,16 +121,126 @@ static const char* MaskedArgValue(const char* value) {
     return "<provided>";
 }
 
+static char* DuplicateArgString(const char* value) {
+    if (!value) value = "";
+    const size_t len = std::strlen(value);
+    char* copy = static_cast<char*>(std::malloc(len + 1));
+    if (!copy) return NULL;
+    std::memcpy(copy, value, len + 1);
+    return copy;
+}
+
 static void FreeFilteredArgvOwned() {
-    for (uint32_t i = 0; i < g_FilteredArgvOwnedCapacity && i < 16; ++i) {
-        g_FilteredArgvOwned[i] = NULL;
-        g_FilteredArgStorage[i][0] = '\0';
+    if (!g_FilteredArgvOwned) {
+        g_FilteredArgvOwnedCapacity = 0;
+        return;
     }
+
+    for (uint32_t i = 0; i < g_FilteredArgvOwnedCapacity; ++i) {
+        if (g_FilteredArgvOwned[i]) {
+            std::free(g_FilteredArgvOwned[i]);
+            g_FilteredArgvOwned[i] = NULL;
+        }
+    }
+
+    std::free(g_FilteredArgvOwned);
+    g_FilteredArgvOwned = NULL;
     g_FilteredArgvOwnedCapacity = 0;
+}
+
+static DWORD WINAPI DiagnosticPreclientThreadProc(LPVOID) {
+    MSG msg = {};
+    PeekMessageA(&msg, NULL, 0, 0, PM_NOREMOVE);
+
+    g_PreclientEnvironment.readyPointer48 = &g_PreclientEnvironment;
+    InterlockedExchange(&g_PreclientEnvironment.readyFlag44, 0);
+    InterlockedExchange(&g_PreclientEnvironment.readyFlag45, 1);
+    SetEvent(g_PreclientEnvironment.readyEvent);
+    Log(
+        "DIAGNOSTIC: pre-client launcher thread ready threadId=%lu state44=%ld state45=%ld state48=%p",
+        (unsigned long)GetCurrentThreadId(),
+        (long)g_PreclientEnvironment.readyFlag44,
+        (long)g_PreclientEnvironment.readyFlag45,
+        g_PreclientEnvironment.readyPointer48);
+
+    while (WaitForSingleObject(g_PreclientEnvironment.stopEvent, 10) == WAIT_TIMEOUT) {
+        while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessageA(&msg);
+        }
+    }
+
+    Log("DIAGNOSTIC: pre-client launcher thread stopping");
+    return 0;
+}
+
+static bool DiagnosticInitializePreclientEnvironmentLike402EC0() {
+    if (g_PreclientEnvironment.threadHandle) {
+        return true;
+    }
+
+    std::memset(&g_PreclientEnvironment, 0, sizeof(g_PreclientEnvironment));
+    g_PreclientEnvironment.readyEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
+    g_PreclientEnvironment.stopEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
+    if (!g_PreclientEnvironment.readyEvent || !g_PreclientEnvironment.stopEvent) {
+        Log("DIAGNOSTIC: pre-client environment event creation failed (%lu)", (unsigned long)GetLastError());
+        return false;
+    }
+
+    g_PreclientEnvironment.threadHandle = CreateThread(
+        NULL,
+        0,
+        DiagnosticPreclientThreadProc,
+        NULL,
+        0,
+        &g_PreclientEnvironment.threadId);
+    if (!g_PreclientEnvironment.threadHandle) {
+        Log("DIAGNOSTIC: pre-client environment thread creation failed (%lu)", (unsigned long)GetLastError());
+        return false;
+    }
+
+    DWORD waitResult = WaitForSingleObject(g_PreclientEnvironment.readyEvent, 5000);
+    if (waitResult != WAIT_OBJECT_0) {
+        Log("DIAGNOSTIC: pre-client environment readiness wait failed (%lu)", (unsigned long)waitResult);
+        return false;
+    }
+
+    Log(
+        "DIAGNOSTIC: pre-client environment scaffold active threadHandle=%p threadId=%lu state44=%ld state45=%ld state48=%p",
+        g_PreclientEnvironment.threadHandle,
+        (unsigned long)g_PreclientEnvironment.threadId,
+        (long)g_PreclientEnvironment.readyFlag44,
+        (long)g_PreclientEnvironment.readyFlag45,
+        g_PreclientEnvironment.readyPointer48);
+    return true;
+}
+
+static void DiagnosticShutdownPreclientEnvironment() {
+    if (g_PreclientEnvironment.stopEvent) {
+        SetEvent(g_PreclientEnvironment.stopEvent);
+    }
+    if (g_PreclientEnvironment.threadHandle) {
+        WaitForSingleObject(g_PreclientEnvironment.threadHandle, 1000);
+        CloseHandle(g_PreclientEnvironment.threadHandle);
+        g_PreclientEnvironment.threadHandle = NULL;
+    }
+    if (g_PreclientEnvironment.readyEvent) {
+        CloseHandle(g_PreclientEnvironment.readyEvent);
+        g_PreclientEnvironment.readyEvent = NULL;
+    }
+    if (g_PreclientEnvironment.stopEvent) {
+        CloseHandle(g_PreclientEnvironment.stopEvent);
+        g_PreclientEnvironment.stopEvent = NULL;
+    }
+    g_PreclientEnvironment.threadId = 0;
+    g_PreclientEnvironment.readyFlag44 = 0;
+    g_PreclientEnvironment.readyFlag45 = 0;
+    g_PreclientEnvironment.readyPointer48 = NULL;
 }
 
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
+    DiagnosticShutdownPreclientEnvironment();
     FreeFilteredArgvOwned();
     if (g_LogFile) {
         fclose(g_LogFile);
@@ -246,21 +367,29 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     Log("password argv[2] = %s", MaskedArgValue((argc >= 3) ? argv[2] : NULL));
 
     const int filteredCount = hasLauncherAuthArgs ? (1 + ((argc > 3) ? (argc - 3) : 0)) : argc;
-    if (filteredCount < 0 || filteredCount > 15) {
-        Log("ERROR: filtered argv count %d exceeds static launcher storage", filteredCount);
+    if (filteredCount < 0) {
+        Log("ERROR: filtered argv count %d is invalid", filteredCount);
         return false;
     }
 
     FreeFilteredArgvOwned();
-    g_FilteredArgvOwnedCapacity = 16;
+    g_FilteredArgvOwned = static_cast<char**>(std::calloc(filteredCount + 1, sizeof(char*)));
+    if (!g_FilteredArgvOwned) {
+        Log("ERROR: failed to allocate launcher-owned filtered argv pointer array");
+        return false;
+    }
+    g_FilteredArgvOwnedCapacity = static_cast<uint32_t>(filteredCount + 1);
 
     for (int dst = 0; dst < filteredCount; ++dst) {
         const int src = hasLauncherAuthArgs ? ((dst == 0) ? 0 : (dst + 2)) : dst;
         const char* value = (src < argc && argv[src]) ? argv[src] : "";
-        std::strncpy(g_FilteredArgStorage[dst], value, sizeof(g_FilteredArgStorage[dst]) - 1);
-        g_FilteredArgStorage[dst][sizeof(g_FilteredArgStorage[dst]) - 1] = '\0';
-        g_FilteredArgvOwned[dst] = g_FilteredArgStorage[dst];
-        Log("DIAGNOSTIC: filtered argv[%d] stored at %p -> '%s'", dst, g_FilteredArgvOwned[dst], g_FilteredArgvOwned[dst]);
+        g_FilteredArgvOwned[dst] = DuplicateArgString(value);
+        if (!g_FilteredArgvOwned[dst]) {
+            Log("ERROR: failed to duplicate filtered argv[%d]", dst);
+            FreeFilteredArgvOwned();
+            return false;
+        }
+        Log("DIAGNOSTIC: filtered argv[%d] duplicated at %p -> '%s'", dst, g_FilteredArgvOwned[dst], g_FilteredArgvOwned[dst]);
     }
 
     g_FilteredArgvOwned[filteredCount] = NULL;
@@ -273,7 +402,7 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
             Log("forwarded extra launcher argv count = %d", argc - 3);
         }
     } else {
-        Log("DIAGNOSTIC: duplicated raw argv into launcher-owned filtered storage");
+        Log("DIAGNOSTIC: duplicated raw argv into launcher-owned heap-backed filtered storage");
     }
     return true;
 }
@@ -287,8 +416,8 @@ int main(int argc, char* argv[]) {
     Log("Default branch target: nopatch path");
     Log("");
 
-    Log("NOTE: arg1/arg2 still reuse process argc/argv as placeholders.");
-    Log("NOTE: launcher-owned nopatch setup, filtered argv storage, arg5, arg6, arg7, and arg8 remain incomplete.");
+    Log("NOTE: arg1/arg2 now use launcher-owned filtered argv storage, but launcher switch parsing/options.cfg preprocessing are still incomplete.");
+    Log("NOTE: launcher-owned nopatch setup, arg5, arg6, arg7, and arg8 remain incomplete.");
     if (!ConfigureFilteredArgv(argc, argv)) {
         return FinishAndReturn(1);
     }
@@ -365,6 +494,10 @@ int main(int argc, char* argv[]) {
         DiagnosticInstallLauncherObjectStub(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
     }
 
+    if (!DiagnosticInitializePreclientEnvironmentLike402EC0()) {
+        Log("WARNING: pre-client environment scaffold failed to initialize");
+    }
+
     if (traceWindows) {
         DiagnosticStartWindowTrace();
     }
@@ -377,7 +510,7 @@ int main(int argc, char* argv[]) {
     //   0x40a4d0  -> resolve exports + Init/Run/Term/Error path
 
     Log("=== Original-path gaps still missing ===");
-    Log("missing: launcher-owned filtered argv storage / nopatch state setup");
+    Log("arg1/arg2 status: launcher-owned filtered argv storage present, but original 0x409950 switch handling / options.cfg preprocessing are still incomplete");
     if (useLauncherObjectStub) {
         Log("arg5 status: diagnostic launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
     } else {
@@ -390,7 +523,11 @@ int main(int argc, char* argv[]) {
     } else {
         Log("missing: resolve ILTLoginMediator.Default into 0x4d2c58");
     }
-    Log("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
+    if (g_PreclientEnvironment.threadHandle) {
+        Log("pre-client env status: diagnostic 0x402ec0-style launcher thread/message scaffold active (not yet faithful original class/import path)");
+    } else {
+        Log("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
+    }
     Log("");
 
     if (!LoadCresDLL()) {

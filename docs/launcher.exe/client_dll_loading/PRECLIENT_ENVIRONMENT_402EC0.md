@@ -80,6 +80,40 @@ So a launcher that skips `0x402ec0` is still missing part of the original path.
 
 `0x402ec0` likely establishes a launcher thread / message / event environment that the rest of the launcher assumes is live before handing off to the client.
 
+## New clarification from current scaffold work
+
+The custom launcher now includes a **diagnostic pre-client environment scaffold** intended to be closer to `0x402ec0` than simply skipping the step entirely.
+
+Current scaffold behavior:
+
+- creates a launcher-owned helper thread before `cres.dll` / `client.dll` load
+- forces a thread message queue into existence with `PeekMessage`
+- marks diagnostic readiness state analogous to the original polling pattern:
+  - `state44 = 0`
+  - `state45 = 1`
+  - `state48 = non-NULL`
+- keeps a simple message pump alive until launcher shutdown
+
+This is still **not** a faithful reconstruction of the original path:
+
+- it does not recreate the real object returned by `0x48b970`
+- it does not reproduce the original imported helper sequence around `0x48b88c` / message dispatch exactly
+- it does not model the original `CLauncherThread` internal fields beyond a minimal readiness analogue
+
+## Current experiment result with the scaffold enabled
+
+With this diagnostic `0x402ec0`-style scaffold active, the launcher still reaches the same deep client path and then crashes in the same later way:
+
+- deep mediator sequence still reaches first `+0x170`, `+0x124`, second `+0x170`
+- late crash still redirects execution into the current `arg2 filteredArgv` area
+
+So the new scaffold improves **startup-shape fidelity**, but it did **not** by itself remove the current post-startup-context crash.
+
+That is useful evidence:
+
+- skipping `0x402ec0` was a real faithfulness gap,
+- but the present late crash is not explained solely by the absence of any launcher thread/message environment.
+
 ## Open questions
 
 - What exact concrete class is returned by `0x48b970` here?
