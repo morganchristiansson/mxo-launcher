@@ -144,9 +144,11 @@ This matters because:
 - `+0xec` is now better understood as a **selection/config-state handoff**, not just an opaque pointer call,
 - the client uses `+0x38` and `+0x40` while building path strings like `Profiles\%s\` and `Profiles\%s\%s_%X\`,
 - the `+0x40` descriptor builder maps a scratch-shaped arg7-derived request back into descriptor fields at payload `+3` (name pointer) and `+7` (selection id) for that `%s_%X` formatting path,
+- after `+0xec`, the current confirmed path inside `0x62170b00` just jumps to `0x62170f62`, calls `0x6216a1c0`, and then returns success to its caller at `0x620015fd`
 - and later crashes that still land at current `arg2 filteredArgv + 2` survive even after the replacement launcher copies that full `0xb4` object into stable mediator-owned storage.
 
-So the current late crash is no longer well-explained by a trivial `+0xec` lifetime bug alone.
+So the current late crash is no longer well-explained by a trivial `+0xec` lifetime bug alone, and the next likely gap is now the enclosing `InitClientDLL` logic **after** this already-confirmed-success helper returns.
+That also fits the current corrupted-return-chain model better than before: the already-reached loading/selection helper appears to complete successfully, so the visible late `arg2+2` failure may be happening during or immediately after the enclosing `InitClientDLL` success return / unwind rather than inside another unseen mediator callback in that helper.
 
 ### Diagnostic-only note: the current `arg2` landing can be stepped past with `ret`
 
@@ -167,8 +169,11 @@ Current stronger validation result:
 - a fresh static pass now explains that as a client-side scratch mutation of the original arg7 stack slot at `0x62170dc1..0x62170e59`, not as a random unrelated value
 - that same block also stores the original masked low-24-bit selection id separately through the nearby `0x629e1c7c` / `0x620011e0` path before the scratch rewrite, which suggests the client expects both a persisted low-24-bit selection id and the later scratch-shaped `+0x40` lookup key
 - newer static work now identifies `0x629e1c7c` as a client-side console-int named `CreateCharacterWorldIndex`, not an anonymous scratch/global slot
-- current direct xref search for its current value is still narrow, but current runtime observation matters: the patched-client crash is visibly occurring during the in-game `Loading Character` phase, so this preserved low-24-bit state should remain an active loading-path suspect rather than being dismissed as unrelated late UI state
-- even after teaching the diagnostic mediator to accept that scratch-shaped request, the late crash family still did not move (`crash_60` / `crash_61`, still `EIP=0x003e5e8a`)
+- important ordering correction: the user-visible `"Loading Character"` status text is pushed earlier at `client.dll:0x62170f2a`, immediately before the already-observed `arg6->+0xec` call at `0x62170f48`
+- so the visible loading-bar/status phase is consistent with the current `+0xec` evidence, but does **not** yet prove that the later direct `CreateCharacterWorldIndex` consumer at `0x62054cbd` has been reached
+- to avoid missing the next loading-path transition, the diagnostic mediator now also exposes/logs slot `+0x120`
+- a follow-up rerun after adding that slot still did **not** show any `+0x120` traffic before the same late crash (`crash_62`, still `EIP=0x003e5e8a`)
+- that keeps `CreateCharacterWorldIndex` interesting, but narrows the currently confirmed visual `Loading Character` evidence back to the already-known pre-`+0xec` phase
 
 Canonical note:
 - `RET_BYPASS_HACK.md`

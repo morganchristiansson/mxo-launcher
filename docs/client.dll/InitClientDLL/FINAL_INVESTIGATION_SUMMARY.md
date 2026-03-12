@@ -178,7 +178,16 @@ That makes the current split cleaner:
 - later mutated arg7 scratch dword -> `arg6->+0x40` lookup key shape
 The diagnostic mediator now accepts the scratch-shaped request, but the late crash still did not move (`crash_60` / `crash_61`, still `EIP=0x003e5e8a`).
 And a newer runtime observation keeps the `CreateCharacterWorldIndex` side interesting rather than dismissing it: the current patched-client crash is visibly happening during the in-game `Loading Character` phase.
-That keeps arg7 / sibling-selection reconstruction as the highest-value unresolved pre-crash target.
+Important ordering correction, though: that visible `"Loading Character"` text is pushed earlier at `client.dll:0x62170f2a`, immediately before the already-observed `arg6->+0xec` call at `0x62170f48`, so it does **not** yet prove the later direct `CreateCharacterWorldIndex` consumer at `0x62054cbd`.
+A follow-up rerun after adding diagnostic mediator slot `+0x120` likewise still showed no `+0x120` traffic before the same late crash (`crash_62`, still `EIP=0x003e5e8a`).
+And a newer post-`+0xec` static pass narrows the immediate continuation further:
+- after `+0xec`, `0x62170b00` just jumps to `0x62170f62`
+- calls `0x6216a1c0`
+- returns success to its caller at `0x620015fd`
+- and that enclosing helper returns success directly at `0x62001634`
+So the already-reached `+0xec` helper itself currently shows **no further mediator traffic after `+0xec`** before success returns to the enclosing `InitClientDLL` logic.
+That in turn strengthens the current corrupted-return-chain interpretation: the loading/selection helper appears to finish successfully, so the visible late `arg2+2` failure may be occurring during or immediately after the enclosing `InitClientDLL` success return / unwind rather than inside another unseen mediator callback in that helper.
+That keeps arg7 / sibling-selection reconstruction as the highest-value unresolved pre-crash target, but also raises the priority of tracing the enclosing `InitClientDLL` logic immediately after this successful helper return.
 
 ## Final Takeaway
 

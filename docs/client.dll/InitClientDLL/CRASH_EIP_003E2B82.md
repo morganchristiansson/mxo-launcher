@@ -33,6 +33,9 @@ Older related family members with the same higher-level behavior:
 - `crash_54` / `EIP=0x003e5e4a` with current `arg2=0x003e5e48`
   - after widening arg5 to the full recovered 13-slot primary vtable surface
   - still no observed new arg5 slot traffic before failure in `resurrections.log`
+- `crash_62` / `EIP=0x003e5e8a`
+  - follow-up rerun after instrumenting mediator slot `+0x120`
+  - still no observed `+0x120` traffic before failure
 
 ## Run conditions
 
@@ -96,6 +99,17 @@ Result:
 
 Interpretation:
 - the current late crash is **not** explained solely by the old theory that the mediator was retaining only a raw pointer to a dead stack object.
+
+Newer post-`+0xec` static narrowing also matters:
+- after the already-observed `arg6->+0xec` call, the helper at `0x62170b00` just jumps to `0x62170f62`
+- calls `0x6216a1c0`
+- returns success to its caller at `0x620015fd`
+- and the enclosing `InitClientDLL` path then returns success directly at `0x62001634`
+
+So on the current proven path there is **no additional mediator traffic after `+0xec` inside that helper before success return**.
+That makes the visible late `arg2+2` landing even more consistent with the existing corrupted-return-chain interpretation:
+- the loading/selection helper itself appears to complete successfully,
+- and the observed failure may therefore be happening during or immediately after the enclosing `InitClientDLL` success return / unwind.
 
 ### 2. Correcting the obvious `+0x38` path-root meaning did not move the crash either
 

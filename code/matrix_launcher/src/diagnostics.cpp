@@ -140,6 +140,7 @@ struct DiagnosticMediatorRuntimeState {
     void* netShell124;
     void* netMgr124;
     void* distrObjExecutive124;
+    void* loadingState120;
     void* selectionContext0ec;
     void* selectionContext0ecCopy;
     void* runtimeObject148;
@@ -147,6 +148,7 @@ struct DiagnosticMediatorRuntimeState {
     void* runtimeDescriptor178;
     uint32_t attach170Count;
     uint32_t provide124Count;
+    uint32_t loading120Count;
     uint32_t selection0ecCount;
     uint32_t profile0f4Count;
     uint32_t runtime148Count;
@@ -754,6 +756,40 @@ __attribute__((naked)) static void Mediator_ProvideStartupTriple() {
         :
         : "b"(Mediator_ProvideStartupTriple_Impl)
         : "eax");
+}
+
+extern "C" void Mediator_FillLoadingCharacterState120_Impl(
+    MinimalLoginMediatorStub* self,
+    void* loadingState,
+    void* returnAddress) {
+    g_MediatorRuntimeState.loadingState120 = loadingState;
+    ++g_MediatorRuntimeState.loading120Count;
+    Log(
+        "MediatorStub::FillLoadingCharacterState(+0x120 out=%p self=%p) [count=%u caller=%p copiedFrom0ec=%u]",
+        loadingState,
+        self,
+        (unsigned)g_MediatorRuntimeState.loading120Count,
+        returnAddress,
+        g_MediatorSelectionContextCopyValid ? 1u : 0u);
+    LogPointerWords("FillLoadingCharacterState self", self, 8);
+    LogPointerWords("FillLoadingCharacterState out(before/after stub)", loadingState, 8);
+}
+
+__attribute__((naked)) static void Mediator_FillLoadingCharacterState120() {
+    __asm__ volatile(
+        "push %%ebx\n\t"
+        "mov 8(%%esp), %%eax\n\t"
+        "mov 4(%%esp), %%edx\n\t"
+        "push %%edx\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "call *%%ebx\n\t"
+        "add $12, %%esp\n\t"
+        "pop %%ebx\n\t"
+        "ret $4\n\t"
+        :
+        : "b"(Mediator_FillLoadingCharacterState120_Impl)
+        : "eax", "edx");
 }
 
 extern "C" void Mediator_AttachStartupContext_Impl(
@@ -1501,6 +1537,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[64] = (void*)Mediator_GetWorldTypeByIndex; // +0x100
     g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldFlag104; // +0x104
     g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldExtra108; // +0x108
+    g_LoginMediatorVtable[72] = (void*)Mediator_FillLoadingCharacterState120; // +0x120
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
     g_LoginMediatorVtable[82] = (void*)Mediator_AttachRuntimeObject; // +0x148
     g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164

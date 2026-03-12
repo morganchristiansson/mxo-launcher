@@ -67,6 +67,20 @@ Current deep diagnostic progress with patched client:
 
 Current practical crash state:
 - current patched-client scaffold no longer dies on a simple missing-vtable-slot `EIP=0` case
+- visible current runtime state also now includes an in-game **Loading Character** phase with loading bar / status text before the crash
+- static ordering now explains why that is compatible with the currently logged mediator depth:
+  - `client.dll:0x62170f2a` pushes the string `"Loading Character"`
+  - and the same block then calls `arg6->+0xec` at `0x62170f48`
+  - so seeing that UI proves the client reached the pre-`+0xec` loading/status phase, but does **not** yet prove later loading-character consumers such as the `CreateCharacterWorldIndex` read at `0x62054cbd`
+  - newer post-`+0xec` static review now tightens the immediate continuation:
+    - after `arg6->+0xec`, control just jumps to `0x62170f62`
+    - calls `0x6216a1c0`
+    - and `0x62170b00` then returns success back to its caller at `0x620015fd`
+    - the surrounding helper returns success directly at `0x62001634`
+  - so the currently confirmed path has **no additional mediator traffic after `+0xec` inside `0x62170b00` itself** before returning success to the enclosing `InitClientDLL` logic
+  - that makes the current late `arg2+2` crash even more consistent with the existing corrupted-return-chain model:
+    - the already-reached loading/selection helper appears to complete successfully
+    - and the visible failure may therefore be happening during or immediately after the enclosing `InitClientDLL` success return / unwind rather than inside another unseen mediator callback in that helper
 - the deepest stable logged mediator sequence now reaches:
   - `GetWorldOrSelectionName()`
   - `GetProfileOrSessionName()`
@@ -94,6 +108,10 @@ Current practical crash state:
     - `EIP=0x003e5e8a`
   - `~/MxO_7.6005/MatrixOnline_0.0_crash_61.dmp`
     - follow-up rerun after explicit `selectionContext[0]` logging
+    - `EIP=0x003e5e8a`
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_62.dmp`
+    - follow-up rerun after adding diagnostic mediator slot `+0x120`
+    - still no observed `+0x120` log before failure
     - `EIP=0x003e5e8a`
 - the stable higher-level signature across the unfixed runs is still:
   - control later redirects into **current `arg2 filteredArgv + 2`**
@@ -148,8 +166,9 @@ Current practical crash state:
     - base console-var ctor `0x622a2270` zeroes callback slots `+0x20 / +0x24 / +0x28`
     - current direct xref search found only one concrete direct read of its current value field `0x629e1cb0` at `client.dll:0x62054cbd`
     - surrounding strings there (`CharCreate_2_Finish`, `CharCreate_2_Back`, `Loading Character`) still tie it to character/loading flow rather than a simple mediator method surface
-    - newer runtime observation now matters here: the current patched-client crash is visibly happening during the in-game **Loading Character** phase (loading bar + status text already on screen)
-    - so this `CreateCharacterWorldIndex` path should stay live as a promising later consumer of the persisted arg7 low-24-bit state, not be written off as unrelated late UI only
+    - important ordering correction from newer static review: the user-visible `"Loading Character"` status text comes from earlier `client.dll:0x62170f2a`, immediately before the already-observed `arg6->+0xec` call at `0x62170f48`
+    - so the current visible loading-bar state keeps this area interesting, but does **not** yet prove we reached the later `CreateCharacterWorldIndex` consumer at `0x62054cbd`
+    - to avoid missing the next loading-phase transition, the diagnostic mediator now also exposes/logs slot `+0x120`; follow-up rerun `crash_62` still showed no `+0x120` traffic before the same late crash
   - so the low-24-bit arg7 path now looks more like client-owned persisted console/config state than another unresolved arg6 method contract — but it may still be materially relevant on the current failing loading-character path
   - but this still did **not** move the late crash family (`~/MxO_7.6005/MatrixOnline_0.0_crash_60.dmp`, `EIP=0x003e5e8a`)
 - newer evidence-backed mediator corrections now tried without moving this crash family:
@@ -263,9 +282,10 @@ Canonical docs:
    - determine how the client expects the mutated arg7 scratch request to map back to persisted low-24-bit selection id / descriptor data after `0x62170dc1..0x62170e59`
    - stop assuming that accepting the scratch-shaped request alone is enough
 3. Reconstruct more of `0x409950` launcher-side preprocessing, especially `options.cfg` side effects and launcher-global state derived before `InitClientDLL`
-4. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the visible `Loading Character` path) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
-5. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
-6. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently recovered arg5 slots alone explain the late crash
-7. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
-8. Keep tracing what `0x402ec0` minimally sets up
-9. Revisit legitimate `RunClientDLL` only after the faithful path gets past the current late `EIP=arg2+2` crash
+4. Follow the enclosing `InitClientDLL` logic immediately **after** the confirmed-success `0x62170b00` / `0x620015fd` return, because current static evidence now says the already-reached `+0xec` path itself returns success without any further mediator calls inside that helper
+5. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the loading-character path around `0x620547c0..0x62054eac`) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
+6. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
+7. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently recovered arg5 slots alone explain the late crash
+8. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
+9. Keep tracing what `0x402ec0` minimally sets up
+10. Revisit legitimate `RunClientDLL` only after the faithful path gets past the current late `EIP=arg2+2` crash

@@ -161,6 +161,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
 | `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
 | `+0xf4` | later runtime/config paths treat return value like a persisted selection/config snapshot, not a plain C-string | medium |
+| `+0x120` | later loading-character path passes a large stack-built state object here before UI teardown / transition work | medium |
 | `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
 | `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
 | `+0x170` | consumes client startup context object in deeper init | medium |
@@ -168,6 +169,12 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x178` | consumes runtime descriptor object in later setup paths | medium |
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
+
+Current practical note on `+0x120`:
+- newer static review places one `+0x120` use inside a broader loading-character path (`0x620547c0..0x62054eac`) that also directly reads client-side `CreateCharacterWorldIndex` current value `0x629e1cb0`
+- but the currently visible `"Loading Character"` status text on patched-client runs is already explained earlier by `client.dll:0x62170f2a`, immediately before the already-observed `+0xec` handoff at `0x62170f48`
+- and a follow-up diagnostic rerun with mediator slot `+0x120` instrumented still showed no `+0x120` traffic before the same late `EIP=0x003e5e8a` crash (`crash_62`)
+- newer post-`+0xec` static review also shows that the already-reached `0x62170b00` helper performs no further mediator calls after `+0xec` before returning success through `0x620015fd` / `0x62001634`
 
 ## What the stub experiments proved
 
