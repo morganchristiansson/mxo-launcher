@@ -189,6 +189,30 @@ Current practical crash state:
       - `0x43909f -> 0x41d170`
       - `0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500`
       - with the latter set hanging off higher-level owner state rooted at `0x4f78b8`
+    - newer server-config string recovery now also gives concrete auth/margin config anchors in both binaries:
+      - launcher.exe:
+        - `qsAuthServerDNSName`
+        - `AuthServerPort` (default `0x2af8 = 11000`)
+        - `MarginServerDNSSuffix`
+        - `MarginServerPort` (default `0x2710 = 10000`)
+      - client.dll:
+        - `AuthServerDNSName`
+        - `AuthServerPort` (default `0x2af8 = 11000`)
+        - `MarginServerDNSSuffix`
+        - `MarginServerPort` (default `0x2710 = 10000`)
+      - important nuance: current recovered margin-side string is `MarginServerDNSSuffix`, not an exact direct `MarginServerDNSName`
+    - newer auth/margin config review now also gives the strongest concrete answer yet for where connection is initiated from:
+      - auth-side launcher owner path:
+        - owner root at `0x4f78b8`
+        - auth DNS current string consumed from `0x4f7b14`
+        - auth port consumed from `0x4f7a50`
+        - `0x43909f -> 0x41d170` constructs `CMessageConnection`, builds endpoint at owner `+0x5c`, then calls `connection->+0x1c(owner+0x5c)`
+      - margin-side launcher owner path:
+        - margin suffix consumed from `0x4d6814`
+        - margin port consumed from `0x4d669c`
+        - `0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500` constructs `CMessageConnection`, builds endpoint at owner `+0x6c`, then calls `connection->+0x1c(owner+0x6c)`
+      - with the current method mapping, that virtual `+0x1c` remains best read as the connection-oriented ensure-connected / engine-`Connect` wrapper
+      - so connection init currently looks launcher-owned and higher-level-owner-driven, not a trivial direct raw-global `0x4d6304->Connect(...)` call
   - newer deliberate rerun after partially wiring slots `1/2/6/7/8/12` into `src/liblttcp/` did **not** change the observed runtime surface yet:
     - still only mediator `+0x2c`
     - still only arg5 helper `+0x60` slot `0/1`

@@ -1026,6 +1026,120 @@ That narrowing materially raises the priority of tracing these owner paths:
 - `0x439300 -> 0x41e500`
 - and the higher-level object rooted at `0x4f78b8`
 
+## New concrete answer: where connection is initiated from
+
+The current best answer is now substantially tighter than “some later indirect owner path”.
+The original launcher appears to initiate connection work from a higher-level owner object rooted at `0x4f78b8`, using a two-stage setup that consumes the recovered auth/margin server config variables before calling into `CMessageConnection`.
+
+### Auth-side launcher path
+
+Owner root construction/seed path:
+- function body around `launcher.exe:0x41b1c1`
+- stores global owner pointer: `0x4f78b8 = esi`
+- seeds owner `+0x4c` from current auth DNS config:
+  - reads `qsAuthServerDNSName` current string via `0x4f7b14`
+  - calls `0x440d80(owner+0x4c, authDnsName, mode)`
+- this is now the strongest current launcher-side auth-DNS consumer tied to the recovered config object family
+
+Auth connection-init path:
+- `launcher.exe:0x43909f -> 0x41d170`
+- `0x41d170`:
+  - constructs a `CMessageConnection`-family object through `0x4417e0 -> 0x448b40`
+  - stores it at owner `+0x18`
+  - reads auth port from `AuthServerPort` current value `0x4f7a50`
+  - builds endpoint data into owner `+0x5c`
+  - then immediately calls `connection->+0x1c(owner+0x5c)`
+- with the current method mapping, that virtual `+0x1c` remains best read as the connection-oriented ensure-connected / engine-`Connect` wrapper
+
+So the current best auth-side connection-init model is:
+1. auth DNS name is copied into owner `+0x4c`
+2. auth port is read from `0x4f7a50`
+3. endpoint is built at owner `+0x5c`
+4. `CMessageConnection->+0x1c(owner+0x5c)` initiates the connection through the launcher-owned engine
+
+### Margin-side launcher path
+
+Margin connection-init path:
+- `launcher.exe:0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500`
+- `0x41e500`:
+  - constructs another `CMessageConnection`-family object through the same `0x4417e0 -> 0x448b40` path
+  - stores it at owner `+0x1c`
+  - reads `MarginServerDNSSuffix` current string from `0x4d6814`
+  - reads `MarginServerPort` current value from `0x4d669c`
+  - calls `0x440d80(owner+0x3c, marginSuffix, mode)` and later `0x440bb0(owner+0x3c, mode)`
+  - builds endpoint data into owner `+0x6c`
+  - then immediately calls `connection->+0x1c(owner+0x6c)`
+
+So the current best margin-side connection-init model is parallel to the auth side:
+1. margin suffix is copied into owner-side string state
+2. margin port is read from `0x4d669c`
+3. endpoint is built at owner `+0x6c`
+4. `CMessageConnection->+0x1c(owner+0x6c)` initiates the connection through the launcher-owned engine
+
+### Why this matters
+
+This now answers the “where is connection initiated from?” question more concretely:
+- **not** directly from raw global `0x4d6304`
+- **not** directly from client.dll alone
+- but from higher-level launcher owner objects that:
+  - consume auth/margin server config variables
+  - create `CMessageConnection` children
+  - build endpoint state
+  - and immediately invoke the connection wrapper that drives the launcher-owned network engine
+
+## Newly confirmed server-config string surfaces
+
+Fresh string/xref review now identifies the launcher/client-side server-config names around this network family more concretely.
+
+### launcher.exe
+
+String-backed names found:
+- `qsAuthServerDNSName` at `0x4b617e`
+- `AuthServerPort` at `0x4b61b0`
+- `MarginServerDNSSuffix` at `0x4b1974`
+- `MarginServerPort` at `0x4b19a6`
+
+Current initializer-style xrefs recovered:
+- `0x49f660`
+  - pushes default `0x2af8`
+  - pushes string `AuthServerPort`
+- `0x49c670`
+  - pushes default `0x2710`
+  - pushes string `MarginServerPort`
+- `0x49f660` / `0x49c640`
+  - also register the paired DNS/suffix names above through the same config/registration helper family
+
+So the current best launcher-side reading is:
+- the launcher clearly knows about an auth-server DNS name + port pair
+- and a margin-server DNS suffix + port pair
+- with current recovered default numeric seeds:
+  - `AuthServerPort = 0x2af8 = 11000`
+  - `MarginServerPort = 0x2710 = 10000`
+
+### client.dll
+
+String-backed names found:
+- `AuthServerDNSName` at `0x628cf160`
+- `AuthServerPort` at `0x628cf190`
+- `MarginServerDNSSuffix` at `0x628cf2e8`
+- `MarginServerPort` at `0x628cf31a`
+
+Recovered initializer-style xrefs:
+- `0x6281d620` registers `AuthServerDNSName`
+- `0x6281d650` registers `AuthServerPort` with default `0x2af8`
+- `0x6281dd80` registers `MarginServerDNSSuffix`
+- `0x6281ddb0` registers `MarginServerPort` with default `0x2710`
+
+Important naming nuance:
+- in `client.dll`, the auth-side string is the direct name **`AuthServerDNSName`**
+- in `launcher.exe`, the closest currently recovered auth-side launcher string is **`qsAuthServerDNSName`** rather than the exact client spelling
+- for the margin side, both binaries currently show **`MarginServerDNSSuffix`**, not an exact direct string `MarginServerDNSName`
+
+That does not prove the runtime never builds a fuller margin host name elsewhere.
+But it does narrow the currently recovered config surface to:
+- a direct auth-server DNS name
+- a margin-server DNS suffix
+- and their paired ports
 
 Important limitation:
 - those new source files are still **not** a faithful full arg5 runtime implementation inside the launcher scaffold
