@@ -66,6 +66,13 @@ static void* g_CodeSentinel0 = NULL;  // Will be set to recognizable pattern
 static void* g_CodeSentinel1 = NULL;
 static void* g_CodeSentinel2 = NULL;
 
+// Alternative: Argument vtable slots - if client treats arg2 as a vtable
+// these recognizable addresses might appear in crash instead of string pointer
+static uint8_t g_vtableSlot0[8] = {0x90, 0x90, 0x90, 0x90, 0xc3, 0xcc, 0xcc, 0xcc};  // nops + ret
+static uint8_t g_vtableSlot1[8] = {0xeb, 0xfe, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // jmp to self (hang)
+static uint8_t g_vtableSlot2[8] = {0xf4, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // halt
+static uint8_t g_vtableSlot3[8] = {0xcd, 0x03, 0xc3, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // int3 + ret
+
 // Diagnostic state tracking for pre-crash analysis
 static const char* g_LastMediatorMethod = NULL;
 static uint32_t g_LastMediatorCallCount = 0;
@@ -162,9 +169,9 @@ static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
 static void DiagnosticSnapshotArgvMemory() {
   if (!g_FilteredArgv || !g_FilteredArgvOwned) return;
   // Take a snapshot of argv array memory for post-crash analysis
-  std::memcpy(g_ArgvSnapshot, &g_FilteredArgv[0], 
-              (g_FilteredArgCount + 2) * sizeof(char*) > sizeof(g_ArgvSnapshot) 
-                  ? sizeof(g_ArgvSnapshot) 
+  std::memcpy(g_ArgvSnapshot, &g_FilteredArgv[0],
+              (g_FilteredArgCount + 2) * sizeof(char*) > sizeof(g_ArgvSnapshot)
+                  ? sizeof(g_ArgvSnapshot)
                   : (g_FilteredArgCount + 2) * sizeof(char*));
   g_ArgvSnapshotValid = true;
 }
@@ -221,14 +228,14 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
     LogWordSpan("crash stack", reinterpret_cast<const void*>(context->Esp), 8);
     if (g_FilteredArgv) {
         LogWordSpan("current arg2 filteredArgv", g_FilteredArgv, 4);
-      
+
       // Analyze if crash is in argv memory (arg2+2 pattern detection)
       uintptr_t eip = static_cast<uintptr_t>(context->Eip);
       uintptr_t argvStart = reinterpret_cast<uintptr_t>(g_FilteredArgv);
       size_t argvSize = (g_FilteredArgCount + 1) * sizeof(char*);
       if (eip >= argvStart && eip < argvStart + argvSize) {
         Log("!!! CRASH IN ARGV MEMORY !!!");
-        Log("    eip=%p is at argv+%zu (argv[%zu])", 
+        Log("    eip=%p is at argv+%zu (argv[%zu])",
             reinterpret_cast<void*>(eip),
             eip - argvStart,
             (eip - argvStart) / sizeof(char*));
@@ -244,7 +251,7 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
         LogWordSpan("current arg6 mediator", g_pILTLoginMediatorDefault, 8);
     }
     if (g_LastMediatorMethod) {
-      Log("last mediator method: %s (call#%u, self=%p)", 
+      Log("last mediator method: %s (call#%u, self=%p)",
           g_LastMediatorMethod, g_LastMediatorCallCount, g_LastMediatorSelf);
     }
 
@@ -943,15 +950,34 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     }
 
     g_FilteredArgvOwned[filteredCount] = NULL;
-  
+
   // Padding experiment: Add sentinel values to detect if client iterates past argv
   // These magic values will appear in crash dumps if code reads past NULL terminator
   if (g_FilteredArgvOwnedCapacity > static_cast<uint32_t>(filteredCount + 4)) {
-    Log("DIAGNOSTIC: adding argv padding sentinels after terminator");
-    g_FilteredArgvOwned[filteredCount + 1] = reinterpret_cast<char*>(0xDEADC0DE);
-    g_FilteredArgvOwned[filteredCount + 2] = reinterpret_cast<char*>(0xCAFEBABE);
-    g_FilteredArgvOwned[filteredCount + 3] = reinterpret_cast<char*>(0xBEEFCAFE);
-    g_FilteredArgvOwned[filteredCount + 4] = NULL;  // Second NULL for safety
+    // Experiment: Try alternate arg2 interpretation
+    // If client treats arg2 as a vtable instead of argv, use executable slot addresses
+    static bool useVtableExperiment = EnvFlagEnabled("MXO_ARG2_AS_VTABLE");
+    if (useVtableExperiment) {
+      Log("DIAGNOSTIC: EXPERIMENT - treating arg2 as vtable with executable slots");
+      // Replace argv[0] with slot0 (nop+ret), fill in other slots
+      if (g_FilteredArgvOwned[0]) {
+        std::free(g_FilteredArgvOwned[0]);
+      }
+      g_FilteredArgvOwned[0] = reinterpret_cast<char*>(g_vtableSlot0);
+      g_FilteredArgvOwned[1] = reinterpret_cast<char*>(g_vtableSlot1);
+      g_FilteredArgvOwned[2] = reinterpret_cast<char*>(g_vtableSlot2);
+      g_FilteredArgvOwned[3] = reinterpret_cast<char*>(g_vtableSlot3);
+      g_FilteredArgvOwned[4] = NULL;
+      Log("DIAGNOSTIC: vtable slots: [0]=%p [1]=%p [2]=%p [3]=%p",
+          g_FilteredArgvOwned[0], g_FilteredArgvOwned[1],
+          g_FilteredArgvOwned[2], g_FilteredArgvOwned[3]);
+    } else {
+      Log("DIAGNOSTIC: adding argv padding sentinels after terminator");
+      g_FilteredArgvOwned[filteredCount + 1] = reinterpret_cast<char*>(0xDEADC0DE);
+      g_FilteredArgvOwned[filteredCount + 2] = reinterpret_cast<char*>(0xCAFEBABE);
+      g_FilteredArgvOwned[filteredCount + 3] = reinterpret_cast<char*>(0xBEEFCAFE);
+      g_FilteredArgvOwned[filteredCount + 4] = NULL;  // Second NULL for safety
+    }
   }
     g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
     g_FilteredArgv = g_FilteredArgvOwned;

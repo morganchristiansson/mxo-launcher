@@ -116,3 +116,58 @@ This is the "standalone" default. Previous crashes with `MXO_MEDIATOR_SELECTION_
 - [ ] Add padding slots to filteredArgv
 - [ ] Test if crash offset correlates with argv content vs pointer
 - [ ] Check if ESI offset (argv+0xc) hints at specific expected structure
+### Refined hypothesis: Indirect jump via vtable/callback
+
+The crash at filteredArgv base (not into padding) suggests:
+1. Some code stored `filteredArgv` as a pointer (maybe void* or callback)
+2. Later code dereferences that pointer expecting a function/vtable
+3. Jump goes to `*filteredArgv` which would be `filteredArgv[0]` contents
+
+Log evidence:
+```
+arg2 pointer array @ 003e2bb8:
+  argv[0] = 003e4008  -> "Z:\home\morgan\MxO_7.6005\resurrections.exe"
+  argv[1] = 00000000  -> NULL terminator  
+  argv[2] = deadc0de  -> padding sentinel
+  argv[3] = cafebabe  -> padding sentinel
+```
+
+### CRITICAL: ESI = &filteredArgv[3] = 0x003e2bc4
+
+From crash dump (crash_41.dmp):
+- ESI = 0x003e2bc4 = filteredArgv + 0x0c = **&argv[3]**
+- So the code **knew about argv[3]** - it was accessing or iterating to it!
+
+### Revised theory: Client confusion about arg2 structure
+
+Hypothesis: **The client thinks filteredArgv is not an argv array but a vtable/object structure**
+
+The consistent ESI = &argv[3] across crashes suggests the client accesses slot 3 of what it thinks is a vtable. This means:
+
+1. Something in the setup told client that arg2 is a pointer to a structure with 4+ slots
+2. The client used slot 0 as a function pointer (crash at filteredArgv[0])
+3. The client used slot 3 as data (ESI = &argv[3])
+
+Possibility: Maybe arg2 is SUPPOSED to be a pointer to a structure where:
+- slot 0 = a callback function
+- slot 3 = some data/context
+
+The original launcher might pass a different structure, not a filtered argv array?
+
+### What arg2 is supposed to be
+
+Looking at original launcher.exe disassembly around 0x409950:
+- arg2 is built from argv after processing launcher switches
+- It's passed as `char**` to InitClientDLL
+- But maybe the CLIENT expects something different...
+
+Alternative hypothesis: The client may be corrupting its own data structures, and filteredArgv happens to reside at an address that matches some expected pattern.
+
+### Next experiment: Control filteredArgv content at slot 0
+
+Since the crash tries to execute argv[0], let's try making argv[0] point to:
+1. A ret instruction (to see if we can survive the call)
+2. An int3 (to see if we can breakpoint there)
+3. A recognizable pattern to confirm execution
+
+This will tell us definitively if code is jumping to argv[0].
