@@ -54,6 +54,7 @@ static uint32_t g_FilteredArgvOwnedCapacity = 0;
 static const char* g_AuthUsername = NULL;
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
 static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
+static void* g_pILTLoginMediatorSelection3584 = NULL; // original sibling slot: [0x4d3584]
 static uint32_t g_CLauncherFieldA8 = 0;          // original: [CLauncher+0xa8], high 8 bits used
 static uint32_t g_CLauncherFieldAC = 0;          // original: [CLauncher+0xac], low 24 bits used
 static uint32_t g_PackedArg7Selection = 0;       // packed from [this+0xa8]/[this+0xac]
@@ -977,26 +978,65 @@ int main(int argc, char* argv[]) {
         Log("WARNING: both MXO_BINDER_LOGIN_MEDIATOR and MXO_STUB_LOGIN_MEDIATOR set; binder scaffold wins.");
     }
 
+    if (useMediatorBinderScaffold) {
+        DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
+    } else if (useMediatorStub) {
+        DiagnosticInstallMediatorStub(&g_pILTLoginMediatorDefault);
+    }
+
     if (useMediatorBinderScaffold || useMediatorStub) {
         const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
         const uint32_t selectionPackedLow24 = g_PackedArg7Selection & 0x00ffffffu;
-        const uint32_t selectionUpperBoundExclusive = (selectedHighByte < 0xffu) ? (selectedHighByte + 1u) : 0xffu;
-        DiagnosticConfigureMediatorSelection(selectionUpperBoundExclusive, mediatorSelectionName, selectionPackedLow24);
+        const uint32_t worldUpperBoundExclusive =
+            (selectionPackedLow24 < 0xffu) ? (selectionPackedLow24 + 1u) : 1u;
+        const uint32_t variantUpperBoundExclusive =
+            (selectedHighByte < 0xffu) ? (selectedHighByte + 1u) : 1u;
+        DiagnosticConfigureMediatorSelection(
+            worldUpperBoundExclusive,
+            variantUpperBoundExclusive,
+            mediatorSelectionName,
+            mediatorSelectionName,
+            selectionPackedLow24,
+            selectedHighByte);
         DiagnosticConfigureMediatorProfileName(g_AuthUsername);
+        DiagnosticConfigureMediatorAuthName(g_AuthUsername);
+        DiagnosticApplyDefaultNopatchMediatorConfig(
+            g_pILTLoginMediatorDefault,
+            nopatchParsedValue,
+            nopatchClientVersionValue);
     }
 
-    if (useMediatorBinderScaffold) {
-        DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
-        DiagnosticApplyDefaultNopatchMediatorConfig(
-            g_pILTLoginMediatorDefault,
-            nopatchParsedValue,
-            nopatchClientVersionValue);
-    } else if (useMediatorStub) {
-        DiagnosticInstallMediatorStub(&g_pILTLoginMediatorDefault);
-        DiagnosticApplyDefaultNopatchMediatorConfig(
-            g_pILTLoginMediatorDefault,
-            nopatchParsedValue,
-            nopatchClientVersionValue);
+    if (g_pILTLoginMediatorDefault) {
+        g_pILTLoginMediatorSelection3584 = g_pILTLoginMediatorDefault;
+        Log(
+            "DIAGNOSTIC: reusing current ILTLoginMediator.Default object as sibling 0x4d3584 selection slot (%p)",
+            g_pILTLoginMediatorSelection3584);
+
+        uint32_t resolvedA8 = g_CLauncherFieldA8;
+        uint32_t resolvedAC = g_CLauncherFieldAC;
+        char resolvedWorldName[sizeof(g_LastWorldName)] = {0};
+        if (DiagnosticResolveLauncherSelectionFromMediator(
+                g_pILTLoginMediatorSelection3584,
+                g_CLauncherFieldAC,
+                g_CLauncherFieldA8,
+                &resolvedA8,
+                &resolvedAC,
+                resolvedWorldName,
+                sizeof(resolvedWorldName))) {
+            g_CLauncherFieldA8 = resolvedA8;
+            g_CLauncherFieldAC = resolvedAC;
+            g_PackedArg7Selection = BuildPackedArg7Selection();
+            if (resolvedWorldName[0]) {
+                std::strncpy(g_LastWorldName, resolvedWorldName, sizeof(g_LastWorldName) - 1);
+                g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
+            }
+            Log(
+                "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x%08x ac=0x%08x packed=0x%08x world='%s'",
+                g_CLauncherFieldA8,
+                g_CLauncherFieldAC,
+                g_PackedArg7Selection,
+                g_LastWorldName[0] ? g_LastWorldName : mediatorSelectionName);
+        }
     }
 
     if (useLauncherObjectStub) {
@@ -1033,6 +1073,11 @@ int main(int argc, char* argv[]) {
         Log("arg6 status: direct diagnostic stub materialized ILTLoginMediator.Default (bypasses binder path)");
     } else {
         Log("missing: resolve ILTLoginMediator.Default into 0x4d2c58");
+    }
+    if (g_pILTLoginMediatorSelection3584) {
+        Log("arg7 status: sibling 0x4d3584-style ILTLoginMediator selection slot currently reuses the diagnostic mediator object and now rebuilds a8/ac through +0xfc/+0x100/+0xe4");
+    } else {
+        Log("missing: reconstruct sibling ILTLoginMediator.Default-style slot at 0x4d3584 for launcher-owned arg7 selection resolution");
     }
     if (g_PreclientEnvironment.threadHandle) {
         Log("pre-client env status: diagnostic 0x402ec0-style launcher thread/message scaffold active (not yet faithful original class/import path)");
