@@ -368,3 +368,137 @@ So the current best reading is still:
   - deeper arg5 state not yet reconstructed,
   - broader `0x409950` launcher preprocessing / `options.cfg` side effects,
   - or another later ownership mismatch that converts the launcher-owned arg2 area into control flow.
+
+## New clarification from widening arg5 to the full recovered 13-slot primary vtable surface
+
+A new static/code reconstruction pass widened the diagnostic arg5 scaffold from the earlier partial primary-vtable coverage to the full currently recovered 13-slot table at `0x4b2768`.
+
+Recovered primary table entries from `launcher.exe` / canonical vtable table:
+
+- slot 0 -> `0x4319a0`
+- slot 1 -> `0x431ce0`
+- slot 2 -> `0x4325d0`
+- slot 3 -> `0x436000`
+- slot 4 -> `0x42f7c0`
+- slot 5 -> `0x431840`
+- slot 6 -> `0x4328a0`
+- slot 7 -> `0x42f970`
+- slot 8 -> `0x42fbd0`
+- slot 9 -> `0x42fd10`
+- slot 10 -> `0x443810`
+- slot 11 -> `0x431670`
+- slot 12 -> `0x4316a0`
+
+What is now modeled in the scaffold:
+
+- slots `0..12` are all now present with matching stack cleanup shapes
+- slot `10` now matches the original tiny stub exactly in effect (`xor al,al ; ret 4` -> returns `0`)
+- slot `5` now models the one high-confidence semantic path already recovered from static analysis:
+  - when the `+0x80` list is still empty, it zeroes the caller out-pointer and returns `0x7000004`
+- slot `12` now at least distinguishes the proven empty-`+0x8c` fast path from the still-unreconstructed non-empty teardown path
+- slots `6..9` are still logging placeholders only; their deeper real behavior has not been reconstructed yet
+
+Why slot `5` matters:
+
+Static disassembly of `0x431840` shows a concrete empty-container behavior rather than a generic opaque callback:
+
+- it searches the `+0x80` intrusive/list container
+- if the search misses the container head (`eax == [esi]` after `self += 0x80`), it writes `0` to the caller output pointer
+- and returns `0x7000004`
+
+That means the current scaffold can now reproduce one real launcher-observed miss result instead of only returning a generic neutral placeholder there.
+
+### New clarification: `+0x80` / `+0x8c` are sentinel-headed tree/list containers, not simple counted lists
+
+A follow-up static pass tightened the container interpretation further.
+The earlier scaffold treated the allocated `0x24` / `0x18` heads somewhat like generic list heads with a count field.
+The recovered code instead points to **sentinel node objects** with these high-confidence fields:
+
+For the `+0x80` allocated `0x24` head:
+- `+0x00` = flag/color byte
+- `+0x04` = root node pointer (`NULL` in ctor)
+- `+0x08` = first / sentinel-linked forward pointer (`self` in ctor)
+- `+0x0c` = last / sentinel-linked backward pointer (`self` in ctor)
+- `+0x10` = key area used by the comparator path
+- `+0x20` = payload/object pointer used by `0x431840`
+
+For the `+0x8c` allocated `0x18` head:
+- `+0x00` = flag/color byte
+- `+0x04` = root node pointer (`NULL` in ctor)
+- `+0x08` = first / sentinel-linked forward pointer (`self` in ctor)
+- `+0x0c` = last / sentinel-linked backward pointer (`self` in ctor)
+- `+0x10` = dword key used by `0x42fe10`
+- `+0x14` = payload/object pointer used by `0x4316a0`
+
+Evidence:
+- ctor `0x431c30` sets the allocated heads as:
+  - `[head+0x04] = 0`
+  - `[head+0x08] = head`
+  - `[head+0x0c] = head`
+- search helper `0x42fdb0` starts from `[head+0x04]` and compares keys at `node+0x10`
+- search helper `0x42fe10` also starts from `[head+0x04]` and compares the requested dword key against `node+0x10`
+- slot `5` then consumes payload from `[node+0x20]`
+- slot `12` then consumes payload from `[node+0x14]`
+
+So the scaffold has now been corrected to treat emptiness as:
+- `root == NULL`
+- and sentinel forward/back links still pointing to the head itself
+
+rather than as a guessed count-based condition.
+
+Practical status of this update:
+
+- the widened arg5 vtable scaffold built successfully
+- a follow-up rerun with the usual deep path
+  - `cd /home/morgan/mxo/code/matrix_launcher && make run_binder_both`
+  still showed **no** new arg5 logs before failure from:
+  - primary vtable slots `5..10`
+  - primary vtable slots `11..12`
+  - helper slots at `+0x5c / +0x60 / +0x98`
+- representative latest dump after that rerun:
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_54.dmp`
+  - `EIP=0x003e5e4a`
+  - current `arg2 filteredArgv = 0x003e5e48`
+- so this wider primary-vtable coverage still did **not** move the launcher past the current late `arg2+2` crash family
+
+That makes this update useful faithfulness groundwork for later differential runs, but still **not** a demonstrated fix.
+
+## New validation result from the in-launcher `ret` bypass
+
+To test whether the current late `arg2` crash was merely blocking later arg5 traffic from becoming visible, the launcher now has an opt-in diagnostic path:
+
+- `MXO_ARG2_RET_BYPASS=1`
+- optional limit override: `MXO_ARG2_RET_BYPASS_MAX=<n>`
+
+That path simulates a single x86 `ret` when a fault lands inside current `arg2 filteredArgv` storage.
+
+Representative validation run:
+- `cd /home/morgan/mxo/code/matrix_launcher && MXO_ARG2_RET_BYPASS=1 MXO_ARG2_RET_BYPASS_MAX=4 make run_binder_both`
+
+Observed result:
+- the first fault still lands at current `arg2+2`
+  - `EIP=0x003e5e82`
+  - current `arg2 filteredArgv = 0x003e5e80`
+- the bypass fires once and pops the current stack top as though executing `ret`
+- the popped target is:
+  - `0x62000000`
+  - which is just current `arg3 hClientDll`, not a meaningful later client continuation
+- execution then immediately faults again at:
+  - `client.dll+0x3`
+  - representative dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_57.dmp`
+  - `EIP=0x62000003`
+- the stack at that second fault still starts with stale startup-frame values:
+  - `0x003e71c8` (arg5)
+  - `0x0041bb60` (arg6)
+- and `resurrections.log` still shows no new observed arg5 traffic before that second crash from:
+  - primary slots `5..10`
+  - primary slots `11..12`
+  - helper slots `+0x5c / +0x60 / +0x98`
+
+Interpretation:
+- this finally gives a useful **runtime validation result**, but it is a negative one
+- the temporary `ret` bypass does **not** reveal later arg5 method traffic on the present path
+- instead, it shows that the corrupted return chain is currently collapsing into stale `InitClientDLL` startup-frame values
+- so the current arg5 reconstruction remains only partially runtime-validated:
+  - object creation / registration / passing are live
+  - deeper arg5 method behavior is still not observed before the current corruption wins

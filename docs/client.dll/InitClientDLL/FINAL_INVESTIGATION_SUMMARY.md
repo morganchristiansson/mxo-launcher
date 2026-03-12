@@ -148,7 +148,37 @@ All investigation artifacts in `../../docs/client.dll/InitClientDLL/`:
 - `LENGTH_TESTS.md` - Path length experiments
 - `CRASH_TIMING_ANALYSIS.md` - Nested function theory
 - `OVERFLOW_SOURCE_ANALYSIS.md` - Source attribution
+- `RET_BYPASS_HACK.md` - Diagnostic-only `ret` workaround note
 - `NEXT_STEPS.md` - Actionable recommendations
+
+## Addendum: temporary `ret` bypass does not change the diagnosis
+
+A newer practical debugging result is that the visible late crash can be stepped past temporarily by forcing the bad `arg2` landing to execute `ret`.
+That is useful only for reaching later behavior during interactive debugging.
+It does **not** change the core conclusion here:
+
+- the `arg2` crash is still collateral damage
+- the underlying problem is still earlier corruption / bad state
+- the real fix is still reconstructing `arg5` / `arg6` / `arg7`, not teaching argv storage to execute
+
+Newer in-launcher validation tightened this further:
+- with `MXO_ARG2_RET_BYPASS=1`, the simulated `ret` currently pops into stale startup-frame `arg3 hClientDll = 0x62000000`
+- execution then immediately faults at `client.dll+0x3`
+- and no later arg5 traffic becomes visible before that second fault
+
+So even the diagnostic bypass currently reinforces the same conclusion:
+this is a corrupted return chain, not a hidden valid continuation we merely failed to expose.
+
+Newer preserved-frame logging tightened that further by showing the late crash-time stack walking directly through stale saved `InitClientDLL` args (`arg3`, `arg4`, `arg5`, `arg6`, and in non-zero arg7 runs also `arg7`).
+A newer non-zero arg7 probe also showed that later client `+0x40` requests arrive as `selectionIndex=0x05000005` under `arg7=0x0500002a`.
+A fresh static pass now explains that value as a client-side scratch mutation of the original arg7 stack slot at `0x62170dc1..0x62170e59`, and also shows that the client stores the original masked low-24-bit selection id separately through the nearby `0x629e1c7c` / `0x620011e0` path before that mutation.
+Newer follow-up static work now identifies that sink more concretely as the client-side console-int `CreateCharacterWorldIndex`.
+That makes the current split cleaner:
+- masked low-24-bit selection id -> persisted client-owned `CreateCharacterWorldIndex`
+- later mutated arg7 scratch dword -> `arg6->+0x40` lookup key shape
+The diagnostic mediator now accepts the scratch-shaped request, but the late crash still did not move (`crash_60` / `crash_61`, still `EIP=0x003e5e8a`).
+And a newer runtime observation keeps the `CreateCharacterWorldIndex` side interesting rather than dismissing it: the current patched-client crash is visibly happening during the in-game `Loading Character` phase.
+That keeps arg7 / sibling-selection reconstruction as the highest-value unresolved pre-crash target.
 
 ## Final Takeaway
 

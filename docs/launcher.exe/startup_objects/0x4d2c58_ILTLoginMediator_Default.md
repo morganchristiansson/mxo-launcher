@@ -279,10 +279,13 @@ The same `0x62170b00` family also calls `0x62195ff0` / `0x62195f00`, which forma
 - `rl.cfg`
 - `cl.cfg`
 - `mcd.cfg`
+- `cui.cfg`
+- plus profile-root files such as `keymap.cfg` and `aui.cfg`
 
 That materially strengthens the interpretation that:
 
 - `+0x38` is a **profile-root string input** to the client's config-path builder,
+- `+0x40` maps an arg7-derived selection request into a descriptor payload whose fields at `+3` and `+7` feed the `%s_%X` path suffix formatting,
 - `+0xec` is a **selection/config state handoff**,
 - and `+0xf4` is more likely a later accessor for persisted selection/config state than a simple string-returning helper.
 
@@ -333,6 +336,105 @@ At this point the best current read is:
   - still-incomplete arg7 low-24-bit / selection-id state,
   - another launcher-owned client-config expectation inside the same `0x62170b00` / `0x622a39d0` family,
   - or a later ownership/call-path mismatch that still poisons control flow with the current `arg2` pointer.
+
+## New diagnostic tightening after this pass
+
+### 1. Preserved `InitClientDLL` frame now confirms the stale return chain more directly
+
+The launcher now preserves the intended 8-argument `InitClientDLL` frame before the call and compares it against crash-time stack words in the exception logger.
+
+Current late-crash result:
+- on the `arg2+2` crash family, the crash-time stack top now directly matches the preserved startup-frame values in order:
+  - `esp[0] = arg3 hClientDll`
+  - `esp[1] = arg4 hCresDll`
+  - `esp[2] = arg5 launcherNetworkObject`
+  - `esp[3] = arg6 ILTLoginMediatorDefault`
+- in a non-zero arg7 run, `esp[4]` also matched preserved `arg7 packedArg7Selection`
+
+That materially strengthens the current interpretation that the later failure is collapsing into stale `InitClientDLL` startup-frame data rather than reaching a hidden valid continuation.
+
+### 2. Arg7-related mediator probes are now stricter and exposed a more specific `+0x40` scratch shape
+
+The diagnostic mediator no longer generically accepts every in-range world/variant value for the arg7-related surface.
+It now:
+- returns the configured selected world from `+0x3c`
+- exact-matches the configured selected world / variant pair for:
+  - `+0xfc`
+  - `+0x100`
+  - `+0xe4`
+- and now also accepts one specific client-side `+0x40` scratch-shaped request derived from the current configured arg7 state
+- accepts optional diagnostic overrides:
+  - `MXO_MEDIATOR_WORLD_TYPE`
+  - `MXO_MEDIATOR_VARIANT_STATE`
+
+Representative non-zero arg7 run:
+- `MXO_ARG7_SELECTION=0x0500002a`
+- `MXO_MEDIATOR_SELECTION_NAME=Vector`
+- `make run_binder_both`
+- representative dumps from that run family:
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_59.dmp`
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_60.dmp`
+  - both still land at `EIP=0x003e5e8a`
+
+Observed launcher-side sibling-slot phase:
+- `+0xfc(worldIndex=0x2a)` -> `"Vector"`
+- `+0x100(worldIndex=0x2a)` -> `1`
+- `+0xe4(variantIndex=0x05)` -> `0`
+- launcher-side arg7 rebuild still succeeded as:
+  - `a8=0x00000005`
+  - `ac=0x0000002a`
+  - `packed=0x0500002a`
+
+A fresh static pass explains why later client-side `+0x40` calls use:
+- `selectionIndex=0x05000005`
+
+Inside `client.dll:0x62170dc1..0x62170e59`, the client reuses the original arg7 stack slot as scratch storage and:
+- masks low 24 bits into one register,
+- shifts the high 8 bits into another,
+- writes `bl` back into the low byte of `[ebp+0x14]`,
+- then later reloads the full mutated dword from `[ebp+0x14]`.
+
+So `0x0500002a` becomes `0x05000005` before later path-building helpers call `arg6->+0x40`.
+
+Important neighboring detail from the same block:
+- before mutating the arg7 stack slot, the client also stores the original masked low-24-bit selection id separately via `push esi ; mov ecx, 0x629e1c7c ; call 0x620011e0`
+- newer static follow-up now identifies that sink as the client-side console-int `CreateCharacterWorldIndex`
+- so the current best interpretation is that the client expects both:
+  - a stable persisted low-24-bit selection id somewhere else
+  - specifically through that client-owned `0x629e1c7c` state path
+  - and the later scratch-shaped `+0x40` request key
+
+The replacement launcher now accepts that scratch-shaped request diagnostically and returns the configured descriptor with:
+- `mappedName='Vector'`
+- `packedSelectionId=0x00002a`
+- `matchMode=arg7-scratch-shape`
+
+Practical result:
+- this better matches the observed client request shape,
+- but it still did **not** move the late `arg2+2` crash family.
+- a follow-up rerun after adding explicit `selectionContext[0]` logging still remained in the same family:
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_61.dmp`
+  - `EIP=0x003e5e8a`
+
+### 3. `+0xec` logging is now richer
+
+`MediatorStub::ConsumeSelectionContext(+0xec)` now logs:
+- the full copied `0xb4` word buffer
+- the configured world / variant / profile inputs active for that handoff
+- printable ASCII candidate scans inside the copied object
+
+Representative non-zero arg7 result from that same run:
+- first dword in the copied `0xb4` object changed to `0x00000005`
+- runtime log now confirms it directly:
+  - `DIAGNOSTIC: selectionContext[0]=0x00000005 (configuredVariant=0x05 configuredWorld=0x00002a)`
+- a newer static pass now explains that field:
+  - at `client.dll:0x62170de2..0x62170e3b`, the client zero-extends the arg7 high-8-bit variant value into `esi`
+  - and stores that value into the first dword of the `+0xec` handoff object before the path-building helper sequence
+- no printable ASCII strings were found in the copied object itself
+
+So the current `+0xec` object is not just "some paths blob":
+- its first dword now looks like the current variant/high-8 selector,
+- and later fields are built from selection-specific config helpers rooted under `Profiles\%s\%s_%X\`.
 
 ## Decision for reimplementation direction
 

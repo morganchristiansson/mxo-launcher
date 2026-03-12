@@ -62,21 +62,21 @@ struct MinimalLauncherObjectStub {
 };
 
 struct DiagnosticIntrusiveListHead {
-    unsigned char firstByte;
+    unsigned char colorOrFlag;  // +0x00 RB-tree/list sentinel byte
     unsigned char padding[3];
-    uint32_t count;
-    void* next;
-    void* prev;
-    unsigned char payload[0x14];
+    void* root;                 // +0x04 root node pointer (NULL in ctor)
+    void* first;                // +0x08 first/list-next sentinel link (self in ctor)
+    void* last;                 // +0x0c last/list-prev sentinel link (self in ctor)
+    unsigned char keyAndPayload[0x14];
 };
 
 struct DiagnosticIntrusiveListHeadSmall {
-    unsigned char firstByte;
+    unsigned char colorOrFlag;  // +0x00 RB-tree/list sentinel byte
     unsigned char padding[3];
-    uint32_t count;
-    void* next;
-    void* prev;
-    unsigned char payload[0x8];
+    void* root;                 // +0x04 root node pointer (NULL in ctor)
+    void* first;                // +0x08 first/list-next sentinel link (self in ctor)
+    void* last;                 // +0x0c last/list-prev sentinel link (self in ctor)
+    unsigned char keyAndPayload[0x8];
 };
 
 struct DiagnosticLauncherObjectBuildState {
@@ -86,6 +86,12 @@ struct DiagnosticLauncherObjectBuildState {
     uint32_t slot2CallCount;
     uint32_t slot3CallCount;
     uint32_t slot4CallCount;
+    uint32_t slot5CallCount;
+    uint32_t slot6CallCount;
+    uint32_t slot7CallCount;
+    uint32_t slot8CallCount;
+    uint32_t slot9CallCount;
+    uint32_t slot10CallCount;
     uint32_t slot11CallCount;
     uint32_t slot12CallCount;
     uint32_t subobject5CSlot0CallCount;
@@ -175,6 +181,8 @@ static uint32_t g_MediatorWorldUpperBoundExclusive = 1;
 static uint32_t g_MediatorVariantUpperBoundExclusive = 1;
 static uint32_t g_MediatorSelectedWorldIndexLow24 = 0;
 static uint32_t g_MediatorSelectedVariantIndexHigh8 = 0;
+static uint32_t g_MediatorSelectedWorldType = 1;
+static uint32_t g_MediatorSelectedVariantState = 0;
 static uint32_t g_MediatorMappedSelectionId = 0;
 static const char* g_MediatorMappedSelectionName = g_MediatorStringC;
 static const char* g_MediatorMappedVariantName = g_MediatorStringC;
@@ -229,6 +237,82 @@ static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCou
     }
 }
 
+static void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
+    if (!label || !ptr || byteCount == 0) {
+        return;
+    }
+
+    const uint32_t* words = static_cast<const uint32_t*>(ptr);
+    const uint32_t wordCount = byteCount / 4;
+    for (uint32_t i = 0; i < wordCount; i += 4) {
+        Log(
+            "%s @ %p [+0x%02x]=%08x [+0x%02x]=%08x [+0x%02x]=%08x [+0x%02x]=%08x",
+            label,
+            ptr,
+            (unsigned)(i * 4),
+            words[i + 0],
+            (unsigned)((i + 1) * 4),
+            (i + 1 < wordCount) ? words[i + 1] : 0,
+            (unsigned)((i + 2) * 4),
+            (i + 2 < wordCount) ? words[i + 2] : 0,
+            (unsigned)((i + 3) * 4),
+            (i + 3 < wordCount) ? words[i + 3] : 0);
+    }
+}
+
+static bool IsMostlyPrintableAscii(const unsigned char* data, uint32_t length) {
+    if (!data || length < 4) return false;
+    for (uint32_t i = 0; i < length; ++i) {
+        const unsigned char c = data[i];
+        if (c < 0x20 || c > 0x7e) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static void LogSelectionContextDetails(const void* selectionContext, uint32_t byteCount) {
+    if (!selectionContext || byteCount == 0) {
+        return;
+    }
+
+    LogWordBuffer("SelectionContext words", selectionContext, byteCount);
+
+    const unsigned char* bytes = static_cast<const unsigned char*>(selectionContext);
+    bool loggedAnyString = false;
+    for (uint32_t i = 0; i < byteCount;) {
+        if (bytes[i] == '\0') {
+            ++i;
+            continue;
+        }
+
+        uint32_t j = i;
+        while (j < byteCount && bytes[j] != '\0' && bytes[j] >= 0x20 && bytes[j] <= 0x7e) {
+            ++j;
+        }
+
+        if (j > i && j < byteCount && IsMostlyPrintableAscii(bytes + i, j - i)) {
+            char buffer[128] = {0};
+            const uint32_t copyLength = ((j - i) < (sizeof(buffer) - 1)) ? (j - i) : (sizeof(buffer) - 1);
+            std::memcpy(buffer, bytes + i, copyLength);
+            buffer[copyLength] = '\0';
+            Log(
+                "SelectionContext ascii candidate [+0x%02x] = '%s'",
+                (unsigned)i,
+                buffer);
+            loggedAnyString = true;
+            i = j + 1;
+            continue;
+        }
+
+        ++i;
+    }
+
+    if (!loggedAnyString) {
+        Log("SelectionContext ascii candidate scan: none");
+    }
+}
+
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
     std::memset(&g_MediatorSelectionObject, 0, sizeof(g_MediatorSelectionObject));
@@ -238,6 +322,8 @@ static void ResetMediatorObjectState() {
     g_MediatorVariantUpperBoundExclusive = 1;
     g_MediatorSelectedWorldIndexLow24 = 0;
     g_MediatorSelectedVariantIndexHigh8 = 0;
+    g_MediatorSelectedWorldType = 1;
+    g_MediatorSelectedVariantState = 0;
     g_MediatorMappedSelectionId = 0;
     g_MediatorMappedSelectionName = g_MediatorStringC;
     g_MediatorMappedVariantName = g_MediatorStringC;
@@ -294,8 +380,14 @@ static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* 
     return g_MediatorProfileName;
 }
 
+static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex);
+static bool DiagnosticMediatorVariantIndexMatchesConfiguredSelection(uint32_t variantIndex);
+
 static const char* DiagnosticMediatorWorldNameForIndex(uint32_t worldIndex) {
     if (worldIndex >= g_MediatorWorldUpperBoundExclusive) {
+        return NULL;
+    }
+    if (!DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex)) {
         return NULL;
     }
     return g_MediatorMappedSelectionName;
@@ -305,39 +397,88 @@ static const char* DiagnosticMediatorVariantNameForIndex(uint32_t variantIndex) 
     if (variantIndex >= g_MediatorVariantUpperBoundExclusive) {
         return NULL;
     }
+    if (!DiagnosticMediatorVariantIndexMatchesConfiguredSelection(variantIndex)) {
+        return NULL;
+    }
     return g_MediatorMappedVariantName;
+}
+
+static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex) {
+    return worldIndex == g_MediatorSelectedWorldIndexLow24;
+}
+
+static bool DiagnosticMediatorVariantIndexMatchesConfiguredSelection(uint32_t variantIndex) {
+    return variantIndex == g_MediatorSelectedVariantIndexHigh8;
+}
+
+static uint32_t DiagnosticMediatorExpectedSelectionDescriptorScratchRequest() {
+    // client.dll:62170dc1..62170e59 reuses the original arg7 stack slot as scratch,
+    // then stores only BL back into its low byte before later reloading the full dword
+    // for the +0x40 selection-descriptor path.
+    const uint32_t variantHigh8 = (g_MediatorSelectedVariantIndexHigh8 & 0xffu) << 24;
+    const uint32_t preservedMiddle16 = g_MediatorSelectedWorldIndexLow24 & 0x00ffff00u;
+    const uint32_t lowByteOverwrittenWithVariant = g_MediatorSelectedVariantIndexHigh8 & 0xffu;
+    return variantHigh8 | preservedMiddle16 | lowByteOverwrittenWithVariant;
+}
+
+static bool DiagnosticMediatorSelectionDescriptorMatchesConfiguredRequest(uint32_t selectionIndex) {
+    const uint32_t normalizedSelectionIndex = selectionIndex & 0xffffffffu;
+    if ((normalizedSelectionIndex & 0x00ffffffu) == g_MediatorSelectedWorldIndexLow24) {
+        return true;
+    }
+    return normalizedSelectionIndex == DiagnosticMediatorExpectedSelectionDescriptorScratchRequest();
 }
 
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::GetDefaultSelectionIndex() -> 0");
-    return 0;
+    Log(
+        "MediatorStub::GetDefaultSelectionIndex() -> 0x%06x",
+        (unsigned)g_MediatorSelectedWorldIndexLow24);
+    return g_MediatorSelectedWorldIndexLow24;
 }
 
 static uint32_t g_GetSelectionCallCount = 0;
 static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub* self, uint32_t selectionIndex) {
     (void)self;
 
-    const char* worldName = DiagnosticMediatorWorldNameForIndex(selectionIndex);
+    const uint32_t low24 = selectionIndex & 0x00ffffffu;
+    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
+    const uint32_t expectedScratchRequest = DiagnosticMediatorExpectedSelectionDescriptorScratchRequest();
+    const bool matchedConfiguredRequest = DiagnosticMediatorSelectionDescriptorMatchesConfiguredRequest(selectionIndex);
+    const char* worldName = matchedConfiguredRequest ? g_MediatorMappedSelectionName : NULL;
+
     if (!worldName) {
         Log(
-            "MediatorStub::GetSelectionDescriptor(selectionIndex=%u) -> NULL (worldUpperBoundExclusive=%u)",
+            "MediatorStub::GetSelectionDescriptor(selectionIndex=0x%08x low24=0x%06x high8=0x%02x) -> NULL (configuredWorld=0x%06x configuredVariant=0x%02x expectedScratchRequest=0x%08x worldUpperBoundExclusive=%u)",
             (unsigned)selectionIndex,
+            (unsigned)low24,
+            (unsigned)high8,
+            (unsigned)g_MediatorSelectedWorldIndexLow24,
+            (unsigned)g_MediatorSelectedVariantIndexHigh8,
+            (unsigned)expectedScratchRequest,
             (unsigned)g_MediatorWorldUpperBoundExclusive);
         return NULL;
     }
 
     g_MediatorSelectionPacked.mappedName = worldName;
-    g_MediatorSelectionPacked.selectionId = selectionIndex & 0x00ffffffu;
+    g_MediatorSelectionPacked.selectionId = g_MediatorMappedSelectionId;
     g_MediatorSelectionObject.packed = &g_MediatorSelectionPacked;
 
+    const char* matchMode =
+        (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
+        ((low24 == g_MediatorSelectedWorldIndexLow24) ? "low24-world-match" : "other-match");
     Log(
-        "MediatorStub::GetSelectionDescriptor(selectionIndex=%u) -> %p (mappedName='%s' packedSelectionId=0x%06x selectedWorld=0x%06x)",
+        "MediatorStub::GetSelectionDescriptor(selectionIndex=0x%08x low24=0x%06x high8=0x%02x) -> %p (matchMode=%s mappedName='%s' packedSelectionId=0x%06x configuredWorld=0x%06x configuredVariant=0x%02x expectedScratchRequest=0x%08x)",
         (unsigned)selectionIndex,
+        (unsigned)low24,
+        (unsigned)high8,
         &g_MediatorSelectionObject,
+        matchMode,
         worldName,
         (unsigned)g_MediatorSelectionPacked.selectionId,
-        (unsigned)g_MediatorSelectedWorldIndexLow24);
+        (unsigned)g_MediatorSelectedWorldIndexLow24,
+        (unsigned)g_MediatorSelectedVariantIndexHigh8,
+        (unsigned)expectedScratchRequest);
     return &g_MediatorSelectionObject;
 }
 
@@ -406,30 +547,41 @@ static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorS
     ++g_GetSelectionCallCount;
   if (g_GetSelectionCallCount % 5 == 0) { Log("DIAGNOSTIC: GetSelectionDescriptor count = %u", g_GetSelectionCallCount); }
   const char* worldName = DiagnosticMediatorWorldNameForIndex(g_MediatorSelectedWorldIndexLow24);
-    if (!worldName || variantIndex >= g_MediatorVariantUpperBoundExclusive) {
+    if (!worldName ||
+        variantIndex >= g_MediatorVariantUpperBoundExclusive ||
+        !DiagnosticMediatorVariantIndexMatchesConfiguredSelection(variantIndex)) {
         Log(
-            "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=%u) -> NULL (world='%s' variantUpperBoundExclusive=%u)",
-            (unsigned)variantIndex,
+            "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x%02x) -> NULL (world='%s' configuredVariant=0x%02x variantUpperBoundExclusive=%u)",
+            (unsigned)(variantIndex & 0xffu),
             worldName ? worldName : "<null>",
+            (unsigned)g_MediatorSelectedVariantIndexHigh8,
             (unsigned)g_MediatorVariantUpperBoundExclusive);
         return NULL;
     }
 
     Log(
-        "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=%u) -> '%s'",
-        (unsigned)variantIndex,
+        "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x%02x) -> '%s'",
+        (unsigned)(variantIndex & 0xffu),
         worldName);
     return worldName;
 }
 
 static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* self, int32_t variantIndex) {
     (void)self;
-    const uint32_t state =
-        (variantIndex >= 0 && static_cast<uint32_t>(variantIndex) < g_MediatorVariantUpperBoundExclusive) ? 0u : 3u;
+    uint32_t state = 3u;
+    if (variantIndex >= 0) {
+        const uint32_t unsignedVariantIndex = static_cast<uint32_t>(variantIndex);
+        if (unsignedVariantIndex < g_MediatorVariantUpperBoundExclusive &&
+            DiagnosticMediatorVariantIndexMatchesConfiguredSelection(unsignedVariantIndex)) {
+            state = g_MediatorSelectedVariantState;
+        }
+    }
     Log(
-        "MediatorStub::GetVariantState(+0xe4 variantIndex=%d) -> %u",
+        "MediatorStub::GetVariantState(+0xe4 variantIndex=%d) -> %u (configuredVariant=0x%02x configuredState=%u)",
         (int)variantIndex,
-        (unsigned)state);
+        (unsigned)state,
+        (unsigned)g_MediatorSelectedVariantIndexHigh8,
+        (unsigned)g_MediatorSelectedVariantState);
     return state;
 }
 
@@ -447,38 +599,53 @@ static const char* __thiscall Mediator_GetWorldNameByIndex(MinimalLoginMediatorS
   if (g_GetSelectionCallCount % 5 == 0) { Log("DIAGNOSTIC: GetSelectionDescriptor count = %u", g_GetSelectionCallCount); }
   const char* worldName = DiagnosticMediatorWorldNameForIndex(worldIndex);
     Log(
-        "MediatorStub::GetWorldNameByIndex(+0xfc worldIndex=%u) -> %s",
-        (unsigned)worldIndex,
-        worldName ? worldName : "<null>");
+        "MediatorStub::GetWorldNameByIndex(+0xfc worldIndex=0x%06x) -> %s (configuredWorld=0x%06x)",
+        (unsigned)(worldIndex & 0x00ffffffu),
+        worldName ? worldName : "<null>",
+        (unsigned)g_MediatorSelectedWorldIndexLow24);
     return worldName;
 }
 
 static uint32_t __thiscall Mediator_GetWorldTypeByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const uint32_t worldType = (worldIndex < g_MediatorWorldUpperBoundExclusive) ? 1u : 0u;
+    const uint32_t worldType =
+        (worldIndex < g_MediatorWorldUpperBoundExclusive &&
+         DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
+            ? g_MediatorSelectedWorldType
+            : 0u;
     Log(
-        "MediatorStub::GetWorldTypeByIndex(+0x100 worldIndex=%u) -> %u",
-        (unsigned)worldIndex,
-        (unsigned)worldType);
+        "MediatorStub::GetWorldTypeByIndex(+0x100 worldIndex=0x%06x) -> %u (configuredWorld=0x%06x configuredType=%u)",
+        (unsigned)(worldIndex & 0x00ffffffu),
+        (unsigned)worldType,
+        (unsigned)g_MediatorSelectedWorldIndexLow24,
+        (unsigned)g_MediatorSelectedWorldType);
     return worldType;
 }
 
 static uint32_t __thiscall Mediator_GetWorldFlag104(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const uint32_t flagValue = (worldIndex < g_MediatorWorldUpperBoundExclusive) ? 0u : 0u;
+    const uint32_t flagValue =
+        (worldIndex < g_MediatorWorldUpperBoundExclusive &&
+         DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
+            ? 0u
+            : 0u;
     Log(
-        "MediatorStub::GetWorldFlag104(+0x104 worldIndex=%u) -> %u",
-        (unsigned)worldIndex,
+        "MediatorStub::GetWorldFlag104(+0x104 worldIndex=0x%06x) -> %u",
+        (unsigned)(worldIndex & 0x00ffffffu),
         (unsigned)flagValue);
     return flagValue;
 }
 
 static const char* __thiscall Mediator_GetWorldExtra108(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const char* value = (worldIndex < g_MediatorWorldUpperBoundExclusive) ? g_MediatorMappedVariantName : NULL;
+    const char* value =
+        (worldIndex < g_MediatorWorldUpperBoundExclusive &&
+         DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
+            ? g_MediatorMappedVariantName
+            : NULL;
     Log(
-        "MediatorStub::GetWorldExtra108(+0x108 worldIndex=%u) -> %s",
-        (unsigned)worldIndex,
+        "MediatorStub::GetWorldExtra108(+0x108 worldIndex=0x%06x) -> %s",
+        (unsigned)(worldIndex & 0x00ffffffu),
         value ? value : "<null>");
     return value;
 }
@@ -501,14 +668,25 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
     }
     ++g_MediatorRuntimeState.selection0ecCount;
     Log(
-        "MediatorStub::ConsumeSelectionContext(%p) [count=%u caller=%p copied=%p size=0x%lx valid=%u]",
+        "MediatorStub::ConsumeSelectionContext(%p) [count=%u caller=%p copied=%p size=0x%lx valid=%u configuredWorld=0x%06x configuredVariant=0x%02x profile='%s' world='%s']",
         selectionContext,
         (unsigned)g_MediatorRuntimeState.selection0ecCount,
         returnAddress,
         &g_MediatorSelectionContextCopy,
         (unsigned long)sizeof(g_MediatorSelectionContextCopy),
-        g_MediatorSelectionContextCopyValid ? 1u : 0u);
+        g_MediatorSelectionContextCopyValid ? 1u : 0u,
+        (unsigned)g_MediatorSelectedWorldIndexLow24,
+        (unsigned)g_MediatorSelectedVariantIndexHigh8,
+        g_MediatorProfileName,
+        g_MediatorMappedSelectionName);
     LogPointerWords("ConsumeSelectionContext copied", &g_MediatorSelectionContextCopy, 8);
+    const uint32_t* copiedWords = reinterpret_cast<const uint32_t*>(&g_MediatorSelectionContextCopy);
+    Log(
+        "DIAGNOSTIC: selectionContext[0]=0x%08x (configuredVariant=0x%02x configuredWorld=0x%06x)",
+        (unsigned)copiedWords[0],
+        (unsigned)g_MediatorSelectedVariantIndexHigh8,
+        (unsigned)g_MediatorSelectedWorldIndexLow24);
+    LogSelectionContextDetails(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
 }
 
 __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
@@ -645,6 +823,7 @@ static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediato
         g_MediatorSelectionContextCopyValid ? 1u : 0u,
         g_MediatorRuntimeState.selectionContext0ec);
     LogPointerWords("GetSelectionContextSnapshot copy", &g_MediatorSelectionContextCopy, 8);
+    LogSelectionContextDetails(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
     return &g_MediatorSelectionContextCopy;
 }
 
@@ -696,19 +875,19 @@ static uint32_t __thiscall Mediator_ShouldExportB(MinimalLoginMediatorStub* self
 static void InitializeDiagnosticIntrusiveListHead(DiagnosticIntrusiveListHead* head) {
     if (!head) return;
     std::memset(head, 0, sizeof(*head));
-    head->firstByte = 0;
-    head->count = 0;
-    head->next = head;
-    head->prev = head;
+    head->colorOrFlag = 0;
+    head->root = NULL;
+    head->first = head;
+    head->last = head;
 }
 
 static void InitializeDiagnosticIntrusiveListHeadSmall(DiagnosticIntrusiveListHeadSmall* head) {
     if (!head) return;
     std::memset(head, 0, sizeof(*head));
-    head->firstByte = 0;
-    head->count = 0;
-    head->next = head;
-    head->prev = head;
+    head->colorOrFlag = 0;
+    head->root = NULL;
+    head->first = head;
+    head->last = head;
 }
 
 struct DiagnosticLauncherQueuePair {
@@ -1003,6 +1182,122 @@ static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
     return 0;
 }
 
+static uint32_t __thiscall LauncherObject_Slot5_431840(
+    MinimalLauncherObjectStub* self,
+    void* arg1,
+    uint32_t* out0,
+    void* arg3) {
+    ++g_LauncherObjectBuildState.slot5CallCount;
+    if (out0) *out0 = 0;
+
+    const DiagnosticIntrusiveListHead* list80 =
+        self ? static_cast<const DiagnosticIntrusiveListHead*>(self->list80) : NULL;
+    const bool listLooksEmpty =
+        !self || !list80 || !list80->root || list80->first == list80;
+
+    Log(
+        "LauncherObjectStub::Slot5_431840(self=%p arg1=%p out0=%p arg3=%p root=%p first=%p last=%p empty=%u) [count=%u]",
+        self,
+        arg1,
+        out0,
+        arg3,
+        list80 ? list80->root : NULL,
+        list80 ? list80->first : NULL,
+        list80 ? list80->last : NULL,
+        listLooksEmpty ? 1u : 0u,
+        (unsigned)g_LauncherObjectBuildState.slot5CallCount);
+    LogPointerWords("LauncherObject slot5 self", self, 8);
+
+    if (listLooksEmpty) {
+        Log("LauncherObjectStub::Slot5_431840 -> faithful empty-list80 miss path (return 0x7000004, out0=0)");
+        return 0x7000004u;
+    }
+
+    Log("LauncherObjectStub::Slot5_431840 -> non-empty list80 not reconstructed yet, returning neutral 0");
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot6_4328A0(
+    MinimalLauncherObjectStub* self,
+    void* arg1) {
+    ++g_LauncherObjectBuildState.slot6CallCount;
+    Log(
+        "LauncherObjectStub::Slot6_4328A0(self=%p arg1=%p) [count=%u]",
+        self,
+        arg1,
+        (unsigned)g_LauncherObjectBuildState.slot6CallCount);
+    LogPointerWords("LauncherObject slot6 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot7_42F970(
+    MinimalLauncherObjectStub* self,
+    void* arg1,
+    uint32_t arg2) {
+    ++g_LauncherObjectBuildState.slot7CallCount;
+    Log(
+        "LauncherObjectStub::Slot7_42F970(self=%p arg1=%p arg2=0x%08x) [count=%u]",
+        self,
+        arg1,
+        (unsigned)arg2,
+        (unsigned)g_LauncherObjectBuildState.slot7CallCount);
+    LogPointerWords("LauncherObject slot7 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot8_42FBD0(
+    MinimalLauncherObjectStub* self,
+    void* arg1,
+    void* arg2,
+    void* arg3,
+    void* arg4) {
+    ++g_LauncherObjectBuildState.slot8CallCount;
+    Log(
+        "LauncherObjectStub::Slot8_42FBD0(self=%p arg1=%p arg2=%p arg3=%p arg4=%p) [count=%u]",
+        self,
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        (unsigned)g_LauncherObjectBuildState.slot8CallCount);
+    LogPointerWords("LauncherObject slot8 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot9_42FD10(
+    MinimalLauncherObjectStub* self,
+    void* arg1,
+    void* arg2,
+    void* arg3,
+    void* arg4,
+    void* arg5) {
+    ++g_LauncherObjectBuildState.slot9CallCount;
+    Log(
+        "LauncherObjectStub::Slot9_42FD10(self=%p arg1=%p arg2=%p arg3=%p arg4=%p arg5=%p) [count=%u]",
+        self,
+        arg1,
+        arg2,
+        arg3,
+        arg4,
+        arg5,
+        (unsigned)g_LauncherObjectBuildState.slot9CallCount);
+    LogPointerWords("LauncherObject slot9 self", self, 8);
+    return 0;
+}
+
+static uint32_t __thiscall LauncherObject_Slot10_443810(
+    MinimalLauncherObjectStub* self,
+    void* arg1) {
+    ++g_LauncherObjectBuildState.slot10CallCount;
+    Log(
+        "LauncherObjectStub::Slot10_443810(self=%p arg1=%p) [count=%u]",
+        self,
+        arg1,
+        (unsigned)g_LauncherObjectBuildState.slot10CallCount);
+    LogPointerWords("LauncherObject slot10 self", self, 8);
+    return 0;
+}
+
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self);
 static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self);
 static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self);
@@ -1032,12 +1327,29 @@ static uint32_t __thiscall LauncherObject_Slot12_4316A0(
     void* arg1) {
     ++g_LauncherObjectBuildState.slot12CallCount;
     LauncherObject_Subobject98_Slot0(&self->helper98);
+
+    const DiagnosticIntrusiveListHeadSmall* list8C =
+        self ? static_cast<const DiagnosticIntrusiveListHeadSmall*>(self->list8C) : NULL;
+    const bool listLooksEmpty =
+        !self || !list8C || !list8C->root || list8C->first == list8C;
+
     Log(
-        "LauncherObjectStub::Slot12_4316A0(self=%p arg1=%p) [count=%u]",
+        "LauncherObjectStub::Slot12_4316A0(self=%p arg1=%p root=%p first=%p last=%p empty=%u) [count=%u]",
         self,
         arg1,
+        list8C ? list8C->root : NULL,
+        list8C ? list8C->first : NULL,
+        list8C ? list8C->last : NULL,
+        listLooksEmpty ? 1u : 0u,
         (unsigned)g_LauncherObjectBuildState.slot12CallCount);
     LogPointerWords("LauncherObject slot12 self", self, 8);
+
+    if (listLooksEmpty) {
+        Log("LauncherObjectStub::Slot12_4316A0 -> faithful empty-list8C fast path, returning 0 after helper unlock");
+    } else {
+        Log("LauncherObjectStub::Slot12_4316A0 -> non-empty list8C teardown path not reconstructed yet, returning neutral 0");
+    }
+
     LauncherObject_Subobject98_Slot1(&self->helper98);
     return 0;
 }
@@ -1215,6 +1527,12 @@ static void InitializeLauncherObjectStub() {
     g_LauncherObjectVtable[2] = (void*)LauncherObject_Slot2_4325D0;   // 0x4325d0
     g_LauncherObjectVtable[3] = (void*)LauncherObject_Slot3_436000;   // 0x436000
     g_LauncherObjectVtable[4] = (void*)LauncherObject_Slot4_42F7C0;   // 0x42f7c0
+    g_LauncherObjectVtable[5] = (void*)LauncherObject_Slot5_431840;   // 0x431840
+    g_LauncherObjectVtable[6] = (void*)LauncherObject_Slot6_4328A0;   // 0x4328a0
+    g_LauncherObjectVtable[7] = (void*)LauncherObject_Slot7_42F970;   // 0x42f970
+    g_LauncherObjectVtable[8] = (void*)LauncherObject_Slot8_42FBD0;   // 0x42fbd0
+    g_LauncherObjectVtable[9] = (void*)LauncherObject_Slot9_42FD10;   // 0x42fd10
+    g_LauncherObjectVtable[10] = (void*)LauncherObject_Slot10_443810; // 0x443810
     g_LauncherObjectVtable[11] = (void*)LauncherObject_Slot11_431670; // 0x431670
     g_LauncherObjectVtable[12] = (void*)LauncherObject_Slot12_4316A0; // 0x4316a0
     g_LauncherObjectSubVtable5C[0] = (void*)LauncherObject_Subobject5C_Slot0; // base +0x5c helper slot 0x435f90
@@ -1373,7 +1691,7 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
         sizeof(MinimalLauncherObjectStub),
         (unsigned)g_LauncherObjectBuildState.buildGeneration);
     Log(
-        "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x0c/+0x34 faithful queue skeletons initialized +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to faithful placeholders, vtable slots 0-4 now mapped to logging probes with original function indices");
+        "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x0c/+0x34 faithful queue skeletons initialized +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to faithful placeholders, full primary 13-slot vtable surface now exposed; slot5 models the proven empty-list80 miss path and slot10 matches the original zero-return stub");
     LogPointerWords("LauncherObject self", object, 8);
     LogPointerWords("LauncherObject queue0C", &object->queue0C, 8);
     LogPointerWords("LauncherObject queue34", &object->queue34, 8);
@@ -1433,11 +1751,15 @@ void DiagnosticConfigureMediatorSelection(
     const char* mappedSelectionName,
     const char* mappedVariantName,
     uint32_t selectedWorldIndexLow24,
-    uint32_t selectedVariantIndexHigh8) {
+    uint32_t selectedVariantIndexHigh8,
+    uint32_t selectedWorldType,
+    uint32_t selectedVariantState) {
     g_MediatorWorldUpperBoundExclusive = worldUpperBoundExclusive ? worldUpperBoundExclusive : 1;
     g_MediatorVariantUpperBoundExclusive = variantUpperBoundExclusive ? variantUpperBoundExclusive : 1;
     g_MediatorSelectedWorldIndexLow24 = selectedWorldIndexLow24 & 0x00ffffffu;
     g_MediatorSelectedVariantIndexHigh8 = selectedVariantIndexHigh8 & 0xffu;
+    g_MediatorSelectedWorldType = selectedWorldType;
+    g_MediatorSelectedVariantState = selectedVariantState;
     g_MediatorMappedSelectionId = g_MediatorSelectedWorldIndexLow24;
     g_MediatorMappedSelectionName =
         (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : g_MediatorStringC;
@@ -1447,13 +1769,15 @@ void DiagnosticConfigureMediatorSelection(
     g_MediatorSelectionPacked.selectionId = g_MediatorMappedSelectionId;
 
     Log(
-        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive=%u variantUpperBoundExclusive=%u worldName='%s' variantName='%s' selectedWorldLow24=0x%06x selectedVariantHigh8=0x%02x",
+        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive=%u variantUpperBoundExclusive=%u worldName='%s' variantName='%s' selectedWorldLow24=0x%06x selectedVariantHigh8=0x%02x selectedWorldType=%u selectedVariantState=%u",
         (unsigned)g_MediatorWorldUpperBoundExclusive,
         (unsigned)g_MediatorVariantUpperBoundExclusive,
         g_MediatorMappedSelectionName,
         g_MediatorMappedVariantName,
         (unsigned)g_MediatorSelectedWorldIndexLow24,
-        (unsigned)g_MediatorSelectedVariantIndexHigh8);
+        (unsigned)g_MediatorSelectedVariantIndexHigh8,
+        (unsigned)g_MediatorSelectedWorldType,
+        (unsigned)g_MediatorSelectedVariantState);
 }
 
 bool DiagnosticResolveLauncherSelectionFromMediator(

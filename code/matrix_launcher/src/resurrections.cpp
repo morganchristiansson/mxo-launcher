@@ -139,13 +139,21 @@ struct DiagnosticPreclientEnvironmentState {
     void* readyPointer48;
 };
 
+struct DiagnosticInitClientFrameSnapshot {
+    bool valid;
+    uint32_t args[8];
+};
+
 static DiagnosticPreclientEnvironmentState g_PreclientEnvironment = {};
+static DiagnosticInitClientFrameSnapshot g_InitClientFrameSnapshot = {};
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase);
 void Log(const char* fmt, ...);
 
 static void LogWordSpan(const char* label, const void* base, size_t wordCount);
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo);
+static bool EnvFlagEnabled(const char* name);
+static bool EnvUint32Value(const char* name, uint32_t* outValue);
 
 template <typename T>
 static T ResolveProc(HMODULE module, const char* name) {
@@ -185,6 +193,66 @@ static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
     }
 }
 
+static const char* InitClientArgName(size_t index) {
+    switch (index) {
+        case 0: return "arg1 filteredArgCount";
+        case 1: return "arg2 filteredArgv";
+        case 2: return "arg3 hClientDll";
+        case 3: return "arg4 hCresDll";
+        case 4: return "arg5 launcherNetworkObject";
+        case 5: return "arg6 ILTLoginMediatorDefault";
+        case 6: return "arg7 packedArg7Selection";
+        case 7: return "arg8 flagByte";
+        default: return NULL;
+    }
+}
+
+static void CaptureInitClientFrameSnapshot() {
+    g_InitClientFrameSnapshot.valid = true;
+    g_InitClientFrameSnapshot.args[0] = g_FilteredArgCount;
+    g_InitClientFrameSnapshot.args[1] = reinterpret_cast<uint32_t>(g_FilteredArgv);
+    g_InitClientFrameSnapshot.args[2] = reinterpret_cast<uint32_t>(g_hClient);
+    g_InitClientFrameSnapshot.args[3] = reinterpret_cast<uint32_t>(g_hCres);
+    g_InitClientFrameSnapshot.args[4] = reinterpret_cast<uint32_t>(g_pLauncherObject6304);
+    g_InitClientFrameSnapshot.args[5] = reinterpret_cast<uint32_t>(g_pILTLoginMediatorDefault);
+    g_InitClientFrameSnapshot.args[6] = g_PackedArg7Selection;
+    g_InitClientFrameSnapshot.args[7] = g_FlagByte;
+
+    Log("DIAGNOSTIC: preserved InitClientDLL argument frame snapshot");
+    for (size_t i = 0; i < 8; ++i) {
+        Log(
+            "  %s = %08x",
+            InitClientArgName(i),
+            (unsigned)g_InitClientFrameSnapshot.args[i]);
+    }
+}
+
+static void LogCrashStackVsInitFrame(uint32_t crashEsp) {
+    if (!g_InitClientFrameSnapshot.valid || crashEsp == 0) return;
+
+    Log("DIAGNOSTIC: comparing crash stack against preserved InitClientDLL argument frame");
+    for (size_t i = 0; i < 8; ++i) {
+        Log(
+            "  saved %s = %08x",
+            InitClientArgName(i),
+            (unsigned)g_InitClientFrameSnapshot.args[i]);
+    }
+
+    const uint32_t* stackWords = reinterpret_cast<const uint32_t*>(crashEsp);
+    for (size_t stackIndex = 0; stackIndex < 8; ++stackIndex) {
+        const uint32_t value = stackWords[stackIndex];
+        for (size_t argIndex = 0; argIndex < 8; ++argIndex) {
+            if (value != 0 && value == g_InitClientFrameSnapshot.args[argIndex]) {
+                Log(
+                    "  crash esp[%u] = %08x matches %s",
+                    (unsigned)stackIndex,
+                    (unsigned)value,
+                    InitClientArgName(argIndex));
+            }
+        }
+    }
+}
+
 static void DiagnosticSnapshotArgvMemory() {
   if (!g_FilteredArgv || !g_FilteredArgvOwned) return;
   // Take a snapshot of argv array memory for post-crash analysis
@@ -194,6 +262,8 @@ static void DiagnosticSnapshotArgvMemory() {
                   : (g_FilteredArgCount + 2) * sizeof(char*));
   g_ArgvSnapshotValid = true;
 }
+
+static uint32_t g_Arg2RetBypassCount = 0;
 
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
     if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
@@ -244,7 +314,8 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
             (unsigned long)mbi.Type);
     }
 
-    LogWordSpan("crash stack", reinterpret_cast<const void*>(context->Esp), 8);
+    LogWordSpan("crash stack", reinterpret_cast<const void*>(context->Esp), 16);
+    LogCrashStackVsInitFrame(context->Esp);
     if (g_FilteredArgv) {
         LogWordSpan("current arg2 filteredArgv", g_FilteredArgv, 4);
 
@@ -272,6 +343,43 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
     if (g_LastMediatorMethod) {
       Log("last mediator method: %s (call#%u, self=%p)",
           g_LastMediatorMethod, g_LastMediatorCallCount, g_LastMediatorSelf);
+    }
+
+    if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+        record->NumberParameters >= 2 &&
+        g_FilteredArgv) {
+      uintptr_t eip = static_cast<uintptr_t>(context->Eip);
+      uintptr_t argvStart = reinterpret_cast<uintptr_t>(g_FilteredArgv);
+      size_t argvSize = (g_FilteredArgCount + 1) * sizeof(char*);
+      if (eip >= argvStart && eip < argvStart + argvSize && EnvFlagEnabled("MXO_ARG2_RET_BYPASS")) {
+        uint32_t maxBypasses = 1;
+        EnvUint32Value("MXO_ARG2_RET_BYPASS_MAX", &maxBypasses);
+        if (g_Arg2RetBypassCount < maxBypasses) {
+          uint32_t* stackTop = reinterpret_cast<uint32_t*>(context->Esp);
+          if (stackTop) {
+            uint32_t returnTarget = *stackTop;
+            Log(
+                "DIAGNOSTIC: ARG2 RET BYPASS #%u/%u at eip=%p argv+0x%zx avKind=%llu -> simulating ret to %p (esp %08lx -> %08lx)",
+                (unsigned)(g_Arg2RetBypassCount + 1),
+                (unsigned)maxBypasses,
+                reinterpret_cast<void*>(eip),
+                static_cast<size_t>(eip - argvStart),
+                static_cast<unsigned long long>(record->ExceptionInformation[0]),
+                reinterpret_cast<void*>(returnTarget),
+                (unsigned long)context->Esp,
+                (unsigned long)(context->Esp + 4));
+            context->Eip = returnTarget;
+            context->Esp += 4;
+            ++g_Arg2RetBypassCount;
+            return EXCEPTION_CONTINUE_EXECUTION;
+          }
+        } else {
+          Log(
+              "DIAGNOSTIC: ARG2 RET BYPASS disabled for this fault because bypass count %u reached max %u",
+              (unsigned)g_Arg2RetBypassCount,
+              (unsigned)maxBypasses);
+        }
+      }
     }
 
     return EXCEPTION_CONTINUE_SEARCH;
@@ -1064,6 +1172,7 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     g_LogFile = fopen("resurrections.log", "w");
+    AddVectoredExceptionHandler(1, reinterpret_cast<PVECTORED_EXCEPTION_HANDLER>(DiagnosticUnhandledExceptionFilter));
     SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
 
     Log("Matrix Online launcher reimplementation scaffold");
@@ -1086,6 +1195,13 @@ int main(int argc, char* argv[]) {
     const bool useMediatorBinderScaffold = EnvFlagEnabled("MXO_BINDER_LOGIN_MEDIATOR");
     const bool useLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
     const bool traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
+    const bool useArg2RetBypass = EnvFlagEnabled("MXO_ARG2_RET_BYPASS");
+
+    if (useArg2RetBypass) {
+        uint32_t maxBypasses = 1;
+        EnvUint32Value("MXO_ARG2_RET_BYPASS_MAX", &maxBypasses);
+        Log("DIAGNOSTIC: enabled MXO_ARG2_RET_BYPASS with max bypasses = %u", (unsigned)maxBypasses);
+    }
 
     LoadLastWorldNameFromRegistry(g_LastWorldName, sizeof(g_LastWorldName));
 
@@ -1122,6 +1238,15 @@ int main(int argc, char* argv[]) {
     }
     if (EnvUint32Value("MXO_ARG8_FLAG", &g_FlagByte)) {
         Log("DIAGNOSTIC: overridden arg8 flag from env = 0x%08x", g_FlagByte);
+    }
+
+    uint32_t mediatorSelectedWorldType = 1;
+    if (EnvUint32Value("MXO_MEDIATOR_WORLD_TYPE", &mediatorSelectedWorldType)) {
+        Log("DIAGNOSTIC: mediator selected-world type overridden from env = %u", (unsigned)mediatorSelectedWorldType);
+    }
+    uint32_t mediatorSelectedVariantState = 0;
+    if (EnvUint32Value("MXO_MEDIATOR_VARIANT_STATE", &mediatorSelectedVariantState)) {
+        Log("DIAGNOSTIC: mediator selected-variant state overridden from env = %u", (unsigned)mediatorSelectedVariantState);
     }
 
     const uint32_t nopatchParsedValue = FloatBitsFromCString("0.1");
@@ -1169,7 +1294,9 @@ int main(int argc, char* argv[]) {
             mediatorSelectionName,
             mediatorSelectionName,
             selectionPackedLow24,
-            selectedHighByte);
+            selectedHighByte,
+            mediatorSelectedWorldType,
+            mediatorSelectedVariantState);
         DiagnosticConfigureMediatorProfileName(g_AuthUsername);
         DiagnosticConfigureMediatorAuthName(g_AuthUsername);
         DiagnosticApplyDefaultNopatchMediatorConfig(
@@ -1283,8 +1410,9 @@ int main(int argc, char* argv[]) {
     }
 
     Log("=== Forced experiment: calling InitClientDLL with incomplete original-path state ===");
-  DiagnosticSnapshotArgvMemory();
-  Log("DIAGNOSTIC: argv memory snapshotted for crash analysis");
+    CaptureInitClientFrameSnapshot();
+    DiagnosticSnapshotArgvMemory();
+    Log("DIAGNOSTIC: argv memory snapshotted for crash analysis");
     int initResult = g_InitClientDLL(
         g_FilteredArgCount,
         g_FilteredArgv,

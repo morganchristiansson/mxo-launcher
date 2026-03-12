@@ -134,7 +134,8 @@ Static analysis now tightens the deepest currently reached mediator handoff.
 
 Inside `client.dll:0x62170e2a..0x62170f48` the client:
 - constructs a stack object at `[ebp-0xbc]`,
-- fills it with profile/config path fragments via helper calls such as `0x62195ff0` / `0x62195f00`,
+- stores the current arg7-derived **variant/high-8 value** into the first dword of that object,
+- fills the rest with profile/config path fragments via helper calls such as `0x62195ff0` / `0x62195f00`,
 - and then passes that object to `arg6->+0xec`.
 
 The zero-init helper at `client.dll:0x6211d3e0` clears this object through offset `+0xb0`, which fixes its size at **`0xb4` bytes**.
@@ -142,9 +143,36 @@ The zero-init helper at `client.dll:0x6211d3e0` clears this object through offse
 This matters because:
 - `+0xec` is now better understood as a **selection/config-state handoff**, not just an opaque pointer call,
 - the client uses `+0x38` and `+0x40` while building path strings like `Profiles\%s\` and `Profiles\%s\%s_%X\`,
+- the `+0x40` descriptor builder maps a scratch-shaped arg7-derived request back into descriptor fields at payload `+3` (name pointer) and `+7` (selection id) for that `%s_%X` formatting path,
 - and later crashes that still land at current `arg2 filteredArgv + 2` survive even after the replacement launcher copies that full `0xb4` object into stable mediator-owned storage.
 
 So the current late crash is no longer well-explained by a trivial `+0xec` lifetime bug alone.
+
+### Diagnostic-only note: the current `arg2` landing can be stepped past with `ret`
+
+A newer interactive debugging result is that the immediate late `arg2` crash can be bypassed temporarily by forcing the bad landing site to execute a single x86 `ret` (`0xc3`).
+
+That is useful for differential debugging because it lets execution step past the immediate corrupted landing and reveal what fails next.
+But it is **not** a real fix and **not** faithful startup behavior.
+It should be interpreted only as further evidence that the visible `arg2` fault is collateral damage from earlier state/call-flow corruption.
+
+Current stronger validation result:
+- the replacement launcher now has an opt-in diagnostic implementation of this bypass (`MXO_ARG2_RET_BYPASS=1`)
+- on the current path it does **not** reveal a meaningful later continuation
+- the popped target is just stale startup-frame `arg3 hClientDll = 0x62000000`
+- execution then immediately faults again at `client.dll+0x3`
+- and this still does **not** surface any later arg5 method traffic
+- newer preserved-frame logging now shows that the late crash-time stack directly lines up with stale saved `InitClientDLL` startup args (`arg3`, `arg4`, `arg5`, `arg6`, and in non-zero arg7 runs also `arg7`)
+- a newer non-zero arg7 probe (`MXO_ARG7_SELECTION=0x0500002a`) showed that later client `+0x40` requests arrive as `selectionIndex=0x05000005`
+- a fresh static pass now explains that as a client-side scratch mutation of the original arg7 stack slot at `0x62170dc1..0x62170e59`, not as a random unrelated value
+- that same block also stores the original masked low-24-bit selection id separately through the nearby `0x629e1c7c` / `0x620011e0` path before the scratch rewrite, which suggests the client expects both a persisted low-24-bit selection id and the later scratch-shaped `+0x40` lookup key
+- newer static work now identifies `0x629e1c7c` as a client-side console-int named `CreateCharacterWorldIndex`, not an anonymous scratch/global slot
+- current direct xref search for its current value is still narrow, but current runtime observation matters: the patched-client crash is visibly occurring during the in-game `Loading Character` phase, so this preserved low-24-bit state should remain an active loading-path suspect rather than being dismissed as unrelated late UI state
+- even after teaching the diagnostic mediator to accept that scratch-shaped request, the late crash family still did not move (`crash_60` / `crash_61`, still `EIP=0x003e5e8a`)
+
+Canonical note:
+- `RET_BYPASS_HACK.md`
+- `CRASH_EIP_003E2B82.md`
 
 ## Validation result from a closer original-path experiment
 
