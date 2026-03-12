@@ -7,7 +7,7 @@ void Log(const char* fmt, ...);
 
 void DiagnosticInstallMediatorStub(void** outMediatorPtr);
 void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr);
-void DiagnosticConfigureMediatorSelection(uint32_t selectionUpperBoundExclusive, const char* mappedSelectionName);
+void DiagnosticConfigureMediatorSelection(uint32_t selectionUpperBoundExclusive, const char* mappedSelectionName, uint32_t packedSelectionLow24);
 void DiagnosticConfigureMediatorProfileName(const char* profileName);
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr, uint32_t parsedNoPatchValue, uint32_t clientVersionValue);
 void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr);

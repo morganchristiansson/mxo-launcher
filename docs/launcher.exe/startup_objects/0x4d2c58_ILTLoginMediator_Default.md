@@ -110,6 +110,17 @@ At `0x40b360..0x40b409` the launcher uses the same interface during cleanup, inc
 4. The launcher passes the resolved pointer value to `InitClientDLL`.
 5. A replacement launcher that skips this acquisition/registration path is not equivalent to the original.
 
+### New sibling-slot clarification
+
+Fresh static review of `launcher.exe:0x496480..0x496491` shows that the launcher also registers **another output slot** through the same wrapper ctor `0x4030d0` with the same interface string `"ILTLoginMediator.Default"`:
+
+- output slot: `0x4d3584`
+
+That is important because the current arg7-selection writer around `0x40d763..0x40d810` consults `0x4d3584` through methods `+0xfc`, `+0x100`, and `+0xe4` before writing `0x4d3410 / 0x4d3414`.
+
+So `0x4d2c58` is not the only launcher-global slot tied to this interface name.
+The launcher appears to keep at least one **sibling `ILTLoginMediator.Default`-style pointer slot** involved in world/selection resolution.
+
 ## Early method surface observed so far
 
 ### Launcher-observed offsets on `0x4d2c58`
@@ -138,9 +149,9 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 |---:|---|---|
 | `+0x10` | readiness / availability gate; this is part of the old `-7` barrier | high |
 | `+0x2c` | additional runtime readiness gate before arg5-related runtime work | medium |
-| `+0x38` | returns C-string used by client formatting path | high |
+| `+0x38` | returns profile-root string used by client `Profiles\\%s\\...` formatting path | high |
 | `+0x3c` | returns default selection index when the client asks for `0xff` fallback selection | medium |
-| `+0x40` | returns selection-descriptor object for the arg7-derived selection index | medium |
+| `+0x40` | returns selection-descriptor object for the arg7-derived selection index, including name + low-24-bit id data | medium |
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
 | `+0x58` | string-producing helper in early init logging/config path | medium |
@@ -148,8 +159,8 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x60` | chained string-producing helper | medium |
 | `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
-| `+0xec` | consumes assembled selection/config structure in deeper init | medium |
-| `+0xf4` | returns a profile/path-style string in later runtime/config setup paths | medium |
+| `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
+| `+0xf4` | later runtime/config paths treat return value like a persisted selection/config snapshot, not a plain C-string | medium |
 | `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
 | `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
 | `+0x170` | consumes client startup context object in deeper init | medium |
@@ -244,6 +255,84 @@ This is the strongest current evidence that:
 
 - arg6 is the highest-priority missing launcher-owned state,
 - and the old `-7` barrier is more directly about `ILTLoginMediator.Default` than about arg5 or `0x402ec0`.
+
+## New clarification: `+0xec` now lands, but the late `arg2+2` crash family survives it
+
+Newer patched-client reruns now push the mediator probe one step further than the earlier `crash_3..5` family.
+
+### Static anchor
+
+`client.dll:0x62170e2a..0x62170f48` builds a stack object at `[ebp-0xbc]` and passes it to `arg6->+0xec`.
+The constructor at `client.dll:0x6211d3e0` zero-initializes that object through offset `+0xb0`, which fixes the current handoff size at **`0xb4` bytes**.
+
+The same `0x62170b00` family also calls `0x62195ff0` / `0x62195f00`, which format paths like:
+
+- `Profiles\%s\`
+- `Profiles\%s\%s_%X\`
+- `hl.cfg`
+- `an.cfg`
+- `pi.cfg`
+- `ai.cfg`
+- `cs.cfg`
+- `bl.cfg`
+- `il.cfg`
+- `rl.cfg`
+- `cl.cfg`
+- `mcd.cfg`
+
+That materially strengthens the interpretation that:
+
+- `+0x38` is a **profile-root string input** to the client's config-path builder,
+- `+0xec` is a **selection/config state handoff**,
+- and `+0xf4` is more likely a later accessor for persisted selection/config state than a simple string-returning helper.
+
+### What the newer reruns showed
+
+Representative latest dumps:
+
+- `~/MxO_7.6005/MatrixOnline_0.0_crash_33.dmp`
+  - default scaffold selection name
+  - `EIP=0x003e2b62`
+  - current `arg2 filteredArgv = 0x003e2b60`
+- `~/MxO_7.6005/MatrixOnline_0.0_crash_34.dmp`
+- `~/MxO_7.6005/MatrixOnline_0.0_crash_35.dmp`
+  - with `MXO_MEDIATOR_SELECTION_NAME=Vector`
+  - `EIP=0x003e2b82`
+  - current `arg2 filteredArgv = 0x003e2b80`
+
+In both branches the same higher-level signature survives:
+
+- the client now definitely reaches `MediatorStub::ConsumeSelectionContext(...)` at `+0xec`,
+- the diagnostic scaffold now keeps a stable copied `0xb4` snapshot of that object instead of only retaining the raw stack pointer,
+- but control still later redirects into **current `arg2 filteredArgv + 2`**.
+
+### Negative results that still narrowed the search
+
+Two evidence-backed mediator corrections were tried in this newer family:
+
+1. **persist the `+0xec` handoff more faithfully**
+   - the scaffold now copies the full `0xb4` selection/config object to stable mediator-owned storage
+   - practical result: crash signature did **not** move
+2. **treat `+0x38` as profile-root text instead of arbitrary launcher name**
+   - the scaffold now returns the profile/session-style name (`morgan`) from `+0x38`
+   - this materially changed on-disk side effects by creating `~/MxO_7.6005/Profiles/morgan/aui.cfg`
+   - but the late `arg2+2` crash still remained (`crash_35`)
+
+This is useful narrowing, because it shows:
+
+- the client is not blocked solely on the old `+0xec` raw-pointer lifetime issue,
+- and correcting the obvious `Profiles\%s\...` root string input at `+0x38` is still **not** enough by itself.
+
+### Updated narrow interpretation
+
+At this point the best current read is:
+
+- the crash is still happening **after** the deeper `+0xec` selection/config handoff,
+- but **before** later observed `+0xf4` probe traffic from this scaffold family,
+- so the remaining mismatch is more likely tied to:
+  - still-incomplete arg7 low-24-bit / selection-id state,
+  - another launcher-owned client-config expectation inside the same `0x62170b00` / `0x622a39d0` family,
+  - or a later ownership/call-path mismatch that still poisons control flow with the current `arg2` pointer.
 
 ## Decision for reimplementation direction
 

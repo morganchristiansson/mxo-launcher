@@ -135,12 +135,14 @@ struct DiagnosticMediatorRuntimeState {
     void* netMgr124;
     void* distrObjExecutive124;
     void* selectionContext0ec;
+    void* selectionContext0ecCopy;
     void* runtimeObject148;
     void* runtimeObject174;
     void* runtimeDescriptor178;
     uint32_t attach170Count;
     uint32_t provide124Count;
     uint32_t selection0ecCount;
+    uint32_t profile0f4Count;
     uint32_t runtime148Count;
     uint32_t runtime174Count;
     uint32_t descriptor178Count;
@@ -170,6 +172,7 @@ static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringB[] = "nopatch";
 static const char g_MediatorStringC[] = "standalone";
 static uint32_t g_MediatorSelectionUpperBoundExclusive = 1;
+static uint32_t g_MediatorMappedSelectionId = 0;
 static const char* g_MediatorMappedSelectionName = g_MediatorStringC;
 static const char* g_MediatorProfileName = g_MediatorStringA;
 
@@ -186,8 +189,15 @@ struct DiagnosticMediatorSelectionObject {
     DiagnosticMediatorSelectionPacked* packed; // read by client as dword at +0x10
 };
 
+static constexpr size_t kDiagnosticSelectionContextSize = 0xb4; // from client.dll:6211d3e0 zero-init of the +0xec handoff object
+struct DiagnosticMediatorSelectionContextCopy {
+    unsigned char bytes[kDiagnosticSelectionContextSize];
+};
+
 static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
 static DiagnosticMediatorSelectionObject g_MediatorSelectionObject = {};
+static DiagnosticMediatorSelectionContextCopy g_MediatorSelectionContextCopy = {};
+static bool g_MediatorSelectionContextCopyValid = false;
 
 static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
@@ -216,6 +226,11 @@ static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCou
 
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
+    std::memset(&g_MediatorSelectionObject, 0, sizeof(g_MediatorSelectionObject));
+    std::memset(&g_MediatorSelectionContextCopy, 0, sizeof(g_MediatorSelectionContextCopy));
+    g_MediatorSelectionContextCopyValid = false;
+    g_MediatorMappedSelectionId = 0;
+    g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
 
@@ -262,7 +277,8 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 
 static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* self) {
     (void)self;
-    return g_MediatorStringA;
+    Log("MediatorStub::GetProfileRootName(+0x38) -> '%s'", g_MediatorProfileName);
+    return g_MediatorProfileName;
 }
 
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
@@ -274,7 +290,7 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
 static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub* self, uint32_t selectionIndex) {
     (void)self;
     g_MediatorSelectionPacked.mappedName = g_MediatorMappedSelectionName;
-    g_MediatorSelectionPacked.selectionId = selectionIndex;
+    g_MediatorSelectionPacked.selectionId = g_MediatorMappedSelectionId;
     g_MediatorSelectionObject.packed = &g_MediatorSelectionPacked;
 
     if (selectionIndex >= g_MediatorSelectionUpperBoundExclusive) {
@@ -286,7 +302,7 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
     }
 
     Log(
-        "MediatorStub::GetSelectionDescriptor(selectionIndex=%u) -> %p (mappedName='%s' selectionId=%u)",
+        "MediatorStub::GetSelectionDescriptor(selectionIndex=%u) -> %p (mappedName='%s' packedSelectionId=0x%06x)",
         (unsigned)selectionIndex,
         &g_MediatorSelectionObject,
         g_MediatorMappedSelectionName,
@@ -345,15 +361,27 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
     void* selectionContext,
     void* returnAddress) {
     g_MediatorRuntimeState.selectionContext0ec = selectionContext;
+    g_MediatorRuntimeState.selectionContext0ecCopy = &g_MediatorSelectionContextCopy;
+    if (selectionContext) {
+        std::memcpy(&g_MediatorSelectionContextCopy, selectionContext, sizeof(g_MediatorSelectionContextCopy));
+        g_MediatorSelectionContextCopyValid = true;
+    } else {
+        std::memset(&g_MediatorSelectionContextCopy, 0, sizeof(g_MediatorSelectionContextCopy));
+        g_MediatorSelectionContextCopyValid = false;
+    }
     if (self) {
-        self->field1C = selectionContext;
+        self->field1C = &g_MediatorSelectionContextCopy;
     }
     ++g_MediatorRuntimeState.selection0ecCount;
     Log(
-        "MediatorStub::ConsumeSelectionContext(%p) [count=%u caller=%p]",
+        "MediatorStub::ConsumeSelectionContext(%p) [count=%u caller=%p copied=%p size=0x%lx valid=%u]",
         selectionContext,
         (unsigned)g_MediatorRuntimeState.selection0ecCount,
-        returnAddress);
+        returnAddress,
+        &g_MediatorSelectionContextCopy,
+        (unsigned long)sizeof(g_MediatorSelectionContextCopy),
+        g_MediatorSelectionContextCopyValid ? 1u : 0u);
+    LogPointerWords("ConsumeSelectionContext copied", &g_MediatorSelectionContextCopy, 8);
 }
 
 __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
@@ -480,10 +508,17 @@ __attribute__((naked)) static void Mediator_AttachStartupContext() {
         : "eax", "edx");
 }
 
-static const char* __thiscall Mediator_GetProfilePathComponent(MinimalLoginMediatorStub* self) {
+static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::GetProfilePathComponent() -> '%s'", g_MediatorProfileName);
-    return g_MediatorProfileName;
+    ++g_MediatorRuntimeState.profile0f4Count;
+    Log(
+        "MediatorStub::GetSelectionContextSnapshot(+0xf4) -> %p [count=%u copiedFrom0ec=%u raw0ec=%p]",
+        &g_MediatorSelectionContextCopy,
+        (unsigned)g_MediatorRuntimeState.profile0f4Count,
+        g_MediatorSelectionContextCopyValid ? 1u : 0u,
+        g_MediatorRuntimeState.selectionContext0ec);
+    LogPointerWords("GetSelectionContextSnapshot copy", &g_MediatorSelectionContextCopy, 8);
+    return &g_MediatorSelectionContextCopy;
 }
 
 static void __thiscall Mediator_AttachRuntimeObject(MinimalLoginMediatorStub* self, void* runtimeObject) {
@@ -1018,7 +1053,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7SelectionUpperBoundExclusive; // +0xd8
     g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc
     g_LoginMediatorVtable[59] = (void*)Mediator_ConsumeSelectionContext; // +0xec
-    g_LoginMediatorVtable[61] = (void*)Mediator_GetProfilePathComponent; // +0xf4
+    g_LoginMediatorVtable[61] = (void*)Mediator_GetSelectionContextSnapshot; // +0xf4
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
     g_LoginMediatorVtable[82] = (void*)Mediator_AttachRuntimeObject; // +0x148
     g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164
@@ -1257,16 +1292,22 @@ void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr) {
     Log("DIAGNOSTIC: binder scaffold materialized arg6 as %p", outMediatorPtr ? *outMediatorPtr : NULL);
 }
 
-void DiagnosticConfigureMediatorSelection(uint32_t selectionUpperBoundExclusive, const char* mappedSelectionName) {
+void DiagnosticConfigureMediatorSelection(
+    uint32_t selectionUpperBoundExclusive,
+    const char* mappedSelectionName,
+    uint32_t packedSelectionLow24) {
     g_MediatorSelectionUpperBoundExclusive = selectionUpperBoundExclusive ? selectionUpperBoundExclusive : 1;
+    g_MediatorMappedSelectionId = packedSelectionLow24 & 0x00ffffffu;
     g_MediatorMappedSelectionName =
         (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : g_MediatorStringC;
     g_MediatorSelectionPacked.mappedName = g_MediatorMappedSelectionName;
+    g_MediatorSelectionPacked.selectionId = g_MediatorMappedSelectionId;
 
     Log(
-        "DIAGNOSTIC: mediator selection configured upperBoundExclusive=%u mappedSelection='%s'",
+        "DIAGNOSTIC: mediator selection configured upperBoundExclusive=%u mappedSelection='%s' packedSelectionLow24=0x%06x",
         (unsigned)g_MediatorSelectionUpperBoundExclusive,
-        g_MediatorMappedSelectionName);
+        g_MediatorMappedSelectionName,
+        (unsigned)g_MediatorMappedSelectionId);
 }
 
 void DiagnosticConfigureMediatorProfileName(const char* profileName) {

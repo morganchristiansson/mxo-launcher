@@ -128,6 +128,24 @@ Relevant launcher-side object docs:
 For the growing mediator method surface itself, see:
 - `../../launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
 
+### New clarification: the client builds a `0xb4` selection/config object before `arg6->+0xec`
+
+Static analysis now tightens the deepest currently reached mediator handoff.
+
+Inside `client.dll:0x62170e2a..0x62170f48` the client:
+- constructs a stack object at `[ebp-0xbc]`,
+- fills it with profile/config path fragments via helper calls such as `0x62195ff0` / `0x62195f00`,
+- and then passes that object to `arg6->+0xec`.
+
+The zero-init helper at `client.dll:0x6211d3e0` clears this object through offset `+0xb0`, which fixes its size at **`0xb4` bytes**.
+
+This matters because:
+- `+0xec` is now better understood as a **selection/config-state handoff**, not just an opaque pointer call,
+- the client uses `+0x38` and `+0x40` while building path strings like `Profiles\%s\` and `Profiles\%s\%s_%X\`,
+- and later crashes that still land at current `arg2 filteredArgv + 2` survive even after the replacement launcher copies that full `0xb4` object into stable mediator-owned storage.
+
+So the current late crash is no longer well-explained by a trivial `+0xec` lifetime bug alone.
+
 ## Validation result from a closer original-path experiment
 
 A 2026-03-11 experiment that:

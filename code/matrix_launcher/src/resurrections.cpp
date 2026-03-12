@@ -993,8 +993,9 @@ int main(int argc, char* argv[]) {
 
     if (useMediatorBinderScaffold || useMediatorStub) {
         const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
+        const uint32_t selectionPackedLow24 = g_PackedArg7Selection & 0x00ffffffu;
         const uint32_t selectionUpperBoundExclusive = (selectedHighByte < 0xffu) ? (selectedHighByte + 1u) : 0xffu;
-        DiagnosticConfigureMediatorSelection(selectionUpperBoundExclusive, mediatorSelectionName);
+        DiagnosticConfigureMediatorSelection(selectionUpperBoundExclusive, mediatorSelectionName, selectionPackedLow24);
         DiagnosticConfigureMediatorProfileName(g_AuthUsername);
     }
 

@@ -66,30 +66,46 @@ Current deep diagnostic progress with patched client:
   - `AttachStartupContext(second)`
 
 Current practical crash state:
-- latest patched-client scaffold dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_25.dmp`
-- current crash is still not a simple missing-vtable-slot `EIP=0` case
-- latest dump lands at `EIP=0x003e2b62` while current `arg2 filteredArgv = 0x003e2b60`
+- current patched-client scaffold no longer dies on a simple missing-vtable-slot `EIP=0` case
+- the deepest stable logged mediator sequence now reaches:
+  - `GetWorldOrSelectionName()`
+  - `GetProfileOrSessionName()`
+  - repeated `GetSelectionDescriptor(...)`
+  - `AttachStartupContext(first)`
+  - `ProvideStartupTriple(netShell, netMgr, distrObjExecutive)`
+  - `ConsumeSelectionContext(...)` at `+0xec`
+- current latest crash family is now tracked canonically in:
+  - `../../docs/client.dll/InitClientDLL/CRASH_EIP_003E2B82.md`
+- representative current dumps:
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_33.dmp`
+    - default scaffold selection name
+    - `EIP=0x003e2b62`
+    - current `arg2 filteredArgv = 0x003e2b60`
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_34.dmp`
+  - `~/MxO_7.6005/MatrixOnline_0.0_crash_35.dmp`
+    - with `MXO_MEDIATOR_SELECTION_NAME=Vector`
+    - `EIP=0x003e2b82`
+    - current `arg2 filteredArgv = 0x003e2b80`
+- the stable higher-level signature across those runs is still:
+  - control later redirects into **current `arg2 filteredArgv + 2`**
 - widening arg5 helper/vtable probes through:
   - primary slots `1..4`
   - primary slots `11..12`
   - embedded helper surfaces at `+0x5c`, `+0x60`, `+0x98`
   has still produced no observed arg5 traffic before the late crash
-- rerunning the scaffold after a successful original `launcher.exe` login / EULA acceptance did **not** change this crash signature
+- newer evidence-backed mediator corrections now tried without moving this crash family:
+  - the scaffold now copies the full `0xb4` `+0xec` selection/config handoff object into stable mediator-owned storage
+  - `+0x38` is now treated as the client's `Profiles\%s\...` root string input and returns the profile/session-style name (`morgan`)
+  - that `+0x38` correction materially changed on-disk side effects by creating `~/MxO_7.6005/Profiles/morgan/aui.cfg`
+  - but the late `arg2+2` crash still remained
 - current best remaining launcher-owned suspects are:
-  - deeper arg5 state beyond the current faithful helper probes
-  - still-incomplete `0x409950` preprocessing / `options.cfg` side effects
-  - arg7 / arg8 / saved-world selection state
+  - still-incomplete arg7 low-24-bit / selection-id state
+  - the launcher-owned arg7 selection-resolution chain around `0x40d763..0x40d810`
   - another later launcher/client ownership mismatch that redirects control into current arg2 storage
-- newer larger-step launcher-side reconstruction now landed for `0x409950` / nopatch behavior:
-  - exact switch-state map is now better recovered from original `0x409950`
-  - replacement launcher now forces its advertised default nopatch branch semantics into internal launcher state (`4c8b1d=0`) instead of only saying "nopatch" in logs
-  - replacement launcher now rebuilds the nopatch mediator `+0x24` value from the on-disk `client.dll` version resource (`'7.6005'` -> `0x40f3374c`) instead of reusing the old `0.1` placeholder
-- practical result of that larger-step reconstruction:
-  - latest dumps `~/MxO_7.6005/MatrixOnline_0.0_crash_27.dmp` and `..._28.dmp` still land at the same late signature (`EIP=0x003e2b62`, current `arg2=0x003e2b60`)
-  - so this bigger `0x409950` / nopatch pass improved faithfulness but did **not** yet move the crash
-- important arg7 correction from fresh disassembly:
-  - the writer path around `0x40d763..0x40d810` appears to **write back** `Last_WorldName` via registry after selection resolution, not simply read it as the full arg7 source
-  - current next arg7 focus should therefore be the launcher-owned selection/service chain rooted near `0x4d3584`, not only registry fallback
+- important newer arg7 clarification from fresh static review:
+  - the launcher-global root at `0x4d3584` is not just an unknown generic service object
+  - initializer `0x496480..0x496491` registers `0x4d3584` through the same `0x4030d0` wrapper using the same string `"ILTLoginMediator.Default"`
+  - current next arg7 focus should therefore be the sibling `ILTLoginMediator.Default`-style slot at `0x4d3584` and its `+0xfc / +0x100 / +0xe4` selection queries, not only registry fallback
 
 Current original-launcher runtime validation note:
 - the original `~/MxO_7.6005/launcher.exe` now successfully logs into the live game on this machine after manual EULA acceptance
@@ -173,7 +189,7 @@ Canonical docs:
 
 1. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently probed arg5 slots alone explain the late crash
 2. Reconstruct more of `0x409950` launcher-side preprocessing, especially `options.cfg` side effects and launcher-global state derived before `InitClientDLL`
-3. Recover the arg7 selection-resolution chain around `0x40d763..0x40d810`, `0x48baea`, and the launcher-owned service object near `0x4d3584` instead of treating `Last_WorldName` alone as the derivation
+3. Recover the arg7 selection-resolution chain around `0x40d763..0x40d810`, `0x48baea`, and the sibling `ILTLoginMediator.Default`-style slot at `0x4d3584` (`+0xfc / +0x100 / +0xe4`) instead of treating `Last_WorldName` alone as the derivation
 4. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
 5. Keep tracing what `0x402ec0` minimally sets up
 6. Revisit legitimate `RunClientDLL` only after the faithful path gets past the current late `EIP=arg2+2` crash
