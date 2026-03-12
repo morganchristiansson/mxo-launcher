@@ -83,6 +83,15 @@ static void* g_FakeArgv[8] = {
     nullptr, nullptr, nullptr, nullptr    // padding
 };
 
+// CRITICAL TEST: Executable 'ret' instruction to test if arg2 is called as function
+// If client calls arg2 directly, executing 0xC3 (ret) should return safely
+// If client accesses arg2[0], it will try to read 0x00C30000 as a pointer
+static uint8_t g_CallbackTestRet[8] __attribute__((aligned(16))) = {
+    0xc3,                   // ret (returns immediately)
+    0xcc, 0xcc, 0xcc,      // int3 padding (trap if executed past ret)
+    0xcc, 0xcc, 0xcc, 0xcc
+};
+
 // Diagnostic state tracking for pre-crash analysis
 static const char* g_LastMediatorMethod = NULL;
 static uint32_t g_LastMediatorCallCount = 0;
@@ -905,6 +914,20 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
         return false;
     }
     Log("DIAGNOSTIC: filtered argv[0] duplicated at %p -> '%s'", g_FilteredArgvOwned[0], g_FilteredArgvOwned[0]);
+  
+  // STACK SMASHING TEST: Replace long path with short string
+  // If crash moves/changes, confirms overflow theory
+  bool useShortArgv = EnvFlagEnabled("MXO_SHORT_ARGV0");
+  bool useExeNameOnly = EnvFlagEnabled("MXO_EXE_NAME_ONLY");
+  if (useShortArgv) {
+    Log("DIAGNOSTIC: replacing argv[0] with short string 'X'");
+    std::free(g_FilteredArgvOwned[0]);
+    g_FilteredArgvOwned[0] = new char[2]{'X', '\0'};
+  } else if (useExeNameOnly) {
+    Log("DIAGNOSTIC: replacing argv[0] with 'resurrections.exe'");
+    std::free(g_FilteredArgvOwned[0]);
+    g_FilteredArgvOwned[0] = strdup("resurrections.exe");
+  }
 
     LauncherValueTarget pendingValueTarget = LauncherValueTarget::None;
     int filteredCount = 1;
@@ -963,13 +986,23 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
 
   // Padding experiment: Add sentinel values to detect if client iterates past argv
   // These magic values will appear in crash dumps if code reads past NULL terminator
-  if (g_FilteredArgvOwnedCapacity > static_cast<uint32_t>(filteredCount + 4)) {
-    // Experiment levels:
-    // Level 1: Vtable slots (arg2[0]..[3] = code addresses)
-    // Level 2: Static fake argv (entire arg2 array is at known static address)
-    static bool useVtableExperiment = EnvFlagEnabled("MXO_ARG2_AS_VTABLE");
-    static bool useStaticArgv = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
-    if (useStaticArgv) {
+  // NOTE: Check env vars HERE (not static) so Wine can propagate them
+  bool useCallbackTest = EnvFlagEnabled("MXO_ARG2_CALLBACK_TEST");
+  bool useVtableExperiment = EnvFlagEnabled("MXO_ARG2_AS_VTABLE");
+  bool useStaticArgv = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
+  Log("DIAGNOSTIC: argv experiment check - capacity=%u needed=%u callback=%d vtable=%d static=%d",
+      g_FilteredArgvOwnedCapacity, filteredCount + 4,
+      useCallbackTest ? 1 : 0, useVtableExperiment ? 1 : 0, useStaticArgv ? 1 : 0);
+  if (useCallbackTest || g_FilteredArgvOwnedCapacity > static_cast<uint32_t>(filteredCount + 4)) {
+    if (useCallbackTest) {
+      Log("DIAGNOSTIC: CRITICAL TEST - arg2 points directly to 'ret' instruction at %p", g_CallbackTestRet);
+      // Make arg2 point to executable code:
+      // If client calls arg2 directly, it will execute 'ret' and return
+      // If client reads arg2[0], it will read 0x00C30000 or crash
+      g_FilteredArgv = reinterpret_cast<char**>(g_CallbackTestRet);
+      Log("DIAGNOSTIC: Set arg2=%p, contents: %02x %02x %02x %02x (expecting crash at this address OR ret)",
+          g_FilteredArgv, g_CallbackTestRet[0], g_CallbackTestRet[1], g_CallbackTestRet[2], g_CallbackTestRet[3]);
+    } else if (useStaticArgv) {
       Log("DIAGNOSTIC: EXPERIMENT LEVEL 2 - using static fake argv at %p", g_FakeArgv);
       // DON'T use heap argv - use static global instead
       g_FilteredArgv = reinterpret_cast<char**>(g_FakeArgv);
@@ -1009,8 +1042,10 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     }
   }
     g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
-  static bool useStaticArgvFinal = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
-  if (!useStaticArgvFinal) {
+  // Re-check env vars (not static - runtime check for Wine)
+  bool useCallbackTestFinal = EnvFlagEnabled("MXO_ARG2_CALLBACK_TEST");
+  bool useStaticArgvFinal = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
+  if (!useCallbackTestFinal && !useStaticArgvFinal) {
     g_FilteredArgv = g_FilteredArgvOwned;
   }
     g_AuthUsername = g_LauncherUser[0] ? g_LauncherUser : NULL;

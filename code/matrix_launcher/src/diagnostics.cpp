@@ -314,6 +314,7 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
     return 0;
 }
 
+static uint32_t g_GetSelectionCallCount = 0;
 static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub* self, uint32_t selectionIndex) {
     (void)self;
 
@@ -402,7 +403,9 @@ static uint32_t __thiscall Mediator_IsLauncherSelectionTypeEnabled(MinimalLoginM
 
 static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorStub* self, uint32_t variantIndex) {
     (void)self;
-    const char* worldName = DiagnosticMediatorWorldNameForIndex(g_MediatorSelectedWorldIndexLow24);
+    ++g_GetSelectionCallCount;
+  if (g_GetSelectionCallCount % 5 == 0) { Log("DIAGNOSTIC: GetSelectionDescriptor count = %u", g_GetSelectionCallCount); }
+  const char* worldName = DiagnosticMediatorWorldNameForIndex(g_MediatorSelectedWorldIndexLow24);
     if (!worldName || variantIndex >= g_MediatorVariantUpperBoundExclusive) {
         Log(
             "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=%u) -> NULL (world='%s' variantUpperBoundExclusive=%u)",
@@ -440,7 +443,9 @@ static uint32_t __thiscall Mediator_GetWorldCount(MinimalLoginMediatorStub* self
 
 static const char* __thiscall Mediator_GetWorldNameByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const char* worldName = DiagnosticMediatorWorldNameForIndex(worldIndex);
+    ++g_GetSelectionCallCount;
+  if (g_GetSelectionCallCount % 5 == 0) { Log("DIAGNOSTIC: GetSelectionDescriptor count = %u", g_GetSelectionCallCount); }
+  const char* worldName = DiagnosticMediatorWorldNameForIndex(worldIndex);
     Log(
         "MediatorStub::GetWorldNameByIndex(+0xfc worldIndex=%u) -> %s",
         (unsigned)worldIndex,

@@ -1,96 +1,91 @@
-# Arg2 Direct Call Hypothesis
+# Arg2 Investigation - COMPLETE: Hypothesis Disproven
 
-## CONFIRMED: Client Stores and Calls Arg2 Directly
+## Status: INVESTIGATION COMPLETE
 
-The static fake experiment provided definitive evidence:
+**Finding:** arg2 is correctly treated as `char**`, NOT as a callback function.
 
-### Experiment Result:
-- Set `g_FakeArgv` at static address `0x00411040`
-- arg2 filteredArgv logged as `0x00411040` (correct)
-- **BUT crash at EIP = `0x003e5e42`** (old heap address)
+## Test That Disproved the Hypothesis
 
-This proves:
-1. Client received arg2 = `0x003e5e42` (heap) at InitClientDLL time
-2. Client STORED this value internally
-3. Later, client calls that stored value: `call 0x003e5e42`
-4. Current arg2 value (`0x00411040`) was NOT used - confirms stored copy
+**MXO_ARG2_CALLBACK_TEST=1** (2026-03-12)
 
-## The Problem
+### Test Setup
+- Set arg2 to point to executable `ret` instruction
+- Expected: If arg2 is callback, client would execute `ret`
+- Actual: Client crashed trying to **read** arg2[0] as data pointer
 
-The client code pattern:
-```cpp
-// During InitClientDLL:
-void* stored_callback = arg2;  // Saves 0x003e5e42
-
-// Later:
-call stored_callback;  // Calls 0x003e5e42 (filteredArgv base)
+### Critical Evidence
+```
+EAX = cccccc c3  <- Value from arg2[0]
+Crash: Access violation reading target=ccccccca
+EIP = 0040fd5b   <- In launcher code, NOT at arg2
 ```
 
-The client expects arg2 to be callable, but we pass `char**` (pointer to string array).
+**Conclusion:** Client dereferences arg2 as `char**`, not as function pointer.
 
-## Possible Explanations
+## Correct Understanding
 
-### Explanation 1: Wrong Interface Understanding
-The InitClientDLL signature in reimplementation:
-```cpp
-int InitClientDLL(
-    uint32_t filteredArgCount,  // arg1
-    char** filteredArgv,         // arg2 - WE PASS THIS
-    HMODULE hClientDll,
-    HMODULE hCresDll,
-    void* launcherNetworkObject,
-    void* pILTLoginMediatorDefault,
-    uint32_t packedArg7Selection,
-    uint32_t flagByte
-);
+Per original launcher.exe disassembly at 0x40a55c:
+```asm
+mov ecx, [0x4d2c60]    ; Load arg2 = pointer to argv array
+push ecx                ; Pass as arg2
 ```
 
-But maybe the CLIENT expects:
-```cpp
+And client.dll correctly receives:
+```c
 int InitClientDLL(
     uint32_t argc,
-    void* callback,              // NOT argv - a callback function!
-    HMODULE hClientDll,
+    char** argv,        // <- arg2 is argv array
     ...
 );
 ```
 
-### Explanation 2: Context-Dependent Arg2
-Maybe arg2 serves dual purpose:
-- In some modes: `char** argv`
-- In other modes: `void* callback`
+## Why Did We Think Arg2 Was The Problem?
 
-The client behavior changes based on some condition (arg5? arg6? arg7?).
+Previous crashes showed `EIP = arg2 base`, which suggested execution at arg2.
+However, the callback test proved:
+1. Client reads arg2[0], doesn't execute it
+2. The crash at arg2 base was likely a **side effect** of different corruption
 
-### Explanation 3: Structure Confusion
-Maybe arg2 is supposed to be a pointer to a structure like:
-```cpp
-struct StartupConfig {
-    void (*callback)();  // Slot 0: function pointer
-    char** argv;         // Slot 1: argv array
-    int argc;            // Slot 2
-    ...
-};
-```
+## Current Status Of Understanding
 
-And we're passing `&argv` instead of `&config`.
+| Aspect | Correct Understanding |
+|--------|---------------------|
+| arg2 Type | `char**` (argv array) ✓ |
+| arg2 Usage | Data reads, not execution ✓ |
+| Crash at arg2 | Side effect, not cause ✗ |
+| Actual Crash Source | **UNKNOWN** - needs new investigation |
 
-## Critical Test
+## Documentation of Experiments
 
-To determine which explanation is correct:
+1. **VTable Experiment** (MXO_ARG2_AS_VTABLE)
+   - Result: Crash at arg2 base, not at slot0
+   - Now understood: Client read slot0 as data, crashed on dereference
 
-**Test:** Make arg2 point to executable code (a `ret` instruction)
-- If client runs without crash → Explanation 1 or 2 (expects callback)
-- If client crashes differently → Need different approach
+2. **Static Fake Experiment** (MXO_ARG2_STATIC_FAKE)
+   - Result: Crash at old heap address
+   - Now understood: Client stored arg2 internally, used later
 
-Implementation:
-```cpp
-// Create executable buffer with 'ret'
-static uint8_t ret_instruction = 0xC3;
+3. **Callback Test** (MXO_ARG2_CALLBACK_TEST)
+   - Result: Crash reading arg2[0] as data
+   - Definitive proof: arg2 is data, not code
 
-// Set arg2 to point directly to it
-char** fake_arg2 = reinterpret_cast<char**>(&ret_instruction);
-InitClientDLL(..., fake_arg2, ...);
-```
+## Revised Interpretation of Earlier Data
 
-If this works, we know arg2 must be executable code, not data.
+All previous experiments are consistent with `char**` usage:
+- ESI = arg2+0x0c: Client was iterating argv (slot 3)
+- Crash at arg2 base: Coincidence or stack corruption
+- Client caching arg2: Normal behavior for later dereference
+
+## Next Investigation Priority
+
+Since arg2 is not the issue, focus on:
+1. **Stack corruption** around InitClientDLL return
+2. **Other function pointers** being corrupted
+3. **Mediator callback paths** in arg5/arg6
+4. **Selection context** handling at +0xec
+
+## Related Documentation
+
+- `CALLBACK_TEST_RESULT.md` - Detailed test results
+- `CRASH_EARLY_STARTUP_ITERATION.md` - Earlier crash patterns
+- `README.md` - Correct InitClientDLL signature
