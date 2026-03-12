@@ -14,6 +14,12 @@ Current active sources:
 - `src/resurrections.cpp`
 - `src/diagnostics.cpp`
 - `src/diagnostics.h`
+- `src/liblttcp/ltthreadperclienttcpengine.h`
+- `src/liblttcp/ltthreadperclienttcpengine.cpp`
+- `src/liblttcp/lttcpconnection.h`
+- `src/liblttcp/lttcpconnection.cpp`
+- `src/liblttcp/cmessageconnection.h`
+- `src/liblttcp/cmessageconnection.cpp`
 
 ## Current Status (2026-03-12)
 
@@ -131,22 +137,56 @@ Current practical crash state:
       - `0x432dd7`
       - internal self-calls: `0x436a0e`, `0x436fa8`
       - looped submit-and-wait path: `0x449d8a`
-    - newer import-backed narrowing now makes the producer family more concrete than “generic queued work”:
+    - newer import-backed + string-backed narrowing now makes the producer family more concrete than “generic queued work”:
       - `0x4302d5` sits on a later `recvfrom` path, so it now looks like receive/packet-side event submission
       - helper `0x449b40` is a socket factory around `socket(AF_INET, type, protocol)` plus option setup
-      - `0x4328a0` uses that helper as `SOCK_STREAM` / `IPPROTO_TCP` and later calls `connect`, so its queue submissions now look like TCP connect / connect-status work
-      - `0x4325d0` uses that helper as `SOCK_DGRAM` / `IPPROTO_UDP`, then `setsockopt(...SO_REUSEADDR...)`, then `bind`, so that method now reads as UDP bind/setup in the same engine family
+      - arg5 slot `1` / `0x431ce0` is now string-backed as `MonitorPort`
+      - arg5 slot `2` / `0x4325d0` is now string-backed as `UDPMonitorPort` and uses `SOCK_DGRAM` / `IPPROTO_UDP`, then `setsockopt(...SO_REUSEADDR...)`, then `bind`
+      - arg5 slot `6` / `0x4328a0` is now string-backed as `Connect` and uses `SOCK_STREAM` / `IPPROTO_TCP`, then `bind` + `connect`
+      - arg5 slot `7` / `0x42f970` is now string-backed as `Close`
+      - arg5 slot `8` / `0x42fbd0` is now string-backed as `SendBuffer`
+      - arg5 slot `12` / `0x4316a0` is now string-backed as `CleanupConnection`
       - coded `0x435050(payload)` items now look like network status/result objects, not generic integer blobs
     - current best reading is therefore that queue0C is a launcher-owned **network-engine event/status queue**, not a generic task list
+    - newer direct-xref review also narrows how the engine seems to be entered from startup:
+      - current direct uses of global `0x4d6304` still only show construction/registration, `InitClientDLL` handoff, descriptor embedding/default fallback, and teardown release
+      - there is still no obvious single direct launcher-mainline call on raw global `0x4d6304` to `MonitorPort` / `UDPMonitorPort` / `Connect`
+      - newer worker/connection review now also shows why that may be so:
+        - a likely `CMessageConnection`-family object captures the engine pointer at `+0x10`
+        - then calls back into engine methods and also enqueues `(work, self, 0)` through `0x436820`
+      - so the next missing startup activity is currently more likely to be indirect engine/helper/connection setup than one trivial direct global call we just missed
     - newer container/dispatch narrowing now also shows:
       - arg5 `+0x80` is an endpoint-keyed container (sockaddr/port-style key)
       - arg5 `+0x8c` is a pointer-keyed container (context/owner dword key)
-      - arg5 slot `5` (`0x431840`) is now best read as an endpoint-removal / teardown / handle-extraction path with miss result `0x7000004`
-      - arg5 slot `12` (`0x4316a0`) acquires helper `+0x98`, looks up the dequeued context in `+0x8c`, consumes/removes a payload object there, performs teardown/state-transition work, and then calls `0x44ab60(context)`
+      - `+0x80` payloads are now best read as `AcceptThread`-style worker objects populated by slot `1` / `MonitorPort`
+      - `+0x8c` payloads are now best read as `WorkerThread`-style worker objects populated by helper `0x431ff0` for slot `2` / `UDPMonitorPort` and slot `6` / `Connect`
+      - slot `2` success marks worker state `[worker+0x34] = 2`
+      - slot `6` success marks worker state `[worker+0x34] = 1`
+      - slot `7` / `Close` and slot `8` / `SendBuffer` both explicitly gate on connection state `1` or `2`
+      - arg5 slot `5` (`0x431840`) is now best read as an endpoint-keyed unmonitor / teardown / handle-extraction path with miss result `0x7000004`
+      - arg5 slot `12` (`0x4316a0` / `CleanupConnection`) acquires helper `+0x98`, looks up the dequeued context in `+0x8c`, consumes/removes a payload object there, performs teardown/state-transition work, and then calls `0x44ab60(context)`
       - launcher consumer `0x436d31..0x436ee7` dequeues `(workItem, context)`, reads `[workItem+0x04]` through `0x4816f0`, calls arg5 slot `12(context)`, then calls `context->+0x10(workItem)`
+      - that dequeued `context` is now likely a `CMessageConnection`-family object on important paths, not just an anonymous owner pointer
+      - current best `CMessageConnection` callback mapping is now:
+        - `+0x10` / `0x4490c0` = likely `OnOperationCompleted(workItem)`
+        - `+0x20` / `0x449d20` = likely `SendPacket(...)` -> engine `+0x20` / `SendBuffer`
+        - `+0x1c` / `0x449cd0` = likely endpoint-update / ensure-connected wrapper -> engine `+0x18` / `Connect`
+        - `+0x0c` / `0x449ca0` = likely close/abort wrapper -> engine `+0x1c` / `Close`
+      - newer ctor/vtable review now also shows `0x448b40` first builds a base `CLTTCPConnection`-family object (vtable `0x4b8018`, string-backed by nearby `CLTTCPConnection::OnReceive()` text) and then overwrites the vtable to `0x4b7928` for `CMessageConnection`
+      - newer wrapper-level signature narrowing now also shows those engine callbacks are importantly connection-object-based on this path:
+        - `0x449cd0` updates connection `+0x24` and then calls engine `+0x18(self)`
+        - `0x449ca0` calls engine `+0x1c(self, ...)`
+        - `0x449d20` forwards send args together with `self` into engine `+0x20`
+      - current best reading is therefore that the engine is often reached indirectly through `CMessageConnection`-family objects after they capture the engine pointer, not only through obvious direct raw-global `0x4d6304` calls
     - when queue work is present, client `0x62531e31..0x62531fe7` mirrors launcher `0x436d31..0x436ee7` and then calls arg5 primary vtable offset `+0x30` (slot `12`)
     - so the current absence of arg5 slot-12 runtime traffic is now best explained by **empty queue state**, not by slot 12 being irrelevant
   - current best reading is that the binder/scaffold path now reaches a real runtime idle/poll loop rather than an immediate post-init crash, and the next blocker is missing launcher-owned work/state that should drive arg5 queue activity beyond the current empty-loop path
+  - newer deliberate rerun after partially wiring slots `1/2/6/7/8/12` into `src/liblttcp/` did **not** change the observed runtime surface yet:
+    - still only mediator `+0x2c`
+    - still only arg5 helper `+0x60` slot `0/1`
+    - still no live slot `6/7/8/12` traffic in the current runtime loop
+    - still empty queue0C / queue34 cursor state
+  - user subjectively observed that the in-game **Loading Character** phase seemed to stay visible/useful longer after the recent class-wiring cleanup, but current logs do **not** yet prove a deeper runtime transition there; treat that as suggestive only until a new surface/state change/crash signature confirms it
 - visible current runtime state still includes an in-game **Loading Character** phase with loading bar / status text on the deeper path
 - static ordering still explains why that UI is compatible with the currently logged mediator depth:
   - `client.dll:0x62170f2a` pushes the string `"Loading Character"`
@@ -299,6 +339,9 @@ Code:
 - `src/resurrections.cpp` - startup orchestration / DLL loading / InitClientDLL frame
 - `src/diagnostics.cpp` - mediator stub, launcher-object stub, window tracing
 - `src/diagnostics.h`
+- `src/liblttcp/ltthreadperclienttcpengine.h` / `.cpp` - starter original-name engine skeleton (`MonitorPort`, `UDPMonitorPort`, provisional slot-3 `MonitorEphemeralUDPPort`, `Connect`, `Close`, `SendBuffer`, `CleanupConnection`) now partially wired from the diagnostics arg5 scaffold for slots `1` / `2` / `6` / `7` / `8` / `12`
+- `src/liblttcp/lttcpconnection.h` / `.cpp` - starter original-name TCP connection skeleton (`Close`, `SendBuffer`, `OnReceive`) now treated as the current best base connection layer under `CMessageConnection`
+- `src/liblttcp/cmessageconnection.h` / `.cpp` - starter original-name message-connection skeleton (`SendPacket`, `OnOperationCompleted`) that now mirrors the best current read of the queue0C `context` object family and now exposes sidecar `EnsureConnected()` / `CloseConnection()` wrappers used by the diagnostics arg5 slot-6/slot-7 paths, while `SendPacket(...)` now backs the diagnostics slot-8 path
 - `Makefile`
 - runtime executable: `resurrections.exe`
 
@@ -313,6 +356,7 @@ Canonical docs:
 - Do not treat old test harnesses as the solution architecture
 - Do not add `client.dll` memory injection to the intended path
 - Do not treat a forced `RunClientDLL` after failed `InitClientDLL` as original-equivalent behavior
+- Prefer original launcher/client names when a string-backed or strong static name is available (`MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, `SendBuffer`, `CleanupConnection`, `AcceptThread`, `WorkerThread`, etc.) instead of inventing fresh generic labels
 - Be diligent about experiment documentation: every meaningful rerun, crash change, stable non-change, or new disassembly-backed interpretation must update the relevant canonical docs in `../../docs/` as part of the same work, not later
 - Record negative results too when they narrow the search, but keep them in canonical component docs rather than scattered duplicate notes
 - When a crash becomes a recurring reference, prefer canonical doc names keyed by a stable signature such as faulting `EIP` / `module+offset` rather than transient dump numbers alone; record the specific dump filenames inside the doc body
@@ -364,7 +408,7 @@ Canonical docs:
    - keep the newer semantic narrowing in mind while doing that:
      - queue0C now looks like a launcher-owned **network-engine event/status queue**
      - not a generic arbitrary job list
-     - concrete recovered producer families now already touch `recvfrom`, `socket`, `setsockopt`, `bind`, and `connect`
+     - concrete recovered producer families now already touch `recvfrom`, `socket`, `setsockopt`, `bind`, `listen`, and `connect`
    - determine what the queued pair means semantically:
      - first dword = work-item-like object (`0x435090` / `0x435010` / `0x435050` / `0x435070` families)
      - second dword = owner/context pointer or paired object
@@ -376,13 +420,33 @@ Canonical docs:
      - `0x449d8a` currently looks like a submit-and-wait loop
    - current highest-value semantic anchors inside that taxonomy are now:
      - `0x4302d5` = recvfrom-adjacent / packet-side producer
-     - arg5 primary slot `6` / `0x4328a0` = TCP socket/connect family producer path
-     - arg5 primary slot `2` / `0x4325d0` = UDP socket/bind family path in the same engine
+     - arg5 primary slot `1` / `0x431ce0` = `MonitorPort` (TCP listen/accept-side endpoint-keyed `+0x80` population)
+     - arg5 primary slot `2` / `0x4325d0` = `UDPMonitorPort` (UDP socket/bind family path in the same engine)
+     - arg5 primary slot `3` / `0x436000` = provisional UDP-monitor helper / local-port query wrapper
+     - arg5 primary slot `6` / `0x4328a0` = `Connect` (TCP socket/bind/connect family producer path)
+     - arg5 primary slot `7` / `0x42f970` = `Close`
+     - arg5 primary slot `8` / `0x42fbd0` = `SendBuffer`
+     - arg5 primary slot `12` / `0x4316a0` = `CleanupConnection`
+     - queue0C `context` is now likely a `CMessageConnection`-family object on important paths
+     - current best `CMessageConnection` callback mapping is now:
+       - `+0x10` / `0x4490c0` = likely `OnOperationCompleted(workItem)`
+       - `+0x20` / `0x449d20` = likely `SendPacket(...)` -> engine `+0x20` / `SendBuffer`
+       - `+0x1c` / `0x449cd0` = likely endpoint-update / ensure-connected wrapper -> engine `+0x18` / `Connect`
+       - `+0x0c` / `0x449ca0` = likely close/abort wrapper -> engine `+0x1c` / `Close`
+     - newer ctor/vtable review now also shows:
+       - base `CLTTCPConnection` vtable = `0x4b8018` (string-backed by nearby `CLTTCPConnection::OnReceive()` text)
+       - derived `CMessageConnection` vtable = `0x4b7928`
+       - current live slot-6/7/8 path is connection-object-based through that family, not just raw primitive endpoint args
      - `0x435050(payload)` = coded status/result item family (`0x700000x`-style)
    - keep the now-identified next consumer milestone in mind:
      - once queue work exists, client `0x62531e31..0x62531fe7` should reach arg5 primary slot `12` at vtable offset `+0x30`
      - original launcher consumer `0x436d31..0x436ee7` then treats the dequeued pair as `(workItem, context)`, reads `[workItem+0x04]`, calls slot `12(context)`, and then calls `context->+0x10(workItem)`
      - that means the next fidelity gap is not just “feed any queue entry” but “feed the right **workItem + context** pair family so the later slot-12 / context callback chain is meaningful”
+   - current best concrete producer-side preconditions to trace before runtime are now:
+     - `MonitorPort` seeding endpoint-keyed `+0x80` with `AcceptThread` payloads
+     - `UDPMonitorPort` seeding pointer-keyed `+0x8c` with `WorkerThread` payloads in state `2`
+     - `Connect` seeding pointer-keyed `+0x8c` with `WorkerThread` payloads in state `1`
+     - `CMessageConnection`-family objects capturing the engine pointer, then driving `Connect` / `Close` / `SendBuffer`, and enqueueing `(workItem, self, 0)` into queue0C
    - determine which launcher-owned startup/runtime state should cause those producer paths to become live beyond the present idle loop where both queues still show `current0 == current1`
 6. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the loading-character path around `0x620547c0..0x62054eac`) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
 7. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
@@ -390,3 +454,10 @@ Canonical docs:
 9. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
 10. Keep tracing what `0x402ec0` minimally sets up
 11. Continue deliberate `RunClientDLL` experiments on the now-clean positive-return path, but keep them clearly labeled as binder/scaffold progress rather than faithful original-equivalent success until the launcher-owned arg5/arg6/arg7/pre-client state is reconstructed more faithfully
+12. If the deliberate path keeps avoiding fresh crashes, treat progress measurement as shifting from crash signatures to **new runtime surfaces/state changes** instead:
+   - new mediator slots
+   - new arg5 primary-slot traffic
+   - first non-empty queue0C / queue34 state
+   - first reach of slot `12`
+   - first class-backed sidecar activity that actually becomes live in logs
+   - only add dwell-time/UI timing instrumentation if those stronger runtime markers stop moving for a while

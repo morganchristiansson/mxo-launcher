@@ -221,13 +221,22 @@ A newer import-backed pass also tightens what kind of work those submissions rep
 The currently documented queue0C producer family is now best interpreted as a **network-engine event / status queue**, not a generic launcher task list:
 - `0x4302d5` sits in a function that later calls `WS2_32!recvfrom`, so that producer is best read as receive-side / packet-side work submission
 - helper `0x449b40` now resolves as a socket factory around `WS2_32!socket(AF_INET, type, protocol)` plus option setup
-- `0x4328a0` uses that helper as `socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)` and later calls `WS2_32!connect`, so its queue submissions are part of a TCP connect / connect-status family
-- `0x4325d0` uses the same helper as `socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)`, then `setsockopt(...SO_REUSEADDR...)`, then `bind`, which identifies that method as a UDP bind/setup path in the same engine family
+- original arg5 slot `6` / `Connect` (`0x4328a0`) uses that helper as `socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)` and later calls `WS2_32!connect`, so its queue submissions are part of a TCP connect / connect-status family
+- original arg5 slot `2` / `UDPMonitorPort` (`0x4325d0`) uses the same helper as `socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)`, then `setsockopt(...SO_REUSEADDR...)`, then `bind`, which identifies that method as a UDP bind/setup path in the same engine family
+- original arg5 slot `1` / `MonitorPort` (`0x431ce0`) is now also string-backed and populates the endpoint-keyed `+0x80` side with `AcceptThread`-style worker payloads
+- slot `2` / `UDPMonitorPort` success now also clearly creates a `WorkerThread` payload in `+0x8c` and marks `[worker+0x34] = 2`
+- slot `6` / `Connect` success clearly creates a `WorkerThread` payload in `+0x8c` and marks `[worker+0x34] = 1`
+- slot `7` / `Close` and slot `8` / `SendBuffer` both explicitly gate on connection state `1` or `2`, which makes those slot-2/slot-6 success writes more structurally relevant to later runtime behavior
 - coded `0x435050(payload)` work items now look even more status-like because later wait logic at `0x449d40` checks values in the same `0x700000x` family (`0x7000000`, `0x700000b`) seen near `0x4329cc`
 
 That makes the current runtime idle loop more specific than before:
 - the scaffold is not merely missing “some arbitrary producer activity”
 - it is currently missing the launcher-owned state and/or earlier socket-driving steps that should populate arg5's **network-engine queue0C** path before the client-side consumer poll begins
+- with the newer original names in hand, the highest-value missing launcher activity now looks like some combination of:
+  - `MonitorPort`
+  - `UDPMonitorPort`
+  - `Connect`
+  - and the resulting `AcceptThread` / `WorkerThread` population behind arg5 `+0x80` / `+0x8c`
 
 A further client/launcher comparison now explains why current `RunClientDLL` logs still never show arg5 primary slot `12` traffic.
 When the queue is **not** empty, client `0x62531e31..0x62531fe7` mirrors launcher `0x436d31..0x436ee7`:
@@ -253,7 +262,26 @@ It:
 - calls arg5 primary slot `12` with the dequeued `context`
 - then calls `context->+0x10(workItem)`
 
-And static recovery of original slot `12` (`0x4316a0`) now shows that it:
+A newer worker/connection pass also improves the likely type of that `context` pointer.
+It is now best treated not just as an anonymous owner pointer, but likely as a **`CMessageConnection`-family object** on important paths:
+- vtable `0x4b7928` is followed by `CMessageConnection::SendPacket` / `CMessageConnection::OnOperationCompleted` strings
+- constructor path around `0x448b40` stores an engine pointer at object `+0x10`
+- newer ctor/vtable review now also shows that `0x448b40` first builds a base **`CLTTCPConnection`-family** object and then overwrites the vtable to `0x4b7928`
+  - base vtable `0x4b8018` is now string-backed by nearby `CLTTCPConnection::OnReceive()` strings
+  - so the current best read is `CLTTCPConnection` base + derived `CMessageConnection`
+- methods on that class then call back into the engine and also enqueue `(work, self, 0)` through `0x436820`
+- current best callback mapping on that class is now:
+  - vtable `+0x10` / `0x4490c0` = likely `OnOperationCompleted(workItem)`
+  - vtable `+0x20` / `0x449d20` = likely `SendPacket(...)` -> engine `+0x20` (`SendBuffer`)
+  - vtable `+0x1c` / `0x449cd0` = likely endpoint-update / ensure-connected wrapper -> engine `+0x18` (`Connect`)
+  - vtable `+0x0c` / `0x449ca0` = likely close/abort wrapper -> engine `+0x1c` (`Close`)
+- newer wrapper-level narrowing also improves the real engine-call signatures:
+  - `0x449cd0` copies a requested endpoint into `self+0x24` and then calls engine `+0x18` with **`self`**
+  - `0x449ca0` forwards **`self`** into engine `+0x1c`
+  - `0x449d20` forwards send args together with **`self`** into engine `+0x20`
+  - so on the important current path, arg5 slots `6/7/8` are best treated as **connection-object-based** entrypoints, not merely raw `(ip,port)` helpers
+
+And static recovery of original slot `12` (`0x4316a0`, now string-backed as `CleanupConnection`) now shows that it:
 - acquires arg5 helper `+0x98`
 - searches arg5 `+0x8c` by the raw context pointer as key
 - consumes/removes a payload object from that pointer-keyed container
@@ -280,6 +308,56 @@ That shifts the next runtime question again.
 The most likely blocker is now:
 - not an immediate runtime null dereference,
 - but missing launcher-owned state that should populate or advance the arg5-owned work path beyond the current empty-loop behavior.
+
+A newer launcher-side direct-xref pass also tightens one practical expectation there.
+Current direct uses of global `0x4d6304` still only show:
+- creation / mediator registration
+- passing as `InitClientDLL` arg5
+- descriptor embedding / default-object fallback
+- teardown release
+
+So the next missing activity may not show up as one simple obvious direct `launcher-main -> g_4d6304->Connect(...)` call on the raw global alone.
+Current best reading is that the engine's meaningful runtime setup is likely driven more indirectly, through the engine's own connection/worker/helper objects and the subsystems that own them after arg5 is constructed and registered.
+
+## New negative runtime result after partial arg5 `src/liblttcp/` wiring
+
+A fresh deliberate runtime rerun was made after incrementally wiring the diagnostics arg5 scaffold into the new original-name classes for:
+- slot `1` / `MonitorPort`
+- slot `2` / `UDPMonitorPort`
+- slot `6` / `Connect`
+- slot `7` / `Close`
+- slot `8` / `SendBuffer`
+- slot `12` / `CleanupConnection`
+
+Representative command:
+
+```bash
+cd /home/morgan/mxo/code/matrix_launcher && \
+  MXO_TRACE_WINDOWS=1 \
+  MXO_FORCE_RUNCLIENT=1 \
+  MXO_ARG7_SELECTION=0x0500002a \
+  MXO_MEDIATOR_SELECTION_NAME=Vector \
+  make run_binder_both
+```
+
+Observed result on that rerun:
+- `InitClientDLL` still returns cleanly with `1`
+- `RunClientDLL` still reaches the same stable visible runtime path and did not return within the timed run window
+- but **no new slot `6` / `7` / `8` / `12` traffic appeared in `resurrections.log`**
+- the runtime log still only showed:
+  - mediator `+0x2c` / `IsConnected()`
+  - arg5 helper `+0x60` slot `0`
+  - arg5 helper `+0x60` slot `1`
+- queue state also remained unchanged on that rerun:
+  - queue0C `current0 == current1 == block0 == block1`
+  - queue34 `current0 == current1 == block0 == block1`
+
+So this partial wiring changed the internal implementation structure, but did **not** yet change the currently observed runtime behavior.
+Current best reading remains:
+- the live deliberate `RunClientDLL` path is still stuck in the same empty-work non-blocking consumer loop
+- the newly wired class-backed slot `6/7/8/12` paths are still gated behind runtime state we are not yet reaching
+- this is therefore useful negative evidence that simply moving starter semantics into `src/liblttcp/` is not, by itself, enough to make the current binder/scaffold runtime path feed queue0C or reach the later slot-12 cleanup branch
+- user subjectively reported that the visible `Loading Character` phase seemed to remain on screen longer/usefully after the recent refactor, but current logs still do **not** prove a new deeper transition there; for now that should be treated as suggestive, not canonical runtime advancement
 
 ## Relationship to the older `client.dll+0x3b3573` crash
 

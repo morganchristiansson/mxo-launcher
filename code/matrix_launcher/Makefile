@@ -4,7 +4,9 @@ CXX = i686-w64-mingw32-g++
 GAME_DIR = ~/MxO_7.6005
 TARGET = $(GAME_DIR)/resurrections.exe
 CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
-SRC = src/resurrections.cpp src/diagnostics.cpp
+SRC = src/resurrections.cpp src/diagnostics.cpp \
+	src/liblttcp/lttcpconnection.cpp src/liblttcp/ltthreadperclienttcpengine.cpp \
+	src/liblttcp/cmessageconnection.cpp
 CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 
 -include secrets/launcher_login.local.mk

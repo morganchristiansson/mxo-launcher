@@ -389,6 +389,50 @@ Recovered primary table entries from `launcher.exe` / canonical vtable table:
 - slot 11 -> `0x431670`
 - slot 12 -> `0x4316a0`
 
+Newer string-backed naming now tightens several of those slots substantially:
+- slot 1 / `0x431ce0` = **`MonitorPort`**
+  - proven by in-function log strings:
+    - `CLTThreadPerClientTCPEngine::MonitorPort: Successfully monitored ...`
+    - `... port is already monitored`
+- slot 2 / `0x4325d0` = **`UDPMonitorPort`**
+  - proven by in-function log strings:
+    - `CLTThreadPerClientTCPEngine::UDPMonitorPort: Successfully monitored ...`
+    - `... Failed to monitor port ...`
+- slot 3 / `0x436000` = **provisional UDP-monitor helper / local-port query wrapper**
+  - no direct surviving string name recovered yet
+  - current static behavior:
+    - calls slot `2` / `UDPMonitorPort` with `port = 0`
+    - and on one branch then queries `getsockname` / `ntohs` to hand a bound local port back to the caller
+  - this is still lower confidence than the string-backed names above, but it is no longer just an anonymous opaque callback
+- slot 6 / `0x4328a0` = **`Connect`**
+  - proven by in-function log strings:
+    - `CLTThreadPerClientTCPEngine::Connect: ...`
+- slot 7 / `0x42f970` = **`Close`**
+  - proven by in-function log strings:
+    - `CLTThreadPerClientTCPEngine::Close: shutdown() failed ...`
+    - `CLTThreadPerClientTCPEngine::Close: closesocket() failed ...`
+- slot 8 / `0x42fbd0` = **`SendBuffer`**
+  - proven by in-function log string:
+    - `CLTThreadPerClientTCPEngine::SendBuffer: Send failed ...`
+- slot 12 / `0x4316a0` = **`CleanupConnection`**
+  - proven by in-function log string:
+    - `CLTThreadPerClientTCPEngine::CleanupConnection: Couldn't find socket ...`
+
+Slot `5` still does not have an equally direct surviving string label in the recovered pass, but its concrete endpoint-keyed behavior is now much narrower than an anonymous unknown callback.
+
+The next cluster of names also now has a useful state-backed interpretation:
+- slot `7` / `Close` checks `[conn+0x34]` and only proceeds for state `1` or `2`
+  - then it drives `shutdown` / `closesocket` cleanup on the connection object
+- slot `8` / `SendBuffer` also only accepts connection state `1` or `2`
+  - otherwise it logs the original `SendBuffer: ... not connected/connecting` failure string
+- slot `2` / `UDPMonitorPort` success marks worker payload state with `[worker+0x34] = 2`
+- slot `6` / `Connect` success marks worker payload state with `[worker+0x34] = 1`
+
+Current best reading:
+- worker/connection state `1` and `2` are the launcher's active network states for the paths now recovered here
+- `Close` and `SendBuffer` are explicitly gated on those active states
+- and the slot-2 / slot-6 success paths are the current best-evidenced writers of those state values on the worker side
+
 What is now modeled in the scaffold:
 
 - slots `0..12` are all now present with matching stack cleanup shapes
@@ -462,6 +506,20 @@ That means the two arg5 containers are now best read as:
 - `+0x80` = endpoint-keyed container (network address / port)
 - `+0x8c` = pointer-keyed container (dword context/owner key)
 
+A newer naming pass also makes the payload families on those containers more concrete.
+Current best read:
+- `+0x80` stores endpoint nodes whose payload at `[node+0x20]` is an **AcceptThread-style worker object**
+  - slot `1` / `MonitorPort` allocates a `0x44` object via `0x431ab0`
+  - that ctor is string-backed by `CLTThreadPerClientTCPEngine::AcceptThread`
+  - `MonitorPort` creates `socket(AF_INET, SOCK_STREAM, 0)`, then `bind`, then `listen`
+  - on success it stores the new AcceptThread-style payload into the matched/new `+0x80` node at `[node+0x20]`
+- `+0x8c` stores pointer-keyed nodes whose payload at `[node+0x14]` is a **WorkerThread-style worker object**
+  - helper `0x431ff0` allocates a `0x48` object via `0x431b60`
+  - that ctor is string-backed by `CLTThreadPerClientTCPEngine::WorkerThread`
+  - helper `0x431ff0` then inserts `(contextKey, workerPayload)` into `+0x8c`
+  - slot `2` / `UDPMonitorPort` uses that helper after successful UDP socket/bind setup and then marks the returned worker object with `[worker+0x34] = 2`
+  - slot `6` / `Connect` uses that helper after successful TCP setup/connect sequencing and then marks the returned worker object with `[worker+0x34] = 1`
+
 ### New clarification: slot `5` is an endpoint-removal / handle-extraction path
 
 Static disassembly of `0x431840` now supports a stronger reading than only “empty-path returns `0x7000004`.”
@@ -477,15 +535,17 @@ Recovered behavior:
   - decrements the container count
   - loads payload object from `[node+0x20]`
   - writes `[payload+0x38]` to the caller out-pointer
-  - calls `send/recv`-adjacent cleanup helpers on payload state including:
+  - calls cleanup helpers on the payload state including:
     - `0x452320` on `payload+0x40`
     - payload virtual `+0x14`
     - `closesocket([payload+0x3c])`
     - payload virtual `+0x2c(1)`
 - then returns `0`
 
+Because slot `1` / `MonitorPort` is now known to populate `+0x80` with `AcceptThread`-style worker payloads, slot `5` can now be read more specifically as the **endpoint-keyed unmonitor / stop-monitoring counterpart** to `MonitorPort`, even though the exact exported/public method name is still not directly string-labeled in the recovered pass.
+
 Current best interpretation:
-- slot `5` is an **endpoint-keyed removal / teardown / handle-extraction** method in the network-engine family, not a generic opaque callback
+- slot `5` is an **endpoint-keyed unmonitor / teardown / handle-extraction** method in the network-engine family, not a generic opaque callback
 
 ### New clarification: slot `12` is part of the non-empty queue-dispatch continuation
 
@@ -766,7 +826,8 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
 - allocates `0x20` via `0x435d80`
 - constructs via `0x435010`
 - enqueues `(work=eax, context=edi, queueSelect=0)`
-- this still needs fuller semantic decoding, but the surrounding function family is clearly socket-facing rather than arbitrary UI work
+- newer naming/static review now ties this more concretely to original arg5 slot `2` / `UDPMonitorPort`
+- because `UDPMonitorPort` now also clearly creates/inserts a `WorkerThread` payload into arg5 `+0x8c` and marks it with `[worker+0x34] = 2`, this producer now looks like a **UDP monitor-port setup completion / worker-start submission** rather than a generic socket-facing task
 
 #### `launcher.exe:0x4329cc`
 - allocates `0x0c` via `0x435d90`
@@ -774,10 +835,12 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
 - enqueues `(work=eax, context=edi, queueSelect=0)`
 - this is the clearest currently read path proving that some queue items carry an immediate status/code payload rather than only pointer state
 - newer import-backed review also tightens the enclosing function meaning:
-  - enclosing method `0x4328a0` creates a socket through helper `0x449b40(1, 6, 0)`
+  - enclosing method is original arg5 slot `6` / `Connect`
+  - `0x4328a0` creates a socket through helper `0x449b40(1, 6, 0)`
   - `0x449b40` wraps `WS2_32!socket(AF_INET, type, protocol)` and option setup
   - later in the same `0x4328a0` method the launcher calls `WS2_32!connect`
-  - so `0x4329cc` is now best read as part of a **TCP connect / connect-status** producer path
+  - successful connect then creates/inserts a `WorkerThread` payload into arg5 `+0x8c` and marks it with `[worker+0x34] = 1`
+  - so `0x4329cc` is now best read as part of a **TCP connect / connect-status / worker-start** producer path
 
 #### `launcher.exe:0x432d86`, `0x432dc1`, and `0x432dd7`
 - same function, several queue0C variants
@@ -847,3 +910,111 @@ Current best interpretation:
 - but on the current scaffold that producer side still does not appear to be feeding even the now-best-understood queue0C path, so both queues remain in a stable **empty cursor** state rather than advancing
 - so the next arg5 problem is no longer just “which missing slot causes the old late crash?”
 - it is now more specifically “which missing launcher-owned state should populate or advance this arg5-owned runtime work path beyond the current empty-loop behavior?”
+
+### New clarification: the queued `context` is now likely a `CMessageConnection`-family object
+
+A newer pass over the worker/connection side tightens the meaning of the dequeued second dword.
+
+High-value evidence:
+- vtable at `0x4b7928` is followed by strings for:
+  - `CMessageConnection::SendPacket()`
+  - `CMessageConnection::OnOperationCompleted()`
+- constructor path around `0x448b40` installs that vtable and stores an engine pointer at `+0x10`
+- methods on that same class then call back into the engine through that stored pointer, including:
+  - engine `+0x18`
+  - engine `+0x1c`
+  - engine `+0x20`
+  - and the queue producer helper `0x436820`
+- notably, `0x449d40` uses object field `+0x6c` as the wait/poll helper and repeatedly enqueues `(work, self, 0)` through `0x436820`
+
+Current best virtual-method mapping on that class is now:
+- vtable `+0x10` / `0x4490c0` = likely **`OnOperationCompleted(workItem)`**
+  - dispatches on `workItem->[+0x04]`
+  - contains string-backed receive/completion/error handling paths
+- vtable `+0x20` / `0x449d20` = likely **`SendPacket(...)`**
+  - forwards into engine `+0x20`
+  - which matches current arg5 slot `8` / `SendBuffer`
+- vtable `+0x1c` / `0x449cd0` = likely endpoint-update / ensure-connected wrapper
+  - copies a new endpoint into object `+0x24`
+  - then calls engine `+0x18`
+  - which matches current arg5 slot `6` / `Connect`
+- vtable `+0x0c` / `0x449ca0` = likely close/abort wrapper
+  - calls engine `+0x1c`
+  - which matches current arg5 slot `7` / `Close`
+
+Newer ctor/vtable-backed clarification now makes that class family more concrete than before:
+- `0x448b40` first constructs a **base `CLTTCPConnection`-family object** and then overwrites its vtable to `0x4b7928`
+- base vtable `0x4b8018` is now string-backed by nearby `CLTTCPConnection::OnReceive()` strings
+- so current best reading is:
+  - `CLTTCPConnection` = base connection/socket object family
+  - `CMessageConnection` = derived message-oriented connection object layered on top of that base
+- this also explains why the same object family carries:
+  - engine pointer at `+0x10`
+  - endpoint copy at `+0x24`
+  - connection state at `+0x34`
+  - wait/poll helper at `+0x6c`
+
+That newer read also narrows the real engine-call signatures more than the earlier slot-name pass alone:
+- `0x449cd0` does **not** build a raw `(ip, port, context)` call
+  - it compares/copies the requested endpoint into `self+0x24`
+  - then calls engine `+0x18` with **`self`**
+  - so current best original read is that arg5 slot `6` / `Connect` is importantly a **connection-object-based** entrypoint
+- `0x449ca0` similarly forwards **`self`** into engine `+0x1c`
+  - so arg5 slot `7` / `Close` is likewise connection-object-based on this path
+- `0x449d20` forwards packet/buffer args together with **`self`** into engine `+0x20`
+  - so arg5 slot `8` / `SendBuffer` is also reached through the connection object, not as a free-standing raw socket helper alone
+
+Current best reading from that combination:
+- the queued second dword currently described as generic `context/owner` is now more specifically likely a **`CMessageConnection`-family object pointer** on at least important producer/consumer paths
+- that object is no longer just a passive owner token:
+  - it appears to be an active bridge back into engine `Connect` / `Close` / `SendBuffer` paths
+- and the pointer-keyed `+0x8c` container now looks more concrete too:
+  - helper `0x431ff0` inserts nodes there using the raw connection/context pointer as key and a `WorkerThread`-style payload as value
+  - both `UDPMonitorPort` and `Connect` then store that returned worker back through the connection-side object before marking worker state `2` / `1`
+- that also helps explain why the engine methods are hard to find through direct global `0x4d6304` xrefs alone:
+  - meaningful calls are likely mediated through these connection objects after they capture the engine pointer, not only through raw global-engine direct calls
+
+### New clarification: how the engine appears to be called from launcher startup so far
+
+A newer direct-xref pass over global `0x4d6304` is useful mainly for what it does **not** show.
+Current direct uses of the global slot still narrow to:
+- construction and registration through mediator `+0x08`
+- passing it into `InitClientDLL` as arg5
+- embedding it into a local descriptor at `0x40ed7c`
+- default-object fallback at `0x41b16d`
+- teardown via slot `0` at `0x40b3ee`
+
+What it does **not** yet show is an obvious simple launcher-mainline direct call to global `0x4d6304` slots like:
+- `MonitorPort`
+- `UDPMonitorPort`
+- `Connect`
+
+Current best reading from that absence:
+- the interesting network-engine methods are probably not driven by a single easy-to-spot direct startup call on the raw global pointer alone
+- they are more likely reached indirectly through engine-owned connection/worker/helper objects, or through later launcher subsystems after the engine object has already been registered and handed off
+- that fits the current evidence better than assuming the remaining missing startup work is a single direct `g_4d6304->Connect(...)` call that we simply have not noticed yet
+
+
+Important limitation:
+- those new source files are still **not** a faithful full arg5 runtime implementation inside the launcher scaffold
+- but they are no longer completely disconnected placeholders either:
+  - the current diagnostics scaffold now incrementally delegates slot `1` / `MonitorPort`, slot `2` / `UDPMonitorPort`, slot `6` / `Connect`, slot `7` / `Close`, slot `8` / `SendBuffer`, and slot `12` / `CleanupConnection` into the new `src/liblttcp/` classes through a diagnostic sidecar engine/connection binding
+  - `Connect`, `Close`, and `SendBuffer` are now routed through sidecar `CMessageConnection` wrappers (`EnsureConnected()` / `CloseConnection()` / `SendPacket(...)`) instead of keeping those connection-oriented paths entirely inside `diagnostics.cpp`
+  - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
+  - current diagnostic list-head emptiness for arg5 `+0x80` / `+0x8c` is also synchronized from that sidecar engine state so later stub logs track the new class-backed state more directly
+- they are therefore now best treated as **partially wired starter structure**, still far from faithful semantics but no longer only dormant future placeholders
+
+New practical rerun result after that partial wiring:
+- a fresh deliberate binder/scaffold `RunClientDLL` rerun was made after wiring slots `1/2/6/7/8/12` into the `src/liblttcp/` sidecar engine/connection classes
+- that rerun still showed only:
+  - mediator `+0x2c`
+  - arg5 helper `+0x60` slot `0`
+  - arg5 helper `+0x60` slot `1`
+- it still did **not** show any new primary-slot traffic from:
+  - slot `6` / `Connect`
+  - slot `7` / `Close`
+  - slot `8` / `SendBuffer`
+  - slot `12` / `CleanupConnection`
+- queue0C / queue34 also remained in the same empty-cursor state on that rerun
+
+So the new class wiring is currently best treated as implementation cleanup / groundwork, not as proof that those arg5 paths are live on the present runtime branch yet.
