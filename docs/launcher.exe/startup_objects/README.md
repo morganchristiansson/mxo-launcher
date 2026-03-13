@@ -26,6 +26,9 @@ This folder documents launcher-owned globals and heap objects that are part of t
 
 The current custom launcher failures are best explained by missing launcher-owned objects and registrations here, not by a need to patch `client.dll` memory.
 
+For launcher-owned auth flow work that uses the standalone auth probe as a fast reference harness, see:
+- `../auth/README.md`
+
 ## Key relationship
 
 Static analysis currently supports this chain:

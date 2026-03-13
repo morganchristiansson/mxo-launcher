@@ -519,6 +519,50 @@ Diagnostic-only forced runtime result:
 
 That forced crash is useful for diagnostics, but it is **not** original-equivalent behavior.
 
+### Auth-only probe status (2026-03-13)
+- there is now a fast host-native auth probe target independent of `resurrections.exe` / Wine:
+  - `make auth_probe`
+  - `./build/host/auth_probe --username <name> --password <password> --timeout-ms 3000`
+- current source split for that probe:
+  - `tools/auth_probe.cpp` = small TCP/logging driver
+  - `src/auth/auth_crypto.h` / `.cpp` = shared auth packet framing, `0x07` parsing, reply-embedded public-key extraction, `0x09` challenge parse, `0x0a` challenge-response builder, `0x0b` auth-reply parse, world/character list decode, and auth-reply private-exponent decrypt logic intended to stay reusable for migration back into the launcher path
+- current verified live result on the direct host-native path now covers the full auth loop:
+  - `0x06` / `AS_GetPublicKeyRequest`
+  - `0x07` / `AS_GetPublicKeyReply`
+  - `0x08` / `AS_AuthRequest`
+  - `0x09` / `AS_AuthChallenge`
+  - `0x0a` / `AS_AuthChallengeResponse`
+  - `0x0b` / `AS_AuthReply`
+- current strongest blocker resolution from that faster loop:
+  - the old direct-probe `0x08` failure was not just generic header noise
+  - the highest-value concrete fix was: **stop encrypting `AS_AuthRequest` with the stale hard-coded mxo-hd public key and instead use the RSA modulus/exponent carried by the live `0x07` reply**
+- current verified full-auth run against the live auth server with launcher-project secrets:
+  - `0x07`: `status=0 currentTime=1773438144 publicKeyId=4 keySize=18 modulusLength=128 signatureLength=256 publicExponentByte=0x11`
+  - `0x08`: `payloadLen=170 headerLen=2 byteCount=172 blobLen=128 usedReplyPublicKey=1`
+  - `0x09`: challenge payloadLen `17`
+  - `0x0a`: challenge-response payloadLen `69`, plaintextLen `64`, ciphertextLen `64`
+  - `0x0b`: parsed auth success with:
+    - `characterCount=2`
+    - `worldCount=1`
+    - `username='morgan'`
+    - decoded character entries:
+      - `Morg4n`
+      - `Noobish`
+    - decoded world entry:
+      - `Reality`
+    - parsed auth-data block:
+      - marker `0x0136` (`36 01` on wire)
+      - signature length `128`
+      - encrypted private exponent length `96`
+    - decrypted auth-reply private exponent length `96`
+- important credential-shape note from the same pass:
+  - user-facing auth now uses **one real password input**
+  - the older `soePass` field is treated as a legacy internal payload field only
+  - current probe behavior mirrors the real password into that legacy field internally by default instead of exposing a second public CLI credential
+- current auth-only status:
+  - the standalone probe now reaches a semantic enough `0x0b` parse to be immediately useful for later margin/bootstrap migration work
+  - the auth gate itself is no longer blocked
+
 ## Build / Install / Run
 
 Build:
@@ -527,12 +571,28 @@ cd /home/morgan/mxo/code/matrix_launcher
 make
 ```
 
+Fast host-native auth probe build:
+```bash
+cd /home/morgan/mxo/code/matrix_launcher
+make auth_probe
+```
+
 The active launcher is built directly to:
 - `~/MxO_7.6005/resurrections.exe`
 
 Safe run:
 ```bash
 make run
+```
+
+Fast auth-only probe run:
+```bash
+./build/host/auth_probe --username <name> --password <password> --timeout-ms 3000
+```
+
+Or via included local secrets:
+```bash
+make run_auth_probe
 ```
 
 Forced incomplete-init experiment:
@@ -577,6 +637,8 @@ Code:
 - `src/liblttcp/cmessageconnection.h` / `.cpp` - starter original-name message-connection skeleton (`SendPacket`, `OnOperationCompleted`) that now mirrors the best current read of the queue0C `context` object family and now exposes sidecar `EnsureConnected()` / `CloseConnection()` wrappers used by the diagnostics arg5 slot-6/slot-7 paths, while `SendPacket(...)` now backs the diagnostics slot-8 path
 - `src/ltlogin/loginmediator.h` / `.cpp` - scaffold-first launcher-side login/controller skeleton around the current best `CLTLoginMediator`/`0x4f78b8` read, including auth/margin server config anchors, helper-family scaffolding for `0x4f7868/6c/70/0xa0`, and source-level placeholders for the recovered margin-route owner vtable surfaces `+0xe0 / +0xfc / +0x10c`
 - `src/ltlogin/loginstates.h` / `.cpp` - scaffold-first login-state skeletons for string-backed methods like `CLTLoginState_WorldListPending::AuthMessageDispatch()` and `CLTLoginState_AuthenticatePending::AuthMessageDispatch()`, now also preserving original recovered log/error strings directly in source as future implementation/logging anchors
+- `src/auth/auth_crypto.h` / `.cpp` - shared auth-only packet/framing / `AS_GetPublicKeyReply` parse / `AS_AuthRequest` blob+header builder logic reused by the standalone probe and intended to migrate back into launcher-owned auth work
+- `tools/auth_probe.cpp` - fast host-native auth-only TCP probe for direct `0x06 -> 0x07 -> 0x08` iteration without `resurrections.exe` / Wine
 - `Makefile`
 - runtime executable: `resurrections.exe`
 

@@ -13,6 +13,9 @@ Canonical launcher-side documentation lives in component folders.
 - `startup_objects/README.md`
   - Canonical docs for launcher-owned globals and heap objects used before `InitClientDLL`.
 
+- `auth/README.md`
+  - Canonical docs for launcher-owned auth flow and the standalone auth probe used as the fast reference harness for fixing real launcher auth.
+
 - `WINEDBG.md`
   - Practical `winedbg` workflow for dump triage and live startup tracing around `InitClientDLL`.
 

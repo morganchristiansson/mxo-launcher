@@ -1,14 +1,36 @@
 # Matrix Online launcher reimplementation Makefile
 
 CXX = i686-w64-mingw32-g++
+HOST_CXX ?= g++
+HOST_AR ?= ar
 GAME_DIR = ~/MxO_7.6005
 TARGET = $(GAME_DIR)/resurrections.exe
 CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
+
+CRYPTOPP_DIR = third_party/cryptopp890
+CRYPTOPP_SOURCES = $(CRYPTOPP_DIR)/cryptlib.cpp $(CRYPTOPP_DIR)/rijndael.cpp \
+	$(CRYPTOPP_DIR)/modes.cpp $(CRYPTOPP_DIR)/sha.cpp \
+	$(CRYPTOPP_DIR)/md5.cpp $(CRYPTOPP_DIR)/hmac.cpp \
+	$(CRYPTOPP_DIR)/rsa.cpp $(CRYPTOPP_DIR)/pkcspad.cpp \
+	$(CRYPTOPP_DIR)/integer.cpp $(CRYPTOPP_DIR)/algparam.cpp \
+	$(CRYPTOPP_DIR)/asn.cpp \
+	$(CRYPTOPP_DIR)/filters.cpp $(CRYPTOPP_DIR)/queue.cpp \
+	$(CRYPTOPP_DIR)/misc.cpp \
+	$(CRYPTOPP_DIR)/files.cpp $(CRYPTOPP_DIR)/hex.cpp \
+	$(CRYPTOPP_DIR)/base64.cpp $(CRYPTOPP_DIR)/base32.cpp \
+	$(CRYPTOPP_DIR)/osrng.cpp $(CRYPTOPP_DIR)/rng.cpp
+
 SRC = src/resurrections.cpp src/diagnostics.cpp \
 	src/liblttcp/lttcpconnection.cpp src/liblttcp/ltthreadperclienttcpengine.cpp \
 	src/liblttcp/cmessageconnection.cpp src/ltlogin/loginmediator.cpp \
-	src/ltlogin/loginstates.cpp
+	src/ltlogin/loginstates.cpp src/auth/auth_crypto.cpp
 CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
+AUTH_PROBE_SRC = tools/auth_probe.cpp src/auth/auth_crypto.cpp
+
+HOST_BUILD_DIR = build/host
+AUTH_PROBE = $(HOST_BUILD_DIR)/auth_probe
+HOST_CRYPTOPP_LIB = $(CRYPTOPP_DIR)/libcryptopp.a
+AUTH_PROBE_OBJECTS = $(patsubst %.cpp,$(HOST_BUILD_DIR)/%.o,$(AUTH_PROBE_SRC))
 
 -include secrets/launcher_login.local.mk
 
@@ -16,14 +38,35 @@ LAUNCHER_ARGS = $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_
 
 all: $(TARGET)
 
+auth_probe: $(AUTH_PROBE)
+
+CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR)
+HOST_CXXFLAGS = -Wall -Wextra -O2 -std=c++17 -I$(CRYPTOPP_DIR) -Isrc
+
 $(TARGET): $(SRC)
-	$(CXX) -Wall -Wextra -O2 -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
+	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
 
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
 	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^
 
+$(HOST_BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -c -o $@ $<
+
+$(HOST_CRYPTOPP_LIB):
+	$(MAKE) -C $(CRYPTOPP_DIR) static
+
+$(AUTH_PROBE): $(AUTH_PROBE_OBJECTS) $(HOST_CRYPTOPP_LIB)
+	@mkdir -p $(dir $@)
+	$(HOST_CXX) $(HOST_CXXFLAGS) -o $@ $(AUTH_PROBE_OBJECTS) $(HOST_CRYPTOPP_LIB)
+
 run: $(TARGET)
 	cd $(GAME_DIR) && wine ./resurrections.exe $(LAUNCHER_ARGS)
+
+run_auth_probe: $(AUTH_PROBE)
+	@MXO_AUTH_PROBE_USERNAME="$(or $(MXO_AUTH_PROBE_USERNAME),$(MXO_USER))" \
+	MXO_AUTH_PROBE_PASSWORD="$(or $(MXO_AUTH_PROBE_PASSWORD),$(MXO_PASS))" \
+	$(AUTH_PROBE)
 
 crashdump:
 	@latest=$$(cd $(GAME_DIR) && ls -t MatrixOnline_0.0_crash_*.dmp 2>/dev/null | head -1); \
@@ -82,5 +125,6 @@ restore_crashreporter:
 
 clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
+	rm -rf $(HOST_BUILD_DIR)
 
-.PHONY: all run crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_stub_both run_binder_both install_crashreporter_stub restore_crashreporter clean
+.PHONY: all auth_probe run run_auth_probe crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_stub_both run_binder_both install_crashreporter_stub restore_crashreporter clean

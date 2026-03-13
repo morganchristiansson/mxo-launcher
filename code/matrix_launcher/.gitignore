@@ -1,6 +1,8 @@
 ClientErrors*.txt
 MatrixOnline_0.0_crash_*.dmp
-/third_party/
+/third_party
+/build
+
 # Local credentials / secrets
 secrets/
 *.local.json

@@ -532,6 +532,19 @@ However, the growing method surface strongly suggests that the real fix should p
 
 rather than continuing to grow a fake mediator into a large hand-emulated interface.
 
+## Standalone auth-only probe docs moved
+
+The standalone auth probe notes no longer live in `startup_objects/`.
+They now have a dedicated canonical home under:
+- `../auth/README.md`
+
+That auth doc covers:
+- the host-native probe build/run flow
+- the working `0x06 -> 0x07 -> 0x08 -> 0x09 -> 0x0A -> 0x0B` sequence
+- the reply-derived RSA key fix for `AS_AuthRequest`
+- semantic `AS_AuthReply` parsing
+- how to use the probe as a reference while fixing launcher-owned auth
+
 ## Current implication for reimplementation
 
 The current custom launcher should stop treating arg6 as a vague `master database` or arbitrary placeholder.
