@@ -1,9 +1,12 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
+#include "../auth/auth_crypto.h"
 #include "../liblttcp/cmessageconnection.h"
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
@@ -290,6 +293,15 @@ public:
     uint32_t BeginAuthHandshake();
     uint32_t BeginMarginHandshake();
 
+    void SetAuthCredentials(const char* username, const char* password);
+    void SetAuthBootstrapConfig(
+        uint32_t launcherVersion,
+        uint32_t currentPublicKeyId,
+        uint8_t loginType,
+        const std::vector<uint8_t>& keyConfigMd5,
+        const std::vector<uint8_t>& uiConfigMd5);
+    uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+
     const char* ExpectedAuthRequestName() const;
     const char* ExpectedMarginRequestName() const;
 
@@ -319,6 +331,12 @@ public:
     void* WorldPayloadSlot(uint32_t index) const;
 
 private:
+    uint32_t SendAuthFramedPacket(const mxo::auth::FramedPacket& packet, const char* stepLabel);
+    uint32_t SendAuthGetPublicKeyRequest();
+    uint32_t SendAuthRequestFromReply(const mxo::auth::GetPublicKeyReply& reply);
+    uint32_t SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge);
+    void LogParsedAuthReply(const mxo::auth::AuthReply& reply) const;
+
     void BuildAuthEndpoint();
     void BuildMarginEndpoint();
     mxo::liblttcp::CMessageConnection* EnsureAuthConnectionObject();
@@ -357,6 +375,21 @@ private:
 
     mxo::liblttcp::LTTCPEndpointKey authEndpoint_;
     mxo::liblttcp::LTTCPEndpointKey marginEndpoint_;
+
+    std::string authUsername_;
+    std::string authPassword_;
+    uint32_t authLauncherVersion_;
+    uint32_t authCurrentPublicKeyId_;
+    uint8_t authLoginType_;
+    std::vector<uint8_t> authKeyConfigMd5_;
+    std::vector<uint8_t> authUiConfigMd5_;
+    bool authGetPublicKeyRequestSent_;
+    bool authRequestSent_;
+    bool authChallengeResponseSent_;
+    mxo::auth::GetPublicKeyReply lastAuthPublicKeyReply_;
+    mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
+    mxo::auth::AuthChallenge lastAuthChallenge_;
+    mxo::auth::AuthReply lastAuthReply_;
 
     uint32_t lastAuthConnectStatus_;
     uint32_t lastMarginConnectStatus_;

@@ -502,67 +502,8 @@ Current best reading remains:
           - the outbound send target stored at `+0x50`
           - and the exact selected-source object shape passed into `0x448050`
         - but the launcher-owned auth progression claim itself is now stronger, not weaker
-    - new env-gated diagnostic runtime validation against the live auth socket now gives the first concrete outbound/reply pair on this launcher-owned auth path:
-      - command:
-
-```bash
-cd /home/morgan/mxo/code/matrix_launcher && \
-  MXO_FORCE_RUNCLIENT=1 \
-  MXO_BEGIN_AUTH_CONNECTION=1 \
-  MXO_DIAGNOSTIC_SEND_AS_GETPUBLICKEY=1 \
-  MXO_DIAGNOSTIC_AUTH_LAUNCHER_VERSION=76005 \
-  MXO_DIAGNOSTIC_AUTH_CUR_PUBLIC_KEY_ID=0 \
-  MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Vector \
-  make run_binder_both
-```
-
-      - important scope label:
-        - this is a **diagnostic bootstrap experiment**, not a claim of faithful original-equivalent launcher progression yet
-        - `76005` is a practical guessed launcher-version value from current `7.6005`, not yet a fully recovered canonical owner-field proof
-      - current evidence-backed result from that run:
-        - env-gated send log:
-          - `auth bootstrap experiment rawCode=0x06 request='AS_GetPublicKeyRequest' launcherVersion=76005 currentPublicKeyId=0 byteCount=10 -> sendResult=0x00000001`
-        - a new queued auth receive item then appears on the same runtime path:
-          - `queued connection-status work item label='AuthReceivePacket' ... type=3 payload=0x00000198`
-        - receive preview + framing decode now log:
-          - `received-bytes label='AuthConnection' total=408 preview=81 96 07 ... 04 00 00 00 12`
-          - `auth receive framing payloadLength=406 headerBytes=2 rawCode=0x07 likelyMessage='AS_GetPublicKeyReply'`
-        - newer static formatter alignment with `0x44e20` now also makes the preview itself more informative than a generic blob:
-          - `81 96` = 2-byte length prefix for payload `0x0196 = 406`
-          - payload byte `0x07` = `AS_GetPublicKeyReply`
-          - next dword `00 00 00 00` = plausible reply status `0`
-          - next dword = plausible `CurrentTime`
-          - next dword `04 00 00 00` = plausible `PublicKeyId = 4`
-          - next byte `0x12` aligns with the later formatter's `KeySize` field
-      - strongest current reading from that diagnostic pair:
-        - the small-payload send framing model taken from `0x448a00` is now runtime-supported enough to matter
-        - the raw `0x06` packet shape from `0x447eb0` is now runtime-supported enough to matter
-        - and the server reply beginning with raw `0x07` strongly supports the current `AS_GetPublicKeyRequest -> AS_GetPublicKeyReply` read on this launcher-owned auth path
-      - newer cross-check against the open-source server implementations now also sharpens how aggressively we can shortcut on this path without losing the bigger launcher-owned auth picture:
-        - active protocol-oracle references:
-          - `~/work/mxoemu/Reality/Source/AuthSocket.cpp`
-          - `~/work/mxoemu/Proxy/Logging.cpp`
-          - `~/work/mxo-hd/hds/auth/AuthHandler.cs`
-        - those implementations corroborate the live/auth-side read enough to be useful as a **secondary** source behind original-launcher static work:
-          - `AS_GetPublicKeyReply` current fixed fields line up with the live `0x07` result
-          - `AS_AuthRequest` on these servers expects a fixed recovered header plus an RSA-encrypted blob
-          - open-source server/proxy naming around that request use labels like `rsaType` / `rsaVersion`, but on the current live path that still fits the launcher-side `PublicKeyId = 4` read closely enough to be useful
-      - current pragmatic shortcut policy on this auth path is therefore:
-        - keep original `launcher.exe` static analysis as the canonical shape anchor
-        - but allow clearly labeled diagnostic shortcuts when the current live server accepts a simpler path
-      - one concrete implementation step from that policy is now in the scaffold:
-        - env-gated `AS_AuthRequest` sending support exists in `src/diagnostics.cpp`
-        - it currently expects an externally supplied RSA blob via:
-          - `MXO_DIAGNOSTIC_AUTHREQUEST_RSA_BLOB=<hex>`
-        - plus optional fixed-header inputs:
-          - `MXO_DIAGNOSTIC_AUTH_LOGIN_TYPE`
-          - `MXO_DIAGNOSTIC_AUTH_KEYCONFIG_MD5`
-          - `MXO_DIAGNOSTIC_AUTH_UICONFIG_MD5`
-        - if the RSA blob env is absent, the scaffold now logs a precise skip instead of pretending the full request is already reconstructed
-      - that still does **not** prove the full faithful original field population yet
-        - but it materially upgrades the auth-bootstrap work from pure static suspicion to a live send/reply diagnostic foothold
-        - and it gives us a practical next step for server-guided iteration on the `AS_AuthRequest` blob while staying anchored to launcher-side ownership
+    - later launcher-owned auth protocol details now belong under:
+      - `../../launcher.exe/auth/README.md`
     - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
   - current runtime log now makes that bypass/narrowing explicit with the updated static lead carried in source scaffolding as:
     - `DIAGNOSTIC: routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
@@ -597,35 +538,23 @@ cd /home/morgan/mxo/code/matrix_launcher && \
     - arg5 helper `+0x60` slot `1`
   - no logged type-3 receive work items appeared before timeout
   - no new runtime surface yet contradicted the newer negative conclusion that `0x4401a0` / `0x448a60` are not the missing first-send origin
-- newer deliberate server-guided follow-up after that `0x07` foothold now also tests the next outbound step:
-
-```bash
-cd /home/morgan/mxo/code/matrix_launcher && \
-  BLOB=$(python3 tools/build_authrequest_blob.py --username morgan) && \
-  MXO_FORCE_RUNCLIENT=1 \
-  MXO_BEGIN_AUTH_CONNECTION=1 \
-  MXO_DIAGNOSTIC_SEND_AS_GETPUBLICKEY=1 \
-  MXO_DIAGNOSTIC_SEND_AS_AUTHREQUEST=1 \
-  MXO_DIAGNOSTIC_AUTH_LAUNCHER_VERSION=76005 \
-  MXO_DIAGNOSTIC_AUTH_CUR_PUBLIC_KEY_ID=0 \
-  MXO_DIAGNOSTIC_AUTHREQUEST_RSA_BLOB="$BLOB" \
-  MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Vector \
-  make run_binder_both
-```
-
-  - new implementation/runtime result on that path:
-    - the scaffold now successfully parses the live `AS_GetPublicKeyReply` enough to log:
-      - `parsed AS_GetPublicKeyReply status=0 currentTime=1773423753 publicKeyId=4 keySize=18 payloadLength=406`
-    - then sends a diagnostic `AS_AuthRequest` using a server-guided RSA blob built from `tools/build_authrequest_blob.py`:
-      - `auth request experiment rawCode=0x08 request='AS_AuthRequest' publicKeyId=4 loginType=1 keySize=18 blobLen=128 keyConfigMd5Env=0 uiConfigMd5Env=0 payloadLen=170 headerLen=2 byteCount=172 -> sendResult=0x00000001`
-  - important scope label:
-    - this remains a **diagnostic/server-guided shortcut** path
-    - the helper script currently uses the public modulus/exponent shortcut recovered from the open-source server implementation rather than a full launcher-native crypto implementation inside `resurrections.exe`
-  - important negative runtime result from that same experiment so far:
-    - no new logged auth type-3 reply such as raw `0x09` / `AS_AuthChallenge` appeared within the timed run window yet
-    - so the remaining immediate gap has now shifted from “can we send raw `0x08` at all?” to the more specific question of whether our current diagnostic `AS_AuthRequest` blob/header shape is accepted closely enough by the live server to trigger the next challenge reply
 - current user-observed runtime impression after these queue/connect milestones is that the in-game `Loading Character` phase now appears to remain visible/useful longer than before; current logs still do **not** prove a later faithful transition there yet, but this is now consistent with the stronger runtime markers that the path is doing more than the old totally empty loop
+
+## Launcher-owned auth integration milestone inside `RunClientDLL`
+
+The deliberate binder/runtime path now reaches a real launcher-owned auth success in `resurrections.exe`.
+
+For packet-level auth details and the canonical auth loop write-up, prefer:
+- `../../launcher.exe/auth/README.md`
+
+What matters here for `RunClientDLL` is narrower:
+- the auth connect-status queue item is now feeding a real launcher-owned auth progression instead of the older dead-end shortcut path
+- auth therefore remains launcher-owned in practice as well as in static analysis
+- the next auth-side/runtime question now shifts forward to what launcher-owned state should happen **after** successful `AS_AuthReply` so later world-list / loading progression becomes faithful
+
+Important restraint:
+- this remains a deliberate binder/scaffold run gated by `MXO_BEGIN_AUTH_CONNECTION=1`
+- so it is a real launcher-owned auth milestone, but still not final proof of full original-equivalent automatic state-machine entry
 
 ## Relationship to the older `client.dll+0x3b3573` crash
 

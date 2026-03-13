@@ -1,6 +1,6 @@
 # launcher.exe auth
 
-This folder is the canonical home for launcher-owned auth flow documentation that does **not** belong under `startup_objects/`.
+This folder is the canonical home for launcher-owned auth flow and auth-protocol documentation that does **not** belong under `startup_objects/`.
 
 In particular, the standalone auth probe lives here because it is:
 - a fast host-native auth-only harness
@@ -38,6 +38,10 @@ It exists to iterate quickly on the launcher-owned auth bootstrap sequence while
 
 The probe should remain the fast executable reference.
 Reusable packet logic should continue to live in `src/auth/auth_crypto.*` so it can be migrated back into launcher-owned code instead of forked into two implementations.
+
+Documentation policy note:
+- prefer this `docs/launcher.exe/auth/` folder for packet-level auth protocol behavior and launcher-auth milestones
+- avoid duplicating detailed wire-loop notes back into `startup_objects/`; those docs should link here instead
 
 ## Current working wire sequence
 
@@ -174,6 +178,49 @@ The key practical integration rules are:
 3. preserve reply-derived RSA key usage for `0x08`
 4. preserve the current `0x09 -> 0x0A -> 0x0B` handling shape
 5. keep the probe runnable as the fastest auth regression harness while launcher integration progresses
+
+## Launcher integration milestone in `resurrections.exe` (2026-03-13)
+
+The working probe is no longer just an external reference.
+The deliberate binder/runtime launcher path now reuses the same shared `src/auth/auth_crypto.*` helpers inside `resurrections.exe` through the launcher-side `CLTLoginMediator` scaffold.
+
+Representative launcher command:
+
+```bash
+cd /home/morgan/mxo/code/matrix_launcher && \
+  MXO_FORCE_RUNCLIENT=1 \
+  MXO_BEGIN_AUTH_CONNECTION=1 \
+  MXO_ARG7_SELECTION=0x0500002a \
+  MXO_MEDIATOR_SELECTION_NAME=Vector \
+  make run_binder_both
+```
+
+Current verified launcher-owned wire result on that path now also covers the full live auth loop:
+- `0x06` / `AS_GetPublicKeyRequest`
+- `0x07` / `AS_GetPublicKeyReply`
+- `0x08` / `AS_AuthRequest`
+- `0x09` / `AS_AuthChallenge`
+- `0x0A` / `AS_AuthChallengeResponse`
+- `0x0B` / `AS_AuthReply`
+
+Representative launcher-side evidence from `~/MxO_7.6005/resurrections.log`:
+- `launcher-owned auth send step='AS_GetPublicKeyRequest' ... -> sendResult=0x00000001`
+- `launcher-owned auth parsed AS_GetPublicKeyReply ... publicKeyId=4 keySize=18 ... hasEmbeddedPublicKey=1`
+- `launcher-owned auth send step='AS_AuthRequest' ... -> sendResult=0x00000001`
+- `launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen=16`
+- `launcher-owned auth send step='AS_AuthChallengeResponse' ... -> sendResult=0x00000001`
+- `launcher-owned auth parsed AS_AuthReply success characterCount=2 worldCount=1 username='morgan'`
+- `launcher-owned auth decrypted AS_AuthReply private exponent length=96`
+
+Important interpretation:
+- this keeps auth **launcher-owned**
+- the probe remains the fastest auth regression harness
+- but the packet logic is now materially migrated into the launcher path rather than living only in `tools/auth_probe.cpp`
+
+Important current restraint:
+- this is still a deliberate binder/scaffold run gated by `MXO_BEGIN_AUTH_CONNECTION=1`
+- so it proves the launcher-owned auth wire logic now works in `resurrections.exe`
+- but it does **not** yet prove that the original launcher's full helper/state machine reaches the same transition automatically without that trigger
 
 ## Related docs
 

@@ -545,6 +545,21 @@ That auth doc covers:
 - semantic `AS_AuthReply` parsing
 - how to use the probe as a reference while fixing launcher-owned auth
 
+## Launcher-owned auth note
+
+Packet-level auth protocol behavior now belongs under:
+- `../auth/README.md`
+
+Prefer that auth folder as the canonical home for:
+- `0x06 -> 0x07 -> 0x08 -> 0x09 -> 0x0A -> 0x0B` loop details
+- reply-derived RSA key notes
+- launcher-side auth integration milestones in `resurrections.exe`
+
+This startup-object doc should stay focused on what that auth work implies about `0x4d2c58` itself:
+- auth remains **launcher-owned**
+- `ILTLoginMediator.Default` is carrying real launcher-side auth traffic on the scaffold path
+- but full original automatic helper/state-machine reconstruction is still incomplete
+
 ## Current implication for reimplementation
 
 The current custom launcher should stop treating arg6 as a vague `master database` or arbitrary placeholder.
