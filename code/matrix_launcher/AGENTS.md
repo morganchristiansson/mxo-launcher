@@ -326,6 +326,34 @@ Current practical crash state:
             - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
           - current runtime log now makes that narrowing explicit by logging:
             - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
+          - newer env-gated diagnostic bootstrap experiment now also gives the first concrete outbound/reply pair on this launcher-owned auth path:
+            - command:
+              - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_DIAGNOSTIC_SEND_AS_GETPUBLICKEY=1 MXO_DIAGNOSTIC_AUTH_LAUNCHER_VERSION=76005 MXO_DIAGNOSTIC_AUTH_CUR_PUBLIC_KEY_ID=0 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+            - scope label:
+              - this is a **diagnostic bootstrap experiment**, not a claim of faithful original-equivalent launcher progression yet
+              - `76005` is a practical guessed launcher-version value from current `7.6005`, not yet a fully recovered canonical owner-field proof
+            - current result from that run:
+              - env-gated send log:
+                - `auth bootstrap experiment rawCode=0x06 request='AS_GetPublicKeyRequest' launcherVersion=76005 currentPublicKeyId=0 byteCount=10 -> sendResult=0x00000001`
+              - a new queued auth receive item then appears on the same runtime path:
+                - `queued connection-status work item label='AuthReceivePacket' ... type=3 payload=0x00000198`
+              - receive preview + framing decode now log:
+                - `received-bytes label='AuthConnection' total=408 preview=81 96 07 ... 04 00 00 00 12`
+                - `auth receive framing payloadLength=406 headerBytes=2 rawCode=0x07 likelyMessage='AS_GetPublicKeyReply'`
+              - newer static formatter alignment with `0x44e20` now also makes that preview itself informative:
+                - `81 96` = 2-byte length prefix for payload `0x0196 = 406`
+                - payload byte `0x07` = `AS_GetPublicKeyReply`
+                - next dword `00 00 00 00` = plausible reply status `0`
+                - next dword = plausible `CurrentTime`
+                - next dword `04 00 00 00` = plausible `PublicKeyId = 4`
+                - next byte `0x12` aligns with the later formatter's `KeySize` field
+            - current strongest reading from that pair:
+              - the small-payload framing model derived from `0x448a00` is now runtime-supported enough to matter
+              - the raw `0x06` send shape from `0x447eb0` is now runtime-supported enough to matter
+              - and the server reply beginning with raw `0x07` strongly supports the current `AS_GetPublicKeyRequest -> AS_GetPublicKeyReply` read on this launcher-owned auth path
+            - important restraint:
+              - this still does **not** prove the full faithful original field population yet
+              - but it materially upgrades the auth-bootstrap work from pure static suspicion to a live send/reply diagnostic foothold
           - this is still binder/scaffold progress, not yet faithful original producer semantics
           - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
           - fresh validation reruns after the newer auth-side owner/fallback-chain narrowing still did **not** move the runtime surface yet:
@@ -703,5 +731,23 @@ Canonical docs:
      - so the next first-send target should now move from a generic unresolved blank to the concrete phase-2 bootstrap chain above; the remaining unknown is now narrower:
        - not whether `+0xa0` matters at all
        - but what exact helper object is stored at bootstrap `+0xa0`, what exact send-target object is stored at bootstrap `+0x50`, and what exact selected-source object family is copied into the bootstrap object before that branch
-   - because current timed runs still do not show any type-3 receive work items, and the server likely will not produce useful reply traffic until the correct first auth/message exchange is sent
+   - newer env-gated diagnostic bootstrap experiment now materially changes that runtime picture:
+     - with
+       - `MXO_FORCE_RUNCLIENT=1`
+       - `MXO_BEGIN_AUTH_CONNECTION=1`
+       - `MXO_DIAGNOSTIC_SEND_AS_GETPUBLICKEY=1`
+       - `MXO_DIAGNOSTIC_AUTH_LAUNCHER_VERSION=76005`
+       - `MXO_DIAGNOSTIC_AUTH_CUR_PUBLIC_KEY_ID=0`
+     - the launcher-side scaffold successfully sends a diagnostic raw `0x06` packet and then receives a real auth type-3 reply:
+       - send log:
+         - `auth bootstrap experiment rawCode=0x06 request='AS_GetPublicKeyRequest' launcherVersion=76005 currentPublicKeyId=0 byteCount=10 -> sendResult=0x00000001`
+       - receive logs:
+         - `received-bytes label='AuthConnection' total=408 preview=81 96 07 ... 04 00 00 00 12`
+         - `auth receive framing payloadLength=406 headerBytes=2 rawCode=0x07 likelyMessage='AS_GetPublicKeyReply'`
+     - important restraint:
+       - this is a **diagnostic bootstrap experiment**, not faithful original-equivalent proof of the full field-population path yet
+       - `76005` is still only a practical guessed launcher-version value from current `7.6005`
+   - so the next runtime/auth task has now shifted one step forward:
+     - stop treating the first auth bootstrap exchange as purely hypothetical
+     - next target is to parse / model the live `0x07` / `AS_GetPublicKeyReply` result strongly enough to drive the next launcher-owned bootstrap send candidate `0x08` / `AS_AuthRequest`
    - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever

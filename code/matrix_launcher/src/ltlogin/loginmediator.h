@@ -124,22 +124,22 @@ public:
         // - later challenge/crypto continuation `0x429b0`:
         //   - uses helper pointer `+0xa0 -> +0x1c`
         //   - writes 16-byte material to `+0x85`
-        //   - derives / caches dword-ish token at `+0x9c` via `0x41470`
+        //   - derives / caches the current/public key id at `+0x9c` via `0x41470`
         //
         // Current field sketch from `0x45500` + `0x448050` + `0x447eb0` + `0x4474f0`:
         // - `+0x04` = first copied string from the selected phase-2 source object
         // - `+0x10` = second copied string from the selected phase-2 source object
         // - `+0x1c` = third copied string/pointer from the selected phase-2 source object
-        // - `+0x28` = current fixed `1` on the recovered `0x439210` call path
-        // - `+0x2c` = owner-side dword copied from the object returned by owner `+0x20`
-        // - `+0x30..+0x3c` = copied 16-byte block from selected source object `+0x40`
-        // - `+0x40..+0x4c` = copied 16-byte block from selected source object `+0x50`
-        // - `+0x50` = pointer/object later used via virtual `+0x24` for outbound send
+        // - `+0x28` = `LoginType`; current recovered `0x439210` path passes fixed `1`
+        // - `+0x2c` = `LauncherVersion`; copied from the owner-side object returned by owner `+0x20`
+        // - `+0x30..+0x3c` = `KeyConfigMD5[16]`; copied from selected source object `+0x40`
+        // - `+0x40..+0x4c` = `UIConfigMD5[16]`; copied from selected source object `+0x50`
+        // - `+0x50` = outbound send-target object later used via virtual `+0x24` for send
         // - `+0x54` = embedded `0x180`-byte helper subobject from base ctor `0x45500`
         // - `+0x80` = timestamp / later delta source used on the raw `0x1b` path in `0x4474f0`
         // - `+0x84..+0x94` = challenge-derived / decrypted 16-byte material family
         // - `+0x94` / `+0x98` = later auxiliary heap objects on the raw `0x08` path
-        // - `+0x9c` = dword-ish derived token used by raw `0x06` and raw `0x08`
+        // - `+0x9c` = `CurPublicKeyId` / `PublicKeyId`; used by raw `0x06` and raw `0x08`
         // - `+0xa0` = auth/public-key helper pointer; its nullness selects raw `0x06` vs `0x08`
         // - `+0xa4` = lazy side object created on the raw `0x06` path before first send
         // - `+0xa8` = later helper/handle used on the raw `0x08` auxiliary `0x1b` path
