@@ -442,29 +442,49 @@ Current best reading remains:
         - the first faithful outbound auth/message send is **not** initiated from later helper body `0x4401a0`
         - and it is **not** initiated from fallback `0x448a60`
         - so this owner/helper/fallback chain is later incoming/fallback handling, not the missing first-send origin
-    - newer helper-family tracing now gives a concrete earlier outbound candidate worth prioritizing next:
+    - newer helper-family tracing now narrows the earlier launcher-owned auth/bootstrap lead more concretely than before:
       - `0x41b450(1)` selects helper `0x4f786c`
       - helper `0x4f786c` enter path `+0x08 / 0x439090` starts auth connect through `0x41d170`
-      - a follow-up packet-code pass then corrected and sharpened that lead:
-        - the concrete `0x43b830` sender is reached through helper object `0x4f78a0` rather than directly proving helper `0x4f786c`
-        - when that path sends through the auth wrapper:
+      - direct code xrefs to auth wrapper `0x41af60` still only tie down the later helper `0x4f78a0 +0x08 / 0x43b830`
+        - that later auth-channel path remains:
           - `0x41af60`
           - auth connection `+0x24 / 0x41cf30`
           - auth connection `+0x28 / 0x448cf0`
           - send helper `0x448a00`
           - connection `+0x20 / 0x449d20`
           - engine `+0x20` / current best `SendBuffer`
-        - the packet object there has raw code `0x35`, which maps through the auth table to **`AS_GetWorldListRequest`**
-      - that is still a valuable concrete launcher-side auth send path, but it also weakens the earlier “first send” guess:
-        - `AS_GetWorldListRequest` looks later than an initial credential/bootstrap request
-        - so it is better treated as the first **concrete auth-channel send path now tied down**, not yet proven as the first auth send after connect
-      - important channel-specific correction from the same pass:
+        - and the packet object there still has raw code `0x35`, which maps through the auth table to **`AS_GetWorldListRequest`**
+      - so the earlier bootstrap auth send now looks less like “another direct `0x41af60` caller we simply have not found yet” and more like a different launcher-owned object path
+      - current strongest earlier credential/bootstrap auth lead is now helper `0x4f7870` selected through `0x41b450(2)`:
+        - `0x439210` first gates on `0x41b490()` (`auth connection state == 2`)
+        - if auth is not connected yet, it falls back to `0x41b450(1)`
+        - on the connected branch it gathers launcher-owned owner data through:
+          - owner `+0x168`
+          - owner `+0x20`
+          - owner `+0x38`
+        - then calls `0x448050`, which is currently only xref'd from `0x439210`
+      - `0x448050` then branches by object byte `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through a bootstrap-object connection pointer at `object + 0x50 -> +0x24`:
+        - `0x447eb0`
+          - builds/sends raw auth code `0x06`
+          - strongest current **`AS_GetPublicKeyRequest`** candidate
+        - `0x4474f0`
+          - builds/sends raw auth code `0x08`
+          - strongest current **`AS_AuthRequest`** candidate
+          - also emits a later auxiliary raw `0x1b` packet on that same indirect path
+      - important channel-specific correction from the same pass still holds:
         - margin-side wrapper traffic must be read through the separate margin table
         - for example, raw code `0x06` on `0x41af70` maps to **`MS_GetClientIPRequest`**, not auth-side `AS_GetPublicKeyRequest`
-      - so `+Username/+Password` propagation into client-facing state still does **not** imply that `client.dll` owns auth; current best read remains that launcher-side helper/state code owns the network/auth progression, and the earliest credential/bootstrap auth send is still unresolved earlier than the later `AS_GetWorldListRequest` path
+      - current best auth-side conclusion is therefore now tighter than “completely unresolved before world-list”:
+        - the missing earlier launcher-owned auth/bootstrap send still sits **before** the later `AS_GetWorldListRequest` path
+        - but the highest-value concrete target is now the **phase-2 helper chain**
+          - `0x4f7870 +0x08 / 0x439210`
+          - `0x448050`
+          - `0x447eb0` raw `0x06` / candidate `AS_GetPublicKeyRequest`
+          - `0x4474f0` raw `0x08` / candidate `AS_AuthRequest`
+        - the remaining unresolved detail is the exact branch condition / object identity behind `object + 0xa0` / `object + 0x50`, not whether the launcher still owns auth progression at all
     - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
-  - current runtime log now makes that bypass/narrowing explicit with:
-    - `DIAGNOSTIC: routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='<unresolved>' laterIncomingReplyAnchor='AS_AuthReply'`
+  - current runtime log now makes that bypass/narrowing explicit with the updated static lead carried in source scaffolding as:
+    - `DIAGNOSTIC: routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
 - this is still not faithful original-equivalent queue semantics yet, but it is a concrete step past the previous totally empty queue0C runtime state
 - newer non-blocking live-socket receive polling is now also wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced any logged type-3 receive work items (`AuthReceivePacket` / `MarginReceivePacket`) on this path
 - fresh validation reruns after the auth-side owner/fallback-chain narrowing did **not** change the live runtime picture:
@@ -485,7 +505,7 @@ cd /home/morgan/mxo/code/matrix_launcher && \
   - still shows one queued auth type-2 connect-status item consumed:
     - `queued connection-status work item label='AuthConnectStatus' ... type=2 payload=0x07000001`
     - `raw message-connection context OnOperationCompleted ... type=2 payload=0x07000001`
-    - `routed auth type-2 connect-status ... nextOutboundRequest='<unresolved>' ...`
+    - `routed auth type-2 connect-status ... nextOutboundRequest='phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest' ...`
     - `releasing queued work item ...`
   - after that first consume, queue0C returns to the same empty-cursor idle loop:
     - first sample: `sameCursor=0`

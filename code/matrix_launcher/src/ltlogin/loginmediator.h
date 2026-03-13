@@ -49,16 +49,53 @@ public:
     static constexpr const char* kMessageAsAuthReply = "AS_AuthReply";
     static constexpr const char* kMessageAsGetWorldListRequest = "AS_GetWorldListRequest";
     static constexpr const char* kMessageMsConnectRequest = "MS_ConnectRequest";
+
+    // Current high-value raw auth-code anchors on the launcher-owned helper path:
+    // - `0x447eb0` currently builds/sends raw code `0x06`
+    //   -> strongest current `AS_GetPublicKeyRequest` candidate
+    // - `0x4474f0` currently builds/sends raw code `0x08`
+    //   -> strongest current `AS_AuthRequest` candidate
+    // - `0x43b830` currently builds/sends raw code `0x35`
+    //   -> later `AS_GetWorldListRequest`
+    static constexpr uint8_t kAuthRawCodeGetPublicKeyRequest = 0x06;
+    static constexpr uint8_t kAuthRawCodeAuthRequest = 0x08;
+    static constexpr uint8_t kAuthRawCodeGetWorldListRequest = 0x35;
     static constexpr const char* kMessageMsConnectReply = "MS_ConnectReply";
     static constexpr const char* kMessageMsLoadCharacterReply = "MS_LoadCharacterReply";
 
     struct ConnectionHelperFamily {
-        // launcher.exe:0x43b300 currently initializes this small helper/object family
-        // immediately after `0x4f78b8 = esi`.
-        void* helper7868 = nullptr;  // global `0x4f7868`
-        void* helper786C = nullptr;  // global `0x4f786c`
-        void* helper7870 = nullptr;  // global `0x4f7870`
-        void* helper78A0 = nullptr;  // global `0x4f78a0`
+        // launcher.exe:0x43b300 initializes a contiguous 15-slot helper/state array rooted at
+        // `0x4f7868`, immediately after `0x4f78b8 = esi`.
+        //
+        // Current highest-value slot anchors:
+        // - slot 1 / `0x4f786c` / phase-code `1`
+        //   - `+0x08 / 0x439090` starts auth connect through `0x41d170`
+        // - slot 2 / `0x4f7870` / phase-code `2`
+        //   - `+0x08 / 0x439210` is the strongest current earlier credential/bootstrap auth lead
+        //   - on the connected branch it reaches `0x448050`, which then branches to:
+        //     - `0x447eb0` building/sending raw auth code `0x06`
+        //       -> strongest current `AS_GetPublicKeyRequest` candidate
+        //     - `0x4474f0` building/sending raw auth code `0x08`
+        //       -> strongest current `AS_AuthRequest` candidate
+        // - slot 10 / `0x4f7890` / phase-code `10`
+        //   - `+0x14 / 0x4401a0` handles later incoming `AS_AuthReply`
+        // - slot 14 / `0x4f78a0` / phase-code `14`
+        //   - `+0x08 / 0x43b830` sends later `AS_GetWorldListRequest`
+        void* helper7868 = nullptr;  // slot 0 / phase-code 0
+        void* helper786C = nullptr;  // slot 1 / phase-code 1
+        void* helper7870 = nullptr;  // slot 2 / phase-code 2
+        void* helper7874 = nullptr;  // slot 3 / phase-code 3
+        void* helper7878 = nullptr;  // slot 4 / phase-code 4
+        void* helper787C = nullptr;  // slot 5 / phase-code 5
+        void* helper7880 = nullptr;  // slot 6 / phase-code 6
+        void* helper7884 = nullptr;  // slot 7 / phase-code 7
+        void* helper7888 = nullptr;  // slot 8 / phase-code 8
+        void* helper788C = nullptr;  // slot 9 / phase-code 9
+        void* helper7890 = nullptr;  // slot 10 / phase-code 10
+        void* helper7894 = nullptr;  // slot 11 / phase-code 11
+        void* helper7898 = nullptr;  // slot 12 / phase-code 12
+        void* helper789C = nullptr;  // slot 13 / phase-code 13
+        void* helper78A0 = nullptr;  // slot 14 / phase-code 14
     };
 
     struct MarginRouteState {
@@ -118,10 +155,12 @@ public:
 
     // launcher.exe:0x43b300
     // Current best read:
-    // - allocates / initializes a family of small launcher-global helper/state objects
-    //   currently rooted at `0x4f7868 / 0x4f786c / 0x4f7870 / 0x4f78a0`
+    // - allocates / initializes a contiguous 15-slot launcher-global helper/state array
+    //   rooted at `0x4f7868 .. 0x4f78a0`
     // - this happens immediately after `0x4f78b8 = esi`
-    // - exact class names for those helper objects are still being recovered
+    // - the slot index and each helper's vtable `+0x18` phase-code getter now match across
+    //   the recovered table (`0..14`)
+    // - exact class names for most helper objects are still being recovered
     void InitializeConnectionHelpers();
 
     // Current best auth-side connection-init path:
@@ -170,23 +209,44 @@ public:
     //   first outbound request after connect; current best read is now stronger than that:
     //   this owner/helper/fallback chain is **not** where the first faithful outbound auth
     //   request begins, even though it remains important later incoming-path evidence
-    // - newer helper-family tracing now gives one stronger earlier candidate for the first
-    //   outbound auth send:
+    // - newer helper-family tracing now gives a stronger earlier bootstrap lead than only the
+    //   later world-list sender:
     //   - `0x41b450(1)` selects helper `0x4f786c`
     //   - helper `+0x08 / 0x439090` starts auth connect through `0x41d170`
-    //   - helper `+0x30 / 0x43b830` later checks auth connectivity and, when connected,
-    //     builds a packet-like object and routes it through:
+    //   - direct code xrefs to auth wrapper `0x41af60` still only tie down the later helper
+    //     `0x4f78a0 +0x08 / 0x43b830`
+    //   - that later auth-side wrapper path remains:
     //       - `0x41af60`
     //       - auth connection `+0x24 / 0x41cf30`
     //       - auth connection `+0x28 / 0x448cf0`
     //       - send helper `0x448a00`
     //       - connection `+0x20 / 0x449d20`
     //       - engine `+0x20` / current best `SendBuffer`
-    //   - important channel-specific correction from the latest packet-code pass:
-    //     - this auth-side wrapper path currently ties raw code `0x35` to
-    //       `AS_GetWorldListRequest`
-    //     - do not confuse that with margin-side wrapper traffic like `0x41af70`, where raw
-    //       code `0x06` maps through the margin table to `MS_GetClientIPRequest`
+    //     with raw code `0x35` -> `AS_GetWorldListRequest`
+    // - current strongest earlier credential/bootstrap auth lead is now helper
+    //   `0x4f7870` selected through `0x41b450(2)`:
+    //   - helper `+0x08 / 0x439210`
+    //   - if auth is not connected yet, it falls back to `0x41b450(1)`
+    //   - on the connected branch it gathers launcher-owned owner data through:
+    //     - owner `+0x168`
+    //     - owner `+0x20`
+    //     - owner `+0x38`
+    //   - then calls `0x448050`, which is currently only xref'd from `0x439210`
+    //   - `0x448050` then branches into two launcher-owned outbound packet builders that both
+    //     send indirectly through a bootstrap object connection pointer at `object + 0x50`
+    //     via virtual `+0x24`, rather than through another simple direct `0x41af60` callsite:
+    //     - `0x447eb0`
+    //       - builds/sends raw code `0x06`
+    //       - strongest current `AS_GetPublicKeyRequest` candidate
+    //     - `0x4474f0`
+    //       - builds/sends raw code `0x08`
+    //       - strongest current `AS_AuthRequest` candidate
+    //       - also builds/sends a later auxiliary raw `0x1b` packet on that same indirect path
+    //   - the branch condition between those builders is still only known as object byte `+0xa0`
+    // - important channel-specific correction from the latest packet-code pass:
+    //   - do not confuse this auth-side bootstrap lead with margin-side wrapper traffic like
+    //     `0x41af70`, where raw code `0x06` maps through the margin table to
+    //     `MS_GetClientIPRequest`
     uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
     uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
     uint32_t BeginAuthHandshake();

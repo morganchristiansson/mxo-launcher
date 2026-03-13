@@ -289,17 +289,30 @@ Current practical crash state:
               - so the missing first faithful outbound auth/message send is currently best treated as **not** originating from later helper body `0x4401a0` and **not** from `0x448a60`
             - newer helper-family tracing now also sharpens one important auth-ownership point the user called out:
               - even if `+Username/+Password` reach client-facing argv/state, that still does **not** imply `client.dll` owns auth
-              - current stronger launcher-side send evidence is:
-                - concrete auth-channel send body `0x43b830` reached through helper object `0x4f78a0`
+              - current later concrete launcher-side auth-channel send remains:
+                - helper object `0x4f78a0`
+                - send body `0x43b830`
                 - wrapper path `0x41af60 -> auth connection +0x24 / 0x41cf30 -> +0x28 / 0x448cf0 -> 0x448a00 -> 0x449d20 -> engine +0x20`
                 - packet raw code `0x35` = **`AS_GetWorldListRequest`** through the auth table
+              - but newer static narrowing now ties the **earlier** launcher-owned credential/bootstrap lead down much further than before:
+                - direct code xrefs to `0x41af60` still only show that later `0x43b830` world-list path
+                - current strongest earlier lead is helper `0x4f7870` selected through `0x41b450(2)`
+                - helper `+0x08 / 0x439210` first gates on `0x41b490()` and falls back to `0x41b450(1)` if auth is not connected yet
+                - on the connected branch it gathers launcher-owned owner data through owner `+0x168`, `+0x20`, and `+0x38`, then calls `0x448050`
+                - `0x448050` is currently only xref'd from `0x439210`
+                - `0x448050` then branches by object byte `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through a bootstrap-object connection pointer at `object + 0x50 -> +0x24`:
+                  - `0x447eb0` builds/sends raw auth code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
+                  - `0x4474f0` builds/sends raw auth code `0x08` -> strongest current **`AS_AuthRequest`** candidate
+                  - `0x4474f0` also emits a later auxiliary raw `0x1b` packet on that same indirect path
               - important channel-specific correction from the same pass:
                 - margin-side wrapper traffic must be decoded through the margin table
                 - raw `0x06` on `0x41af70` = **`MS_GetClientIPRequest`**, not auth `AS_GetPublicKeyRequest`
-              - so the concrete launcher-side auth send path now looks stronger, while the earlier credential/bootstrap auth send still remains unresolved before that later `AS_GetWorldListRequest` path
+              - so the auth-side bootstrap send is no longer just a generic unresolved blank before world-list:
+                - it still sits **before** the later `AS_GetWorldListRequest` path
+                - but the highest-value concrete target is now the **phase-2 helper chain** `0x4f7870 -> 0x439210 -> 0x448050 -> (0x447eb0 raw 0x06 | 0x4474f0 raw 0x08)`
             - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
           - current runtime log now makes that narrowing explicit by logging:
-            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='<unresolved>' laterIncomingReplyAnchor='AS_AuthReply'`
+            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
           - this is still binder/scaffold progress, not yet faithful original producer semantics
           - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
           - fresh validation reruns after the newer auth-side owner/fallback-chain narrowing still did **not** move the runtime surface yet:
@@ -307,7 +320,7 @@ Current practical crash state:
             - deliberate auth runtime rerun
               - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
               - still consumes exactly one queued auth type-2 connect-status item
-              - still logs `nextOutboundRequest='<unresolved>'`
+              - now logs `nextOutboundRequest='phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest'`
               - still falls back to the same mediator `+0x2c` + arg5 helper `+0x60` slot `0/1` idle loop after that first consume
               - still shows no logged type-3 receive work items before timeout
             - so current runtime evidence still does **not** contradict the newer static negative conclusion that `0x4401a0` / `0x448a60` are not the missing first-send origin
@@ -645,13 +658,25 @@ Canonical docs:
          - it still does **not** show the missing first auth send
        - failure branch: `0x41b450(3)` + `CLTLoginMediator::PostError(0x0b)`
      - fallback `0x448a60` is only the string-backed generic logger `Got unhandled op of type %d with status %s`
-     - newer concrete launcher-side auth send path now tied down:
+     - newer later launcher-side auth send path now firmly tied down:
        - helper object `0x4f78a0` reaches send body `0x43b830`
        - auth wrapper path `0x41af60 -> auth connection +0x24 / 0x41cf30 -> +0x28 / 0x448cf0 -> 0x448a00 -> 0x449d20 -> engine +0x20`
        - packet raw code `0x35` = **`AS_GetWorldListRequest`** through the auth table
+     - important negative narrowing from the same pass:
+       - direct code xrefs to `0x41af60` still only show that later world-list path
+       - so the missing earlier bootstrap auth send is currently **not** best modeled as just “another direct `0x41af60` caller we have not found yet”
+     - current strongest earlier launcher-owned bootstrap/auth target is now the phase-2 helper chain:
+       - `0x41b450(2)` selects helper `0x4f7870`
+       - helper `+0x08 / 0x439210` first gates on `0x41b490()` and falls back to `0x41b450(1)` if auth is not connected yet
+       - on the connected branch it gathers launcher-owned owner data via owner `+0x168`, `+0x20`, and `+0x38`, then calls `0x448050`
+       - `0x448050` is currently only xref'd from `0x439210`
+       - `0x448050` then branches by object byte `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through a bootstrap-object connection pointer at `object + 0x50 -> +0x24`:
+         - `0x447eb0` raw code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
+         - `0x4474f0` raw code `0x08` -> strongest current **`AS_AuthRequest`** candidate
+         - `0x4474f0` also emits a later auxiliary raw `0x1b` packet on that same indirect path
      - important channel-specific correction from the same pass:
        - margin-side wrapper traffic must be decoded through the margin table
        - raw `0x06` on `0x41af70` = **`MS_GetClientIPRequest`**, not auth `AS_GetPublicKeyRequest`
-     - so the next first-send target should now move **earlier than the later `AS_GetWorldListRequest` path too**, into some still-unresolved launcher-side credential/bootstrap auth send before that later helper state
+     - so the next first-send target should now move from a generic unresolved blank to the concrete phase-2 bootstrap chain above; the remaining unknown is the exact object/branch identity behind `+0xa0` / `+0x50`, not whether the launcher still owns auth progression
    - because current timed runs still do not show any type-3 receive work items, and the server likely will not produce useful reply traffic until the correct first auth/message exchange is sent
    - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever

@@ -163,12 +163,24 @@ const CLTLoginMediator::ConnectionHelperFamily& CLTLoginMediator::Helpers() cons
 
 void CLTLoginMediator::InitializeConnectionHelpers() {
     // Placeholder only.
-    // Original launcher `0x43b300` initializes the helper/state family around
-    // `0x4f7868 / 0x4f786c / 0x4f7870 / 0x4f78a0` immediately after `0x4f78b8 = esi`.
-    // Keep those globals represented here so the source scaffold carries the structure.
+    // Original launcher `0x43b300` initializes a contiguous helper/state array at
+    // `0x4f7868 .. 0x4f78a0` immediately after `0x4f78b8 = esi`.
+    // Keep the full recovered slot layout represented here so the source scaffold carries the
+    // structure, even while most per-slot class names/behavior remain provisional.
     helpers_.helper7868 = reinterpret_cast<void*>(0x4f7868);
     helpers_.helper786C = reinterpret_cast<void*>(0x4f786c);
     helpers_.helper7870 = reinterpret_cast<void*>(0x4f7870);
+    helpers_.helper7874 = reinterpret_cast<void*>(0x4f7874);
+    helpers_.helper7878 = reinterpret_cast<void*>(0x4f7878);
+    helpers_.helper787C = reinterpret_cast<void*>(0x4f787c);
+    helpers_.helper7880 = reinterpret_cast<void*>(0x4f7880);
+    helpers_.helper7884 = reinterpret_cast<void*>(0x4f7884);
+    helpers_.helper7888 = reinterpret_cast<void*>(0x4f7888);
+    helpers_.helper788C = reinterpret_cast<void*>(0x4f788c);
+    helpers_.helper7890 = reinterpret_cast<void*>(0x4f7890);
+    helpers_.helper7894 = reinterpret_cast<void*>(0x4f7894);
+    helpers_.helper7898 = reinterpret_cast<void*>(0x4f7898);
+    helpers_.helper789C = reinterpret_cast<void*>(0x4f789c);
     helpers_.helper78A0 = reinterpret_cast<void*>(0x4f78a0);
 }
 
@@ -226,16 +238,35 @@ uint32_t CLTLoginMediator::BeginAuthHandshake() {
     // - current best negative conclusion is therefore stronger than before:
     //   this owner/helper/fallback chain is later incoming-path handling, not the point where
     //   the first faithful outbound auth request begins
-    // - current stronger earlier first-send candidate to trace next:
-    //   - `0x41b450(1)` -> helper `0x4f786c`
-    //   - helper `+0x08 / 0x439090` starts auth connect
-    //   - helper `+0x30 / 0x43b830` later appears to build/send a packet-like object through
-    //     `0x41af60 -> 0x41cf30 -> 0x448cf0 -> 0x448a00 -> 0x449d20 -> engine +0x20`
-    //   - current packet-code correction there:
-    //     - auth-side raw code `0x35` maps to `AS_GetWorldListRequest`
-    //     - margin-side wrapper traffic must be read through the separate margin table, e.g.
-    //       raw `0x06` on `0x41af70` is `MS_GetClientIPRequest`, not auth `GetPublicKey`
-    expectedAuthRequestName_ = nullptr;
+    // - current stronger earlier bootstrap lead now sits before the later `0x43b830`
+    //   world-list send:
+    //   - helper `0x4f786c +0x08 / 0x439090` still starts auth connect
+    //   - but direct code xrefs to auth wrapper `0x41af60` still only tie down the later
+    //     helper `0x4f78a0 +0x08 / 0x43b830`
+    //   - that later path remains raw auth code `0x35` = `AS_GetWorldListRequest`
+    // - current strongest earlier credential/bootstrap lead is helper `0x4f7870`
+    //   selected through `0x41b450(2)`:
+    //   - `0x439210` first gates on `0x41b490()` (auth connected)
+    //   - if not connected, it falls back to `0x41b450(1)`
+    //   - on the connected branch it gathers launcher-owned owner data through owner
+    //     `+0x168`, `+0x20`, and `+0x38`
+    //   - then calls `0x448050`, which is currently only xref'd from `0x439210`
+    //   - `0x448050` branches by object byte `+0xa0` into two launcher-owned outbound packet
+    //     builders that both send through a bootstrap-object connection pointer at
+    //     `object + 0x50 -> +0x24` rather than through another simple direct `0x41af60`
+    //     callsite:
+    //     - `0x447eb0`
+    //       - builds/sends raw auth code `0x06`
+    //       - strongest current `AS_GetPublicKeyRequest` candidate
+    //     - `0x4474f0`
+    //       - builds/sends raw auth code `0x08`
+    //       - strongest current `AS_AuthRequest` candidate
+    //       - also emits a later auxiliary raw `0x1b` packet on that same indirect path
+    // - important channel-specific correction remains:
+    //   margin-side wrapper traffic must be read through the separate margin table, e.g.
+    //   raw `0x06` on `0x41af70` is `MS_GetClientIPRequest`, not auth `GetPublicKey`
+    expectedAuthRequestName_ =
+        "phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest";
     return 1u;
 }
 
