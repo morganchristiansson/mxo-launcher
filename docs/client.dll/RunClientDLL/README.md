@@ -407,15 +407,95 @@ Current best reading remains:
       - importantly, the auth/margin startup path currently builds derived connections through `0x4417e0 -> 0x448b40(flag=0)`, so both `+0x7c` and `+0x80` remain **NULL** on that startup path
       - that means the current auth/margin type-2 connect-status path does **not** get resolved by those helper objects alone; it falls through `0x449a70 / 0x44af60` into the owner callback / fallback chain instead
     - important correction from newer message-code review:
-      - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
+      - later auth helper body `0x4401a0` handles raw auth message code `0x0b`
       - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
-      - margin/loading callback `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
+      - margin/loading helper body `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
       - so those callbacks are currently best treated as later **incoming packet handlers** on the type-3 receive path, not direct proof of the first outbound request after connect
+    - newer auth-side fallback-chain review now gives the strongest corrected answer yet for the auth half:
+      - auth wrapper `0x449a70` runs in this order:
+        - base `0x4490c0`
+        - owner callback `[self+0xa4]->+0x17c`
+        - fallback `0x448a60` if that callback also returns `0`
+      - crucial correction: owner `+0x17c` is not fixed body `0x4401a0`
+        - owner `+0x17c` = thunk `0x41f260`
+        - `0x41f260` forwards to the owner's current helper/state object at `+0x10`
+        - then jumps to helper vtable `+0x14`
+      - so the concrete auth-side body depends on the currently selected helper from the
+        `0x4f7868` family managed by `0x41b450(...)`
+      - later helper body `0x4401a0` remains important, but now in the corrected role:
+        - it is helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
+        - it only has a real handling path for raw code `0x0b` / **`AS_AuthReply`**
+        - on the successful branch (`[reply+3] < 1`), it parses via `0x43a330`, stores reply/result state back into owner `+0x80`, appends a small owner record under `+0x684`, mirrors the current record index to owner byte `+0xcc8`, then calls:
+          - `0x41b450(0x0b)`
+          - string-backed `CLTLoginMediator::PostEvent(0x14)` via `0x41cfb0`
+        - newer helper-side follow-up on that same success branch is still negative for first-send purposes:
+          - `0x41b450(0x0b)` selects helper `0x4f7894` (vtable `0x4b5154`)
+          - its concrete `+0x8` method `0x43c020` prepares owner-side data and posts event `0x15`
+          - it still does **not** show the missing first auth send
+        - on the failure branch (`[reply+3] >= 1`), it instead calls:
+          - `0x41b450(3)`
+          - string-backed `CLTLoginMediator::PostError(0x0b)` via `0x41d090`
+      - fallback `0x448a60` is likewise not a send path:
+        - it only logs string-backed `Got unhandled op of type %d with status %s`
+        - using work-item status from `0x434d00(workItem)` and work-item type from `0x4816f0(workItem)`
+      - current best auth-side conclusion is therefore stricter than the earlier softer wording:
+        - the first faithful outbound auth/message send is **not** initiated from later helper body `0x4401a0`
+        - and it is **not** initiated from fallback `0x448a60`
+        - so this owner/helper/fallback chain is later incoming/fallback handling, not the missing first-send origin
+    - newer helper-family tracing now gives a concrete earlier outbound candidate worth prioritizing next:
+      - `0x41b450(1)` selects helper `0x4f786c`
+      - helper `0x4f786c` enter path `+0x08 / 0x439090` starts auth connect through `0x41d170`
+      - a follow-up packet-code pass then corrected and sharpened that lead:
+        - the concrete `0x43b830` sender is reached through helper object `0x4f78a0` rather than directly proving helper `0x4f786c`
+        - when that path sends through the auth wrapper:
+          - `0x41af60`
+          - auth connection `+0x24 / 0x41cf30`
+          - auth connection `+0x28 / 0x448cf0`
+          - send helper `0x448a00`
+          - connection `+0x20 / 0x449d20`
+          - engine `+0x20` / current best `SendBuffer`
+        - the packet object there has raw code `0x35`, which maps through the auth table to **`AS_GetWorldListRequest`**
+      - that is still a valuable concrete launcher-side auth send path, but it also weakens the earlier “first send” guess:
+        - `AS_GetWorldListRequest` looks later than an initial credential/bootstrap request
+        - so it is better treated as the first **concrete auth-channel send path now tied down**, not yet proven as the first auth send after connect
+      - important channel-specific correction from the same pass:
+        - margin-side wrapper traffic must be read through the separate margin table
+        - for example, raw code `0x06` on `0x41af70` maps to **`MS_GetClientIPRequest`**, not auth-side `AS_GetPublicKeyRequest`
+      - so `+Username/+Password` propagation into client-facing state still does **not** imply that `client.dll` owns auth; current best read remains that launcher-side helper/state code owns the network/auth progression, and the earliest credential/bootstrap auth send is still unresolved earlier than the later `AS_GetWorldListRequest` path
     - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
   - current runtime log now makes that bypass/narrowing explicit with:
     - `DIAGNOSTIC: routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='<unresolved>' laterIncomingReplyAnchor='AS_AuthReply'`
 - this is still not faithful original-equivalent queue semantics yet, but it is a concrete step past the previous totally empty queue0C runtime state
 - newer non-blocking live-socket receive polling is now also wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced any logged type-3 receive work items (`AuthReceivePacket` / `MarginReceivePacket`) on this path
+- fresh validation reruns after the auth-side owner/fallback-chain narrowing did **not** change the live runtime picture:
+  - plain `make run_binder_both` still ends at:
+    - `InitClientDLL returned: 1`
+    - `InitClientDLL succeeded, but RunClientDLL is gated.`
+  - deliberate runtime/auth command:
+
+```bash
+cd /home/morgan/mxo/code/matrix_launcher && \
+  MXO_FORCE_RUNCLIENT=1 \
+  MXO_BEGIN_AUTH_CONNECTION=1 \
+  MXO_ARG7_SELECTION=0x0500002a \
+  MXO_MEDIATOR_SELECTION_NAME=Vector \
+  make run_binder_both
+```
+
+  - still shows one queued auth type-2 connect-status item consumed:
+    - `queued connection-status work item label='AuthConnectStatus' ... type=2 payload=0x07000001`
+    - `raw message-connection context OnOperationCompleted ... type=2 payload=0x07000001`
+    - `routed auth type-2 connect-status ... nextOutboundRequest='<unresolved>' ...`
+    - `releasing queued work item ...`
+  - after that first consume, queue0C returns to the same empty-cursor idle loop:
+    - first sample: `sameCursor=0`
+    - later samples: `sameCursor=1`
+  - repeated live surfaces remained unchanged through the timed run:
+    - mediator `+0x2c` / `IsConnected()`
+    - arg5 helper `+0x60` slot `0`
+    - arg5 helper `+0x60` slot `1`
+  - no logged type-3 receive work items appeared before timeout
+  - no new runtime surface yet contradicted the newer negative conclusion that `0x4401a0` / `0x448a60` are not the missing first-send origin
 - current user-observed runtime impression after these queue/connect milestones is that the in-game `Loading Character` phase now appears to remain visible/useful longer than before; current logs still do **not** prove a later faithful transition there yet, but this is now consistent with the stronger runtime markers that the path is doing more than the old totally empty loop
 
 ## Relationship to the older `client.dll+0x3b3573` crash

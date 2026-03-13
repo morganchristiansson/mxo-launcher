@@ -35,8 +35,23 @@ namespace mxo::liblttcp {
 //   - auth-side derived connection vtable `0x4afef0`
 //   - margin-side derived connection vtable `0x4aff38`
 //   - those families wrap base completion through `0x449a70` / `0x44af60`
-//   - important nuance: those wrappers now look like later packet/owner handling anchors, not
-//     direct proof of the first outbound request after connect
+//   - auth-side `0x449a70` is now narrowed one step further:
+//     - after base `0x4490c0` returns 0, it calls owner `[self+0xa4]->+0x17c`
+//     - that owner surface is now resolved as thunk `0x41f260`, which forwards to the
+//       owner's current helper/state object at `owner+0x10`, then jumps to helper vtable `+0x14`
+//     - so the concrete handling target depends on the current helper selected through the
+//       `0x4f7868` family and `0x41b450(...)`, not on one fixed owner-body function alone
+//     - important correction: later body `0x4401a0` is **not** the generic owner `+0x17c`
+//       target by itself; it is helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
+//     - that helper body only meaningfully handles later raw auth code `0x0b`
+//       (`AS_AuthReply`), then updates owner state and reaches
+//       `0x41b450` + `CLTLoginMediator::PostEvent()` / `PostError()`
+//     - if the current helper `+0x14` target returns 0, `0x449a70` falls through to
+//       `0x448a60`, which is string-backed only as a generic
+//       `Got unhandled op of type %d with status %s` logger
+//   - important nuance: that auth-side owner/helper/fallback chain is therefore a later
+//     incoming packet/owner-handling anchor, not direct proof of the first outbound request
+//     after connect
 // - connection fields `+0x7c` / `+0x80` are no longer just anonymous mystery pointers:
 //   - ctor helper `0x436080` builds a `0x24` event+critical-section helper object there
 //   - helper shape now reads as:

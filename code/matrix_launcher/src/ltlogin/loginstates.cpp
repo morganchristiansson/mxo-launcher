@@ -38,6 +38,10 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
     // - CLTLoginState_AuthenticatePending::AuthMessageDispatch()
     // - AS_AuthReply / AS_AuthChallenge / AS_AuthChallengeResponse
     // - AS_PSAuthenticateReply
+    // - current concrete auth-side helper body `0x4401a0` now firmly anchors this as a later
+    //   incoming auth-reply/state-update area, not the first outbound auth-send point
+    // - important correction: owner `+0x17c` reaches this indirectly through thunk `0x41f260`
+    //   and the current helper/state object at owner `+0x10`
     // - original diagnostic strings worth preserving later:
     //   - CLTLoginState_AuthenticatePending::kLogInvalidCharacterStatus
     //   - CLTLoginState_AuthenticatePending::kLogInvalidWorldType

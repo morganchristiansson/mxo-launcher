@@ -1177,10 +1177,38 @@ Newer implementation milestone after the real auth connect work:
         - so those auth/margin startup-derived connection objects leave `+0x7c` and `+0x80` as **NULL**
         - therefore the auth/margin type-2 connect-status path falls through `0x449a70 / 0x44af60` into the owner callback / fallback chain instead of being completed entirely by helper signaling
     - important correction from newer message-code review:
-      - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
+      - later auth helper body `0x4401a0` handles raw auth message code `0x0b`
       - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
-      - margin/loading callback `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
+      - margin/loading helper body `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
       - so those callbacks are currently best treated as later incoming packet handlers on the type-3 receive path, not direct proof of the first outbound request after connect
+    - newer auth-side fallback-chain review now also narrows the answer more sharply:
+      - `0x449a70` runs as `0x4490c0 -> owner +0x17c -> fallback 0x448a60`
+      - owner `+0x17c` is thunk `0x41f260`, which forwards to the owner's current helper/state object at `+0x10`, then jumps to helper vtable `+0x14`
+      - so `0x4401a0` is not the generic owner callback itself; it is later helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
+      - that later helper only meaningfully handles raw `0x0b` / `AS_AuthReply`
+        - on success it parses via `0x43a330`, updates owner `+0x80`, appends a small record under owner `+0x684`, mirrors the current record index to owner byte `+0xcc8`, then reaches `0x41b450(0x0b)` and string-backed `CLTLoginMediator::PostEvent(0x14)`
+        - newer helper-side follow-up on that success branch is still negative for first-send purposes:
+          - `0x41b450(0x0b)` selects helper `0x4f7894` (vtable `0x4b5154`)
+          - its concrete `+0x8` method `0x43c020` prepares owner-side data and posts event `0x15`
+          - it still does **not** show the missing first auth send
+        - on failure it reaches `0x41b450(3)` and string-backed `CLTLoginMediator::PostError(0x0b)`
+      - fallback `0x448a60` only logs `Got unhandled op of type %d with status %s`
+      - current best auth-side conclusion is therefore that the missing first faithful outbound auth/message send is **not** initiated from later helper body `0x4401a0` and **not** from `0x448a60`
+    - newer helper-family tracing also tightened that earlier outbound lead further:
+      - the concrete sender body `0x43b830` is reached through helper object `0x4f78a0`
+      - when that path sends through the auth wrapper it routes through:
+        - `0x41af60`
+        - auth connection `+0x24 / 0x41cf30`
+        - auth connection `+0x28 / 0x448cf0`
+        - send helper `0x448a00`
+        - connection `+0x20 / 0x449d20`
+        - engine `+0x20` / current best `SendBuffer`
+      - the packet object on that concrete auth-channel path has raw code `0x35`, which maps through the auth table to **`AS_GetWorldListRequest`**
+      - that is strong evidence for a real launcher-side auth-channel send path, but it now looks safer to treat it as a **later** auth request rather than automatically calling it the first auth send after connect
+      - important channel-specific correction from the same pass:
+        - margin-side wrapper traffic must be read through the separate margin table
+        - for example, raw code `0x06` on `0x41af70` maps to **`MS_GetClientIPRequest`**, not auth-side `AS_GetPublicKeyRequest`
+      - so the remaining earlier credential/bootstrap auth send still appears unresolved somewhere before the later `AS_GetWorldListRequest` helper path
     - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
   - but live receive work still does not appear, so the next likely missing activity is the first faithful outbound auth/message send rather than merely more socket setup alone
 

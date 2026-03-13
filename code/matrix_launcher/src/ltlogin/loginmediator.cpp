@@ -201,19 +201,40 @@ uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
 
 uint32_t CLTLoginMediator::BeginAuthHandshake() {
     // Important correction from newer message-code review:
-    // - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
-    // - auth string mapping `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to
-    //   `AS_AuthReply`, not `AS_GetPublicKeyReply`
-    // - that makes `0x4401a0` a later **incoming auth-reply** anchor on the packet/receive
-    //   path, not direct proof of the first outbound send after connect
-    // - newer `CMessageConnection +0x7c/+0x80` review also narrows why the auth startup path
-    //   still falls through here:
-    //   - startup auth derived objects are built via `0x4417e0 -> 0x448b40(flag=0)`
-    //   - so the optional helper objects at `+0x7c / +0x80` remain null on that path
-    //   - type-2 connect-status completion therefore falls through `0x449a70` into the owner
-    //     callback/fallback chain rather than being resolved entirely inside helper signaling
-    // - current best reading is therefore still that the first faithful outbound auth request
-    //   remains unresolved on the current scaffold
+    // - raw auth code `0x0b` still resolves through `0x41bd10` to `AS_AuthReply`, not
+    //   `AS_GetPublicKeyReply`
+    // - but the concrete callback chain needed one more correction:
+    //   - `0x449a70` does **not** jump straight to fixed body `0x4401a0`
+    //   - it calls owner `+0x17c`, which is thunk `0x41f260`
+    //   - `0x41f260` forwards to the owner's current helper/state object at `+0x10`, then jumps
+    //     to helper vtable `+0x14`
+    //   - so the concrete handling body depends on the current helper selected through the
+    //     `0x4f7868` family via `0x41b450(...)`
+    // - startup auth derived objects are still built via `0x4417e0 -> 0x448b40(flag=0)`
+    //   with null `+0x7c / +0x80`, so type-2 connect-status still falls through here rather
+    //   than being resolved entirely inside helper signaling
+    // - later helper body `0x4401a0` remains important, but now in the corrected role:
+    //   - it is helper `0x4f7890` / vtable `0x4b512c` slot `+0x14`
+    //   - it only meaningfully handles later incoming `AS_AuthReply`
+    //   - on success it parses the reply via `0x43a330`, updates owner `+0x80`, appends a
+    //     small record under owner `+0x684`, mirrors the current index to owner byte `+0xcc8`,
+    //     then reaches `0x41b450(0x0b)` and `CLTLoginMediator::PostEvent(0x14)`
+    //   - `0x41b450(0x0b)` then selects helper `0x4f7894` (vtable `0x4b5154`), whose concrete
+    //     `+0x8` path `0x43c020` prepares owner-side data and posts event `0x15`
+    // - if the current helper `+0x14` target returns 0, `0x448a60` only logs
+    //   `Got unhandled op of type %d with status %s`
+    // - current best negative conclusion is therefore stronger than before:
+    //   this owner/helper/fallback chain is later incoming-path handling, not the point where
+    //   the first faithful outbound auth request begins
+    // - current stronger earlier first-send candidate to trace next:
+    //   - `0x41b450(1)` -> helper `0x4f786c`
+    //   - helper `+0x08 / 0x439090` starts auth connect
+    //   - helper `+0x30 / 0x43b830` later appears to build/send a packet-like object through
+    //     `0x41af60 -> 0x41cf30 -> 0x448cf0 -> 0x448a00 -> 0x449d20 -> engine +0x20`
+    //   - current packet-code correction there:
+    //     - auth-side raw code `0x35` maps to `AS_GetWorldListRequest`
+    //     - margin-side wrapper traffic must be read through the separate margin table, e.g.
+    //       raw `0x06` on `0x41af70` is `MS_GetClientIPRequest`, not auth `GetPublicKey`
     expectedAuthRequestName_ = nullptr;
     return 1u;
 }

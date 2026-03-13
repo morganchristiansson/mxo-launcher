@@ -148,9 +148,45 @@ public:
     //   - type-2 connect-status completion therefore falls through `0x449a70 / 0x44af60`
     //     into the owner callback / fallback chain instead of being fully handled by those
     //     optional helper objects alone
+    // - important auth-side fallback-chain narrowing from `0x449a70 -> owner +0x17c -> 0x448a60`:
+    //   - owner `+0x17c` is now resolved as thunk `0x41f260`
+    //   - `0x41f260` forwards to the owner's current helper/state object at `+0x10`, then jumps
+    //     to helper vtable `+0x14`
+    //   - so the concrete auth-side body depends on the current helper selected through the
+    //     `0x4f7868` family via `0x41b450(...)`
+    //   - important correction: `0x4401a0` is one **later helper-state** `+0x14` body
+    //     (`0x4f7890` / vtable `0x4b512c`), not the generic owner `+0x17c` target itself
+    //   - that later helper body only meaningfully handles raw auth code `0x0b` (`AS_AuthReply`)
+    //   - on success it parses that reply via `0x43a330`, updates owner `+0x80`, appends a
+    //     small owner record under `+0x684`, mirrors the current index to owner byte `+0xcc8`,
+    //     then reaches `0x41b450(0x0b)` and string-backed `CLTLoginMediator::PostEvent(0x14)`
+    //   - newer helper-side follow-up now also narrows the `0x41b450(0x0b)` continuation:
+    //     - it selects helper `0x4f7894` (vtable `0x4b5154`)
+    //     - that helper's current concrete `+0x8` path `0x43c020` prepares owner-side data and
+    //       posts event `0x15`, but still does **not** show the missing first auth send
+    //   - if the current helper `+0x14` body returns 0, `0x448a60` only logs
+    //     `Got unhandled op of type %d with status %s`
     // - important current nuance: those later packet handlers are not themselves proof of the
-    //   first outbound request after connect, but they do show that raw connect success alone is
-    //   not the whole launcher-owned auth/margin path
+    //   first outbound request after connect; current best read is now stronger than that:
+    //   this owner/helper/fallback chain is **not** where the first faithful outbound auth
+    //   request begins, even though it remains important later incoming-path evidence
+    // - newer helper-family tracing now gives one stronger earlier candidate for the first
+    //   outbound auth send:
+    //   - `0x41b450(1)` selects helper `0x4f786c`
+    //   - helper `+0x08 / 0x439090` starts auth connect through `0x41d170`
+    //   - helper `+0x30 / 0x43b830` later checks auth connectivity and, when connected,
+    //     builds a packet-like object and routes it through:
+    //       - `0x41af60`
+    //       - auth connection `+0x24 / 0x41cf30`
+    //       - auth connection `+0x28 / 0x448cf0`
+    //       - send helper `0x448a00`
+    //       - connection `+0x20 / 0x449d20`
+    //       - engine `+0x20` / current best `SendBuffer`
+    //   - important channel-specific correction from the latest packet-code pass:
+    //     - this auth-side wrapper path currently ties raw code `0x35` to
+    //       `AS_GetWorldListRequest`
+    //     - do not confuse that with margin-side wrapper traffic like `0x41af70`, where raw
+    //       code `0x06` maps through the margin table to `MS_GetClientIPRequest`
     uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
     uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
     uint32_t BeginAuthHandshake();

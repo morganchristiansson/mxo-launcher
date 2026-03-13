@@ -270,15 +270,47 @@ Current practical crash state:
                 - `0x41d170 / 0x41e500 -> 0x4417e0 -> 0x448b40(flag=0)` leaves both `+0x7c` and `+0x80` as **NULL** there
                 - so current auth/margin type-2 connect-status completion falls through `0x449a70 / 0x44af60` into the owner callback / fallback chain instead of being resolved inside those helper objects alone
             - important correction from newer message-code review:
-              - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
+              - later auth helper body `0x4401a0` handles raw auth message code `0x0b`
               - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
-              - margin/loading callback `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
+              - margin/loading helper body `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
               - so those callbacks are currently best treated as **later incoming packet handlers** on the type-3 receive path, not direct proof of the first outbound request after connect
+            - newer auth-side fallback-chain review now gives the strongest corrected answer yet for where the first auth send does **not** come from:
+              - `0x449a70` runs as `0x4490c0 -> owner +0x17c -> fallback 0x448a60`
+              - owner `+0x17c` is thunk `0x41f260`, which forwards to the owner's current helper/state object at `+0x10`, then jumps to helper vtable `+0x14`
+              - so `0x4401a0` is not the generic owner callback itself; it is later helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
+              - that later helper only meaningfully handles raw `0x0b` / `AS_AuthReply`
+              - on its success branch it parses via `0x43a330`, updates owner `+0x80`, appends a small record under owner `+0x684`, mirrors the current record index to owner byte `+0xcc8`, then reaches `0x41b450(0x0b)` and string-backed `CLTLoginMediator::PostEvent(0x14)`
+              - newer helper-side follow-up on that same success branch is still negative for first-send purposes:
+                - `0x41b450(0x0b)` selects helper `0x4f7894` (vtable `0x4b5154`)
+                - helper `+0x8` / `0x43c020` prepares owner-side data and posts event `0x15`
+                - it still does **not** show the missing first auth send
+              - on its failure branch it reaches `0x41b450(3)` and string-backed `CLTLoginMediator::PostError(0x0b)`
+              - fallback `0x448a60` is only the string-backed generic logger `Got unhandled op of type %d with status %s`
+              - so the missing first faithful outbound auth/message send is currently best treated as **not** originating from later helper body `0x4401a0` and **not** from `0x448a60`
+            - newer helper-family tracing now also sharpens one important auth-ownership point the user called out:
+              - even if `+Username/+Password` reach client-facing argv/state, that still does **not** imply `client.dll` owns auth
+              - current stronger launcher-side send evidence is:
+                - concrete auth-channel send body `0x43b830` reached through helper object `0x4f78a0`
+                - wrapper path `0x41af60 -> auth connection +0x24 / 0x41cf30 -> +0x28 / 0x448cf0 -> 0x448a00 -> 0x449d20 -> engine +0x20`
+                - packet raw code `0x35` = **`AS_GetWorldListRequest`** through the auth table
+              - important channel-specific correction from the same pass:
+                - margin-side wrapper traffic must be decoded through the margin table
+                - raw `0x06` on `0x41af70` = **`MS_GetClientIPRequest`**, not auth `AS_GetPublicKeyRequest`
+              - so the concrete launcher-side auth send path now looks stronger, while the earlier credential/bootstrap auth send still remains unresolved before that later `AS_GetWorldListRequest` path
             - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
           - current runtime log now makes that narrowing explicit by logging:
             - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='<unresolved>' laterIncomingReplyAnchor='AS_AuthReply'`
           - this is still binder/scaffold progress, not yet faithful original producer semantics
           - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
+          - fresh validation reruns after the newer auth-side owner/fallback-chain narrowing still did **not** move the runtime surface yet:
+            - plain `make run_binder_both` still stops at clean `InitClientDLL returned: 1` with `RunClientDLL` gated
+            - deliberate auth runtime rerun
+              - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+              - still consumes exactly one queued auth type-2 connect-status item
+              - still logs `nextOutboundRequest='<unresolved>'`
+              - still falls back to the same mediator `+0x2c` + arg5 helper `+0x60` slot `0/1` idle loop after that first consume
+              - still shows no logged type-3 receive work items before timeout
+            - so current runtime evidence still does **not** contradict the newer static negative conclusion that `0x4401a0` / `0x448a60` are not the missing first-send origin
           - user now also subjectively reports this is the longest the current scaffold has remained in the in-game `Loading Character` phase so far; treat that as encouraging but still secondary to harder runtime markers like new queue work / new callbacks / first real receive item
   - newer deliberate rerun after partially wiring slots `1/2/6/7/8/12` into `src/liblttcp/` did **not** change the observed runtime surface yet:
     - still only mediator `+0x2c`
@@ -590,7 +622,7 @@ Canonical docs:
    - current best narrowing is still that this sits behind the original **type-2 connect-status completion chain**, not behind raw TCP connect alone:
      - `0x4329b9..0x4329cc` -> `0x435050(0x7000001)` -> queue0C `(workItem, connection, 0)`
      - auth/margin derived connection families still matter there, but do **not** over-read later packet handlers as proof of the first send:
-       - auth derived vtable `0x4afef0`, later packet wrapper `0x449a70`, later incoming auth anchor `0x4401a0 -> AS_AuthReply`
+       - auth derived vtable `0x4afef0`, later packet wrapper `0x449a70`, later incoming auth helper-state anchor `0x4401a0 -> AS_AuthReply`
        - margin derived vtable `0x4aff38`, later packet wrapper `0x44af60`, later incoming loading anchor `0x440320 -> MS_LoadCharacterReply`
    - but the earlier `+0x7c / +0x80` helper-object target is now partly resolved and should no longer be treated as the main mystery by itself:
      - helper ctor `0x436080` builds a `0x24` event+critical-section notifier object
@@ -601,8 +633,25 @@ Canonical docs:
        - `+0x7c` = type-2 status/connect-style completion helper
        - `+0x80` = type-1 close/terminal completion helper
      - crucial narrowing: startup auth/margin derived objects are built through `0x4417e0 -> 0x448b40(flag=0)`, so both helpers are **NULL** on that important startup path
-     - therefore the next concrete reverse-engineering target shifts one step later, into the **owner callback / fallback chain after `0x4490c0` returns 0**:
-       - auth side: `0x449a70 -> owner +0x17c / 0x4401a0 -> fallback 0x448a60`
-       - margin side: `0x44af60 -> owner +0x188 -> fallback 0x448a60`
+   - the newer auth-side owner/fallback-chain pass is now also strong enough to demote that pair as the main first-send mystery:
+     - auth side `0x449a70 -> owner +0x17c -> fallback 0x448a60` is now best read as **later incoming/fallback handling**, not the first outbound auth-send origin
+     - owner `+0x17c` is thunk `0x41f260`, which forwards to owner current-helper `+0x10`, then jumps to helper vtable `+0x14`
+     - later helper body `0x4401a0` is therefore only one **state-specific** `+0x14` target (`0x4f7890` / `0x4b512c`), not the generic owner callback itself
+     - concrete `0x4401a0` only meaningfully handles later `AS_AuthReply`
+       - success branch: parse via `0x43a330`, update owner `+0x80`, append owner record under `+0x684`, mirror index to owner byte `+0xcc8`, then `0x41b450(0x0b)` + `CLTLoginMediator::PostEvent(0x14)`
+       - newer helper-side follow-up on that success branch is still negative for first-send purposes:
+         - `0x41b450(0x0b)` selects helper `0x4f7894` (vtable `0x4b5154`)
+         - helper `+0x8` / `0x43c020` prepares owner-side data and posts event `0x15`
+         - it still does **not** show the missing first auth send
+       - failure branch: `0x41b450(3)` + `CLTLoginMediator::PostError(0x0b)`
+     - fallback `0x448a60` is only the string-backed generic logger `Got unhandled op of type %d with status %s`
+     - newer concrete launcher-side auth send path now tied down:
+       - helper object `0x4f78a0` reaches send body `0x43b830`
+       - auth wrapper path `0x41af60 -> auth connection +0x24 / 0x41cf30 -> +0x28 / 0x448cf0 -> 0x448a00 -> 0x449d20 -> engine +0x20`
+       - packet raw code `0x35` = **`AS_GetWorldListRequest`** through the auth table
+     - important channel-specific correction from the same pass:
+       - margin-side wrapper traffic must be decoded through the margin table
+       - raw `0x06` on `0x41af70` = **`MS_GetClientIPRequest`**, not auth `AS_GetPublicKeyRequest`
+     - so the next first-send target should now move **earlier than the later `AS_GetWorldListRequest` path too**, into some still-unresolved launcher-side credential/bootstrap auth send before that later helper state
    - because current timed runs still do not show any type-3 receive work items, and the server likely will not produce useful reply traffic until the correct first auth/message exchange is sent
    - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever

@@ -64,8 +64,18 @@ public:
     // Current best contextual role:
     // - auth-server authentication/character-selection response handling
     // - current concrete packet-side anchor now firmly includes later incoming `AS_AuthReply`
-    //   handling on the auth path; the earlier exact `GetPublicKey` request/reply ordering is
-    //   still not settled enough to present as a fixed sequence here
+    //   handling on the auth path through helper body `0x4401a0`
+    // - important correction: `0x4401a0` is not the generic owner `+0x17c` callback itself
+    //   - owner `+0x17c` is thunk `0x41f260`
+    //   - that thunk forwards to the owner's current helper/state object at `+0x10`, then jumps
+    //     to helper vtable `+0x14`
+    //   - `0x4401a0` is one later helper-state `+0x14` body (`0x4f7890` / `0x4b512c`)
+    // - that path now also narrows one important negative point:
+    //   - `0x4401a0` parses later `AS_AuthReply`, updates owner-side state, and then reaches
+    //     `CLTLoginMediator::PostEvent(0x14)` or `PostError(0x0b)` depending on reply result
+    //   - it is therefore not direct proof of the first outbound auth request after connect
+    // - the earlier exact `GetPublicKey` request/reply ordering is still not settled enough to
+    //   present as a fixed sequence here
     // - current canonical string anchors include:
     //   - "AS_GetPublicKeyRequest"
     //   - "AS_GetPublicKeyReply"
