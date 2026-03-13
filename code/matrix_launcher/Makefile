@@ -131,6 +131,5 @@ restore_crashreporter:
 clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
 	rm -rf $(HOST_BUILD_DIR) $(WIN32_BUILD_DIR)
-	$(MAKE) -C $(CRYPTOPP_DIR) clean
 
 .PHONY: all auth_probe run run_auth_probe crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_stub_both run_binder_both install_crashreporter_stub restore_crashreporter clean

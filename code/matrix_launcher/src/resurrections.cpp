@@ -52,22 +52,9 @@ static char** g_FilteredArgv = NULL;
 static char** g_FilteredArgvOwned = NULL;
 static uint32_t g_FilteredArgvOwnedCapacity = 0;
 
-// Diagnostic: track which argv indices are most likely to be corrupted
-// The arg2+2 crash pattern suggests something reads filteredArgv[2] as a code pointer
-static const char* g_ArgvSentinel0 = "ARGV_SENTINEL_0";
-static const char* g_ArgvSentinel1 = "ARGV_SENTINEL_1";
-static const char* g_ArgvSentinel2 = "ARGV_SENTINEL_2_CRASH_TARGET";
-static const char* g_ArgvSentinel3 = "ARGV_SENTINEL_3";
-static const char* g_ArgvSentinel4 = "ARGV_SENTINEL_4";
-
-// Memory pattern sentinels to identify when client treats argv array as code
-// These are placed at indices likely to be dereferenced as function pointers
-static void* g_CodeSentinel0 = NULL;  // Will be set to recognizable pattern
-static void* g_CodeSentinel1 = NULL;
-static void* g_CodeSentinel2 = NULL;
-
-// Alternative: Argument vtable slots - if client treats arg2 as a vtable
-// these recognizable addresses might appear in crash instead of string pointer
+// Alternative: argument-vtable payloads used by the arg2 diagnostic experiments.
+// If client treats arg2 as a vtable, these recognizable addresses may surface in
+// a crash instead of an ordinary string pointer.
 static uint8_t g_vtableSlot0[8] = {0x90, 0x90, 0x90, 0x90, 0xc3, 0xcc, 0xcc, 0xcc};  // nops + ret
 static uint8_t g_vtableSlot1[8] = {0xeb, 0xfe, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // jmp to self (hang)
 static uint8_t g_vtableSlot2[8] = {0xf4, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // halt

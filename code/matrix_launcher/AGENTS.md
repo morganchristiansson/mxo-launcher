@@ -10,17 +10,6 @@ Reimplement the original Matrix Online `launcher.exe` startup path as faithfully
 Source of truth:
 - `~/MxO_7.6005/launcher.exe`
 
-Current active sources:
-- `src/resurrections.cpp`
-- `src/diagnostics.cpp`
-- `src/diagnostics.h`
-- `src/liblttcp/ltthreadperclienttcpengine.h`
-- `src/liblttcp/ltthreadperclienttcpengine.cpp`
-- `src/liblttcp/lttcpconnection.h`
-- `src/liblttcp/lttcpconnection.cpp`
-- `src/liblttcp/cmessageconnection.h`
-- `src/liblttcp/cmessageconnection.cpp`
-
 ## Current Status (2026-03-12)
 
 ### Faithful path now implemented in the scaffold

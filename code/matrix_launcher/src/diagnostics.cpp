@@ -1173,32 +1173,6 @@ static bool DiagnosticGrowLauncherQueue(
     return true;
 }
 
-static bool DiagnosticPopLauncherQueue(DiagnosticLauncherQueue* queue, uint32_t* out0, uint32_t* out1) {
-    if (!queue || !queue->current0 || !out0 || !out1) return false;
-
-    uint32_t* current0 = static_cast<uint32_t*>(queue->current0);
-    *out0 = current0[0];
-    *out1 = current0[1];
-
-    uint8_t* lastPairInBlock = queue->end0 ? (static_cast<uint8_t*>(queue->end0) - 8) : NULL;
-    if (static_cast<void*>(current0) != static_cast<void*>(lastPairInBlock)) {
-        queue->current0 = current0 + 2;
-        return true;
-    }
-
-    if (queue->block0) {
-        std::free(queue->block0);
-    }
-
-    uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
-    ++slotsCurrent;
-    queue->slotsCurrent = slotsCurrent;
-    queue->block0 = *slotsCurrent;
-    queue->end0 = queue->block0 ? (static_cast<uint8_t*>(queue->block0) + 0x80) : NULL;
-    queue->current0 = queue->block0;
-    return true;
-}
-
 static bool DiagnosticPushLauncherQueue(
     DiagnosticLauncherQueue* queue,
     uint32_t value0,
