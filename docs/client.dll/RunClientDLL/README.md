@@ -375,6 +375,19 @@ Current best reading remains:
 - the newly wired class-backed slot `6/7/8/12` paths are still gated behind runtime state we are not yet reaching
 - this is therefore useful negative evidence that simply moving starter semantics into `src/liblttcp/` is not, by itself, enough to make the current binder/scaffold runtime path feed queue0C or reach the later slot-12 cleanup branch
 - user subjectively reported that the visible `Loading Character` phase seemed to remain on screen longer/usefully after the recent refactor, but current logs still do **not** prove a new deeper transition there; for now that should be treated as suggestive, not canonical runtime advancement
+- newer implementation-side auth-connect work now also confirms that a real launcher-side TCP auth connection can be made on the binder/scaffold path before the runtime loop
+- newer queue/work milestone after that wiring:
+  - the replacement launcher can now deliberately enqueue original-shaped queue0C `(workItem, context)` pairs after successful auth/margin connect attempts
+  - on deliberate `RunClientDLL` runs, the client now visibly consumes those queued items instead of staying purely in the old empty-cursor loop from the very first sample
+  - current runtime evidence on that path now includes:
+    - queue0C cursor change before first consume (`sameCursor=0`)
+    - raw context callback activity:
+      - `DIAGNOSTIC: raw message-connection context OnOperationCompleted ...`
+    - queued work-item release activity:
+      - `DIAGNOSTIC: releasing queued work item ...`
+  - with auth + exact-host-overridden margin enabled together, two queued connect-status items are currently consumed in order on that path
+- this is still not faithful original-equivalent queue semantics yet, but it is a concrete step past the previous totally empty queue0C runtime state
+- newer non-blocking live-socket receive polling is now also wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced any logged type-3 receive work items (`AuthReceivePacket` / `MarginReceivePacket`) on this path
 
 ## Relationship to the older `client.dll+0x3b3573` crash
 

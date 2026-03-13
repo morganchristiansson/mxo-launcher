@@ -408,6 +408,23 @@ static bool EnvUint32Value(const char* name, uint32_t* outValue) {
     return true;
 }
 
+static void LowercaseAsciiCopy(char* destination, size_t destinationSize, const char* source) {
+    if (!destination || destinationSize == 0) return;
+    destination[0] = '\0';
+    if (!source) return;
+
+    size_t write = 0;
+    for (size_t i = 0; source[i] && write + 1 < destinationSize; ++i) {
+        unsigned char c = static_cast<unsigned char>(source[i]);
+        if (c >= 'A' && c <= 'Z') {
+            destination[write++] = static_cast<char>(c - 'A' + 'a');
+        } else {
+            destination[write++] = static_cast<char>(c);
+        }
+    }
+    destination[write] = '\0';
+}
+
 static const char* MaskedArgValue(const char* value) {
     if (!value || !value[0]) return "<empty>";
     return "<provided>";
@@ -1193,6 +1210,8 @@ int main(int argc, char* argv[]) {
     const bool useLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
     const bool traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
     const bool useArg2RetBypass = EnvFlagEnabled("MXO_ARG2_RET_BYPASS");
+    const bool beginAuthConnection = EnvFlagEnabled("MXO_BEGIN_AUTH_CONNECTION");
+    const bool beginMarginConnection = EnvFlagEnabled("MXO_BEGIN_MARGIN_CONNECTION");
 
     if (useArg2RetBypass) {
         uint32_t maxBypasses = 1;
@@ -1338,6 +1357,47 @@ int main(int argc, char* argv[]) {
 
     if (useLauncherObjectStub) {
         DiagnosticInstallLauncherObjectStub(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
+
+        char authServerDnsName[256] = "auth.lith.thematrixonline.net";
+        char envAuthServerDnsName[256] = {0};
+        if (EnvStringValue("MXO_AUTH_SERVER_DNS", envAuthServerDnsName, sizeof(envAuthServerDnsName))) {
+            std::strncpy(authServerDnsName, envAuthServerDnsName, sizeof(authServerDnsName) - 1);
+            authServerDnsName[sizeof(authServerDnsName) - 1] = '\0';
+        }
+
+        uint32_t authServerPort = 11000;
+        EnvUint32Value("MXO_AUTH_SERVER_PORT", &authServerPort);
+
+        char marginServerSuffix[256] = ".lith.thematrixonline.net";
+        char envMarginServerSuffix[256] = {0};
+        if (EnvStringValue("MXO_MARGIN_SERVER_SUFFIX", envMarginServerSuffix, sizeof(envMarginServerSuffix))) {
+            std::strncpy(marginServerSuffix, envMarginServerSuffix, sizeof(marginServerSuffix) - 1);
+            marginServerSuffix[sizeof(marginServerSuffix) - 1] = '\0';
+        }
+
+        uint32_t marginServerPort = 10000;
+        EnvUint32Value("MXO_MARGIN_SERVER_PORT", &marginServerPort);
+
+        char marginRoutePrefix[256] = {0};
+        if (!EnvStringValue("MXO_MARGIN_ROUTE_PREFIX", marginRoutePrefix, sizeof(marginRoutePrefix))) {
+            LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), mediatorSelectionName);
+        }
+
+        char exactMarginHostName[256] = {0};
+        EnvStringValue("MXO_MARGIN_SERVER_DNS", exactMarginHostName, sizeof(exactMarginHostName));
+
+        const bool ignoreHostsFileForAuth = EnvFlagEnabled("MXO_IGNORE_HOSTS_FILE_FOR_AUTH");
+        const bool ignoreHostsFileForMargin = EnvFlagEnabled("MXO_IGNORE_HOSTS_FILE_FOR_MARGIN");
+
+        DiagnosticConfigureLoginControllerNetwork(
+            authServerDnsName,
+            static_cast<uint16_t>(authServerPort),
+            ignoreHostsFileForAuth,
+            marginServerSuffix,
+            static_cast<uint16_t>(marginServerPort),
+            ignoreHostsFileForMargin,
+            marginRoutePrefix,
+            exactMarginHostName);
     }
 
     if (!DiagnosticInitializePreclientEnvironmentLike402EC0()) {
@@ -1434,6 +1494,17 @@ int main(int argc, char* argv[]) {
             return FinishAndReturn(1);
         }
         Log("DIAGNOSTIC OVERRIDE: continuing to RunClientDLL despite InitClientDLL failure.");
+    }
+
+    if (initSucceeded) {
+        if (beginAuthConnection) {
+            const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
+            Log("DIAGNOSTIC: post-init auth connection attempt result = 0x%08x", (unsigned)authConnectResult);
+        }
+        if (beginMarginConnection) {
+            const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
+            Log("DIAGNOSTIC: post-init margin connection attempt result = 0x%08x", (unsigned)marginConnectResult);
+        }
     }
 
     if (initSucceeded && EnvFlagEnabled("MXO_DIAGNOSTIC_CRASH_AFTER_INIT_SUCCESS")) {

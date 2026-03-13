@@ -204,6 +204,8 @@ Current practical crash state:
     - newer auth/margin config review now also gives the strongest concrete answer yet for where connection is initiated from:
       - auth-side launcher owner path:
         - owner root at `0x4f78b8`
+        - owner construction path stores `0x4f78b8 = esi`, then immediately calls `0x43b300`
+        - `0x43b300` allocates/initializes helper/state objects at `0x4f7868 / 0x4f786c / 0x4f7870 / 0x4f78a0`
         - auth DNS current string consumed from `0x4f7b14`
         - auth port consumed from `0x4f7a50`
         - `0x43909f -> 0x41d170` constructs `CMessageConnection`, builds endpoint at owner `+0x5c`, then calls `connection->+0x1c(owner+0x5c)`
@@ -211,8 +213,41 @@ Current practical crash state:
         - margin suffix consumed from `0x4d6814`
         - margin port consumed from `0x4d669c`
         - `0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500` constructs `CMessageConnection`, builds endpoint at owner `+0x6c`, then calls `connection->+0x1c(owner+0x6c)`
+        - those calls are reached through owner-state dispatch in `0x439300`, which consults `[owner+4]->vtable+0x18` and then uses owner vtable surfaces `+0xe0 / +0xfc / +0x10c` plus owner fields `+0xcc8 / +0x12c / +0x104`
       - with the current method mapping, that virtual `+0x1c` remains best read as the connection-oriented ensure-connected / engine-`Connect` wrapper
       - so connection init currently looks launcher-owned and higher-level-owner-driven, not a trivial direct raw-global `0x4d6304->Connect(...)` call
+      - newer implementation milestone: the scaffold can now make a **real auth TCP connection** from the launcher side when running the binder/stub path
+        - current config defaults now mirror recovered binary strings:
+          - auth host default = `auth.lith.thematrixonline.net`
+          - auth port default = `11000`
+          - margin suffix default = `.lith.thematrixonline.net`
+          - margin port default = `10000`
+        - current opt-in env knobs:
+          - `MXO_BEGIN_AUTH_CONNECTION=1`
+          - `MXO_BEGIN_MARGIN_CONNECTION=1`
+          - optional overrides:
+            - `MXO_AUTH_SERVER_DNS`
+            - `MXO_AUTH_SERVER_PORT`
+            - `MXO_MARGIN_SERVER_DNS`
+            - `MXO_MARGIN_SERVER_SUFFIX`
+            - `MXO_MARGIN_SERVER_PORT`
+            - `MXO_MARGIN_ROUTE_PREFIX`
+        - current verified run result on binder/stub path:
+          - `CLTLoginMediator::BeginAuthConnection() authHost='auth.lith.thematrixonline.net' port=11000 -> 0x00000001`
+        - current margin attempt with guessed `vector.lith.thematrixonline.net:10000` still fails (`0x00000000`), so exact margin-host derivation remains unresolved
+        - newer exact-host override check also shows the raw socket/connect path itself is no longer the blocker there:
+          - with `MXO_MARGIN_SERVER_DNS=auth.lith.thematrixonline.net`, the margin-side path also returns `0x00000001`
+          - so the remaining margin gap is host derivation/fidelity, not basic launcher-side TCP capability
+        - important current runtime limitation after that auth-connect milestone:
+          - real auth socket connect alone was not yet enough by itself to make the client-visible queue consumer branch go live
+        - newer queue/work implementation milestone after that:
+          - the scaffold can now deliberately enqueue queue0C `(workItem, context)` pairs after successful auth/margin connect attempts
+          - deliberate `RunClientDLL` runs now show queue0C cursor divergence before first consume and then client-side callback/release activity on those queued items
+          - current runtime evidence on that path now includes:
+            - `raw message-connection context OnOperationCompleted ...`
+            - `releasing queued work item ...`
+          - this is still binder/scaffold progress, not yet faithful original producer semantics
+          - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
   - newer deliberate rerun after partially wiring slots `1/2/6/7/8/12` into `src/liblttcp/` did **not** change the observed runtime surface yet:
     - still only mediator `+0x2c`
     - still only arg5 helper `+0x60` slot `0/1`
@@ -389,6 +424,8 @@ Code:
 - `src/liblttcp/ltthreadperclienttcpengine.h` / `.cpp` - starter original-name engine skeleton (`MonitorPort`, `UDPMonitorPort`, provisional slot-3 `MonitorEphemeralUDPPort`, `Connect`, `Close`, `SendBuffer`, `CleanupConnection`) now partially wired from the diagnostics arg5 scaffold for slots `1` / `2` / `6` / `7` / `8` / `12`
 - `src/liblttcp/lttcpconnection.h` / `.cpp` - starter original-name TCP connection skeleton (`Close`, `SendBuffer`, `OnReceive`) now treated as the current best base connection layer under `CMessageConnection`
 - `src/liblttcp/cmessageconnection.h` / `.cpp` - starter original-name message-connection skeleton (`SendPacket`, `OnOperationCompleted`) that now mirrors the best current read of the queue0C `context` object family and now exposes sidecar `EnsureConnected()` / `CloseConnection()` wrappers used by the diagnostics arg5 slot-6/slot-7 paths, while `SendPacket(...)` now backs the diagnostics slot-8 path
+- `src/ltlogin/loginmediator.h` / `.cpp` - scaffold-first launcher-side login/controller skeleton around the current best `CLTLoginMediator`/`0x4f78b8` read, including auth/margin server config anchors, helper-family scaffolding for `0x4f7868/6c/70/0xa0`, and source-level placeholders for the recovered margin-route owner vtable surfaces `+0xe0 / +0xfc / +0x10c`
+- `src/ltlogin/loginstates.h` / `.cpp` - scaffold-first login-state skeletons for string-backed methods like `CLTLoginState_WorldListPending::AuthMessageDispatch()` and `CLTLoginState_AuthenticatePending::AuthMessageDispatch()`, now also preserving original recovered log/error strings directly in source as future implementation/logging anchors
 - `Makefile`
 - runtime executable: `resurrections.exe`
 
@@ -403,7 +440,9 @@ Canonical docs:
 - Do not treat old test harnesses as the solution architecture
 - Do not add `client.dll` memory injection to the intended path
 - Do not treat a forced `RunClientDLL` after failed `InitClientDLL` as original-equivalent behavior
-- Prefer original launcher/client names when a string-backed or strong static name is available (`MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, `SendBuffer`, `CleanupConnection`, `AcceptThread`, `WorkerThread`, etc.) instead of inventing fresh generic labels
+- Prefer original launcher/client names when a string-backed or strong static name is available (`MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, `SendBuffer`, `CleanupConnection`, `AcceptThread`, `WorkerThread`, `CLTLoginMediator`, `CLTLoginState_AuthenticatePending`, etc.) instead of inventing fresh generic labels
+- When a recovered original log/error string clearly identifies a method or state path, prefer reusing that original string as a source-level anchor in scaffolds/comments and later logging rather than inventing fresh text
+- Prefer pushing interface/class/method recovery into source scaffolds first (with tight inline comments) and reserve `../../docs/` for experiment evidence, runtime behavior, and cross-component conclusions rather than duplicating interface descriptions in markdown
 - Be diligent about experiment documentation: every meaningful rerun, crash change, stable non-change, or new disassembly-backed interpretation must update the relevant canonical docs in `../../docs/` as part of the same work, not later
 - Record negative results too when they narrow the search, but keep them in canonical component docs rather than scattered duplicate notes
 - When a crash becomes a recurring reference, prefer canonical doc names keyed by a stable signature such as faulting `EIP` / `module+offset` rather than transient dump numbers alone; record the specific dump filenames inside the doc body

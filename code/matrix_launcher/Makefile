@@ -6,7 +6,8 @@ TARGET = $(GAME_DIR)/resurrections.exe
 CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
 SRC = src/resurrections.cpp src/diagnostics.cpp \
 	src/liblttcp/lttcpconnection.cpp src/liblttcp/ltthreadperclienttcpengine.cpp \
-	src/liblttcp/cmessageconnection.cpp
+	src/liblttcp/cmessageconnection.cpp src/ltlogin/loginmediator.cpp \
+	src/ltlogin/loginstates.cpp
 CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 
 -include secrets/launcher_login.local.mk
@@ -16,7 +17,7 @@ LAUNCHER_ARGS = $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_
 all: $(TARGET)
 
 $(TARGET): $(SRC)
-	$(CXX) -Wall -Wextra -O2 -o $@ $^ -Wl,--export-all-symbols -lversion
+	$(CXX) -Wall -Wextra -O2 -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
 
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
 	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^

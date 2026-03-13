@@ -2,7 +2,57 @@
 
 #include "cmessageconnection.h"
 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
 namespace mxo::liblttcp {
+
+namespace {
+
+static bool EnsureWinsockReady() {
+    static bool initialized = false;
+    static bool attempted = false;
+    if (attempted) {
+        return initialized;
+    }
+    attempted = true;
+
+    WSADATA wsaData = {};
+    initialized = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
+    return initialized;
+}
+
+static bool ResolveIpv4Address(const char* hostName, uint32_t* outIpv4NetworkOrder) {
+    if (!hostName || !hostName[0] || !outIpv4NetworkOrder || !EnsureWinsockReady()) {
+        return false;
+    }
+
+    addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    addrinfo* results = nullptr;
+    if (getaddrinfo(hostName, nullptr, &hints, &results) != 0 || !results) {
+        return false;
+    }
+
+    bool ok = false;
+    for (addrinfo* it = results; it; it = it->ai_next) {
+        if (it->ai_family != AF_INET || !it->ai_addr || it->ai_addrlen < static_cast<int>(sizeof(sockaddr_in))) {
+            continue;
+        }
+        const sockaddr_in* addr = reinterpret_cast<const sockaddr_in*>(it->ai_addr);
+        *outIpv4NetworkOrder = addr->sin_addr.s_addr;
+        ok = true;
+        break;
+    }
+
+    freeaddrinfo(results);
+    return ok;
+}
+
+}  // namespace
 
 // Keep the implementation intentionally conservative.
 // These methods currently provide original-name structure and evidence-backed state
@@ -60,14 +110,36 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorEphemeralUDPPort(uint16_t* outBound
 }
 
 uint32_t CLTThreadPerClientTCPEngine::Connect(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, void* contextKey, void* ownerContext) {
+    if (!contextKey || !EnsureWinsockReady()) {
+        return 0;
+    }
+
+    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock == INVALID_SOCKET) {
+        return 0;
+    }
+
+    sockaddr_in addr = {};
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(portHostOrder);
+    addr.sin_addr.s_addr = ipv4NetworkOrder;
+
+    if (connect(sock, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR) {
+        closesocket(sock);
+        return 0;
+    }
+
     WorkerThreadRecord worker = {};
     worker.contextKey = contextKey;
     worker.ownerContext = ownerContext;
-    worker.socketHandle = nextSyntheticSocketHandle_++;
+    worker.socketHandle = static_cast<uint32_t>(sock);
     worker.state = LTTCPEngineConnectionState::kConnectActive;
-    (void)portHostOrder;
-    (void)ipv4NetworkOrder;
-    workerThreads_.push_back(worker);
+
+    if (WorkerThreadRecord* existing = FindWorker(contextKey)) {
+        *existing = worker;
+    } else {
+        workerThreads_.push_back(worker);
+    }
     return kResultSuccess;
 }
 
@@ -79,10 +151,19 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(CLTTCPConnection* connection) {
     const LTTCPEndpointKey& endpoint = connection->RemoteEndpoint();
     const uint16_t portHostOrder =
         static_cast<uint16_t>((endpoint.portNetworkOrder << 8) | (endpoint.portNetworkOrder >> 8));
+
+    uint32_t ipv4NetworkOrder = endpoint.ipv4NetworkOrder;
+    if (ipv4NetworkOrder == 0 && !connection->RemoteHostName().empty()) {
+        ResolveIpv4Address(connection->RemoteHostName().c_str(), &ipv4NetworkOrder);
+    }
+    if (ipv4NetworkOrder == 0) {
+        return 0;
+    }
+
     void* contextKey = connection->OwnerContext() ? connection->OwnerContext() : static_cast<void*>(connection);
     const uint32_t result = Connect(
         portHostOrder,
-        endpoint.ipv4NetworkOrder,
+        ipv4NetworkOrder,
         /*contextKey=*/contextKey,
         /*ownerContext=*/connection->OwnerContext());
     if (result == kResultSuccess) {

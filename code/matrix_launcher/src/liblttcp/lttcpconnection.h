@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace mxo::liblttcp {
 
@@ -50,6 +52,13 @@ public:
     void SetRemoteEndpoint(const LTTCPEndpointKey& endpoint);
     const LTTCPEndpointKey& RemoteEndpoint() const;
 
+    void SetRemoteHostName(const char* hostName);
+    const std::string& RemoteHostName() const;
+
+    int PollReceiveNonBlocking();
+    const std::vector<uint8_t>& ReceivedBytes() const;
+    void ClearReceivedBytes();
+
     // Placeholder reimplementation entry points.
     // These names follow original launcher/client strings, but behavior is still skeletal.
     //
@@ -70,6 +79,8 @@ private:
     uint32_t socketHandle_;
     LTTCPEngineConnectionState state_;
     LTTCPEndpointKey remoteEndpoint_;
+    std::string remoteHostName_;
+    std::vector<uint8_t> receivedBytes_;
 };
 
 }  // namespace mxo::liblttcp

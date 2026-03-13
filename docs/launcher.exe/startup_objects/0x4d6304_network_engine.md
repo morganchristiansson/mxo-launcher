@@ -1036,10 +1036,26 @@ The original launcher appears to initiate connection work from a higher-level ow
 Owner root construction/seed path:
 - function body around `launcher.exe:0x41b1c1`
 - stores global owner pointer: `0x4f78b8 = esi`
-- seeds owner `+0x4c` from current auth DNS config:
+- immediately calls `0x43b300`, which allocates/initializes a small family of launcher-global helper/state objects at:
+  - `0x4f7868`
+  - `0x4f786c`
+  - `0x4f7870`
+  - `0x4f78a0`
+- then seeds owner `+0x4c` from current auth DNS config:
   - reads `qsAuthServerDNSName` current string via `0x4f7b14`
   - calls `0x440d80(owner+0x4c, authDnsName, mode)`
 - this is now the strongest current launcher-side auth-DNS consumer tied to the recovered config object family
+
+A further state/dispatch clue now also exists in the same owner family.
+`launcher.exe:0x439300` consults the owner's current state object through `[owner+4]->vtable+0x18`, then dispatches several cases into the margin-side connection initializer `0x41e500`.
+The concrete cases currently recovered are:
+- use owner byte `+0xcc8` and call owner vtable `+0xe0`, then `0x41e500`
+- use owner dword `+0x12c` and call owner vtable `+0xfc`, then `0x41e500`
+- call owner vtable `+0x10c`, then `0x41e500`
+- or, if owner dword `+0x104 != -1`, call owner vtable `+0xfc(owner+0x104)`, then `0x41e500`
+
+So the current best reading is not just “owner object exists”.
+There is now a concrete **owner-state-driven dispatcher** that decides when to start margin-side connection work.
 
 Auth connection-init path:
 - `launcher.exe:0x43909f -> 0x41d170`
@@ -1086,6 +1102,54 @@ This now answers the “where is connection initiated from?” question more con
   - create `CMessageConnection` children
   - build endpoint state
   - and immediately invoke the connection wrapper that drives the launcher-owned network engine
+
+### New implementation milestone: real auth connect now possible from the scaffold
+
+The current replacement launcher now also has an implementation-side milestone that goes beyond naming-only scaffolds.
+The diagnostic sidecar engine/login-controller path can now make a **real TCP auth connection** on the binder/stub path.
+
+Current defaults now wired from recovered binary strings:
+- auth host = `auth.lith.thematrixonline.net`
+- auth port = `11000`
+- margin suffix = `.lith.thematrixonline.net`
+- margin port = `10000`
+
+Current opt-in env knobs:
+- `MXO_BEGIN_AUTH_CONNECTION=1`
+- `MXO_BEGIN_MARGIN_CONNECTION=1`
+- optional host/port overrides:
+  - `MXO_AUTH_SERVER_DNS`
+  - `MXO_AUTH_SERVER_PORT`
+  - `MXO_MARGIN_SERVER_DNS`
+  - `MXO_MARGIN_SERVER_SUFFIX`
+  - `MXO_MARGIN_SERVER_PORT`
+  - `MXO_MARGIN_ROUTE_PREFIX`
+
+Current verified auth result on the binder/stub init-success path:
+- `CLTLoginMediator::BeginAuthConnection() authHost='auth.lith.thematrixonline.net' port=11000 -> 0x00000001`
+
+Current limitation from the same implementation pass:
+- margin connect is still unresolved because the current scaffold only knows the recovered suffix/port pair and not yet the faithful exact margin-host derivation
+- current guessed `vector.lith.thematrixonline.net:10000` attempt still returns `0x00000000`
+- but a newer exact-host override check proves the raw socket/connect path itself is not the blocker there:
+  - with `MXO_MARGIN_SERVER_DNS=auth.lith.thematrixonline.net`
+  - the margin-side connect path also returns `0x00000001`
+- so the remaining margin gap is now best described as **host derivation fidelity**, not basic TCP capability
+
+So the implementation frontier has now moved from “can the replacement launcher name the config and owner paths?” to:
+- auth connect = **yes, concretely possible now**
+- margin connect = socket-capable too with an exact host override, but still blocked on faithful host derivation
+- client-visible queue/work integration = no longer completely blocked, but still only partially scaffolded
+
+Newer implementation milestone after the real auth connect work:
+- the replacement launcher can now deliberately enqueue queue0C `(workItem, context)` pairs using raw diagnostic stubs shaped to match the client consumer expectations enough for live consumption
+- on deliberate binder/scaffold `RunClientDLL` runs, current runtime evidence now shows:
+  - queue0C cursor divergence before first consume (`current0 != current1`)
+  - later queue cursor convergence after consume
+  - client-side callback into a raw `context->+0x10(workItem)` surrogate (`OnOperationCompleted`-style scaffold)
+  - later queued work-item release through the work-item vtable `+0x04` surrogate
+- this is still explicitly scaffold/diagnostic behavior, not a claim that the full original producer semantics are reconstructed yet
+- but it is now a concrete step past the old purely empty queue0C runtime loop
 
 ## Newly confirmed server-config string surfaces
 
