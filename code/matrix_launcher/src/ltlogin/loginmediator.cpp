@@ -266,7 +266,7 @@ uint32_t CLTLoginMediator::BeginAuthHandshake() {
     //   margin-side wrapper traffic must be read through the separate margin table, e.g.
     //   raw `0x06` on `0x41af70` is `MS_GetClientIPRequest`, not auth `GetPublicKey`
     expectedAuthRequestName_ =
-        "phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest";
+        "phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest";
     return 1u;
 }
 

@@ -300,19 +300,32 @@ Current practical crash state:
                 - helper `+0x08 / 0x439210` first gates on `0x41b490()` and falls back to `0x41b450(1)` if auth is not connected yet
                 - on the connected branch it gathers launcher-owned owner data through owner `+0x168`, `+0x20`, and `+0x38`, then calls `0x448050`
                 - `0x448050` is currently only xref'd from `0x439210`
-                - `0x448050` then branches by object byte `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through a bootstrap-object connection pointer at `object + 0x50 -> +0x24`:
-                  - `0x447eb0` builds/sends raw auth code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
-                  - `0x4474f0` builds/sends raw auth code `0x08` -> strongest current **`AS_AuthRequest`** candidate
+                - `0x448050` now also resolves more concretely than before:
+                  - it runs as a method on the extra owner child allocated by `0x41290` / base ctor `0x45500` and stored at owner `+0x680`
+                  - that phase-2 bootstrap object is size `0x11c`
+                  - it copies three string sources plus two 16-byte blocks into bootstrap state and stores an outbound send target at bootstrap `+0x50`
+                  - crucial correction: the branch at `0x44811e` is not just a loose byte-ish mode flag but the nullness of **pointer `+0xa0`** inside that bootstrap object
+                - `0x448050` then branches by bootstrap helper pointer `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through bootstrap `+0x50 -> +0x24`:
+                  - `0x447eb0` is taken when bootstrap helper pointer `+0xa0 == NULL` and builds/sends raw auth code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
+                  - `0x4474f0` is taken when bootstrap helper pointer `+0xa0 != NULL` and builds/sends raw auth code `0x08` -> strongest current **`AS_AuthRequest`** candidate
                   - `0x4474f0` also emits a later auxiliary raw `0x1b` packet on that same indirect path
+                - newer bootstrap-object follow-up now also tightens later field meaning:
+                  - `0x429b0` uses bootstrap helper pointer `+0xa0 -> +0x1c` on a later incoming path
+                  - it writes 16-byte challenge-derived material to bootstrap `+0x85 .. +0x94`
+                  - `0x41470` then derives/caches a dword-ish token at bootstrap `+0x9c`
+                  - that same `+0x9c` value is later used by both raw `0x06` and raw `0x08` send builders
               - important channel-specific correction from the same pass:
                 - margin-side wrapper traffic must be decoded through the margin table
                 - raw `0x06` on `0x41af70` = **`MS_GetClientIPRequest`**, not auth `AS_GetPublicKeyRequest`
               - so the auth-side bootstrap send is no longer just a generic unresolved blank before world-list:
                 - it still sits **before** the later `AS_GetWorldListRequest` path
-                - but the highest-value concrete target is now the **phase-2 helper chain** `0x4f7870 -> 0x439210 -> 0x448050 -> (0x447eb0 raw 0x06 | 0x4474f0 raw 0x08)`
+                - the highest-value concrete target remains the **phase-2 helper chain** `0x4f7870 -> 0x439210 -> 0x448050 -> (0x447eb0 raw 0x06 | 0x4474f0 raw 0x08)`
+                - and the remaining unknown is now narrower:
+                  - not whether `+0xa0` matters at all
+                  - but what exact helper object is stored at bootstrap `+0xa0`, what exact send-target object is stored at bootstrap `+0x50`, and what exact source-object family is copied into the bootstrap object before that branch
             - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
           - current runtime log now makes that narrowing explicit by logging:
-            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
+            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
           - this is still binder/scaffold progress, not yet faithful original producer semantics
           - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
           - fresh validation reruns after the newer auth-side owner/fallback-chain narrowing still did **not** move the runtime surface yet:
@@ -320,7 +333,7 @@ Current practical crash state:
             - deliberate auth runtime rerun
               - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
               - still consumes exactly one queued auth type-2 connect-status item
-              - now logs `nextOutboundRequest='phase2-bootstrap candidate: AS_GetPublicKeyRequest or AS_AuthRequest'`
+              - now logs `nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest'`
               - still falls back to the same mediator `+0x2c` + arg5 helper `+0x60` slot `0/1` idle loop after that first consume
               - still shows no logged type-3 receive work items before timeout
             - so current runtime evidence still does **not** contradict the newer static negative conclusion that `0x4401a0` / `0x448a60` are not the missing first-send origin
@@ -670,13 +683,25 @@ Canonical docs:
        - helper `+0x08 / 0x439210` first gates on `0x41b490()` and falls back to `0x41b450(1)` if auth is not connected yet
        - on the connected branch it gathers launcher-owned owner data via owner `+0x168`, `+0x20`, and `+0x38`, then calls `0x448050`
        - `0x448050` is currently only xref'd from `0x439210`
-       - `0x448050` then branches by object byte `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through a bootstrap-object connection pointer at `object + 0x50 -> +0x24`:
-         - `0x447eb0` raw code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
-         - `0x4474f0` raw code `0x08` -> strongest current **`AS_AuthRequest`** candidate
+       - `0x448050` now also resolves more concretely than before:
+         - it runs as a method on the extra owner child allocated by `0x41290` / base ctor `0x45500` and stored at owner `+0x680`
+         - that phase-2 bootstrap object is size `0x11c`
+         - it copies three string sources plus two 16-byte blocks into bootstrap state and stores an outbound send target at bootstrap `+0x50`
+         - crucial correction: the branch at `0x44811e` is not just a loose byte-ish mode flag but the nullness of **pointer `+0xa0`** inside that bootstrap object
+       - `0x448050` then branches by bootstrap helper pointer `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through bootstrap `+0x50 -> +0x24`:
+         - `0x447eb0` is taken when bootstrap helper pointer `+0xa0 == NULL` and sends raw code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
+         - `0x4474f0` is taken when bootstrap helper pointer `+0xa0 != NULL` and sends raw code `0x08` -> strongest current **`AS_AuthRequest`** candidate
          - `0x4474f0` also emits a later auxiliary raw `0x1b` packet on that same indirect path
+       - newer bootstrap-object follow-up now also tightens later field meaning:
+         - `0x429b0` uses bootstrap helper pointer `+0xa0 -> +0x1c` on a later incoming path
+         - it writes 16-byte challenge-derived material to bootstrap `+0x85 .. +0x94`
+         - `0x41470` then derives/caches a dword-ish token at bootstrap `+0x9c`
+         - that same `+0x9c` value is later used by both raw `0x06` and raw `0x08` send builders
      - important channel-specific correction from the same pass:
        - margin-side wrapper traffic must be decoded through the margin table
        - raw `0x06` on `0x41af70` = **`MS_GetClientIPRequest`**, not auth `AS_GetPublicKeyRequest`
-     - so the next first-send target should now move from a generic unresolved blank to the concrete phase-2 bootstrap chain above; the remaining unknown is the exact object/branch identity behind `+0xa0` / `+0x50`, not whether the launcher still owns auth progression
+     - so the next first-send target should now move from a generic unresolved blank to the concrete phase-2 bootstrap chain above; the remaining unknown is now narrower:
+       - not whether `+0xa0` matters at all
+       - but what exact helper object is stored at bootstrap `+0xa0`, what exact send-target object is stored at bootstrap `+0x50`, and what exact selected-source object family is copied into the bootstrap object before that branch
    - because current timed runs still do not show any type-3 receive work items, and the server likely will not produce useful reply traffic until the correct first auth/message exchange is sent
    - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever

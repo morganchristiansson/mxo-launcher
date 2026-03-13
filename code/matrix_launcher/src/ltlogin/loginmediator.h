@@ -111,6 +111,41 @@ public:
         std::string exactMarginHostName;
     };
 
+    struct AuthBootstrapState680Sketch {
+        // Current best read of the extra owner child allocated through `0x41290` and stored at
+        // owner `+0x680` by `0x41b160`.
+        //
+        // High-value phase-2 auth/bootstrap anchors:
+        // - base ctor `0x45500`, size `0x11c`
+        // - preparation/fill helper `0x448050`
+        // - branch condition at `0x44811e`: pointer `+0xa0`
+        //   - NULL -> `0x447eb0` builds/sends raw code `0x06`
+        //   - non-NULL -> `0x4474f0` builds/sends raw code `0x08`
+        // - later challenge/crypto continuation `0x429b0`:
+        //   - uses helper pointer `+0xa0 -> +0x1c`
+        //   - writes 16-byte material to `+0x85`
+        //   - derives / caches dword-ish token at `+0x9c` via `0x41470`
+        //
+        // Current field sketch from `0x45500` + `0x448050` + `0x447eb0` + `0x4474f0`:
+        // - `+0x04` = first copied string from the selected phase-2 source object
+        // - `+0x10` = second copied string from the selected phase-2 source object
+        // - `+0x1c` = third copied string/pointer from the selected phase-2 source object
+        // - `+0x28` = current fixed `1` on the recovered `0x439210` call path
+        // - `+0x2c` = owner-side dword copied from the object returned by owner `+0x20`
+        // - `+0x30..+0x3c` = copied 16-byte block from selected source object `+0x40`
+        // - `+0x40..+0x4c` = copied 16-byte block from selected source object `+0x50`
+        // - `+0x50` = pointer/object later used via virtual `+0x24` for outbound send
+        // - `+0x54` = embedded `0x180`-byte helper subobject from base ctor `0x45500`
+        // - `+0x80` = timestamp / later delta source used on the raw `0x1b` path in `0x4474f0`
+        // - `+0x84..+0x94` = challenge-derived / decrypted 16-byte material family
+        // - `+0x94` / `+0x98` = later auxiliary heap objects on the raw `0x08` path
+        // - `+0x9c` = dword-ish derived token used by raw `0x06` and raw `0x08`
+        // - `+0xa0` = auth/public-key helper pointer; its nullness selects raw `0x06` vs `0x08`
+        // - `+0xa4` = lazy side object created on the raw `0x06` path before first send
+        // - `+0xa8` = later helper/handle used on the raw `0x08` auxiliary `0x1b` path
+        // - `+0xb0 / +0xc4 / +0xd8` = three embedded helper blobs built by base ctor `0x45500`
+    };
+
     CLTLoginMediator();
     ~CLTLoginMediator();
 
@@ -293,7 +328,8 @@ private:
     // - `+0x4c` = auth DNS / route string staging area
     // - `+0x5c` = auth endpoint block consumed by auth-side `connection->+0x1c(...)`
     // - `+0x6c` = margin endpoint block consumed by margin-side `connection->+0x1c(...)`
-    // - `+0x680` = extra heap child built during owner construction
+    // - `+0x680` = extra heap child built during owner initialization; current best read is
+    //   the phase-2 auth/bootstrap object sketched above (`0x41290` / `0x45500` family)
     // - `+0x688` = world-slot pointer table (100 entries)
     // - `+0x818` = world payload/range table family (100-entry shape still provisional)
     // - `+0xd84` = world/character record pointer table family

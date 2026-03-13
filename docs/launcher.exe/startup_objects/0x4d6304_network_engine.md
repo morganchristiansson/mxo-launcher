@@ -1195,7 +1195,7 @@ Newer implementation milestone after the real auth connect work:
       - fallback `0x448a60` only logs `Got unhandled op of type %d with status %s`
       - current best auth-side conclusion is therefore that the missing first faithful outbound auth/message send is **not** initiated from later helper body `0x4401a0` and **not** from `0x448a60`
     - newer helper-family tracing also tightened that earlier outbound lead further:
-      - the concrete sender body `0x43b830` is reached through helper object `0x4f78a0`
+      - the concrete later sender body `0x43b830` is reached through helper object `0x4f78a0`
       - when that path sends through the auth wrapper it routes through:
         - `0x41af60`
         - auth connection `+0x24 / 0x41cf30`
@@ -1205,10 +1205,34 @@ Newer implementation milestone after the real auth connect work:
         - engine `+0x20` / current best `SendBuffer`
       - the packet object on that concrete auth-channel path has raw code `0x35`, which maps through the auth table to **`AS_GetWorldListRequest`**
       - that is strong evidence for a real launcher-side auth-channel send path, but it now looks safer to treat it as a **later** auth request rather than automatically calling it the first auth send after connect
+      - direct code xrefs to `0x41af60` still only show that later world-list path, so the missing earlier bootstrap auth send is currently **not** best modeled as just another direct `0x41af60` caller we have not found yet
+      - current strongest earlier launcher-owned bootstrap/auth target is now the phase-2 helper chain:
+        - `0x41b450(2)` selects helper `0x4f7870`
+        - helper `+0x08 / 0x439210` first gates on `0x41b490()` and falls back to `0x41b450(1)` if auth is not connected yet
+        - on the connected branch it gathers launcher-owned owner data via owner `+0x168`, `+0x20`, and `+0x38`, then calls `0x448050`
+        - `0x448050` is currently only xref'd from `0x439210`
+        - `0x448050` now also resolves more concretely than before:
+          - it runs as a method on the extra owner child allocated by `0x41290` / base ctor `0x45500` and stored at owner `+0x680`
+          - that phase-2 bootstrap object is size `0x11c`
+          - it copies three string sources plus two 16-byte blocks into bootstrap state and stores an outbound send target at bootstrap `+0x50`
+          - crucial correction: the branch at `0x44811e` is not just a loose byte-ish mode flag but the nullness of **pointer `+0xa0`** inside that bootstrap object
+        - `0x448050` then branches by bootstrap helper pointer `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through bootstrap `+0x50 -> +0x24`:
+          - `0x447eb0` is taken when bootstrap helper pointer `+0xa0 == NULL` and sends raw code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
+          - `0x4474f0` is taken when bootstrap helper pointer `+0xa0 != NULL` and sends raw code `0x08` -> strongest current **`AS_AuthRequest`** candidate
+          - `0x4474f0` also emits a later auxiliary raw `0x1b` packet on that same indirect path
+        - newer bootstrap-object follow-up now also tightens later field meaning:
+          - `0x429b0` uses bootstrap helper pointer `+0xa0 -> +0x1c` on a later incoming path
+          - it writes 16-byte challenge-derived material to bootstrap `+0x85 .. +0x94`
+          - `0x41470` then derives/caches a dword-ish token at bootstrap `+0x9c`
+          - that same `+0x9c` value is later used by both raw `0x06` and raw `0x08` send builders
       - important channel-specific correction from the same pass:
         - margin-side wrapper traffic must be read through the separate margin table
         - for example, raw code `0x06` on `0x41af70` maps to **`MS_GetClientIPRequest`**, not auth-side `AS_GetPublicKeyRequest`
-      - so the remaining earlier credential/bootstrap auth send still appears unresolved somewhere before the later `AS_GetWorldListRequest` helper path
+      - so the remaining earlier credential/bootstrap auth send no longer reads as a generic unresolved blank before the later `AS_GetWorldListRequest` helper path
+      - the remaining unknown is now narrower:
+        - what exact helper object is stored at bootstrap `+0xa0`
+        - what exact send-target object is stored at bootstrap `+0x50`
+        - and what exact selected-source object family is copied into the bootstrap object before that branch
     - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
   - but live receive work still does not appear, so the next likely missing activity is the first faithful outbound auth/message send rather than merely more socket setup alone
 
