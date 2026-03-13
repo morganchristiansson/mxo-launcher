@@ -31,6 +31,10 @@ CLTLoginMediator::CLTLoginMediator()
       ignoreHostsFileForMargin_(false),
       authEndpoint_(BuildLoopbackEndpoint(authServerPortHostOrder_)),
       marginEndpoint_(BuildLoopbackEndpoint(marginServerPortHostOrder_)),
+      lastAuthConnectStatus_(0),
+      lastMarginConnectStatus_(0),
+      authConnectStatusCount_(0),
+      marginConnectStatusCount_(0),
       worldSlots_{},
       worldPayloadSlots_{} {}
 
@@ -179,6 +183,18 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     connection->SetRemoteHostName(authServerDnsName_.c_str());
     connection->SetRemoteEndpoint(authEndpoint_);
     return connection->EnsureConnected();
+}
+
+uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
+    lastAuthConnectStatus_ = workResultCode;
+    ++authConnectStatusCount_;
+    return (workResultCode == kConnectStatusSuccess) ? 1u : 0u;
+}
+
+uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
+    lastMarginConnectStatus_ = workResultCode;
+    ++marginConnectStatusCount_;
+    return (workResultCode == kConnectStatusSuccess) ? 1u : 0u;
 }
 
 uint32_t CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {

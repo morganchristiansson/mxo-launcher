@@ -27,9 +27,16 @@ namespace mxo::liblttcp {
 //   - CMessageConnection::OnOperationCompleted
 //
 // Current best virtual mapping from launcher.exe:
-// - vtable +0x10 / 0x4490c0 -> likely OnOperationCompleted(workItem)
+// - base vtable +0x10 / 0x4490c0 -> likely OnOperationCompleted(workItem)
 //   - processes work item types via [workItem+0x04]
 //   - string-backed receive/completion/error handling lives on this path
+// - newer startup-side narrowing now also shows important **derived** auth/margin families
+//   on top of this base object:
+//   - auth-side derived connection vtable `0x4afef0`
+//   - margin-side derived connection vtable `0x4aff38`
+//   - those families wrap base completion through `0x449a70` / `0x44af60`
+//   - current best practical implication: the first faithful outbound auth/message send likely
+//     sits behind that derived post-connect type-2 completion chain, not behind raw TCP connect alone
 // - vtable +0x20 / 0x449d20 -> likely SendPacket(...)
 //   - forwards send args together with `self` to engine +0x20
 //   - current best engine mapping there is slot-8 / SendBuffer

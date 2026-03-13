@@ -246,8 +246,19 @@ Current practical crash state:
           - current runtime evidence on that path now includes:
             - `raw message-connection context OnOperationCompleted ...`
             - `releasing queued work item ...`
+          - with auth connect enabled, one queued connect-status item is currently consumed on that path
+          - with auth connect + exact-host-overridden margin connect enabled, two queued connect-status items are currently consumed in order on that path
+          - newer static narrowing now also explains why that still does not automatically produce the first real outbound auth message:
+            - original `Connect` success path `0x4329b9..0x4329cc` constructs `0x435050(0x7000001)` which is a **type-2** status work item, then enqueues `(workItem, connection, 0)`
+            - auth-side startup path `0x41d170` builds a **derived** `CMessageConnection` object with vtable `0x4afef0`
+            - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
+            - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
+            - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
+          - current runtime log now makes that bypass explicit by logging:
+            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 ...`
           - this is still binder/scaffold progress, not yet faithful original producer semantics
           - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
+          - user now also subjectively reports this is the longest the current scaffold has remained in the in-game `Loading Character` phase so far; treat that as encouraging but still secondary to harder runtime markers like new queue work / new callbacks / first real receive item
   - newer deliberate rerun after partially wiring slots `1/2/6/7/8/12` into `src/liblttcp/` did **not** change the observed runtime surface yet:
     - still only mediator `+0x2c`
     - still only arg5 helper `+0x60` slot `0/1`
@@ -547,3 +558,11 @@ Canonical docs:
    - first reach of slot `12`
    - first class-backed sidecar activity that actually becomes live in logs
    - only add dwell-time/UI timing instrumentation if those stronger runtime markers stop moving for a while
+13. Current highest-value next runtime task after the auth-connect + queue-consume milestone:
+   - identify the first **real outbound auth/message send** that should happen after launcher-side auth connect
+   - current best narrowing is that this likely sits behind the original **type-2 connect-status completion chain**, not behind raw TCP connect alone:
+     - `0x4329b9..0x4329cc` -> `0x435050(0x7000001)` -> queue0C `(workItem, connection, 0)`
+     - auth derived connection vtable `0x4afef0` / wrapper `0x449a70`
+     - margin derived connection vtable `0x4aff38` / wrapper `0x44af60`
+   - because current timed runs still do not show any type-3 receive work items, and the server likely will not produce useful reply traffic until the correct first auth/message exchange is sent
+   - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever

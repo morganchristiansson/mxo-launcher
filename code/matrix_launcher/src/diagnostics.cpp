@@ -1260,6 +1260,32 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_Release(Diagnos
     return 1;
 }
 
+static void DiagnosticRouteConnectStatusToLoginController(
+    DiagnosticRawMessageConnectionContext* self,
+    DiagnosticQueuedWorkItemStub* workItem) {
+    if (!self || !workItem || !g_DiagnosticLoginController || workItem->workType != 2u) {
+        return;
+    }
+
+    uint32_t handled = 0;
+    const char* routeLabel = "<unknown>";
+    if (self == g_DiagnosticAuthContext) {
+        handled = g_DiagnosticLoginController->HandleAuthConnectStatus(workItem->workPayload);
+        routeLabel = "auth";
+    } else if (self == g_DiagnosticMarginContext) {
+        handled = g_DiagnosticLoginController->HandleMarginConnectStatus(workItem->workPayload);
+        routeLabel = "margin";
+    } else {
+        return;
+    }
+
+    Log(
+        "DIAGNOSTIC: routed %s type-2 connect-status payload=0x%08x into CLTLoginMediator scaffold -> handled=%u (original next step likely lives behind derived connection completion, not raw TCP connect alone)",
+        routeLabel,
+        (unsigned)workItem->workPayload,
+        (unsigned)handled);
+}
+
 static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationCompleted(
     DiagnosticRawMessageConnectionContext* self,
     DiagnosticQueuedWorkItemStub* workItem) {
@@ -1272,6 +1298,9 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
         workItem ? (unsigned)workItem->workPayload : 0u);
 
     if (self && self->sidecarConnection && workItem) {
+        if (workItem->workType == 2u) {
+            DiagnosticRouteConnectStatusToLoginController(self, workItem);
+        }
         if (workItem->workType == 3u) {
             const std::vector<uint8_t>& bytes = self->sidecarConnection->ReceivedBytes();
             if (!bytes.empty()) {

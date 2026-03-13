@@ -130,6 +130,21 @@ public:
     // oriented ensure-connected / engine-Connect wrapper.
     uint32_t BeginAuthConnection();
 
+    // Current best post-connect status/result anchors:
+    // - original engine `Connect` success path `0x4329b9..0x4329cc` builds `0x435050(0x7000001)`
+    //   which is a type-2 work item enqueued as `(workItem, connection, 0)`
+    // - auth-side derived connection family (`0x41d170`, vtable `0x4afef0`) then reaches
+    //   owner-side completion handling through the `0x449a70` wrapper
+    // - margin-side derived connection family (`0x41e500`, vtable `0x4aff38`) then reaches
+    //   owner-side completion handling through the `0x44af60` wrapper
+    // - current best practical implication: raw connect success alone is not the end of the
+    //   launcher-owned auth path; the first faithful outbound auth/message send likely sits
+    //   behind this type-2 completion handling rather than behind socket connect alone
+    uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
+    uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
+
+    static constexpr uint32_t kConnectStatusSuccess = 0x7000001u;
+
     // launcher.exe owner-vtable surfaces currently recovered from the margin-state dispatcher.
     // These names remain provisional, but keeping them in source is more useful than leaving
     // the recovered callsites as anonymous `+0xe0/+0xfc/+0x10c` notes in markdown.
@@ -191,6 +206,11 @@ private:
 
     mxo::liblttcp::LTTCPEndpointKey authEndpoint_;
     mxo::liblttcp::LTTCPEndpointKey marginEndpoint_;
+
+    uint32_t lastAuthConnectStatus_;
+    uint32_t lastMarginConnectStatus_;
+    uint32_t authConnectStatusCount_;
+    uint32_t marginConnectStatusCount_;
 
     std::array<void*, kRecoveredWorldSlotCapacity> worldSlots_;
     std::array<void*, kRecoveredWorldSlotCapacity> worldPayloadSlots_;

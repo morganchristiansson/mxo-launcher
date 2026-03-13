@@ -1150,6 +1150,17 @@ Newer implementation milestone after the real auth connect work:
   - later queued work-item release through the work-item vtable `+0x04` surrogate
 - this is still explicitly scaffold/diagnostic behavior, not a claim that the full original producer semantics are reconstructed yet
 - but it is now a concrete step past the old purely empty queue0C runtime loop
+- current remaining practical runtime gap after that milestone is now narrower:
+  - launcher-side auth connect works
+  - margin connect also works when the exact host is overridden
+  - queue0C connect-status items can now be consumed by the client
+  - newer static narrowing now also explains why that does not yet automatically produce the first real auth send:
+    - original `Connect` success path `0x4329b9..0x4329cc` builds `0x435050(0x7000001)`, i.e. a **type-2** status work item, then enqueues `(workItem, connection, 0)`
+    - auth-side startup path `0x41d170` builds a **derived** connection object with vtable `0x4afef0`
+    - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
+    - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
+    - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
+  - but live receive work still does not appear, so the next likely missing activity is the first faithful outbound auth/message send rather than merely more socket setup alone
 
 ## Newly confirmed server-config string surfaces
 

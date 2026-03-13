@@ -386,8 +386,17 @@ Current best reading remains:
     - queued work-item release activity:
       - `DIAGNOSTIC: releasing queued work item ...`
   - with auth + exact-host-overridden margin enabled together, two queued connect-status items are currently consumed in order on that path
+  - newer static narrowing now also explains why that is still not enough by itself to produce the first faithful outbound auth/message send:
+    - original `Connect` success path `0x4329b9..0x4329cc` constructs `0x435050(0x7000001)` which is a **type-2** status work item, then enqueues `(workItem, connection, 0)`
+    - auth-side startup path `0x41d170` builds a **derived** connection object with vtable `0x4afef0`
+    - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
+    - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
+    - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
+  - current runtime log now makes that bypass explicit with:
+    - `DIAGNOSTIC: routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 ...`
 - this is still not faithful original-equivalent queue semantics yet, but it is a concrete step past the previous totally empty queue0C runtime state
 - newer non-blocking live-socket receive polling is now also wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced any logged type-3 receive work items (`AuthReceivePacket` / `MarginReceivePacket`) on this path
+- current user-observed runtime impression after these queue/connect milestones is that the in-game `Loading Character` phase now appears to remain visible/useful longer than before; current logs still do **not** prove a later faithful transition there yet, but this is now consistent with the stronger runtime markers that the path is doing more than the old totally empty loop
 
 ## Relationship to the older `client.dll+0x3b3573` crash
 
