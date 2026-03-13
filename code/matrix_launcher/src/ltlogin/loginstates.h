@@ -63,7 +63,12 @@ public:
 
     // Current best contextual role:
     // - auth-server authentication/character-selection response handling
+    // - current concrete packet-side anchor now firmly includes later incoming `AS_AuthReply`
+    //   handling on the auth path; the earlier exact `GetPublicKey` request/reply ordering is
+    //   still not settled enough to present as a fixed sequence here
     // - current canonical string anchors include:
+    //   - "AS_GetPublicKeyRequest"
+    //   - "AS_GetPublicKeyReply"
     //   - "AS_AuthReply"
     //   - "AS_AuthChallenge"
     //   - "AS_AuthChallengeResponse"

@@ -35,6 +35,8 @@ CLTLoginMediator::CLTLoginMediator()
       lastMarginConnectStatus_(0),
       authConnectStatusCount_(0),
       marginConnectStatusCount_(0),
+      expectedAuthRequestName_(nullptr),
+      expectedMarginRequestName_(nullptr),
       worldSlots_{},
       worldPayloadSlots_{} {}
 
@@ -188,13 +190,45 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
 uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
     lastAuthConnectStatus_ = workResultCode;
     ++authConnectStatusCount_;
-    return (workResultCode == kConnectStatusSuccess) ? 1u : 0u;
+    return (workResultCode == kConnectStatusSuccess) ? BeginAuthHandshake() : 0u;
 }
 
 uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
     lastMarginConnectStatus_ = workResultCode;
     ++marginConnectStatusCount_;
-    return (workResultCode == kConnectStatusSuccess) ? 1u : 0u;
+    return (workResultCode == kConnectStatusSuccess) ? BeginMarginHandshake() : 0u;
+}
+
+uint32_t CLTLoginMediator::BeginAuthHandshake() {
+    // Important correction from newer message-code review:
+    // - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
+    // - auth string mapping `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to
+    //   `AS_AuthReply`, not `AS_GetPublicKeyReply`
+    // - that makes `0x4401a0` a later **incoming auth-reply** anchor on the packet/receive
+    //   path, not direct proof of the first outbound send after connect
+    // - current best reading is therefore still that the first faithful outbound auth request
+    //   remains unresolved on the current scaffold
+    expectedAuthRequestName_ = nullptr;
+    return 1u;
+}
+
+uint32_t CLTLoginMediator::BeginMarginHandshake() {
+    // Important correction from newer message-code review:
+    // - the owner callback path around `0x440320` handles raw margin message code `0x10`
+    // - margin string mapping `0x41bf70` also uses `code - 6`, so raw `0x10` resolves to
+    //   `MS_LoadCharacterReply`, not `MS_ConnectRequest`
+    // - that makes `0x440320` a later incoming loading-character anchor, not direct proof of
+    //   the first outbound request after margin connect
+    expectedMarginRequestName_ = nullptr;
+    return 1u;
+}
+
+const char* CLTLoginMediator::ExpectedAuthRequestName() const {
+    return expectedAuthRequestName_ ? expectedAuthRequestName_ : "";
+}
+
+const char* CLTLoginMediator::ExpectedMarginRequestName() const {
+    return expectedMarginRequestName_ ? expectedMarginRequestName_ : "";
 }
 
 uint32_t CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {

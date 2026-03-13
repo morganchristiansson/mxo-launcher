@@ -43,9 +43,14 @@ public:
 
     // String-backed network/auth message anchors near the same owner paths.
     static constexpr const char* kMessageAsRouteToAuthServer = "AS_RouteToAuthServer";
+    static constexpr const char* kMessageAsGetPublicKeyRequest = "AS_GetPublicKeyRequest";
+    static constexpr const char* kMessageAsGetPublicKeyReply = "AS_GetPublicKeyReply";
     static constexpr const char* kMessageAsAuthRequest = "AS_AuthRequest";
+    static constexpr const char* kMessageAsAuthReply = "AS_AuthReply";
     static constexpr const char* kMessageAsGetWorldListRequest = "AS_GetWorldListRequest";
     static constexpr const char* kMessageMsConnectRequest = "MS_ConnectRequest";
+    static constexpr const char* kMessageMsConnectReply = "MS_ConnectReply";
+    static constexpr const char* kMessageMsLoadCharacterReply = "MS_LoadCharacterReply";
 
     struct ConnectionHelperFamily {
         // launcher.exe:0x43b300 currently initializes this small helper/object family
@@ -133,15 +138,20 @@ public:
     // Current best post-connect status/result anchors:
     // - original engine `Connect` success path `0x4329b9..0x4329cc` builds `0x435050(0x7000001)`
     //   which is a type-2 work item enqueued as `(workItem, connection, 0)`
-    // - auth-side derived connection family (`0x41d170`, vtable `0x4afef0`) then reaches
-    //   owner-side completion handling through the `0x449a70` wrapper
-    // - margin-side derived connection family (`0x41e500`, vtable `0x4aff38`) then reaches
-    //   owner-side completion handling through the `0x44af60` wrapper
-    // - current best practical implication: raw connect success alone is not the end of the
-    //   launcher-owned auth path; the first faithful outbound auth/message send likely sits
-    //   behind this type-2 completion handling rather than behind socket connect alone
+    // - auth-side derived connection family (`0x41d170`, vtable `0x4afef0`) later reaches
+    //   owner-side packet handling through wrapper `0x449a70`
+    // - margin-side derived connection family (`0x41e500`, vtable `0x4aff38`) later reaches
+    //   owner-side packet handling through wrapper `0x44af60`
+    // - important current nuance: those later packet handlers are not themselves proof of the
+    //   first outbound request after connect, but they do show that raw connect success alone is
+    //   not the whole launcher-owned auth/margin path
     uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
     uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
+    uint32_t BeginAuthHandshake();
+    uint32_t BeginMarginHandshake();
+
+    const char* ExpectedAuthRequestName() const;
+    const char* ExpectedMarginRequestName() const;
 
     static constexpr uint32_t kConnectStatusSuccess = 0x7000001u;
 
@@ -211,6 +221,8 @@ private:
     uint32_t lastMarginConnectStatus_;
     uint32_t authConnectStatusCount_;
     uint32_t marginConnectStatusCount_;
+    const char* expectedAuthRequestName_;
+    const char* expectedMarginRequestName_;
 
     std::array<void*, kRecoveredWorldSlotCapacity> worldSlots_;
     std::array<void*, kRecoveredWorldSlotCapacity> worldPayloadSlots_;

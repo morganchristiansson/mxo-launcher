@@ -1279,11 +1279,23 @@ static void DiagnosticRouteConnectStatusToLoginController(
         return;
     }
 
+    const char* expectedNextRequest = "";
+    const char* incomingReplyAnchor = "";
+    if (self == g_DiagnosticAuthContext) {
+        expectedNextRequest = g_DiagnosticLoginController->ExpectedAuthRequestName();
+        incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
+    } else if (self == g_DiagnosticMarginContext) {
+        expectedNextRequest = g_DiagnosticLoginController->ExpectedMarginRequestName();
+        incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply;
+    }
+
     Log(
-        "DIAGNOSTIC: routed %s type-2 connect-status payload=0x%08x into CLTLoginMediator scaffold -> handled=%u (original next step likely lives behind derived connection completion, not raw TCP connect alone)",
+        "DIAGNOSTIC: routed %s type-2 connect-status payload=0x%08x into CLTLoginMediator scaffold -> handled=%u nextOutboundRequest='%s' laterIncomingReplyAnchor='%s'",
         routeLabel,
         (unsigned)workItem->workPayload,
-        (unsigned)handled);
+        (unsigned)handled,
+        (expectedNextRequest && expectedNextRequest[0]) ? expectedNextRequest : "<unresolved>",
+        (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
 }
 
 static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationCompleted(

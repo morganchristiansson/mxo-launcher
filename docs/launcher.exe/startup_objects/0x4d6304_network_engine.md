@@ -1159,6 +1159,11 @@ Newer implementation milestone after the real auth connect work:
     - auth-side startup path `0x41d170` builds a **derived** connection object with vtable `0x4afef0`
     - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
     - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
+    - important correction from newer message-code review:
+      - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
+      - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
+      - margin/loading callback `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
+      - so those callbacks are currently best treated as later incoming packet handlers on the type-3 receive path, not direct proof of the first outbound request after connect
     - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
   - but live receive work still does not appear, so the next likely missing activity is the first faithful outbound auth/message send rather than merely more socket setup alone
 

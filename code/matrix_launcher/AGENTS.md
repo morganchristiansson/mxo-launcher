@@ -253,9 +253,14 @@ Current practical crash state:
             - auth-side startup path `0x41d170` builds a **derived** `CMessageConnection` object with vtable `0x4afef0`
             - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
             - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
+            - important correction from newer message-code review:
+              - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
+              - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
+              - margin/loading callback `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
+              - so those callbacks are currently best treated as **later incoming packet handlers** on the type-3 receive path, not direct proof of the first outbound request after connect
             - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
-          - current runtime log now makes that bypass explicit by logging:
-            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 ...`
+          - current runtime log now makes that narrowing explicit by logging:
+            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='<unresolved>' laterIncomingReplyAnchor='AS_AuthReply'`
           - this is still binder/scaffold progress, not yet faithful original producer semantics
           - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
           - user now also subjectively reports this is the longest the current scaffold has remained in the in-game `Loading Character` phase so far; treat that as encouraging but still secondary to harder runtime markers like new queue work / new callbacks / first real receive item
@@ -457,6 +462,12 @@ Canonical docs:
 - Be diligent about experiment documentation: every meaningful rerun, crash change, stable non-change, or new disassembly-backed interpretation must update the relevant canonical docs in `../../docs/` as part of the same work, not later
 - Record negative results too when they narrow the search, but keep them in canonical component docs rather than scattered duplicate notes
 - When a crash becomes a recurring reference, prefer canonical doc names keyed by a stable signature such as faulting `EIP` / `module+offset` rather than transient dump numbers alone; record the specific dump filenames inside the doc body
+- For PE inspection tasks, treat `python3 pefile` as a normal supplementary RE tool for:
+  - VA/RVA/file-offset conversion
+  - vtable neighborhood inspection
+  - nearby string/rdata inspection
+  - quick binary-structure checks
+  - but keep disassembly/debugger evidence as the primary source for control flow, calling convention, and semantic claims
 
 ## Immediate Next Work
 
@@ -562,7 +573,9 @@ Canonical docs:
    - identify the first **real outbound auth/message send** that should happen after launcher-side auth connect
    - current best narrowing is that this likely sits behind the original **type-2 connect-status completion chain**, not behind raw TCP connect alone:
      - `0x4329b9..0x4329cc` -> `0x435050(0x7000001)` -> queue0C `(workItem, connection, 0)`
-     - auth derived connection vtable `0x4afef0` / wrapper `0x449a70`
-     - margin derived connection vtable `0x4aff38` / wrapper `0x44af60`
+     - auth/margin derived connection families still matter there, but do **not** over-read later packet handlers as proof of the first send:
+       - auth derived vtable `0x4afef0`, later packet wrapper `0x449a70`, later incoming auth anchor `0x4401a0 -> AS_AuthReply`
+       - margin derived vtable `0x4aff38`, later packet wrapper `0x44af60`, later incoming loading anchor `0x440320 -> MS_LoadCharacterReply`
+     - the next concrete reverse-engineering target is therefore the **type-2 callback / helper-object path** around connection fields `+0x7c / +0x80` and helper ctor `0x436080`, because that is closer to connect completion than the later type-3 packet handlers
    - because current timed runs still do not show any type-3 receive work items, and the server likely will not produce useful reply traffic until the correct first auth/message exchange is sent
    - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever

@@ -35,8 +35,8 @@ namespace mxo::liblttcp {
 //   - auth-side derived connection vtable `0x4afef0`
 //   - margin-side derived connection vtable `0x4aff38`
 //   - those families wrap base completion through `0x449a70` / `0x44af60`
-//   - current best practical implication: the first faithful outbound auth/message send likely
-//     sits behind that derived post-connect type-2 completion chain, not behind raw TCP connect alone
+//   - important nuance: those wrappers now look like later packet/owner handling anchors, not
+//     direct proof of the first outbound request after connect
 // - vtable +0x20 / 0x449d20 -> likely SendPacket(...)
 //   - forwards send args together with `self` to engine +0x20
 //   - current best engine mapping there is slot-8 / SendBuffer
