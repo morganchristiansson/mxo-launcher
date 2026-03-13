@@ -195,6 +195,16 @@ static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldL
 static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
 static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
 static bool g_DiagnosticAuthGetPublicKeyExperimentSent = false;
+static bool g_DiagnosticAuthRequestExperimentSent = false;
+struct DiagnosticAuthGetPublicKeyReplyState {
+    bool valid;
+    uint32_t payloadLength;
+    uint32_t status;
+    uint32_t currentTime;
+    uint32_t publicKeyId;
+    uint8_t keySize;
+};
+static DiagnosticAuthGetPublicKeyReplyState g_DiagnosticAuthGetPublicKeyReplyState = {};
 static void* g_DiagnosticWorkItemVtable[2] = {0};
 static void* g_DiagnosticMessageConnectionContextVtable[5] = {0};
 static DiagnosticMediatorResolverNode g_DiagnosticMediatorResolver = {};
@@ -1286,11 +1296,69 @@ static bool DiagnosticTryParseEnvU32(const char* name, uint32_t* outValue) {
     return true;
 }
 
+static bool DiagnosticTryParseEnvHexBytes(const char* name, uint8_t* outBytes, size_t byteCount) {
+    if (!outBytes || byteCount == 0u) {
+        return false;
+    }
+
+    const char* value = std::getenv(name);
+    if (!value || !value[0]) {
+        return false;
+    }
+
+    const size_t neededChars = byteCount * 2u;
+    if (std::strlen(value) != neededChars) {
+        return false;
+    }
+
+    for (size_t i = 0; i < byteCount; ++i) {
+        char nibbleText[3] = { value[i * 2u], value[i * 2u + 1u], 0 };
+        char* end = nullptr;
+        const unsigned long parsed = std::strtoul(nibbleText, &end, 16);
+        if (end != nibbleText + 2) {
+            return false;
+        }
+        outBytes[i] = static_cast<uint8_t>(parsed);
+    }
+
+    return true;
+}
+
+static bool DiagnosticTryParseEnvHexVector(const char* name, std::vector<uint8_t>* outBytes) {
+    if (!outBytes) {
+        return false;
+    }
+
+    const char* value = std::getenv(name);
+    if (!value || !value[0]) {
+        return false;
+    }
+
+    const size_t hexChars = std::strlen(value);
+    if ((hexChars & 1u) != 0u) {
+        return false;
+    }
+
+    outBytes->assign(hexChars / 2u, 0);
+    for (size_t i = 0; i < outBytes->size(); ++i) {
+        char nibbleText[3] = { value[i * 2u], value[i * 2u + 1u], 0 };
+        char* end = nullptr;
+        const unsigned long parsed = std::strtoul(nibbleText, &end, 16);
+        if (end != nibbleText + 2) {
+            outBytes->clear();
+            return false;
+        }
+        (*outBytes)[i] = static_cast<uint8_t>(parsed);
+    }
+
+    return true;
+}
+
 static const char* DiagnosticAuthRawCodeName(uint8_t rawCode) {
     switch (rawCode) {
         case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyRequest:
             return mxo::ltlogin::CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-        case 0x07:
+        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyReply:
             return mxo::ltlogin::CLTLoginMediator::kMessageAsGetPublicKeyReply;
         case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeAuthRequest:
             return mxo::ltlogin::CLTLoginMediator::kMessageAsAuthRequest;
@@ -1307,6 +1375,32 @@ static const char* DiagnosticAuthRawCodeName(uint8_t rawCode) {
         default:
             return "<unknown-auth-code>";
     }
+}
+
+static bool DiagnosticBuildVariableLengthPacket(
+    const uint8_t* payload,
+    size_t payloadLen,
+    std::vector<uint8_t>* outPacket,
+    size_t* outHeaderLen = nullptr) {
+    if (!payload || !outPacket) {
+        return false;
+    }
+    if (payloadLen > 0x7fffu) {
+        return false;
+    }
+
+    outPacket->clear();
+    if (payloadLen < 0x80u) {
+        outPacket->push_back(static_cast<uint8_t>(payloadLen));
+        if (outHeaderLen) *outHeaderLen = 1u;
+    } else {
+        outPacket->push_back(static_cast<uint8_t>(0x80u | ((payloadLen >> 8u) & 0x7fu)));
+        outPacket->push_back(static_cast<uint8_t>(payloadLen & 0xffu));
+        if (outHeaderLen) *outHeaderLen = 2u;
+    }
+
+    outPacket->insert(outPacket->end(), payload, payload + payloadLen);
+    return true;
 }
 
 static void DiagnosticMaybeSendAuthGetPublicKeyExperiment(DiagnosticRawMessageConnectionContext* self) {
@@ -1336,25 +1430,169 @@ static void DiagnosticMaybeSendAuthGetPublicKeyExperiment(DiagnosticRawMessageCo
     //   - dword +1 = LauncherVersion
     //   - dword +5 = CurPublicKeyId
     // - `0x448a00` then sends a variable-length-prefixed payload buffer.
-    // This experiment only models the small-payload single-byte-length case.
-    uint8_t packet[1 + 1 + 4 + 4] = {0};
-    packet[0] = 9;  // payload size
-    packet[1] = mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyRequest;
-    std::memcpy(packet + 2, &launcherVersion, sizeof(launcherVersion));
-    std::memcpy(packet + 6, &currentPublicKeyId, sizeof(currentPublicKeyId));
+    uint8_t payload[1 + 4 + 4] = {0};
+    payload[0] = mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyRequest;
+    std::memcpy(payload + 1, &launcherVersion, sizeof(launcherVersion));
+    std::memcpy(payload + 5, &currentPublicKeyId, sizeof(currentPublicKeyId));
 
-    const uint32_t sendResult = self->sidecarConnection->SendPacket(packet, sizeof(packet), nullptr);
+    std::vector<uint8_t> packet;
+    size_t headerLen = 0u;
+    if (!DiagnosticBuildVariableLengthPacket(payload, sizeof(payload), &packet, &headerLen)) {
+        Log("DIAGNOSTIC: auth bootstrap experiment failed to frame raw 0x06 packet");
+        return;
+    }
+
+    const uint32_t sendResult = self->sidecarConnection->SendPacket(packet.data(), static_cast<uint32_t>(packet.size()), nullptr);
     g_DiagnosticAuthGetPublicKeyExperimentSent = (sendResult != 0u);
 
     Log(
-        "DIAGNOSTIC: auth bootstrap experiment rawCode=0x%02x request='%s' launcherVersion=%u currentPublicKeyId=%u byteCount=%u -> sendResult=0x%08x sentOnce=%u",
+        "DIAGNOSTIC: auth bootstrap experiment rawCode=0x%02x request='%s' launcherVersion=%u currentPublicKeyId=%u payloadLen=%u headerLen=%u byteCount=%u -> sendResult=0x%08x sentOnce=%u",
         (unsigned)mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyRequest,
         mxo::ltlogin::CLTLoginMediator::kMessageAsGetPublicKeyRequest,
         (unsigned)launcherVersion,
         (unsigned)currentPublicKeyId,
-        (unsigned)sizeof(packet),
+        (unsigned)sizeof(payload),
+        (unsigned)headerLen,
+        (unsigned)packet.size(),
         (unsigned)sendResult,
         g_DiagnosticAuthGetPublicKeyExperimentSent ? 1u : 0u);
+}
+
+static bool DiagnosticTryParseAuthGetPublicKeyReply(
+    const std::vector<uint8_t>& bytes,
+    DiagnosticAuthGetPublicKeyReplyState* outState) {
+    if (!outState) {
+        return false;
+    }
+
+    *outState = {};
+    if (bytes.size() < 16u) {
+        return false;
+    }
+
+    size_t headerBytes = 0u;
+    uint32_t payloadLength = 0u;
+    if (bytes[0] & 0x80u) {
+        if (bytes.size() < 3u) {
+            return false;
+        }
+        payloadLength = (static_cast<uint32_t>(bytes[0] & 0x7fu) << 8) |
+                        static_cast<uint32_t>(bytes[1]);
+        headerBytes = 2u;
+    } else {
+        payloadLength = static_cast<uint32_t>(bytes[0]);
+        headerBytes = 1u;
+    }
+
+    if (headerBytes + payloadLength > bytes.size()) {
+        return false;
+    }
+    if (bytes[headerBytes] != 0x07u) {
+        return false;
+    }
+    if (payloadLength < 15u) {
+        return false;
+    }
+
+    const uint8_t* payload = bytes.data() + headerBytes;
+    std::memcpy(&outState->status, payload + 1, sizeof(uint32_t));
+    std::memcpy(&outState->currentTime, payload + 5, sizeof(uint32_t));
+    std::memcpy(&outState->publicKeyId, payload + 9, sizeof(uint32_t));
+    outState->keySize = payload[13];
+    outState->payloadLength = payloadLength;
+    outState->valid = true;
+    return true;
+}
+
+static void DiagnosticMaybeSendAuthRequestExperiment(
+    DiagnosticRawMessageConnectionContext* self,
+    const DiagnosticAuthGetPublicKeyReplyState& replyState) {
+    if (!self || !self->sidecarConnection || !replyState.valid) {
+        return;
+    }
+    if (g_DiagnosticAuthRequestExperimentSent) {
+        return;
+    }
+    if (!DiagnosticEnvFlagEnabled("MXO_DIAGNOSTIC_SEND_AS_AUTHREQUEST")) {
+        return;
+    }
+
+    uint32_t loginType = 1u;
+    (void)DiagnosticTryParseEnvU32("MXO_DIAGNOSTIC_AUTH_LOGIN_TYPE", &loginType);
+    loginType &= 0xffu;
+
+    uint8_t keyConfigMd5[16] = {0};
+    uint8_t uiConfigMd5[16] = {0};
+    const bool haveKeyConfig =
+        DiagnosticTryParseEnvHexBytes("MXO_DIAGNOSTIC_AUTH_KEYCONFIG_MD5", keyConfigMd5, sizeof(keyConfigMd5));
+    const bool haveUiConfig =
+        DiagnosticTryParseEnvHexBytes("MXO_DIAGNOSTIC_AUTH_UICONFIG_MD5", uiConfigMd5, sizeof(uiConfigMd5));
+
+    std::vector<uint8_t> encryptedBlob;
+    const bool haveEncryptedBlob =
+        DiagnosticTryParseEnvHexVector("MXO_DIAGNOSTIC_AUTHREQUEST_RSA_BLOB", &encryptedBlob);
+    if (!haveEncryptedBlob) {
+        Log(
+            "DIAGNOSTIC: auth request experiment skipped; env MXO_DIAGNOSTIC_AUTHREQUEST_RSA_BLOB (hex RSA blob) is required for launcher-side raw 0x08 / AS_AuthRequest");
+        return;
+    }
+    if (encryptedBlob.size() > 0xffffu) {
+        Log(
+            "DIAGNOSTIC: auth request experiment skipped; RSA blob size %u exceeds uint16 blobLen field",
+            (unsigned)encryptedBlob.size());
+        return;
+    }
+
+    // Evidence-backed `AS_AuthRequest` wire shape from current launcher static + open-source
+    // server/proxy references:
+    // - byte 0 = raw code `0x08`
+    // - dword +1 = PublicKeyId / rsaType
+    // - byte +5 = LoginType
+    // - word +6 = 0
+    // - bytes +8..+0x17 = KeyConfigMD5[16]
+    // - bytes +0x18..+0x27 = UIConfigMD5[16]
+    // - word +0x28 = blobLen
+    // - bytes +0x2a.. = RSA-encrypted auth blob
+    const uint16_t blobLen = static_cast<uint16_t>(encryptedBlob.size());
+    const uint32_t payloadLen = 0x2au + static_cast<uint32_t>(blobLen);
+    std::vector<uint8_t> payload(payloadLen, 0u);
+    payload[0] = mxo::ltlogin::CLTLoginMediator::kAuthRawCodeAuthRequest;
+    std::memcpy(payload.data() + 1, &replyState.publicKeyId, sizeof(uint32_t));
+    payload[5] = static_cast<uint8_t>(loginType);
+    payload[6] = 0;
+    payload[7] = 0;
+    std::memcpy(payload.data() + 8, keyConfigMd5, sizeof(keyConfigMd5));
+    std::memcpy(payload.data() + 24, uiConfigMd5, sizeof(uiConfigMd5));
+    std::memcpy(payload.data() + 40, &blobLen, sizeof(blobLen));
+    if (!encryptedBlob.empty()) {
+        std::memcpy(payload.data() + 42, encryptedBlob.data(), encryptedBlob.size());
+    }
+
+    std::vector<uint8_t> packet;
+    size_t headerLen = 0u;
+    if (!DiagnosticBuildVariableLengthPacket(payload.data(), payload.size(), &packet, &headerLen)) {
+        Log("DIAGNOSTIC: auth request experiment failed to frame raw 0x08 packet payloadLen=%u", (unsigned)payload.size());
+        return;
+    }
+
+    const uint32_t sendResult = self->sidecarConnection->SendPacket(packet.data(), static_cast<uint32_t>(packet.size()), nullptr);
+    g_DiagnosticAuthRequestExperimentSent = (sendResult != 0u);
+
+    Log(
+        "DIAGNOSTIC: auth request experiment rawCode=0x%02x request='%s' publicKeyId=%u loginType=%u keySize=%u blobLen=%u keyConfigMd5Env=%u uiConfigMd5Env=%u payloadLen=%u headerLen=%u byteCount=%u -> sendResult=0x%08x sentOnce=%u",
+        (unsigned)mxo::ltlogin::CLTLoginMediator::kAuthRawCodeAuthRequest,
+        mxo::ltlogin::CLTLoginMediator::kMessageAsAuthRequest,
+        (unsigned)replyState.publicKeyId,
+        (unsigned)loginType,
+        (unsigned)replyState.keySize,
+        (unsigned)blobLen,
+        haveKeyConfig ? 1u : 0u,
+        haveUiConfig ? 1u : 0u,
+        (unsigned)payload.size(),
+        (unsigned)headerLen,
+        (unsigned)packet.size(),
+        (unsigned)sendResult,
+        g_DiagnosticAuthRequestExperimentSent ? 1u : 0u);
 }
 
 static void DiagnosticRouteConnectStatusToLoginController(
@@ -1455,6 +1693,21 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                             (unsigned)headerBytes,
                             (unsigned)rawCode,
                             DiagnosticAuthRawCodeName(rawCode));
+
+                        if (rawCode == 0x07u) {
+                            DiagnosticAuthGetPublicKeyReplyState replyState = {};
+                            if (DiagnosticTryParseAuthGetPublicKeyReply(bytes, &replyState)) {
+                                g_DiagnosticAuthGetPublicKeyReplyState = replyState;
+                                Log(
+                                    "DIAGNOSTIC: parsed AS_GetPublicKeyReply status=%u currentTime=%u publicKeyId=%u keySize=%u payloadLength=%u",
+                                    (unsigned)replyState.status,
+                                    (unsigned)replyState.currentTime,
+                                    (unsigned)replyState.publicKeyId,
+                                    (unsigned)replyState.keySize,
+                                    (unsigned)replyState.payloadLength);
+                                DiagnosticMaybeSendAuthRequestExperiment(self, replyState);
+                            }
+                        }
                     }
                 }
 

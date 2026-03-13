@@ -53,11 +53,14 @@ public:
     // Current high-value raw auth-code anchors on the launcher-owned helper path:
     // - `0x447eb0` currently builds/sends raw code `0x06`
     //   -> strongest current `AS_GetPublicKeyRequest` candidate
+    // - live diagnostic reply parsing now also confirms raw `0x07`
+    //   -> `AS_GetPublicKeyReply`
     // - `0x4474f0` currently builds/sends raw code `0x08`
     //   -> strongest current `AS_AuthRequest` candidate
     // - `0x43b830` currently builds/sends raw code `0x35`
     //   -> later `AS_GetWorldListRequest`
     static constexpr uint8_t kAuthRawCodeGetPublicKeyRequest = 0x06;
+    static constexpr uint8_t kAuthRawCodeGetPublicKeyReply = 0x07;
     static constexpr uint8_t kAuthRawCodeAuthRequest = 0x08;
     static constexpr uint8_t kAuthRawCodeGetWorldListRequest = 0x35;
     static constexpr const char* kMessageMsConnectReply = "MS_ConnectReply";

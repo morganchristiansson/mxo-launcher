@@ -351,6 +351,39 @@ Current practical crash state:
               - the small-payload framing model derived from `0x448a00` is now runtime-supported enough to matter
               - the raw `0x06` send shape from `0x447eb0` is now runtime-supported enough to matter
               - and the server reply beginning with raw `0x07` strongly supports the current `AS_GetPublicKeyRequest -> AS_GetPublicKeyReply` read on this launcher-owned auth path
+            - newer cross-check against the open-source server implementations now also sharpens how aggressively we can shortcut on this path without losing the bigger launcher-owned auth picture:
+              - active protocol-oracle references:
+                - `~/work/mxoemu/Reality/Source/AuthSocket.cpp`
+                - `~/work/mxoemu/Proxy/Logging.cpp`
+                - `~/work/mxo-hd/hds/auth/AuthHandler.cs`
+              - use these as a **secondary** source behind original-launcher static work:
+                - useful for concrete packet field ordering / server expectations
+                - not as a replacement for original launcher behavior when they diverge
+              - current shortcut policy on this auth path is therefore:
+                - keep original `launcher.exe` static analysis as the canonical shape anchor
+                - but allow clearly labeled diagnostic shortcuts when the current live server accepts a simpler path
+            - one concrete implementation step from that policy is now in the scaffold:
+              - env-gated `AS_AuthRequest` send support now exists in `src/diagnostics.cpp`
+              - it currently expects an externally supplied RSA blob via:
+                - `MXO_DIAGNOSTIC_AUTHREQUEST_RSA_BLOB=<hex>`
+              - plus optional fixed-header inputs:
+                - `MXO_DIAGNOSTIC_AUTH_LOGIN_TYPE`
+                - `MXO_DIAGNOSTIC_AUTH_KEYCONFIG_MD5`
+                - `MXO_DIAGNOSTIC_AUTH_UICONFIG_MD5`
+              - helper `tools/build_authrequest_blob.py` now also exists as a practical server-guided blob generator using the public modulus/exponent shortcut recovered from `mxo-hd`
+              - if the RSA blob env is absent, the scaffold now logs a precise skip instead of pretending the full request is already reconstructed
+            - newer deliberate follow-up after landing that support now also sends raw `0x08` on the live auth path:
+              - command shape:
+                - `BLOB=$(python3 tools/build_authrequest_blob.py --username morgan)`
+                - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_DIAGNOSTIC_SEND_AS_GETPUBLICKEY=1 MXO_DIAGNOSTIC_SEND_AS_AUTHREQUEST=1 MXO_DIAGNOSTIC_AUTH_LAUNCHER_VERSION=76005 MXO_DIAGNOSTIC_AUTH_CUR_PUBLIC_KEY_ID=0 MXO_DIAGNOSTIC_AUTHREQUEST_RSA_BLOB="$BLOB" MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+              - current result from that run:
+                - parsed reply log:
+                  - `parsed AS_GetPublicKeyReply status=0 currentTime=1773423753 publicKeyId=4 keySize=18 payloadLength=406`
+                - outbound auth-request log:
+                  - `auth request experiment rawCode=0x08 request='AS_AuthRequest' publicKeyId=4 loginType=1 keySize=18 blobLen=128 keyConfigMd5Env=0 uiConfigMd5Env=0 payloadLen=170 headerLen=2 byteCount=172 -> sendResult=0x00000001 sentOnce=1`
+              - important current negative result:
+                - no new logged auth type-3 reply such as raw `0x09` / `AS_AuthChallenge` appeared within the timed run window yet
+                - so the immediate gap has now shifted from “can we send raw `0x08` at all?” to whether the current diagnostic `AS_AuthRequest` blob/header shape is accepted closely enough by the live server to trigger the next challenge reply
             - important restraint:
               - this still does **not** prove the full faithful original field population yet
               - but it materially upgrades the auth-bootstrap work from pure static suspicion to a live send/reply diagnostic foothold
@@ -740,14 +773,28 @@ Canonical docs:
        - `MXO_DIAGNOSTIC_AUTH_CUR_PUBLIC_KEY_ID=0`
      - the launcher-side scaffold successfully sends a diagnostic raw `0x06` packet and then receives a real auth type-3 reply:
        - send log:
-         - `auth bootstrap experiment rawCode=0x06 request='AS_GetPublicKeyRequest' launcherVersion=76005 currentPublicKeyId=0 byteCount=10 -> sendResult=0x00000001`
+         - `auth bootstrap experiment rawCode=0x06 request='AS_GetPublicKeyRequest' launcherVersion=76005 currentPublicKeyId=0 payloadLen=9 headerLen=1 byteCount=10 -> sendResult=0x00000001`
        - receive logs:
          - `received-bytes label='AuthConnection' total=408 preview=81 96 07 ... 04 00 00 00 12`
          - `auth receive framing payloadLength=406 headerBytes=2 rawCode=0x07 likelyMessage='AS_GetPublicKeyReply'`
+         - `parsed AS_GetPublicKeyReply status=0 currentTime=1773423753 publicKeyId=4 keySize=18 payloadLength=406`
+     - a further server-guided follow-up now also sends diagnostic raw `0x08` / `AS_AuthRequest`:
+       - command shape includes:
+         - `MXO_DIAGNOSTIC_SEND_AS_AUTHREQUEST=1`
+         - `MXO_DIAGNOSTIC_AUTHREQUEST_RSA_BLOB=$(python3 tools/build_authrequest_blob.py --username morgan)`
+       - current send log:
+         - `auth request experiment rawCode=0x08 request='AS_AuthRequest' publicKeyId=4 loginType=1 keySize=18 blobLen=128 keyConfigMd5Env=0 uiConfigMd5Env=0 payloadLen=170 headerLen=2 byteCount=172 -> sendResult=0x00000001`
+       - important current negative result:
+         - no new logged auth type-3 reply such as raw `0x09` / `AS_AuthChallenge` appeared within the timed run window yet
      - important restraint:
-       - this is a **diagnostic bootstrap experiment**, not faithful original-equivalent proof of the full field-population path yet
+       - these are **diagnostic bootstrap experiments**, not faithful original-equivalent proof of the full field-population path yet
        - `76005` is still only a practical guessed launcher-version value from current `7.6005`
-   - so the next runtime/auth task has now shifted one step forward:
-     - stop treating the first auth bootstrap exchange as purely hypothetical
-     - next target is to parse / model the live `0x07` / `AS_GetPublicKeyReply` result strongly enough to drive the next launcher-owned bootstrap send candidate `0x08` / `AS_AuthRequest`
+       - `tools/build_authrequest_blob.py` currently uses the public modulus/exponent shortcut recovered from the open-source server implementation rather than a full launcher-native crypto implementation inside `resurrections.exe`
+   - so the next runtime/auth task has now shifted one step forward again:
+     - stop treating `AS_AuthRequest` as only a static candidate
+     - next target is to determine why the current diagnostic raw `0x08` request still does **not** elicit raw `0x09` / `AS_AuthChallenge`
+     - current most likely remaining gaps are:
+       - exact `AS_AuthRequest` fixed-header fidelity
+       - exact RSA-blob plaintext shape / time / username packing
+       - or another live-server simplification/difference we can exploit deliberately
    - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever
