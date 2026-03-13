@@ -142,6 +142,12 @@ public:
     //   owner-side packet handling through wrapper `0x449a70`
     // - margin-side derived connection family (`0x41e500`, vtable `0x4aff38`) later reaches
     //   owner-side packet handling through wrapper `0x44af60`
+    // - newer helper-object review now narrows one important negative detail:
+    //   - startup auth/margin derived objects come through `0x4417e0 -> 0x448b40(flag=0)`
+    //   - so connection helper slots `+0x7c / +0x80` stay null on that path
+    //   - type-2 connect-status completion therefore falls through `0x449a70 / 0x44af60`
+    //     into the owner callback / fallback chain instead of being fully handled by those
+    //     optional helper objects alone
     // - important current nuance: those later packet handlers are not themselves proof of the
     //   first outbound request after connect, but they do show that raw connect success alone is
     //   not the whole launcher-owned auth/margin path

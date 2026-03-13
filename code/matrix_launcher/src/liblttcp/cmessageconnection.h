@@ -37,6 +37,23 @@ namespace mxo::liblttcp {
 //   - those families wrap base completion through `0x449a70` / `0x44af60`
 //   - important nuance: those wrappers now look like later packet/owner handling anchors, not
 //     direct proof of the first outbound request after connect
+// - connection fields `+0x7c` / `+0x80` are no longer just anonymous mystery pointers:
+//   - ctor helper `0x436080` builds a `0x24` event+critical-section helper object there
+//   - helper shape now reads as:
+//     - main helper methods: `SetEvent()` and `WaitForSingleObject(timeout)`
+//     - embedded lock helper rooted at `+0x04` (shared `0x4add70` family)
+//     - event handle at `+0x20`
+//   - `0x4490c0` uses them as completion notifiers:
+//     - work type `2` -> signal `self+0x7c`
+//     - work type `1` -> signal `self+0x80`
+//   - current best subtype read:
+//     - `+0x7c` = type-2 status/connect-style completion helper
+//     - `+0x80` = type-1 close/terminal completion helper, supported by `0x448af0`
+//       waiting on `+0x80` until connection state `+0x34` returns to `8`
+//   - crucial current narrowing: startup auth/margin derived objects built through
+//     `0x41d170 / 0x41e500 -> 0x4417e0 -> 0x448b40(flag=0)` leave both `+0x7c` and `+0x80`
+//     as null on that path, so current auth/margin type-2 connect-status handling falls
+//     through to owner callbacks instead of using these helper objects
 // - vtable +0x20 / 0x449d20 -> likely SendPacket(...)
 //   - forwards send args together with `self` to engine +0x20
 //   - current best engine mapping there is slot-8 / SendBuffer

@@ -206,6 +206,12 @@ uint32_t CLTLoginMediator::BeginAuthHandshake() {
     //   `AS_AuthReply`, not `AS_GetPublicKeyReply`
     // - that makes `0x4401a0` a later **incoming auth-reply** anchor on the packet/receive
     //   path, not direct proof of the first outbound send after connect
+    // - newer `CMessageConnection +0x7c/+0x80` review also narrows why the auth startup path
+    //   still falls through here:
+    //   - startup auth derived objects are built via `0x4417e0 -> 0x448b40(flag=0)`
+    //   - so the optional helper objects at `+0x7c / +0x80` remain null on that path
+    //   - type-2 connect-status completion therefore falls through `0x449a70` into the owner
+    //     callback/fallback chain rather than being resolved entirely inside helper signaling
     // - current best reading is therefore still that the first faithful outbound auth request
     //   remains unresolved on the current scaffold
     expectedAuthRequestName_ = nullptr;

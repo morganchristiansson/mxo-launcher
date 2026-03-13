@@ -391,6 +391,21 @@ Current best reading remains:
     - auth-side startup path `0x41d170` builds a **derived** connection object with vtable `0x4afef0`
     - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
     - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
+    - newer focused review of `CMessageConnection +0x7c / +0x80` now narrows those helper objects substantially:
+      - ctor helper `0x436080` builds a `0x24` event+critical-section object
+      - final helper shape is:
+        - main method `+0x00` = `SetEvent(...)`
+        - main method `+0x04` = `WaitForSingleObject(timeout)` with lock release/reacquire
+        - embedded lock helper at `+0x04`
+        - event handle at `+0x20`
+      - base completion dispatcher `0x4490c0` uses them as optional completion notifiers:
+        - work type `2` -> signal `connection+0x7c`
+        - work type `1` -> signal `connection+0x80`
+      - current best subtype read is:
+        - `+0x7c` = type-2 status/connect-style completion helper
+        - `+0x80` = type-1 close/terminal completion helper
+      - importantly, the auth/margin startup path currently builds derived connections through `0x4417e0 -> 0x448b40(flag=0)`, so both `+0x7c` and `+0x80` remain **NULL** on that startup path
+      - that means the current auth/margin type-2 connect-status path does **not** get resolved by those helper objects alone; it falls through `0x449a70 / 0x44af60` into the owner callback / fallback chain instead
     - important correction from newer message-code review:
       - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
       - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`

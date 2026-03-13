@@ -253,6 +253,22 @@ Current practical crash state:
             - auth-side startup path `0x41d170` builds a **derived** `CMessageConnection` object with vtable `0x4afef0`
             - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
             - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
+            - newer focused review now also resolves the previously vague `CMessageConnection +0x7c / +0x80` helper objects much further:
+              - ctor helper `0x436080` builds a `0x24` event+critical-section helper object
+              - current best helper shape:
+                - main `+0x00` = `SetEvent(...)`
+                - main `+0x04` = `WaitForSingleObject(timeout)` with lock release/reacquire
+                - embedded lock helper at `+0x04`
+                - event handle at `+0x20`
+              - base completion dispatcher `0x4490c0` uses them as optional notifier helpers:
+                - work type `2` -> signal `connection+0x7c`
+                - work type `1` -> signal `connection+0x80`
+              - current best subtype read is:
+                - `+0x7c` = type-2 status/connect-style completion helper
+                - `+0x80` = type-1 close/terminal completion helper
+              - important negative narrowing on the auth/margin startup path:
+                - `0x41d170 / 0x41e500 -> 0x4417e0 -> 0x448b40(flag=0)` leaves both `+0x7c` and `+0x80` as **NULL** there
+                - so current auth/margin type-2 connect-status completion falls through `0x449a70 / 0x44af60` into the owner callback / fallback chain instead of being resolved inside those helper objects alone
             - important correction from newer message-code review:
               - auth owner callback `+0x17c` / `0x4401a0` handles raw auth message code `0x0b`
               - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
@@ -571,11 +587,22 @@ Canonical docs:
    - only add dwell-time/UI timing instrumentation if those stronger runtime markers stop moving for a while
 13. Current highest-value next runtime task after the auth-connect + queue-consume milestone:
    - identify the first **real outbound auth/message send** that should happen after launcher-side auth connect
-   - current best narrowing is that this likely sits behind the original **type-2 connect-status completion chain**, not behind raw TCP connect alone:
+   - current best narrowing is still that this sits behind the original **type-2 connect-status completion chain**, not behind raw TCP connect alone:
      - `0x4329b9..0x4329cc` -> `0x435050(0x7000001)` -> queue0C `(workItem, connection, 0)`
      - auth/margin derived connection families still matter there, but do **not** over-read later packet handlers as proof of the first send:
        - auth derived vtable `0x4afef0`, later packet wrapper `0x449a70`, later incoming auth anchor `0x4401a0 -> AS_AuthReply`
        - margin derived vtable `0x4aff38`, later packet wrapper `0x44af60`, later incoming loading anchor `0x440320 -> MS_LoadCharacterReply`
-     - the next concrete reverse-engineering target is therefore the **type-2 callback / helper-object path** around connection fields `+0x7c / +0x80` and helper ctor `0x436080`, because that is closer to connect completion than the later type-3 packet handlers
+   - but the earlier `+0x7c / +0x80` helper-object target is now partly resolved and should no longer be treated as the main mystery by itself:
+     - helper ctor `0x436080` builds a `0x24` event+critical-section notifier object
+     - `0x4490c0` maps:
+       - work type `2` -> signal `connection+0x7c`
+       - work type `1` -> signal `connection+0x80`
+     - current best subtype read:
+       - `+0x7c` = type-2 status/connect-style completion helper
+       - `+0x80` = type-1 close/terminal completion helper
+     - crucial narrowing: startup auth/margin derived objects are built through `0x4417e0 -> 0x448b40(flag=0)`, so both helpers are **NULL** on that important startup path
+     - therefore the next concrete reverse-engineering target shifts one step later, into the **owner callback / fallback chain after `0x4490c0` returns 0**:
+       - auth side: `0x449a70 -> owner +0x17c / 0x4401a0 -> fallback 0x448a60`
+       - margin side: `0x44af60 -> owner +0x188 -> fallback 0x448a60`
    - because current timed runs still do not show any type-3 receive work items, and the server likely will not produce useful reply traffic until the correct first auth/message exchange is sent
    - keep this coupled to more faithful work-item/context modeling rather than feeding arbitrary synthetic queue items forever
