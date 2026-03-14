@@ -467,8 +467,28 @@ Current best reading remains:
         - it runs as a method on the extra owner child allocated by `0x41290` / base ctor `0x45500`
           and stored at owner `+0x680`
         - that phase-2 bootstrap object is size `0x11c`
-        - it copies three string sources plus two 16-byte blocks into bootstrap state and stores
-          an outbound send target at bootstrap `+0x50`
+        - owner vtable `+0x38` is now also directly pinned down as tiny getter `0x41f0a0`
+          returning embedded owner block `this + 0x94`
+        - owner vtable `+0x30` / `0x41ecd0` is now the matching setter/consumer side and uses
+          `0x41eb80` to copy the same family
+        - current best recovered owner `+0x94` source-family layout is:
+          - `+0x00 .. +0x1f` = first inline 32-byte string
+          - `+0x20 .. +0x3f` = second inline 32-byte string
+          - `+0x40 .. +0x4f` = first 16-byte block
+          - `+0x50 .. +0x5f` = second 16-byte block
+          - `+0x60 .. +0x68` = embedded small-string object
+          - `+0x6c` = trailing byte/flag
+        - newer field-specific follow-up now also tightens later use:
+          - owner vtable `+0x150` / `0x41f270` directly writes the first inline string
+          - later auth-reply path `0x43f300 -> owner +0x150` feeds that field from `0x43d480(...)`
+          - the second inline string is later copied into bootstrap `+0xf8` by `0x41330`
+            and validated by `0x456c40` against a slash-plus-6-digits shape
+          - the embedded small string at `+0x60` later drives a literal `"STATION"` default
+            path in `0x489bc0`, or gets copied into owner helper `+0x65c + 0x18` via `0x21a50`
+        - important correction to the older shorthand:
+          - `0x448050` only consumes the **first dword** of source `+0x60` as a raw `char*`
+          - but the source field there is not merely a naked optional pointer; `0x41eb80`
+            proves it is a full `0x407dd0`-style small-string object
         - crucial correction: the branch at `0x44811e` is not just a loose byte-ish mode flag
           but the nullness of **pointer `+0xa0`** inside that bootstrap object
       - `0x448050` then branches by bootstrap helper pointer `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through bootstrap `+0x50 -> +0x24`:
@@ -500,7 +520,8 @@ Current best reading remains:
         - it is now the more specific identity/ownership of:
           - the bootstrap helper pointer stored at `+0xa0`
           - the outbound send target stored at `+0x50`
-          - and the exact selected-source object shape passed into `0x448050`
+          - and the original concrete class/name semantics of the now-better-defined owner `+0x94`
+            phase-2 auth/bootstrap source block passed into `0x448050`
         - but the launcher-owned auth progression claim itself is now stronger, not weaker
     - later launcher-owned auth protocol details now belong under:
       - `../../launcher.exe/auth/README.md`

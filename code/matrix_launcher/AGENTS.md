@@ -10,6 +10,30 @@ Reimplement the original Matrix Online `launcher.exe` startup path as faithfully
 Source of truth:
 - `~/MxO_7.6005/launcher.exe`
 
+## Tools
+
+### Ghidra
+
+Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
+
+Good practice for this project:
+- start by confirming the active program/binary (`launcher.exe` vs `client.dll`) before trusting an address
+- use **decompile + disassembly together** for important functions; do not trust decompiler output alone for:
+  - calling convention
+  - stack cleanup
+  - byte-vs-dword field meaning
+  - inline string / small-buffer layout
+- when recovering an object field, prefer this chain of evidence:
+  - allocator / ctor
+  - fill/helper writer
+  - later reader / consumer
+- use callers/callees/xrefs aggressively so isolated helper bodies are not over-interpreted
+- for branch conditions, check the actual instruction width (`test al,al` vs `test eax,eax`, etc.) before documenting field semantics
+- when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
+- keep renamed symbols and source scaffolds conservative; use provisional names when the role is strong but not fully settled
+- push confirmed Ghidra findings into source comments/scaffolds and canonical docs in the same task so knowledge does not live only in the tool session
+- record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
+
 ## Current Status (2026-03-12)
 
 ### Faithful path now implemented in the scaffold

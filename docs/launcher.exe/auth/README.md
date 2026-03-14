@@ -222,6 +222,22 @@ Important current restraint:
 - so it proves the launcher-owned auth wire logic now works in `resurrections.exe`
 - but it does **not** yet prove that the original launcher's full helper/state machine reaches the same transition automatically without that trigger
 
+## 0x448050 / phase-2 bootstrap object note
+
+Further work on `0x448050` is now primarily about **faithful launcher-owned bootstrap-state reconstruction**, not about basic auth wire viability by itself.
+
+Current canonical object-level notes for that path live under:
+- `../startup_objects/0x4d6304_network_engine.md`
+
+Newest Ghidra-backed tightening there now includes:
+- the direct `0x439210 -> 0x448050` call shape
+- the selected source-object layout passed from owner `+0x38`
+- the three small-string destinations at bootstrap `+0x04 / +0x10 / +0x1c`
+- the fixed writes to bootstrap `+0x28 / +0x2c / +0x30..+0x4f / +0x50`
+- the ctor-backed tail shape from `0x45500` / `0x41290`
+
+Keep detailed packet/auth-loop behavior here in `docs/launcher.exe/auth/` and keep the concrete `0x448050` owner-object field recovery in the startup-object doc above.
+
 ## Related docs
 
 - `../startup_objects/0x4d2c58_ILTLoginMediator_Default.md`

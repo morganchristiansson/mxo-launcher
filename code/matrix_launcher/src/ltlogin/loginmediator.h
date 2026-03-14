@@ -117,6 +117,59 @@ public:
         std::string exactMarginHostName;
     };
 
+    struct AuthBootstrapSelectedSource38Sketch {
+        struct SmallStringLike60Sketch {
+            // Same three-dword small-string family used by `0x407dd0`:
+            // - `+0x00` = begin/data pointer
+            // - `+0x04` = current/end pointer
+            // - `+0x08` = capacity/end-of-storage pointer
+            // `0x448050` only consumes the first dword here as a raw `char*` for its arg9 path,
+            // but `0x41eb80` proves the full embedded small-string object still lives here.
+            const char* begin = nullptr;
+            const char* current = nullptr;
+            const char* capacity = nullptr;
+        };
+
+        // Current best concrete family returned by owner vtable `+0x38`:
+        // - getter is tiny function `0x41f0a0 = lea eax,[ecx+0x94] ; ret`
+        // - so this is an **embedded owner subobject at `0x4f78b8 + 0x94`**, not a separate heap object
+        // - owner vtable `+0x30` / `0x41ecd0` then acts as the corresponding setter/consumer and
+        //   uses `0x41eb80` to copy the same family into owner `+0x94`
+        // - owner vtable `+0x150` / `0x41f270` is now also a direct first-string writer for the
+        //   same block and copies up to `0x20` bytes into owner `+0x94`
+        //
+        // Current best recovered layout from `0x41f0a0` + `0x41ecd0` + `0x41eb80` + `0x439210`
+        // plus later owner-path uses like `0x43f300`, `0x41330`, `0x21a50`, and `0x20720`:
+        // - `+0x00 .. +0x1f` = first inline 32-byte NUL-terminated string
+        // - `+0x20 .. +0x3f` = second inline 32-byte NUL-terminated string
+        // - `+0x40 .. +0x4f` = first copied 16-byte block
+        // - `+0x50 .. +0x5f` = second copied 16-byte block
+        // - `+0x60 .. +0x68` = embedded small-string object
+        // - `+0x6c` = trailing byte/flag
+        //
+        // Newer semantic anchors on individual fields:
+        // - `+0x00` first string:
+        //   - owner vtable `+0x150` / `0x41f270` writes it directly
+        //   - later auth-reply path `0x43f300 -> owner +0x150` feeds it from `0x43d480(...)`
+        // - `+0x20` second string:
+        //   - later copied into bootstrap `+0xf8` by `0x41330`
+        //   - `0x41330 -> 0x456c40` validates it against a concrete slash+6-digit shape
+        // - `+0x60` embedded small string:
+        //   - empty case falls through a literal `"STATION"` default path in `0x489bc0`
+        //   - non-empty case is later copied into owner `+0x65c + 0x18` through `0x21a50`
+        //
+        // Current best semantic read is therefore stronger than a generic auth blob but still
+        // deliberately provisional on exact original class name:
+        // an owner-side **station/launchpad-flavored phase-2 auth/bootstrap source block**
+        // that feeds `0x448050` and later session/bootstrap helpers.
+        std::array<char, 0x20> inlineString00{};
+        std::array<char, 0x20> inlineString20{};
+        std::array<uint8_t, 16> block40{};
+        std::array<uint8_t, 16> block50{};
+        SmallStringLike60Sketch string60;
+        uint8_t flag6C = 0;
+    };
+
     struct AuthBootstrapState680Sketch {
         // Current best read of the extra owner child allocated through `0x41290` and stored at
         // owner `+0x680` by `0x41b160`.
@@ -124,32 +177,42 @@ public:
         // High-value phase-2 auth/bootstrap anchors:
         // - base ctor `0x45500`, size `0x11c`
         // - preparation/fill helper `0x448050`
-        // - branch condition at `0x44811e`: pointer `+0xa0`
-        //   - NULL -> `0x447eb0` builds/sends raw code `0x06`
-        //   - non-NULL -> `0x4474f0` builds/sends raw code `0x08`
+        // - branch condition at `0x44811e`: low-byte null test on dword field `+0xa0`
+        //   - later `0x429b0` still uses that same field as a helper/pointer object via `+0x1c`
+        //   - current best read therefore remains a helper/pointer family at `+0xa0`
         // - later challenge/crypto continuation `0x429b0`:
-        //   - uses helper pointer `+0xa0 -> +0x1c`
         //   - writes 16-byte material to `+0x85`
         //   - derives / caches the current/public key id at `+0x9c` via `0x41470`
         //
         // Current field sketch from `0x45500` + `0x448050` + `0x447eb0` + `0x4474f0`:
-        // - `+0x04` = first copied string from the selected phase-2 source object
-        // - `+0x10` = second copied string from the selected phase-2 source object
-        // - `+0x1c` = third copied string/pointer from the selected phase-2 source object
-        // - `+0x28` = `LoginType`; current recovered `0x439210` path passes fixed `1`
-        // - `+0x2c` = `LauncherVersion`; copied from the owner-side object returned by owner `+0x20`
-        // - `+0x30..+0x3c` = `KeyConfigMD5[16]`; copied from selected source object `+0x40`
-        // - `+0x40..+0x4c` = `UIConfigMD5[16]`; copied from selected source object `+0x50`
-        // - `+0x50` = outbound send-target object later used via virtual `+0x24` for send
-        // - `+0x54` = embedded `0x180`-byte helper subobject from base ctor `0x45500`
-        // - `+0x80` = timestamp / later delta source used on the raw `0x1b` path in `0x4474f0`
-        // - `+0x84..+0x94` = challenge-derived / decrypted 16-byte material family
-        // - `+0x94` / `+0x98` = later auxiliary heap objects on the raw `0x08` path
-        // - `+0x9c` = `CurPublicKeyId` / `PublicKeyId`; used by raw `0x06` and raw `0x08`
-        // - `+0xa0` = auth/public-key helper pointer; its nullness selects raw `0x06` vs `0x08`
-        // - `+0xa4` = lazy side object created on the raw `0x06` path before first send
-        // - `+0xa8` = later helper/handle used on the raw `0x08` auxiliary `0x1b` path
-        // - `+0xb0 / +0xc4 / +0xd8` = three embedded helper blobs built by base ctor `0x45500`
+        std::string string04;               // `+0x04`
+        std::string string10;               // `+0x10`
+        std::string string1C;               // `+0x1c`
+        uint32_t loginType28 = 0;           // `+0x28`
+        uint32_t launcherVersion2C = 0;     // `+0x2c`
+        std::array<uint8_t, 16> block30{};  // `+0x30 .. +0x3f`
+        std::array<uint8_t, 16> block40{};  // `+0x40 .. +0x4f`
+        void* sendTarget50 = nullptr;       // `+0x50`
+        uint32_t timestamp80 = 0;           // `+0x80`
+        std::array<uint8_t, 16> material85{}; // `+0x85 .. +0x94`
+        void* sideObject94 = nullptr;       // `+0x94`
+        void* sideObject98 = nullptr;       // `+0x98`
+        uint32_t currentPublicKeyId9C = 0;  // `+0x9c`
+        void* helperA0 = nullptr;           // `+0xa0`
+        void* lazyRaw06StateA4 = nullptr;   // `+0xa4`
+        void* raw08AuxHandleA8 = nullptr;   // `+0xa8`
+        uint32_t fieldAC = 0;               // `+0xac`
+        uint32_t stateFlagEC = 1;           // `+0xec` from base ctor `0x45500`
+        void* fieldF0 = nullptr;            // `+0xf0`
+        void* fieldF4 = nullptr;            // `+0xf4`
+        void* fieldF8 = nullptr;            // `+0xf8`
+        void* fieldFC = nullptr;            // `+0xfc`
+        void* field100 = nullptr;           // `+0x100`
+        uint32_t field108 = 0;              // `+0x108`
+        uint32_t field10C = 0;              // `+0x10c`
+        uint32_t field110 = 0;              // `+0x110`
+        uint32_t field114 = 0;              // `+0x114`
+        uint32_t field118 = 0;              // `+0x118`
     };
 
     CLTLoginMediator();
@@ -193,6 +256,7 @@ public:
     const MarginRouteState& CurrentMarginRouteState() const;
 
     const ConnectionHelperFamily& Helpers() const;
+    const AuthBootstrapState680Sketch& AuthBootstrap680() const;
 
     // launcher.exe:0x43b300
     // Current best read:
@@ -273,8 +337,18 @@ public:
     //     - owner `+0x20`
     //     - owner `+0x38`
     //   - then calls `0x448050`, which is currently only xref'd from `0x439210`
+    //   - Ghidra-backed callsite layout now narrows the selected source object materially:
+    //     - owner vtable `+0x38` getter `0x41f0a0` returns embedded owner block `this + 0x94`
+    //     - owner vtable `+0x30` / `0x41ecd0` copies/consumes the same family via `0x41eb80`
+    //     - source `+0x00 .. +0x1f` = first inline 32-byte NUL-terminated string
+    //     - source `+0x20 .. +0x3f` = second inline 32-byte NUL-terminated string
+    //     - source `+0x40 .. +0x4f` = first copied 16-byte block
+    //     - source `+0x50 .. +0x5f` = second copied 16-byte block
+    //     - source `+0x60 .. +0x68` = embedded `0x407dd0`-style small-string object
+    //       whose first dword is passed into `0x448050` as the raw third-string pointer
+    //     - source `+0x6c` = trailing byte/flag
     //   - `0x448050` then branches into two launcher-owned outbound packet builders that both
-    //     send indirectly through a bootstrap object connection pointer at `object + 0x50`
+    //     send indirectly through a bootstrap object send-target at `object + 0x50`
     //     via virtual `+0x24`, rather than through another simple direct `0x41af60` callsite:
     //     - `0x447eb0`
     //       - builds/sends raw code `0x06`
@@ -283,7 +357,7 @@ public:
     //       - builds/sends raw code `0x08`
     //       - strongest current `AS_AuthRequest` candidate
     //       - also builds/sends a later auxiliary raw `0x1b` packet on that same indirect path
-    //   - the branch condition between those builders is still only known as object byte `+0xa0`
+    //   - the branch there is now best read as a low-byte null test on dword helper field `+0xa0`
     // - important channel-specific correction from the latest packet-code pass:
     //   - do not confuse this auth-side bootstrap lead with margin-side wrapper traffic like
     //     `0x41af70`, where raw code `0x06` maps through the margin table to
@@ -336,6 +410,7 @@ private:
     uint32_t SendAuthRequestFromReply(const mxo::auth::GetPublicKeyReply& reply);
     uint32_t SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge);
     void LogParsedAuthReply(const mxo::auth::AuthReply& reply) const;
+    void SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
 
     void BuildAuthEndpoint();
     void BuildMarginEndpoint();
@@ -349,6 +424,9 @@ private:
     // - `+0x4c` = auth DNS / route string staging area
     // - `+0x5c` = auth endpoint block consumed by auth-side `connection->+0x1c(...)`
     // - `+0x6c` = margin endpoint block consumed by margin-side `connection->+0x1c(...)`
+    // - `+0x94` = embedded station/launchpad-flavored phase-2 auth/bootstrap source block
+    //   returned by owner vtable `+0x38` (`0x41f0a0`), copied/consumed by owner vtable `+0x30`
+    //   (`0x41ecd0 -> 0x41eb80`), and also written through owner vtable `+0x150` (`0x41f270`)
     // - `+0x680` = extra heap child built during owner initialization; current best read is
     //   the phase-2 auth/bootstrap object sketched above (`0x41290` / `0x45500` family)
     // - `+0x688` = world-slot pointer table (100 entries)
@@ -364,6 +442,8 @@ private:
 
     ConnectionHelperFamily helpers_;
     MarginRouteState marginRouteState_;
+    AuthBootstrapSelectedSource38Sketch authBootstrapSource38_;
+    AuthBootstrapState680Sketch authBootstrap680_;
 
     std::string authServerDnsName_;
     uint16_t authServerPortHostOrder_;

@@ -3,6 +3,7 @@
 #include "../diagnostics.h"
 #include "loginstates.h"
 
+#include <algorithm>
 #include <ctime>
 
 namespace mxo::ltlogin {
@@ -21,6 +22,13 @@ static const char* MaskedAuthValue(const std::string& value) {
     return value.empty() ? "<empty>" : "<provided>";
 }
 
+static std::array<uint8_t, 16> CopyPrefix16(const std::vector<uint8_t>& bytes) {
+    std::array<uint8_t, 16> out = {};
+    const size_t count = std::min(out.size(), bytes.size());
+    std::copy_n(bytes.begin(), count, out.begin());
+    return out;
+}
+
 }  // namespace
 
 CLTLoginMediator::CLTLoginMediator()
@@ -32,6 +40,7 @@ CLTLoginMediator::CLTLoginMediator()
       marginConnectionContextKey_(nullptr),
       helpers_{},
       marginRouteState_{},
+      authBootstrap680_{},
       authServerPortHostOrder_(11000),
       ignoreHostsFileForAuth_(false),
       marginServerPortHostOrder_(10000),
@@ -59,7 +68,9 @@ CLTLoginMediator::CLTLoginMediator()
       expectedAuthRequestName_(nullptr),
       expectedMarginRequestName_(nullptr),
       worldSlots_{},
-      worldPayloadSlots_{} {}
+      worldPayloadSlots_{} {
+    SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
+}
 
 CLTLoginMediator::~CLTLoginMediator() {
     if (!(engine_ && authConnectionContextKey_)) {
@@ -124,6 +135,7 @@ void CLTLoginMediator::SetAuthBootstrapConfig(
     authLoginType_ = loginType;
     authKeyConfigMd5_ = keyConfigMd5;
     authUiConfigMd5_ = uiConfigMd5;
+    SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
 
     Log(
         "DIAGNOSTIC: CLTLoginMediator auth bootstrap configured launcherVersion=%u currentPublicKeyId=%u loginType=%u keyConfigMd5Len=%u uiConfigMd5Len=%u",
@@ -218,6 +230,10 @@ const CLTLoginMediator::MarginRouteState& CLTLoginMediator::CurrentMarginRouteSt
 
 const CLTLoginMediator::ConnectionHelperFamily& CLTLoginMediator::Helpers() const {
     return helpers_;
+}
+
+const CLTLoginMediator::AuthBootstrapState680Sketch& CLTLoginMediator::AuthBootstrap680() const {
+    return authBootstrap680_;
 }
 
 void CLTLoginMediator::InitializeConnectionHelpers() {
@@ -563,6 +579,14 @@ void CLTLoginMediator::LogParsedAuthReply(const mxo::auth::AuthReply& reply) con
     }
 }
 
+void CLTLoginMediator::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig() {
+    authBootstrap680_.loginType28 = authLoginType_;
+    authBootstrap680_.launcherVersion2C = authLauncherVersion_;
+    authBootstrap680_.block30 = CopyPrefix16(authKeyConfigMd5_);
+    authBootstrap680_.block40 = CopyPrefix16(authUiConfigMd5_);
+    authBootstrap680_.currentPublicKeyId9C = authCurrentPublicKeyId_;
+}
+
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
     mxo::auth::FramedPacket framedPacket;
     if (!packetBytes || !mxo::auth::ParseVariableLengthPacket(packetBytes, packetSize, &framedPacket) ||
@@ -581,6 +605,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
 
             lastAuthPublicKeyReply_ = reply;
             authCurrentPublicKeyId_ = reply.publicKeyId;
+            SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
             Log(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status=%u currentTime=%u publicKeyId=%u keySize=%u modulusLength=%u signatureLength=%u exponentByte=0x%02x hasEmbeddedPublicKey=%u",
                 (unsigned)reply.status,

@@ -1225,6 +1225,56 @@ Newer implementation milestone after the real auth connect work:
           - it writes 16-byte challenge-derived material to bootstrap `+0x85 .. +0x94`
           - `0x41470` then derives/caches a dword-ish token at bootstrap `+0x9c`
           - that same `+0x9c` value is later used by both raw `0x06` and raw `0x08` send builders
+        - newer Ghidra pass on the direct `0x439210 -> 0x448050` callsite now narrows the source/fill shape materially beyond the older generic wording:
+          - auth helper `0x439210` first gates on `0x41b490`, i.e. current auth connection object at owner `+0x18` in state `2`
+          - the bootstrap target is concretely owner child `+0x680`
+          - `0x448050` itself is the only current xref target from that helper
+          - owner vtable `+0x38` is now also directly pinned down:
+            - tiny getter `0x41f0a0 = lea eax,[ecx+0x94] ; ret`
+            - so the returned value is an **embedded owner subobject at `0x4f78b8 + 0x94`**, not a separate heap object family
+          - owner vtable `+0x30` is now the matching setter/consumer side:
+            - `0x41ecd0`
+            - it copies/consumes the same family via helper `0x41eb80`
+          - current best concrete layout for that embedded owner `+0x94` family is now:
+            - `+0x00 .. +0x1f` = first inline 32-byte NUL-terminated string
+            - `+0x20 .. +0x3f` = second inline 32-byte NUL-terminated string
+            - `+0x40 .. +0x4f` = first copied 16-byte block
+            - `+0x50 .. +0x5f` = second copied 16-byte block
+            - `+0x60 .. +0x68` = embedded three-dword small-string object
+            - `+0x6c` = trailing byte/flag
+          - important correction to the earlier rough wording:
+            - `0x448050` only consumes the **first dword** of source `+0x60` as a raw `char*` argument
+            - but `0x41eb80` proves source `+0x60` is not just a naked optional pointer field
+            - it is a full embedded `0x407dd0`-style small-string object (`begin/current/end`)
+          - `0x448050` copies those fields into the bootstrap object as:
+            - source `+0x00` -> bootstrap small string `+0x04`
+            - source `+0x20` -> bootstrap small string `+0x10`
+            - source `+0x60.begin` (or empty-string fallback) -> bootstrap small string `+0x1c`
+            - source `+0x40 .. +0x4f` -> bootstrap `+0x30 .. +0x3f`
+            - source `+0x50 .. +0x5f` -> bootstrap `+0x40 .. +0x4f`
+          - the same call also writes:
+            - `+0x28 = 1` from the fixed callsite constant
+            - `+0x2c = *(*owner->+0x20 result)`
+            - `+0x50 = owner->+0x168 result`
+          - newer per-field follow-up now also strengthens the semantic read beyond layout alone:
+            - owner vtable `+0x150` / `0x41f270` is a direct first-string setter for this same block
+            - later auth-reply path `0x43f300 -> owner +0x150` feeds that first string from `0x43d480(...)`
+            - the second inline string is copied into bootstrap `+0xf8` by `0x41330`, where
+              `0x456c40` validates it against a concrete slash-plus-6-digits shape
+            - the embedded small string at `+0x60` is not just carried passively:
+              - empty case falls through a literal `"STATION"` default path in `0x489bc0`
+              - non-empty case is later copied into owner helper object `+0x65c + 0x18` through `0x21a50`
+          - current best semantic read is therefore stronger than the older “unknown selected source blob” wording:
+            - owner `+0x38` returns an embedded **station/launchpad-flavored phase-2 auth/bootstrap source/config block**
+            - not a detached heap object and not merely an arbitrary pointer bundle
+          - base ctor `0x45500` now backs the bootstrap-target interpretation more concretely:
+            - it constructs three 8-byte small-string buffers rooted at `+0x04`, `+0x10`, and `+0x1c`
+            - it zeroes `+0x2c`, `+0x50`, `+0x80`, `+0x94`, `+0x98`, `+0x9c`, `+0xa4`, `+0xa8`, `+0xac`
+            - it sets byte/dword state at `+0xa0 = 0` and `+0xec = 1`
+          - follow-on ctor `0x41290` then zeros/initializes the later tail at `+0xf8`, `+0xfc`, `+0x100`, `+0x108`, `+0x10c`, `+0x110`, `+0x114`, and `+0x118`
+          - important nuance on the branch at `0x44811e`:
+            - the instruction there is a **low-byte** null test on field `+0xa0`
+            - but in context that field is still best read as the same helper/pointer family later used as a dword at `0x429b0`
       - important channel-specific correction from the same pass:
         - margin-side wrapper traffic must be read through the separate margin table
         - for example, raw code `0x06` on `0x41af70` maps to **`MS_GetClientIPRequest`**, not auth-side `AS_GetPublicKeyRequest`
@@ -1232,7 +1282,7 @@ Newer implementation milestone after the real auth connect work:
       - the remaining unknown is now narrower:
         - what exact helper object is stored at bootstrap `+0xa0`
         - what exact send-target object is stored at bootstrap `+0x50`
-        - and what exact selected-source object family is copied into the bootstrap object before that branch
+        - and what the **original concrete class/name semantics** of that now-better-defined owner `+0x94` phase-2 source block are beyond its recovered layout and auth/bootstrap role
     - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
   - but live receive work still does not appear, so the next likely missing activity is the first faithful outbound auth/message send rather than merely more socket setup alone
 
