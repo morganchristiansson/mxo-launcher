@@ -11,7 +11,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "auth/auth_crypto.h"
+#include "../matrixstaging/runtime/src/libltcrypto/auth_crypto.h"
 
 namespace {
 

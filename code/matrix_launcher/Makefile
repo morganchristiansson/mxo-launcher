@@ -12,12 +12,25 @@ CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
 
 CRYPTOPP_DIR = third_party/cryptopp890
 
-COMMON_AUTH_SRC = src/auth/auth_crypto.cpp
+# Transitional note:
+# - public auth declarations still live under src/auth/auth_crypto.h for compatibility
+# - low-level auth implementation is now split conservatively under recovered runtime-style paths:
+#   - matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp
+#   - matrixstaging/runtime/src/libltcrypto/filters.cpp
+#   - matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
+# - launcher/login/runtime class scaffolds now start moving under recovered source-style paths
+#   rooted at matrixstaging/
+COMMON_AUTH_SRC = \
+	matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp \
+	matrixstaging/runtime/src/libltcrypto/filters.cpp \
+	matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
 
 LAUNCHER_SRC = src/resurrections.cpp src/diagnostics.cpp \
-	src/liblttcp/lttcpconnection.cpp src/liblttcp/ltthreadperclienttcpengine.cpp \
-	src/liblttcp/cmessageconnection.cpp src/ltlogin/loginmediator.cpp \
-	src/ltlogin/loginstates.cpp $(COMMON_AUTH_SRC)
+	matrixstaging/runtime/src/liblttcp/lttcpconnection.cpp \
+	matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp \
+	matrixstaging/runtime/src/libltmessaging/messageconnection.cpp \
+	matrixstaging/game/src/libltclientlogin/loginmediator.cpp \
+	matrixstaging/game/src/libltclientlogin/loginstate.cpp $(COMMON_AUTH_SRC)
 CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 AUTH_PROBE_SRC = tools/auth_probe.cpp $(COMMON_AUTH_SRC)
 

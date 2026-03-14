@@ -24,24 +24,66 @@ It exists to iterate quickly on the launcher-owned auth bootstrap sequence while
 - `tools/auth_probe.cpp`
   - small TCP/logging driver
   - no `resurrections.exe`, no Wine, no client startup
-- `src/auth/auth_crypto.h` / `.cpp`
-  - shared auth packet/framing helpers
-  - `AS_GetPublicKeyReply` parse helper
-  - reply-embedded RSA modulus/signature extraction
-  - `AS_AuthRequest` blob/header builder
-  - `AS_AuthChallenge` parse + `AS_AuthChallengeResponse` builder
-  - `AS_AuthReply` parse including:
-    - character/world list decode
-    - auth-data block decode
-    - signed-data block decode
-    - auth-reply private-exponent decrypt helper
+- canonical public auth API now lives under recovered runtime-style path:
+  - `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`
+- compatibility wrapper retained at:
+  - `src/auth/auth_crypto.h`
+- current conservative runtime-style implementation split:
+  - `matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp`
+    - variable-length packet framing
+    - current address anchors:
+      - exact original helper VA: not yet isolated
+      - current callers include launcher `0x447eb0 / 0x4474f0 / 0x43b830`
+  - `matrixstaging/runtime/src/libltcrypto/filters.cpp`
+    - opcode/text helpers and packet parse helpers
+    - current address anchors:
+      - `0x4401a0` later auth-reply owner handler
+      - `0x43a330` auth-reply parse helper object
+      - `0x41bc20` opcode read helper
+  - `matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp`
+    - auth/session-key crypto and outbound packet builders
+    - current address anchors:
+      - `0x448050` phase-2 auth/bootstrap dispatcher
+      - `0x447eb0` strongest raw `0x06` send anchor
+      - `0x4474f0` strongest raw `0x08` send anchor
 
 The probe should remain the fast executable reference.
-Reusable packet logic should continue to live in `src/auth/auth_crypto.*` so it can be migrated back into launcher-owned code instead of forked into two implementations.
+The canonical public declarations now live under `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`.
+A compatibility wrapper remains at `src/auth/auth_crypto.h`, but current project direction is for that `src/auth/` surface to keep shrinking rather than remain the primary home.
 
 Documentation policy note:
 - prefer this `docs/launcher.exe/auth/` folder for packet-level auth protocol behavior and launcher-auth milestones
 - avoid duplicating detailed wire-loop notes back into `startup_objects/`; those docs should link here instead
+
+## Recovered source-file anchors and current ownership split
+
+New string-backed source-path anchors now help separate the layers more cleanly:
+
+Launcher/game-side login layer:
+- `\matrixstaging\game\src\libltclientlogin\loginmediator.cpp`
+- `\matrixstaging\game\src\libltclientlogin\loginstate.cpp`
+- `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
+- `\matrixstaging\game\src\launcher\launcher.cpp`
+
+Runtime/network/crypto layer:
+- `\matrixstaging\runtime\src\libltmessaging\messageconnection.cpp`
+- `\matrixstaging\runtime\src\libltmessaging\variablelengthprefixedtcpstreamparser.cpp`
+- `\matrixstaging\runtime\src\libltcrypto\sessionkeyencryption.cpp`
+- `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
+- `\matrixstaging\runtime\src\liblttcp\lttcpconnection.cpp`
+- `\matrixstaging\runtime\src\liblttcp\ltthreadperclienttcpengine.cpp`
+
+Current best interpretation of that split:
+- direct MxO auth packet framing / crypto / socket transport belongs to the lower runtime/liblt* layer
+- launcher-owned auth progression, helper switching, state writeback, world/character storage, and post-auth event flow belong to the `libltclientlogin` layer around `CLTLoginMediator`
+- `LaunchPadClient` should currently be treated as a **neighboring pre-game account/subscription/play-request component** under `launchpad.cpp`, not as settled proof that the direct `AS_*` auth wire loop itself lives in that class
+
+Current evidence for that last point:
+- `LaunchPadClient` string-backed handlers are heavily tied to login-request / subscription / play-request result text in `launchpad.cpp`
+- the direct MxO auth wire loop now recovered in the launcher path still anchors more naturally to the `CLTLoginMediator` helper chain (`0x41d170`, `0x439210`, `0x448050`, `0x4401a0`, `0x43b830`) than to the currently reviewed `LaunchPadClient` callbacks
+- so the safest current architecture is:
+  - keep low-level auth packet logic reusable and outside the mediator object itself
+  - but keep auth **launcher-owned** and coordinated by the mediator/helper-state layer rather than moving ownership wholesale into `LaunchPadClient` or `client.dll`
 
 ## Current working wire sequence
 

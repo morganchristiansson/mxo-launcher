@@ -13,6 +13,13 @@ So the current canonical name is:
 
 - **`ILTLoginMediator.Default` runtime interface pointer**
 
+Relevant recovered source-file anchors nearby in the same launcher/login area:
+- `\matrixstaging\game\src\libltclientlogin\loginmediator.cpp`
+- `\matrixstaging\game\src\libltclientlogin\loginstate.cpp`
+- `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
+
+Those path strings do **not** by themselves prove exact class ownership for every auth/login packet path, but they do support treating this interface as part of the launcher/game-side login layer rather than a generic runtime-only socket helper.
+
 ## Source of truth
 
 ### Dynamic initializer

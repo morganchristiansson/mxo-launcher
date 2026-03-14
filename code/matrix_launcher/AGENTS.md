@@ -12,12 +12,17 @@ Source of truth:
 
 ## Tools
 
-### Ghidra
+### Ghidra MCP
 
 Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
 
-Good practice for this project:
-- start by confirming the active program/binary (`launcher.exe` vs `client.dll`) before trusting an address
+#### Best Practices
+
+- Use `ghidra_set_program` or check the program name in tool calls (`launcher.exe` vs `client.dll`)
+- **Don't trust decompiler alone**: Verify with disassembly tools when in doubt about calling conventions, stack cleanup, or field semantics
+- **Cross-reference**: Combine decompilation output with direct disassembly analysis for critical functions
+- **Rename functions with high confidence**: When decompiler output is clear and matches static analysis, rename to descriptive names (e.g., `FUN_0040b330` → `CWinApp_AppInit`)
+- **Rename local variables with high confidence**: When variable names are obvious from context (e.g., parameter names like `this`, `param_1`, `pcVar1` = pointer to string, `local_7c` = CString buffer), rename to descriptive names for better code readability and cross-referencing
 - use **decompile + disassembly together** for important functions; do not trust decompiler output alone for:
   - calling convention
   - stack cleanup
@@ -33,6 +38,23 @@ Good practice for this project:
 - keep renamed symbols and source scaffolds conservative; use provisional names when the role is strong but not fully settled
 - push confirmed Ghidra findings into source comments/scaffolds and canonical docs in the same task so knowledge does not live only in the tool session
 - record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
+
+#### Example usage
+
+1. **Decompile a function by address**:
+   ```bash
+   mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x6fb6aef0"}' })
+   ```
+
+2. **Batch decompile multiple functions**:
+   ```bash
+   mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "0x400000 0x410000 0x420000", "program": "launcher.exe"}' })
+   ```
+
+3. **Set function prototype** (helps decompiler accuracy):
+   ```bash
+   mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x48baea", "prototype": "ulong __thiscall CListCtrl::GetItemData(CListCtrl *this,int param_1)", "calling_convention": "__thiscall"}' })
+   ```
 
 ## Current Status (2026-03-12)
 

@@ -1,3 +1,14 @@
+// Legacy monolithic implementation file.
+//
+// IMPORTANT:
+// - the active build no longer compiles this file directly
+// - low-level auth implementation has been split conservatively under:
+//   - matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
+//   - matrixstaging/runtime/src/libltcrypto/filters.cpp
+//   - matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp
+// - keep this file only as a temporary migration reference until the old monolithic copy is
+//   fully pruned
+
 #include "auth_crypto.h"
 
 #include <cstring>
