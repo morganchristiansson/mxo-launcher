@@ -1,8 +1,7 @@
 #include "diagnostics.h"
+#include "diagnostics_auth.h"
 #include "liblttcp/cmessageconnection.h"
 #include "liblttcp/ltthreadperclienttcpengine.h"
-#include "ltlogin/loginmediator.h"
-#include "ltlogin/loginstates.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -134,6 +133,8 @@ static_assert(sizeof(DiagnosticLauncherLockHelper) == 0x1c, "launcher lock helpe
 static_assert(sizeof(MinimalLauncherObjectStub) == 0xb4, "launcher object scaffold size must match original allocation");
 
 static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count);
+static void DiagnosticSyncLauncherObjectSidecarState(MinimalLauncherObjectStub* self);
+static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEngine(MinimalLauncherObjectStub* owner);
 static_assert(sizeof(DiagnosticIntrusiveListHead) == 0x24, "list80 scaffold size mismatch");
 static_assert(sizeof(DiagnosticIntrusiveListHeadSmall) == 0x18, "list8C scaffold size mismatch");
 
@@ -162,22 +163,6 @@ struct DiagnosticMediatorRuntimeState {
     uint32_t descriptor178Count;
 };
 
-struct DiagnosticQueuedWorkItemStub {
-    void** vtable;          // +0x00
-    uint32_t workType;      // +0x04, read through 0x4816f0 on the original path
-    uint32_t workPayload;   // +0x08, e.g. 0x700000x-style status/result code family
-    const char* debugLabel; // +0x0c
-};
-
-struct DiagnosticRawMessageConnectionContext {
-    void** vtable;                                      // +0x00
-    unsigned char autoReleaseFlag;                      // +0x04, client tests this before optional +0x04 release call
-    unsigned char padding05[3];
-    mxo::liblttcp::CMessageConnection* sidecarConnection; // +0x08
-    const char* debugLabel;                             // +0x0c
-    void* contextKey;                                   // +0x10
-};
-
 static DWORD g_MainProcessId = 0;
 static HANDLE g_hWindowTraceThread = NULL;
 static volatile LONG g_WindowTraceRunning = 0;
@@ -189,13 +174,6 @@ static MinimalLoginMediatorStub g_LoginMediatorStub = {};
 static DiagnosticLauncherObjectBuildState g_LauncherObjectBuildState = {};
 static MinimalLauncherObjectStub* g_DiagnosticLttcpOwner = NULL;
 static mxo::liblttcp::CLTThreadPerClientTCPEngine* g_DiagnosticLttcpEngine = NULL;
-static mxo::ltlogin::CLTLoginMediator* g_DiagnosticLoginController = NULL;
-static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAuthenticatePending = {};
-static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldListPending = {};
-static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
-static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
-static void* g_DiagnosticWorkItemVtable[2] = {0};
-static void* g_DiagnosticMessageConnectionContextVtable[5] = {0};
 static DiagnosticMediatorResolverNode g_DiagnosticMediatorResolver = {};
 static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
 static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
@@ -222,14 +200,6 @@ static const char* g_MediatorMappedVariantName = g_MediatorStringC;
 static const char* g_MediatorProfileName = g_MediatorStringA;
 static const char* g_MediatorAuthName = g_MediatorStringA;
 static const char* g_MediatorAuthPassword = g_MediatorEmptyString;
-static char g_LoginControllerAuthDnsName[256] = "auth.lith.thematrixonline.net";
-static uint16_t g_LoginControllerAuthPortHostOrder = 11000;
-static bool g_LoginControllerIgnoreHostsFileForAuth = false;
-static char g_LoginControllerMarginDnsSuffix[256] = ".lith.thematrixonline.net";
-static uint16_t g_LoginControllerMarginPortHostOrder = 10000;
-static bool g_LoginControllerIgnoreHostsFileForMargin = false;
-static char g_LoginControllerMarginRouteHostPrefix[256] = {};
-static char g_LoginControllerExactMarginHostName[256] = {};
 
 struct __attribute__((packed)) DiagnosticMediatorSelectionPacked {
     uint8_t reserved0;
@@ -1192,304 +1162,24 @@ static bool DiagnosticPushLauncherQueue(
     return true;
 }
 
+bool DiagnosticAuthBridgePushQueue0C(void* ownerPtr, uint32_t value0, uint32_t value1) {
+    MinimalLauncherObjectStub* owner = static_cast<MinimalLauncherObjectStub*>(ownerPtr);
+    return owner ? DiagnosticPushLauncherQueue(&owner->queue0C, value0, value1) : false;
+}
+
+void DiagnosticAuthBridgeSyncOwnerState(void* ownerPtr) {
+    DiagnosticSyncLauncherObjectSidecarState(static_cast<MinimalLauncherObjectStub*>(ownerPtr));
+}
+
 static void DiagnosticClearLttcpBinding(MinimalLauncherObjectStub* owner) {
     if (owner && g_DiagnosticLttcpOwner != owner) {
         return;
     }
 
-    if (g_DiagnosticAuthContext) {
-        std::free(g_DiagnosticAuthContext);
-        g_DiagnosticAuthContext = NULL;
-    }
-    if (g_DiagnosticMarginContext) {
-        std::free(g_DiagnosticMarginContext);
-        g_DiagnosticMarginContext = NULL;
-    }
-    delete g_DiagnosticLoginController;
-    g_DiagnosticLoginController = NULL;
+    DiagnosticAuthResetState();
     delete g_DiagnosticLttcpEngine;
     g_DiagnosticLttcpEngine = NULL;
     g_DiagnosticLttcpOwner = NULL;
-}
-
-static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWorkItemStub* self) {
-    if (self) {
-        Log(
-            "DIAGNOSTIC: releasing queued work item %p type=%u payload=0x%08x label='%s'",
-            self,
-            (unsigned)self->workType,
-            (unsigned)self->workPayload,
-            self->debugLabel ? self->debugLabel : "<null>");
-        std::free(self);
-    }
-    return 1;
-}
-
-static uint32_t __thiscall DiagnosticRawMessageConnectionContext_Release(DiagnosticRawMessageConnectionContext* self) {
-    Log(
-        "DIAGNOSTIC: raw message-connection context release self=%p label='%s' autoRelease=%u",
-        self,
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        (self && self->autoReleaseFlag) ? 1u : 0u);
-    return 1;
-}
-
-static const char* DiagnosticAuthRawCodeName(uint8_t rawCode) {
-    switch (rawCode) {
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyRequest:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyReply:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsGetPublicKeyReply;
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeAuthRequest:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsAuthRequest;
-        case 0x09:
-            return "AS_AuthChallenge";
-        case 0x0a:
-            return "AS_AuthChallengeResponse";
-        case 0x0b:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetWorldListRequest:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsGetWorldListRequest;
-        case 0x36:
-            return "AS_GetWorldListReply";
-        default:
-            return "<unknown-auth-code>";
-    }
-}
-
-static void DiagnosticRouteConnectStatusToLoginController(
-    DiagnosticRawMessageConnectionContext* self,
-    DiagnosticQueuedWorkItemStub* workItem) {
-    if (!self || !workItem || !g_DiagnosticLoginController || workItem->workType != 2u) {
-        return;
-    }
-
-    uint32_t handled = 0;
-    const char* routeLabel = "<unknown>";
-    if (self == g_DiagnosticAuthContext) {
-        handled = g_DiagnosticLoginController->HandleAuthConnectStatus(workItem->workPayload);
-        routeLabel = "auth";
-    } else if (self == g_DiagnosticMarginContext) {
-        handled = g_DiagnosticLoginController->HandleMarginConnectStatus(workItem->workPayload);
-        routeLabel = "margin";
-    } else {
-        return;
-    }
-
-    const char* expectedNextRequest = "";
-    const char* incomingReplyAnchor = "";
-    if (self == g_DiagnosticAuthContext) {
-        expectedNextRequest = g_DiagnosticLoginController->ExpectedAuthRequestName();
-        incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
-    } else if (self == g_DiagnosticMarginContext) {
-        expectedNextRequest = g_DiagnosticLoginController->ExpectedMarginRequestName();
-        incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply;
-    }
-
-    Log(
-        "DIAGNOSTIC: routed %s type-2 connect-status payload=0x%08x into CLTLoginMediator scaffold -> handled=%u nextOutboundRequest='%s' laterIncomingReplyAnchor='%s'",
-        routeLabel,
-        (unsigned)workItem->workPayload,
-        (unsigned)handled,
-        (expectedNextRequest && expectedNextRequest[0]) ? expectedNextRequest : "<unresolved>",
-        (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
-}
-
-static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationCompleted(
-    DiagnosticRawMessageConnectionContext* self,
-    DiagnosticQueuedWorkItemStub* workItem) {
-    Log(
-        "DIAGNOSTIC: raw message-connection context OnOperationCompleted self=%p label='%s' workItem=%p type=%u payload=0x%08x",
-        self,
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        workItem,
-        workItem ? (unsigned)workItem->workType : 0u,
-        workItem ? (unsigned)workItem->workPayload : 0u);
-
-    if (self && self->sidecarConnection && workItem) {
-        if (workItem->workType == 2u) {
-            DiagnosticRouteConnectStatusToLoginController(self, workItem);
-        }
-        if (workItem->workType == 3u) {
-            const std::vector<uint8_t>& bytes = self->sidecarConnection->ReceivedBytes();
-            if (!bytes.empty()) {
-                const size_t preview = (bytes.size() < 16u) ? bytes.size() : 16u;
-                char hexPreview[16 * 3 + 1] = {0};
-                char* out = hexPreview;
-                for (size_t i = 0; i < preview; ++i) {
-                    std::snprintf(out, 4, "%02x ", bytes[i]);
-                    out += 3;
-                }
-                Log(
-                    "DIAGNOSTIC: received-bytes label='%s' total=%u preview=%s",
-                    self->debugLabel ? self->debugLabel : "<null>",
-                    (unsigned)bytes.size(),
-                    hexPreview);
-
-                if (self == g_DiagnosticAuthContext && bytes.size() >= 2u) {
-                    uint32_t payloadLength = 0;
-                    size_t headerBytes = 0;
-                    uint8_t rawCode = 0;
-                    if (bytes[0] & 0x80u) {
-                        if (bytes.size() >= 3u) {
-                            payloadLength = (static_cast<uint32_t>(bytes[0] & 0x7fu) << 8) |
-                                            static_cast<uint32_t>(bytes[1]);
-                            headerBytes = 2u;
-                            rawCode = bytes[2];
-                        }
-                    } else {
-                        payloadLength = static_cast<uint32_t>(bytes[0]);
-                        headerBytes = 1u;
-                        rawCode = bytes[1];
-                    }
-
-                    if (headerBytes != 0u) {
-                        Log(
-                            "DIAGNOSTIC: auth receive framing payloadLength=%u headerBytes=%u rawCode=0x%02x likelyMessage='%s'",
-                            (unsigned)payloadLength,
-                            (unsigned)headerBytes,
-                            (unsigned)rawCode,
-                            DiagnosticAuthRawCodeName(rawCode));
-                    }
-
-                    if (g_DiagnosticLoginController) {
-                        const uint32_t handled =
-                            g_DiagnosticLoginController->HandleAuthPacketBytes(bytes.data(), bytes.size());
-                        Log(
-                            "DIAGNOSTIC: launcher-owned auth packet handler label='%s' handled=%u rawCode=0x%02x",
-                            self->debugLabel ? self->debugLabel : "<null>",
-                            (unsigned)handled,
-                            (unsigned)rawCode);
-                    }
-                }
-
-                self->sidecarConnection->ClearReceivedBytes();
-            }
-        }
-        return self->sidecarConnection->OnOperationCompleted(workItem->workType);
-    }
-    return 1;
-}
-
-static DiagnosticRawMessageConnectionContext* DiagnosticGetOrCreateRawConnectionContext(
-    DiagnosticRawMessageConnectionContext** slot,
-    const char* label) {
-    if (!slot) return NULL;
-
-    if (!g_DiagnosticWorkItemVtable[1]) {
-        g_DiagnosticWorkItemVtable[1] = (void*)DiagnosticQueuedWorkItem_Release;
-    }
-    if (!g_DiagnosticMessageConnectionContextVtable[1]) {
-        g_DiagnosticMessageConnectionContextVtable[1] = (void*)DiagnosticRawMessageConnectionContext_Release;
-        g_DiagnosticMessageConnectionContextVtable[4] = (void*)DiagnosticRawMessageConnectionContext_OnOperationCompleted;
-    }
-
-    if (!*slot) {
-        *slot = static_cast<DiagnosticRawMessageConnectionContext*>(
-            std::calloc(1, sizeof(DiagnosticRawMessageConnectionContext)));
-        if (!*slot) {
-            Log("DIAGNOSTIC: failed to allocate raw message-connection context for '%s'", label ? label : "<null>");
-            return NULL;
-        }
-        (*slot)->vtable = g_DiagnosticMessageConnectionContextVtable;
-        (*slot)->autoReleaseFlag = 0;
-        (*slot)->debugLabel = label;
-        (*slot)->contextKey = *slot;
-    }
-
-    return *slot;
-}
-
-static bool DiagnosticEnqueueConnectionStatusWorkItem(
-    MinimalLauncherObjectStub* owner,
-    DiagnosticRawMessageConnectionContext* context,
-    uint32_t workType,
-    uint32_t workPayload,
-    const char* label) {
-    if (!owner || !context) return false;
-
-    DiagnosticQueuedWorkItemStub* workItem = static_cast<DiagnosticQueuedWorkItemStub*>(
-        std::calloc(1, sizeof(DiagnosticQueuedWorkItemStub)));
-    if (!workItem) {
-        Log("DIAGNOSTIC: failed to allocate queued work item for '%s'", label ? label : "<null>");
-        return false;
-    }
-
-    workItem->vtable = g_DiagnosticWorkItemVtable;
-    workItem->workType = workType;
-    workItem->workPayload = workPayload;
-    workItem->debugLabel = label;
-
-    const bool pushed = DiagnosticPushLauncherQueue(
-        &owner->queue0C,
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
-    if (!pushed) {
-        std::free(workItem);
-        return false;
-    }
-
-    Log(
-        "DIAGNOSTIC: queued connection-status work item label='%s' workItem=%p context=%p type=%u payload=0x%08x",
-        label ? label : "<null>",
-        workItem,
-        context,
-        (unsigned)workType,
-        (unsigned)workPayload);
-    return true;
-}
-
-static void DiagnosticPollLiveConnectionTraffic(MinimalLauncherObjectStub* owner) {
-    if (!owner) return;
-
-    auto tryPoll = [owner](DiagnosticRawMessageConnectionContext* context, const char* label) {
-        if (!context || !context->sidecarConnection) return;
-
-        const int received = context->sidecarConnection->PollReceiveNonBlocking();
-        if (received <= 0) return;
-
-        DiagnosticEnqueueConnectionStatusWorkItem(
-            owner,
-            context,
-            /*workType=*/3u,
-            /*workPayload=*/static_cast<uint32_t>(received),
-            label);
-    };
-
-    tryPoll(g_DiagnosticAuthContext, "AuthReceivePacket");
-    tryPoll(g_DiagnosticMarginContext, "MarginReceivePacket");
-}
-
-static void DiagnosticApplyLoginControllerConfig() {
-    if (!g_DiagnosticLoginController) return;
-
-    // The launcher-owned auth path now has a working default shared with the auth probe.
-    // Remove the older temporary auth-shaping env overrides until we have stronger evidence
-    // for real launcher-owned field population to replace them.
-    const uint32_t launcherVersion = 76005u;
-    const uint32_t currentPublicKeyId = 0u;
-    const uint8_t loginType = 1u;
-    const std::vector<uint8_t> keyConfigMd5;
-    const std::vector<uint8_t> uiConfigMd5;
-
-    g_DiagnosticLoginController->SetAuthServerConfig(
-        g_LoginControllerAuthDnsName,
-        g_LoginControllerAuthPortHostOrder,
-        g_LoginControllerIgnoreHostsFileForAuth);
-    g_DiagnosticLoginController->SetMarginServerConfig(
-        g_LoginControllerMarginDnsSuffix,
-        g_LoginControllerMarginPortHostOrder,
-        g_LoginControllerIgnoreHostsFileForMargin);
-    g_DiagnosticLoginController->SetMarginRouteHostPrefix(g_LoginControllerMarginRouteHostPrefix);
-    g_DiagnosticLoginController->SetExactMarginHostName(g_LoginControllerExactMarginHostName);
-    g_DiagnosticLoginController->SetAuthCredentials(g_MediatorAuthName, g_MediatorAuthPassword);
-    g_DiagnosticLoginController->SetAuthBootstrapConfig(
-        launcherVersion,
-        currentPublicKeyId,
-        static_cast<uint8_t>(loginType),
-        keyConfigMd5,
-        uiConfigMd5);
-    g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
 }
 
 static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEngine(
@@ -1503,17 +1193,9 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
             Log("DIAGNOSTIC: failed to allocate CLTThreadPerClientTCPEngine sidecar for %p", owner);
             return NULL;
         }
-        g_DiagnosticLoginController = new mxo::ltlogin::CLTLoginMediator();
-        if (g_DiagnosticLoginController) {
-            g_DiagnosticLoginController->SetNetworkEngine(g_DiagnosticLttcpEngine);
-            g_DiagnosticLoginController->InitializeConnectionHelpers();
-            DiagnosticApplyLoginControllerConfig();
-        }
+        DiagnosticAuthInitializeForEngine(owner, g_DiagnosticLttcpEngine);
         g_DiagnosticLttcpOwner = owner;
         Log("DIAGNOSTIC: created CLTThreadPerClientTCPEngine sidecar for launcher object %p", owner);
-        if (g_DiagnosticLoginController) {
-            Log("DIAGNOSTIC: created CLTLoginMediator sidecar for launcher object %p", owner);
-        }
     }
 
     return g_DiagnosticLttcpEngine;
@@ -2004,7 +1686,7 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
         EnterCriticalSection(crit);
     }
     MinimalLauncherObjectStub* owner = DiagnosticLauncherObjectFromHelper(self, 0x60);
-    DiagnosticPollLiveConnectionTraffic(owner);
+    DiagnosticAuthPollLiveConnectionTraffic(owner);
     const uint32_t count = g_LauncherObjectBuildState.subobject60Slot0CallCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
         Log(
@@ -2479,7 +2161,7 @@ void DiagnosticConfigureMediatorAuthName(const char* authName) {
         (authName && authName[0]) ? authName : g_MediatorProfileName;
 
     Log("DIAGNOSTIC: mediator auth-name chain (+0x5c) configured as '%s'", g_MediatorAuthName);
-    DiagnosticApplyLoginControllerConfig();
+    DiagnosticAuthSetMediatorCredentials(g_MediatorAuthName, g_MediatorAuthPassword);
 }
 
 void DiagnosticConfigureMediatorAuthPassword(const char* authPassword) {
@@ -2489,7 +2171,7 @@ void DiagnosticConfigureMediatorAuthPassword(const char* authPassword) {
     Log(
         "DIAGNOSTIC: mediator auth-password chain (+0x60) configured as %s",
         MaskedSensitiveValue(g_MediatorAuthPassword));
-    DiagnosticApplyLoginControllerConfig();
+    DiagnosticAuthSetMediatorCredentials(g_MediatorAuthName, g_MediatorAuthPassword);
 }
 
 void DiagnosticApplyDefaultNopatchMediatorConfig(
@@ -2535,118 +2217,6 @@ void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* medi
         Log("DIAGNOSTIC: mirroring original handoff: registering arg5 through arg6 before InitClientDLL");
         DiagnosticRegisterLauncherObjectWithMediator(mediatorPtr, object);
     }
-}
-
-void DiagnosticConfigureLoginControllerNetwork(
-    const char* authDnsName,
-    uint16_t authPortHostOrder,
-    bool ignoreHostsFileForAuth,
-    const char* marginDnsSuffix,
-    uint16_t marginPortHostOrder,
-    bool ignoreHostsFileForMargin,
-    const char* marginRouteHostPrefix,
-    const char* exactMarginHostName) {
-    std::strncpy(g_LoginControllerAuthDnsName, authDnsName ? authDnsName : "", sizeof(g_LoginControllerAuthDnsName) - 1);
-    g_LoginControllerAuthDnsName[sizeof(g_LoginControllerAuthDnsName) - 1] = '\0';
-    g_LoginControllerAuthPortHostOrder = authPortHostOrder;
-    g_LoginControllerIgnoreHostsFileForAuth = ignoreHostsFileForAuth;
-
-    std::strncpy(g_LoginControllerMarginDnsSuffix, marginDnsSuffix ? marginDnsSuffix : "", sizeof(g_LoginControllerMarginDnsSuffix) - 1);
-    g_LoginControllerMarginDnsSuffix[sizeof(g_LoginControllerMarginDnsSuffix) - 1] = '\0';
-    g_LoginControllerMarginPortHostOrder = marginPortHostOrder;
-    g_LoginControllerIgnoreHostsFileForMargin = ignoreHostsFileForMargin;
-
-    std::strncpy(g_LoginControllerMarginRouteHostPrefix, marginRouteHostPrefix ? marginRouteHostPrefix : "", sizeof(g_LoginControllerMarginRouteHostPrefix) - 1);
-    g_LoginControllerMarginRouteHostPrefix[sizeof(g_LoginControllerMarginRouteHostPrefix) - 1] = '\0';
-    std::strncpy(g_LoginControllerExactMarginHostName, exactMarginHostName ? exactMarginHostName : "", sizeof(g_LoginControllerExactMarginHostName) - 1);
-    g_LoginControllerExactMarginHostName[sizeof(g_LoginControllerExactMarginHostName) - 1] = '\0';
-
-    DiagnosticApplyLoginControllerConfig();
-    Log(
-        "DIAGNOSTIC: login controller network configured auth='%s':%u marginSuffix='%s' marginPort=%u marginRoutePrefix='%s' exactMarginHost='%s' ignoreAuthHosts=%u ignoreMarginHosts=%u",
-        g_LoginControllerAuthDnsName,
-        (unsigned)g_LoginControllerAuthPortHostOrder,
-        g_LoginControllerMarginDnsSuffix,
-        (unsigned)g_LoginControllerMarginPortHostOrder,
-        g_LoginControllerMarginRouteHostPrefix[0] ? g_LoginControllerMarginRouteHostPrefix : "<empty>",
-        g_LoginControllerExactMarginHostName[0] ? g_LoginControllerExactMarginHostName : "<empty>",
-        g_LoginControllerIgnoreHostsFileForAuth ? 1u : 0u,
-        g_LoginControllerIgnoreHostsFileForMargin ? 1u : 0u);
-}
-
-bool DiagnosticCanBeginAuthConnection() {
-    return g_DiagnosticLoginController != NULL;
-}
-
-uint32_t DiagnosticBeginAuthConnection() {
-    if (!g_DiagnosticLoginController) {
-        Log("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for auth connection");
-        return 0;
-    }
-
-    DiagnosticRawMessageConnectionContext* context =
-        DiagnosticGetOrCreateRawConnectionContext(&g_DiagnosticAuthContext, "AuthConnection");
-    if (context) {
-        g_DiagnosticLoginController->SetAuthConnectionContextKey(context);
-    }
-
-    const uint32_t result = g_DiagnosticLoginController->BeginAuthConnection();
-    if (context) {
-        context->sidecarConnection = g_DiagnosticLoginController->AuthConnection();
-    }
-    DiagnosticSyncLauncherObjectSidecarState(g_DiagnosticLttcpOwner);
-
-    if (result != 0u && context && g_DiagnosticLttcpOwner) {
-        DiagnosticEnqueueConnectionStatusWorkItem(
-            g_DiagnosticLttcpOwner,
-            context,
-            /*workType=*/2u,
-            /*workPayload=*/0x7000001u,
-            "AuthConnectStatus");
-    }
-
-    Log(
-        "DIAGNOSTIC: CLTLoginMediator::BeginAuthConnection() authHost='%s' port=%u -> 0x%08x",
-        g_DiagnosticLoginController->AuthServerDnsName().c_str(),
-        (unsigned)g_DiagnosticLoginController->AuthServerPortHostOrder(),
-        (unsigned)result);
-    return result;
-}
-
-uint32_t DiagnosticBeginMarginConnection() {
-    if (!g_DiagnosticLoginController) {
-        Log("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for margin connection");
-        return 0;
-    }
-
-    DiagnosticRawMessageConnectionContext* context =
-        DiagnosticGetOrCreateRawConnectionContext(&g_DiagnosticMarginContext, "MarginConnection");
-    if (context) {
-        g_DiagnosticLoginController->SetMarginConnectionContextKey(context);
-    }
-
-    const std::string marginHost = g_DiagnosticLoginController->ResolvedMarginHostName();
-    const uint32_t result = g_DiagnosticLoginController->DispatchMarginConnectionByState();
-    if (context) {
-        context->sidecarConnection = g_DiagnosticLoginController->MarginConnection();
-    }
-    DiagnosticSyncLauncherObjectSidecarState(g_DiagnosticLttcpOwner);
-
-    if (result != 0u && context && g_DiagnosticLttcpOwner) {
-        DiagnosticEnqueueConnectionStatusWorkItem(
-            g_DiagnosticLttcpOwner,
-            context,
-            /*workType=*/2u,
-            /*workPayload=*/0x7000001u,
-            "MarginConnectStatus");
-    }
-
-    Log(
-        "DIAGNOSTIC: CLTLoginMediator::DispatchMarginConnectionByState() marginHost='%s' port=%u -> 0x%08x",
-        marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
-        (unsigned)g_DiagnosticLoginController->MarginServerPortHostOrder(),
-        (unsigned)result);
-    return result;
 }
 
 static void LogCurrentDisplayMode(const char* prefix) {

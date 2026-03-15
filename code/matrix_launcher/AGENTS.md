@@ -251,167 +251,15 @@ Current practical crash state:
         - those calls are reached through owner-state dispatch in `0x439300`, which consults `[owner+4]->vtable+0x18` and then uses owner vtable surfaces `+0xe0 / +0xfc / +0x10c` plus owner fields `+0xcc8 / +0x12c / +0x104`
       - with the current method mapping, that virtual `+0x1c` remains best read as the connection-oriented ensure-connected / engine-`Connect` wrapper
       - so connection init currently looks launcher-owned and higher-level-owner-driven, not a trivial direct raw-global `0x4d6304->Connect(...)` call
-      - newer implementation milestone: the scaffold can now make a **real auth TCP connection** from the launcher side when running the binder/stub path
-        - current config defaults now mirror recovered binary strings:
-          - auth host default = `auth.lith.thematrixonline.net`
-          - auth port default = `11000`
-          - margin suffix default = `.lith.thematrixonline.net`
-          - margin port default = `10000`
-        - current runtime env knobs:
-          - auth auto-begins by default on the binder/scaffold path when the diagnostic login-controller sidecar exists
-          - opt-out for quick offline/isolated testing:
-            - `MXO_DISABLE_AUTH_CONNECTION=1`
-          - optional margin trigger:
-            - `MXO_BEGIN_MARGIN_CONNECTION=1`
-          - optional overrides:
-            - `MXO_AUTH_SERVER_DNS`
-            - `MXO_AUTH_SERVER_PORT`
-            - `MXO_MARGIN_SERVER_DNS`
-            - `MXO_MARGIN_SERVER_SUFFIX`
-            - `MXO_MARGIN_SERVER_PORT`
-            - `MXO_MARGIN_ROUTE_PREFIX`
-        - current verified run result on binder/stub path:
-          - `CLTLoginMediator::BeginAuthConnection() authHost='auth.lith.thematrixonline.net' port=11000 -> 0x00000001`
-        - current margin attempt with guessed `vector.lith.thematrixonline.net:10000` still fails (`0x00000000`), so exact margin-host derivation remains unresolved
-        - newer exact-host override check also shows the raw socket/connect path itself is no longer the blocker there:
-          - with `MXO_MARGIN_SERVER_DNS=auth.lith.thematrixonline.net`, the margin-side path also returns `0x00000001`
-          - so the remaining margin gap is host derivation/fidelity, not basic launcher-side TCP capability
-        - important current runtime limitation after that auth-connect milestone:
-          - real auth socket connect alone was not yet enough by itself to make the client-visible queue consumer branch go live
-        - newer queue/work implementation milestone after that:
-          - the scaffold can now deliberately enqueue queue0C `(workItem, context)` pairs after successful auth/margin connect attempts
-          - deliberate `RunClientDLL` runs now show queue0C cursor divergence before first consume and then client-side callback/release activity on those queued items
-          - current runtime evidence on that path now includes:
-            - `raw message-connection context OnOperationCompleted ...`
-            - `releasing queued work item ...`
-          - with auth connect enabled, one queued connect-status item is currently consumed on that path
-          - with auth connect + exact-host-overridden margin connect enabled, two queued connect-status items are currently consumed in order on that path
-          - newer static narrowing now also explains why that still does not automatically produce the first real outbound auth message:
-            - original `Connect` success path `0x4329b9..0x4329cc` constructs `0x435050(0x7000001)` which is a **type-2** status work item, then enqueues `(workItem, connection, 0)`
-            - auth-side startup path `0x41d170` builds a **derived** `CMessageConnection` object with vtable `0x4afef0`
-            - margin-side startup path `0x41e500` builds another derived connection object with vtable `0x4aff38`
-            - those derived families use wrapper `OnOperationCompleted` entries `0x449a70` / `0x44af60` on top of base `0x4490c0`
-            - newer focused review now also resolves the previously vague `CMessageConnection +0x7c / +0x80` helper objects much further:
-              - ctor helper `0x436080` builds a `0x24` event+critical-section helper object
-              - current best helper shape:
-                - main `+0x00` = `SetEvent(...)`
-                - main `+0x04` = `WaitForSingleObject(timeout)` with lock release/reacquire
-                - embedded lock helper at `+0x04`
-                - event handle at `+0x20`
-              - base completion dispatcher `0x4490c0` uses them as optional notifier helpers:
-                - work type `2` -> signal `connection+0x7c`
-                - work type `1` -> signal `connection+0x80`
-              - current best subtype read is:
-                - `+0x7c` = type-2 status/connect-style completion helper
-                - `+0x80` = type-1 close/terminal completion helper
-              - important negative narrowing on the auth/margin startup path:
-                - `0x41d170 / 0x41e500 -> 0x4417e0 -> 0x448b40(flag=0)` leaves both `+0x7c` and `+0x80` as **NULL** there
-                - so current auth/margin type-2 connect-status completion falls through `0x449a70 / 0x44af60` into the owner callback / fallback chain instead of being resolved inside those helper objects alone
-            - important correction from newer message-code review:
-              - later auth helper body `0x4401a0` handles raw auth message code `0x0b`
-              - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
-              - margin/loading helper body `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
-              - so those callbacks are currently best treated as **later incoming packet handlers** on the type-3 receive path, not direct proof of the first outbound request after connect
-            - newer auth-side fallback-chain review now gives the strongest corrected answer yet for where the first auth send does **not** come from:
-              - `0x449a70` runs as `0x4490c0 -> owner +0x17c -> fallback 0x448a60`
-              - owner `+0x17c` is thunk `0x41f260`, which forwards to the owner's current helper/state object at `+0x10`, then jumps to helper vtable `+0x14`
-              - so `0x4401a0` is not the generic owner callback itself; it is later helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
-              - that later helper only meaningfully handles raw `0x0b` / `AS_AuthReply`
-              - on its success branch it parses via `0x43a330`, updates owner `+0x80`, appends a small record under owner `+0x684`, mirrors the current record index to owner byte `+0xcc8`, then reaches `0x41b450(0x0b)` and string-backed `CLTLoginMediator::PostEvent(0x14)`
-              - newer helper-side follow-up on that same success branch is still negative for first-send purposes:
-                - `0x41b450(0x0b)` selects helper `0x4f7894` (vtable `0x4b5154`)
-                - helper `+0x8` / `0x43c020` prepares owner-side data and posts event `0x15`
-                - it still does **not** show the missing first auth send
-              - on its failure branch it reaches `0x41b450(3)` and string-backed `CLTLoginMediator::PostError(0x0b)`
-              - fallback `0x448a60` is only the string-backed generic logger `Got unhandled op of type %d with status %s`
-              - so the missing first faithful outbound auth/message send is currently best treated as **not** originating from later helper body `0x4401a0` and **not** from `0x448a60`
-            - newer helper-family tracing now also sharpens one important auth-ownership point the user called out:
-              - even if `+Username/+Password` reach client-facing argv/state, that still does **not** imply `client.dll` owns auth
-              - current later concrete launcher-side auth-channel send remains:
-                - helper object `0x4f78a0`
-                - send body `0x43b830`
-                - wrapper path `0x41af60 -> auth connection +0x24 / 0x41cf30 -> +0x28 / 0x448cf0 -> 0x448a00 -> 0x449d20 -> engine +0x20`
-                - packet raw code `0x35` = **`AS_GetWorldListRequest`** through the auth table
-              - but newer static narrowing now ties the **earlier** launcher-owned credential/bootstrap lead down much further than before:
-                - direct code xrefs to `0x41af60` still only show that later `0x43b830` world-list path
-                - current strongest earlier lead is helper `0x4f7870` selected through `0x41b450(2)`
-                - helper `+0x08 / 0x439210` first gates on `0x41b490()` and falls back to `0x41b450(1)` if auth is not connected yet
-                - on the connected branch it gathers launcher-owned owner data through owner `+0x168`, `+0x20`, and `+0x38`, then calls `0x448050`
-                - `0x448050` is currently only xref'd from `0x439210`
-                - `0x448050` now also resolves more concretely than before:
-                  - it runs as a method on the extra owner child allocated by `0x41290` / base ctor `0x45500` and stored at owner `+0x680`
-                  - that phase-2 bootstrap object is size `0x11c`
-                  - it copies three string sources plus two 16-byte blocks into bootstrap state and stores an outbound send target at bootstrap `+0x50`
-                  - crucial correction: the branch at `0x44811e` is not just a loose byte-ish mode flag but the nullness of **pointer `+0xa0`** inside that bootstrap object
-                - `0x448050` then branches by bootstrap helper pointer `+0xa0` into two launcher-owned outbound packet builders that both send indirectly through bootstrap `+0x50 -> +0x24`:
-                  - `0x447eb0` is taken when bootstrap helper pointer `+0xa0 == NULL` and builds/sends raw auth code `0x06` -> strongest current **`AS_GetPublicKeyRequest`** candidate
-                  - `0x4474f0` is taken when bootstrap helper pointer `+0xa0 != NULL` and builds/sends raw auth code `0x08` -> strongest current **`AS_AuthRequest`** candidate
-                  - `0x4474f0` also emits a later auxiliary raw `0x1b` packet on that same indirect path
-                - newer bootstrap-object follow-up now also tightens later field meaning:
-                  - `0x429b0` uses bootstrap helper pointer `+0xa0 -> +0x1c` on a later incoming path
-                  - it writes 16-byte challenge-derived material to bootstrap `+0x85 .. +0x94`
-                  - `0x41470` then derives/caches a dword-ish token at bootstrap `+0x9c`
-                  - that same `+0x9c` value is later used by both raw `0x06` and raw `0x08` send builders
-              - important channel-specific correction from the same pass:
-                - margin-side wrapper traffic must be decoded through the margin table
-                - raw `0x06` on `0x41af70` = **`MS_GetClientIPRequest`**, not auth `AS_GetPublicKeyRequest`
-              - so the auth-side bootstrap send is no longer just a generic unresolved blank before world-list:
-                - it still sits **before** the later `AS_GetWorldListRequest` path
-                - the highest-value concrete target remains the **phase-2 helper chain** `0x4f7870 -> 0x439210 -> 0x448050 -> (0x447eb0 raw 0x06 | 0x4474f0 raw 0x08)`
-                - and the remaining unknown is now narrower:
-                  - not whether `+0xa0` matters at all
-                  - but what exact helper object is stored at bootstrap `+0xa0`, what exact send-target object is stored at bootstrap `+0x50`, and what exact source-object family is copied into the bootstrap object before that branch
-            - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
-          - current runtime log now makes that narrowing explicit by logging:
-            - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
-          - newer diagnostic bootstrap experiment now also gives the first concrete outbound/reply pair on this launcher-owned auth path:
-            - command:
-              - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
-            - scope label:
-              - this is a **diagnostic bootstrap experiment**, not a claim of faithful original-equivalent launcher progression yet
-              - `76005` is a practical guessed launcher-version value from current `7.6005`, not yet a fully recovered canonical owner-field proof
-            - current result from that run:
-              - env-gated send log:
-                - `auth bootstrap experiment rawCode=0x06 request='AS_GetPublicKeyRequest' launcherVersion=76005 currentPublicKeyId=0 byteCount=10 -> sendResult=0x00000001`
-              - a new queued auth receive item then appears on the same runtime path:
-                - `queued connection-status work item label='AuthReceivePacket' ... type=3 payload=0x00000198`
-              - receive preview + framing decode now log:
-                - `received-bytes label='AuthConnection' total=408 preview=81 96 07 ... 04 00 00 00 12`
-                - `auth receive framing payloadLength=406 headerBytes=2 rawCode=0x07 likelyMessage='AS_GetPublicKeyReply'`
-              - newer static formatter alignment with `0x44e20` now also makes that preview itself informative:
-                - `81 96` = 2-byte length prefix for payload `0x0196 = 406`
-                - payload byte `0x07` = `AS_GetPublicKeyReply`
-                - next dword `00 00 00 00` = plausible reply status `0`
-                - next dword = plausible `CurrentTime`
-                - next dword `04 00 00 00` = plausible `PublicKeyId = 4`
-                - next byte `0x12` aligns with the later formatter's `KeySize` field
-            - current strongest reading from that pair:
-              - the small-payload framing model derived from `0x448a00` is now runtime-supported enough to matter
-              - the raw `0x06` send shape from `0x447eb0` is now runtime-supported enough to matter
-              - and the server reply beginning with raw `0x07` strongly supports the current `AS_GetPublicKeyRequest -> AS_GetPublicKeyReply` read on this launcher-owned auth path
-            - newer cross-check against the open-source server implementations now also sharpens how aggressively we can shortcut on this path without losing the bigger launcher-owned auth picture:
-              - active protocol-oracle references:
-                - `~/work/mxoemu/Reality/Source/AuthSocket.cpp`
-                - `~/work/mxoemu/Proxy/Logging.cpp`
-                - `~/work/mxo-hd/hds/auth/AuthHandler.cs`
-              - use these as a **secondary** source behind original-launcher static work:
-                - useful for concrete packet field ordering / server expectations
-                - not as a replacement for original launcher behavior when they diverge
-              - current shortcut policy on this auth path is therefore:
-                - keep original `launcher.exe` static analysis as the canonical shape anchor
-                - but allow clearly labeled diagnostic shortcuts when the current live server accepts a simpler path
-          - this is still binder/scaffold progress, not yet faithful original producer semantics
-          - newer non-blocking receive polling is also now wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced logged type-3 receive work items on that path
-          - fresh validation reruns after the newer auth-side owner/fallback-chain narrowing still did **not** move the runtime surface yet:
-            - plain `make run_binder_both` still stops at clean `InitClientDLL returned: 1` with `RunClientDLL` gated
-            - deliberate auth runtime rerun
-              - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
-              - still consumes exactly one queued auth type-2 connect-status item
-              - now logs `nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest'`
-              - still falls back to the same mediator `+0x2c` + arg5 helper `+0x60` slot `0/1` idle loop after that first consume
-              - still shows no logged type-3 receive work items before timeout
-            - so current runtime evidence still does **not** contradict the newer static negative conclusion that `0x4401a0` / `0x448a60` are not the missing first-send origin
-          - user now also subjectively reports this is the longest the current scaffold has remained in the in-game `Loading Character` phase so far; treat that as encouraging but still secondary to harder runtime markers like new queue work / new callbacks / first real receive item
+      - completed launcher-owned auth milestones are now consolidated under:
+        - `../../docs/launcher.exe/auth/README.md`
+        - `../../docs/launcher.exe/auth/STATUS.md`
+      - current concise auth summary on this path:
+        - auth auto-begins by default on the binder/scaffold path unless explicitly disabled with `MXO_DISABLE_AUTH_CONNECTION=1`
+        - the launcher-owned `0x06 -> 0x07 -> 0x08 -> 0x09 -> 0x0a -> 0x0b` loop is working and no longer the main blocker
+        - remaining auth-side work is now mainly:
+          - post-`0x0b` mediator-owned state writeback fidelity
+          - faithful progression into later world-list/auth-side follow-up such as `0x43b830`
   - newer deliberate rerun after partially wiring slots `1/2/6/7/8/12` into `src/liblttcp/` did **not** change the observed runtime surface yet:
     - still only mediator `+0x2c`
     - still only arg5 helper `+0x60` slot `0/1`
@@ -532,59 +380,16 @@ Diagnostic-only forced runtime result:
 
 That forced crash is useful for diagnostics, but it is **not** original-equivalent behavior.
 
-### Auth-only probe status (2026-03-13)
-- there is now a fast host-native auth probe target independent of `resurrections.exe` / Wine:
-  - `make auth_probe`
-  - `./build/host/auth_probe --username <name> --password <password> --timeout-ms 3000`
-- current source split for that probe:
-  - `tools/auth_probe.cpp` = small TCP/logging driver
-  - `src/auth/auth_crypto.h` / `.cpp` = shared auth packet framing, `0x07` parsing, reply-embedded public-key extraction, `0x09` challenge parse, `0x0a` challenge-response builder, `0x0b` auth-reply parse, world/character list decode, and auth-reply private-exponent decrypt logic intended to stay reusable for migration back into the launcher path
-- current verified live result on the direct host-native path now covers the full auth loop:
-  - `0x06` / `AS_GetPublicKeyRequest`
-  - `0x07` / `AS_GetPublicKeyReply`
-  - `0x08` / `AS_AuthRequest`
-  - `0x09` / `AS_AuthChallenge`
-  - `0x0a` / `AS_AuthChallengeResponse`
-  - `0x0b` / `AS_AuthReply`
-- current strongest blocker resolution from that faster loop:
-  - the old direct-probe `0x08` failure was not just generic header noise
-  - the highest-value concrete fix was: **stop encrypting `AS_AuthRequest` with the stale hard-coded mxo-hd public key and instead use the RSA modulus/exponent carried by the live `0x07` reply**
-- current verified full-auth run against the live auth server with launcher-project secrets:
-  - `0x07`: `status=0 currentTime=1773438144 publicKeyId=4 keySize=18 modulusLength=128 signatureLength=256 publicExponentByte=0x11`
-  - `0x08`: `payloadLen=170 headerLen=2 byteCount=172 blobLen=128 usedReplyPublicKey=1`
-  - `0x09`: challenge payloadLen `17`
-  - `0x0a`: challenge-response payloadLen `69`, plaintextLen `64`, ciphertextLen `64`
-  - `0x0b`: parsed auth success with:
-    - `characterCount=2`
-    - `worldCount=1`
-    - `username='morgan'`
-    - decoded character entries:
-      - `Morg4n`
-      - `Noobish`
-    - decoded world entry:
-      - `Reality`
-    - parsed auth-data block:
-      - marker `0x0136` (`36 01` on wire)
-      - signature length `128`
-      - encrypted private exponent length `96`
-    - decrypted auth-reply private exponent length `96`
-- important credential-shape note from the same pass:
-  - user-facing auth now uses **one real password input**
-  - the older `soePass` field is treated as a legacy internal payload field only
-  - current probe behavior mirrors the real password into that legacy field internally by default instead of exposing a second public CLI credential
-- current auth-only status:
-  - the standalone probe now reaches a semantic enough `0x0b` parse to be immediately useful for later margin/bootstrap migration work
-  - the auth gate itself is no longer blocked
-
-### Launcher-owned auth status (2026-03-13)
-- the deliberate binder/runtime path in `resurrections.exe` now authenticates successfully through the launcher-side `CLTLoginMediator` scaffold using shared `src/auth/auth_crypto.*` helpers
-- auth remains launcher-owned, not `client.dll`-owned
-- keep packet-level auth details under:
+### Auth status
+- completed auth packet/protocol milestones and launcher-owned auth status now live under:
   - `../../docs/launcher.exe/auth/README.md`
-- current deliberate runtime auth behavior:
+  - `../../docs/launcher.exe/auth/STATUS.md`
+- keep auth **launcher-owned**, not `client.dll`-owned
+- current practical runtime behavior:
   - auth auto-begins by default on the binder/scaffold path when the diagnostic login-controller sidecar exists
   - optional quick-test opt-out:
     - `MXO_DISABLE_AUTH_CONNECTION=1`
+- keep AGENTS focused on current workflow and active blockers; do not duplicate completed auth history here
 
 ## Build / Install / Run
 
@@ -657,14 +462,20 @@ make crashdump
 
 Code:
 - `src/resurrections.cpp` - startup orchestration / DLL loading / InitClientDLL frame
-- `src/diagnostics.cpp` - mediator stub, launcher-object stub, window tracing
+- `src/diagnostics.cpp` - mediator stub, launcher-object stub, window tracing, and non-auth diagnostics glue
+- `src/diagnostics_auth.cpp` / `.h` - launcher-owned auth/margin diagnostics sidecar split out of `src/diagnostics.cpp` so auth queue-routing, connection-status handling, login-controller config, and auth receive processing no longer live in the main diagnostics file
 - `src/diagnostics.h`
-- `src/liblttcp/ltthreadperclienttcpengine.h` / `.cpp` - starter original-name engine skeleton (`MonitorPort`, `UDPMonitorPort`, provisional slot-3 `MonitorEphemeralUDPPort`, `Connect`, `Close`, `SendBuffer`, `CleanupConnection`) now partially wired from the diagnostics arg5 scaffold for slots `1` / `2` / `6` / `7` / `8` / `12`
-- `src/liblttcp/lttcpconnection.h` / `.cpp` - starter original-name TCP connection skeleton (`Close`, `SendBuffer`, `OnReceive`) now treated as the current best base connection layer under `CMessageConnection`
-- `src/liblttcp/cmessageconnection.h` / `.cpp` - starter original-name message-connection skeleton (`SendPacket`, `OnOperationCompleted`) that now mirrors the best current read of the queue0C `context` object family and now exposes sidecar `EnsureConnected()` / `CloseConnection()` wrappers used by the diagnostics arg5 slot-6/slot-7 paths, while `SendPacket(...)` now backs the diagnostics slot-8 path
-- `src/ltlogin/loginmediator.h` / `.cpp` - scaffold-first launcher-side login/controller skeleton around the current best `CLTLoginMediator`/`0x4f78b8` read, now also driving the current launcher-owned auth loop on the deliberate binder path by reusing `src/auth/auth_crypto.*` for `0x06 -> 0x07 -> 0x08 -> 0x09 -> 0x0a -> 0x0b`, while still preserving auth/margin server config anchors, helper-family scaffolding for `0x4f7868/6c/70/0xa0`, and source-level placeholders for the recovered margin-route owner vtable surfaces `+0xe0 / +0xfc / +0x10c`
-- `src/ltlogin/loginstates.h` / `.cpp` - scaffold-first login-state skeletons for string-backed methods like `CLTLoginState_WorldListPending::AuthMessageDispatch()` and `CLTLoginState_AuthenticatePending::AuthMessageDispatch()`, now also preserving original recovered log/error strings directly in source as future implementation/logging anchors
-- `src/auth/auth_crypto.h` / `.cpp` - shared auth packet/framing / `AS_GetPublicKeyReply` parse / reply-derived RSA extraction / `AS_AuthRequest` builder / `AS_AuthChallenge` parse / `AS_AuthChallengeResponse` builder / `AS_AuthReply` parse, now reused by both the host probe and the launcher-owned auth path in `resurrections.exe`
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h` / `.cpp` - starter original-name engine skeleton (`MonitorPort`, `UDPMonitorPort`, provisional slot-3 `MonitorEphemeralUDPPort`, `Connect`, `Close`, `SendBuffer`, `CleanupConnection`) now partially wired from the diagnostics arg5 scaffold for slots `1` / `2` / `6` / `7` / `8` / `12`
+- `matrixstaging/runtime/src/liblttcp/lttcpconnection.h` / `.cpp` - starter original-name TCP connection skeleton (`Close`, `SendBuffer`, `OnReceive`) now treated as the current best base connection layer under `CMessageConnection`
+- `matrixstaging/runtime/src/libltmessaging/messageconnection.h` / `.cpp` - starter original-name message-connection skeleton (`SendPacket`, `OnOperationCompleted`) that now mirrors the best current read of the queue0C `context` object family and now exposes sidecar `EnsureConnected()` / `CloseConnection()` wrappers used by the diagnostics arg5 slot-6/slot-7 paths, while `SendPacket(...)` now backs the diagnostics slot-8 path
+- `matrixstaging/game/src/libltclientlogin/loginmediator.h` / `.cpp` - scaffold-first launcher-side login/controller skeleton around the current best `CLTLoginMediator`/`0x4f78b8` read, now also driving the current launcher-owned auth loop on the deliberate binder path while preserving auth/margin server config anchors, helper-family scaffolding for `0x4f7868/6c/70/0xa0`, and source-level placeholders for the recovered margin-route owner vtable surfaces `+0xe0 / +0xfc / +0x10c`
+- `matrixstaging/game/src/libltclientlogin/loginstate.h` / `.cpp` - scaffold-first login-state skeletons for string-backed methods like `CLTLoginState_WorldListPending::AuthMessageDispatch()` and `CLTLoginState_AuthenticatePending::AuthMessageDispatch()`, now also preserving original recovered log/error strings directly in source as future implementation/logging anchors
+- `matrixstaging/runtime/src/libltcrypto/auth_crypto.h` plus:
+  - `matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp`
+  - `matrixstaging/runtime/src/libltcrypto/filters.cpp`
+  - `matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp`
+  - canonical low-level auth packet/framing/crypto implementation now reused by both the host probe and the launcher-owned auth path in `resurrections.exe`
+  - `src/auth/` is now compatibility-only
 - `tools/auth_probe.cpp` - fast host-native auth-only TCP probe for direct auth regression/reference runs without `resurrections.exe` / Wine
 - `Makefile`
 - runtime executable: `resurrections.exe`
@@ -794,35 +605,13 @@ Canonical docs:
    - first reach of slot `12`
    - first class-backed sidecar activity that actually becomes live in logs
    - only add dwell-time/UI timing instrumentation if those stronger runtime markers stop moving for a while
-13. Current highest-value next runtime task after the launcher-owned auth integration milestone:
-   - the deliberate binder/runtime path in `resurrections.exe` now completes the real live launcher-side auth loop by reusing `src/auth/auth_crypto.*` on the queue-driven `CLTLoginMediator` path:
-     - `0x06` / `AS_GetPublicKeyRequest`
-     - `0x07` / `AS_GetPublicKeyReply`
-     - `0x08` / `AS_AuthRequest`
-     - `0x09` / `AS_AuthChallenge`
-     - `0x0a` / `AS_AuthChallengeResponse`
-     - `0x0b` / `AS_AuthReply`
-   - representative current launcher command:
-     - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
-   - representative current launcher evidence from `resurrections.log`:
-     - `launcher-owned auth send step='AS_GetPublicKeyRequest' ... -> sendResult=0x00000001`
-     - `launcher-owned auth parsed AS_GetPublicKeyReply ... publicKeyId=4 keySize=18 ... hasEmbeddedPublicKey=1`
-     - `launcher-owned auth send step='AS_AuthRequest' ... -> sendResult=0x00000001`
-     - `launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen=16`
-     - `launcher-owned auth send step='AS_AuthChallengeResponse' ... -> sendResult=0x00000001`
-     - `launcher-owned auth parsed AS_AuthReply success characterCount=2 worldCount=1 username='morgan'`
-     - `launcher-owned auth decrypted AS_AuthReply private exponent length=96`
-   - important architecture update:
-     - the standalone probe remains the fastest auth regression harness
-     - but the current working packet logic is no longer probe-only; it is now materially reused in the launcher path
-     - the older diagnostics-only raw `0x06` / `0x08` experiment helpers are now superseded, not the main auth path we should keep extending
-   - auth still remains **launcher-owned**, not `client.dll`-owned
-   - the auth-side blocker is therefore no longer “why does launcher-side `0x08` fail to produce `0x09`?”
-   - the next auth-side target now shifts forward to the **post-auth** launcher-owned path:
-     - trace how later `AS_AuthReply` handling updates owner state under the existing recovered helper/state chain
-     - keep following the already-recovered later auth sender `0x43b830` / raw `0x35` = `AS_GetWorldListRequest`
-     - determine how the now-working auth result should feed later launcher-owned world-list / character / margin progression on the original path
-   - keep one important restraint in mind while doing that:
-     - auth auto-begin is now the default on the binder/scaffold path when the diagnostic login-controller sidecar exists
-     - that proves the launcher-owned auth wire logic is now working in `resurrections.exe` without the old explicit `MXO_BEGIN_AUTH_CONNECTION=1` trigger
-     - but it does **not** yet prove that the original launcher's full helper/state machine drives the same transition automatically without the current binder/scaffold substitutions
+13. Auth is no longer the main blocker; completed auth milestones now live under:
+   - `../../docs/launcher.exe/auth/README.md`
+   - `../../docs/launcher.exe/auth/STATUS.md`
+   - current highest-value auth-adjacent runtime work is now only:
+     - improve post-`0x0b` owner-state writeback fidelity around `0x4401a0`
+     - follow the later auth-side/world-list progression at `0x43b830`
+     - continue treating auth as **launcher-owned**, not `client.dll`-owned
+
+Current date: 2026-03-15
+Current working directory: /home/morgan/mxo/code/matrix_launcher

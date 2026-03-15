@@ -2,6 +2,15 @@
 
 This folder is the canonical home for launcher-owned auth flow and auth-protocol documentation that does **not** belong under `startup_objects/`.
 
+Quick status view:
+- `STATUS.md`
+- `CONNECTION_PATHS.md`
+
+Auth docs split:
+- `README.md` = packet/protocol + architecture overview
+- `STATUS.md` = concise completion / remaining-work summary
+- `CONNECTION_PATHS.md` = auth/margin connection-init ownership, server-config names/defaults, and later launcher-owned auth sender/bootstrap-path notes
+
 In particular, the standalone auth probe lives here because it is:
 - a fast host-native auth-only harness
 - useful for fixing launcher-owned auth
