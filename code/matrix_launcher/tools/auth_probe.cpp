@@ -10,7 +10,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 
-#pragma comment(lib, "ws2_32.lib")
+// ws2_32.lib is linked via -lws2_32 in the Makefile
 
 #include "../matrixstaging/runtime/src/libltcrypto/auth_crypto.h"
 
@@ -349,13 +349,14 @@ static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, SO
         struct timeval tv;
         tv.tv_sec = timeoutMs / 1000;
         tv.tv_usec = (timeoutMs % 1000) * 1000;
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+        char timeout_buf[8];
+        memcpy(timeout_buf, &tv, sizeof(tv));
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, timeout_buf, sizeof(tv));
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, timeout_buf, sizeof(tv));
 
         if (connect(fd, current->ai_addr, current->ai_addrlen) == 0) {
             *outFd = fd;
             freeaddrinfo(results);
-            WSACleanup();
             return true;
         }
 
@@ -370,7 +371,8 @@ static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, SO
 static bool SendAll(SOCKET fd, const std::vector<uint8_t>& bytes) {
     size_t offset = 0u;
     while (offset < bytes.size()) {
-        const ssize_t written = send(fd, bytes.data() + offset, static_cast<int>(bytes.size() - offset), 0);
+        const char* data_ptr = reinterpret_cast<const char*>(bytes.data() + offset);
+        const ssize_t written = send(fd, data_ptr, static_cast<int>(bytes.size() - offset), 0);
         if (written < 0) {
             const int err = WSAGetLastError();
             if (err == WSAEWOULDBLOCK || err == WSAETIMEDOUT) {
@@ -395,7 +397,8 @@ static bool ReceiveExact(SOCKET fd, size_t byteCount, std::vector<uint8_t>* outB
     while (outBytes->size() < byteCount) {
         uint8_t buffer[512];
         const size_t want = (byteCount - outBytes->size() < sizeof(buffer)) ? (byteCount - outBytes->size()) : sizeof(buffer);
-        const ssize_t got = recv(fd, buffer, static_cast<int>(want), 0);
+        char* buffer_ptr = reinterpret_cast<char*>(buffer);
+        const ssize_t got = recv(fd, buffer_ptr, static_cast<int>(want), 0);
         if (got == 0) {
             return false;
         }

@@ -1,8 +1,8 @@
 # Matrix Online launcher reimplementation Makefile
 
 CXX = i686-w64-mingw32-g++-posix
-WIN32_AR ?= i686-w64-mingw32-ar
-WIN32_RANLIB ?= i686-w64-mingw32-ranlib
+AR ?= i686-w64-mingw32-ar
+RANLIB ?= i686-w64-mingw32-ranlib
 GAME_DIR = ~/MxO_7.6005
 TARGET = $(GAME_DIR)/resurrections.exe
 CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
@@ -33,9 +33,9 @@ LAUNCHER_SRC = src/resurrections.cpp src/diagnostics.cpp src/diagnostics_auth.cp
 CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 AUTH_PROBE_SRC = tools/auth_probe.cpp $(COMMON_AUTH_SRC)
 
-WIN32_BUILD_DIR = build/win32
-AUTH_PROBE = $(WIN32_BUILD_DIR)/auth_probe
-WIN32_CRYPTOPP_LIB = $(WIN32_BUILD_DIR)/libcryptopp.a
+BUILD_DIR = build
+AUTH_PROBE = $(GAME_DIR)/auth_probe.exe
+CRYPTOPP_LIB = $(BUILD_DIR)/libcryptopp.a
 
 -include secrets/launcher_login.local.mk
 
@@ -47,33 +47,32 @@ auth_probe: $(AUTH_PROBE)
 
 CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR)
 
-$(TARGET): $(LAUNCHER_SRC) $(WIN32_CRYPTOPP_LIB)
-	$(CXX) $(CXXFLAGS) -o $@ $(LAUNCHER_SRC) $(WIN32_CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
+$(TARGET): $(LAUNCHER_SRC) $(CRYPTOPP_LIB)
+	$(CXX) $(CXXFLAGS) -o $@ $(LAUNCHER_SRC) $(CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
 
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
 	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^
 
-$(WIN32_BUILD_DIR)/%.o: %.cpp
+$(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(WIN32_CRYPTOPP_LIB): Makefile
+$(CRYPTOPP_LIB): Makefile
 	@mkdir -p $(dir $@)
-	$(MAKE) -C $(CRYPTOPP_DIR) clean
-	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" AR="$(WIN32_AR)" RANLIB="$(WIN32_RANLIB)" static
+	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" static
 	cp $(CRYPTOPP_DIR)/libcryptopp.a $@
 
-$(AUTH_PROBE): $(AUTH_PROBE_SRC) $(WIN32_CRYPTOPP_LIB)
+$(AUTH_PROBE): $(AUTH_PROBE_SRC) $(CRYPTOPP_LIB)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ $(AUTH_PROBE_SRC) $(WIN32_CRYPTOPP_LIB)
+	$(CXX) $(CXXFLAGS) -o $@ $(AUTH_PROBE_SRC) $(CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
 
 run: $(TARGET)
 	cd $(GAME_DIR) && wine ./resurrections.exe $(LAUNCHER_ARGS)
 
 run_auth_probe: $(AUTH_PROBE)
-	@MXO_AUTH_PROBE_USERNAME="$(or $(MXO_AUTH_PROBE_USERNAME),$(MXO_USER))" \
+	@cd $(GAME_DIR) && MXO_AUTH_PROBE_USERNAME="$(or $(MXO_AUTH_PROBE_USERNAME),$(MXO_USER))" \
 	MXO_AUTH_PROBE_PASSWORD="$(or $(MXO_AUTH_PROBE_PASSWORD),$(MXO_PASS))" \
-	$(AUTH_PROBE)
+	wine ./auth_probe.exe
 
 crashdump:
 	@latest=$$(cd $(GAME_DIR) && ls -t MatrixOnline_0.0_crash_*.dmp 2>/dev/null | head -1); \
@@ -132,6 +131,6 @@ restore_crashreporter:
 
 clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
-	rm -rf $(WIN32_BUILD_DIR)
+	rm -rf $(BUILD_DIR)
 
 .PHONY: all auth_probe run run_auth_probe crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_stub_both run_binder_both install_crashreporter_stub restore_crashreporter clean
