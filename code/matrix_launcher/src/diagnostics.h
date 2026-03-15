@@ -38,6 +38,7 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
+bool DiagnosticCanBeginAuthConnection();
 uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();
 void DiagnosticStartWindowTrace();

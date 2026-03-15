@@ -1197,7 +1197,7 @@ int main(int argc, char* argv[]) {
     const bool useLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
     const bool traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
     const bool useArg2RetBypass = EnvFlagEnabled("MXO_ARG2_RET_BYPASS");
-    const bool beginAuthConnection = EnvFlagEnabled("MXO_BEGIN_AUTH_CONNECTION");
+    const bool disableAuthConnection = EnvFlagEnabled("MXO_DISABLE_AUTH_CONNECTION");
     const bool beginMarginConnection = EnvFlagEnabled("MXO_BEGIN_MARGIN_CONNECTION");
 
     if (useArg2RetBypass) {
@@ -1484,9 +1484,19 @@ int main(int argc, char* argv[]) {
     }
 
     if (initSucceeded) {
-        if (beginAuthConnection) {
+        // Address anchors for the original launcher-owned auth start handoff:
+        // - launcher.exe:0x4207c0 = LaunchPadClient_OnConnectionStatusCheck
+        // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection
+        // - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
+        //
+        // Current project direction:
+        // - launcher-owned auth should begin by default on the binder/scaffold path
+        // - keep an opt-out only for quick offline/isolated diagnostics
+        if (!disableAuthConnection && DiagnosticCanBeginAuthConnection()) {
             const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
-            Log("DIAGNOSTIC: post-init auth connection attempt result = 0x%08x", (unsigned)authConnectResult);
+            Log("DIAGNOSTIC: post-init auth auto-begin result = 0x%08x", (unsigned)authConnectResult);
+        } else if (disableAuthConnection) {
+            Log("DIAGNOSTIC: auth auto-begin disabled by MXO_DISABLE_AUTH_CONNECTION=1");
         }
         if (beginMarginConnection) {
             const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();

@@ -257,9 +257,12 @@ Current practical crash state:
           - auth port default = `11000`
           - margin suffix default = `.lith.thematrixonline.net`
           - margin port default = `10000`
-        - current opt-in env knobs:
-          - `MXO_BEGIN_AUTH_CONNECTION=1`
-          - `MXO_BEGIN_MARGIN_CONNECTION=1`
+        - current runtime env knobs:
+          - auth auto-begins by default on the binder/scaffold path when the diagnostic login-controller sidecar exists
+          - opt-out for quick offline/isolated testing:
+            - `MXO_DISABLE_AUTH_CONNECTION=1`
+          - optional margin trigger:
+            - `MXO_BEGIN_MARGIN_CONNECTION=1`
           - optional overrides:
             - `MXO_AUTH_SERVER_DNS`
             - `MXO_AUTH_SERVER_PORT`
@@ -361,9 +364,9 @@ Current practical crash state:
             - the current diagnostic raw-context callback is therefore still bypassing the original post-connect auth/margin completion chain where the next faithful outbound message likely lives
           - current runtime log now makes that narrowing explicit by logging:
             - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
-          - newer env-gated diagnostic bootstrap experiment now also gives the first concrete outbound/reply pair on this launcher-owned auth path:
+          - newer diagnostic bootstrap experiment now also gives the first concrete outbound/reply pair on this launcher-owned auth path:
             - command:
-              - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+              - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
             - scope label:
               - this is a **diagnostic bootstrap experiment**, not a claim of faithful original-equivalent launcher progression yet
               - `76005` is a practical guessed launcher-version value from current `7.6005`, not yet a fully recovered canonical owner-field proof
@@ -402,7 +405,7 @@ Current practical crash state:
           - fresh validation reruns after the newer auth-side owner/fallback-chain narrowing still did **not** move the runtime surface yet:
             - plain `make run_binder_both` still stops at clean `InitClientDLL returned: 1` with `RunClientDLL` gated
             - deliberate auth runtime rerun
-              - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+              - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
               - still consumes exactly one queued auth type-2 connect-status item
               - now logs `nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest'`
               - still falls back to the same mediator `+0x2c` + arg5 helper `+0x60` slot `0/1` idle loop after that first consume
@@ -578,8 +581,10 @@ That forced crash is useful for diagnostics, but it is **not** original-equivale
 - auth remains launcher-owned, not `client.dll`-owned
 - keep packet-level auth details under:
   - `../../docs/launcher.exe/auth/README.md`
-- current deliberate runtime entry remains:
-  - `MXO_BEGIN_AUTH_CONNECTION=1`
+- current deliberate runtime auth behavior:
+  - auth auto-begins by default on the binder/scaffold path when the diagnostic login-controller sidecar exists
+  - optional quick-test opt-out:
+    - `MXO_DISABLE_AUTH_CONNECTION=1`
 
 ## Build / Install / Run
 
@@ -798,7 +803,7 @@ Canonical docs:
      - `0x0a` / `AS_AuthChallengeResponse`
      - `0x0b` / `AS_AuthReply`
    - representative current launcher command:
-     - `MXO_FORCE_RUNCLIENT=1 MXO_BEGIN_AUTH_CONNECTION=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
+     - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both`
    - representative current launcher evidence from `resurrections.log`:
      - `launcher-owned auth send step='AS_GetPublicKeyRequest' ... -> sendResult=0x00000001`
      - `launcher-owned auth parsed AS_GetPublicKeyReply ... publicKeyId=4 keySize=18 ... hasEmbeddedPublicKey=1`
@@ -818,6 +823,6 @@ Canonical docs:
      - keep following the already-recovered later auth sender `0x43b830` / raw `0x35` = `AS_GetWorldListRequest`
      - determine how the now-working auth result should feed later launcher-owned world-list / character / margin progression on the original path
    - keep one important restraint in mind while doing that:
-     - the current success run is still an env-gated binder/scaffold path through `MXO_BEGIN_AUTH_CONNECTION=1`
-     - that proves the launcher-owned auth wire logic is now working in `resurrections.exe`
-     - but it does **not** yet prove that the original launcher's full helper/state machine drives the same transition automatically without that trigger
+     - auth auto-begin is now the default on the binder/scaffold path when the diagnostic login-controller sidecar exists
+     - that proves the launcher-owned auth wire logic is now working in `resurrections.exe` without the old explicit `MXO_BEGIN_AUTH_CONNECTION=1` trigger
+     - but it does **not** yet prove that the original launcher's full helper/state machine drives the same transition automatically without the current binder/scaffold substitutions

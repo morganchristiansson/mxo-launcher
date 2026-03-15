@@ -420,6 +420,7 @@ private:
     uint32_t SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge);
     void LogParsedAuthReply(const mxo::auth::AuthReply& reply) const;
     void SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
+    void AdoptAuthReplyIntoRecoveredMediatorState();
 
     void BuildAuthEndpoint();
     void BuildMarginEndpoint();

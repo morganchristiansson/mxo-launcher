@@ -49,7 +49,8 @@ It exists to iterate quickly on the launcher-owned auth bootstrap sequence while
 
 The probe should remain the fast executable reference.
 The canonical public declarations now live under `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`.
-A compatibility wrapper remains at `src/auth/auth_crypto.h`, but current project direction is for that `src/auth/` surface to keep shrinking rather than remain the primary home.
+A compatibility wrapper remains at `src/auth/auth_crypto.h`, and `src/auth/auth_crypto.cpp` is now an intentionally empty deprecated placeholder.
+Current project direction is for `src/auth/` to remain compatibility-only rather than an implementation home.
 
 Documentation policy note:
 - prefer this `docs/launcher.exe/auth/` folder for packet-level auth protocol behavior and launcher-auth milestones
@@ -231,7 +232,6 @@ Representative launcher command:
 ```bash
 cd /home/morgan/mxo/code/matrix_launcher && \
   MXO_FORCE_RUNCLIENT=1 \
-  MXO_BEGIN_AUTH_CONNECTION=1 \
   MXO_ARG7_SELECTION=0x0500002a \
   MXO_MEDIATOR_SELECTION_NAME=Vector \
   make run_binder_both
@@ -257,12 +257,15 @@ Representative launcher-side evidence from `~/MxO_7.6005/resurrections.log`:
 Important interpretation:
 - this keeps auth **launcher-owned**
 - the probe remains the fastest auth regression harness
-- but the packet logic is now materially migrated into the launcher path rather than living only in `tools/auth_probe.cpp`
+- the packet logic is now materially migrated into the launcher path rather than living only in `tools/auth_probe.cpp`
+- newer launcher-side state-writeback scaffolding now also begins to adopt parsed `AS_AuthReply` data into recovered mediator-owned tables/state instead of leaving it only in transient parse storage
 
 Important current restraint:
-- this is still a deliberate binder/scaffold run gated by `MXO_BEGIN_AUTH_CONNECTION=1`
-- so it proves the launcher-owned auth wire logic now works in `resurrections.exe`
-- but it does **not** yet prove that the original launcher's full helper/state machine reaches the same transition automatically without that trigger
+- auth auto-begin on the binder/scaffold path is now the default when the diagnostic login-controller sidecar exists
+- optional quick-test opt-out remains:
+  - `MXO_DISABLE_AUTH_CONNECTION=1`
+- so the launcher-owned auth wire logic no longer depends on the old explicit `MXO_BEGIN_AUTH_CONNECTION=1` trigger
+- but it still does **not** yet prove that the original launcher's full helper/state machine reaches the same transition automatically without the current binder/scaffold substitutions
 
 ## 0x448050 / phase-2 bootstrap object note
 

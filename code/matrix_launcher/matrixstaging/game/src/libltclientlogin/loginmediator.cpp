@@ -612,6 +612,46 @@ void CLTLoginMediator::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig() 
     authBootstrap680_.currentPublicKeyId9C = authCurrentPublicKeyId_;
 }
 
+void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
+    // Address anchors:
+    // - launcher.exe:0x4401a0 = CLTLoginMediator_Helper10_HandleAuthReply
+    // - important owner-side writeback areas on that path include:
+    //   - +0x80
+    //   - +0x684 / +0x688 / +0x818 / +0xd84
+    //   - +0xcc8
+    //
+    // Transitional note:
+    // - this is still only a partial writeback sketch, not a faithful one-to-one reconstruction
+    // - it exists so the parsed auth result begins to live in mediator-owned tables rather than
+    //   only in `lastAuthReply_`
+    worldSlots_.fill(nullptr);
+    worldPayloadSlots_.fill(nullptr);
+
+    const size_t worldCount = std::min(worldSlots_.size(), lastAuthReply_.worlds.size());
+    for (size_t i = 0; i < worldCount; ++i) {
+        worldSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
+        worldPayloadSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
+    }
+
+    if (!lastAuthReply_.worlds.empty()) {
+        marginRouteState_.pendingWorldId = lastAuthReply_.worlds[0].worldId;
+        if (marginRouteState_.currentWorldId < 0) {
+            marginRouteState_.currentWorldId = static_cast<int32_t>(lastAuthReply_.worlds[0].worldId);
+        }
+    }
+
+    if (!lastAuthReply_.characters.empty()) {
+        marginRouteState_.currentCharacterOrRouteIndex = 0;
+    }
+
+    Log(
+        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount=%u characterCount=%u firstWorldId=%u currentCharacterOrRouteIndex=%u",
+        (unsigned)lastAuthReply_.worlds.size(),
+        (unsigned)lastAuthReply_.characters.size(),
+        lastAuthReply_.worlds.empty() ? 0u : (unsigned)lastAuthReply_.worlds[0].worldId,
+        (unsigned)marginRouteState_.currentCharacterOrRouteIndex);
+}
+
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
     // Address anchors:
     // - launcher.exe:0x41bc20 = auth opcode read helper on later incoming path
@@ -672,6 +712,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             }
 
             lastAuthReply_ = reply;
+            AdoptAuthReplyIntoRecoveredMediatorState();
             LogParsedAuthReply(reply);
             expectedAuthRequestName_ = kMessageAsGetWorldListRequest;
             return 1u;

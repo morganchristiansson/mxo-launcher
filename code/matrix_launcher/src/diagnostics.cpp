@@ -2574,6 +2574,10 @@ void DiagnosticConfigureLoginControllerNetwork(
         g_LoginControllerIgnoreHostsFileForMargin ? 1u : 0u);
 }
 
+bool DiagnosticCanBeginAuthConnection() {
+    return g_DiagnosticLoginController != NULL;
+}
+
 uint32_t DiagnosticBeginAuthConnection() {
     if (!g_DiagnosticLoginController) {
         Log("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for auth connection");

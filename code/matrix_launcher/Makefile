@@ -13,7 +13,9 @@ CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
 CRYPTOPP_DIR = third_party/cryptopp890
 
 # Transitional note:
-# - public auth declarations still live under src/auth/auth_crypto.h for compatibility
+# - canonical public auth declarations now live under:
+#   matrixstaging/runtime/src/libltcrypto/auth_crypto.h
+# - a compatibility wrapper remains at src/auth/auth_crypto.h
 # - low-level auth implementation is now split conservatively under recovered runtime-style paths:
 #   - matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp
 #   - matrixstaging/runtime/src/libltcrypto/filters.cpp
