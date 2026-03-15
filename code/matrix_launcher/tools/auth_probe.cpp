@@ -336,7 +336,6 @@ static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, SO
     const int gai = getaddrinfo(host.c_str(), portText, &hints, &results);
     if (gai != 0) {
         std::cerr << "getaddrinfo failed: " << gai_strerror(gai) << "\n";
-        WSACleanup();
         return false;
     }
 
@@ -364,7 +363,6 @@ static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, SO
     }
 
     freeaddrinfo(results);
-    WSACleanup();
     return false;
 }
 
@@ -585,7 +583,6 @@ int main(int argc, char** argv) {
     SOCKET fd = INVALID_SOCKET;
     if (!ConnectTcp(options.host, options.port, options.timeoutMs, &fd)) {
         std::cerr << "error: connect failed\n";
-        WSACleanup();
         return 1;
     }
     std::cout << "connected\n";
@@ -598,7 +595,6 @@ int main(int argc, char** argv) {
             &getPublicKeyRequest)) {
         std::cerr << "error: failed to build AS_GetPublicKeyRequest\n";
         closesocket(fd);
-        WSACleanup();
         return 1;
     }
 
@@ -606,7 +602,6 @@ int main(int argc, char** argv) {
     LogPacketSummary("  outbound", getPublicKeyRequest);
     if (!SendAll(fd, getPublicKeyRequest.bytes)) {
         closesocket(fd);
-        WSACleanup();
         return 1;
     }
 
@@ -615,7 +610,6 @@ int main(int argc, char** argv) {
     if (!ReceivePacket(fd, &getPublicKeyReplyPacket, &timedOut)) {
         std::cerr << "error: failed waiting for 0x07 reply" << (timedOut ? " (timeout)" : "") << "\n";
         closesocket(fd);
-        WSACleanup();
         return 1;
     }
 
@@ -629,7 +623,6 @@ int main(int argc, char** argv) {
             &publicKeyReply)) {
         std::cerr << "error: failed to parse AS_GetPublicKeyReply\n";
         closesocket(fd);
-        WSACleanup();
         return 1;
     }
 
@@ -685,7 +678,6 @@ int main(int argc, char** argv) {
             &authRequest)) {
         std::cerr << "error: failed to build AS_AuthRequest\n";
         closesocket(fd);
-        WSACleanup();
         return 1;
     }
 
@@ -711,7 +703,6 @@ int main(int argc, char** argv) {
 
     if (!SendAll(fd, authRequest.packet.bytes)) {
         closesocket(fd);
-        WSACleanup();
         return 1;
     }
 
@@ -721,12 +712,10 @@ int main(int argc, char** argv) {
         if (timedOut) {
             std::cout << "recv after 0x08: timeout after " << options.timeoutMs << " ms\n";
             closesocket(fd);
-            WSACleanup();
             return 0;
         }
         std::cout << "recv after 0x08: connection closed or recv failed\n";
         closesocket(fd);
-        WSACleanup();
         return 0;
     }
 
@@ -742,7 +731,6 @@ int main(int argc, char** argv) {
                 &authChallenge)) {
             std::cerr << "error: failed to parse AS_AuthChallenge\n";
             closesocket(fd);
-            WSACleanup();
             return 1;
         }
 
@@ -752,7 +740,6 @@ int main(int argc, char** argv) {
         if (options.password.empty()) {
             std::cout << "challenge received, but no password was provided; stopping before 0x0A\n";
             closesocket(fd);
-            WSACleanup();
             return 0;
         }
 
@@ -770,7 +757,6 @@ int main(int argc, char** argv) {
                 &challengeResponse)) {
             std::cerr << "error: failed to build AS_AuthChallengeResponse\n";
             closesocket(fd);
-            WSACleanup();
             return 1;
         }
 
@@ -792,7 +778,6 @@ int main(int argc, char** argv) {
 
         if (!SendAll(fd, challengeResponse.packet.bytes)) {
             closesocket(fd);
-            WSACleanup();
             return 1;
         }
 
@@ -802,12 +787,10 @@ int main(int argc, char** argv) {
             if (timedOut) {
                 std::cout << "recv after 0x0A: timeout after " << options.timeoutMs << " ms\n";
                 closesocket(fd);
-                WSACleanup();
                 return 0;
             }
             std::cout << "recv after 0x0A: connection closed or recv failed\n";
             closesocket(fd);
-            WSACleanup();
             return 0;
         }
 
@@ -822,7 +805,6 @@ int main(int argc, char** argv) {
                     &authReply)) {
                 std::cerr << "error: failed to parse AS_AuthReply\n";
                 closesocket(fd);
-                WSACleanup();
                 return 1;
             }
 
@@ -845,6 +827,5 @@ int main(int argc, char** argv) {
     }
 
     closesocket(fd);
-    WSACleanup();
     return 0;
 }
