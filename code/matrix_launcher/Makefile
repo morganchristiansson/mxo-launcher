@@ -3,9 +3,6 @@
 CXX = i686-w64-mingw32-g++-posix
 WIN32_AR ?= i686-w64-mingw32-ar
 WIN32_RANLIB ?= i686-w64-mingw32-ranlib
-HOST_CXX ?= g++
-HOST_AR ?= ar
-HOST_RANLIB ?= ranlib
 GAME_DIR = ~/MxO_7.6005
 TARGET = $(GAME_DIR)/resurrections.exe
 CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
@@ -36,12 +33,9 @@ LAUNCHER_SRC = src/resurrections.cpp src/diagnostics.cpp src/diagnostics_auth.cp
 CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 AUTH_PROBE_SRC = tools/auth_probe.cpp $(COMMON_AUTH_SRC)
 
-HOST_BUILD_DIR = build/host
 WIN32_BUILD_DIR = build/win32
-AUTH_PROBE = $(HOST_BUILD_DIR)/auth_probe
-HOST_CRYPTOPP_LIB = $(HOST_BUILD_DIR)/libcryptopp_native.a
+AUTH_PROBE = $(WIN32_BUILD_DIR)/auth_probe
 WIN32_CRYPTOPP_LIB = $(WIN32_BUILD_DIR)/libcryptopp.a
-AUTH_PROBE_OBJECTS = $(patsubst %.cpp,$(HOST_BUILD_DIR)/%.o,$(AUTH_PROBE_SRC))
 
 -include secrets/launcher_login.local.mk
 
@@ -52,7 +46,6 @@ all: $(TARGET)
 auth_probe: $(AUTH_PROBE)
 
 CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR)
-HOST_CXXFLAGS = -Wall -Wextra -O2 -std=c++17 -I$(CRYPTOPP_DIR) -Isrc
 
 $(TARGET): $(LAUNCHER_SRC) $(WIN32_CRYPTOPP_LIB)
 	$(CXX) $(CXXFLAGS) -o $@ $(LAUNCHER_SRC) $(WIN32_CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
@@ -60,15 +53,9 @@ $(TARGET): $(LAUNCHER_SRC) $(WIN32_CRYPTOPP_LIB)
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
 	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^
 
-$(HOST_BUILD_DIR)/%.o: %.cpp
+$(WIN32_BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -c -o $@ $<
-
-$(HOST_CRYPTOPP_LIB): Makefile
-	@mkdir -p $(dir $@)
-	$(MAKE) -C $(CRYPTOPP_DIR) clean
-	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(HOST_CXX)" AR="$(HOST_AR)" RANLIB="$(HOST_RANLIB)" static
-	cp $(CRYPTOPP_DIR)/libcryptopp.a $@
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(WIN32_CRYPTOPP_LIB): Makefile
 	@mkdir -p $(dir $@)
@@ -76,9 +63,9 @@ $(WIN32_CRYPTOPP_LIB): Makefile
 	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" AR="$(WIN32_AR)" RANLIB="$(WIN32_RANLIB)" static
 	cp $(CRYPTOPP_DIR)/libcryptopp.a $@
 
-$(AUTH_PROBE): $(AUTH_PROBE_OBJECTS) $(HOST_CRYPTOPP_LIB)
+$(AUTH_PROBE): $(AUTH_PROBE_SRC) $(WIN32_CRYPTOPP_LIB)
 	@mkdir -p $(dir $@)
-	$(HOST_CXX) $(HOST_CXXFLAGS) -o $@ $(AUTH_PROBE_OBJECTS) $(HOST_CRYPTOPP_LIB)
+	$(CXX) $(CXXFLAGS) -o $@ $(AUTH_PROBE_SRC) $(WIN32_CRYPTOPP_LIB)
 
 run: $(TARGET)
 	cd $(GAME_DIR) && wine ./resurrections.exe $(LAUNCHER_ARGS)
@@ -145,6 +132,6 @@ restore_crashreporter:
 
 clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
-	rm -rf $(HOST_BUILD_DIR) $(WIN32_BUILD_DIR)
+	rm -rf $(WIN32_BUILD_DIR)
 
 .PHONY: all auth_probe run run_auth_probe crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_stub_both run_binder_both install_crashreporter_stub restore_crashreporter clean
