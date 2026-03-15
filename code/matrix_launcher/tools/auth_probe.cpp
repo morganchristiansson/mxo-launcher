@@ -6,10 +6,11 @@
 #include <string>
 #include <vector>
 
-#include <netdb.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <unistd.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
+
+#pragma comment(lib, "ws2_32.lib")
 
 #include "../matrixstaging/runtime/src/libltcrypto/auth_crypto.h"
 
@@ -310,11 +311,18 @@ static void LogHex(const char* label, const std::vector<uint8_t>& bytes) {
     std::cout << label << mxo::auth::HexEncode(bytes) << "\n";
 }
 
-static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, int* outFd) {
+static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, SOCKET* outFd) {
     if (!outFd) {
         return false;
     }
-    *outFd = -1;
+    *outFd = INVALID_SOCKET;
+
+    WSADATA wsaData;
+    const int wsaResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (wsaResult != 0) {
+        std::cerr << "WSAStartup failed: " << wsaResult << "\n";
+        return false;
+    }
 
     struct addrinfo hints;
     std::memset(&hints, 0, sizeof(hints));
@@ -322,18 +330,19 @@ static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, in
     hints.ai_socktype = SOCK_STREAM;
 
     char portText[16] = {0};
-    std::snprintf(portText, sizeof(portText), "%u", static_cast<unsigned>(port));
+    _snprintf_s(portText, sizeof(portText), _TRUNCATE, "%u", static_cast<unsigned>(port));
 
     struct addrinfo* results = NULL;
     const int gai = getaddrinfo(host.c_str(), portText, &hints, &results);
     if (gai != 0) {
         std::cerr << "getaddrinfo failed: " << gai_strerror(gai) << "\n";
+        WSACleanup();
         return false;
     }
 
     for (struct addrinfo* current = results; current; current = current->ai_next) {
-        const int fd = socket(current->ai_family, current->ai_socktype, current->ai_protocol);
-        if (fd < 0) {
+        const SOCKET fd = socket(current->ai_family, current->ai_socktype, current->ai_protocol);
+        if (fd == INVALID_SOCKET) {
             continue;
         }
 
@@ -346,22 +355,28 @@ static bool ConnectTcp(const std::string& host, uint16_t port, int timeoutMs, in
         if (connect(fd, current->ai_addr, current->ai_addrlen) == 0) {
             *outFd = fd;
             freeaddrinfo(results);
+            WSACleanup();
             return true;
         }
 
-        close(fd);
+        closesocket(fd);
     }
 
     freeaddrinfo(results);
+    WSACleanup();
     return false;
 }
 
-static bool SendAll(int fd, const std::vector<uint8_t>& bytes) {
+static bool SendAll(SOCKET fd, const std::vector<uint8_t>& bytes) {
     size_t offset = 0u;
     while (offset < bytes.size()) {
-        const ssize_t written = send(fd, bytes.data() + offset, bytes.size() - offset, 0);
+        const ssize_t written = send(fd, bytes.data() + offset, static_cast<int>(bytes.size() - offset), 0);
         if (written < 0) {
-            std::cerr << "send failed: " << std::strerror(errno) << "\n";
+            const int err = WSAGetLastError();
+            if (err == WSAEWOULDBLOCK || err == WSAETIMEDOUT) {
+                continue;
+            }
+            std::cerr << "send failed: " << err << "\n";
             return false;
         }
         offset += static_cast<size_t>(written);
@@ -369,27 +384,28 @@ static bool SendAll(int fd, const std::vector<uint8_t>& bytes) {
     return true;
 }
 
-static bool ReceiveExact(int fd, size_t byteCount, std::vector<uint8_t>* outBytes, bool* outTimedOut) {
+static bool ReceiveExact(SOCKET fd, size_t byteCount, std::vector<uint8_t>* outBytes, bool* outTimedOut) {
     if (!outBytes || !outTimedOut) {
         return false;
     }
     *outTimedOut = false;
     outBytes->clear();
-    outBytes->reserve(byteCount);
+    outBytes->reserve(static_cast<int>(byteCount));
 
     while (outBytes->size() < byteCount) {
         uint8_t buffer[512];
         const size_t want = (byteCount - outBytes->size() < sizeof(buffer)) ? (byteCount - outBytes->size()) : sizeof(buffer);
-        const ssize_t got = recv(fd, buffer, want, 0);
+        const ssize_t got = recv(fd, buffer, static_cast<int>(want), 0);
         if (got == 0) {
             return false;
         }
         if (got < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            const int err = WSAGetLastError();
+            if (err == WSAEWOULDBLOCK || err == WSAETIMEDOUT) {
                 *outTimedOut = true;
                 return false;
             }
-            std::cerr << "recv failed: " << std::strerror(errno) << "\n";
+            std::cerr << "recv failed: " << err << "\n";
             return false;
         }
         outBytes->insert(outBytes->end(), buffer, buffer + got);
@@ -397,7 +413,7 @@ static bool ReceiveExact(int fd, size_t byteCount, std::vector<uint8_t>* outByte
     return true;
 }
 
-static bool ReceivePacket(int fd, mxo::auth::FramedPacket* outPacket, bool* outTimedOut) {
+static bool ReceivePacket(SOCKET fd, mxo::auth::FramedPacket* outPacket, bool* outTimedOut) {
     if (!outPacket || !outTimedOut) {
         return false;
     }
@@ -563,9 +579,10 @@ int main(int argc, char** argv) {
         << " timeoutMs=" << options.timeoutMs
         << "\n";
 
-    int fd = -1;
+    SOCKET fd = INVALID_SOCKET;
     if (!ConnectTcp(options.host, options.port, options.timeoutMs, &fd)) {
         std::cerr << "error: connect failed\n";
+        WSACleanup();
         return 1;
     }
     std::cout << "connected\n";
@@ -577,14 +594,16 @@ int main(int argc, char** argv) {
             options.frameMode,
             &getPublicKeyRequest)) {
         std::cerr << "error: failed to build AS_GetPublicKeyRequest\n";
-        close(fd);
+        closesocket(fd);
+        WSACleanup();
         return 1;
     }
 
     std::cout << "send 0x06 AS_GetPublicKeyRequest\n";
     LogPacketSummary("  outbound", getPublicKeyRequest);
     if (!SendAll(fd, getPublicKeyRequest.bytes)) {
-        close(fd);
+        closesocket(fd);
+        WSACleanup();
         return 1;
     }
 
@@ -592,7 +611,8 @@ int main(int argc, char** argv) {
     bool timedOut = false;
     if (!ReceivePacket(fd, &getPublicKeyReplyPacket, &timedOut)) {
         std::cerr << "error: failed waiting for 0x07 reply" << (timedOut ? " (timeout)" : "") << "\n";
-        close(fd);
+        closesocket(fd);
+        WSACleanup();
         return 1;
     }
 
@@ -605,7 +625,8 @@ int main(int argc, char** argv) {
             getPublicKeyReplyPacket.bytes.size(),
             &publicKeyReply)) {
         std::cerr << "error: failed to parse AS_GetPublicKeyReply\n";
-        close(fd);
+        closesocket(fd);
+        WSACleanup();
         return 1;
     }
 
@@ -660,7 +681,8 @@ int main(int argc, char** argv) {
             options.frameMode,
             &authRequest)) {
         std::cerr << "error: failed to build AS_AuthRequest\n";
-        close(fd);
+        closesocket(fd);
+        WSACleanup();
         return 1;
     }
 
@@ -685,7 +707,8 @@ int main(int argc, char** argv) {
     LogPacketSummary("  outbound", authRequest.packet);
 
     if (!SendAll(fd, authRequest.packet.bytes)) {
-        close(fd);
+        closesocket(fd);
+        WSACleanup();
         return 1;
     }
 
@@ -694,11 +717,13 @@ int main(int argc, char** argv) {
     if (!ReceivePacket(fd, &postAuthReply, &timedOut)) {
         if (timedOut) {
             std::cout << "recv after 0x08: timeout after " << options.timeoutMs << " ms\n";
-            close(fd);
+            closesocket(fd);
+            WSACleanup();
             return 0;
         }
         std::cout << "recv after 0x08: connection closed or recv failed\n";
-        close(fd);
+        closesocket(fd);
+        WSACleanup();
         return 0;
     }
 
@@ -713,7 +738,8 @@ int main(int argc, char** argv) {
                 postAuthReply.bytes.size(),
                 &authChallenge)) {
             std::cerr << "error: failed to parse AS_AuthChallenge\n";
-            close(fd);
+            closesocket(fd);
+            WSACleanup();
             return 1;
         }
 
@@ -722,7 +748,8 @@ int main(int argc, char** argv) {
 
         if (options.password.empty()) {
             std::cout << "challenge received, but no password was provided; stopping before 0x0A\n";
-            close(fd);
+            closesocket(fd);
+            WSACleanup();
             return 0;
         }
 
@@ -739,7 +766,8 @@ int main(int argc, char** argv) {
                 options.frameMode,
                 &challengeResponse)) {
             std::cerr << "error: failed to build AS_AuthChallengeResponse\n";
-            close(fd);
+            closesocket(fd);
+            WSACleanup();
             return 1;
         }
 
@@ -760,7 +788,8 @@ int main(int argc, char** argv) {
         LogPacketSummary("  outbound", challengeResponse.packet);
 
         if (!SendAll(fd, challengeResponse.packet.bytes)) {
-            close(fd);
+            closesocket(fd);
+            WSACleanup();
             return 1;
         }
 
@@ -769,11 +798,13 @@ int main(int argc, char** argv) {
         if (!ReceivePacket(fd, &authReplyPacket, &timedOut)) {
             if (timedOut) {
                 std::cout << "recv after 0x0A: timeout after " << options.timeoutMs << " ms\n";
-                close(fd);
+                closesocket(fd);
+                WSACleanup();
                 return 0;
             }
             std::cout << "recv after 0x0A: connection closed or recv failed\n";
-            close(fd);
+            closesocket(fd);
+            WSACleanup();
             return 0;
         }
 
@@ -787,7 +818,8 @@ int main(int argc, char** argv) {
                     authReplyPacket.bytes.size(),
                     &authReply)) {
                 std::cerr << "error: failed to parse AS_AuthReply\n";
-                close(fd);
+                closesocket(fd);
+                WSACleanup();
                 return 1;
             }
 
@@ -809,6 +841,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    close(fd);
+    closesocket(fd);
+    WSACleanup();
     return 0;
 }
