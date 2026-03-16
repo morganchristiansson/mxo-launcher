@@ -676,22 +676,6 @@ void* CLTLoginMediator::WorldPayloadSlot(uint32_t index) const {
 // - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
 // =============================================================================
 
-// =============================================================================
-// ARG6 FAITHFUL INITIALIZATION: ILTLoginMediator.Default at 0x4d2c58
-// =============================================================================
-// Address anchors from Ghidra analysis:
-// - launcher.exe:0x4d2c58 = ILTLoginMediator_Default (object pointer)
-// - launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (vtable root at +0xc)
-// - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
-// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList
-// - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
-// - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
-// - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
-// - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
-// - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
-// - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
-// =============================================================================
-
 void CLTLoginMediator::InitializeArg6DefaultObject() {
     // Transitional implementation preserves the structure for faithful completion.
     // Future work:
