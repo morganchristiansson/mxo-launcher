@@ -3,8 +3,8 @@
 
 #include "liblttcp/cmessageconnection.h"
 #include "liblttcp/ltthreadperclienttcpengine.h"
-#include "ltlogin/loginmediator.h"
-#include "ltlogin/loginstates.h"
+#include "loginmediator.h"
+#include "loginstate.h"
 
 #include <cstdlib>
 #include <cstring>

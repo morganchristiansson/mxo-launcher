@@ -45,7 +45,7 @@ all: $(TARGET)
 
 auth_probe: $(AUTH_PROBE)
 
-CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR)
+CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp
 
 $(TARGET): $(LAUNCHER_SRC) $(CRYPTOPP_LIB)
 	$(CXX) $(CXXFLAGS) -o $@ $(LAUNCHER_SRC) $(CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32

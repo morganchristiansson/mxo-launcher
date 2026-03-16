@@ -146,6 +146,11 @@ public:
         void* helper7898 = nullptr;  // slot 12 / phase-code 12
         void* helper789C = nullptr;  // slot 13 / phase-code 13
         void* helper78A0 = nullptr;  // slot 14 / phase-code 14
+        void* helper78A4 = nullptr;  // slot 15 / phase-code 15 (FUN_00420640)
+        void* helper78A8 = nullptr;  // slot 16 / phase-code 16 (FUN_004206e0)
+        void* helper78AC = nullptr;  // slot 17 / phase-code 17 (FUN_00420850)
+        void* helper78B0 = nullptr;  // slot 18 / phase-code 18 (FUN_00420920)
+        void* helper78B4 = nullptr;  // slot 19 / phase-code 19 (FUN_004209a0)
     };
 
     struct MarginRouteState {
@@ -343,6 +348,23 @@ public:
     // launcher.exe:0x4f78b4 = slot 19 (FUN_004209a0)
     // ==============================================================================
 
+    // Minimal placeholder accessors for recovered world/selection storage families.
+    // These are not yet faithful data structures; they only preserve the currently recovered
+    // slot-count / owner-shape in source instead of re-describing it in markdown.
+    void* WorldSlot(uint32_t index) const;
+    void* WorldPayloadSlot(uint32_t index) const;
+
+    // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
+    // Faithful implementation of arg6 world list provider for InitClientDLL
+    // Vtable at offset +0xc from object pointer at 0x4d2c58
+    void InitializeArg6DefaultObject();
+    const char* Arg6GetWorldNameByIndex(uint32_t index);
+    uint8_t Arg6GetWorldVariantByIndex(uint32_t index);
+    uint8_t Arg6ValidateWorldSelection(uint8_t variant);
+    uint32_t Arg6GetWorldListCount() const;
+    uint32_t Arg6GetActiveWorldListCount() const;
+    bool Arg6GetAvailableWorlds(uint32_t index) const;
+
     // Current best auth-side connection-init path:
     // - launcher `0x43909f -> 0x41d170`
     // - copies auth DNS into owner `+0x4c`
@@ -472,12 +494,7 @@ public:
     // - `0x41e500` then constructs the margin-side CMessageConnection child at owner `+0x1c`,
     //   builds endpoint state into owner `+0x6c`, and calls `connection->+0x1c(owner+0x6c)`
     uint32_t DispatchMarginConnectionByState();
-
-    // Minimal placeholder accessors for recovered world/selection storage families.
-    // These are not yet faithful data structures; they only preserve the currently recovered
-    // slot-count / owner-shape in source instead of re-describing it in markdown.
-    void* WorldSlot(uint32_t index) const;
-    void* WorldPayloadSlot(uint32_t index) const;
+    const char* Arg6GetAvailableWorldName(uint32_t index);
 
 private:
     uint32_t SendAuthFramedPacket(const mxo::auth::FramedPacket& packet, const char* stepLabel);
@@ -562,13 +579,13 @@ private:
     // Vtable at offset +0xc from object pointer at 0x4d2c58
     struct Arg6WorldListData {
         // launcher.exe:0x4d3584 +0xfc = GetWorldNameByIndex(index) -> char*
-        std::string worldNames_[10] = {"Default", "Starter", "Classic", "Advanced", "Extreme"};  // placeholder data
+        std::array<std::string, 10> worldNames_ = {"Default", "Starter", "Classic", "Advanced", "Extreme"};
 
         // launcher.exe:0x4d3584 +0x100 = GetWorldVariantByIndex(index) -> uint (1,2,3,5)
-        uint8_t worldVariants_[10] = {1, 2, 3, 5, 1};  // variant states
+        std::array<uint8_t, 10> worldVariants_ = {1, 2, 3, 5, 1};
 
         // launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
-        bool worldValid_[10] = {true, true, true, true, true, false, false, false, false, false};
+        std::array<bool, 10> worldValid_ = {true, true, true, true, true, false, false, false, false, false};
 
         // launcher.exe:0x4d3584 +0xf8 = GetWorldListCount() -> uint total count
         uint32_t totalCount_ = 5;
@@ -577,7 +594,7 @@ private:
         uint32_t activeCount_ = 5;
 
         // launcher.exe:0x4d3584 +0xe0 = GetAvailableWorlds(index) -> bool (fallback path check)
-        bool available_[10] = {true, true, true, true, true, false, false, false, false, false};
+        std::array<bool, 10> available_ = {true, true, true, true, true, false, false, false, false, false};
     };
 
     Arg6WorldListData arg6WorldList_;
