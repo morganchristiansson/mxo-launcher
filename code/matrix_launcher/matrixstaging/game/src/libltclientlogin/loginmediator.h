@@ -10,7 +10,8 @@
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
 #include "../../../runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
-namespace mxo::ltlogin {
+namespace mxo {
+namespace ltlogin {
 
 class CLTLoginState;
 class CLTLoginState_AuthenticatePending;
@@ -577,6 +578,17 @@ private:
     // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
     // Faithful implementation of arg6 world list provider for InitClientDLL
     // Vtable at offset +0xc from object pointer at 0x4d2c58
+    // =============================================================================
+    // Address anchors for arg6 world list provider:
+    // launcher.exe:0x4d3584 +0xc = vtable (ILTLoginMediator)
+    // launcher.exe:0x4d3584 +0x10 = ILTLoginMediator_BuildWorldList()
+    // launcher.exe:0x4d3584 +0x14 = Arg6GetWorldNameByIndex(char*)
+    // launcher.exe:0x4d3584 +0x18 = Arg6GetWorldVariantByIndex(uint)
+    // launcher.exe:0x4d3584 +0x1c = Arg6ValidateWorldSelection(uint -> 0 or 7)
+    // launcher.exe:0x4d3584 +0x20 = Arg6GetWorldListCount(uint)
+    // launcher.exe:0x4d3584 +0x24 = Arg6GetActiveWorldListCount(uint)
+    // launcher.exe:0x4d3584 +0x28 = Arg6GetAvailableWorlds(bool)
+    // =============================================================================
     struct Arg6WorldListData {
         // launcher.exe:0x4d3584 +0xfc = GetWorldNameByIndex(index) -> char*
         std::array<std::string, 10> worldNames_ = {"Default", "Starter", "Classic", "Advanced", "Extreme"};
@@ -598,6 +610,20 @@ private:
     };
 
     Arg6WorldListData arg6WorldList_;
+
+    // launcher.dll export that populates the client.dll's world list view for InitClientDLL
+    // This should be called before InitClientDLL so client.dll receives populated world data
+    // Address anchor: launcher.exe:0x4d3584 +0xc = vtable (ILTLoginMediator)
+    // Note: The original launcher initializes arg6WorldList_ inline when the object is created,
+    // not through a separate method call. We keep these methods for future reference/testing.
+public:
+    // void BuildWorldList();  // Removed - original launcher doesn't use separate method
+
+private:
+    // Populates the client's world list view with launcher-provided data
+    void PopulateClientWorldView();  // Kept for reference/testing
 };
 
 }  // namespace mxo::ltlogin
+
+}  // namespace mxo

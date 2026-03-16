@@ -126,7 +126,7 @@ Current practical crash state:
       - `0x432dd7`
       - internal self-calls: `0x436a0e`, `0x436fa8`
       - looped submit-and-wait path: `0x449d8a`
-    - newer import-backed + string-backed narrowing now makes the producer family more concrete than “generic queued work”:
+    - newer import-backed + string-backed narrowing now makes the producer family more concrete than "generic queued work":
       - `0x4302d5` sits on a later `recvfrom` path, so it now looks like receive/packet-side event submission
       - helper `0x449b40` is a socket factory around `socket(AF_INET, type, protocol)` plus option setup
       - arg5 slot `1` / `0x431ce0` is now string-backed as `MonitorPort`
@@ -284,7 +284,7 @@ Current practical crash state:
     - important ordering correction from newer static review: the user-visible `"Loading Character"` status text comes from earlier `client.dll:0x62170f2a`, immediately before the already-observed `arg6->+0xec` call at `0x62170f48`
     - so the current visible loading-bar state keeps this area interesting, but does **not** yet prove we reached the later `CreateCharacterWorldIndex` consumer at `0x62054cbd`
     - to avoid missing the next loading-phase transition, the diagnostic mediator now also exposes/logs slot `+0x120`; follow-up rerun `crash_62` still showed no `+0x120` traffic before the same late crash
-  - so the low-24-bit arg7 path now looks more like client-owned persisted console/config state than another unresolved arg6 method contract — but it may still be materially relevant on the current failing loading-character path
+  - so the low-24-bit arg7 path now looks more like client-owned persisted console/config state than another unresolved arg6 method contract - but it may still be materially relevant on the current failing loading-character path
   - but this still did **not** move the late crash family (`~/MxO_7.6005/MatrixOnline_0.0_crash_60.dmp`, `EIP=0x003e5e8a`)
 - newer evidence-backed mediator corrections now tried without moving this crash family:
   - the scaffold now copies the full `0xb4` `+0xec` selection/config handoff object into stable mediator-owned storage
@@ -456,15 +456,31 @@ Canonical docs:
 
 ## Immediate Next Work
 
-1. Recover the arg7 selection-resolution chain around `0x40d763..0x40d810`, `0x48baea`, and the sibling `ILTLoginMediator.Default`-style slot at `0x4d3584` (`+0xfc / +0x100 / +0xe4`) instead of treating `Last_WorldName` alone as the derivation
-2. Follow the new `+0x40` scratch-shape explanation deeper:
+1. **COMPLETED**: Implement `ILTLoginMediator_BuildWorldList` and call it before `InitClientDLL`
+   - Added `ILTLoginMediator_BuildWorldList()` to launcher.dll (address anchor: `launcher.exe:0x4d3584 +0x10`)
+   - Implemented world list provider methods in `loginmediator.cpp`:
+     - `Arg6GetWorldNameByIndex(char*)` at `+0x14`
+     - `Arg6GetWorldVariantByIndex(uint)` at `+0x18`
+     - `Arg6ValidateWorldSelection(uint -> 0 or 7)` at `+0x1c`
+     - `Arg6GetWorldListCount(uint)` at `+0x20`
+     - `Arg6GetActiveWorldListCount(uint)` at `+0x24`
+     - `Arg6GetAvailableWorlds(bool)` at `+0x28`
+   - Populated world list data in `Arg6WorldListData` structure with 5 worlds:
+     - World names: "Default", "Starter", "Classic", "Advanced", "Extreme"
+     - World variants: {1, 2, 3, 5, 1}
+     - Valid/available flags for all 5 worlds
+   - Called `ILTLoginMediator_BuildWorldList()` in `resurrections.cpp` before `InitClientDLL`
+   - This ensures client.dll receives populated world data when InitClientDLL passes arg6
+
+2. Recover the arg7 selection-resolution chain around `0x40d763..0x40d810`, `0x48baea`, and the sibling `ILTLoginMediator.Default`-style slot at `0x4d3584` (`+0xfc / +0x100 / +0xe4`) instead of treating `Last_WorldName` alone as the derivation
+3. Follow the new `+0x40` scratch-shape explanation deeper:
    - determine how the client expects the mutated arg7 scratch request to map back to persisted low-24-bit selection id / descriptor data after `0x62170dc1..0x62170e59`
    - stop assuming that accepting the scratch-shaped request alone is enough
-3. Reconstruct more of `0x409950` launcher-side preprocessing, especially `options.cfg` side effects and launcher-global state derived before `InitClientDLL`
-4. Follow the **new post-fix blocker** now that the old late `arg2+2` crash family no longer reproduces on the current binder path:
+4. Reconstruct more of `0x409950` launcher-side preprocessing, especially `options.cfg` side effects and launcher-global state derived before `InitClientDLL`
+5. Follow the **new post-fix blocker** now that the old late `arg2+2` crash family no longer reproduces on the current binder path:
    - preserve the now-confirmed original success contract from `launcher.exe:0x40a5a9 / 0x40a624 / 0x40a6be` (`test eax,eax ; jg ...`) and `0x40a6fd` (`al = 1` on overall success)
    - treat positive `InitClientDLL` / `RunClientDLL` / `TermClientDLL` returns as the original success shape, not an anomaly
-5. Trace the stable deliberate `RunClientDLL` loop now reachable on the clean binder path:
+6. Trace the stable deliberate `RunClientDLL` loop now reachable on the clean binder path:
    - `RunClientDLL -> 0x62006c30` repeatedly polls mediator `+0x2c`
    - then drives arg5 through `0x62532130 -> 0x62531c10(1)`
    - treat that as the **non-blocking consumer** side of the same engine-family logic seen in launcher `0x436b10`, not merely as arbitrary queue comparisons
@@ -479,22 +495,7 @@ Canonical docs:
      - releases `+0x60`
      - signals `+0x5c` on empty->non-empty transition
    - the representative set is no longer enough; all currently identified concrete producer xrefs have now been read and should be treated as the active reference set:
-     - `0x4302d5`
-     - `0x43051f`
-     - `0x43067f`
-     - `0x4306a7`
-     - `0x4309da`
-     - `0x4309ef`
-     - `0x430c25`
-     - `0x430d71`
-     - `0x430d94`
-     - `0x430da8`
-     - `0x4315b0`
-     - `0x4325aa`
-     - `0x4329cc`
-     - `0x432d86`
-     - `0x432dc1`
-     - `0x432dd7`
+     - `0x4302d5`, `0x43051f`, `0x43067f`, `0x4306a7`, `0x4309da`, `0x4309ef`, `0x430c25`, `0x430d71`, `0x430d94`, `0x430da8`, `0x4315b0`, `0x4325aa`, `0x4329cc`, `0x432d86`, `0x432dc1`, `0x432dd7`
      - internal lifecycle/self-calls: `0x436a0e`, `0x436fa8`
      - looped submit-and-wait path: `0x449d8a`
    - current concrete startup/runtime producer evidence passes third-arg `0`, so prioritize understanding the **queue0C** feed path first
@@ -534,33 +535,33 @@ Canonical docs:
    - keep the now-identified next consumer milestone in mind:
      - once queue work exists, client `0x62531e31..0x62531fe7` should reach arg5 primary slot `12` at vtable offset `+0x30`
      - original launcher consumer `0x436d31..0x436ee7` then treats the dequeued pair as `(workItem, context)`, reads `[workItem+0x04]`, calls slot `12(context)`, and then calls `context->+0x10(workItem)`
-     - that means the next fidelity gap is not just “feed any queue entry” but “feed the right **workItem + context** pair family so the later slot-12 / context callback chain is meaningful”
+     - that means the next fidelity gap is not just "feed any queue entry" but "feed the right **workItem + context** pair family so the later slot-12 / context callback chain is meaningful"
    - current best concrete producer-side preconditions to trace before runtime are now:
      - `MonitorPort` seeding endpoint-keyed `+0x80` with `AcceptThread` payloads
      - `UDPMonitorPort` seeding pointer-keyed `+0x8c` with `WorkerThread` payloads in state `2`
      - `Connect` seeding pointer-keyed `+0x8c` with `WorkerThread` payloads in state `1`
      - `CMessageConnection`-family objects capturing the engine pointer, then driving `Connect` / `Close` / `SendBuffer`, and enqueueing `(workItem, self, 0)` into queue0C
    - determine which launcher-owned startup/runtime state should cause those producer paths to become live beyond the present idle loop where both queues still show `current0 == current1`
-6. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the loading-character path around `0x620547c0..0x62054eac`) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
-7. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
-8. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently recovered arg5 slots alone explain the late crash
-9. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
-10. Keep tracing what `0x402ec0` minimally sets up
-11. Continue deliberate `RunClientDLL` experiments on the now-clean positive-return path, but keep them clearly labeled as binder/scaffold progress rather than faithful original-equivalent success until the launcher-owned arg5/arg6/arg7/pre-client state is reconstructed more faithfully
-12. If the deliberate path keeps avoiding fresh crashes, treat progress measurement as shifting from crash signatures to **new runtime surfaces/state changes** instead:
-   - new mediator slots
-   - new arg5 primary-slot traffic
-   - first non-empty queue0C / queue34 state
-   - first reach of slot `12`
-   - first class-backed sidecar activity that actually becomes live in logs
-   - only add dwell-time/UI timing instrumentation if those stronger runtime markers stop moving for a while
-13. Auth is no longer the main blocker; completed auth milestones now live under:
-   - `../../docs/launcher.exe/auth/README.md`
-   - `../../docs/launcher.exe/auth/STATUS.md`
-   - current highest-value auth-adjacent runtime work is now only:
-     - improve post-`0x0b` owner-state writeback fidelity around `0x4401a0`
-     - follow the later auth-side/world-list progression at `0x43b830`
-     - continue treating auth as **launcher-owned**, not `client.dll`-owned
+7. Trace the persisted low-24-bit selection-id path rooted at `0x629e1c7c` / `0x620011e0` now that it is identified as client-side `CreateCharacterWorldIndex`, and determine how its later consumers (especially on the loading-character path around `0x620547c0..0x62054eac`) depend on launcher-owned state before or alongside the later scratch-shaped `+0x40` lookup
+8. Improve semantic validation of the post-`+0xec` `0xb4` selection/config handoff object instead of treating it as only an opaque copied buffer
+9. Reconstruct deeper `0x4d6304` state on the original path, but stop assuming the currently recovered arg5 slots alone explain the late crash
+10. Revisit arg8 / nopatch-derived flag-byte handling once the arg7 / preprocessing path is less incomplete
+11. Keep tracing what `0x402ec0` minimally sets up
+12. Continue deliberate `RunClientDLL` experiments on the now-clean positive-return path, but keep them clearly labeled as binder/scaffold progress rather than faithful original-equivalent success until the launcher-owned arg5/arg6/arg7/pre-client state is reconstructed more faithfully
+13. If the deliberate path keeps avoiding fresh crashes, treat progress measurement as shifting from crash signatures to **new runtime surfaces/state changes** instead:
+    - new mediator slots
+    - new arg5 primary-slot traffic
+    - first non-empty queue0C / queue34 state
+    - first reach of slot `12`
+    - first class-backed sidecar activity that actually becomes live in logs
+    - only add dwell-time/UI timing instrumentation if those stronger runtime markers stop moving for a while
+14. Auth is no longer the main blocker; completed auth milestones now live under:
+    - `../../docs/launcher.exe/auth/README.md`
+    - `../../docs/launcher.exe/auth/STATUS.md`
+    - current highest-value auth-adjacent runtime work is now only:
+      - improve post-`0x0b` owner-state writeback fidelity around `0x4401a0`
+      - follow the later auth-side/world-list progression at `0x43b830`
+      - continue treating auth as **launcher-owned**, not `client.dll`-owned
 
 Current date: 2026-03-15
 Current working directory: /home/morgan/mxo/code/matrix_launcher

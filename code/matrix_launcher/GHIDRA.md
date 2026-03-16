@@ -43,15 +43,6 @@ mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "0x400000 0x410000 0x
 mcp({ tool: "ghidra_disassemble_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
 ```
 
-### Search for functions by name pattern
-```
-# Find functions with custom names
-mcp({ tool: "ghidra_search_functions_enhanced", args: '{"name_pattern": "CLTLoginMediator", "min_xrefs": 0, "max_xrefs": 100, "calling_convention": "", "has_custom_name": true, "program": "launcher.exe"}' })
-
-# Find by name pattern only
-mcp({ tool: "ghidra_search_functions_enhanced", args: '{"name_pattern": "AuthBootstrap", "min_xrefs": 0, "max_xrefs": 100, "calling_convention": "", "has_custom_name": true, "program": "launcher.exe"}' })
-```
-
 ### Get function callers/callees
 ```
 mcp({ tool: "ghidra_get_function_callers", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
