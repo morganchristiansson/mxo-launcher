@@ -1,0 +1,98 @@
+## Tools
+
+### Ghidra MCP
+
+Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
+
+#### Best Practices
+
+- Use `ghidra_set_program` or check the program name in tool calls (`launcher.exe` vs `client.dll`)
+- **Don't trust decompiler alone**: Verify with disassembly tools when in doubt about calling conventions, stack cleanup, or field semantics
+- **Cross-reference**: Combine decompilation output with direct disassembly analysis for critical functions
+- **Rename functions with high confidence**: When decompiler output is clear and matches static analysis, rename to descriptive names (e.g., `FUN_0040b330` → `CWinApp_AppInit`)
+- **Rename local variables with high confidence**: When variable names are obvious from context (e.g., parameter names like `this`, `param_1`, `pcVar1` = pointer to string, `local_7c` = CString buffer), rename to descriptive names for better code readability and cross-referencing
+- use **decompile + disassembly together** for important functions; do not trust decompiler output alone for:
+  - calling convention
+  - stack cleanup
+  - byte-vs-dword field meaning
+  - inline string / small-buffer layout
+- when recovering an object field, prefer this chain of evidence:
+  - allocator / ctor
+  - fill/helper writer
+  - later reader / consumer
+- use callers/callees/xrefs aggressively so isolated helper bodies are not over-interpreted
+- for branch conditions, check the actual instruction width (`test al,al` vs `test eax,eax`, etc.) before documenting field semantics
+- when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
+- keep renamed symbols and source scaffolds conservative; use provisional names when the role is strong but not fully settled
+- push confirmed Ghidra findings into source comments/scaffolds and canonical docs in the same task so knowledge does not live only in the tool session
+- record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
+
+#### Example usage
+
+1. **Decompile a function by address**:
+   ```
+   mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x6fb6aef0"}' })
+   ```
+
+2. **Batch decompile multiple functions**:
+   ```
+   mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "0x400000 0x410000 0x420000", "program": "launcher.exe"}' })
+   ```
+
+3. **Set function prototype** (helps decompiler accuracy):
+   ```
+   mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x48baea", "prototype": "ulong __thiscall CListCtrl::GetItemData(CListCtrl *this,int param_1)", "calling_convention": "__thiscall"}' })
+   ```
+
+# Ghidra MCP Tools Quick Guide
+
+### Decompile a function
+```
+mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+```
+
+### Disassemble a function
+```
+mcp({ tool: "ghidra_disassemble_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+```
+
+### Search for functions by name pattern
+```
+# Find functions with custom names
+mcp({ tool: "ghidra_search_functions_enhanced", args: '{"name_pattern": "CLTLoginMediator", "min_xrefs": 0, "max_xrefs": 100, "calling_convention": "", "has_custom_name": true, "program": "launcher.exe"}' })
+
+# Find by name pattern only
+mcp({ tool: "ghidra_search_functions_enhanced", args: '{"name_pattern": "AuthBootstrap", "min_xrefs": 0, "max_xrefs": 100, "calling_convention": "", "has_custom_name": true, "program": "launcher.exe"}' })
+```
+
+### Get function callers/callees
+```
+mcp({ tool: "ghidra_get_function_callers", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_get_function_callees", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+```
+
+### Get xrefs from/to an address
+```
+mcp({ tool: "ghidra_get_xrefs_from", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_get_xrefs_to", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+```
+
+### Rename a function
+```
+mcp({ tool: "ghidra_rename_function", args: '{"name": "CLTLoginMediator_InitializeHelperDispatchTable", "address": "0x43b300", "program": "launcher.exe"}' })
+```
+
+### Set function prototype (helps decompiler accuracy)
+```
+mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x43b300", "prototype": "void CLTLoginMediator_InitializeHelperDispatchTable(void)", "calling_convention": "__thiscall"}' })
+```
+
+### Rename variables in a function
+```
+mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "variables": {"puVar1": "ptr", "DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}}}' })
+```
+
+### Read memory at an address
+```
+mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "program": "launcher.exe"}' })
+```

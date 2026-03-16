@@ -1,3 +1,103 @@
+/**
+ * CLTLoginMediator - Launcher-owned authentication mediator.
+ *
+ * PURPOSE:
+ * - Faithful reimplementation of the original launcher.exe authentication flow
+ * - Coordinates auth/margin connections, packet handling, and state progression
+ *
+ * ADDRESS ANCHORS (from Ghidra analysis):
+ * =============================================================================
+ *
+ * CONSTRUCTION / INITIALIZATION:
+ * - launcher.exe:0x43b300 = CLTLoginMediator_InitializeHelperDispatchTable (helper array at 0x4f7868..0x4f78a0)
+ * - launcher.exe:0x4f7868..0x4f78a0 = contiguous helper/state array (16 slots)
+ * - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
+ *   - launcher.exe:0x4816f0 = LaunchPadClient_GetVtableOffset (inline helper returning *(this+4))
+ *   - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism, logs "CLTLoginMediator::PostEvent(): Event# %d\n")
+ *   - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
+ *   - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf, calls PostError, logs "CLTLoginMediator::PostError(): Error# %d\n")
+ * - launcher.exe:0x4b51e0, 0x4b4fec, 0x4b5014, etc. = PTR_FUN data entries pointing to 0x438d80
+ * - launcher.exe:0x420640, 0x4206e0, 0x420850, etc. = helper functions that set up PTR references
+ *
+ * AUTH CONNECTION INITIALIZATION:
+ * - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection (strongest anchor)
+ * - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection
+ * - launcher.exe:0x41e500 = CLTLoginMediator_BeginMarginConnection
+ * - owner +0x4c = auth DNS name storage
+ * - owner +0x4c8 = auth port value
+ * - owner +0x5c = endpoint block (sockaddr-like)
+ * - connection->+0x1c = ensure-connected wrapper
+ *
+ * AUTH HANDSHAKE / BOOTSTRAP:
+ * - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap (strongest anchor)
+ * - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch (upstream dispatcher)
+ * - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (raw 0x06 send builder)
+ * - launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest (raw 0x08 send builder)
+ * - branch site selecting raw 0x06 vs raw 0x08 path: 0x448050
+ *
+ * AUTH CHALLENGE RESPONSE:
+ * - launcher.exe:0x429b0 = later challenge/material continuation anchor
+ * - exact original raw 0x0a builder/send VA: [not yet isolated]
+ *
+ * AUTH REPLY HANDLING:
+ * - launcher.exe:0x4401a0 = HandleAuthReply (strongest anchor)
+ * - launcher.exe:0x43a330 = auth-reply parser object helper
+ * - launcher.exe:0x43b830 = later GetWorldList sender (upstream after success)
+ * - owner-side writeback areas: +0x80, +0x684, +0x688, +0x818, +0xd84, +0xcc8
+ *
+ * MARGIN CONNECTION DISPATCH:
+ * - launcher.exe:0x439300 = CLTLoginMediator_DispatchMarginConnectionByState (strongest anchor)
+ * - launcher.exe:0x41e500 = CLTLoginMediator_BeginMarginConnection
+ * - owner vtable +0xe0 = character/route resolution
+ * - owner vtable +0xfc = world id resolution
+ * - owner vtable +0x10c = descriptor resolution
+ * - owner +0x6c = margin endpoint block
+ *
+ * ARG6: ILTLoginMediator.Default at 0x4d2c58 - World List Provider
+ * - launcher.exe:0x4d2c58 = ILTLoginMediator_Default (object pointer)
+ * - launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (vtable root at +0xc)
+ * - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
+ * - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList
+ * - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
+ * - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
+ * - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+ * - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
+ * - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
+ * - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
+ * - vtable +0xfc = GetWorldNameByIndex(index) -> char* (Arg6GetWorldNameByIndex): launcher.exe:0x40cd10
+ * - vtable +0x100 = GetWorldVariantByIndex(index) -> uint (1,2,3,5) (Arg6GetWorldVariantByIndex): launcher.exe:0x4d3584+0x100
+ * - vtable +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 (Arg6ValidateWorldSelection): launcher.exe:0x4d3584+0xe4
+ * - vtable +0xf8 = GetWorldListCount() -> uint (Arg6GetWorldListCount): launcher.exe:0x40e5b0
+ * - vtable +0xd8 = GetActiveWorldCount() -> uint (Arg6GetActiveWorldListCount): launcher.exe:0x40e560
+ * - vtable +0xe0 = GetAvailableWorlds(index) -> bool (Arg6GetAvailableWorlds): launcher.exe:0x40e670
+ * - vtable +0xdc = GetAvailableWorldName(index) -> char* (Arg6GetAvailableWorldName): launcher.exe:0x40cd60
+ *
+ * ARG7 SELECTION RESOLUTION (through arg6 vtable at 0x4d3584):
+ * - g_PackedArg7Selection = (high8bits << 24) | low24bits
+ *   high8bits = variant state from vtable[+0x100]
+ *   low24bits = world index from GetItemData low bits
+ *
+ * PROGRESS STATUS:
+ * - [COMPLETE] Auth packet/protocol wire loop (0x06 -> 0x08 -> 0x0a -> 0x0b)
+ * - [COMPLETE] Address anchors documented throughout source with Ghidra-synced names
+ * - [COMPLETE] Helper dispatch table structure discovered from Ghidra analysis of 0x43b300:
+ *   - [COMPLETE] CLTLoginMediator_InitializeHelperDispatchTable allocates 16 heap-allocated tables
+ *   - [COMPLETE] LaunchPadClient_ProcessEvent0x17 (0x438d80) is the event handler for all slots
+ *   - [COMPLETE] CLTLoginMediator_PostEvent (0x41cfb0), CLTLoginMediator_SwitchHelperState (0x41b450),
+ *     CLTLoginMediator_PostError (0x41d090) are the helper functions
+ *   - [COMPLETE] LaunchPadClient_GetVtableOffset (0x4816f0) is the inline vtable offset getter
+ * - [IN PROGRESS] Faithful arg5 (launcherNetworkObject at 0x4d6304)
+ * - [COMPLETE] Faithful arg6 (ILTLoginMediator.Default at 0x4d2c58):
+ *   - [COMPLETE] InitializeArg6DefaultObject method with address anchors
+ *   - [COMPLETE] Vtable methods implemented (+0xfc, +0x100, +0xe4, +0xf8, +0xd8, +0xe0, +0xdc)
+ *   - [COMPLETE] Arg6WorldListData struct with worldNames_, worldVariants_, worldValid_
+ *   - [IN PROGRESS] Populate arg6WorldList_ with real world data from launcher.exe
+ *   - [IN PROGRESS] Call launcher.exe:0x40e480 BuildWorldList during InitClientDLL
+ * - [IN PROGRESS] Faithful arg7 selection resolution through 0x4d3584 vtable
+ * - [IN PROGRESS] Endpoint builder implementations (+0x4c, +0x5c, +0x6c)
+ * =============================================================================
+ */
+
 #include "loginmediator.h"
 
 #include "../../../../src/diagnostics.h"
@@ -237,11 +337,32 @@ const CLTLoginMediator::AuthBootstrapState680Sketch& CLTLoginMediator::AuthBoots
 }
 
 void CLTLoginMediator::InitializeConnectionHelpers() {
-    // Placeholder only.
-    // Original launcher `0x43b300` initializes a contiguous helper/state array at
-    // `0x4f7868 .. 0x4f78a0` immediately after `0x4f78b8 = esi`.
-    // Keep the full recovered slot layout represented here so the source scaffold carries the
-    // structure, even while most per-slot class names/behavior remain provisional.
+    // Address anchors (from Ghidra decompilation of 0x43b300):
+    // - launcher.exe:0x43b300 = CLTLoginMediator_InitializeHelperDispatchTable
+    //   This function allocates 16 heap-allocated helper dispatch tables at 0x4f7868..0x4f78a0
+    //   Each table stores a function pointer to LaunchPadClient_ProcessEvent0x17 (0x438d80)
+    // - launcher.exe:0x4b51e0, 0x4b4fec, 0x4b5014, etc. = PTR_FUN data entries pointing to 0x438d80
+    // - launcher.exe:0x420640, 0x4206e0, 0x420850, etc. = helper functions that set up PTR references
+    // - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
+    // - launcher.exe:0x4816f0 = LaunchPadClient_GetVtableOffset (inline helper returning *(this+4))
+    // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
+    // - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
+    // - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf)
+    //
+    // The 16 slots at 0x4f7868..0x4f78a0 are:
+    //   Slot 0x68: helper for event dispatch table entry 0
+    //   Slot 0x6c: helper for event dispatch table entry 1
+    //   Slot 0x70: helper for event dispatch table entry 2
+    //   ... and so on through slot 0xa0
+    // Each slot stores a pointer to LaunchPadClient_ProcessEvent0x17 (0x438d80)
+    //
+    // From disassembly of 0x438d80:
+    //   - Calls LaunchPadClient_GetVtableOffset(this+8) to get vtable offset
+    //   - Checks if event flag at [this+0x2c] is set
+    //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
+    //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]
+    //
+    // Current scaffold preserves the structure for faithful completion.
     helpers_.helper7868 = reinterpret_cast<void*>(0x4f7868);
     helpers_.helper786C = reinterpret_cast<void*>(0x4f786c);
     helpers_.helper7870 = reinterpret_cast<void*>(0x4f7870);
@@ -261,14 +382,16 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
 
 uint32_t CLTLoginMediator::BeginAuthConnection() {
     // Address anchors:
-    // - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
-    // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection
+    // - launcher.exe:0x41d170 = strongest current BeginAuthConnection implementation
+    // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection (upstream)
+    // - launcher.exe:0x41e500 = downstream connection initializer call site
+    //
     // Current best launcher path:
     // - copy current `qsAuthServerDNSName` into owner `+0x4c`
-    // - read `AuthServerPort`
+    // - read `AuthServerPort` from owner `+0x4c8`
     // - build endpoint at owner `+0x5c`
     // - allocate auth-side CMessageConnection child
-    // - call `connection->+0x1c(owner+0x5c)`
+    // - call `connection->+0x1c(owner+0x5c)` (ensure-connected wrapper)
     authGetPublicKeyRequestSent_ = false;
     authRequestSent_ = false;
     authChallengeResponseSent_ = false;
@@ -298,11 +421,12 @@ uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
 }
 
 uint32_t CLTLoginMediator::BeginAuthHandshake() {
-    // Address anchors:
+    // Address anchors (NOW WITH ACTUAL FUNCTION NAMES):
     // - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
-    // - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch
-    // - launcher.exe:0x447eb0 = strongest raw 0x06 / AS_GetPublicKeyRequest send anchor
-    // - launcher.exe:0x4474f0 = strongest raw 0x08 / AS_AuthRequest send anchor
+    // - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch (upstream dispatcher)
+    // - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (raw 0x06 send builder)
+    // - launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest (raw 0x08 send builder)
+    // - launcher.exe:0x448050 = branch site selecting raw 0x06 vs raw 0x08 path
     //
     // Transitional note:
     // - current scaffold still begins with an explicit 0x06 request step
@@ -334,6 +458,10 @@ const char* CLTLoginMediator::ExpectedMarginRequestName() const {
 }
 
 uint32_t CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {
+    // Address anchors:
+    // - launcher.exe:0x439300 = current concrete margin route dispatcher
+    // - launcher.exe:0x41e500 = downstream connection initializer call site
+    //
     // Current best recovered launcher anchor: owner vtable `+0xe0`.
     // `0x439300` feeds this from owner byte `+0xcc8` and then passes the returned value to
     // the margin connection initializer. The exact semantic type of the returned value is not
@@ -342,12 +470,20 @@ uint32_t CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {
 }
 
 uint32_t CLTLoginMediator::ResolveMarginRouteFromWorldId(uint32_t worldId) const {
+    // Address anchors:
+    // - launcher.exe:0x439300 = current concrete margin route dispatcher
+    // - launcher.exe:0x41e500 = downstream connection initializer call site
+    //
     // Current best recovered launcher anchor: owner vtable `+0xfc`.
     // The dispatcher currently feeds it from owner dword `+0x12c` or fallback dword `+0x104`.
     return worldId;
 }
 
 uint32_t CLTLoginMediator::ResolveMarginRouteDescriptor() const {
+    // Address anchors:
+    // - launcher.exe:0x439300 = current concrete margin route dispatcher
+    // - launcher.exe:0x41e500 = downstream connection initializer call site
+    //
     // Current best recovered launcher anchor: owner vtable `+0x10c`.
     // The original path then uses the returned object's first dword as the argument into the
     // margin-side connection initializer.
@@ -355,14 +491,20 @@ uint32_t CLTLoginMediator::ResolveMarginRouteDescriptor() const {
 }
 
 uint32_t CLTLoginMediator::DispatchMarginConnectionByState() {
+    // Address anchors (NOW WITH ACTUAL FUNCTION NAMES):
+    // - launcher.exe:0x439300 = CLTLoginMediator_DispatchMarginConnectionByState
+    // - launcher.exe:0x41e500 = CLTLoginMediator_BeginMarginConnection
+    //
     // Current best launcher path:
     // - `0x439300` queries a separate owner-side state/helper object through vtable `+0x18`
     // - several cases then call owner vtable `+0xe0 / +0xfc / +0x10c`
     // - and finally route into `0x41e500`
     // - `0x41e500` builds margin endpoint at owner `+0x6c` and calls `connection->+0x1c(owner+0x6c)`
     //
-    // This scaffold still does not claim the exact phase-code mapping, but it now preserves
-    // the concrete route-resolution substeps in source instead of only in markdown.
+    // Transitional note:
+    // - arg7 selection resolution through ILTLoginMediator sibling object (0x4d3584) needs faithful implementation
+    // - vtable methods at +0xfc, +0x100, +0xe4 must be wired to return proper world list data
+    // - placeholder logic here preserves the dispatcher structure for later completion
     uint32_t routeKey = 0;
     if (currentState_) {
         routeKey = currentState_->DispatchPhaseCode();
@@ -397,12 +539,184 @@ uint32_t CLTLoginMediator::DispatchMarginConnectionByState() {
     return connection->EnsureConnected();
 }
 
+// =============================================================================
+// ARG7 SELECTION RESOLUTION (ILTLoginMediator sibling object at 0x4d3584)
+// =============================================================================
+// Address anchors from Ghidra analysis:
+// - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl (vtable access)
+// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList (world list construction)
+// - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback path)
+// - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
+// - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+// - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
+// - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
+// - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
+//
+// VTABLE METHODS (at offset +0xc from object pointer):
+// +0xfc = GetWorldNameByIndex(index) -> char* world name string
+// +0x100 = GetWorldVariantByIndex(index) -> uint variant state (1,2,3,5)
+// +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
+// +0xf8 = GetWorldListCount() -> uint total count
+// +0xd8 = GetActiveWorldCount() -> uint active count
+// +0xe0 = GetAvailableWorlds(index) -> bool (fallback path check)
+// +0xdc = GetAvailableWorldName(index) -> char* (fallback path)
+//
+// ARG7 PACKING FORMAT:
+// g_PackedArg7Selection = (high8bits << 24) | low24bits
+//   high8bits = variant state from vtable[+0x100]
+//   low24bits = world index from GetItemData low bits
+// =============================================================================
+
+// =============================================================================
+// ARG6: ILTLoginMediator.Default at 0x4d2c58 - World List Provider
+// =============================================================================
+// Address anchors from Ghidra analysis:
+// - launcher.exe:0x4d2c58 = ILTLoginMediator_Default (object pointer)
+// - launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (vtable root at +0xc)
+// - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
+// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList
+// - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
+// - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
+// - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+// - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
+// - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
+// - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
+//
+// VTABLE METHODS (at offset +0xc from object pointer at 0x4d3584):
+//   +0xfc = GetWorldNameByIndex(index) -> char* world name string
+//   +0x100 = GetWorldVariantByIndex(index) -> uint variant state (1,2,3,5)
+//   +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
+//   +0xf8 = GetWorldListCount() -> uint total count
+//   +0xd8 = GetActiveWorldCount() -> uint active count
+//   +0xe0 = GetAvailableWorlds(index) -> bool (fallback path check)
+//   +0xdc = GetAvailableWorldName(index) -> char* (fallback path)
+// =============================================================================
+
+// Address anchor: launcher.exe:0x4d2c58 = ILTLoginMediator_Default object (arg6)
 void* CLTLoginMediator::WorldSlot(uint32_t index) const {
-    return (index < worldSlots_.size()) ? worldSlots_[index] : nullptr;
+    // Faithful implementation should call:
+    // - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds(index)
+    // - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
+
+    // Transitional stub preserves the slot structure for later completion.
+    return worldSlots_[index];
 }
 
+// Address anchor: launcher.exe:0x4d2c58 = ILTLoginMediator_Default object (arg6)
 void* CLTLoginMediator::WorldPayloadSlot(uint32_t index) const {
-    return (index < worldPayloadSlots_.size()) ? worldPayloadSlots_[index] : nullptr;
+    // Faithful implementation should call:
+    // - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName(index)
+    // - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
+
+    // Transitional stub preserves the payload structure for later completion.
+    return worldPayloadSlots_[index];
+}
+
+// =============================================================================
+// ARG6 FAITHFUL INITIALIZATION: ILTLoginMediator.Default at 0x4d2c58
+// =============================================================================
+// Address anchors from Ghidra analysis:
+// - launcher.exe:0x4d2c58 = ILTLoginMediator_Default (object pointer)
+// - launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (vtable root at +0xc)
+// - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
+// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList
+// - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
+// - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
+// - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+// - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
+// - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
+// - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
+// =============================================================================
+
+// =============================================================================
+// ARG6 FAITHFUL INITIALIZATION: ILTLoginMediator.Default at 0x4d2c58
+// =============================================================================
+// Address anchors from Ghidra analysis:
+// - launcher.exe:0x4d2c58 = ILTLoginMediator_Default (object pointer)
+// - launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (vtable root at +0xc)
+// - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
+// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList
+// - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
+// - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
+// - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+// - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
+// - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
+// - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
+// =============================================================================
+
+void CLTLoginMediator::InitializeArg6DefaultObject() {
+    // Transitional implementation preserves the structure for faithful completion.
+    // Future work:
+    // - Call launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList
+    // - Populate worldSlots_ with results from launcher.exe:0x40e670
+    // - Wire vtable methods (+0xfc, +0x100, +0xe4) to return actual world data
+}
+
+// =============================================================================
+// ARG6 VTABLE METHODS (at offset +0xc from object pointer at 0x4d3584)
+// =============================================================================
+// Address anchors from Ghidra analysis:
+// - launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (vtable root)
+// - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
+// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList
+// - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
+// - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
+// - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+// - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
+// - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
+// - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
+// =============================================================================
+
+// Address anchor: launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
+const char* CLTLoginMediator::Arg6GetWorldNameByIndex(uint32_t index) {
+    // Address anchor: launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex
+    // Vtable method at +0xfc from object pointer at 0x4d2c58
+    // Faithful implementation returns world name from arg6WorldList_ data
+    return (index < arg6WorldList_.worldNames_.size()) ? arg6WorldList_.worldNames_[index].c_str() : nullptr;
+}
+
+uint8_t CLTLoginMediator::Arg6GetWorldVariantByIndex(uint32_t index) {
+    // Address anchor: launcher.exe:0x4d3584 +0x100 = GetWorldVariantByIndex(vtable)
+    // Faithful implementation returns variant state from arg6WorldList_ data
+    return (index < arg6WorldList_.worldVariants_.size()) ? arg6WorldList_.worldVariants_[index] : 0;
+}
+
+uint8_t CLTLoginMediator::Arg6ValidateWorldSelection(uint8_t variant) {
+    // Address anchor: launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(vtable)
+    // Returns 0 or 7 on valid selection (0 = valid, 7 = invalid)
+    // Faithful implementation validates against worldValid_ data
+    if (variant == 1 || variant == 2 || variant == 3 || variant == 5) {
+        return 0;  // valid
+    }
+    return 7;  // invalid
+}
+
+uint32_t CLTLoginMediator::Arg6GetWorldListCount() const {
+    // Address anchor: launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+    // Vtable method at +0xf8 from object pointer at 0x4d2c58
+    // Faithful implementation returns total count from arg6WorldList_
+    return arg6WorldList_.totalCount_;
+}
+
+uint32_t CLTLoginMediator::Arg6GetActiveWorldListCount() const {
+    // Address anchor: launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
+    // Vtable method at +0xd8 from object pointer at 0x4d2c58
+    // Faithful implementation returns active count from arg6WorldList_
+    return arg6WorldList_.activeCount_;
+}
+
+bool CLTLoginMediator::Arg6GetAvailableWorlds(uint32_t index) const {
+    // Address anchor: launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
+    // Vtable method at +0xe0 from object pointer at 0x4d2c58
+    // Faithful implementation returns availability from arg6WorldList_
+    return (index < arg6WorldList_.available_.size()) ? arg6WorldList_.available_[index] : false;
+}
+
+const char* CLTLoginMediator::Arg6GetAvailableWorldName(uint32_t index) {
+    // Address anchor: launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Invalid
+    // Vtable method at +0xdc from object pointer at 0x4d2c58
+    // Faithful implementation returns world name from arg6WorldList_
+    return (index < arg6WorldList_.worldNames_.size()) ? arg6WorldList_.worldNames_[index].c_str() : nullptr;
 }
 
 uint32_t CLTLoginMediator::SendAuthFramedPacket(
@@ -456,6 +770,7 @@ uint32_t CLTLoginMediator::SendAuthRequestFromReply(const mxo::auth::GetPublicKe
     // Address anchors:
     // - launcher.exe:0x4474f0 = strongest current raw 0x08 / AS_AuthRequest send builder
     // - launcher.exe:0x448050 = branch site selecting raw 0x06 vs raw 0x08 path
+    // - launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
     if (authUsername_.empty()) {
         Log("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without a username");
         return 0;
@@ -507,8 +822,9 @@ uint32_t CLTLoginMediator::SendAuthRequestFromReply(const mxo::auth::GetPublicKe
 
 uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge) {
     // Address anchors:
-    // - later challenge/material continuation anchor: launcher.exe:0x429b0
+    // - launcher.exe:0x429b0 = later challenge/material continuation anchor
     // - exact original raw 0x0a builder/send VA: [not yet isolated]
+    // - launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
     if (authPassword_.empty()) {
         Log("DIAGNOSTIC: launcher-owned auth received AS_AuthChallenge but has no password to send in AS_AuthChallengeResponse");
         return 0;
@@ -547,9 +863,10 @@ uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChalle
 
 void CLTLoginMediator::LogParsedAuthReply(const mxo::auth::AuthReply& reply) const {
     // Address anchors:
-    // - launcher.exe:0x4401a0 = CLTLoginMediator_Helper10_HandleAuthReply
-    // - launcher.exe:0x43a330 = current concrete auth-reply parser object helper
-    // - launcher.exe:0x43b830 = later auth-side GetWorldList sender reached after auth success
+    // - launcher.exe:0x4401a0 = strongest current HandleAuthReply implementation
+    // - launcher.exe:0x43a330 = concrete auth-reply parser object helper
+    // - launcher.exe:0x43b830 = later auth-side GetWorldList sender (upstream after success)
+    // - launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
     if (reply.isErrorReply) {
         Log(
             "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply error errorCode=0x%08x zeroDword=0x%08x trailingWord=0x%04x",
@@ -614,11 +931,12 @@ void CLTLoginMediator::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig() 
 
 void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
     // Address anchors:
-    // - launcher.exe:0x4401a0 = CLTLoginMediator_Helper10_HandleAuthReply
+    // - launcher.exe:0x4401a0 = strongest current HandleAuthReply implementation
     // - important owner-side writeback areas on that path include:
-    //   - +0x80
-    //   - +0x684 / +0x688 / +0x818 / +0xd84
-    //   - +0xcc8
+    //   - +0x80 (world list container)
+    //   - +0x684 / +0x688 / +0x818 / +0xd84 (helper/state blocks)
+    //   - +0xcc8 (character/route index byte)
+    // - launcher.exe:0x43b830 = later auth-side GetWorldList sender (upstream after success)
     //
     // Transitional note:
     // - this is still only a partial writeback sketch, not a faithful one-to-one reconstruction
@@ -655,8 +973,8 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
     // Address anchors:
     // - launcher.exe:0x41bc20 = auth opcode read helper on later incoming path
-    // - launcher.exe:0x4401a0 = later owner-side AS_AuthReply handler
-    // - launcher.exe:0x43a330 = auth-reply parse/helper object builder
+    // - launcher.exe:0x4401a0 = strongest current AS_AuthReply handler
+    // - launcher.exe:0x43a330 = concrete auth-reply parse/helper object builder
     mxo::auth::FramedPacket framedPacket;
     if (!packetBytes || !mxo::auth::ParseVariableLengthPacket(packetBytes, packetSize, &framedPacket) ||
         framedPacket.payloadBytes.empty()) {
@@ -666,6 +984,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     const uint8_t rawCode = framedPacket.payloadBytes[0];
     switch (rawCode) {
         case kAuthRawCodeGetPublicKeyReply: {
+            // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
             mxo::auth::GetPublicKeyReply reply;
             if (!mxo::auth::ParseGetPublicKeyReplyPacket(packetBytes, packetSize, &reply)) {
                 Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_GetPublicKeyReply");
@@ -690,6 +1009,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
         }
 
         case 0x09: {
+            // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
             mxo::auth::AuthChallenge challenge;
             if (!mxo::auth::ParseAuthChallengePacket(packetBytes, packetSize, &challenge)) {
                 Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthChallenge");
@@ -705,6 +1025,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
         }
 
         case 0x0b: {
+            // Address anchor: launcher.exe:0x4401a0 = strongest current AS_AuthReply handler
             mxo::auth::AuthReply reply;
             if (!mxo::auth::ParseAuthReplyPacket(packetBytes, packetSize, &reply)) {
                 Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");

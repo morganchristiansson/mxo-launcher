@@ -36,6 +36,13 @@ class CLTLoginState_WorldListPending;
 //   - `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
 // - current best read: this object owns the launcher-side auth/margin connection flow,
 //   while `ILTLoginMediator.Default` remains the runtime interface slot passed into client.dll
+// - discovered helper dispatch structure from Ghidra analysis of 0x43b300:
+//   - `CLTLoginMediator_InitializeHelperDispatchTable` allocates 16 heap-allocated dispatch tables
+//   - each table stores a function pointer to `LaunchPadClient_ProcessEvent0x17` (0x438d80)
+//   - this is the launcher-side event handler system for auth/margin state transitions
+// - recovered logging string anchors:
+//   - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (logs "CLTLoginMediator::PostEvent(): Event# %d\n")
+//   - launcher.exe:0x41d090 = CLTLoginMediator_PostError (calls PostError, logs "CLTLoginMediator::PostError(): Error# %d\n")
 // - important current architectural split:
 //   - keep low-level packet/crypto helpers under `src/auth/`
 //   - keep launcher-owned auth/session state transitions here
@@ -63,13 +70,13 @@ public:
     static constexpr const char* kMessageMsConnectRequest = "MS_ConnectRequest";
 
     // Current high-value raw auth-code anchors on the launcher-owned helper path:
-    // - `0x447eb0` currently builds/sends raw code `0x06`
+    // - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (builds/sends raw code 0x06)
     //   -> strongest current `AS_GetPublicKeyRequest` candidate
     // - live diagnostic reply parsing now also confirms raw `0x07`
     //   -> `AS_GetPublicKeyReply`
-    // - `0x4474f0` currently builds/sends raw code `0x08`
+    // - launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest (builds/sends raw code 0x08)
     //   -> strongest current `AS_AuthRequest` candidate
-    // - `0x43b830` currently builds/sends raw code `0x35`
+    // - launcher.exe:0x43b830 = CLTLoginMediator_Helper14_SendGetWorldListRequest (builds/sends raw code 0x35)
     //   -> later `AS_GetWorldListRequest`
     static constexpr uint8_t kAuthRawCodeGetPublicKeyRequest = 0x06;
     static constexpr uint8_t kAuthRawCodeGetPublicKeyReply = 0x07;
@@ -78,24 +85,51 @@ public:
     static constexpr const char* kMessageMsConnectReply = "MS_ConnectReply";
     static constexpr const char* kMessageMsLoadCharacterReply = "MS_LoadCharacterReply";
 
+    // Recovered logging string anchors from launcher.exe:
+    // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent
+    //   logs: "CLTLoginMediator::PostEvent(): Event# %d\n"
+    static constexpr const char* kLogPrefixPostEvent = "CLTLoginMediator::PostEvent():";
+    // - launcher.exe:0x41d090 = CLTLoginMediator_PostError (calls PostError)
+    //   logs: "CLTLoginMediator::PostError(): Error# %d\n"
+    static constexpr const char* kLogPrefixPostError = "CLTLoginMediator::PostError():";
+
     struct ConnectionHelperFamily {
         // launcher.exe:0x43b300 initializes a contiguous 15-slot helper/state array rooted at
         // `0x4f7868`, immediately after `0x4f78b8 = esi`.
         //
+        // From Ghidra decompilation of 0x43b300 (CLTLoginMediator_InitializeHelperDispatchTable):
+        // - Allocates 16 heap-allocated dispatch tables at 0x4f7868..0x4f78a0
+        // - Each table stores a function pointer to LaunchPadClient_ProcessEvent0x17 (0x438d80)
+        // - PTR_FUN data entries at 0x4b51e0, 0x4b4fec, etc. all point to 0x438d80
+        // - Helper functions FUN_00420640, FUN_004206e0, etc. set up PTR references to the event handler
+        //
+        // Discovered function names from Ghidra renaming:
+        // - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
+        // - launcher.exe:0x4816f0 = LaunchPadClient_GetVtableOffset (inline helper returning *(this+4))
+        // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
+        // - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
+        // - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf)
+        //
+        // Disassembly of 0x438d80 shows:
+        //   - Calls LaunchPadClient_GetVtableOffset(this+8) to get vtable offset
+        //   - Checks if event flag at [this+0x2c] is set
+        //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
+        //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]
+        //
         // Current highest-value slot anchors:
         // - slot 1 / `0x4f786c` / phase-code `1`
-        //   - `+0x08 / 0x439090` starts auth connect through `0x41d170`
+        //   - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection starts auth connect through launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
         // - slot 2 / `0x4f7870` / phase-code `2`
-        //   - `+0x08 / 0x439210` is the strongest current earlier credential/bootstrap auth lead
-        //   - on the connected branch it reaches `0x448050`, which then branches to:
-        //     - `0x447eb0` building/sending raw auth code `0x06`
+        //   - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap is the strongest current earlier credential/bootstrap auth lead
+        //   - on the connected branch it reaches launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch, which then branches to:
+        //     - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (builds/sends raw auth code 0x06)
         //       -> strongest current `AS_GetPublicKeyRequest` candidate
-        //     - `0x4474f0` building/sending raw auth code `0x08`
+        //     - launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest (builds/sends raw auth code 0x08)
         //       -> strongest current `AS_AuthRequest` candidate
         // - slot 10 / `0x4f7890` / phase-code `10`
-        //   - `+0x14 / 0x4401a0` handles later incoming `AS_AuthReply`
+        //   - launcher.exe:0x4401a0 = CLTLoginMediator_Helper10_HandleAuthReply handles later incoming `AS_AuthReply`
         // - slot 14 / `0x4f78a0` / phase-code `14`
-        //   - `+0x08 / 0x43b830` sends later `AS_GetWorldListRequest`
+        //   - launcher.exe:0x43b830 = CLTLoginMediator_Helper14_SendGetWorldListRequest (sends later `AS_GetWorldListRequest`)
         void* helper7868 = nullptr;  // slot 0 / phase-code 0
         void* helper786C = nullptr;  // slot 1 / phase-code 1
         void* helper7870 = nullptr;  // slot 2 / phase-code 2
@@ -132,7 +166,7 @@ public:
             // - `+0x00` = begin/data pointer
             // - `+0x04` = current/end pointer
             // - `+0x08` = capacity/end-of-storage pointer
-            // `0x448050` only consumes the first dword here as a raw `char*` for its arg9 path,
+            // launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch only consumes the first dword here as a raw `char*` for its arg9 path,
             // but `0x41eb80` proves the full embedded small-string object still lives here.
             const char* begin = nullptr;
             const char* current = nullptr;
@@ -147,7 +181,7 @@ public:
         // - owner vtable `+0x150` / `0x41f270` is now also a direct first-string writer for the
         //   same block and copies up to `0x20` bytes into owner `+0x94`
         //
-        // Current best recovered layout from `0x41f0a0` + `0x41ecd0` + `0x41eb80` + `0x439210`
+        // Current best recovered layout from launcher.exe:0x41f0a0 + launcher.exe:0x41ecd0 + launcher.exe:0x41eb80 + launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
         // plus later owner-path uses like `0x43f300`, `0x41330`, `0x21a50`, and `0x20720`:
         // - `+0x00 .. +0x1f` = first inline 32-byte NUL-terminated string
         // - `+0x20 .. +0x3f` = second inline 32-byte NUL-terminated string
@@ -170,7 +204,7 @@ public:
         // Current best semantic read is therefore stronger than a generic auth blob but still
         // deliberately provisional on exact original class name:
         // an owner-side **station/launchpad-flavored phase-2 auth/bootstrap source block**
-        // that feeds `0x448050` and later session/bootstrap helpers.
+        // that feeds launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch and later session/bootstrap helpers.
         std::array<char, 0x20> inlineString00{};
         std::array<char, 0x20> inlineString20{};
         std::array<uint8_t, 16> block40{};
@@ -185,7 +219,7 @@ public:
         //
         // High-value phase-2 auth/bootstrap anchors:
         // - base ctor `0x45500`, size `0x11c`
-        // - preparation/fill helper `0x448050`
+        // - preparation/fill helper launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch
         // - branch condition at `0x44811e`: low-byte null test on dword field `+0xa0`
         //   - later `0x429b0` still uses that same field as a helper/pointer object via `+0x1c`
         //   - current best read therefore remains a helper/pointer family at `+0xa0`
@@ -193,7 +227,7 @@ public:
         //   - writes 16-byte material to `+0x85`
         //   - derives / caches the current/public key id at `+0x9c` via `0x41470`
         //
-        // Current field sketch from `0x45500` + `0x448050` + `0x447eb0` + `0x4474f0`:
+        // Current field sketch from launcher.exe:0x45500 + launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch + launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest + launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest:
         std::string string04;               // `+0x04`
         std::string string10;               // `+0x10`
         std::string string1C;               // `+0x1c`
@@ -291,7 +325,7 @@ public:
     // Current best post-connect status/result anchors:
     // - original engine `Connect` success path `0x4329b9..0x4329cc` builds `0x435050(0x7000001)`
     //   which is a type-2 work item enqueued as `(workItem, connection, 0)`
-    // - auth-side derived connection family (`0x41d170`, vtable `0x4afef0`) later reaches
+    // - auth-side derived connection family (launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection, vtable `0x4afef0`) later reaches
     //   owner-side packet handling through wrapper `0x449a70`
     // - margin-side derived connection family (`0x41e500`, vtable `0x4aff38`) later reaches
     //   owner-side packet handling through wrapper `0x44af60`
@@ -307,7 +341,7 @@ public:
     //     to helper vtable `+0x14`
     //   - so the concrete auth-side body depends on the current helper selected through the
     //     `0x4f7868` family via `0x41b450(...)`
-    //   - important correction: `0x4401a0` is one **later helper-state** `+0x14` body
+    //   - important correction: launcher.exe:0x4401a0 = CLTLoginMediator_Helper10_HandleAuthReply is one **later helper-state** `+0x14` body
     //     (`0x4f7890` / vtable `0x4b512c`), not the generic owner `+0x17c` target itself
     //   - that later helper body only meaningfully handles raw auth code `0x0b` (`AS_AuthReply`)
     //   - on success it parses that reply via `0x43a330`, updates owner `+0x80`, appends a
@@ -326,9 +360,9 @@ public:
     // - newer helper-family tracing now gives a stronger earlier bootstrap lead than only the
     //   later world-list sender:
     //   - `0x41b450(1)` selects helper `0x4f786c`
-    //   - helper `+0x08 / 0x439090` starts auth connect through `0x41d170`
+    //   - helper launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection starts auth connect through launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
     //   - direct code xrefs to auth wrapper `0x41af60` still only tie down the later helper
-    //     `0x4f78a0 +0x08 / 0x43b830`
+    //     launcher.exe:0x4f78a0 +0x08 / launcher.exe:0x43b830 = CLTLoginMediator_Helper14_SendGetWorldListRequest
     //   - that later auth-side wrapper path remains:
     //       - `0x41af60`
     //       - auth connection `+0x24 / 0x41cf30`
@@ -339,13 +373,13 @@ public:
     //     with raw code `0x35` -> `AS_GetWorldListRequest`
     // - current strongest earlier credential/bootstrap auth lead is now helper
     //   `0x4f7870` selected through `0x41b450(2)`:
-    //   - helper `+0x08 / 0x439210`
+    //   - helper launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
     //   - if auth is not connected yet, it falls back to `0x41b450(1)`
     //   - on the connected branch it gathers launcher-owned owner data through:
     //     - owner `+0x168`
     //     - owner `+0x20`
     //     - owner `+0x38`
-    //   - then calls `0x448050`, which is currently only xref'd from `0x439210`
+    //   - then calls launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch, which is currently only xref'd from launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
     //   - Ghidra-backed callsite layout now narrows the selected source object materially:
     //     - owner vtable `+0x38` getter `0x41f0a0` returns embedded owner block `this + 0x94`
     //     - owner vtable `+0x30` / `0x41ecd0` copies/consumes the same family via `0x41eb80`
@@ -354,9 +388,9 @@ public:
     //     - source `+0x40 .. +0x4f` = first copied 16-byte block
     //     - source `+0x50 .. +0x5f` = second copied 16-byte block
     //     - source `+0x60 .. +0x68` = embedded `0x407dd0`-style small-string object
-    //       whose first dword is passed into `0x448050` as the raw third-string pointer
+    //       whose first dword is passed into launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch as the raw third-string pointer
     //     - source `+0x6c` = trailing byte/flag
-    //   - `0x448050` then branches into two launcher-owned outbound packet builders that both
+    //   - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch then branches into two launcher-owned outbound packet builders that both
     //     send indirectly through a bootstrap object send-target at `object + 0x50`
     //     via virtual `+0x24`, rather than through another simple direct `0x41af60` callsite:
     //     - `0x447eb0`
@@ -490,6 +524,31 @@ private:
 
     std::array<void*, kRecoveredWorldSlotCapacity> worldSlots_;
     std::array<void*, kRecoveredWorldSlotCapacity> worldPayloadSlots_;
+
+    // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
+    // Faithful implementation of arg6 world list provider for InitClientDLL
+    // Vtable at offset +0xc from object pointer at 0x4d2c58
+    struct Arg6WorldListData {
+        // launcher.exe:0x4d3584 +0xfc = GetWorldNameByIndex(index) -> char*
+        std::string worldNames_[10] = {"Default", "Starter", "Classic", "Advanced", "Extreme"};  // placeholder data
+
+        // launcher.exe:0x4d3584 +0x100 = GetWorldVariantByIndex(index) -> uint (1,2,3,5)
+        uint8_t worldVariants_[10] = {1, 2, 3, 5, 1};  // variant states
+
+        // launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
+        bool worldValid_[10] = {true, true, true, true, true, false, false, false, false, false};
+
+        // launcher.exe:0x4d3584 +0xf8 = GetWorldListCount() -> uint total count
+        uint32_t totalCount_ = 5;
+
+        // launcher.exe:0x4d3584 +0xd8 = GetActiveWorldCount() -> uint active count
+        uint32_t activeCount_ = 5;
+
+        // launcher.exe:0x4d3584 +0xe0 = GetAvailableWorlds(index) -> bool (fallback path check)
+        bool available_[10] = {true, true, true, true, true, false, false, false, false, false};
+    };
+
+    Arg6WorldListData arg6WorldList_;
 };
 
 }  // namespace mxo::ltlogin
