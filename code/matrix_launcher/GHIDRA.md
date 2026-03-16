@@ -1,16 +1,13 @@
-## Tools
-
-### Ghidra MCP
+# Ghidra MCP
 
 Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
 
-#### Best Practices
+## Best Practices
 
-- Use `ghidra_set_program` or check the program name in tool calls (`launcher.exe` vs `client.dll`)
 - **Don't trust decompiler alone**: Verify with disassembly tools when in doubt about calling conventions, stack cleanup, or field semantics
 - **Cross-reference**: Combine decompilation output with direct disassembly analysis for critical functions
-- **Rename functions with high confidence**: When decompiler output is clear and matches static analysis, rename to descriptive names (e.g., `FUN_0040b330` → `CWinApp_AppInit`)
-- **Rename local variables with high confidence**: When variable names are obvious from context (e.g., parameter names like `this`, `param_1`, `pcVar1` = pointer to string, `local_7c` = CString buffer), rename to descriptive names for better code readability and cross-referencing
+- **Rename functions**: Sync method names with source code. When log message strings contain method names, use it. Otherwise use descriptive names to improve long term clarity, improve existing names when our understanding improves.
+- **Rename variables**: Sync variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - use **decompile + disassembly together** for important functions; do not trust decompiler output alone for:
   - calling convention
   - stack cleanup
@@ -23,32 +20,22 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 - use callers/callees/xrefs aggressively so isolated helper bodies are not over-interpreted
 - for branch conditions, check the actual instruction width (`test al,al` vs `test eax,eax`, etc.) before documenting field semantics
 - when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
-- keep renamed symbols and source scaffolds conservative; use provisional names when the role is strong but not fully settled
 - push confirmed Ghidra findings into source comments/scaffolds and canonical docs in the same task so knowledge does not live only in the tool session
 - record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
 
-#### Example usage
+## Anchors
+Document function addresses in comment above methods like this:
+```
+// anchor: launcher.exe:0x420640
+void CLTLoginMediator::InitializeHelperDispatchSlot15() {
+```
 
-1. **Decompile a function by address**:
-   ```
-   mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x6fb6aef0"}' })
-   ```
+## Example usage
 
-2. **Batch decompile multiple functions**:
-   ```
-   mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "0x400000 0x410000 0x420000", "program": "launcher.exe"}' })
-   ```
-
-3. **Set function prototype** (helps decompiler accuracy):
-   ```
-   mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x48baea", "prototype": "ulong __thiscall CListCtrl::GetItemData(CListCtrl *this,int param_1)", "calling_convention": "__thiscall"}' })
-   ```
-
-# Ghidra MCP Tools Quick Guide
-
-### Decompile a function
+### Decompile one or multiple function
 ```
 mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "0x400000 0x410000 0x420000", "program": "launcher.exe"}' })
 ```
 
 ### Disassemble a function
@@ -80,11 +67,6 @@ mcp({ tool: "ghidra_get_xrefs_to", args: '{"address": "0x43b300", "program": "la
 ### Rename a function
 ```
 mcp({ tool: "ghidra_rename_function", args: '{"name": "CLTLoginMediator_InitializeHelperDispatchTable", "address": "0x43b300", "program": "launcher.exe"}' })
-```
-
-### Set function prototype (helps decompiler accuracy)
-```
-mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x43b300", "prototype": "void CLTLoginMediator_InitializeHelperDispatchTable(void)", "calling_convention": "__thiscall"}' })
 ```
 
 ### Rename variables in a function

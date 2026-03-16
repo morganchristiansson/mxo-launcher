@@ -452,12 +452,7 @@ Canonical docs:
 - Be diligent about experiment documentation: every meaningful rerun, crash change, stable non-change, or new disassembly-backed interpretation must update the relevant canonical docs in `../../docs/` as part of the same work, not later
 - Record negative results too when they narrow the search, but keep them in canonical component docs rather than scattered duplicate notes
 - When a crash becomes a recurring reference, prefer canonical doc names keyed by a stable signature such as faulting `EIP` / `module+offset` rather than transient dump numbers alone; record the specific dump filenames inside the doc body
-- For PE inspection tasks, treat `python3 pefile` as a normal supplementary RE tool for:
-  - VA/RVA/file-offset conversion
-  - vtable neighborhood inspection
-  - nearby string/rdata inspection
-  - quick binary-structure checks
-  - but keep disassembly/debugger evidence as the primary source for control flow, calling convention, and semantic claims
+- For instructions on decompiling and disassembling read ./GHIDRA.md
 
 ## Immediate Next Work
 
