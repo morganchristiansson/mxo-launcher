@@ -17,7 +17,6 @@
  *   - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
  *   - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf, calls PostError, logs "CLTLoginMediator::PostError(): Error# %d\n")
  * - launcher.exe:0x4b51e0, 0x4b4fec, 0x4b5014, etc. = PTR_FUN data entries pointing to 0x438d80
- * - launcher.exe:0x420640, 0x4206e0, 0x420850, etc. = helper functions that set up PTR references
  *
  * AUTH CONNECTION INITIALIZATION:
  * - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection (strongest anchor)
@@ -342,7 +341,11 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     //   This function allocates 16 heap-allocated helper dispatch tables at 0x4f7868..0x4f78a0
     //   Each table stores a function pointer to LaunchPadClient_ProcessEvent0x17 (0x438d80)
     // - launcher.exe:0x4b51e0, 0x4b4fec, 0x4b5014, etc. = PTR_FUN data entries pointing to 0x438d80
-    // - launcher.exe:0x420640, 0x4206e0, 0x420850, etc. = helper functions that set up PTR references
+    // - launcher.exe:0x420640 = InitializeHelperDispatchSlot15 (initializes slot at 0x4f78a4)
+    // - launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16 (initializes slot at 0x4f78a8)
+    // - launcher.exe:0x420850 = InitializeHelperDispatchSlot17 (initializes slot at 0x4f78ac)
+    // - launcher.exe:0x420920 = InitializeHelperDispatchSlot18 (initializes slot at 0x4f78b0)
+    // - launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19 (initializes slot at 0x4f78b4)
     // - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
     // - launcher.exe:0x4816f0 = LaunchPadClient_GetVtableOffset (inline helper returning *(this+4))
     // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
@@ -362,22 +365,67 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
     //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]
     //
-    // Current scaffold preserves the structure for faithful completion.
-    helpers_.helper7868 = reinterpret_cast<void*>(0x4f7868);
-    helpers_.helper786C = reinterpret_cast<void*>(0x4f786c);
-    helpers_.helper7870 = reinterpret_cast<void*>(0x4f7870);
-    helpers_.helper7874 = reinterpret_cast<void*>(0x4f7874);
-    helpers_.helper7878 = reinterpret_cast<void*>(0x4f7878);
-    helpers_.helper787C = reinterpret_cast<void*>(0x4f787c);
-    helpers_.helper7880 = reinterpret_cast<void*>(0x4f7880);
-    helpers_.helper7884 = reinterpret_cast<void*>(0x4f7884);
-    helpers_.helper7888 = reinterpret_cast<void*>(0x4f7888);
-    helpers_.helper788C = reinterpret_cast<void*>(0x4f788c);
-    helpers_.helper7890 = reinterpret_cast<void*>(0x4f7890);
-    helpers_.helper7894 = reinterpret_cast<void*>(0x4f7894);
-    helpers_.helper7898 = reinterpret_cast<void*>(0x4f7898);
-    helpers_.helper789C = reinterpret_cast<void*>(0x4f789c);
-    helpers_.helper78A0 = reinterpret_cast<void*>(0x4f78a0);
+    // The re-implementation calls the helper methods to properly initialize all slots.
+    InitializeHelperDispatchSlot15();
+    InitializeHelperDispatchSlot16();
+    InitializeHelperDispatchSlot17();
+    InitializeHelperDispatchSlot18();
+    InitializeHelperDispatchSlot19();
+}
+
+//
+// These are called from InitializeConnectionHelpers() to properly initialize the
+// helper dispatch table slots beyond the main 15 (0x68-0xa0).
+
+void CLTLoginMediator::InitializeHelperDispatchSlot15() {
+    // Address anchor: launcher.exe:0x420640 = InitializeHelperDispatchSlot15
+    // Original: allocates 8 bytes, stores PTR reference at address 0x4b51e0
+    // The helper function calls the allocated memory which then stores &PTR_LaunchPadClient_ProcessEvent0x17_004b0b88
+    void* ptr = malloc(8);
+    if (ptr) {
+        *(void**)ptr = reinterpret_cast<void*>(0x4b51e0);
+        helpers_.helper78A4 = ptr;
+    }
+}
+
+void CLTLoginMediator::InitializeHelperDispatchSlot16() {
+    // Address anchor: launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16
+    // Original: allocates 4 bytes, stores PTR reference at address 0x4b4fec
+    void* ptr = malloc(4);
+    if (ptr) {
+        *(void**)ptr = reinterpret_cast<void*>(0x4b4fec);
+        helpers_.helper78A8 = ptr;
+    }
+}
+
+void CLTLoginMediator::InitializeHelperDispatchSlot17() {
+    // Address anchor: launcher.exe:0x420850 = InitializeHelperDispatchSlot17
+    // Original: allocates 4 bytes, stores PTR reference at address 0x4b4fc4
+    void* ptr = malloc(4);
+    if (ptr) {
+        *(void**)ptr = reinterpret_cast<void*>(0x4b4fc4);
+        helpers_.helper78AC = ptr;
+    }
+}
+
+void CLTLoginMediator::InitializeHelperDispatchSlot18() {
+    // Address anchor: launcher.exe:0x420920 = InitializeHelperDispatchSlot18
+    // Original: allocates 8 bytes, stores PTR reference at address 0x4b5014
+    void* ptr = malloc(8);
+    if (ptr) {
+        *(void**)ptr = reinterpret_cast<void*>(0x4b5014);
+        helpers_.helper78B0 = ptr;
+    }
+}
+
+void CLTLoginMediator::InitializeHelperDispatchSlot19() {
+    // Address anchor: launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19
+    // Original: allocates 4 bytes, stores PTR reference at address 0x4b508c
+    void* ptr = malloc(4);
+    if (ptr) {
+        *(void**)ptr = reinterpret_cast<void*>(0x4b508c);
+        helpers_.helper78B4 = ptr;
+    }
 }
 
 uint32_t CLTLoginMediator::BeginAuthConnection() {

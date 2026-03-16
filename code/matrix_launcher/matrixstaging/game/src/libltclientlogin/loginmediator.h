@@ -101,7 +101,8 @@ public:
         // - Allocates 16 heap-allocated dispatch tables at 0x4f7868..0x4f78a0
         // - Each table stores a function pointer to LaunchPadClient_ProcessEvent0x17 (0x438d80)
         // - PTR_FUN data entries at 0x4b51e0, 0x4b4fec, etc. all point to 0x438d80
-        // - Helper functions FUN_00420640, FUN_004206e0, etc. set up PTR references to the event handler
+        // - Helper functions InitializeHelperDispatchSlot15..Slot19 (0x420640..0x4209a0)
+        //   set up PTR references to the event handler for additional slots at 0x4f78a4..0x4f78b4
         //
         // Discovered function names from Ghidra renaming:
         // - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
@@ -310,6 +311,37 @@ public:
     //   the recovered table (`0..14`)
     // - exact class names for most helper objects are still being recovered
     void InitializeConnectionHelpers();
+
+    // HELPER DISPATCH TABLE INITIALIZATION HELPERS (from Ghidra analysis of 0x43b300):
+    // ==============================================================================
+    // launcher.exe:0x4f7868..0x4f78a0 = contiguous helper/state array (16 slots)
+    // launcher.exe:0x420640..0x4209a0 = InitializeHelperDispatchSlot15..Slot19 for additional slots at 0x4f78a4..0x4f78b4
+    // ==============================================================================
+    // launcher.exe:0x420640 = InitializeHelperDispatchSlot15 (slot at 0x4f78a4)
+    //   Original: allocates 8 bytes, stores PTR reference at 0x4b51e0
+    // launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16 (slot at 0x4f78a8)
+    //   Original: allocates 4 bytes, stores PTR reference at 0x4b4fec
+    // launcher.exe:0x420850 = InitializeHelperDispatchSlot17 (slot at 0x4f78ac)
+    //   Original: allocates 4 bytes, stores PTR reference at 0x4b4fc4
+    // launcher.exe:0x420920 = InitializeHelperDispatchSlot18 (slot at 0x4f78b0)
+    //   Original: allocates 8 bytes, stores PTR reference at 0x4b5014
+    // launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19 (slot at 0x4f78b4)
+    //   Original: allocates 4 bytes, stores PTR reference at 0x4b508c
+    void InitializeHelperDispatchSlot15();
+    void InitializeHelperDispatchSlot16();
+    void InitializeHelperDispatchSlot17();
+    void InitializeHelperDispatchSlot18();
+    void InitializeHelperDispatchSlot19();
+    // Slot anchors from Ghidra decompilation:
+    // launcher.exe:0x4f7868 = slot 0, launcher.exe:0x4f78a0 = slot 1, launcher.exe:0x4f786c = slot 2,
+    // launcher.exe:0x4f7870 = slot 3, launcher.exe:0x4f7874 = slot 4, launcher.exe:0x4f7878 = slot 5,
+    // launcher.exe:0x4f787c = slot 6, launcher.exe:0x4f7880 = slot 7, launcher.exe:0x4f7884 = slot 8,
+    // launcher.exe:0x4f7888 = slot 9, launcher.exe:0x4f7890 = slot 10, launcher.exe:0x4f7894 = slot 11,
+    // launcher.exe:0x4f788c = slot 12, launcher.exe:0x4f7898 = slot 13, launcher.exe:0x4f789c = slot 14,
+    // launcher.exe:0x4f78a4 = slot 15 (FUN_00420640), launcher.exe:0x4f78a8 = slot 16 (FUN_004206e0),
+    // launcher.exe:0x4f78ac = slot 17 (FUN_00420850), launcher.exe:0x4f78b0 = slot 18 (FUN_00420920),
+    // launcher.exe:0x4f78b4 = slot 19 (FUN_004209a0)
+    // ==============================================================================
 
     // Current best auth-side connection-init path:
     // - launcher `0x43909f -> 0x41d170`
