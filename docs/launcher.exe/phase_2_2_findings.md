@@ -24,7 +24,7 @@ The "stupidly large API surface" mentioned in the TODO has been confirmed and qu
 
 Table size distribution (top entries):
 ```
-250 entries: 1 table  (0x4b62b8)
+~17 entries: 1 table  (0x4b62b8, CMessageConnection Type C)
 165 entries: 1 table  (0x4b4fc4)
 155 entries: 1 table  (0x4b8438)
 129 entries: 1 table  (0x4ba338)
@@ -40,10 +40,10 @@ Table size distribution (top entries):
 
 Based on table patterns, we've identified several types:
 
-#### Type A: Large Virtual Function Tables (80+ entries)
-- Likely represent C++ class vtables
+#### Type A: Specialized C++ Vtables (16-32 entries)
+- Likely represent CMessageConnection family vtables
 - Contains destructor, constructor, and method pointers
-- Example: Table at 0x4b62b8 (250 entries)
+- Example: 0x4b62b8 (~17 entries, CMessageConnection Type C)
 
 #### Type B: Medium Callback Tables (10-50 entries)
 - Likely event handler tables
@@ -82,14 +82,14 @@ Common patterns observed:
 3. **Nullsub Pattern**: Many tables contain nullsub placeholders (0x441790)
 4. **Thunk Pattern**: Short jump thunks at end of tables
 
-### Largest Tables
+## Largest Tables
 
 Top 5 largest tables and their significance:
 
-1. **0x4b62b8 (250 entries, 1000 bytes)**
-   - Likely a large C++ class vtable
-   - Could be main application class
-   - Contains extensive functionality
+1. **0x4b62b8 (~17 entries, ~64 bytes)**
+   - CMessageConnection Type C vtable
+   - Specialized TCP messaging with OnOperationCompleted and SendPacket
+   - Direct child of CMessageConnection (0x004afef0)
 
 2. **0x4b4fc4 (165 entries, 660 bytes)**
    - Large vtable, possibly network manager
@@ -154,7 +154,7 @@ We have successfully mapped the internal API surface of launcher.exe, discoverin
 
 ---
 
-**Date**: 2025-06-17
+**Date**: 2026-03-17
 **Phase**: 2.2
 **Status**: COMPLETE ✅
 **Next Phase**: 2.3 - Callback Registration
