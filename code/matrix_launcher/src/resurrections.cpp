@@ -1560,15 +1560,3 @@ int main(int argc, char* argv[]) {
 
     return FinishAndReturn(0);
 }
-
-BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
-    (void)lpvReserved;
-    switch (fdwReason) {
-        case DLL_PROCESS_ATTACH:
-            DisableThreadLibraryCalls(hinstDLL);
-            break;
-        default:
-            break;
-    }
-    return TRUE;
-}
