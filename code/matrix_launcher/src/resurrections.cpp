@@ -19,6 +19,7 @@
 #include <sys/stat.h>
 
 #include "diagnostics.h"
+#include "spdlog/spdlog.h"
 
 // Include the login mediator header for world list builder access
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
@@ -214,10 +215,10 @@ static void CaptureInitClientFrameSnapshot() {
     g_InitClientFrameSnapshot.args[6] = g_PackedArg7Selection;
     g_InitClientFrameSnapshot.args[7] = g_FlagByte;
 
-    Log("DIAGNOSTIC: preserved InitClientDLL argument frame snapshot");
+    spdlog::info("DIAGNOSTIC: preserved InitClientDLL argument frame snapshot");
     for (size_t i = 0; i < 8; ++i) {
-        Log(
-            "  %s = %08x",
+        spdlog::info(
+            "  {} = {:08x}",
             InitClientArgName(i),
             (unsigned)g_InitClientFrameSnapshot.args[i]);
     }

@@ -8,6 +8,7 @@ TARGET = $(GAME_DIR)/resurrections.exe
 CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
 
 CRYPTOPP_DIR = third_party/cryptopp890
+SPDLOG_DIR = third_party/spdlog-1.17.0
 
 # Transitional note:
 # - canonical public auth declarations now live under:
@@ -36,6 +37,7 @@ AUTH_PROBE_SRC = tools/auth_probe.cpp $(COMMON_AUTH_SRC)
 BUILD_DIR = build
 AUTH_PROBE = $(GAME_DIR)/auth_probe.exe
 CRYPTOPP_LIB = $(BUILD_DIR)/libcryptopp.a
+SPDLOG_LIB = $(BUILD_DIR)/libspdlog.a
 
 -include secrets/launcher_login.local.mk
 
@@ -45,7 +47,7 @@ all: $(TARGET)
 
 auth_probe: $(AUTH_PROBE)
 
-CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp
+CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp
 
 $(TARGET): $(LAUNCHER_SRC) $(CRYPTOPP_LIB)
 	$(CXX) $(CXXFLAGS) -o $@ $(LAUNCHER_SRC) $(CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
@@ -61,6 +63,8 @@ $(CRYPTOPP_LIB): Makefile
 	@mkdir -p $(dir $@)
 	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" static
 	cp $(CRYPTOPP_DIR)/libcryptopp.a $@
+
+# spdlog is header-only, included via CXXFLAGS. No build step needed.
 
 $(AUTH_PROBE): $(AUTH_PROBE_SRC) $(CRYPTOPP_LIB)
 	@mkdir -p $(dir $@)
