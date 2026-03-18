@@ -202,7 +202,7 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                 self->sidecarConnection->ClearReceivedBytes();
             }
         }
-        return self->sidecarConnection->OnOperationCompleted(workItem->workType);
+        return self->sidecarConnection->OnOperationCompleted(reinterpret_cast<void*>(workItem->workType));
     }
     return 1;
 }

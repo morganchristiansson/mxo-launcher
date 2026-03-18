@@ -135,14 +135,22 @@ public:
     //   connection object on the starter path
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
 
+    // Pure virtual method required by base class CBaseConnection (slot 5)
+    // ProcessPacketResult at 0x00449a70
+    uint32_t ProcessPacketResult(const void* packetData, uint32_t byteCount);
+
+   // Override for base class CBaseConnection::OnOperationCompleted(void*) (slot 5)
     // string-backed original name: CMessageConnection::OnOperationCompleted
     // current best read:
     // - completion/receive-side bridge back into engine/queue handling
-    uint32_t OnOperationCompleted(uint32_t workCode);
+    uint32_t OnOperationCompleted(void* workCode);
 
     // Placeholder helper to mirror the currently recovered queue producer shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
     void* ContextKey() { return this; }
+
+   // FAITHFUL: VTable 0x004aff1c - ProcessDispatchResult at 0x00449a30
+    uint32_t ProcessDispatchResult(const void* packetData, uint32_t byteCount);
 
 private:
     CLTThreadPerClientTCPEngine* engine_;

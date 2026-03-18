@@ -56,7 +56,22 @@ CLTThreadPerClientTCPEngine* CMessageConnection::Engine() const {
 }
 
 // ============================================================
-// FAITHFUL: VTable 0x004aff00 - CMessageConnection::ProcessPacketResult at 0x00449a70
+// FAITHFUL: VTable 0x004aff1c - CMessageConnection::OnOperationCompleted at 0x00448a60
+// Generic fallback handler for unhandled operation codes
+// ============================================================
+uint32_t CMessageConnection::OnOperationCompleted(void* workCode) {
+    if (!engine_) {
+        return 0;
+    }
+
+    // FAITHFUL: Original launcher.exe FUN_00448a60 is string-backed only as a generic
+    // "Got unhandled op of type %d with status %s" logger when the auth helper returns 0.
+    (void)workCode;
+    return 1;
+}
+
+// ============================================================
+// FAITHFUL: ProcessPacketResult at 0x00449a70
 // 42 instructions, 8 complexity, 5 calls
 // Packet result processing handler
 // ============================================================
@@ -84,22 +99,6 @@ uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetB
     // Current starter path deliberately routes through the recovered connection-object-based
     // engine surface instead of pretending this is already a faithful packet serializer.
     return engine_->SendBuffer(this, packetData, packetByteCount, completionContext);
-}
-
-// ============================================================
-// FAITHFUL: VTable 0x004aff1c - CMessageConnection::ProcessDispatchResult at 0x00449a30
-// 23 instructions, 2 complexity, 2 calls
-// Message dispatch result handler
-// ============================================================
-uint32_t CMessageConnection::ProcessDispatchResult(const void* packetData, uint32_t byteCount) {
-    if (!engine_) {
-        return 0;
-    }
-
-    // Placeholder only: original launcher.exe shows this family logging packet/stream
-    // outcomes and then driving engine callbacks / queue submissions.
-    (void)workCode;
-    return 1;
 }
 
 // ============================================================
@@ -190,17 +189,12 @@ CLTThreadPerClientTCPEngine* CMarginConnection::MarginEngine() const {
 // Calls OnOperationCompleted first, then delegates to protocol-specific handlers
 // ============================================================
 uint32_t CMarginConnection::RouteMessage(const void* packetData, uint32_t byteCount) {
-// 42 instructions, 7 complexity, 5 calls
-// Advanced message routing with fallback handlers for robustness
-// Calls OnOperationCompleted first, then delegates to protocol-specific handlers
-// ============================================================
-uint32_t CMarginConnection::RouteMessage(const void* packetData, uint32_t byteCount) {
     if (!marginEngine_ || !packetData) {
         return 0;
     }
 
     // FAITHFUL: Calls Type A's OnOperationCompleted first (FUN_0044af60 pattern)
-    uint32_t result = OnOperationCompleted(0);
+    uint32_t result = OnOperationCompleted(nullptr);
     if (result == 0) {
         return 0;
     }

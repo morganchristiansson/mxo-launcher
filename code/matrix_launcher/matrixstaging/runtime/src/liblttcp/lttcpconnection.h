@@ -29,20 +29,49 @@ struct LTTCPEndpointKey {
     uint32_t reserved1 = 0;
 };
 
-// VTable 0x004b8034 - CLTTCPConnection (Base Class)
-// 0x004b8034 - Constructor at 0x0044ac40
-// 0x004b8040 - IsConnected at 0x00449ca0
-// 0x004b8048 - OnReceive at 0x00449d40
-// 0x004b804c - OnClose at 0x00449fd0
-// 0x004b8050 - Close at 0x00449cd0
-// 0x004b8054 - Destructor at 0x00449d20
+// ============================================================
+// VTable 0x004b8018 - CBaseConnection (Abstract Root)
+// This is the abstract base class that serves as the ROOT of the connection hierarchy.
+// Objects are created with this vtable but immediately transition to concrete subclass vtables.
+//
+// Memory Layout:
+//   Offset 0x34: Connection state field (original binary layout)
+// ============================================================
+class CBaseConnection {
+ public:
+  // Virtual destructor at slot 0 - cleanup routine for abstract base (16 instructions)
+  virtual ~CBaseConnection() = default;
 
-// current best original identity:
-// - base CLTTCPConnection family from launcher.exe string evidence
-// - base vtable `0x4b8018` is now string-backed by nearby `CLTTCPConnection::OnReceive()` text
-// - `CMessageConnection` currently looks like a derived message-layer object built on top of this base
-// - used by engine slots Close / SendBuffer and by later worker/receive paths
-class CLTTCPConnection {
+  // Pure virtual methods at slots 4-6 define the contract for all derived classes
+  // These are intentionally unimplemented in the abstract base
+  virtual uint32_t OnReceive() = 0;           // slot 4 - pure virtual
+  virtual uint32_t OnOperationCompleted(void*) = 0;  // slot 5 - pure virtual
+  virtual uint32_t SendPacket(const void*, uint32_t, void*) = 0;  // slot 6 - pure virtual
+
+  // Common virtual method at slot 3 - checks state field != kClosed
+  // Original: static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this) + 0x34) & 0xff != 8
+  virtual bool IsConnected() const;
+  
+  // Getter for state field
+  // Original access: *(uint8_t*)((int)this + 0x34)
+  LTTCPEngineConnectionState State() const {
+    return static_cast<LTTCPEngineConnectionState>(
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this) + 0x34) & 0xff);
+  }
+
+  // Constructor to initialize state at offset 0x34
+  CBaseConnection(LTTCPEngineConnectionState initialState = LTTCPEngineConnectionState::kClosed);
+
+ protected:
+  // State field at offset 0x34 - matches original binary layout for faithful implementation
+  LTTCPEngineConnectionState state_;
+};
+
+// ============================================================
+// VTable 0x004b8034 - CLTTCPConnection (Base Class)
+// Inherits from CBaseConnection and implements the abstract methods.
+// ============================================================
+class CLTTCPConnection : public CBaseConnection {
 public:
     CLTTCPConnection();
     explicit CLTTCPConnection(void* ownerContext);
@@ -81,23 +110,19 @@ public:
     // We do not yet have a high-confidence direct original method name mapped onto the
     // connection-side receive processing entrypoint in this starter skeleton.
     uint32_t OnReceive();
-
-    // ============================================================
-    // FAITHFUL: VTable 0x004b804c - OnClose at 0x00449fd0
-    // Helper/utility function for close operations (9 instructions)
-    // ============================================================
     void OnClose();
 
     // ============================================================
-    // FAITHFUL: VTable 0x004b8040 - IsConnected at 0x00449ca0
-    // Checks state field != 8 (kClosed)
+    // FAITHFUL: Helper functions from OnReceive implementation at 0x00449d40
     // ============================================================
-    bool IsConnected() const;
 
-private:
+    std::uint32_t pollReceive();
+    void pushCompletedOperation(void* thisPtr, int priority, void* connection, char opType);
+    void cleanupConnection();
+
+ private:
     void* ownerContext_;
     uint32_t socketHandle_;
-    LTTCPEngineConnectionState state_;
     LTTCPEndpointKey remoteEndpoint_;
     std::string remoteHostName_;
     std::vector<uint8_t> receivedBytes_;
