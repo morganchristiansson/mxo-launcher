@@ -73,6 +73,28 @@ it is using the **resolved interface pointer value**, not a wrapper object.
 That means our reimplementation should not model `0x4d2c58` as a plain homemade struct.
 It needs the original launcher-side acquisition / registration behavior.
 
+## Current implementation milestone (2026-03-18)
+
+Focused early-path result from current replacement-launcher work:
+- the default `make run` path now auto-enables the current binder-backed `ILTLoginMediator.Default` scaffold together with the current `0x40a380`-style arg5 build/register step instead of requiring manual diagnostic env flags just to reach `InitClientDLL`
+- this change is intentionally narrow: it promotes the original launcher control-flow obligation
+  - build `0x4d6304`
+  - hand it into `ILTLoginMediator.Default` via `+0x08`
+  - pass the resolved arg6/arg5 pair into `InitClientDLL`
+- it does **not** claim faithful completion of the deeper mediator/object internals yet
+
+Representative validation run:
+- command: `make run`
+- current result:
+  - reaches `InitClientDLL`
+  - `InitClientDLL returned: 1`
+  - launcher-owned auth auto-begin still follows on that path
+  - `RunClientDLL` remains intentionally gated by default
+
+That makes the first obstacle narrower than before:
+- the earliest blocker is no longer simply "default run never reaches InitClientDLL because arg5/arg6 are absent"
+- the next early-path work should stay focused on improving the faithfulness of the now-default startup-object path rather than keeping it behind diagnostic-only switches
+
 ## Verified uses in the original startup path
 
 ### Nopatch branch configures it

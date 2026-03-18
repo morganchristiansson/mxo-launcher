@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "lttcpconnection.h"
@@ -9,6 +10,108 @@
 namespace mxo::liblttcp {
 
 class CMessageConnection;
+class CLTThreadPerClientTCPEngine;
+
+// Recovered base-queue object from CLTBaseThreadPerClientTCPEngine.
+// Current high-confidence field map comes from 0x436610 -> 0x436340 and later consumer paths.
+// This matches the launcher arg5 queue storage shape at:
+// - +0x0c..+0x33
+// - +0x34..+0x5b
+struct CLTThreadPerClientTCPEngine_Queue {
+    void* current0;        // +0x00
+    void* block0;          // +0x04
+    void* end0;            // +0x08
+    void* slotsCurrent;    // +0x0c
+    void* current1;        // +0x10
+    void* block1;          // +0x14
+    void* end1;            // +0x18
+    void* slotsLast;       // +0x1c
+    void* slotsBase;       // +0x20
+    uint32_t slotCapacity; // +0x24
+};
+
+// Recovered generic thread-base surface shared by several launcher worker objects.
+// Current original anchors:
+// - base ctor: 0x4319e0
+// - GetNameString: 0x4319d0
+// - Start: 0x4528d0
+// - Resume: 0x4525d0
+// - Stop: 0x452660
+// - IsRunning: 0x431a60
+// - Wait: 0x4526e0
+// - Suspend: 0x452620
+// - IsCurrentThread: 0x431a40
+// - exit log hook: 0x452770
+// - deleting dtor: 0x431a80
+// Scaffold note:
+// - this source model now tracks the recovered object layout / naming / ownership surface
+// - but it still does NOT reproduce original Win32 force-terminate semantics faithfully yet
+class CLTThread {
+public:
+    static constexpr uint32_t kStartSuccess = 0;
+    static constexpr uint32_t kStartAlreadyRunning = 0x8000005;
+    static constexpr uint32_t kStartFailure = 1;
+
+    // anchor: launcher.exe:0x4319e0
+    explicit CLTThread(const char* threadName);
+    // anchor: launcher.exe:0x452950 / 0x431a80 deleting wrapper
+    virtual ~CLTThread();
+
+    // anchor: launcher.exe:0x4319d0
+    const std::string& GetNameString() const;
+
+    // anchor: launcher.exe:0x4528d0
+    virtual uint32_t Start(int startPriority);
+    // anchor: launcher.exe:0x4525d0
+    virtual bool Resume();
+    // anchor: launcher.exe:0x452660
+    virtual int Stop(bool waitAfterTerminate);
+    // anchor: launcher.exe:0x431a60
+    virtual bool IsRunning() const;
+    // anchor: launcher.exe:0x4526e0
+    virtual uint32_t Wait();
+    // anchor: launcher.exe:0x452620
+    virtual void Suspend();
+    // anchor: launcher.exe:0x431a40
+    virtual bool IsCurrentThread() const;
+
+protected:
+    // anchor: launcher.exe:0x437b50 on the current shared base vtable family
+    virtual uint32_t PreRun();
+    // UNANCHORED scaffold base default; concrete derived thread classes override the thread-main slot
+    virtual void Run();
+    // anchor: launcher.exe:0x452770
+    virtual void LogExit();
+
+    std::string threadName_;
+    int startPriority_;
+    int suspendDepth_;
+    bool running_;
+    uint32_t threadId_;
+};
+
+// Recovered queue-thread child allocated by engine base ctor helper 0x4365a0.
+// Current high-confidence shape:
+// - inherits generic CLTThread-style base state
+// - stores owner engine pointer at +0x38
+// - overrides the thread-main slot to call owner RunCompletedOperationQueue(owner, 0)
+class CLTThreadPerClientTCPEngine_QueueThread : public CLTThread {
+public:
+    // anchor: launcher.exe:0x4365a0
+    explicit CLTThreadPerClientTCPEngine_QueueThread(CLTThreadPerClientTCPEngine* owner);
+    // UNANCHORED scaffold dtor; current vtable/dtor mapping still reuses the shared CLTThread deleting dtor
+    ~CLTThreadPerClientTCPEngine_QueueThread() override;
+
+    // UNANCHORED scaffold accessor for the recovered child +0x38 owner field
+    CLTThreadPerClientTCPEngine* Owner() const;
+
+protected:
+    // anchor: launcher.exe:0x436fc0
+    void Run() override;
+
+private:
+    CLTThreadPerClientTCPEngine* owner_;
+};
 
 // Reimplementation note:
 // This file intentionally mirrors recovered original launcher.exe naming.
@@ -20,7 +123,10 @@ class CMessageConnection;
 
 // original class identity:
 // - launcher global 0x4d6304
-// - ctor 0x431c30
+// - derived ctor 0x431c30
+// - base ctor 0x4366f0
+// - queue-pair init helper 0x436610 -> queue init helper 0x436340
+// - queue-thread child ctor 0x4365a0
 // - primary vtable 0x4b2768
 // strongest current class string:
 // - CLTThreadPerClientTCPEngine
@@ -44,7 +150,9 @@ public:
         LTTCPEngineConnectionState state = LTTCPEngineConnectionState::kClosed;
     };
 
+    // anchor: launcher.exe:0x431c30 / base ctor 0x4366f0
     CLTThreadPerClientTCPEngine();
+    // anchor: launcher.exe:0x40b389..0x40b404 teardown release path; current C++ body remains scaffold-only
     ~CLTThreadPerClientTCPEngine();
 
     uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext);
@@ -60,6 +168,24 @@ public:
     uint32_t CleanupConnection(void* contextKey);
     uint32_t UnmonitorPort(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, uint32_t* outSocketHandle);
 
+    // Base queue helpers recovered from:
+    // - 0x436340 = Queue_Init
+    // - 0x436670 / 0x436820 = queue-pair push helpers
+    // Current scaffold uses these helpers as the canonical queue-storage implementation even
+    // while the live arg5 ABI object still owns the runtime-visible queue fields.
+    static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);
+    static bool Queue_Init(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t initialSize);
+    static bool Queue_PushPair(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t value0, uint32_t value1);
+
+    // anchor: launcher.exe:0x436b10
+    // Current shared consumer-family name recovered from the queue-thread child path.
+    void RunCompletedOperationQueue(bool nonBlocking);
+
+    // UNANCHORED scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.
+    void RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount);
+    // UNANCHORED scaffold accessor for source-side queue-thread child tracking.
+    size_t QueueThreadCount() const;
+
     const std::vector<AcceptThreadRecord>& MonitoredPorts() const;
     const std::vector<WorkerThreadRecord>& WorkerThreads() const;
 
@@ -72,6 +198,7 @@ private:
     AcceptThreadRecord* FindMonitoredPort(const LTTCPEndpointKey& key);
     WorkerThreadRecord* FindWorker(void* contextKey);
 
+    std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads_;
     std::vector<AcceptThreadRecord> monitoredPorts_;
     std::vector<WorkerThreadRecord> workerThreads_;
     std::vector<CMessageConnection*> messageConnections_;
@@ -84,16 +211,25 @@ private:
 // recovered liblttcp side.
 class CLTThreadPerClientTCPEngineBinding {
 public:
+    // UNANCHORED starter binding helper.
     CLTThreadPerClientTCPEngineBinding();
+    // UNANCHORED starter binding helper.
     ~CLTThreadPerClientTCPEngineBinding();
 
+    // UNANCHORED starter binding helper.
     bool Bind(void* owner);
+    // UNANCHORED starter binding helper.
     void Reset();
 
+    // UNANCHORED starter binding helper.
     void* Owner() const;
+    // UNANCHORED starter binding helper.
     CLTThreadPerClientTCPEngine* Engine() const;
+    // UNANCHORED starter binding helper.
     bool HasEngine() const;
+    // UNANCHORED starter binding helper.
     bool HasMonitoredPorts() const;
+    // UNANCHORED starter binding helper.
     bool HasWorkerThreads() const;
 
 private:

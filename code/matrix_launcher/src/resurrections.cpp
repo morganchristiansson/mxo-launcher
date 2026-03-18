@@ -1202,9 +1202,14 @@ int main(int argc, char* argv[]) {
     const bool forceIncompleteInit = EnvFlagEnabled("MXO_FORCE_INCOMPLETE_INIT");
     const bool forceRunClient = EnvFlagEnabled("MXO_FORCE_RUNCLIENT");
     const bool forceRunAfterInitFailure = EnvFlagEnabled("MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE");
-    const bool useMediatorStub = EnvFlagEnabled("MXO_STUB_LOGIN_MEDIATOR");
-    const bool useMediatorBinderScaffold = EnvFlagEnabled("MXO_BINDER_LOGIN_MEDIATOR");
-    const bool useLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
+    const bool requestedMediatorStub = EnvFlagEnabled("MXO_STUB_LOGIN_MEDIATOR");
+    const bool requestedMediatorBinderScaffold = EnvFlagEnabled("MXO_BINDER_LOGIN_MEDIATOR");
+    const bool requestedLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
+    const bool autoEnableStartupObjectScaffold =
+        !requestedMediatorStub && !requestedMediatorBinderScaffold && !requestedLauncherObjectStub;
+    const bool useMediatorStub = requestedMediatorStub;
+    const bool useMediatorBinderScaffold = requestedMediatorBinderScaffold || autoEnableStartupObjectScaffold;
+    const bool useLauncherObjectStub = requestedLauncherObjectStub || autoEnableStartupObjectScaffold;
     const bool traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
     const bool useArg2RetBypass = EnvFlagEnabled("MXO_ARG2_RET_BYPASS");
     const bool disableAuthConnection = EnvFlagEnabled("MXO_DISABLE_AUTH_CONNECTION");
@@ -1214,6 +1219,10 @@ int main(int argc, char* argv[]) {
         uint32_t maxBypasses = 1;
         EnvUint32Value("MXO_ARG2_RET_BYPASS_MAX", &maxBypasses);
         Log("DIAGNOSTIC: enabled MXO_ARG2_RET_BYPASS with max bypasses = %u", (unsigned)maxBypasses);
+    }
+
+    if (autoEnableStartupObjectScaffold) {
+        Log("DIAGNOSTIC: auto-enabling current startup-object scaffold for default run (binder arg6 + arg5 build/register path)");
     }
 
     LoadLastWorldNameFromRegistry(g_LastWorldName, sizeof(g_LastWorldName));
@@ -1464,13 +1473,22 @@ int main(int argc, char* argv[]) {
     LogKnownStartupState();
     Log("");
 
-    if (!forceIncompleteInit) {
+    const bool allowInitWithCurrentStartupScaffold =
+        useMediatorBinderScaffold && useLauncherObjectStub &&
+        g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
+
+    if (!forceIncompleteInit && !allowInitWithCurrentStartupScaffold) {
         Log("Refusing to call InitClientDLL with knowingly incomplete launcher state.");
         Log("Set MXO_FORCE_INCOMPLETE_INIT=1 to run a deliberate original-path experiment.");
         return FinishAndReturn(2);
     }
 
-    Log("=== Forced experiment: calling InitClientDLL with incomplete original-path state ===");
+    if (forceIncompleteInit) {
+        Log("=== Forced experiment: calling InitClientDLL with incomplete original-path state ===");
+    } else {
+        Log("=== Calling InitClientDLL with current default startup-object scaffold ===");
+        Log("DIAGNOSTIC: proceeding because the original 0x40a380-style arg5 build/register path and binder-backed arg6 slot are now present on the default run path");
+    }
     CaptureInitClientFrameSnapshot();
     DiagnosticSnapshotArgvMemory();
     Log("DIAGNOSTIC: argv memory snapshotted for crash analysis");

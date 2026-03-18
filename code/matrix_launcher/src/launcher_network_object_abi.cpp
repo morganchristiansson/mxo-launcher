@@ -32,18 +32,7 @@ static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCou
     }
 }
 
-struct DiagnosticLauncherQueue {
-    void* current0;        // +0x00
-    void* block0;          // +0x04
-    void* end0;            // +0x08
-    void* slotsCurrent;    // +0x0c
-    void* current1;        // +0x10
-    void* block1;          // +0x14
-    void* end1;            // +0x18
-    void* slotsLast;       // +0x1c
-    void* slotsBase;       // +0x20
-    uint32_t slotCapacity; // +0x24
-};
+using DiagnosticLauncherQueue = mxo::liblttcp::CLTThreadPerClientTCPEngine_Queue;
 
 struct DiagnosticLauncherLockHelper {
     void** vtable;          // +0x00
@@ -144,180 +133,34 @@ static void InitializeDiagnosticIntrusiveListHeadSmall(DiagnosticIntrusiveListHe
     head->last = head;
 }
 
-struct DiagnosticLauncherQueuePair {
-    uint32_t value0;
-    uint32_t value1;
-};
-
+// UNANCHORED: launcher-side wrapper that now delegates queue storage teardown to the liblttcp scaffold.
 static void DiagnosticFreeLauncherQueue(DiagnosticLauncherQueue* queue) {
-    if (!queue) return;
-
-    if (queue->slotsBase) {
-        uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
-        uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
-        uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
-        if (slotsCurrent && slotsLast && slotsCurrent <= slotsLast) {
-            for (uint32_t** slot = slotsCurrent; slot <= slotsLast; ++slot) {
-                if (*slot) {
-                    std::free(*slot);
-                    *slot = NULL;
-                }
-            }
-        }
-        std::free(slotsBase);
-    }
-
-    std::memset(queue, 0, sizeof(*queue));
+    mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_Free(queue);
 }
 
+// UNANCHORED: launcher-side wrapper that now delegates queue initialization to the liblttcp scaffold.
 static bool DiagnosticInitializeLauncherQueue(DiagnosticLauncherQueue* queue, uint32_t initialSize) {
-    if (!queue) return false;
-    DiagnosticFreeLauncherQueue(queue);
-
-    uint32_t blockCount = (initialSize >> 4) + 1;
-    uint32_t slotCapacity = blockCount + 2;
-    if (slotCapacity < 8) slotCapacity = 8;
-
-    uint32_t** slotsBase = static_cast<uint32_t**>(std::calloc(slotCapacity, sizeof(uint32_t*)));
-    if (!slotsBase) {
-        Log("DIAGNOSTIC: failed to allocate launcher queue slot array (capacity=%u)", (unsigned)slotCapacity);
-        return false;
+    const bool ok = mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_Init(queue, initialSize);
+    if (!ok) {
+        Log("DIAGNOSTIC: failed to initialize launcher queue via liblttcp Queue_Init(initialSize=%u)",
+            (unsigned)initialSize);
     }
-
-    const uint32_t firstIndex = (slotCapacity - blockCount) >> 1;
-    for (uint32_t i = 0; i < blockCount; ++i) {
-        slotsBase[firstIndex + i] = static_cast<uint32_t*>(std::calloc(1, 0x80));
-        if (!slotsBase[firstIndex + i]) {
-            Log("DIAGNOSTIC: failed to allocate launcher queue block %u/%u", (unsigned)(i + 1), (unsigned)blockCount);
-            queue->slotsBase = slotsBase;
-            queue->slotsCurrent = slotsBase + firstIndex;
-            queue->slotsLast = slotsBase + firstIndex + i;
-            DiagnosticFreeLauncherQueue(queue);
-            return false;
-        }
-    }
-
-    uint32_t** slotsCurrent = slotsBase + firstIndex;
-    uint32_t** slotsLast = slotsCurrent + blockCount - 1;
-    uint8_t* block0 = reinterpret_cast<uint8_t*>(*slotsCurrent);
-    uint8_t* block1 = reinterpret_cast<uint8_t*>(*slotsLast);
-
-    queue->slotsBase = slotsBase;
-    queue->slotCapacity = slotCapacity;
-    queue->slotsCurrent = slotsCurrent;
-    queue->slotsLast = slotsLast;
-    queue->block0 = block0;
-    queue->end0 = block0 ? (block0 + 0x80) : NULL;
-    queue->current0 = block0;
-    queue->block1 = block1;
-    queue->end1 = block1 ? (block1 + 0x80) : NULL;
-    queue->current1 = block1 ? (block1 + ((initialSize & 0xfu) * 8u)) : NULL;
-    return true;
+    return ok;
 }
 
-static bool DiagnosticRecenterLauncherQueueSlots(
-    DiagnosticLauncherQueue* queue,
-    uint32_t additionalBlocks,
-    bool biasTowardTail) {
-    if (!queue || !queue->slotsBase || !queue->slotsCurrent || !queue->slotsLast) return false;
-
-    uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
-    uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
-    uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
-    const uint32_t activeBlocks = static_cast<uint32_t>((slotsLast - slotsCurrent) + 1);
-    const uint32_t neededBlocks = activeBlocks + additionalBlocks;
-
-    uint32_t newCapacity = queue->slotCapacity;
-    uint32_t** newSlotsBase = slotsBase;
-
-    if (queue->slotCapacity <= (neededBlocks * 2u)) {
-        const uint32_t growthBase = (queue->slotCapacity >= additionalBlocks) ? queue->slotCapacity : additionalBlocks;
-        newCapacity = queue->slotCapacity + growthBase + 2u;
-        newSlotsBase = static_cast<uint32_t**>(std::calloc(newCapacity, sizeof(uint32_t*)));
-        if (!newSlotsBase) {
-            Log("DIAGNOSTIC: failed to grow launcher queue slot array (%u -> %u)",
-                (unsigned)queue->slotCapacity,
-                (unsigned)newCapacity);
-            return false;
-        }
-    }
-
-    uint32_t newIndex = (newCapacity - neededBlocks) >> 1;
-    if (biasTowardTail) newIndex += additionalBlocks;
-
-    uint32_t** newSlotsCurrent = newSlotsBase + newIndex;
-    std::memmove(newSlotsCurrent, slotsCurrent, activeBlocks * sizeof(uint32_t*));
-
-    if (newSlotsBase != slotsBase) {
-        std::free(slotsBase);
-        queue->slotsBase = newSlotsBase;
-        queue->slotCapacity = newCapacity;
-    }
-
-    queue->slotsCurrent = newSlotsCurrent;
-    queue->block0 = *newSlotsCurrent;
-    queue->end0 = queue->block0 ? (static_cast<uint8_t*>(queue->block0) + 0x80) : NULL;
-
-    uint32_t** newSlotsLast = newSlotsCurrent + activeBlocks - 1;
-    queue->slotsLast = newSlotsLast;
-    queue->block1 = *newSlotsLast;
-    queue->end1 = queue->block1 ? (static_cast<uint8_t*>(queue->block1) + 0x80) : NULL;
-    return true;
-}
-
-static bool DiagnosticGrowLauncherQueue(
-    DiagnosticLauncherQueue* queue,
-    const DiagnosticLauncherQueuePair* pendingPair) {
-    if (!queue || !queue->slotsLast) return false;
-
-    uint32_t** slotsBase = static_cast<uint32_t**>(queue->slotsBase);
-    uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
-    const uint32_t tailFreeSlots = queue->slotCapacity - static_cast<uint32_t>(slotsLast - slotsBase);
-    if (tailFreeSlots < 2u) {
-        if (!DiagnosticRecenterLauncherQueueSlots(queue, 1, false)) {
-            return false;
-        }
-        slotsLast = static_cast<uint32_t**>(queue->slotsLast);
-    }
-
-    uint32_t* newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
-    if (!newBlock) {
-        Log("DIAGNOSTIC: failed to allocate launcher queue growth block");
-        return false;
-    }
-
-    slotsLast[1] = newBlock;
-
-    uint32_t* current1 = static_cast<uint32_t*>(queue->current1);
-    if (current1 && pendingPair) {
-        current1[0] = pendingPair->value0;
-        current1[1] = pendingPair->value1;
-    }
-
-    queue->slotsLast = slotsLast + 1;
-    queue->block1 = newBlock;
-    queue->end1 = static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80;
-    queue->current1 = newBlock;
-    return true;
-}
-
+// UNANCHORED: launcher-side wrapper that now delegates queue pair pushes to the liblttcp scaffold.
 static bool DiagnosticPushLauncherQueue(
     DiagnosticLauncherQueue* queue,
     uint32_t value0,
     uint32_t value1) {
-    if (!queue || !queue->current1) return false;
-
-    uint8_t* lastPairInBlock = queue->end1 ? (static_cast<uint8_t*>(queue->end1) - 8) : NULL;
-    if (static_cast<void*>(queue->current1) == static_cast<void*>(lastPairInBlock)) {
-        DiagnosticLauncherQueuePair pair = {value0, value1};
-        return DiagnosticGrowLauncherQueue(queue, &pair);
+    const bool ok = mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_PushPair(queue, value0, value1);
+    if (!ok) {
+        Log("DIAGNOSTIC: liblttcp Queue_PushPair failed for queue=%p value0=0x%08x value1=0x%08x",
+            queue,
+            (unsigned)value0,
+            (unsigned)value1);
     }
-
-    uint32_t* current1 = static_cast<uint32_t*>(queue->current1);
-    current1[0] = value0;
-    current1[1] = value1;
-    queue->current1 = current1 + 2;
-    return true;
+    return ok;
 }
 
 // UNANCHORED: auth-side diagnostics bridge into the replacement arg5 queue0C scaffold.

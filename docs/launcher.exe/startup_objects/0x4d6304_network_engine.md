@@ -18,10 +18,16 @@ This is supported by the vtable at `0x4b2768`, which is immediately followed in 
 ## Source of truth
 
 ### Builder function
-- `launcher.exe:0x40a380`
+- `launcher.exe:0x40a380` = `Launcher_InitializeThreadPerClientTCPEngine`
 
 ### Constructor
-- `launcher.exe:0x431c30`
+- `launcher.exe:0x431c30` = `CLTThreadPerClientTCPEngine_ctor`
+- `launcher.exe:0x4366f0` = `CLTBaseThreadPerClientTCPEngine_ctor` (current provisional base-class name)
+- `launcher.exe:0x436610` = `CLTBaseThreadPerClientTCPEngine_InitializeQueuePair`
+- `launcher.exe:0x436340` = `CLTBaseThreadPerClientTCPEngine_Queue_Init`
+- `launcher.exe:0x4365a0` = `CLTThreadPerClientTCPEngine_QueueThread_ctor`
+- `launcher.exe:0x436fd0` = `CLTBaseThreadPerClientTCPEngine_dtor`
+- `launcher.exe:0x437050` = `CLTBaseThreadPerClientTCPEngine_deleting_dtor`
 
 ### Primary users
 - `0x40a3e9..0x40a3fe`
@@ -58,23 +64,50 @@ call [edx+0x08]
 
 ## Constructor evidence
 
-Ctor `0x431c30`:
+Ctor `0x431c30` / `CLTThreadPerClientTCPEngine_ctor`:
 
-- first calls base ctor `0x4366f0`
+- first calls base ctor `0x4366f0` / `CLTBaseThreadPerClientTCPEngine_ctor`
 - then overwrites the primary vtable with `0x4b2768`
 - allocates and initializes internal list/tree objects at offsets around:
-  - `+0x80`
-  - `+0x8c`
-  - `+0x98`
-  - `+0x9c`
+  - `+0x80` = `0x24`-byte sentinel-headed endpoint map object
+  - `+0x8c` = `0x18`-byte sentinel-headed context map object
+  - `+0x98` = derived helper root
+  - `+0x9c` = `CRITICAL_SECTION` storage paired with that helper root
 
-Base ctor `0x4366f0` itself:
+Base ctor `0x4366f0` / `CLTBaseThreadPerClientTCPEngine_ctor` itself:
 
 - sets base vtable `0x4b3e74`
+- preserves ctor flag/count input at `+0x04`
+- zeroes `+0x08`
+- initializes the paired queue region at `+0x0c` / `+0x34` through:
+  - `0x436610` / `CLTThreadPerClientTCPEngine_InitializeQueuePair`
+  - `0x436340` / `CLTThreadPerClientTCPEngine_Queue_Init`
 - initializes a subobject at `+0x5c`
 - initializes another helper subobject rooted at `+0x60`
-- allocates an array at `+0x08`
-- constructs per-entry helper objects of size `0x3c`
+- creates the event stored at `+0x7c`
+- allocates an array at `+0x08` when the effective queue-thread count is non-zero
+- constructs per-entry helper objects of size `0x3c` through `0x4365a0` / `CLTThreadPerClientTCPEngine_QueueThread_ctor`
+
+New queue-thread clarification from the current focused pass:
+- these `0x3c` children are not anonymous queue blobs
+- `0x4365a0` first builds a shared generic thread base through `0x4319e0` / `CLTThread_ctor`
+  - that base is the same thread-family surface also reused by the engine's `AcceptThread`, `WorkerThread`, and other launcher thread objects
+- the queue-thread ctor then stores the owning engine pointer at child `+0x38`
+- and overwrites the shared base vtable with queue-thread vtable `0x004b3e28`
+- current high-confidence queue-thread-specific override there is slot `+0x20`:
+  - `0x436fc0` / `CLTThreadPerClientTCPEngine_QueueThread_Run`
+  - which simply calls the owner engine's blocking completed-operation consumer loop:
+    - `0x436b10` / `CLTBaseThreadPerClientTCPEngine_RunCompletedOperationQueue(owner, 0)`
+- so queue-thread start / stop / wait / dtor semantics currently come from the shared generic `CLTThread_*` base methods rather than from large queue-thread-specific lifecycle code
+- source scaffolds now mirror that relationship under:
+  - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h`
+  - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp`
+  - with a generic `CLTThread` base, a `CLTThreadPerClientTCPEngine_QueueThread` child, and a source-level `RunCompletedOperationQueue(bool)` entrypoint kept in lockstep with the current RE naming even though the queue-consumer body is still only scaffolded there
+- newer lockstep source cleanup also moved the recovered queue-storage helpers into canonical liblttcp-side source names instead of keeping queue init/push/free logic only inside `src/launcher_network_object_abi.cpp`
+  - current source anchors there are explicitly commented as:
+    - `Queue_Init` <- `0x436340`
+    - `Queue_PushPair` <- `0x436670 / 0x436820`
+  - launcher ABI glue now delegates to those liblttcp helpers rather than carrying a fully separate duplicate queue implementation
 
 ## New clarification: arg5 contains helper subobjects the client can call directly
 
