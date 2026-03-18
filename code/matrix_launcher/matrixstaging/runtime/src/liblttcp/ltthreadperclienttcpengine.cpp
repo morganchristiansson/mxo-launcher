@@ -360,6 +360,127 @@ bool CLTThreadPerClientTCPEngine::Queue_PushPair(
     return true;
 }
 
+// anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
+bool CLTThreadPerClientTCPEngine::Queue_IsEmpty(const CLTThreadPerClientTCPEngine_Queue* queue) {
+    return !queue || !queue->current0 || (queue->current1 == queue->current0);
+}
+
+// anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
+bool CLTThreadPerClientTCPEngine::Queue_TryPopPair(
+    CLTThreadPerClientTCPEngine_Queue* queue,
+    CLTThreadPerClientTCPEngine_QueuedPair* outPair) {
+    if (!queue || !outPair || Queue_IsEmpty(queue)) {
+        return false;
+    }
+
+    uint32_t* current0 = static_cast<uint32_t*>(queue->current0);
+    outPair->value0 = current0[0];
+    outPair->value1 = current0[1];
+
+    uint8_t* lastPairInBlock = queue->end0 ? (static_cast<uint8_t*>(queue->end0) - 8) : nullptr;
+    if (static_cast<void*>(queue->current0) == static_cast<void*>(lastPairInBlock)) {
+        uint32_t* oldBlock = static_cast<uint32_t*>(queue->block0);
+        uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
+        uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
+        if (!slotsCurrent || slotsCurrent >= slotsLast) {
+            // The recovered original uses a block free-list here before advancing to the next block.
+            // Current scaffold keeps the same observable cursor transition shape but falls back to a
+            // simple in-place advance if no next block is available.
+            queue->current0 = current0 + 2;
+            return true;
+        }
+
+        if (oldBlock) {
+            std::free(oldBlock);
+        }
+        ++slotsCurrent;
+        queue->slotsCurrent = slotsCurrent;
+        uint32_t* newBlock = *slotsCurrent;
+        queue->block0 = newBlock;
+        queue->end0 = newBlock ? (static_cast<uint8_t*>(static_cast<void*>(newBlock)) + 0x80) : nullptr;
+        queue->current0 = newBlock;
+        return true;
+    }
+
+    queue->current0 = current0 + 2;
+    return true;
+}
+
+// UNANCHORED internal helper for the current source-side consumer scaffold.
+// Current best anchor for the type read itself is launcher helper 0x4816f0,
+// which returns [workItem+0x04]. We model that as a documented header view rather than
+// open-coded pointer arithmetic.
+static uint32_t QueueWorkItem_GetType(const void* workItem) {
+    if (!workItem) {
+        return 0;
+    }
+    const CLTThreadPerClientTCPEngine_WorkItemHeader* header =
+        static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    return header->workType;
+}
+
+// UNANCHORED internal helper for the current source-side consumer scaffold.
+// Current best consumer anchor is the trailing work-item release in 0x436d31..0x436ee7.
+static void QueueWorkItem_Release(void* workItem) {
+    if (!workItem) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(workItem);
+    if (!vtable || !vtable[1]) {
+        return;
+    }
+
+    typedef uint32_t (__thiscall *ReleaseFn)(void*);
+    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+    (void)fn(workItem);
+}
+
+// UNANCHORED internal helper for the current source-side consumer scaffold.
+// Current best consumer anchor is context->+0x10(workItem) in 0x436d31..0x436ee7.
+static void QueueContext_OnOperationCompleted(void* context, void* workItem) {
+    if (!context) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(context);
+    if (!vtable || !vtable[4]) {
+        return;
+    }
+
+    typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
+    OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
+    (void)fn(context, workItem);
+}
+
+// UNANCHORED internal helper for the current source-side consumer scaffold.
+// Current best consumer anchor is the conditional context->+0x04 release after type-1 work.
+static void QueueContext_Release(void* context) {
+    if (!context) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(context);
+    if (!vtable || !vtable[1]) {
+        return;
+    }
+
+    typedef uint32_t (__thiscall *ReleaseFn)(void*);
+    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+    (void)fn(context);
+}
+
+// UNANCHORED internal helper for the current source-side consumer scaffold.
+// Current best consumer anchor is the `(char)context[1]` test in 0x436d31..0x436ee7.
+static bool QueueContext_ShouldAutoReleaseAfterType1(void* context) {
+    if (!context) {
+        return false;
+    }
+
+    const uint8_t* bytes = static_cast<const uint8_t*>(context);
+    return bytes[4] != 0;
+}
+
 // Keep the implementation intentionally conservative.
 // These methods currently provide original-name structure and evidence-backed state
 // shaping, but they are not yet the fully faithful runtime path used by arg5.
@@ -374,7 +495,9 @@ bool CLTThreadPerClientTCPEngine::Queue_PushPair(
 // - derived list heads at `+0x80` (0x24 bytes) and `+0x8c` (0x18 bytes)
 // - derived helper root at `+0x98`
 CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
-    : queueThreads_(),
+    : externalQueue0C_(nullptr),
+      externalQueue34_(nullptr),
+      queueThreads_(),
       monitoredPorts_(),
       workerThreads_(),
       messageConnections_(),
@@ -590,15 +713,76 @@ uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint
     return kResultEndpointNotFound;
 }
 
+// UNANCHORED scaffold bridge because the current liblttcp engine lives beside, not inside,
+// the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields.
+void CLTThreadPerClientTCPEngine::AttachExternalQueuePair(
+    CLTThreadPerClientTCPEngine_Queue* queue0C,
+    CLTThreadPerClientTCPEngine_Queue* queue34) {
+    externalQueue0C_ = queue0C;
+    externalQueue34_ = queue34;
+}
+
 // anchor: launcher.exe:0x436b10
 void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
     // Current scaffold note:
     // - the recovered queue-thread child now calls into this source-level entrypoint
-    // - but the actual intrusive queue/block storage still lives in the launcher ABI diagnostic
-    //   scaffold rather than in this liblttcp engine object
-    // - keep the recovered method surface here so source and RE stay aligned while the queue
-    //   consumer body is moved over incrementally
-    (void)nonBlocking;
+    // - the real queue fields still live on the launcher ABI object, so this source method reaches
+    //   them through AttachExternalQueuePair(...)
+    // - current source model now mirrors more of the original consumer loop shape:
+    //   - repeatedly poll queue34 first, otherwise queue0C
+    //   - in non-blocking mode, return only once both queues are empty
+    //   - null work item means shutdown-style sentinel and cascades one more null queue0C item
+    //   - slot12/CleanupConnection only runs for type-1 work
+    //   - later context callback always receives the original work-item pointer
+    //   - optional context release remains type-1-only and uses the pre-callback byte-at-+4 test
+    while (true) {
+        CLTThreadPerClientTCPEngine_Queue* selectedQueue = nullptr;
+        if (!Queue_IsEmpty(externalQueue34_)) {
+            selectedQueue = externalQueue34_;
+        } else if (!Queue_IsEmpty(externalQueue0C_)) {
+            selectedQueue = externalQueue0C_;
+        }
+
+        if (!selectedQueue) {
+            if (nonBlocking) {
+                return;
+            }
+            // The faithful blocking wait path still belongs to the launcher-owned helper/event surface.
+            return;
+        }
+
+        CLTThreadPerClientTCPEngine_QueuedPair pair = {};
+        if (!Queue_TryPopPair(selectedQueue, &pair)) {
+            return;
+        }
+
+        void* workItem = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value0));
+        void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
+        if (!workItem) {
+            // Current best read: a null work item is the shutdown-style queue sentinel.
+            // Original 0x436f56..0x436fa8 cascades shutdown by enqueueing one more null queue0C item.
+            Queue_PushPair(externalQueue0C_, 0u, 0u);
+            return;
+        }
+
+        const uint32_t workType = QueueWorkItem_GetType(workItem);
+        const bool isType1 = (workType == 1u);
+        const bool shouldAutoReleaseContext =
+            context && isType1 && QueueContext_ShouldAutoReleaseAfterType1(context);
+
+        if (context && isType1) {
+            CleanupConnection(context);
+        }
+
+        if (context) {
+            QueueContext_OnOperationCompleted(context, workItem);
+            if (shouldAutoReleaseContext) {
+                QueueContext_Release(context);
+            }
+        }
+
+        QueueWorkItem_Release(workItem);
+    }
 }
 
 // UNANCHORED scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.

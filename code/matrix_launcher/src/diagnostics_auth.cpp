@@ -12,9 +12,12 @@
 
 namespace {
 
+// UNANCHORED diagnostic-only queued work item.
+// Its leading fields intentionally match the recovered queue work-item header shape:
+// - vtable
+// - workType at +0x04
 struct DiagnosticQueuedWorkItemStub {
-    void** vtable;
-    uint32_t workType;
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader header;
     uint32_t workPayload;
     const char* debugLabel;
 };
@@ -53,7 +56,7 @@ static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWork
         Log(
             "DIAGNOSTIC: releasing queued work item %p type=%u payload=0x%08x label='%s'",
             self,
-            (unsigned)self->workType,
+            (unsigned)self->header.workType,
             (unsigned)self->workPayload,
             self->debugLabel ? self->debugLabel : "<null>");
         std::free(self);
@@ -96,7 +99,7 @@ static const char* DiagnosticAuthRawCodeName(uint8_t rawCode) {
 static void DiagnosticRouteConnectStatusToLoginController(
     DiagnosticRawMessageConnectionContext* self,
     DiagnosticQueuedWorkItemStub* workItem) {
-    if (!self || !workItem || !g_DiagnosticLoginController || workItem->workType != 2u) {
+    if (!self || !workItem || !g_DiagnosticLoginController || workItem->header.workType != 2u) {
         return;
     }
 
@@ -139,14 +142,14 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
         self,
         (self && self->debugLabel) ? self->debugLabel : "<null>",
         workItem,
-        workItem ? (unsigned)workItem->workType : 0u,
+        workItem ? (unsigned)workItem->header.workType : 0u,
         workItem ? (unsigned)workItem->workPayload : 0u);
 
     if (self && self->sidecarConnection && workItem) {
-        if (workItem->workType == 2u) {
+        if (workItem->header.workType == 2u) {
             DiagnosticRouteConnectStatusToLoginController(self, workItem);
         }
-        if (workItem->workType == 3u) {
+        if (workItem->header.workType == 3u) {
             const std::vector<uint8_t>& bytes = self->sidecarConnection->ReceivedBytes();
             if (!bytes.empty()) {
                 const size_t preview = (bytes.size() < 16u) ? bytes.size() : 16u;
@@ -202,7 +205,7 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                 self->sidecarConnection->ClearReceivedBytes();
             }
         }
-        return self->sidecarConnection->OnOperationCompleted(reinterpret_cast<void*>(workItem->workType));
+        return self->sidecarConnection->OnOperationCompleted(reinterpret_cast<void*>(workItem->header.workType));
     }
     return 1;
 }
@@ -249,8 +252,8 @@ static bool DiagnosticEnqueueConnectionStatusWorkItem(
         return false;
     }
 
-    workItem->vtable = g_DiagnosticWorkItemVtable;
-    workItem->workType = workType;
+    workItem->header.vtable = g_DiagnosticWorkItemVtable;
+    workItem->header.workType = workType;
     workItem->workPayload = workPayload;
     workItem->debugLabel = label;
 

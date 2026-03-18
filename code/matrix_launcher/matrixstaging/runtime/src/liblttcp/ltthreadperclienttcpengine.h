@@ -30,6 +30,26 @@ struct CLTThreadPerClientTCPEngine_Queue {
     uint32_t slotCapacity; // +0x24
 };
 
+// Recovered queued pair shape from 0x436820 producer and 0x436d31..0x436ee7 consumer paths.
+// Current best reading:
+// - value0 = workItem pointer
+// - value1 = context / owner pointer
+struct CLTThreadPerClientTCPEngine_QueuedPair {
+    uint32_t value0;
+    uint32_t value1;
+};
+
+// Recovered queued work-item header shape.
+// Current high-confidence anchor:
+// - launcher helper 0x4816f0 returns [workItem+0x04]
+// Current best read:
+// - +0x00 = vtable
+// - +0x04 = work-item type/code consumed by the queue consumer
+struct CLTThreadPerClientTCPEngine_WorkItemHeader {
+    void** vtable;
+    uint32_t workType;
+};
+
 // Recovered generic thread-base surface shared by several launcher worker objects.
 // Current original anchors:
 // - base ctor: 0x4319e0
@@ -176,6 +196,16 @@ public:
     static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);
     static bool Queue_Init(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t initialSize);
     static bool Queue_PushPair(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t value0, uint32_t value1);
+    // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
+    static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_Queue* queue);
+    // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
+    static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_Queue* queue, CLTThreadPerClientTCPEngine_QueuedPair* outPair);
+
+    // UNANCHORED scaffold bridge because the current liblttcp engine lives beside, not inside,
+    // the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields.
+    void AttachExternalQueuePair(
+        CLTThreadPerClientTCPEngine_Queue* queue0C,
+        CLTThreadPerClientTCPEngine_Queue* queue34);
 
     // anchor: launcher.exe:0x436b10
     // Current shared consumer-family name recovered from the queue-thread child path.
@@ -198,6 +228,8 @@ private:
     AcceptThreadRecord* FindMonitoredPort(const LTTCPEndpointKey& key);
     WorkerThreadRecord* FindWorker(void* contextKey);
 
+    CLTThreadPerClientTCPEngine_Queue* externalQueue0C_;
+    CLTThreadPerClientTCPEngine_Queue* externalQueue34_;
     std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads_;
     std::vector<AcceptThreadRecord> monitoredPorts_;
     std::vector<WorkerThreadRecord> workerThreads_;

@@ -428,10 +428,16 @@ Current best reading remains:
         - on the successful branch (`[reply+3] < 1`), it parses via `0x43a330`, stores reply/result state back into owner `+0x80`, appends a small owner record under `+0x684`, mirrors the current record index to owner byte `+0xcc8`, then calls:
           - `0x41b450(0x0b)`
           - string-backed `CLTLoginMediator::PostEvent(0x14)` via `0x41cfb0`
-        - newer helper-side follow-up on that same success branch is still negative for first-send purposes:
+        - newer helper-side follow-up on that same success branch is now much more concrete:
           - `0x41b450(0x0b)` selects helper `0x4f7894` (vtable `0x4b5154`)
-          - its concrete `+0x8` method `0x43c020` prepares owner-side data and posts event `0x15`
-          - it still does **not** show the missing first auth send
+          - helper11 `+0x8` / `0x43c020`
+            (`CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`) builds a larger
+            margin-side packet whose first payload byte is raw `0x4d`, sends it through
+            `CLTLoginMediator_SendCurrentMarginPacket`, then posts event `0x15`
+          - helper11 `+0x14` / `0x440320`
+            (`CLTLoginMediator_Helper11_HandleLoadCharacterReply`) handles raw `0x10`
+            / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
+            completion switches helper state to `9` then posts event `0x16`
         - on the failure branch (`[reply+3] >= 1`), it instead calls:
           - `0x41b450(3)`
           - string-backed `CLTLoginMediator::PostError(0x0b)` via `0x41d090`
@@ -529,36 +535,61 @@ Current best reading remains:
   - current runtime log now makes that bypass/narrowing explicit with the updated static lead carried in source scaffolding as:
     - `DIAGNOSTIC: routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
 - this is still not faithful original-equivalent queue semantics yet, but it is a concrete step past the previous totally empty queue0C runtime state
-- newer non-blocking live-socket receive polling is now also wired into the helper `+0x60` runtime surface, but current timed auth-connect runs have not yet produced any logged type-3 receive work items (`AuthReceivePacket` / `MarginReceivePacket`) on this path
-- fresh validation reruns after the auth-side owner/fallback-chain narrowing did **not** change the live runtime picture:
-  - plain `make run_binder_both` still ends at:
+- newer validation reruns now tighten that runtime picture materially further instead of leaving it at the old single-consumed-item milestone:
+  - plain `make run` still ends at:
     - `InitClientDLL returned: 1`
     - `InitClientDLL succeeded, but RunClientDLL is gated.`
-  - deliberate runtime/auth command:
+  - deliberate runtime/auth command used for the new evidence:
 
 ```bash
 cd /home/morgan/mxo/code/matrix_launcher && \
   MXO_FORCE_RUNCLIENT=1 \
-  MXO_BEGIN_AUTH_CONNECTION=1 \
-  MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Vector \
-  make run_binder_both
+  make run
 ```
 
-  - still shows one queued auth type-2 connect-status item consumed:
-    - `queued connection-status work item label='AuthConnectStatus' ... type=2 payload=0x07000001`
-    - `raw message-connection context OnOperationCompleted ... type=2 payload=0x07000001`
-    - `routed auth type-2 connect-status ... nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' ...`
-    - `releasing queued work item ...`
-  - after that first consume, queue0C returns to the same empty-cursor idle loop:
-    - first sample: `sameCursor=0`
-    - later samples: `sameCursor=1`
-  - repeated live surfaces remained unchanged through the timed run:
+  - that deliberate run now shows the client consuming multiple launcher-owned queue0C items on the live arg5 path, not just the first type-2 connect-status item:
+    - first type-2 connect-status item:
+      - `queued connection-status work item label='AuthConnectStatus' ... type=2 payload=0x07000001`
+      - `raw message-connection context OnOperationCompleted ... type=2 payload=0x07000001`
+      - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='AS_GetPublicKeyRequest' laterIncomingReplyAnchor='AS_AuthReply'`
+    - later type-3 receive items:
+      - `AuthReceivePacket ... type=3 payload=0x00000198`
+      - `AuthReceivePacket ... type=3 payload=0x00000012`
+      - `AuthReceivePacket ... type=3 payload=0x00000219`
+  - those type-3 receives now drive a concrete launcher-owned auth progression on the deliberate `RunClientDLL` path:
+    - `AS_GetPublicKeyReply`
+    - `AS_AuthRequest`
+    - `AS_AuthChallenge`
+    - `AS_AuthChallengeResponse`
+    - `AS_AuthReply`
+  - the same run now logs successful auth reply adoption/writeback at the launcher-owned sidecar layer:
+    - `adopted AS_AuthReply into recovered mediator state worldCount=1 characterCount=2 firstWorldId=1 currentCharacterOrRouteIndex=0`
+    - `launcher-owned auth parsed AS_AuthReply success ...`
+  - queue instrumentation on that run also proves the client-side non-blocking arg5 consumer is really advancing through those queued items:
+    - `q0(current0=... current1=... sameCursor=0)` before a consume
+    - then `sameCursor=1` again after the consume completes
+  - repeated live runtime surfaces still remain the same on the consumer side:
     - mediator `+0x2c` / `IsConnected()`
     - arg5 helper `+0x60` slot `0`
     - arg5 helper `+0x60` slot `1`
-  - no logged type-3 receive work items appeared before timeout
-  - no new runtime surface yet contradicted the newer negative conclusion that `0x4401a0` / `0x448a60` are not the missing first-send origin
+  - still no arg5 slot `12` traffic has appeared on this auth-success path, which remains consistent with the recovered consumer rule that slot `12` only matters for type-1 work items
+- current best blocker reading therefore shifts one step past the old “empty queue0C” diagnosis:
+  - the auth-side arg5 queue consumer chain is now demonstrably alive for type-2 / type-3 work items on deliberate `RunClientDLL`
+  - the next missing state is later launcher-owned progression **after** successful `AS_AuthReply`, not proof that the arg5 queue consumer itself is still dead
+- newer original-launcher helper follow-up now makes that post-auth gap more concrete:
+  - `launcher.exe:0x4401a0` (`CLTLoginMediator_Helper10_HandleAuthReply`) performs the auth-reply writeback
+  - then success reaches `0x41b450(0x0b)` and selects helper `0x4f7894` / vtable `0x4b5154`
+  - helper11 enter path `0x43c020`
+    (`CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`) then builds a larger
+    margin-side packet whose first payload byte is raw `0x4d`, sends it through
+    `CLTLoginMediator_SendCurrentMarginPacket`, and posts event `0x15`
+  - later helper11 incoming path `0x440320`
+    (`CLTLoginMediator_Helper11_HandleLoadCharacterReply`) handles raw `0x10`
+    / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
+    completion switches helper state to `9` then posts event `0x16`
+  - so the immediate original continuation after auth success now looks like helper11-driven
+    **margin/loading progression**, not an immediate fall-through to the later auth-side
+    `0x43b830 / AS_GetWorldListRequest` helper
 - current user-observed runtime impression after these queue/connect milestones is that the in-game `Loading Character` phase now appears to remain visible/useful longer than before; current logs still do **not** prove a later faithful transition there yet, but this is now consistent with the stronger runtime markers that the path is doing more than the old totally empty loop
 
 ## Launcher-owned auth integration milestone inside `RunClientDLL`
@@ -571,11 +602,11 @@ For packet-level auth details and the canonical auth loop write-up, prefer:
 What matters here for `RunClientDLL` is narrower:
 - the auth connect-status queue item is now feeding a real launcher-owned auth progression instead of the older dead-end shortcut path
 - auth therefore remains launcher-owned in practice as well as in static analysis
-- the next auth-side/runtime question now shifts forward to what launcher-owned state should happen **after** successful `AS_AuthReply` so later world-list / loading progression becomes faithful
+- the next auth-side/runtime question now shifts forward to what launcher-owned state should happen **after** successful `AS_AuthReply` so the newly identified helper11 margin/loading continuation (`0x43c020` / `0x440320`) becomes faithful and live on the deliberate runtime path
 
 Important restraint:
-- this remains a deliberate binder/scaffold run gated by `MXO_BEGIN_AUTH_CONNECTION=1`
-- so it is a real launcher-owned auth milestone, but still not final proof of full original-equivalent automatic state-machine entry
+- this remains a deliberate binder/scaffold runtime run gated by `MXO_FORCE_RUNCLIENT=1`
+- launcher-owned auth auto-begins by default on this path when the sidecar is present, but that still does **not** make it proof of full original-equivalent automatic state-machine entry
 
 ## Relationship to the older `client.dll+0x3b3573` crash
 

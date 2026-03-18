@@ -90,7 +90,7 @@ Current best interpretation of that split:
 
 Current evidence for that last point:
 - `LaunchPadClient` string-backed handlers are heavily tied to login-request / subscription / play-request result text in `launchpad.cpp`
-- the direct MxO auth wire loop now recovered in the launcher path still anchors more naturally to the `CLTLoginMediator` helper chain (`0x41d170`, `0x439210`, `0x448050`, `0x4401a0`, `0x43b830`) than to the currently reviewed `LaunchPadClient` callbacks
+- the direct MxO auth wire loop and immediate post-auth continuation now recovered in the launcher path still anchor more naturally to the `CLTLoginMediator` helper chain (`0x41d170`, `0x439210`, `0x448050`, `0x4401a0`, `0x43c020`, `0x440320`, with `0x43b830` as a later auth-side sender) than to the currently reviewed `LaunchPadClient` callbacks
 - so the safest current architecture is:
   - keep low-level auth packet logic reusable and outside the mediator object itself
   - but keep auth **launcher-owned** and coordinated by the mediator/helper-state layer rather than moving ownership wholesale into `LaunchPadClient` or `client.dll`
@@ -268,6 +268,33 @@ Important interpretation:
 - the probe remains the fastest auth regression harness
 - the packet logic is now materially migrated into the launcher path rather than living only in `tools/auth_probe.cpp`
 - newer launcher-side state-writeback scaffolding now also begins to adopt parsed `AS_AuthReply` data into recovered mediator-owned tables/state instead of leaving it only in transient parse storage
+
+## Immediate post-`AS_AuthReply` original continuation
+
+Newer Ghidra-backed follow-up now tightens what the original launcher does **after** a successful
+`AS_AuthReply`.
+
+Current best read:
+- `launcher.exe:0x4401a0`
+  - `CLTLoginMediator_Helper10_HandleAuthReply`
+  - performs the important owner-side writeback under `+0x80`, `+0x684 / +0x688 / +0x818 / +0xd84`, and `+0xcc8`
+- then the original launcher does **not** immediately fall into the later auth-side
+  `0x43b830 / AS_GetWorldListRequest` helper
+- instead `0x4401a0` success reaches `0x41b450(0x0b)`, which selects helper `0x4f7894`
+  (vtable `0x4b5154`)
+- that helper's enter path `launcher.exe:0x43c020`
+  - now renamed in Ghidra as `CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
+  - builds a larger margin-side packet whose first payload byte is raw `0x4d`
+  - sends it through `CLTLoginMediator_SendCurrentMarginPacket`
+  - then posts event `0x15`
+- the same helper's incoming handler `launcher.exe:0x440320`
+  - now renamed in Ghidra as `CLTLoginMediator_Helper11_HandleLoadCharacterReply`
+  - handles raw margin code `0x10` / `MS_LoadCharacterReply`
+  - accumulates reply fragments into owner `+0xf1c`
+  - and on completion switches helper state to `9` then posts event `0x16`
+
+So the current post-auth blocker is now more specific than “what comes after auth?” in the broad
+sense. The immediate original continuation is helper11-driven **margin/loading progression**.
 
 Important current restraint:
 - auth auto-begin on the binder/scaffold path is now the default when the diagnostic login-controller sidecar exists

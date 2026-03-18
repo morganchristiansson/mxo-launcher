@@ -163,10 +163,58 @@ static bool DiagnosticPushLauncherQueue(
     return ok;
 }
 
+// UNANCHORED but now intentionally shaped after launcher.exe:0x436820.
+// The current auth-side diagnostics bridge previously pushed straight into queue0C without
+// reproducing the original lock + empty->non-empty signal behavior. Keep the raw queue-storage
+// helper above, but route live owner-visible producer traffic through an owner-aware wrapper.
+static bool DiagnosticEnqueueCompletedOperation(
+    MinimalLauncherObjectStub* owner,
+    uint32_t value0,
+    uint32_t value1,
+    bool useQueue34,
+    const char* label) {
+    if (!owner) {
+        return false;
+    }
+
+    CRITICAL_SECTION* crit = &owner->helper60.crit;
+    if (crit) {
+        EnterCriticalSection(crit);
+    }
+
+    const bool queue0Empty = (owner->queue0C.current1 == owner->queue0C.current0);
+    const bool queue34Empty = (owner->queue34.current1 == owner->queue34.current0);
+    const bool queuePairWasEmpty = queue0Empty && queue34Empty;
+
+    DiagnosticLauncherQueue* targetQueue = useQueue34 ? &owner->queue34 : &owner->queue0C;
+    const bool pushed = DiagnosticPushLauncherQueue(targetQueue, value0, value1);
+
+    if (crit) {
+        LeaveCriticalSection(crit);
+    }
+
+    if (pushed && queuePairWasEmpty && owner->subVtable5C && owner->subVtable5C[0]) {
+        typedef uint32_t (__thiscall *SignalQueueFn)(void*);
+        SignalQueueFn signalQueue = reinterpret_cast<SignalQueueFn>(owner->subVtable5C[0]);
+        (void)signalQueue(&owner->subVtable5C);
+    }
+
+    Log(
+        "DIAGNOSTIC: enqueue completed-op label='%s' owner=%p queue=%s workItem=0x%08x context=0x%08x pairWasEmpty=%u pushed=%u",
+        label ? label : "<null>",
+        owner,
+        useQueue34 ? "queue34" : "queue0C",
+        (unsigned)value0,
+        (unsigned)value1,
+        queuePairWasEmpty ? 1u : 0u,
+        pushed ? 1u : 0u);
+    return pushed;
+}
+
 // UNANCHORED: auth-side diagnostics bridge into the replacement arg5 queue0C scaffold.
 bool DiagnosticAuthBridgePushQueue0C(void* ownerPtr, uint32_t value0, uint32_t value1) {
     MinimalLauncherObjectStub* owner = static_cast<MinimalLauncherObjectStub*>(ownerPtr);
-    return owner ? DiagnosticPushLauncherQueue(&owner->queue0C, value0, value1) : false;
+    return DiagnosticEnqueueCompletedOperation(owner, value0, value1, /*useQueue34=*/false, "auth-bridge");
 }
 
 // UNANCHORED: auth-side diagnostics bridge for refreshing replacement arg5 sidecar state.
@@ -237,6 +285,12 @@ static void DiagnosticSetListHeadOccupancySmall(DiagnosticIntrusiveListHeadSmall
 
 static void DiagnosticSyncLauncherObjectSidecarState(MinimalLauncherObjectStub* self) {
     if (!self) return;
+
+    if (g_DiagnosticLttcpBinding && g_DiagnosticLttcpBinding->Owner() == self && g_DiagnosticLttcpBinding->Engine()) {
+        // UNANCHORED scaffold bridge: current liblttcp engine sidecar is separate from the ABI object,
+        // so hand the real launcher-visible queue-field addresses across explicitly.
+        g_DiagnosticLttcpBinding->Engine()->AttachExternalQueuePair(&self->queue0C, &self->queue34);
+    }
 
     const bool hasMonitoredPorts = g_DiagnosticLttcpBinding && g_DiagnosticLttcpBinding->HasMonitoredPorts();
     const bool hasWorkerThreads = g_DiagnosticLttcpBinding && g_DiagnosticLttcpBinding->HasWorkerThreads();

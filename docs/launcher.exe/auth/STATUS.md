@@ -70,14 +70,32 @@ What remains:
   - `+0xcc8`
 - stop relying on only the current partial/diagnostic table adoption
 
-### 2. Faithful post-auth progression into the next launcher-owned request
-Current next-step anchor:
-- `launcher.exe:0x43b830`
-  - renamed in Ghidra as `CLTLoginMediator_Helper14_SendGetWorldListRequest`
+### 2. Faithful post-auth progression into the actual immediate original continuation
+Current next-step anchors after successful `AS_AuthReply` are now:
+- `launcher.exe:0x4401a0`
+  - `CLTLoginMediator_Helper10_HandleAuthReply`
+- `launcher.exe:0x43c020`
+  - `CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
+- `launcher.exe:0x440320`
+  - `CLTLoginMediator_Helper11_HandleLoadCharacterReply`
+
+Current best read:
+- `0x4401a0` success does **not** immediately fall into the later auth-side
+  `0x43b830 / CLTLoginMediator_Helper14_SendGetWorldListRequest` path
+- instead it switches helper state to `0x4f7894` and immediately runs helper11 `+0x8`
+- that helper builds a larger margin-side packet whose first payload byte is raw `0x4d`,
+  sends it through `CLTLoginMediator_SendCurrentMarginPacket`, and posts event `0x15`
+- later helper11 `+0x14` handles raw `0x10` / `MS_LoadCharacterReply`, accumulates reply
+  fragments into owner `+0xf1c`, and on completion switches helper state to `9` then posts
+  event `0x16`
 
 What remains:
-- make the launcher naturally reach this from the helper/state chain
-- not just as a known likely next request name in logs
+- reconstruct enough post-`0x0b` owner state that the helper11 margin/loading phase becomes
+  live in the scaffold
+- stop advertising the later `AS_GetWorldListRequest` helper as though it were the immediate
+  next original step on this startup path
+- keep `0x43b830` as a real later auth-side sender, but no longer treat it as the best first
+  post-auth anchor
 
 ### 3. Better reconstruction of the `0x448050` helper/bootstrap chain
 Current anchors:
@@ -114,11 +132,13 @@ Auth can reasonably be treated as finished enough when all of the following are 
 1. the current working wire loop remains stable
 2. auth no longer depends on manual env triggering
 3. post-`0x0B` owner-state writeback is close enough to original to drive later launcher logic
-4. the launcher naturally reaches the next auth-side/world-list progression step
+4. the launcher naturally reaches the immediate post-`AS_AuthReply` helper11 margin/loading progression, with any later auth-side world-list helper activity treated as a separate later milestone
 
 ## Current recommendation
 
 Treat auth as **no longer the main blocker**.
-The highest-value remaining auth work is now:
+The highest-value remaining auth-adjacent work is now:
 - faithful post-`0x0B` mediator state writeback
-- and faithful progression into the later `AS_GetWorldListRequest` path
+- and faithful progression into the immediate helper11-driven post-auth margin/loading phase
+  (`0x43c020` / `0x440320`), rather than prematurely aiming at the later
+  `AS_GetWorldListRequest` helper path

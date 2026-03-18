@@ -107,7 +107,17 @@ New queue-thread clarification from the current focused pass:
   - current source anchors there are explicitly commented as:
     - `Queue_Init` <- `0x436340`
     - `Queue_PushPair` <- `0x436670 / 0x436820`
-  - launcher ABI glue now delegates to those liblttcp helpers rather than carrying a fully separate duplicate queue implementation
+    - `Queue_IsEmpty` <- `0x436b10` / client `0x62531c10` empty-check shape
+    - `Queue_TryPopPair` <- `0x436d31..0x436ee7` consumer pop shape
+  - launcher ABI glue now delegates queue init/push/free to those liblttcp helpers rather than carrying a fully separate duplicate queue implementation
+- newer lockstep source cleanup also added an explicit sidecar bridge for the recovered ownership mismatch in the current scaffold:
+  - the runtime-visible queue fields still live on the launcher ABI object (`+0x0c` / `+0x34`)
+  - but the liblttcp engine sidecar now exposes `AttachExternalQueuePair(queue0C, queue34)` so source-level `RunCompletedOperationQueue(bool)` can at least model the current best consumer ordering against the real launcher-visible queue storage
+  - current source-level consumer skeleton now preserves these highest-confidence rules only:
+    - prefer queue34 when non-empty, else queue0C
+    - null work item means shutdown-style sentinel
+    - cleanup/slot-12-style connection teardown logically precedes later context callback
+  - that source consumer is still explicitly scaffold-first and should not yet be treated as a faithful final replacement for original `0x436b10`
 
 ## New clarification: arg5 contains helper subobjects the client can call directly
 
@@ -1100,16 +1110,26 @@ Important limitation:
 - they are therefore now best treated as **partially wired starter structure**, still far from faithful semantics but no longer only dormant future placeholders
 
 New practical rerun result after that partial wiring:
-- a fresh deliberate binder/scaffold `RunClientDLL` rerun was made after wiring slots `1/2/6/7/8/12` into the `src/liblttcp/` sidecar engine/connection classes
-- that rerun still showed only:
+- a fresh deliberate `MXO_FORCE_RUNCLIENT=1 make run` rerun was made after tightening the arg5-side producer/consumer scaffolds further
+- that rerun still showed the same stable consumer-side live surfaces:
   - mediator `+0x2c`
   - arg5 helper `+0x60` slot `0`
   - arg5 helper `+0x60` slot `1`
-- it still did **not** show any new primary-slot traffic from:
-  - slot `6` / `Connect`
-  - slot `7` / `Close`
-  - slot `8` / `SendBuffer`
-  - slot `12` / `CleanupConnection`
-- queue0C / queue34 also remained in the same empty-cursor state on that rerun
+- but it is no longer accurate to summarize the live path as "still purely empty queue state":
+  - queue0C now visibly transitions non-empty and back to empty while the client consumes queued auth-side work items
+  - the current diagnostic producer bridge now also mirrors original `0x436820` one step more faithfully by:
+    - locking through the arg5 `+0x60` critical-section helper surface
+    - checking the combined queue-pair empty state before enqueue
+    - signaling arg5 `+0x5c` on empty -> non-empty transition
+- concrete deliberate-run evidence now includes consumed queue0C items for:
+  - `AuthConnectStatus` (type `2`)
+  - repeated `AuthReceivePacket` items (type `3`)
+- that same run reaches launcher-owned auth progression through:
+  - `AS_GetPublicKeyReply`
+  - `AS_AuthChallenge`
+  - `AS_AuthReply`
+- current remaining negative runtime result is now narrower:
+  - still no new live primary-slot traffic from slot `6` / `Connect`, slot `7` / `Close`, slot `8` / `SendBuffer`, or slot `12` / `CleanupConnection`
+  - and in particular still no slot-12 traffic has appeared, which remains consistent with the recovered consumer rule that slot `12` is only reached for type-1 work items
 
-So the new class wiring is currently best treated as implementation cleanup / groundwork, not as proof that those arg5 paths are live on the present runtime branch yet.
+So the new class wiring is no longer just dormant cleanup: the auth-side queue0C consumer chain is now observably live on the deliberate runtime path. The next missing progression is later launcher-owned state after successful auth-side queue consumption, not proof that arg5 queue consumption itself is still dead.

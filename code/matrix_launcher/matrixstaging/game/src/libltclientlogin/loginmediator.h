@@ -430,10 +430,19 @@ public:
     //   - on success it parses that reply via `0x43a330`, updates owner `+0x80`, appends a
     //     small owner record under `+0x684`, mirrors the current index to owner byte `+0xcc8`,
     //     then reaches `0x41b450(0x0b)` and string-backed `CLTLoginMediator::PostEvent(0x14)`
-    //   - newer helper-side follow-up now also narrows the `0x41b450(0x0b)` continuation:
+    //   - newer helper-side follow-up now makes that immediate post-`AS_AuthReply`
+    //     continuation much more concrete:
     //     - it selects helper `0x4f7894` (vtable `0x4b5154`)
-    //     - that helper's current concrete `+0x8` path `0x43c020` prepares owner-side data and
-    //       posts event `0x15`, but still does **not** show the missing first auth send
+    //     - helper `+0x8` / `0x43c020`
+    //       (`CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`) builds a larger
+    //       margin-side packet whose first payload byte is raw `0x4d`, sends it through
+    //       `CLTLoginMediator_SendCurrentMarginPacket` (`0x41af70`), then posts event `0x15`
+    //     - helper `+0x14` / `0x440320`
+    //       (`CLTLoginMediator_Helper11_HandleLoadCharacterReply`) handles raw `0x10`
+    //       / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
+    //       completion switches helper state to `9` then posts event `0x16`
+    //   - this now makes the post-auth gap narrower than a generic “later world-list send”:
+    //     the immediate original continuation is helper11-driven margin/loading progression
     //   - if the current helper `+0x14` body returns 0, `0x448a60` only logs
     //     `Got unhandled op of type %d with status %s`
     // - important current nuance: those later packet handlers are not themselves proof of the

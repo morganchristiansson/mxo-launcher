@@ -449,6 +449,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
     expectedAuthRequestName_ = nullptr;
+    expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();
     auto* connection = EnsureAuthConnectionObject();
     if (!connection) return 0;
@@ -488,12 +489,21 @@ uint32_t CLTLoginMediator::BeginAuthHandshake() {
 }
 
 uint32_t CLTLoginMediator::BeginMarginHandshake() {
-    // Important correction from newer message-code review:
-    // - the owner callback path around `0x440320` handles raw margin message code `0x10`
-    // - margin string mapping `0x41bf70` also uses `code - 6`, so raw `0x10` resolves to
-    //   `MS_LoadCharacterReply`, not `MS_ConnectRequest`
-    // - that makes `0x440320` a later incoming loading-character anchor, not direct proof of
-    //   the first outbound request after margin connect
+    // Important correction from newer helper-state review:
+    // - the immediate post-`AS_AuthReply` continuation is not the later auth-side
+    //   `AS_GetWorldListRequest` helper at `0x43b830`
+    // - original `0x4401a0` success instead reaches `0x41b450(0x0b)`, which selects helper
+    //   `0x4f7894` and immediately runs helper `+0x8` /
+    //   `0x43c020 = CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
+    // - that helper builds a larger margin-side packet whose first payload byte is raw `0x4d`,
+    //   sends it via `CLTLoginMediator_SendCurrentMarginPacket` (`0x41af70`), then posts
+    //   event `0x15`
+    // - later helper `+0x14` /
+    //   `0x440320 = CLTLoginMediator_Helper11_HandleLoadCharacterReply` handles raw margin
+    //   code `0x10` / `MS_LoadCharacterReply`, accumulates reply fragments under owner `+0xf1c`,
+    //   and on completion switches helper state to `9` then posts event `0x16`
+    // - the current scaffold still does not reconstruct that helper11-driven margin/loading
+    //   phase faithfully, so this deliberate margin-connect hook remains diagnostic-only
     expectedMarginRequestName_ = nullptr;
     return 1u;
 }
@@ -1079,10 +1089,15 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
     // Address anchors:
     // - launcher.exe:0x4401a0 = strongest current HandleAuthReply implementation
     // - important owner-side writeback areas on that path include:
-    //   - +0x80 (world list container)
-    //   - +0x684 / +0x688 / +0x818 / +0xd84 (helper/state blocks)
+    //   - +0x80 (world list/result status)
+    //   - +0x684 / +0x688 / +0x818 / +0xd84 (record tables keyed by current slot byte)
     //   - +0xcc8 (character/route index byte)
-    // - launcher.exe:0x43b830 = later auth-side GetWorldList sender (upstream after success)
+    // - immediate post-success continuation then goes through:
+    //   - `0x41b450(0x0b)`
+    //   - `0x43c020 = CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
+    //   - later `0x440320 = CLTLoginMediator_Helper11_HandleLoadCharacterReply`
+    // - `0x43b830 = CLTLoginMediator_Helper14_SendGetWorldListRequest` remains a later auth-side
+    //   sender, but is no longer the best immediate next-step anchor after `AS_AuthReply`
     //
     // Transitional note:
     // - this is still only a partial writeback sketch, not a faithful one-to-one reconstruction
@@ -1171,7 +1186,13 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
         }
 
         case 0x0b: {
-            // Address anchor: launcher.exe:0x4401a0 = strongest current AS_AuthReply handler
+            // Address anchors:
+            // - launcher.exe:0x4401a0 = strongest current AS_AuthReply handler
+            // - immediate post-success continuation there is not the later helper14
+            //   `AS_GetWorldListRequest` sender at `0x43b830`
+            // - instead it goes through helper11:
+            //   `0x41b450(0x0b)` -> `0x43c020` (raw post-auth margin packet `0x4d`) -> later
+            //   `0x440320` (`MS_LoadCharacterReply`)
             mxo::auth::AuthReply reply;
             if (!mxo::auth::ParseAuthReplyPacket(packetBytes, packetSize, &reply)) {
                 Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
@@ -1181,7 +1202,8 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             lastAuthReply_ = reply;
             AdoptAuthReplyIntoRecoveredMediatorState();
             LogParsedAuthReply(reply);
-            expectedAuthRequestName_ = kMessageAsGetWorldListRequest;
+            expectedAuthRequestName_ = nullptr;
+            expectedMarginRequestName_ = "post-AS_AuthReply helper11 raw-0x4d margin packet";
             return 1u;
         }
 
