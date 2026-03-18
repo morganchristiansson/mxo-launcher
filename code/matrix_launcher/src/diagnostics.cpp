@@ -1,7 +1,7 @@
 #include "diagnostics.h"
 #include "diagnostics_auth.h"
-#include "liblttcp/cmessageconnection.h"
-#include "liblttcp/ltthreadperclienttcpengine.h"
+#include "../matrixstaging/runtime/src/libltmessaging/messageconnection.h"
+#include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -1438,7 +1438,7 @@ static uint32_t __thiscall LauncherObject_Slot7_42F970(
     uint32_t result = 0;
     if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
         mxo::liblttcp::CMessageConnection* connection = engine->GetOrCreateMessageConnection(arg1);
-        result = connection ? connection->CloseConnection(/*graceful=*/(arg2 != 0u)) : 0u;
+        result = connection ? connection->Close(/*graceful=*/(arg2 != 0u)) : 0u;
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 

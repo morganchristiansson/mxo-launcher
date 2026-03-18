@@ -29,6 +29,14 @@ struct LTTCPEndpointKey {
     uint32_t reserved1 = 0;
 };
 
+// VTable 0x004b8034 - CLTTCPConnection (Base Class)
+// 0x004b8034 - Constructor at 0x0044ac40
+// 0x004b8040 - IsConnected at 0x00449ca0
+// 0x004b8048 - OnReceive at 0x00449d40
+// 0x004b804c - OnClose at 0x00449fd0
+// 0x004b8050 - Close at 0x00449cd0
+// 0x004b8054 - Destructor at 0x00449d20
+
 // current best original identity:
 // - base CLTTCPConnection family from launcher.exe string evidence
 // - base vtable `0x4b8018` is now string-backed by nearby `CLTTCPConnection::OnReceive()` text
@@ -73,6 +81,18 @@ public:
     // We do not yet have a high-confidence direct original method name mapped onto the
     // connection-side receive processing entrypoint in this starter skeleton.
     uint32_t OnReceive();
+
+    // ============================================================
+    // FAITHFUL: VTable 0x004b804c - OnClose at 0x00449fd0
+    // Helper/utility function for close operations (9 instructions)
+    // ============================================================
+    void OnClose();
+
+    // ============================================================
+    // FAITHFUL: VTable 0x004b8040 - IsConnected at 0x00449ca0
+    // Checks state field != 8 (kClosed)
+    // ============================================================
+    bool IsConnected() const;
 
 private:
     void* ownerContext_;

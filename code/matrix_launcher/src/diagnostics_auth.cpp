@@ -1,8 +1,8 @@
 #include "diagnostics.h"
 #include "diagnostics_auth.h"
 
-#include "liblttcp/cmessageconnection.h"
-#include "liblttcp/ltthreadperclienttcpengine.h"
+#include "../matrixstaging/runtime/src/libltmessaging/messageconnection.h"
+#include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 #include "loginmediator.h"
 #include "loginstate.h"
 

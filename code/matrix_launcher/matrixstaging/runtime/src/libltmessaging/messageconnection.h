@@ -82,6 +82,35 @@ namespace mxo::liblttcp {
 //   - calls engine +0x1c with `self`
 //   - current best engine mapping there is slot-7 / Close
 //
+// ============================================================
+// VTable 0x004afef0 - CMessageConnection (Intermediate Base)
+// ============================================================
+// 0x004afef0 - FUN_0041cf50
+// 0x004afefc - CLTTCPConnection::CLTTCPConnection at 0x00449ca0
+// 0x004aff00 - FUN_00449a70
+// 0x004aff04 - CLTTCPConnection::OnReceive at 0x00449d40
+// 0x004aff08 - CLTTCPConnection::OnClose at 0x00449fd0
+// 0x004aff0c - CLTTCPConnection::Close at 0x00449cd0
+// 0x004aff10 - CLTTCPConnection::~CLTTCPConnection at 0x00449d20
+// 0x004aff14 - FUN_0041cf30
+// 0x004aff18 - SendPacket at 0x00448cf0
+// 0x004aff1c - FUN_00449a30
+// 0x004aff34 - FUN_0041ce80
+
+// ============================================================
+// VTable 0x004aff38 - CMarginConnection (Type D)
+// ============================================================
+// Inheritance Chain:
+// CLTTCPConnection (0x004b8034) [Base]
+// └── CMessageConnection (0x004afef0) [Intermediate Base]
+//     └── Type A (0x004b64a8) [Base for Type D]
+//         └── CMarginConnection (Type D) [0x004aff38] - Leaf
+// ============================================================
+// 0x004aff38 - FUN_0041cf80 (Type D initialization)
+// 0x004aff48 - FUN_0044af60 (Advanced message routing)
+// 0x004aff64 - FUN_0044af20 (Message dispatcher)
+// Inherits: CLTTCPConnection methods + CMessageConnection::SendPacket
+
 // Important current limitation for this starter skeleton:
 // - the recovered original engine entry on this path is more connection-object-oriented
 //   than the placeholder engine signatures currently model
@@ -99,11 +128,6 @@ public:
     // This keeps the connection-object-oriented call site out of diagnostics.cpp.
     uint32_t EnsureConnected();
 
-    // Current recovered wrapper shape around engine slot 7 / Close.
-    uint32_t CloseConnection(bool graceful);
-
-    // String-backed original names kept as placeholders.
-    // These are intentionally thin until the surrounding worker/completion model is recovered.
     // string-backed original name: CMessageConnection::SendPacket
     // current best read:
     // - producer-side bridge into engine/queue work
@@ -122,6 +146,72 @@ public:
 
 private:
     CLTThreadPerClientTCPEngine* engine_;
+};
+
+// ============================================================
+// CMarginConnection class declaration
+// ============================================================
+class CMarginConnection : public CMessageConnection {
+public:
+    // ============================================================
+    // FAITHFUL: VTable 0x004aff38 - Constructor at 0x0041cf80
+    // Type D initialization - sets vtable pointer, calls FUN_00441820 cleanup
+    // ============================================================
+    CMarginConnection();
+
+    // ============================================================
+    // UNANCHORED: Not based on vtable analysis
+    // Constructor with margin engine parameter
+    // ============================================================
+    explicit CMarginConnection(CLTThreadPerClientTCPEngine* marginEngine);
+
+    // ============================================================
+    // FAITHFUL: VTable 0x004aff38 - Destructor at 0x00449d20
+    // Inherits from CLTTCPConnection (via CMessageConnection)
+    // Note: Cleanup calls FUN_00441820 which sets vtable to Type A's vtable
+    // ============================================================
+    ~CMarginConnection();
+
+    // ============================================================
+    // UNANCHORED: Not based on vtable analysis
+    // Placeholder entry point for margin engine management
+    // ============================================================
+    void SetMarginEngine(CLTThreadPerClientTCPEngine* marginEngine);
+
+    // ============================================================
+    // UNANCHORED: Not based on vtable analysis
+    // Getter for margin engine pointer
+    // ============================================================
+    CLTThreadPerClientTCPEngine* MarginEngine() const;
+
+    // ============================================================
+    // FAITHFUL: VTable 0x004aff48 - FUN_0044af60 at 0x0044af60
+    // 42 instructions, 7 complexity, 5 calls
+    // Advanced message routing with fallback handlers for robustness
+    // ============================================================
+    uint32_t RouteMessage(const void* packetData, uint32_t byteCount);
+
+    // ============================================================
+    // FAITHFUL: VTable 0x004aff64 - FUN_0044af20 at 0x0044af20
+    // 23 instructions, 2 complexity, 2 calls
+    // Message dispatcher - calls dispatch router FUN_00442d00
+    // ============================================================
+    uint32_t DispatchMessage(const void* packetData, uint32_t byteCount);
+
+    // ============================================================
+    // UNANCHORED: Not based on vtable analysis
+    // CERT protocol handler placeholder
+    // ============================================================
+    uint32_t HandleCERTMessage(const void* packetData, uint32_t byteCount);
+
+    // ============================================================
+    // UNANCHORED: Not based on vtable analysis
+    // MS protocol handler placeholder
+    // ============================================================
+    uint32_t HandleMSMessage(const void* packetData, uint32_t byteCount);
+
+private:
+    CLTThreadPerClientTCPEngine* marginEngine_;
 };
 
 }  // namespace mxo::liblttcp
