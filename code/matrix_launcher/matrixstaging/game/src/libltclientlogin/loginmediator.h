@@ -359,6 +359,34 @@ public:
     // Faithful implementation of arg6 world list provider for InitClientDLL
     // Vtable at offset +0xc from object pointer at 0x4d2c58
     void InitializeArg6DefaultObject();
+    void ConfigureArg6Selection(
+        uint32_t worldUpperBoundExclusive,
+        uint32_t variantUpperBoundExclusive,
+        const char* mappedSelectionName,
+        const char* mappedVariantName,
+        uint32_t selectedWorldIndexLow24,
+        uint32_t selectedVariantIndexHigh8,
+        uint32_t selectedWorldType,
+        uint32_t selectedVariantState);
+    void SetArg6ProfileName(const char* profileName);
+    void SetArg6AuthName(const char* authName);
+    void SetArg6AuthPassword(const char* authPassword);
+    uint32_t Arg6WorldUpperBoundExclusive() const;
+    uint32_t Arg6VariantUpperBoundExclusive() const;
+    uint32_t Arg6SelectedWorldIndexLow24() const;
+    uint32_t Arg6SelectedVariantIndexHigh8() const;
+    uint32_t Arg6SelectedWorldType() const;
+    uint32_t Arg6SelectedVariantState() const;
+    uint32_t Arg6MappedSelectionId() const;
+    const char* Arg6MappedSelectionName() const;
+    const char* Arg6MappedVariantName() const;
+    const char* Arg6ProfileName() const;
+    const char* Arg6AuthName() const;
+    const char* Arg6AuthPassword() const;
+    bool Arg6WorldIndexMatchesSelection(uint32_t worldIndex) const;
+    bool Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const;
+    uint32_t Arg6ExpectedSelectionDescriptorScratchRequest() const;
+    bool Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
     const char* Arg6GetWorldNameByIndex(uint32_t index);
     uint8_t Arg6GetWorldVariantByIndex(uint32_t index);
     uint8_t Arg6ValidateWorldSelection(uint8_t variant);
@@ -609,7 +637,23 @@ private:
         std::array<bool, 10> available_ = {true, true, true, true, true, false, false, false, false, false};
     };
 
+    struct Arg6SelectionConfig {
+        uint32_t worldUpperBoundExclusive_ = 1;
+        uint32_t variantUpperBoundExclusive_ = 1;
+        uint32_t selectedWorldIndexLow24_ = 0;
+        uint32_t selectedVariantIndexHigh8_ = 0;
+        uint32_t selectedWorldType_ = 1;
+        uint32_t selectedVariantState_ = 0;
+        uint32_t mappedSelectionId_ = 0;
+        std::string mappedSelectionName_ = "standalone";
+        std::string mappedVariantName_ = "standalone";
+        std::string profileName_ = "resurrections";
+        std::string authName_ = "resurrections";
+        std::string authPassword_;
+    };
+
     Arg6WorldListData arg6WorldList_;
+    Arg6SelectionConfig arg6Selection_;
 
     // launcher.dll export that populates the client.dll's world list view for InitClientDLL
     // This should be called before InitClientDLL so client.dll receives populated world data

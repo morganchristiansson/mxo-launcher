@@ -18,6 +18,11 @@ Relevant recovered source-file anchors nearby in the same launcher/login area:
 - `\matrixstaging\game\src\libltclientlogin\loginstate.cpp`
 - `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
 
+Current replacement-launcher source split:
+- launcher-owned mediator state/model lives under `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- the replacement `ILTLoginMediator.Default` ABI/vtable shell now lives in `src/launcher_mediator_abi.cpp`
+- diagnostics-only window tracing remains in `src/diagnostics.cpp`
+
 Those path strings do **not** by themselves prove exact class ownership for every auth/login packet path, but they do support treating this interface as part of the launcher/game-side login layer rather than a generic runtime-only socket helper.
 
 ## Source of truth

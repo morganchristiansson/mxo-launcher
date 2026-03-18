@@ -24,7 +24,7 @@ COMMON_AUTH_SRC = \
 	matrixstaging/runtime/src/libltcrypto/filters.cpp \
 	matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
 
-LAUNCHER_SRC = src/resurrections.cpp src/diagnostics.cpp src/diagnostics_auth.cpp \
+LAUNCHER_SRC = src/resurrections.cpp src/diagnostics.cpp src/diagnostics_auth.cpp src/launcher_mediator_abi.cpp src/launcher_network_object_abi.cpp \
 	matrixstaging/runtime/src/liblttcp/lttcpconnection.cpp \
 	matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp \
 	matrixstaging/runtime/src/libltmessaging/messageconnection.cpp \

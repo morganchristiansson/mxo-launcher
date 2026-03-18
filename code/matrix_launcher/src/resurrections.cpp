@@ -1295,13 +1295,10 @@ int main(int argc, char* argv[]) {
     }
 
     // =============================================================================
-    // arg6 world list data is already populated in mediator object
-    // Address anchor: launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (instance)
+    // arg6 / sibling mediator configuration for InitClientDLL
+    // Address anchor: launcher.exe:0x4d3584 = ILTLoginMediator sibling slot used by launcher-side selection resolution
     // =============================================================================
-    // The original launcher initializes the world list data inline when the mediator
-    // object is created, not through a separate method call. We don't need to call
-    // BuildWorldList() since the data is already in arg6WorldList_.
-    Log("=== arg6 world list data ready for InitClientDLL ===");
+    Log("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
     
     if (useMediatorBinderScaffold || useMediatorStub) {
         const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
@@ -1478,22 +1475,10 @@ int main(int argc, char* argv[]) {
     DiagnosticSnapshotArgvMemory();
     Log("DIAGNOSTIC: argv memory snapshotted for crash analysis");
     
-    // Faithful step: initialize arg6 world list data before InitClientDLL
-    // This mirrors the original launcher.exe behavior where world list is built inline
     if (g_pILTLoginMediatorDefault) {
-        Log("=== Initializing arg6 world list data ===");
-        // Call InitializeArg6DefaultObject() to populate world list
-        // Cast to CLTLoginMediator* and call member function
-        // Note: The binder scaffold already configures selection, but we need to
-        // explicitly initialize the world list data here for faithful replication
-        // Since InitializeArg6DefaultObject is a class method, we need a way to call it
-        // We'll use a helper approach - cast and call through vtable or direct method
-        
-        // For now, the binder scaffold already sets up selection configuration
-        // The world list data in arg6WorldList_ should be populated by InitializeArg6DefaultObject
-        Log("DIAGNOSTIC: arg6 mediator object at %p ready for InitClientDLL", g_pILTLoginMediatorDefault);
+        Log("arg6 mediator object prepared for InitClientDLL: %p", g_pILTLoginMediatorDefault);
     } else {
-        Log("WARNING: arg6 mediator object is NULL, world list data may not be initialized");
+        Log("WARNING: arg6 mediator object is NULL");
     }
     
     int initResult = g_InitClientDLL(

@@ -215,16 +215,16 @@ It means only that the present crash is not explained by the earlier ultra-minim
 
 ## New clarification from early arg5 vtable-slot probes
 
-The custom launcher now also wires the first few original primary vtable slots from `0x4b2768` as **logging placeholders with matching stack cleanup**:
+The custom launcher now also wires the first few original primary vtable slots from `0x4b2768` with matching stack cleanup, and the scaffold has started moving some of them beyond pure probes:
 
 - slot 0 -> `0x4319a0`-style release / destructor probe (`ret 4`)
-- slot 1 -> `0x431ce0`-style 3-arg probe (`ret 0xc`)
-- slot 2 -> `0x4325d0`-style 3-arg probe (`ret 0xc`)
-- slot 3 -> `0x436000`-style 3-arg probe (`ret 0xc`)
+- slot 1 -> `0x431ce0`-style 3-arg starter wiring (`MonitorPort`)
+- slot 2 -> `0x4325d0`-style 3-arg starter wiring (`UDPMonitorPort`)
+- slot 3 -> `0x436000`-style 3-arg starter wiring (`MonitorEphemeralUDPPort` wrapper)
 - slot 4 -> `0x42f7c0`-style 1-arg probe (`ret 4`)
 
-This is still **not** faithful behavior for those methods.
-The current probes only log arguments / object state and return neutral placeholder values.
+This is still **not** fully faithful behavior for those methods.
+But slot `3` is no longer just a neutral placeholder return: the current scaffold now routes it into the starter `CLTThreadPerClientTCPEngine::MonitorEphemeralUDPPort(...)` implementation instead of leaving it as a dormant future probe.
 
 Practical result from the latest deep patched-client runs:
 
@@ -439,8 +439,9 @@ What is now modeled in the scaffold:
 - slot `10` now matches the original tiny stub exactly in effect (`xor al,al ; ret 4` -> returns `0`)
 - slot `5` now models the one high-confidence semantic path already recovered from static analysis:
   - when the `+0x80` list is still empty, it zeroes the caller out-pointer and returns `0x7000004`
+  - and when the `+0x80` sidecar is non-empty, the current starter path now routes into `CLTThreadPerClientTCPEngine::UnmonitorPort(...)` instead of returning a generic neutral value
 - slot `12` now at least distinguishes the proven empty-`+0x8c` fast path from the still-unreconstructed non-empty teardown path
-- slots `6..9` are still logging placeholders only; their deeper real behavior has not been reconstructed yet
+- slots `6..9` are still only partially reconstructed; slot `6/7/8` now route into starter liblttcp methods, while slot `9` remains a logging placeholder
 
 Why slot `5` matters:
 
@@ -1054,9 +1055,14 @@ Concise retained summary here:
 Important limitation:
 - those new source files are still **not** a faithful full arg5 runtime implementation inside the launcher scaffold
 - but they are no longer completely disconnected placeholders either:
-  - the current diagnostics scaffold now incrementally delegates slot `1` / `MonitorPort`, slot `2` / `UDPMonitorPort`, slot `6` / `Connect`, slot `7` / `Close`, slot `8` / `SendBuffer`, and slot `12` / `CleanupConnection` into the new `src/liblttcp/` classes through a diagnostic sidecar engine/connection binding
-  - `Connect`, `Close`, and `SendBuffer` are now routed through sidecar `CMessageConnection` wrappers (`EnsureConnected()` / `CloseConnection()` / `SendPacket(...)`) instead of keeping those connection-oriented paths entirely inside `diagnostics.cpp`
+  - the current replacement launcher now keeps the arg5 ABI/object-shape trampolines in a dedicated source file (`src/launcher_network_object_abi.cpp`) instead of mixing that scaffold directly into `src/diagnostics.cpp`
+  - that ABI layer now incrementally delegates slot `1` / `MonitorPort`, slot `2` / `UDPMonitorPort`, slot `3` / `MonitorEphemeralUDPPort`, slot `5` / `UnmonitorPort`, slot `6` / `Connect`, slot `7` / `Close`, slot `8` / `SendBuffer`, and slot `12` / `CleanupConnection` into the recovered `liblttcp` / `libltmessaging` classes through a sidecar engine/connection binding
+  - `Connect`, `Close`, and `SendBuffer` are now routed through liblttcp-side context wrappers (`ConnectContext()` / `CloseContext()` / `SendPacketContext()`) instead of keeping those connection-oriented paths entirely inside `diagnostics.cpp`
+  - sidecar owner/engine binding state is now also kept by `CLTThreadPerClientTCPEngineBinding` on the liblttcp side rather than by diagnostics-local owner/engine globals
   - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
+  - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered unique-key intent:
+    - `UDPMonitorPort` now updates an existing worker record for the same context key instead of blindly growing duplicates
+    - `CleanupConnection` now also marks the matching `CMessageConnection` sidecar closed before removing the worker record
   - current diagnostic list-head emptiness for arg5 `+0x80` / `+0x8c` is also synchronized from that sidecar engine state so later stub logs track the new class-backed state more directly
 - they are therefore now best treated as **partially wired starter structure**, still far from faithful semantics but no longer only dormant future placeholders
 
