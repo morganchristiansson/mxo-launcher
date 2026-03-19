@@ -4,6 +4,8 @@
 
 namespace mxo::ltlogin {
 
+class CLTLoginMediator;
+
 // Recovered source-file anchor:
 // - `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
 //
@@ -25,13 +27,26 @@ namespace mxo::ltlogin {
 // - `0x420ef0` = `LaunchPadClient_OnPlayRequestStatus`
 // - `0x421220` = `LaunchPadClient_OnLoginRequestStatus`
 // - `0x488360` = `LaunchPadClient_DispatchConnectionStatus`
+// Detailed ownership / writer-path notes for the vtable-backed status handlers now live in:
+// - `launchpad.cpp`
+// - `../../docs/launcher.exe/VTABLES/0x004b0e48.md`
 class LaunchPadClient {
 public:
     LaunchPadClient() = default;
 
-    // Address anchors only for now; these are still placeholders, not faithful implementations.
-    uint32_t OnLoginRequestStatus();      // launcher.exe:0x421220
-    uint32_t OnPlayRequestStatus();       // launcher.exe:0x420ef0
+    // Source-owned success-path mirrors for the concrete mediator writeback already proven in the
+    // original launcher handlers. Non-success branches remain documented in the vtable notes.
+    uint32_t OnLoginRequestStatus(
+        CLTLoginMediator* mediator,
+        uint32_t resultCode,
+        const char* sourceBlock94FirstString,
+        uint32_t sharedMarginPacketField660,
+        const char* sessionText);  // launcher.exe:0x421220
+    uint32_t OnPlayRequestStatus(
+        CLTLoginMediator* mediator,
+        uint32_t resultCode,
+        const char* gameSessionId);  // launcher.exe:0x420ef0
+
     uint32_t OnConnectionOpened();        // launcher.exe:0x420440
     uint32_t OnSessionClosed();           // launcher.exe:0x4204f0
     uint32_t OnSubscriptionValidation();  // launcher.exe:0x420580

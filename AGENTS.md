@@ -66,5 +66,5 @@ Document the mismatch and adjust the implementation/docs.
 - prefer owning recovered code structure, local TODOs, and active implementation notes in inline/header source comments
 - prefer canonical `../docs/<binary>/<component>/` docs for experiment evidence, crash references, and cross-component conclusions
 - when an `AGENTS.md` entry becomes resolved or stops steering current work, prune it instead of appending more history
-- when finishing one area of work and the next task likely moves into a different area, give the user a self-contained prompt for starting the next session; include current state, source-of-truth docs/files, exact next target, and any important commands or env flags
+- when finishing one area of work and the next task likely moves into a different area, finish with a self-contained prompt to start next session; include current state, source-of-truth docs/files, exact next target, and any important context, commands or env flags
 - avoid duplicate documentation; merge/prune overlapping docs and keep each topic in the smallest obvious canonical home instead of letting one large doc sprawl across many components

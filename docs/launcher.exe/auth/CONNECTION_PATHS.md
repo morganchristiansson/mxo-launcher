@@ -78,15 +78,29 @@ So current auth-side connection-init model is:
 
 ### Margin owner-state dispatch
 - `launcher.exe:0x439300`
-- consults `[owner+4]->vtable+0x18`
-- then dispatches into `0x41e500` using owner vtable surfaces:
-  - `+0xe0`
-  - `+0xfc`
-  - `+0x10c`
-- plus owner fields:
-  - `+0xcc8`
-  - `+0x12c`
-  - `+0x104`
+- belongs to `CLTLoginState_State4` vtable `0x004b503c` slot 3
+- caches the first incoming upstream/helper pointer at `this+4` if that slot is null
+- then consults `[this+4]->vtable+0x18`
+- exact case split currently backed by both decompilation and disassembly:
+  - case `6`
+    - owner vtable `+0x10c`
+    - use the first dword of the returned object
+    - call `0x41e500`
+  - cases `7`, `8`, `0x0d`
+    - owner byte `+0xcc8`
+    - owner vtable `+0xe0(slot, 0)`
+    - call `0x41e500`
+  - case `10`
+    - owner dword `+0x12c`
+    - owner vtable `+0xfc(value, 0)`
+    - call `0x41e500`
+  - default
+    - owner dword `+0x104`
+    - if not `-1`, owner vtable `+0xfc(value)`
+    - only if non-null does it call `0x41e500`
+- current source ownership consequence:
+  - keep the case split in `loginstate.cpp` / `CLTLoginState_State4::Slot3_BeginOrContinue`
+  - keep only the narrower route-getter / host-resolution / `0x41e500` transport-init helpers in `loginmediator.cpp`
 
 ### Margin connection-init body
 - `launcher.exe:0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500`
@@ -145,12 +159,12 @@ Current highest-value original-launcher follow-up after successful auth reply is
   - `CLTLoginMediator_Helper10_HandleAuthReply`
 - `launcher.exe:0x41b450(0x0b)`
   - switches current helper to `0x4f7894` / vtable `0x4b5154`
-- helper11 enter path:
+- helper11 / state11 enter path:
   - `launcher.exe:0x43c020`
-  - renamed in Ghidra as `CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
-- helper11 incoming path:
+  - renamed in Ghidra as `CLTLoginState_State11_SendPostAuthMarginPacket0x4d`
+- helper11 / state11 incoming path:
   - `launcher.exe:0x440320`
-  - renamed in Ghidra as `CLTLoginMediator_Helper11_HandleLoadCharacterReply`
+  - renamed in Ghidra as `CLTLoginState_State11_HandleLoadCharacterReply`
 
 Current best static read of that chain:
 - `0x4401a0` success still performs the important owner writeback under:

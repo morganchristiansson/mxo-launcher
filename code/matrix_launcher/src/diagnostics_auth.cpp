@@ -33,6 +33,7 @@ struct DiagnosticRawMessageConnectionContext {
 
 static mxo::ltlogin::CLTLoginMediator* g_DiagnosticLoginController = NULL;
 static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAuthenticatePending = {};
+static mxo::ltlogin::CLTLoginState_State4 g_DiagnosticLoginStateState4 = {};
 static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldListPending = {};
 static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
 static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
@@ -518,8 +519,10 @@ uint32_t DiagnosticBeginMarginConnection() {
         g_DiagnosticLoginController->SetMarginConnectionContextKey(context);
     }
 
+    const uint32_t result = g_DiagnosticLoginStateState4.Slot3_BeginOrContinue(
+        g_DiagnosticLoginController->CurrentState(),
+        g_DiagnosticLoginController);
     const std::string marginHost = g_DiagnosticLoginController->ResolvedMarginHostName();
-    const uint32_t result = g_DiagnosticLoginController->DispatchMarginConnectionByState();
     if (context) {
         context->sidecarConnection = g_DiagnosticLoginController->MarginConnection();
     }
@@ -535,7 +538,7 @@ uint32_t DiagnosticBeginMarginConnection() {
     }
 
     Log(
-        "DIAGNOSTIC: CLTLoginMediator::DispatchMarginConnectionByState() marginHost='%s' port=%u -> 0x%08x",
+        "DIAGNOSTIC: CLTLoginState_State4::Slot3_BeginOrContinue() marginHost='%s' port=%u -> 0x%08x",
         marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
         (unsigned)g_DiagnosticLoginController->MarginServerPortHostOrder(),
         (unsigned)result);

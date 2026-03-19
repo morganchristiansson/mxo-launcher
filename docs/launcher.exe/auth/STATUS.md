@@ -102,6 +102,9 @@ What remains:
   - practical consequence for the reimplementation:
     - state-8 margin routing should prefer reconstructed `+0x688/+0x818/+0xd84` data over the old
       single fallback world-name path
+    - the load-character scaffold should likewise prefer the reconstructed current-slot record
+      (`+0x688[owner+0xcc8]`) when seeding the `+0xf1c` name/world family, with owner `+0x108`
+      left only as fallback scaffolding
   - owner vtable `+0x120` / `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the
     strongest recovered writer for the immediate helper11 source block:
     - writes owner `+0x12c`
@@ -136,19 +139,83 @@ Current next-step anchors after successful `AS_AuthReply` are now:
 - `launcher.exe:0x4401a0`
   - `CLTLoginMediator_Helper10_HandleAuthReply`
 - `launcher.exe:0x43c020`
-  - `CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
+  - `CLTLoginState_State11` slot-3 send body
 - `launcher.exe:0x440320`
-  - `CLTLoginMediator_Helper11_HandleLoadCharacterReply`
+  - `CLTLoginState_State11` slot-6 reply body
 
 Current best read:
 - `0x4401a0` success does **not** immediately fall into the later auth-side
   `0x43b830 / CLTLoginMediator_Helper14_SendGetWorldListRequest` path
-- instead it switches helper state to `0x4f7894` and immediately runs helper11 `+0x8`
-- that helper builds a larger margin-side packet whose first payload byte is raw `0x4d`,
+- instead it switches helper state to `0x4f7894` / vtable `0x004b5154` and immediately runs
+  `CLTLoginState_State11` slot 3 (`0x43c020`)
+- that state body builds a larger margin-side packet whose first payload byte is raw `0x4d`,
   sends it through `CLTLoginMediator_SendCurrentMarginPacket`, and posts event `0x15`
-- later helper11 `+0x14` handles raw `0x10` / `MS_LoadCharacterReply`, accumulates reply
-  fragments into owner `+0xf1c`, and on completion switches helper state to `9` then posts
-  event `0x16`
+- source ownership now mirrors that more closely:
+  - packet build/send shape lives in `CLTLoginState_State11::Slot3_BeginOrContinue`
+  - mediator only keeps the narrower current-margin-connection transport helper for `0x41af70`
+  - the local `0x43c020` packet-builder family is now also source-owned as internal helper
+    scaffolding instead of one flat raw-byte helper:
+    - `0x439840 = CLTLoginMediatorPacketBuilderEnvelope_Initialize`
+    - `0x43a470 = CLTLoginMediatorPacket0x4d_ResetAndInitialize`
+    - `0x43a640 / 0x43a740 / 0x43a840 / 0x43a940` = string append helpers
+- newer concrete packet-builder detail worth preserving:
+  - state11 sender `0x43c020` is no longer just a generic margin packet builder
+  - packet debug printer `0x43e540` now shows its owner fields as:
+    - `+0x134..+0x174` = appearance/customization ids (`SkinToneID .. TraitID`)
+    - `+0x178` = `RealFirstName`
+    - `+0x198` = `RealLastName`
+    - `+0x1b8` = `Background`
+  - the send body also appends a final `GameSessionID` string from owner vtable `+0x148`
+  - that getter is now recovered as `0x41f320 = CLTLoginMediator_GetGameSessionId664`
+    returning owner `+0x664`
+  - comparison against the state-8 sender `0x43bd20` now narrows the remaining source problem:
+    - state-8 does share that same trailing `GameSessionID` append through `+0x148`
+    - but `0x43bd20` does **not** consume owner `+0x178/+0x198/+0x1b8`
+    - instead it pulls:
+      - the current-slot record id pair through owner vtable `+0x44`
+      - the persisted state-3->8 snapshot blocks from owner `+0xcd0..+0xd7f`
+    - source now mirrors that more faithfully too:
+      - packet build/send shape lives in `CLTLoginState_State8::Slot3_BeginOrContinue`
+      - the local state8 packet-builder family is now source-owned around:
+        - `0x43ac10 = CLTLoginMediatorPacket0x0f_ResetAndInitialize`
+        - `0x43acf0 = CLTLoginMediatorPacket0x0f_ReserveGameSessionId`
+        - `0x43ada0 = CLTLoginMediatorPacket0x0f_SetGameSessionId`
+    - practical consequence: `RealFirstName/RealLastName/Background` are currently a
+      state11-only source problem, while `GameSessionID` is the real shared state8/state11 field
+  - stronger `GameSessionID` writer chain now in scope:
+    - owner init `0x41ee60` zeros `+0x660` and empty-initializes `+0x664`
+    - login-request success `0x421220` writes `+0x660` through owner vtable `+0x14c / 0x41f330`
+    - that same login-success path writes owner `+0x94` through `+0x150 / 0x41f270`, not `+0x664`
+    - later play-request success `0x420ef0` copies its callback string into owner `+0x664`
+    - alternate helper path now has a stronger full chain:
+      - owner vtable `+0x130 / 0x41f310` returns lazy helper `+0x65c`
+      - owner vtable `+0x134 / 0x420d00` allocates that `0x30`-byte helper through `0x420ca0`
+      - `0x421a50` refreshes helper string `+0x18` from owner `+0x94 + 0x60`
+        (the recovered bootstrap/source embedded small string)
+      - `0x420e70` then copies helper `+0x18` into owner `+0x664`
+  - source ownership now matches that narrowing better:
+    - state8 slot 3 has an anchored send scaffold
+    - state10 slot 3 now also has an anchored gated send scaffold in `loginstate.cpp`
+      - stronger current read from `0x43bf90`:
+        - gate on `0x41b4b0` (`owner +0x1c`, connection state `+0x34 == 2`)
+        - gate on owner byte `+0xf14`
+        - initialize `0x43a1f0`
+        - copy `CharacterName` from owner `+0x108` through `0x43aa80`
+        - send through `0x41af70`
+        - post event `0x13`
+      - source now also reifies that local packet-builder family as:
+        - `0x43a1f0 = CLTLoginMediatorPacket0x0a_ResetAndInitialize`
+        - `0x43aa80 = CLTLoginMediatorPacket0x0a_SetCharacterName`
+    - state18 slot 3 is now explicitly owned in `loginstate.cpp`
+    - source-owned mirrors now exist for owner `+0x65c`, `+0x660`, and `+0x664`
+    - launchpad-owned success mirrors now live in `launchpad.cpp` for:
+      - `0x421220 -> +0x660` and owner `+0x94` first-string consequences
+      - `0x420ef0 -> +0x664` (`GameSessionID`)
+  - practical consequence: do **not** keep synthesizing `+0x178/+0x198/+0x1b8` from route/world
+    fallback data in the scaffold just because those fields were once structurally opaque
+- later `CLTLoginState_State11` slot 6 (`0x440320`) handles raw `0x10` / `MS_LoadCharacterReply`,
+  accumulates reply fragments into owner `+0xf1c`, and on completion switches helper state to `9`
+  then posts event `0x16`
 
 What remains:
 - reconstruct enough post-`0x0b` owner state that the helper11 margin/loading phase becomes

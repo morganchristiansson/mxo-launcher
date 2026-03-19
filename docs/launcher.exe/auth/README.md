@@ -282,13 +282,13 @@ Current best read:
   `0x43b830 / AS_GetWorldListRequest` helper
 - instead `0x4401a0` success reaches `0x41b450(0x0b)`, which selects helper `0x4f7894`
   (vtable `0x4b5154`)
-- that helper's enter path `launcher.exe:0x43c020`
-  - now renamed in Ghidra as `CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
+- that helper/state11 enter path `launcher.exe:0x43c020`
+  - now renamed in Ghidra as `CLTLoginState_State11_SendPostAuthMarginPacket0x4d`
   - builds a larger margin-side packet whose first payload byte is raw `0x4d`
   - sends it through `CLTLoginMediator_SendCurrentMarginPacket`
   - then posts event `0x15`
-- the same helper's incoming handler `launcher.exe:0x440320`
-  - now renamed in Ghidra as `CLTLoginMediator_Helper11_HandleLoadCharacterReply`
+- the same helper/state11 incoming handler `launcher.exe:0x440320`
+  - now renamed in Ghidra as `CLTLoginState_State11_HandleLoadCharacterReply`
   - handles raw margin code `0x10` / `MS_LoadCharacterReply`
   - accumulates reply fragments into owner `+0xf1c`
   - and on completion switches helper state to `9` then posts event `0x16`

@@ -49,6 +49,12 @@ Source of truth:
 The launcher still does **not** reconstruct enough launcher-owned startup/runtime state.
 Current unresolved inputs remain:
 - post-`AS_AuthReply` launcher-owned progression / owner-state writeback / next-state activation
+  - launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
+    first-string consequences are now source-owned
+  - current narrower remaining state11-only source gap is active-path writers for:
+    - owner `+0x178` = `RealFirstName`
+    - owner `+0x198` = `RealLastName`
+    - owner `+0x1b8` = `Background`
 - arg6: `ILTLoginMediator.Default` from `0x4d2c58`
 - arg7: packed selection state from `CLauncher+0xa8/+0xac`
 - arg8: flag byte from `0x4d2c69`
@@ -115,16 +121,15 @@ Use `../../docs/` for:
 
 Prefer updating existing docs over expanding this file.
 
-### Use Ghidra in lockstep with source for active arg5 work
-For the current arg5 blocker, Ghidra is the primary static-analysis tool.
-Do all of the following together for high-value original launcher functions:
-- decompile **and** disassemble the same function before trusting a call shape
-- rename recovered functions in Ghidra to match source-level names when confidence is good
-- rename local/global variables in Ghidra to match source terminology when confidence is good
-- retype parameters / locals / globals in Ghidra when evidence supports it
-- mirror confirmed names/types/anchors back into source comments and canonical docs in the same task
+### Use Ghidra in lockstep with source
+Ghidra is the primary static-analysis tool. Ghidra HOWTO: `GHIDRA.md`
 
-Do not let understanding live only in the current Ghidra session.
+Source code, VTABLE documentation and Ghidra should progress in lockstep and be synced.
+
+When reverse engineering or decompiling new methods / vtable slots on active classes:
+- add anchored source implementations or scaffolds for them in the same task
+- sync function names with `../../docs/launcher.exe/VTABLES/` and Ghidra in the same task
+- do not let newly recovered active-slot understanding live only in docs or only in the current Ghidra session
 
 ## Current implementation priorities
 
@@ -188,7 +193,11 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
 
 1. Continue refining `CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool)` and producer helpers against original `0x436b10` / `0x436670` / `0x436820`
 2. Treat the completed auth-side queue milestone as proven on the deliberate runtime path, and now ask the next narrower question: what later type-1 or post-auth launcher-owned work/state is still missing after successful auth-side queue consumption?
-3. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
-4. For each high-value arg5 function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
-5. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but be willing to shift the active blocker away from arg5 if new evidence keeps showing that arg5 queue consumption itself is already alive
-6. Prune stale or resolved notes from this file instead of letting it grow again
+3. On the login-mediator side, the next narrower post-auth source problem is active-path writers for state11-only fields:
+   - owner `+0x178` = `RealFirstName`
+   - owner `+0x198` = `RealLastName`
+   - owner `+0x1b8` = `Background`
+4. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
+5. For each high-value arg5 function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
+6. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but be willing to shift the active blocker away from arg5 if new evidence keeps showing that arg5 queue consumption itself is already alive
+7. Prune stale or resolved notes from this file instead of letting it grow again

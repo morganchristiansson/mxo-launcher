@@ -31,7 +31,7 @@ These names are intentionally structural and avoid overclaiming semantics where 
 | slot 2 | `Slot2_HandleSecondaryGate` | shared fallback gate / transition entry (`0x00438df0` on most reviewed vtables; locally overridden by the B1 branch) |
 | slot 3 | `Slot3_BeginOrContinue` | main per-state outbound step / begin / continue body |
 | slot 4 | `Slot4_NoOp` | trivial `ret` stub on most reviewed vtables |
-| slot 5 | `Slot5_HandlePrimaryMessage` | first inbound-message / failure surface; string-backed auth/world-list handlers live here on some states |
+| slot 5 | `AuthMessageDispatch` | first inbound-message / failure surface; string-backed auth/world-list handlers live here on some states |
 | slot 6 | `Slot6_HandleSecondaryMessage` | second inbound-message / completion surface |
 | slot 7 | `Slot7_GetStateId` | tiny state-id getter, or `purecall` on the abstract final-leaf base |
 | slot 8 | `Slot8_HandleAuxiliaryEvent` | optional auxiliary completion / UI / status handler |
@@ -141,6 +141,30 @@ This remains the clearest sequential state pipeline recovered so far:
 - state 9 handles the next reply stage and switches into state 12
 - final leaves then take over
 
+## Provisional better-name suggestions
+
+These are **documentation aliases only for now**.
+Do not mass-rename the source classes yet; several are still behavior-backed rather than string-backed.
+
+| Current class | Suggested alias | Confidence | Why |
+|---|---|---:|---|
+| `CLTLoginState_State1` | `CLTLoginState_AuthConnectPending` | high | slot 3 is `CLTLoginMediator_Helper1_StartAuthConnection` |
+| `CLTLoginState_State3` | `CLTLoginState_SelectionContextPending` | medium | live original path reaches state `3`, then owner writers `0x41c390/0x41c1f0` consume selection-context input and switch to states `7/8` |
+| `CLTLoginState_State7` | `CLTLoginState_MarginRouteProbePending` | low-medium | sends a smaller current-selection/current-character margin packet and expects reply opcode `0x0e` |
+| `CLTLoginState_State8` | `CLTLoginState_MarginLoadCharacterPending` | medium | sends a large structured margin packet, handles chunked opcode `0x10`, then advances to state `9` |
+| `CLTLoginState_State9` | `CLTLoginState_LoadCharacterFollowupPending` | low-medium | consumes the post-`0x10` follow-up path, handles opcode `0x11`, and advances to state `0x0c` |
+| `CLTLoginState_State10` | `CLTLoginState_AuthReplyPending` | high | slot 6 is the best-anchored `AS_AuthReply` handler at `0x4401a0` |
+| `CLTLoginState_State11` | `CLTLoginState_PostAuthMarginLoadPending` | high | immediate post-auth state; sends raw `0x4d`, then handles load-character reply fragments |
+| `CLTLoginState_State12` | `CLTLoginState_FinalMarginLeaf12` | low | only final-leaf evidence so far; stronger semantic name still missing |
+| `CLTLoginState_State13` | `CLTLoginState_LateMarginRouteProbePending` | low | later branch-specific request/reply pair that feeds state `9` via opcode `0x16` |
+
+States still too weakly understood to rename beyond number-led placeholders:
+- `State0`
+- `State4`
+- `State5`
+- `State6`
+- `State15..19`
+
 ## Naming guidance
 
 Preferred wording:
@@ -149,5 +173,6 @@ Preferred wording:
 - string-backed names where they do exist:
   - `CLTLoginState_AuthenticatePending`
   - `CLTLoginState_WorldListPending`
+- when a number-led class gains enough behavioral evidence, document the **suggested alias** first before renaming source/Ghidra wholesale
 
 Avoid treating `LaunchPadClient_*` labels as authoritative class names unless separate evidence anchors them.

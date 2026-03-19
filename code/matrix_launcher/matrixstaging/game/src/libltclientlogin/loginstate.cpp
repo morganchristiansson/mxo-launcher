@@ -1,14 +1,225 @@
 #include "loginstate.h"
 
 #include "loginmediator.h"
+#include "../../../../src/diagnostics.h"
 
 namespace mxo::ltlogin {
 namespace {
+
+struct State11Packet0x4dFixedPayload {
+    static constexpr uint8_t kPayloadTag0c = 0x0c;
+    static constexpr size_t kRealFirstNameOffset = 0x45;
+    static constexpr size_t kRealLastNameOffset = 0x47;
+    static constexpr size_t kBackgroundOffset = 0x49;
+    static constexpr size_t kGameSessionIdOffset = 0x4b;
+    static constexpr size_t kFixedByteCount = 0x4d;
+    static constexpr size_t kMaxPayloadByteCount = 0xffc;
+};
+
+class RecoveredPacketBuilderEnvelope {
+public:
+    // anchor: launcher.exe:0x439840
+    RecoveredPacketBuilderEnvelope() {
+        // Current best source-owned mirror of the local helper object initialized by `0x439840`:
+        // - acquires/installs a shared payload object
+        // - stores the active payload write base as `shared + 0x0c`
+        payloadBytes_.reserve(State11Packet0x4dFixedPayload::kMaxPayloadByteCount);
+    }
+
+    uint8_t* PayloadBase() {
+        return payloadBytes_.empty() ? nullptr : payloadBytes_.data();
+    }
+
+    const uint8_t* PayloadBase() const {
+        return payloadBytes_.empty() ? nullptr : payloadBytes_.data();
+    }
+
+    uint32_t PayloadByteCount() const {
+        return static_cast<uint32_t>(payloadBytes_.size());
+    }
+
+    const std::vector<uint8_t>& PayloadBytes() const {
+        return payloadBytes_;
+    }
+
+protected:
+    void ResetPayloadToFixedByteCount0x4d() {
+        payloadBytes_.assign(State11Packet0x4dFixedPayload::kFixedByteCount, 0);
+    }
+
+    void ResizePayload(size_t fixedByteCount) {
+        payloadBytes_.assign(fixedByteCount, 0);
+    }
+
+    void WritePayloadByte(size_t offset, uint8_t value) {
+        if (offset < payloadBytes_.size()) {
+            payloadBytes_[offset] = value;
+        }
+    }
+
+    void WritePayloadU16LE(size_t offset, uint16_t value) {
+        if (offset + 1 >= payloadBytes_.size()) {
+            return;
+        }
+        payloadBytes_[offset] = static_cast<uint8_t>(value & 0xffu);
+        payloadBytes_[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xffu);
+    }
+
+    void WritePayloadU32LE(size_t offset, uint32_t value) {
+        if (offset + 3 >= payloadBytes_.size()) {
+            return;
+        }
+        payloadBytes_[offset] = static_cast<uint8_t>(value & 0xffu);
+        payloadBytes_[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xffu);
+        payloadBytes_[offset + 2] = static_cast<uint8_t>((value >> 16) & 0xffu);
+        payloadBytes_[offset + 3] = static_cast<uint8_t>((value >> 24) & 0xffu);
+    }
+
+    uint16_t AppendLengthPrefixedString(size_t offsetField, const char* text, size_t bound) {
+        if (!text) {
+            return 0;
+        }
+
+        size_t textLength = 0;
+        while (textLength < bound && text[textLength] != '\0') {
+            ++textLength;
+        }
+        if (textLength == 0) {
+            return 0;
+        }
+        if (payloadBytes_.size() + 2 > State11Packet0x4dFixedPayload::kMaxPayloadByteCount) {
+            return 0;
+        }
+
+        const size_t remainingAfterLength =
+            State11Packet0x4dFixedPayload::kMaxPayloadByteCount - payloadBytes_.size() - 2;
+        const uint16_t storedLength = static_cast<uint16_t>(std::min(textLength, remainingAfterLength));
+        const uint16_t fieldOffset = static_cast<uint16_t>(payloadBytes_.size());
+        WritePayloadU16LE(offsetField, fieldOffset);
+        payloadBytes_.push_back(static_cast<uint8_t>(storedLength & 0xffu));
+        payloadBytes_.push_back(static_cast<uint8_t>((storedLength >> 8) & 0xffu));
+        payloadBytes_.insert(payloadBytes_.end(), text, text + storedLength);
+        return storedLength;
+    }
+
+private:
+    std::vector<uint8_t> payloadBytes_;
+};
+
+struct State10Packet0x0aFixedPayload {
+    static constexpr uint8_t kPayloadTag0a = 0x0a;
+    static constexpr size_t kCharacterNameOffset = 0x01;
+    static constexpr size_t kFixedByteCount = 0x03;
+};
+
+class State10Packet0x0aBuilder final : public RecoveredPacketBuilderEnvelope {
+public:
+    // anchor: launcher.exe:0x43a1f0
+    void ResetAndInitialize() {
+        ResizePayload(State10Packet0x0aFixedPayload::kFixedByteCount);
+        WritePayloadByte(0x00, State10Packet0x0aFixedPayload::kPayloadTag0a);
+        WritePayloadU16LE(State10Packet0x0aFixedPayload::kCharacterNameOffset, 0);
+    }
+
+    // anchor: launcher.exe:0x43aa80
+    void SetCharacterName(const char* text) {
+        AppendLengthPrefixedString(State10Packet0x0aFixedPayload::kCharacterNameOffset, text, 0xffffu);
+    }
+};
+
+class State11Packet0x4dBuilder final : public RecoveredPacketBuilderEnvelope {
+public:
+    // anchor: launcher.exe:0x43a470
+    void ResetAndInitialize() {
+        ResetPayloadToFixedByteCount0x4d();
+        WritePayloadByte(0x00, State11Packet0x4dFixedPayload::kPayloadTag0c);
+        WritePayloadU16LE(State11Packet0x4dFixedPayload::kRealFirstNameOffset, 0);
+        WritePayloadU16LE(State11Packet0x4dFixedPayload::kRealLastNameOffset, 0);
+        WritePayloadU16LE(State11Packet0x4dFixedPayload::kBackgroundOffset, 0);
+        WritePayloadU16LE(State11Packet0x4dFixedPayload::kGameSessionIdOffset, 0);
+    }
+
+    void SetFixedDword(size_t payloadOffset, uint32_t value) {
+        WritePayloadU32LE(payloadOffset, value);
+    }
+
+    // anchor: launcher.exe:0x43a640
+    void SetRealFirstName(const char* text) {
+        AppendLengthPrefixedString(State11Packet0x4dFixedPayload::kRealFirstNameOffset, text, 0x20);
+    }
+
+    // anchor: launcher.exe:0x43a740
+    void SetRealLastName(const char* text) {
+        AppendLengthPrefixedString(State11Packet0x4dFixedPayload::kRealLastNameOffset, text, 0x20);
+    }
+
+    // anchor: launcher.exe:0x43a840
+    void SetBackground(const char* text) {
+        AppendLengthPrefixedString(State11Packet0x4dFixedPayload::kBackgroundOffset, text, 0x20);
+    }
+
+    // anchor: launcher.exe:0x43a940
+    void SetGameSessionId(const char* text) {
+        AppendLengthPrefixedString(State11Packet0x4dFixedPayload::kGameSessionIdOffset, text, 0xffffu);
+    }
+};
+
+struct State8StructuredMarginPacketFixedPayload {
+    static constexpr uint8_t kPayloadTag0f = 0x0f;
+    static constexpr size_t kGameSessionIdOffset = 0xb9;
+    static constexpr size_t kFixedByteCount = 0xbb;
+};
+
+class State8StructuredMarginPacketBuilder final : public RecoveredPacketBuilderEnvelope {
+public:
+    // anchor: launcher.exe:0x43ac10 = CLTLoginMediatorPacket0x0f_ResetAndInitialize
+    void ResetAndInitialize() {
+        ResizePayload(State8StructuredMarginPacketFixedPayload::kFixedByteCount);
+        WritePayloadByte(0x00, State8StructuredMarginPacketFixedPayload::kPayloadTag0f);
+        WritePayloadU32LE(0x01, 0);
+        WritePayloadU32LE(0x05, 0);
+        WritePayloadU16LE(State8StructuredMarginPacketFixedPayload::kGameSessionIdOffset, 0);
+    }
+
+    void SetFixedDword(size_t payloadOffset, uint32_t value) {
+        WritePayloadU32LE(payloadOffset, value);
+    }
+
+    void SetSelectionBlock(size_t payloadOffset, const std::array<uint32_t, 4>& block) {
+        WritePayloadU32LE(payloadOffset + 0x0, block[0]);
+        WritePayloadU32LE(payloadOffset + 0x4, block[1]);
+        WritePayloadU32LE(payloadOffset + 0x8, block[2]);
+        WritePayloadU32LE(payloadOffset + 0xc, block[3]);
+    }
+
+    // anchor: launcher.exe:0x43ada0 = CLTLoginMediatorPacket0x0f_SetGameSessionId
+    // helper-local length reservation/writeback mirrors launcher.exe:0x43acf0 =
+    // CLTLoginMediatorPacket0x0f_ReserveGameSessionId through AppendLengthPrefixedString().
+    void SetGameSessionId(const char* text) {
+        AppendLengthPrefixedString(State8StructuredMarginPacketFixedPayload::kGameSessionIdOffset, text, 0xffffu);
+    }
+
+};
 
 static uint32_t PlaceholderStateAction(const char* debugName, const char* anchor) {
     (void)debugName;
     (void)anchor;
     return 1;
+}
+
+static uint32_t RecoverCachedUpstreamPhaseCode(const void* cachedUpstreamOrArg) {
+    // `0x439300` calls the cached upstream/helper object's vtable `+0x18`.
+    // The source scaffold keeps that as the shared `DispatchPhaseCode()` wrapper over the
+    // recovered login-state family.
+    const auto* cachedUpstreamState = static_cast<const CLTLoginState*>(cachedUpstreamOrArg);
+    return cachedUpstreamState ? cachedUpstreamState->DispatchPhaseCode() : 0u;
+}
+
+static uint32_t BeginMarginConnectionIfResolved(CLTLoginMediator* mediator, const char* routeHostText) {
+    if (!mediator || !routeHostText || routeHostText[0] == '\0') {
+        return 0u;
+    }
+    return mediator->BeginMarginConnectionScaffold(routeHostText);
 }
 
 }  // namespace
@@ -43,7 +254,7 @@ uint32_t CLTLoginState::Slot4_NoOp() {
 }
 
 // anchor: launcher.exe:0x004397c0 (shared slot 5 failure stub on multiple vtables)
-uint32_t CLTLoginState::Slot5_HandlePrimaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
     (void)workItem;
     (void)mediator;
     return 0;
@@ -138,16 +349,6 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x00439210");
 }
 
-// anchor: launcher.exe:0x0043f300 (vtable 0x004b5014 slot 5)
-uint32_t CLTLoginState_AuthenticatePending::Slot5_HandlePrimaryMessage(void* workItem, CLTLoginMediator* mediator) {
-    return AuthMessageDispatch(workItem, mediator);
-}
-
-// anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
-uint32_t CLTLoginState_AuthenticatePending::Slot7_GetStateId() const {
-    return 2;
-}
-
 // anchor: launcher.exe:0x0043f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())
 uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
     // Current best recovered role from `0x43f300`:
@@ -169,6 +370,11 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
     (void)workItem;
     (void)mediator;
     return 1;
+}
+
+// anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
+uint32_t CLTLoginState_AuthenticatePending::Slot7_GetStateId() const {
+    return 2;
 }
 
 // anchor: launcher.exe vtable 0x004b5208
@@ -194,9 +400,54 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(CLTLoginMediator* media
 
 // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
 uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
-    (void)upstreamOrArg;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x00439300");
+    if (!mediator) {
+        return 0u;
+    }
+
+    // Faithfulness/ownership correction from the fresh `0x439300` disassembly review:
+    // - `0x439300` belongs to `CLTLoginState_State4` vtable `0x004b503c` slot 3
+    // - this object caches the first incoming upstream/helper pointer at `this+4`
+    // - it then calls that cached object's vtable `+0x18` and uses the returned phase/state code
+    //   for the real case split
+    // - only the narrow owner-side route getters and `0x41e500` transport/init stay on the
+    //   mediator
+    if (cachedUpstreamOrArg_ == nullptr) {
+        cachedUpstreamOrArg_ = upstreamOrArg;
+    }
+
+    const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    switch (upstreamPhaseCode) {
+        case 6:
+            return BeginMarginConnectionIfResolved(
+                mediator,
+                mediator->ResolveMarginRouteDescriptor());
+
+        case 7:
+        case 8:
+        case 13:
+            return BeginMarginConnectionIfResolved(
+                mediator,
+                mediator->ResolveMarginRouteFromCurrentCharacterSlot());
+
+        case 10:
+            return BeginMarginConnectionIfResolved(
+                mediator,
+                mediator->ResolveMarginRouteFromWorldId(mediator->SourceField12c()));
+
+        default: {
+            // Current source-owned mirror for the default branch's owner `+0x104` dword remains
+            // `CurrentMarginRouteState().currentWorldId`; keep the field meaning provisional and
+            // only preserve the original `!= -1 -> owner vtable +0xfc -> if non-null call 0x41e500`
+            // structure here.
+            const int32_t field104Value = mediator->CurrentMarginRouteState().currentWorldId;
+            if (field104Value == -1) {
+                return 0u;
+            }
+            return BeginMarginConnectionIfResolved(
+                mediator,
+                mediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value)));
+        }
+    }
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b503c slot 6)
@@ -297,8 +548,59 @@ const char* CLTLoginState_State8::DebugName() const {
 // anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
 uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     (void)upstreamOrArg;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043bd20");
+    if (!mediator) {
+        return 0u;
+    }
+
+    // Ownership/fidelity correction:
+    // - `0x43bd20` is `CLTLoginState_State8` slot 3
+    // - it owns a structured packet-builder path, not a mediator slot body
+    // - current best read from decompilation:
+    //   - early prechecks can switch helper states `4` or `6`
+    //   - fetch current slot record through owner vtable `+0x44`
+    //   - initialize packet-builder family `0x43ac10`
+    //   - write the current character id pair plus selection snapshot blocks
+    //     `+0xcd0..+0xd7f` in the original write order
+    //   - append `GameSessionID` through `0x43ada0`
+    //   - send through `0x41af70`
+    //   - post event `9`
+    const CLTLoginMediator::SlotRecordState004b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
+    State8StructuredMarginPacketBuilder packetBuilder;
+    packetBuilder.ResetAndInitialize();
+
+    packetBuilder.SetFixedDword(0x01, currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u);
+    packetBuilder.SetFixedDword(0x05, currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u);
+
+    // Keep block write order aligned with the original `0x43bd20` disassembly, not numeric order.
+    packetBuilder.SetSelectionBlock(0x09, mediator->SelectionContextBlockCd0());
+    packetBuilder.SetSelectionBlock(0x19, mediator->SelectionContextBlockCe0());
+    packetBuilder.SetSelectionBlock(0x29, mediator->SelectionContextBlockCf0());
+    packetBuilder.SetSelectionBlock(0x79, mediator->SelectionContextBlockD40());
+    packetBuilder.SetSelectionBlock(0x89, mediator->SelectionContextBlockD50());
+    packetBuilder.SetSelectionBlock(0x99, mediator->SelectionContextBlockD60());
+    packetBuilder.SetSelectionBlock(0xa9, mediator->SelectionContextBlockD70());
+    packetBuilder.SetSelectionBlock(0x39, mediator->SelectionContextBlockD00());
+    packetBuilder.SetSelectionBlock(0x49, mediator->SelectionContextBlockD10());
+    packetBuilder.SetSelectionBlock(0x59, mediator->SelectionContextBlockD20());
+    packetBuilder.SetSelectionBlock(0x69, mediator->SelectionContextBlockD30());
+
+    packetBuilder.SetGameSessionId(mediator->GetGameSessionId664());
+
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
+        packetBuilder.PayloadBase(),
+        packetBuilder.PayloadByteCount());
+
+    Log(
+        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' -> sendResult=0x%08x then posts event=9",
+        (unsigned)State8StructuredMarginPacketFixedPayload::kFixedByteCount,
+        (unsigned)packetBuilder.PayloadByteCount(),
+        currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdLow03 : 0u,
+        currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdHigh07 : 0u,
+        (unsigned)mediator->SelectionContextBlockCd0()[0],
+        (unsigned)mediator->SelectionContextBlockD70()[3],
+        mediator->GetGameSessionId664() ? mediator->GetGameSessionId664() : "<empty>",
+        (unsigned)sendResult);
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
@@ -345,8 +647,45 @@ const char* CLTLoginState_State10::DebugName() const {
 // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
 uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     (void)upstreamOrArg;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043bf90");
+    if (!mediator) {
+        return 0u;
+    }
+
+    // Fresh `0x43bf90` read from decompilation + disassembly:
+    // - precheck owner `+0x1c` connection state through `0x41b4b0`
+    //   - on failure, original switches helper state to `4`
+    // - then check owner byte `+0xf14`
+    //   - on zero, original switches helper state to `6`
+    // - initialize local packet-builder family `0x43a1f0`
+    // - copy owner `+0x108` (`CharacterName`) through `0x43aa80`
+    // - send through `0x41af70`
+    // - post event `0x13`
+    if (!mediator->State10HasReadyConnectionState2()) {
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4");
+        return 0u;
+    }
+    if (mediator->State10SendGateFlagF14() == 0) {
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0xf14==0; original would switch helper state to 6");
+        return 0u;
+    }
+
+    State10Packet0x0aBuilder packetBuilder;
+    packetBuilder.ResetAndInitialize();
+    packetBuilder.SetCharacterName(mediator->SourceLeadString108().data());
+
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
+        packetBuilder.PayloadBase(),
+        packetBuilder.PayloadByteCount());
+
+    Log(
+        "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x%02x totalBytes=0x%02x CharacterName='%s' -> sendResult=0x%08x then posts event=0x13",
+        (unsigned)State10Packet0x0aFixedPayload::kFixedByteCount,
+        (unsigned)packetBuilder.PayloadByteCount(),
+        mediator->SourceLeadString108().data(),
+        (unsigned)sendResult);
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
@@ -369,12 +708,74 @@ const char* CLTLoginState_State11::DebugName() const {
 // anchor: launcher.exe:0x0043c020 (vtable 0x004b5154 slot 3)
 uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     (void)upstreamOrArg;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043c020");
+    if (!mediator) {
+        return 0u;
+    }
+
+    // Faithfulness correction:
+    // - `0x43c020` belongs to `CLTLoginState_State11` slot 3, so the packet build/send shape
+    //   should live here, not on the mediator
+    // - original body:
+    //   - treats `ESI = owner + 0x108`
+    //   - creates a packet-builder object through `0x439840`
+    //   - resets/initializes the raw `0x4d` payload through `0x43a470`
+    //   - writes 17 dwords from owner `+0x134..+0x174`
+    //   - appends `RealFirstName`, `RealLastName`, optional `Background`, and `GameSessionID`
+    //     through `0x43a640 / 0x43a740 / 0x43a840 / 0x43a940`
+    //   - calls `0x41af70` to send through the current margin connection
+    //   - then posts event `0x15`
+    const auto& sourceDwords134 = mediator->SourceDwords134();
+    State11Packet0x4dBuilder packetBuilder;
+    packetBuilder.ResetAndInitialize();
+
+    // Keep write order aligned with the original disassembly of `0x43c020`.
+    packetBuilder.SetFixedDword(0x01, sourceDwords134[0]);
+    packetBuilder.SetFixedDword(0x05, sourceDwords134[1]);
+    packetBuilder.SetFixedDword(0x09, sourceDwords134[2]);
+    packetBuilder.SetFixedDword(0x0d, sourceDwords134[3]);
+    packetBuilder.SetFixedDword(0x11, sourceDwords134[4]);
+    packetBuilder.SetFixedDword(0x15, sourceDwords134[5]);
+    packetBuilder.SetFixedDword(0x19, sourceDwords134[6]);
+    packetBuilder.SetFixedDword(0x1d, sourceDwords134[7]);
+    packetBuilder.SetFixedDword(0x35, sourceDwords134[13]);
+    packetBuilder.SetFixedDword(0x25, sourceDwords134[9]);
+    packetBuilder.SetFixedDword(0x3d, sourceDwords134[15]);
+    packetBuilder.SetFixedDword(0x2d, sourceDwords134[11]);
+    packetBuilder.SetFixedDword(0x21, sourceDwords134[8]);
+    packetBuilder.SetFixedDword(0x39, sourceDwords134[14]);
+    packetBuilder.SetFixedDword(0x31, sourceDwords134[12]);
+    packetBuilder.SetFixedDword(0x29, sourceDwords134[10]);
+    packetBuilder.SetFixedDword(0x41, sourceDwords134[16]);
+
+    packetBuilder.SetRealFirstName(reinterpret_cast<const char*>(mediator->SourceBlock178().data()));
+    packetBuilder.SetRealLastName(reinterpret_cast<const char*>(mediator->SourceBlock198().data()));
+    packetBuilder.SetBackground(reinterpret_cast<const char*>(mediator->SourceBlock1b8().data()));
+    packetBuilder.SetGameSessionId(mediator->GetGameSessionId664());
+
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
+        packetBuilder.PayloadBase(),
+        packetBuilder.PayloadByteCount());
+
+    Log(
+        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built raw-0x4d packet fixedBytes=0x%02x totalBytes=0x%02x SkinToneID=0x%08x RealFirstName='%s' RealLastName='%s' Background='%s' GameSessionID='%s' -> sendResult=0x%08x then posts event=0x15",
+        (unsigned)State11Packet0x4dFixedPayload::kFixedByteCount,
+        (unsigned)packetBuilder.PayloadByteCount(),
+        (unsigned)sourceDwords134[0],
+        reinterpret_cast<const char*>(mediator->SourceBlock178().data()),
+        reinterpret_cast<const char*>(mediator->SourceBlock198().data()),
+        reinterpret_cast<const char*>(mediator->SourceBlock1b8().data()),
+        mediator->GetGameSessionId664() ? mediator->GetGameSessionId664() : "<empty>",
+        (unsigned)sendResult);
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
 uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+    // Ownership correction mirrors slot 3 as well:
+    // - `0x440320` belongs to `CLTLoginState_State11` slot 6
+    // - the mediator-side scaffold remains useful for recovered owner-buffer layout work, but the
+    //   call-shape from `workItem` to parsed packet bytes is not source-owned strongly enough yet
+    //   to wire this through here without guessing
     (void)workItem;
     (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x00440320");
@@ -437,16 +838,6 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043b830");
 }
 
-// anchor: launcher.exe:0x0043d4d0 (vtable 0x004b4fec slot 5)
-uint32_t CLTLoginState_WorldListPending::Slot5_HandlePrimaryMessage(void* workItem, CLTLoginMediator* mediator) {
-    return AuthMessageDispatch(workItem, mediator);
-}
-
-// anchor: launcher.exe:0x00438ce0 (vtable 0x004b4fec slot 7)
-uint32_t CLTLoginState_WorldListPending::Slot7_GetStateId() const {
-    return 14;
-}
-
 // anchor: launcher.exe:0x0043d4d0 (string/file anchors: loginstate.cpp, CLTLoginState_WorldListPending::AuthMessageDispatch())
 uint32_t CLTLoginState_WorldListPending::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
     // Current best contextual role from the vtable and string anchors:
@@ -455,6 +846,11 @@ uint32_t CLTLoginState_WorldListPending::AuthMessageDispatch(void* workItem, CLT
     (void)workItem;
     (void)mediator;
     return 1;
+}
+
+// anchor: launcher.exe:0x00438ce0 (vtable 0x004b4fec slot 7)
+uint32_t CLTLoginState_WorldListPending::Slot7_GetStateId() const {
+    return 14;
 }
 
 // anchor: launcher.exe vtable 0x004b0b88
@@ -552,9 +948,15 @@ const char* CLTLoginState_State18::DebugName() const {
 
 // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
 uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+    // Stronger current read from disassembly review:
+    // - this is a later launchpad/session helper path, not a direct helper11 writer
+    // - it fetches owner vtable `+0x130` helper `+0x65c`
+    // - when conditions permit, it refreshes helper string `+0x18` from owner `+0x94 + 0x60`
+    //   (the embedded small-string in the recovered auth/bootstrap source block)
+    // - it then reaches `0x420e70`, which copies helper `+0x18` into owner `+0x664`
+    //   (`GameSessionID`) when helper flag `+0x2d` is clear
     (void)upstreamOrArg;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x00421a50");
+    return mediator ? mediator->RefreshSessionHelperGameSessionId664FromSourceBlock94() : 0u;
 }
 
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)

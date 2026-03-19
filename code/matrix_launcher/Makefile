@@ -30,7 +30,8 @@ LAUNCHER_SRC = src/resurrections.cpp src/diagnostics.cpp src/diagnostics_auth.cp
 	matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp \
 	matrixstaging/runtime/src/libltmessaging/messageconnection.cpp \
 	matrixstaging/game/src/libltclientlogin/loginmediator.cpp \
-	matrixstaging/game/src/libltclientlogin/loginstate.cpp $(COMMON_AUTH_SRC)
+	matrixstaging/game/src/libltclientlogin/loginstate.cpp \
+	matrixstaging/game/src/libltclientlogin/launchpad.cpp $(COMMON_AUTH_SRC)
 CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 AUTH_PROBE_SRC = tools/auth_probe.cpp $(COMMON_AUTH_SRC)
 

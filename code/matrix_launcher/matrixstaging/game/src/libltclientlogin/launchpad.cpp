@@ -1,42 +1,110 @@
 #include "launchpad.h"
 
+#include "loginmediator.h"
+#include "../../../../src/diagnostics.h"
+
 namespace mxo::ltlogin {
 
-uint32_t LaunchPadClient::OnLoginRequestStatus() {
-    // launcher.exe:0x421220
-    // current best role: login-request result handling plus subscription/status filtering
-    return 0;
+namespace {
+
+static const char* NonEmptyOrFallback(const char* value, const char* fallback) {
+    return (value && value[0] != '\0') ? value : fallback;
 }
 
-uint32_t LaunchPadClient::OnPlayRequestStatus() {
-    // launcher.exe:0x420ef0
-    // current best role: play-request result handling after earlier LaunchPad-side login work
-    return 0;
+}  // namespace
+
+// anchor: launcher.exe vtable 0x004b0e48
+// docs: ../../docs/launcher.exe/VTABLES/0x004b0e48.md
+// Current best class ownership for this file:
+// - `0x004b0e48` = LaunchPadClient vtable family
+// - key vtable entries now kept here instead of being described only from mediator-side notes:
+//   - `0x420440` = `LaunchPadClient_OnConnectionOpened`
+//   - `0x4204f0` = `LaunchPadClient_OnSessionClosed`
+//   - `0x420580` = `LaunchPadClient_OnSubscriptionValidation`
+//   - `0x421220` = `LaunchPadClient_OnLoginRequestStatus`
+//   - `0x420ef0` = `LaunchPadClient_OnPlayRequestStatus`
+
+uint32_t LaunchPadClient::OnLoginRequestStatus(
+    CLTLoginMediator* mediator,
+    uint32_t resultCode,
+    const char* sourceBlock94FirstString,
+    uint32_t sharedMarginPacketField660,
+    const char* sessionText) {
+    // anchor: launcher.exe:0x421220
+    // anchor: launcher.exe vtable 0x004b0e48 + 0x14
+    // Current best recovered success effects only:
+    // - on `resultCode == 0`, the original handler first calls mediator vtable `+0x144`
+    // - then pushes stack arg `[ebp+0x14]` into owner vtable `+0x14c` / `0x41f330`, writing
+    //   owner dword `+0x660`
+    // - then pushes stack arg `[ebp+0x10]` into owner vtable `+0x150` / `0x41f270`, writing the
+    //   first inline string of the owner `+0x94` source block
+    // - it separately logs `Session %s` from stack arg `[ebp+0x20]`, but that success path does
+    //   **not** directly write owner `+0x664`
+    if (!mediator || resultCode != 0u) {
+        return 0u;
+    }
+
+    mediator->SetSharedMarginPacketField660(sharedMarginPacketField660);
+    mediator->SetLaunchPadSourceBlock94FirstString(sourceBlock94FirstString);
+
+    Log(
+        "DIAGNOSTIC: mirrored launchpad login-request success owner660=0x%08x source94.inlineString00='%s' session='%s'",
+        (unsigned)sharedMarginPacketField660,
+        NonEmptyOrFallback(sourceBlock94FirstString, "<empty>"),
+        NonEmptyOrFallback(sessionText, "<empty>"));
+    return 1u;
+}
+
+uint32_t LaunchPadClient::OnPlayRequestStatus(
+    CLTLoginMediator* mediator,
+    uint32_t resultCode,
+    const char* gameSessionId) {
+    // anchor: launcher.exe:0x420ef0
+    // anchor: launcher.exe vtable 0x004b0e48 + 0x18
+    // Current best recovered success effects only:
+    // - on `resultCode == 0`, this path copies its callback string into mediator owner `+0x664`
+    // - state8/state11 packet builders later read that same string through owner vtable `+0x148`
+    //   / `0x41f320` as `GameSessionID`
+    // - current best concrete read is therefore that `GameSessionID` is launchpad/play-session
+    //   owned, not part of the branch-specific `0x41c3c0` helper11 source writer
+    if (!mediator || resultCode != 0u) {
+        return 0u;
+    }
+
+    mediator->SetGameSessionId664(gameSessionId);
+
+    Log(
+        "DIAGNOSTIC: mirrored launchpad play-request success GameSessionID='%s'",
+        NonEmptyOrFallback(gameSessionId, "<empty>"));
+    return 1u;
 }
 
 uint32_t LaunchPadClient::OnConnectionOpened() {
-    // launcher.exe:0x420440
+    // anchor: launcher.exe:0x420440
+    // anchor: launcher.exe vtable 0x004b0e48 + 0x08
     // string-backed anchor:
     // - "LaunchPadClient %d connections opened (now %d total) from %s"
     return 0;
 }
 
 uint32_t LaunchPadClient::OnSessionClosed() {
-    // launcher.exe:0x4204f0
+    // anchor: launcher.exe:0x4204f0
+    // anchor: launcher.exe vtable 0x004b0e48 + 0x0c
     // string-backed anchor:
     // - "LaunchPadClient %d connections closed (now %d total) from %s"
     return 0;
 }
 
 uint32_t LaunchPadClient::OnSubscriptionValidation() {
-    // launcher.exe:0x420580
+    // anchor: launcher.exe:0x420580
+    // anchor: launcher.exe vtable 0x004b0e48 + 0x10
     // string-backed anchor:
     // - "LaunchPadClient connection failed (now %d total) from %s"
     return 0;
 }
 
 uint32_t LaunchPadClient::OnConnectionStatusCheck() {
-    // launcher.exe:0x4207c0
+    // anchor: launcher.exe:0x4207c0
     // string-backed anchor:
     // - "LaunchPad login successful."
     // important handoff:
