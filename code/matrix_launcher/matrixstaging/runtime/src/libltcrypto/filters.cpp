@@ -6,8 +6,9 @@
 // launcher-owned login state machine but not yet split to exact original class boundaries.
 //
 // Address anchors:
-// - later incoming auth-reply owner handler: launcher.exe:0x4401a0
-//   renamed in Ghidra as CLTLoginMediator_Helper10_HandleAuthReply
+// - later incoming auth-reply owner/helper handler: launcher.exe:0x4401a0
+//   - current best `CLTLoginState` mapping: `CLTLoginState_State10` vtable `0x004b512c` slot 6
+//   - older Ghidra label: `CLTLoginMediator_Helper10_HandleAuthReply`
 // - concrete auth-reply parser object helper: launcher.exe:0x43a330
 // - auth opcode read helper used by that later path: launcher.exe:0x41bc20
 // - exact original parser VAs for 0x07/0x09 packet bodies: [not yet isolated]

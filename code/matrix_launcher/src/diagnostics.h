@@ -42,6 +42,7 @@ void DiagnosticConfigureLoginControllerSelectionSeed(
     const char* selectionName,
     uint32_t selectedWorldIndexLow24,
     bool enableRecoveredProcessLoginCredentialsSeed);
+void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionContext, uint32_t byteCount);
 bool DiagnosticCanBeginAuthConnection();
 uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();

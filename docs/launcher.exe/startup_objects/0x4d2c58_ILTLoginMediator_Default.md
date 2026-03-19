@@ -409,7 +409,6 @@ Representative latest dumps:
   - current `arg2 filteredArgv = 0x003e2b60`
 - `~/MxO_7.6005/MatrixOnline_0.0_crash_34.dmp`
 - `~/MxO_7.6005/MatrixOnline_0.0_crash_35.dmp`
-  - with `MXO_MEDIATOR_SELECTION_NAME=Vector`
   - `EIP=0x003e2b82`
   - current `arg2 filteredArgv = 0x003e2b80`
 
@@ -485,8 +484,11 @@ It now:
 
 Representative non-zero arg7 run:
 - `MXO_ARG7_SELECTION=0x0500002a`
-- `MXO_MEDIATOR_SELECTION_NAME=Vector`
 - `make run_binder_both`
+
+Current practical correction:
+- the correct world name for this path is `Reality`
+- newer auth-reply evidence points to `reality.lith.thematrixonline.net`
 - representative dumps from that run family:
   - `~/MxO_7.6005/MatrixOnline_0.0_crash_59.dmp`
   - `~/MxO_7.6005/MatrixOnline_0.0_crash_60.dmp`
@@ -520,10 +522,12 @@ Important neighboring detail from the same block:
   - specifically through that client-owned `0x629e1c7c` state path
   - and the later scratch-shaped `+0x40` request key
 
-The replacement launcher now accepts that scratch-shaped request diagnostically and returns the configured descriptor with:
-- `mappedName='Vector'`
+The replacement launcher now accepts that scratch-shaped request diagnostically and returns the configured descriptor with the expected:
 - `packedSelectionId=0x00002a`
 - `matchMode=arg7-scratch-shape`
+
+Current correction:
+- the descriptor name for this path should align with `Reality`, not the old incorrect override
 
 Practical result:
 - this better matches the observed client request shape,
@@ -546,6 +550,15 @@ Representative non-zero arg7 result from that same run:
 - a newer static pass now explains that field:
   - at `client.dll:0x62170de2..0x62170e3b`, the client zero-extends the arg7 high-8-bit variant value into `esi`
   - and stores that value into the first dword of the `+0xec` handoff object before the path-building helper sequence
+- newer live original `matrix.exe` WineDbg tracing now strengthens the downstream meaning of that same `0xb4` object:
+  - password confirmation hits owner `+0xec` / `0x41ecd0`
+  - the observed launcher branch then transitions `0 -> 2 -> 3 -> 8`
+  - while current helper vtable is `0x004b5208` (state `3`), the launcher reaches `0x41c1f0`
+  - `0x41c1f0` copies the first dword into owner byte `+0xcc8`, then copies the remaining
+    `0xb0` bytes into owner `+0xcd0 .. +0xd7f`, and switches helper state to `8`
+- replacement-launcher follow-up now mirrors that copied arg6 `+0xec` snapshot directly into the
+  source-owned `CLTLoginMediator::PersistSelectionContextForState8(...)` model path instead of
+  leaving the recovered `0xb4` object only as ABI-side diagnostic storage
 - no printable ASCII strings were found in the copied object itself
 
 So the current `+0xec` object is not just "some paths blob":

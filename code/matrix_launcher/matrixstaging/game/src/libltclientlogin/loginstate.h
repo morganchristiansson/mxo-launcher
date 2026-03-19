@@ -6,53 +6,126 @@ namespace mxo::ltlogin {
 
 class CLTLoginMediator;
 
-// Reimplementation note:
-// Prefer original launcher/client names where string-backed evidence exists.
-// For the login state machine, the most concrete current names come from recovered
-// diagnostic/log strings rather than fully named public RTTI.
-// Keep those names in source scaffolds even while behavior remains skeletal.
-//
-// Recovered source-file anchor:
-// - `\matrixstaging\game\src\libltclientlogin\loginstate.cpp`
-//
-// Practical policy note:
-// - when these methods later gain real behavior, prefer reusing the original log/error strings
-//   where appropriate instead of inventing fresh text
-// - that keeps the implementation anchored to disassembly and makes log comparison easier
+// anchor: reconstructed shared login-state surface spanning launcher.exe vtable families
+// - 0x004b0b88
+// - 0x004b0bb0
+// - 0x004b0bd8
+// - 0x004b0c00
+// - 0x004b0c28
+// - 0x004b4fc4
+// - 0x004b4fec
+// - 0x004b5014
+// - 0x004b503c
+// - 0x004b5064
+// - 0x004b508c
+// - 0x004b50b4
+// - 0x004b50dc
+// - 0x004b5104
+// - 0x004b512c
+// - 0x004b5154
+// - 0x004b517c
+// - 0x004b51b8
+// - 0x004b51e0
+// - 0x004b5208
+// - 0x004b5230
 class CLTLoginState {
 public:
     virtual ~CLTLoginState() = default;
 
+    // anchor: reconstructed shared login-state family surface
     virtual const char* DebugName() const = 0;
 
-    // Current owner-state dispatcher (`launcher.exe:0x439300`) consults an object through
-    // vtable `+0x18` before deciding which connection-init path to take.
-    // The exact semantic name of that query is still open, so keep this generic for now.
+    // anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
+    virtual uint32_t Slot1_HandlePrimaryGate(CLTLoginMediator* mediator);
+
+    // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
+    virtual uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator);
+
+    // anchor: launcher.exe:0x00441790 (shared slot 3 no-op stub on multiple vtables)
+    virtual uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator);
+
+    // anchor: launcher.exe:0x00441790 (shared slot 4 no-op stub on multiple vtables)
+    virtual uint32_t Slot4_NoOp();
+
+    // anchor: launcher.exe:0x004397c0 (shared slot 5 failure stub on multiple vtables)
+    virtual uint32_t Slot5_HandlePrimaryMessage(void* workItem, CLTLoginMediator* mediator);
+
+    // anchor: launcher.exe:0x004397c0 (default shared slot 6 failure stub on selected vtables)
+    virtual uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator);
+
+    // anchor: reconstructed shared slot 7 state-id surface
+    virtual uint32_t Slot7_GetStateId() const = 0;
+
+    // anchor: launcher.exe:0x00441790 (shared slot 8 no-op stub on multiple vtables)
+    virtual uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator);
+
+    // anchor: launcher.exe:0x00437860 (shared slot 9 getter stub returning 1 on most live states)
+    virtual uint32_t Slot9_IsNetworkDriven() const;
+
+    // anchor: launcher.exe:0x00439300 and launcher.exe:0x004439300 consult slot-7-style helper codes;
+    // reimplementation wrapper forwards to Slot7_GetStateId().
     virtual uint32_t DispatchPhaseCode() const;
 };
 
-// String-backed original name recovered from launcher/client logging:
-// - CLTLoginState_WorldListPending::AuthMessageDispatch()
-class CLTLoginState_WorldListPending : public CLTLoginState {
+// anchor: launcher.exe vtable 0x004b51b8
+// docs: ../../docs/launcher.exe/VTABLES/0x004b51b8.md
+class CLTLoginState_AbstractFinalLeafBase : public CLTLoginState {
 public:
-    static constexpr const char* kLogInvalidWorldType =
-        "CLTLoginState_WorldListPending::AuthMessageDispatch(): World %s (id = %d) has an invalid type (%d)!  Forcing it to WORLDTYPE_INVALID.";
-    static constexpr const char* kLogInvalidWorldStatus =
-        "CLTLoginState_WorldListPending::AuthMessageDispatch(): World %s (id = %d) has an invalid status (%d)!  Forcing it to WORLDSTATUS_INVALID.";
+    // anchor: launcher.exe:0x00439d80 (vtable 0x004b51b8 slot 10 initializer)
+    CLTLoginState_AbstractFinalLeafBase() = default;
 
+    // anchor: launcher.exe vtable 0x004b51b8
     const char* DebugName() const override;
 
-    // Current best contextual role:
-    // - auth-server/world-list response handling
-    // - current canonical string anchors include:
-    //   - "AS_GetWorldListReply"
-    //   - "AS_PSGetWorldListReply"
-    //   - CLTLoginState_WorldListPending::AuthMessageDispatch()...
-    uint32_t AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator);
+    // anchor: launcher.exe:0x004397e0 (vtable 0x004b51b8 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0048bc34 (vtable 0x004b51b8 slot 7 purecall)
+    uint32_t Slot7_GetStateId() const override = 0;
+
+    // anchor: launcher.exe:0x00437b40 (vtable 0x004b51b8 slot 9)
+    uint32_t Slot9_IsNetworkDriven() const override;
 };
 
-// String-backed original name recovered from launcher/client logging:
-// - CLTLoginState_AuthenticatePending::AuthMessageDispatch()
+// anchor: launcher.exe vtable 0x004b51e0
+// docs: ../../docs/launcher.exe/VTABLES/0x004b51e0.md
+class CLTLoginState_State0 : public CLTLoginState_AbstractFinalLeafBase {
+public:
+    // anchor: launcher.exe:0x00439d80 (vtable 0x004b51e0 slot 10 shared initializer)
+    CLTLoginState_State0() = default;
+
+    // anchor: launcher.exe vtable 0x004b51e0
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00437b50 (vtable 0x004b51e0 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b4fc4
+// docs: ../../docs/launcher.exe/VTABLES/0x004b4fc4.md
+class CLTLoginState_State1 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00439060 (vtable 0x004b4fc4 slot 10 initializer)
+    CLTLoginState_State1() = default;
+
+    // anchor: launcher.exe vtable 0x004b4fc4
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
+    uint32_t Slot1_HandlePrimaryGate(CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0044e360 (vtable 0x004b4fc4 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b5014
+// docs: ../../docs/launcher.exe/VTABLES/0x004b5014.md
 class CLTLoginState_AuthenticatePending : public CLTLoginState {
 public:
     static constexpr const char* kLogInvalidCharacterStatus =
@@ -62,32 +135,380 @@ public:
     static constexpr const char* kLogInvalidWorldStatus =
         "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): World %s (id = %d) has an invalid status (%d)!  Forcing it to WORLDSTATUS_INVALID.";
 
+    // anchor: launcher.exe:0x004391e0 (vtable 0x004b5014 slot 10 initializer)
+    CLTLoginState_AuthenticatePending() = default;
+
+    // anchor: launcher.exe vtable 0x004b5014
     const char* DebugName() const override;
 
-    // Current best contextual role:
-    // - auth-server authentication/character-selection response handling
-    // - current concrete packet-side anchor now firmly includes later incoming `AS_AuthReply`
-    //   handling on the auth path through helper body `0x4401a0`
-    // - important correction: `0x4401a0` is not the generic owner `+0x17c` callback itself
-    //   - owner `+0x17c` is thunk `0x41f260`
-    //   - that thunk forwards to the owner's current helper/state object at `+0x10`, then jumps
-    //     to helper vtable `+0x14`
-    //   - `0x4401a0` is one later helper-state `+0x14` body (`0x4f7890` / `0x4b512c`)
-    // - that path now also narrows one important negative point:
-    //   - `0x4401a0` parses later `AS_AuthReply`, updates owner-side state, and then reaches
-    //     `CLTLoginMediator::PostEvent(0x14)` or `PostError(0x0b)` depending on reply result
-    //   - it is therefore not direct proof of the first outbound auth request after connect
-    // - the earlier exact `GetPublicKey` request/reply ordering is still not settled enough to
-    //   present as a fixed sequence here
-    // - current canonical string anchors include:
-    //   - "AS_GetPublicKeyRequest"
-    //   - "AS_GetPublicKeyReply"
-    //   - "AS_AuthReply"
-    //   - "AS_AuthChallenge"
-    //   - "AS_AuthChallengeResponse"
-    //   - "AS_PSAuthenticateReply"
-    //   - CLTLoginState_AuthenticatePending::AuthMessageDispatch()...
+    // anchor: launcher.exe:0x00439210 (vtable 0x004b5014 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0043f300 (vtable 0x004b5014 slot 5)
+    uint32_t Slot5_HandlePrimaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+
+    // anchor: launcher.exe:0x0043f300 (string-backed slot-5 handler on vtable 0x004b5014)
     uint32_t AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator);
+};
+
+// anchor: launcher.exe vtable 0x004b5208
+// docs: ../../docs/launcher.exe/VTABLES/0x004b5208.md
+class CLTLoginState_State3 : public CLTLoginState_AbstractFinalLeafBase {
+public:
+    // anchor: launcher.exe:0x00439d80 (vtable 0x004b5208 slot 10 shared initializer)
+    CLTLoginState_State3() = default;
+
+    // anchor: launcher.exe vtable 0x004b5208
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00438cf0 (vtable 0x004b5208 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b503c
+// docs: ../../docs/launcher.exe/VTABLES/0x004b503c.md
+class CLTLoginState_State4 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x004392a0 (vtable 0x004b503c slot 10 initializer)
+    CLTLoginState_State4() = default;
+
+    // anchor: launcher.exe vtable 0x004b503c
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x004393f0 (vtable 0x004b503c slot 2)
+    uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00439190 (vtable 0x004b503c slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x004686b0 (vtable 0x004b503c slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b5064
+// docs: ../../docs/launcher.exe/VTABLES/0x004b5064.md
+class CLTLoginState_State5 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x004394f0 (vtable 0x004b5064 slot 10 initializer)
+    CLTLoginState_State5() = default;
+
+    // anchor: launcher.exe vtable 0x004b5064
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00439590 (vtable 0x004b5064 slot 2)
+    uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438c60 (vtable 0x004b5064 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b508c
+// docs: ../../docs/launcher.exe/VTABLES/0x004b508c.md
+class CLTLoginState_State6 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x004395f0 (vtable 0x004b508c slot 10 initializer)
+    CLTLoginState_State6() = default;
+
+    // anchor: launcher.exe vtable 0x004b508c
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438c70 (vtable 0x004b508c slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b50b4
+// docs: ../../docs/launcher.exe/VTABLES/0x004b50b4.md
+class CLTLoginState_State7 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00439620 (vtable 0x004b50b4 slot 10 initializer)
+    CLTLoginState_State7() = default;
+
+    // anchor: launcher.exe vtable 0x004b50b4
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x0043ba20 (vtable 0x004b50b4 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0043bae0 (vtable 0x004b50b4 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438c80 (vtable 0x004b50b4 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b5104
+// docs: ../../docs/launcher.exe/VTABLES/0x004b5104.md
+class CLTLoginState_State8 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x004396c0 (vtable 0x004b5104 slot 10 initializer)
+    CLTLoginState_State8() = default;
+
+    // anchor: launcher.exe vtable 0x004b5104
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438c90 (vtable 0x004b5104 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b517c
+// docs: ../../docs/launcher.exe/VTABLES/0x004b517c.md
+class CLTLoginState_State9 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00439750 (vtable 0x004b517c slot 10 initializer)
+    CLTLoginState_State9() = default;
+
+    // anchor: launcher.exe vtable 0x004b517c
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438cc0 (vtable 0x004b517c slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b512c
+// docs: ../../docs/launcher.exe/VTABLES/0x004b512c.md
+class CLTLoginState_State10 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x004396f0 (vtable 0x004b512c slot 10 initializer)
+    CLTLoginState_State10() = default;
+
+    // anchor: launcher.exe vtable 0x004b512c
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b5154
+// docs: ../../docs/launcher.exe/VTABLES/0x004b5154.md
+class CLTLoginState_State11 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00439720 (vtable 0x004b5154 slot 10 initializer)
+    CLTLoginState_State11() = default;
+
+    // anchor: launcher.exe vtable 0x004b5154
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x0043c020 (vtable 0x004b5154 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438cb0 (vtable 0x004b5154 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b5230
+// docs: ../../docs/launcher.exe/VTABLES/0x004b5230.md
+class CLTLoginState_State12 : public CLTLoginState_AbstractFinalLeafBase {
+public:
+    // anchor: launcher.exe:0x00439d80 (vtable 0x004b5230 slot 10 shared initializer)
+    CLTLoginState_State12() = default;
+
+    // anchor: launcher.exe vtable 0x004b5230
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00438d00 (vtable 0x004b5230 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b50dc
+// docs: ../../docs/launcher.exe/VTABLES/0x004b50dc.md
+class CLTLoginState_State13 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00439650 (vtable 0x004b50dc slot 10 initializer)
+    CLTLoginState_State13() = default;
+
+    // anchor: launcher.exe vtable 0x004b50dc
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00439680 (vtable 0x004b50dc slot 2)
+    uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0043bb90 (vtable 0x004b50dc slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0043bc60 (vtable 0x004b50dc slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438cd0 (vtable 0x004b50dc slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b4fec
+// docs: ../../docs/launcher.exe/VTABLES/0x004b4fec.md
+class CLTLoginState_WorldListPending : public CLTLoginState {
+public:
+    static constexpr const char* kLogInvalidWorldType =
+        "CLTLoginState_WorldListPending::AuthMessageDispatch(): World %s (id = %d) has an invalid type (%d)!  Forcing it to WORLDTYPE_INVALID.";
+    static constexpr const char* kLogInvalidWorldStatus =
+        "CLTLoginState_WorldListPending::AuthMessageDispatch(): World %s (id = %d) has an invalid status (%d)!  Forcing it to WORLDSTATUS_INVALID.";
+
+    // anchor: launcher.exe:0x004391b0 (vtable 0x004b4fec slot 10 initializer)
+    CLTLoginState_WorldListPending() = default;
+
+    // anchor: launcher.exe vtable 0x004b4fec
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x0043d4d0 (vtable 0x004b4fec slot 5)
+    uint32_t Slot5_HandlePrimaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00438ce0 (vtable 0x004b4fec slot 7)
+    uint32_t Slot7_GetStateId() const override;
+
+    // anchor: launcher.exe:0x0043d4d0 (string-backed slot-5 handler on vtable 0x004b4fec)
+    uint32_t AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator);
+};
+
+// anchor: launcher.exe vtable 0x004b0b88
+// docs: ../../docs/launcher.exe/VTABLES/0x004b0b88.md
+class CLTLoginState_State15 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00420650 (vtable 0x004b0b88 slot 10 initializer)
+    CLTLoginState_State15() = default;
+
+    // anchor: launcher.exe vtable 0x004b0b88
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00420680 (vtable 0x004b0b88 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x004208e0 (vtable 0x004b0b88 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00420310 (vtable 0x004b0b88 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+
+    // anchor: launcher.exe:0x004206a0 (vtable 0x004b0b88 slot 8)
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
+};
+
+// anchor: launcher.exe vtable 0x004b0bb0
+// docs: ../../docs/launcher.exe/VTABLES/0x004b0bb0.md
+class CLTLoginState_State16 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x004206f0 (vtable 0x004b0bb0 slot 10 initializer)
+    CLTLoginState_State16() = default;
+
+    // anchor: launcher.exe vtable 0x004b0bb0
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00420720 (vtable 0x004b0bb0 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bb0 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00420320 (vtable 0x004b0bb0 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+
+    // anchor: launcher.exe:0x004207c0 (vtable 0x004b0bb0 slot 8)
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
+};
+
+// anchor: launcher.exe vtable 0x004b0bd8
+// docs: ../../docs/launcher.exe/VTABLES/0x004b0bd8.md
+class CLTLoginState_State17 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00420860 (vtable 0x004b0bd8 slot 10 initializer)
+    CLTLoginState_State17() = default;
+
+    // anchor: launcher.exe vtable 0x004b0bd8
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00420890 (vtable 0x004b0bd8 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bd8 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00420330 (vtable 0x004b0bd8 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+};
+
+// anchor: launcher.exe vtable 0x004b0c00
+// docs: ../../docs/launcher.exe/VTABLES/0x004b0c00.md
+class CLTLoginState_State18 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x00420930 (vtable 0x004b0c00 slot 10 initializer)
+    CLTLoginState_State18() = default;
+
+    // anchor: launcher.exe vtable 0x004b0c00
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00420340 (vtable 0x004b0c00 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+
+    // anchor: launcher.exe:0x00420960 (vtable 0x004b0c00 slot 8)
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
+};
+
+// anchor: launcher.exe vtable 0x004b0c28
+// docs: ../../docs/launcher.exe/VTABLES/0x004b0c28.md
+class CLTLoginState_State19 : public CLTLoginState {
+public:
+    // anchor: launcher.exe:0x004209b0 (vtable 0x004b0c28 slot 10 initializer)
+    CLTLoginState_State19() = default;
+
+    // anchor: launcher.exe vtable 0x004b0c28
+    const char* DebugName() const override;
+
+    // anchor: launcher.exe:0x004209e0 (vtable 0x004b0c28 slot 3)
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c28 slot 6)
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+
+    // anchor: launcher.exe:0x00420350 (vtable 0x004b0c28 slot 7)
+    uint32_t Slot7_GetStateId() const override;
+
+    // anchor: launcher.exe:0x00420a00 (vtable 0x004b0c28 slot 8)
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
 };
 
 }  // namespace mxo::ltlogin

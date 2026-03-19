@@ -74,12 +74,61 @@ What remains:
     owner byte `+0xcc8`
   - this makes `+0x688` look less like a generic world-slot array and more like a
     current-slot cached record table used by later load-character paths
-  - owner vtable `+0x120` / `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is now the
+  - owner vtable `+0xe0` / `0x41b260` is now the strongest current state-8 margin-route getter:
+    - it reads owner `+0x818[index*0x0c]`
+    - and returns the first dword only when begin != current
+    - current best read is therefore a per-slot **route-host string triple**
+  - owner vtable `+0xfc/+0x100/+0x104/+0x108` now also read a linked owner `+0xd84[index]`
+    **world-descriptor** family through payload offsets `+0x03`, `+0x18`, `+0x19`, and `+0x1f & 0xf`
+  - stronger current class/layout read for that `+0xd84` family:
+    - concrete `0x14`-byte object rooted at vtable `0x004b533c`
+    - ctor/init `0x43c310`, dtor `0x443aa0`, debug printer `0x43ded0`, payload reset `0x439a70`
+    - debug printer proves payload fields:
+      - `+0x01` = world id
+      - `+0x03` = world name
+      - `+0x17` = status
+      - `+0x18` = type
+      - `+0x19` = server version
+      - `+0x1d` = server language
+      - `+0x1e` = private flag
+      - `+0x1f` = population levels
+  - helper10 (`0x4401a0`) still looks like the selected-slot bridge between those families, but the
+    broader writer path is now materially clearer:
+  - `0x43f300 = CLTLoginState_AuthenticatePending_AuthMessageDispatch`
+    - builds `+0xd84` first from auth **world** data
+    - then builds `+0x688` as the auth **character-slot** table
+    - then seeds `+0x818` by matching each character record's world id against the
+      world-descriptor table and copying the descriptor name
+  - practical consequence for the reimplementation:
+    - state-8 margin routing should prefer reconstructed `+0x688/+0x818/+0xd84` data over the old
+      single fallback world-name path
+  - owner vtable `+0x120` / `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the
     strongest recovered writer for the immediate helper11 source block:
     - writes owner `+0x12c`
     - writes owner `+0x134..+0x177`
     - writes owner `+0x108`, `+0x178`, `+0x198`, `+0x1b8`
     - then switches helper state to `10`
+- important runtime narrowing from live original `matrix.exe` under WineDbg:
+  - confirming the launcher password does hit owner vtable `+0xec` / `0x41ecd0 = ProcessLoginRequest`
+  - that live path then visibly transitions through `0x41b450` as:
+    - state `0 -> 2`
+    - state `2 -> 3`
+    - state `3 -> 8`
+  - the state-`3 -> 8` step returns to `0x41c382`, i.e. the `0x41c1f0` family, while current helper
+    vtable is `0x004b5208` (state `3`)
+  - `0x41c3c0` did **not** fire on that observed authenticated launch path before later game loading
+  - current practical consequence: treat `0x41c3c0` as a real writer for one branch, but not yet as
+    the active default post-password progression we most urgently need for launching the game
+  - stronger active-path replacement target now looks like owner `+0xec -> 0x41c1f0 -> state 8`,
+    with `0x41c1f0` persisting a `0xb4` selection/config snapshot under owner `+0xcc8/+0xcd0..+0xd7f`
+  - replacement launcher now also mirrors the copied arg6 `+0xec` snapshot into the source-owned
+    `CLTLoginMediator::PersistSelectionContextForState8(...)` path so this active branch no longer
+    lives only in ABI-side logs
+  - that same copied snapshot is now also mirrored into the auth/login-controller sidecar model,
+    so launcher-owned runtime experiments can consume the observed state-3->8 selection snapshot too
+  - practical host-name correction from live auth data:
+    - decoded auth-reply world name `Reality` is the current ground truth for
+      `reality.lith.thematrixonline.net`
 - stop relying on only the current partial/diagnostic table adoption
 
 ### 2. Faithful post-auth progression into the actual immediate original continuation

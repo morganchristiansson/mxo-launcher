@@ -45,7 +45,7 @@ namespace mxo::liblttcp {
 //     - so the concrete handling target depends on the current helper selected through the
 //       `0x4f7868` family and `0x41b450(...)`, not on one fixed owner-body function alone
 //     - important correction: later body `0x4401a0` is **not** the generic owner `+0x17c`
-//       target by itself; it is helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
+//       target by itself; it is helper `0x4f7890` (`CLTLoginState_State10`, vtable `0x4b512c`) slot `+0x14`
 //     - that helper body only meaningfully handles later raw auth code `0x0b`
 //       (`AS_AuthReply`), then updates owner state and reaches
 //       `0x41b450` + `CLTLoginMediator::PostEvent()` / `PostError()`

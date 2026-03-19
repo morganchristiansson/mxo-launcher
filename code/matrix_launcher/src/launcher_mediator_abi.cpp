@@ -108,6 +108,10 @@ static const char* MaskedSensitiveValue(const char* value) {
     return "<provided>";
 }
 
+static_assert(
+    sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch) == kDiagnosticSelectionContextSize,
+    "State3SelectionContextInputSketch must stay layout-compatible with the recovered arg6 +0xec 0xb4 snapshot");
+
 // UNANCHORED: sidecar-model accessor for the replacement arg6 ABI shell.
 static mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
     if (!g_DiagnosticMediatorModel) {
@@ -175,6 +179,20 @@ static const char* DiagnosticMediatorAuthName() {
 static const char* DiagnosticMediatorAuthPassword() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6AuthPassword() : g_MediatorEmptyString;
+}
+
+static void DiagnosticMirrorSelectionContextIntoMediatorModel(const void* selectionContext) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator || !selectionContext) return;
+
+    mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch input = {};
+    std::memcpy(&input, selectionContext, sizeof(input));
+    mediator->PersistSelectionContextForState8(input);
+    Log(
+        "DIAGNOSTIC: mirrored arg6 +0xec selection context into CLTLoginMediator state3->8 snapshot slot=0x%02x firstBlock04=0x%08x lastBlockA4=0x%08x",
+        (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
+        (unsigned)input.block04[0],
+        (unsigned)input.blockA4[3]);
 }
 
 // UNANCHORED: masks reflected password arguments in mediator-chain logs.
@@ -717,6 +735,8 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
     if (selectionContext) {
         std::memcpy(&g_MediatorSelectionContextCopy, selectionContext, sizeof(g_MediatorSelectionContextCopy));
         g_MediatorSelectionContextCopyValid = true;
+        DiagnosticMirrorSelectionContextIntoMediatorModel(&g_MediatorSelectionContextCopy);
+        DiagnosticMirrorSelectionContextIntoLoginController(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
     } else {
         std::memset(&g_MediatorSelectionContextCopy, 0, sizeof(g_MediatorSelectionContextCopy));
         g_MediatorSelectionContextCopyValid = false;

@@ -181,7 +181,7 @@ make run
 Current deliberate binder path:
 ```bash
 cd /home/morgan/mxo/code/matrix_launcher
-MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Vector make run_binder_both
+MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both
 ```
 
 ## Immediate next tasks

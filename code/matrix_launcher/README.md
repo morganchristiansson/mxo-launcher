@@ -119,7 +119,7 @@ MXO_CLAUNCHER_A8=1 MXO_CLAUNCHER_AC=0 make run_stub_both
 Optional mediator selection name override:
 
 ```bash
-MXO_MEDIATOR_SELECTION_NAME=Vector make run_stub_both
+MXO_MEDIATOR_SELECTION_NAME=Reality make run_stub_both
 ```
 
 By default the launcher now also probes the original registry location for:

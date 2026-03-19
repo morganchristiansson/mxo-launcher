@@ -36,6 +36,7 @@ static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAut
 static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldListPending = {};
 static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
 static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
+static bool g_DiagnosticPostAuthMarginBeginAttempted = false;
 static void* g_DiagnosticWorkItemVtable[2] = {0};
 static void* g_DiagnosticMessageConnectionContextVtable[5] = {0};
 static void* g_DiagnosticCurrentOwner = NULL;
@@ -202,6 +203,14 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                             self->debugLabel ? self->debugLabel : "<null>",
                             (unsigned)handled,
                             (unsigned)rawCode);
+
+                        if (handled != 0u && rawCode == 0x0b && !g_DiagnosticPostAuthMarginBeginAttempted) {
+                            g_DiagnosticPostAuthMarginBeginAttempted = true;
+                            const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
+                            Log(
+                                "DIAGNOSTIC: post-AS_AuthReply margin auto-begin result = 0x%08x",
+                                (unsigned)marginConnectResult);
+                        }
                     }
                 }
 
@@ -334,10 +343,12 @@ void DiagnosticAuthResetState() {
     delete g_DiagnosticLoginController;
     g_DiagnosticLoginController = NULL;
     g_DiagnosticCurrentOwner = NULL;
+    g_DiagnosticPostAuthMarginBeginAttempted = false;
 }
 
 void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
     g_DiagnosticCurrentOwner = owner;
+    g_DiagnosticPostAuthMarginBeginAttempted = false;
     if (!engine) {
         return;
     }
@@ -413,6 +424,28 @@ void DiagnosticConfigureLoginControllerNetwork(
         g_LoginControllerExactMarginHostName[0] ? g_LoginControllerExactMarginHostName : "<empty>",
         g_LoginControllerIgnoreHostsFileForAuth ? 1u : 0u,
         g_LoginControllerIgnoreHostsFileForMargin ? 1u : 0u);
+}
+
+void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionContext, uint32_t byteCount) {
+    if (!g_DiagnosticLoginController || !selectionContext) {
+        return;
+    }
+    if (byteCount < sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch)) {
+        Log(
+            "DIAGNOSTIC: selection context mirror into login controller skipped byteCount=0x%lx required=0x%lx",
+            (unsigned long)byteCount,
+            (unsigned long)sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch));
+        return;
+    }
+
+    mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch input = {};
+    std::memcpy(&input, selectionContext, sizeof(input));
+    g_DiagnosticLoginController->PersistSelectionContextForState8(input);
+    Log(
+        "DIAGNOSTIC: mirrored selection context into CLTLoginMediator sidecar slot=0x%02x firstBlock04=0x%08x lastBlockA4=0x%08x",
+        (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
+        (unsigned)input.block04[0],
+        (unsigned)input.blockA4[3]);
 }
 
 void DiagnosticConfigureLoginControllerSelectionSeed(

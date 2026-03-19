@@ -242,7 +242,7 @@ Representative launcher command:
 cd /home/morgan/mxo/code/matrix_launcher && \
   MXO_FORCE_RUNCLIENT=1 \
   MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Vector \
+  MXO_MEDIATOR_SELECTION_NAME=Reality \
   make run_binder_both
 ```
 

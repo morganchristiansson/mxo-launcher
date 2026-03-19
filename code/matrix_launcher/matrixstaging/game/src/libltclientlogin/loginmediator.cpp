@@ -121,6 +121,16 @@ static const char* MaskedAuthValue(const std::string& value) {
     return value.empty() ? "<empty>" : "<provided>";
 }
 
+static std::string LowercaseAsciiString(const std::string& value) {
+    std::string out = value;
+    for (char& c : out) {
+        if (c >= 'A' && c <= 'Z') {
+            c = static_cast<char>(c - 'A' + 'a');
+        }
+    }
+    return out;
+}
+
 static std::array<uint8_t, 16> CopyPrefix16(const std::vector<uint8_t>& bytes) {
     std::array<uint8_t, 16> out = {};
     const size_t count = std::min(out.size(), bytes.size());
@@ -141,6 +151,7 @@ CLTLoginMediator::CLTLoginMediator()
       marginRouteState_{},
       authBootstrapSource38_{},
       authBootstrap680_{},
+      state8SelectionContextSnapshotState_{},
       postAuthMarginLoadingState_{},
       authServerPortHostOrder_(11000),
       ignoreHostsFileForAuth_(false),
@@ -341,9 +352,9 @@ const CLTLoginMediator::AuthBootstrapState680Sketch& CLTLoginMediator::AuthBoots
 void CLTLoginMediator::InitializeConnectionHelpers() {
     // Address anchors (from Ghidra decompilation of 0x43b300):
     // - launcher.exe:0x43b300 = CLTLoginMediator_InitializeHelperDispatchTable
-    //   This function allocates 16 heap-allocated helper dispatch tables at 0x4f7868..0x4f78a0
-    //   Each table stores a function pointer to LaunchPadClient_ProcessEvent0x17 (0x438d80)
-    // - launcher.exe:0x4b51e0, 0x4b4fec, 0x4b5014, etc. = PTR_FUN data entries pointing to 0x438d80
+    //   This function allocates the helper/state objects installed into 0x4f7868..0x4f78b4.
+    // - launcher.exe:0x4b51e0, 0x4b4fc4, 0x4b4fec, 0x4b5014, etc. = `CLTLoginState_*` vtables
+    //   whose slot 1 commonly points at 0x438d80.
     // - launcher.exe:0x420640 = InitializeHelperDispatchSlot15 (initializes slot at 0x4f78a4)
     // - launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16 (initializes slot at 0x4f78a8)
     // - launcher.exe:0x420850 = InitializeHelperDispatchSlot17 (initializes slot at 0x4f78ac)
@@ -360,7 +371,8 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     //   Slot 0x6c: helper for event dispatch table entry 1
     //   Slot 0x70: helper for event dispatch table entry 2
     //   ... and so on through slot 0xa0
-    // Each slot stores a pointer to LaunchPadClient_ProcessEvent0x17 (0x438d80)
+    // Each slot ultimately stores a helper/state object whose vtable slot 1 commonly points to
+    // `0x438d80`; the installed object pointer itself carries the concrete `CLTLoginState_*` vtable.
     //
     // From disassembly of 0x438d80:
     //   - Calls LaunchPadClient_GetVtableOffset(this+8) to get vtable offset
@@ -382,8 +394,8 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
 
 void CLTLoginMediator::InitializeHelperDispatchSlot15() {
     // Address anchor: launcher.exe:0x420640 = InitializeHelperDispatchSlot15
-    // Original: allocates 8 bytes, stores PTR reference at address 0x4b51e0
-    // The helper function calls the allocated memory which then stores &PTR_LaunchPadClient_ProcessEvent0x17_004b0b88
+    // Original: allocates 8 bytes, stores vtable 0x4b51e0 (`CLTLoginState_State0`)
+    // Current best concrete object identity: heap object with vtable `0x4b51e0` (`CLTLoginState_State0`).
     void* ptr = malloc(8);
     if (ptr) {
         *(void**)ptr = reinterpret_cast<void*>(0x4b51e0);
@@ -393,7 +405,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot15() {
 
 void CLTLoginMediator::InitializeHelperDispatchSlot16() {
     // Address anchor: launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16
-    // Original: allocates 4 bytes, stores PTR reference at address 0x4b4fec
+    // Original: allocates 4 bytes, stores vtable 0x4b4fec (`CLTLoginState_WorldListPending`)
     void* ptr = malloc(4);
     if (ptr) {
         *(void**)ptr = reinterpret_cast<void*>(0x4b4fec);
@@ -403,7 +415,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot16() {
 
 void CLTLoginMediator::InitializeHelperDispatchSlot17() {
     // Address anchor: launcher.exe:0x420850 = InitializeHelperDispatchSlot17
-    // Original: allocates 4 bytes, stores PTR reference at address 0x4b4fc4
+    // Original: allocates 4 bytes, stores vtable 0x4b4fc4 (`CLTLoginState_State1`)
     void* ptr = malloc(4);
     if (ptr) {
         *(void**)ptr = reinterpret_cast<void*>(0x4b4fc4);
@@ -413,7 +425,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot17() {
 
 void CLTLoginMediator::InitializeHelperDispatchSlot18() {
     // Address anchor: launcher.exe:0x420920 = InitializeHelperDispatchSlot18
-    // Original: allocates 8 bytes, stores PTR reference at address 0x4b5014
+    // Original: allocates 8 bytes, stores vtable 0x4b5014 (`CLTLoginState_AuthenticatePending`)
     void* ptr = malloc(8);
     if (ptr) {
         *(void**)ptr = reinterpret_cast<void*>(0x4b5014);
@@ -423,7 +435,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot18() {
 
 void CLTLoginMediator::InitializeHelperDispatchSlot19() {
     // Address anchor: launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19
-    // Original: allocates 4 bytes, stores PTR reference at address 0x4b508c
+    // Original: allocates 4 bytes, stores vtable 0x4b508c (`CLTLoginState_State6`)
     void* ptr = malloc(4);
     if (ptr) {
         *(void**)ptr = reinterpret_cast<void*>(0x4b508c);
@@ -508,6 +520,47 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
     //   phase faithfully, so this deliberate margin-connect hook remains diagnostic-only
     expectedMarginRequestName_ = nullptr;
     return 1u;
+}
+
+// anchor: launcher.exe:0x41c1f0
+uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) {
+    // Current best recovered live branch after password confirmation:
+    // - owner `+0xec` / `0x41ecd0` is hit on the original launcher path
+    // - runtime then transitions `0 -> 2 -> 3 -> 8`
+    // - while current helper vtable is `0x004b5208` (state `3`), `0x41c1f0` writes this owner
+    //   snapshot block and switches helper state to `8`
+    //
+    // Structural writes:
+    // - owner byte `+0xcc8` from input `+0x00` if `< 100`
+    // - owner `+0xcd0 .. +0xd7f` from input `+0x04 .. +0xb3`
+    // - then `CLTLoginMediator_SwitchHelperState(..., 8)`
+    //
+    // This now looks closely related to the already recovered arg6 `+0xec` / `+0xf4`
+    // selection/config snapshot family, but exact semantic names remain provisional.
+    if (input.slotOrSelectionIndex00 >= 100u) {
+        return 0u;
+    }
+
+    state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 =
+        static_cast<uint8_t>(input.slotOrSelectionIndex00);
+    std::copy(input.block04.begin(), input.block04.end(), state8SelectionContextSnapshotState_.blockCd0.begin());
+    std::copy(input.block14.begin(), input.block14.end(), state8SelectionContextSnapshotState_.blockCe0.begin());
+    std::copy(input.block24.begin(), input.block24.end(), state8SelectionContextSnapshotState_.blockCf0.begin());
+    std::copy(input.block34.begin(), input.block34.end(), state8SelectionContextSnapshotState_.blockD00.begin());
+    std::copy(input.block44.begin(), input.block44.end(), state8SelectionContextSnapshotState_.blockD10.begin());
+    std::copy(input.block54.begin(), input.block54.end(), state8SelectionContextSnapshotState_.blockD20.begin());
+    std::copy(input.block64.begin(), input.block64.end(), state8SelectionContextSnapshotState_.blockD30.begin());
+    std::copy(input.block74.begin(), input.block74.end(), state8SelectionContextSnapshotState_.blockD40.begin());
+    std::copy(input.block84.begin(), input.block84.end(), state8SelectionContextSnapshotState_.blockD50.begin());
+    std::copy(input.block94.begin(), input.block94.end(), state8SelectionContextSnapshotState_.blockD60.begin());
+    std::copy(input.blockA4.begin(), input.blockA4.end(), state8SelectionContextSnapshotState_.blockD70.begin());
+
+    Log(
+        "DIAGNOSTIC: PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x%02x blockCd0_0=0x%08x blockD70_3=0x%08x",
+        (unsigned)state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8,
+        (unsigned)state8SelectionContextSnapshotState_.blockCd0[0],
+        (unsigned)state8SelectionContextSnapshotState_.blockD70[3]);
+    return 0u;
 }
 
 // anchor: launcher.exe:0x41c3c0
@@ -630,6 +683,77 @@ const char* CLTLoginMediator::ExpectedMarginRequestName() const {
     return expectedMarginRequestName_ ? expectedMarginRequestName_ : "";
 }
 
+// anchor: launcher.exe:0x41f2e0
+const CLTLoginMediator::SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= slotRecordValid688_.size() || !slotRecordValid688_[slotIndex]) {
+        return nullptr;
+    }
+    return &slotRecords688_[slotIndex];
+}
+
+// anchor: launcher.exe:0x41f300
+const CLTLoginMediator::SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
+    return GetSlotRecordByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8);
+}
+
+// anchor: launcher.exe:0x41b220
+const char* CLTLoginMediator::GetSlotRecordHeapStringByIndex(uint8_t slotIndex) const {
+    const SlotRecordState004b5328* record = GetSlotRecordByIndex(slotIndex);
+    if (!record || record->heapString14.empty()) {
+        return nullptr;
+    }
+    return record->heapString14.c_str();
+}
+
+// anchor: launcher.exe:0x41b260
+const char* CLTLoginMediator::GetRouteHostPrefixBySlot(uint8_t slotIndex) const {
+    if (slotIndex >= routeHostStrings818_.size()) {
+        return nullptr;
+    }
+    const RouteHostStringTripleState& slot = routeHostStrings818_[slotIndex];
+    return slot.text.empty() ? nullptr : slot.text.c_str();
+}
+
+// anchor: launcher.exe:0x41b2a0
+uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
+    const SlotRecordState004b5328* record = GetSlotRecordByIndex(slotIndex);
+    return record ? record->status0b : 7u;
+}
+
+// anchor: launcher.exe:0x41b2e0
+const char* CLTLoginMediator::GetDescriptorInlineNameByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+        return nullptr;
+    }
+    const WorldDescriptorState004b533c& slot = worldDescriptorsD84_[slotIndex];
+    return slot.inlineNamePlus03.empty() ? nullptr : slot.inlineNamePlus03.c_str();
+}
+
+// anchor: launcher.exe:0x41b320
+uint8_t CLTLoginMediator::GetDescriptorField18ByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+        return 0;
+    }
+    return worldDescriptorsD84_[slotIndex].type18;
+}
+
+// anchor: launcher.exe:0x41b360
+uint8_t CLTLoginMediator::GetDescriptorField19ByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+        return 0;
+    }
+    return static_cast<uint8_t>(worldDescriptorsD84_[slotIndex].serverVersion19 & 0xffu);
+}
+
+// anchor: launcher.exe:0x41b3a0
+uint8_t CLTLoginMediator::GetDescriptorLowNibble1fByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+        return 0;
+    }
+    const uint8_t value = worldDescriptorsD84_[slotIndex].populationLevel1f & 0x0f;
+    return (value >= 1u && value <= 3u) ? value : 0u;
+}
+
 uint32_t CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {
     // Address anchors:
     // - launcher.exe:0x439300 = current concrete margin route dispatcher
@@ -674,19 +798,38 @@ uint32_t CLTLoginMediator::DispatchMarginConnectionByState() {
     // - and finally route into `0x41e500`
     // - `0x41e500` builds margin endpoint at owner `+0x6c` and calls `connection->+0x1c(owner+0x6c)`
     //
-    // Transitional note:
-    // - arg7 selection resolution through ILTLoginMediator sibling object (0x4d3584) needs faithful implementation
-    // - vtable methods at +0xfc, +0x100, +0xe4 must be wired to return proper world list data
-    // - placeholder logic here preserves the dispatcher structure for later completion
+    // Broader writer tightening from `0x43f300`:
+    // - `+0x688` is now mirrored as the character-slot table
+    // - `+0xd84` is now mirrored as the world-descriptor table
+    // - `+0x818` is now seeded from that world-descriptor table by matching each character's
+    //   `worldId0c`
+    // So before route dispatch, prefer the reconstructed current-slot character/world data over
+    // older fallback-only margin-route state.
+    if (const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord()) {
+        marginRouteState_.pendingWorldId = currentSlotRecord->worldId0c;
+        if (marginRouteState_.currentWorldId < 0) {
+            marginRouteState_.currentWorldId = static_cast<int32_t>(currentSlotRecord->worldId0c);
+        }
+    }
+    if (const char* routeHostPrefix =
+            GetRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
+        marginRouteState_.routeHostPrefix = routeHostPrefix;
+    }
+
     uint32_t routeKey = 0;
     if (currentState_) {
         routeKey = currentState_->DispatchPhaseCode();
     }
 
     switch (routeKey) {
-        case 0:
+        case 0: {
             routeKey = ResolveMarginRouteFromCurrentCharacterSlot();
+            if (const char* routeHostPrefix =
+                    GetRouteHostPrefixBySlot(static_cast<uint8_t>(marginRouteState_.currentCharacterOrRouteIndex))) {
+                marginRouteState_.routeHostPrefix = routeHostPrefix;
+            }
             break;
+        }
         case 1:
             routeKey = ResolveMarginRouteFromWorldId(marginRouteState_.pendingWorldId);
             break;
@@ -696,6 +839,12 @@ uint32_t CLTLoginMediator::DispatchMarginConnectionByState() {
         default:
             if (marginRouteState_.currentWorldId >= 0) {
                 routeKey = ResolveMarginRouteFromWorldId(static_cast<uint32_t>(marginRouteState_.currentWorldId));
+            }
+            if (marginRouteState_.routeHostPrefix.empty()) {
+                if (const char* routeHostPrefix =
+                        GetRouteHostPrefixBySlot(static_cast<uint8_t>(marginRouteState_.currentCharacterOrRouteIndex))) {
+                    marginRouteState_.routeHostPrefix = routeHostPrefix;
+                }
             }
             break;
     }
@@ -1199,67 +1348,151 @@ void CLTLoginMediator::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig() 
     authBootstrap680_.currentPublicKeyId9C = authCurrentPublicKeyId_;
 }
 
+void CLTLoginMediator::SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world) {
+    if (worldIndex >= worldDescriptorsD84_.size()) {
+        return;
+    }
+
+    WorldDescriptorState004b533c& descriptor = worldDescriptorsD84_[worldIndex];
+    descriptor.worldId01 = world.worldId;
+    descriptor.inlineNamePlus03 = world.worldName;
+    descriptor.status17 = static_cast<uint8_t>(world.status & 0xffu);
+    descriptor.type18 = static_cast<uint8_t>(world.type & 0xffu);
+    descriptor.serverVersion19 = world.clientVersion;
+    descriptor.serverLanguage1d = static_cast<uint8_t>(world.unknown4 & 0xffu);
+    descriptor.privateFlag1e = static_cast<uint8_t>((world.unknown4 >> 8) & 0xffu);
+    descriptor.populationLevel1f = world.load;
+    worldDescriptorValidD84_[worldIndex] = true;
+}
+
+void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
+    uint8_t characterIndex,
+    const mxo::auth::AuthCharacterEntry& character) {
+    if (characterIndex >= slotRecords688_.size()) {
+        return;
+    }
+
+    SlotRecordState004b5328& slotRecord = slotRecords688_[characterIndex];
+    slotRecord.heapString14 = character.handle.text;
+    slotRecord.globalCharacterIdLow03 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
+    slotRecord.globalCharacterIdHigh07 = static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
+    slotRecord.status0b = static_cast<uint8_t>(character.status & 0xffu);
+    slotRecord.worldId0c = character.worldId;
+    slotRecordValid688_[characterIndex] = true;
+}
+
+int CLTLoginMediator::FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const {
+    for (size_t i = 0; i < worldDescriptorsD84_.size(); ++i) {
+        if (worldDescriptorValidD84_[i] && worldDescriptorsD84_[i].worldId01 == worldId) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
 void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
     // Address anchors:
     // - launcher.exe:0x4401a0 = strongest current HandleAuthReply implementation
-    // - important owner-side writeback areas on that path include:
-    //   - +0x80 (world list/result status)
-    //   - +0x684 / +0x688 / +0x818 / +0xd84 (record tables keyed by current slot byte)
-    //   - +0xcc8 (character/route index byte)
-    // - immediate post-success continuation then goes through:
-    //   - `0x41b450(0x0b)`
-    //   - `0x43c020 = CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`
-    //   - later `0x440320 = CLTLoginMediator_Helper11_HandleLoadCharacterReply`
-    // - `0x43b830 = CLTLoginMediator_Helper14_SendGetWorldListRequest` remains a later auth-side
-    //   sender, but is no longer the best immediate next-step anchor after `AS_AuthReply`
+    // - broader writer/validator now in scope: `0x43f300 = CLTLoginState_AuthenticatePending_AuthMessageDispatch`
+    // - important owner-side writeback areas on that combined path include:
+    //   - `+0x80`  = auth-reply result/status / world-count family
+    //   - `+0x684/+0x688` = character-slot record table
+    //   - `+0x818` = per-character route-host string triple table
+    //   - `+0xd80/+0xd84` = world-descriptor table
+    //   - `+0xcc8` = current character/route index byte
     //
-    // Transitional note:
-    // - this is still only a partial writeback sketch, not a faithful one-to-one reconstruction
-    // - it exists so the parsed auth result begins to live in mediator-owned tables rather than
-    //   only in `lastAuthReply_`
+    // Current stronger source-owned read from `0x43f300`:
+    // - the launcher first builds the `+0xd84` world-descriptor table from auth world entries
+    // - then it builds the `+0x688` character-slot table from auth character entries
+    // - then it seeds `+0x818` by matching each character record's `worldId0c` against the
+    //   descriptor table's `worldId01` and copying the descriptor inline name
     //
-    // Faithful writeback to owner fields (0x4f78b8):
-    // - +0x80 = auth-reply result/status from helper10 (`0x4401a0`)
-    // - +0xcc8 = character/route index byte
-    //
-    // Important narrower remaining gap:
+    // Important remaining gap:
     // - helper11 later consumes the owner source block rooted at `+0x108`
     //   (string at `+0x108`, object/span at `+0x134`, follow-on blocks at `+0x178/+0x198/+0x1b8`)
     // - this scaffold still does not reconstruct the upstream writers for that block
     worldSlots_.fill(nullptr);
     worldPayloadSlots_.fill(nullptr);
+    slotRecordValid688_.fill(false);
+    worldDescriptorValidD84_.fill(false);
+    slotRecordCount684_ = 0;
+    worldDescriptorCountD80_ = 0;
+    for (RouteHostStringTripleState& routeString : routeHostStrings818_) {
+        routeString.text.clear();
+    }
 
     const size_t worldCount = std::min(worldSlots_.size(), lastAuthReply_.worlds.size());
     for (size_t i = 0; i < worldCount; ++i) {
         worldSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
         worldPayloadSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
+        SeedRecoveredWorldDescriptorFromAuthReply(static_cast<uint8_t>(i), lastAuthReply_.worlds[i]);
     }
+    worldDescriptorCountD80_ = static_cast<uint8_t>(worldCount);
 
-    // Writeback to owner +0x80 (world list count/status)
+    const size_t characterCount = std::min(slotRecords688_.size(), lastAuthReply_.characters.size());
+    for (size_t i = 0; i < characterCount; ++i) {
+        SeedRecoveredCharacterSlotRecordFromAuthReply(static_cast<uint8_t>(i), lastAuthReply_.characters[i]);
+        const SlotRecordState004b5328& slotRecord = slotRecords688_[i];
+        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId0c);
+        if (matchedWorldIndex >= 0) {
+            // Current source-owned tightening for the active state-8 margin path:
+            // preserve the original descriptor-name join, but lowercase the copied text so the
+            // reconstructed `+0x818` family can feed DNS host-prefix use directly (`Reality`
+            // -> `reality`).
+            routeHostStrings818_[i].text =
+                LowercaseAsciiString(worldDescriptorsD84_[static_cast<size_t>(matchedWorldIndex)].inlineNamePlus03);
+        }
+    }
+    slotRecordCount684_ = static_cast<uint8_t>(characterCount);
+
+    // Writeback to owner +0x80 (world list count/status family)
     postAuthMarginLoadingState_.worldListCountOrStatus80 = static_cast<uint32_t>(lastAuthReply_.worlds.size());
-    
-    // Writeback to owner +0xcc8 (character/route index byte)
-    if (!lastAuthReply_.characters.empty()) {
-        postAuthMarginLoadingState_.characterRouteIndexCc8 = 0;
+
+    // Writeback to owner +0xcc8 (current character/route index byte)
+    postAuthMarginLoadingState_.characterRouteIndexCc8 = 0;
+    marginRouteState_.currentCharacterOrRouteIndex = 0;
+
+    if (characterCount != 0) {
+        const SlotRecordState004b5328& currentSlotRecord = slotRecords688_[0];
+        marginRouteState_.pendingWorldId = currentSlotRecord.worldId0c;
+        marginRouteState_.currentWorldId = static_cast<int32_t>(currentSlotRecord.worldId0c);
+    } else if (worldCount != 0) {
+        const mxo::auth::AuthWorldEntry& firstWorld = lastAuthReply_.worlds[0];
+        marginRouteState_.pendingWorldId = firstWorld.worldId;
+        marginRouteState_.currentWorldId = static_cast<int32_t>(firstWorld.worldId);
     }
 
-    if (!lastAuthReply_.worlds.empty()) {
-        marginRouteState_.pendingWorldId = lastAuthReply_.worlds[0].worldId;
-        if (marginRouteState_.currentWorldId < 0) {
-            marginRouteState_.currentWorldId = static_cast<int32_t>(lastAuthReply_.worlds[0].worldId);
+    if (const char* routeHostPrefix = GetRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
+        marginRouteState_.routeHostPrefix = routeHostPrefix;
+    } else {
+        marginRouteState_.routeHostPrefix.clear();
+    }
+
+    const char* currentDescriptorName = "<empty>";
+    if (characterCount != 0) {
+        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecords688_[0].worldId0c);
+        if (matchedWorldIndex >= 0) {
+            if (const char* name = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex))) {
+                currentDescriptorName = name;
+            }
+        }
+    } else if (worldCount != 0) {
+        if (const char* name = GetDescriptorInlineNameByIndex(0)) {
+            currentDescriptorName = name;
         }
     }
 
-    if (!lastAuthReply_.characters.empty()) {
-        marginRouteState_.currentCharacterOrRouteIndex = 0;
-    }
-
     Log(
-        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount=%u characterCount=%u firstWorldId=%u currentCharacterOrRouteIndex=%u",
-        (unsigned)lastAuthReply_.worlds.size(),
-        (unsigned)lastAuthReply_.characters.size(),
-        lastAuthReply_.worlds.empty() ? 0u : (unsigned)lastAuthReply_.worlds[0].worldId,
-        (unsigned)marginRouteState_.currentCharacterOrRouteIndex);
+        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount=%u characterCount=%u currentCharacterOrRouteIndex=%u currentSlotWorldId=%u routeHostPrefix='%s' slotRecordHeapString='%s' currentWorldDescriptorName='%s'",
+        (unsigned)worldCount,
+        (unsigned)characterCount,
+        (unsigned)marginRouteState_.currentCharacterOrRouteIndex,
+        characterCount == 0 ? 0u : (unsigned)slotRecords688_[0].worldId0c,
+        marginRouteState_.routeHostPrefix.empty() ? "<empty>" : marginRouteState_.routeHostPrefix.c_str(),
+        GetSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
+            ? GetSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
+            : "<empty>",
+        currentDescriptorName);
 }
 
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
