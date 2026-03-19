@@ -48,6 +48,9 @@ static uint16_t g_LoginControllerMarginPortHostOrder = 10000;
 static bool g_LoginControllerIgnoreHostsFileForMargin = false;
 static char g_LoginControllerMarginRouteHostPrefix[256] = {};
 static char g_LoginControllerExactMarginHostName[256] = {};
+static char g_LoginControllerSelectionSeedName[64] = {};
+static uint32_t g_LoginControllerSelectionSeedWorldIndexLow24 = 0;
+static bool g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed = false;
 static const char* g_LoginControllerAuthName = "resurrections";
 static const char* g_LoginControllerAuthPassword = "";
 
@@ -303,6 +306,18 @@ static void DiagnosticApplyLoginControllerConfig() {
         keyConfigMd5,
         uiConfigMd5);
     g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
+
+    if (g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed && g_LoginControllerSelectionSeedName[0]) {
+        mxo::ltlogin::CLTLoginMediator::ProcessLoginCredentialsInputSketch input = {};
+        std::strncpy(input.string00.data(), g_LoginControllerSelectionSeedName, input.string00.size() - 1);
+        input.string00[input.string00.size() - 1] = '\0';
+        input.field24 = g_LoginControllerSelectionSeedWorldIndexLow24;
+        g_DiagnosticLoginController->ProcessLoginCredentials(input);
+        Log(
+            "DIAGNOSTIC: applied recovered 0x41c3c0 seed selectionName='%s' selectedWorldIndexLow24=0x%06x",
+            g_LoginControllerSelectionSeedName,
+            (unsigned)g_LoginControllerSelectionSeedWorldIndexLow24);
+    }
 }
 
 }  // namespace
@@ -398,6 +413,25 @@ void DiagnosticConfigureLoginControllerNetwork(
         g_LoginControllerExactMarginHostName[0] ? g_LoginControllerExactMarginHostName : "<empty>",
         g_LoginControllerIgnoreHostsFileForAuth ? 1u : 0u,
         g_LoginControllerIgnoreHostsFileForMargin ? 1u : 0u);
+}
+
+void DiagnosticConfigureLoginControllerSelectionSeed(
+    const char* selectionName,
+    uint32_t selectedWorldIndexLow24,
+    bool enableRecoveredProcessLoginCredentialsSeed) {
+    std::strncpy(
+        g_LoginControllerSelectionSeedName,
+        selectionName ? selectionName : "",
+        sizeof(g_LoginControllerSelectionSeedName) - 1);
+    g_LoginControllerSelectionSeedName[sizeof(g_LoginControllerSelectionSeedName) - 1] = '\0';
+    g_LoginControllerSelectionSeedWorldIndexLow24 = selectedWorldIndexLow24 & 0x00ffffffu;
+    g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed = enableRecoveredProcessLoginCredentialsSeed;
+    DiagnosticApplyLoginControllerConfig();
+    Log(
+        "DIAGNOSTIC: recovered 0x41c3c0 seed configured enabled=%u selectionName='%s' selectedWorldIndexLow24=0x%06x",
+        g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed ? 1u : 0u,
+        g_LoginControllerSelectionSeedName[0] ? g_LoginControllerSelectionSeedName : "<empty>",
+        (unsigned)g_LoginControllerSelectionSeedWorldIndexLow24);
 }
 
 bool DiagnosticCanBeginAuthConnection() {

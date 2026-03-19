@@ -139,7 +139,9 @@ CLTLoginMediator::CLTLoginMediator()
       marginConnectionContextKey_(nullptr),
       helpers_{},
       marginRouteState_{},
+      authBootstrapSource38_{},
       authBootstrap680_{},
+      postAuthMarginLoadingState_{},
       authServerPortHostOrder_(11000),
       ignoreHostsFileForAuth_(false),
       marginServerPortHostOrder_(10000),
@@ -505,6 +507,118 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
     // - the current scaffold still does not reconstruct that helper11-driven margin/loading
     //   phase faithfully, so this deliberate margin-connect hook remains diagnostic-only
     expectedMarginRequestName_ = nullptr;
+    return 1u;
+}
+
+// anchor: launcher.exe:0x41c3c0
+uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) {
+    // Current best recovered writer for the helper11 owner source block.
+    // Original `0x41c3c0` writes:
+    // - owner `+0x12c` from input `+0x24`
+    // - owner `+0x134 .. +0x153` from input `+0x2c`
+    // - owner `+0x154 .. +0x173` from input `+0x4c`
+    // - owner `+0x174 .. +0x177` from input `+0x6c`
+    // - owner strings/blocks at `+0x108 / +0x178 / +0x198 / +0x1b8`
+    // - then switches helper state to `10`
+    //
+    // This source-owned mirror preserves the recovered data movement but does not yet claim the
+    // exact upstream caller that feeds the original input blob.
+    std::copy(input.string00.begin(), input.string00.end(), postAuthMarginLoadingState_.sourceLeadString108.begin());
+    postAuthMarginLoadingState_.sourceField128 = input.field20;
+    postAuthMarginLoadingState_.sourceField12c = input.field24;
+    postAuthMarginLoadingState_.sourceField130 = input.field28;
+
+    std::copy(input.dwords2c.begin(), input.dwords2c.end(), postAuthMarginLoadingState_.sourceDwords134.begin());
+    std::copy(input.dwords4c.begin(), input.dwords4c.end(), postAuthMarginLoadingState_.sourceDwords134.begin() + 8);
+    postAuthMarginLoadingState_.sourceDwords134[16] =
+        static_cast<uint32_t>(input.bytes6c[0]) |
+        (static_cast<uint32_t>(input.bytes6c[1]) << 8) |
+        (static_cast<uint32_t>(input.bytes6c[2]) << 16) |
+        (static_cast<uint32_t>(input.bytes6c[3]) << 24);
+
+    std::copy(input.string70.begin(), input.string70.end(), postAuthMarginLoadingState_.sourceBlock178.begin());
+    std::copy(input.string90.begin(), input.string90.end(), postAuthMarginLoadingState_.sourceBlock198.begin());
+    std::copy(input.stringB0.begin(), input.stringB0.end(), postAuthMarginLoadingState_.sourceBlock1b8.begin());
+
+    Log(
+        "DIAGNOSTIC: ProcessLoginCredentials mirrored recovered helper11 source write name='%s' field12c=0x%08x firstDword134=0x%08x",
+        postAuthMarginLoadingState_.sourceLeadString108.data(),
+        (unsigned)postAuthMarginLoadingState_.sourceField12c,
+        (unsigned)postAuthMarginLoadingState_.sourceDwords134[0]);
+    return 0u;
+}
+
+// =============================================================================
+// HELPER11: Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
+// =============================================================================
+// Recovered from Ghidra analysis of launcher.exe helper functions:
+// - 0x43c020 = CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d
+//   Builds/sends margin packet with first payload byte 0x4d, posts event 0x15
+// - 0x440320 = CLTLoginMediator_Helper11_HandleLoadCharacterReply
+//   Handles MS_LoadCharacterReply (0x10), accumulates fragments into +0xf1c,
+//   posts event 0x16 on completion
+// =============================================================================
+
+// anchor: launcher.exe:0x43c020
+uint32_t CLTLoginMediator::CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d() {
+    // Evidence-backed current read from disassembly:
+    // - `ESI = owner + 0x108`
+    // - packet builder consumes:
+    //   - dwords `owner + 0x134 .. +0x174`
+    //   - string/block `owner + 0x178`
+    //   - string/block `owner + 0x198`
+    //   - optional block `owner + 0x1b8`
+    // - then sends through `0x41af70` and posts event `0x15`
+    //
+    // Current scaffold intentionally does not fake this send until the upstream owner writers
+    // for the `+0x108/+0x134/+0x178/+0x198/+0x1b8` block are reconstructed.
+    Log(
+        "DIAGNOSTIC: helper11 raw-0x4d send scaffold not yet live sourceLeadString108='%s' sourceField12c=0x%08x firstDword134=0x%08x routeIndex=0x%02x",
+        postAuthMarginLoadingState_.sourceLeadString108.data(),
+        (unsigned)postAuthMarginLoadingState_.sourceField12c,
+        (unsigned)postAuthMarginLoadingState_.sourceDwords134[0],
+        (unsigned)postAuthMarginLoadingState_.characterRouteIndexCc8);
+    return 0u;
+}
+
+// anchor: launcher.exe:0x440320
+uint32_t CLTLoginMediator::CLTLoginMediator_Helper11_HandleLoadCharacterReply(const uint8_t* packetBytes, size_t packetSize) {
+    // Evidence-backed current read:
+    // - validates raw margin opcode `0x10`
+    // - first-fragment path copies owner `+0x108` into `+0xf1c`
+    // - copies first 8 dwords from owner `+0x134` into `+0xf48`
+    // - accumulates later section fragments under `+0xf1c`
+    // - on completion switches helper state to `9` and posts event `0x16`
+    //
+    // Current scaffold only preserves the recovered owner writeback surfaces.
+    if (!packetBytes || packetSize < 2) {
+        return 0u;
+    }
+
+    const uint16_t marginOpcode =
+        static_cast<uint16_t>(packetBytes[0]) | (static_cast<uint16_t>(packetBytes[1]) << 8);
+    if (marginOpcode != 0x10) {
+        return 0u;
+    }
+
+    std::fill(
+        std::begin(postAuthMarginLoadingState_.characterNameBufferF1c),
+        std::end(postAuthMarginLoadingState_.characterNameBufferF1c),
+        '\0');
+    std::copy(
+        postAuthMarginLoadingState_.sourceLeadString108.begin(),
+        postAuthMarginLoadingState_.sourceLeadString108.end(),
+        postAuthMarginLoadingState_.characterNameBufferF1c);
+    std::copy_n(
+        postAuthMarginLoadingState_.sourceDwords134.begin(),
+        postAuthMarginLoadingState_.characterFlagsF48.size(),
+        postAuthMarginLoadingState_.characterFlagsF48.begin());
+
+    Log(
+        "DIAGNOSTIC: helper11 load-character scaffold seeded name='%s' firstDword134=0x%08x packetBytes=%u",
+        postAuthMarginLoadingState_.characterNameBufferF1c,
+        (unsigned)postAuthMarginLoadingState_.characterFlagsF48[0],
+        (unsigned)packetSize);
     return 1u;
 }
 
@@ -1103,6 +1217,15 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
     // - this is still only a partial writeback sketch, not a faithful one-to-one reconstruction
     // - it exists so the parsed auth result begins to live in mediator-owned tables rather than
     //   only in `lastAuthReply_`
+    //
+    // Faithful writeback to owner fields (0x4f78b8):
+    // - +0x80 = auth-reply result/status from helper10 (`0x4401a0`)
+    // - +0xcc8 = character/route index byte
+    //
+    // Important narrower remaining gap:
+    // - helper11 later consumes the owner source block rooted at `+0x108`
+    //   (string at `+0x108`, object/span at `+0x134`, follow-on blocks at `+0x178/+0x198/+0x1b8`)
+    // - this scaffold still does not reconstruct the upstream writers for that block
     worldSlots_.fill(nullptr);
     worldPayloadSlots_.fill(nullptr);
 
@@ -1110,6 +1233,14 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
     for (size_t i = 0; i < worldCount; ++i) {
         worldSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
         worldPayloadSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
+    }
+
+    // Writeback to owner +0x80 (world list count/status)
+    postAuthMarginLoadingState_.worldListCountOrStatus80 = static_cast<uint32_t>(lastAuthReply_.worlds.size());
+    
+    // Writeback to owner +0xcc8 (character/route index byte)
+    if (!lastAuthReply_.characters.empty()) {
+        postAuthMarginLoadingState_.characterRouteIndexCc8 = 0;
     }
 
     if (!lastAuthReply_.worlds.empty()) {

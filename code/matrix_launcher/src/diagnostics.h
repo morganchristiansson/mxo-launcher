@@ -38,6 +38,10 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
+void DiagnosticConfigureLoginControllerSelectionSeed(
+    const char* selectionName,
+    uint32_t selectedWorldIndexLow24,
+    bool enableRecoveredProcessLoginCredentialsSeed);
 bool DiagnosticCanBeginAuthConnection();
 uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();

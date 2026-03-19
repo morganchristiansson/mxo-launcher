@@ -68,6 +68,18 @@ What remains:
   - `+0x80`
   - `+0x684 / +0x688 / +0x818 / +0xd84`
   - `+0xcc8`
+- newer recovered detail worth preserving while doing that work:
+  - owner vtable `+0x40` / `0x41f2e0` returns `owner + 0x688[index]`
+  - owner vtable `+0x44` / `0x41f300` returns the current entry from that same table using
+    owner byte `+0xcc8`
+  - this makes `+0x688` look less like a generic world-slot array and more like a
+    current-slot cached record table used by later load-character paths
+  - owner vtable `+0x120` / `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is now the
+    strongest recovered writer for the immediate helper11 source block:
+    - writes owner `+0x12c`
+    - writes owner `+0x134..+0x177`
+    - writes owner `+0x108`, `+0x178`, `+0x198`, `+0x1b8`
+    - then switches helper state to `10`
 - stop relying on only the current partial/diagnostic table adoption
 
 ### 2. Faithful post-auth progression into the actual immediate original continuation

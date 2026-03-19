@@ -1329,6 +1329,14 @@ int main(int argc, char* argv[]) {
         DiagnosticConfigureMediatorProfileName(g_AuthUsername[0] ? g_AuthUsername : NULL);
         DiagnosticConfigureMediatorAuthName(g_AuthUsername[0] ? g_AuthUsername : NULL);
         DiagnosticConfigureMediatorAuthPassword(g_AuthPassword[0] ? g_AuthPassword : NULL);
+
+        const bool enableRecoveredProcessLoginCredentialsSeed =
+            EnvFlagEnabled("MXO_DIAGNOSTIC_SEED_PROCESS_LOGIN_CREDENTIALS");
+        DiagnosticConfigureLoginControllerSelectionSeed(
+            mediatorSelectionName,
+            selectionPackedLow24,
+            enableRecoveredProcessLoginCredentialsSeed);
+
         DiagnosticApplyDefaultNopatchMediatorConfig(
             g_pILTLoginMediatorDefault,
             nopatchParsedValue,

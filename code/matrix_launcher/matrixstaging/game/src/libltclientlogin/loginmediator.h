@@ -265,6 +265,124 @@ public:
         uint32_t field118 = 0;              // `+0x118`
     };
 
+    // =============================================================================
+    // LAUNCHER.EXE OWNER OBJECT (0x4f78b8) - Post-Auth Margin/Loading State
+    // =============================================================================
+    // Recovered from Ghidra analysis of helper11 functions:
+    // - 0x43c020 = CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d
+    //   reads scattered fields and builds margin packet with first payload byte 0x4d
+    // - 0x440320 = CLTLoginMediator_Helper11_HandleLoadCharacterReply
+    //   handles MS_LoadCharacterReply (0x10), accumulates fragments into +0xf1c,
+    //   posts event 0x16 on completion
+    //
+    // Field layout derived from:
+    // - helper11 SendPostAuthMarginPacket (`0x43c020`) disassembly shows:
+    //   - `ESI = owner + 0x108`
+    //   - reads dwords from `owner + 0x134 .. +0x174`
+    //   - passes `owner + 0x178`, `owner + 0x198`, and `owner + 0x1b8` to packet-builder helpers
+    // - helper11 HandleLoadCharacterReply (`0x440320`) shows:
+    //   - first-fragment path copies leading owner `+0x108` string-ish data into `owner + 0xf1c`
+    //   - separately reads owner dword `+0x12c`
+    //   - copies 8 dwords from `owner + 0x134` into `owner + 0xf48`
+    //   - accumulates later reply fragments under `owner + 0xf1c`
+    // - later sibling load-character path `0x43f930` proves a different seed source for the same
+    //   `+0xf1c` family:
+    //   - owner vtable `+0x44` / `0x41f300` returns current record `owner + 0x688[owner+0xcc8]`
+    //   - that path seeds the `+0xf1c` name/world fields from the current cached record table
+    // - helper10 HandleAuthReply (`0x4401a0`) also proves:
+    //   - `owner + 0x80` is updated from parsed auth-reply status/result
+    //   - `owner + 0xcc8` mirrors the current slot/index byte
+    //   - `FUN_0043aa80(newRecord, owner + 0x108)` copies the owner `+0x108` string into a
+    //     newly allocated per-slot record before helper11 becomes active
+    struct ProcessLoginCredentialsInputSketch {
+        // Current best evidence-backed input layout for owner vtable `+0x120`
+        // / `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials`.
+        //
+        // That function directly writes the helper11 owner source block then switches helper state
+        // to `10`:
+        // - compares input `+0x24` against owner vtable `+0xf8`
+        // - writes owner `+0x12c` from input `+0x24`
+        // - copies 8 dwords from input `+0x2c` -> owner `+0x134`
+        // - copies 8 dwords from input `+0x4c` -> owner `+0x154`
+        // - copies 4 bytes from input `+0x6c` -> owner `+0x174`
+        // - copies strings from input `+0x00/+0x70/+0x90/+0xb0`
+        //   -> owner `+0x108/+0x178/+0x198/+0x1b8`
+        //
+        // Exact semantic names for these fields are still unsettled; keep them as structural input.
+        std::array<char, 0x20> string00{};              // input `+0x00 .. +0x1f`
+        uint32_t field20 = 0;                           // input `+0x20`
+        uint32_t field24 = 0;                           // input `+0x24`
+        uint32_t field28 = 0;                           // input `+0x28`
+        std::array<uint32_t, 8> dwords2c{};            // input `+0x2c .. +0x4b`
+        std::array<uint32_t, 8> dwords4c{};            // input `+0x4c .. +0x6b`
+        std::array<uint8_t, 4> bytes6c{};              // input `+0x6c .. +0x6f`
+        std::array<char, 0x20> string70{};             // input `+0x70 .. +0x8f`
+        std::array<char, 0x20> string90{};             // input `+0x90 .. +0xaf`
+        std::array<char, 0x20> stringB0{};             // input `+0xb0 .. +0xcf`
+    };
+
+    struct PostAuthMarginLoadingState {
+        // ========================================================================
+        // Owner source block consumed by helper11 send/load paths
+        // ========================================================================
+        // `0x440320` copies a NUL-terminated byte/string field from the start of this owner block
+        // to `+0xf1c` on first fragment, but the entire `+0x108 .. +0x133` range is not proven to
+        // be one flat string. The same first-fragment path also reads the dword at relative `+0x24`
+        // (`owner +0x12c`) separately.
+        std::array<char, 0x20> sourceLeadString108{};    // `+0x108 .. +0x127`
+        uint32_t sourceField128 = 0;                     // `+0x128`
+        uint32_t sourceField12c = 0;                     // `+0x12c`
+        uint32_t sourceField130 = 0;                     // `+0x130`
+
+        // `0x43c020` reads these 17 dwords into the outgoing raw-0x4d margin packet.
+        // `0x440320` also copies the first 8 dwords of this same span into `+0xf48`.
+        // Keep this as an opaque owner-side dword/object span for now.
+        // A nearby `0x440d80` lead turned out to be ambiguous and is not yet strong enough to
+        // claim a concrete object identity for `owner +0x134`.
+        std::array<uint32_t, 17> sourceDwords134{};      // `+0x134 .. +0x174`
+
+        // `0x43c020` passes these three adjacent owner blocks to packet-builder helpers.
+        // Keep them as opaque byte blocks until those helper parameter types are recovered.
+        std::array<uint8_t, 0x20> sourceBlock178{};      // `+0x178 .. +0x197`
+        std::array<uint8_t, 0x20> sourceBlock198{};      // `+0x198 .. +0x1b7`
+        std::array<uint8_t, 0x20> sourceBlock1b8{};      // `+0x1b8 .. +0x1d7`
+
+        // ========================================================================
+        // Helper11 HandleLoadCharacterReply outputs (0x440320)
+        // ========================================================================
+        uint32_t worldListCountOrStatus80 = 0;           // `+0x80`
+
+        char characterNameBufferF1c[32] = {0};           // `+0xf1c .. +0xf3f`
+        std::array<uint32_t, 8> characterFlagsF48{};     // `+0xf48 .. +0xf67`
+        std::array<uint32_t, 8> secondaryCharacterDataF68{}; // `+0xf68 .. +0xf87`
+        std::array<uint32_t, 10> characterRecordPointersF88{}; // `+0xf88 ..`
+
+        // Allocated buffer pointers for character data fragments:
+        void* allocatedBuffer1418 = nullptr;             // `+0x1418` (case 0x03)
+        uint16_t allocatedBufferLength141c = 0;         // `+0x141c`
+        uint8_t allocatedBufferFlag141e = 0;             // `+0x141e`
+
+        void* allocatedBuffer1420 = nullptr;             // `+0x1420` (case 0x04)
+        uint16_t allocatedBufferLength1424 = 0;         // `+0x1424`
+        uint8_t allocatedBufferFlag1426 = 0;             // `+0x1426`
+
+        void* allocatedBuffer1428 = nullptr;             // `+0x1428` (case 0x05)
+        uint16_t allocatedBufferLength142c = 0;         // `+0x142c`
+        uint8_t allocatedBufferFlag142e = 0;             // `+0x142e`
+
+        void* allocatedBuffer1408 = nullptr;             // `+0x1408` (case 0x06)
+        uint16_t allocatedBufferLength140c = 0;         // `+0x140c`
+        uint8_t allocatedBufferFlag140e = 0;             // `+0x140e`
+
+        // Additional fields for character reply parsing:
+        std::array<uint8_t, 8> replyParseBuffer{};       // `+0x13cc .. +0x13d3` scratch family
+        uint32_t replySectionData13cc = 0;               // `+0x13cc`
+        uint32_t replySectionData13d0 = 0;               // `+0x13d0`
+
+        // +0xcc8 = character/route index byte (mirrored from auth reply)
+        uint8_t characterRouteIndexCc8 = 0;              // `+0xcc8`
+    };
+
     CLTLoginMediator();
     ~CLTLoginMediator();
 
@@ -441,7 +559,7 @@ public:
     //       (`CLTLoginMediator_Helper11_HandleLoadCharacterReply`) handles raw `0x10`
     //       / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
     //       completion switches helper state to `9` then posts event `0x16`
-    //   - this now makes the post-auth gap narrower than a generic “later world-list send”:
+    //   - this now makes the post-auth gap narrower than a generic "later world-list send":
     //     the immediate original continuation is helper11-driven margin/loading progression
     //   - if the current helper `+0x14` body returns 0, `0x448a60` only logs
     //     `Got unhandled op of type %d with status %s`
@@ -523,6 +641,26 @@ public:
     uint32_t ResolveMarginRouteFromWorldId(uint32_t worldId) const; // current best anchor: owner vtable +0xfc
     uint32_t ResolveMarginRouteDescriptor() const;                  // current best anchor: owner vtable +0x10c
 
+    // =============================================================================
+    // HELPER11: Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
+    // =============================================================================
+    // Recovered from Ghidra analysis of launcher.exe helper functions:
+    // - 0x43c020 = CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d
+    //   Builds/sends margin packet with first payload byte 0x4d, posts event 0x15
+    // - 0x440320 = CLTLoginMediator_Helper11_HandleLoadCharacterReply
+    //   Handles MS_LoadCharacterReply (0x10), accumulates fragments into +0xf1c,
+    //   posts event 0x16 on completion
+    // =============================================================================
+
+    // anchor: launcher.exe:0x41c3c0
+    uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input);
+
+    // anchor: launcher.exe:0x43c020
+    uint32_t CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d();
+    
+    // anchor: launcher.exe:0x440320
+    uint32_t CLTLoginMediator_Helper11_HandleLoadCharacterReply(const uint8_t* packetBytes, size_t packetSize);
+
     // Current best margin-side connection-init dispatcher:
     // - launcher `0x439300`
     // - consults `[owner+4]` current state object through vtable `+0x18`
@@ -533,6 +671,49 @@ public:
     //   builds endpoint state into owner `+0x6c`, and calls `connection->+0x1c(owner+0x6c)`
     uint32_t DispatchMarginConnectionByState();
     const char* Arg6GetAvailableWorldName(uint32_t index);
+
+    // Post-Auth Margin/Loading State Accessors (launcher.exe:0x4f78b8)
+    // =============================================================================
+    // These methods expose the owner fields recovered from Ghidra analysis of helper11.
+    // They are used to faithfully reconstruct the original launcher's margin packet building
+    // and load character reply handling logic.
+    // =============================================================================
+
+    // Helper11 source block (`0x43c020`, `0x440320`):
+    const std::array<char, 0x20>& SourceLeadString108() const { return postAuthMarginLoadingState_.sourceLeadString108; }
+    uint32_t SourceField12c() const { return postAuthMarginLoadingState_.sourceField12c; }
+    const std::array<uint32_t, 17>& SourceDwords134() const { return postAuthMarginLoadingState_.sourceDwords134; }
+    const std::array<uint8_t, 0x20>& SourceBlock178() const { return postAuthMarginLoadingState_.sourceBlock178; }
+    const std::array<uint8_t, 0x20>& SourceBlock198() const { return postAuthMarginLoadingState_.sourceBlock198; }
+    const std::array<uint8_t, 0x20>& SourceBlock1b8() const { return postAuthMarginLoadingState_.sourceBlock1b8; }
+
+    // Helper11 HandleLoadCharacterReply outputs (0x440320):
+    uint32_t& WorldListCountOrStatus80() { return postAuthMarginLoadingState_.worldListCountOrStatus80; }
+    const char* CharacterNameBufferF1c() { return postAuthMarginLoadingState_.characterNameBufferF1c; }
+    const std::array<uint32_t, 8>& CharacterFlagsF48() { return postAuthMarginLoadingState_.characterFlagsF48; }
+    const std::array<uint32_t, 8>& SecondaryCharacterDataF68() { return postAuthMarginLoadingState_.secondaryCharacterDataF68; }
+    const std::array<uint32_t, 10>& CharacterRecordPointersF88() { return postAuthMarginLoadingState_.characterRecordPointersF88; }
+
+    void* AllocatedBuffer1418() { return postAuthMarginLoadingState_.allocatedBuffer1418; }
+    uint16_t& AllocatedBufferLength141c() { return postAuthMarginLoadingState_.allocatedBufferLength141c; }
+    uint8_t& AllocatedBufferFlag141e() { return postAuthMarginLoadingState_.allocatedBufferFlag141e; }
+
+    void* AllocatedBuffer1420() { return postAuthMarginLoadingState_.allocatedBuffer1420; }
+    uint16_t& AllocatedBufferLength1424() { return postAuthMarginLoadingState_.allocatedBufferLength1424; }
+    uint8_t& AllocatedBufferFlag1426() { return postAuthMarginLoadingState_.allocatedBufferFlag1426; }
+
+    void* AllocatedBuffer1428() { return postAuthMarginLoadingState_.allocatedBuffer1428; }
+    uint16_t& AllocatedBufferLength142c() { return postAuthMarginLoadingState_.allocatedBufferLength142c; }
+    uint8_t& AllocatedBufferFlag142e() { return postAuthMarginLoadingState_.allocatedBufferFlag142e; }
+
+    void* AllocatedBuffer1408() { return postAuthMarginLoadingState_.allocatedBuffer1408; }
+    uint16_t& AllocatedBufferLength140c() { return postAuthMarginLoadingState_.allocatedBufferLength140c; }
+    uint8_t& AllocatedBufferFlag140e() { return postAuthMarginLoadingState_.allocatedBufferFlag140e; }
+
+    const std::array<uint8_t, 8>& ReplyParseBuffer() { return postAuthMarginLoadingState_.replyParseBuffer; }
+    uint32_t& ReplySectionData13cc() { return postAuthMarginLoadingState_.replySectionData13cc; }
+    uint32_t& ReplySectionData13d0() { return postAuthMarginLoadingState_.replySectionData13d0; }
+    uint8_t& CharacterRouteIndexCc8() { return postAuthMarginLoadingState_.characterRouteIndexCc8; }
 
 private:
     uint32_t SendAuthFramedPacket(const mxo::auth::FramedPacket& packet, const char* stepLabel);
@@ -560,9 +741,13 @@ private:
     //   (`0x41ecd0 -> 0x41eb80`), and also written through owner vtable `+0x150` (`0x41f270`)
     // - `+0x680` = extra heap child built during owner initialization; current best read is
     //   the phase-2 auth/bootstrap object sketched above (`0x41290` / `0x45500` family)
-    // - `+0x688` = world-slot pointer table (100 entries)
-    // - `+0x818` = world payload/range table family (100-entry shape still provisional)
-    // - `+0xd84` = world/character record pointer table family
+    // - `+0x688` = current-slot record pointer table
+    //   - owner vtable `+0x40` / `0x41f2e0` returns `owner + 0x688[index]`
+    //   - owner vtable `+0x44` / `0x41f300` returns the current entry via owner byte `+0xcc8`
+    //   - helper10 (`0x4401a0`) stores newly built per-slot records here
+    // - `+0x818` = parallel per-slot copied small-record/string/object table family
+    //   keyed by the same slot byte as `+0x688`
+    // - `+0xd84` = separate world/character record pointer table family
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine_;
     CLTLoginState* currentState_;
 
@@ -575,6 +760,9 @@ private:
     MarginRouteState marginRouteState_;
     AuthBootstrapSelectedSource38Sketch authBootstrapSource38_;
     AuthBootstrapState680Sketch authBootstrap680_;
+    // launcher.exe:0x4f78b8 owner-side post-auth margin/loading writeback area recovered from
+    // helper11 (`0x43c020`, `0x440320`). Keep this as source-owned field layout evidence.
+    PostAuthMarginLoadingState postAuthMarginLoadingState_;
 
     std::string authServerDnsName_;
     uint16_t authServerPortHostOrder_;
