@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "spdlog/spdlog.h"
+
 namespace mxo::liblttcp {
 
 // ============================================================
@@ -148,9 +150,52 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
         return 0;
     }
 
-    u_long available = 0;
-    if (ioctlsocket(static_cast<SOCKET>(socketHandle_), FIONREAD, &available) != 0 || available == 0) {
+    SOCKET socket = static_cast<SOCKET>(socketHandle_);
+    fd_set readSet;
+    FD_ZERO(&readSet);
+    FD_SET(socket, &readSet);
+    timeval timeout = {};
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    const int ready = select(0, &readSet, nullptr, nullptr, &timeout);
+    if (ready <= 0 || !FD_ISSET(socket, &readSet)) {
         return 0;
+    }
+
+    u_long available = 0;
+    if (ioctlsocket(socket, FIONREAD, &available) != 0) {
+        return 0;
+    }
+
+    if (available == 0) {
+        char probeByte = 0;
+        const int peekResult = recv(socket, &probeByte, 1, MSG_PEEK);
+        if (peekResult == 0) {
+            spdlog::info(
+                "CLTTCPConnection::PollReceiveNonBlocking peer closed socket=0x{:08x} remoteHost='{}'",
+                socketHandle_,
+                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+            state_ = LTTCPEngineConnectionState::kClosed;
+            closesocket(socket);
+            socketHandle_ = 0xffffffffu;
+            return -1;
+        }
+        if (peekResult == SOCKET_ERROR) {
+            const int wsaError = WSAGetLastError();
+            if (wsaError == WSAEWOULDBLOCK) {
+                return 0;
+            }
+            spdlog::warn(
+                "CLTTCPConnection::PollReceiveNonBlocking recv(MSG_PEEK) failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+                socketHandle_,
+                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+                wsaError);
+            state_ = LTTCPEngineConnectionState::kClosed;
+            closesocket(socket);
+            socketHandle_ = 0xffffffffu;
+            return -1;
+        }
+        available = 1;
     }
 
     const int toRead = static_cast<int>(std::min<u_long>(available, 4096));
@@ -161,13 +206,36 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
     const size_t oldSize = receivedBytes_.size();
     receivedBytes_.resize(oldSize + static_cast<size_t>(toRead));
     const int received = recv(
-        static_cast<SOCKET>(socketHandle_),
+        socket,
         reinterpret_cast<char*>(receivedBytes_.data() + oldSize),
         toRead,
         0);
     if (received <= 0) {
         receivedBytes_.resize(oldSize);
-        return 0;
+        if (received == 0) {
+            spdlog::info(
+                "CLTTCPConnection::PollReceiveNonBlocking recv returned EOF socket=0x{:08x} remoteHost='{}'",
+                socketHandle_,
+                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+            state_ = LTTCPEngineConnectionState::kClosed;
+            closesocket(socket);
+            socketHandle_ = 0xffffffffu;
+            return -1;
+        }
+
+        const int wsaError = WSAGetLastError();
+        if (wsaError == WSAEWOULDBLOCK) {
+            return 0;
+        }
+        spdlog::warn(
+            "CLTTCPConnection::PollReceiveNonBlocking recv failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+            socketHandle_,
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+            wsaError);
+        state_ = LTTCPEngineConnectionState::kClosed;
+        closesocket(socket);
+        socketHandle_ = 0xffffffffu;
+        return -1;
     }
 
     receivedBytes_.resize(oldSize + static_cast<size_t>(received));

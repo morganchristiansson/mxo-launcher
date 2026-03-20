@@ -40,6 +40,8 @@ class CLTLoginState_WorldListPending;
 // - discovered helper dispatch structure from Ghidra analysis of 0x43b300:
 //   - `CLTLoginMediator_InitializeHelperDispatchTable` allocates 16 heap-allocated dispatch tables
 //   - each table stores a function pointer to `LaunchPadClient_ProcessEvent0x17` (0x438d80)
+//   - keep that symbol name as an analysis anchor only: it is a shared launcher-side event gate,
+//     not evidence that the mediator object itself is a `LaunchPadClient`
 //   - this is the launcher-side event handler system for auth/margin state transitions
 // - recovered logging string anchors:
 //   - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (logs "CLTLoginMediator::PostEvent(): Event# %d\n")
@@ -106,14 +108,17 @@ public:
         //   set up PTR references to the event handler for additional slots at 0x4f78a4..0x4f78b4
         //
         // Discovered function names from Ghidra renaming:
-        // - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
-        // - launcher.exe:0x4816f0 = LaunchPadClient_GetVtableOffset (inline helper returning *(this+4))
+        // - launcher.exe:0x438d80 = current shared launcher-side event gate symbolized as
+        //   `LaunchPadClient_ProcessEvent0x17`
+        // - launcher.exe:0x4816f0 = reused inline helper symbolized as
+        //   `LaunchPadClient_GetVtableOffset` (anchor only; not a mediator-class identity claim)
         // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
         // - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
         // - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf)
         //
         // Disassembly of 0x438d80 shows:
-        //   - Calls LaunchPadClient_GetVtableOffset(this+8) to get vtable offset
+        //   - Calls the helper currently named `LaunchPadClient_GetVtableOffset(this+8)` to get a
+        //     vtable offset
         //   - Checks if event flag at [this+0x2c] is set
         //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
         //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]
@@ -174,6 +179,17 @@ public:
         std::string exactMarginHostName;
     };
 
+    struct MarginAddressListState {
+        // Source-owned mirror of the `0x41e500` host-resolution family rooted at owner `+0x3c`.
+        // Current best decompile-backed read:
+        // - owner `+0x30` stores the current route/prefix string
+        // - owner `+0x3c` owns the resolved IPv4 list object rebuilt through `0x440d80`
+        // - owner `+0x7c` holds the transient selected IPv4 used to build `+0x6c`
+        std::string resolvedHostName;
+        std::vector<uint32_t> ipv4NetworkOrderList;
+        size_t nextIndex = 0;
+    };
+
     struct AuthBootstrapSelectedSource38Sketch {
         struct SmallStringLike60Sketch {
             // Same three-dword small-string family used by `0x407dd0`:
@@ -219,13 +235,16 @@ public:
         //
         // Current best semantic read is therefore stronger than a generic auth blob but still
         // deliberately provisional on exact original class name:
-        // an owner-side **station/launchpad-flavored phase-2 auth/bootstrap source block**
-        // that feeds launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch and later session/bootstrap helpers.
+        // an owner-side **station/bootstrap phase-2 auth source block** that later separate
+        // LaunchPad/session helpers also touch.
+        // Keep this on the mediator owner because it is shared state, not because the mediator and
+        // LaunchPadClient are the same class.
         std::array<char, 0x20> inlineString00{};
         std::array<char, 0x20> inlineString20{};
         std::array<uint8_t, 16> block40{};
         std::array<uint8_t, 16> block50{};
         SmallStringLike60Sketch string60;
+        std::string string60Owned;         // source-owned backing storage for the copied `+0x60` small-string mirror
         uint8_t flag6C = 0;
     };
 
@@ -349,6 +368,30 @@ public:
         std::array<uint32_t, 4> blockA4{};             // input `+0xa4 .. +0xb3`
     };
 
+    struct ProcessLoginRequestInputSketch {
+        // Current best evidence-backed input layout for owner vtable `+0x30`
+        // / `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest`.
+        //
+        // New stronger live read from WineDbg on the original launcher path:
+        // - `+0x00` = username
+        // - `+0x20` = password
+        // - `+0x40 .. +0x5f` = copied 16-byte blocks
+        // - `+0x60 .. +0x68` = embedded small-string object
+        // - `+0x6c` = trailing byte/flag
+        //
+        // Current practical role:
+        // - this is the earlier/default password-submit branch that copies into owner `+0x94`
+        //   through `0x41eb80`
+        // - when `DAT_004d66ec == 0`, the branch then clears owner `+0xf4`
+        //   (`+0x94 + 0x60`) and switches helper state to `2`
+        std::array<char, 0x20> inlineString00{};     // input `+0x00 .. +0x1f` = username
+        std::array<char, 0x20> inlineString20{};     // input `+0x20 .. +0x3f` = password
+        std::array<uint8_t, 16> block40{};           // input `+0x40 .. +0x4f`
+        std::array<uint8_t, 16> block50{};           // input `+0x50 .. +0x5f`
+        AuthBootstrapSelectedSource38Sketch::SmallStringLike60Sketch string60; // input `+0x60 .. +0x68`
+        uint8_t flag6C = 0;                          // input `+0x6c`
+    };
+
     struct ProcessLoginCredentialsInputSketch {
         // Current best evidence-backed input layout for owner vtable `+0x120`
         // / `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials`.
@@ -371,7 +414,11 @@ public:
         // - `+0x70`  -> real first name (`owner +0x178`)
         // - `+0x90`  -> real last name (`owner +0x198`)
         // - `+0xb0`  -> background (`owner +0x1b8`)
-        // - `+0x24` / owner `+0x12c` remains structurally live but semantically unsettled
+        // - `+0x24` / owner `+0x12c` now has a stronger active-branch read:
+        //   `0x41c3c0` bounds-checks it against owner vtable `+0xf8`, and later `0x4401a0`
+        //   uses owner `+0x12c` as an index into owner `+0xd84`
+        // - current best read is therefore a selected world-descriptor index / selector, not a
+        //   direct world-id payload
         // - current broader field-offset scan across launcher functions has not produced another
         //   concrete mediator-side writer for `+0x178/+0x198/+0x1b8`
         //   so `0x41c3c0` remains the only direct writer path currently in scope for those
@@ -397,6 +444,12 @@ public:
         //
         // Keep this grouped as the persisted selection/config snapshot sibling to the arg6 `+0xec`
         // handoff object until stronger field names are anchored.
+        // Newer client.dll tightening around `0x62170e2a..0x62170f48` / `0x621996a0` now shows the
+        // copied 16-byte blocks are **profile/config filename records** keyed by selector ids
+        // `4/5/6/7/8/0xb/2/3/9/10` (`pi.cfg`, `ai.cfg`, `cs.cfg`, `bl.cfg`, `il.cfg`, `cui.cfg`,
+        // `hl.cfg`, `an.cfg`, `rl.cfg`, `cl.cfg`).
+        // Practical consequence: this state-3 -> state-8 snapshot is not a safe source for the
+        // helper11 appearance/name block at `+0x134..+0x1b8`.
         uint8_t slotOrSelectionIndexCc8 = 0;           // `+0xcc8`
         std::array<uint8_t, 7> paddingCc9{};           // `+0xcc9 .. +0xccf`
         std::array<uint32_t, 4> blockCd0{};            // `+0xcd0 .. +0xcdf`
@@ -431,7 +484,7 @@ public:
         // while sibling load-character path `0x43f930` proves current-slot record seeding too.
         std::array<char, 0x20> sourceLeadString108{};    // `+0x108 .. +0x127` = CharacterName
         uint32_t sourceField128 = 0;                     // `+0x128`
-        uint32_t sourceField12c = 0;                     // `+0x12c` (still semantically unsettled)
+        uint32_t sourceField12c = 0;                     // `+0x12c` = selected world-descriptor index / selector on the active branch
         uint32_t sourceField130 = 0;                     // `+0x130`
 
         // raw `0x4d` sender field names from `0x43e540`:
@@ -474,10 +527,15 @@ public:
         // Current source-owned tightening from sibling path `0x43f930`:
         // - prefer current-slot record `+0x688[owner+0xcc8]` as the seed for this name/world block
         // - fall back to the older owner `+0x108` scaffold mirror only when that slot record is absent
-        char characterNameBufferF1c[32] = {0};           // `+0xf1c .. +0xf3f`
+        char characterNameBufferF1c[32] = {0};           // `+0xf1c .. +0xf3b`
+        uint32_t characterReplyFieldF3c = 0;             // `+0xf3c`
+        uint32_t characterReplyFieldF40 = 0;             // `+0xf40`
         std::array<uint32_t, 8> characterFlagsF48{};     // `+0xf48 .. +0xf67`
         std::array<uint32_t, 8> secondaryCharacterDataF68{}; // `+0xf68 .. +0xf87` (provisional world/status seed area)
         std::array<uint32_t, 10> characterRecordPointersF88{}; // `+0xf88 ..`
+        std::array<char, 0x20> section0StringF8c{};      // `+0xf8c .. +0xfab`
+        std::array<char, 0x20> section0StringFac{};      // `+0xfac .. +0xfcb`
+        std::array<char, 0x20> section0StringFcc{};      // `+0xfcc .. +0xfeb`
 
         // Allocated buffer pointers for character data fragments:
         void* allocatedBuffer1418 = nullptr;             // `+0x1418` (case 0x03)
@@ -500,6 +558,12 @@ public:
         std::array<uint8_t, 8> replyParseBuffer{};       // `+0x13cc .. +0x13d3` scratch family
         uint32_t replySectionData13cc = 0;               // `+0x13cc`
         uint32_t replySectionData13d0 = 0;               // `+0x13d0`
+        uint8_t section0Flag13f6 = 0;                    // `+0x13f6`
+        uint8_t flag13fe = 0;                            // `+0x13fe`
+        uint8_t flag1406 = 0;                            // `+0x1406`
+        uint8_t flag1416 = 0;                            // `+0x1416`
+        uint8_t flag1448 = 0;                            // `+0x1448`
+        uint8_t flag1452 = 0;                            // `+0x1452`
 
         // +0xcc8 = character/route index byte (mirrored from auth reply)
         uint8_t characterRouteIndexCc8 = 0;              // `+0xcc8`
@@ -581,6 +645,16 @@ public:
 
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
+
+    // Source-owned scaffold registration for concrete CLTLoginState objects that live outside the
+    // mediator header. This preserves the original helper-state ownership on the login-state
+    // vtables while still letting the mediator switch between the active scaffold states.
+    void RegisterScaffoldState9(CLTLoginState* state);
+    void RegisterScaffoldState10(CLTLoginState* state);
+    void RegisterScaffoldState11(CLTLoginState* state);
+    CLTLoginState* ScaffoldState9() const;
+    CLTLoginState* ScaffoldState10() const;
+    CLTLoginState* ScaffoldState11() const;
 
     void SetAuthConnectionContextKey(void* contextKey);
     void SetMarginConnectionContextKey(void* contextKey);
@@ -820,6 +894,17 @@ public:
         const std::vector<uint8_t>& keyConfigMd5,
         const std::vector<uint8_t>& uiConfigMd5);
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+
+    // Narrow owner-side parsers/stagers used by the concrete CLTLoginState slot-6 bodies.
+    // Keep the packet/class ownership split explicit:
+    // - state10 slot 6 / `0x4401a0` owns the auth-reply transition
+    // - state11 slot 6 / `0x440320` owns the load-character reply transition
+    // - mediator only keeps the staged bytes plus owner-state writeback helpers
+    uint32_t HandleStagedAuthReplyPacketScaffold();
+    uint32_t HandleStagedMarginLoadCharacterReplyPacketScaffold();
+    const std::vector<uint8_t>& StagedIncomingAuthPacketBytes() const;
+    const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
 
     const char* ExpectedAuthRequestName() const;
     const char* ExpectedMarginRequestName() const;
@@ -830,9 +915,10 @@ public:
     // Keep these helpers narrow and structural:
     // - `0x439300` decides which helper to call
     // - these mediator methods only mirror the owner-side route-string getters that feed `0x41e500`
-    const char* ResolveMarginRouteFromCurrentCharacterSlot() const;    // current best anchor: owner vtable +0xe0
-    const char* ResolveMarginRouteFromWorldId(uint32_t worldId) const; // current best anchor: owner vtable +0xfc
-    const char* ResolveMarginRouteDescriptor() const;                  // current best anchor: owner vtable +0x10c first-dword fetch
+    const char* ResolveMarginRouteFromCurrentCharacterSlot() const;            // current best anchor: owner vtable +0xe0
+    const char* ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const; // current best anchor: owner vtable +0xfc when fed owner `+0x12c`
+    const char* ResolveMarginRouteFromWorldId(uint32_t worldId) const;         // provisional fallback helper for world-id keyed route recovery
+    const char* ResolveMarginRouteDescriptor() const;                          // current best anchor: owner vtable +0x10c first-dword fetch
 
     // Post-auth slot/route families recovered around helper10 (`0x4401a0`) and the later
     // state-8 margin dispatcher (`0x439300`).
@@ -846,7 +932,7 @@ public:
     void* GetSessionCallbackHelper65c() const;
     // anchor: launcher.exe:0x41f320 / owner vtable +0x148
     const char* GetGameSessionId664() const;
-    // UNANCHORED: source-owned shared GameSessionID writer mirror for the later launchpad/session paths
+    // UNANCHORED: source-owned owner-field setter used by separate LaunchPad/session callback paths
     void SetGameSessionId664(const char* value);
     // anchor: launcher.exe:0x41f270 / owner vtable +0x150
     void SetLaunchPadSourceBlock94FirstString(const char* value);
@@ -882,6 +968,9 @@ public:
     //   posts event 0x16 on completion
     // =============================================================================
 
+    // anchor: launcher.exe:0x41ecd0
+    uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input);
+
     // anchor: launcher.exe:0x41c1f0
     uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input);
 
@@ -904,9 +993,10 @@ public:
     // anchor: launcher.exe:0x41e500
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`
     // case split back into `CLTLoginState_State4::Slot3_BeginOrContinue`.
-    // The provided route string becomes the owner-side prefix/text consumed when building the
-    // final resolved host before `connection->+0x1c(owner+0x6c)`.
-    uint32_t BeginMarginConnectionScaffold(const char* routeHostText);
+    // Preserved call contract from the original body:
+    // - arg1 = route/prefix text used to refresh owner `+0x30`
+    // - arg2 = cached non-zero selector that skips the route-refresh / address-list rebuild path
+    uint32_t BeginMarginConnectionScaffold(const char* routeHostText, uint8_t cachedRouteSelector);
     const char* Arg6GetAvailableWorldName(uint32_t index);
 
     // Post-Auth Margin/Loading State Accessors (launcher.exe:0x4f78b8)
@@ -983,6 +1073,8 @@ private:
 
     void BuildAuthEndpoint();
     void BuildMarginEndpoint();
+    bool RebuildMarginAddressList();
+    bool SelectMarginEndpointIpv4();
     mxo::liblttcp::CMessageConnection* EnsureAuthConnectionObject();
     mxo::liblttcp::CMessageConnection* EnsureMarginConnectionObject();
 
@@ -993,7 +1085,7 @@ private:
     // - `+0x4c` = auth DNS / route string staging area
     // - `+0x5c` = auth endpoint block consumed by auth-side `connection->+0x1c(...)`
     // - `+0x6c` = margin endpoint block consumed by margin-side `connection->+0x1c(...)`
-    // - `+0x94` = embedded station/launchpad-flavored phase-2 auth/bootstrap source block
+    // - `+0x94` = embedded station/bootstrap phase-2 auth source block
     //   returned by owner vtable `+0x38` (`0x41f0a0`), copied/consumed by owner vtable `+0x30`
     //   (`0x41ecd0 -> 0x41eb80`), and also written through owner vtable `+0x150`
     //   (`0x41f270 = CLTLoginMediator_SetLaunchPadSourceBlock94FirstString`)
@@ -1047,20 +1139,31 @@ private:
     //     selected-slot adoption reads from it
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine_;
     CLTLoginState* currentState_;
+    CLTLoginState* scaffoldState9_;
+    CLTLoginState* scaffoldState10_;
+    CLTLoginState* scaffoldState11_;
 
     mxo::liblttcp::CMessageConnection* authConnection_;
     mxo::liblttcp::CMessageConnection* marginConnection_;
+    bool authConnectionOwnedByMediator_ = false;
+    bool marginConnectionOwnedByMediator_ = false;
     void* authConnectionContextKey_;
     void* marginConnectionContextKey_;
 
     ConnectionHelperFamily helpers_;
     MarginRouteState marginRouteState_;
+    MarginAddressListState marginAddressList3c_{};
+    uint32_t marginBeginCount24_ = 0;
+    uint8_t marginConnectionFlag2d_ = 0;
+    uint32_t marginSelectedIpv4_7c_ = 0;
     AuthBootstrapSelectedSource38Sketch authBootstrapSource38_;
     AuthBootstrapState680Sketch authBootstrap680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
-    // Current best read: lazily allocated launchpad/session callback helper whose `+0x18`
+    // Current best read: lazily allocated owner-side session callback helper whose `+0x18`
     // string can later feed owner `+0x664` (`GameSessionID`).
+    // Separate LaunchPadClient or state18 paths may drive it, but it is still mediator-owned
+    // storage/state.
     SessionCallbackHelper65cSketch sessionCallbackHelper65cState_{};
     void* sessionCallbackHelper65c_ = nullptr;
     uint32_t sharedMarginPacketField660_ = 0;  // owner `+0x660`
@@ -1110,6 +1213,8 @@ private:
     mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
     mxo::auth::AuthChallenge lastAuthChallenge_;
     mxo::auth::AuthReply lastAuthReply_;
+    std::vector<uint8_t> stagedIncomingAuthPacketBytes_;
+    std::vector<uint8_t> stagedIncomingMarginPacketBytes_;
 
     uint32_t lastAuthConnectStatus_;
     uint32_t lastMarginConnectStatus_;

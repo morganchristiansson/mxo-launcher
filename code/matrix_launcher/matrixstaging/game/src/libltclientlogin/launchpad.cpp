@@ -17,7 +17,11 @@ static const char* NonEmptyOrFallback(const char* value, const char* fallback) {
 // docs: ../../docs/launcher.exe/VTABLES/0x004b0e48.md
 // Current best class ownership for this file:
 // - `0x004b0e48` = LaunchPadClient vtable family
-// - key vtable entries now kept here instead of being described only from mediator-side notes:
+// - this is a separate class from `CLTLoginMediator`
+// - this is also separate from the `CLTLoginState_*` family
+// - keep LaunchPad-owned status-handler behavior here instead of re-describing it from the
+//   mediator implementation files
+// - key vtable entries now kept here:
 //   - `0x420440` = `LaunchPadClient_OnConnectionOpened`
 //   - `0x4204f0` = `LaunchPadClient_OnSessionClosed`
 //   - `0x420580` = `LaunchPadClient_OnSubscriptionValidation`
@@ -32,7 +36,7 @@ uint32_t LaunchPadClient::OnLoginRequestStatus(
     const char* sessionText) {
     // anchor: launcher.exe:0x421220
     // anchor: launcher.exe vtable 0x004b0e48 + 0x14
-    // Current best recovered success effects only:
+    // Current best recovered LaunchPadClient success effects only:
     // - on `resultCode == 0`, the original handler first calls mediator vtable `+0x144`
     // - then pushes stack arg `[ebp+0x14]` into owner vtable `+0x14c` / `0x41f330`, writing
     //   owner dword `+0x660`
@@ -40,6 +44,8 @@ uint32_t LaunchPadClient::OnLoginRequestStatus(
     //   first inline string of the owner `+0x94` source block
     // - it separately logs `Session %s` from stack arg `[ebp+0x20]`, but that success path does
     //   **not** directly write owner `+0x664`
+    // - keep that ownership here: this is LaunchPadClient behavior writing into mediator-owned
+    //   state, not evidence that LaunchPadClient and CLTLoginMediator are the same class
     if (!mediator || resultCode != 0u) {
         return 0u;
     }
@@ -61,12 +67,14 @@ uint32_t LaunchPadClient::OnPlayRequestStatus(
     const char* gameSessionId) {
     // anchor: launcher.exe:0x420ef0
     // anchor: launcher.exe vtable 0x004b0e48 + 0x18
-    // Current best recovered success effects only:
+    // Current best recovered LaunchPadClient success effects only:
     // - on `resultCode == 0`, this path copies its callback string into mediator owner `+0x664`
     // - state8/state11 packet builders later read that same string through owner vtable `+0x148`
     //   / `0x41f320` as `GameSessionID`
     // - current best concrete read is therefore that `GameSessionID` is launchpad/play-session
     //   owned, not part of the branch-specific `0x41c3c0` helper11 source writer
+    // - keep that ownership split explicit: this write belongs to LaunchPadClient's vtable path,
+    //   even though the destination storage lives on the mediator owner object
     if (!mediator || resultCode != 0u) {
         return 0u;
     }

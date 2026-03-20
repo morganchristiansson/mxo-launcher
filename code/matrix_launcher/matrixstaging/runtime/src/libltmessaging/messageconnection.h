@@ -4,6 +4,10 @@
 
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
+#ifdef DispatchMessage
+#undef DispatchMessage
+#endif
+
 namespace mxo::liblttcp {
 
 // Reimplementation note:

@@ -1,5 +1,11 @@
 #include "messageconnection.h"
 
+#include "spdlog/spdlog.h"
+
+#ifdef DispatchMessage
+#undef DispatchMessage
+#endif
+
 namespace mxo::liblttcp {
 
 // ============================================================
@@ -122,9 +128,23 @@ uint32_t CMessageConnection::ProcessDispatchResult(const void* packetData, uint3
 // ============================================================
 uint32_t CMessageConnection::EnsureConnected() {
     if (!engine_) {
+        spdlog::debug(
+            "CMessageConnection::EnsureConnected failed because engine is null this={} ownerContext={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
         return 0;
     }
-    return engine_->Connect(this);
+
+    const uint32_t result = engine_->Connect(this);
+    if (result == 0u) {
+        spdlog::debug(
+            "CMessageConnection::EnsureConnected connect failed this={} ownerContext={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    }
+    return result;
 }
 
 // ============================================================

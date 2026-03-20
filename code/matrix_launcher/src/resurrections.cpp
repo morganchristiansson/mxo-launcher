@@ -20,6 +20,7 @@
 
 #include "diagnostics.h"
 #include "spdlog/spdlog.h"
+#include "spdlog/sinks/basic_file_sink.h"
 
 // Include the login mediator header for world list builder access
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
@@ -1184,6 +1185,13 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     g_LogFile = fopen("resurrections.log", "w");
+    try {
+        auto logger = spdlog::basic_logger_mt("clientstate", "resurrections_spdlog.log", true);
+        spdlog::set_default_logger(logger);
+        spdlog::set_level(spdlog::level::debug);
+        spdlog::flush_on(spdlog::level::debug);
+    } catch (const spdlog::spdlog_ex&) {
+    }
     AddVectoredExceptionHandler(1, reinterpret_cast<PVECTORED_EXCEPTION_HANDLER>(DiagnosticUnhandledExceptionFilter));
     SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
 
@@ -1191,6 +1199,7 @@ int main(int argc, char* argv[]) {
     Log("===============================================");
     Log("Mode: original startup order, no client-memory injection");
     Log("Default branch target: nopatch path");
+    Log("DIAGNOSTIC: spdlog debug file = resurrections_spdlog.log");
     Log("");
 
     Log("NOTE: arg1/arg2 now use launcher-owned filtered argv storage, but launcher switch parsing/options.cfg preprocessing are still incomplete.");

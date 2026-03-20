@@ -30,12 +30,19 @@ class CLTLoginMediator;
 // Detailed ownership / writer-path notes for the vtable-backed status handlers now live in:
 // - `launchpad.cpp`
 // - `../../docs/launcher.exe/VTABLES/0x004b0e48.md`
+//
+// Important separation rule:
+// - `LaunchPadClient` is its own class/vtable family (`0x004b0e48`)
+// - it is **not** the `CLTLoginMediator` class and **not** part of the `CLTLoginState_*` family
+// - the mediator pointer passed into the success-path mirrors below is only the downstream owner
+//   writeback target recovered from the original handlers
 class LaunchPadClient {
 public:
     LaunchPadClient() = default;
 
-    // Source-owned success-path mirrors for the concrete mediator writeback already proven in the
-    // original launcher handlers. Non-success branches remain documented in the vtable notes.
+    // Source-owned success-path mirrors for the concrete mediator-owner writeback already proven in
+    // the original LaunchPadClient handlers. Non-success branches remain documented in the vtable
+    // notes.
     uint32_t OnLoginRequestStatus(
         CLTLoginMediator* mediator,
         uint32_t resultCode,

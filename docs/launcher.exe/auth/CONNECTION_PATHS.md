@@ -105,16 +105,28 @@ So current auth-side connection-init model is:
 ### Margin connection-init body
 - `launcher.exe:0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500`
 - `0x41e500`:
-  - constructs another `CMessageConnection`-family object through `0x4417e0 -> 0x448b40`
-  - stores it at owner `+0x1c`
-  - builds endpoint state into owner `+0x6c`
+  - allocates `0xa8`
+  - initializes a base margin-connection object through `0x4417e0 -> 0x448b40`
+  - overwrites the vtable to `0x004aff38` (`CMarginConnection`)
+  - stores the owner pointer at connection `+0xa4`
+  - calls `0x448960(1, 0x41ce40)` on that margin connection family
+  - stores the connection at owner `+0x1c`
+  - clears owner byte `+0x2d`
+  - on the `arg2 == 0` path:
+    - compares/refills owner route text at `+0x30`
+    - rebuilds the owner address-list object at `+0x3c` through `0x440d80`
+    - if owner `+0x7c == 0`, selects the next IPv4 from that list through `0x440bb0`
+    - materializes endpoint state at owner `+0x6c` through `0x44b090`
+  - increments owner dword `+0x24`
+  - clears owner `+0x7c`
   - immediately calls `connection->+0x1c(owner+0x6c)`
 
-So current margin-side connection-init model is parallel to auth:
-1. copy/resolve margin host/suffix into owner-side string state
-2. read margin port from `0x4d669c`
+So current best margin-side connection-init model is now narrower than “parallel to auth”:
+1. build a dedicated `CMarginConnection`
+2. refresh owner route text / address-list state (`+0x30 / +0x3c / +0x7c`) when needed
 3. build endpoint at owner `+0x6c`
-4. call `CMessageConnection->+0x1c(owner+0x6c)`
+4. call the connection-oriented ensure-connected wrapper with that endpoint
+5. retain the selected-IP / connect-attempt bookkeeping on the owner side (`+0x24 / +0x7c / +0x2d`)
 
 ## Current server-config string surfaces
 
@@ -173,9 +185,9 @@ Current best static read of that chain:
   - `+0xcc8`
 - but its immediate next helper transition is **not** the later auth-side
   `0x43b830 / AS_GetWorldListRequest` sender
-- instead helper11 `+0x8` (`0x43c020`) builds a larger margin-side packet whose first payload
-  byte is raw `0x4d`, sends it through `CLTLoginMediator_SendCurrentMarginPacket`
-  (`0x41af70`), then posts event `0x15`
+- instead helper11 `+0x8` (`0x43c020`) first reserves a fixed `0x4d`-byte payload span,
+  then `0x43a470` initializes payload byte `0x00 = 0x0c`, and that framed margin packet is sent
+  through `CLTLoginMediator_SendCurrentMarginPacket` (`0x41af70`) before event `0x15`
 - later helper11 `+0x14` (`0x440320`) handles raw margin code `0x10`
   / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
   completion switches helper state to `9` then posts event `0x16`
@@ -223,14 +235,21 @@ Current scaffold/runtime milestones already achieved:
   - `MXO_DISABLE_AUTH_CONNECTION=1`
 - optional margin trigger remains:
   - `MXO_BEGIN_MARGIN_CONNECTION=1`
+- newer live runtime milestone after the State4/`0x41e500` correction:
+  - validated on the deliberate runtime path with:
+    - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both`
+    - canonical log: `~/MxO_7.6005/resurrections.log`
+  - post-`AS_AuthReply` margin begin now returns non-zero on the real deliberate runtime path
+  - the real path now emits a margin-side type-2 connect-status item
+  - helper11/state11 slot 3 (`0x43c020`) is now live and builds/sends the raw `0x4d` packet on that path
 
 Current limitation summary:
 - exact margin-host derivation is still unresolved
 - the current scaffold still does not claim faithful full helper-state equivalence around `0x448050`
 - post-auth owner-state reconstruction around `0x4401a0` is still incomplete
-- the immediate helper11 margin/loading phase (`0x43c020` / `0x440320`) is not yet reproduced
-  faithfully in the scaffold, so current post-auth runtime still stops short of the original
-  launcher-owned continuation
+- the remaining post-auth blocker has moved forward:
+  - helper11/state11 send is now live
+  - later incoming margin `0x10` / `MS_LoadCharacterReply` handling (`0x440320`) is still not yet live
 
 ## Practical boundary
 

@@ -1,6 +1,7 @@
 #include "ltthreadperclienttcpengine.h"
 
 #include "../libltmessaging/messageconnection.h"
+#include "spdlog/spdlog.h"
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -618,6 +619,9 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(CLTTCPConnection* connection) {
         ResolveIpv4Address(connection->RemoteHostName().c_str(), &ipv4NetworkOrder);
     }
     if (ipv4NetworkOrder == 0) {
+        spdlog::debug(
+            "CLTThreadPerClientTCPEngine::Connect failed to resolve remote host '{}'",
+            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName());
         return 0;
     }
 

@@ -11,9 +11,76 @@ Use it for two related jobs:
 This guide is intentionally biased toward the current active investigation:
 - launcher-owned startup reconstruction
 - `client.dll!InitClientDLL`
+- the original `launcher.exe` / temp-copied `matrix.exe` login-state path under Wine
+- active auth/login-state progression into state-8 / margin work
 - the late crash family that lands in current `arg2 filteredArgv + 2`
 
 It is **not** a generic Windows debugging tutorial.
+
+## New practical note: original launcher copies itself to `matrix.exe`
+
+For the original launcher path, the process you usually want is **not** `launcher.exe` itself.
+The launcher copies itself into a temp folder and runs as:
+
+- `C:\users\morgan\Temp\MatrixOnline.0\matrix.exe -clone`
+
+That means two practical rules matter a lot:
+
+1. use the **Wine internal PID**, not the Linux host PID, when attaching with `winedbg`
+2. verify the target with `wine tasklist`, not only `ps`
+
+Useful commands:
+
+```bash
+wine tasklist /v
+wine cmd /c tasklist /FI "IMAGENAME eq matrix.exe"
+```
+
+If `ps` shows something like:
+
+```text
+C:\users\morgan\Temp\MatrixOnline.0\matrix.exe -clone
+```
+
+and `wine tasklist` shows:
+
+```text
+matrix.exe   300
+```
+
+then attach with:
+
+```text
+winedbg 300
+```
+
+not with the Linux PID from `ps`.
+
+## MCP / wrapper cautions from live runs
+
+The current `mcp-winedbg` wrapper is good enough for breakpoints, but has some important quirks:
+
+- `cont` may succeed even when the MCP call looks like it hangs
+- inspection commands like `bt`, `print`, `info ...` can auto-interrupt the target
+- that can create a **fake stop** in:
+  - `ntdll!DbgUiRemoteBreakin`
+- after attach + breakpoint setup, one initial `cont` is usually needed just to unfreeze the target
+
+So for live collaborative runs, prefer this discipline:
+
+1. attach
+2. set the smallest possible breakpoint set
+3. `cont` once
+4. if the UI freezes, check whether it is just debugger stop state before assuming a real hit
+5. only use `bt` / `print` after a confirmed useful stop
+
+A backtrace rooted in:
+
+```text
+ntdll!DbgUiRemoteBreakin
+```
+
+usually means the debugger tooling interrupted the process; it is **not** evidence of a real game-side branch hit.
 
 ## Current high-value addresses
 
@@ -34,6 +101,36 @@ These are the most useful current anchors.
 ### Current crash family
 - representative late crash = `EIP=0x003e5e8a`
 - stable higher-level signature = control later redirects into current `arg2 filteredArgv + 2`
+
+### Original launcher / `matrix.exe` active login-state branch
+
+These are the current highest-value original-launcher anchors for active-path work:
+
+- `0x0041ecd0`
+  - `CLTLoginMediator::ProcessLoginRequest`
+  - confirmed live on password submit
+  - current observed input shape:
+    - `param + 0x00` = username
+    - `param + 0x20` = password
+- `0x0041c1f0`
+  - `CLTLoginMediator_PersistSelectionContextAndSwitchToState8`
+  - confirmed live after the password-submit branch
+- `0x00439300`
+  - `CLTLoginState_State4::Slot3_BeginOrContinue`
+  - state-4 margin-route dispatch body
+- `0x0043bd20`
+  - `CLTLoginState_State8::Slot3_BeginOrContinue`
+  - active state-8 structured margin send
+- `0x0043f930`
+  - `CLTLoginState_State8::Slot6_HandleSecondaryMessage`
+  - active state-8 reply body
+
+Important current interpretation:
+- the original live password path is now better evidenced as:
+  - `0x41ecd0 -> 0x41c1f0 -> state8-side continuation`
+- not as an immediate helper11 / `0x41c3c0` path
+- so when debugging the original launcher, **start with the state-8 branch first**
+  before trying to force helper11-specific hypotheses
 
 ## Fastest path: inspect the latest dump
 
@@ -81,6 +178,32 @@ But keep that bypass strictly diagnostic-only; see:
 - `../client.dll/InitClientDLL/RET_BYPASS_HACK.md`
 
 ## Breakpoint strategy that works well here
+
+### Active original-launcher breakpoint set
+
+For the current original `matrix.exe -clone` login-state work, this is the most useful **minimal** breakpoint set:
+
+```text
+break *0x0041ecd0
+break *0x0041c1f0
+break *0x00439300
+break *0x0043bd20
+break *0x0043f930
+cont
+```
+
+Practical use:
+- `0x0041ecd0` is chatty but confirms password-submit entry into the active branch
+- after confirming that once, it is often worth deleting that breakpoint so the UI can progress:
+
+```text
+delete 1
+cont
+```
+
+- `0x0041c1f0` is the highest-value next stop because it confirms the active branch is persisting
+  the `0xb4` selection/config object and switching to state `8`
+- `0x00439300`, `0x0043bd20`, and `0x0043f930` are the next state-4/state-8 continuation anchors
 
 ### 1. Break in the custom launcher first
 

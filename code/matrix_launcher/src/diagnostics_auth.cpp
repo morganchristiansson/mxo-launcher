@@ -5,7 +5,11 @@
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 #include "loginmediator.h"
 #include "loginstate.h"
+#include "launchpad.h"
+#include "spdlog/spdlog.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -29,11 +33,15 @@ struct DiagnosticRawMessageConnectionContext {
     mxo::liblttcp::CMessageConnection* sidecarConnection;
     const char* debugLabel;
     void* contextKey;
+    bool peerCloseQueued;
 };
 
 static mxo::ltlogin::CLTLoginMediator* g_DiagnosticLoginController = NULL;
 static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAuthenticatePending = {};
 static mxo::ltlogin::CLTLoginState_State4 g_DiagnosticLoginStateState4 = {};
+static mxo::ltlogin::CLTLoginState_State9 g_DiagnosticLoginStateState9 = {};
+static mxo::ltlogin::CLTLoginState_State10 g_DiagnosticLoginStateState10 = {};
+static mxo::ltlogin::CLTLoginState_State11 g_DiagnosticLoginStateState11 = {};
 static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldListPending = {};
 static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
 static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
@@ -99,6 +107,124 @@ static const char* DiagnosticAuthRawCodeName(uint8_t rawCode) {
         default:
             return "<unknown-auth-code>";
     }
+}
+
+static void DiagnosticCopyCStringIntoFixed(char* dest, size_t destSize, const char* src) {
+    if (!dest || destSize == 0u) {
+        return;
+    }
+
+    std::memset(dest, 0, destSize);
+    if (!src || !src[0]) {
+        return;
+    }
+
+    const size_t copyCount = std::min(destSize - 1u, std::strlen(src));
+    std::memcpy(dest, src, copyCount);
+    dest[copyCount] = '\0';
+}
+
+static const char* DiagnosticGetEnvNonEmpty(const char* name) {
+    if (!name || !name[0]) {
+        return NULL;
+    }
+
+    const char* value = std::getenv(name);
+    return (value && value[0]) ? value : NULL;
+}
+
+static bool DiagnosticTryParseEnvU32(const char* name, uint32_t* outValue) {
+    if (outValue) {
+        *outValue = 0u;
+    }
+
+    const char* value = DiagnosticGetEnvNonEmpty(name);
+    if (!value || !outValue) {
+        return false;
+    }
+
+    char* end = NULL;
+    const unsigned long parsed = std::strtoul(value, &end, 0);
+    if (!end || end == value || *end != '\0') {
+        return false;
+    }
+
+    *outValue = static_cast<uint32_t>(parsed & 0xffffffffu);
+    return true;
+}
+
+static size_t DiagnosticParseEnvU32List(
+    const char* name,
+    uint32_t* outValues,
+    size_t maxValues) {
+    if (!outValues || maxValues == 0u) {
+        return 0u;
+    }
+
+    std::fill(outValues, outValues + maxValues, 0u);
+
+    const char* text = DiagnosticGetEnvNonEmpty(name);
+    if (!text) {
+        return 0u;
+    }
+
+    size_t count = 0u;
+    const char* cursor = text;
+    while (*cursor && count < maxValues) {
+        while (*cursor == ' ' || *cursor == '\t' || *cursor == ',' || *cursor == ';' || *cursor == '|') {
+            ++cursor;
+        }
+        if (!*cursor) {
+            break;
+        }
+
+        char* end = NULL;
+        const unsigned long parsed = std::strtoul(cursor, &end, 0);
+        if (!end || end == cursor) {
+            break;
+        }
+
+        outValues[count++] = static_cast<uint32_t>(parsed & 0xffffffffu);
+        cursor = end;
+    }
+
+    return count;
+}
+
+static bool DiagnosticParseVariableLengthPayload(
+    const std::vector<uint8_t>& bytes,
+    const uint8_t** outPayload,
+    size_t* outPayloadSize,
+    size_t* outHeaderBytes) {
+    if (outPayload) *outPayload = NULL;
+    if (outPayloadSize) *outPayloadSize = 0u;
+    if (outHeaderBytes) *outHeaderBytes = 0u;
+    if (bytes.size() < 2u) {
+        return false;
+    }
+
+    uint32_t payloadLength = 0u;
+    size_t headerBytes = 0u;
+    if (bytes[0] & 0x80u) {
+        if (bytes.size() < 3u) {
+            return false;
+        }
+        payloadLength = (static_cast<uint32_t>(bytes[0] & 0x7fu) << 8) |
+                        static_cast<uint32_t>(bytes[1]);
+        headerBytes = 2u;
+    } else {
+        payloadLength = static_cast<uint32_t>(bytes[0]);
+        headerBytes = 1u;
+    }
+
+    if (bytes.size() < headerBytes + payloadLength) {
+        return false;
+    }
+
+    if (outPayload) *outPayload = bytes.data() + headerBytes;
+    if (outPayloadSize) *outPayloadSize = payloadLength;
+    if (outHeaderBytes) *outHeaderBytes = headerBytes;
+    return true;
 }
 
 static void DiagnosticRouteConnectStatusToLoginController(
@@ -213,6 +339,32 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                                 (unsigned)marginConnectResult);
                         }
                     }
+                } else if (self == g_DiagnosticMarginContext && bytes.size() >= 2u) {
+                    const uint8_t* payloadBytes = NULL;
+                    size_t payloadSize = 0u;
+                    size_t headerBytes = 0u;
+                    const bool parsedFrame = DiagnosticParseVariableLengthPayload(
+                        bytes,
+                        &payloadBytes,
+                        &payloadSize,
+                        &headerBytes);
+                    const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
+                    Log(
+                        "DIAGNOSTIC: margin receive framing payloadLength=%u headerBytes=%u rawCode=0x%02x likelyMessage='%s'",
+                        (unsigned)payloadSize,
+                        (unsigned)headerBytes,
+                        (unsigned)rawCode,
+                        rawCode == 0x10 ? mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply : "<unknown-margin-code>");
+
+                    if (g_DiagnosticLoginController && parsedFrame && payloadBytes && payloadSize != 0u) {
+                        const uint32_t handled =
+                            g_DiagnosticLoginController->HandleMarginPacketBytes(payloadBytes, payloadSize);
+                        Log(
+                            "DIAGNOSTIC: launcher-owned margin packet handler label='%s' handled=%u rawCode=0x%02x",
+                            self->debugLabel ? self->debugLabel : "<null>",
+                            (unsigned)handled,
+                            (unsigned)rawCode);
+                    }
                 }
 
                 self->sidecarConnection->ClearReceivedBytes();
@@ -315,18 +467,83 @@ static void DiagnosticApplyLoginControllerConfig() {
         static_cast<uint8_t>(loginType),
         keyConfigMd5,
         uiConfigMd5);
+    g_DiagnosticLoginController->RegisterScaffoldState9(&g_DiagnosticLoginStateState9);
+    g_DiagnosticLoginController->RegisterScaffoldState10(&g_DiagnosticLoginStateState10);
+    g_DiagnosticLoginController->RegisterScaffoldState11(&g_DiagnosticLoginStateState11);
     g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
 
     if (g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed && g_LoginControllerSelectionSeedName[0]) {
         mxo::ltlogin::CLTLoginMediator::ProcessLoginCredentialsInputSketch input = {};
-        std::strncpy(input.string00.data(), g_LoginControllerSelectionSeedName, input.string00.size() - 1);
-        input.string00[input.string00.size() - 1] = '\0';
+        DiagnosticCopyCStringIntoFixed(
+            input.string00.data(),
+            input.string00.size(),
+            g_LoginControllerSelectionSeedName);
         input.field24 = g_LoginControllerSelectionSeedWorldIndexLow24;
+
+        DiagnosticCopyCStringIntoFixed(
+            input.string70.data(),
+            input.string70.size(),
+            DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_REAL_FIRST_NAME"));
+        DiagnosticCopyCStringIntoFixed(
+            input.string90.data(),
+            input.string90.size(),
+            DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_REAL_LAST_NAME"));
+        DiagnosticCopyCStringIntoFixed(
+            input.stringB0.data(),
+            input.stringB0.size(),
+            DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_BACKGROUND"));
+
+        std::array<uint32_t, 17> appearanceIds = {};
+        const size_t appearanceCount = DiagnosticParseEnvU32List(
+            "MXO_DIAGNOSTIC_APPEARANCE_IDS",
+            appearanceIds.data(),
+            appearanceIds.size());
+        for (size_t i = 0; i < 8u; ++i) {
+            input.dwords2c[i] = appearanceIds[i];
+            input.dwords4c[i] = appearanceIds[8u + i];
+        }
+        input.bytes6c[0] = static_cast<uint8_t>(appearanceIds[16] & 0xffu);
+        input.bytes6c[1] = static_cast<uint8_t>((appearanceIds[16] >> 8) & 0xffu);
+        input.bytes6c[2] = static_cast<uint8_t>((appearanceIds[16] >> 16) & 0xffu);
+        input.bytes6c[3] = static_cast<uint8_t>((appearanceIds[16] >> 24) & 0xffu);
+
         g_DiagnosticLoginController->ProcessLoginCredentials(input);
-        Log(
-            "DIAGNOSTIC: applied recovered 0x41c3c0 seed selectionName='%s' selectedWorldIndexLow24=0x%06x",
+        spdlog::info(
+            "DiagnosticApplyLoginControllerConfig applied recovered 0x41c3c0 seed selectionName='{}' selectedWorldIndexLow24=0x{:06x} realFirst='{}' realLast='{}' background='{}' appearanceCount={}",
             g_LoginControllerSelectionSeedName,
-            (unsigned)g_LoginControllerSelectionSeedWorldIndexLow24);
+            static_cast<unsigned>(g_LoginControllerSelectionSeedWorldIndexLow24),
+            input.string70[0] ? input.string70.data() : "<empty>",
+            input.string90[0] ? input.string90.data() : "<empty>",
+            input.stringB0[0] ? input.stringB0.data() : "<empty>",
+            static_cast<unsigned>(appearanceCount));
+    }
+
+    mxo::ltlogin::LaunchPadClient launchPad;
+    const char* diagnosticPlayRequestSessionId = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_PLAY_REQUEST_SESSION_ID");
+    if (diagnosticPlayRequestSessionId) {
+        launchPad.OnPlayRequestStatus(g_DiagnosticLoginController, /*resultCode=*/0u, diagnosticPlayRequestSessionId);
+        spdlog::info(
+            "DiagnosticApplyLoginControllerConfig routed diagnostic LaunchPadClient::OnPlayRequestStatus GameSessionID='{}'",
+            diagnosticPlayRequestSessionId);
+    }
+
+    const char* diagnosticLoginSource94First = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_LOGIN_SOURCE94_FIRST");
+    const char* diagnosticLoginSessionText = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_LOGIN_SESSION_TEXT");
+    uint32_t diagnosticLoginShared660 = 0u;
+    const bool haveDiagnosticLoginShared660 =
+        DiagnosticTryParseEnvU32("MXO_DIAGNOSTIC_LOGIN_SHARED660", &diagnosticLoginShared660);
+    if (diagnosticLoginSource94First || diagnosticLoginSessionText || haveDiagnosticLoginShared660) {
+        launchPad.OnLoginRequestStatus(
+            g_DiagnosticLoginController,
+            /*resultCode=*/0u,
+            diagnosticLoginSource94First ? diagnosticLoginSource94First : "",
+            diagnosticLoginShared660,
+            diagnosticLoginSessionText ? diagnosticLoginSessionText : "");
+        spdlog::info(
+            "DiagnosticApplyLoginControllerConfig routed diagnostic LaunchPadClient::OnLoginRequestStatus owner660=0x{:08x} source94='{}' session='{}'",
+            static_cast<unsigned>(diagnosticLoginShared660),
+            diagnosticLoginSource94First ? diagnosticLoginSource94First : "<empty>",
+            diagnosticLoginSessionText ? diagnosticLoginSessionText : "<empty>");
     }
 }
 
@@ -376,14 +593,30 @@ void DiagnosticAuthPollLiveConnectionTraffic(void* owner) {
         if (!context || !context->sidecarConnection) return;
 
         const int received = context->sidecarConnection->PollReceiveNonBlocking();
-        if (received <= 0) return;
+        if (received > 0) {
+            DiagnosticEnqueueConnectionStatusWorkItem(
+                owner,
+                context,
+                /*workType=*/3u,
+                /*workPayload=*/static_cast<uint32_t>(received),
+                label);
+            return;
+        }
 
-        DiagnosticEnqueueConnectionStatusWorkItem(
-            owner,
-            context,
-            /*workType=*/3u,
-            /*workPayload=*/static_cast<uint32_t>(received),
-            label);
+        if (received < 0 && !context->peerCloseQueued) {
+            context->peerCloseQueued = true;
+            spdlog::info(
+                "DiagnosticAuthPollLiveConnectionTraffic queued peer-close work label='{}' context={} connection={}",
+                (context->debugLabel && context->debugLabel[0]) ? context->debugLabel : "<null>",
+                fmt::ptr(context),
+                fmt::ptr(context->sidecarConnection));
+            DiagnosticEnqueueConnectionStatusWorkItem(
+                owner,
+                context,
+                /*workType=*/1u,
+                /*workPayload=*/0u,
+                context == g_DiagnosticAuthContext ? "AuthPeerClosed" : "MarginPeerClosed");
+        }
     };
 
     tryPoll(g_DiagnosticAuthContext, "AuthReceivePacket");

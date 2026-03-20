@@ -552,8 +552,13 @@ Representative non-zero arg7 result from that same run:
   - and stores that value into the first dword of the `+0xec` handoff object before the path-building helper sequence
 - newer live original `matrix.exe` WineDbg tracing now strengthens the downstream meaning of that same `0xb4` object:
   - password confirmation hits owner `+0xec` / `0x41ecd0`
+    - live stop there also tightens the input layout:
+      - `+0x00` = username
+      - `+0x20` = password
+      - observed active branch had `DAT_004d66ec == 0`
   - the observed launcher branch then transitions `0 -> 2 -> 3 -> 8`
   - while current helper vtable is `0x004b5208` (state `3`), the launcher reaches `0x41c1f0`
+  - newer live stop now confirms `0x41c1f0` itself is reached on that same branch
   - `0x41c1f0` copies the first dword into owner byte `+0xcc8`, then copies the remaining
     `0xb0` bytes into owner `+0xcd0 .. +0xd7f`, and switches helper state to `8`
 - replacement-launcher follow-up now mirrors that copied arg6 `+0xec` snapshot directly into the

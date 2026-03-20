@@ -105,28 +105,51 @@ What remains:
     - the load-character scaffold should likewise prefer the reconstructed current-slot record
       (`+0x688[owner+0xcc8]`) when seeding the `+0xf1c` name/world family, with owner `+0x108`
       left only as fallback scaffolding
+  - important distinction for current RE/source work:
+    - auth reply handling already reconstructs and source-owns the auth-side character/world data
+      families under owner `+0x688/+0x818/+0xd84`
+      - character slot records there currently give us character handle, gcid pair, status, and world id
+      - world descriptors give us world id/name/type/status/version/load
+    - that is **not** yet the same thing as the helper11 human-name / appearance source block used by
+      state11 sender `0x43c020`
   - owner vtable `+0x120` / `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the
     strongest recovered writer for the immediate helper11 source block:
     - writes owner `+0x12c`
+      - newer tightening from `0x41c3c0` + `0x4401a0` now makes that field less opaque:
+        it is bounds-checked against owner vtable `+0xf8` and then used as an index into
+        owner `+0xd84`, so current best read is a selected world-descriptor index / selector,
+        not a direct world-id payload
     - writes owner `+0x134..+0x177`
     - writes owner `+0x108`, `+0x178`, `+0x198`, `+0x1b8`
     - then switches helper state to `10`
 - important runtime narrowing from live original `matrix.exe` under WineDbg:
   - confirming the launcher password does hit owner vtable `+0xec` / `0x41ecd0 = ProcessLoginRequest`
+    - newer live stop there also tightens the concrete input shape:
+      - input `+0x00` = username
+      - input `+0x20` = password
+      - observed active branch had `DAT_004d66ec == 0`, owner `+0x65c == 0`, owner `+0x12c == 0`
+      - that matches the earlier/default auth-bootstrap branch rather than the later helper11 writer branch
   - that live path then visibly transitions through `0x41b450` as:
     - state `0 -> 2`
     - state `2 -> 3`
     - state `3 -> 8`
   - the state-`3 -> 8` step returns to `0x41c382`, i.e. the `0x41c1f0` family, while current helper
     vtable is `0x004b5208` (state `3`)
+  - newer live stop now confirms `0x41c1f0` itself is reached on that same branch, not merely inferred
+    from the return site
   - `0x41c3c0` did **not** fire on that observed authenticated launch path before later game loading
   - current practical consequence: treat `0x41c3c0` as a real writer for one branch, but not yet as
     the active default post-password progression we most urgently need for launching the game
   - stronger active-path replacement target now looks like owner `+0xec -> 0x41c1f0 -> state 8`,
     with `0x41c1f0` persisting a `0xb4` selection/config snapshot under owner `+0xcc8/+0xcd0..+0xd7f`
+  - practical implementation consequence: prioritize faithful state4/state8 continuation
+    (`0x439300`, `0x43bd20`, `0x43f930`) before trying to force helper11-only data paths
   - replacement launcher now also mirrors the copied arg6 `+0xec` snapshot into the source-owned
     `CLTLoginMediator::PersistSelectionContextForState8(...)` path so this active branch no longer
     lives only in ABI-side logs
+  - source now also has a first anchored mirror for `0x41ecd0 = ProcessLoginRequest`, keeping the
+    owner `+0x94` copy and default `DAT_004d66ec == 0` small-string clear on the mediator side
+    instead of leaving that active password-submit branch entirely outside source ownership
   - that same copied snapshot is now also mirrored into the auth/login-controller sidecar model,
     so launcher-owned runtime experiments can consume the observed state-3->8 selection snapshot too
   - practical host-name correction from live auth data:
@@ -148,10 +171,27 @@ Current best read:
   `0x43b830 / CLTLoginMediator_Helper14_SendGetWorldListRequest` path
 - instead it switches helper state to `0x4f7894` / vtable `0x004b5154` and immediately runs
   `CLTLoginState_State11` slot 3 (`0x43c020`)
-- that state body builds a larger margin-side packet whose first payload byte is raw `0x4d`,
-  sends it through `CLTLoginMediator_SendCurrentMarginPacket`, and posts event `0x15`
+- newer `0x43c020` decompilation tightening corrects one packet-detail claim:
+  - it reserves a fixed `0x4d`-byte payload span first
+  - then `0x43a470` initializes payload byte `0x00 = 0x0c`
+  - current best read is therefore a framed margin send of fixed-length `0x4d` payload bytes
+    whose payload starts with `0x0c`, not a flat payload whose first byte is `0x4d`
+- that state body then sends the packet through `CLTLoginMediator_SendCurrentMarginPacket` and posts event `0x15`
 - source ownership now mirrors that more closely:
   - packet build/send shape lives in `CLTLoginState_State11::Slot3_BeginOrContinue`
+  - `0x4401a0` / state10 slot 6 is now likewise routed through
+    `CLTLoginState_State10::Slot6_HandleSecondaryMessage` instead of living only as a mediator-side
+    catch-all
+  - `0x440320` / state11 slot 6 is now likewise routed through
+    `CLTLoginState_State11::Slot6_HandleSecondaryMessage`, with the mediator reduced to the narrower
+    staged-packet and owner-buffer helper role
+  - that same source-owned slot-6 path now also performs the scaffold handoff into registered
+    helper9/state9 when helper11 reply progression completes, instead of leaving the state-9 bridge
+    entirely implicit
+  - newer slot-6 parsing work now also preserves more of the recovered helper-local metadata there:
+    - expected fragment count from parsed reply `+0x0b/+0x0c`
+    - helper9 handoff word from parsed reply `+0x09`
+    - section-specific owner writes for section `0` and append sections `3/4/5/6`
   - mediator only keeps the narrower current-margin-connection transport helper for `0x41af70`
   - the local `0x43c020` packet-builder family is now also source-owned as internal helper
     scaffolding instead of one flat raw-byte helper:
@@ -218,8 +258,15 @@ Current best read:
   then posts event `0x16`
 
 What remains:
-- reconstruct enough post-`0x0b` owner state that the helper11 margin/loading phase becomes
-  live in the scaffold
+- preserve the now-proven split in the canonical status view:
+  - post-`AS_AuthReply` State4/`0x41e500` margin begin is now live on the real deliberate runtime path
+  - helper11/state11 slot 3 (`0x43c020`) is now likewise live there
+  - newer source/runtime tightening now also shows the current scaffold sends framed bytes
+    beginning `4d 0c ...` on that path, matching the fixed-size-`0x4d` / payload-tag-`0x0c`
+    read better than the older flat-`0x4d` claim
+  - the next remaining post-auth blocker is still later incoming margin `0x10` / `MS_LoadCharacterReply`
+    handling in state11 slot 6 (`0x440320`), with current active-path source starvation in the
+    helper11 payload (`+0x134..+0x1b8`, `+0x664`) now looking more relevant to that lack of reply
 - stop advertising the later `AS_GetWorldListRequest` helper as though it were the immediate
   next original step on this startup path
 - keep `0x43b830` as a real later auth-side sender, but no longer treat it as the best first
@@ -267,6 +314,8 @@ Auth can reasonably be treated as finished enough when all of the following are 
 Treat auth as **no longer the main blocker**.
 The highest-value remaining auth-adjacent work is now:
 - faithful post-`0x0B` mediator state writeback
-- and faithful progression into the immediate helper11-driven post-auth margin/loading phase
-  (`0x43c020` / `0x440320`), rather than prematurely aiming at the later
-  `AS_GetWorldListRequest` helper path
+- and faithful continuation after the now-live helper11/state11 send step:
+  - keep the State4/`0x41e500` margin-begin milestone as done enough for the active path
+  - focus next on making later incoming margin `0x10` / `MS_LoadCharacterReply`
+    (`0x440320`) become live, rather than prematurely aiming at the later
+    `AS_GetWorldListRequest` helper path

@@ -11,8 +11,10 @@
  * CONSTRUCTION / INITIALIZATION:
  * - launcher.exe:0x43b300 = CLTLoginMediator_InitializeHelperDispatchTable (helper array at 0x4f7868..0x4f78a0)
  * - launcher.exe:0x4f7868..0x4f78a0 = contiguous helper/state array (16 slots)
- * - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
- *   - launcher.exe:0x4816f0 = LaunchPadClient_GetVtableOffset (inline helper returning *(this+4))
+ * - launcher.exe:0x438d80 = current shared launcher-side event gate symbolized as
+ *   `LaunchPadClient_ProcessEvent0x17`
+ *   - launcher.exe:0x4816f0 = reused inline helper symbolized as
+ *     `LaunchPadClient_GetVtableOffset` (anchor only; not a mediator-class identity claim)
  *   - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism, logs "CLTLoginMediator::PostEvent(): Event# %d\n")
  *   - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
  *   - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf, calls PostError, logs "CLTLoginMediator::PostError(): Error# %d\n")
@@ -83,10 +85,13 @@
  * - [COMPLETE] Address anchors documented throughout source with Ghidra-synced names
  * - [COMPLETE] Helper dispatch table structure discovered from Ghidra analysis of 0x43b300:
  *   - [COMPLETE] CLTLoginMediator_InitializeHelperDispatchTable allocates 16 heap-allocated tables
- *   - [COMPLETE] LaunchPadClient_ProcessEvent0x17 (0x438d80) is the event handler for all slots
+ *   - [COMPLETE] `0x438d80` remains anchored under the current symbol
+ *     `LaunchPadClient_ProcessEvent0x17`, but here it should be read as a shared launcher-side
+ *     event gate rather than evidence that CLTLoginMediator is a LaunchPadClient instance
  *   - [COMPLETE] CLTLoginMediator_PostEvent (0x41cfb0), CLTLoginMediator_SwitchHelperState (0x41b450),
  *     CLTLoginMediator_PostError (0x41d090) are the helper functions
- *   - [COMPLETE] LaunchPadClient_GetVtableOffset (0x4816f0) is the inline vtable offset getter
+ *   - [COMPLETE] `0x4816f0` remains anchored as `LaunchPadClient_GetVtableOffset`, a reused inline
+ *     helper name rather than a mediator-class identity claim
  * - [IN PROGRESS] Faithful arg5 (launcherNetworkObject at 0x4d6304)
  * - [COMPLETE] Faithful arg6 starter surface (ILTLoginMediator.Default at 0x4d2c58):
  *   - [COMPLETE] InitializeArg6DefaultObject method with address anchors
@@ -101,10 +106,16 @@
 
 #include "loginmediator.h"
 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
 #include "../../../../src/diagnostics.h"
 #include "loginstate.h"
+#include "spdlog/spdlog.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <ctime>
 
 namespace mxo::ltlogin {
@@ -117,6 +128,53 @@ static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOr
     key.portNetworkOrder = static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
     key.ipv4NetworkOrder = 0;
     return key;
+}
+
+static bool EnsureWinsockReady() {
+    static bool initialized = false;
+    static bool attempted = false;
+    if (attempted) {
+        return initialized;
+    }
+    attempted = true;
+
+    WSADATA wsaData = {};
+    initialized = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
+    return initialized;
+}
+
+static bool ResolveAllIpv4Addresses(const char* hostName, std::vector<uint32_t>* outIpv4NetworkOrderList) {
+    if (!hostName || !hostName[0] || !outIpv4NetworkOrderList || !EnsureWinsockReady()) {
+        return false;
+    }
+
+    addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    addrinfo* results = nullptr;
+    if (getaddrinfo(hostName, nullptr, &hints, &results) != 0 || !results) {
+        return false;
+    }
+
+    outIpv4NetworkOrderList->clear();
+    for (addrinfo* it = results; it; it = it->ai_next) {
+        if (it->ai_family != AF_INET || !it->ai_addr ||
+            it->ai_addrlen < static_cast<int>(sizeof(sockaddr_in))) {
+            continue;
+        }
+
+        const sockaddr_in* addr = reinterpret_cast<const sockaddr_in*>(it->ai_addr);
+        const uint32_t ipv4NetworkOrder = addr->sin_addr.s_addr;
+        if (std::find(outIpv4NetworkOrderList->begin(), outIpv4NetworkOrderList->end(), ipv4NetworkOrder) ==
+            outIpv4NetworkOrderList->end()) {
+            outIpv4NetworkOrderList->push_back(ipv4NetworkOrder);
+        }
+    }
+
+    freeaddrinfo(results);
+    return !outIpv4NetworkOrderList->empty();
 }
 
 static const char* MaskedAuthValue(const std::string& value) {
@@ -140,17 +198,107 @@ static std::array<uint8_t, 16> CopyPrefix16(const std::vector<uint8_t>& bytes) {
     return out;
 }
 
+static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t maxPreviewBytes) {
+    if (!bytes || byteCount == 0u || maxPreviewBytes == 0u) {
+        return "<empty>";
+    }
+
+    const uint8_t* p = static_cast<const uint8_t*>(bytes);
+    const size_t previewCount = std::min(byteCount, maxPreviewBytes);
+    std::string out;
+    out.reserve(previewCount * 3u);
+    static const char kHexDigits[] = "0123456789abcdef";
+    for (size_t i = 0; i < previewCount; ++i) {
+        const uint8_t value = p[i];
+        out.push_back(kHexDigits[(value >> 4) & 0x0fu]);
+        out.push_back(kHexDigits[value & 0x0fu]);
+        if (i + 1u != previewCount) {
+            out.push_back(' ');
+        }
+    }
+    return out;
+}
+
+static uint16_t ReadU16LE(const uint8_t* p) {
+    return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+}
+
+static uint32_t ReadU32LE(const uint8_t* p) {
+    return static_cast<uint32_t>(p[0]) |
+           (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) |
+           (static_cast<uint32_t>(p[3]) << 24);
+}
+
+static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src, size_t srcAvailable) {
+    if (!dest || destSize == 0u) {
+        return;
+    }
+
+    std::fill(dest, dest + destSize, '\0');
+    if (!src || srcAvailable == 0u) {
+        return;
+    }
+
+    size_t copyCount = 0u;
+    while (copyCount + 1u < destSize && copyCount < srcAvailable && src[copyCount] != '\0') {
+        dest[copyCount] = static_cast<char>(src[copyCount]);
+        ++copyCount;
+    }
+    dest[copyCount] = '\0';
+}
+
+static void AppendOwnedSectionBytes(void*& buffer, uint16_t& length, const uint8_t* src, uint16_t appendLen) {
+    if (!src || appendLen == 0u) {
+        return;
+    }
+
+    const size_t oldLength = length;
+    const size_t newLength = oldLength + appendLen;
+    void* newBuffer = buffer ? std::realloc(buffer, newLength) : std::malloc(newLength);
+    if (!newBuffer) {
+        return;
+    }
+
+    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, src, appendLen);
+    buffer = newBuffer;
+    length = static_cast<uint16_t>(newLength & 0xffffu);
+}
+
+static void AssignOwnedSmallString(
+    CLTLoginMediator::AuthBootstrapSelectedSource38Sketch& dest,
+    const char* begin,
+    const char* current) {
+    dest.string60Owned.clear();
+    dest.string60 = {};
+
+    if (!begin || !current || current <= begin) {
+        return;
+    }
+
+    dest.string60Owned.assign(begin, current);
+    dest.string60.begin = dest.string60Owned.c_str();
+    dest.string60.current = dest.string60Owned.c_str() + dest.string60Owned.size();
+    dest.string60.capacity = dest.string60.current;
+}
+
 }  // namespace
 
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
       currentState_(nullptr),
+      scaffoldState9_(nullptr),
+      scaffoldState10_(nullptr),
+      scaffoldState11_(nullptr),
       authConnection_(nullptr),
       marginConnection_(nullptr),
+      authConnectionOwnedByMediator_(false),
+      marginConnectionOwnedByMediator_(false),
       authConnectionContextKey_(nullptr),
       marginConnectionContextKey_(nullptr),
       helpers_{},
       marginRouteState_{},
+      marginAddressList3c_{},
       authBootstrapSource38_{},
       authBootstrap680_{},
       sessionCallbackHelper65c_(nullptr),
@@ -189,18 +337,25 @@ CLTLoginMediator::CLTLoginMediator()
 }
 
 CLTLoginMediator::~CLTLoginMediator() {
-    if (!(engine_ && authConnectionContextKey_)) {
+    if (authConnectionOwnedByMediator_) {
         delete authConnection_;
     }
-    if (!(engine_ && marginConnectionContextKey_)) {
+    if (marginConnectionOwnedByMediator_) {
         delete marginConnection_;
     }
 }
 
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
     engine_ = engine;
-    if (authConnection_) authConnection_->SetEngine(engine_);
-    if (marginConnection_) marginConnection_->SetEngine(engine_);
+    if (authConnection_) {
+        authConnection_->SetEngine(engine_);
+    }
+    if (marginConnection_) {
+        marginConnection_->SetEngine(engine_);
+        if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
+            marginConnection->SetMarginEngine(engine_);
+        }
+    }
 }
 
 mxo::liblttcp::CLTThreadPerClientTCPEngine* CLTLoginMediator::NetworkEngine() const {
@@ -213,6 +368,30 @@ void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
 
 CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
+}
+
+void CLTLoginMediator::RegisterScaffoldState9(CLTLoginState* state) {
+    scaffoldState9_ = state;
+}
+
+void CLTLoginMediator::RegisterScaffoldState10(CLTLoginState* state) {
+    scaffoldState10_ = state;
+}
+
+void CLTLoginMediator::RegisterScaffoldState11(CLTLoginState* state) {
+    scaffoldState11_ = state;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState9() const {
+    return scaffoldState9_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState10() const {
+    return scaffoldState10_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState11() const {
+    return scaffoldState11_;
 }
 
 void CLTLoginMediator::SetAuthConnectionContextKey(void* contextKey) {
@@ -363,8 +542,10 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     // - launcher.exe:0x420850 = InitializeHelperDispatchSlot17 (initializes slot at 0x4f78ac)
     // - launcher.exe:0x420920 = InitializeHelperDispatchSlot18 (initializes slot at 0x4f78b0)
     // - launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19 (initializes slot at 0x4f78b4)
-    // - launcher.exe:0x438d80 = LaunchPadClient_ProcessEvent0x17 (event handler for event code 0x1)
-    // - launcher.exe:0x4816f0 = LaunchPadClient_GetVtableOffset (inline helper returning *(this+4))
+    // - launcher.exe:0x438d80 = current shared launcher-side event gate symbolized as
+    //   `LaunchPadClient_ProcessEvent0x17`
+    // - launcher.exe:0x4816f0 = reused inline helper symbolized as
+    //   `LaunchPadClient_GetVtableOffset` (keep as an anchor, not a class-identity claim)
     // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
     // - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
     // - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf)
@@ -378,7 +559,8 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     // `0x438d80`; the installed object pointer itself carries the concrete `CLTLoginState_*` vtable.
     //
     // From disassembly of 0x438d80:
-    //   - Calls LaunchPadClient_GetVtableOffset(this+8) to get vtable offset
+    //   - Calls the helper currently named `LaunchPadClient_GetVtableOffset(this+8)` to get a
+    //     vtable offset
     //   - Checks if event flag at [this+0x2c] is set
     //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
     //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]
@@ -512,17 +694,74 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
     // - original `0x4401a0` success instead reaches `0x41b450(0x0b)`, which selects helper
     //   `0x4f7894` and immediately runs `CLTLoginState_State11` slot 3 /
     //   `0x43c020`
-    // - that state body builds a larger margin-side packet whose first payload byte is raw `0x4d`,
-    //   sends it via `CLTLoginMediator_SendCurrentMarginPacket` (`0x41af70`), then posts
-    //   event `0x15`
-    // - later `CLTLoginState_State11` slot 6 /
-    //   `0x440320` handles raw margin
-    //   code `0x10` / `MS_LoadCharacterReply`, accumulates reply fragments under owner `+0xf1c`,
-    //   and on completion switches helper state to `9` then posts event `0x16`
-    // - the current scaffold still does not reconstruct that helper11-driven margin/loading
-    //   phase faithfully, so this deliberate margin-connect hook remains diagnostic-only
-    expectedMarginRequestName_ = nullptr;
-    return 1u;
+    // - keep that ownership split explicit in source too:
+    //   - mediator only owns the shared margin-connection transport helper
+    //   - the concrete send body remains on the active CLTLoginState vtable object
+    if (!currentState_) {
+        Log("DIAGNOSTIC: BeginMarginHandshake has no active CLTLoginState; helper11 send is unresolved");
+        return 0u;
+    }
+
+    return currentState_->Slot3_BeginOrContinue(/*upstreamOrArg=*/currentState_, this);
+}
+
+// anchor: launcher.exe:0x41ecd0
+uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) {
+    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    switch (stateCode) {
+        case 1u:
+        case 2u:
+        case 3u:
+            return 0x12000006u;
+        case 4u:
+        case 6u:
+        case 7u:
+        case 8u:
+        case 9u:
+        case 10u:
+        case 11u:
+            return 0x12000000u;
+        case 12u:
+            return 0x12000007u;
+        default:
+            break;
+    }
+
+    if ((input.inlineString00[0] == '\0' || input.inlineString20[0] == '\0') &&
+        input.string60.current == input.string60.begin) {
+        return 4u;
+    }
+
+    authBootstrapSource38_.inlineString00 = input.inlineString00;
+    authBootstrapSource38_.inlineString20 = input.inlineString20;
+    authBootstrapSource38_.block40 = input.block40;
+    authBootstrapSource38_.block50 = input.block50;
+    authBootstrapSource38_.flag6C = input.flag6C;
+    AssignOwnedSmallString(authBootstrapSource38_, input.string60.begin, input.string60.current);
+
+    if (currentState_ && currentState_->DispatchPhaseCode() == 2u) {
+        Log(
+            "DIAGNOSTIC: ProcessLoginRequest copied owner+0x94 username='%s' password='%s' string60Len=%u and remains on helper state 2",
+            authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
+            authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
+            (unsigned)authBootstrapSource38_.string60Owned.size());
+    } else {
+        Log(
+            "DIAGNOSTIC: ProcessLoginRequest copied owner+0x94 username='%s' password='%s' string60Len=%u (state-switch scaffolding beyond active state-2 branch still partial)",
+            authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
+            authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
+            (unsigned)authBootstrapSource38_.string60Owned.size());
+    }
+
+    // Active original branch observed under WineDbg had `DAT_004d66ec == 0`, which means:
+    // - clear owner `+0xf4` (`+0x94 + 0x60`) through the small-string helper
+    // - switch helper state to `2`
+    // Current source scaffold keeps the already-live state-2 side conservative and only mirrors
+    // the owner-state mutation here.
+    AssignOwnedSmallString(authBootstrapSource38_, nullptr, nullptr);
+    Log(
+        "DIAGNOSTIC: ProcessLoginRequest mirrored default DAT_004d66ec==0 branch by clearing owner+0xf4 small-string state");
+    return 0u;
 }
 
 // anchor: launcher.exe:0x41c1f0
@@ -569,6 +808,11 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
 // anchor: launcher.exe:0x41c3c0
 uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) {
     // Current best recovered writer for the helper11 owner source block.
+    // Important current active-path caution from live original WineDbg runs:
+    // - this is a real writer, but the observed password-submit branch first goes through
+    //   `0x41ecd0 -> 0x41c1f0 -> state 8`
+    // - so keep this method class-faithful and source-owned, but do not currently treat it as the
+    //   default first target for launcher startup reconstruction
     // Original `0x41c3c0` writes:
     // - owner `+0x12c` from input `+0x24`
     // - owner `+0x134 .. +0x153` from input `+0x2c`
@@ -628,66 +872,204 @@ bool CLTLoginMediator::State10HasReadyConnectionState2() const {
 // anchor: launcher.exe:0x440320
 uint32_t CLTLoginMediator::State11HandleLoadCharacterReplyScaffold(const uint8_t* packetBytes, size_t packetSize) {
     // Evidence-backed current read:
-    // - validates raw margin opcode `0x10`
-    // - `0x440320` first-fragment path can seed `+0xf1c` from the owner source block rooted at
-    //   `+0x108`
-    // - later sibling path `0x43f930` proves the same `+0xf1c` family can also be seeded from the
-    //   current slot record returned by owner vtable `+0x44`
-    // - copies first 8 dwords from owner `+0x134` into `+0xf48`
-    // - accumulates later section fragments under `+0xf1c`
-    // - on completion switches helper state to `9` and posts event `0x16`
-    //
-    // Current source-owned tightening:
-    // - prefer reconstructed current-slot record data for the name/world seed when it exists
-    // - otherwise fall back to the older owner `+0x108` scaffold mirror
-    if (!packetBytes || packetSize < 2) {
+    // - validates raw margin code `0x10`
+    // - on first helper11 fragment it clears/seeds the owner `+0xf1c` family
+    // - section selector `(byte+0x0d) - 2` drives later per-section writes
+    // - cases `3/4/5/6` append bytes into owned buffers at `+0x1418/+0x1420/+0x1428/+0x1408`
+    // - case `0` fills the `+0xf88/+0x13cc/+0x13d0` family plus three inline strings
+    if (!packetBytes || packetSize < 0x10) {
+        return 0u;
+    }
+    if (packetBytes[0] != 0x10) {
         return 0u;
     }
 
-    const uint16_t marginOpcode =
-        static_cast<uint16_t>(packetBytes[0]) | (static_cast<uint16_t>(packetBytes[1]) << 8);
-    if (marginOpcode != 0x10) {
+    const uint32_t parsedStatus = ReadU32LE(packetBytes + 1);
+    const uint32_t parsedField05 = ReadU32LE(packetBytes + 5);
+    const uint16_t parsedHandoffWord09 = ReadU16LE(packetBytes + 9);
+    const uint8_t parsedExpectedCount0b = packetBytes[0x0b];
+    const uint8_t parsedSeedCount0c = packetBytes[0x0c];
+    const uint8_t parsedSelectorMinus2 = static_cast<uint8_t>(packetBytes[0x0d] - 2u);
+    const uint16_t sectionOffset0e = ReadU16LE(packetBytes + 0x0e);
+
+    postAuthMarginLoadingState_.worldListCountOrStatus80 = parsedStatus;
+    if (parsedStatus >= 1u) {
+        postAuthMarginLoadingState_.sourceLeadString108[0] = '\0';
+        postAuthMarginLoadingState_.characterRouteIndexCc8 = 0xffu;
+        Log(
+            "DIAGNOSTIC: helper11 load-character scaffold observed non-success status=0x%08x handoffWord=0x%04x and mirrored failure-side owner clears",
+            (unsigned)parsedStatus,
+            (unsigned)parsedHandoffWord09);
         return 0u;
     }
 
-    std::fill(
-        std::begin(postAuthMarginLoadingState_.characterNameBufferF1c),
-        std::end(postAuthMarginLoadingState_.characterNameBufferF1c),
-        '\0');
+    uint16_t sectionByteCount = 0u;
+    const uint8_t* sectionData = nullptr;
+    if (sectionOffset0e != 0u && static_cast<size_t>(sectionOffset0e) + 2u <= packetSize) {
+        sectionByteCount = ReadU16LE(packetBytes + sectionOffset0e);
+        const size_t sectionDataOffset = static_cast<size_t>(sectionOffset0e) + 2u;
+        if (sectionDataOffset <= packetSize) {
+            sectionData = packetBytes + sectionDataOffset;
+            const size_t remaining = packetSize - sectionDataOffset;
+            if (sectionByteCount > remaining) {
+                sectionByteCount = static_cast<uint16_t>(remaining);
+            }
+        }
+    }
 
+    const bool firstFragment = (postAuthMarginLoadingState_.characterNameBufferF1c[0] == '\0');
     bool usedCurrentSlotRecord = false;
-    if (const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord()) {
-        const size_t copyCount = std::min(
-            currentSlotRecord->heapString14.size(),
-            sizeof(postAuthMarginLoadingState_.characterNameBufferF1c) - 1);
+    if (firstFragment) {
+        std::fill(
+            std::begin(postAuthMarginLoadingState_.characterNameBufferF1c),
+            std::end(postAuthMarginLoadingState_.characterNameBufferF1c),
+            '\0');
+        postAuthMarginLoadingState_.characterReplyFieldF3c = parsedField05;
+        postAuthMarginLoadingState_.characterReplyFieldF40 = postAuthMarginLoadingState_.sourceField12c;
+        std::fill(postAuthMarginLoadingState_.characterFlagsF48.begin(), postAuthMarginLoadingState_.characterFlagsF48.end(), 0u);
+        std::fill(postAuthMarginLoadingState_.secondaryCharacterDataF68.begin(), postAuthMarginLoadingState_.secondaryCharacterDataF68.end(), 0u);
+        std::fill(postAuthMarginLoadingState_.characterRecordPointersF88.begin(), postAuthMarginLoadingState_.characterRecordPointersF88.end(), 0u);
+        std::fill(postAuthMarginLoadingState_.section0StringF8c.begin(), postAuthMarginLoadingState_.section0StringF8c.end(), '\0');
+        std::fill(postAuthMarginLoadingState_.section0StringFac.begin(), postAuthMarginLoadingState_.section0StringFac.end(), '\0');
+        std::fill(postAuthMarginLoadingState_.section0StringFcc.begin(), postAuthMarginLoadingState_.section0StringFcc.end(), '\0');
+        postAuthMarginLoadingState_.replySectionData13cc = 0u;
+        postAuthMarginLoadingState_.replySectionData13d0 = 0u;
+        postAuthMarginLoadingState_.section0Flag13f6 = 0u;
+        postAuthMarginLoadingState_.flag13fe = 1u;
+        postAuthMarginLoadingState_.flag1406 = 1u;
+        postAuthMarginLoadingState_.flag1416 = 1u;
+        postAuthMarginLoadingState_.flag1448 = 1u;
+        postAuthMarginLoadingState_.flag1452 = 1u;
+
+        if (postAuthMarginLoadingState_.allocatedBuffer1418) {
+            std::free(postAuthMarginLoadingState_.allocatedBuffer1418);
+            postAuthMarginLoadingState_.allocatedBuffer1418 = nullptr;
+        }
+        if (postAuthMarginLoadingState_.allocatedBuffer1420) {
+            std::free(postAuthMarginLoadingState_.allocatedBuffer1420);
+            postAuthMarginLoadingState_.allocatedBuffer1420 = nullptr;
+        }
+        if (postAuthMarginLoadingState_.allocatedBuffer1428) {
+            std::free(postAuthMarginLoadingState_.allocatedBuffer1428);
+            postAuthMarginLoadingState_.allocatedBuffer1428 = nullptr;
+        }
+        if (postAuthMarginLoadingState_.allocatedBuffer1408) {
+            std::free(postAuthMarginLoadingState_.allocatedBuffer1408);
+            postAuthMarginLoadingState_.allocatedBuffer1408 = nullptr;
+        }
+        postAuthMarginLoadingState_.allocatedBufferLength141c = 0u;
+        postAuthMarginLoadingState_.allocatedBufferLength1424 = 0u;
+        postAuthMarginLoadingState_.allocatedBufferLength142c = 0u;
+        postAuthMarginLoadingState_.allocatedBufferLength140c = 0u;
+        postAuthMarginLoadingState_.allocatedBufferFlag141e = 0u;
+        postAuthMarginLoadingState_.allocatedBufferFlag1426 = 0u;
+        postAuthMarginLoadingState_.allocatedBufferFlag142e = 0u;
+        postAuthMarginLoadingState_.allocatedBufferFlag140e = 0u;
+
+        if (const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord()) {
+            const size_t copyCount = std::min(
+                currentSlotRecord->heapString14.size(),
+                sizeof(postAuthMarginLoadingState_.characterNameBufferF1c) - 1);
+            std::copy_n(
+                currentSlotRecord->heapString14.data(),
+                copyCount,
+                postAuthMarginLoadingState_.characterNameBufferF1c);
+            postAuthMarginLoadingState_.characterNameBufferF1c[copyCount] = '\0';
+            postAuthMarginLoadingState_.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
+            postAuthMarginLoadingState_.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
+            usedCurrentSlotRecord = true;
+        } else {
+            std::copy(
+                postAuthMarginLoadingState_.sourceLeadString108.begin(),
+                postAuthMarginLoadingState_.sourceLeadString108.end(),
+                postAuthMarginLoadingState_.characterNameBufferF1c);
+            postAuthMarginLoadingState_.secondaryCharacterDataF68[0] = postAuthMarginLoadingState_.sourceField12c;
+            postAuthMarginLoadingState_.secondaryCharacterDataF68[1] = 0u;
+        }
+
         std::copy_n(
-            currentSlotRecord->heapString14.data(),
-            copyCount,
-            postAuthMarginLoadingState_.characterNameBufferF1c);
-        postAuthMarginLoadingState_.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
-        postAuthMarginLoadingState_.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
-        usedCurrentSlotRecord = true;
-    } else {
-        std::copy(
-            postAuthMarginLoadingState_.sourceLeadString108.begin(),
-            postAuthMarginLoadingState_.sourceLeadString108.end(),
-            postAuthMarginLoadingState_.characterNameBufferF1c);
-        postAuthMarginLoadingState_.secondaryCharacterDataF68[0] = postAuthMarginLoadingState_.sourceField12c;
-        postAuthMarginLoadingState_.secondaryCharacterDataF68[1] = 0;
+            postAuthMarginLoadingState_.sourceDwords134.begin(),
+            postAuthMarginLoadingState_.characterFlagsF48.size(),
+            postAuthMarginLoadingState_.characterFlagsF48.begin());
     }
 
-    std::copy_n(
-        postAuthMarginLoadingState_.sourceDwords134.begin(),
-        postAuthMarginLoadingState_.characterFlagsF48.size(),
-        postAuthMarginLoadingState_.characterFlagsF48.begin());
+    switch (parsedSelectorMinus2) {
+        case 0u:
+            if (sectionData && sectionByteCount >= 0x44cu) {
+                postAuthMarginLoadingState_.characterRecordPointersF88[0] = ReadU32LE(sectionData + 0x00);
+                postAuthMarginLoadingState_.replySectionData13cc = ReadU32LE(sectionData + 0x444);
+                postAuthMarginLoadingState_.replySectionData13d0 = ReadU32LE(sectionData + 0x448);
+                CopyCStringIntoFixed(
+                    postAuthMarginLoadingState_.section0StringF8c.data(),
+                    postAuthMarginLoadingState_.section0StringF8c.size(),
+                    sectionData + 0x04,
+                    sectionByteCount - 0x04);
+                CopyCStringIntoFixed(
+                    postAuthMarginLoadingState_.section0StringFac.data(),
+                    postAuthMarginLoadingState_.section0StringFac.size(),
+                    sectionData + 0x24,
+                    sectionByteCount > 0x24 ? sectionByteCount - 0x24 : 0u);
+                CopyCStringIntoFixed(
+                    postAuthMarginLoadingState_.section0StringFcc.data(),
+                    postAuthMarginLoadingState_.section0StringFcc.size(),
+                    sectionData + 0x44,
+                    sectionByteCount > 0x44 ? sectionByteCount - 0x44 : 0u);
+                postAuthMarginLoadingState_.section0Flag13f6 = 1u;
+            }
+            break;
+        case 3u:
+            AppendOwnedSectionBytes(
+                postAuthMarginLoadingState_.allocatedBuffer1418,
+                postAuthMarginLoadingState_.allocatedBufferLength141c,
+                sectionData,
+                sectionByteCount);
+            postAuthMarginLoadingState_.allocatedBufferFlag141e = 1u;
+            break;
+        case 4u:
+            AppendOwnedSectionBytes(
+                postAuthMarginLoadingState_.allocatedBuffer1420,
+                postAuthMarginLoadingState_.allocatedBufferLength1424,
+                sectionData,
+                sectionByteCount);
+            postAuthMarginLoadingState_.allocatedBufferFlag1426 = 1u;
+            break;
+        case 5u:
+            AppendOwnedSectionBytes(
+                postAuthMarginLoadingState_.allocatedBuffer1428,
+                postAuthMarginLoadingState_.allocatedBufferLength142c,
+                sectionData,
+                sectionByteCount);
+            postAuthMarginLoadingState_.allocatedBufferFlag142e = 1u;
+            break;
+        case 6u:
+            AppendOwnedSectionBytes(
+                postAuthMarginLoadingState_.allocatedBuffer1408,
+                postAuthMarginLoadingState_.allocatedBufferLength140c,
+                sectionData,
+                sectionByteCount);
+            postAuthMarginLoadingState_.allocatedBufferFlag140e = 1u;
+            break;
+        case 0x0bu:
+            Log(
+                "DIAGNOSTIC: helper11 load-character scaffold observed section 0x0b with byteCount=%u; downstream `0x43f8c0` side effect still unresolved",
+                (unsigned)sectionByteCount);
+            break;
+        default:
+            break;
+    }
 
     Log(
-        "DIAGNOSTIC: helper11 load-character scaffold seeded name='%s' worldOrSource=0x%08x firstDword134=0x%08x usedCurrentSlotRecord=%u packetBytes=%u",
-        postAuthMarginLoadingState_.characterNameBufferF1c,
-        (unsigned)postAuthMarginLoadingState_.secondaryCharacterDataF68[0],
-        (unsigned)postAuthMarginLoadingState_.characterFlagsF48[0],
+        "DIAGNOSTIC: helper11 load-character scaffold status=0x%08x field05=0x%08x handoffWord=0x%04x expectedCount=%u seedCount=%u section=%u sectionBytes=%u firstFragment=%u usedCurrentSlotRecord=%u name='%s'",
+        (unsigned)parsedStatus,
+        (unsigned)parsedField05,
+        (unsigned)parsedHandoffWord09,
+        (unsigned)parsedExpectedCount0b,
+        (unsigned)parsedSeedCount0c,
+        (unsigned)parsedSelectorMinus2,
+        (unsigned)sectionByteCount,
+        firstFragment ? 1u : 0u,
         usedCurrentSlotRecord ? 1u : 0u,
-        (unsigned)packetSize);
+        postAuthMarginLoadingState_.characterNameBufferF1c);
     return 1u;
 }
 
@@ -741,7 +1123,26 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetByt
     if (!connection || !packetBytes || packetByteCount == 0u) {
         return 0u;
     }
-    return connection->SendPacket(packetBytes, packetByteCount, nullptr);
+
+    std::vector<uint8_t> framedBytes;
+    framedBytes.reserve(packetByteCount + 2u);
+    if (packetByteCount > 0x7fu) {
+        framedBytes.push_back(static_cast<uint8_t>(0x80u | ((packetByteCount >> 8) & 0x7fu)));
+        framedBytes.push_back(static_cast<uint8_t>(packetByteCount & 0xffu));
+    } else {
+        framedBytes.push_back(static_cast<uint8_t>(packetByteCount & 0x7fu));
+    }
+    const uint8_t* payload = static_cast<const uint8_t*>(packetBytes);
+    framedBytes.insert(framedBytes.end(), payload, payload + packetByteCount);
+
+    spdlog::info(
+        "CLTLoginMediator::SendCurrentMarginPacketScaffold host='{}' state={} payloadBytes={} framedBytes={} preview={}",
+        connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+        static_cast<unsigned>(connection->State()),
+        static_cast<unsigned>(packetByteCount),
+        static_cast<unsigned>(framedBytes.size()),
+        BuildHexPreview(framedBytes.data(), framedBytes.size(), 32u));
+    return connection->SendPacket(framedBytes.data(), static_cast<uint32_t>(framedBytes.size()), nullptr);
 }
 
 // anchor: launcher.exe:0x41f270
@@ -880,21 +1281,39 @@ const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const
     return GetRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8);
 }
 
-const char* CLTLoginMediator::ResolveMarginRouteFromWorldId(uint32_t worldId) const {
+const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const {
     // Address anchors:
-    // - launcher.exe:0x439300 case `10` and default branch
+    // - launcher.exe:0x439300 case `10`
+    // - owner dword `+0x12c`
     // - owner vtable `+0xfc`
     //
-    // Important naming caution:
-    // - the argument is still carried under a provisional `worldId` name in source
-    // - the disassembly only proves that `0x439300` forwards owner dword `+0x12c` or owner dword
-    //   `+0x104` into vtable `+0xfc`
-    // - current source-owned mirror resolves that value against the reconstructed `+0xd84`
-    //   descriptor table and returns the inline string at payload `+0x03`
-    if (worldId > 0xffu) {
+    // Fresh tightening from `0x41c3c0` + `0x4401a0`:
+    // - `0x41c3c0` bounds-checks input `+0x24` against owner vtable `+0xf8`
+    // - later `0x4401a0` indexes owner `+0xd84` using owner `+0x12c`
+    // - current best read is therefore that the state4 case-10 branch forwards a
+    //   world-descriptor index/selector here, not a direct world-id payload
+    if (descriptorIndex >= worldDescriptorCountD80_) {
         return nullptr;
     }
-    return GetDescriptorInlineNameByIndex(static_cast<uint8_t>(worldId));
+    return GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
+}
+
+const char* CLTLoginMediator::ResolveMarginRouteFromWorldId(uint32_t worldId) const {
+    // Address anchors:
+    // - launcher.exe:0x439300 default branch
+    // - owner vtable `+0xfc`
+    //
+    // Keep this narrower fallback helper for places where source still only has a recovered
+    // world-id value and must rejoin it against the descriptor table.
+    if (worldId > 0xffffu) {
+        return nullptr;
+    }
+
+    const int descriptorIndex = FindRecoveredWorldDescriptorIndexByWorldId(static_cast<uint16_t>(worldId));
+    if (descriptorIndex < 0) {
+        return nullptr;
+    }
+    return GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
 }
 
 const char* CLTLoginMediator::ResolveMarginRouteDescriptor() const {
@@ -914,31 +1333,77 @@ const char* CLTLoginMediator::ResolveMarginRouteDescriptor() const {
 }
 
 // anchor: launcher.exe:0x41e500
-uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostText) {
+uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostText, uint8_t cachedRouteSelector) {
     // Narrow transport/init helper intentionally kept separate from the state4 `0x439300`
     // case split.
     //
     // Current best recovered `0x41e500` shape:
-    // - stores/refreshes the margin route text
-    // - builds endpoint state at owner `+0x6c`
-    // - ensures the margin-side CMessageConnection child at owner `+0x1c`
-    // - then calls `connection->+0x1c(owner+0x6c)`
-    if (routeHostText && routeHostText[0] != '\0') {
-        marginRouteState_.routeHostPrefix = routeHostText;
-    }
-
-    BuildMarginEndpoint();
-    auto* connection = EnsureMarginConnectionObject();
+    // - allocate/configure a margin-specific connection object at owner `+0x1c`
+    // - clear owner byte `+0x2d`
+    // - if arg2 == 0, refresh owner `+0x30`, rebuild owner `+0x3c`, select owner `+0x7c`,
+    //   and materialize owner `+0x6c`
+    // - increment owner dword `+0x24`
+    // - clear owner `+0x7c`
+    // - call `connection->+0x1c(owner+0x6c)`
+    mxo::liblttcp::CMessageConnection* connection = EnsureMarginConnectionObject();
     if (!connection) {
+        spdlog::warn("CLTLoginMediator::BeginMarginConnectionScaffold failed to allocate margin connection");
         return 0u;
     }
+
+    marginConnectionFlag2d_ = 0;
+
+    const bool shouldRefreshRouteState = (cachedRouteSelector == 0u) ||
+                                         (marginAddressList3c_.ipv4NetworkOrderList.empty()) ||
+                                         (marginEndpoint_.ipv4NetworkOrder == 0u);
+    if (shouldRefreshRouteState) {
+        if (routeHostText && routeHostText[0] != '\0') {
+            marginRouteState_.routeHostPrefix = routeHostText;
+        }
+
+        const std::string marginHost = ResolvedMarginHostName();
+        if (marginHost.empty()) {
+            spdlog::debug("CLTLoginMediator::BeginMarginConnectionScaffold has no resolved margin host");
+            return 0u;
+        }
+
+        const bool routeChanged = (marginAddressList3c_.resolvedHostName != marginHost);
+        if (routeChanged || marginAddressList3c_.ipv4NetworkOrderList.empty()) {
+            if (!RebuildMarginAddressList()) {
+                return 0u;
+            }
+        }
+
+        if (marginSelectedIpv4_7c_ == 0u && !SelectMarginEndpointIpv4()) {
+            spdlog::warn(
+                "CLTLoginMediator::BeginMarginConnectionScaffold found no IPv4 candidates for '{}'",
+                marginHost);
+            return 0u;
+        }
+
+        BuildMarginEndpoint();
+    }
+
+    ++marginBeginCount24_;
+    marginSelectedIpv4_7c_ = 0u;
 
     const std::string marginHost = ResolvedMarginHostName();
     if (!marginHost.empty()) {
         connection->SetRemoteHostName(marginHost.c_str());
     }
     connection->SetRemoteEndpoint(marginEndpoint_);
-    return connection->EnsureConnected();
+
+    const uint32_t result = connection->EnsureConnected();
+    if (result == 0u) {
+        spdlog::debug(
+            "CLTLoginMediator::BeginMarginConnectionScaffold connect failed host='{}' port={} ip=0x{:08x} selector={} beginCount={}",
+            marginHost.empty() ? std::string("<empty>") : marginHost,
+            static_cast<unsigned>(marginServerPortHostOrder_),
+            static_cast<unsigned>(marginEndpoint_.ipv4NetworkOrder),
+            static_cast<unsigned>(cachedRouteSelector),
+            static_cast<unsigned>(marginBeginCount24_));
+    }
+    return result;
 }
 
 // =============================================================================
@@ -1481,7 +1946,11 @@ void CLTLoginMediator::SeedHelper11SourceBlockFromRecoveredPostAuthStateIfUnset(
     //   `RealFirstName/RealLastName/Background`
     // - so do **not** synthesize those fields from reconstructed route/world tables
     // - the only safe active-path seed we currently keep here is the current-slot character name
-    //   and paired unresolved dword at `+0x12c`
+    //   and the paired selector/index dword at `+0x12c`
+    //
+    // Fresh tightening from `0x41c3c0` + `0x4401a0`:
+    // - owner `+0x12c` should not be backfilled from slot-record `worldId0c`
+    // - the active branch uses `+0x12c` as a world-descriptor index/selector
     const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (currentSlotRecord != nullptr) {
         if (postAuthMarginLoadingState_.sourceLeadString108[0] == '\0' && !currentSlotRecord->heapString14.empty()) {
@@ -1494,8 +1963,12 @@ void CLTLoginMediator::SeedHelper11SourceBlockFromRecoveredPostAuthStateIfUnset(
                 postAuthMarginLoadingState_.sourceLeadString108.begin());
             postAuthMarginLoadingState_.sourceLeadString108[copyCount] = '\0';
         }
-        if (postAuthMarginLoadingState_.sourceField12c == 0) {
-            postAuthMarginLoadingState_.sourceField12c = currentSlotRecord->worldId0c;
+
+        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(currentSlotRecord->worldId0c);
+        if (matchedWorldIndex >= 0 &&
+            (postAuthMarginLoadingState_.sourceField12c >= static_cast<uint32_t>(worldDescriptorCountD80_) ||
+             (postAuthMarginLoadingState_.sourceField12c == 0u && matchedWorldIndex != 0))) {
+            postAuthMarginLoadingState_.sourceField12c = static_cast<uint32_t>(matchedWorldIndex);
         }
     }
 }
@@ -1520,7 +1993,11 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
     // Important remaining gap:
     // - helper11 later consumes the owner source block rooted at `+0x108`
     //   (string at `+0x108`, object/span at `+0x134`, follow-on blocks at `+0x178/+0x198/+0x1b8`)
-    // - this scaffold still does not reconstruct the upstream writers for that block
+    // - do not confuse that with the auth-reply character/world tables recovered here:
+    //   this method *does* already reconstruct the auth-side slot/world data families
+    //   (`+0x688/+0x818/+0xd84`, current slot/index, route/world joins)
+    // - but this scaffold still does not reconstruct the upstream writer for the helper11-only
+    //   human-name / appearance block
     worldSlots_.fill(nullptr);
     worldPayloadSlots_.fill(nullptr);
     slotRecordValid688_.fill(false);
@@ -1658,29 +2135,26 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
                 "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen=%u",
                 (unsigned)challenge.encryptedChallengeBytes.size());
             expectedAuthRequestName_ = "AS_AuthChallengeResponse";
-            return SendAuthChallengeResponse(challenge);
+            const uint32_t sendResult = SendAuthChallengeResponse(challenge);
+            if (sendResult != 0u && scaffoldState10_ != nullptr) {
+                currentState_ = scaffoldState10_;
+            }
+            return sendResult;
         }
 
         case 0x0b: {
             // Address anchors:
-            // - launcher.exe:0x4401a0 = strongest current AS_AuthReply handler
+            // - launcher.exe:0x4401a0 = state10 slot 6 / current best AS_AuthReply handler
             // - immediate post-success continuation there is not the later helper14
             //   `AS_GetWorldListRequest` sender at `0x43b830`
             // - instead it goes through helper11:
             //   `0x41b450(0x0b)` -> `0x43c020` (raw post-auth margin packet `0x4d`) -> later
             //   `0x440320` (`MS_LoadCharacterReply`)
-            mxo::auth::AuthReply reply;
-            if (!mxo::auth::ParseAuthReplyPacket(packetBytes, packetSize, &reply)) {
-                Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
-                return 0;
+            stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+            if (currentState_ != nullptr) {
+                return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
             }
-
-            lastAuthReply_ = reply;
-            AdoptAuthReplyIntoRecoveredMediatorState();
-            LogParsedAuthReply(reply);
-            expectedAuthRequestName_ = nullptr;
-            expectedMarginRequestName_ = "post-AS_AuthReply helper11 raw-0x4d margin packet";
-            return 1u;
+            return HandleStagedAuthReplyPacketScaffold();
         }
 
         default:
@@ -1695,6 +2169,57 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     return 0;
 }
 
+uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
+    if (!packetBytes || packetSize < 2u) {
+        return 0u;
+    }
+
+    stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+    if (currentState_ != nullptr) {
+        return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
+    }
+    return HandleStagedMarginLoadCharacterReplyPacketScaffold();
+}
+
+uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
+    if (stagedIncomingAuthPacketBytes_.empty()) {
+        return 0u;
+    }
+
+    mxo::auth::AuthReply reply;
+    if (!mxo::auth::ParseAuthReplyPacket(
+            stagedIncomingAuthPacketBytes_.data(),
+            stagedIncomingAuthPacketBytes_.size(),
+            &reply)) {
+        Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
+        return 0u;
+    }
+
+    lastAuthReply_ = reply;
+    AdoptAuthReplyIntoRecoveredMediatorState();
+    LogParsedAuthReply(reply);
+    expectedAuthRequestName_ = nullptr;
+    expectedMarginRequestName_ = "post-AS_AuthReply helper11 raw-0x4d margin packet";
+    return 1u;
+}
+
+uint32_t CLTLoginMediator::HandleStagedMarginLoadCharacterReplyPacketScaffold() {
+    if (stagedIncomingMarginPacketBytes_.empty()) {
+        return 0u;
+    }
+    return State11HandleLoadCharacterReplyScaffold(
+        stagedIncomingMarginPacketBytes_.data(),
+        stagedIncomingMarginPacketBytes_.size());
+}
+
+const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingAuthPacketBytes() const {
+    return stagedIncomingAuthPacketBytes_;
+}
+
+const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() const {
+    return stagedIncomingMarginPacketBytes_;
+}
+
 void CLTLoginMediator::BuildAuthEndpoint() {
     // Placeholder only.
     // Original launcher currently appears to preserve host text in owner `+0x4c` and then
@@ -1703,32 +2228,85 @@ void CLTLoginMediator::BuildAuthEndpoint() {
 }
 
 void CLTLoginMediator::BuildMarginEndpoint() {
-    // Placeholder only.
-    // Current recovered launcher path preserves margin suffix text separately and builds the
-    // later connect endpoint block at owner `+0x6c` using the current margin port.
-    marginEndpoint_ = BuildLoopbackEndpoint(marginServerPortHostOrder_);
+    marginEndpoint_ = {};
+    marginEndpoint_.family = 2;
+    marginEndpoint_.portNetworkOrder =
+        static_cast<uint16_t>((marginServerPortHostOrder_ << 8) | (marginServerPortHostOrder_ >> 8));
+    marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
+}
+
+bool CLTLoginMediator::RebuildMarginAddressList() {
+    const std::string resolvedHostName = ResolvedMarginHostName();
+    marginAddressList3c_.resolvedHostName = resolvedHostName;
+    marginAddressList3c_.ipv4NetworkOrderList.clear();
+    marginAddressList3c_.nextIndex = 0;
+
+    if (resolvedHostName.empty()) {
+        spdlog::debug("CLTLoginMediator::BeginMarginConnectionScaffold unresolved margin host");
+        return false;
+    }
+
+    if (!ResolveAllIpv4Addresses(resolvedHostName.c_str(), &marginAddressList3c_.ipv4NetworkOrderList)) {
+        spdlog::warn(
+            "CLTLoginMediator::BeginMarginConnectionScaffold failed to resolve margin host '{}'",
+            resolvedHostName);
+        return false;
+    }
+
+    return true;
+}
+
+bool CLTLoginMediator::SelectMarginEndpointIpv4() {
+    if (marginAddressList3c_.ipv4NetworkOrderList.empty()) {
+        return false;
+    }
+
+    if (marginAddressList3c_.nextIndex >= marginAddressList3c_.ipv4NetworkOrderList.size()) {
+        marginAddressList3c_.nextIndex = 0;
+    }
+
+    marginSelectedIpv4_7c_ = marginAddressList3c_.ipv4NetworkOrderList[marginAddressList3c_.nextIndex++];
+    return true;
 }
 
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject() {
     if (engine_ && authConnectionContextKey_) {
         authConnection_ = engine_->GetOrCreateMessageConnection(authConnectionContextKey_);
+        authConnectionOwnedByMediator_ = false;
         return authConnection_;
     }
 
     if (!authConnection_) {
         authConnection_ = new mxo::liblttcp::CMessageConnection(engine_);
+        authConnectionOwnedByMediator_ = true;
     }
     return authConnection_;
 }
 
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObject() {
-    if (engine_ && marginConnectionContextKey_) {
-        marginConnection_ = engine_->GetOrCreateMessageConnection(marginConnectionContextKey_);
-        return marginConnection_;
+    mxo::liblttcp::CMarginConnection* marginConnection =
+        dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_);
+    if (!marginConnection) {
+        if (marginConnectionOwnedByMediator_) {
+            delete marginConnection_;
+        }
+        marginConnection = new mxo::liblttcp::CMarginConnection(engine_);
+        if (!marginConnection) {
+            marginConnection_ = nullptr;
+            marginConnectionOwnedByMediator_ = false;
+            return nullptr;
+        }
+
+        marginConnection->SetEngine(engine_);
+        marginConnection->SetMarginEngine(engine_);
+        marginConnection_ = marginConnection;
+        marginConnectionOwnedByMediator_ = true;
     }
 
-    if (!marginConnection_) {
-        marginConnection_ = new mxo::liblttcp::CMessageConnection(engine_);
+    marginConnection->SetEngine(engine_);
+    marginConnection->SetMarginEngine(engine_);
+    if (marginConnectionContextKey_) {
+        marginConnection->SetOwnerContext(marginConnectionContextKey_);
     }
     return marginConnection_;
 }

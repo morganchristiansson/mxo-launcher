@@ -291,6 +291,18 @@ public:
     // anchor: launcher.exe:0x00439750 (vtable 0x004b517c slot 10 initializer)
     CLTLoginState_State9() = default;
 
+private:
+    // `0x00439780` consumes a local byte/word payload from `this+4/+6`.
+    uint8_t pendingByte4_ = 0;
+    uint8_t padding5_ = 0;
+    uint16_t pendingWord6_ = 0;
+
+public:
+    void SetPendingPayload(uint8_t byte4, uint16_t word6) {
+        pendingByte4_ = byte4;
+        pendingWord6_ = word6;
+    }
+
     // anchor: launcher.exe vtable 0x004b517c
     const char* DebugName() const override;
 
@@ -333,6 +345,14 @@ public:
     // anchor: launcher.exe:0x00439720 (vtable 0x004b5154 slot 10 initializer)
     CLTLoginState_State11() = default;
 
+private:
+    // `0x440320` uses two byte-sized fields on the 8-byte helper11 object at `this+4/+5` as
+    // reply-fragment progress counters. Keep them state-owned here rather than smearing them onto
+    // the mediator.
+    uint8_t replySectionsSeen_ = 0;
+    uint8_t replySectionsExpected_ = 0;
+
+public:
     // anchor: launcher.exe vtable 0x004b5154
     const char* DebugName() const override;
 

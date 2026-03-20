@@ -7,6 +7,8 @@ namespace mxo::ltlogin {
 namespace {
 
 struct State11Packet0x4dFixedPayload {
+    // anchor: launcher.exe:0x43a470 / packet payload tag written after the outer builder reserves
+    // a fixed 0x4d-byte payload span through the shared envelope object.
     static constexpr uint8_t kPayloadTag0c = 0x0c;
     static constexpr size_t kRealFirstNameOffset = 0x45;
     static constexpr size_t kRealLastNameOffset = 0x47;
@@ -201,6 +203,62 @@ public:
 
 };
 
+static uint16_t ReadU16LE(const uint8_t* p) {
+    return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+}
+
+static uint32_t ReadU32LE(const uint8_t* p) {
+    return static_cast<uint32_t>(p[0]) |
+           (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) |
+           (static_cast<uint32_t>(p[3]) << 24);
+}
+
+struct ParsedState11LoadCharacterReplyScaffold {
+    bool valid = false;
+    uint32_t status = 0;
+    uint32_t field05 = 0;
+    uint16_t handoffWord09 = 0;
+    uint8_t expectedSectionCount0b = 0;
+    bool shouldSeedExpectedSectionCount = false;
+    uint8_t sectionSelectorMinus2 = 0xff;
+    uint16_t sectionOffset0e = 0;
+    uint16_t sectionByteCount = 0;
+    const uint8_t* sectionData = nullptr;
+};
+
+static ParsedState11LoadCharacterReplyScaffold ParseState11LoadCharacterReplyScaffold(
+    const std::vector<uint8_t>& bytes) {
+    ParsedState11LoadCharacterReplyScaffold out = {};
+    if (bytes.size() < 0x10 || bytes[0] != 0x10) {
+        return out;
+    }
+
+    out.valid = true;
+    out.status = ReadU32LE(bytes.data() + 1);
+    out.field05 = ReadU32LE(bytes.data() + 5);
+    out.handoffWord09 = ReadU16LE(bytes.data() + 9);
+    out.expectedSectionCount0b = bytes[0x0b];
+    out.shouldSeedExpectedSectionCount = (bytes[0x0c] == 0x01);
+    out.sectionSelectorMinus2 = static_cast<uint8_t>(bytes[0x0d] - 2u);
+    out.sectionOffset0e = ReadU16LE(bytes.data() + 0x0e);
+
+    if (out.sectionOffset0e != 0u &&
+        static_cast<size_t>(out.sectionOffset0e) + 2u <= bytes.size()) {
+        out.sectionByteCount = ReadU16LE(bytes.data() + out.sectionOffset0e);
+        const size_t payloadOffset = static_cast<size_t>(out.sectionOffset0e) + 2u;
+        if (payloadOffset <= bytes.size()) {
+            out.sectionData = bytes.data() + payloadOffset;
+            const size_t remaining = bytes.size() - payloadOffset;
+            if (out.sectionByteCount > remaining) {
+                out.sectionByteCount = static_cast<uint16_t>(remaining);
+            }
+        }
+    }
+
+    return out;
+}
+
 static uint32_t PlaceholderStateAction(const char* debugName, const char* anchor) {
     (void)debugName;
     (void)anchor;
@@ -215,11 +273,14 @@ static uint32_t RecoverCachedUpstreamPhaseCode(const void* cachedUpstreamOrArg) 
     return cachedUpstreamState ? cachedUpstreamState->DispatchPhaseCode() : 0u;
 }
 
-static uint32_t BeginMarginConnectionIfResolved(CLTLoginMediator* mediator, const char* routeHostText) {
+static uint32_t BeginMarginConnectionIfResolved(
+    CLTLoginMediator* mediator,
+    const char* routeHostText,
+    uint8_t cachedRouteSelector) {
     if (!mediator || !routeHostText || routeHostText[0] == '\0') {
         return 0u;
     }
-    return mediator->BeginMarginConnectionScaffold(routeHostText);
+    return mediator->BeginMarginConnectionScaffold(routeHostText, cachedRouteSelector);
 }
 
 }  // namespace
@@ -420,19 +481,22 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         case 6:
             return BeginMarginConnectionIfResolved(
                 mediator,
-                mediator->ResolveMarginRouteDescriptor());
+                mediator->ResolveMarginRouteDescriptor(),
+                0u);
 
         case 7:
         case 8:
         case 13:
             return BeginMarginConnectionIfResolved(
                 mediator,
-                mediator->ResolveMarginRouteFromCurrentCharacterSlot());
+                mediator->ResolveMarginRouteFromCurrentCharacterSlot(),
+                mediator->CharacterRouteIndexCc8());
 
         case 10:
             return BeginMarginConnectionIfResolved(
                 mediator,
-                mediator->ResolveMarginRouteFromWorldId(mediator->SourceField12c()));
+                mediator->ResolveMarginRouteFromDescriptorIndex(mediator->SourceField12c()),
+                static_cast<uint8_t>(mediator->SourceField12c() & 0xffu));
 
         default: {
             // Current source-owned mirror for the default branch's owner `+0x104` dword remains
@@ -445,7 +509,8 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             }
             return BeginMarginConnectionIfResolved(
                 mediator,
-                mediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value)));
+                mediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value)),
+                0u);
         }
     }
 }
@@ -624,7 +689,21 @@ const char* CLTLoginState_State9::DebugName() const {
 uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     (void)upstreamOrArg;
     (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x00439780");
+
+    // Narrow ownership correction from `0x004b517c` docs + Ghidra:
+    // - this state consumes the helper-local byte/word payload at `this+4/+6`
+    // - forwards them into owner helper `0x41de40`
+    // - clears the local payload
+    // - posts event `0x17` on success
+    // The concrete owner helper is still unresolved in source, so keep the state-local payload
+    // lifecycle here and leave the deeper owner-side effect as a logged scaffold step.
+    Log(
+        "DIAGNOSTIC: CLTLoginState_State9::Slot3_BeginOrContinue consuming helper-local payload byte4=0x%02x word6=0x%04x (owner helper 0x41de40 still unresolved)",
+        (unsigned)pendingByte4_,
+        (unsigned)pendingWord6_);
+    pendingByte4_ = 0;
+    pendingWord6_ = 0;
+    return 1u;
 }
 
 // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
@@ -691,8 +770,27 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
 // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
 uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
     (void)workItem;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x004401a0");
+    if (!mediator) {
+        return 0u;
+    }
+
+    // Ownership correction from the vtable docs + Ghidra decompilation:
+    // - `0x4401a0` belongs to `CLTLoginState_State10` slot 6, not to the mediator vtable
+    // - the state entry itself handles raw auth code `0x0b`, performs the owner writeback, then
+    //   switches helper state to `11`
+    // - the mediator keeps only the narrower staged-packet + owner-state helpers
+    const uint32_t handled = mediator->HandleStagedAuthReplyPacketScaffold();
+    if (handled == 0u) {
+        return 0u;
+    }
+
+    if (CLTLoginState* nextState = mediator->ScaffoldState11()) {
+        mediator->SetCurrentState(nextState);
+    } else {
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed AS_AuthReply but has no registered helper11 state");
+    }
+    return handled;
 }
 
 // anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)
@@ -725,6 +823,8 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     //   - calls `0x41af70` to send through the current margin connection
     //   - then posts event `0x15`
     const auto& sourceDwords134 = mediator->SourceDwords134();
+    replySectionsSeen_ = 0;
+    replySectionsExpected_ = 0;
     State11Packet0x4dBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();
 
@@ -757,7 +857,8 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
         packetBuilder.PayloadByteCount());
 
     Log(
-        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built raw-0x4d packet fixedBytes=0x%02x totalBytes=0x%02x SkinToneID=0x%08x RealFirstName='%s' RealLastName='%s' Background='%s' GameSessionID='%s' -> sendResult=0x%08x then posts event=0x15",
+        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x%02x fixedBytes=0x%02x totalBytes=0x%02x SkinToneID=0x%08x RealFirstName='%s' RealLastName='%s' Background='%s' GameSessionID='%s' -> sendResult=0x%08x then posts event=0x15",
+        (unsigned)State11Packet0x4dFixedPayload::kPayloadTag0c,
         (unsigned)State11Packet0x4dFixedPayload::kFixedByteCount,
         (unsigned)packetBuilder.PayloadByteCount(),
         (unsigned)sourceDwords134[0],
@@ -771,14 +872,72 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
 
 // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
 uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+    (void)workItem;
+    if (!mediator) {
+        return 0u;
+    }
+
+    const ParsedState11LoadCharacterReplyScaffold parsed =
+        ParseState11LoadCharacterReplyScaffold(mediator->StagedIncomingMarginPacketBytes());
+    if (!parsed.valid) {
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage could not parse staged margin bytes as raw-0x10 helper11 reply");
+        return 0u;
+    }
+
     // Ownership correction mirrors slot 3 as well:
     // - `0x440320` belongs to `CLTLoginState_State11` slot 6
-    // - the mediator-side scaffold remains useful for recovered owner-buffer layout work, but the
-    //   call-shape from `workItem` to parsed packet bytes is not source-owned strongly enough yet
-    //   to wire this through here without guessing
-    (void)workItem;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x00440320");
+    // - the state object owns reply-progress counters and the helper11 -> helper9 handoff
+    // - mediator keeps the narrower owner-buffer mutation helper because those writes target the
+    //   mediator-owned `0x4f78b8` state area
+    const uint32_t handled = mediator->HandleStagedMarginLoadCharacterReplyPacketScaffold();
+    if (handled == 0u) {
+        return 0u;
+    }
+
+    if (parsed.shouldSeedExpectedSectionCount) {
+        replySectionsExpected_ = parsed.expectedSectionCount0b;
+    }
+    if (replySectionsExpected_ == 0u) {
+        replySectionsExpected_ = 1u;
+    }
+    if (replySectionsSeen_ < 0xffu) {
+        ++replySectionsSeen_;
+    }
+
+    const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
+    if (completed) {
+        if (CLTLoginState* nextBase = mediator->ScaffoldState9()) {
+            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
+                // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
+                // Current source-owned mirror keeps that on the concrete state9 object.
+                nextState->SetPendingPayload(/*byte4=*/0, parsed.handoffWord09);
+            }
+            mediator->SetCurrentState(nextBase);
+        }
+
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u -> currentState=helper9",
+            (unsigned)parsed.status,
+            (unsigned)parsed.sectionSelectorMinus2,
+            (unsigned)parsed.sectionByteCount,
+            (unsigned)parsed.handoffWord09,
+            (unsigned)replySectionsSeen_,
+            (unsigned)replySectionsExpected_);
+        replySectionsSeen_ = 0;
+        replySectionsExpected_ = 0;
+    } else {
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage routed helper11 reply status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u seedCount=%u",
+            (unsigned)parsed.status,
+            (unsigned)parsed.sectionSelectorMinus2,
+            (unsigned)parsed.sectionByteCount,
+            (unsigned)parsed.handoffWord09,
+            (unsigned)replySectionsSeen_,
+            (unsigned)replySectionsExpected_,
+            parsed.shouldSeedExpectedSectionCount ? 1u : 0u);
+    }
+    return handled;
 }
 
 // anchor: launcher.exe:0x00438cb0 (vtable 0x004b5154 slot 7)

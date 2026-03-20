@@ -43,18 +43,27 @@ Source of truth:
   - arg5 helper `+0x60` slot `0` / slot `1` are live
   - auth-side queue0C type-2 / type-3 items are consumed on the live `RunClientDLL` path
   - launcher-owned auth now progresses through `AS_GetPublicKeyReply` / `AS_AuthChallenge` / `AS_AuthReply`
-- current best read is that arg5 queue consumption is alive enough for auth-side work, and the next blocker is later launcher-owned progression after successful `AS_AuthReply`
+- newer post-auth live milestone on the real deliberate runtime path:
+  - State4/`0x41e500` margin begin now returns non-zero
+  - margin-side type-2 connect-status work is now consumed
+  - helper11/state11 slot 3 (`0x43c020`) is now live and sends the raw `0x4d` packet
 
 ### Current main blockers
 The launcher still does **not** reconstruct enough launcher-owned startup/runtime state.
-Current unresolved inputs remain:
-- post-`AS_AuthReply` launcher-owned progression / owner-state writeback / next-state activation
-  - launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
-    first-string consequences are now source-owned
-  - current narrower remaining state11-only source gap is active-path writers for:
-    - owner `+0x178` = `RealFirstName`
-    - owner `+0x198` = `RealLastName`
-    - owner `+0x1b8` = `Background`
+Current unresolved inputs remain, but the active login-side blocker has now narrowed more clearly:
+- the real original password-submit branch is now confirmed as:
+  - `0x41ecd0 = ProcessLoginRequest`
+  - then `0x41c1f0` / state `3 -> 8`
+- so the next highest-value launcher-side fidelity work is the **active state-8 path**, not jumping
+  straight to helper11 as though `0x41c3c0` were already proven on the default branch
+- concretely, we still need faithful continuation after that active branch through:
+  - state4 margin dispatch `0x439300`
+  - state8 send `0x43bd20`
+  - state8 reply `0x43f930`
+- helper11/state11 remains a real later path and still matters, but current evidence now says its
+  source-starved payload is **not** the first active-path problem to solve
+- launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
+  first-string consequences are now source-owned, but broader post-auth writeback is still incomplete
 - arg6: `ILTLoginMediator.Default` from `0x4d2c58`
 - arg7: packed selection state from `CLauncher+0xa8/+0xac`
 - arg8: flag byte from `0x4d2c69`
@@ -121,6 +130,9 @@ Use `../../docs/` for:
 
 Prefer updating existing docs over expanding this file.
 
+### Logging
+- new log statements should use `spdlog`
+
 ### Use Ghidra in lockstep with source
 Ghidra is the primary static-analysis tool. Ghidra HOWTO: `GHIDRA.md`
 
@@ -133,15 +145,23 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 
 ## Current implementation priorities
 
-1. Continue active-path arg5 queue work in lockstep across:
+1. Follow the now-confirmed original password-submit branch first:
+   - `0x41ecd0`
+   - `0x41c1f0`
+   - `0x439300`
+   - `0x43bd20`
+   - `0x43f930`
+2. Keep that work in lockstep across:
    - Ghidra names/types
    - source implementation
    - canonical docs
-2. Prefer original `launcher.exe` arg5 fidelity work over expanding login-mediator work unless the mediator side is directly required by the active arg5 blocker
-3. Improve `CLTThreadPerClientTCPEngine` consumer/producers only where they help the active game-running path
-4. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
-5. Keep pruning duplicated queue logic from ABI scaffolding into canonical liblttcp/libltmessaging code when safe
-6. Keep auth launcher-owned, not client-owned
+3. Prefer active state-8 branch fidelity over expanding helper11/state11 scaffolding unless new
+   evidence shows the active default branch has really moved there
+4. Continue active-path arg5 queue work where it directly helps the game-running path, but do not
+   let arg5 work displace the now-confirmed earlier launcher/login branch
+5. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
+6. Keep pruning duplicated queue logic from ABI scaffolding into canonical liblttcp/libltmessaging code when safe
+7. Keep auth launcher-owned, not client-owned
 
 ## Key files
 
@@ -158,6 +178,10 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 - `matrixstaging/runtime/src/libltmessaging/messageconnection.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginmediator.h`
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- `matrixstaging/game/src/libltclientlogin/loginstate.h`
+- `matrixstaging/game/src/libltclientlogin/loginstate.cpp`
+- `matrixstaging/game/src/libltclientlogin/launchpad.h`
+- `matrixstaging/game/src/libltclientlogin/launchpad.cpp`
 
 ### Canonical docs
 - `../../docs/client.dll/InitClientDLL/README.md`
@@ -191,13 +215,16 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
 
 ## Immediate next tasks
 
-1. Continue refining `CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool)` and producer helpers against original `0x436b10` / `0x436670` / `0x436820`
-2. Treat the completed auth-side queue milestone as proven on the deliberate runtime path, and now ask the next narrower question: what later type-1 or post-auth launcher-owned work/state is still missing after successful auth-side queue consumption?
-3. On the login-mediator side, the next narrower post-auth source problem is active-path writers for state11-only fields:
-   - owner `+0x178` = `RealFirstName`
-   - owner `+0x198` = `RealLastName`
-   - owner `+0x1b8` = `Background`
+1. Make the active original password-submit branch more faithful in source and docs:
+   - `0x41ecd0 = ProcessLoginRequest`
+   - `0x41c1f0 = PersistSelectionContextAndSwitchToState8`
+2. Continue from that branch into the next concrete state-owned methods:
+   - `0x439300 = CLTLoginState_State4::Slot3_BeginOrContinue`
+   - `0x43bd20 = CLTLoginState_State8::Slot3_BeginOrContinue`
+   - `0x43f930 = CLTLoginState_State8::Slot6_HandleSecondaryMessage`
+3. Treat helper11/state11 as a later real branch, but stop treating it as the first active-path
+   target until new evidence proves the default branch reaches it naturally
 4. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
-5. For each high-value arg5 function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
-6. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but be willing to shift the active blocker away from arg5 if new evidence keeps showing that arg5 queue consumption itself is already alive
+5. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
+6. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but do not let that hide the now-confirmed earlier login-state gap
 7. Prune stale or resolved notes from this file instead of letting it grow again

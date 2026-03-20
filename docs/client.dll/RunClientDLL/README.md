@@ -602,7 +602,8 @@ For packet-level auth details and the canonical auth loop write-up, prefer:
 What matters here for `RunClientDLL` is narrower:
 - the auth connect-status queue item is now feeding a real launcher-owned auth progression instead of the older dead-end shortcut path
 - auth therefore remains launcher-owned in practice as well as in static analysis
-- the next auth-side/runtime question now shifts forward to what launcher-owned state should happen **after** successful `AS_AuthReply` so the newly identified helper11 margin/loading continuation (`0x43c020` / `0x440320`) becomes faithful and live on the deliberate runtime path
+- newer live-runtime validation now also shows the post-`AS_AuthReply` State4/`0x41e500` margin begin succeeding on the deliberate runtime path, with helper11/state11 slot 3 (`0x43c020`) becoming live and sending the raw `0x4d` packet there
+- the next auth-side/runtime question therefore shifts one step forward again: what launcher-owned state or incoming margin traffic is still missing so later helper11/state11 slot 6 (`0x440320` / `MS_LoadCharacterReply`) becomes live on that same deliberate runtime path
 
 Important restraint:
 - this remains a deliberate binder/scaffold runtime run gated by `MXO_FORCE_RUNCLIENT=1`

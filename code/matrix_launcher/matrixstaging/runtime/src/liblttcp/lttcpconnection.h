@@ -55,8 +55,7 @@ class CBaseConnection {
   // Getter for state field
   // Original access: *(uint8_t*)((int)this + 0x34)
   LTTCPEngineConnectionState State() const {
-    return static_cast<LTTCPEngineConnectionState>(
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this) + 0x34) & 0xff);
+    return state_;
   }
 
   // Constructor to initialize state at offset 0x34
