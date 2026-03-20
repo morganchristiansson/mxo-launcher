@@ -347,8 +347,8 @@ The highest-value remaining auth-adjacent work is now:
     - slot 6 keeps the raw `0x11` success/failure transition on the state object
     - remaining unresolved work is deeper owner/collaborator behavior under `0x41de40`, not the
       state-vtable body itself
-- newer forced-`RunClientDLL` evidence now proves the default active path really does reach the
-  helper11/state11 margin send first on the live runtime path:
+- forced-`RunClientDLL` scaffold evidence still proves that the deliberate runtime path can later
+  reach helper11/state11 and stall there:
   - command:
     `env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE MXO_BINDER_LOGIN_MEDIATOR=1 MXO_STUB_LAUNCHER_OBJECT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality MXO_FORCE_RUNCLIENT=1 wine ./resurrections.exe -user morgan -pwd '<pwd>'`
   - observed sequence in `/home/morgan/MxO_7.6005/resurrections.log`:
@@ -357,14 +357,60 @@ The highest-value remaining auth-adjacent work is now:
     - `CLTLoginState_State11::Slot3_BeginOrContinue` sends the fixed-size `0x4d` margin payload
     - the client reaches **Loading Character**
     - but no `MarginReceivePacket` / `MS_LoadCharacterReply` arrives during the deliberate run window
-  - current live helper11 send is still visibly source-starved:
+  - current live helper11 send is still visibly source-starved by default:
     - `SkinToneID=0`
     - `RealFirstName=''`
     - `RealLastName=''`
     - `Background=''`
     - `GameSessionID='<empty>'`
-  - practical consequence:
-    - reopen helper11/state11 as the **current first runtime target** because new evidence now
-      proves the default active path reaches it naturally and stalls there
-    - post-state9 / state-`0x0c` continuation remains important, but only after helper11 reply
-      traffic becomes live again
+- but newer original-launcher WineDbg runs now re-raise an earlier faithful boundary on the natural
+  password-submit path:
+  - natural original hits confirmed:
+    - `0x41ecd0`
+    - `0x41c1f0`
+    - `0x43bd20`
+  - natural original non-hits before process death on those same runs:
+    - `0x43f930`
+    - `0x41c3c0`
+    - `0x421220`
+    - `0x420ef0`
+    - `0x43c020`
+  - additional concrete state at the natural original `0x43bd20` stop:
+    - owner `+0x664` (`GameSessionID`) was still zero
+- practical consequence:
+  - for **faithful original-launcher progression**, the next first target is now the boundary
+    between state8 send `0x43bd20` and the still-missing natural state8 reply stop `0x43f930`
+  - keep helper11/state11 as a **real later scaffold/runtime stall**, but stop treating it as the
+    first faithful original-live breakpoint target until original evidence reaches it naturally
+  - post-state9 / state-`0x0c` continuation remains important, but only after the earlier
+    state8-post-send/original-live boundary is better explained
+  - current replacement-launcher experiment bridge now mirrors a little more of the confirmed
+    helper11 writer chain without pretending the original upstream producer is solved:
+    - explicit helper11 character/customization seed inputs are routed through
+      `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials`
+    - explicit session/game-session seed inputs are routed through
+      `0x420ef0 = LaunchPadClient_OnPlayRequestStatus`
+    - replacement launcher `-char` / `-session` values can now feed that bridge on the scaffold path
+      - validation run:
+        `env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE MXO_BINDER_LOGIN_MEDIATOR=1 MXO_STUB_LAUNCHER_OBJECT=1 MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality wine ./resurrections.exe -user morgan -pwd '<pwd>' -char TestChar -session TESTSESSION`
+      - current observed effect in `resurrections.log`:
+        - `ProcessLoginCredentials mirrored recovered helper11 source write name='TestChar' ...`
+        - `mirrored launchpad play-request success GameSessionID='TESTSESSION'`
+        - helper11 send changed from fixed-only `0x4d` bytes to total `0x5a` bytes because the
+          trailing `GameSessionID` append became live
+      - stronger negative-result follow-up with a deliberately non-empty helper11 payload:
+        `env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE MXO_BINDER_LOGIN_MEDIATOR=1 MXO_STUB_LAUNCHER_OBJECT=1 MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality MXO_DIAGNOSTIC_REAL_FIRST_NAME=Morg4n MXO_DIAGNOSTIC_REAL_LAST_NAME=Anderson MXO_DIAGNOSTIC_BACKGROUND=Operator MXO_DIAGNOSTIC_APPEARANCE_IDS='1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17' wine ./resurrections.exe -user morgan -pwd '<pwd>' -char Morg4n -session TESTSESSION`
+        - observed helper11 send became:
+          - `totalBytes=0x76`
+          - `SkinToneID=0x00000001`
+          - `RealFirstName='Morg4n'`
+          - `RealLastName='Anderson'`
+          - `Background='Operator'`
+          - `GameSessionID='TESTSESSION'`
+        - but the runtime still produced **no** later `MarginReceivePacket` / `MS_LoadCharacterReply`
+      - practical consequence of that negative result:
+        - merely making the helper11-visible fields non-empty is **not** enough
+        - the remaining problem is now more likely the authenticity/source of those values or some
+          still-missing neighboring launcher-owned state, not just empty-string/zero presence alone
+    - treat this as a diagnostic bridge into confirmed writers, **not** as proof that the original
+      launcher used those exact startup arguments as the upstream producer for helper11 data

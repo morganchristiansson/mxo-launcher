@@ -129,8 +129,12 @@ Important current interpretation:
 - the original live password path is now better evidenced as:
   - `0x41ecd0 -> 0x41c1f0 -> state8-side continuation`
 - not as an immediate helper11 / `0x41c3c0` path
-- so when debugging the original launcher, **start with the state-8 branch first**
-  before trying to force helper11-specific hypotheses
+- newer live runs narrow that boundary further:
+  - natural original stops reached `0x43bd20`
+  - then the process died before any natural stop at `0x43f930`
+- so when debugging the original launcher, **start with the state-8 branch first** and treat the
+  `0x43bd20 -> 0x43f930` gap as the current highest-value live boundary before trying to force
+  helper11-specific hypotheses
 
 ## Fastest path: inspect the latest dump
 
@@ -265,22 +269,25 @@ On the current path, `client.dll` should appear at base `0x62000000`.
 
 ## Current preferred live trace target
 
-Right now, the highest-value live question is **not** the later `0x62054cbd` / `+0x120` loading-character path.
+For original `matrix.exe` login-state work, the highest-value live question is now the **state8 post-send boundary**, not helper11-first speculation.
 
-The higher-value target is the enclosing `InitClientDLL` logic immediately after the already-confirmed successful helper return:
-- `0x620015f8` calls `0x62170b00`
-- `0x620015fd` tests `al`
-- success path goes to `0x62001634`
-- the path returns at `0x6200163c`
+Current best target sequence:
+- `0x41ecd0`
+- `0x41c1f0`
+- `0x43bd20`
+- hoped-for next natural stop: `0x43f930`
 
-That matters because current static analysis now says:
-- the already-reached `+0xec` helper itself performs no further mediator calls after `+0xec`
-- it just continues through `0x62170f62`, calls `0x6216a1c0`, and returns success
+Why this is the current priority:
+- newer original-launcher runs repeatedly confirmed the password-submit branch through
+  `0x41c1f0` and into `0x43bd20`
+- those same runs then terminated before any natural hit on `0x43f930`
+- they also did **not** naturally hit `0x41c3c0`, `0x421220`, `0x420ef0`, or `0x43c020`
 
-So if the current crash still lands in `arg2+2`, the best immediate question is whether failure occurs:
-- during the enclosing success epilogue
-- at the final `ret`
-- or immediately after that return target is consumed
+Practical consequence:
+- if you are choosing between chasing helper11 writers and chasing the natural original branch,
+  prefer the `0x43bd20 -> 0x43f930` gap first
+- helper11 remains relevant for the forced scaffold runtime stall, but it is not yet the first
+  faithful original-live breakpoint target
 
 ## Minimal live workflow for that question
 

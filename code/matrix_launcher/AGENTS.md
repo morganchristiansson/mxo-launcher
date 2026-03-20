@@ -50,12 +50,24 @@ Source of truth:
 - newest deliberate runtime evidence from the forced-`RunClientDLL` binder path:
   - the default active path really does reach helper11/state11 first after auth success
   - the run then stalls at **Loading Character** with **no incoming margin reply yet**
-  - current sent helper11 payload is still source-starved:
+  - current sent helper11 payload is still source-starved by default:
     - zero appearance/customization ids
     - empty `RealFirstName`
     - empty `RealLastName`
     - empty `Background`
     - empty `GameSessionID`
+  - even a deliberately non-empty diagnostic helper11 payload is still **not** enough by itself to
+    elicit `MS_LoadCharacterReply`
+- newer original-launcher WineDbg evidence now also narrows the faithful branch boundary:
+  - the natural password-submit path hits `0x41ecd0 -> 0x41c1f0 -> 0x43bd20`
+  - original runs reached state8 send `0x43bd20` repeatedly
+  - owner `+0x664` (`GameSessionID`) was still zero there on the original live path
+  - those runs terminated before any natural hit on:
+    - `0x43f930`
+    - `0x41c3c0`
+    - `0x421220`
+    - `0x420ef0`
+    - `0x43c020`
 
 ### Current main blockers
 The launcher still does **not** reconstruct enough launcher-owned startup/runtime state.
@@ -63,23 +75,27 @@ Current unresolved inputs remain, but the active login-side blocker has narrowed
 - the real original password-submit branch is now confirmed as:
   - `0x41ecd0 = ProcessLoginRequest`
   - then `0x41c1f0` / state `3 -> 8`
-- the active state-8 branch is now **good enough for the current path** through:
-  - state4 margin dispatch `0x439300`
-  - state8 send `0x43bd20`
-  - state8 reply `0x43f930`
-- keep only two narrow state-8 leftovers explicit for now:
+- the active state-8 branch remains **closed enough in source for the intended path shape**, but
+  newer original-launcher WineDbg runs now say the first faithful live boundary is still earlier
+  than helper11:
+  - natural original runs reached `0x43bd20`
+  - then died before any natural hit on `0x43f930`
+- practical consequence:
+  - for faithful original-launcher progression, the next highest-value target is now the
+    **state8 post-send survivability / immediate continuation after `0x43bd20`**, before treating
+    helper11 as the first faithful live branch target
+- keep only two narrow state-8 leftovers explicit in source for now:
   - non-`0x10` slot-6 fallback through `0x41c5c0`
   - section-`0x0b` side effect through `0x43f8c0`
-- the immediate continuation after successful state-8 completion is now also good enough through
-  helper9/state9 follow-on
-- newer forced-`RunClientDLL` evidence now proves the default live continuation after auth success
-  really does reach helper11/state11 first and currently stalls there before any incoming
+- the immediate continuation after successful state-8 completion is still good enough in source
+  through helper9/state9 follow-on, but that continuation is not yet the first original live stop
+- forced-`RunClientDLL` scaffold evidence still separately proves that the deliberate runtime path
+  can later reach helper11/state11 first after auth success and stall there before any incoming
   `MS_LoadCharacterReply`
-- so the current highest-value runtime target is now the **helper11 source block / packet payload
-  reconstruction needed to elicit the first real margin reply**, not a speculative deeper state9
-  continuation that never becomes live on the source-starved run
-- keep the deeper post-state9 / state-`0x0c` work as the next target **after** helper11 reply work
-  becomes live again
+- so keep two distinct truths explicit:
+  - **original launcher live boundary**: state8 send / immediate post-send survivability
+  - **forced scaffold runtime stall**: helper11 source block / packet payload is still too weak to
+    elicit the first real margin reply
 - launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
   first-string consequences are now source-owned, but broader post-auth writeback is still incomplete
 - arg6: `ILTLoginMediator.Default` from `0x4d2c58`
@@ -163,29 +179,32 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 
 ## Current implementation priorities
 
-1. Treat the now-confirmed password-submit branch through state `8` as **closed enough for the
-   active path**:
+1. Treat the now-confirmed password-submit branch through state `8` as **closed enough in source**,
+   but make the next faithful original-live question explicit:
    - `0x41ecd0`
    - `0x41c1f0`
    - `0x439300`
    - `0x43bd20`
    - `0x43f930`
+   - immediate next task is now the boundary between natural original hits on `0x43bd20` and the
+     still-missing natural hit on `0x43f930`
 2. Keep the remaining narrow state-8 leftovers explicit, but do not reopen the whole state unless
    the runtime path proves they matter:
    - non-`0x10` fallback through `0x41c5c0`
    - section-`0x0b` side effect through `0x43f8c0`
-3. Treat helper9/state9 as closed enough for the active path and shift login work forward into the
-   post-state9 continuation / deeper owner-collaborator behavior, before expanding helper11-first
-   theories again
+3. Treat helper11/state11 as a **real later scaffold/runtime stall**, but stop treating it as the
+   first faithful original-launcher breakpoint target until original live evidence reaches it
 4. Keep that work in lockstep across:
    - Ghidra names/types
    - source implementation
    - canonical docs
-5. Continue active-path arg5 queue work where it directly helps the game-running path, but do not
-   let arg5 work displace the confirmed login-state continuation
-6. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
-7. Keep pruning duplicated queue logic from ABI scaffolding into canonical liblttcp/libltmessaging code when safe
-8. Keep auth launcher-owned, not client-owned
+5. Use original-launcher WineDbg evidence to steer priority when it contradicts scaffold intuition;
+   right now that means state8-post-send survivability outranks speculative helper11 producer work
+6. Continue active-path arg5 queue work where it directly helps the game-running path, but do not
+   let arg5 work displace the confirmed state8/original-live continuation boundary
+7. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
+8. Keep pruning duplicated queue logic from ABI scaffolding into canonical liblttcp/libltmessaging code when safe
+9. Keep auth launcher-owned, not client-owned
 
 ## Key files
 
@@ -237,26 +256,34 @@ cd /home/morgan/mxo/code/matrix_launcher
 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both
 ```
 
+Current deliberate binder runtime path:
+```bash
+cd /home/morgan/mxo/code/matrix_launcher
+MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both_runtime
+```
+
 ## Immediate next tasks
 
-1. Keep state `8` closed enough for the active path:
+1. Keep state `8` closed enough in source for the active path:
    - keep only the narrow explicit leftovers:
      - non-`0x10` fallback through `0x41c5c0`
      - section-`0x0b` side effect through `0x43f8c0`
-2. Use the newest forced-`RunClientDLL` evidence to retarget the immediate runtime blocker:
-   - helper11/state11 slot 3 is live on the default active path
-   - no margin reply arrives after that send on the current source-starved payload
-   - reconstruct the owner-side helper11 source block actually needed for the first real
-     `MS_LoadCharacterReply`
-3. In that helper11 work, prioritize the fields the current live send still leaves empty/zero:
-   - owner `+0x134..+0x174` appearance/customization ids
-   - owner `+0x178` / `+0x198` / `+0x1b8`
-   - owner `+0x664` (`GameSessionID`)
-4. Once helper11 reply traffic becomes live again, move back forward into:
-   - the deeper owner/collaborator behavior behind `0x41de40`
-   - the state9-success owner side effect `0x41b420`
+2. Retarget the immediate faithful-original problem using the newest WineDbg evidence:
+   - natural original runs hit `0x41c1f0` and `0x43bd20`
+   - natural original runs did **not** reach `0x43f930` before process death
+   - inspect `0x43bd20`, `0x41af70`, and the immediate post-send/runtime continuation that should
+     survive long enough for a later state8 reply
+3. Keep the scaffold-only helper11 story explicit but secondary while doing that:
+   - forced runtime still reaches helper11/state11 and stalls with no margin reply
+   - even deliberately non-empty helper11 payload seeding is not enough by itself
+4. Use Ghidra + source to narrow what the original state8 send still depends on around:
+   - margin connection/runtime state
+   - packet send / post-send event path
+   - any launcher-owned startup state needed before a later natural `0x43f930` can exist
+5. Once the original-live state8 post-send boundary is better explained, return to:
+   - helper11/source-block authenticity
+   - deeper owner/collaborator behavior behind `0x41de40`
    - the next concrete post-state9 continuation that consumes state `0x0c`
-5. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
-6. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
-7. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but do not let that hide the now-proven helper11-first runtime stall
+6. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
+7. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
 8. Prune stale or resolved notes from this file instead of letting it grow again

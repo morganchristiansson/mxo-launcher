@@ -1388,6 +1388,9 @@ int main(int argc, char* argv[]) {
             mediatorSelectionName,
             selectionPackedLow24,
             enableRecoveredProcessLoginCredentialsSeed);
+        DiagnosticConfigureLoginControllerHelper11Seed(
+            g_LauncherCharacter[0] ? g_LauncherCharacter : NULL,
+            g_LauncherSession[0] ? g_LauncherSession : NULL);
 
         DiagnosticApplyDefaultNopatchMediatorConfig(
             g_pILTLoginMediatorDefault,
