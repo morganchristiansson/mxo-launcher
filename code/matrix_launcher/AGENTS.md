@@ -50,16 +50,21 @@ Source of truth:
 
 ### Current main blockers
 The launcher still does **not** reconstruct enough launcher-owned startup/runtime state.
-Current unresolved inputs remain, but the active login-side blocker has now narrowed more clearly:
+Current unresolved inputs remain, but the active login-side blocker has narrowed again:
 - the real original password-submit branch is now confirmed as:
   - `0x41ecd0 = ProcessLoginRequest`
   - then `0x41c1f0` / state `3 -> 8`
-- so the next highest-value launcher-side fidelity work is the **active state-8 path**, not jumping
-  straight to helper11 as though `0x41c3c0` were already proven on the default branch
-- concretely, we still need faithful continuation after that active branch through:
+- the active state-8 branch is now **good enough for the current path** through:
   - state4 margin dispatch `0x439300`
   - state8 send `0x43bd20`
   - state8 reply `0x43f930`
+- keep only two narrow state-8 leftovers explicit for now:
+  - non-`0x10` slot-6 fallback through `0x41c5c0`
+  - section-`0x0b` side effect through `0x43f8c0`
+- the immediate continuation after successful state-8 completion is now also good enough through
+  helper9/state9 follow-on
+- so the next highest-value login-side target is now the **post-state9 continuation and deeper
+  owner/collaborator behavior behind it**, before reopening a helper11-first bias
 - helper11/state11 remains a real later path and still matters, but current evidence now says its
   source-starved payload is **not** the first active-path problem to solve
 - launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
@@ -145,23 +150,29 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 
 ## Current implementation priorities
 
-1. Follow the now-confirmed original password-submit branch first:
+1. Treat the now-confirmed password-submit branch through state `8` as **closed enough for the
+   active path**:
    - `0x41ecd0`
    - `0x41c1f0`
    - `0x439300`
    - `0x43bd20`
    - `0x43f930`
-2. Keep that work in lockstep across:
+2. Keep the remaining narrow state-8 leftovers explicit, but do not reopen the whole state unless
+   the runtime path proves they matter:
+   - non-`0x10` fallback through `0x41c5c0`
+   - section-`0x0b` side effect through `0x43f8c0`
+3. Treat helper9/state9 as closed enough for the active path and shift login work forward into the
+   post-state9 continuation / deeper owner-collaborator behavior, before expanding helper11-first
+   theories again
+4. Keep that work in lockstep across:
    - Ghidra names/types
    - source implementation
    - canonical docs
-3. Prefer active state-8 branch fidelity over expanding helper11/state11 scaffolding unless new
-   evidence shows the active default branch has really moved there
-4. Continue active-path arg5 queue work where it directly helps the game-running path, but do not
-   let arg5 work displace the now-confirmed earlier launcher/login branch
-5. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
-6. Keep pruning duplicated queue logic from ABI scaffolding into canonical liblttcp/libltmessaging code when safe
-7. Keep auth launcher-owned, not client-owned
+5. Continue active-path arg5 queue work where it directly helps the game-running path, but do not
+   let arg5 work displace the confirmed login-state continuation
+6. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
+7. Keep pruning duplicated queue logic from ABI scaffolding into canonical liblttcp/libltmessaging code when safe
+8. Keep auth launcher-owned, not client-owned
 
 ## Key files
 
@@ -215,16 +226,17 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
 
 ## Immediate next tasks
 
-1. Make the active original password-submit branch more faithful in source and docs:
-   - `0x41ecd0 = ProcessLoginRequest`
-   - `0x41c1f0 = PersistSelectionContextAndSwitchToState8`
-2. Continue from that branch into the next concrete state-owned methods:
-   - `0x439300 = CLTLoginState_State4::Slot3_BeginOrContinue`
-   - `0x43bd20 = CLTLoginState_State8::Slot3_BeginOrContinue`
-   - `0x43f930 = CLTLoginState_State8::Slot6_HandleSecondaryMessage`
+1. Close out state `8` in source/docs as done enough for the active path:
+   - keep only the narrow explicit leftovers:
+     - non-`0x10` fallback through `0x41c5c0`
+     - section-`0x0b` side effect through `0x43f8c0`
+2. Shift to the next active-path continuation after helper9/state9:
+   - the deeper owner/collaborator behavior behind `0x41de40`
+   - the state9-success owner side effect `0x41b420`
+   - the next concrete post-state9 continuation that consumes state `0x0c`
 3. Treat helper11/state11 as a later real branch, but stop treating it as the first active-path
    target until new evidence proves the default branch reaches it naturally
 4. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
 5. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
-6. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but do not let that hide the now-confirmed earlier login-state gap
+6. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but do not let that hide the now-confirmed later login-state continuation target
 7. Prune stale or resolved notes from this file instead of letting it grow again

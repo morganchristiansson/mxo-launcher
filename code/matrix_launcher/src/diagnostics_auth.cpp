@@ -38,10 +38,14 @@ struct DiagnosticRawMessageConnectionContext {
 
 static mxo::ltlogin::CLTLoginMediator* g_DiagnosticLoginController = NULL;
 static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAuthenticatePending = {};
+static mxo::ltlogin::CLTLoginState_State3 g_DiagnosticLoginStateState3 = {};
 static mxo::ltlogin::CLTLoginState_State4 g_DiagnosticLoginStateState4 = {};
+static mxo::ltlogin::CLTLoginState_State6 g_DiagnosticLoginStateState6 = {};
+static mxo::ltlogin::CLTLoginState_State8 g_DiagnosticLoginStateState8 = {};
 static mxo::ltlogin::CLTLoginState_State9 g_DiagnosticLoginStateState9 = {};
 static mxo::ltlogin::CLTLoginState_State10 g_DiagnosticLoginStateState10 = {};
 static mxo::ltlogin::CLTLoginState_State11 g_DiagnosticLoginStateState11 = {};
+static mxo::ltlogin::CLTLoginState_State12 g_DiagnosticLoginStateState12 = {};
 static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldListPending = {};
 static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
 static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
@@ -467,9 +471,14 @@ static void DiagnosticApplyLoginControllerConfig() {
         static_cast<uint8_t>(loginType),
         keyConfigMd5,
         uiConfigMd5);
+    g_DiagnosticLoginController->RegisterScaffoldState3(&g_DiagnosticLoginStateState3);
+    g_DiagnosticLoginController->RegisterScaffoldState4(&g_DiagnosticLoginStateState4);
+    g_DiagnosticLoginController->RegisterScaffoldState6(&g_DiagnosticLoginStateState6);
+    g_DiagnosticLoginController->RegisterScaffoldState8(&g_DiagnosticLoginStateState8);
     g_DiagnosticLoginController->RegisterScaffoldState9(&g_DiagnosticLoginStateState9);
     g_DiagnosticLoginController->RegisterScaffoldState10(&g_DiagnosticLoginStateState10);
     g_DiagnosticLoginController->RegisterScaffoldState11(&g_DiagnosticLoginStateState11);
+    g_DiagnosticLoginController->RegisterScaffoldState12(&g_DiagnosticLoginStateState12);
     g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
 
     if (g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed && g_LoginControllerSelectionSeedName[0]) {

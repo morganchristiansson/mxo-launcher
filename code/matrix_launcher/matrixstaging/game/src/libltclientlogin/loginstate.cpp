@@ -2,6 +2,11 @@
 
 #include "loginmediator.h"
 #include "../../../../src/diagnostics.h"
+#include "spdlog/spdlog.h"
+
+#include <algorithm>
+#include <cstdlib>
+#include <cstring>
 
 namespace mxo::ltlogin {
 namespace {
@@ -214,6 +219,71 @@ static uint32_t ReadU32LE(const uint8_t* p) {
            (static_cast<uint32_t>(p[3]) << 24);
 }
 
+static void AppendOwnedSectionBytesU16(void*& buffer, uint16_t& length, const uint8_t* src, uint16_t appendLen) {
+    if (!src || appendLen == 0u) {
+        return;
+    }
+
+    const size_t oldLength = length;
+    const size_t newLength = oldLength + appendLen;
+    void* newBuffer = buffer ? std::realloc(buffer, newLength) : std::malloc(newLength);
+    if (!newBuffer) {
+        return;
+    }
+
+    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, src, appendLen);
+    buffer = newBuffer;
+    length = static_cast<uint16_t>(newLength & 0xffffu);
+}
+
+static void AppendOwnedSectionBytesU32(void*& buffer, uint32_t& length, const uint8_t* src, uint16_t appendLen) {
+    if (!src || appendLen == 0u) {
+        return;
+    }
+
+    const size_t oldLength = length;
+    const size_t newLength = oldLength + appendLen;
+    void* newBuffer = buffer ? std::realloc(buffer, newLength) : std::malloc(newLength);
+    if (!newBuffer) {
+        return;
+    }
+
+    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, src, appendLen);
+    buffer = newBuffer;
+    length = static_cast<uint32_t>(newLength);
+}
+
+static void ResetOwnedSectionBytes(void*& buffer, uint16_t& length, uint8_t& flag) {
+    if (buffer) {
+        std::free(buffer);
+        buffer = nullptr;
+    }
+    length = 0u;
+    flag = 0u;
+}
+
+static void ResetOwnedSectionBytes(void*& buffer, uint32_t& length, uint8_t& flag) {
+    if (buffer) {
+        std::free(buffer);
+        buffer = nullptr;
+    }
+    length = 0u;
+    flag = 0u;
+}
+
+static void CopyBoundedRawBytes(uint8_t* dest, size_t destSize, const uint8_t* src, size_t srcSize) {
+    if (!dest || destSize == 0u) {
+        return;
+    }
+
+    std::memset(dest, 0, destSize);
+    if (!src || srcSize == 0u) {
+        return;
+    }
+
+    std::memcpy(dest, src, std::min(destSize, srcSize));
+}
+
 struct ParsedState11LoadCharacterReplyScaffold {
     bool valid = false;
     uint32_t status = 0;
@@ -257,6 +327,226 @@ static ParsedState11LoadCharacterReplyScaffold ParseState11LoadCharacterReplySca
     }
 
     return out;
+}
+
+using PostAuthMarginLoadingState = CLTLoginMediator::PostAuthMarginLoadingState;
+using SlotRecordState = CLTLoginMediator::SlotRecordState004b5328;
+
+static void ResetState8ReplyOwnerState(PostAuthMarginLoadingState& ownerState) {
+    std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
+    ownerState.characterReplyFieldF3c = 0u;
+    ownerState.characterReplyFieldF40 = 0u;
+    std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
+    std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
+    std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
+    std::fill(ownerState.section0StringF8c.begin(), ownerState.section0StringF8c.end(), '\0');
+    std::fill(ownerState.section0StringFac.begin(), ownerState.section0StringFac.end(), '\0');
+    std::fill(ownerState.section0StringFcc.begin(), ownerState.section0StringFcc.end(), '\0');
+    std::fill(ownerState.state8Section0RawF88.begin(), ownerState.state8Section0RawF88.end(), 0u);
+    ownerState.replySectionData13cc = 0u;
+    ownerState.replySectionData13d0 = 0u;
+    ownerState.section0Flag13f6 = 0u;
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, ownerState.flag1416);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, ownerState.allocatedBufferFlag141e);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, ownerState.allocatedBufferFlag1426);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, ownerState.allocatedBufferFlag142e);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, ownerState.flag1436);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, ownerState.flag143e);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, ownerState.flag1448);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, ownerState.flag1452);
+    ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
+    ownerState.state8Section10ChunkBitmap = 0u;
+    ownerState.state8Section11Dword145c = 0u;
+    ownerState.state8Section11String1460.clear();
+}
+
+static bool SeedState8FirstFragment(
+    PostAuthMarginLoadingState& ownerState,
+    CLTLoginMediator* mediator,
+    uint32_t parsedField05) {
+    ResetState8ReplyOwnerState(ownerState);
+    ownerState.characterReplyFieldF3c = parsedField05;
+
+    const SlotRecordState* currentSlotRecord = mediator ? mediator->GetCurrentSlotRecord() : nullptr;
+    if (currentSlotRecord != nullptr) {
+        if (!currentSlotRecord->heapString14.empty()) {
+            const size_t copyCount = std::min(
+                currentSlotRecord->heapString14.size(),
+                sizeof(ownerState.characterNameBufferF1c) - 1u);
+            std::copy_n(
+                currentSlotRecord->heapString14.data(),
+                copyCount,
+                ownerState.characterNameBufferF1c);
+            ownerState.characterNameBufferF1c[copyCount] = '\0';
+        }
+        ownerState.characterReplyFieldF40 = currentSlotRecord->worldId0c;
+        ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
+        ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
+        return true;
+    }
+
+    std::copy(
+        ownerState.sourceLeadString108.begin(),
+        ownerState.sourceLeadString108.end(),
+        ownerState.characterNameBufferF1c);
+    ownerState.characterNameBufferF1c[sizeof(ownerState.characterNameBufferF1c) - 1u] = '\0';
+    ownerState.characterReplyFieldF40 = ownerState.sourceField12c;
+    return false;
+}
+
+static void ApplyState8Section11SideEffect(
+    PostAuthMarginLoadingState& ownerState,
+    const ParsedState11LoadCharacterReplyScaffold& parsed) {
+    // anchor: launcher.exe:0x43f8c0
+    // Current best read from disassembly:
+    // - if section byteCount > 4, copy the leading dword into owner `+0x145c`
+    // - then copy the remaining bytes into the small-string-like family at owner `+0x1460`
+    // - otherwise clear both fields
+    ownerState.state8Section11Dword145c = 0u;
+    ownerState.state8Section11String1460.clear();
+
+    if (!parsed.sectionData || parsed.sectionByteCount <= 4u) {
+        return;
+    }
+
+    ownerState.state8Section11Dword145c = ReadU32LE(parsed.sectionData);
+    ownerState.state8Section11String1460.assign(
+        reinterpret_cast<const char*>(parsed.sectionData + 4u),
+        reinterpret_cast<const char*>(parsed.sectionData + parsed.sectionByteCount));
+}
+
+static void HandleState8ReplySection(
+    PostAuthMarginLoadingState& ownerState,
+    const ParsedState11LoadCharacterReplyScaffold& parsed) {
+    switch (parsed.sectionSelectorMinus2) {
+        case 0u:
+            if (!parsed.sectionData) {
+                break;
+            }
+            {
+                const size_t fixedPrefixBytes = std::min<size_t>(
+                    parsed.sectionByteCount,
+                    ownerState.characterFlagsF48.size() * sizeof(uint32_t));
+                if (fixedPrefixBytes != 0u) {
+                    std::memcpy(ownerState.characterFlagsF48.data(), parsed.sectionData, fixedPrefixBytes);
+                }
+                if (parsed.sectionByteCount > 0x20u) {
+                    CopyBoundedRawBytes(
+                        ownerState.state8Section0RawF88.data(),
+                        ownerState.state8Section0RawF88.size(),
+                        parsed.sectionData + 0x20u,
+                        parsed.sectionByteCount - 0x20u);
+                }
+                if (parsed.sectionByteCount > 0x485u && ownerState.allocatedBuffer1418 == nullptr) {
+                    AppendOwnedSectionBytesU16(
+                        ownerState.allocatedBuffer1418,
+                        ownerState.allocatedBufferLength141c,
+                        parsed.sectionData + 0x485u,
+                        static_cast<uint16_t>(parsed.sectionByteCount - 0x485u));
+                }
+                ownerState.section0Flag13f6 = 1u;
+            }
+            break;
+        case 1u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag13fe = 1u;
+            break;
+        case 2u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag1406 = 1u;
+            break;
+        case 3u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag141e = 1u;
+            break;
+        case 4u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag1426 = 1u;
+            break;
+        case 5u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag142e = 1u;
+            break;
+        case 6u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag1436 = 1u;
+            break;
+        case 7u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag143e = 1u;
+            break;
+        case 8u:
+            AppendOwnedSectionBytesU32(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag1448 = 1u;
+            break;
+        case 9u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag1452 = 1u;
+            break;
+        case 10u:
+            if (ownerState.allocatedBuffer1454 == nullptr) {
+                ownerState.allocatedBuffer1454 = std::malloc(0x7d00u);
+                ownerState.allocatedBufferLength1458 = 0u;
+                ownerState.state8Section10ChunkBitmap = 0u;
+            }
+            if (ownerState.allocatedBuffer1454 != nullptr && parsed.sectionData && parsed.expectedSectionCount0b != 0u) {
+                const size_t chunkIndex = static_cast<size_t>(parsed.expectedSectionCount0b - 1u);
+                const size_t chunkOffset = chunkIndex * 1000u;
+                if (chunkOffset + parsed.sectionByteCount <= 0x7d00u) {
+                    std::memcpy(
+                        static_cast<uint8_t*>(ownerState.allocatedBuffer1454) + chunkOffset,
+                        parsed.sectionData,
+                        parsed.sectionByteCount);
+                    if (chunkIndex < 32u) {
+                        ownerState.state8Section10ChunkBitmap |= (1u << chunkIndex);
+                    }
+                    ownerState.allocatedBufferLength1458 = static_cast<uint16_t>(
+                        ownerState.allocatedBufferLength1458 + parsed.sectionByteCount);
+                    ownerState.flag145a = 1u;
+                }
+            }
+            break;
+        case 11u:
+            ApplyState8Section11SideEffect(ownerState, parsed);
+            spdlog::info(
+                "CLTLoginState_State8::Slot6_HandleSecondaryMessage applied section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
+                static_cast<unsigned>(ownerState.state8Section11Dword145c),
+                static_cast<unsigned>(ownerState.state8Section11String1460.size()));
+            break;
+        case 12u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag140e = 1u;
+            break;
+        case 13u:
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag1416 = 1u;
+            break;
+        default:
+            break;
+    }
+}
+
+static void FinalizeState8ChunkedSection10Buffer(PostAuthMarginLoadingState& ownerState) {
+    if (ownerState.allocatedBuffer1454 == nullptr) {
+        return;
+    }
+
+    size_t firstChunkIndex = 0u;
+    while (firstChunkIndex < 32u && ((ownerState.state8Section10ChunkBitmap >> firstChunkIndex) & 1u) == 0u) {
+        ++firstChunkIndex;
+    }
+    if (firstChunkIndex < 32u) {
+        std::memmove(
+            ownerState.allocatedBuffer1454,
+            static_cast<uint8_t*>(ownerState.allocatedBuffer1454) + (firstChunkIndex * 1000u),
+            ownerState.allocatedBufferLength1458);
+    }
+    if (void* compacted = std::realloc(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458)) {
+        ownerState.allocatedBuffer1454 = compacted;
+    }
 }
 
 static uint32_t PlaceholderStateAction(const char* debugName, const char* anchor) {
@@ -620,8 +910,11 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     // Ownership/fidelity correction:
     // - `0x43bd20` is `CLTLoginState_State8` slot 3
     // - it owns a structured packet-builder path, not a mediator slot body
-    // - current best read from decompilation:
-    //   - early prechecks can switch helper states `4` or `6`
+    // - current best read from decompilation + disassembly:
+    //   - precheck owner `+0x1c` through `0x41b4b0`
+    //     - on failure, original switches helper state to `4`
+    //   - then gate on owner byte `+0xf14`
+    //     - on zero, original switches helper state to `6`
     //   - fetch current slot record through owner vtable `+0x44`
     //   - initialize packet-builder family `0x43ac10`
     //   - write the current character id pair plus selection snapshot blocks
@@ -629,6 +922,27 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //   - append `GameSessionID` through `0x43ada0`
     //   - send through `0x41af70`
     //   - post event `9`
+    if (!mediator->State10HasReadyConnectionState2()) {
+        if (CLTLoginState* fallbackState = mediator->ScaffoldState4()) {
+            mediator->SetCurrentState(fallbackState);
+        }
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4 currentState=%s",
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+        return 0u;
+    }
+    if (mediator->State10SendGateFlagF14() == 0) {
+        if (CLTLoginState* fallbackState = mediator->ScaffoldState6()) {
+            mediator->SetCurrentState(fallbackState);
+        }
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0xf14==0; original would switch helper state to 6 currentState=%s",
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+        return 0u;
+    }
+
+    replySectionsSeen_ = 0;
+    replySectionsExpected_ = 0;
     const CLTLoginMediator::SlotRecordState004b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
     State8StructuredMarginPacketBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();
@@ -671,8 +985,89 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
 uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
     (void)workItem;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043f930");
+    if (!mediator) {
+        return 0u;
+    }
+
+    const ParsedState11LoadCharacterReplyScaffold parsed =
+        ParseState11LoadCharacterReplyScaffold(mediator->StagedIncomingMarginPacketBytes());
+    if (!parsed.valid) {
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage could not parse staged margin bytes as raw-0x10 state8 reply; non-0x10 fallback (`0x41c5c0`) remains unresolved in source");
+        return 0u;
+    }
+
+    auto& ownerState = mediator->MutablePostAuthMarginLoadingState();
+    ownerState.worldListCountOrStatus80 = parsed.status;
+    if (parsed.status >= 1u) {
+        replySectionsSeen_ = 0;
+        replySectionsExpected_ = 0;
+        ownerState.state8Section10ChunkBitmap = 0u;
+        if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
+            mediator->SetCurrentState(failureState);
+        }
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x%08x; original would switch helper state to 3 and post error=10 currentState=%s",
+            (unsigned)parsed.status,
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+        return 1u;
+    }
+
+    const bool firstFragment = (replySectionsSeen_ == 0u);
+    const bool usedCurrentSlotRecord = firstFragment
+        ? SeedState8FirstFragment(ownerState, mediator, parsed.field05)
+        : false;
+
+    HandleState8ReplySection(ownerState, parsed);
+
+    if (parsed.shouldSeedExpectedSectionCount) {
+        replySectionsExpected_ = parsed.expectedSectionCount0b;
+    }
+    if (replySectionsExpected_ == 0u) {
+        replySectionsExpected_ = 1u;
+    }
+    if (replySectionsSeen_ < 0xffu) {
+        ++replySectionsSeen_;
+    }
+
+    const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
+    if (completed) {
+        FinalizeState8ChunkedSection10Buffer(ownerState);
+
+        if (CLTLoginState* nextBase = mediator->ScaffoldState9()) {
+            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
+                nextState->SetPendingPayload(/*byte4=*/0, parsed.handoffWord09);
+            }
+            mediator->SetCurrentState(nextBase);
+        }
+
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u firstFragment=%u usedCurrentSlotRecord=%u -> currentState=helper9",
+            (unsigned)parsed.status,
+            (unsigned)parsed.sectionSelectorMinus2,
+            (unsigned)parsed.sectionByteCount,
+            (unsigned)parsed.handoffWord09,
+            (unsigned)replySectionsSeen_,
+            (unsigned)replySectionsExpected_,
+            firstFragment ? 1u : 0u,
+            usedCurrentSlotRecord ? 1u : 0u);
+        replySectionsSeen_ = 0;
+        replySectionsExpected_ = 0;
+        ownerState.state8Section10ChunkBitmap = 0u;
+    } else {
+        Log(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage routed state8 reply status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u seedCount=%u firstFragment=%u usedCurrentSlotRecord=%u",
+            (unsigned)parsed.status,
+            (unsigned)parsed.sectionSelectorMinus2,
+            (unsigned)parsed.sectionByteCount,
+            (unsigned)parsed.handoffWord09,
+            (unsigned)replySectionsSeen_,
+            (unsigned)replySectionsExpected_,
+            parsed.shouldSeedExpectedSectionCount ? 1u : 0u,
+            firstFragment ? 1u : 0u,
+            usedCurrentSlotRecord ? 1u : 0u);
+    }
+    return 1u;
 }
 
 // anchor: launcher.exe:0x00438c90 (vtable 0x004b5104 slot 7)
@@ -688,29 +1083,73 @@ const char* CLTLoginState_State9::DebugName() const {
 // anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
 uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     (void)upstreamOrArg;
-    (void)mediator;
+    if (!mediator) {
+        return 0u;
+    }
 
-    // Narrow ownership correction from `0x004b517c` docs + Ghidra:
-    // - this state consumes the helper-local byte/word payload at `this+4/+6`
-    // - forwards them into owner helper `0x41de40`
-    // - clears the local payload
-    // - posts event `0x17` on success
-    // The concrete owner helper is still unresolved in source, so keep the state-local payload
-    // lifecycle here and leave the deeper owner-side effect as a logged scaffold step.
-    Log(
-        "DIAGNOSTIC: CLTLoginState_State9::Slot3_BeginOrContinue consuming helper-local payload byte4=0x%02x word6=0x%04x (owner helper 0x41de40 still unresolved)",
-        (unsigned)pendingByte4_,
-        (unsigned)pendingWord6_);
+    // Current best read from `0x00439780` + `0x41de40`:
+    // - this state consumes helper-local byte/word payload at `this+4/+6`
+    // - forwards them into the owner helper
+    // - clears the local payload regardless of branch
+    // - posts event `0x17` when that helper returns `< 1`
+    const uint8_t consumedByte4 = pendingByte4_;
+    const uint16_t consumedWord6 = pendingWord6_;
+    const uint32_t submitResult = mediator->State9SubmitFollowupScaffold(consumedByte4, consumedWord6);
     pendingByte4_ = 0;
     pendingWord6_ = 0;
+
+    if (submitResult < 1u) {
+        spdlog::info(
+            "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x} then posts event=0x17",
+            static_cast<unsigned>(consumedByte4),
+            static_cast<unsigned>(consumedWord6),
+            static_cast<unsigned>(submitResult));
+    } else {
+        spdlog::info(
+            "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x}",
+            static_cast<unsigned>(consumedByte4),
+            static_cast<unsigned>(consumedWord6),
+            static_cast<unsigned>(submitResult));
+    }
     return 1u;
 }
 
 // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
 uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
     (void)workItem;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043c180");
+    if (!mediator) {
+        return 0u;
+    }
+
+    const std::vector<uint8_t>& bytes = mediator->StagedIncomingMarginPacketBytes();
+    if (bytes.size() < 5u || bytes[0] != 0x11u) {
+        spdlog::info(
+            "CLTLoginState_State9::Slot6_HandleSecondaryMessage could not parse staged margin bytes as raw-0x11 state9 reply; non-0x11 fallback (`0x41c5c0`) remains unresolved in source");
+        return 0u;
+    }
+
+    const uint32_t parsedStatus = ReadU32LE(bytes.data() + 1u);
+    mediator->WorldListCountOrStatus80() = parsedStatus;
+    if (parsedStatus < 1u) {
+        mediator->HandleState9Opcode11SuccessSideEffect();
+        if (CLTLoginState* nextState = mediator->ScaffoldState12()) {
+            mediator->SetCurrentState(nextState);
+        }
+        spdlog::info(
+            "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
+            static_cast<unsigned>(parsedStatus),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+        return 1u;
+    }
+
+    if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
+        mediator->SetCurrentState(failureState);
+    }
+    spdlog::info(
+        "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
+        static_cast<unsigned>(parsedStatus),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+    return 1u;
 }
 
 // anchor: launcher.exe:0x00438cc0 (vtable 0x004b517c slot 7)

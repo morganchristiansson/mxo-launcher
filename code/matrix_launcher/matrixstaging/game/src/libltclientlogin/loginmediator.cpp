@@ -287,9 +287,14 @@ static void AssignOwnedSmallString(
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
       currentState_(nullptr),
+      scaffoldState3_(nullptr),
+      scaffoldState4_(nullptr),
+      scaffoldState6_(nullptr),
+      scaffoldState8_(nullptr),
       scaffoldState9_(nullptr),
       scaffoldState10_(nullptr),
       scaffoldState11_(nullptr),
+      scaffoldState12_(nullptr),
       authConnection_(nullptr),
       marginConnection_(nullptr),
       authConnectionOwnedByMediator_(false),
@@ -370,6 +375,22 @@ CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
 }
 
+void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
+    scaffoldState3_ = state;
+}
+
+void CLTLoginMediator::RegisterScaffoldState4(CLTLoginState* state) {
+    scaffoldState4_ = state;
+}
+
+void CLTLoginMediator::RegisterScaffoldState6(CLTLoginState* state) {
+    scaffoldState6_ = state;
+}
+
+void CLTLoginMediator::RegisterScaffoldState8(CLTLoginState* state) {
+    scaffoldState8_ = state;
+}
+
 void CLTLoginMediator::RegisterScaffoldState9(CLTLoginState* state) {
     scaffoldState9_ = state;
 }
@@ -382,6 +403,33 @@ void CLTLoginMediator::RegisterScaffoldState11(CLTLoginState* state) {
     scaffoldState11_ = state;
 }
 
+void CLTLoginMediator::RegisterScaffoldState12(CLTLoginState* state) {
+    scaffoldState12_ = state;
+}
+
+// anchor: launcher.exe:0x41f1d0
+void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c) {
+    state9Callback84_ = callback84;
+    state9Object88_ = object88;
+    state9Object8c_ = object8c;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
+    return scaffoldState3_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState4() const {
+    return scaffoldState4_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState6() const {
+    return scaffoldState6_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState8() const {
+    return scaffoldState8_;
+}
+
 CLTLoginState* CLTLoginMediator::ScaffoldState9() const {
     return scaffoldState9_;
 }
@@ -392,6 +440,10 @@ CLTLoginState* CLTLoginMediator::ScaffoldState10() const {
 
 CLTLoginState* CLTLoginMediator::ScaffoldState11() const {
     return scaffoldState11_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState12() const {
+    return scaffoldState12_;
 }
 
 void CLTLoginMediator::SetAuthConnectionContextKey(void* contextKey) {
@@ -698,7 +750,7 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
     //   - mediator only owns the shared margin-connection transport helper
     //   - the concrete send body remains on the active CLTLoginState vtable object
     if (!currentState_) {
-        Log("DIAGNOSTIC: BeginMarginHandshake has no active CLTLoginState; helper11 send is unresolved");
+        Log("DIAGNOSTIC: BeginMarginHandshake has no active CLTLoginState to dispatch");
         return 0u;
     }
 
@@ -797,11 +849,16 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     std::copy(input.block94.begin(), input.block94.end(), state8SelectionContextSnapshotState_.blockD60.begin());
     std::copy(input.blockA4.begin(), input.blockA4.end(), state8SelectionContextSnapshotState_.blockD70.begin());
 
+    if (scaffoldState8_ != nullptr) {
+        currentState_ = scaffoldState8_;
+    }
+
     Log(
-        "DIAGNOSTIC: PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x%02x blockCd0_0=0x%08x blockD70_3=0x%08x",
+        "DIAGNOSTIC: PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x%02x blockCd0_0=0x%08x blockD70_3=0x%08x currentState=%s",
         (unsigned)state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8,
         (unsigned)state8SelectionContextSnapshotState_.blockCd0[0],
-        (unsigned)state8SelectionContextSnapshotState_.blockD70[3]);
+        (unsigned)state8SelectionContextSnapshotState_.blockD70[3],
+        currentState_ ? currentState_->DebugName() : "<unchanged>");
     return 0u;
 }
 
@@ -846,6 +903,62 @@ uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentials
         (unsigned)postAuthMarginLoadingState_.sourceField12c,
         (unsigned)postAuthMarginLoadingState_.sourceDwords134[0]);
     return 0u;
+}
+
+// anchor: launcher.exe:0x41de40
+uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6) {
+    // Current best read from `0x41de40` + `0x439780`:
+    // - owner callback object `+0x84` fills two dwords through vtable `+0x38`
+    // - owner `+0x1c + 0x24..0x30` seeds a local transport/address block
+    // - `0x44afd0` / `0x44b0d0` derive a packet-like payload from helper word `+6`
+    // - owner object `+0x88` chooses between direct send (`+0x28`) and handle-based send
+    //   (`+0x1c`, `+0x18`, `+0x24`) after testing `(+0x44)->(+0x30)`
+    // - owner dword `+0x90` is only forwarded when helper byte `+4 != 0`
+    // - owner dword `+0x147c` caches the acquired handle on the managed-send branch
+    //
+    // The concrete owner-side collaborators remain unresolved in source, so keep this helper
+    // narrow and structural for now. Returning `0` preserves the observed `0x439780` success-side
+    // event-post shape (`< 1` => post event `0x17`).
+    const uint32_t forwardedArg90 = helperByte4 != 0u ? state9OptionalField90_ : 0u;
+    spdlog::info(
+        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} (deeper owner collaborators unresolved)",
+        static_cast<unsigned>(helperByte4),
+        static_cast<unsigned>(helperWord6),
+        fmt::ptr(state9Callback84_),
+        fmt::ptr(state9Object88_),
+        fmt::ptr(state9Object8c_),
+        static_cast<unsigned>(forwardedArg90),
+        state9CachedHandle147c_);
+    return 0u;
+}
+
+// anchor: launcher.exe:0x41b420
+uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
+    // Current best read from `0x41b420`, reached by state9 slot 6 / `0x43c180` success:
+    // - if owner `+0x1c` is null, return false-ish
+    // - clear owner byte `+0xf14`
+    // - set owner byte `+0x2d`
+    // - if margin connection state `+0x34` is `1` or `2`, call connection vtable `+0x0c(1)`
+    //
+    // Keep the vtable `+0x0c` call explicit but unresolved at the class level for now; the
+    // evidence-backed owner-side state mutation is enough to keep the active state9 path faithful.
+    if (!marginConnection_) {
+        return 0u;
+    }
+
+    postAuthMarginLoadingState_.state10SendGateFlagF14 = 0u;
+    marginConnectionFlag2d_ = 1u;
+
+    const uint32_t rawState = static_cast<uint32_t>(marginConnection_->State());
+    const bool wouldCallConnectionVtable0c =
+        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
+        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+
+    spdlog::info(
+        "CLTLoginMediator::HandleState9Opcode11SuccessSideEffect cleared owner+0xf14, set owner+0x2d, marginConnectionState={} wouldCallConnectionVtable0cArg1={}",
+        rawState,
+        wouldCallConnectionVtable0c ? 1u : 0u);
+    return 1u;
 }
 
 // =============================================================================

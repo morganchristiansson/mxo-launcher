@@ -147,6 +147,17 @@ What remains:
   - replacement launcher now also mirrors the copied arg6 `+0xec` snapshot into the source-owned
     `CLTLoginMediator::PersistSelectionContextForState8(...)` path so this active branch no longer
     lives only in ABI-side logs
+  - when a scaffold state8 object is registered, that same source-owned mirror now also advances
+    the mediator's active state to `CLTLoginState_State8`, making the recovered state-3 -> state-8
+    handoff live in source instead of only implicit in docs/logs
+  - representative binder-side validation after that change:
+    - command:
+      `MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both`
+    - current `resurrections.log` now shows the launcher-owned login-controller sidecar step as:
+      `PersistSelectionContextForState8 ... currentState=CLTLoginState_State8`
+    - that run still stops at the expected current deliberate boundary
+      (`InitClientDLL succeeded, but RunClientDLL is gated.`), so treat it as a state-handoff
+      validation run, not a full state8 runtime proof by itself
   - source now also has a first anchored mirror for `0x41ecd0 = ProcessLoginRequest`, keeping the
     owner `+0x94` copy and default `DAT_004d66ec == 0` small-string clear on the mediator side
     instead of leaving that active password-submit branch entirely outside source ownership
@@ -235,6 +246,15 @@ Current best read:
       - `0x420e70` then copies helper `+0x18` into owner `+0x664`
   - source ownership now matches that narrowing better:
     - state8 slot 3 has an anchored send scaffold
+    - state8 slot 6 now also has an anchored reply scaffold in `loginstate.cpp`
+      - keeps the state-local fragment counters on `CLTLoginState_State8`
+      - mirrors first-fragment seeding from the current slot record via owner vtable `+0x44`
+      - mirrors the broader section-append family through owner ranges `+0x13f8 .. +0x1458`
+      - keeps section-`0x0b` / `0x43f8c0` source-owned as the narrow owner `+0x145c/+0x1460` side effect
+      - mirrors the failure-side switch back to helper state `3`
+      - completes with the helper9 handoff using parsed word `+0x09`
+    - practical current read: state8 is now closed enough for the active password-submit branch,
+      with only the non-`0x10` fallback through `0x41c5c0` left explicitly unresolved
     - state10 slot 3 now also has an anchored gated send scaffold in `loginstate.cpp`
       - stronger current read from `0x43bf90`:
         - gate on `0x41b4b0` (`owner +0x1c`, connection state `+0x34 == 2`)
@@ -314,8 +334,20 @@ Auth can reasonably be treated as finished enough when all of the following are 
 Treat auth as **no longer the main blocker**.
 The highest-value remaining auth-adjacent work is now:
 - faithful post-`0x0B` mediator state writeback
-- and faithful continuation after the now-live helper11/state11 send step:
-  - keep the State4/`0x41e500` margin-begin milestone as done enough for the active path
-  - focus next on making later incoming margin `0x10` / `MS_LoadCharacterReply`
-    (`0x440320`) become live, rather than prematurely aiming at the later
-    `AS_GetWorldListRequest` helper path
+- keep the active password-submit state-8 branch marked as closed enough for now
+- keep the immediate post-state8 helper9/state9 continuation marked as closed enough for the active
+  path
+  - now narrowed as:
+    - `0x00439780 = CLTLoginState_State9::Slot3_BeginOrContinue`
+    - `0x41de40` owner helper behind that follow-on
+    - `0x43c180 = CLTLoginState_State9::Slot6_HandleSecondaryMessage`
+    - `0x41b420 = CLTLoginMediator_HandleState9Opcode11SuccessSideEffect`
+  - practical current read:
+    - slot 3 keeps the helper-local payload lifecycle on the state object
+    - slot 6 keeps the raw `0x11` success/failure transition on the state object
+    - remaining unresolved work is deeper owner/collaborator behavior under `0x41de40`, not the
+      state-vtable body itself
+- shift the next active-path continuation target forward into the post-state9 / state-`0x0c`
+  continuation before reopening helper11-first theories
+- keep the helper11/state11 margin path as a real later milestone, but not as the first branch to
+  force on the default active path
