@@ -638,9 +638,29 @@ uint32_t CLTLoginState::DispatchPhaseCode() const {
 
 // anchor: launcher.exe:0x004397e0 (vtable 0x004b51b8 slot 6)
 uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
-    (void)workItem;
-    (void)mediator;
-    return 1;
+    // Exact recovered shape from `0x004397e0`:
+    // - when object byte `this+4 == 1`, delegate to owner helper `0x41c5c0`
+    // - if that helper returns `< 1`, return success-ish immediately
+    // - otherwise write owner `+0x80 = 0x12000005` and fail
+    if (slot6DispatchByte4_ == 1u && mediator != nullptr) {
+        const uint32_t dispatchResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
+        if (dispatchResult < 1u) {
+            spdlog::info(
+                "CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage byte4=1 delegated to owner callback84 workItem={} -> dispatchResult=0x{:08x}",
+                fmt::ptr(workItem),
+                static_cast<unsigned>(dispatchResult));
+            return 1u;
+        }
+    }
+
+    if (mediator != nullptr) {
+        mediator->WorldListCountOrStatus80() = 0x12000005u;
+    }
+    spdlog::info(
+        "CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage byte4=0x{:02x} set owner+0x80=0x12000005 workItem={}",
+        static_cast<unsigned>(slot6DispatchByte4_),
+        fmt::ptr(workItem));
+    return 0u;
 }
 
 // anchor: launcher.exe:0x00437b40 (vtable 0x004b51b8 slot 9)
@@ -992,8 +1012,17 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     const ParsedState11LoadCharacterReplyScaffold parsed =
         ParseState11LoadCharacterReplyScaffold(mediator->StagedIncomingMarginPacketBytes());
     if (!parsed.valid) {
+        const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
+        if (fallbackResult < 1u) {
+            Log(
+                "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 -> dispatchResult=0x%08x",
+                (unsigned)fallbackResult);
+            return 1u;
+        }
+        mediator->WorldListCountOrStatus80() = 0x12000005u;
         Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage could not parse staged margin bytes as raw-0x10 state8 reply; non-0x10 fallback (`0x41c5c0`) remains unresolved in source");
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x%08x; mirrored owner+0x80=0x12000005",
+            (unsigned)fallbackResult);
         return 0u;
     }
 
@@ -1123,8 +1152,17 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
 
     const std::vector<uint8_t>& bytes = mediator->StagedIncomingMarginPacketBytes();
     if (bytes.size() < 5u || bytes[0] != 0x11u) {
+        const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
+        if (fallbackResult < 1u) {
+            spdlog::info(
+                "CLTLoginState_State9::Slot6_HandleSecondaryMessage delegated non-0x11 fallback through owner callback84 -> dispatchResult=0x{:08x}",
+                static_cast<unsigned>(fallbackResult));
+            return 1u;
+        }
+        mediator->WorldListCountOrStatus80() = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State9::Slot6_HandleSecondaryMessage could not parse staged margin bytes as raw-0x11 state9 reply; non-0x11 fallback (`0x41c5c0`) remains unresolved in source");
+            "CLTLoginState_State9::Slot6_HandleSecondaryMessage non-0x11 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
+            static_cast<unsigned>(fallbackResult));
         return 0u;
     }
 
@@ -1382,6 +1420,14 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
 // anchor: launcher.exe:0x00438cb0 (vtable 0x004b5154 slot 7)
 uint32_t CLTLoginState_State11::Slot7_GetStateId() const {
     return 11;
+}
+
+CLTLoginState_State12::CLTLoginState_State12() {
+    // anchor: launcher.exe:0x00439d80 + helper-dispatch init at `0x43b300`
+    // The dispatch table creates this final leaf with byte `this+4 = 1`, which is what makes the
+    // shared slot-6 handler (`0x004397e0`) delegate into `0x41c5c0` instead of immediately
+    // writing `0x12000005`.
+    slot6DispatchByte4_ = 1u;
 }
 
 // anchor: launcher.exe vtable 0x004b5230

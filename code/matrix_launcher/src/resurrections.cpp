@@ -153,6 +153,25 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
 static bool EnvFlagEnabled(const char* name);
 static bool EnvUint32Value(const char* name, uint32_t* outValue);
 
+struct DiagnosticRuntimeModeFlags {
+    bool forceIncompleteInit = false;
+    bool forceRunClient = false;
+    bool forceRunAfterInitFailure = false;
+    bool requestedMediatorStub = false;
+    bool requestedMediatorBinderScaffold = false;
+    bool requestedLauncherObjectStub = false;
+    bool autoEnableStartupObjectScaffold = false;
+    bool useMediatorStub = false;
+    bool useMediatorBinderScaffold = false;
+    bool useLauncherObjectStub = false;
+    bool traceWindows = false;
+    bool useArg2RetBypass = false;
+    bool disableAuthConnection = false;
+    bool beginMarginConnection = false;
+};
+
+static DiagnosticRuntimeModeFlags ReadDiagnosticRuntimeModeFlags();
+
 template <typename T>
 static T ResolveProc(HMODULE module, const char* name) {
     FARPROC proc = GetProcAddress(module, name);
@@ -405,6 +424,30 @@ static bool EnvUint32Value(const char* name, uint32_t* outValue) {
     if (end == buffer) return false;
     *outValue = static_cast<uint32_t>(parsed);
     return true;
+}
+
+static DiagnosticRuntimeModeFlags ReadDiagnosticRuntimeModeFlags() {
+    DiagnosticRuntimeModeFlags flags = {};
+    flags.forceIncompleteInit = EnvFlagEnabled("MXO_FORCE_INCOMPLETE_INIT");
+    flags.forceRunClient = EnvFlagEnabled("MXO_FORCE_RUNCLIENT");
+    flags.forceRunAfterInitFailure = EnvFlagEnabled("MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE");
+    flags.requestedMediatorStub = EnvFlagEnabled("MXO_STUB_LOGIN_MEDIATOR");
+    flags.requestedMediatorBinderScaffold = EnvFlagEnabled("MXO_BINDER_LOGIN_MEDIATOR");
+    flags.requestedLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
+    flags.autoEnableStartupObjectScaffold =
+        !flags.requestedMediatorStub &&
+        !flags.requestedMediatorBinderScaffold &&
+        !flags.requestedLauncherObjectStub;
+    flags.useMediatorStub = flags.requestedMediatorStub;
+    flags.useMediatorBinderScaffold =
+        flags.requestedMediatorBinderScaffold || flags.autoEnableStartupObjectScaffold;
+    flags.useLauncherObjectStub =
+        flags.requestedLauncherObjectStub || flags.autoEnableStartupObjectScaffold;
+    flags.traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
+    flags.useArg2RetBypass = EnvFlagEnabled("MXO_ARG2_RET_BYPASS");
+    flags.disableAuthConnection = EnvFlagEnabled("MXO_DISABLE_AUTH_CONNECTION");
+    flags.beginMarginConnection = EnvFlagEnabled("MXO_BEGIN_MARGIN_CONNECTION");
+    return flags;
 }
 
 static void LowercaseAsciiCopy(char* destination, size_t destinationSize, const char* source) {
@@ -1209,29 +1252,29 @@ int main(int argc, char* argv[]) {
     }
     Log("");
 
-    const bool forceIncompleteInit = EnvFlagEnabled("MXO_FORCE_INCOMPLETE_INIT");
-    const bool forceRunClient = EnvFlagEnabled("MXO_FORCE_RUNCLIENT");
-    const bool forceRunAfterInitFailure = EnvFlagEnabled("MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE");
-    const bool requestedMediatorStub = EnvFlagEnabled("MXO_STUB_LOGIN_MEDIATOR");
-    const bool requestedMediatorBinderScaffold = EnvFlagEnabled("MXO_BINDER_LOGIN_MEDIATOR");
-    const bool requestedLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
-    const bool autoEnableStartupObjectScaffold =
-        !requestedMediatorStub && !requestedMediatorBinderScaffold && !requestedLauncherObjectStub;
-    const bool useMediatorStub = requestedMediatorStub;
-    const bool useMediatorBinderScaffold = requestedMediatorBinderScaffold || autoEnableStartupObjectScaffold;
-    const bool useLauncherObjectStub = requestedLauncherObjectStub || autoEnableStartupObjectScaffold;
-    const bool traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
-    const bool useArg2RetBypass = EnvFlagEnabled("MXO_ARG2_RET_BYPASS");
-    const bool disableAuthConnection = EnvFlagEnabled("MXO_DISABLE_AUTH_CONNECTION");
-    const bool beginMarginConnection = EnvFlagEnabled("MXO_BEGIN_MARGIN_CONNECTION");
+    const DiagnosticRuntimeModeFlags runtimeFlags = ReadDiagnosticRuntimeModeFlags();
 
-    if (useArg2RetBypass) {
+    Log(
+        "DIAGNOSTIC: runtime flags incompleteInit=%u forceRunClient=%u forceRunAfterInitFailure=%u binderMediator=%u stubMediator=%u stubLauncherObject=%u autoStartupScaffold=%u disableAuth=%u beginMargin=%u arg2RetBypass=%u traceWindows=%u",
+        runtimeFlags.forceIncompleteInit ? 1u : 0u,
+        runtimeFlags.forceRunClient ? 1u : 0u,
+        runtimeFlags.forceRunAfterInitFailure ? 1u : 0u,
+        runtimeFlags.requestedMediatorBinderScaffold ? 1u : 0u,
+        runtimeFlags.requestedMediatorStub ? 1u : 0u,
+        runtimeFlags.requestedLauncherObjectStub ? 1u : 0u,
+        runtimeFlags.autoEnableStartupObjectScaffold ? 1u : 0u,
+        runtimeFlags.disableAuthConnection ? 1u : 0u,
+        runtimeFlags.beginMarginConnection ? 1u : 0u,
+        runtimeFlags.useArg2RetBypass ? 1u : 0u,
+        runtimeFlags.traceWindows ? 1u : 0u);
+
+    if (runtimeFlags.useArg2RetBypass) {
         uint32_t maxBypasses = 1;
         EnvUint32Value("MXO_ARG2_RET_BYPASS_MAX", &maxBypasses);
         Log("DIAGNOSTIC: enabled MXO_ARG2_RET_BYPASS with max bypasses = %u", (unsigned)maxBypasses);
     }
 
-    if (autoEnableStartupObjectScaffold) {
+    if (runtimeFlags.autoEnableStartupObjectScaffold) {
         Log("DIAGNOSTIC: auto-enabling current startup-object scaffold for default run (binder arg6 + arg5 build/register path)");
     }
 
@@ -1303,13 +1346,13 @@ int main(int argc, char* argv[]) {
         return FinishAndReturn(1);
     }
 
-    if (useMediatorBinderScaffold && useMediatorStub) {
+    if (runtimeFlags.useMediatorBinderScaffold && runtimeFlags.useMediatorStub) {
         Log("WARNING: both MXO_BINDER_LOGIN_MEDIATOR and MXO_STUB_LOGIN_MEDIATOR set; binder scaffold wins.");
     }
 
-    if (useMediatorBinderScaffold) {
+    if (runtimeFlags.useMediatorBinderScaffold) {
         DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
-    } else if (useMediatorStub) {
+    } else if (runtimeFlags.useMediatorStub) {
         DiagnosticInstallMediatorStub(&g_pILTLoginMediatorDefault);
     }
 
@@ -1319,7 +1362,7 @@ int main(int argc, char* argv[]) {
     // =============================================================================
     Log("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
     
-    if (useMediatorBinderScaffold || useMediatorStub) {
+    if (runtimeFlags.useMediatorBinderScaffold || runtimeFlags.useMediatorStub) {
         const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
         const uint32_t selectionPackedLow24 = g_PackedArg7Selection & 0x00ffffffu;
         const uint32_t worldUpperBoundExclusive =
@@ -1385,7 +1428,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (useLauncherObjectStub) {
+    if (runtimeFlags.useLauncherObjectStub) {
         DiagnosticInstallLauncherObjectStub(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
 
         char authServerDnsName[256] = "auth.lith.thematrixonline.net";
@@ -1436,7 +1479,7 @@ int main(int argc, char* argv[]) {
 
     RunOptionsCfgAutodetectStepIfNeeded();
 
-    if (traceWindows) {
+    if (runtimeFlags.traceWindows) {
         DiagnosticStartWindowTrace();
     }
 
@@ -1449,14 +1492,14 @@ int main(int argc, char* argv[]) {
 
     Log("=== Original-path gaps still missing ===");
     Log("arg1/arg2 status: launcher-owned filtered argv storage present, but original 0x409950 switch handling / options.cfg preprocessing are still incomplete");
-    if (useLauncherObjectStub) {
+    if (runtimeFlags.useLauncherObjectStub) {
         Log("arg5 status: diagnostic launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
     } else {
         Log("missing: build/register launcher object at 0x4d6304");
     }
-    if (useMediatorBinderScaffold) {
+    if (runtimeFlags.useMediatorBinderScaffold) {
         Log("arg6 status: diagnostic binder scaffold materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
-    } else if (useMediatorStub) {
+    } else if (runtimeFlags.useMediatorStub) {
         Log("arg6 status: direct diagnostic stub materialized ILTLoginMediator.Default (bypasses binder path)");
     } else {
         Log("missing: resolve ILTLoginMediator.Default into 0x4d2c58");
@@ -1492,16 +1535,16 @@ int main(int argc, char* argv[]) {
     Log("");
 
     const bool allowInitWithCurrentStartupScaffold =
-        useMediatorBinderScaffold && useLauncherObjectStub &&
+        runtimeFlags.useMediatorBinderScaffold && runtimeFlags.useLauncherObjectStub &&
         g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
 
-    if (!forceIncompleteInit && !allowInitWithCurrentStartupScaffold) {
+    if (!runtimeFlags.forceIncompleteInit && !allowInitWithCurrentStartupScaffold) {
         Log("Refusing to call InitClientDLL with knowingly incomplete launcher state.");
         Log("Set MXO_FORCE_INCOMPLETE_INIT=1 to run a deliberate original-path experiment.");
         return FinishAndReturn(2);
     }
 
-    if (forceIncompleteInit) {
+    if (runtimeFlags.forceIncompleteInit) {
         Log("=== Forced experiment: calling InitClientDLL with incomplete original-path state ===");
     } else {
         Log("=== Calling InitClientDLL with current default startup-object scaffold ===");
@@ -1535,7 +1578,7 @@ int main(int argc, char* argv[]) {
     const bool initSucceeded = (initResult > 0);
     if (!initSucceeded) {
         Log("InitClientDLL failed.");
-        if (!forceRunAfterInitFailure) {
+        if (!runtimeFlags.forceRunAfterInitFailure) {
             Log("Stopping. Set MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE=1 for a diagnostic-only crash experiment.");
             return FinishAndReturn(1);
         }
@@ -1551,13 +1594,13 @@ int main(int argc, char* argv[]) {
         // Current project direction:
         // - launcher-owned auth should begin by default on the binder/scaffold path
         // - keep an opt-out only for quick offline/isolated diagnostics
-        if (!disableAuthConnection && DiagnosticCanBeginAuthConnection()) {
+        if (!runtimeFlags.disableAuthConnection && DiagnosticCanBeginAuthConnection()) {
             const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
             Log("DIAGNOSTIC: post-init auth auto-begin result = 0x%08x", (unsigned)authConnectResult);
-        } else if (disableAuthConnection) {
+        } else if (runtimeFlags.disableAuthConnection) {
             Log("DIAGNOSTIC: auth auto-begin disabled by MXO_DISABLE_AUTH_CONNECTION=1");
         }
-        if (beginMarginConnection) {
+        if (runtimeFlags.beginMarginConnection) {
             const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
             Log("DIAGNOSTIC: post-init margin connection attempt result = 0x%08x", (unsigned)marginConnectResult);
         }
@@ -1569,7 +1612,7 @@ int main(int argc, char* argv[]) {
         *crashPtr = 0xdeadbeef;
     }
 
-    if (!forceRunClient) {
+    if (!runtimeFlags.forceRunClient) {
         Log("InitClientDLL succeeded, but RunClientDLL is gated.");
         Log("Set MXO_FORCE_RUNCLIENT=1 for a deliberate runtime experiment.");
         return FinishAndReturn(0);

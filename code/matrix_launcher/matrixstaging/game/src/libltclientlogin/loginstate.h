@@ -75,6 +75,13 @@ public:
     // anchor: launcher.exe:0x00439d80 (vtable 0x004b51b8 slot 10 initializer)
     CLTLoginState_AbstractFinalLeafBase() = default;
 
+protected:
+    // anchor: launcher.exe:0x004397e0 shared final-leaf slot-6 byte gate at `this+4`
+    // - state0 / state3 keep this byte `0`
+    // - state12 initializes it to `1`, which enables owner-callback84 secondary dispatch
+    uint8_t slot6DispatchByte4_ = 0;
+
+public:
     // anchor: launcher.exe vtable 0x004b51b8
     const char* DebugName() const override;
 
@@ -380,7 +387,7 @@ public:
 class CLTLoginState_State12 : public CLTLoginState_AbstractFinalLeafBase {
 public:
     // anchor: launcher.exe:0x00439d80 (vtable 0x004b5230 slot 10 shared initializer)
-    CLTLoginState_State12() = default;
+    CLTLoginState_State12();
 
     // anchor: launcher.exe vtable 0x004b5230
     const char* DebugName() const override;

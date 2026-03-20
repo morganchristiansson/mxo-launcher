@@ -230,6 +230,16 @@ static uint32_t ReadU32LE(const uint8_t* p) {
            (static_cast<uint32_t>(p[3]) << 24);
 }
 
+static uint16_t ReadOpcodePrefixVariableWidth(const uint8_t* bytes, size_t byteCount) {
+    if (!bytes || byteCount == 0u) {
+        return 0u;
+    }
+    if ((bytes[0] & 0x80u) != 0u && byteCount >= 2u) {
+        return static_cast<uint16_t>(((bytes[0] & 0x7fu) << 8) | bytes[1]);
+    }
+    return bytes[0];
+}
+
 static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src, size_t srcAvailable) {
     if (!dest || destSize == 0u) {
         return;
@@ -295,6 +305,7 @@ CLTLoginMediator::CLTLoginMediator()
       scaffoldState10_(nullptr),
       scaffoldState11_(nullptr),
       scaffoldState12_(nullptr),
+      scaffoldState13_(nullptr),
       authConnection_(nullptr),
       marginConnection_(nullptr),
       authConnectionOwnedByMediator_(false),
@@ -407,11 +418,15 @@ void CLTLoginMediator::RegisterScaffoldState12(CLTLoginState* state) {
     scaffoldState12_ = state;
 }
 
+void CLTLoginMediator::RegisterScaffoldState13(CLTLoginState* state) {
+    scaffoldState13_ = state;
+}
+
 // anchor: launcher.exe:0x41f1d0
 void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c) {
-    state9Callback84_ = callback84;
-    state9Object88_ = object88;
-    state9Object8c_ = object8c;
+    ownerCallback84_ = callback84;
+    ownerObject88_ = object88;
+    ownerObject8c_ = object8c;
 }
 
 CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
@@ -444,6 +459,10 @@ CLTLoginState* CLTLoginMediator::ScaffoldState11() const {
 
 CLTLoginState* CLTLoginMediator::ScaffoldState12() const {
     return scaffoldState12_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState13() const {
+    return scaffoldState13_;
 }
 
 void CLTLoginMediator::SetAuthConnectionContextKey(void* contextKey) {
@@ -905,6 +924,86 @@ uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentials
     return 0u;
 }
 
+// anchor: launcher.exe:0x41c5c0
+uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workItem) {
+    // Current best read from `0x41c5c0`:
+    // - if owner `+0x84` is null, return `1`
+    // - otherwise derive the incoming secondary-message opcode through `0x41bc20`
+    // - then call callback84 vtable `+0x0c(&opcodeStorage, workItem)`
+    // Current source scaffold note:
+    // - the replacement launcher does not yet materialize the original message wrapper object
+    // - so this mirror derives the opcode from staged auth/margin bytes when possible
+    if (!ownerCallback84_) {
+        return 1u;
+    }
+
+    uint32_t opcodeStorage = 0u;
+    if (!stagedIncomingMarginPacketBytes_.empty()) {
+        opcodeStorage = ReadOpcodePrefixVariableWidth(
+            stagedIncomingMarginPacketBytes_.data(),
+            stagedIncomingMarginPacketBytes_.size());
+    } else if (!stagedIncomingAuthPacketBytes_.empty()) {
+        mxo::auth::FramedPacket framedPacket;
+        if (mxo::auth::ParseVariableLengthPacket(
+                stagedIncomingAuthPacketBytes_.data(),
+                stagedIncomingAuthPacketBytes_.size(),
+                &framedPacket) &&
+            !framedPacket.payloadBytes.empty()) {
+            opcodeStorage = ReadOpcodePrefixVariableWidth(
+                framedPacket.payloadBytes.data(),
+                framedPacket.payloadBytes.size());
+        }
+    }
+
+    using OwnerCallback84DispatchSecondaryFn = uint32_t(__thiscall*)(void*, uint32_t*, void*);
+    void** vtable = *reinterpret_cast<void***>(ownerCallback84_);
+    if (!vtable || !vtable[3]) {
+        return 1u;
+    }
+
+    const auto dispatchFn = reinterpret_cast<OwnerCallback84DispatchSecondaryFn>(vtable[3]);
+    const uint32_t dispatchResult = dispatchFn(ownerCallback84_, &opcodeStorage, workItem);
+    spdlog::info(
+        "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 callback84={} opcode=0x{:04x} workItem={} -> dispatchResult=0x{:08x}",
+        fmt::ptr(ownerCallback84_),
+        static_cast<unsigned>(opcodeStorage & 0xffffu),
+        fmt::ptr(workItem),
+        static_cast<unsigned>(dispatchResult));
+    return dispatchResult;
+}
+
+// anchor: launcher.exe:0x41c510
+uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t field90Value) {
+    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    switch (stateCode) {
+        case 0u:
+        case 1u:
+        case 2u:
+        case 3u:
+            return 0x12000006u;
+        case 4u:
+        case 6u:
+        case 7u:
+        case 8u:
+        case 9u:
+        case 10u:
+        case 11u:
+            return 0x12000000u;
+        case 12u:
+            ownerOptionalField90_ = field90Value;
+            if (scaffoldState13_ != nullptr) {
+                currentState_ = scaffoldState13_;
+            }
+            spdlog::info(
+                "CLTLoginMediator::SetState9OptionalField90AndSwitchToState13 stored owner+0x90=0x{:08x} currentState={}",
+                static_cast<unsigned>(ownerOptionalField90_),
+                currentState_ ? currentState_->DebugName() : "<unchanged>");
+            return 0u;
+        default:
+            return 1u;
+    }
+}
+
 // anchor: launcher.exe:0x41de40
 uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6) {
     // Current best read from `0x41de40` + `0x439780`:
@@ -919,16 +1018,16 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     // The concrete owner-side collaborators remain unresolved in source, so keep this helper
     // narrow and structural for now. Returning `0` preserves the observed `0x439780` success-side
     // event-post shape (`< 1` => post event `0x17`).
-    const uint32_t forwardedArg90 = helperByte4 != 0u ? state9OptionalField90_ : 0u;
+    const uint32_t forwardedArg90 = helperByte4 != 0u ? ownerOptionalField90_ : 0u;
     spdlog::info(
         "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} (deeper owner collaborators unresolved)",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
-        fmt::ptr(state9Callback84_),
-        fmt::ptr(state9Object88_),
-        fmt::ptr(state9Object8c_),
+        fmt::ptr(ownerCallback84_),
+        fmt::ptr(ownerObject88_),
+        fmt::ptr(ownerObject8c_),
         static_cast<unsigned>(forwardedArg90),
-        state9CachedHandle147c_);
+        ownerCachedHandle147c_);
     return 0u;
 }
 

@@ -347,7 +347,24 @@ The highest-value remaining auth-adjacent work is now:
     - slot 6 keeps the raw `0x11` success/failure transition on the state object
     - remaining unresolved work is deeper owner/collaborator behavior under `0x41de40`, not the
       state-vtable body itself
-- shift the next active-path continuation target forward into the post-state9 / state-`0x0c`
-  continuation before reopening helper11-first theories
-- keep the helper11/state11 margin path as a real later milestone, but not as the first branch to
-  force on the default active path
+- newer forced-`RunClientDLL` evidence now proves the default active path really does reach the
+  helper11/state11 margin send first on the live runtime path:
+  - command:
+    `env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE MXO_BINDER_LOGIN_MEDIATOR=1 MXO_STUB_LAUNCHER_OBJECT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality MXO_FORCE_RUNCLIENT=1 wine ./resurrections.exe -user morgan -pwd '<pwd>'`
+  - observed sequence in `/home/morgan/MxO_7.6005/resurrections.log`:
+    - auth progresses through `AS_GetPublicKeyReply` / `AS_AuthChallenge` / `AS_AuthReply`
+    - post-auth margin connect-status is consumed
+    - `CLTLoginState_State11::Slot3_BeginOrContinue` sends the fixed-size `0x4d` margin payload
+    - the client reaches **Loading Character**
+    - but no `MarginReceivePacket` / `MS_LoadCharacterReply` arrives during the deliberate run window
+  - current live helper11 send is still visibly source-starved:
+    - `SkinToneID=0`
+    - `RealFirstName=''`
+    - `RealLastName=''`
+    - `Background=''`
+    - `GameSessionID='<empty>'`
+  - practical consequence:
+    - reopen helper11/state11 as the **current first runtime target** because new evidence now
+      proves the default active path reaches it naturally and stalls there
+    - post-state9 / state-`0x0c` continuation remains important, but only after helper11 reply
+      traffic becomes live again

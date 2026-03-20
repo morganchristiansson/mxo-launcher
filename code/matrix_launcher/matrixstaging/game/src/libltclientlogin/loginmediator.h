@@ -604,6 +604,7 @@ public:
     void RegisterScaffoldState10(CLTLoginState* state);
     void RegisterScaffoldState11(CLTLoginState* state);
     void RegisterScaffoldState12(CLTLoginState* state);
+    void RegisterScaffoldState13(CLTLoginState* state);
     // anchor: launcher.exe:0x41f1d0
     void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
     CLTLoginState* ScaffoldState3() const;
@@ -614,6 +615,7 @@ public:
     CLTLoginState* ScaffoldState10() const;
     CLTLoginState* ScaffoldState11() const;
     CLTLoginState* ScaffoldState12() const;
+    CLTLoginState* ScaffoldState13() const;
 
     void SetAuthConnectionContextKey(void* contextKey);
     void SetMarginConnectionContextKey(void* contextKey);
@@ -856,6 +858,12 @@ public:
     uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input);
 
     // Internal source-owned scaffolds for active CLTLoginState vtable bodies:
+    // - owner callback84 secondary-message bridge shared by state8/state9 fallbacks and state12
+    //   slot 6 / launcher.exe:0x41c5c0
+    uint32_t DispatchSecondaryMessageToOwnerCallback84(void* workItem);
+    // - state12-gated owner helper that stores `+0x90` and switches to state13 /
+    //   launcher.exe:0x41c510
+    uint32_t SetState9OptionalField90AndSwitchToState13(uint32_t field90Value);
     // - state9 slot 3 / launcher.exe:0x41de40 + 0x439780
     uint32_t State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6);
     // - state9 slot 6 success side effect / launcher.exe:0x41b420 (owner vtable +0x16c)
@@ -986,6 +994,7 @@ private:
     CLTLoginState* scaffoldState10_;
     CLTLoginState* scaffoldState11_;
     CLTLoginState* scaffoldState12_;
+    CLTLoginState* scaffoldState13_;
 
     mxo::liblttcp::CMessageConnection* authConnection_;
     mxo::liblttcp::CMessageConnection* marginConnection_;
@@ -1009,12 +1018,13 @@ private:
     void* sessionCallbackHelper65c_ = nullptr;
     uint32_t sharedMarginPacketField660_ = 0;  // owner `+0x660`
     std::string gameSessionId664_;             // owner `+0x664`
-    // Narrow source-owned state9 follow-up mirrors from `0x41f1d0` / `0x41de40`.
-    void* state9Callback84_ = nullptr;         // owner `+0x84`
-    void* state9Object88_ = nullptr;           // owner `+0x88`
-    void* state9Object8c_ = nullptr;           // owner `+0x8c`
-    uint32_t state9OptionalField90_ = 0;       // owner `+0x90`, only forwarded when helper byte `+4 != 0`
-    int32_t state9CachedHandle147c_ = -1;      // owner `+0x147c`, reused on one branch before reacquire
+    // Narrow source-owned post-state9 / post-state12 owner collaborators from
+    // `0x41f1d0` / `0x41de40` / `0x41c5c0` / `0x41c510`.
+    void* ownerCallback84_ = nullptr;          // owner `+0x84`
+    void* ownerObject88_ = nullptr;            // owner `+0x88`
+    void* ownerObject8c_ = nullptr;            // owner `+0x8c`
+    uint32_t ownerOptionalField90_ = 0;        // owner `+0x90`, only forwarded when helper byte `+4 != 0`
+    int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, reused on one branch before reacquire
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
     State8SelectionContextSnapshotState state8SelectionContextSnapshotState_;
     // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.

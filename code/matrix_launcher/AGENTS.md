@@ -46,7 +46,16 @@ Source of truth:
 - newer post-auth live milestone on the real deliberate runtime path:
   - State4/`0x41e500` margin begin now returns non-zero
   - margin-side type-2 connect-status work is now consumed
-  - helper11/state11 slot 3 (`0x43c020`) is now live and sends the raw `0x4d` packet
+  - helper11/state11 slot 3 (`0x43c020`) is now live and sends the fixed-size `0x4d` margin payload
+- newest deliberate runtime evidence from the forced-`RunClientDLL` binder path:
+  - the default active path really does reach helper11/state11 first after auth success
+  - the run then stalls at **Loading Character** with **no incoming margin reply yet**
+  - current sent helper11 payload is still source-starved:
+    - zero appearance/customization ids
+    - empty `RealFirstName`
+    - empty `RealLastName`
+    - empty `Background`
+    - empty `GameSessionID`
 
 ### Current main blockers
 The launcher still does **not** reconstruct enough launcher-owned startup/runtime state.
@@ -63,10 +72,14 @@ Current unresolved inputs remain, but the active login-side blocker has narrowed
   - section-`0x0b` side effect through `0x43f8c0`
 - the immediate continuation after successful state-8 completion is now also good enough through
   helper9/state9 follow-on
-- so the next highest-value login-side target is now the **post-state9 continuation and deeper
-  owner/collaborator behavior behind it**, before reopening a helper11-first bias
-- helper11/state11 remains a real later path and still matters, but current evidence now says its
-  source-starved payload is **not** the first active-path problem to solve
+- newer forced-`RunClientDLL` evidence now proves the default live continuation after auth success
+  really does reach helper11/state11 first and currently stalls there before any incoming
+  `MS_LoadCharacterReply`
+- so the current highest-value runtime target is now the **helper11 source block / packet payload
+  reconstruction needed to elicit the first real margin reply**, not a speculative deeper state9
+  continuation that never becomes live on the source-starved run
+- keep the deeper post-state9 / state-`0x0c` work as the next target **after** helper11 reply work
+  becomes live again
 - launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
   first-string consequences are now source-owned, but broader post-auth writeback is still incomplete
 - arg6: `ILTLoginMediator.Default` from `0x4d2c58`
@@ -226,17 +239,24 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
 
 ## Immediate next tasks
 
-1. Close out state `8` in source/docs as done enough for the active path:
+1. Keep state `8` closed enough for the active path:
    - keep only the narrow explicit leftovers:
      - non-`0x10` fallback through `0x41c5c0`
      - section-`0x0b` side effect through `0x43f8c0`
-2. Shift to the next active-path continuation after helper9/state9:
+2. Use the newest forced-`RunClientDLL` evidence to retarget the immediate runtime blocker:
+   - helper11/state11 slot 3 is live on the default active path
+   - no margin reply arrives after that send on the current source-starved payload
+   - reconstruct the owner-side helper11 source block actually needed for the first real
+     `MS_LoadCharacterReply`
+3. In that helper11 work, prioritize the fields the current live send still leaves empty/zero:
+   - owner `+0x134..+0x174` appearance/customization ids
+   - owner `+0x178` / `+0x198` / `+0x1b8`
+   - owner `+0x664` (`GameSessionID`)
+4. Once helper11 reply traffic becomes live again, move back forward into:
    - the deeper owner/collaborator behavior behind `0x41de40`
    - the state9-success owner side effect `0x41b420`
    - the next concrete post-state9 continuation that consumes state `0x0c`
-3. Treat helper11/state11 as a later real branch, but stop treating it as the first active-path
-   target until new evidence proves the default branch reaches it naturally
-4. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
-5. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
-6. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but do not let that hide the now-confirmed later login-state continuation target
-7. Prune stale or resolved notes from this file instead of letting it grow again
+5. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
+6. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
+7. Continue reconstructing launcher-owned startup/runtime state around arg5 / arg6 / arg7 / `0x402ec0`, but do not let that hide the now-proven helper11-first runtime stall
+8. Prune stale or resolved notes from this file instead of letting it grow again

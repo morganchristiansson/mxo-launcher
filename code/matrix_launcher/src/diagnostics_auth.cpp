@@ -46,6 +46,7 @@ static mxo::ltlogin::CLTLoginState_State9 g_DiagnosticLoginStateState9 = {};
 static mxo::ltlogin::CLTLoginState_State10 g_DiagnosticLoginStateState10 = {};
 static mxo::ltlogin::CLTLoginState_State11 g_DiagnosticLoginStateState11 = {};
 static mxo::ltlogin::CLTLoginState_State12 g_DiagnosticLoginStateState12 = {};
+static mxo::ltlogin::CLTLoginState_State13 g_DiagnosticLoginStateState13 = {};
 static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldListPending = {};
 static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
 static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
@@ -479,6 +480,7 @@ static void DiagnosticApplyLoginControllerConfig() {
     g_DiagnosticLoginController->RegisterScaffoldState10(&g_DiagnosticLoginStateState10);
     g_DiagnosticLoginController->RegisterScaffoldState11(&g_DiagnosticLoginStateState11);
     g_DiagnosticLoginController->RegisterScaffoldState12(&g_DiagnosticLoginStateState12);
+    g_DiagnosticLoginController->RegisterScaffoldState13(&g_DiagnosticLoginStateState13);
     g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
 
     if (g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed && g_LoginControllerSelectionSeedName[0]) {
