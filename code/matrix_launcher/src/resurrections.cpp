@@ -18,6 +18,8 @@
 #include <ctime>
 #include <sys/stat.h>
 
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/basic_file_sink.h"
 #include "diagnostics.h"
 
 // Include the login mediator header for world list builder access

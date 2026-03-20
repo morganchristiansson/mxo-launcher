@@ -140,6 +140,73 @@ Inside `client.dll:0x62170e2a..0x62170f48` the client:
 
 The zero-init helper at `client.dll:0x6211d3e0` clears this object through offset `+0xb0`, which fixes its size at **`0xb4` bytes**.
 
+### New clarification: exact active per-selection cfg readers on the `+0xec` path
+
+Newer static tightening around `client.dll:0x62170e5c..0x62170f07` now closes the exact loader ids and the
+current live stack destinations used by the active `0x62170b00` branch.
+
+Loader multiplexer:
+- `client.dll:0x621996a0`
+
+Per-file reader ids:
+- `0x62197ec0` = profile-root `keymap.cfg`
+- `0x62197f30` = profile-root `aui.cfg`
+- `0x62197fa0` = selection `hl.cfg`
+- `0x62198010` = selection `an.cfg`
+- `0x62198080` = selection `pi.cfg`
+- `0x621980f0` = selection `ai.cfg`
+- `0x62198160` = selection `cs.cfg`
+- `0x621981d0` = selection `bl.cfg`
+- `0x62198240` = selection `il.cfg`
+- `0x621982b0` = selection `rl.cfg`
+- `0x62198320` = selection `cl.cfg`
+- `0x62198400` = selection `cui.cfg`
+- `0x62198390` = selection `mcd.cfg`
+  - loader exists, but it is **not** called on the current `0x62170b00` path
+
+Exact current active `0x62170b00` call sequence on the `+0xec` path:
+- id `4`  -> `pi.cfg`  -> stack object `+0x74`
+- id `5`  -> `ai.cfg`  -> stack object `+0x84`
+- id `6`  -> `cs.cfg`  -> temporary stack slot `+0x94`
+- id `7`  -> `bl.cfg`  -> same stack slot `+0x94` on the same live path
+- id `8`  -> `il.cfg`  -> stack object `+0x24`
+- id `0xb`-> `cui.cfg` -> stack object `+0xa4`
+- id `2`  -> `hl.cfg`  -> stack object `+0x34`
+- id `3`  -> `an.cfg`  -> stack object `+0x44`
+- id `9`  -> `rl.cfg`  -> stack object `+0x54`
+- id `10` -> `cl.cfg`  -> stack object `+0x64`
+
+Practical consequence:
+- the active selection-specific state8-input subset is now narrower than the earlier loose file list
+- for the currently proven `0x62170b00` path, the minimum active subset is:
+  - `hl.cfg`
+  - `an.cfg`
+  - `pi.cfg`
+  - `ai.cfg`
+  - `cs.cfg`
+  - `bl.cfg`
+  - `il.cfg`
+  - `rl.cfg`
+  - `cl.cfg`
+  - `cui.cfg`
+- `mcd.cfg` should stay tracked as a real sibling loader, but it is not yet part of the minimum
+  active completeness gate for this path
+
+Newer writer-side tightening also identifies a sibling **client-owned** save family:
+- `client.dll:0x62198490` bulk-writes the per-selection cfg corpus under `Profiles\%s\%s_%X\`
+- example concrete writer anchors now identified:
+  - `0x62196310` = `hl.cfg`
+  - `0x62196400` = `an.cfg`
+  - `0x621964f0` = `pi.cfg`
+  - `0x621966d0` = `cs.cfg`
+- those writers emit binary cfg payloads, not simple text placeholders
+
+Important ownership caution:
+- this is evidence about what the pristine original `client.dll` reads and writes
+- it is **not** by itself evidence that `launcher.exe` owned or should reimplement that cfg writer family
+- for the launcher project, the main value is narrowing the expected on-disk corpus and avoiding
+  synthetic claims about faithful state when those files are absent
+
 This matters because:
 - `+0xec` is now better understood as a **selection/config-state handoff**, not just an opaque pointer call,
 - the client uses `+0x38` and `+0x40` while building path strings like `Profiles\%s\` and `Profiles\%s\%s_%X\`,

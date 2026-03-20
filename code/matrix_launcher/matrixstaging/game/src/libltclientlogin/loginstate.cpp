@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 namespace mxo::ltlogin {
 namespace {
@@ -232,6 +233,19 @@ static uint32_t ReadU32LE(const uint8_t* p) {
            (static_cast<uint32_t>(p[1]) << 8) |
            (static_cast<uint32_t>(p[2]) << 16) |
            (static_cast<uint32_t>(p[3]) << 24);
+}
+
+static std::string FormatU32x4Block(const std::array<uint32_t, 4>& block) {
+    return fmt::format(
+        "[{:#010x} {:#010x} {:#010x} {:#010x}]",
+        block[0],
+        block[1],
+        block[2],
+        block[3]);
+}
+
+static bool U32x4BlockHasAnyNonZero(const std::array<uint32_t, 4>& block) {
+    return block[0] != 0u || block[1] != 0u || block[2] != 0u || block[3] != 0u;
 }
 
 static void AppendOwnedSectionBytesU16(void*& buffer, uint16_t& length, const uint8_t* src, uint16_t appendLen) {
@@ -1034,12 +1048,40 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         packetBuilder.PayloadByteCount());
     mediator->PostEventScaffold(0x09u);
 
+    spdlog::debug(
+        "CLTLoginState_State8::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0={} d00={} d10={} d20={} d30={} d40={} d50={} d60={} d70={}",
+        FormatU32x4Block(mediator->SelectionContextBlockCd0()),
+        FormatU32x4Block(mediator->SelectionContextBlockCe0()),
+        FormatU32x4Block(mediator->SelectionContextBlockCf0()),
+        FormatU32x4Block(mediator->SelectionContextBlockD00()),
+        FormatU32x4Block(mediator->SelectionContextBlockD10()),
+        FormatU32x4Block(mediator->SelectionContextBlockD20()),
+        FormatU32x4Block(mediator->SelectionContextBlockD30()),
+        FormatU32x4Block(mediator->SelectionContextBlockD40()),
+        FormatU32x4Block(mediator->SelectionContextBlockD50()),
+        FormatU32x4Block(mediator->SelectionContextBlockD60()),
+        FormatU32x4Block(mediator->SelectionContextBlockD70()));
+
+    const unsigned nonZeroSnapshotBlockCount =
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockCd0())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockCe0())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockCf0())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD00())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD10())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD20())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD30())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD40())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD50())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD60())) +
+        static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD70()));
+
     Log(
-        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' -> sendResult=0x%08x then posts event=9",
+        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x nonZeroSnapshotBlocks=%u/11 blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' -> sendResult=0x%08x then posts event=9",
         (unsigned)State8StructuredMarginPacketFixedPayload::kFixedByteCount,
         (unsigned)packetBuilder.PayloadByteCount(),
         currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdLow03 : 0u,
         currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdHigh07 : 0u,
+        nonZeroSnapshotBlockCount,
         (unsigned)mediator->SelectionContextBlockCd0()[0],
         (unsigned)mediator->SelectionContextBlockD70()[3],
         mediator->GetGameSessionId664() ? mediator->GetGameSessionId664() : "<empty>",

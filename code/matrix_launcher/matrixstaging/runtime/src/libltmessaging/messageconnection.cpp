@@ -29,7 +29,10 @@ namespace mxo::liblttcp {
 // ============================================================
 CMessageConnection::CMessageConnection()
     : CLTTCPConnection(),
-      engine_(nullptr) {}
+      engine_(nullptr),
+      packetNameFamilyScaffold_(CMessageConnectionPacketNameFamilyScaffold::kUnknown),
+      packetizedMessagesEnabledScaffold_(false),
+      packetAgendaScaffold_() {}
 
 // ============================================================
 // UNANCHORED: Not based on vtable analysis
@@ -37,7 +40,10 @@ CMessageConnection::CMessageConnection()
 // ============================================================
 CMessageConnection::CMessageConnection(CLTThreadPerClientTCPEngine* engine)
     : CLTTCPConnection(),
-      engine_(engine) {}
+      engine_(engine),
+      packetNameFamilyScaffold_(CMessageConnectionPacketNameFamilyScaffold::kUnknown),
+      packetizedMessagesEnabledScaffold_(false),
+      packetAgendaScaffold_() {}
 
 // ============================================================
 // FAITHFUL: VTable 0x004aff10 - Destructor at 0x00449d20
@@ -59,6 +65,163 @@ void CMessageConnection::SetEngine(CLTThreadPerClientTCPEngine* engine) {
 // ============================================================
 CLTThreadPerClientTCPEngine* CMessageConnection::Engine() const {
     return engine_;
+}
+
+const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family) {
+    switch (family) {
+        case CMessageConnectionPacketNameFamilyScaffold::kAuth:
+            return "auth";
+        case CMessageConnectionPacketNameFamilyScaffold::kMargin:
+            return "margin";
+        default:
+            return "unknown";
+    }
+}
+
+void CMessageConnection::ConfigurePacketNameFamilyScaffold(
+    CMessageConnectionPacketNameFamilyScaffold family,
+    bool packetizedMessagesEnabled) {
+    packetNameFamilyScaffold_ = family;
+    packetizedMessagesEnabledScaffold_ = packetizedMessagesEnabled;
+}
+
+CMessageConnectionPacketNameFamilyScaffold CMessageConnection::PacketNameFamilyScaffold() const {
+    return packetNameFamilyScaffold_;
+}
+
+bool CMessageConnection::PacketizedMessagesEnabledScaffold() const {
+    return packetizedMessagesEnabledScaffold_;
+}
+
+void CMessageConnection::EnsurePacketAgendaScaffold() {
+    if (!packetAgendaScaffold_) {
+        packetAgendaScaffold_ = std::make_unique<CMessageConnectionPacketAgendaScaffold>();
+    }
+    if (packetAgendaScaffold_) {
+        packetAgendaScaffold_->created = true;
+    }
+}
+
+const CMessageConnectionPacketAgendaScaffold* CMessageConnection::PacketAgendaScaffold() const {
+    return packetAgendaScaffold_.get();
+}
+
+// ============================================================
+// Source-owned launcher-only bridge for the narrowed margin send-authenticity gap.
+// Mirrors the now-recovered original split between:
+// - local packet-envelope object (`0x41af70` / `0x41cf30`)
+// - shared message object consumed by `0x448cf0 -> 0x448a00`
+// ============================================================
+CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPayloadEnvelopeScaffold(
+    const void* packetData,
+    uint32_t packetByteCount,
+    bool headerless) {
+    CMessageConnectionEnvelopeScaffold envelope = {};
+    if (!packetData || packetByteCount == 0u || packetByteCount > CMessageConnectionMessageScaffold::kMaxPayloadByteCount) {
+        return envelope;
+    }
+
+    envelope.sharedMessage = std::make_shared<CMessageConnectionMessageScaffold>();
+    if (!envelope.sharedMessage) {
+        return envelope;
+    }
+
+    envelope.headerless10 = headerless ? 1u : 0u;
+    std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
+    framedBytesFrom0a.reserve(static_cast<size_t>(packetByteCount) + 2u);
+
+    if (packetByteCount > 0x7fu) {
+        framedBytesFrom0a.push_back(static_cast<uint8_t>(0x80u | ((packetByteCount >> 8) & 0x7fu)));
+    } else {
+        framedBytesFrom0a.push_back(0u);
+    }
+    framedBytesFrom0a.push_back(static_cast<uint8_t>(packetByteCount & 0xffu));
+
+    const uint8_t* payloadBytes = static_cast<const uint8_t*>(packetData);
+    framedBytesFrom0a.insert(
+        framedBytesFrom0a.end(),
+        payloadBytes,
+        payloadBytes + packetByteCount);
+    return envelope;
+}
+
+bool CMessageConnection::PacketAgendaAllowsEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) const {
+    // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
+    // Newer tightening now makes that connection-side metadata explicit too:
+    // - `0x448980` lazy-creates the `+0x74` agenda object
+    // - `0x469950` runs the send-side write-helper chain and may return a replaced or null packet
+    // Current source model still keeps the active path pass-through, but it now preserves whether
+    // we have even modeled the presence of that agenda object on the connection.
+    (void)envelope;
+    return true;
+}
+
+uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope) {
+    if (!engine_ || !envelope.sharedMessage) {
+        return 0u;
+    }
+
+    const std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
+    if (framedBytesFrom0a.size() < 2u) {
+        return 0u;
+    }
+
+    const uint8_t frameByte0a = framedBytesFrom0a[0];
+    const uint8_t frameByte0b = framedBytesFrom0a[1];
+    const uint32_t payloadByteCount =
+        (static_cast<uint32_t>(frameByte0a & 0x7fu) << 8) |
+        static_cast<uint32_t>(frameByte0b);
+    const size_t pointerOffsetFrom0a = ((frameByte0a >> 7) == 0u) ? 1u : 0u;
+    const uint32_t submittedByteCount = payloadByteCount + ((payloadByteCount > 0x7fu) ? 2u : 1u);
+
+    if (framedBytesFrom0a.size() < pointerOffsetFrom0a + submittedByteCount) {
+        return 0u;
+    }
+
+    const uint8_t* submittedBytes = framedBytesFrom0a.data() + pointerOffsetFrom0a;
+    spdlog::info(
+        "CMessageConnection::SubmitEnvelopeBytesScaffold payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(payloadByteCount),
+        static_cast<unsigned>(submittedByteCount),
+        static_cast<unsigned>(pointerOffsetFrom0a),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return engine_->SendBuffer(this, submittedBytes, submittedByteCount, nullptr);
+}
+
+uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) {
+    if (!engine_ || !envelope.sharedMessage) {
+        return 0u;
+    }
+
+    if (!PacketAgendaAllowsEnvelopeScaffold(envelope)) {
+        spdlog::info(
+            "CMessageConnection::SendPacketEnvelopeScaffold discarded packet because packet-agenda reconstruction is still missing this={} ownerContext={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        return 0u;
+    }
+
+    const std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
+    const uint8_t rawOpcode = framedBytesFrom0a.size() >= 3u ? framedBytesFrom0a[2] : 0u;
+    const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
+    spdlog::info(
+        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} payloadBytes={} framedBytesFrom0a={} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(envelope.headerless10),
+        static_cast<unsigned>(rawOpcode),
+        framedBytesFrom0a.size() >= 2u ? static_cast<unsigned>(((static_cast<uint32_t>(framedBytesFrom0a[0] & 0x7fu) << 8) | framedBytesFrom0a[1])) : 0u,
+        static_cast<unsigned>(framedBytesFrom0a.size()),
+        PacketNameFamilyToString(packetNameFamilyScaffold_),
+        packetizedMessagesEnabledScaffold_ ? 1u : 0u,
+        (agenda && agenda->created) ? 1u : 0u,
+        agenda ? static_cast<unsigned>(agenda->configuredReadHelperCount) : 0u,
+        agenda ? static_cast<unsigned>(agenda->configuredWriteHelperCount) : 0u,
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return SubmitEnvelopeBytesScaffold(envelope);
 }
 
 // ============================================================

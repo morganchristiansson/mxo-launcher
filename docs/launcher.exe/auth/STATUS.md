@@ -251,6 +251,44 @@ Current best read:
           reaches the engine-facing byte send
         - practical consequence: original state8/state11 send still depends on a real
           **packet-envelope / agenda** path, not just raw payload bytes reaching the socket
+        - current source now mirrors that one step more closely too:
+          - margin send no longer pre-submits caller-framed bytes directly
+          - it now wraps payload bytes in a source-owned envelope/message scaffold
+            whose inner header bytes are submitted using the same `0x448a00`-style
+            length/pointer derivation (`+0x0a/+0x0b`, 1-byte vs 2-byte header)
+          - still-missing launcher-owned authenticity is now narrower and explicit:
+            packet-agenda / callback metadata around `0x448cf0`, not the old raw-byte
+            framing alone
+          - current source now also owns the `0x448960` connection-side packet-name-family /
+            packetized-mode configuration more explicitly:
+            - auth connection -> auth family, packetized enabled
+            - margin connection -> margin family, packetized enabled
+          - latest short replacement run still showed the remaining concrete gap on the live state8
+            send:
+            - margin send logged `packetNameFamily=margin packetizedEnabled=1`
+            - but still `agendaCreated=0`
+          - newer original-launcher WineDbg send-bridge capture now narrows that read again:
+            - natural original state8 send at `0x448cf0/0x448a00` also had margin connection
+              `+0x70 = 0x41ce40`
+            - and natural original still had connection `+0x74 = 0` on that first state8 send
+            - so the remaining launcher-owned authenticity gap is now weighted more toward the
+              **actual message-object content/shape** than toward agenda presence alone
+            - strongest single concrete mismatch from that capture:
+              - natural original submitted payload length `0x13b`
+              - current replacement submits payload length `0x0bb`
+              - delta = `0x80`
+            - practical consequence:
+              - current replacement is still under-building the state8 send object
+              - the old "missing lazy `+0x74` agenda path is probably the first blocker" theory is
+                weaker now
+          - but a separate faithful-direction correction also landed on the launcher side:
+            - the copied arg6 `+0xec` state8 snapshot no longer zeroes cfg-derived blocks by default
+            - that old zeroing is now explicit diagnostic-only behavior behind
+              `MXO_DIAGNOSTIC_SANITIZE_SELECTION_CFG_DERIVED_BLOCKS=1`
+            - current short run therefore preserves more of the real client-supplied snapshot even
+              when the client-owned per-selection cfg corpus is incomplete
+            - representative effect on the live replacement state8 send was immediate:
+              `blockD70_3` stopped being zero (`0x7e42f8ec` in the short run)
       - the later natural state8 reply target also now has a tighter receive-side prerequisite,
         and newer live original runs now confirm that this prerequisite is really crossed:
         - incoming margin work survives through
@@ -464,11 +502,13 @@ The highest-value remaining auth-adjacent work is now:
       - `client.dll:0x62170b00` fills the `+0xec` tail from per-selection profile/config helpers
         (`FUN_621996a0`) rooted under `Profiles\%s\%s_%X\` and files like
         `hl.cfg / pi.cfg / ai.cfg / ...`
-      - current replacement runs do not have that per-selection cfg corpus on disk
+      - current replacement runs do not have that active client-owned per-selection cfg corpus on
+        disk
       - the copied `+0xec` state8 snapshot had therefore degenerated into repeated cfg-parser/
         default values across `+0x24..+0xb3`
-      - the scaffold now keeps the arg7-derived first dword and zeros the cfg-derived tail instead
-        of forwarding those repeated values into the replacement launcher's state8 send
+      - the scaffold now keeps the arg7-derived first dword and zeros the cfg-derived tail as
+        **diagnostic narrowing only**, not as a claim that launcher.exe owned or should recreate
+        that client cfg writer/reader family
     - but no later incoming raw-`0x10` / `MS_LoadCharacterReply` arrives during the deliberate run window
   - practical comparison against the natural original path:
     - this moves the replacement launcher later and closer to the natural-original shape than the

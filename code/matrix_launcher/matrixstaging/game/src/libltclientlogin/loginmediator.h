@@ -931,8 +931,9 @@ public:
     // - that wrapper forwards the envelope's shared packet/message object into
     //   `+0x28` = inherited `CMessageConnection::SendPacket` / `0x448cf0`
     // - `0x448cf0` consumes a message/envelope object, not bare payload bytes
-    // Current source helper is therefore intentionally narrower/scaffold-only: it bridges the
-    // recovered payload bytes into the source-owned transport path, but does not yet reconstruct
+    // Current source helper is therefore intentionally narrower/scaffold-only: it now wraps the
+    // recovered payload bytes in a source-owned envelope/message scaffold that matches the
+    // original `0x448a00` byte-derivation shape more closely, but it still does not reconstruct
     // the original packet-envelope metadata / agenda semantics that sit between `0x43bd20` and a
     // later natural `0x43f930`.
     uint32_t SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount);

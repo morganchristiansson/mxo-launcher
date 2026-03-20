@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
@@ -122,6 +124,49 @@ namespace mxo::liblttcp {
 // - the recovered original engine entry on this path is more connection-object-oriented
 //   than the placeholder engine signatures currently model
 // - keep the names stable, but treat the exact live method signatures as still provisional
+
+struct CMessageConnectionMessageScaffold {
+    // Source-owned bridge for the original shared message object consumed by
+    // `0x448cf0 -> 0x448a00`.
+    // Current best narrowed fields that materially affect the final byte submit:
+    // - original inner object `+0x08` participates in payload-cap checks (`0xffc`)
+    // - original inner object `+0x0a/+0x0b` hold the framed payload length/header bytes
+    // - original final send pointer begins at original `+0x0a` for 2-byte lengths or `+0x0b`
+    //   for 1-byte lengths, with payload bytes following immediately after
+    static constexpr uint16_t kMaxPayloadByteCount = 0x0ffcu;
+
+    uint16_t payloadCapacity08 = kMaxPayloadByteCount;
+    std::vector<uint8_t> framedBytesFrom0a;
+};
+
+enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
+    kUnknown = 0,
+    kAuth = 1,
+    kMargin = 2,
+};
+
+struct CMessageConnectionPacketAgendaScaffold {
+    // Source-owned mirror of the lazy packet-processing agenda object rooted at original
+    // connection `+0x74`.
+    // Current best narrowed shape from `0x448980 -> 0x469b10 -> 0x469850 -> 0x469740`:
+    // - object is lazy-created, not constructor-owned
+    // - object has distinct read/write helper sides
+    // - send path `0x448cf0` consults the write side and may replace/discard the envelope
+    bool created = false;
+    uint32_t configuredReadHelperCount = 0;
+    uint32_t configuredWriteHelperCount = 0;
+};
+
+struct CMessageConnectionEnvelopeScaffold {
+    // Source-owned bridge for the original local envelope family forwarded by `0x41af70`
+    // through `0x41cf30` into `0x448cf0`.
+    // Current best narrowed material fields:
+    // - original envelope `+0x08` = shared message object
+    // - original envelope `+0x10` = headerless/send-mode flag consumed by `0x448cf0`
+    std::shared_ptr<CMessageConnectionMessageScaffold> sharedMessage;
+    uint8_t headerless10 = 0;
+};
+
 class CMessageConnection : public CLTTCPConnection {
 public:
     CMessageConnection();
@@ -141,8 +186,41 @@ public:
     // - it runs packet-agenda filtering first, then reaches a lower submit helper that forwards
     //   final byte pointer/size through engine slot 8 / SendBuffer using `this` as the
     //   connection object
-    // - the current source signature remains a narrower bridge over the starter path
+    // - the raw-byte overload remains as the older narrow bridge used by auth-side scaffold sends
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
+
+    // Source-owned launcher-only bridge for the narrower state8/state10/state11 send-authenticity
+    // gap. It preserves the now-recovered envelope/message split from
+    // `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00` without pretending the full original shared
+    // message-object shape is already recovered.
+    // Important current narrowing from original-launcher WineDbg at the natural first state8 send:
+    // - margin connection `+0x70` was live (`0x41ce40`)
+    // - connection `+0x74` was still null on that send
+    // - submitted payload length there was `0x13b`, not the current replacement `0x0bb`
+    // So the remaining blocker is no longer best framed as agenda presence alone; the stronger
+    // current gap is the richer original message-object content that our scaffold still does not
+    // build.
+    static CMessageConnectionEnvelopeScaffold BuildPayloadEnvelopeScaffold(
+        const void* packetData,
+        uint32_t packetByteCount,
+        bool headerless = false);
+    uint32_t SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
+
+    // anchor: launcher.exe:0x448960
+    // Narrow source-owned mirror of the per-connection packet-name callback configuration:
+    // - original writes connection `+0x78 = enabled`
+    // - when enabled, original writes connection `+0x70 = callback`
+    void ConfigurePacketNameFamilyScaffold(
+        CMessageConnectionPacketNameFamilyScaffold family,
+        bool packetizedMessagesEnabled);
+    CMessageConnectionPacketNameFamilyScaffold PacketNameFamilyScaffold() const;
+    bool PacketizedMessagesEnabledScaffold() const;
+
+    // anchor: launcher.exe:0x448980
+    // Narrow source-owned mirror of the lazy packet-agenda object at connection `+0x74`.
+    // Current source model keeps only the creation/ownership fact and helper counts explicit.
+    void EnsurePacketAgendaScaffold();
+    const CMessageConnectionPacketAgendaScaffold* PacketAgendaScaffold() const;
 
     // Pure virtual method required by base class CBaseConnection (slot 5)
     // ProcessPacketResult at 0x00449a70
@@ -162,7 +240,15 @@ public:
     uint32_t ProcessDispatchResult(const void* packetData, uint32_t byteCount);
 
 private:
+    static const char* PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family);
+    bool PacketAgendaAllowsEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) const;
+    uint32_t SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
+
     CLTThreadPerClientTCPEngine* engine_;
+    CMessageConnectionPacketNameFamilyScaffold packetNameFamilyScaffold_ =
+        CMessageConnectionPacketNameFamilyScaffold::kUnknown;
+    bool packetizedMessagesEnabledScaffold_ = false;
+    std::unique_ptr<CMessageConnectionPacketAgendaScaffold> packetAgendaScaffold_;
 };
 
 // ============================================================

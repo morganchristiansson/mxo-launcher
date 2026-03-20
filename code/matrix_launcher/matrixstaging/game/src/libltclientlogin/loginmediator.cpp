@@ -1453,26 +1453,18 @@ const char* CLTLoginMediator::GetGameSessionId664() const {
 
 // anchor: launcher.exe:0x41af70
 uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
-    // Fresh `0x41af70` + `0x448cf0` tightening:
+    // Fresh `0x41af70` + `0x41cf30` + `0x448cf0` + `0x448a00` tightening:
     // - original `0x41af70` is only a tiny forwarder
     // - it jumps through current margin connection vtable `+0x24`
-    // - newer tightening now shows that `+0x24` is itself just a wrapper:
-    //   `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
-    // - that wrapper forwards the envelope's shared packet/message object into
-    //   connection vtable `+0x28` / inherited `CMessageConnection::SendPacket` (`0x448cf0`)
-    // - `0x448cf0` then runs packet-agenda logic before any lower transport send helper
-    // Current source call remains deliberately narrower: the active state objects already own the
-    // recovered payload layout, so this scaffold only bridges those payload bytes into the
-    // source-owned transport path.
-    // Keep the fidelity gap explicit:
-    // - natural original now proves this send bridge can survive far enough to reach state8 slot 6
-    //   / `0x43f930`
-    // - but the replacement path still needs the same receive-side chain to stay faithful:
-    //   `CMarginConnection::OnOperationCompleted` (`0x44af60`) ->
-    //   `CMessageConnection::OnOperationCompleted` (`0x4490c0`) ->
-    //   `CBaseMarginConnection::DispatchMessage` (`0x442d00`)
-    // - the next missing practical question is therefore deeper reply-side behavior after this
-    //   send, not the old pre-`0x43f930` survivability question.
+    // - `0x41cf30` then extracts envelope `+0x08` and forwards it into vtable `+0x28`
+    // - `0x448cf0` consumes that message/envelope object, may apply packet-agenda filtering, and
+    //   only then reaches `0x448a00`
+    // - `0x448a00` derives the final byte pointer/length from the inner message object header at
+    //   `+0x0a/+0x0b`, rather than trusting already-framed caller bytes
+    // Current source tightening therefore moves one step closer to the original launcher-owned
+    // send bridge: state objects still own the payload bytes, but we now wrap them in a
+    // source-owned envelope/message scaffold before submit instead of sending raw framed bytes
+    // directly. The remaining explicit gap is the original packet-agenda / callback metadata.
     mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     if (!connection) {
         connection = EnsureMarginConnectionObject();
@@ -1481,26 +1473,27 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetByt
         return 0u;
     }
 
-    std::vector<uint8_t> framedBytes;
-    framedBytes.reserve(packetByteCount + 2u);
-    if (packetByteCount > 0x7fu) {
-        framedBytes.push_back(static_cast<uint8_t>(0x80u | ((packetByteCount >> 8) & 0x7fu)));
-        framedBytes.push_back(static_cast<uint8_t>(packetByteCount & 0xffu));
-    } else {
-        framedBytes.push_back(static_cast<uint8_t>(packetByteCount & 0x7fu));
+    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold envelope =
+        mxo::liblttcp::CMessageConnection::BuildPayloadEnvelopeScaffold(packetBytes, packetByteCount, /*headerless=*/false);
+    if (!envelope.sharedMessage) {
+        return 0u;
     }
-    const uint8_t* payload = static_cast<const uint8_t*>(packetBytes);
-    framedBytes.insert(framedBytes.end(), payload, payload + packetByteCount);
 
-    const std::string framedPreview = BuildHexPreview(framedBytes.data(), framedBytes.size(), 32u);
+    const std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
+    const size_t previewOffset = framedBytesFrom0a.empty() ? 0u : (((framedBytesFrom0a[0] >> 7) == 0u) ? 1u : 0u);
+    const std::string framedPreview =
+        (previewOffset < framedBytesFrom0a.size())
+            ? BuildHexPreview(framedBytesFrom0a.data() + previewOffset, framedBytesFrom0a.size() - previewOffset, 32u)
+            : std::string();
     spdlog::info(
-        "CLTLoginMediator::SendCurrentMarginPacketScaffold host='{}' state={} payloadBytes={} framedBytes={} preview={}",
+        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardEnvelopeToSendPacket host='{}' state={} payloadBytes={} framedBytesFrom0a={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
         connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
         static_cast<unsigned>(connection->State()),
         static_cast<unsigned>(packetByteCount),
-        static_cast<unsigned>(framedBytes.size()),
-        framedPreview);
-    return connection->SendPacket(framedBytes.data(), static_cast<uint32_t>(framedBytes.size()), nullptr);
+        static_cast<unsigned>(framedBytesFrom0a.size()),
+        static_cast<unsigned>(previewOffset),
+        framedPreview.empty() ? std::string("<empty>") : framedPreview);
+    return connection->SendPacketEnvelopeScaffold(envelope);
 }
 
 // anchor: launcher.exe:0x41f270
@@ -2700,12 +2693,20 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
     if (engine_ && authConnectionContextKey_) {
         authConnection_ = engine_->GetOrCreateMessageConnection(authConnectionContextKey_);
         authConnectionOwnedByMediator_ = false;
-        return authConnection_;
-    }
-
-    if (!authConnection_) {
+    } else if (!authConnection_) {
         authConnection_ = new mxo::liblttcp::CMessageConnection(engine_);
         authConnectionOwnedByMediator_ = true;
+    }
+
+    if (authConnection_) {
+        // anchor: launcher.exe:0x448960 via `0x41d170`
+        // Auth connection startup config writes `+0x78 = 1` and `+0x70 = FUN_0041ce00`.
+        // Current source scaffold keeps the packet-name family / packetized-mode side of that
+        // connection metadata explicit even though the callback body itself is still only used as
+        // evidence for naming, not as a live function pointer.
+        authConnection_->ConfigurePacketNameFamilyScaffold(
+            mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kAuth,
+            /*packetizedMessagesEnabled=*/true);
     }
     return authConnection_;
 }
@@ -2732,6 +2733,9 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
 
     marginConnection->SetEngine(engine_);
     marginConnection->SetMarginEngine(engine_);
+    marginConnection->ConfigurePacketNameFamilyScaffold(
+        mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kMargin,
+        /*packetizedMessagesEnabled=*/true);
     if (marginConnectionContextKey_) {
         marginConnection->SetOwnerContext(marginConnectionContextKey_);
     }

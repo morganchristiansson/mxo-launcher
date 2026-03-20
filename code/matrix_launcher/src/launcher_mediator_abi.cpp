@@ -2,6 +2,7 @@
 #include "diagnostics_auth.h"
 #include "loginmediator.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -194,7 +195,12 @@ static bool DiagnosticFileExists(const char* path) {
     return stat(path, &st) == 0;
 }
 
-static bool DiagnosticSelectionProfileCfgSetExists() {
+static bool DiagnosticBuildSelectionProfileCfgDir(char* outPath, size_t outPathCapacity) {
+    if (!outPath || outPathCapacity == 0u) {
+        return false;
+    }
+
+    outPath[0] = '\0';
     const char* profileName = DiagnosticMediatorProfileName();
     const char* selectionName = DiagnosticMediatorMappedSelectionName();
     const uint32_t selectionId = DiagnosticMediatorMappedSelectionId();
@@ -202,28 +208,81 @@ static bool DiagnosticSelectionProfileCfgSetExists() {
         return false;
     }
 
-    char basePath[512] = {};
     std::snprintf(
-        basePath,
-        sizeof(basePath),
-        "/home/morgan/MxO_7.6005/Profiles/%s/%s_%X",
+        outPath,
+        outPathCapacity,
+        "Profiles/%s/%s_%X",
         profileName,
         selectionName,
         static_cast<unsigned>(selectionId));
+    return outPath[0] != '\0';
+}
 
-    static const char* kCfgNames[] = {
-        "hl.cfg", "an.cfg", "pi.cfg", "ai.cfg", "cs.cfg", "bl.cfg",
-        "il.cfg", "rl.cfg", "cl.cfg", "mcd.cfg", "cui.cfg"
+static bool DiagnosticBuildSelectionProfileCfgPath(char* outPath, size_t outPathCapacity, const char* cfgName) {
+    if (!outPath || outPathCapacity == 0u || !cfgName || !cfgName[0]) {
+        return false;
+    }
+
+    char basePath[512] = {};
+    if (!DiagnosticBuildSelectionProfileCfgDir(basePath, sizeof(basePath))) {
+        outPath[0] = '\0';
+        return false;
+    }
+
+    std::snprintf(outPath, outPathCapacity, "%s/%s", basePath, cfgName);
+    return outPath[0] != '\0';
+}
+
+static const std::array<const char*, 10>& DiagnosticSelectionState8CfgNames() {
+    // Evidence-backed active-path read from client.dll:0x62170b00 -> 0x621996a0 on the current
+    // +0xec selection-context builder:
+    // - keymap.cfg / aui.cfg are profile-root only (`0x62195f00`)
+    // - the active selection-specific 0xb4 handoff uses ids 4,5,6,7,8,0xb,2,3,9,10
+    // - those ids map to:
+    //   - 4  -> pi.cfg  -> selectionContext +0x74
+    //   - 5  -> ai.cfg  -> selectionContext +0x84
+    //   - 6  -> cs.cfg  -> temporary stack slot later reused by id 7 on the same live path
+    //   - 7  -> bl.cfg  -> final occupant of selectionContext +0x94 on that live path
+    //   - 8  -> il.cfg  -> selectionContext +0x24
+    //   - 0xb-> cui.cfg -> selectionContext +0xa4
+    //   - 2  -> hl.cfg  -> selectionContext +0x34
+    //   - 3  -> an.cfg  -> selectionContext +0x44
+    //   - 9  -> rl.cfg  -> selectionContext +0x54
+    //   - 10 -> cl.cfg  -> selectionContext +0x64
+    // - loader id 0xc / mcd.cfg exists (`0x62198390`) but is not called on this active
+    //   `0x62170b00` path, so keep it out of the minimum state8-input completeness gate for now.
+    static const std::array<const char*, 10> kCfgNames = {
+        "hl.cfg", "an.cfg", "pi.cfg", "ai.cfg", "cs.cfg",
+        "bl.cfg", "il.cfg", "rl.cfg", "cl.cfg", "cui.cfg"
     };
+    return kCfgNames;
+}
+
+static bool DiagnosticSelectionState8CfgSetComplete(char* outMissingList, size_t outMissingListCapacity) {
+    if (outMissingList && outMissingListCapacity != 0u) {
+        outMissingList[0] = '\0';
+    }
 
     char candidatePath[640] = {};
-    for (const char* cfgName : kCfgNames) {
-        std::snprintf(candidatePath, sizeof(candidatePath), "%s/%s", basePath, cfgName);
-        if (DiagnosticFileExists(candidatePath)) {
-            return true;
+    bool allPresent = true;
+    bool firstMissing = true;
+    for (const char* cfgName : DiagnosticSelectionState8CfgNames()) {
+        if (!DiagnosticBuildSelectionProfileCfgPath(candidatePath, sizeof(candidatePath), cfgName) ||
+            !DiagnosticFileExists(candidatePath)) {
+            allPresent = false;
+            if (outMissingList && outMissingListCapacity != 0u) {
+                const int written = std::snprintf(
+                    outMissingList + std::strlen(outMissingList),
+                    outMissingListCapacity - std::strlen(outMissingList),
+                    "%s%s",
+                    firstMissing ? "" : ", ",
+                    cfgName);
+                (void)written;
+            }
+            firstMissing = false;
         }
     }
-    return false;
+    return allPresent;
 }
 
 static void DiagnosticSanitizeSelectionContextCfgDerivedBlocks(
@@ -231,25 +290,49 @@ static void DiagnosticSanitizeSelectionContextCfgDerivedBlocks(
     if (!input) {
         return;
     }
-    if (DiagnosticSelectionProfileCfgSetExists()) {
+
+    char missingCfgList[256] = {};
+    if (DiagnosticSelectionState8CfgSetComplete(missingCfgList, sizeof(missingCfgList))) {
         return;
     }
 
-    // Evidence-backed scaffold fallback:
+    // Faithful-direction correction:
+    // - the copied `+0xec` selection-context snapshot is client-owned evidence supplied to the
+    //   launcher through the real arg6 callback path
+    // - forcibly zeroing that tail is only a diagnostic narrowing hack, not faithful launcher
+    //   behavior
+    // - keep the old sanitizer available only behind an explicit env flag, so normal launcher-only
+    //   runs preserve what the client actually handed us even when the per-selection cfg corpus is
+    //   incomplete on disk
+    const char* forceSanitize = std::getenv("MXO_DIAGNOSTIC_SANITIZE_SELECTION_CFG_DERIVED_BLOCKS");
+    const bool shouldForceSanitize =
+        forceSanitize && forceSanitize[0] != '\0' && std::strcmp(forceSanitize, "0") != 0;
+    if (!shouldForceSanitize) {
+        spdlog::info(
+            "DiagnosticSanitizeSelectionContextCfgDerivedBlocks preserved client-supplied cfg-derived state8 snapshot blocks for faithful launcher-only flow even though the active client-owned per-selection cfg subset is incomplete for profile='{}' selection='{}' selectionId=0x{:06x} missing=[{}]; set MXO_DIAGNOSTIC_SANITIZE_SELECTION_CFG_DERIVED_BLOCKS=1 to restore the older diagnostic zeroing hack",
+            DiagnosticMediatorProfileName(),
+            DiagnosticMediatorMappedSelectionName(),
+            static_cast<unsigned>(DiagnosticMediatorMappedSelectionId()),
+            missingCfgList[0] ? missingCfgList : "<unresolved>");
+        return;
+    }
+
+    // Evidence-backed diagnostic narrowing only:
     // - client.dll:0x62170b00 seeds the first dword from arg7 high8/variant
-    // - later `FUN_621996a0` helpers fill the remaining 0xb0 bytes from profile/config paths rooted
-    //   under `Profiles\%s\%s_%X\` and files like `hl.cfg` / `pi.cfg` / `ai.cfg` / ...
-    // - current replacement runs do not have that per-selection cfg corpus on disk
-    // - the copied `+0xec` snapshot therefore degenerates into repeated parser/default values that
-    //   are unlikely to be valid launcher-owned state8 send material
-    // Keep the first dword intact, but zero the cfg-derived tail until that profile/config source is
-    // reconstructed faithfully.
+    // - later `FUN_621996a0` helpers fill the remaining 0xb0 bytes from per-selection profile cfgs
+    // - the active live path does not just need “some cfg file”; it needs the current state8-visible
+    //   subset rooted at hl/an/pi/ai/cs/bl/il/rl/cl/cui
+    // - we do *not* currently claim launcher.exe owned those cfg files or their writer family
+    // - until that active client-owned subset exists on disk, forwarding the copied `+0xec` tail
+    //   into the replacement launcher's state8 send is still more likely parser/default junk than
+    //   faithful startup state
     std::memset(&input->block04, 0, sizeof(*input) - offsetof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch, block04));
     spdlog::info(
-        "DiagnosticSanitizeSelectionContextCfgDerivedBlocks zeroed cfg-derived state8 snapshot blocks because no per-selection profile cfg set was found for profile='{}' selection='{}' selectionId=0x{:06x}",
+        "DiagnosticSanitizeSelectionContextCfgDerivedBlocks zeroed cfg-derived state8 snapshot blocks as diagnostic narrowing because the active client-owned per-selection state8 cfg subset is incomplete for profile='{}' selection='{}' selectionId=0x{:06x} missing=[{}]",
         DiagnosticMediatorProfileName(),
         DiagnosticMediatorMappedSelectionName(),
-        static_cast<unsigned>(DiagnosticMediatorMappedSelectionId()));
+        static_cast<unsigned>(DiagnosticMediatorMappedSelectionId()),
+        missingCfgList[0] ? missingCfgList : "<unresolved>");
 }
 
 static void DiagnosticMirrorSelectionContextIntoMediatorModel(const void* selectionContext) {
@@ -1406,4 +1489,5 @@ void DiagnosticApplyDefaultNopatchMediatorConfig(
     setValue2(mediatorPtr, (void*)&clientVersionValue);
     Log("DIAGNOSTIC: applied default nopatch mediator +0x24 with value 0x%08x", clientVersionValue);
 }
+
 
