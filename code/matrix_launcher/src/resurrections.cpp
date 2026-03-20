@@ -19,8 +19,6 @@
 #include <sys/stat.h>
 
 #include "diagnostics.h"
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/basic_file_sink.h"
 
 // Include the login mediator header for world list builder access
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
