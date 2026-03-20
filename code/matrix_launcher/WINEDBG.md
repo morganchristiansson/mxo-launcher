@@ -32,7 +32,6 @@ MXO_USER=morgan MXO_PASS='<pwd>' MXO_CHAR=Morg4n make run_original_launcher
 That target currently expands to a real-launcher run with:
 - `-noeula`
 - `-nopatch`
-- `-skiplaunch`
 - optional `-char $(MXO_CHAR)`
 - `-user $(MXO_USER)`
 - `-pwd $(MXO_PASS)`
@@ -55,7 +54,7 @@ wine cmd /c tasklist /FI "IMAGENAME eq matrix.exe"
 If `ps` shows something like:
 
 ```text
-C:\users\morgan\Temp\MatrixOnline.1\matrix.exe -noeula -nopatch -skiplaunch -char Morg4n -user morgan -pwd <pwd> -clone
+C:\users\morgan\Temp\MatrixOnline.1\matrix.exe -noeula -nopatch -char Morg4n -user morgan -pwd <pwd> -clone
 ```
 
 and `wine tasklist` shows:
@@ -78,6 +77,7 @@ The current `mcp-winedbg` wrapper is good enough for breakpoints, but has some i
 
 - `cont` may succeed even when the MCP call looks like it hangs
 - inspection commands like `bt`, `print`, `info ...` can auto-interrupt the target
+- output from one MCP request can visibly bleed into the next request's response
 - that can create a **fake stop** in:
   - `ntdll!DbgUiRemoteBreakin`
 - after attach + breakpoint setup, one initial `cont` is usually needed just to unfreeze the target
@@ -88,7 +88,9 @@ So for live collaborative runs, prefer this discipline:
 2. set the smallest possible breakpoint set
 3. `cont` once
 4. if the UI freezes, check whether it is just debugger stop state before assuming a real hit
-5. only use `bt` / `print` after a confirmed useful stop
+5. on a useful stop, prefer the smallest possible capture first
+   - e.g. `print $eip`, `print $ecx`, maybe one or two more values, then `cont`
+6. only use heavier `bt` / `print` / `info ...` once the stop is clearly worth the extra debugger churn
 
 A backtrace rooted in:
 
@@ -148,6 +150,8 @@ These are the current highest-value original-launcher anchors for active-path wo
 - `0x0043c180`
   - `CLTLoginState_State9::Slot6_HandleSecondaryMessage`
   - later raw-`0x11` reply body
+  - now also live-proven naturally
+  - representative natural-success stop landed at `0x0043c1c2` with parsed status `0`
 
 Important current interpretation:
 - the original live password path is now better evidenced as:
@@ -157,11 +161,20 @@ Important current interpretation:
   - natural original reaches `0x43bd20`
   - crosses the `0x41af70/0x41cf30` send bridge
   - reaches `0x43f930`
-  - and then naturally continues into `0x00439780`
-  - representative live stop there showed helper9 local word `this+6 = 0x2710`
+  - naturally continues into `0x00439780`
+  - and is now also live-proven one step deeper into `0x0041de40`
+  - representative live stop sequence showed:
+    - at `0x00439780`: helper9 local byte `this+4 = 0`, word `this+6 = 0x2710`
+    - at `0x0041de40`: `ECX = 0x004d4e38`, `EAX = 0x2710`, `EDX = 0x004b517c`
+- current remaining natural-original question is therefore later again:
+  - what happens after the now-proven `0x0043c180` success-side state-`0x0c` switch / event-`0x18`
+- representative live UI consequence at that boundary:
+  - a natural run was visibly at **Waiting for Regionserver** while stopped around the
+    `0x0043c180 / 0x0043c1c2` success-side window
 - so when debugging the original launcher, **start with the state-8 branch first** and now treat
-  deeper behavior under the state9 continuation (`0x41de40`, then `0x43c180`) as the current
-  highest-value live boundary before trying to force helper11-specific hypotheses
+  deeper behavior under the state9 continuation (`0x41de40`, then `0x43c180`, then post-state9
+  state-`0x0c` continuation) as the current highest-value live boundary before trying to force
+  helper11-specific hypotheses
 
 ## Fastest path: inspect the latest dump
 
@@ -311,17 +324,70 @@ wine tasklist /v
 Current late-breakpoint set for the active question is intentionally small:
 
 ```text
-break *0x0043f930
+break *0x0041de40
+break *0x0043c180
+cont
+```
+
+Optional one-time sanity anchor on a fresh run:
+
+```text
 break *0x00439780
 break *0x0041de40
 break *0x0043c180
 cont
 ```
 
-Why this smaller set is better now:
+Optional branch split once `0x0043c180` is proven:
+
+```text
+break *0x0043c1c2
+break *0x0043c1e6
+cont
+```
+
+Preferred immediate post-success narrowing once `0x43c180` is proven:
+
+```text
+break *0x0041b450
+break *0x0041cfb0
+cont
+```
+
+Optional later-continuation probes only after that helper-switch / event boundary is understood:
+
+```text
+break *0x004397e0
+break *0x0041c5c0
+cont
+```
+
+Current caution from the first follow-up probe pass:
+- a natural run that already proved `0x43c180` success still produced **no** natural hit on
+  `0x004397e0` or `0x0041c5c0`
+- newer Ghidra review now explains why that non-hit is not surprising:
+  - success first goes through `0x41b420`, then `0x41b450(0x0c)`, then `0x41cfb0(0x18)`
+  - `0x41cfb0` walks the owner `+0x674` listener tree
+- newer breakpoint-only live proof now tightens that one step further too:
+  - after the proven `0x41cfb0(0x18)` post, the same natural run later hit `0x41cfb0(0x0f)`
+  - the run then entered game without any observed hit on `0x004397e0` or `0x0041c5c0`
+- so treat `0x004397e0` / `0x0041c5c0` as informed later probes, not as guaranteed immediate next
+  stops after state `0x0c`
+
+Why this set is better now:
 - earlier state8 send-side hits have already been re-proven enough
-- natural original is now live through `0x43f930 -> 0x439780`
-- the next missing original-live question is deeper state9 continuation, not whether state8 sends at all
+- natural original is now live through `0x43f930 -> 0x439780 -> 0x41de40 -> 0x43c180`
+- the next missing original-live question is no longer whether state9 slot 6 is reached, but what
+  the later post-state9 / state-`0x0c` continuation does after the now-proven success-side branch
+- newer Ghidra tightening now makes the first concrete post-success boundary:
+  - `0x41b420 -> 0x41b450(0x0c) -> 0x41cfb0(0x18)`
+  - and `0x41cfb0` delivers through the owner `+0x674` listener tree
+- newer breakpoint-only live proof now also shows a later event post on that same continuation:
+  - `0x41cfb0(0x0f)`
+  - before the run enters game
+- current practical live-status clue there is the visible **Waiting for Regionserver** phase
+- current practical negative-result clue there is also that the first late probes on
+  `0x004397e0` / `0x0041c5c0` stayed silent
 
 ## Current preferred live trace target
 
@@ -336,15 +402,30 @@ Current best proven target sequence:
 - `0x41cf30`
 - `0x43f930`
 - `0x439780`
+- `0x41de40`
+- `0x43c180`
 
 Why this is the current priority:
 - newer original-launcher runs confirmed the password-submit branch through
-  `0x41c1f0`, `0x43bd20`, the send bridge, `0x43f930`, and into `0x439780`
+  `0x41c1f0`, `0x43bd20`, the send bridge, `0x43f930`, `0x439780`, `0x41de40`, and now `0x43c180`
+- the state9 slot-6 natural hit also reached the success-side branch at `0x43c1c2`
 - they still did **not** naturally hit `0x41c3c0`, `0x421220`, `0x420ef0`, or `0x43c020`
 
 Practical consequence:
 - if you are choosing between chasing helper11 writers and chasing the natural original branch,
-  prefer deeper behavior under `0x41de40` and the later state9 reply body `0x43c180`
+  prefer the now-proven state9 continuation through `0x43c180` and then move later into the
+  post-state9 / state-`0x0c` continuation
+- the next tight original-launcher breakpoints should now center on the helper-switch / event tail
+  behind that success:
+  - `0x0041b450`
+  - `0x0041cfb0`
+- yes, there is also a later concrete character-data path:
+  - `0x0041c3c0 = CLTLoginMediator_ProcessLoginCredentials`
+  - `0x0043c020 = CLTLoginState_State11_SendPostAuthMarginPacket0x4d`
+  - `0x0043e540` debug-printer confirms fields like SkinToneID, HairID, StartingHat,
+    StartingShirt, StartingCoat, RealFirstName, RealLastName, Background, GameSessionID
+- but keep that path secondary for the next natural-original pass unless the helper-switch / event
+  tail itself proves it feeds there
 - helper11 remains relevant for the forced scaffold runtime stall, but it is not the first
   faithful original-live breakpoint target
 
@@ -353,14 +434,26 @@ Practical consequence:
 For the active original `matrix.exe` branch, a better minimal live workflow is now:
 
 1. attach to `matrix.exe`
-2. set only the later continuation breakpoints, e.g.:
-   - `break *0x0043f930`
-   - `break *0x00439780`
+2. set only the late continuation breakpoints:
    - `break *0x0041de40`
    - `break *0x0043c180`
-3. `cont`
-4. once `0x439780` is confirmed on a natural run, retarget deeper into `0x41de40` / `0x43c180`
-   instead of repeatedly re-proving the earlier state8 send side
+3. optional on a fresh sanity run:
+   - add `break *0x00439780`
+4. `cont`
+5. once `0x43c180` is confirmed on a natural run, optionally split the branch with:
+   - `break *0x0043c1c2`
+   - `break *0x0043c1e6`
+6. on the next pass, prefer the immediate post-success tail:
+   - `break *0x0041b450`
+   - `break *0x0041cfb0`
+7. only after that, reuse the later probes:
+   - `break *0x004397e0`
+   - `break *0x0041c5c0`
+8. optional secondary sanity probes if the tail suggests helper11 re-entry later:
+   - `break *0x0041c3c0`
+   - `break *0x0043c020`
+9. keep the next pass centered on the later post-state9 / state-`0x0c` continuation instead of
+   repeatedly re-proving the earlier state8/state9 entries
 
 Keep the older `client.dll` / `InitClientDLL` workflow below for client-startup questions, but it is
 no longer the highest-value live path for the active original-launcher state8 investigation.

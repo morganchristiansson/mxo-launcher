@@ -188,6 +188,15 @@ Current best read:
   - current best read is therefore a framed margin send of fixed-length `0x4d` payload bytes
     whose payload starts with `0x0c`, not a flat payload whose first byte is `0x4d`
 - that state body then sends the packet through `CLTLoginMediator_SendCurrentMarginPacket` and posts event `0x15`
+- newer opcode-name tightening now makes the helper10/11 branch identity less generic:
+  - `0x41bf70 = CLTLoginMediator_MarginOpcodeName`
+  - state10 slot 3 raw `0x0a` = `MS_ClaimCharacterNameRequest`
+  - state11 slot 3 raw `0x0c` = `MS_CreateCharacterRequest`
+  - state8 slot 3 raw `0x0f` = `MS_LoadCharacterRequest`
+- practical consequence for the current replacement-launcher stall:
+  - the helper10/11 branch we are currently proving is specifically a
+    **claim/create-character** branch, not the already-proven natural-original state8
+    `MS_LoadCharacterRequest` branch
 - source ownership now mirrors that more closely:
   - packet build/send shape lives in `CLTLoginState_State11::Slot3_BeginOrContinue`
   - `0x4401a0` / state10 slot 6 is now likewise routed through
@@ -331,6 +340,17 @@ What remains:
   - the next remaining post-auth blocker is still later incoming margin `0x10` / `MS_LoadCharacterReply`
     handling in state11 slot 6 (`0x440320`), with current active-path source starvation in the
     helper11 payload (`+0x134..+0x1b8`, `+0x664`) now looking more relevant to that lack of reply
+  - newer helper11 receive-boundary tightening now keeps the first real slot-6 prerequisite explicit:
+    - decoded margin codes `2`, `4`, and `5` are consumed by
+      `0x44af20 -> 0x442d00 = CBaseMarginConnection_DispatchMessage`
+    - only other decoded codes survive into owner `+0x184 / 0x41f260`
+      (`CLTLoginMediator_DispatchCurrentHelperSlot6`)
+    - practical consequence: the first real helper11 reply candidate must be a later raw `0x10`
+      that survives that base-dispatch filter before `0x440320` can even run
+    - source/runtime logs now distinguish three short-run outcomes:
+      - no margin packet arrived yet
+      - margin packet arrived but would be base-dispatch-consumed before slot 6
+      - helper11 slot 6 was entered but parse/status gating failed
 - stop advertising the later `AS_GetWorldListRequest` helper as though it were the immediate
   next original step on this startup path
 - keep `0x43b830` as a real later auth-side sender, but no longer treat it as the best first
@@ -383,30 +403,78 @@ The highest-value remaining auth-adjacent work is now:
   path
   - now narrowed as:
     - `0x00439780 = CLTLoginState_State9::Slot3_BeginOrContinue`
-    - `0x41de40` owner helper behind that follow-on
+    - `0x41de40 = CLTLoginMediator_State9SubmitFollowup`
     - `0x43c180 = CLTLoginState_State9::Slot6_HandleSecondaryMessage`
     - `0x41b420 = CLTLoginMediator_HandleState9Opcode11SuccessSideEffect`
   - practical current read:
     - slot 3 keeps the helper-local payload lifecycle on the state object
+    - natural original is now live-proven through the submit bridge too:
+      - representative natural stop at `0x439780` showed `this+4 = 0`, `this+6 = 0x2710`
+      - immediate follow-on stop at `0x41de40` showed `ECX = 0x004d4e38`, `EAX = 0x2710`,
+        `EDX = 0x004b517c`
+      - that same `0x41de40` stop also had a non-null owner callback/object triple at
+        `+0x84/+0x88/+0x8c`
     - slot 6 keeps the raw `0x11` success/failure transition on the state object
-    - remaining unresolved work is deeper owner/collaborator behavior under `0x41de40`, not the
-      state-vtable body itself
-- forced-`RunClientDLL` scaffold evidence still proves that the deliberate runtime path can later
-  reach helper11/state11 and stall there:
+    - natural original is now live-proven through the slot-6 success side too:
+      - natural hit now reached `0x43c180`
+      - representative natural-success stop landed at `0x43c1c2`
+      - parsed status there was `0`
+      - owner `+0x80` was likewise `0`
+      - representative visible UI at that same boundary was **Waiting for Regionserver**
+      - newer Ghidra-first tightening now also makes the immediate success tail concrete:
+        - `0x41b420`
+        - `0x41b450(0x0c)`
+        - `0x41cfb0(0x18)`
+      - practical consequence of that tail:
+        - post-state9 continuation is now better read as helper-switch + listener-tree event flow,
+          not as an already-proven immediate fall into `0x004397e0` / `0x0041c5c0`
+        - current known blocking observer path (`CLTEvilBlockingLoginObserver::WaitForEvent`) is
+          only statically confirmed at events `1`, `8`, and `0x0f`, so event `0x18` consumer work
+          remains a later question rather than a closed mapping
+      - newer live breakpoint-only proof now also closes the next concrete event step there:
+        - after the live `0x41cfb0(0x18)` post, the same natural run later hit `0x41cfb0(0x0f)`
+        - the run then continued into game without any observed hit on `0x004397e0` or
+          `0x0041c5c0`
+      - first follow-up late probes on `0x004397e0` / `0x0041c5c0` still stayed negative
+    - remaining unresolved work now moves later into the post-state9 / state-`0x0c` continuation,
+      while tightening the deeper owner/collaborator behavior already proven under `0x41de40`
+- forced-`RunClientDLL` scaffold evidence now proves a closer existing-character branch too:
   - command:
     `env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE MXO_BINDER_LOGIN_MEDIATOR=1 MXO_STUB_LAUNCHER_OBJECT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality MXO_FORCE_RUNCLIENT=1 wine ./resurrections.exe -user morgan -pwd '<pwd>'`
-  - observed sequence in `/home/morgan/MxO_7.6005/resurrections.log`:
-    - auth progresses through `AS_GetPublicKeyReply` / `AS_AuthChallenge` / `AS_AuthReply`
+  - newer short-run source-log proof now makes the current replacement-launcher progression more
+    explicit too:
+    - `SwitchHelperStateScaffold(0x08)`
+      - `CLTLoginState_AuthenticatePending -> CLTLoginState_State8`
+    - preserve state `8` through `AS_AuthChallengeResponse`
+      - do **not** force helper state `0x0a` on the existing-character path
+    - successful `AS_AuthReply`
+      - route it back onto the existing-character state8 path
     - post-auth margin connect-status is consumed
-    - `CLTLoginState_State11::Slot3_BeginOrContinue` sends the fixed-size `0x4d` margin payload
-    - the client reaches **Loading Character**
-    - but no `MarginReceivePacket` / `MS_LoadCharacterReply` arrives during the deliberate run window
-  - current live helper11 send is still visibly source-starved by default:
-    - `SkinToneID=0`
-    - `RealFirstName=''`
-    - `RealLastName=''`
-    - `Background=''`
-    - `GameSessionID='<empty>'`
+    - promote owner `+0x1c` into the ready send state required by `0x41b4b0`
+    - `CLTLoginState_State8::Slot3_BeginOrContinue` now sends the structured raw-`0x0f`
+      / `MS_LoadCharacterRequest` packet
+    - representative short-run send now shows:
+      - host `reality.lith.thematrixonline.net`
+      - connection state `2`
+      - payload bytes `0xbb`
+      - GCID low `0x00006dce`
+      - GCID high `0x00000000`
+    - newer client-side selection-context tightening also removed one clearly bad state8 input
+      family there:
+      - `client.dll:0x62170b00` fills the `+0xec` tail from per-selection profile/config helpers
+        (`FUN_621996a0`) rooted under `Profiles\%s\%s_%X\` and files like
+        `hl.cfg / pi.cfg / ai.cfg / ...`
+      - current replacement runs do not have that per-selection cfg corpus on disk
+      - the copied `+0xec` state8 snapshot had therefore degenerated into repeated cfg-parser/
+        default values across `+0x24..+0xb3`
+      - the scaffold now keeps the arg7-derived first dword and zeros the cfg-derived tail instead
+        of forwarding those repeated values into the replacement launcher's state8 send
+    - but no later incoming raw-`0x10` / `MS_LoadCharacterReply` arrives during the deliberate run window
+  - practical comparison against the natural original path:
+    - this moves the replacement launcher later and closer to the natural-original shape than the
+      old helper11-only stall
+    - current replacement proof now ends at the existing-character state8 send family, not at the
+      helper11 send / event `0x15` claim/create branch
 - newer original-launcher WineDbg runs now move the natural password-submit branch later again:
   - natural original hits confirmed:
     - `0x41ecd0`
@@ -418,6 +486,14 @@ The highest-value remaining auth-adjacent work is now:
     - `0x43bf6c`
     - `0x43f930`
     - `0x439780`
+    - `0x41de40`
+    - `0x43c180`
+  - representative deeper state9 stop sequence now also shows:
+    - at `0x439780`: helper9 local byte `this+4 = 0`, word `this+6 = 0x2710`
+    - at `0x41de40`: `ECX = 0x004d4e38`, `EAX = 0x2710`, `EDX = 0x004b517c`
+    - at `0x43c1c2` (state9 slot-6 success side): parsed status `0`, owner `+0x80 = 0`
+    - representative natural `0x41de40` stop also had a non-null owner callback/object triple at
+      `+0x84/+0x88/+0x8c`
   - helper11-first alternatives remain unsupported on that same natural path:
     - no natural hit yet on `0x41c3c0`
     - no natural hit yet on `0x421220`
@@ -427,16 +503,38 @@ The highest-value remaining auth-adjacent work is now:
     - owner `+0x664` (`GameSessionID`) was still zero
 - practical consequence:
   - for **faithful original-launcher progression**, the old post-send/live-boundary question is now
-    crossed; natural original not only reaches `0x43f930` but also continues into
-    `0x439780 = CLTLoginState_State9::Slot3_BeginOrContinue`
-  - representative live stop there also showed the helper9 local handoff word (`this+6`) as
+    crossed; natural original not only reaches `0x43f930`, `0x439780`, and the deeper
+    submit helper `0x41de40 = CLTLoginMediator_State9SubmitFollowup`, but now also the later
+    raw-`0x11` reply body `0x43c180`
+  - representative live stops there also showed the state8->state9 handoff word (`this+6`) as
     `0x2710`, i.e. the state8 completion handoff is live and non-zero on the natural path
+  - representative natural-success stop at `0x43c1c2` also now shows the state9 slot-6 success
+    branch is live with parsed status `0`
+  - representative visible status at that same later boundary is now:
+    - **Waiting for Regionserver**
+  - but the easy immediate state-`0x0c` leaf follow-on theory is weaker now too:
+    - first follow-up late probes on `0x004397e0` / `0x0041c5c0` did not fire naturally
+  - separate but important later loading-character note:
+    - `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the strongest recovered writer
+      for the helper11 appearance/name/background source block
+    - `0x43c020 = CLTLoginState_State11_SendPostAuthMarginPacket0x4d` is the later sender that
+      consumes those fields
+    - `0x43e540` debug-printer keeps the concrete field names anchored there:
+      - `SkinToneID`, `BodyID`, `HeadID`, `HairID`, `HairColorID`, `TattooID`
+      - `FacialHairID`, `FacialHairColorID`
+      - `StartingHat`, `StartingGlasses`, `StartingShirt`, `StartingGloves`
+      - `StartingCoat`, `StartingPants`, `StartingTights`, `StartingShoes`
+      - `TraitID`, `RealFirstName`, `RealLastName`, `Background`, `GameSessionID`
+  - current active-path caution on that same note:
+    - those fields still look likely relevant to the later Loading Character phase
+    - but they are still **not** the first natural-original boundary to force back onto the active
+      path while `0x41b450/0x41cfb0` after state9 success remain the tighter next question
   - keep helper11/state11 as a **real later scaffold/runtime stall**, but stop treating it as the
     first faithful original-live breakpoint target while the natural original path is now confirmed
     later on state8/state9
   - post-state9 / state-`0x0c` continuation now moves up again in priority; the next natural-live
-    target is deeper owner/collaborator behavior under `0x41de40` and the later raw-`0x11` reply
-    body `0x43c180`
+    target is whatever concrete helper/state body follows the now-proven state9 success-side switch
+    to `0x0c` plus event `0x18`
   - current replacement-launcher experiment bridge now mirrors a little more of the confirmed
     helper11 writer chain without pretending the original upstream producer is solved:
     - explicit helper11 character/customization seed inputs are routed through

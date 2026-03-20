@@ -600,6 +600,17 @@ public:
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
 
+    // anchor: launcher.exe:0x41b450
+    // Recovered helper-state switcher:
+    // - not just a raw assignment
+    // - notifies the old helper with the new helper object
+    // - installs the new helper from the dispatch table
+    // - then notifies the new helper with the old helper object
+    // Current source scaffold keeps the same transition boundary explicit even though the exact
+    // old/new helper notification slots are still unresolved.
+    void SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state);
+    uint32_t LastSwitchedHelperStateScaffold() const { return lastSwitchedHelperStateScaffold_; }
+
     // Narrow source-owned scaffolds for the launcher.exe logging/event side effects at
     // `0x41cfb0` / `0x41d090`.
     // Current implementation keeps these as lightweight source-owned event/error markers instead of
@@ -608,6 +619,18 @@ public:
     void PostErrorScaffold(uint32_t errorId);
     uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }
     uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
+    const std::array<uint32_t, 8>& RecentPostedEventsScaffold() const { return recentPostedEventsScaffold_; }
+    uint32_t RecentPostedEventCountScaffold() const { return recentPostedEventCountScaffold_; }
+
+    // Narrow helper11 receive-boundary counters used only for short runtime discrimination:
+    // - no packet arrived yet
+    // - packet arrived but would be consumed by base margin dispatch before slot 6
+    // - packet survived into current helper slot 6
+    uint32_t MarginPacketReceiveCountScaffold() const { return marginPacketReceiveCountScaffold_; }
+    uint32_t MarginPacketFilteredBeforeSlot6CountScaffold() const { return marginPacketFilteredBeforeSlot6CountScaffold_; }
+    uint32_t MarginPacketSlot6DispatchCountScaffold() const { return marginPacketSlot6DispatchCountScaffold_; }
+    uint16_t LastMarginPacketOpcodeScaffold() const { return lastMarginPacketOpcodeScaffold_; }
+    uint32_t LastMarginPacketSizeScaffold() const { return lastMarginPacketSizeScaffold_; }
 
     // Source-owned scaffold registration for concrete CLTLoginState objects that live outside the
     // mediator header. This preserves the original helper-state ownership on the login-state
@@ -790,6 +813,12 @@ public:
         const std::vector<uint8_t>& keyConfigMd5,
         const std::vector<uint8_t>& uiConfigMd5);
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the helper11 receive boundary
+    // explicit in source too:
+    // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
+    // - only other codes survive into owner `+0x184` / current helper slot 6
+    // - practical helper11 consequence: the first real `MS_LoadCharacterReply` candidate must
+    //   arrive as raw code `0x10` *after* that base-dispatch filter
     uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
 
     // Narrow owner-side parsers/stagers used by the concrete CLTLoginState slot-6 bodies.
@@ -881,6 +910,8 @@ public:
     //   launcher.exe:0x41c510
     uint32_t SetState9OptionalField90AndSwitchToState13(uint32_t field90Value);
     // - state9 slot 3 / launcher.exe:0x41de40 + 0x439780
+    //   - newer natural-original WineDbg now proves `0x439780 -> 0x41de40`
+    //   - representative live state there: helper byte `+4 = 0`, helper word `+6 = 0x2710`
     uint32_t State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6);
     // - state9 slot 6 success side effect / launcher.exe:0x41b420 (owner vtable +0x16c)
     uint32_t HandleState9Opcode11SuccessSideEffect();
@@ -1018,8 +1049,16 @@ private:
     // - `+0xd84` = world-descriptor table
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine_;
     CLTLoginState* currentState_;
+    uint32_t lastSwitchedHelperStateScaffold_ = 0;
     uint32_t lastPostedEventScaffold_ = 0;
     uint32_t lastPostedErrorScaffold_ = 0;
+    std::array<uint32_t, 8> recentPostedEventsScaffold_{};
+    uint32_t recentPostedEventCountScaffold_ = 0;
+    uint32_t marginPacketReceiveCountScaffold_ = 0;
+    uint32_t marginPacketFilteredBeforeSlot6CountScaffold_ = 0;
+    uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
+    uint16_t lastMarginPacketOpcodeScaffold_ = 0;
+    uint32_t lastMarginPacketSizeScaffold_ = 0;
     CLTLoginState* scaffoldState3_;
     CLTLoginState* scaffoldState4_;
     CLTLoginState* scaffoldState6_;

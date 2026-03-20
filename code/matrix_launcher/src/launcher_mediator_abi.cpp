@@ -2,9 +2,14 @@
 #include "diagnostics_auth.h"
 #include "loginmediator.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
+#include <sys/stat.h>
+
+#include "spdlog/spdlog.h"
 
 struct MinimalLoginMediatorStub {
     void** vtable;
@@ -179,6 +184,72 @@ static const char* DiagnosticMediatorAuthName() {
 static const char* DiagnosticMediatorAuthPassword() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6AuthPassword() : g_MediatorEmptyString;
+}
+
+static bool DiagnosticFileExists(const char* path) {
+    if (!path || !path[0]) {
+        return false;
+    }
+    struct stat st = {};
+    return stat(path, &st) == 0;
+}
+
+static bool DiagnosticSelectionProfileCfgSetExists() {
+    const char* profileName = DiagnosticMediatorProfileName();
+    const char* selectionName = DiagnosticMediatorMappedSelectionName();
+    const uint32_t selectionId = DiagnosticMediatorMappedSelectionId();
+    if (!profileName || !profileName[0] || !selectionName || !selectionName[0]) {
+        return false;
+    }
+
+    char basePath[512] = {};
+    std::snprintf(
+        basePath,
+        sizeof(basePath),
+        "/home/morgan/MxO_7.6005/Profiles/%s/%s_%X",
+        profileName,
+        selectionName,
+        static_cast<unsigned>(selectionId));
+
+    static const char* kCfgNames[] = {
+        "hl.cfg", "an.cfg", "pi.cfg", "ai.cfg", "cs.cfg", "bl.cfg",
+        "il.cfg", "rl.cfg", "cl.cfg", "mcd.cfg", "cui.cfg"
+    };
+
+    char candidatePath[640] = {};
+    for (const char* cfgName : kCfgNames) {
+        std::snprintf(candidatePath, sizeof(candidatePath), "%s/%s", basePath, cfgName);
+        if (DiagnosticFileExists(candidatePath)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static void DiagnosticSanitizeSelectionContextCfgDerivedBlocks(
+    mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch* input) {
+    if (!input) {
+        return;
+    }
+    if (DiagnosticSelectionProfileCfgSetExists()) {
+        return;
+    }
+
+    // Evidence-backed scaffold fallback:
+    // - client.dll:0x62170b00 seeds the first dword from arg7 high8/variant
+    // - later `FUN_621996a0` helpers fill the remaining 0xb0 bytes from profile/config paths rooted
+    //   under `Profiles\%s\%s_%X\` and files like `hl.cfg` / `pi.cfg` / `ai.cfg` / ...
+    // - current replacement runs do not have that per-selection cfg corpus on disk
+    // - the copied `+0xec` snapshot therefore degenerates into repeated parser/default values that
+    //   are unlikely to be valid launcher-owned state8 send material
+    // Keep the first dword intact, but zero the cfg-derived tail until that profile/config source is
+    // reconstructed faithfully.
+    std::memset(&input->block04, 0, sizeof(*input) - offsetof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch, block04));
+    spdlog::info(
+        "DiagnosticSanitizeSelectionContextCfgDerivedBlocks zeroed cfg-derived state8 snapshot blocks because no per-selection profile cfg set was found for profile='{}' selection='{}' selectionId=0x{:06x}",
+        DiagnosticMediatorProfileName(),
+        DiagnosticMediatorMappedSelectionName(),
+        static_cast<unsigned>(DiagnosticMediatorMappedSelectionId()));
 }
 
 static void DiagnosticMirrorSelectionContextIntoMediatorModel(const void* selectionContext) {
@@ -735,6 +806,9 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
     if (selectionContext) {
         std::memcpy(&g_MediatorSelectionContextCopy, selectionContext, sizeof(g_MediatorSelectionContextCopy));
         g_MediatorSelectionContextCopyValid = true;
+        DiagnosticSanitizeSelectionContextCfgDerivedBlocks(
+            reinterpret_cast<mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch*>(
+                &g_MediatorSelectionContextCopy));
         DiagnosticMirrorSelectionContextIntoMediatorModel(&g_MediatorSelectionContextCopy);
         DiagnosticMirrorSelectionContextIntoLoginController(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
     } else {

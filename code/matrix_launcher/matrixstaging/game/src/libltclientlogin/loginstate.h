@@ -308,6 +308,9 @@ public:
 
 private:
     // `0x00439780` consumes a local byte/word payload from `this+4/+6`.
+    // Newer natural-original WineDbg now confirms a representative live handoff there as:
+    // - `this+4 = 0`
+    // - `this+6 = 0x2710`
     uint8_t pendingByte4_ = 0;
     uint8_t padding5_ = 0;
     uint16_t pendingWord6_ = 0;

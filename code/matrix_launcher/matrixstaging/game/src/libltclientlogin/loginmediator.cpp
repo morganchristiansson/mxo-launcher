@@ -114,6 +114,7 @@
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -216,6 +217,25 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
             out.push_back(' ');
         }
     }
+    return out;
+}
+
+static std::string BuildRecentEventHistoryPreview(const std::array<uint32_t, 8>& events, uint32_t count) {
+    if (count == 0u) {
+        return "[]";
+    }
+
+    const uint32_t boundedCount = std::min<uint32_t>(count, static_cast<uint32_t>(events.size()));
+    std::string out = "[";
+    char buffer[16] = {};
+    for (uint32_t i = 0; i < boundedCount; ++i) {
+        if (i != 0u) {
+            out += ", ";
+        }
+        std::snprintf(buffer, sizeof(buffer), "0x%02x", static_cast<unsigned>(events[i] & 0xffu));
+        out += buffer;
+    }
+    out += "]";
     return out;
 }
 
@@ -386,9 +406,80 @@ CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
 }
 
+void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
+    // anchor: launcher.exe:0x41b450
+    // Exact recovered shape from the current Ghidra pass:
+    // - if an old helper exists, call its vtable `+0x0c` with the new helper object
+    // - install the dispatch-table target into owner `+0x10`
+    // - then call the new helper's vtable `+0x08` with the old helper object
+    // Current source scaffold keeps that boundary explicit and records the target helper id, but
+    // does not yet claim the exact old/new helper notification slot semantics beyond the proven
+    // call shape.
+    lastSwitchedHelperStateScaffold_ = helperStateId;
+    CLTLoginState* oldState = currentState_;
+    if (!state) {
+        spdlog::info(
+            "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState=<null> (source scaffold leaves currentState unchanged)",
+            static_cast<unsigned>(helperStateId),
+            oldState ? oldState->DebugName() : "<null>");
+        Log(
+            "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x%02x oldState=%s newState=<null>",
+            (unsigned)(helperStateId & 0xffu),
+            oldState ? oldState->DebugName() : "<null>");
+        return;
+    }
+
+    currentState_ = state;
+    spdlog::info(
+        "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState={} (anchor: launcher.exe:0x41b450; original also performs old/new helper notification calls around the install)",
+        static_cast<unsigned>(helperStateId),
+        oldState ? oldState->DebugName() : "<null>",
+        state->DebugName());
+    Log(
+        "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x%02x oldState=%s newState=%s",
+        (unsigned)(helperStateId & 0xffu),
+        oldState ? oldState->DebugName() : "<null>",
+        state->DebugName());
+}
+
 void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
+    // anchor: launcher.exe:0x41cfb0
+    // Current Ghidra-first tightening matters for the post-state9 boundary:
+    // - this is not a trivial logger
+    // - original walks the owner `+0x674` listener tree and calls each observer callback
+    // - newer live original proof now also closes the immediate post-state9 success event shape:
+    //   - `0x43c180` success -> `0x41b450(0x0c)` -> `0x41cfb0(0x18)`
+    //   - then later a follow-on `0x41cfb0(0x0f)` was observed before entering game
+    //   - still with no natural hit on `0x004397e0` / `0x0041c5c0`
+    // - practical scaffold consequence:
+    //   keep explicit event-history logging here so replacement-launcher runs can be compared
+    //   against the natural original event sequence without pretending the listener tree is already
+    //   reconstructed.
     lastPostedEventScaffold_ = eventId;
-    spdlog::info("{} Event# {}", kLogPrefixPostEvent, static_cast<unsigned>(eventId));
+    if (recentPostedEventCountScaffold_ < recentPostedEventsScaffold_.size()) {
+        recentPostedEventsScaffold_[recentPostedEventCountScaffold_++] = eventId;
+    } else {
+        std::move(
+            recentPostedEventsScaffold_.begin() + 1,
+            recentPostedEventsScaffold_.end(),
+            recentPostedEventsScaffold_.begin());
+        recentPostedEventsScaffold_.back() = eventId;
+    }
+    const std::string recentEventsPreview =
+        BuildRecentEventHistoryPreview(recentPostedEventsScaffold_, recentPostedEventCountScaffold_);
+    spdlog::info(
+        "{} Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={} (listener tree at owner+0x674 not yet scaffolded)",
+        kLogPrefixPostEvent,
+        static_cast<unsigned>(eventId),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(lastSwitchedHelperStateScaffold_ & 0xffu),
+        recentEventsPreview);
+    Log(
+        "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# %u currentState=%s lastSwitch=0x%02x recentEvents=%s",
+        (unsigned)eventId,
+        currentState_ ? currentState_->DebugName() : "<null>",
+        (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu),
+        recentEventsPreview.c_str());
 }
 
 void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
@@ -747,6 +838,16 @@ uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
 uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
     lastMarginConnectStatus_ = workResultCode;
     ++marginConnectStatusCount_;
+    if (workResultCode == kConnectStatusSuccess && marginConnection_ != nullptr) {
+        // Active state8/state10 sender gates at `0x41b4b0` require owner `+0x1c` connection state `== 2`.
+        // On the current scaffold path the successful margin connect-status callback is the
+        // narrowest evidence-backed place to promote the live margin connection into that ready
+        // send state before slot-3 send bodies run.
+        marginConnection_->SetState(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginConnectStatus promoted margin connection to ready state=2 after connect-status success currentState={}",
+            currentState_ ? currentState_->DebugName() : "<null>");
+    }
     return (workResultCode == kConnectStatusSuccess) ? BeginMarginHandshake() : 0u;
 }
 
@@ -879,7 +980,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     std::copy(input.blockA4.begin(), input.blockA4.end(), state8SelectionContextSnapshotState_.blockD70.begin());
 
     if (scaffoldState8_ != nullptr) {
-        currentState_ = scaffoldState8_;
+        SwitchHelperStateScaffold(8u, scaffoldState8_);
     }
 
     Log(
@@ -899,6 +1000,10 @@ uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentials
     //   `0x41ecd0 -> 0x41c1f0 -> state 8`
     // - so keep this method class-faithful and source-owned, but do not currently treat it as the
     //   default first target for launcher startup reconstruction
+    // - newer `0x43e540` debug-printer review also confirms what this writer is feeding later:
+    //   the 17 dwords copied to `+0x134..+0x177` are the appearance/customization family
+    //   (`SkinToneID .. TraitID`), while `+0x178/+0x198/+0x1b8` become
+    //   `RealFirstName/RealLastName/Background`
     // Original `0x41c3c0` writes:
     // - owner `+0x12c` from input `+0x24`
     // - owner `+0x134 .. +0x153` from input `+0x2c`
@@ -1002,7 +1107,7 @@ uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t f
         case 12u:
             ownerOptionalField90_ = field90Value;
             if (scaffoldState13_ != nullptr) {
-                currentState_ = scaffoldState13_;
+                SwitchHelperStateScaffold(0x0du, scaffoldState13_);
             }
             spdlog::info(
                 "CLTLoginMediator::SetState9OptionalField90AndSwitchToState13 stored owner+0x90=0x{:08x} currentState={}",
@@ -1017,11 +1122,18 @@ uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t f
 // anchor: launcher.exe:0x41de40
 uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6) {
     // Current best read from `0x41de40` + `0x439780`:
+    // - natural original now really does hit `0x41de40` immediately after `0x439780`
+    // - representative live stop shape:
+    //   - `0x439780`: helper byte `this+4 = 0`, helper word `this+6 = 0x2710`
+    //   - `0x41de40`: `ECX = owner (0x4d4e38)`, `EAX = helperWord6 (0x2710)`,
+    //     `EDX = state9 vtable (0x004b517c)`
     // - owner callback object `+0x84` fills two dwords through vtable `+0x38`
     // - owner `+0x1c + 0x24..0x30` seeds a local transport/address block
     // - `0x44afd0` / `0x44b0d0` derive a packet-like payload from helper word `+6`
     // - owner object `+0x88` chooses between direct send (`+0x28`) and handle-based send
     //   (`+0x1c`, `+0x18`, `+0x24`) after testing `(+0x44)->(+0x30)`
+    // - representative natural-original stop also had non-null owner callback/object triple
+    //   at `+0x84/+0x88/+0x8c`
     // - owner dword `+0x90` is only forwarded when helper byte `+4 != 0`
     // - owner dword `+0x147c` caches the acquired handle on the managed-send branch
     //
@@ -1030,7 +1142,7 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     // event-post shape (`< 1` => post event `0x17`).
     const uint32_t forwardedArg90 = helperByte4 != 0u ? ownerOptionalField90_ : 0u;
     spdlog::info(
-        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} (deeper owner collaborators unresolved)",
+        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} (natural original now proven into 0x41de40; deeper owner collaborators unresolved)",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
         fmt::ptr(ownerCallback84_),
@@ -1044,6 +1156,9 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
 // anchor: launcher.exe:0x41b420
 uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
     // Current best read from `0x41b420`, reached by state9 slot 6 / `0x43c180` success:
+    // - natural original is now live-proven onto the `0x43c180` success side too
+    // - representative natural stop at `0x43c1c2` showed owner `+0x80 = 0` just before the
+    //   vtable `+0x16c` call
     // - if owner `+0x1c` is null, return false-ish
     // - clear owner byte `+0xf14`
     // - set owner byte `+0x2d`
@@ -1377,13 +1492,14 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetByt
     const uint8_t* payload = static_cast<const uint8_t*>(packetBytes);
     framedBytes.insert(framedBytes.end(), payload, payload + packetByteCount);
 
+    const std::string framedPreview = BuildHexPreview(framedBytes.data(), framedBytes.size(), 32u);
     spdlog::info(
         "CLTLoginMediator::SendCurrentMarginPacketScaffold host='{}' state={} payloadBytes={} framedBytes={} preview={}",
         connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
         static_cast<unsigned>(connection->State()),
         static_cast<unsigned>(packetByteCount),
         static_cast<unsigned>(framedBytes.size()),
-        BuildHexPreview(framedBytes.data(), framedBytes.size(), 32u));
+        framedPreview);
     return connection->SendPacket(framedBytes.data(), static_cast<uint32_t>(framedBytes.size()), nullptr);
 }
 
@@ -1636,6 +1752,15 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     connection->SetRemoteEndpoint(marginEndpoint_);
 
     const uint32_t result = connection->EnsureConnected();
+    spdlog::info(
+        "CLTLoginMediator::BeginMarginConnectionScaffold resolvedHost='{}' routeHostText='{}' selector=0x{:02x} beginCount={} selectedIpv4=0x{:08x} port={} ensureConnectedResult=0x{:08x}",
+        marginHost.empty() ? std::string("<empty>") : marginHost,
+        (routeHostText && routeHostText[0]) ? std::string(routeHostText) : std::string("<empty>"),
+        static_cast<unsigned>(cachedRouteSelector),
+        static_cast<unsigned>(marginBeginCount24_),
+        static_cast<unsigned>(marginEndpoint_.ipv4NetworkOrder),
+        static_cast<unsigned>(marginServerPortHostOrder_),
+        static_cast<unsigned>(result));
     if (result == 0u) {
         spdlog::debug(
             "CLTLoginMediator::BeginMarginConnectionScaffold connect failed host='{}' port={} ip=0x{:08x} selector={} beginCount={}",
@@ -2378,8 +2503,13 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
                 (unsigned)challenge.encryptedChallengeBytes.size());
             expectedAuthRequestName_ = "AS_AuthChallengeResponse";
             const uint32_t sendResult = SendAuthChallengeResponse(challenge);
-            if (sendResult != 0u && scaffoldState10_ != nullptr) {
-                currentState_ = scaffoldState10_;
+            const bool preserveExistingCharacterState8Path =
+                currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u;
+            if (sendResult != 0u && scaffoldState10_ != nullptr && !preserveExistingCharacterState8Path) {
+                SwitchHelperStateScaffold(0x0au, scaffoldState10_);
+            } else if (sendResult != 0u && preserveExistingCharacterState8Path) {
+                spdlog::info(
+                    "CLTLoginMediator::HandleAuthPacketBytes preserving current state8 through AS_AuthChallengeResponse for the existing-character path instead of forcing helperState=0x0a claim/create flow");
             }
             return sendResult;
         }
@@ -2393,6 +2523,16 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             //   `0x41b450(0x0b)` -> `0x43c020` (raw post-auth margin packet `0x4d`) -> later
             //   `0x440320` (`MS_LoadCharacterReply`)
             stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+            if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u) {
+                spdlog::info(
+                    "CLTLoginMediator::HandleAuthPacketBytes routing AS_AuthReply onto the existing-character state8 path; keeping currentState={} and skipping helper10/helper11 claim/create transition",
+                    currentState_->DebugName());
+                const uint32_t handled = HandleStagedAuthReplyPacketScaffold();
+                if (handled != 0u) {
+                    expectedMarginRequestName_ = "existing-character state8 raw-0x0f margin packet";
+                }
+                return handled;
+            }
             if (currentState_ != nullptr) {
                 return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
             }
@@ -2412,14 +2552,56 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
 }
 
 uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
-    if (!packetBytes || packetSize < 2u) {
+    if (!packetBytes || packetSize < 1u) {
         return 0u;
     }
 
     stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+    const uint16_t rawCode = packetBytes[0];
+    ++marginPacketReceiveCountScaffold_;
+    lastMarginPacketOpcodeScaffold_ = rawCode;
+    lastMarginPacketSizeScaffold_ = static_cast<uint32_t>(packetSize);
+
+    spdlog::info(
+        "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} currentState={} receiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
+        static_cast<unsigned>(rawCode),
+        static_cast<unsigned>(packetSize),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(marginPacketReceiveCountScaffold_),
+        static_cast<unsigned>(marginPacketFilteredBeforeSlot6CountScaffold_),
+        static_cast<unsigned>(marginPacketSlot6DispatchCountScaffold_));
+
+    // anchor: launcher.exe:0x44af20 -> 0x442d00 -> 0x41f260
+    // Exact receive-side boundary now mirrored in source:
+    // - decoded codes 2 / 4 / 5 are consumed by base margin dispatch
+    // - only other decoded codes survive into owner +0x184 / current helper slot 6
+    if (rawCode == 2u || rawCode == 4u || rawCode == 5u) {
+        ++marginPacketFilteredBeforeSlot6CountScaffold_;
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} would be consumed by base margin dispatch before helper slot6 receiveCount={} filteredBeforeSlot6={} currentState={}",
+            static_cast<unsigned>(rawCode),
+            static_cast<unsigned>(packetSize),
+            static_cast<unsigned>(marginPacketReceiveCountScaffold_),
+            static_cast<unsigned>(marginPacketFilteredBeforeSlot6CountScaffold_),
+            currentState_ ? currentState_->DebugName() : "<null>");
+        return 1u;
+    }
+
     if (currentState_ != nullptr) {
+        ++marginPacketSlot6DispatchCountScaffold_;
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} routing to current helper slot6 dispatchCount={} currentState={}",
+            static_cast<unsigned>(rawCode),
+            static_cast<unsigned>(packetSize),
+            static_cast<unsigned>(marginPacketSlot6DispatchCountScaffold_),
+            currentState_->DebugName());
         return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
     }
+
+    spdlog::info(
+        "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} has no active helper state; using direct helper11 scaffold parser",
+        static_cast<unsigned>(rawCode),
+        static_cast<unsigned>(packetSize));
     return HandleStagedMarginLoadCharacterReplyPacketScaffold();
 }
 
@@ -2441,7 +2623,10 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     AdoptAuthReplyIntoRecoveredMediatorState();
     LogParsedAuthReply(reply);
     expectedAuthRequestName_ = nullptr;
-    expectedMarginRequestName_ = "post-AS_AuthReply helper11 raw-0x4d margin packet";
+    expectedMarginRequestName_ =
+        (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u)
+            ? "post-AS_AuthReply existing-character state8 raw-0x0f margin packet"
+            : "post-AS_AuthReply helper11 raw-0x4d margin packet";
     return 1u;
 }
 

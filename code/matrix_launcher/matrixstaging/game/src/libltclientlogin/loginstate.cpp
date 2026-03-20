@@ -14,6 +14,8 @@ namespace {
 struct State11Packet0x4dFixedPayload {
     // anchor: launcher.exe:0x43a470 / packet payload tag written after the outer builder reserves
     // a fixed 0x4d-byte payload span through the shared envelope object.
+    // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
+    // raw margin opcode `0x0c` = `MS_CreateCharacterRequest`
     static constexpr uint8_t kPayloadTag0c = 0x0c;
     static constexpr size_t kRealFirstNameOffset = 0x45;
     static constexpr size_t kRealLastNameOffset = 0x47;
@@ -119,6 +121,8 @@ private:
 };
 
 struct State10Packet0x0aFixedPayload {
+    // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
+    // raw margin opcode `0x0a` = `MS_ClaimCharacterNameRequest`
     static constexpr uint8_t kPayloadTag0a = 0x0a;
     static constexpr size_t kCharacterNameOffset = 0x01;
     static constexpr size_t kFixedByteCount = 0x03;
@@ -177,6 +181,8 @@ public:
 };
 
 struct State8StructuredMarginPacketFixedPayload {
+    // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
+    // raw margin opcode `0x0f` = `MS_LoadCharacterRequest`
     static constexpr uint8_t kPayloadTag0f = 0x0f;
     static constexpr size_t kGameSessionIdOffset = 0xb9;
     static constexpr size_t kFixedByteCount = 0xbb;
@@ -655,6 +661,11 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(void*
     // - when object byte `this+4 == 1`, delegate to owner helper `0x41c5c0`
     // - if that helper returns `< 1`, return success-ish immediately
     // - otherwise write owner `+0x80 = 0x12000005` and fail
+    // Live-path caution tightened again from the latest breakpoint-only original run:
+    // - after the proven state9 success tail (`0x41b450(0x0c) -> 0x41cfb0(0x18)`), the natural run
+    //   later re-hit `0x41cfb0` with event `0x0f` and entered game
+    // - it still did not hit `0x004397e0` or `0x41c5c0` on that continuation
+    // - so keep this as a later probe path, not as the already-proven immediate post-state9 flow
     if (slot6DispatchByte4_ == 1u && mediator != nullptr) {
         const uint32_t dispatchResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (dispatchResult < 1u) {
@@ -977,7 +988,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //   fall into mediator fallback `0x41afc0`, which re-enters helper slot 2 instead of slot 6
     if (!mediator->State10HasReadyConnectionState2()) {
         if (CLTLoginState* fallbackState = mediator->ScaffoldState4()) {
-            mediator->SetCurrentState(fallbackState);
+            mediator->SwitchHelperStateScaffold(4u, fallbackState);
         }
         Log(
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4 currentState=%s",
@@ -986,7 +997,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     }
     if (mediator->State10SendGateFlagF14() == 0) {
         if (CLTLoginState* fallbackState = mediator->ScaffoldState6()) {
-            mediator->SetCurrentState(fallbackState);
+            mediator->SwitchHelperStateScaffold(6u, fallbackState);
         }
         Log(
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0xf14==0; original would switch helper state to 6 currentState=%s",
@@ -1021,6 +1032,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
         packetBuilder.PayloadBase(),
         packetBuilder.PayloadByteCount());
+    mediator->PostEventScaffold(0x09u);
 
     Log(
         "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' -> sendResult=0x%08x then posts event=9",
@@ -1073,7 +1085,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         replySectionsExpected_ = 0;
         ownerState.state8Section10ChunkBitmap = 0u;
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
-            mediator->SetCurrentState(failureState);
+            mediator->SwitchHelperStateScaffold(3u, failureState);
         }
         mediator->PostErrorScaffold(10u);
         Log(
@@ -1106,7 +1118,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
                 nextState->SetPendingPayload(/*byte4=*/0, parsed.handoffWord09);
             }
-            mediator->SetCurrentState(nextBase);
+            mediator->SwitchHelperStateScaffold(9u, nextBase);
         }
         // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
         mediator->PostEventScaffold(0x0bu);
@@ -1162,8 +1174,15 @@ uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     // - forwards them into the owner helper
     // - clears the local payload regardless of branch
     // - posts event `0x17` when that helper returns `< 1`
-    // - newer original-launcher WineDbg now also proves this slot really is reached on the natural
-    //   path after state8 completion, with a representative live stop showing `this+6 = 0x2710`
+    // - newer original-launcher WineDbg now proves the natural path continues not just into this
+    //   slot, but immediately onward into `0x41de40`
+    // - representative natural stop shape:
+    //   - `EIP = 0x439780`
+    //   - `ECX = this`
+    //   - `EAX = helper-local side pointer / temp = 0x00f9bb10`
+    //   - `EDX = 0x004b517c` (this vtable)
+    //   - `this+4 = 0`
+    //   - `this+6 = 0x2710`
     const uint8_t consumedByte4 = pendingByte4_;
     const uint16_t consumedWord6 = pendingWord6_;
     const uint32_t submitResult = mediator->State9SubmitFollowupScaffold(consumedByte4, consumedWord6);
@@ -1190,6 +1209,24 @@ uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
 // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
 uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+    // Current live-status note:
+    // - newer natural-original WineDbg now proves this slot-6 body is reached on the natural path
+    // - representative natural stop hit the success-side branch at `0x43c1c2`
+    // - observed state there matched the raw-`0x11` success interpretation:
+    //   - owner `+0x80 = 0`
+    //   - parsed status dword = 0
+    // - representative natural run at this same boundary was visibly in the
+    //   "Waiting for Regionserver" phase
+    // - so the old “does natural original ever reach `0x43c180`?” question is now closed
+    // - newer Ghidra-first tightening also matters for what comes next:
+    //   success here is not just "set current state to 12 and immediately fall into slot 6"
+    //   it first runs `0x41b420`, then `0x41b450(0x0c)`, then `0x41cfb0(0x18)`
+    // - newer breakpoint-only live proof now tightens that one step further too:
+    //   the same natural run later re-hit `0x41cfb0` with event `0x0f` before entering game
+    // - `0x41cfb0` walks the owner `+0x674` listener tree, so observer/UI consumers are now part
+    //   of the next faithful-original question too
+    // - next natural-original question therefore moves later again, into the post-state9 /
+    //   state-`0x0c` continuation after this slot posts event `0x18`
     (void)workItem;
     if (!mediator) {
         return 0u;
@@ -1216,7 +1253,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     if (parsedStatus < 1u) {
         mediator->HandleState9Opcode11SuccessSideEffect();
         if (CLTLoginState* nextState = mediator->ScaffoldState12()) {
-            mediator->SetCurrentState(nextState);
+            mediator->SwitchHelperStateScaffold(0x0cu, nextState);
         }
         // anchor: launcher.exe:0x43c180 success tail posts event 0x18 after switching to state 0x0c.
         mediator->PostEventScaffold(0x18u);
@@ -1228,7 +1265,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     }
 
     if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
-        mediator->SetCurrentState(failureState);
+        mediator->SwitchHelperStateScaffold(3u, failureState);
     }
     // anchor: launcher.exe:0x43c180 failure tail posts error 0x0d after switching back to state 3.
     mediator->PostErrorScaffold(0x0du);
@@ -1257,6 +1294,9 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     }
 
     // Fresh `0x43bf90` read from decompilation + disassembly:
+    // - sends raw margin opcode `0x0a`
+    //   - `0x41bf70 = CLTLoginMediator_MarginOpcodeName` names that opcode
+    //     `MS_ClaimCharacterNameRequest`
     // - precheck owner `+0x1c` connection state through `0x41b4b0`
     //   - on failure, original switches helper state to `4`
     // - then check owner byte `+0xf14`
@@ -1283,6 +1323,7 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
         packetBuilder.PayloadBase(),
         packetBuilder.PayloadByteCount());
+    mediator->PostEventScaffold(0x13u);
 
     Log(
         "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x%02x totalBytes=0x%02x CharacterName='%s' -> sendResult=0x%08x then posts event=0x13",
@@ -1311,7 +1352,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem, CLT
     }
 
     if (CLTLoginState* nextState = mediator->ScaffoldState11()) {
-        mediator->SetCurrentState(nextState);
+        mediator->SwitchHelperStateScaffold(0x0bu, nextState);
     } else {
         Log(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed AS_AuthReply but has no registered helper11 state");
@@ -1340,15 +1381,28 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     // - `0x43c020` belongs to `CLTLoginState_State11` slot 3, so the packet build/send shape
     //   should live here, not on the mediator
     // - original body:
+    //   - sends raw margin opcode `0x0c`
+    //     - `0x41bf70 = CLTLoginMediator_MarginOpcodeName` names that opcode
+    //       `MS_CreateCharacterRequest`
     //   - treats `ESI = owner + 0x108`
     //   - creates a packet-builder object through `0x439840`
     //   - resets/initializes the raw `0x4d` payload through `0x43a470`
     //   - writes 17 dwords from owner `+0x134..+0x174`
     //   - appends `RealFirstName`, `RealLastName`, optional `Background`, and `GameSessionID`
     //     through `0x43a640 / 0x43a740 / 0x43a840 / 0x43a940`
+    //   - newer `0x43e540` debug-printer review makes those 17 dwords concrete:
+    //     SkinToneID, BodyID, HeadID, HairID, HairColorID, TattooID, FacialHairID,
+    //     FacialHairColorID, StartingHat, StartingGlasses, StartingShirt, StartingGloves,
+    //     StartingCoat, StartingPants, StartingTights, StartingShoes, TraitID
     //   - calls `0x41af70` to forward the completed packet-envelope object through the current
     //     margin connection send path (`0x448cf0`), not to serialize raw bytes itself
     //   - then posts event `0x15`
+    // Active-path caution:
+    // - this is a very real character-data sender, but the natural-original password-submit path is
+    //   still not live-proven here; no natural hit yet on `0x41c3c0` or `0x43c020`
+    // - current replacement-launcher runtime proof now lands here explicitly:
+    //   `... -> helperState 0x0b -> event 0x15 -> State11::Slot3 send -> Loading Character`
+    //   and then stalls before any incoming `MS_LoadCharacterReply`
     const auto& sourceDwords134 = mediator->SourceDwords134();
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
@@ -1382,18 +1436,25 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
         packetBuilder.PayloadBase(),
         packetBuilder.PayloadByteCount());
+    mediator->PostEventScaffold(0x15u);
 
-    Log(
-        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x%02x fixedBytes=0x%02x totalBytes=0x%02x SkinToneID=0x%08x RealFirstName='%s' RealLastName='%s' Background='%s' GameSessionID='%s' -> sendResult=0x%08x then posts event=0x15",
-        (unsigned)State11Packet0x4dFixedPayload::kPayloadTag0c,
-        (unsigned)State11Packet0x4dFixedPayload::kFixedByteCount,
-        (unsigned)packetBuilder.PayloadByteCount(),
-        (unsigned)sourceDwords134[0],
+    spdlog::info(
+        "CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
+        static_cast<unsigned>(State11Packet0x4dFixedPayload::kPayloadTag0c),
+        static_cast<unsigned>(State11Packet0x4dFixedPayload::kFixedByteCount),
+        static_cast<unsigned>(packetBuilder.PayloadByteCount()),
+        static_cast<unsigned>(sourceDwords134[0]),
         reinterpret_cast<const char*>(mediator->SourceBlock178().data()),
         reinterpret_cast<const char*>(mediator->SourceBlock198().data()),
         reinterpret_cast<const char*>(mediator->SourceBlock1b8().data()),
         mediator->GetGameSessionId664() ? mediator->GetGameSessionId664() : "<empty>",
-        (unsigned)sendResult);
+        static_cast<unsigned>(sendResult));
+    spdlog::info(
+        "CLTLoginState_State11::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        static_cast<unsigned>(mediator->MarginPacketReceiveCountScaffold()),
+        static_cast<unsigned>(mediator->MarginPacketFilteredBeforeSlot6CountScaffold()),
+        static_cast<unsigned>(mediator->MarginPacketSlot6DispatchCountScaffold()));
     return sendResult;
 }
 
@@ -1404,11 +1465,15 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
         return 0u;
     }
 
+    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
+    const uint16_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
     const ParsedState11LoadCharacterReplyScaffold parsed =
-        ParseState11LoadCharacterReplyScaffold(mediator->StagedIncomingMarginPacketBytes());
+        ParseState11LoadCharacterReplyScaffold(stagedBytes);
     if (!parsed.valid) {
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage could not parse staged margin bytes as raw-0x10 helper11 reply");
+        spdlog::info(
+            "CLTLoginState_State11::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; helper11 slot6 only handles raw-0x10 after the base margin code-2/4/5 filter",
+            static_cast<unsigned>(stagedBytes.size()),
+            static_cast<unsigned>(rawCode));
         return 0u;
     }
 
@@ -1419,6 +1484,12 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
     //   mediator-owned `0x4f78b8` state area
     const uint32_t handled = mediator->HandleStagedMarginLoadCharacterReplyPacketScaffold();
     if (handled == 0u) {
+        spdlog::info(
+            "CLTLoginState_State11::Slot6_HandleSecondaryMessage entered raw-0x10 receive path but owner-side parse/gate failed status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} currentState={}",
+            static_cast<unsigned>(parsed.status),
+            static_cast<unsigned>(parsed.field05),
+            static_cast<unsigned>(parsed.handoffWord09),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         return 0u;
     }
 
@@ -1440,7 +1511,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
                 // Current source-owned mirror keeps that on the concrete state9 object.
                 nextState->SetPendingPayload(/*byte4=*/0, parsed.handoffWord09);
             }
-            mediator->SetCurrentState(nextBase);
+            mediator->SwitchHelperStateScaffold(9u, nextBase);
         }
         // anchor: launcher.exe:0x440320 completion tail posts event 0x16 after switching to helper9.
         mediator->PostEventScaffold(0x16u);
@@ -1479,6 +1550,16 @@ CLTLoginState_State12::CLTLoginState_State12() {
     // The dispatch table creates this final leaf with byte `this+4 = 1`, which is what makes the
     // shared slot-6 handler (`0x004397e0`) delegate into `0x41c5c0` instead of immediately
     // writing `0x12000005`.
+    // Current natural-original status note:
+    // - `0x43c180` success now proves the launcher switches into state `0x0c`
+    // - a representative live run at that boundary was visibly at "Waiting for Regionserver"
+    // - newer `0x41b450` / `0x41cfb0` review now also shows why the old immediate-leaf theory is
+    //   too strong: the success tail switches helper state and then posts event `0x18` through the
+    //   owner listener tree before any later shared final-leaf slot-6 hit is proven
+    // - follow-up late probes on `0x004397e0` / `0x0041c5c0` still did **not** hit naturally
+    // - so keep this as the strongest current state-identity lead for the post-state9 continuation,
+    //   but do not yet claim that the natural path immediately falls into the shared final-leaf
+    //   slot-6 handler behind it
     slot6DispatchByte4_ = 1u;
 }
 
