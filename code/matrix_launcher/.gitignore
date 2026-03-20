@@ -2,6 +2,7 @@ ClientErrors*.txt
 MatrixOnline_0.0_crash_*.dmp
 /third_party
 /build
+*.o
 
 # Local credentials / secrets
 secrets/

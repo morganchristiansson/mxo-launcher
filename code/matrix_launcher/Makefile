@@ -20,20 +20,31 @@ SPDLOG_DIR = third_party/spdlog-1.17.0
 #   - matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
 # - launcher/login/runtime class scaffolds now start moving under recovered source-style paths
 #   rooted at matrixstaging/
-COMMON_AUTH_SRC = \
-	matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp \
-	matrixstaging/runtime/src/libltcrypto/filters.cpp \
-	matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
+# Shared object dependencies for common auth sources (used by both TARGET and AUTH_PROBE)
+COMMON_AUTH_OBJS = \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/filters.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.o
 
-LAUNCHER_SRC = src/resurrections.cpp src/diagnostics.cpp src/diagnostics_auth.cpp src/launcher_mediator_abi.cpp src/launcher_network_object_abi.cpp \
-	matrixstaging/runtime/src/liblttcp/lttcpconnection.cpp \
-	matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp \
-	matrixstaging/runtime/src/libltmessaging/messageconnection.cpp \
-	matrixstaging/game/src/libltclientlogin/loginmediator.cpp \
-	matrixstaging/game/src/libltclientlogin/loginstate.cpp \
-	matrixstaging/game/src/libltclientlogin/launchpad.cpp $(COMMON_AUTH_SRC)
-CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
-AUTH_PROBE_SRC = tools/auth_probe.cpp $(COMMON_AUTH_SRC)
+# Launcher object dependencies (includes COMMON_AUTH_OBJS)
+LAUNCHER_OBJS = \
+	$(BUILD_DIR)/src/resurrections.o \
+	$(BUILD_DIR)/src/diagnostics.o \
+	$(BUILD_DIR)/src/diagnostics_auth.o \
+	$(BUILD_DIR)/src/launcher_mediator_abi.o \
+	$(BUILD_DIR)/src/launcher_network_object_abi.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/lttcpconnection.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/messageconnection.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/launchpad.o \
+	$(COMMON_AUTH_OBJS)
+
+# Tools object dependencies (includes COMMON_AUTH_OBJS)
+TOOLS_OBJS = \
+	$(BUILD_DIR)/tools/auth_probe.o \
+	$(COMMON_AUTH_OBJS)
 
 BUILD_DIR = build
 AUTH_PROBE = $(GAME_DIR)/auth_probe.exe
@@ -55,15 +66,32 @@ auth_probe: $(AUTH_PROBE)
 
 CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp
 
-$(TARGET): $(LAUNCHER_SRC) $(CRYPTOPP_LIB) $(SPDLOG_DIR)
-	$(CXX) $(CXXFLAGS) -o $@ $(LAUNCHER_SRC) $(CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
+# Object file for each source
+# Object file for each source - pattern rule handles all src/*.cpp files
+$(BUILD_DIR)/src/%.o: src/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# Object file for matrixstaging/ sources - pattern rule handles all matrixstaging/*.cpp files
+$(BUILD_DIR)/matrixstaging/%.o: matrixstaging/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# Object file for tools/ sources - pattern rule handles all tools/*.cpp files
+$(BUILD_DIR)/tools/%.o: tools/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+# Target depends on launcher objects and cryptopp (spdlog is order-only prerequisite)
+$(TARGET): $(LAUNCHER_OBJS) $(CRYPTOPP_LIB) | $(SPDLOG_DIR)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
+
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
 
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
 	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^
-
-$(BUILD_DIR)/%.o: %.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Download cryptopp and spdlog if they don't exist
 $(CRYPTOPP_DIR):
@@ -87,9 +115,10 @@ $(CRYPTOPP_LIB): $(CRYPTOPP_DIR)
 
 # spdlog is header-only, included via CXXFLAGS. No build step needed.
 
-$(AUTH_PROBE): $(AUTH_PROBE_SRC) $(CRYPTOPP_LIB)
+# Auth probe depends on tools objects and cryptopp (spdlog is order-only prerequisite)
+$(AUTH_PROBE): $(TOOLS_OBJS) $(CRYPTOPP_LIB) | $(SPDLOG_DIR)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ $(AUTH_PROBE_SRC) $(CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
+	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
 
 run: $(TARGET)
 	cd $(GAME_DIR) && wine ./resurrections.exe $(LAUNCHER_ARGS)
