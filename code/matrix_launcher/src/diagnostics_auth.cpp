@@ -202,10 +202,12 @@ static bool DiagnosticParseVariableLengthPayload(
     const std::vector<uint8_t>& bytes,
     const uint8_t** outPayload,
     size_t* outPayloadSize,
-    size_t* outHeaderBytes) {
+    size_t* outHeaderBytes,
+    size_t* outConsumedBytes) {
     if (outPayload) *outPayload = NULL;
     if (outPayloadSize) *outPayloadSize = 0u;
     if (outHeaderBytes) *outHeaderBytes = 0u;
+    if (outConsumedBytes) *outConsumedBytes = 0u;
     if (bytes.size() < 2u) {
         return false;
     }
@@ -224,13 +226,15 @@ static bool DiagnosticParseVariableLengthPayload(
         headerBytes = 1u;
     }
 
-    if (bytes.size() < headerBytes + payloadLength) {
+    const size_t consumedBytes = headerBytes + payloadLength;
+    if (bytes.size() < consumedBytes) {
         return false;
     }
 
     if (outPayload) *outPayload = bytes.data() + headerBytes;
     if (outPayloadSize) *outPayloadSize = payloadLength;
     if (outHeaderBytes) *outHeaderBytes = headerBytes;
+    if (outConsumedBytes) *outConsumedBytes = consumedBytes;
     return true;
 }
 
@@ -288,8 +292,12 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
             DiagnosticRouteConnectStatusToLoginController(self, workItem);
         }
         if (workItem->header.workType == 3u) {
-            const std::vector<uint8_t>& bytes = self->sidecarConnection->ReceivedBytes();
-            if (!bytes.empty()) {
+            while (true) {
+                const std::vector<uint8_t>& bytes = self->sidecarConnection->ReceivedBytes();
+                if (bytes.empty()) {
+                    break;
+                }
+
                 const size_t preview = (bytes.size() < 16u) ? bytes.size() : 16u;
                 char hexPreview[16 * 3 + 1] = {0};
                 char* out = hexPreview;
@@ -304,34 +312,35 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                     hexPreview);
 
                 if (self == g_DiagnosticAuthContext && bytes.size() >= 2u) {
-                    uint32_t payloadLength = 0;
-                    size_t headerBytes = 0;
-                    uint8_t rawCode = 0;
-                    if (bytes[0] & 0x80u) {
-                        if (bytes.size() >= 3u) {
-                            payloadLength = (static_cast<uint32_t>(bytes[0] & 0x7fu) << 8) |
-                                            static_cast<uint32_t>(bytes[1]);
-                            headerBytes = 2u;
-                            rawCode = bytes[2];
-                        }
-                    } else {
-                        payloadLength = static_cast<uint32_t>(bytes[0]);
-                        headerBytes = 1u;
-                        rawCode = bytes[1];
+                    const uint8_t* payloadBytes = NULL;
+                    size_t payloadSize = 0u;
+                    size_t headerBytes = 0u;
+                    size_t consumedBytes = 0u;
+                    const bool parsedFrame = DiagnosticParseVariableLengthPayload(
+                        bytes,
+                        &payloadBytes,
+                        &payloadSize,
+                        &headerBytes,
+                        &consumedBytes);
+                    const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
+                    if (!parsedFrame) {
+                        Log(
+                            "DIAGNOSTIC: auth receive buffering incomplete frame buffered=%u preview=%s",
+                            (unsigned)bytes.size(),
+                            hexPreview);
+                        break;
                     }
 
-                    if (headerBytes != 0u) {
-                        Log(
-                            "DIAGNOSTIC: auth receive framing payloadLength=%u headerBytes=%u rawCode=0x%02x likelyMessage='%s'",
-                            (unsigned)payloadLength,
-                            (unsigned)headerBytes,
-                            (unsigned)rawCode,
-                            DiagnosticAuthRawCodeName(rawCode));
-                    }
+                    Log(
+                        "DIAGNOSTIC: auth receive framing payloadLength=%u headerBytes=%u rawCode=0x%02x likelyMessage='%s'",
+                        (unsigned)payloadSize,
+                        (unsigned)headerBytes,
+                        (unsigned)rawCode,
+                        DiagnosticAuthRawCodeName(rawCode));
 
                     if (g_DiagnosticLoginController) {
                         const uint32_t handled =
-                            g_DiagnosticLoginController->HandleAuthPacketBytes(bytes.data(), bytes.size());
+                            g_DiagnosticLoginController->HandleAuthPacketBytes(payloadBytes, payloadSize);
                         Log(
                             "DIAGNOSTIC: launcher-owned auth packet handler label='%s' handled=%u rawCode=0x%02x",
                             self->debugLabel ? self->debugLabel : "<null>",
@@ -346,35 +355,55 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                                 (unsigned)marginConnectResult);
                         }
                     }
-                } else if (self == g_DiagnosticMarginContext && bytes.size() >= 2u) {
+
+                    self->sidecarConnection->ConsumeReceivedBytesPrefix(consumedBytes);
+                    continue;
+                }
+
+                if (self == g_DiagnosticMarginContext && bytes.size() >= 2u) {
                     const uint8_t* payloadBytes = NULL;
                     size_t payloadSize = 0u;
                     size_t headerBytes = 0u;
+                    size_t consumedBytes = 0u;
                     const bool parsedFrame = DiagnosticParseVariableLengthPayload(
                         bytes,
                         &payloadBytes,
                         &payloadSize,
-                        &headerBytes);
+                        &headerBytes,
+                        &consumedBytes);
                     const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
+                    if (!parsedFrame) {
+                        Log(
+                            "DIAGNOSTIC: margin receive buffering incomplete frame buffered=%u preview=%s",
+                            (unsigned)bytes.size(),
+                            hexPreview);
+                        break;
+                    }
+
+                    const bool looksLikePlainBootstrapReply =
+                        rawCode == 0x02u || rawCode == 0x04u || rawCode == 0x07u || rawCode == 0x09u;
                     Log(
-                        "DIAGNOSTIC: margin receive framing payloadLength=%u headerBytes=%u rawCode=0x%02x likelyMessage='%s'",
+                        "DIAGNOSTIC: margin receive framing payloadLength=%u headerBytes=%u outerByte0=0x%02x framingHint='%s' logicalOpcode=resolved-later-by-mediator-after-optional-decrypt",
                         (unsigned)payloadSize,
                         (unsigned)headerBytes,
                         (unsigned)rawCode,
-                        rawCode == 0x10 ? mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply : "<unknown-margin-code>");
+                        looksLikePlainBootstrapReply ? "plaintext-bootstrap-reply" : "possibly-encrypted-post-bootstrap-payload");
 
-                    if (g_DiagnosticLoginController && parsedFrame && payloadBytes && payloadSize != 0u) {
+                    if (g_DiagnosticLoginController && payloadBytes && payloadSize != 0u) {
                         const uint32_t handled =
                             g_DiagnosticLoginController->HandleMarginPacketBytes(payloadBytes, payloadSize);
                         Log(
-                            "DIAGNOSTIC: launcher-owned margin packet handler label='%s' handled=%u rawCode=0x%02x",
+                            "DIAGNOSTIC: launcher-owned margin packet handler label='%s' handled=%u outerByte0=0x%02x decryptedOpcode=see-CLTLoginMediator-log-when-transportEncrypted=1",
                             self->debugLabel ? self->debugLabel : "<null>",
                             (unsigned)handled,
                             (unsigned)rawCode);
                     }
+
+                    self->sidecarConnection->ConsumeReceivedBytesPrefix(consumedBytes);
+                    continue;
                 }
 
-                self->sidecarConnection->ClearReceivedBytes();
+                break;
             }
         }
         return self->sidecarConnection->OnOperationCompleted(reinterpret_cast<void*>(workItem->header.workType));

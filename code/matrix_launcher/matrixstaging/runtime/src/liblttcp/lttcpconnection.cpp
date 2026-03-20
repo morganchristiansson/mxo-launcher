@@ -259,6 +259,23 @@ void CLTTCPConnection::ClearReceivedBytes() {
 }
 
 // ============================================================
+// UNANCHORED: Not based on vtable analysis
+// Consume a prefix from the buffered receive bytes, preserving any partial tail.
+// This is used by the launcher-side diagnostics receive bridge so split TCP frames do not get
+// dropped between polls.
+// ============================================================
+void CLTTCPConnection::ConsumeReceivedBytesPrefix(size_t byteCount) {
+    if (byteCount == 0u) {
+        return;
+    }
+    if (byteCount >= receivedBytes_.size()) {
+        receivedBytes_.clear();
+        return;
+    }
+    receivedBytes_.erase(receivedBytes_.begin(), receivedBytes_.begin() + static_cast<std::ptrdiff_t>(byteCount));
+}
+
+// ============================================================
 // FAITHFUL: VTable 0x004b8050 - Close at 0x00449cd0
 // Evidence-backed shape only:
 // - original engine treats states 1/2 as active

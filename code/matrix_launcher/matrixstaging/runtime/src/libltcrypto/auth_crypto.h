@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -449,6 +450,146 @@ bool DecryptAuthReplyPrivateExponent(
     const std::vector<uint8_t>& twofishKeyBytes,
     const std::vector<uint8_t>& challengeIvBytes,
     std::vector<uint8_t>* outPrivateExponentBytes);
+
+// Transitional low-level margin CERT/MS bootstrap helpers.
+// These stay in the shared crypto layer because they model reusable wire/crypto behavior backed by
+// open server/proxy evidence:
+// - `../../../work/mxoemu/Reality/Source/MarginSocket.cpp`
+// - `../../../work/mxoemu/Proxy/Logging.cpp`
+// They are not a claim that final launcher-owned state progression/source ownership should live
+// here permanently.
+struct MarginCertChallenge {
+    bool valid;
+    std::vector<uint8_t> headerBytes;
+    std::vector<uint8_t> payloadBytes;
+    std::vector<uint8_t> bytes;
+    std::vector<uint8_t> encryptedBlobBytes;
+    std::vector<uint8_t> twofishKeyBytes;
+    std::vector<uint8_t> challengeBytes;
+
+    MarginCertChallenge() : valid(false) {}
+};
+
+struct MarginConnectReply {
+    bool valid;
+    std::vector<uint8_t> headerBytes;
+    std::vector<uint8_t> payloadBytes;
+    std::vector<uint8_t> bytes;
+    std::vector<uint8_t> encryptedPayloadBytes;
+    uint32_t status0;
+    uint32_t status1;
+    uint32_t sessionId;
+    uint16_t field0d;
+    uint16_t field0f;
+    uint16_t field11;
+    uint16_t field13;
+    uint16_t field15;
+
+    MarginConnectReply()
+        : valid(false),
+          status0(0),
+          status1(0),
+          sessionId(0),
+          field0d(0),
+          field0f(0),
+          field11(0),
+          field13(0),
+          field15(0) {}
+};
+
+// Plaintext raw 0x01 / CERT_ConnectRequest builder.
+bool BuildMarginCertConnectRequestPacket(
+    const AuthReply& reply,
+    FrameMode frameMode,
+    FramedPacket* outPacket);
+
+// Plaintext raw 0x02 / CERT_Challenge parse helpers.
+bool ParseMarginCertChallengePayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    const AuthSignedData& signedData,
+    const std::vector<uint8_t>& privateExponentBytes,
+    MarginCertChallenge* outChallenge);
+
+bool ParseMarginCertChallengePacket(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    const AuthSignedData& signedData,
+    const std::vector<uint8_t>& privateExponentBytes,
+    MarginCertChallenge* outChallenge);
+
+// Encrypted raw 0x03 / CERT_ChallengeResponse builder.
+bool BuildMarginCertChallengeResponsePacket(
+    const std::vector<uint8_t>& challengeBytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket);
+
+// Encrypted raw 0x06 / MS_ConnectRequest builder.
+bool BuildMarginMsConnectRequestPacket(
+    uint32_t matrixVersion,
+    uint32_t clientDllVersion,
+    const std::array<uint8_t, 16>& weirdSequenceBytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket);
+
+// Transitional compatibility alias for earlier call sites.
+bool BuildMarginConnectRequestPacket(
+    uint32_t matrixVersion,
+    uint32_t clientDllVersion,
+    const std::array<uint8_t, 16>& weirdSequenceBytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket);
+
+// Encrypted raw 0x08 / MS_ConnectChallengeResponse builder.
+bool BuildMarginMsConnectChallengeResponsePacket(
+    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket);
+
+// Transitional compatibility alias for earlier call sites.
+bool BuildMarginConnectChallengeResponsePacket(
+    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket);
+
+// Encrypted raw 0x09 / MS_ConnectReply parse helpers.
+bool ParseMarginMsConnectReplyPayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectReply* outReply);
+
+// Transitional compatibility alias for earlier call sites.
+bool ParseMarginConnectReplyPayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectReply* outReply);
+
+bool ParseMarginMsConnectReplyPacket(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    MarginConnectReply* outReply);
+
+// Generic encrypted margin payload wrapper used by MS bootstrap packets and later margin traffic.
+// Wire shape follows the open-server `EncryptedPacket` helper: random IV + Twofish-CBC ciphertext
+// over `[crc32][u16 length][u32 timestamp][payload]`.
+bool EncryptMarginPayloadPacket(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket);
+
+bool DecryptMarginPayloadPacket(
+    const uint8_t* encryptedPayloadBytes,
+    size_t encryptedPayloadSize,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    std::vector<uint8_t>* outPayloadBytes);
 
 // Compatibility wrappers used by earlier diagnostics / tooling.
 // These are explicitly transitional convenience helpers, not a claim of original source-level

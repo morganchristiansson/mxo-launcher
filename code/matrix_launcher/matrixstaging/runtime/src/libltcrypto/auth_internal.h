@@ -10,6 +10,7 @@
 #endif
 
 #include "base64.h"
+#include "crc.h"
 #include "filters.h"
 #include "md5.h"
 #include "modes.h"
@@ -53,6 +54,22 @@ inline bool BuildPublicKeyFromBytes(
     CryptoPP::Integer modulus(modulusBytes.data(), modulusBytes.size());
     CryptoPP::Integer exponent(exponentBytes.data(), exponentBytes.size());
     outKey->Initialize(modulus, exponent);
+    return true;
+}
+
+inline bool BuildPrivateKeyFromBytes(
+    const std::vector<uint8_t>& modulusBytes,
+    const std::vector<uint8_t>& exponentBytes,
+    const std::vector<uint8_t>& privateExponentBytes,
+    CryptoPP::RSA::PrivateKey* outKey) {
+    if (!outKey || modulusBytes.empty() || exponentBytes.empty() || privateExponentBytes.empty()) {
+        return false;
+    }
+
+    CryptoPP::Integer modulus(modulusBytes.data(), modulusBytes.size());
+    CryptoPP::Integer exponent(exponentBytes.data(), exponentBytes.size());
+    CryptoPP::Integer privateExponent(privateExponentBytes.data(), privateExponentBytes.size());
+    outKey->Initialize(modulus, exponent, privateExponent);
     return true;
 }
 

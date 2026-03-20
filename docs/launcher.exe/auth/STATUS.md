@@ -553,7 +553,52 @@ The highest-value remaining auth-adjacent work is now:
       - the scaffold now keeps the arg7-derived first dword and zeros the cfg-derived tail as
         **diagnostic narrowing only**, not as a claim that launcher.exe owned or should recreate
         that client cfg writer/reader family
-    - but no later incoming raw-`0x10` / `MS_LoadCharacterReply` arrives during the deliberate run window
+    - newer server/proxy-side protocol review narrowed the remaining replacement gap further:
+      - the old replacement framing was too weak: post-connect margin traffic cannot be treated as
+        though state8 raw `0x0f` may go straight out once the TCP connection reaches owner `+0x1c`
+        state `2`
+      - `mxoemu` `MarginSocket.cpp` + `Proxy/Logging.cpp` instead show a required margin-side
+        bootstrap before later load-character traffic:
+        - plaintext `CERT_ConnectRequest (0x01)`
+        - plaintext `CERT_Challenge (0x02)`
+        - encrypted `CERT_ChallengeResponse (0x03)`
+        - encrypted `CERT_ConnectReply (0x04)`
+        - encrypted `MS_ConnectRequest (0x06)`
+        - encrypted `MS_ConnectChallenge (0x07)`
+        - encrypted `MS_ConnectChallengeResponse (0x08)`
+        - encrypted `MS_ConnectReply (0x09)`
+        - only then later encrypted load-family traffic like raw `0x0f`
+      - practical consequence for the current launcher reimplementation:
+        - the active replacement was better read as missing the margin CERT/MS bootstrap and
+          encrypted post-bootstrap transport layer, not as merely missing one more state8 payload tweak
+        - current source ownership therefore moved that bootstrap into the launcher-owned
+          mediator/runtime path instead of reviving a separate probe-style client
+      - current source-side groundwork now in place under:
+        - `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`
+        - `matrixstaging/runtime/src/libltcrypto/auth_internal.h`
+        - `matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp`
+        - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+      - runtime validation updated on `2026-03-21` using:
+        - `MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality timeout 20 make run_binder_both_runtime`
+      - current validation result is now positive through the old state8 blocker:
+        - auth again progresses through `AS_GetPublicKeyReply`, `AS_AuthChallenge`, and `AS_AuthReply`
+        - launcher-owned margin bootstrap now runs in order:
+          - `0x01 -> 0x02 -> 0x03 -> 0x04 -> 0x06 -> 0x07 -> 0x08 -> 0x09`
+        - bootstrap completion now returns control to state8 slot 3
+        - state8 raw `0x0f` is now sent on encrypted post-bootstrap margin transport
+        - the first decrypted incoming raw `0x10` now arrives and routes through state8 slot 6
+        - state8 reply progression now completes far enough to switch into helper9/state9 with event `0x0b`
+      - two concrete source/runtime fixes were needed to reach that point:
+        - `CLTLoginMediator::HandleAuthPacketBytes(...)` had been re-parsing already-unframed auth
+          payload bytes as though they still carried a variable-length header; it now consumes raw
+          payload bytes directly on the receive bridge
+        - `ParseMarginMsConnectReplyPayload(...)` had been requiring an exact 23-byte raw `0x09`
+          body; current live traffic preserves the same leading field family but carries a longer
+          decrypted payload, so the parser now accepts the stable 23-byte prefix while preserving
+          the full payload bytes
+      - practical consequence for the active blocker:
+        - the old “missing first decrypted raw `0x10`” state8 blocker is now closed enough
+        - focus should move later again onto helper9/state9 and the post-state9 continuation
   - practical comparison against the natural original path:
     - this moves the replacement launcher later and closer to the natural-original shape than the
       old helper11-only stall

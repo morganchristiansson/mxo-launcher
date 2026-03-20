@@ -373,6 +373,400 @@ bool DecryptAuthReplyPrivateExponent(
         outPrivateExponentBytes);
 }
 
+// Transitional low-level margin CERT/MS helper note:
+// - wire/crypto shape here is intentionally shared runtime code
+// - evidence source is open server/proxy code, especially:
+//   - `../../../work/mxoemu/Reality/Source/MarginSocket.cpp`
+//   - `../../../work/mxoemu/Proxy/Logging.cpp`
+//   - `../../../work/mxoemu/Proxy/EncryptedPacket.cpp`
+// - this is not a claim that final launcher-owned state progression should remain here
+
+bool BuildMarginCertConnectRequestPacket(
+    const AuthReply& reply,
+    FrameMode frameMode,
+    FramedPacket* outPacket) {
+    using namespace internal;
+
+    if (!outPacket || !reply.signedData.valid || reply.signedData.rawBytes.empty() ||
+        reply.authSignatureBytes.empty()) {
+        return false;
+    }
+
+    const uint16_t authDataMarker = reply.hasAuthDataMarker ? reply.authDataMarker : 0x0136u;
+
+    std::vector<uint8_t> payload;
+    payload.reserve(1u + 2u + 2u + reply.authSignatureBytes.size() + reply.signedData.rawBytes.size());
+    payload.push_back(0x01u);
+    AppendU16LE(&payload, 3u);
+    AppendU16LE(&payload, authDataMarker);
+    payload.insert(payload.end(), reply.authSignatureBytes.begin(), reply.authSignatureBytes.end());
+    payload.insert(payload.end(), reply.signedData.rawBytes.begin(), reply.signedData.rawBytes.end());
+    return BuildVariableLengthPacket(payload.data(), payload.size(), frameMode, outPacket);
+}
+
+bool ParseMarginCertChallengePayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    const AuthSignedData& signedData,
+    const std::vector<uint8_t>& privateExponentBytes,
+    MarginCertChallenge* outChallenge) {
+    using namespace internal;
+
+    if (!payloadBytes || !outChallenge || payloadSize < 5u || payloadBytes[0] != 0x02u ||
+        !signedData.valid || signedData.modulusBytes.empty() || privateExponentBytes.empty()) {
+        return false;
+    }
+
+    const uint16_t firstNumber = ReadU16LE(payloadBytes + 1u);
+    const uint16_t blobSize = ReadU16LE(payloadBytes + 3u);
+    if (firstNumber != 3u || payloadSize != 5u + blobSize) {
+        return false;
+    }
+
+    std::vector<uint8_t> exponentBytes;
+    if ((signedData.publicExponent >> 8u) != 0u) {
+        exponentBytes.push_back(static_cast<uint8_t>((signedData.publicExponent >> 8u) & 0xffu));
+    }
+    exponentBytes.push_back(static_cast<uint8_t>(signedData.publicExponent & 0xffu));
+
+    CryptoPP::RSA::PrivateKey privateKey;
+    if (!BuildPrivateKeyFromBytes(
+            signedData.modulusBytes,
+            exponentBytes,
+            privateExponentBytes,
+            &privateKey)) {
+        return false;
+    }
+
+    std::vector<uint8_t> decryptedBytes;
+    try {
+        CryptoPP::AutoSeededRandomPool rng;
+        CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
+        std::string plaintext;
+        CryptoPP::StringSource source(
+            payloadBytes + 5u,
+            blobSize,
+            true,
+            new CryptoPP::PK_DecryptorFilter(
+                rng,
+                decryptor,
+                new CryptoPP::StringSink(plaintext)));
+        decryptedBytes.assign(plaintext.begin(), plaintext.end());
+    } catch (const CryptoPP::Exception&) {
+        return false;
+    }
+
+    if (decryptedBytes.size() != 33u || decryptedBytes[0] != 0u) {
+        return false;
+    }
+
+    MarginCertChallenge challenge;
+    challenge.valid = true;
+    challenge.payloadBytes.assign(payloadBytes, payloadBytes + payloadSize);
+    challenge.bytes = challenge.payloadBytes;
+    challenge.encryptedBlobBytes.assign(payloadBytes + 5u, payloadBytes + 5u + blobSize);
+    challenge.twofishKeyBytes.assign(decryptedBytes.begin() + 1u, decryptedBytes.begin() + 17u);
+    challenge.challengeBytes.assign(decryptedBytes.begin() + 17u, decryptedBytes.begin() + 33u);
+    *outChallenge = challenge;
+    return true;
+}
+
+bool ParseMarginCertChallengePacket(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    const AuthSignedData& signedData,
+    const std::vector<uint8_t>& privateExponentBytes,
+    MarginCertChallenge* outChallenge) {
+    if (!packetBytes || !outChallenge) {
+        return false;
+    }
+
+    FramedPacket framed;
+    if (!ParseVariableLengthPacket(packetBytes, packetSize, &framed)) {
+        return false;
+    }
+
+    MarginCertChallenge challenge;
+    if (!ParseMarginCertChallengePayload(
+            framed.payloadBytes.data(),
+            framed.payloadBytes.size(),
+            signedData,
+            privateExponentBytes,
+            &challenge)) {
+        return false;
+    }
+
+    challenge.headerBytes = framed.headerBytes;
+    challenge.bytes = framed.bytes;
+    *outChallenge = challenge;
+    return true;
+}
+
+bool EncryptMarginPayloadPacket(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket) {
+    using namespace internal;
+
+    if (!payloadBytes || payloadSize == 0u || !outPacket || twofishKeyBytes.size() != 16u ||
+        payloadSize > 0xffffu) {
+        return false;
+    }
+
+    const uint16_t payloadLength = static_cast<uint16_t>(payloadSize);
+    const uint32_t timestamp = CurrentUnixTimeU32();
+
+    std::vector<uint8_t> crcInput;
+    crcInput.reserve(2u + 4u + payloadSize);
+    AppendU16LE(&crcInput, payloadLength);
+    AppendU32LE(&crcInput, timestamp);
+    crcInput.insert(crcInput.end(), payloadBytes, payloadBytes + payloadSize);
+
+    uint8_t crcBytes[4] = {0};
+    CryptoPP::CRC32 crc;
+    crc.Update(crcInput.data(), crcInput.size());
+    crc.Final(crcBytes);
+
+    std::vector<uint8_t> plaintext;
+    plaintext.reserve(4u + crcInput.size());
+    plaintext.insert(plaintext.end(), crcBytes, crcBytes + sizeof(crcBytes));
+    plaintext.insert(plaintext.end(), crcInput.begin(), crcInput.end());
+
+    uint8_t ivBytes[16] = {0};
+    std::vector<uint8_t> ciphertextBytes;
+    try {
+        CryptoPP::AutoSeededRandomPool rng;
+        rng.GenerateBlock(ivBytes, sizeof(ivBytes));
+
+        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Encryption cipher;
+        cipher.SetKeyWithIV(twofishKeyBytes.data(), twofishKeyBytes.size(), ivBytes);
+
+        std::string ciphertext;
+        CryptoPP::StringSource source(
+            plaintext.data(),
+            plaintext.size(),
+            true,
+            new CryptoPP::StreamTransformationFilter(
+                cipher,
+                new CryptoPP::StringSink(ciphertext)));
+        ciphertextBytes.assign(ciphertext.begin(), ciphertext.end());
+    } catch (const CryptoPP::Exception&) {
+        return false;
+    }
+
+    std::vector<uint8_t> encryptedPayload;
+    encryptedPayload.reserve(sizeof(ivBytes) + ciphertextBytes.size());
+    encryptedPayload.insert(encryptedPayload.end(), ivBytes, ivBytes + sizeof(ivBytes));
+    encryptedPayload.insert(encryptedPayload.end(), ciphertextBytes.begin(), ciphertextBytes.end());
+    return BuildVariableLengthPacket(encryptedPayload.data(), encryptedPayload.size(), frameMode, outPacket);
+}
+
+bool DecryptMarginPayloadPacket(
+    const uint8_t* encryptedPayloadBytes,
+    size_t encryptedPayloadSize,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    std::vector<uint8_t>* outPayloadBytes) {
+    using namespace internal;
+
+    if (!encryptedPayloadBytes || !outPayloadBytes || encryptedPayloadSize <= 16u ||
+        twofishKeyBytes.size() != 16u) {
+        return false;
+    }
+
+    std::vector<uint8_t> decryptedBytes;
+    try {
+        CryptoPP::CBC_Mode<CryptoPP::Twofish>::Decryption cipher;
+        cipher.SetKeyWithIV(twofishKeyBytes.data(), twofishKeyBytes.size(), encryptedPayloadBytes);
+
+        std::string decrypted;
+        CryptoPP::StringSource source(
+            encryptedPayloadBytes + 16u,
+            encryptedPayloadSize - 16u,
+            true,
+            new CryptoPP::StreamTransformationFilter(
+                cipher,
+                new CryptoPP::StringSink(decrypted)));
+        decryptedBytes.assign(decrypted.begin(), decrypted.end());
+    } catch (const CryptoPP::Exception&) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    if (decryptedBytes.size() < 10u) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    const uint16_t payloadLength = ReadU16LE(decryptedBytes.data() + 4u);
+    const size_t totalExpected = 4u + 2u + 4u + payloadLength;
+    if (decryptedBytes.size() != totalExpected) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    uint8_t expectedCrc[4] = {0};
+    CryptoPP::CRC32 crc;
+    crc.Update(decryptedBytes.data() + 4u, decryptedBytes.size() - 4u);
+    crc.Final(expectedCrc);
+    if (std::memcmp(expectedCrc, decryptedBytes.data(), sizeof(expectedCrc)) != 0) {
+        outPayloadBytes->clear();
+        return false;
+    }
+
+    outPayloadBytes->assign(decryptedBytes.begin() + 10u, decryptedBytes.end());
+    return true;
+}
+
+bool BuildMarginCertChallengeResponsePacket(
+    const std::vector<uint8_t>& challengeBytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket) {
+    if (challengeBytes.size() != 16u) {
+        return false;
+    }
+
+    std::vector<uint8_t> payload;
+    payload.reserve(17u);
+    payload.push_back(0x03u);
+    payload.insert(payload.end(), challengeBytes.begin(), challengeBytes.end());
+    return EncryptMarginPayloadPacket(payload.data(), payload.size(), twofishKeyBytes, frameMode, outPacket);
+}
+
+bool BuildMarginMsConnectRequestPacket(
+    uint32_t matrixVersion,
+    uint32_t clientDllVersion,
+    const std::array<uint8_t, 16>& weirdSequenceBytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket) {
+    using namespace internal;
+
+    std::vector<uint8_t> payload;
+    payload.reserve(1u + 4u + 4u + 9u + weirdSequenceBytes.size() + 1u);
+    payload.push_back(0x06u);
+    AppendU32LE(&payload, matrixVersion);
+    AppendU32LE(&payload, clientDllVersion);
+    payload.insert(payload.end(), 9u, 0u);
+    payload.insert(payload.end(), weirdSequenceBytes.begin(), weirdSequenceBytes.end());
+    payload.push_back(0u);
+    return EncryptMarginPayloadPacket(payload.data(), payload.size(), twofishKeyBytes, frameMode, outPacket);
+}
+
+bool BuildMarginConnectRequestPacket(
+    uint32_t matrixVersion,
+    uint32_t clientDllVersion,
+    const std::array<uint8_t, 16>& weirdSequenceBytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket) {
+    return BuildMarginMsConnectRequestPacket(
+        matrixVersion,
+        clientDllVersion,
+        weirdSequenceBytes,
+        twofishKeyBytes,
+        frameMode,
+        outPacket);
+}
+
+bool BuildMarginMsConnectChallengeResponsePacket(
+    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket) {
+    std::vector<uint8_t> payload;
+    payload.reserve(1u + gameFilesMd5Bytes.size());
+    payload.push_back(0x08u);
+    payload.insert(payload.end(), gameFilesMd5Bytes.begin(), gameFilesMd5Bytes.end());
+    return EncryptMarginPayloadPacket(payload.data(), payload.size(), twofishKeyBytes, frameMode, outPacket);
+}
+
+bool BuildMarginConnectChallengeResponsePacket(
+    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    FrameMode frameMode,
+    FramedPacket* outPacket) {
+    return BuildMarginMsConnectChallengeResponsePacket(
+        gameFilesMd5Bytes,
+        twofishKeyBytes,
+        frameMode,
+        outPacket);
+}
+
+bool ParseMarginMsConnectReplyPayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectReply* outReply) {
+    using namespace internal;
+
+    // Older emulator/proxy evidence shows a 23-byte `MS_ConnectReply` core body.
+    // Current live deliberate runs now show at least one server replying with a longer decrypted
+    // raw `0x09` payload while still preserving that same leading field family.
+    // Treat the first 23 bytes as the stable prefix and preserve the full payload on the reply.
+    if (!payloadBytes || !outReply || payloadSize < 23u || payloadBytes[0] != 0x09u) {
+        return false;
+    }
+
+    MarginConnectReply reply;
+    reply.valid = true;
+    reply.payloadBytes.assign(payloadBytes, payloadBytes + payloadSize);
+    reply.bytes = reply.payloadBytes;
+    reply.status0 = ReadU32LE(payloadBytes + 1u);
+    reply.status1 = ReadU32LE(payloadBytes + 5u);
+    reply.sessionId = ReadU32LE(payloadBytes + 9u);
+    reply.field0d = ReadU16LE(payloadBytes + 13u);
+    reply.field0f = ReadU16LE(payloadBytes + 15u);
+    reply.field11 = ReadU16LE(payloadBytes + 17u);
+    reply.field13 = ReadU16LE(payloadBytes + 19u);
+    reply.field15 = ReadU16LE(payloadBytes + 21u);
+    *outReply = reply;
+    return true;
+}
+
+bool ParseMarginConnectReplyPayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectReply* outReply) {
+    return ParseMarginMsConnectReplyPayload(payloadBytes, payloadSize, outReply);
+}
+
+bool ParseMarginMsConnectReplyPacket(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    const std::vector<uint8_t>& twofishKeyBytes,
+    MarginConnectReply* outReply) {
+    if (!packetBytes || !outReply) {
+        return false;
+    }
+
+    FramedPacket framed;
+    if (!ParseVariableLengthPacket(packetBytes, packetSize, &framed)) {
+        return false;
+    }
+
+    std::vector<uint8_t> payloadBytes;
+    if (!DecryptMarginPayloadPacket(
+            framed.payloadBytes.data(),
+            framed.payloadBytes.size(),
+            twofishKeyBytes,
+            &payloadBytes)) {
+        return false;
+    }
+
+    MarginConnectReply reply;
+    if (!ParseMarginMsConnectReplyPayload(payloadBytes.data(), payloadBytes.size(), &reply)) {
+        return false;
+    }
+
+    reply.headerBytes = framed.headerBytes;
+    reply.encryptedPayloadBytes = framed.payloadBytes;
+    reply.bytes = framed.bytes;
+    *outReply = reply;
+    return true;
+}
+
 std::vector<uint8_t> BuildAuthRequestBlob(
     const char* username,
     uint32_t embeddedTime,

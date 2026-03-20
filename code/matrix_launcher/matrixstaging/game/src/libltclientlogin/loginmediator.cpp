@@ -118,10 +118,44 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <unordered_map>
 
 namespace mxo::ltlogin {
 
 namespace {
+
+enum class MarginBootstrapPhase : uint32_t {
+    kIdle = 0,
+    kSentCertConnectRequest = 1,
+    kSentCertChallengeResponse = 2,
+    kSentMsConnectRequest = 3,
+    kSentMsConnectChallengeResponse = 4,
+    kReady = 5,
+};
+
+struct MarginBootstrapSessionState {
+    MarginBootstrapPhase phase = MarginBootstrapPhase::kIdle;
+    std::vector<uint8_t> authReplyPrivateExponentBytes;
+    std::vector<uint8_t> marginTwofishKeyBytes;
+    std::vector<uint8_t> certChallengeBytes;
+    uint32_t marginSessionId = 0;
+};
+
+// ABI-safety storage note:
+// - margin CERT/MS bootstrap/session state is launcher-owned runtime state
+// - but `CLTLoginMediator` layout is sensitive enough that adding members in the middle is risky
+// - keep that state in a sidecar keyed by mediator pointer until/if a proven append-only layout
+//   change is justified
+static std::unordered_map<const CLTLoginMediator*, MarginBootstrapSessionState>
+    g_marginBootstrapStateByMediator;
+
+static MarginBootstrapSessionState& MutableMarginBootstrapState(const CLTLoginMediator* mediator) {
+    return g_marginBootstrapStateByMediator[mediator];
+}
+
+static void EraseMarginBootstrapState(const CLTLoginMediator* mediator) {
+    g_marginBootstrapStateByMediator.erase(mediator);
+}
 
 static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOrder) {
     mxo::liblttcp::LTTCPEndpointKey key = {};
@@ -379,6 +413,7 @@ CLTLoginMediator::~CLTLoginMediator() {
     if (marginConnectionOwnedByMediator_) {
         delete marginConnection_;
     }
+    EraseMarginBootstrapState(this);
 }
 
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
@@ -584,6 +619,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
+    ResetMarginBootstrapState();
 
     Log(
         "DIAGNOSTIC: CLTLoginMediator auth credentials configured username='%s' password=%s",
@@ -819,6 +855,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
+    ResetMarginBootstrapState();
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();
@@ -870,21 +907,68 @@ uint32_t CLTLoginMediator::BeginAuthHandshake() {
 }
 
 uint32_t CLTLoginMediator::BeginMarginHandshake() {
-    // Important correction from newer helper-state review:
-    // - the immediate post-`AS_AuthReply` continuation is not the later auth-side
-    //   `AS_GetWorldListRequest` helper at `0x43b830`
-    // - original `0x4401a0` success instead reaches `0x41b450(0x0b)`, which selects helper
-    //   `0x4f7894` and immediately runs `CLTLoginState_State11` slot 3 /
-    //   `0x43c020`
-    // - keep that ownership split explicit in source too:
-    //   - mediator only owns the shared margin-connection transport helper
-    //   - the concrete send body remains on the active CLTLoginState vtable object
+    // Important ownership split to keep explicit in source:
+    // - mediator owns the shared margin-connection transport helper (`0x41e500` family)
+    // - the concrete post-bootstrap payload send body remains on the active `CLTLoginState`
+    //   vtable object
+    // - mediator only owns the launcher-side CERT/MS bootstrap progression that must complete on
+    //   the connected margin transport before state8/state11 payload sends like raw `0x0f`
     if (!currentState_) {
         Log("DIAGNOSTIC: BeginMarginHandshake has no active CLTLoginState to dispatch");
         return 0u;
     }
 
-    return currentState_->Slot3_BeginOrContinue(/*upstreamOrArg=*/currentState_, this);
+    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
+    switch (marginBootstrapState.phase) {
+        case MarginBootstrapPhase::kReady:
+            Log(
+                "DIAGNOSTIC: launcher-owned margin bootstrap already complete; returning control to current state slot3 currentState=%s sessionId=0x%08x",
+                currentState_->DebugName(),
+                (unsigned)marginBootstrapState.marginSessionId);
+            return currentState_->Slot3_BeginOrContinue(/*upstreamOrArg=*/currentState_, this);
+
+        case MarginBootstrapPhase::kIdle:
+            break;
+
+        case MarginBootstrapPhase::kSentCertConnectRequest:
+        case MarginBootstrapPhase::kSentCertChallengeResponse:
+        case MarginBootstrapPhase::kSentMsConnectRequest:
+        case MarginBootstrapPhase::kSentMsConnectChallengeResponse:
+            Log(
+                "DIAGNOSTIC: launcher-owned margin bootstrap already in progress phase=%u waitingOn='%s' currentState=%s",
+                (unsigned)marginBootstrapState.phase,
+                expectedMarginRequestName_ ? expectedMarginRequestName_ : "<unset>",
+                currentState_->DebugName());
+            return 1u;
+    }
+
+    if (!lastAuthReply_.signedData.valid || lastAuthReply_.signedData.rawBytes.empty() ||
+        lastAuthReply_.authSignatureBytes.empty()) {
+        Log(
+            "DIAGNOSTIC: BeginMarginHandshake missing auth-reply signed-data material for CERT_ConnectRequest currentState=%s",
+            currentState_->DebugName());
+        return 0u;
+    }
+
+    mxo::auth::FramedPacket packet;
+    if (!mxo::auth::BuildMarginCertConnectRequestPacket(
+            lastAuthReply_,
+            mxo::auth::kFrameModeAuto,
+            &packet)) {
+        Log("DIAGNOSTIC: BeginMarginHandshake failed to build CERT_ConnectRequest");
+        return 0u;
+    }
+
+    const uint32_t sendResult = SendMarginFramedPacket(
+        packet,
+        0x01u,
+        "CERT_ConnectRequest",
+        /*encryptedTransport=*/false);
+    if (sendResult != 0u) {
+        marginBootstrapState.phase = MarginBootstrapPhase::kSentCertConnectRequest;
+        expectedMarginRequestName_ = "CERT_Challenge";
+    }
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x41ecd0
@@ -1484,6 +1568,43 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
     }
     if (!connection || !envelope.sharedMessage) {
         return 0u;
+    }
+
+    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
+    if (marginBootstrapState.phase == MarginBootstrapPhase::kReady &&
+        !marginBootstrapState.marginTwofishKeyBytes.empty()) {
+        const uint8_t* payloadBytes = envelope.sharedMessage->PayloadBaseScaffold();
+        const uint32_t payloadByteCount = envelope.sharedMessage->PayloadByteCountScaffold();
+        mxo::auth::FramedPacket encryptedPacket;
+        if (!payloadBytes || payloadByteCount == 0u ||
+            !mxo::auth::EncryptMarginPayloadPacket(
+                payloadBytes,
+                payloadByteCount,
+                marginBootstrapState.marginTwofishKeyBytes,
+                mxo::auth::kFrameModeAuto,
+                &encryptedPacket)) {
+            spdlog::warn(
+                "CLTLoginMediator::SendCurrentMarginPacketScaffold failed to encrypt post-bootstrap margin payload rawOpcode=0x{:02x} payloadBytes={} state={} sessionId=0x{:08x}",
+                payloadBytes ? static_cast<unsigned>(payloadBytes[0]) : 0u,
+                static_cast<unsigned>(payloadByteCount),
+                static_cast<unsigned>(connection->State()),
+                static_cast<unsigned>(marginBootstrapState.marginSessionId));
+            return 0u;
+        }
+
+        spdlog::info(
+            "CLTLoginMediator::SendCurrentMarginPacketScaffold encrypted post-bootstrap margin payload rawOpcode=0x{:02x} payloadBytes={} outerHeaderBytes={} outerPayloadBytes={} sessionId=0x{:08x} host='{}' state={}",
+            static_cast<unsigned>(payloadBytes[0]),
+            static_cast<unsigned>(payloadByteCount),
+            static_cast<unsigned>(encryptedPacket.headerBytes.size()),
+            static_cast<unsigned>(encryptedPacket.payloadBytes.size()),
+            static_cast<unsigned>(marginBootstrapState.marginSessionId),
+            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+            static_cast<unsigned>(connection->State()));
+        return connection->SendBuffer(
+            encryptedPacket.bytes.data(),
+            static_cast<uint32_t>(encryptedPacket.bytes.size()),
+            nullptr);
     }
 
     const std::vector<uint8_t> framedBytesFrom0a = envelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
@@ -2089,6 +2210,251 @@ uint32_t CLTLoginMediator::SendAuthFramedPacket(
     return sendResult;
 }
 
+uint32_t CLTLoginMediator::SendMarginFramedPacket(
+    const mxo::auth::FramedPacket& packet,
+    uint8_t plainRawCode,
+    const char* stepLabel,
+    bool encryptedTransport) {
+    mxo::liblttcp::CMessageConnection* connection = MarginConnection();
+    if (!connection) {
+        connection = EnsureMarginConnectionObject();
+    }
+    if (!connection || packet.bytes.empty()) {
+        return 0u;
+    }
+
+    const uint32_t sendResult = connection->SendBuffer(
+        packet.bytes.data(),
+        static_cast<uint32_t>(packet.bytes.size()),
+        nullptr);
+    Log(
+        "DIAGNOSTIC: launcher-owned margin bootstrap send step='%s' rawCode=0x%02x transportEncrypted=%u outerHeaderLen=%u outerPayloadLen=%u outerByteCount=%u -> sendResult=0x%08x",
+        (stepLabel && stepLabel[0]) ? stepLabel : "<unnamed>",
+        (unsigned)plainRawCode,
+        encryptedTransport ? 1u : 0u,
+        (unsigned)packet.headerBytes.size(),
+        (unsigned)packet.payloadBytes.size(),
+        (unsigned)packet.bytes.size(),
+        (unsigned)sendResult);
+    return sendResult;
+}
+
+void CLTLoginMediator::ResetMarginBootstrapState() {
+    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
+    marginBootstrapState.phase = MarginBootstrapPhase::kIdle;
+    marginBootstrapState.authReplyPrivateExponentBytes.clear();
+    marginBootstrapState.marginTwofishKeyBytes.clear();
+    marginBootstrapState.certChallengeBytes.clear();
+    marginBootstrapState.marginSessionId = 0u;
+    stagedIncomingMarginPacketBytes_.clear();
+}
+
+uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    bool transportEncrypted) {
+    if (!payloadBytes || payloadSize == 0u) {
+        return 0u;
+    }
+
+    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
+    const uint8_t rawCode = payloadBytes[0];
+    switch (rawCode) {
+        case 0x02u: {
+            Log(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_Challenge transportEncrypted=%u payloadLen=%u",
+                transportEncrypted ? 1u : 0u,
+                (unsigned)payloadSize);
+
+            mxo::auth::MarginCertChallenge challenge;
+            if (!mxo::auth::ParseMarginCertChallengePayload(
+                    payloadBytes,
+                    payloadSize,
+                    lastAuthReply_.signedData,
+                    marginBootstrapState.authReplyPrivateExponentBytes,
+                    &challenge)) {
+                Log(
+                    "DIAGNOSTIC: launcher-owned margin failed to parse CERT_Challenge transportEncrypted=%u payloadLen=%u",
+                    transportEncrypted ? 1u : 0u,
+                    (unsigned)payloadSize);
+                return 0u;
+            }
+
+            marginBootstrapState.marginTwofishKeyBytes = challenge.twofishKeyBytes;
+            marginBootstrapState.certChallengeBytes = challenge.challengeBytes;
+
+            mxo::auth::FramedPacket response;
+            if (!mxo::auth::BuildMarginCertChallengeResponsePacket(
+                    marginBootstrapState.certChallengeBytes,
+                    marginBootstrapState.marginTwofishKeyBytes,
+                    mxo::auth::kFrameModeAuto,
+                    &response)) {
+                Log("DIAGNOSTIC: launcher-owned margin failed to build CERT_ChallengeResponse");
+                return 0u;
+            }
+
+            const uint32_t sendResult = SendMarginFramedPacket(
+                response,
+                0x03u,
+                "CERT_ChallengeResponse",
+                /*encryptedTransport=*/true);
+            if (sendResult != 0u) {
+                marginBootstrapState.phase = MarginBootstrapPhase::kSentCertChallengeResponse;
+                expectedMarginRequestName_ = "CERT_ConnectReply";
+            }
+            return sendResult;
+        }
+
+        case 0x04u: {
+            Log(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_ConnectReply transportEncrypted=%u payloadLen=%u",
+                transportEncrypted ? 1u : 0u,
+                (unsigned)payloadSize);
+
+            if (payloadSize < 5u) {
+                return 0u;
+            }
+            const uint32_t status = ReadU32LE(payloadBytes + 1u);
+            if (status != 0u) {
+                Log(
+                    "DIAGNOSTIC: launcher-owned margin observed CERT_ConnectReply failure status=0x%08x",
+                    (unsigned)status);
+                return 0u;
+            }
+
+            auto pickWeirdSequence = [this]() {
+                const std::array<const std::array<uint32_t, 4>*, 9> candidates = {
+                    &SelectionContextBlockCf0(),
+                    &SelectionContextBlockD00(),
+                    &SelectionContextBlockD10(),
+                    &SelectionContextBlockD20(),
+                    &SelectionContextBlockD30(),
+                    &SelectionContextBlockD40(),
+                    &SelectionContextBlockD50(),
+                    &SelectionContextBlockD60(),
+                    &SelectionContextBlockD70()};
+                std::array<uint8_t, 16> bytes = {};
+                for (const auto* candidate : candidates) {
+                    if (!candidate) {
+                        continue;
+                    }
+                    if ((*candidate)[0] == 0u && (*candidate)[1] == 0u && (*candidate)[2] == 0u && (*candidate)[3] == 0u) {
+                        continue;
+                    }
+                    for (size_t i = 0; i < 4u; ++i) {
+                        const uint32_t value = (*candidate)[i];
+                        bytes[i * 4u + 0u] = static_cast<uint8_t>(value & 0xffu);
+                        bytes[i * 4u + 1u] = static_cast<uint8_t>((value >> 8u) & 0xffu);
+                        bytes[i * 4u + 2u] = static_cast<uint8_t>((value >> 16u) & 0xffu);
+                        bytes[i * 4u + 3u] = static_cast<uint8_t>((value >> 24u) & 0xffu);
+                    }
+                    break;
+                }
+                return bytes;
+            };
+
+            uint32_t clientDllVersion = authLauncherVersion_;
+            if (!lastAuthReply_.worlds.empty() && lastAuthReply_.worlds[0].clientVersion != 0u) {
+                clientDllVersion = lastAuthReply_.worlds[0].clientVersion;
+            }
+
+            mxo::auth::FramedPacket response;
+            if (!mxo::auth::BuildMarginConnectRequestPacket(
+                    authLauncherVersion_,
+                    clientDllVersion,
+                    pickWeirdSequence(),
+                    marginBootstrapState.marginTwofishKeyBytes,
+                    mxo::auth::kFrameModeAuto,
+                    &response)) {
+                Log("DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectRequest");
+                return 0u;
+            }
+
+            const uint32_t sendResult = SendMarginFramedPacket(
+                response,
+                0x06u,
+                kMessageMsConnectRequest,
+                /*encryptedTransport=*/true);
+            if (sendResult != 0u) {
+                marginBootstrapState.phase = MarginBootstrapPhase::kSentMsConnectRequest;
+                expectedMarginRequestName_ = "MS_ConnectChallenge";
+            }
+            return sendResult;
+        }
+
+        case 0x07u: {
+            Log(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectChallenge transportEncrypted=%u payloadLen=%u",
+                transportEncrypted ? 1u : 0u,
+                (unsigned)payloadSize);
+
+            std::array<uint8_t, 16> md5Bytes = {};
+            if (authKeyConfigMd5_.size() >= md5Bytes.size()) {
+                std::copy_n(authKeyConfigMd5_.begin(), md5Bytes.size(), md5Bytes.begin());
+            }
+
+            mxo::auth::FramedPacket response;
+            if (!mxo::auth::BuildMarginConnectChallengeResponsePacket(
+                    md5Bytes,
+                    marginBootstrapState.marginTwofishKeyBytes,
+                    mxo::auth::kFrameModeAuto,
+                    &response)) {
+                Log("DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectChallengeResponse");
+                return 0u;
+            }
+
+            const uint32_t sendResult = SendMarginFramedPacket(
+                response,
+                0x08u,
+                "MS_ConnectChallengeResponse",
+                /*encryptedTransport=*/true);
+            if (sendResult != 0u) {
+                marginBootstrapState.phase = MarginBootstrapPhase::kSentMsConnectChallengeResponse;
+                expectedMarginRequestName_ = kMessageMsConnectReply;
+            }
+            return sendResult;
+        }
+
+        case 0x09u: {
+            Log(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectReply transportEncrypted=%u payloadLen=%u",
+                transportEncrypted ? 1u : 0u,
+                (unsigned)payloadSize);
+
+            mxo::auth::MarginConnectReply reply;
+            if (!mxo::auth::ParseMarginConnectReplyPayload(payloadBytes, payloadSize, &reply)) {
+                Log(
+                    "DIAGNOSTIC: launcher-owned margin failed to parse MS_ConnectReply transportEncrypted=%u payloadLen=%u",
+                    transportEncrypted ? 1u : 0u,
+                    (unsigned)payloadSize);
+                return 0u;
+            }
+
+            marginBootstrapState.marginSessionId = reply.sessionId;
+            marginBootstrapState.phase = MarginBootstrapPhase::kReady;
+            expectedMarginRequestName_ =
+                (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u)
+                    ? "existing-character state8 raw-0x0f margin packet"
+                    : "post-auth helper state margin packet";
+            Log(
+                "DIAGNOSTIC: launcher-owned margin bootstrap completed sessionId=0x%08x field0d=0x%04x field0f=0x%04x field11=0x%04x field13=0x%04x field15=0x%04x currentState=%s",
+                (unsigned)reply.sessionId,
+                (unsigned)reply.field0d,
+                (unsigned)reply.field0f,
+                (unsigned)reply.field11,
+                (unsigned)reply.field13,
+                (unsigned)reply.field15,
+                currentState_ ? currentState_->DebugName() : "<null>");
+            return currentState_ ? currentState_->Slot3_BeginOrContinue(currentState_, this) : 1u;
+        }
+
+        default:
+            break;
+    }
+
+    return 0u;
+}
+
 uint32_t CLTLoginMediator::SendAuthGetPublicKeyRequest() {
     // Address anchors:
     // - launcher.exe:0x447eb0 = strongest current raw 0x06 send builder
@@ -2467,18 +2833,21 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     // - launcher.exe:0x41bc20 = auth opcode read helper on later incoming path
     // - launcher.exe:0x4401a0 = strongest current AS_AuthReply handler
     // - launcher.exe:0x43a330 = concrete auth-reply parse/helper object builder
-    mxo::auth::FramedPacket framedPacket;
-    if (!packetBytes || !mxo::auth::ParseVariableLengthPacket(packetBytes, packetSize, &framedPacket) ||
-        framedPacket.payloadBytes.empty()) {
+    // Receive-side note:
+    // - the diagnostic auth bridge already strips the variable-length frame header before calling
+    //   this mediator entry point
+    // - so this function must operate on logical auth payload bytes beginning at raw opcode, not
+    //   try to frame-parse them a second time
+    if (!packetBytes || packetSize == 0u) {
         return 0;
     }
 
-    const uint8_t rawCode = framedPacket.payloadBytes[0];
+    const uint8_t rawCode = packetBytes[0];
     switch (rawCode) {
         case kAuthRawCodeGetPublicKeyReply: {
             // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
             mxo::auth::GetPublicKeyReply reply;
-            if (!mxo::auth::ParseGetPublicKeyReplyPacket(packetBytes, packetSize, &reply)) {
+            if (!mxo::auth::ParseGetPublicKeyReplyPayload(packetBytes, packetSize, &reply)) {
                 Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_GetPublicKeyReply");
                 return 0;
             }
@@ -2503,7 +2872,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
         case 0x09: {
             // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
             mxo::auth::AuthChallenge challenge;
-            if (!mxo::auth::ParseAuthChallengePacket(packetBytes, packetSize, &challenge)) {
+            if (!mxo::auth::ParseAuthChallengePayload(packetBytes, packetSize, &challenge)) {
                 Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthChallenge");
                 return 0;
             }
@@ -2555,7 +2924,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
                 "DIAGNOSTIC: launcher-owned auth received unhandled packet rawCode=0x%02x message='%s' payloadLen=%u",
                 (unsigned)rawCode,
                 mxo::auth::AuthOpcodeName(rawCode),
-                (unsigned)framedPacket.payloadBytes.size());
+                (unsigned)packetSize);
             break;
     }
 
@@ -2567,20 +2936,53 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
         return 0u;
     }
 
-    stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-    const uint16_t rawCode = packetBytes[0];
+    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
+    std::vector<uint8_t> decryptedPayloadBytes;
+    const uint8_t* effectivePacketBytes = packetBytes;
+    size_t effectivePacketSize = packetSize;
+    bool transportEncrypted = false;
+    if (!marginBootstrapState.marginTwofishKeyBytes.empty() &&
+        mxo::auth::DecryptMarginPayloadPacket(
+            packetBytes,
+            packetSize,
+            marginBootstrapState.marginTwofishKeyBytes,
+            &decryptedPayloadBytes) &&
+        !decryptedPayloadBytes.empty()) {
+        effectivePacketBytes = decryptedPayloadBytes.data();
+        effectivePacketSize = decryptedPayloadBytes.size();
+        transportEncrypted = true;
+    }
+
+    stagedIncomingMarginPacketBytes_.assign(
+        effectivePacketBytes,
+        effectivePacketBytes + effectivePacketSize);
+    const uint16_t rawCode = effectivePacketBytes[0];
     ++marginPacketReceiveCountScaffold_;
     lastMarginPacketOpcodeScaffold_ = rawCode;
-    lastMarginPacketSizeScaffold_ = static_cast<uint32_t>(packetSize);
+    lastMarginPacketSizeScaffold_ = static_cast<uint32_t>(effectivePacketSize);
 
     spdlog::info(
-        "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} currentState={} receiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
+        "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} transportEncrypted={} currentState={} receiveCount={} filteredBeforeSlot6={} slot6DispatchCount={} bootstrapPhase={}",
         static_cast<unsigned>(rawCode),
-        static_cast<unsigned>(packetSize),
+        static_cast<unsigned>(effectivePacketSize),
+        transportEncrypted ? 1u : 0u,
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(marginPacketReceiveCountScaffold_),
         static_cast<unsigned>(marginPacketFilteredBeforeSlot6CountScaffold_),
-        static_cast<unsigned>(marginPacketSlot6DispatchCountScaffold_));
+        static_cast<unsigned>(marginPacketSlot6DispatchCountScaffold_),
+        static_cast<unsigned>(marginBootstrapState.phase));
+
+    // Route launcher-owned CERT/MS bootstrap packets first.
+    // This keeps the bootstrap progression explicit instead of faking a ready state after
+    // transport connect.
+    if (marginBootstrapState.phase != MarginBootstrapPhase::kReady ||
+        rawCode == 0x02u || rawCode == 0x04u || rawCode == 0x07u || rawCode == 0x09u) {
+        const uint32_t bootstrapHandled =
+            ContinueMarginBootstrapHandshake(effectivePacketBytes, effectivePacketSize, transportEncrypted);
+        if (bootstrapHandled != 0u) {
+            return bootstrapHandled;
+        }
+    }
 
     // anchor: launcher.exe:0x44af20 -> 0x442d00 -> 0x41f260
     // Exact receive-side boundary now mirrored in source:
@@ -2591,7 +2993,7 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
         spdlog::info(
             "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} would be consumed by base margin dispatch before helper slot6 receiveCount={} filteredBeforeSlot6={} currentState={}",
             static_cast<unsigned>(rawCode),
-            static_cast<unsigned>(packetSize),
+            static_cast<unsigned>(effectivePacketSize),
             static_cast<unsigned>(marginPacketReceiveCountScaffold_),
             static_cast<unsigned>(marginPacketFilteredBeforeSlot6CountScaffold_),
             currentState_ ? currentState_->DebugName() : "<null>");
@@ -2601,9 +3003,9 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     if (currentState_ != nullptr) {
         ++marginPacketSlot6DispatchCountScaffold_;
         spdlog::info(
-            "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} routing to current helper slot6 dispatchCount={} currentState={}",
+            "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} routing post-bootstrap packet to current helper slot6 dispatchCount={} currentState={}",
             static_cast<unsigned>(rawCode),
-            static_cast<unsigned>(packetSize),
+            static_cast<unsigned>(effectivePacketSize),
             static_cast<unsigned>(marginPacketSlot6DispatchCountScaffold_),
             currentState_->DebugName());
         return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
@@ -2612,7 +3014,7 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     spdlog::info(
         "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} has no active helper state; using direct helper11 scaffold parser",
         static_cast<unsigned>(rawCode),
-        static_cast<unsigned>(packetSize));
+        static_cast<unsigned>(effectivePacketSize));
     return HandleStagedMarginLoadCharacterReplyPacketScaffold();
 }
 
@@ -2622,7 +3024,7 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     }
 
     mxo::auth::AuthReply reply;
-    if (!mxo::auth::ParseAuthReplyPacket(
+    if (!mxo::auth::ParseAuthReplyPayload(
             stagedIncomingAuthPacketBytes_.data(),
             stagedIncomingAuthPacketBytes_.size(),
             &reply)) {
@@ -2631,13 +3033,20 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     }
 
     lastAuthReply_ = reply;
+    ResetMarginBootstrapState();
+    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
+    if (!mxo::auth::DecryptAuthReplyPrivateExponent(
+            reply,
+            lastAuthRequestBuildResult_.twofishKeyBytes,
+            lastAuthChallenge_.encryptedChallengeBytes,
+            &marginBootstrapState.authReplyPrivateExponentBytes)) {
+        marginBootstrapState.authReplyPrivateExponentBytes.clear();
+        Log("DIAGNOSTIC: launcher-owned auth could not recover private exponent bytes needed for later margin CERT bootstrap");
+    }
     AdoptAuthReplyIntoRecoveredMediatorState();
     LogParsedAuthReply(reply);
     expectedAuthRequestName_ = nullptr;
-    expectedMarginRequestName_ =
-        (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u)
-            ? "post-AS_AuthReply existing-character state8 raw-0x0f margin packet"
-            : "post-AS_AuthReply helper11 raw-0x4d margin packet";
+    expectedMarginRequestName_ = "CERT_ConnectRequest";
     return 1u;
 }
 

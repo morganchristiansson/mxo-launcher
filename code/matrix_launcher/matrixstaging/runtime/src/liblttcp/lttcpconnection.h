@@ -94,6 +94,7 @@ public:
     int PollReceiveNonBlocking();
     const std::vector<uint8_t>& ReceivedBytes() const;
     void ClearReceivedBytes();
+    void ConsumeReceivedBytesPrefix(size_t byteCount);
 
     // Placeholder reimplementation entry points.
     // These names follow original launcher/client strings, but behavior is still skeletal.

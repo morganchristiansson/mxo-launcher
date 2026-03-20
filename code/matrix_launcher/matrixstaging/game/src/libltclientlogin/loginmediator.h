@@ -1026,6 +1026,21 @@ private:
     void SeedHelper11SourceBlockFromRecoveredPostAuthStateIfUnset();
     void AdoptAuthReplyIntoRecoveredMediatorState();
 
+    uint32_t SendMarginFramedPacket(
+        const mxo::auth::FramedPacket& packet,
+        uint8_t plainRawCode,
+        const char* stepLabel,
+        bool encryptedTransport);
+    uint32_t ContinueMarginBootstrapHandshake(
+        const uint8_t* payloadBytes,
+        size_t payloadSize,
+        bool transportEncrypted);
+    // ABI-safety note:
+    // - margin CERT/MS bootstrap/session storage is intentionally kept in a sidecar keyed by the
+    //   mediator pointer in `loginmediator.cpp`
+    // - do not add those transient fields into the middle of `CLTLoginMediator`
+    void ResetMarginBootstrapState();
+
     void BuildAuthEndpoint();
     void BuildMarginEndpoint();
     bool RebuildMarginAddressList();
@@ -1144,6 +1159,12 @@ private:
     mxo::auth::AuthReply lastAuthReply_;
     std::vector<uint8_t> stagedIncomingAuthPacketBytes_;
     std::vector<uint8_t> stagedIncomingMarginPacketBytes_;
+    // ABI-safety note:
+    // - recovered margin bootstrap/session state derived from auth reply material is stored in a
+    //   sidecar keyed by `this` in `loginmediator.cpp`
+    // - that keeps existing in-class field order stable while we still treat this storage as
+    //   launcher-owned transitional state
+
 
     uint32_t lastAuthConnectStatus_;
     uint32_t lastMarginConnectStatus_;

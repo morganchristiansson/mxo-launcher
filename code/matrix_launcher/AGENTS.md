@@ -42,7 +42,8 @@ Source of truth:
   - mediator `+0x2c` is live
   - arg5 helper `+0x60` slot `0` / slot `1` are live
   - auth-side queue0C type-2 / type-3 items are consumed on the live `RunClientDLL` path
-  - launcher-owned auth now progresses through `AS_GetPublicKeyReply` / `AS_AuthChallenge` / `AS_AuthReply`
+  - latest clean `run_binder_both_runtime` validation now re-proves the launcher-owned auth path,
+    then continues through the launcher-owned margin CERT/MS bootstrap instead of stalling before it
 - newer post-auth live milestone on the real deliberate runtime path:
   - State4/`0x41e500` margin begin now returns non-zero
   - margin-side type-2 connect-status work is now consumed
@@ -69,15 +70,15 @@ Source of truth:
       `MXO_DIAGNOSTIC_SANITIZE_SELECTION_CFG_DERIVED_BLOCKS=1`; it is not part of the faithful path
   - this moves the replacement boundary later and closer to the natural-original shape than the old
     helper11-only stall
-  - current new replacement-side blocker is now the next receive step after that state8 send:
-    - still no incoming margin reply yet in the short run window
-    - state8 slot 6 / raw `0x10` has not fired yet on our own run
-    - newer original-vs-replacement tightening now makes the state8 send itself much less suspect:
-      the natural state8 path uses the same raw `0x0f` builder family and the replacement now
-      matches the natural `0x0be` payload length, leading `0f ce 6d 00` bytes, and trailing empty
-      `GameSessionID` reservation shape
-    - practical consequence: the next gap is weighted more toward post-send reply prerequisites /
-      receive readiness than toward broad state8 packet-builder authenticity
+  - newer validation now closes the old state8 blocker later too:
+    - launcher-owned margin bootstrap now runs in order on the deliberate runtime path:
+      `0x01 -> 0x02 -> 0x03 -> 0x04 -> 0x06 -> 0x07 -> 0x08 -> 0x09`
+    - bootstrap completion now returns control to state8 slot 3
+    - post-bootstrap state8 raw `0x0f` is now sent on encrypted margin transport
+    - the first decrypted incoming raw `0x10` now arrives and routes through state8 slot 6
+    - state8 reply progression now completes far enough to switch into helper9/state9 with event `0x0b`
+    - practical consequence: the active replacement boundary has moved past the old
+      "missing first raw `0x10`" blocker and into the later state9 / post-state9 continuation
   - helper10/state10 raw `0x0a` / helper11/state11 raw `0x0c` now stay explicit as the later
     claim/create-character branch, not the default existing-character path
 - newer original-launcher WineDbg evidence now moves the faithful branch boundary later again:
@@ -122,46 +123,46 @@ Current unresolved inputs remain, but the active login-side blocker has narrowed
 - the real original password-submit branch is now confirmed as:
   - `0x41ecd0 = ProcessLoginRequest`
   - then `0x41c1f0` / state `3 -> 8`
-- the active state-8 branch remains **closed enough in source for the intended path shape**, and
-  newer original-launcher WineDbg runs now prove the natural path is later than the old
-  post-send-boundary read:
-  - natural original reaches `0x43bd20`, the `0x41af70/0x41cf30` send bridge, and
-    `0x43f930`
-- practical consequence:
-  - for faithful original-launcher progression, the next highest-value target is now the
-    **post-state9 continuation after the now-proven `0x43f930 -> 0x439780 -> 0x41de40 -> 0x43c180` path**,
-    especially the concrete state-`0x0c` continuation after the now-proven state9 success-side
-    event `0x18`
-  - current strongest visible-status clue at that later boundary is now:
-    - natural original is already showing **Waiting for Regionserver** around the
-      `0x43c180/0x43c1c2` success-side window
-  - current strongest negative-result clue there is also now:
-    - follow-up late probes on `0x004397e0` / `0x0041c5c0` did not fire naturally
-  - keep the deeper owner/collaborator behavior under `0x41de40` and `0x41b420` source-owned
-    before broadening back into helper11-first theories
-- keep only two narrow state-8 leftovers explicit in source for now:
-  - non-`0x10` slot-6 fallback through `0x41c5c0`
-  - section-`0x0b` side effect through `0x43f8c0`
-- the immediate continuation after successful state-8 completion is now also live in original
-  through helper9/state9 slot 3 (`0x439780`), the deeper owner/helper submit path `0x41de40`,
-  and the later state9 slot-6 reply body `0x43c180`; the next natural-original area to tighten is
-  now the post-state9 / state-`0x0c` continuation, with `0x41de40` and `0x41b420` kept
-  source-owned as already-proven bridges
-- forced-`RunClientDLL` scaffold evidence now proves a closer existing-character branch too:
-  - preserve helper state `0x08` through `AS_AuthChallengeResponse`
-  - route successful `AS_AuthReply` back onto the existing-character state8 path
-  - consume margin connect-status and promote the connection into the ready state required by
-    `0x41b4b0`
-  - send the structured state8 raw-`0x0f` / `MS_LoadCharacterRequest` packet
-- so keep two distinct truths explicit:
+- the active state-8 send body is now **closed enough** for the existing-character path:
+  - natural original uses raw `0x0f` / `MS_LoadCharacterRequest`
+  - replacement now reaches the same raw-`0x0f` send family with the later send bridge
+    `0x41af70 -> 0x41cf30`
+- the old "margin connect-status -> direct state8 raw `0x0f`" framing is no longer acceptable:
+  - open server/proxy evidence currently points at:
+    - plaintext `CERT_ConnectRequest (0x01)`
+    - plaintext `CERT_Challenge (0x02)`
+    - encrypted `CERT_ChallengeResponse (0x03)`
+    - encrypted `CERT_ConnectReply (0x04)`
+    - encrypted `MS_ConnectRequest (0x06)`
+    - encrypted `MS_ConnectChallenge (0x07)`
+    - encrypted `MS_ConnectChallengeResponse (0x08)`
+    - encrypted `MS_ConnectReply (0x09)`
+    - only then later encrypted load-family traffic like raw `0x0f`
+- latest clean runtime validation after the auth receive fix and relaxed `MS_ConnectReply` prefix
+  parse now pushes the active replacement boundary later again:
+  - auth now again progresses through `AS_GetPublicKeyReply`, `AS_AuthChallenge`, and `AS_AuthReply`
+  - margin bootstrap now runs and completes on the deliberate runtime path
+  - encrypted post-bootstrap state8 raw `0x0f` send is now live-proven
+  - decrypted incoming raw `0x10` traffic is now live-proven and routed through state8 slot 6
+  - state8 reply progression now completes and switches into helper9/state9 with event `0x0b`
+  - so the immediate blocker is no longer the old state8/bootstrap gap; it has moved later into the
+    state9 / post-state9 continuation
+- keep two distinct truths explicit:
   - **original launcher live boundary now crossed**: natural original reaches the state8 send tail,
     `0x43f930`, `0x439780`, `0x41de40`, `0x43c180`, then `0x41b450(0x0c)`, `0x41cfb0(0x18)`, and
     later `0x41cfb0(0x0f)` before entering game
-  - **replacement launcher active boundary moved later**: the current existing-character scaffold
-    now reaches the same raw-`0x0f` state8 send family, but has not yet produced the later incoming
-    state8 raw-`0x10` / `MS_LoadCharacterReply`
-- launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
-  first-string consequences are now source-owned, but broader post-auth writeback is still incomplete
+  - **replacement launcher active boundary moved later but is still incomplete**:
+    current existing-character scaffold now reaches and completes the old state8 bootstrap/reply
+    barrier (`0x09` bootstrap completion, encrypted raw `0x0f`, decrypted raw `0x10`, helper9/state9
+    switch), but has not yet been tightened through the later natural-original state9/post-state9 tail
+- practical ownership split to preserve:
+  - state4 / `0x439300` + mediator `0x41e500` starts margin work
+  - low-level margin CERT/MS bootstrap appears to belong primarily to the margin connection family
+  - later state8/state11/state9 slot-6 bodies consume only reply traffic that survives base margin dispatch
+- broader post-auth writeback is still incomplete:
+  - launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
+    first-string consequences are source-owned
+  - but broader launcher-owned startup/runtime state is still missing
 - arg6: `ILTLoginMediator.Default` from `0x4d2c58`
 - arg7: packed selection state from `CLauncher+0xa8/+0xac`
 - arg8: flag byte from `0x4d2c69`
@@ -243,35 +244,32 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 
 ## Current implementation priorities
 
-1. Treat the now-confirmed password-submit branch through state `8` and deeper into state9 as
-   **closed enough in source**, and update the next faithful original-live question accordingly:
-   - `0x41ecd0`
-   - `0x41c1f0`
-   - `0x43bd20`
-   - `0x41af70`
-   - `0x41cf30`
+1. Finish the missing launcher-owned margin bootstrap between state4/`0x41e500` and the existing-character state8 raw `0x0f` send:
+   - keep the ownership split explicit:
+     - state4 / `0x439300` starts margin work
+     - margin connection family owns the CERT/MS bootstrap surface
+     - only after bootstrap completion should control naturally return to the active state slot-3 sender
+2. Keep the state8 send body itself treated as closed enough unless new evidence shows a concrete mismatch:
+   - raw `0x0f`
+   - natural/replacement send bridge `0x41af70 -> 0x41cf30`
+   - keep only the narrow explicit leftovers:
+     - non-`0x10` slot-6 fallback through `0x41c5c0`
+     - section-`0x0b` side effect through `0x43f8c0`
+3. Keep work in lockstep across:
+   - Ghidra names/types
+   - source implementation
+   - canonical docs
+4. Use original-launcher evidence to steer ownership/sequence, and use open server/proxy code only to recover packet/crypto requirements
+5. Once the replacement reaches the first real state8 raw `0x10`, retighten focus on the later natural-original post-state9 / state-`0x0c` continuation:
    - `0x43f930`
    - `0x439780`
    - `0x41de40`
    - `0x43c180`
-   - immediate next task is now the later post-state9 / state-`0x0c` continuation, while keeping
-     the already-proven owner/helper submit bridge under `0x41de40` and success-side effect path
-     under `0x41b420` tight in source
-2. Keep the remaining narrow state-8 leftovers explicit, but do not reopen the whole state unless
-   the runtime path proves they matter:
-   - non-`0x10` fallback through `0x41c5c0`
-   - section-`0x0b` side effect through `0x43f8c0`
-3. Treat helper11/state11 as a **real later scaffold/runtime stall**, but keep it secondary while
-   the natural original path is now confirmed later on the state8 reply branch
-4. Keep that work in lockstep across:
-   - Ghidra names/types
-   - source implementation
-   - canonical docs
-5. Use original-launcher WineDbg evidence to steer priority when it contradicts scaffold intuition;
-   right now that means deeper state9 / post-state9 continuation outranks speculative helper11
-   producer work
-6. Continue active-path arg5 queue work where it directly helps the game-running path, but do not
-   let arg5 work displace the confirmed state8/original-live continuation boundary
+   - `0x41b420`
+   - `0x41b450(0x0c)`
+   - `0x41cfb0(0x18)`
+   - later `0x41cfb0(0x0f)`
+6. Continue active-path arg5 queue work where it directly helps the game-running path, but do not let it displace the current margin-bootstrap blocker
 7. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
 8. Keep pruning duplicated queue logic from ABI scaffolding into canonical liblttcp/libltmessaging code when safe
 9. Keep auth launcher-owned, not client-owned
@@ -331,37 +329,26 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
 
 ## Immediate next tasks
 
-1. Keep state `8` closed enough in source for the active path:
+1. Treat the old state8/bootstrap blocker as closed enough in source for the deliberate path:
+   - auth receive rerun regression is fixed
+   - launcher-owned margin bootstrap now completes on the active path
+   - encrypted state8 raw `0x0f` send is live
+   - decrypted raw `0x10` receive is live and routed through state8 slot 6
+2. Retighten the immediate replacement-launcher question later again:
+   - helper9/state9 handoff after completed state8 reply progression
+   - the later state9 / post-state9 continuation toward the already-proven natural-original tail
+3. Keep state `8` closed enough in source while doing that:
    - keep only the narrow explicit leftovers:
      - non-`0x10` fallback through `0x41c5c0`
      - section-`0x0b` side effect through `0x43f8c0`
-2. Retarget the immediate faithful-original problem using the newest WineDbg evidence:
-   - natural original runs now hit `0x41c1f0`, `0x43bd20`, the `0x41af70/0x41cf30` send bridge,
-     `0x43f930`, the helper9/state9 slot-3 follow-on `0x439780`, then `0x41de40`, the state9
-     slot-6 reply path `0x43c180`, then the post-success tail `0x41b450(0x0c) -> 0x41cfb0(0x18)`
-     and later `0x41cfb0(0x0f)` before entering game
-   - keep `0x41de40`, `0x43c180`, `0x41b420`, `0x41b450`, and `0x41cfb0` source-owned / documented
-     as the now-proven natural bridge family
-   - do not assume that state-`0x0c` immediately means natural hits on `0x004397e0` / `0x0041c5c0`:
-     the later breakpoint-only run still entered game without either hit
-   - next highest-value static question is now the event-consumer/listener path behind owner `+0x674`
-     and the concrete meaning of the later `0x0f` post on that continuation
-3. Keep the helper10/helper11 story explicit but secondary while doing that:
-   - helper10/state10 raw `0x0a` and helper11/state11 raw `0x0c` now read as the
-     claim/create-character branch
-   - that branch is no longer the best default replacement-launcher path for the current account
-   - even deliberately non-empty helper11 payload seeding was already proven insufficient by itself
-4. In parallel, tighten the new replacement-launcher blocker directly:
-   - incoming state8 slot 6 / raw `0x10` prerequisites after the now-live state8 raw-`0x0f` send
-   - any remaining launcher-owned startup / connection / receive-routing state still needed before
-     the first real state8 reply arrives
-   - keep treating broad state8 send-authenticity theories as secondary unless new evidence shows a
-     concrete byte mismatch again; the current natural/replacement state8 send shape is now close
-5. Once the original-live event-consumer side is better explained, connect it back to the
-   replacement-launcher gap:
-   - why original reaches the later `0x18 -> 0x0f` event sequence
-   - why replacement now reaches state8 raw `0x0f` send but still does not receive the later raw
-     `0x10`
-6. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
-7. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
-8. Prune stale or resolved notes from this file instead of letting it grow again
+4. Once the replacement reaches the first real raw `0x10`, retighten focus on the later natural-original bridge family already proven live:
+   - `0x43f930`
+   - `0x439780`
+   - `0x41de40`
+   - `0x43c180`
+   - `0x41b420`
+   - `0x41b450`
+   - `0x41cfb0`
+5. Keep replacing raw queue/work/context byte-offset usage with documented source-level views when evidence is strong enough
+6. For each high-value active-path function, sync Ghidra names and types with source using function rename, variable rename, and variable/parameter retyping as understanding improves
+7. Prune stale or resolved notes from this file instead of letting it grow again
