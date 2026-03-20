@@ -47,7 +47,6 @@ That forced crash is useful for analysis, but it is **not** original-equivalent 
 ## Build
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
 make
 ```
 
@@ -60,7 +59,6 @@ This builds the active launcher directly to:
 Safe default run:
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
 make run
 ```
 

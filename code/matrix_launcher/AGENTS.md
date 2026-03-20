@@ -305,19 +305,16 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 
 Build:
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
 make
 ```
 
 Safe run:
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
 make run
 ```
 
 Current deliberate binder path:
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both
 ```
 

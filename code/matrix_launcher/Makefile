@@ -55,7 +55,7 @@ auth_probe: $(AUTH_PROBE)
 
 CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp
 
-$(TARGET): $(LAUNCHER_SRC) $(CRYPTOPP_LIB)
+$(TARGET): $(LAUNCHER_SRC) $(CRYPTOPP_LIB) $(SPDLOG_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $(LAUNCHER_SRC) $(CRYPTOPP_LIB) -Wl,--export-all-symbols -lversion -lws2_32
 
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
@@ -65,7 +65,22 @@ $(BUILD_DIR)/%.o: %.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-$(CRYPTOPP_LIB): Makefile
+# Download cryptopp and spdlog if they don't exist
+$(CRYPTOPP_DIR):
+	@echo "Downloading cryptopp..."
+	@mkdir -p $(dir $@)
+	@curl -L -o $(dir $@)/cryptopp890.zip https://www.cryptopp.com/cryptopp890.zip && \
+		unzip -q $(dir $@)/cryptopp890.zip -d $@ && \
+		rm $(dir $@)/cryptopp890.zip
+
+$(SPDLOG_DIR):
+	@echo "Downloading spdlog..."
+	@mkdir -p $(dir $@)
+	@curl -L -o $(dir $@)/spdlog-1.17.0.tar.gz https://github.com/gabime/spdlog/archive/refs/tags/v1.17.0.tar.gz && \
+		tar -xzf $(dir $@)/spdlog-1.17.0.tar.gz -C $(dir $@) && \
+		rm $(dir $@)/spdlog-1.17.0.tar.gz
+
+$(CRYPTOPP_LIB): $(CRYPTOPP_DIR)
 	@mkdir -p $(dir $@)
 	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" static
 	cp $(CRYPTOPP_DIR)/libcryptopp.a $@
