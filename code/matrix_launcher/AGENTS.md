@@ -59,20 +59,25 @@ Source of truth:
     - current slot GCID low `0x00006dce`
     - current slot GCID high `0x00000000`
     - host `reality.lith.thematrixonline.net`
-  - newer client-side selection-context tightening now also removed one clearly bad replacement-side
-    input family from that send:
-    - the copied `+0xec` selection/config object was carrying repeated cfg-parser/default values in
-      the `+0x24..+0xb3` tail while no per-selection profile cfg set existed under
-      `Profiles/<profile>/<selection>_<id>/`
-    - current scaffold now zeros those cfg-derived state8 snapshot blocks instead of forwarding the
-      repeated garbage as send material
+  - newer client-side selection-context tightening now also corrected one launcher/client ownership
+    read around that send:
+    - the copied `+0xec` selection/config object still carries repeated cfg-parser/default-looking
+      values in the `+0x24..+0xb3` tail when the client-owned per-selection cfg corpus is missing
+    - but current launcher-side scaffold now preserves those client-supplied snapshot blocks by
+      default for faithful launcher-only flow
+    - the old zeroing hack only remains as a temporary escape hatch for narrow reruns behind
+      `MXO_DIAGNOSTIC_SANITIZE_SELECTION_CFG_DERIVED_BLOCKS=1`; it is not part of the faithful path
   - this moves the replacement boundary later and closer to the natural-original shape than the old
     helper11-only stall
   - current new replacement-side blocker is now the next receive step after that state8 send:
     - still no incoming margin reply yet in the short run window
     - state8 slot 6 / raw `0x10` has not fired yet on our own run
-    - remaining authenticity gap now narrows further onto the state8 send's still-missing
-      per-selection profile/config corpus or other envelope/transport differences
+    - newer original-vs-replacement tightening now makes the state8 send itself much less suspect:
+      the natural state8 path uses the same raw `0x0f` builder family and the replacement now
+      matches the natural `0x0be` payload length, leading `0f ce 6d 00` bytes, and trailing empty
+      `GameSessionID` reservation shape
+    - practical consequence: the next gap is weighted more toward post-send reply prerequisites /
+      receive readiness than toward broad state8 packet-builder authenticity
   - helper10/state10 raw `0x0a` / helper11/state11 raw `0x0c` now stay explicit as the later
     claim/create-character branch, not the default existing-character path
 - newer original-launcher WineDbg evidence now moves the faithful branch boundary later again:
@@ -348,8 +353,10 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
    - even deliberately non-empty helper11 payload seeding was already proven insufficient by itself
 4. In parallel, tighten the new replacement-launcher blocker directly:
    - incoming state8 slot 6 / raw `0x10` prerequisites after the now-live state8 raw-`0x0f` send
-   - any remaining transport/envelope differences between our state8 send and the natural path
-   - any launcher-owned startup state still needed before the first real state8 reply arrives
+   - any remaining launcher-owned startup / connection / receive-routing state still needed before
+     the first real state8 reply arrives
+   - keep treating broad state8 send-authenticity theories as secondary unless new evidence shows a
+     concrete byte mismatch again; the current natural/replacement state8 send shape is now close
 5. Once the original-live event-consumer side is better explained, connect it back to the
    replacement-launcher gap:
    - why original reaches the later `0x18 -> 0x0f` event sequence

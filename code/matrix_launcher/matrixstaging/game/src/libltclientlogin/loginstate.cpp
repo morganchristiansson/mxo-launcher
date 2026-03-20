@@ -1114,18 +1114,9 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD60())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD70()));
     const char* gameSessionId = mediator->GetGameSessionId664();
-    const unsigned gameSessionIdByteCountWithNul =
-        gameSessionId ? static_cast<unsigned>(std::char_traits<char>::length(gameSessionId) + 1u) : 0u;
-    const unsigned naturalPayloadDeltaTo0x0be =
-        (packetBuilder.PayloadByteCount() < 0x0beu) ? (0x0beu - packetBuilder.PayloadByteCount()) : 0u;
-    const uint8_t* payloadBase = packetBuilder.PayloadBase();
-    const unsigned gameSessionIdOffsetField =
-        (payloadBase && packetBuilder.PayloadByteCount() >= 0xbbu) ? ReadU16LE(payloadBase + 0xb9) : 0u;
-    const unsigned gameSessionIdStoredLength =
-        (payloadBase && packetBuilder.PayloadByteCount() >= 0xbdu) ? ReadU16LE(payloadBase + 0xbb) : 0u;
 
     Log(
-        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x nonZeroSnapshotBlocks=%u/11 blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' gameSessionIdBytesWithNul=0x%02x sessionOffsetField=0x%02x sessionStoredLength=0x%02x naturalDeltaTo0x0be=0x%02x -> sendResult=0x%08x then posts event=9",
+        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x nonZeroSnapshotBlocks=%u/11 blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' -> sendResult=0x%08x then posts event=9",
         (unsigned)State8StructuredMarginPacketFixedPayload::kFixedByteCount,
         (unsigned)packetBuilder.PayloadByteCount(),
         currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdLow03 : 0u,
@@ -1134,10 +1125,6 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         (unsigned)mediator->SelectionContextBlockCd0()[0],
         (unsigned)mediator->SelectionContextBlockD70()[3],
         gameSessionId ? gameSessionId : "<empty>",
-        gameSessionIdByteCountWithNul,
-        gameSessionIdOffsetField,
-        gameSessionIdStoredLength,
-        naturalPayloadDeltaTo0x0be,
         (unsigned)sendResult);
     return sendResult;
 }
