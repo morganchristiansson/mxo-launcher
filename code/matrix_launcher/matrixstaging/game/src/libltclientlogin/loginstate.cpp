@@ -29,96 +29,129 @@ struct State11Packet0x4dFixedPayload {
 class RecoveredPacketBuilderEnvelope {
 public:
     // anchor: launcher.exe:0x439840
-    RecoveredPacketBuilderEnvelope() {
+    RecoveredPacketBuilderEnvelope()
+        : envelope_(mxo::liblttcp::CMessageConnection::BuildPacketBuilderEnvelopeScaffold(/*headerless=*/false)) {
         // Current best source-owned mirror of the local helper object initialized by `0x439840`:
-        // - acquires/installs a shared payload object
+        // - acquires/installs a shared payload object through the `0x455cd0 -> 0x455c60 -> 0x455bd0`
+        //   family
         // - stores the active payload write base as `shared + 0x0c`
         // - original local envelope layout is now a little tighter from disassembly:
         //   - `this+0x08` = retained shared packet/message object
         //   - `this+0x04` = base payload pointer (`shared + 0x0c`)
         //   - state-specific builders then cache string-reservation pointers/lengths in later
         //     helper-local fields before `0x41af70` forwards the whole envelope object
-        payloadBytes_.reserve(State11Packet0x4dFixedPayload::kMaxPayloadByteCount);
     }
 
     uint8_t* PayloadBase() {
-        return payloadBytes_.empty() ? nullptr : payloadBytes_.data();
+        return envelope_.sharedMessage ? envelope_.sharedMessage->PayloadBaseScaffold() : nullptr;
     }
 
     const uint8_t* PayloadBase() const {
-        return payloadBytes_.empty() ? nullptr : payloadBytes_.data();
+        return envelope_.sharedMessage ? envelope_.sharedMessage->PayloadBaseScaffold() : nullptr;
     }
 
     uint32_t PayloadByteCount() const {
-        return static_cast<uint32_t>(payloadBytes_.size());
+        return envelope_.sharedMessage ? envelope_.sharedMessage->PayloadByteCountScaffold() : 0u;
     }
 
-    const std::vector<uint8_t>& PayloadBytes() const {
-        return payloadBytes_;
+    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold& EnvelopeScaffold() const {
+        return envelope_;
     }
 
 protected:
     void ResetPayloadToFixedByteCount0x4d() {
-        payloadBytes_.assign(State11Packet0x4dFixedPayload::kFixedByteCount, 0);
+        ResizePayload(State11Packet0x4dFixedPayload::kFixedByteCount);
     }
 
     void ResizePayload(size_t fixedByteCount) {
-        payloadBytes_.assign(fixedByteCount, 0);
+        if (!envelope_.sharedMessage) {
+            return;
+        }
+        envelope_.sharedMessage->ResetPayloadByteCountScaffold(static_cast<uint16_t>(fixedByteCount));
     }
 
     void WritePayloadByte(size_t offset, uint8_t value) {
-        if (offset < payloadBytes_.size()) {
-            payloadBytes_[offset] = value;
+        if (!envelope_.sharedMessage) {
+            return;
+        }
+        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
+        if (payloadBytes && offset < envelope_.sharedMessage->PayloadByteCountScaffold()) {
+            payloadBytes[offset] = value;
         }
     }
 
     void WritePayloadU16LE(size_t offset, uint16_t value) {
-        if (offset + 1 >= payloadBytes_.size()) {
+        if (!envelope_.sharedMessage) {
             return;
         }
-        payloadBytes_[offset] = static_cast<uint8_t>(value & 0xffu);
-        payloadBytes_[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xffu);
+        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
+        const uint16_t payloadByteCount = envelope_.sharedMessage->PayloadByteCountScaffold();
+        if (!payloadBytes || offset + 1 >= payloadByteCount) {
+            return;
+        }
+        payloadBytes[offset] = static_cast<uint8_t>(value & 0xffu);
+        payloadBytes[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xffu);
     }
 
     void WritePayloadU32LE(size_t offset, uint32_t value) {
-        if (offset + 3 >= payloadBytes_.size()) {
+        if (!envelope_.sharedMessage) {
             return;
         }
-        payloadBytes_[offset] = static_cast<uint8_t>(value & 0xffu);
-        payloadBytes_[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xffu);
-        payloadBytes_[offset + 2] = static_cast<uint8_t>((value >> 16) & 0xffu);
-        payloadBytes_[offset + 3] = static_cast<uint8_t>((value >> 24) & 0xffu);
+        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
+        const uint16_t payloadByteCount = envelope_.sharedMessage->PayloadByteCountScaffold();
+        if (!payloadBytes || offset + 3 >= payloadByteCount) {
+            return;
+        }
+        payloadBytes[offset] = static_cast<uint8_t>(value & 0xffu);
+        payloadBytes[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xffu);
+        payloadBytes[offset + 2] = static_cast<uint8_t>((value >> 16) & 0xffu);
+        payloadBytes[offset + 3] = static_cast<uint8_t>((value >> 24) & 0xffu);
     }
 
     uint16_t AppendLengthPrefixedString(size_t offsetField, const char* text, size_t bound) {
-        if (!text) {
+        if (!envelope_.sharedMessage || !text) {
             return 0;
         }
 
-        size_t textLength = 0;
-        while (textLength < bound && text[textLength] != '\0') {
-            ++textLength;
+        size_t textLengthWithoutNul = 0;
+        while (textLengthWithoutNul < bound && text[textLengthWithoutNul] != '\0') {
+            ++textLengthWithoutNul;
         }
-        if (textLength == 0) {
-            return 0;
-        }
-        if (payloadBytes_.size() + 2 > State11Packet0x4dFixedPayload::kMaxPayloadByteCount) {
+
+        const uint16_t currentPayloadByteCount = envelope_.sharedMessage->PayloadByteCountScaffold();
+        const uint16_t remainingAfterLength = envelope_.sharedMessage->RemainingAppendableByteCountScaffold();
+        if (remainingAfterLength < 2u) {
             return 0;
         }
 
-        const size_t remainingAfterLength =
-            State11Packet0x4dFixedPayload::kMaxPayloadByteCount - payloadBytes_.size() - 2;
-        const uint16_t storedLength = static_cast<uint16_t>(std::min(textLength, remainingAfterLength));
-        const uint16_t fieldOffset = static_cast<uint16_t>(payloadBytes_.size());
-        WritePayloadU16LE(offsetField, fieldOffset);
-        payloadBytes_.push_back(static_cast<uint8_t>(storedLength & 0xffu));
-        payloadBytes_.push_back(static_cast<uint8_t>((storedLength >> 8) & 0xffu));
-        payloadBytes_.insert(payloadBytes_.end(), text, text + storedLength);
+        // Fresh original state8 send tightening from `0x43ada0`:
+        // - reserve helper is passed the source string length **including** the terminating NUL
+        // - even an empty-but-non-null string therefore still reserves one content byte plus the
+        //   two-byte length field
+        const uint16_t storedLength = static_cast<uint16_t>(std::min<size_t>(textLengthWithoutNul + 1u, remainingAfterLength - 2u));
+        const uint16_t requestedGrowth = static_cast<uint16_t>(storedLength + 2u);
+        const uint16_t newPayloadByteCount = envelope_.sharedMessage->GrowPayloadByteCountScaffold(requestedGrowth);
+        if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
+            return 0;
+        }
+
+        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
+        if (!payloadBytes) {
+            return 0;
+        }
+
+        WritePayloadU16LE(offsetField, currentPayloadByteCount);
+        payloadBytes[currentPayloadByteCount + 0u] = static_cast<uint8_t>(storedLength & 0xffu);
+        payloadBytes[currentPayloadByteCount + 1u] = static_cast<uint8_t>((storedLength >> 8) & 0xffu);
+        if (storedLength > 1u) {
+            std::copy_n(text, storedLength - 1u, reinterpret_cast<char*>(payloadBytes + currentPayloadByteCount + 2u));
+        }
+        payloadBytes[currentPayloadByteCount + 2u + storedLength - 1u] = 0u;
         return storedLength;
     }
 
 private:
-    std::vector<uint8_t> payloadBytes_;
+    mxo::liblttcp::CMessageConnectionEnvelopeScaffold envelope_;
 };
 
 struct State10Packet0x0aFixedPayload {
@@ -978,6 +1011,14 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //   - write the current character id pair plus selection snapshot blocks
     //     `+0xcd0..+0xd7f` in the original write order
     //   - append `GameSessionID` through `0x43ada0`
+    //     - newer `0x43acf0 + 0x4557b0` tightening now makes the growth rule explicit:
+    //       reserve `(GameSessionID byte count including NUL) + 2` bytes at the tail of the
+    //       shared message object, write the resulting payload-relative offset back to fixed field
+    //       `+0xb9`, then copy the text into that reservation
+    //     - but fresh original-launcher WineDbg validation on the natural first state8 send now
+    //       shows owner `+0x664` / `GetGameSessionId664()` returning `""` there
+    //     - practical consequence: the natural `0x0bb -> 0x13b` growth is **not** explained by a
+    //       non-empty `GameSessionID` append on that first existing-character send
     //   - send through `0x41af70`
     //     - newer `0x41af70` tightening matters for the current blocker:
     //       it does not serialize raw bytes itself
@@ -1043,9 +1084,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
     packetBuilder.SetGameSessionId(mediator->GetGameSessionId664());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
-        packetBuilder.PayloadBase(),
-        packetBuilder.PayloadByteCount());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.EnvelopeScaffold());
     mediator->PostEventScaffold(0x09u);
 
     spdlog::debug(
@@ -1074,9 +1113,19 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD50())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD60())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD70()));
+    const char* gameSessionId = mediator->GetGameSessionId664();
+    const unsigned gameSessionIdByteCountWithNul =
+        gameSessionId ? static_cast<unsigned>(std::char_traits<char>::length(gameSessionId) + 1u) : 0u;
+    const unsigned naturalPayloadDeltaTo0x0be =
+        (packetBuilder.PayloadByteCount() < 0x0beu) ? (0x0beu - packetBuilder.PayloadByteCount()) : 0u;
+    const uint8_t* payloadBase = packetBuilder.PayloadBase();
+    const unsigned gameSessionIdOffsetField =
+        (payloadBase && packetBuilder.PayloadByteCount() >= 0xbbu) ? ReadU16LE(payloadBase + 0xb9) : 0u;
+    const unsigned gameSessionIdStoredLength =
+        (payloadBase && packetBuilder.PayloadByteCount() >= 0xbdu) ? ReadU16LE(payloadBase + 0xbb) : 0u;
 
     Log(
-        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x nonZeroSnapshotBlocks=%u/11 blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' -> sendResult=0x%08x then posts event=9",
+        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x nonZeroSnapshotBlocks=%u/11 blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' gameSessionIdBytesWithNul=0x%02x sessionOffsetField=0x%02x sessionStoredLength=0x%02x naturalDeltaTo0x0be=0x%02x -> sendResult=0x%08x then posts event=9",
         (unsigned)State8StructuredMarginPacketFixedPayload::kFixedByteCount,
         (unsigned)packetBuilder.PayloadByteCount(),
         currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdLow03 : 0u,
@@ -1084,7 +1133,11 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         nonZeroSnapshotBlockCount,
         (unsigned)mediator->SelectionContextBlockCd0()[0],
         (unsigned)mediator->SelectionContextBlockD70()[3],
-        mediator->GetGameSessionId664() ? mediator->GetGameSessionId664() : "<empty>",
+        gameSessionId ? gameSessionId : "<empty>",
+        gameSessionIdByteCountWithNul,
+        gameSessionIdOffsetField,
+        gameSessionIdStoredLength,
+        naturalPayloadDeltaTo0x0be,
         (unsigned)sendResult);
     return sendResult;
 }
@@ -1362,9 +1415,7 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     packetBuilder.ResetAndInitialize();
     packetBuilder.SetCharacterName(mediator->SourceLeadString108().data());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
-        packetBuilder.PayloadBase(),
-        packetBuilder.PayloadByteCount());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.EnvelopeScaffold());
     mediator->PostEventScaffold(0x13u);
 
     Log(
@@ -1475,9 +1526,7 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     packetBuilder.SetBackground(reinterpret_cast<const char*>(mediator->SourceBlock1b8().data()));
     packetBuilder.SetGameSessionId(mediator->GetGameSessionId664());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(
-        packetBuilder.PayloadBase(),
-        packetBuilder.PayloadByteCount());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.EnvelopeScaffold());
     mediator->PostEventScaffold(0x15u);
 
     spdlog::info(

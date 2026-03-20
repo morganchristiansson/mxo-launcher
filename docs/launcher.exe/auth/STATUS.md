@@ -277,10 +277,54 @@ Current best read:
               - natural original submitted payload length `0x13b`
               - current replacement submits payload length `0x0bb`
               - delta = `0x80`
+            - newer `0x43acf0 + 0x4557b0` tightening now explains the growth rule more concretely:
+              - state8 fixed body is really `0x0bb`
+              - trailing growth is owned by the shared message-object family, not by `0x41af70`
+              - `0x43acf0` reserves `(GameSessionID byte count including NUL) + 2` bytes through
+                shared-message vtable `+0x18 = 0x4557b0`
+            - but fresh original-launcher WineDbg validation on the natural **first** state8 send
+              now also disproves the tempting easy explanation for the whole `0x80` delta:
+              - natural path hit `0x41c1f0 -> 0x43bd20 -> 0x41f320 -> 0x43ada0`
+              - at `0x41f320`, owner `this = 0x004d4e38`
+              - owner `+0x664` getter printed `""`
+              - return site on that hit was `0x43bf4a` inside the state8 send body
+              - `0x43ada0` then likewise received `param_1 = ""`
+              - important fidelity correction for source:
+                `0x41f320` returns a non-null pointer to owner `+0x664` even when empty, and
+                `0x43ada0` still routes that through the reserve helper, so an empty string still
+                contributes the trailing 2-byte zero-length field reservation
+            - newer targeted reruns now correct an important mixed-send mistake from that earlier
+              read:
+              - the earlier `0x41cf30/0x448a00` hit with length `0x13b` and bytes
+                `01 03 00 36 ...` returned to `0x441f9f`, i.e. `FUN_00441f30`, not state8
+                `0x43bf64`
+              - so that `0x13b` payload belongs to a different send family and should **not** be
+                used as the state8 submit target
+            - newer targeted state8 stops now give the tighter real state8 picture instead:
+              - natural state8 reached `0x41af70` with return `0x43bf64`
+              - then natural state8 reached `0x41cf30` with return `0x43bf64`
+              - at that exact state8 `0x41cf30` stop, the shared outer object pointed at inner
+                payload buffer `0x357f0b4`, and that inner object already carried:
+                - length bytes `+0x0a/+0x0b = 0x80 / 0xbe` -> payload `0x0be`
+                - first payload dword at `+0x0c = 0x006dce0f` (raw bytes `0f ce 6d 00`)
+              - reading the actual payload base (`inner + 0x0c`) then closed the trailing state8
+                field too:
+                - payload `+0xb9 = 0x00bb`
+                - payload `+0xbb = 0x0001`
+                - payload `+0xbd = 0x00`
+              - natural state8 snapshot blocks also matched the replacement's previously suspicious
+                repeated client-supplied values exactly:
+                - `cd0` / `ce0` still zero
+                - `cf0 .. d70` matched the repeated `d98c1dd4 / 04b2008f / 980980e9 / 7e42f8ec`
+                  family
             - practical consequence:
-              - current replacement is still under-building the state8 send object
-              - the old "missing lazy `+0x74` agenda path is probably the first blocker" theory is
-                weaker now
+              - the natural first existing-character state8 send still looks like the raw `0x0f`
+                builder family after all
+              - the previous `0x13b` theory was a wrong cross-send association
+              - the suspicious repeated snapshot blocks are no longer a state8 send-authenticity
+                blocker by themselves
+              - the NUL-inclusive empty-string `GameSessionID` reservation was the real remaining
+                state8 builder mismatch, and source now mirrors that
           - but a separate faithful-direction correction also landed on the launcher side:
             - the copied arg6 `+0xec` state8 snapshot no longer zeroes cfg-derived blocks by default
             - that old zeroing is now explicit diagnostic-only behavior behind

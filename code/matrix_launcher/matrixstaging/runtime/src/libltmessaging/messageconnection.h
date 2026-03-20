@@ -131,12 +131,31 @@ struct CMessageConnectionMessageScaffold {
     // Current best narrowed fields that materially affect the final byte submit:
     // - original inner object `+0x08` participates in payload-cap checks (`0xffc`)
     // - original inner object `+0x0a/+0x0b` hold the framed payload length/header bytes
-    // - original final send pointer begins at original `+0x0a` for 2-byte lengths or `+0x0b`
-    //   for 1-byte lengths, with payload bytes following immediately after
+    // - original payload bytes begin at `+0x0c`
+    // - builder helpers such as `0x43acf0` grow the payload through shared-object vtable `+0x18`
+    //   (`0x4557b0`) before later copy helpers write bytes into the newly reserved tail
+    // - crucial newer live-original correction:
+    //   an earlier `0x448a00` capture with submitted bytes beginning `01 03 00 36 ...` and
+    //   length `0x13b` was later proven to return to `0x441f9f`, i.e. a different send family,
+    //   not the state8 `0x43bf64` call path
+    // - newer targeted state8 stops at `0x41af70/0x41cf30` with return `0x43bf64` instead show the
+    //   natural state8 shared object still carrying raw `0x0f` payload bytes and a length of
+    //   `0x0be`, so the remaining active state8 gap is much narrower than that earlier mixed-send
+    //   read suggested
     static constexpr uint16_t kMaxPayloadByteCount = 0x0ffcu;
+    static constexpr uint16_t kBuilderReservedBytes08 = 0x002bu;  // anchor: launcher.exe:0x455bd0
 
-    uint16_t payloadCapacity08 = kMaxPayloadByteCount;
-    std::vector<uint8_t> framedBytesFrom0a;
+    uint16_t reservedBytes08 = kBuilderReservedBytes08;
+    std::vector<uint8_t> payloadBytesFrom0c;
+
+    void ResetForPacketBuilderScaffold();
+    void ResetPayloadByteCountScaffold(uint16_t payloadByteCount);
+    uint16_t GrowPayloadByteCountScaffold(uint16_t additionalByteCount);
+    uint16_t PayloadByteCountScaffold() const;
+    uint16_t RemainingAppendableByteCountScaffold() const;
+    uint8_t* PayloadBaseScaffold();
+    const uint8_t* PayloadBaseScaffold() const;
+    std::vector<uint8_t> BuildFramedBytesFrom0aScaffold() const;
 };
 
 enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
@@ -189,7 +208,7 @@ public:
     // - the raw-byte overload remains as the older narrow bridge used by auth-side scaffold sends
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
 
-    // Source-owned launcher-only bridge for the narrower state8/state10/state11 send-authenticity
+    // Source-owned launcher-only bridge for the narrowed state8/state10/state11 send-authenticity
     // gap. It preserves the now-recovered envelope/message split from
     // `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00` without pretending the full original shared
     // message-object shape is already recovered.
@@ -200,6 +219,7 @@ public:
     // So the remaining blocker is no longer best framed as agenda presence alone; the stronger
     // current gap is the richer original message-object content that our scaffold still does not
     // build.
+    static CMessageConnectionEnvelopeScaffold BuildPacketBuilderEnvelopeScaffold(bool headerless = false);
     static CMessageConnectionEnvelopeScaffold BuildPayloadEnvelopeScaffold(
         const void* packetData,
         uint32_t packetByteCount,

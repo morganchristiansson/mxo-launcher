@@ -1448,11 +1448,18 @@ void* CLTLoginMediator::GetSessionCallbackHelper65c() const {
 
 // anchor: launcher.exe:0x41f320
 const char* CLTLoginMediator::GetGameSessionId664() const {
-    return gameSessionId664_.empty() ? nullptr : gameSessionId664_.c_str();
+    // Important fidelity correction from fresh original-launcher WineDbg on the natural first
+    // state8 send:
+    // - original `0x41f320` returns owner `this + 0x664` directly
+    // - the caller then forwards that pointer into `0x43ada0` even when the string is empty
+    // So this getter must preserve the original non-null empty-string behavior instead of
+    // collapsing empty state to nullptr.
+    return gameSessionId664_.c_str();
 }
 
 // anchor: launcher.exe:0x41af70
-uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
+uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
+    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold& envelope) {
     // Fresh `0x41af70` + `0x41cf30` + `0x448cf0` + `0x448a00` tightening:
     // - original `0x41af70` is only a tiny forwarder
     // - it jumps through current margin connection vtable `+0x24`
@@ -1462,38 +1469,49 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetByt
     // - `0x448a00` derives the final byte pointer/length from the inner message object header at
     //   `+0x0a/+0x0b`, rather than trusting already-framed caller bytes
     // Current source tightening therefore moves one step closer to the original launcher-owned
-    // send bridge: state objects still own the payload bytes, but we now wrap them in a
-    // source-owned envelope/message scaffold before submit instead of sending raw framed bytes
-    // directly. The remaining explicit gap is the original packet-agenda / callback metadata.
+    // send bridge: state builders can now preserve their shared message object directly across the
+    // mediator send helper instead of flattening back to raw payload bytes first.
+    // Important mixed-send correction from newer WineDbg:
+    // - an earlier `0x448a00` capture with length `0x13b` and bytes `01 03 00 36 ...` was later
+    //   proven to return to `0x441f9f`, not state8 `0x43bf64`
+    // - targeted state8 stops at `0x41af70 -> 0x41cf30` with return `0x43bf64` instead show the
+    //   natural state8 shared object already carrying raw `0x0f` bytes and length `0x0be`
+    // So the active state8 authenticity gap is now narrower again: one concrete remaining issue
+    // was the NUL-inclusive trailing string reservation, not a huge hidden packetized wrapper.
     mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     if (!connection) {
         connection = EnsureMarginConnectionObject();
     }
-    if (!connection || !packetBytes || packetByteCount == 0u) {
+    if (!connection || !envelope.sharedMessage) {
         return 0u;
     }
 
-    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold envelope =
-        mxo::liblttcp::CMessageConnection::BuildPayloadEnvelopeScaffold(packetBytes, packetByteCount, /*headerless=*/false);
-    if (!envelope.sharedMessage) {
-        return 0u;
-    }
-
-    const std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
+    const std::vector<uint8_t> framedBytesFrom0a = envelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
     const size_t previewOffset = framedBytesFrom0a.empty() ? 0u : (((framedBytesFrom0a[0] >> 7) == 0u) ? 1u : 0u);
     const std::string framedPreview =
         (previewOffset < framedBytesFrom0a.size())
             ? BuildHexPreview(framedBytesFrom0a.data() + previewOffset, framedBytesFrom0a.size() - previewOffset, 32u)
             : std::string();
     spdlog::info(
-        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardEnvelopeToSendPacket host='{}' state={} payloadBytes={} framedBytesFrom0a={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
+        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardEnvelopeToSendPacket host='{}' state={} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
         connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
         static_cast<unsigned>(connection->State()),
-        static_cast<unsigned>(packetByteCount),
+        static_cast<unsigned>(envelope.sharedMessage->reservedBytes08),
+        static_cast<unsigned>(envelope.sharedMessage->PayloadByteCountScaffold()),
         static_cast<unsigned>(framedBytesFrom0a.size()),
         static_cast<unsigned>(previewOffset),
         framedPreview.empty() ? std::string("<empty>") : framedPreview);
     return connection->SendPacketEnvelopeScaffold(envelope);
+}
+
+uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
+    if (!packetBytes || packetByteCount == 0u) {
+        return 0u;
+    }
+
+    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold envelope =
+        mxo::liblttcp::CMessageConnection::BuildPayloadEnvelopeScaffold(packetBytes, packetByteCount, /*headerless=*/false);
+    return SendCurrentMarginPacketScaffold(envelope);
 }
 
 // anchor: launcher.exe:0x41f270

@@ -936,6 +936,8 @@ public:
     // original `0x448a00` byte-derivation shape more closely, but it still does not reconstruct
     // the original packet-envelope metadata / agenda semantics that sit between `0x43bd20` and a
     // later natural `0x43f930`.
+    uint32_t SendCurrentMarginPacketScaffold(
+        const mxo::liblttcp::CMessageConnectionEnvelopeScaffold& envelope);
     uint32_t SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount);
 
     // anchor: launcher.exe:0x41e500

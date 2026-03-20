@@ -2,6 +2,8 @@
 
 #include "spdlog/spdlog.h"
 
+#include <algorithm>
+
 #ifdef DispatchMessage
 #undef DispatchMessage
 #endif
@@ -67,6 +69,73 @@ CLTThreadPerClientTCPEngine* CMessageConnection::Engine() const {
     return engine_;
 }
 
+void CMessageConnectionMessageScaffold::ResetForPacketBuilderScaffold() {
+    // anchor: launcher.exe:0x455bd0 / 0x455c60 / 0x455cd0
+    // Best current source-owned mirror of the shared message-object startup shape:
+    // - reset the builder-reserved byte count at `+0x08` to `0x2b`
+    // - clear the payload-length header bytes `+0x0a/+0x0b`
+    // - leave the payload body empty until builder helpers grow it through `0x4557b0`
+    reservedBytes08 = kBuilderReservedBytes08;
+    payloadBytesFrom0c.clear();
+}
+
+void CMessageConnectionMessageScaffold::ResetPayloadByteCountScaffold(uint16_t payloadByteCount) {
+    const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, kMaxPayloadByteCount);
+    payloadBytesFrom0c.assign(clampedByteCount, 0u);
+}
+
+uint16_t CMessageConnectionMessageScaffold::GrowPayloadByteCountScaffold(uint16_t additionalByteCount) {
+    // anchor: launcher.exe:0x4557b0
+    const uint32_t oldByteCount = static_cast<uint32_t>(payloadBytesFrom0c.size());
+    const uint32_t requestedByteCount = oldByteCount + static_cast<uint32_t>(additionalByteCount);
+    if (requestedByteCount > kMaxPayloadByteCount) {
+        return static_cast<uint16_t>(oldByteCount);
+    }
+
+    payloadBytesFrom0c.resize(static_cast<size_t>(requestedByteCount), 0u);
+    return static_cast<uint16_t>(requestedByteCount);
+}
+
+uint16_t CMessageConnectionMessageScaffold::PayloadByteCountScaffold() const {
+    return static_cast<uint16_t>(std::min<size_t>(payloadBytesFrom0c.size(), kMaxPayloadByteCount));
+}
+
+uint16_t CMessageConnectionMessageScaffold::RemainingAppendableByteCountScaffold() const {
+    const uint32_t payloadByteCount = PayloadByteCountScaffold();
+    if (payloadByteCount >= kMaxPayloadByteCount || reservedBytes08 >= kMaxPayloadByteCount) {
+        return 0u;
+    }
+
+    const uint32_t remaining = kMaxPayloadByteCount - payloadByteCount - reservedBytes08;
+    return static_cast<uint16_t>(std::min<uint32_t>(remaining, kMaxPayloadByteCount));
+}
+
+uint8_t* CMessageConnectionMessageScaffold::PayloadBaseScaffold() {
+    return payloadBytesFrom0c.empty() ? nullptr : payloadBytesFrom0c.data();
+}
+
+const uint8_t* CMessageConnectionMessageScaffold::PayloadBaseScaffold() const {
+    return payloadBytesFrom0c.empty() ? nullptr : payloadBytesFrom0c.data();
+}
+
+std::vector<uint8_t> CMessageConnectionMessageScaffold::BuildFramedBytesFrom0aScaffold() const {
+    const uint16_t payloadByteCount = PayloadByteCountScaffold();
+    std::vector<uint8_t> framedBytesFrom0a;
+    framedBytesFrom0a.reserve(static_cast<size_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u));
+
+    if (payloadByteCount > 0x7fu) {
+        framedBytesFrom0a.push_back(static_cast<uint8_t>(0x80u | ((payloadByteCount >> 8) & 0x7fu)));
+    } else {
+        framedBytesFrom0a.push_back(0u);
+    }
+    framedBytesFrom0a.push_back(static_cast<uint8_t>(payloadByteCount & 0xffu));
+    framedBytesFrom0a.insert(
+        framedBytesFrom0a.end(),
+        payloadBytesFrom0c.begin(),
+        payloadBytesFrom0c.end());
+    return framedBytesFrom0a;
+}
+
 const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family) {
     switch (family) {
         case CMessageConnectionPacketNameFamilyScaffold::kAuth:
@@ -112,36 +181,38 @@ const CMessageConnectionPacketAgendaScaffold* CMessageConnection::PacketAgendaSc
 // - local packet-envelope object (`0x41af70` / `0x41cf30`)
 // - shared message object consumed by `0x448cf0 -> 0x448a00`
 // ============================================================
-CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPayloadEnvelopeScaffold(
-    const void* packetData,
-    uint32_t packetByteCount,
-    bool headerless) {
+CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPacketBuilderEnvelopeScaffold(bool headerless) {
     CMessageConnectionEnvelopeScaffold envelope = {};
-    if (!packetData || packetByteCount == 0u || packetByteCount > CMessageConnectionMessageScaffold::kMaxPayloadByteCount) {
-        return envelope;
-    }
-
     envelope.sharedMessage = std::make_shared<CMessageConnectionMessageScaffold>();
     if (!envelope.sharedMessage) {
         return envelope;
     }
 
+    envelope.sharedMessage->ResetForPacketBuilderScaffold();
     envelope.headerless10 = headerless ? 1u : 0u;
-    std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
-    framedBytesFrom0a.reserve(static_cast<size_t>(packetByteCount) + 2u);
+    return envelope;
+}
 
-    if (packetByteCount > 0x7fu) {
-        framedBytesFrom0a.push_back(static_cast<uint8_t>(0x80u | ((packetByteCount >> 8) & 0x7fu)));
-    } else {
-        framedBytesFrom0a.push_back(0u);
+CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPayloadEnvelopeScaffold(
+    const void* packetData,
+    uint32_t packetByteCount,
+    bool headerless) {
+    CMessageConnectionEnvelopeScaffold envelope = BuildPacketBuilderEnvelopeScaffold(headerless);
+    if (!packetData || packetByteCount == 0u ||
+        packetByteCount > CMessageConnectionMessageScaffold::kMaxPayloadByteCount ||
+        !envelope.sharedMessage) {
+        envelope.sharedMessage.reset();
+        return envelope;
     }
-    framedBytesFrom0a.push_back(static_cast<uint8_t>(packetByteCount & 0xffu));
 
-    const uint8_t* payloadBytes = static_cast<const uint8_t*>(packetData);
-    framedBytesFrom0a.insert(
-        framedBytesFrom0a.end(),
-        payloadBytes,
-        payloadBytes + packetByteCount);
+    envelope.sharedMessage->ResetPayloadByteCountScaffold(static_cast<uint16_t>(packetByteCount));
+    uint8_t* payloadBytes = envelope.sharedMessage->PayloadBaseScaffold();
+    if (!payloadBytes) {
+        envelope.sharedMessage.reset();
+        return envelope;
+    }
+
+    std::copy_n(static_cast<const uint8_t*>(packetData), packetByteCount, payloadBytes);
     return envelope;
 }
 
@@ -161,7 +232,7 @@ uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectio
         return 0u;
     }
 
-    const std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
+    const std::vector<uint8_t> framedBytesFrom0a = envelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
     if (framedBytesFrom0a.size() < 2u) {
         return 0u;
     }
@@ -180,7 +251,8 @@ uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectio
 
     const uint8_t* submittedBytes = framedBytesFrom0a.data() + pointerOffsetFrom0a;
     spdlog::info(
-        "CMessageConnection::SubmitEnvelopeBytesScaffold payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::SubmitEnvelopeBytesScaffold reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(envelope.sharedMessage->reservedBytes08),
         static_cast<unsigned>(payloadByteCount),
         static_cast<unsigned>(submittedByteCount),
         static_cast<unsigned>(pointerOffsetFrom0a),
@@ -204,14 +276,17 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         return 0u;
     }
 
-    const std::vector<uint8_t>& framedBytesFrom0a = envelope.sharedMessage->framedBytesFrom0a;
-    const uint8_t rawOpcode = framedBytesFrom0a.size() >= 3u ? framedBytesFrom0a[2] : 0u;
+    const std::vector<uint8_t> framedBytesFrom0a = envelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
+    const size_t submitOffset = (framedBytesFrom0a.empty() || ((framedBytesFrom0a[0] >> 7) != 0u)) ? 0u : 1u;
+    const size_t opcodeIndex = submitOffset + ((submitOffset == 0u) ? 2u : 1u);
+    const uint8_t rawOpcode = (opcodeIndex < framedBytesFrom0a.size()) ? framedBytesFrom0a[opcodeIndex] : 0u;
     const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
     spdlog::info(
-        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} payloadBytes={} framedBytesFrom0a={} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(envelope.headerless10),
         static_cast<unsigned>(rawOpcode),
-        framedBytesFrom0a.size() >= 2u ? static_cast<unsigned>(((static_cast<uint32_t>(framedBytesFrom0a[0] & 0x7fu) << 8) | framedBytesFrom0a[1])) : 0u,
+        static_cast<unsigned>(envelope.sharedMessage->reservedBytes08),
+        static_cast<unsigned>(envelope.sharedMessage->PayloadByteCountScaffold()),
         static_cast<unsigned>(framedBytesFrom0a.size()),
         PacketNameFamilyToString(packetNameFamilyScaffold_),
         packetizedMessagesEnabledScaffold_ ? 1u : 0u,
