@@ -58,16 +58,16 @@ Source of truth:
     - empty `GameSessionID`
   - even a deliberately non-empty diagnostic helper11 payload is still **not** enough by itself to
     elicit `MS_LoadCharacterReply`
-- newer original-launcher WineDbg evidence now also narrows the faithful branch boundary:
-  - the natural password-submit path hits `0x41ecd0 -> 0x41c1f0 -> 0x43bd20`
-  - original runs reached state8 send `0x43bd20` repeatedly
-  - owner `+0x664` (`GameSessionID`) was still zero there on the original live path
-  - those runs terminated before any natural hit on:
-    - `0x43f930`
-    - `0x41c3c0`
-    - `0x421220`
-    - `0x420ef0`
-    - `0x43c020`
+- newer original-launcher WineDbg evidence now moves the faithful branch boundary later again:
+  - the natural password-submit path hits
+    `0x41ecd0 -> 0x41c1f0 -> 0x43bd20 -> 0x41af70 -> 0x41cf30 -> 0x43bf64 -> 0x43bf6c -> 0x43f930`
+  - natural original therefore reaches both the state8 send tail and the state8 slot-6 reply body
+  - owner `+0x664` (`GameSessionID`) was still zero at the natural state8 send site
+  - helper11-first theories remain secondary on the natural path:
+    - no natural hit yet on `0x41c3c0`
+    - no natural hit yet on `0x421220`
+    - no natural hit yet on `0x420ef0`
+    - no natural hit yet on `0x43c020`
 
 ### Current main blockers
 The launcher still does **not** reconstruct enough launcher-owned startup/runtime state.
@@ -75,25 +75,28 @@ Current unresolved inputs remain, but the active login-side blocker has narrowed
 - the real original password-submit branch is now confirmed as:
   - `0x41ecd0 = ProcessLoginRequest`
   - then `0x41c1f0` / state `3 -> 8`
-- the active state-8 branch remains **closed enough in source for the intended path shape**, but
-  newer original-launcher WineDbg runs now say the first faithful live boundary is still earlier
-  than helper11:
-  - natural original runs reached `0x43bd20`
-  - then died before any natural hit on `0x43f930`
+- the active state-8 branch remains **closed enough in source for the intended path shape**, and
+  newer original-launcher WineDbg runs now prove the natural path is later than the old
+  post-send-boundary read:
+  - natural original reaches `0x43bd20`, the `0x41af70/0x41cf30` send bridge, and
+    `0x43f930`
 - practical consequence:
   - for faithful original-launcher progression, the next highest-value target is now the
-    **state8 post-send survivability / immediate continuation after `0x43bd20`**, before treating
-    helper11 as the first faithful live branch target
+    **reply-side behavior inside `0x43f930` and the immediate post-state8 continuation**, before
+    broadening back into helper11-first theories
 - keep only two narrow state-8 leftovers explicit in source for now:
   - non-`0x10` slot-6 fallback through `0x41c5c0`
   - section-`0x0b` side effect through `0x43f8c0`
 - the immediate continuation after successful state-8 completion is still good enough in source
-  through helper9/state9 follow-on, but that continuation is not yet the first original live stop
+  through helper9/state9 follow-on, and that continuation is now the next natural-original area to
+  tighten after the newly confirmed live `0x43f930` stop
 - forced-`RunClientDLL` scaffold evidence still separately proves that the deliberate runtime path
   can later reach helper11/state11 first after auth success and stall there before any incoming
   `MS_LoadCharacterReply`
 - so keep two distinct truths explicit:
-  - **original launcher live boundary**: state8 send / immediate post-send survivability
+  - **original launcher live boundary now crossed**: natural original reaches the state8 send tail
+    and `0x43f930`; the next original-live question is deeper reply-side state8 behavior /
+    post-state8 continuation
   - **forced scaffold runtime stall**: helper11 source block / packet payload is still too weak to
     elicit the first real margin reply
 - launchpad-owned success mirrors for owner `+0x660`, owner `+0x664`, and owner `+0x94`
@@ -180,26 +183,28 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 ## Current implementation priorities
 
 1. Treat the now-confirmed password-submit branch through state `8` as **closed enough in source**,
-   but make the next faithful original-live question explicit:
+   and update the next faithful original-live question accordingly:
    - `0x41ecd0`
    - `0x41c1f0`
-   - `0x439300`
    - `0x43bd20`
+   - `0x41af70`
+   - `0x41cf30`
    - `0x43f930`
-   - immediate next task is now the boundary between natural original hits on `0x43bd20` and the
-     still-missing natural hit on `0x43f930`
+   - immediate next task is now the reply-side behavior inside `0x43f930` and the continuation
+     after successful state8 reply handling
 2. Keep the remaining narrow state-8 leftovers explicit, but do not reopen the whole state unless
    the runtime path proves they matter:
    - non-`0x10` fallback through `0x41c5c0`
    - section-`0x0b` side effect through `0x43f8c0`
-3. Treat helper11/state11 as a **real later scaffold/runtime stall**, but stop treating it as the
-   first faithful original-launcher breakpoint target until original live evidence reaches it
+3. Treat helper11/state11 as a **real later scaffold/runtime stall**, but keep it secondary while
+   the natural original path is now confirmed later on the state8 reply branch
 4. Keep that work in lockstep across:
    - Ghidra names/types
    - source implementation
    - canonical docs
 5. Use original-launcher WineDbg evidence to steer priority when it contradicts scaffold intuition;
-   right now that means state8-post-send survivability outranks speculative helper11 producer work
+   right now that means deeper state8 reply / post-state8 continuation outranks speculative
+   helper11 producer work
 6. Continue active-path arg5 queue work where it directly helps the game-running path, but do not
    let arg5 work displace the confirmed state8/original-live continuation boundary
 7. Preserve faithful structure even when a path may be inactive, but do **not** overinvest in likely-dead code before it becomes relevant to the active blocker
@@ -269,18 +274,17 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
      - non-`0x10` fallback through `0x41c5c0`
      - section-`0x0b` side effect through `0x43f8c0`
 2. Retarget the immediate faithful-original problem using the newest WineDbg evidence:
-   - natural original runs hit `0x41c1f0` and `0x43bd20`
-   - natural original runs did **not** reach `0x43f930` before process death
-   - inspect `0x43bd20`, `0x41af70`, and the immediate post-send/runtime continuation that should
-     survive long enough for a later state8 reply
+   - natural original runs now hit `0x41c1f0`, `0x43bd20`, the `0x41af70/0x41cf30` send bridge,
+     and `0x43f930`
+   - inspect the reply-side behavior inside `0x43f930` and the completion/handoff path it drives
 3. Keep the scaffold-only helper11 story explicit but secondary while doing that:
    - forced runtime still reaches helper11/state11 and stalls with no margin reply
    - even deliberately non-empty helper11 payload seeding is not enough by itself
-4. Use Ghidra + source to narrow what the original state8 send still depends on around:
-   - margin connection/runtime state
-   - packet send / post-send event path
-   - any launcher-owned startup state needed before a later natural `0x43f930` can exist
-5. Once the original-live state8 post-send boundary is better explained, return to:
+4. Use Ghidra + source to narrow what the original state8 reply still depends on around:
+   - raw `0x10` section handling
+   - completion criteria / helper9 handoff
+   - any launcher-owned startup state still needed before progressing past Loading Character
+5. Once the original-live state8 reply boundary is better explained, return to:
    - helper11/source-block authenticity
    - deeper owner/collaborator behavior behind `0x41de40`
    - the next concrete post-state9 continuation that consumes state `0x0c`

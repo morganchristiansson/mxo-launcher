@@ -76,8 +76,11 @@ namespace mxo::liblttcp {
 //     `0x41d170 / 0x41e500 -> 0x4417e0 -> 0x448b40(flag=0)` leave both `+0x7c` and `+0x80`
 //     as null on that path, so current auth/margin type-2 connect-status handling falls
 //     through to owner callbacks instead of using these helper objects
-// - vtable +0x20 / 0x449d20 -> likely SendPacket(...)
-//   - forwards send args together with `self` to engine +0x20
+// - inherited send path now tightens better as:
+//   - vtable slot 10 / `0x448cf0` = `CMessageConnection::SendPacket`
+//   - consumes a message/envelope object, performs packet-agenda filtering, then reaches the
+//     lower submit helper `0x448a00`
+//   - that lower helper forwards final byte pointer/size together with `self` to engine `+0x20`
 //   - current best engine mapping there is slot-8 / SendBuffer
 // - vtable +0x1c / 0x449cd0 -> likely endpoint-update / ensure-connected wrapper
 //   - updates stored endpoint at +0x24 and then calls engine +0x18 with `self`
@@ -134,9 +137,11 @@ public:
 
     // string-backed original name: CMessageConnection::SendPacket
     // current best read:
-    // - producer-side bridge into engine/queue work
-    // - currently forwards through engine slot 8 / SendBuffer using `this` as the
-    //   connection object on the starter path
+    // - original `0x448cf0` consumes a message/envelope object, not bare payload bytes
+    // - it runs packet-agenda filtering first, then reaches a lower submit helper that forwards
+    //   final byte pointer/size through engine slot 8 / SendBuffer using `this` as the
+    //   connection object
+    // - the current source signature remains a narrower bridge over the starter path
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
 
     // Pure virtual method required by base class CBaseConnection (slot 5)

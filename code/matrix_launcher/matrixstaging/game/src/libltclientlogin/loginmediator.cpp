@@ -386,6 +386,16 @@ CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
 }
 
+void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
+    lastPostedEventScaffold_ = eventId;
+    spdlog::info("{} Event# {}", kLogPrefixPostEvent, static_cast<unsigned>(eventId));
+}
+
+void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
+    lastPostedErrorScaffold_ = errorId;
+    spdlog::info("{} Error# {}", kLogPrefixPostError, static_cast<unsigned>(errorId));
+}
+
 void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
     scaffoldState3_ = state;
 }
@@ -1328,6 +1338,26 @@ const char* CLTLoginMediator::GetGameSessionId664() const {
 
 // anchor: launcher.exe:0x41af70
 uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
+    // Fresh `0x41af70` + `0x448cf0` tightening:
+    // - original `0x41af70` is only a tiny forwarder
+    // - it jumps through current margin connection vtable `+0x24`
+    // - newer tightening now shows that `+0x24` is itself just a wrapper:
+    //   `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
+    // - that wrapper forwards the envelope's shared packet/message object into
+    //   connection vtable `+0x28` / inherited `CMessageConnection::SendPacket` (`0x448cf0`)
+    // - `0x448cf0` then runs packet-agenda logic before any lower transport send helper
+    // Current source call remains deliberately narrower: the active state objects already own the
+    // recovered payload layout, so this scaffold only bridges those payload bytes into the
+    // source-owned transport path.
+    // Keep the fidelity gap explicit:
+    // - natural original now proves this send bridge can survive far enough to reach state8 slot 6
+    //   / `0x43f930`
+    // - but the replacement path still needs the same receive-side chain to stay faithful:
+    //   `CMarginConnection::OnOperationCompleted` (`0x44af60`) ->
+    //   `CMessageConnection::OnOperationCompleted` (`0x4490c0`) ->
+    //   `CBaseMarginConnection::DispatchMessage` (`0x442d00`)
+    // - the next missing practical question is therefore deeper reply-side behavior after this
+    //   send, not the old pre-`0x43f930` survivability question.
     mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     if (!connection) {
         connection = EnsureMarginConnectionObject();

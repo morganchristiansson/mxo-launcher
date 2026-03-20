@@ -95,7 +95,11 @@ uint32_t CMessageConnection::ProcessPacketResult(const void* packetData, uint32_
 // FAITHFUL: VTable 0x004aff18 - CMessageConnection::SendPacket at 0x00448cf0
 // 316 instructions, 45 complexity, 27 calls
 // Current starter path deliberately routes through the recovered connection-object-based
-// engine surface instead of pretending this is already a faithful packet serializer.
+// engine surface instead of pretending this is already a faithful packet-envelope sender.
+// Fresh `0x448cf0` review now makes the original gap narrower and explicit:
+// - original input is a message/envelope object
+// - packet-agenda filtering happens there before the lower submit helper `0x448a00`
+// - only that lower helper forwards final byte pointer/size into the engine
 // ============================================================
 uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext) {
     if (!engine_ || !packetData || packetByteCount == 0) {

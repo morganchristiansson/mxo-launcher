@@ -975,8 +975,15 @@ Current best virtual-method mapping on that class is now:
 - vtable `+0x10` / `0x4490c0` = likely **`OnOperationCompleted(workItem)`**
   - dispatches on `workItem->[+0x04]`
   - contains string-backed receive/completion/error handling paths
-- vtable `+0x20` / `0x449d20` = likely **`SendPacket(...)`**
-  - forwards into engine `+0x20`
+- send bridge on this class family now tightens as:
+  - vtable `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
+    - wrapper used by mediator-side send helper `0x41af70`
+    - extracts the envelope/shared message object from the stack-local packet builder
+  - vtable `+0x28` = `0x448cf0 = CMessageConnection::SendPacket`
+    - consumes that message/envelope object rather than raw bytes
+    - performs packet-agenda filtering first
+    - then reaches lower submit helper `0x448a00`, which forwards final byte pointer/size into
+      engine `+0x20`
   - which matches current arg5 slot `8` / `SendBuffer`
 - vtable `+0x1c` / `0x449cd0` = likely endpoint-update / ensure-connected wrapper
   - copies a new endpoint into object `+0x24`

@@ -186,8 +186,14 @@ Current best static read of that chain:
 - but its immediate next helper transition is **not** the later auth-side
   `0x43b830 / AS_GetWorldListRequest` sender
 - instead helper11 `+0x8` (`0x43c020`) first reserves a fixed `0x4d`-byte payload span,
-  then `0x43a470` initializes payload byte `0x00 = 0x0c`, and that framed margin packet is sent
-  through `CLTLoginMediator_SendCurrentMarginPacket` (`0x41af70`) before event `0x15`
+  then `0x43a470` initializes payload byte `0x00 = 0x0c`, and that completed packet-envelope is
+  forwarded through `CLTLoginMediator_SendCurrentMarginPacket` (`0x41af70`) before event `0x15`
+  - newer tightening there now says:
+    - `0x41af70` is only a tiny forwarder
+    - it jumps into current margin connection vtable `+0x24`
+    - current best target is inherited `0x448cf0 = CMessageConnection::SendPacket`
+    - that send path performs packet-agenda filtering before the lower submit helper
+      `0x448a00` reaches the engine-facing byte send
 - later helper11 `+0x14` (`0x440320`) handles raw margin code `0x10`
   / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
   completion switches helper state to `9` then posts event `0x16`

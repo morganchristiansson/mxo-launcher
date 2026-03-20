@@ -30,6 +30,11 @@ public:
         // Current best source-owned mirror of the local helper object initialized by `0x439840`:
         // - acquires/installs a shared payload object
         // - stores the active payload write base as `shared + 0x0c`
+        // - original local envelope layout is now a little tighter from disassembly:
+        //   - `this+0x08` = retained shared packet/message object
+        //   - `this+0x04` = base payload pointer (`shared + 0x0c`)
+        //   - state-specific builders then cache string-reservation pointers/lengths in later
+        //     helper-local fields before `0x41af70` forwards the whole envelope object
         payloadBytes_.reserve(State11Packet0x4dFixedPayload::kMaxPayloadByteCount);
     }
 
@@ -202,6 +207,10 @@ public:
     // anchor: launcher.exe:0x43ada0 = CLTLoginMediatorPacket0x0f_SetGameSessionId
     // helper-local length reservation/writeback mirrors launcher.exe:0x43acf0 =
     // CLTLoginMediatorPacket0x0f_ReserveGameSessionId through AppendLengthPrefixedString().
+    // Newer `0x43acf0` tightening worth preserving:
+    // - reserve helper writes the payload-relative offset back to fixed field `+0xb9`
+    // - then caches the concrete write pointer and reserved length in helper-local fields before
+    //   the caller copies the session text there
     void SetGameSessionId(const char* text) {
         AppendLengthPrefixedString(State8StructuredMarginPacketFixedPayload::kGameSessionIdOffset, text, 0xffffu);
     }
@@ -941,7 +950,27 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //     `+0xcd0..+0xd7f` in the original write order
     //   - append `GameSessionID` through `0x43ada0`
     //   - send through `0x41af70`
+    //     - newer `0x41af70` tightening matters for the current blocker:
+    //       it does not serialize raw bytes itself
+    //       it forwards the stack-local packet-envelope object into current margin connection
+    //       vtable `+0x24` / `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
+    //       and that wrapper then forwards the envelope's shared packet/message object into
+    //       vtable `+0x28` / inherited `CMessageConnection::SendPacket` (`0x448cf0`)
     //   - post event `9`
+    // Practical current boundary from the newest original-launcher runs:
+    // - natural original reaches this sender, crosses the `0x41af70/0x41cf30` send bridge, and
+    //   later does reach state8 slot 6 / `0x43f930`
+    // - so the old pre-`0x43f930` survivability question is no longer the first missing natural
+    //   boundary; the next target is deeper reply-side behavior inside slot 6 and the continuation
+    //   after it
+    // - the receive-side route for that live slot-6 hit is now tighter too:
+    //   `CMarginConnection::OnOperationCompleted` (`0x44af60`) ->
+    //   `CMessageConnection::OnOperationCompleted` (`0x4490c0`) ->
+    //   `CBaseMarginConnection::DispatchMessage` (`0x442d00`) ->
+    //   mediator re-entry `0x41f260` into the active helper/state slot-6 body
+    // - newer `0x442d00/0x441bc0/0x441850` review now also rules out one tempting shortcut:
+    //   the base type-4/MS wrapper path can synthesize a local type-`0x0b` completion object and
+    //   fall into mediator fallback `0x41afc0`, which re-enters helper slot 2 instead of slot 6
     if (!mediator->State10HasReadyConnectionState2()) {
         if (CLTLoginState* fallbackState = mediator->ScaffoldState4()) {
             mediator->SetCurrentState(fallbackState);
@@ -1009,6 +1038,13 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         return 0u;
     }
 
+    // Newer receive-side boundary tightening from `0x44af20/0x442d00` + live original WineDbg:
+    // - the active state slot-6 body is now proven live on the natural password-submit path
+    // - it is not the first recipient for every incoming margin message
+    // - base margin dispatch fully consumes decoded message codes `2`, `4`, and `5`
+    // - only other decoded message codes fall through owner `+0x184 -> 0x41f260` and land here
+    // - practical consequence: the raw state8 reply opcode `0x10` belongs on that fallback path,
+    //   not on the base code-4 wrapper branch
     const ParsedState11LoadCharacterReplyScaffold parsed =
         ParseState11LoadCharacterReplyScaffold(mediator->StagedIncomingMarginPacketBytes());
     if (!parsed.valid) {
@@ -1035,6 +1071,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
             mediator->SetCurrentState(failureState);
         }
+        mediator->PostErrorScaffold(10u);
         Log(
             "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x%08x; original would switch helper state to 3 and post error=10 currentState=%s",
             (unsigned)parsed.status,
@@ -1069,9 +1106,11 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             }
             mediator->SetCurrentState(nextBase);
         }
+        // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
+        mediator->PostEventScaffold(0x0bu);
 
         Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u firstFragment=%u usedCurrentSlotRecord=%u -> currentState=helper9",
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u firstFragment=%u usedCurrentSlotRecord=%u -> currentState=helper9 event=0x0b",
             (unsigned)parsed.status,
             (unsigned)parsed.sectionSelectorMinus2,
             (unsigned)parsed.sectionByteCount,
@@ -1173,6 +1212,8 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         if (CLTLoginState* nextState = mediator->ScaffoldState12()) {
             mediator->SetCurrentState(nextState);
         }
+        // anchor: launcher.exe:0x43c180 success tail posts event 0x18 after switching to state 0x0c.
+        mediator->PostEventScaffold(0x18u);
         spdlog::info(
             "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
             static_cast<unsigned>(parsedStatus),
@@ -1183,6 +1224,8 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
         mediator->SetCurrentState(failureState);
     }
+    // anchor: launcher.exe:0x43c180 failure tail posts error 0x0d after switching back to state 3.
+    mediator->PostErrorScaffold(0x0du);
     spdlog::info(
         "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
         static_cast<unsigned>(parsedStatus),
@@ -1297,7 +1340,8 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     //   - writes 17 dwords from owner `+0x134..+0x174`
     //   - appends `RealFirstName`, `RealLastName`, optional `Background`, and `GameSessionID`
     //     through `0x43a640 / 0x43a740 / 0x43a840 / 0x43a940`
-    //   - calls `0x41af70` to send through the current margin connection
+    //   - calls `0x41af70` to forward the completed packet-envelope object through the current
+    //     margin connection send path (`0x448cf0`), not to serialize raw bytes itself
     //   - then posts event `0x15`
     const auto& sourceDwords134 = mediator->SourceDwords134();
     replySectionsSeen_ = 0;
@@ -1392,9 +1436,11 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             }
             mediator->SetCurrentState(nextBase);
         }
+        // anchor: launcher.exe:0x440320 completion tail posts event 0x16 after switching to helper9.
+        mediator->PostEventScaffold(0x16u);
 
         Log(
-            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u -> currentState=helper9",
+            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u -> currentState=helper9 event=0x16",
             (unsigned)parsed.status,
             (unsigned)parsed.sectionSelectorMinus2,
             (unsigned)parsed.sectionByteCount,

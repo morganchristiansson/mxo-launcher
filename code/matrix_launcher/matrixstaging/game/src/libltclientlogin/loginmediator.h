@@ -593,6 +593,15 @@ public:
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
 
+    // Narrow source-owned scaffolds for the launcher.exe logging/event side effects at
+    // `0x41cfb0` / `0x41d090`.
+    // Current implementation keeps these as lightweight source-owned event/error markers instead of
+    // attempting the original listener container at owner `+0x674`.
+    void PostEventScaffold(uint32_t eventId);
+    void PostErrorScaffold(uint32_t errorId);
+    uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }
+    uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
+
     // Source-owned scaffold registration for concrete CLTLoginState objects that live outside the
     // mediator header. This preserves the original helper-state ownership on the login-state
     // vtables while still letting the mediator switch between the active scaffold states.
@@ -876,8 +885,18 @@ public:
     bool State10HasReadyConnectionState2() const;
 
     // anchor: launcher.exe:0x41af70
-    // Original call shape is mediator-thiscall plus one packet-builder argument, then a jump to
-    // current margin connection vtable `+0x24`. The reimplementation currently feeds raw bytes.
+    // Original call shape is mediator-thiscall plus one stack-local packet-envelope object built by
+    // helpers like `0x43ac10/0x43ada0`, then a tail jump to current margin connection vtable
+    // `+0x24`.
+    // Newer Ghidra tightening now makes that two-step downstream bridge more concrete:
+    // - `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
+    // - that wrapper forwards the envelope's shared packet/message object into
+    //   `+0x28` = inherited `CMessageConnection::SendPacket` / `0x448cf0`
+    // - `0x448cf0` consumes a message/envelope object, not bare payload bytes
+    // Current source helper is therefore intentionally narrower/scaffold-only: it bridges the
+    // recovered payload bytes into the source-owned transport path, but does not yet reconstruct
+    // the original packet-envelope metadata / agenda semantics that sit between `0x43bd20` and a
+    // later natural `0x43f930`.
     uint32_t SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount);
 
     // anchor: launcher.exe:0x41e500
@@ -975,6 +994,12 @@ private:
 
     // Condensed `0x4f78b8` owner sketch for the active branch:
     // - `+0x10` = current helper/state object
+    //   - newer receive-side tightening now also makes two mediator wrappers around that field
+    //     more concrete:
+    //     - `0x41f260` re-enters current helper vtable `+0x14` (current best read: slot 6)
+    //     - `0x41afc0` is the margin-completion fallback that re-enters current helper vtable
+    //       `+0x04` (current best read: slot 2), and can also clear owner `+0x1c/+0x20` on
+    //       work type `1`
     // - `+0x18` = auth connection, `+0x1c` = margin connection
     // - `+0x4c/+0x5c` = auth route + endpoint
     // - `+0x6c` = margin endpoint
@@ -986,6 +1011,8 @@ private:
     // - `+0xd84` = world-descriptor table
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine_;
     CLTLoginState* currentState_;
+    uint32_t lastPostedEventScaffold_ = 0;
+    uint32_t lastPostedErrorScaffold_ = 0;
     CLTLoginState* scaffoldState3_;
     CLTLoginState* scaffoldState4_;
     CLTLoginState* scaffoldState6_;

@@ -231,6 +231,43 @@ Current best read:
         - `0x43ac10 = CLTLoginMediatorPacket0x0f_ResetAndInitialize`
         - `0x43acf0 = CLTLoginMediatorPacket0x0f_ReserveGameSessionId`
         - `0x43ada0 = CLTLoginMediatorPacket0x0f_SetGameSessionId`
+      - newer `0x41af70` tightening now also sharpens the immediate post-send boundary:
+        - `0x41af70` is only a tiny mediator forwarder
+        - it jumps through current margin connection vtable `+0x24`
+        - current best read there is now two-step, not one-step:
+          - `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
+          - that wrapper forwards into `+0x28` = inherited
+            `0x448cf0 = CMessageConnection::SendPacket`
+        - that send path performs packet-agenda filtering before lower submit helper `0x448a00`
+          reaches the engine-facing byte send
+        - practical consequence: original state8/state11 send still depends on a real
+          **packet-envelope / agenda** path, not just raw payload bytes reaching the socket
+      - the later natural state8 reply target also now has a tighter receive-side prerequisite,
+        and newer live original runs now confirm that this prerequisite is really crossed:
+        - incoming margin work survives through
+          `0x44af60 -> 0x4490c0 -> 0x442d00`
+          and the natural original path now does reach `0x43f930`
+        - that receive chain is now slightly tighter at the mediator edge too:
+          - `0x44af20` fallback reaches owner vtable `+0x184`
+          - current best target there is `0x41f260 = CLTLoginMediator_DispatchCurrentHelperSlot6`
+          - newer `0x442d00` review now also makes the discriminator explicit:
+            base margin dispatch fully consumes decoded message codes `2`, `4`, and `5`
+          - practical consequence: the active state's slot-6 body is the intended receive-side
+            landing point only for other decoded message codes, including the raw state8/state11
+            reply opcode `0x10`
+        - but newer `0x442d00/0x441bc0/0x441850` review now also narrows a nearby non-reply branch:
+          - the base type-4/MS wrapper path can synthesize a local type-`0x0b` completion object
+          - that then falls through `0x44af60 -> 0x41afc0`
+          - and `0x41afc0` re-enters the active helper at vtable `+0x04`
+            (current best read: slot 2), **not** slot 6
+          - practical consequence: not every surviving incoming MS-side path is automatically the
+            later natural state8 reply path
+        - newer `0x44af60` review also exposes an immediate kill-side effect worth tracking on that
+          same boundary:
+          - fallback target there is now narrowed to
+            `0x41afc0 = CLTLoginMediator_HandleMarginConnectionCompletionFallback`
+          - completion work type `1` clears owner margin-connection fields and would strand state8
+            before any later reply handler runs
     - practical consequence: `RealFirstName/RealLastName/Background` are currently a
       state11-only source problem, while `GameSessionID` is the real shared state8/state11 field
   - stronger `GameSessionID` writer chain now in scope:
@@ -251,8 +288,8 @@ Current best read:
       - mirrors first-fragment seeding from the current slot record via owner vtable `+0x44`
       - mirrors the broader section-append family through owner ranges `+0x13f8 .. +0x1458`
       - keeps section-`0x0b` / `0x43f8c0` source-owned as the narrow owner `+0x145c/+0x1460` side effect
-      - mirrors the failure-side switch back to helper state `3`
-      - completes with the helper9 handoff using parsed word `+0x09`
+      - mirrors the failure-side switch back to helper state `3` plus error `10`
+      - completes with the helper9 handoff using parsed word `+0x09` plus event `0x0b`
     - practical current read: state8 is now closed enough for the active password-submit branch,
       with only the non-`0x10` fallback through `0x41c5c0` left explicitly unresolved
     - state10 slot 3 now also has an anchored gated send scaffold in `loginstate.cpp`
@@ -281,9 +318,12 @@ What remains:
 - preserve the now-proven split in the canonical status view:
   - post-`AS_AuthReply` State4/`0x41e500` margin begin is now live on the real deliberate runtime path
   - helper11/state11 slot 3 (`0x43c020`) is now likewise live there
-  - newer source/runtime tightening now also shows the current scaffold sends framed bytes
-    beginning `4d 0c ...` on that path, matching the fixed-size-`0x4d` / payload-tag-`0x0c`
-    read better than the older flat-`0x4d` claim
+  - newer source/runtime tightening now also shows the **current scaffold bridge** sending framed
+    bytes beginning `4d 0c ...` on that path
+    - keep this labeled as scaffold transport evidence, not proof that original `0x41af70`
+      serialized raw bytes the same way
+    - the tighter original-static read is still: state11 builds a packet-envelope, then
+      `0x41af70 -> connection vtable +0x24 -> 0x448cf0`
   - the next remaining post-auth blocker is still later incoming margin `0x10` / `MS_LoadCharacterReply`
     handling in state11 slot 6 (`0x440320`), with current active-path source starvation in the
     helper11 payload (`+0x134..+0x1b8`, `+0x664`) now looking more relevant to that lack of reply
@@ -363,27 +403,32 @@ The highest-value remaining auth-adjacent work is now:
     - `RealLastName=''`
     - `Background=''`
     - `GameSessionID='<empty>'`
-- but newer original-launcher WineDbg runs now re-raise an earlier faithful boundary on the natural
-  password-submit path:
+- newer original-launcher WineDbg runs now move the natural password-submit branch later again:
   - natural original hits confirmed:
     - `0x41ecd0`
     - `0x41c1f0`
     - `0x43bd20`
-  - natural original non-hits before process death on those same runs:
+    - `0x41af70`
+    - `0x41cf30`
+    - `0x43bf64`
+    - `0x43bf6c`
     - `0x43f930`
-    - `0x41c3c0`
-    - `0x421220`
-    - `0x420ef0`
-    - `0x43c020`
-  - additional concrete state at the natural original `0x43bd20` stop:
+  - helper11-first alternatives remain unsupported on that same natural path:
+    - no natural hit yet on `0x41c3c0`
+    - no natural hit yet on `0x421220`
+    - no natural hit yet on `0x420ef0`
+    - no natural hit yet on `0x43c020`
+  - additional concrete state at the natural original state8 send site:
     - owner `+0x664` (`GameSessionID`) was still zero
 - practical consequence:
-  - for **faithful original-launcher progression**, the next first target is now the boundary
-    between state8 send `0x43bd20` and the still-missing natural state8 reply stop `0x43f930`
+  - for **faithful original-launcher progression**, the old post-send/live-boundary question is now
+    crossed; the next first target is deeper reply-side behavior inside `0x43f930` and the
+    immediate continuation after successful state8 reply handling
   - keep helper11/state11 as a **real later scaffold/runtime stall**, but stop treating it as the
-    first faithful original-live breakpoint target until original evidence reaches it naturally
-  - post-state9 / state-`0x0c` continuation remains important, but only after the earlier
-    state8-post-send/original-live boundary is better explained
+    first faithful original-live breakpoint target while the natural original path is now confirmed
+    later on state8
+  - post-state9 / state-`0x0c` continuation now moves up in priority because the earlier
+    state8-post-send/original-live boundary is no longer the first missing stop
   - current replacement-launcher experiment bridge now mirrors a little more of the confirmed
     helper11 writer chain without pretending the original upstream producer is solved:
     - explicit helper11 character/customization seed inputs are routed through
