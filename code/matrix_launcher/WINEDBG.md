@@ -20,9 +20,25 @@ It is **not** a generic Windows debugging tutorial.
 ## New practical note: original launcher copies itself to `matrix.exe`
 
 For the original launcher path, the process you usually want is **not** `launcher.exe` itself.
-The launcher copies itself into a temp folder and runs as:
+The launcher copies itself into a temp folder and runs as a temp `matrix.exe` process.
 
-- `C:\users\morgan\Temp\MatrixOnline.0\matrix.exe -clone`
+Current practical launcher-side workflow now used in-session:
+
+```bash
+cd /home/morgan/mxo/code/matrix_launcher
+MXO_USER=morgan MXO_PASS='<pwd>' MXO_CHAR=Morg4n make run_original_launcher
+```
+
+That target currently expands to a real-launcher run with:
+- `-noeula`
+- `-nopatch`
+- `-skiplaunch`
+- optional `-char $(MXO_CHAR)`
+- `-user $(MXO_USER)`
+- `-pwd $(MXO_PASS)`
+
+Even with those flags, you still attach to the **spawned temp `matrix.exe`**, not the original
+`launcher.exe` process.
 
 That means two practical rules matter a lot:
 
@@ -39,7 +55,7 @@ wine cmd /c tasklist /FI "IMAGENAME eq matrix.exe"
 If `ps` shows something like:
 
 ```text
-C:\users\morgan\Temp\MatrixOnline.0\matrix.exe -clone
+C:\users\morgan\Temp\MatrixOnline.1\matrix.exe -noeula -nopatch -skiplaunch -char Morg4n -user morgan -pwd <pwd> -clone
 ```
 
 and `wine tasklist` shows:
@@ -124,6 +140,14 @@ These are the current highest-value original-launcher anchors for active-path wo
 - `0x0043f930`
   - `CLTLoginState_State8::Slot6_HandleSecondaryMessage`
   - active state-8 reply body
+- `0x00439780`
+  - `CLTLoginState_State9::Slot3_BeginOrContinue`
+  - first natural helper9/state9 follow-on after successful state8 completion
+- `0x0041de40`
+  - owner/helper submit path behind state9 slot 3
+- `0x0043c180`
+  - `CLTLoginState_State9::Slot6_HandleSecondaryMessage`
+  - later raw-`0x11` reply body
 
 Important current interpretation:
 - the original live password path is now better evidenced as:
@@ -132,10 +156,12 @@ Important current interpretation:
 - newer live runs now move that natural branch later again:
   - natural original reaches `0x43bd20`
   - crosses the `0x41af70/0x41cf30` send bridge
-  - and does naturally stop at `0x43f930`
-- so when debugging the original launcher, **start with the state-8 branch first** and treat
-  deeper behavior inside `0x43f930` / post-state8 continuation as the current highest-value live
-  boundary before trying to force helper11-specific hypotheses
+  - reaches `0x43f930`
+  - and then naturally continues into `0x00439780`
+  - representative live stop there showed helper9 local word `this+6 = 0x2710`
+- so when debugging the original launcher, **start with the state-8 branch first** and now treat
+  deeper behavior under the state9 continuation (`0x41de40`, then `0x43c180`) as the current
+  highest-value live boundary before trying to force helper11-specific hypotheses
 
 ## Fastest path: inspect the latest dump
 
@@ -186,7 +212,7 @@ But keep that bypass strictly diagnostic-only; see:
 
 ### Active original-launcher breakpoint set
 
-For the current original `matrix.exe -clone` login-state work, this is the most useful **minimal** breakpoint set:
+For the current original launcher-spawned temp `matrix.exe` login-state work, this is the most useful **minimal** breakpoint set:
 
 ```text
 break *0x0041ecd0
@@ -266,6 +292,37 @@ info share
 
 On the current path, `client.dll` should appear at base `0x62000000`.
 
+## Current practical original-launcher workflow
+
+Use the Makefile helper so the launcher run is reproducible and fast to relaunch:
+
+```bash
+cd /home/morgan/mxo/code/matrix_launcher
+MXO_USER=morgan MXO_PASS='<pwd>' MXO_CHAR=Morg4n make run_original_launcher
+```
+
+Then in a second shell, identify the spawned temp `matrix.exe` and attach `winedbg` to that Wine PID:
+
+```bash
+cd /home/morgan/MxO_7.6005
+wine tasklist /v
+```
+
+Current late-breakpoint set for the active question is intentionally small:
+
+```text
+break *0x0043f930
+break *0x00439780
+break *0x0041de40
+break *0x0043c180
+cont
+```
+
+Why this smaller set is better now:
+- earlier state8 send-side hits have already been re-proven enough
+- natural original is now live through `0x43f930 -> 0x439780`
+- the next missing original-live question is deeper state9 continuation, not whether state8 sends at all
+
 ## Current preferred live trace target
 
 For original `matrix.exe` login-state work, the highest-value live question is no longer the old
@@ -278,15 +335,16 @@ Current best proven target sequence:
 - `0x41af70`
 - `0x41cf30`
 - `0x43f930`
+- `0x439780`
 
 Why this is the current priority:
 - newer original-launcher runs confirmed the password-submit branch through
-  `0x41c1f0`, `0x43bd20`, the send bridge, and into `0x43f930`
+  `0x41c1f0`, `0x43bd20`, the send bridge, `0x43f930`, and into `0x439780`
 - they still did **not** naturally hit `0x41c3c0`, `0x421220`, `0x420ef0`, or `0x43c020`
 
 Practical consequence:
 - if you are choosing between chasing helper11 writers and chasing the natural original branch,
-  prefer deeper behavior inside `0x43f930` and the post-state8 continuation first
+  prefer deeper behavior under `0x41de40` and the later state9 reply body `0x43c180`
 - helper11 remains relevant for the forced scaffold runtime stall, but it is not the first
   faithful original-live breakpoint target
 
@@ -295,14 +353,14 @@ Practical consequence:
 For the active original `matrix.exe` branch, a better minimal live workflow is now:
 
 1. attach to `matrix.exe`
-2. set state8 reply-path breakpoints, e.g.:
-   - `break *0x0043bd20`
-   - `break *0x0041af70`
-   - `break *0x0041cf30`
+2. set only the later continuation breakpoints, e.g.:
    - `break *0x0043f930`
+   - `break *0x00439780`
+   - `break *0x0041de40`
+   - `break *0x0043c180`
 3. `cont`
-4. once `0x43f930` is confirmed on a natural run, retarget breakpoints *inside* `0x43f930`
-   and on the helper9/state9 handoff path instead of repeatedly re-proving the send side
+4. once `0x439780` is confirmed on a natural run, retarget deeper into `0x41de40` / `0x43c180`
+   instead of repeatedly re-proving the earlier state8 send side
 
 Keep the older `client.dll` / `InitClientDLL` workflow below for client-startup questions, but it is
 no longer the highest-value live path for the active original-launcher state8 investigation.

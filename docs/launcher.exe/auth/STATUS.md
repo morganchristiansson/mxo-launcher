@@ -286,9 +286,13 @@ Current best read:
     - state8 slot 6 now also has an anchored reply scaffold in `loginstate.cpp`
       - keeps the state-local fragment counters on `CLTLoginState_State8`
       - mirrors first-fragment seeding from the current slot record via owner vtable `+0x44`
-      - mirrors the broader section-append family through owner ranges `+0x13f8 .. +0x1458`
+      - now keeps the newer `0x43f930` section routing explicit instead of flattening it:
+        - case `0x00` one-shot overflow tail at owner `+0x13f0/+0x13f4`
+        - cases `0x06/0x07` at owner `+0x1408/+0x1410`
+        - cases `0x0c/0x0d` at owner `+0x1430/+0x1438`
       - keeps section-`0x0b` / `0x43f8c0` source-owned as the narrow owner `+0x145c/+0x1460` side effect
       - mirrors the failure-side switch back to helper state `3` plus error `10`
+      - now only completes when the expected-count byte is non-zero, matching the original state-local completion gate before the helper9 handoff / event `0x0b`
       - completes with the helper9 handoff using parsed word `+0x09` plus event `0x0b`
     - practical current read: state8 is now closed enough for the active password-submit branch,
       with only the non-`0x10` fallback through `0x41c5c0` left explicitly unresolved
@@ -413,6 +417,7 @@ The highest-value remaining auth-adjacent work is now:
     - `0x43bf64`
     - `0x43bf6c`
     - `0x43f930`
+    - `0x439780`
   - helper11-first alternatives remain unsupported on that same natural path:
     - no natural hit yet on `0x41c3c0`
     - no natural hit yet on `0x421220`
@@ -422,13 +427,16 @@ The highest-value remaining auth-adjacent work is now:
     - owner `+0x664` (`GameSessionID`) was still zero
 - practical consequence:
   - for **faithful original-launcher progression**, the old post-send/live-boundary question is now
-    crossed; the next first target is deeper reply-side behavior inside `0x43f930` and the
-    immediate continuation after successful state8 reply handling
+    crossed; natural original not only reaches `0x43f930` but also continues into
+    `0x439780 = CLTLoginState_State9::Slot3_BeginOrContinue`
+  - representative live stop there also showed the helper9 local handoff word (`this+6`) as
+    `0x2710`, i.e. the state8 completion handoff is live and non-zero on the natural path
   - keep helper11/state11 as a **real later scaffold/runtime stall**, but stop treating it as the
     first faithful original-live breakpoint target while the natural original path is now confirmed
-    later on state8
-  - post-state9 / state-`0x0c` continuation now moves up in priority because the earlier
-    state8-post-send/original-live boundary is no longer the first missing stop
+    later on state8/state9
+  - post-state9 / state-`0x0c` continuation now moves up again in priority; the next natural-live
+    target is deeper owner/collaborator behavior under `0x41de40` and the later raw-`0x11` reply
+    body `0x43c180`
   - current replacement-launcher experiment bridge now mirrors a little more of the confirmed
     helper11 writer chain without pretending the original upstream producer is solved:
     - explicit helper11 character/customization seed inputs are routed through

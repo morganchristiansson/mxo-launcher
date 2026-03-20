@@ -43,6 +43,11 @@ SPDLOG_LIB = $(BUILD_DIR)/libspdlog.a
 -include secrets/launcher_login.local.mk
 
 LAUNCHER_ARGS = $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_PASS)) $(if $(MXO_SESSION),-session $(MXO_SESSION)) $(if $(MXO_CHAR),-char $(MXO_CHAR))
+# Current original-launcher WineDbg workflow:
+# - use the real launcher, not direct `matrix.exe`
+# - skip EULA / patch-notes friction when possible
+# - still rely on the launcher-spawned temp `matrix.exe` and attach to that with winedbg
+ORIGINAL_LAUNCHER_ARGS = -noeula -nopatch $(if $(MXO_CHAR),-char $(MXO_CHAR)) $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_PASS))
 
 all: $(TARGET)
 
@@ -73,6 +78,9 @@ $(AUTH_PROBE): $(AUTH_PROBE_SRC) $(CRYPTOPP_LIB)
 
 run: $(TARGET)
 	cd $(GAME_DIR) && wine ./resurrections.exe $(LAUNCHER_ARGS)
+
+run_original_launcher:
+	cd $(GAME_DIR) && wine ./launcher.exe $(ORIGINAL_LAUNCHER_ARGS)
 
 run_auth_probe: $(AUTH_PROBE)
 	@cd $(GAME_DIR) && MXO_AUTH_PROBE_USERNAME="$(or $(MXO_AUTH_PROBE_USERNAME),$(MXO_USER))" \
@@ -159,4 +167,4 @@ clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all auth_probe run run_auth_probe crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_binder_mediator_incomplete run_stub_both run_binder_both run_binder_both_runtime run_binder_both_incomplete install_crashreporter_stub restore_crashreporter clean
+.PHONY: all auth_probe run run_original_launcher run_auth_probe crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_binder_mediator_incomplete run_stub_both run_binder_both run_binder_both_runtime run_binder_both_incomplete install_crashreporter_stub restore_crashreporter clean

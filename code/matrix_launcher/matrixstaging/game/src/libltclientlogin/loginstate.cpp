@@ -355,6 +355,10 @@ static void ResetState8ReplyOwnerState(PostAuthMarginLoadingState& ownerState) {
     ownerState.replySectionData13cc = 0u;
     ownerState.replySectionData13d0 = 0u;
     ownerState.section0Flag13f6 = 0u;
+    ResetOwnedSectionBytes(
+        ownerState.state8Section0OverflowBuffer13f0,
+        ownerState.state8Section0OverflowLength13f4,
+        ownerState.section0Flag13f6);
     ResetOwnedSectionBytes(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
     ResetOwnedSectionBytes(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
     ResetOwnedSectionBytes(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
@@ -449,10 +453,10 @@ static void HandleState8ReplySection(
                         parsed.sectionData + 0x20u,
                         parsed.sectionByteCount - 0x20u);
                 }
-                if (parsed.sectionByteCount > 0x485u && ownerState.allocatedBuffer1418 == nullptr) {
+                if (parsed.sectionByteCount > 0x485u && ownerState.state8Section0OverflowBuffer13f0 == nullptr) {
                     AppendOwnedSectionBytesU16(
-                        ownerState.allocatedBuffer1418,
-                        ownerState.allocatedBufferLength141c,
+                        ownerState.state8Section0OverflowBuffer13f0,
+                        ownerState.state8Section0OverflowLength13f4,
                         parsed.sectionData + 0x485u,
                         static_cast<uint16_t>(parsed.sectionByteCount - 0x485u));
                 }
@@ -480,12 +484,12 @@ static void HandleState8ReplySection(
             ownerState.allocatedBufferFlag142e = 1u;
             break;
         case 6u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag1436 = 1u;
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag140e = 1u;
             break;
         case 7u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag143e = 1u;
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag1416 = 1u;
             break;
         case 8u:
             AppendOwnedSectionBytesU32(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, parsed.sectionData, parsed.sectionByteCount);
@@ -526,12 +530,12 @@ static void HandleState8ReplySection(
                 static_cast<unsigned>(ownerState.state8Section11String1460.size()));
             break;
         case 12u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag140e = 1u;
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag1436 = 1u;
             break;
         case 13u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag1416 = 1u;
+            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, parsed.sectionData, parsed.sectionByteCount);
+            ownerState.flag143e = 1u;
             break;
         default:
             break;
@@ -1084,14 +1088,12 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         ? SeedState8FirstFragment(ownerState, mediator, parsed.field05)
         : false;
 
-    HandleState8ReplySection(ownerState, parsed);
-
     if (parsed.shouldSeedExpectedSectionCount) {
         replySectionsExpected_ = parsed.expectedSectionCount0b;
     }
-    if (replySectionsExpected_ == 0u) {
-        replySectionsExpected_ = 1u;
-    }
+
+    HandleState8ReplySection(ownerState, parsed);
+
     if (replySectionsSeen_ < 0xffu) {
         ++replySectionsSeen_;
     }
@@ -1160,6 +1162,8 @@ uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     // - forwards them into the owner helper
     // - clears the local payload regardless of branch
     // - posts event `0x17` when that helper returns `< 1`
+    // - newer original-launcher WineDbg now also proves this slot really is reached on the natural
+    //   path after state8 completion, with a representative live stop showing `this+6 = 0x2710`
     const uint8_t consumedByte4 = pendingByte4_;
     const uint16_t consumedWord6 = pendingWord6_;
     const uint32_t submitResult = mediator->State9SubmitFollowupScaffold(consumedByte4, consumedWord6);
@@ -1167,6 +1171,8 @@ uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     pendingWord6_ = 0;
 
     if (submitResult < 1u) {
+        // anchor: launcher.exe:0x00439780 success-side event post after the `0x41de40` submit call.
+        mediator->PostEventScaffold(0x17u);
         spdlog::info(
             "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x} then posts event=0x17",
             static_cast<unsigned>(consumedByte4),

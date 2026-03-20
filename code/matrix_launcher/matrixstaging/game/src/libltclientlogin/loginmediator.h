@@ -448,6 +448,13 @@ public:
         std::array<char, 0x20> section0StringFcc{};      // helper11/scaffold parsed subview
         std::array<uint8_t, 0x465> state8Section0RawF88{}; // source-owned raw mirror of state8 `0x43f930` section-0 copy span
 
+        // state8 case `0x00` also has a one-shot overflow tail at `+0x13f0/+0x13f4` when the
+        // incoming section exceeds `0x485` bytes. Keep that separate from the append families
+        // below because the original only allocates it once on the case-0 path instead of using
+        // the later generic append buffers.
+        void* state8Section0OverflowBuffer13f0 = nullptr; // `+0x13f0` (state8 case 0x00 overflow tail)
+        uint16_t state8Section0OverflowLength13f4 = 0;    // `+0x13f4`
+
         // Allocated buffer pointers for load-character fragment families.
         // Keep the owner offsets explicit because state8 (`0x43f930`) and state11 (`0x440320`)
         // both reuse this wider owner region with different section selectors.
@@ -459,11 +466,11 @@ public:
         uint16_t allocatedBufferLength1404 = 0;         // `+0x1404`
         uint8_t flag1406 = 0;                            // `+0x1406`
 
-        void* allocatedBuffer1408 = nullptr;             // `+0x1408` (state8 case 0x0c / state11 case 0x06)
+        void* allocatedBuffer1408 = nullptr;             // `+0x1408` (state8 case 0x06 / state11 case 0x06)
         uint16_t allocatedBufferLength140c = 0;         // `+0x140c`
         uint8_t allocatedBufferFlag140e = 0;             // `+0x140e`
 
-        void* allocatedBuffer1410 = nullptr;             // `+0x1410` (state8 case 0x0d)
+        void* allocatedBuffer1410 = nullptr;             // `+0x1410` (state8 case 0x07)
         uint16_t allocatedBufferLength1414 = 0;         // `+0x1414`
         uint8_t flag1416 = 0;                            // `+0x1416`
 
@@ -479,11 +486,11 @@ public:
         uint16_t allocatedBufferLength142c = 0;         // `+0x142c`
         uint8_t allocatedBufferFlag142e = 0;             // `+0x142e`
 
-        void* allocatedBuffer1430 = nullptr;             // `+0x1430` (state8 case 0x06)
+        void* allocatedBuffer1430 = nullptr;             // `+0x1430` (state8 case 0x0c)
         uint16_t allocatedBufferLength1434 = 0;         // `+0x1434`
         uint8_t flag1436 = 0;                            // `+0x1436`
 
-        void* allocatedBuffer1438 = nullptr;             // `+0x1438` (state8 case 0x07)
+        void* allocatedBuffer1438 = nullptr;             // `+0x1438` (state8 case 0x0d)
         uint16_t allocatedBufferLength143c = 0;         // `+0x143c`
         uint8_t flag143e = 0;                            // `+0x143e`
 

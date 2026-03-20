@@ -60,8 +60,9 @@ Source of truth:
     elicit `MS_LoadCharacterReply`
 - newer original-launcher WineDbg evidence now moves the faithful branch boundary later again:
   - the natural password-submit path hits
-    `0x41ecd0 -> 0x41c1f0 -> 0x43bd20 -> 0x41af70 -> 0x41cf30 -> 0x43bf64 -> 0x43bf6c -> 0x43f930`
-  - natural original therefore reaches both the state8 send tail and the state8 slot-6 reply body
+    `0x41ecd0 -> 0x41c1f0 -> 0x43bd20 -> 0x41af70 -> 0x41cf30 -> 0x43bf64 -> 0x43bf6c -> 0x43f930 -> 0x439780`
+  - natural original therefore reaches both the state8 reply body and the helper9/state9 slot-3 follow-on
+  - representative live stop at `0x439780` showed helper9 local word `this+6 = 0x2710`
   - owner `+0x664` (`GameSessionID`) was still zero at the natural state8 send site
   - helper11-first theories remain secondary on the natural path:
     - no natural hit yet on `0x41c3c0`
@@ -82,14 +83,16 @@ Current unresolved inputs remain, but the active login-side blocker has narrowed
     `0x43f930`
 - practical consequence:
   - for faithful original-launcher progression, the next highest-value target is now the
-    **reply-side behavior inside `0x43f930` and the immediate post-state8 continuation**, before
+    **deeper state9 continuation after the now-proven `0x43f930 -> 0x439780` handoff**, especially
+    owner/collaborator behavior under `0x41de40` and the later `0x43c180` reply body, before
     broadening back into helper11-first theories
 - keep only two narrow state-8 leftovers explicit in source for now:
   - non-`0x10` slot-6 fallback through `0x41c5c0`
   - section-`0x0b` side effect through `0x43f8c0`
-- the immediate continuation after successful state-8 completion is still good enough in source
-  through helper9/state9 follow-on, and that continuation is now the next natural-original area to
-  tighten after the newly confirmed live `0x43f930` stop
+- the immediate continuation after successful state-8 completion is now also live in original
+  through helper9/state9 slot 3 (`0x439780`), and the next natural-original area to tighten is
+  deeper owner/collaborator behavior under `0x41de40` plus the later state9 slot-6 reply body
+  `0x43c180`
 - forced-`RunClientDLL` scaffold evidence still separately proves that the deliberate runtime path
   can later reach helper11/state11 first after auth success and stall there before any incoming
   `MS_LoadCharacterReply`
@@ -182,16 +185,17 @@ When reverse engineering or decompiling new methods / vtable slots on active cla
 
 ## Current implementation priorities
 
-1. Treat the now-confirmed password-submit branch through state `8` as **closed enough in source**,
-   and update the next faithful original-live question accordingly:
+1. Treat the now-confirmed password-submit branch through state `8` and into helper9/state9 slot 3
+   as **closed enough in source**, and update the next faithful original-live question accordingly:
    - `0x41ecd0`
    - `0x41c1f0`
    - `0x43bd20`
    - `0x41af70`
    - `0x41cf30`
    - `0x43f930`
-   - immediate next task is now the reply-side behavior inside `0x43f930` and the continuation
-     after successful state8 reply handling
+   - `0x439780`
+   - immediate next task is now the deeper state9 owner/helper continuation under `0x41de40` and
+     the later `0x43c180` reply handling
 2. Keep the remaining narrow state-8 leftovers explicit, but do not reopen the whole state unless
    the runtime path proves they matter:
    - non-`0x10` fallback through `0x41c5c0`
@@ -275,8 +279,9 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
      - section-`0x0b` side effect through `0x43f8c0`
 2. Retarget the immediate faithful-original problem using the newest WineDbg evidence:
    - natural original runs now hit `0x41c1f0`, `0x43bd20`, the `0x41af70/0x41cf30` send bridge,
-     and `0x43f930`
-   - inspect the reply-side behavior inside `0x43f930` and the completion/handoff path it drives
+     `0x43f930`, and the helper9/state9 slot-3 follow-on `0x439780`
+   - inspect the deeper owner/helper behavior under `0x41de40` and the later state9 slot-6 reply
+     path `0x43c180`
 3. Keep the scaffold-only helper11 story explicit but secondary while doing that:
    - forced runtime still reaches helper11/state11 and stalls with no margin reply
    - even deliberately non-empty helper11 payload seeding is not enough by itself
