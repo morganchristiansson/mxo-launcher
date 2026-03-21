@@ -724,10 +724,19 @@ The highest-value remaining auth-adjacent work is now:
           - helper9/state9 slot 3 again re-hits `0x41de40` on the deliberate path
           - the remaining `0x41de40` gap is therefore narrower than a generic null-triple story:
             - first, reconstruct the correct launcher-owned callback84 side behind `+0x38`
-            - only after that does it make sense to reopen the later object88 branch work:
+            - the host:port submit-target builder (`0x44afd0 / 0x44b0d0`) and the object88
+              direct-vs-managed split are now source-owned closely enough as branch/plan shape:
               - `(+0x44)->(+0x30)`
-              - packet-like payload builder `0x44afd0 / 0x44b0d0`
-              - final object88 submit calls `+0x28` or `+0x18/+0x24`
+              - direct submit `+0x28`
+              - managed submit `+0x1c`, `+0x18`, `+0x24`
+            - newer natural-original + client-cross-check also makes the active object88 branch more
+              concrete:
+              - natural original takes the managed branch
+              - owner `+0x88` is the client `INetMgr.Default` wrapper global
+              - the inner submit family is now tightened by client strings/debug paths as
+                `CUDPDriver` / `JoinSession`
+            - but the live launcher-owned object88 collaborator itself is still unresolved, so the
+              current deliberate path still does **not** perform those submit calls yet
           - only after that narrower `0x41de40` work should later raw `0x11` / state9 slot-6
             progression be expected
   - practical comparison against the natural original path:

@@ -1005,6 +1005,10 @@ public:
     // - state9 slot 3 / launcher.exe:0x41de40 + 0x439780
     //   - newer natural-original WineDbg now proves `0x439780 -> 0x41de40`
     //   - representative live state there: helper byte `+4 = 0`, helper word `+6 = 0x2710`
+    //   - source now also keeps the object88 branch split explicit there:
+    //     - mode probe `(+0x44)->(+0x30)`
+    //     - direct submit `+0x28`
+    //     - managed submit `+0x1c`, `+0x18`, `+0x24`
     uint32_t State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6);
     // - state9 slot 6 success side effect / launcher.exe:0x41b420 (owner vtable +0x16c)
     uint32_t HandleState9Opcode11SuccessSideEffect();
@@ -1209,10 +1213,10 @@ private:
     // Strongest current origin: deeper client init owner/arg6 vtable `+0x124`
     // (`netShell, netMgr, distrObjExecutive`) copied directly into this triple by `0x41f1d0`.
     void* ownerCallback84_ = nullptr;          // owner `+0x84`
-    void* ownerObject88_ = nullptr;            // owner `+0x88`
+    void* ownerObject88_ = nullptr;            // owner `+0x88`; natural-original object88 now cross-checks as client `INetMgr.Default` wrapper on the active state9 path
     void* ownerObject8c_ = nullptr;            // owner `+0x8c`
     uint32_t ownerOptionalField90_ = 0;        // owner `+0x90`, only forwarded when helper byte `+4 != 0`
-    int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, reused on one branch before reacquire
+    int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
     State8SelectionContextSnapshotState state8SelectionContextSnapshotState_;
     // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.

@@ -170,13 +170,20 @@ static uint16_t ByteSwap16(uint16_t value) {
     return static_cast<uint16_t>((value << 8) | (value >> 8));
 }
 
-static std::string FormatIpv4NetworkOrderDottedQuad(uint32_t ipv4NetworkOrder) {
+static std::string FormatIpv4StoredDwordLittleEndianDottedQuad(uint32_t storedIpv4Dword) {
+    // anchor: launcher.exe:0x44b0d0
+    // Important correction from a natural-original WineDbg stop inside `0x41de40`:
+    // - the copied submit-address dword at bytes `+4..+7` is formatted in memory-byte order
+    // - representative natural values at the `0x41df0b` boundary were:
+    //   - stored dword `0x3d7a3025`
+    //   - formatted text `"37.48.122.61:10000"`
+    // - so the previous source-owned big-endian dotted-quad read was backwards
     return fmt::format(
         "{}.{}.{}.{}",
-        static_cast<unsigned>((ipv4NetworkOrder >> 24) & 0xffu),
-        static_cast<unsigned>((ipv4NetworkOrder >> 16) & 0xffu),
-        static_cast<unsigned>((ipv4NetworkOrder >> 8) & 0xffu),
-        static_cast<unsigned>(ipv4NetworkOrder & 0xffu));
+        static_cast<unsigned>(storedIpv4Dword & 0xffu),
+        static_cast<unsigned>((storedIpv4Dword >> 8) & 0xffu),
+        static_cast<unsigned>((storedIpv4Dword >> 16) & 0xffu),
+        static_cast<unsigned>((storedIpv4Dword >> 24) & 0xffu));
 }
 
 static std::string BuildState9SubmitTargetTextScaffold(
@@ -194,7 +201,7 @@ static std::string BuildState9SubmitTargetTextScaffold(
 
     const uint16_t portNetworkOrder = ByteSwap16(helperWord6);
     const uint16_t portHostOrder = ByteSwap16(portNetworkOrder);
-    std::string out = FormatIpv4NetworkOrderDottedQuad(endpoint.ipv4NetworkOrder);
+    std::string out = FormatIpv4StoredDwordLittleEndianDottedQuad(endpoint.ipv4NetworkOrder);
     if (appendPort) {
         out += fmt::format(":{}", static_cast<unsigned>(portHostOrder));
     }
@@ -461,14 +468,62 @@ static bool TryState9Object88QueryManagedSendMode(void* object88, bool* outManag
     return true;
 }
 
-struct DeferredState9CallbackTripleScaffold {
-    void* callback84 = nullptr;
-    void* object88 = nullptr;
-    void* object8c = nullptr;
-    bool valid = false;
+enum class State9Object88SubmitRouteScaffold {
+    kUnavailable = 0,
+    kDirectSlot28,
+    kManagedSlots18_1c_24,
 };
 
-static DeferredState9CallbackTripleScaffold g_deferredState9CallbackTripleScaffold;
+struct State9Object88SubmitPlanScaffold {
+    State9Object88SubmitRouteScaffold route = State9Object88SubmitRouteScaffold::kUnavailable;
+    bool modeQueryReady = false;
+    bool managedSendMode = false;
+    bool callbackPairReady = false;
+    bool submitTargetReady = false;
+    bool wouldReleaseCachedHandle147c = false;
+    bool wouldAcquireManagedHandle18 = false;
+    bool wouldCallDirectSend28 = false;
+    bool wouldCallManagedSend24 = false;
+    uint32_t forwardedArg90 = 0u;
+};
+
+static const char* State9Object88SubmitRouteName(State9Object88SubmitRouteScaffold route) {
+    switch (route) {
+        case State9Object88SubmitRouteScaffold::kDirectSlot28:
+            return "direct:+0x28";
+        case State9Object88SubmitRouteScaffold::kManagedSlots18_1c_24:
+            return "managed:+0x1c/+0x18/+0x24";
+        default:
+            return "unavailable";
+    }
+}
+
+static State9Object88SubmitPlanScaffold BuildState9Object88SubmitPlanScaffold(
+    void* object88,
+    bool callbackPairReady,
+    bool submitTargetReady,
+    uint32_t forwardedArg90,
+    int32_t cachedHandle147c) {
+    State9Object88SubmitPlanScaffold plan = {};
+    plan.callbackPairReady = callbackPairReady;
+    plan.submitTargetReady = submitTargetReady;
+    plan.forwardedArg90 = forwardedArg90;
+    plan.modeQueryReady = TryState9Object88QueryManagedSendMode(object88, &plan.managedSendMode);
+    if (!plan.modeQueryReady) {
+        return plan;
+    }
+
+    if (plan.managedSendMode) {
+        plan.route = State9Object88SubmitRouteScaffold::kManagedSlots18_1c_24;
+        plan.wouldReleaseCachedHandle147c = (cachedHandle147c != -1);
+        plan.wouldAcquireManagedHandle18 = true;
+        plan.wouldCallManagedSend24 = callbackPairReady && submitTargetReady;
+    } else {
+        plan.route = State9Object88SubmitRouteScaffold::kDirectSlot28;
+        plan.wouldCallDirectSend28 = callbackPairReady && submitTargetReady;
+    }
+    return plan;
+}
 
 }  // namespace
 
@@ -725,17 +780,14 @@ void CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffol
     void* callback84,
     void* object88,
     void* object8c) {
-    g_deferredState9CallbackTripleScaffold.callback84 = callback84;
-    g_deferredState9CallbackTripleScaffold.object88 = object88;
-    g_deferredState9CallbackTripleScaffold.object8c = object8c;
-    g_deferredState9CallbackTripleScaffold.valid =
+    const bool anyCaptured =
         callback84 != nullptr || object88 != nullptr || object8c != nullptr;
     spdlog::info(
         "CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold callback84={} object88={} object8c={} valid={} (captured from owner/arg6 vtable +0x124 without touching live state yet)",
         fmt::ptr(callback84),
         fmt::ptr(object88),
         fmt::ptr(object8c),
-        g_deferredState9CallbackTripleScaffold.valid ? 1u : 0u);
+        anyCaptured ? 1u : 0u);
 }
 
 CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
@@ -1385,15 +1437,33 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     //   - `0x41de40`: `ECX = owner (0x4d4e38)`, `EAX = helperWord6 (0x2710)`,
     //     `EDX = state9 vtable (0x004b517c)`
     // - owner callback object `+0x84` fills two dwords through vtable `+0x38`
-    // - owner `+0x1c + 0x24..0x30` seeds a local transport/address block
-    // - `0x44afd0` / `0x44b0d0` derive a packet-like payload from helper word `+6`
-    // - owner object `+0x88` chooses between direct send (`+0x28`) and handle-based send
-    //   (`+0x1c`, `+0x18`, `+0x24`) after testing `(+0x44)->(+0x30)`
+    // - owner `+0x1c + 0x24..0x30` seeds a local 16-byte sockaddr-like submit-address block
+    // - `0x44afd0` / `0x44b0d0` then turn that block plus helper word `+6` into a host:port
+    //   submit target, not an opaque packet blob
+    // - owner object `+0x88` then splits exactly as:
+    //   - test mode through `(+0x44)->(+0x30)`
+    //   - direct branch: `+0x28(submitTargetString, callbackOutLow, callbackOutHigh, optionalArg90)`
+    //   - managed branch:
+    //     - if owner `+0x147c != -1`, first `+0x1c(cachedHandle147c)`
+    //     - then `handle = +0x18(0)`
+    //     - cache owner `+0x147c = handle`
+    //     - then `+0x24(handle, submitTargetString, callbackOutLow, callbackOutHigh, optionalArg90)`
     // - representative natural-original stop also had non-null owner callback/object triple
     //   at `+0x84/+0x88/+0x8c`
+    // - newer natural-original + client-cross-check now also tightens the concrete object88 branch:
+    //   - owner `+0x88` was `INetMgr.Default` wrapper `0x62999968`
+    //   - wrapper `+0x44` returned inner object `+0x04 = 0x08814860`
+    //   - inner vtable `+0x30 = 0x623b3800` returned `1`, so the natural run took the
+    //     managed-submit branch
+    //   - managed `+0x18(0)` then returned handle `0x224`, which `0x41de40` stored into
+    //     owner `+0x147c` before calling managed submit `+0x24`
+    //   - client-side string/debug anchors on that path now read as `CUDPDriver` / `JoinSession`
     // - strongest current source/runtime origin for that triple is now narrower too:
     //   deeper client init calls owner/arg6 vtable `+0x124(netShell, netMgr, distrObjExecutive)`,
     //   and `0x41f1d0` stores those three parameters directly into `+0x84/+0x88/+0x8c`
+    // - no earlier launcher.exe-side producer on the active path is isolated yet beyond that
+    //   startup capture; current replacement source keeps the triple launcher-owned and explicit
+    //   instead of silently transplanting client runtime objects
     // - owner dword `+0x90` is only forwarded when helper byte `+4 != 0`
     // - owner dword `+0x147c` caches the acquired handle on the managed-send branch
     //
@@ -1417,16 +1487,17 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     //   - and only then returns pair `(&DAT_629e0284, 0x20)` to the launcher-side submit path
     // - practical consequence: the active state9 problem is not just “fill nulls”; it is to
     //   reconstruct the correct launcher-owned collaborator/wrapper state behind `0x41de40`
-    // - and it still does not claim the deeper `0x44afd0/0x44b0d0` packet-like payload builder or
-    //   the final `+0x28 / +0x18 / +0x24` submit calls are reconstructed yet
+    // - source now owns the host:port builder plus the exact object88 direct-vs-managed submit
+    //   split as an explicit scaffold plan/log boundary
+    // - but it still does **not** claim that callback84/object88/object8c are valid live launcher-
+    //   owned collaborators yet, and it still does not perform the actual `+0x28 / +0x1c / +0x18 /
+    //   +0x24` calls on the current deliberate path
     // Returning `0` still preserves the observed `0x439780` success-side event-post shape
     // (`< 1` => post event `0x17`) while narrowing the remaining blocker beyond mere null collaborators.
     const uint32_t forwardedArg90 = helperByte4 != 0u ? ownerOptionalField90_ : 0u;
     uint32_t callbackOutLow = 0u;
     uint32_t callbackOutHigh = 0u;
     const bool callbackPairReady = TryState9Callback84FillPair(ownerCallback84_, &callbackOutLow, &callbackOutHigh);
-    bool managedSendMode = false;
-    const bool managedSendModeReady = TryState9Object88QueryManagedSendMode(ownerObject88_, &managedSendMode);
 
     std::string submitTargetText;
     std::string remoteHostName = "<empty>";
@@ -1442,8 +1513,15 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
         submitTargetReady = !submitTargetText.empty();
     }
 
+    const State9Object88SubmitPlanScaffold object88SubmitPlan = BuildState9Object88SubmitPlanScaffold(
+        ownerObject88_,
+        callbackPairReady,
+        submitTargetReady,
+        forwardedArg90,
+        ownerCachedHandle147c_);
+
     spdlog::info(
-        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendModeReady={} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' (source now mirrors 0x44afd0/0x44b0d0 host:port formatting; remaining gap stays on callback84/object88 submit path)",
+        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} object88ModeQueryReady={} managedSendMode={} object88Route='{}' wouldReleaseCachedHandle147c={} wouldAcquireManagedHandle18={} wouldCallDirectSend28={} wouldCallManagedSend24={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' (source now mirrors 0x44afd0/0x44b0d0 host:port formatting plus the object88 direct-vs-managed submit split; remaining gap stays on valid launcher-owned callback84/object88 collaborators)",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
         static_cast<unsigned>(State6UdpSessionSecretF18()),
@@ -1455,8 +1533,13 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
         callbackPairReady ? 1u : 0u,
         static_cast<unsigned>(callbackOutLow),
         static_cast<unsigned>(callbackOutHigh),
-        managedSendModeReady ? 1u : 0u,
-        managedSendMode ? 1u : 0u,
+        object88SubmitPlan.modeQueryReady ? 1u : 0u,
+        object88SubmitPlan.managedSendMode ? 1u : 0u,
+        State9Object88SubmitRouteName(object88SubmitPlan.route),
+        object88SubmitPlan.wouldReleaseCachedHandle147c ? 1u : 0u,
+        object88SubmitPlan.wouldAcquireManagedHandle18 ? 1u : 0u,
+        object88SubmitPlan.wouldCallDirectSend28 ? 1u : 0u,
+        object88SubmitPlan.wouldCallManagedSend24 ? 1u : 0u,
         submitTargetReady ? 1u : 0u,
         static_cast<unsigned>(submitTargetIpv4NetworkOrder),
         submitTargetText,
