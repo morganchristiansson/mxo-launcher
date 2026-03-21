@@ -21,28 +21,22 @@ Current runtime note:
 
 ## Current State
 
-The current scaffold already:
+The current launcher path already:
 - preloads support DLLs
 - loads `cres.dll` before `client.dll`
 - resolves the client exports used by original `launcher.exe`
 - uses the correct original 8-argument `InitClientDLL` frame shape
-- refuses incomplete startup by default
+- rebuilds launcher-owned arg7 from recovered selection state
+- reuses persisted `Last_WorldName`
+- negotiates with auth and margin on the active path
+- passes through the old loading-area boundary and enters game on the current live world path
 
-Current blocker:
-- launcher-owned startup state is still incomplete
-- faithful current result is still blocked before a real original-equivalent startup
+Current bounded assumptions:
+- current servers expose only one practical world, so defaulting to the first recovered/persisted world is an acceptable shortcut for the active path
+- the active recovered world entry is still bounded to `Reality -> 0x0500002a`
 
-Current practical progress path with patched client:
-- real-user `/home/morgan` runs now create a visible `MATRIX_ONLINE` window and proceed well past the old immediate mediator gate
-- current deep path reaches mediator calls at `+0x48`, `+0x4c`, `+0x170`, and `+0x124`
-- latest practical progress dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_2.dmp`
-- current crash no longer looks like a simple null-vtable call; latest dump lands at `EIP=0x003e3b90`
-
-Diagnostic-only forced runtime can still reproduce the older known crash:
-- `client.dll+0x3b3573`
-- reference dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
-
-That forced crash is useful for analysis, but it is **not** original-equivalent behavior.
+Current blocker is no longer early startup bringup.
+Current work is now about tightening faithfulness of the active launcher-owned runtime path after successful entry.
 
 ## Build
 
@@ -154,8 +148,7 @@ Start here:
 
 ## Next Work
 
-- make `0x4d2c58` resolve non-NULL on the original path
-- reconstruct enough of the real launcher-side binder/registry path behind `ILTLoginMediator.Default`
-- then revisit `0x4d6304`
-- understand what `0x402ec0` minimally provides
-- get the faithful path past `InitClientDLL` before treating `RunClientDLL` as canonical
+- keep tightening the active launcher-owned runtime path now that it reaches and enters game
+- replace remaining bounded recovered scaffolds with more faithful launcher-owned construction where evidence exists
+- continue the late-runtime parity pass after the old state9/state12 bridge and later observer/event continuations
+- keep source, recovered behavior, and canonical docs aligned as the active path gets less scaffolded

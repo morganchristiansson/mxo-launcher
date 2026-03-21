@@ -2,22 +2,24 @@
 
 ## Current status
 
-There are now **three distinct runtime states** worth keeping separate:
+The active launcher path now reaches `RunClientDLL` as part of the normal `make run` flow.
 
-1. **Safe default scaffold**
-   - uses the faithful launcher-side startup order
-   - currently reaches clean `InitClientDLL = 1`
-   - stops before runtime by default
+Keep these runtime states separate:
 
-2. **Deliberate binder/scaffold `RunClientDLL` experiment on the clean path**
-   - same binder/scaffold setup
-   - but with `MXO_FORCE_RUNCLIENT=1`
-   - now reaches a stable runtime loop instead of immediately crashing
+1. **Current active launcher path**
+   - uses the current launcher-owned startup order
+   - reaches clean `InitClientDLL = 1`
+   - enters `RunClientDLL` on the active path
+   - negotiates auth and margin, progresses through late login, and now reaches in-game entry on the live path
 
-3. **Older diagnostic forced-runtime-after-failed-init path**
+2. **Older pre-entry deliberate runtime runs**
+   - useful only as historical evidence from the bring-up period
+   - no longer describe the active workflow
+
+3. **Older forced-runtime-after-failed-init path**
    - entered `RunClientDLL` after `InitClientDLL = -7`
    - crashed at `client.dll+0x3b3573`
-   - still useful as historical evidence, but no longer the best description of the current binder path
+   - remains useful only as historical evidence for the earlier invalid path
 
 ## Original launcher success contract
 
@@ -51,24 +53,18 @@ That means the current binder result:
 
 is now evidence-backed **success**, not a local guess.
 
-## Current high-value deliberate runtime experiment
+## Current high-value active runtime result
 
 Command:
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher && \
-  MXO_TRACE_WINDOWS=1 \
-  MXO_FORCE_RUNCLIENT=1 \
-  MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Vector \
-  make run_binder_both
+cd /home/morgan/mxo/code/matrix_launcher && make run
 ```
 
-Observed result on the current binder/scaffold path:
-- `InitClientDLL` still returns cleanly with `1`
-- `RunClientDLL` is entered deliberately
-- no fresh crash dump is produced during timed runs
-- `RunClientDLL` does **not** return within the timed run window
+Observed result on the current active path:
+- `InitClientDLL` returns cleanly with `1`
+- `RunClientDLL` is entered on the normal launcher path
+- no fresh crash dump is produced during healthy runs
 - the process reaches a real visible runtime window instead of dying immediately
 
 Window-trace evidence from `resurrections.log`:
@@ -76,14 +72,14 @@ Window-trace evidence from `resurrections.log`:
 - later on the same run:
   - `WindowTrace hwnd=00030058 visible=1 iconic=0 class='MATRIX_ONLINE' title='The Matrix Online' style=0x96000000 exStyle=0x00000008 rect=(0,0)-(800,600)`
 
-So the deliberate runtime experiment now progresses at least this far:
+So the active runtime path now progresses at least this far:
 - creates a real `MATRIX_ONLINE` window
 - transitions it into fullscreen `800x600`
 - stays alive in runtime long enough to keep polling rather than immediately faulting
 
 ## What is dynamically live now
 
-Current `resurrections.log` on that deliberate runtime path shows repeated traffic from exactly three surfaces:
+Current `resurrections.log` on that active runtime path shows repeated traffic from exactly three surfaces:
 
 - `MediatorStub::IsConnected() -> 1`
 - `LauncherObjectStub::Subobject60::Slot0(...)`
@@ -143,7 +139,7 @@ That means two now-live facts matter:
 1. mediator `+0x2c` is a real runtime gate on the `RunClientDLL` path
 2. stored `InitClientDLL` arg5 is then fed into deeper runtime work
 
-The arg5-side helper `0x62532130` immediately checks `[ecx+0x04]` and, on the current scaffold, falls into `0x62531c10(1)`.
+The arg5-side helper `0x62532130` immediately checks `[ecx+0x04]` and, on the current implementation, falls into `0x62531c10(1)`.
 That helper then does:
 
 ```asm
@@ -179,7 +175,7 @@ That comparison also tightens one important behavioral detail:
 - `0x62532130` calls `0x62531c10(1)`
 - so the current runtime path is executing the **non-blocking poll variant** of this shared arg5 queue-consumer logic, not the blocking wait variant
 
-So the current deliberate runtime experiment proves that all of these are now dynamically live on the runtime path:
+So the current active runtime path proves that all of these are now dynamically live on the runtime path:
 - arg5 helper subobject at `+0x60`
 - the surrounding shared queue-consumer logic at `0x62531c10`
 - arg5 queue cursor comparisons at:
@@ -307,19 +303,19 @@ And static recovery of original slot `12` (`0x4316a0`, now string-backed as `Cle
 
 So the current runtime loop is not merely touching arg5 in the abstract.
 It is repeatedly executing the **non-blocking consumer side** of a real queue engine, while the scaffold still has no evidence-backed producer traffic feeding even the now-best-understood queue0C startup path.
-That also now explains why current deliberate `RunClientDLL` runs never reach arg5 primary slot `12`: with queue0C still empty, the consumer never advances into the queued-work branch that would call it.
+That also now explains why current `RunClientDLL` runs never reach arg5 primary slot `12`: with queue0C still empty, the consumer never advances into the queued-work branch that would call it.
 
 ## Current interpretation
 
-The current binder/scaffold path is no longer best described as:
+The current active path is no longer best described as:
 - "forced `RunClientDLL` immediately crashes"
 
 It is now better described as:
 - `InitClientDLL` succeeds cleanly with positive return `1`
-- a deliberate `RunClientDLL` experiment reaches the actual runtime loop
+- the active `RunClientDLL` path reaches the actual runtime loop
 - that loop repeatedly polls mediator `+0x2c` and runs the **non-blocking arg5 queue-consumer path** rooted at `0x62532130 -> 0x62531c10(1)`
 - runtime logging now shows both arg5 queues staying in the same empty cursor state (`queue0C current0==current1`, `queue34 current0==current1`)
-- the current scaffold therefore appears to stay on an **empty-work / idle-loop** path rather than progressing into richer runtime activity because the original arg5 producer side (`0x436820 -> 0x436670`) is still not being driven faithfully
+- the current implementation therefore appears to stay on an **empty-work / idle-loop** path rather than progressing into richer runtime activity because the original arg5 producer side (`0x436820 -> 0x436670`) is still not being driven faithfully
 
 That shifts the next runtime question again.
 The most likely blocker is now:
@@ -338,7 +334,7 @@ Current best reading is that the engine's meaningful runtime setup is likely dri
 
 ## New negative runtime result after partial arg5 `src/liblttcp/` wiring
 
-A fresh deliberate runtime rerun was made after incrementally wiring the diagnostics arg5 scaffold into the new original-name classes for:
+A fresh active-path rerun was made after incrementally wiring the diagnostics arg5 implementation into the new original-name classes for:
 - slot `1` / `MonitorPort`
 - slot `2` / `UDPMonitorPort`
 - slot `6` / `Connect`
@@ -349,12 +345,7 @@ A fresh deliberate runtime rerun was made after incrementally wiring the diagnos
 Representative command:
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher && \
-  MXO_TRACE_WINDOWS=1 \
-  MXO_FORCE_RUNCLIENT=1 \
-  MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Vector \
-  make run_binder_both
+cd /home/morgan/mxo/code/matrix_launcher && make run
 ```
 
 Observed result on that rerun:
@@ -371,11 +362,11 @@ Observed result on that rerun:
 
 So this partial wiring changed the internal implementation structure, but did **not** yet change the currently observed runtime behavior.
 Current best reading remains:
-- the live deliberate `RunClientDLL` path is still stuck in the same empty-work non-blocking consumer loop
+- the live `RunClientDLL` path is still stuck in the same empty-work non-blocking consumer loop
 - the newly wired class-backed slot `6/7/8/12` paths are still gated behind runtime state we are not yet reaching
-- this is therefore useful negative evidence that simply moving starter semantics into `src/liblttcp/` is not, by itself, enough to make the current binder/scaffold runtime path feed queue0C or reach the later slot-12 cleanup branch
+- this is therefore useful negative evidence that simply moving starter semantics into `src/liblttcp/` is not, by itself, enough to make the current active runtime path feed queue0C or reach the later slot-12 cleanup branch
 - user subjectively reported that the visible `Loading Character` phase seemed to remain on screen longer/usefully after the recent refactor, but current logs still do **not** prove a new deeper transition there; for now that should be treated as suggestive, not canonical runtime advancement
-- newer implementation-side auth-connect work now also confirms that a real launcher-side TCP auth connection can be made on the binder/scaffold path before the runtime loop
+- newer implementation-side auth-connect work now also confirms that a real launcher-side TCP auth connection can be made on the active path before the runtime loop
 - newer queue/work milestone after that wiring:
   - the replacement launcher can now deliberately enqueue original-shaped queue0C `(workItem, context)` pairs after successful auth/margin connect attempts
   - on deliberate `RunClientDLL` runs, the client now visibly consumes those queued items instead of staying purely in the old empty-cursor loop from the very first sample
@@ -531,23 +522,12 @@ Current best reading remains:
         - but the launcher-owned auth progression claim itself is now stronger, not weaker
     - later launcher-owned auth protocol details now belong under:
       - `../../launcher.exe/auth/README.md`
-    - current deliberate queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
+    - current queue injection still uses a raw diagnostic context callback, so it bypasses that original post-connect auth/margin completion chain
   - current runtime log now makes that bypass/narrowing explicit with the updated static lead carried in source scaffolding as:
     - `DIAGNOSTIC: routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='phase2-bootstrap: +0xa0 NULL => AS_GetPublicKeyRequest, non-NULL => AS_AuthRequest' laterIncomingReplyAnchor='AS_AuthReply'`
 - this is still not faithful original-equivalent queue semantics yet, but it is a concrete step past the previous totally empty queue0C runtime state
 - newer validation reruns now tighten that runtime picture materially further instead of leaving it at the old single-consumed-item milestone:
-  - plain `make run` still ends at:
-    - `InitClientDLL returned: 1`
-    - `InitClientDLL succeeded, but RunClientDLL is gated.`
-  - deliberate runtime/auth command used for the new evidence:
-
-```bash
-cd /home/morgan/mxo/code/matrix_launcher && \
-  MXO_FORCE_RUNCLIENT=1 \
-  make run
-```
-
-  - that deliberate run now shows the client consuming multiple launcher-owned queue0C items on the live arg5 path, not just the first type-2 connect-status item:
+  - the active `make run` path now shows the client consuming multiple launcher-owned queue0C items on the live arg5 path, not just the first type-2 connect-status item:
     - first type-2 connect-status item:
       - `queued connection-status work item label='AuthConnectStatus' ... type=2 payload=0x07000001`
       - `raw message-connection context OnOperationCompleted ... type=2 payload=0x07000001`
@@ -556,7 +536,7 @@ cd /home/morgan/mxo/code/matrix_launcher && \
       - `AuthReceivePacket ... type=3 payload=0x00000198`
       - `AuthReceivePacket ... type=3 payload=0x00000012`
       - `AuthReceivePacket ... type=3 payload=0x00000219`
-  - those type-3 receives now drive a concrete launcher-owned auth progression on the deliberate `RunClientDLL` path:
+  - those type-3 receives now drive a concrete launcher-owned auth progression on the current `RunClientDLL` path:
     - `AS_GetPublicKeyReply`
     - `AS_AuthRequest`
     - `AS_AuthChallenge`
@@ -602,21 +582,19 @@ For packet-level auth details and the canonical auth loop write-up, prefer:
 What matters here for `RunClientDLL` is narrower:
 - the auth connect-status queue item is now feeding a real launcher-owned auth progression instead of the older dead-end shortcut path
 - auth therefore remains launcher-owned in practice as well as in static analysis
-- newer live-runtime validation now also shows the post-`AS_AuthReply` State4/`0x41e500` margin begin succeeding on the deliberate runtime path, with helper11/state11 slot 3 (`0x43c020`) becoming live and sending the raw `0x4d` packet there
-- the next auth-side/runtime question therefore shifts one step forward again: what launcher-owned state or incoming margin traffic is still missing so later helper11/state11 slot 6 (`0x440320` / `MS_LoadCharacterReply`) becomes live on that same deliberate runtime path
+- newer live-runtime validation now also shows the post-`AS_AuthReply` State4/`0x41e500` margin begin succeeding on the active runtime path, with helper11/state11 slot 3 (`0x43c020`) becoming live and sending the raw `0x4d` packet there
+- the next auth-side/runtime question therefore shifts one step forward again: what launcher-owned state or incoming margin traffic is still missing so later helper11/state11 slot 6 (`0x440320` / `MS_LoadCharacterReply`) becomes live on that same active runtime path
 
 Important restraint:
-- this remains a deliberate binder/scaffold runtime run gated by `MXO_FORCE_RUNCLIENT=1`
-- launcher-owned auth auto-begins by default on this path when the sidecar is present, but that still does **not** make it proof of full original-equivalent automatic state-machine entry
+- this is now the active launcher runtime path rather than a separately gated runtime experiment
+- launcher-owned auth auto-begins by default on this path, but that still does **not** make it proof of full original-equivalent automatic state-machine entry
 
 ## Relationship to the older `client.dll+0x3b3573` crash
 
-The older forced-runtime crash remains useful historical evidence:
-- it came from running `RunClientDLL` after failed `InitClientDLL = -7`
-- it still documents what happened on that intentionally invalid path
+The older forced-runtime crash is now only a retired historical reference from an intentionally invalid path.
+It is no longer the best canonical description of the current active runtime state.
 
-But it is no longer the best canonical description of the current binder/scaffold runtime state.
-The current clean-init deliberate runtime path now has a more valuable signature:
+The current clean-init runtime path now has a more valuable signature:
 - stable fullscreen window
 - repeated mediator `+0x2c`
 - repeated arg5 `+0x60`
@@ -625,7 +603,6 @@ The current clean-init deliberate runtime path now has a more valuable signature
 ## Related docs
 
 - `../InitClientDLL/README.md`
-- `CRASH_623B3573.md`
 - `../../launcher.exe/client_dll_loading/LOADING_SEQUENCE.md`
 - `../../launcher.exe/startup_objects/0x4d6304_network_engine.md`
 - `../../launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`

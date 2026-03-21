@@ -22,8 +22,8 @@ The original launcher copies itself into Wine temp and runs as a temp `matrix.ex
 Normal launch:
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
-MXO_USER=morgan MXO_PASS='<pwd>' MXO_CHAR=Morg4n make run_original_launcher
+cd ~/MxO_7.6005
+wine ./launcher.exe -noeula -nopatch -char Morg4n -user morgan -pwd '<pwd>'
 ```
 
 That uses the real launcher with:
@@ -43,7 +43,7 @@ Use the Wine internal PID from `wine tasklist`.
 Useful commands:
 
 ```bash
-cd /home/morgan/MxO_7.6005
+cd ~/MxO_7.6005
 wine tasklist /v
 wine cmd /c tasklist /FI "IMAGENAME eq matrix.exe"
 ```
@@ -74,7 +74,7 @@ not the Linux PID.
 
 When working together interactively:
 
-1. launch with `make run_original_launcher`
+1. launch the real `launcher.exe` under Wine
 2. wait until the spawned `matrix.exe` is at a **stable UI point**
    - patch notes / Continue button
    - other visibly settled launcher UI
@@ -150,14 +150,13 @@ Practical rule:
 ## Crash-dump fast path
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
 make crashdump
 ```
 
 Direct equivalent:
 
 ```bash
-cd /home/morgan/MxO_7.6005
+cd ~/MxO_7.6005
 printf 'info reg\nbt\ninfo share\nquit\n' | winedbg MatrixOnline_0.0_crash_<n>.dmp
 ```
 

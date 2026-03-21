@@ -64,11 +64,9 @@ static uint16_t g_LoginControllerMarginPortHostOrder = 10000;
 static bool g_LoginControllerIgnoreHostsFileForMargin = false;
 static char g_LoginControllerMarginRouteHostPrefix[256] = {};
 static char g_LoginControllerExactMarginHostName[256] = {};
-static char g_LoginControllerSelectionSeedName[64] = {};
-static uint32_t g_LoginControllerSelectionSeedWorldIndexLow24 = 0;
-static bool g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed = false;
-static char g_LoginControllerHelper11CharacterName[256] = {};
-static char g_LoginControllerHelper11GameSessionId[256] = {};
+static uint32_t g_LoginControllerSelectedWorldIndexLow24 = 0;
+static char g_LoginControllerCharacterNameSeed[256] = {};
+static char g_LoginControllerGameSessionIdSeed[256] = {};
 static const char* g_LoginControllerAuthName = "resurrections";
 static const char* g_LoginControllerAuthPassword = "";
 
@@ -130,73 +128,6 @@ static void DiagnosticCopyCStringIntoFixed(char* dest, size_t destSize, const ch
     const size_t copyCount = std::min(destSize - 1u, std::strlen(src));
     std::memcpy(dest, src, copyCount);
     dest[copyCount] = '\0';
-}
-
-static const char* DiagnosticGetEnvNonEmpty(const char* name) {
-    if (!name || !name[0]) {
-        return NULL;
-    }
-
-    const char* value = std::getenv(name);
-    return (value && value[0]) ? value : NULL;
-}
-
-static bool DiagnosticTryParseEnvU32(const char* name, uint32_t* outValue) {
-    if (outValue) {
-        *outValue = 0u;
-    }
-
-    const char* value = DiagnosticGetEnvNonEmpty(name);
-    if (!value || !outValue) {
-        return false;
-    }
-
-    char* end = NULL;
-    const unsigned long parsed = std::strtoul(value, &end, 0);
-    if (!end || end == value || *end != '\0') {
-        return false;
-    }
-
-    *outValue = static_cast<uint32_t>(parsed & 0xffffffffu);
-    return true;
-}
-
-static size_t DiagnosticParseEnvU32List(
-    const char* name,
-    uint32_t* outValues,
-    size_t maxValues) {
-    if (!outValues || maxValues == 0u) {
-        return 0u;
-    }
-
-    std::fill(outValues, outValues + maxValues, 0u);
-
-    const char* text = DiagnosticGetEnvNonEmpty(name);
-    if (!text) {
-        return 0u;
-    }
-
-    size_t count = 0u;
-    const char* cursor = text;
-    while (*cursor && count < maxValues) {
-        while (*cursor == ' ' || *cursor == '\t' || *cursor == ',' || *cursor == ';' || *cursor == '|') {
-            ++cursor;
-        }
-        if (!*cursor) {
-            break;
-        }
-
-        char* end = NULL;
-        const unsigned long parsed = std::strtoul(cursor, &end, 0);
-        if (!end || end == cursor) {
-            break;
-        }
-
-        outValues[count++] = static_cast<uint32_t>(parsed & 0xffffffffu);
-        cursor = end;
-    }
-
-    return count;
 }
 
 static bool DiagnosticParseVariableLengthPayload(
@@ -515,107 +446,37 @@ static void DiagnosticApplyLoginControllerConfig() {
     g_DiagnosticLoginController->RegisterScaffoldState13(&g_DiagnosticLoginStateState13);
     g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
 
-    const char* helper11RealFirstName = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_REAL_FIRST_NAME");
-    const char* helper11RealLastName = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_REAL_LAST_NAME");
-    const char* helper11Background = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_BACKGROUND");
-    std::array<uint32_t, 17> appearanceIds = {};
-    const size_t appearanceCount = DiagnosticParseEnvU32List(
-        "MXO_DIAGNOSTIC_APPEARANCE_IDS",
-        appearanceIds.data(),
-        appearanceIds.size());
-    const char* helper11CharacterName =
-        g_LoginControllerHelper11CharacterName[0]
-            ? g_LoginControllerHelper11CharacterName
-            : ((g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed &&
-                g_LoginControllerSelectionSeedName[0])
-                   ? g_LoginControllerSelectionSeedName
-                   : NULL);
-    const bool shouldSeedRecoveredProcessLoginCredentials =
-        g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed ||
-        g_LoginControllerHelper11CharacterName[0] ||
-        (helper11RealFirstName && helper11RealFirstName[0]) ||
-        (helper11RealLastName && helper11RealLastName[0]) ||
-        (helper11Background && helper11Background[0]) ||
-        (appearanceCount != 0u);
-    if (shouldSeedRecoveredProcessLoginCredentials && helper11CharacterName && helper11CharacterName[0]) {
+    const char* characterNameSeed =
+        g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : NULL;
+    if (characterNameSeed && characterNameSeed[0]) {
         // Diagnostic bridge only:
         // - `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the strongest concrete
-        //   writer for helper11 owner fields `+0x108/+0x12c/+0x134..+0x1b8`
+        //   writer for the owner source block `+0x108/+0x12c/+0x134..+0x1b8`
         // - the exact original upstream producer feeding that blob is still unresolved
-        // - the replacement launcher therefore lets explicit launcher/runtime seed inputs exercise
-        //   the confirmed writer without pretending we already recovered the original producer
+        // - the replacement launcher therefore lets explicit launcher seed inputs exercise the
+        //   confirmed writer without pretending we already recovered the original producer
         mxo::ltlogin::CLTLoginMediator::ProcessLoginCredentialsInputSketch input = {};
         DiagnosticCopyCStringIntoFixed(
             input.string00.data(),
             input.string00.size(),
-            helper11CharacterName);
-        input.field24 = g_LoginControllerSelectionSeedWorldIndexLow24;
-
-        DiagnosticCopyCStringIntoFixed(
-            input.string70.data(),
-            input.string70.size(),
-            helper11RealFirstName);
-        DiagnosticCopyCStringIntoFixed(
-            input.string90.data(),
-            input.string90.size(),
-            helper11RealLastName);
-        DiagnosticCopyCStringIntoFixed(
-            input.stringB0.data(),
-            input.stringB0.size(),
-            helper11Background);
-
-        for (size_t i = 0; i < 8u; ++i) {
-            input.dwords2c[i] = appearanceIds[i];
-            input.dwords4c[i] = appearanceIds[8u + i];
-        }
-        input.bytes6c[0] = static_cast<uint8_t>(appearanceIds[16] & 0xffu);
-        input.bytes6c[1] = static_cast<uint8_t>((appearanceIds[16] >> 8) & 0xffu);
-        input.bytes6c[2] = static_cast<uint8_t>((appearanceIds[16] >> 16) & 0xffu);
-        input.bytes6c[3] = static_cast<uint8_t>((appearanceIds[16] >> 24) & 0xffu);
+            characterNameSeed);
+        input.field24 = g_LoginControllerSelectedWorldIndexLow24;
 
         g_DiagnosticLoginController->ProcessLoginCredentials(input);
         spdlog::info(
-            "DiagnosticApplyLoginControllerConfig applied recovered 0x41c3c0 seed characterName='{}' selectedWorldIndexLow24=0x{:06x} realFirst='{}' realLast='{}' background='{}' appearanceCount={} explicitEnable={} launcherCharacterSeed={}",
-            helper11CharacterName,
-            static_cast<unsigned>(g_LoginControllerSelectionSeedWorldIndexLow24),
-            input.string70[0] ? input.string70.data() : "<empty>",
-            input.string90[0] ? input.string90.data() : "<empty>",
-            input.stringB0[0] ? input.stringB0.data() : "<empty>",
-            static_cast<unsigned>(appearanceCount),
-            g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed ? 1u : 0u,
-            g_LoginControllerHelper11CharacterName[0] ? 1u : 0u);
+            "DiagnosticApplyLoginControllerConfig applied recovered 0x41c3c0 character seed characterName='{}' selectedWorldIndexLow24=0x{:06x}",
+            characterNameSeed,
+            static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24));
     }
 
     mxo::ltlogin::LaunchPadClient launchPad;
-    const char* diagnosticPlayRequestSessionId =
-        g_LoginControllerHelper11GameSessionId[0]
-            ? g_LoginControllerHelper11GameSessionId
-            : DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_PLAY_REQUEST_SESSION_ID");
-    if (diagnosticPlayRequestSessionId) {
-        launchPad.OnPlayRequestStatus(g_DiagnosticLoginController, /*resultCode=*/0u, diagnosticPlayRequestSessionId);
+    const char* playRequestSessionId =
+        g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : NULL;
+    if (playRequestSessionId) {
+        launchPad.OnPlayRequestStatus(g_DiagnosticLoginController, /*resultCode=*/0u, playRequestSessionId);
         spdlog::info(
-            "DiagnosticApplyLoginControllerConfig routed diagnostic LaunchPadClient::OnPlayRequestStatus GameSessionID='{}' launcherSessionSeed={}",
-            diagnosticPlayRequestSessionId,
-            g_LoginControllerHelper11GameSessionId[0] ? 1u : 0u);
-    }
-
-    const char* diagnosticLoginSource94First = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_LOGIN_SOURCE94_FIRST");
-    const char* diagnosticLoginSessionText = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_LOGIN_SESSION_TEXT");
-    uint32_t diagnosticLoginShared660 = 0u;
-    const bool haveDiagnosticLoginShared660 =
-        DiagnosticTryParseEnvU32("MXO_DIAGNOSTIC_LOGIN_SHARED660", &diagnosticLoginShared660);
-    if (diagnosticLoginSource94First || diagnosticLoginSessionText || haveDiagnosticLoginShared660) {
-        launchPad.OnLoginRequestStatus(
-            g_DiagnosticLoginController,
-            /*resultCode=*/0u,
-            diagnosticLoginSource94First ? diagnosticLoginSource94First : "",
-            diagnosticLoginShared660,
-            diagnosticLoginSessionText ? diagnosticLoginSessionText : "");
-        spdlog::info(
-            "DiagnosticApplyLoginControllerConfig routed diagnostic LaunchPadClient::OnLoginRequestStatus owner660=0x{:08x} source94='{}' session='{}'",
-            static_cast<unsigned>(diagnosticLoginShared660),
-            diagnosticLoginSource94First ? diagnosticLoginSource94First : "<empty>",
-            diagnosticLoginSessionText ? diagnosticLoginSessionText : "<empty>");
+            "DiagnosticApplyLoginControllerConfig routed launcher LaunchPadClient::OnPlayRequestStatus GameSessionID='{}'",
+            playRequestSessionId);
     }
 }
 
@@ -791,43 +652,32 @@ const void* DiagnosticGetState9CallbackSeedPointer85D4() {
     return g_LoginControllerState9CallbackSeed85D4;
 }
 
-void DiagnosticConfigureLoginControllerSelectionSeed(
-    const char* selectionName,
-    uint32_t selectedWorldIndexLow24,
-    bool enableRecoveredProcessLoginCredentialsSeed) {
-    std::strncpy(
-        g_LoginControllerSelectionSeedName,
-        selectionName ? selectionName : "",
-        sizeof(g_LoginControllerSelectionSeedName) - 1);
-    g_LoginControllerSelectionSeedName[sizeof(g_LoginControllerSelectionSeedName) - 1] = '\0';
-    g_LoginControllerSelectionSeedWorldIndexLow24 = selectedWorldIndexLow24 & 0x00ffffffu;
-    g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed = enableRecoveredProcessLoginCredentialsSeed;
+void DiagnosticConfigureLoginControllerSelectedWorldIndex(uint32_t selectedWorldIndexLow24) {
+    g_LoginControllerSelectedWorldIndexLow24 = selectedWorldIndexLow24 & 0x00ffffffu;
     DiagnosticApplyLoginControllerConfig();
     Log(
-        "DIAGNOSTIC: recovered 0x41c3c0 seed configured enabled=%u selectionName='%s' selectedWorldIndexLow24=0x%06x",
-        g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed ? 1u : 0u,
-        g_LoginControllerSelectionSeedName[0] ? g_LoginControllerSelectionSeedName : "<empty>",
-        (unsigned)g_LoginControllerSelectionSeedWorldIndexLow24);
+        "DIAGNOSTIC: recovered 0x41c3c0 selectedWorldIndexLow24 configured value=0x%06x",
+        (unsigned)g_LoginControllerSelectedWorldIndexLow24);
 }
 
-void DiagnosticConfigureLoginControllerHelper11Seed(
+void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* characterName,
     const char* gameSessionId) {
     std::strncpy(
-        g_LoginControllerHelper11CharacterName,
+        g_LoginControllerCharacterNameSeed,
         characterName ? characterName : "",
-        sizeof(g_LoginControllerHelper11CharacterName) - 1);
-    g_LoginControllerHelper11CharacterName[sizeof(g_LoginControllerHelper11CharacterName) - 1] = '\0';
+        sizeof(g_LoginControllerCharacterNameSeed) - 1);
+    g_LoginControllerCharacterNameSeed[sizeof(g_LoginControllerCharacterNameSeed) - 1] = '\0';
     std::strncpy(
-        g_LoginControllerHelper11GameSessionId,
+        g_LoginControllerGameSessionIdSeed,
         gameSessionId ? gameSessionId : "",
-        sizeof(g_LoginControllerHelper11GameSessionId) - 1);
-    g_LoginControllerHelper11GameSessionId[sizeof(g_LoginControllerHelper11GameSessionId) - 1] = '\0';
+        sizeof(g_LoginControllerGameSessionIdSeed) - 1);
+    g_LoginControllerGameSessionIdSeed[sizeof(g_LoginControllerGameSessionIdSeed) - 1] = '\0';
     DiagnosticApplyLoginControllerConfig();
     Log(
-        "DIAGNOSTIC: helper11 seed bridge configured character='%s' session='%s' (diagnostic bridge into confirmed 0x41c3c0 / 0x420ef0 writers; original upstream producer still unresolved)",
-        g_LoginControllerHelper11CharacterName[0] ? g_LoginControllerHelper11CharacterName : "<empty>",
-        g_LoginControllerHelper11GameSessionId[0] ? g_LoginControllerHelper11GameSessionId : "<empty>");
+        "DIAGNOSTIC: login-controller character seed configured character='%s' session='%s' (bridge into confirmed 0x41c3c0 / 0x420ef0 writers; original upstream producer still unresolved)",
+        g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : "<empty>",
+        g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : "<empty>");
 }
 
 bool DiagnosticCanBeginAuthConnection() {

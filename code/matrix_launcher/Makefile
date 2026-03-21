@@ -6,6 +6,7 @@ RANLIB ?= i686-w64-mingw32-ranlib
 GAME_DIR = ~/MxO_7.6005
 TARGET = $(GAME_DIR)/resurrections.exe
 CRASHREPORTER_STUB = $(GAME_DIR)/crashreporter.stub.exe
+CRASHREPORTER_STUB_SRC = tools/crashreporter_stub.cpp
 
 CRYPTOPP_DIR = third_party/cryptopp890
 SPDLOG_DIR = third_party/spdlog-1.17.0
@@ -20,7 +21,7 @@ SPDLOG_DIR = third_party/spdlog-1.17.0
 #   - matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
 # - launcher/login/runtime class scaffolds now start moving under recovered source-style paths
 #   rooted at matrixstaging/
-# Shared object dependencies for common auth sources (used by both TARGET and AUTH_PROBE)
+# Shared object dependencies for launcher auth/runtime sources
 COMMON_AUTH_OBJS = \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/filters.o \
@@ -48,13 +49,7 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/launchpad.o \
 	$(COMMON_AUTH_OBJS)
 
-# Tools object dependencies (includes COMMON_AUTH_OBJS)
-TOOLS_OBJS = \
-	$(BUILD_DIR)/tools/auth_probe.o \
-	$(COMMON_AUTH_OBJS)
-
 BUILD_DIR = build
-AUTH_PROBE = $(GAME_DIR)/auth_probe.exe
 CRYPTOPP_LIB = $(BUILD_DIR)/libcryptopp.a
 SPDLOG_LIB = $(BUILD_DIR)/libspdlog.a
 
@@ -63,8 +58,6 @@ SPDLOG_LIB = $(BUILD_DIR)/libspdlog.a
 LAUNCHER_ARGS = $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_PASS)) $(if $(MXO_SESSION),-session $(MXO_SESSION)) $(if $(MXO_CHAR),-char $(MXO_CHAR))
 
 all: $(TARGET)
-
-auth_probe: $(AUTH_PROBE)
 
 CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp
 
@@ -79,18 +72,10 @@ $(BUILD_DIR)/matrixstaging/%.o: matrixstaging/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-# Object file for tools/ sources - pattern rule handles all tools/*.cpp files
-$(BUILD_DIR)/tools/%.o: tools/%.cpp
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
-
 # Target depends on launcher objects and cryptopp (spdlog is order-only prerequisite)
 $(TARGET): $(LAUNCHER_OBJS) $(CRYPTOPP_LIB) | $(SPDLOG_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
-
-$(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
-	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^
 
 # Download cryptopp and spdlog if they don't exist
 $(CRYPTOPP_DIR):
@@ -114,18 +99,11 @@ $(CRYPTOPP_LIB): $(CRYPTOPP_DIR)
 
 # spdlog is header-only, included via CXXFLAGS. No build step needed.
 
-# Auth probe depends on tools objects and cryptopp (spdlog is order-only prerequisite)
-$(AUTH_PROBE): $(TOOLS_OBJS) $(CRYPTOPP_LIB) | $(SPDLOG_DIR)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
+$(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
+	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^
 
 run: $(TARGET)
 	cd $(GAME_DIR) && wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_auth_probe: $(AUTH_PROBE)
-	@cd $(GAME_DIR) && MXO_AUTH_PROBE_USERNAME="$(or $(MXO_AUTH_PROBE_USERNAME),$(MXO_USER))" \
-	MXO_AUTH_PROBE_PASSWORD="$(or $(MXO_AUTH_PROBE_PASSWORD),$(MXO_PASS))" \
-	wine ./auth_probe.exe
 
 crashdump:
 	@latest=$$(cd $(GAME_DIR) && ls -t MatrixOnline_0.0_crash_*.dmp 2>/dev/null | head -1); \
@@ -150,4 +128,4 @@ clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all auth_probe run run_auth_probe crashdump install_crashreporter_stub restore_crashreporter clean
+.PHONY: all run crashdump install_crashreporter_stub restore_crashreporter clean

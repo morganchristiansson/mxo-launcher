@@ -5,7 +5,6 @@
 
 void Log(const char* fmt, ...);
 
-void DiagnosticInstallMediatorStub(void** outMediatorPtr);
 void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr);
 void DiagnosticConfigureMediatorSelection(
     uint32_t worldUpperBoundExclusive,
@@ -38,11 +37,8 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
-void DiagnosticConfigureLoginControllerSelectionSeed(
-    const char* selectionName,
-    uint32_t selectedWorldIndexLow24,
-    bool enableRecoveredProcessLoginCredentialsSeed);
-void DiagnosticConfigureLoginControllerHelper11Seed(
+void DiagnosticConfigureLoginControllerSelectedWorldIndex(uint32_t selectedWorldIndexLow24);
+void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* characterName,
     const char* gameSessionId);
 void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionContext, uint32_t byteCount);

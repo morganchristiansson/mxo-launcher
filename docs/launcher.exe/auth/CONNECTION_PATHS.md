@@ -229,29 +229,25 @@ The remaining unknown is now narrower than before:
 
 ## Current implementation-side milestone summary
 
-Current scaffold/runtime milestones already achieved:
+Current implementation/runtime milestones already achieved:
 - real launcher-side auth TCP connection is possible
 - current defaults mirror recovered strings:
   - auth host `auth.lith.thematrixonline.net`
   - auth port `11000`
   - margin suffix `.lith.thematrixonline.net`
   - margin port `10000`
-- auth now auto-begins by default on the binder/scaffold path
-- optional quick-test auth opt-out:
-  - `MXO_DISABLE_AUTH_CONNECTION=1`
-- optional margin trigger remains:
-  - `MXO_BEGIN_MARGIN_CONNECTION=1`
+- auth now auto-begins by default on the active launcher path
 - newer live runtime milestone after the State4/`0x41e500` correction:
-  - validated on the deliberate runtime path with:
-    - `MXO_FORCE_RUNCLIENT=1 MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both`
+  - validated on the active runtime path with:
+    - `make run`
     - canonical log: `~/MxO_7.6005/resurrections.log`
-  - post-`AS_AuthReply` margin begin now returns non-zero on the real deliberate runtime path
+  - post-`AS_AuthReply` margin begin now returns non-zero on the real active runtime path
   - the real path now emits a margin-side type-2 connect-status item
   - helper11/state11 slot 3 (`0x43c020`) is now live and builds/sends the raw `0x4d` packet on that path
 
 Current limitation summary:
 - exact margin-host derivation is still unresolved
-- the current scaffold still does not claim faithful full helper-state equivalence around `0x448050`
+- the current implementation still does not claim faithful full helper-state equivalence around `0x448050`
 - post-auth owner-state reconstruction around `0x4401a0` is still incomplete
 - the remaining post-auth blocker has moved forward:
   - helper11/state11 send is now live

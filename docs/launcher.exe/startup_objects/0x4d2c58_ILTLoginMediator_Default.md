@@ -188,7 +188,7 @@ From original `launcher.exe` startup/teardown:
 | `+0x164` | teardown conditional check | medium |
 | `+0x16c` | teardown conditional check | medium |
 
-Current scaffold note:
+Current implementation note:
 - the replacement launcher now still uses parsed `"0.1"` for `+0x1c`,
 - and it now rebuilds the `+0x24` value from the on-disk `client.dll` version resource using the same `%d.%d%d%d%d`-style float-string shaping recovered from the original nopatch path,
 - instead of using the older identical `0.1` placeholder for both slots.
@@ -226,17 +226,17 @@ Client-side mirrored surface:
   - `0x62a27508` -> `+PromptForSecurId`
 
 Important implication for the replacement launcher:
-- the current scaffold already propagates username strongly enough that downstream crashreporter args can show `morgan`
-- newer scaffold cleanup now also wires mediator `+0x60` from explicit auth-password state while preserving the caller-clean wrapper shape and masking password values in logs
+- the current implementation already propagates username strongly enough that downstream crashreporter args can show `morgan`
+- newer implementation cleanup now also wires mediator `+0x60` from explicit auth-password state while preserving the caller-clean wrapper shape and masking password values in logs
 - the highest-value current reconstruction target became the mediator-backed **password** path corresponding to original launcher `+0x60 -> 0x42ee80 -> 0x4d7424`, not only the already-studied early client `+0x58/+0x60/+0x5c` chain at `0x62001325..0x62001362`
 
-New runtime validation with a disposable test credential now confirms that this password path is materially working on the binder/scaffold init-success path.
-Representative diagnostic run:
-- binder mediator + stub launcher object
+Historical runtime validation with a disposable test credential confirmed that this password path was materially working on the earlier init-success path.
+Representative validation run:
+- active mediator/launcher path at the time
 - disposable auth:
   - username = `pwcheck`
   - password = `PW_TEST_7Q9X2M4K`
-- deliberate post-init crash via replacement-launcher env knob `MXO_DIAGNOSTIC_CRASH_AFTER_INIT_SUCCESS=1`
+- controlled post-init crash validation run
 
 Observed `crashreporter_stub.log` result:
 - `+Username "pwcheck"`
@@ -246,7 +246,7 @@ Observed `crashreporter_stub.log` result:
 So, on that path:
 - crashreporter username propagation is now confirmed end-to-end
 - crashreporter password propagation is now also confirmed end-to-end
-- and the current scaffold's mediator-backed auth seeding is now much closer to the original launcher's `+0x5c/+0x60/+0x58` crashreporter-default behavior than before
+- and the current implementation's mediator-backed auth seeding is now much closer to the original launcher's `+0x5c/+0x60/+0x58` crashreporter-default behavior than before
 
 ### Client-observed offsets on arg6-resolved `ILTLoginMediator.Default`
 
@@ -255,7 +255,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | Offset | Earliest observed role | Confidence |
 |---:|---|---|
 | `+0x10` | readiness / availability gate; this is part of the old `-7` barrier | high |
-| `+0x2c` | repeated `RunClientDLL` runtime gate before arg5-owned work at `0x62006cb9..0x62006cca` (`IsConnected()` in the current scaffold) | high |
+| `+0x2c` | repeated `RunClientDLL` runtime gate before arg5-owned work at `0x62006cb9..0x62006cca` (`IsConnected()` in the current implementation) | high |
 | `+0x38` | returns profile-root string used by client `Profiles\\%s\\...` formatting path | high |
 | `+0x3c` | returns default selection index when the client asks for `0xff` fallback selection | medium |
 | `+0x40` | returns selection-descriptor object for the arg7-derived selection index, including name + low-24-bit id data | medium |
@@ -433,7 +433,7 @@ Practical consequences:
    - zero-IV storage at `0x4d4d50`
    - two natural-original samples matched exactly under a one-block Twofish transform of
      `[ownerF18, 0, 0, 0]`
-   - the replacement now uses that live `+0x18c` path on the deliberate runtime branch
+   - the replacement now uses that live `+0x18c` path on the active runtime branch
 
 This is the strongest current static explanation for the crashdump-backed result that raw direct reuse
 of the captured `+0x124` objects regressed the deliberate launcher run: callback84 is a wrapper around
@@ -653,13 +653,9 @@ It now:
   - `+0x100`
   - `+0xe4`
 - and now also accepts one specific client-side `+0x40` scratch-shaped request derived from the current configured arg7 state
-- accepts optional diagnostic overrides:
-  - `MXO_MEDIATOR_WORLD_TYPE`
-  - `MXO_MEDIATOR_VARIANT_STATE`
 
-Representative non-zero arg7 run:
-- `MXO_ARG7_SELECTION=0x0500002a`
-- `make run_binder_both`
+Representative earlier non-zero arg7 run family:
+- packed selection `0x0500002a`
 
 Current practical correction:
 - the correct world name for this path is `Reality`

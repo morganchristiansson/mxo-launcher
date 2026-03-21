@@ -301,13 +301,13 @@ But it is **not** a real fix and **not** faithful startup behavior.
 It should be interpreted only as further evidence that the visible `arg2` fault is collateral damage from earlier state/call-flow corruption.
 
 Current stronger validation result:
-- the replacement launcher now has an opt-in diagnostic implementation of this bypass (`MXO_ARG2_RET_BYPASS=1`)
-- on the current path it does **not** reveal a meaningful later continuation
-- the popped target is just stale startup-frame `arg3 hClientDll = 0x62000000`
-- execution then immediately faults again at `client.dll+0x3`
-- and this still does **not** surface any later arg5 method traffic
+- an earlier in-launcher diagnostic `ret` bypass implementation existed for this fault family
+- on that path it did **not** reveal a meaningful later continuation
+- the popped target was just stale startup-frame `arg3 hClientDll = 0x62000000`
+- execution then immediately faulted again at `client.dll+0x3`
+- and this still did **not** surface any later arg5 method traffic
 - newer preserved-frame logging now shows that the late crash-time stack directly lines up with stale saved `InitClientDLL` startup args (`arg3`, `arg4`, `arg5`, `arg6`, and in non-zero arg7 runs also `arg7`)
-- a newer non-zero arg7 probe (`MXO_ARG7_SELECTION=0x0500002a`) showed that later client `+0x40` requests arrive as `selectionIndex=0x05000005`
+- a newer non-zero arg7 probe using packed selection `0x0500002a` showed that later client `+0x40` requests arrive as `selectionIndex=0x05000005`
 - a fresh static pass now explains that as a client-side scratch mutation of the original arg7 stack slot at `0x62170dc1..0x62170e59`, not as a random unrelated value
 - that same block also stores the original masked low-24-bit selection id separately through the nearby `0x629e1c7c` / `0x620011e0` path before the scratch rewrite, which suggests the client expects both a persisted low-24-bit selection id and the later scratch-shaped `+0x40` lookup key
 - newer static work now identifies `0x629e1c7c` as a client-side console-int named `CreateCharacterWorldIndex`, not an anonymous scratch/global slot
@@ -316,10 +316,6 @@ Current stronger validation result:
 - to avoid missing the next loading-path transition, the diagnostic mediator now also exposes/logs slot `+0x120`
 - a follow-up rerun after adding that slot still did **not** show any `+0x120` traffic before the same late crash (`crash_62`, still `EIP=0x003e5e8a`)
 - that keeps `CreateCharacterWorldIndex` interesting, but narrows the currently confirmed visual `Loading Character` evidence back to the already-known pre-`+0xec` phase
-
-Canonical note:
-- `RET_BYPASS_HACK.md`
-- `CRASH_EIP_003E2B82.md`
 
 ## Validation result from a closer original-path experiment
 
@@ -338,10 +334,9 @@ A follow-up diagnostic run then forced `RunClientDLL` anyway and produced fresh 
 
 - `~/MxO_7.6005/MatrixOnline_0.0_crash_73.dmp`
 
-This strengthens the conclusion that the remaining blocker is missing launcher-owned setup, not just export resolution or DLL order.
+This strengthens the conclusion that the remaining blocker on that older path was missing launcher-owned setup, not just export resolution or DLL order.
 
-See:
-- `INCOMPLETE_ORIGINAL_PATH_EXPERIMENT.md`
+See also:
 - `../RunClientDLL/README.md`
 
 ## New high-value finding: arg6 gates the old `-7` failure path
@@ -397,13 +392,9 @@ So:
 - arg7/arg8 are important,
 - but they are **not** the reason for the original `-7` barrier.
 
-## Diagnostic stub experiment result
+## Historical minimal arg6 stub experiment result
 
-A new opt-in experiment using:
-
-- `MXO_STUB_LOGIN_MEDIATOR=1`
-
-supplied a minimal arg6 stub and changed behavior substantially:
+An earlier minimal arg6 stub experiment changed behavior substantially:
 
 1. the old immediate `InitClientDLL = -7` path was bypassed,
 2. the client reached deeper mediator-dependent methods (`+0x10`, `+0xd8`, `+0x38`),

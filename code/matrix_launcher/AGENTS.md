@@ -28,7 +28,7 @@ Source of truth:
 - strip launcher-only auth argv before `InitClientDLL`
 - treat positive `InitClientDLL` / `RunClientDLL` / `TermClientDLL` returns as success
 - launcher-owned auth progresses through `AS_GetPublicKeyReply`, `AS_AuthChallenge`, and `AS_AuthReply`
-- launcher-owned margin bootstrap completes on the deliberate runtime path
+- launcher-owned margin bootstrap completes on the active runtime path
 - state8 sends encrypted raw `0x0f` / `MS_LoadCharacterRequest`
 - state8 receives decrypted raw `0x10` and hands off into helper9/state9
 - late-login/state9 now reaches and completes the old submit blocker:
@@ -43,7 +43,7 @@ Source of truth:
   - arg6 `+0x178` status `+0x80` getter
   - event-`0x18` observer callback path now gets past arg6 `+0x10c`
   - event-`0x18` observer callback currently tolerates an empty arg6 `+0x118` late-entry list scaffold
-- deliberate replacement has now entered game for the first time on the active existing-character path
+- the replacement launcher has now entered game on the active existing-character path
 
 ### Natural-original boundary already proven later than that
 - natural original reaches:
@@ -146,13 +146,12 @@ make run
 
 Current active runtime path:
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher
 make run
 ```
 
 ## Immediate next task
 
-Now that the deliberate replacement has entered game for the first time, focus on the next
+Now that the replacement launcher has entered game on the active path, focus on the next
 late-runtime fidelity surface behind that breakthrough:
 - the arg6 observer bridge after event `0x18`
 - the second observer registration later reached from `client.dll:0x62031136`

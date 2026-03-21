@@ -29,11 +29,11 @@ Auth is no longer the main blocker.
   - `0x0A` / `AS_AuthChallengeResponse`
   - `0x0B` / `AS_AuthReply`
 - `AS_AuthRequest` now uses the live reply-derived RSA key from `0x07`
-- launcher-owned auth now auto-begins by default on the binder/scaffold path when the login-controller sidecar exists
+- launcher-owned auth now auto-begins by default on the active launcher path when the login-controller sidecar exists
 - parsed `AS_AuthReply` is source-owned enough to populate mediator-side world/character state instead of living only in transient parse storage
 
 ### Existing-character path status after auth
-Closed enough on the deliberate replacement path:
+Closed enough on the active replacement path:
 - auth reaches `AS_AuthReply`
 - launcher-owned margin bootstrap completes
 - state8 sends raw `0x0f`

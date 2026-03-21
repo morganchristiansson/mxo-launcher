@@ -27,7 +27,7 @@ Representative visible UI at the `0x43c180` boundary:
 - **Waiting for Regionserver**
 
 ### Replacement launcher
-Current deliberate existing-character path is source-owned/live enough to reach:
+Current active existing-character path is source-owned/live enough to reach:
 - state8 raw `0x0f`
 - state8 raw `0x10` receive and helper9/state9 handoff
 - `0x41de40` submit followup
@@ -40,7 +40,7 @@ Current deliberate existing-character path is source-owned/live enough to reach:
   - `+0x10c` route-descriptor getter
   - `+0x118` late-entry-list getter (currently empty scaffold)
 - later second observer registration after event `0x18`
-- first entry into game on the deliberate existing-character path
+- first entry into game on the active existing-character path
 
 So the old state9 submit blocker is closed enough for the active path.
 

@@ -63,33 +63,6 @@ static char** g_FilteredArgv = NULL;
 static char** g_FilteredArgvOwned = NULL;
 static uint32_t g_FilteredArgvOwnedCapacity = 0;
 
-// Alternative: argument-vtable payloads used by the arg2 diagnostic experiments.
-// If client treats arg2 as a vtable, these recognizable addresses may surface in
-// a crash instead of an ordinary string pointer.
-static uint8_t g_vtableSlot0[8] = {0x90, 0x90, 0x90, 0x90, 0xc3, 0xcc, 0xcc, 0xcc};  // nops + ret
-static uint8_t g_vtableSlot1[8] = {0xeb, 0xfe, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // jmp to self (hang)
-static uint8_t g_vtableSlot2[8] = {0xf4, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // halt
-static uint8_t g_vtableSlot3[8] = {0xcd, 0x03, 0xc3, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};  // int3 + ret
-
-// Static fake argv: if crash follows this address, confirms arg2 is stored as callback
-// The special recognizable pattern will appear in crash dump
-static void* g_FakeArgv[8] = {
-    reinterpret_cast<void*>(0xDEADDEAD),  // slot 0: recognizable
-    reinterpret_cast<void*>(0xBEEFF00D),  // slot 1
-    reinterpret_cast<void*>(0xCAFEBABE),  // slot 2
-    reinterpret_cast<void*>(0x11223344),  // slot 3: ESI target
-    nullptr, nullptr, nullptr, nullptr    // padding
-};
-
-// CRITICAL TEST: Executable 'ret' instruction to test if arg2 is called as function
-// If client calls arg2 directly, executing 0xC3 (ret) should return safely
-// If client accesses arg2[0], it will try to read 0x00C30000 as a pointer
-static uint8_t g_CallbackTestRet[8] __attribute__((aligned(16))) = {
-    0xc3,                   // ret (returns immediately)
-    0xcc, 0xcc, 0xcc,      // int3 padding (trap if executed past ret)
-    0xcc, 0xcc, 0xcc, 0xcc
-};
-
 // Diagnostic state tracking for pre-crash analysis
 static const char* g_LastMediatorMethod = NULL;
 static uint32_t g_LastMediatorCallCount = 0;
@@ -169,27 +142,6 @@ void Log(const char* fmt, ...);
 
 static void LogWordSpan(const char* label, const void* base, size_t wordCount);
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo);
-static bool EnvFlagEnabled(const char* name);
-static bool EnvUint32Value(const char* name, uint32_t* outValue);
-
-struct DiagnosticRuntimeModeFlags {
-    bool forceIncompleteInit = false;
-    bool forceRunClient = true;
-    bool forceRunAfterInitFailure = false;
-    bool requestedMediatorStub = false;
-    bool requestedMediatorBinderScaffold = true;
-    bool requestedLauncherObjectStub = true;
-    bool autoEnableStartupObjectScaffold = false;
-    bool useMediatorStub = false;
-    bool useMediatorBinderScaffold = true;
-    bool useLauncherObjectStub = true;
-    bool traceWindows = false;
-    bool useArg2RetBypass = false;
-    bool disableAuthConnection = false;
-    bool beginMarginConnection = false;
-};
-
-static DiagnosticRuntimeModeFlags ReadDiagnosticRuntimeModeFlags();
 
 template <typename T>
 static T ResolveProc(HMODULE module, const char* name) {
@@ -299,8 +251,6 @@ static void DiagnosticSnapshotArgvMemory() {
   g_ArgvSnapshotValid = true;
 }
 
-static uint32_t g_Arg2RetBypassCount = 0;
-
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
     if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
         Log("DIAGNOSTIC: unhandled exception filter invoked with incomplete state");
@@ -381,73 +331,7 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
           g_LastMediatorMethod, g_LastMediatorCallCount, g_LastMediatorSelf);
     }
 
-    if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
-        record->NumberParameters >= 2 &&
-        g_FilteredArgv) {
-      uintptr_t eip = static_cast<uintptr_t>(context->Eip);
-      uintptr_t argvStart = reinterpret_cast<uintptr_t>(g_FilteredArgv);
-      size_t argvSize = (g_FilteredArgCount + 1) * sizeof(char*);
-      if (eip >= argvStart && eip < argvStart + argvSize && EnvFlagEnabled("MXO_ARG2_RET_BYPASS")) {
-        uint32_t maxBypasses = 1;
-        EnvUint32Value("MXO_ARG2_RET_BYPASS_MAX", &maxBypasses);
-        if (g_Arg2RetBypassCount < maxBypasses) {
-          uint32_t* stackTop = reinterpret_cast<uint32_t*>(context->Esp);
-          if (stackTop) {
-            uint32_t returnTarget = *stackTop;
-            Log(
-                "DIAGNOSTIC: ARG2 RET BYPASS #%u/%u at eip=%p argv+0x%zx avKind=%llu -> simulating ret to %p (esp %08lx -> %08lx)",
-                (unsigned)(g_Arg2RetBypassCount + 1),
-                (unsigned)maxBypasses,
-                reinterpret_cast<void*>(eip),
-                static_cast<size_t>(eip - argvStart),
-                static_cast<unsigned long long>(record->ExceptionInformation[0]),
-                reinterpret_cast<void*>(returnTarget),
-                (unsigned long)context->Esp,
-                (unsigned long)(context->Esp + 4));
-            context->Eip = returnTarget;
-            context->Esp += 4;
-            ++g_Arg2RetBypassCount;
-            return EXCEPTION_CONTINUE_EXECUTION;
-          }
-        } else {
-          Log(
-              "DIAGNOSTIC: ARG2 RET BYPASS disabled for this fault because bypass count %u reached max %u",
-              (unsigned)g_Arg2RetBypassCount,
-              (unsigned)maxBypasses);
-        }
-      }
-    }
-
     return EXCEPTION_CONTINUE_SEARCH;
-}
-
-static bool EnvFlagEnabled(const char* name) {
-    char value[8] = {0};
-    DWORD len = GetEnvironmentVariableA(name, value, sizeof(value));
-    return len > 0;
-}
-
-static bool EnvStringValue(const char* name, char* out, DWORD outSize) {
-    if (!out || outSize == 0) return false;
-    out[0] = '\0';
-    DWORD len = GetEnvironmentVariableA(name, out, outSize);
-    return len > 0 && len < outSize;
-}
-
-static bool EnvUint32Value(const char* name, uint32_t* outValue) {
-    char buffer[64] = {0};
-    if (!outValue || !EnvStringValue(name, buffer, sizeof(buffer))) return false;
-
-    char* end = NULL;
-    unsigned long parsed = std::strtoul(buffer, &end, 0);
-    if (end == buffer) return false;
-    *outValue = static_cast<uint32_t>(parsed);
-    return true;
-}
-
-static DiagnosticRuntimeModeFlags ReadDiagnosticRuntimeModeFlags() {
-    DiagnosticRuntimeModeFlags flags;
-    return flags;
 }
 
 static void LowercaseAsciiCopy(char* destination, size_t destinationSize, const char* source) {
@@ -1152,39 +1036,26 @@ static void LogKnownStartupState() {
 
 static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     ResetLauncherPreprocessingState();
+    g_ArgvSnapshotValid = false;
 
-    Log("=== Launcher argv preprocessing ===");
-    Log("DIAGNOSTIC: launcher auth/state expected through launcher-style switches (e.g. -user / -pwd)");
+    spdlog::info("=== Launcher argv preprocessing ===");
+    spdlog::info("DIAGNOSTIC: launcher auth/state expected through launcher-style switches (e.g. -user / -pwd)");
 
     FreeFilteredArgvOwned();
     g_FilteredArgvOwned = static_cast<char**>(std::calloc(argc + 1, sizeof(char*)));
     if (!g_FilteredArgvOwned) {
-        Log("ERROR: failed to allocate launcher-owned filtered argv pointer array");
+        spdlog::error("ERROR: failed to allocate launcher-owned filtered argv pointer array");
         return false;
     }
     g_FilteredArgvOwnedCapacity = static_cast<uint32_t>(argc + 1);
 
     g_FilteredArgvOwned[0] = DuplicateArgString((argc > 0 && argv[0]) ? argv[0] : "");
     if (!g_FilteredArgvOwned[0]) {
-        Log("ERROR: failed to duplicate filtered argv[0]");
+        spdlog::error("ERROR: failed to duplicate filtered argv[0]");
         FreeFilteredArgvOwned();
         return false;
     }
-    Log("DIAGNOSTIC: filtered argv[0] duplicated at %p -> '%s'", g_FilteredArgvOwned[0], g_FilteredArgvOwned[0]);
-  
-  // STACK SMASHING TEST: Replace long path with short string
-  // If crash moves/changes, confirms overflow theory
-  bool useShortArgv = EnvFlagEnabled("MXO_SHORT_ARGV0");
-  bool useExeNameOnly = EnvFlagEnabled("MXO_EXE_NAME_ONLY");
-  if (useShortArgv) {
-    Log("DIAGNOSTIC: replacing argv[0] with short string 'X'");
-    std::free(g_FilteredArgvOwned[0]);
-    g_FilteredArgvOwned[0] = new char[2]{'X', '\0'};
-  } else if (useExeNameOnly) {
-    Log("DIAGNOSTIC: replacing argv[0] with 'resurrections.exe'");
-    std::free(g_FilteredArgvOwned[0]);
-    g_FilteredArgvOwned[0] = strdup("resurrections.exe");
-  }
+    spdlog::info("DIAGNOSTIC: filtered argv[0] duplicated at {} -> '{}'", static_cast<void*>(g_FilteredArgvOwned[0]), g_FilteredArgvOwned[0]);
 
     LauncherValueTarget pendingValueTarget = LauncherValueTarget::None;
     int filteredCount = 1;
@@ -1195,14 +1066,17 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
         if (pendingValueTarget != LauncherValueTarget::None) {
             LauncherValueTarget consumedTarget = pendingValueTarget;
             if (!ConsumeLauncherValueSwitch(consumedTarget, value)) {
-                Log("ERROR: failed to consume launcher switch value from argv[%d]", src);
+                spdlog::error("ERROR: failed to consume launcher switch value from argv[{}]", src);
                 FreeFilteredArgvOwned();
                 return false;
             }
             if (consumedTarget == LauncherValueTarget::QlVersionIgnored) {
-                Log("DIAGNOSTIC: consumed launcher switch value argv[%d] = %s (original 0x409950 appears to ignore retained qlver storage)", src, MaskedArgValue(value));
+                spdlog::info(
+                    "DIAGNOSTIC: consumed launcher switch value argv[{}] = {} (original 0x409950 appears to ignore retained qlver storage)",
+                    src,
+                    MaskedArgValue(value));
             } else {
-                Log("DIAGNOSTIC: consumed launcher switch value argv[%d] = %s", src, MaskedArgValue(value));
+                spdlog::info("DIAGNOSTIC: consumed launcher switch value argv[{}] = {}", src, MaskedArgValue(value));
             }
             pendingValueTarget = LauncherValueTarget::None;
             continue;
@@ -1211,110 +1085,47 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
         LauncherValueTarget newTarget = LauncherValueTargetForSwitch(value);
         if (newTarget != LauncherValueTarget::None) {
             pendingValueTarget = newTarget;
-            Log("DIAGNOSTIC: consumed launcher switch '%s' during filtered argv build", value);
+            spdlog::info("DIAGNOSTIC: consumed launcher switch '{}' during filtered argv build", value);
             continue;
         }
 
         if (ConsumeLauncherBooleanSwitch(value)) {
-            Log("DIAGNOSTIC: consumed launcher switch '%s' during filtered argv build", value);
+            spdlog::info("DIAGNOSTIC: consumed launcher switch '{}' during filtered argv build", value);
             continue;
         }
 
         g_FilteredArgvOwned[filteredCount] = DuplicateArgString(value);
         if (!g_FilteredArgvOwned[filteredCount]) {
-            Log("ERROR: failed to duplicate filtered argv[%d] from src argv[%d]", filteredCount, src);
+            spdlog::error("ERROR: failed to duplicate filtered argv[{}] from src argv[{}]", filteredCount, src);
             FreeFilteredArgvOwned();
             return false;
         }
-        Log(
-            "DIAGNOSTIC: filtered argv[%d] duplicated at %p from src argv[%d] -> '%s'",
+        spdlog::info(
+            "DIAGNOSTIC: filtered argv[{}] duplicated at {} from src argv[{}] -> '{}'",
             filteredCount,
-            g_FilteredArgvOwned[filteredCount],
+            static_cast<void*>(g_FilteredArgvOwned[filteredCount]),
             src,
             g_FilteredArgvOwned[filteredCount]);
         ++filteredCount;
     }
 
     if (pendingValueTarget != LauncherValueTarget::None) {
-        Log("WARNING: final launcher switch expected a value but argv ended early");
+        spdlog::warn("WARNING: final launcher switch expected a value but argv ended early");
     }
 
     g_FilteredArgvOwned[filteredCount] = NULL;
-
-  // Padding experiment: Add sentinel values to detect if client iterates past argv
-  // These magic values will appear in crash dumps if code reads past NULL terminator
-  // NOTE: Check env vars HERE (not static) so Wine can propagate them
-  bool useCallbackTest = EnvFlagEnabled("MXO_ARG2_CALLBACK_TEST");
-  bool useVtableExperiment = EnvFlagEnabled("MXO_ARG2_AS_VTABLE");
-  bool useStaticArgv = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
-  Log("DIAGNOSTIC: argv experiment check - capacity=%u needed=%u callback=%d vtable=%d static=%d",
-      g_FilteredArgvOwnedCapacity, filteredCount + 4,
-      useCallbackTest ? 1 : 0, useVtableExperiment ? 1 : 0, useStaticArgv ? 1 : 0);
-  if (useCallbackTest || g_FilteredArgvOwnedCapacity > static_cast<uint32_t>(filteredCount + 4)) {
-    if (useCallbackTest) {
-      Log("DIAGNOSTIC: CRITICAL TEST - arg2 points directly to 'ret' instruction at %p", g_CallbackTestRet);
-      // Make arg2 point to executable code:
-      // If client calls arg2 directly, it will execute 'ret' and return
-      // If client reads arg2[0], it will read 0x00C30000 or crash
-      g_FilteredArgv = reinterpret_cast<char**>(g_CallbackTestRet);
-      Log("DIAGNOSTIC: Set arg2=%p, contents: %02x %02x %02x %02x (expecting crash at this address OR ret)",
-          g_FilteredArgv, g_CallbackTestRet[0], g_CallbackTestRet[1], g_CallbackTestRet[2], g_CallbackTestRet[3]);
-    } else if (useStaticArgv) {
-      Log("DIAGNOSTIC: EXPERIMENT LEVEL 2 - using static fake argv at %p", g_FakeArgv);
-      // DON'T use heap argv - use static global instead
-      g_FilteredArgv = reinterpret_cast<char**>(g_FakeArgv);
-      // Free the heap allocation since we're not using it
-      for (uint32_t i = 0; i < g_FilteredArgvOwnedCapacity; ++i) {
-        if (g_FilteredArgvOwned[i]) {
-          std::free(g_FilteredArgvOwned[i]);
-          g_FilteredArgvOwned[i] = nullptr;
-        }
-      }
-      std::free(g_FilteredArgvOwned);
-      g_FilteredArgvOwned = nullptr;
-      // Update static fake argv with actual exe path (first slot needs to be valid string)
-      // We keep the magic values to see if they appear in crash
-      Log("DIAGNOSTIC: fake argv slots: [0]=%p [1]=%p [2]=%p [3]=%p",
-          g_FakeArgv[0], g_FakeArgv[1], g_FakeArgv[2], g_FakeArgv[3]);
-    } else if (useVtableExperiment) {
-      Log("DIAGNOSTIC: EXPERIMENT LEVEL 1 - treating arg2 as vtable with executable slots");
-      // Replace argv[0] with slot0 (nop+ret), fill in other slots
-      if (g_FilteredArgvOwned[0]) {
-        std::free(g_FilteredArgvOwned[0]);
-      }
-      g_FilteredArgvOwned[0] = reinterpret_cast<char*>(g_vtableSlot0);
-      g_FilteredArgvOwned[1] = reinterpret_cast<char*>(g_vtableSlot1);
-      g_FilteredArgvOwned[2] = reinterpret_cast<char*>(g_vtableSlot2);
-      g_FilteredArgvOwned[3] = reinterpret_cast<char*>(g_vtableSlot3);
-      g_FilteredArgvOwned[4] = NULL;
-      Log("DIAGNOSTIC: vtable slots: [0]=%p [1]=%p [2]=%p [3]=%p",
-          g_FilteredArgvOwned[0], g_FilteredArgvOwned[1],
-          g_FilteredArgvOwned[2], g_FilteredArgvOwned[3]);
-    } else {
-      Log("DIAGNOSTIC: adding argv padding sentinels after terminator");
-      g_FilteredArgvOwned[filteredCount + 1] = reinterpret_cast<char*>(0xDEADC0DE);
-      g_FilteredArgvOwned[filteredCount + 2] = reinterpret_cast<char*>(0xCAFEBABE);
-      g_FilteredArgvOwned[filteredCount + 3] = reinterpret_cast<char*>(0xBEEFCAFE);
-      g_FilteredArgvOwned[filteredCount + 4] = NULL;  // Second NULL for safety
-    }
-  }
     g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
-  // Re-check env vars (not static - runtime check for Wine)
-  bool useCallbackTestFinal = EnvFlagEnabled("MXO_ARG2_CALLBACK_TEST");
-  bool useStaticArgvFinal = EnvFlagEnabled("MXO_ARG2_STATIC_FAKE");
-  if (!useCallbackTestFinal && !useStaticArgvFinal) {
     g_FilteredArgv = g_FilteredArgvOwned;
-  }
 
     if (!g_LauncherSwitchNoPatch) {
         g_LauncherSwitchNoPatch = true;
         g_LauncherGlobal4C8B1D = false;
-        Log("DIAGNOSTIC: forcing default nopatch branch semantics in replacement launcher");
+        spdlog::info("DIAGNOSTIC: forcing default nopatch branch semantics in replacement launcher");
     }
 
     ProbeOptionsCfgAutodetectGate();
     LogLauncherPreprocessingState();
-    Log("DIAGNOSTIC: filtered argv final count = %d", filteredCount);
+    spdlog::info("DIAGNOSTIC: filtered argv final count = {}", filteredCount);
     return true;
 }
 
@@ -1343,8 +1154,6 @@ int main(int argc, char* argv[]) {
         return FinishAndReturn(1);
     }
     Log("");
-
-    const DiagnosticRuntimeModeFlags runtimeFlags = ReadDiagnosticRuntimeModeFlags();
 
     spdlog::info(
         "DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher object scaffold + InitClientDLL/RunClientDLL + launcher-owned auth begin");
@@ -1395,20 +1204,11 @@ int main(int argc, char* argv[]) {
 
     g_PackedArg7Selection = BuildPackedArg7Selection();
     if ((g_CLauncherFieldA8 | g_CLauncherFieldAC) != 0) {
-        Log("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x%08x", g_PackedArg7Selection);
-    }
-    if (EnvUint32Value("MXO_ARG8_FLAG", &g_FlagByte)) {
-        Log("DIAGNOSTIC: overridden arg8 flag from env = 0x%08x", g_FlagByte);
+        spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", g_PackedArg7Selection);
     }
 
-    uint32_t mediatorSelectedWorldType = recoveredSelection ? recoveredSelection->worldType : 1u;
-    if (EnvUint32Value("MXO_MEDIATOR_WORLD_TYPE", &mediatorSelectedWorldType)) {
-        Log("DIAGNOSTIC: mediator selected-world type overridden from env = %u", (unsigned)mediatorSelectedWorldType);
-    }
-    uint32_t mediatorSelectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
-    if (EnvUint32Value("MXO_MEDIATOR_VARIANT_STATE", &mediatorSelectedVariantState)) {
-        Log("DIAGNOSTIC: mediator selected-variant state overridden from env = %u", (unsigned)mediatorSelectedVariantState);
-    }
+    const uint32_t mediatorSelectedWorldType = recoveredSelection ? recoveredSelection->worldType : 1u;
+    const uint32_t mediatorSelectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
 
     const uint32_t nopatchParsedValue = FloatBitsFromCString("0.1");
     uint32_t nopatchClientVersionValue = nopatchParsedValue;
@@ -1432,11 +1232,7 @@ int main(int argc, char* argv[]) {
         return FinishAndReturn(1);
     }
 
-    if (runtimeFlags.useMediatorBinderScaffold) {
-        DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
-    } else if (runtimeFlags.useMediatorStub) {
-        DiagnosticInstallMediatorStub(&g_pILTLoginMediatorDefault);
-    }
+    DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
 
     // =============================================================================
     // arg6 / sibling mediator configuration for InitClientDLL
@@ -1444,41 +1240,34 @@ int main(int argc, char* argv[]) {
     // =============================================================================
     Log("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
     
-    if (runtimeFlags.useMediatorBinderScaffold || runtimeFlags.useMediatorStub) {
-        const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
-        const uint32_t selectionPackedLow24 = g_PackedArg7Selection & 0x00ffffffu;
-        const uint32_t worldUpperBoundExclusive =
-            (selectionPackedLow24 < 0xffu) ? (selectionPackedLow24 + 1u) : 1u;
-        const uint32_t variantUpperBoundExclusive =
-            (selectedHighByte < 0xffu) ? (selectedHighByte + 1u) : 1u;
-        DiagnosticConfigureMediatorSelection(
-            worldUpperBoundExclusive,
-            variantUpperBoundExclusive,
-            mediatorSelectionName,
-            mediatorSelectionName,
-            selectionPackedLow24,
-            selectedHighByte,
-            mediatorSelectedWorldType,
-            mediatorSelectedVariantState);
-        DiagnosticConfigureMediatorProfileName(g_AuthUsername[0] ? g_AuthUsername : NULL);
-        DiagnosticConfigureMediatorAuthName(g_AuthUsername[0] ? g_AuthUsername : NULL);
-        DiagnosticConfigureMediatorAuthPassword(g_AuthPassword[0] ? g_AuthPassword : NULL);
+    const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
+    const uint32_t selectionPackedLow24 = g_PackedArg7Selection & 0x00ffffffu;
+    const uint32_t worldUpperBoundExclusive =
+        (selectionPackedLow24 < 0xffu) ? (selectionPackedLow24 + 1u) : 1u;
+    const uint32_t variantUpperBoundExclusive =
+        (selectedHighByte < 0xffu) ? (selectedHighByte + 1u) : 1u;
+    DiagnosticConfigureMediatorSelection(
+        worldUpperBoundExclusive,
+        variantUpperBoundExclusive,
+        mediatorSelectionName,
+        mediatorSelectionName,
+        selectionPackedLow24,
+        selectedHighByte,
+        mediatorSelectedWorldType,
+        mediatorSelectedVariantState);
+    DiagnosticConfigureMediatorProfileName(g_AuthUsername[0] ? g_AuthUsername : NULL);
+    DiagnosticConfigureMediatorAuthName(g_AuthUsername[0] ? g_AuthUsername : NULL);
+    DiagnosticConfigureMediatorAuthPassword(g_AuthPassword[0] ? g_AuthPassword : NULL);
 
-        const bool enableRecoveredProcessLoginCredentialsSeed =
-            EnvFlagEnabled("MXO_DIAGNOSTIC_SEED_PROCESS_LOGIN_CREDENTIALS");
-        DiagnosticConfigureLoginControllerSelectionSeed(
-            mediatorSelectionName,
-            selectionPackedLow24,
-            enableRecoveredProcessLoginCredentialsSeed);
-        DiagnosticConfigureLoginControllerHelper11Seed(
-            g_LauncherCharacter[0] ? g_LauncherCharacter : NULL,
-            g_LauncherSession[0] ? g_LauncherSession : NULL);
+    DiagnosticConfigureLoginControllerSelectedWorldIndex(selectionPackedLow24);
+    DiagnosticConfigureLoginControllerCharacterSeed(
+        g_LauncherCharacter[0] ? g_LauncherCharacter : NULL,
+        g_LauncherSession[0] ? g_LauncherSession : NULL);
 
-        DiagnosticApplyDefaultNopatchMediatorConfig(
-            g_pILTLoginMediatorDefault,
-            nopatchParsedValue,
-            nopatchClientVersionValue);
-    }
+    DiagnosticApplyDefaultNopatchMediatorConfig(
+        g_pILTLoginMediatorDefault,
+        nopatchParsedValue,
+        nopatchClientVersionValue);
 
     if (g_pILTLoginMediatorDefault) {
         g_pILTLoginMediatorSelection3584 = g_pILTLoginMediatorDefault;
@@ -1514,69 +1303,45 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (runtimeFlags.useLauncherObjectStub) {
-        DiagnosticInstallLauncherObjectStub(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
+    DiagnosticInstallLauncherObjectStub(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
 
-        char authServerDnsName[256] = "auth.lith.thematrixonline.net";
-        char envAuthServerDnsName[256] = {0};
-        if (EnvStringValue("MXO_AUTH_SERVER_DNS", envAuthServerDnsName, sizeof(envAuthServerDnsName))) {
-            std::strncpy(authServerDnsName, envAuthServerDnsName, sizeof(authServerDnsName) - 1);
-            authServerDnsName[sizeof(authServerDnsName) - 1] = '\0';
-        }
+    const char authServerDnsName[] = "auth.lith.thematrixonline.net";
+    const uint16_t authServerPort = 11000;
+    const char marginServerSuffix[] = ".lith.thematrixonline.net";
+    const uint16_t marginServerPort = 10000;
 
-        uint32_t authServerPort = 11000;
-        EnvUint32Value("MXO_AUTH_SERVER_PORT", &authServerPort);
-
-        char marginServerSuffix[256] = ".lith.thematrixonline.net";
-        char envMarginServerSuffix[256] = {0};
-        if (EnvStringValue("MXO_MARGIN_SERVER_SUFFIX", envMarginServerSuffix, sizeof(envMarginServerSuffix))) {
-            std::strncpy(marginServerSuffix, envMarginServerSuffix, sizeof(marginServerSuffix) - 1);
-            marginServerSuffix[sizeof(marginServerSuffix) - 1] = '\0';
-        }
-
-        uint32_t marginServerPort = 10000;
-        EnvUint32Value("MXO_MARGIN_SERVER_PORT", &marginServerPort);
-
-        char marginRoutePrefix[256] = {0};
-        if (!EnvStringValue("MXO_MARGIN_ROUTE_PREFIX", marginRoutePrefix, sizeof(marginRoutePrefix))) {
-            if (recoveredSelection && recoveredSelection->routeHostPrefix && recoveredSelection->routeHostPrefix[0]) {
-                std::strncpy(marginRoutePrefix, recoveredSelection->routeHostPrefix, sizeof(marginRoutePrefix) - 1);
-                marginRoutePrefix[sizeof(marginRoutePrefix) - 1] = '\0';
-                spdlog::info(
-                    "DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'",
-                    marginRoutePrefix,
-                    recoveredSelection->worldName);
-            } else {
-                LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), mediatorSelectionName);
-            }
-        }
-
-        char exactMarginHostName[256] = {0};
-        EnvStringValue("MXO_MARGIN_SERVER_DNS", exactMarginHostName, sizeof(exactMarginHostName));
-
-        const bool ignoreHostsFileForAuth = EnvFlagEnabled("MXO_IGNORE_HOSTS_FILE_FOR_AUTH");
-        const bool ignoreHostsFileForMargin = EnvFlagEnabled("MXO_IGNORE_HOSTS_FILE_FOR_MARGIN");
-
-        DiagnosticConfigureLoginControllerNetwork(
-            authServerDnsName,
-            static_cast<uint16_t>(authServerPort),
-            ignoreHostsFileForAuth,
-            marginServerSuffix,
-            static_cast<uint16_t>(marginServerPort),
-            ignoreHostsFileForMargin,
+    char marginRoutePrefix[256] = {0};
+    if (recoveredSelection && recoveredSelection->routeHostPrefix && recoveredSelection->routeHostPrefix[0]) {
+        std::strncpy(marginRoutePrefix, recoveredSelection->routeHostPrefix, sizeof(marginRoutePrefix) - 1);
+        marginRoutePrefix[sizeof(marginRoutePrefix) - 1] = '\0';
+        spdlog::info(
+            "DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'",
             marginRoutePrefix,
-            exactMarginHostName);
+            recoveredSelection->worldName);
+    } else {
+        LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), mediatorSelectionName);
     }
+
+    const char exactMarginHostName[] = "";
+    const bool ignoreHostsFileForAuth = false;
+    const bool ignoreHostsFileForMargin = false;
+
+    DiagnosticConfigureLoginControllerNetwork(
+        authServerDnsName,
+        authServerPort,
+        ignoreHostsFileForAuth,
+        marginServerSuffix,
+        marginServerPort,
+        ignoreHostsFileForMargin,
+        marginRoutePrefix,
+        exactMarginHostName);
 
     if (!DiagnosticInitializePreclientEnvironmentLike402EC0()) {
         Log("WARNING: pre-client environment scaffold failed to initialize");
     }
 
     RunOptionsCfgAutodetectStepIfNeeded();
-
-    if (runtimeFlags.traceWindows) {
-        DiagnosticStartWindowTrace();
-    }
+    DiagnosticStartWindowTrace();
 
     // Original order from launcher.exe:
     //   0x40a380  -> build 0x4d6304
@@ -1587,18 +1352,8 @@ int main(int argc, char* argv[]) {
 
     Log("=== Original-path gaps still missing ===");
     Log("arg1/arg2 status: launcher-owned filtered argv storage present, but original 0x409950 switch handling / options.cfg preprocessing are still incomplete");
-    if (runtimeFlags.useLauncherObjectStub) {
-        spdlog::info("arg5 status: current launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
-    } else {
-        Log("missing: build/register launcher object at 0x4d6304");
-    }
-    if (runtimeFlags.useMediatorBinderScaffold) {
-        spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
-    } else if (runtimeFlags.useMediatorStub) {
-        Log("arg6 status: direct stub materialized ILTLoginMediator.Default (bypasses binder path)");
-    } else {
-        Log("missing: resolve ILTLoginMediator.Default into 0x4d2c58");
-    }
+    spdlog::info("arg5 status: current launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
+    spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
     if (g_pILTLoginMediatorSelection3584) {
         spdlog::info("arg7 status: sibling 0x4d3584-style ILTLoginMediator selection slot currently reuses the active mediator object and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
     } else {
@@ -1630,7 +1385,6 @@ int main(int argc, char* argv[]) {
     Log("");
 
     const bool allowInitWithCurrentStartupScaffold =
-        runtimeFlags.useMediatorBinderScaffold && runtimeFlags.useLauncherObjectStub &&
         g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
 
     if (!allowInitWithCurrentStartupScaffold) {
@@ -1678,12 +1432,6 @@ int main(int argc, char* argv[]) {
     if (DiagnosticCanBeginAuthConnection()) {
         const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
         Log("DIAGNOSTIC: post-init auth auto-begin result = 0x%08x", (unsigned)authConnectResult);
-    }
-
-    if (initSucceeded && EnvFlagEnabled("MXO_DIAGNOSTIC_CRASH_AFTER_INIT_SUCCESS")) {
-        Log("DIAGNOSTIC: deliberately crashing after successful InitClientDLL for crashreporter/auth validation");
-        volatile uint32_t* crashPtr = reinterpret_cast<volatile uint32_t*>(0);
-        *crashPtr = 0xdeadbeef;
     }
 
     spdlog::info("=== Calling RunClientDLL on the active launcher path ===");

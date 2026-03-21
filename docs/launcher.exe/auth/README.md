@@ -16,23 +16,18 @@ In particular, the standalone auth probe lives here because it is:
 - useful for fixing launcher-owned auth
 - but **not** itself a startup-owned object description
 
-## Standalone auth-only probe result (2026-03-13)
+## Historical standalone auth-only probe note
 
-A fast host-native auth probe now exists under the launcher project:
-- build: `cd /home/morgan/mxo/code/matrix_launcher && make auth_probe`
-- run with explicit credentials:
-  - `./build/host/auth_probe --username <name> --password <password> --timeout-ms 5000`
-- run with local project secrets:
-  - `make run_auth_probe`
+An earlier host-native standalone auth harness existed here during the auth bring-up phase.
+It has now been retired from the active project workflow because launcher-owned auth is live on the
+main `resurrections.exe` path.
 
-This probe is intentionally **outside** the full launcher/client startup path.
-It exists to iterate quickly on the launcher-owned auth bootstrap sequence while keeping original `launcher.exe` static analysis as the canonical ownership anchor.
+Keep treating the original `launcher.exe` and the current launcher-owned auth path as the source of
+truth; do not reintroduce a standalone auth harness as part of the active workflow unless a future
+narrow auth regression specifically requires it.
 
 ## Source split
 
-- `tools/auth_probe.cpp`
-  - small TCP/logging driver
-  - no `resurrections.exe`, no Wine, no client startup
 - canonical public auth API now lives under recovered runtime-style path:
   - `matrixstaging/runtime/src/libltcrypto/auth_crypto.h`
 - compatibility wrapper retained at:
@@ -234,16 +229,12 @@ The key practical integration rules are:
 ## Launcher integration milestone in `resurrections.exe` (2026-03-13)
 
 The working probe is no longer just an external reference.
-The deliberate binder/runtime launcher path now reuses the same shared `src/auth/auth_crypto.*` helpers inside `resurrections.exe` through the launcher-side `CLTLoginMediator` scaffold.
+The active launcher path now reuses the same shared `src/auth/auth_crypto.*` helpers inside `resurrections.exe` through the launcher-side `CLTLoginMediator` implementation.
 
 Representative launcher command:
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher && \
-  MXO_FORCE_RUNCLIENT=1 \
-  MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Reality \
-  make run_binder_both
+cd /home/morgan/mxo/code/matrix_launcher && make run
 ```
 
 Current verified launcher-owned wire result on that path now also covers the full live auth loop:
@@ -265,8 +256,7 @@ Representative launcher-side evidence from `~/MxO_7.6005/resurrections.log`:
 
 Important interpretation:
 - this keeps auth **launcher-owned**
-- the probe remains the fastest auth regression harness
-- the packet logic is now materially migrated into the launcher path rather than living only in `tools/auth_probe.cpp`
+- the packet logic is now materially migrated into the launcher path instead of relying on a separate standalone probe harness
 - newer launcher-side state-writeback scaffolding now also begins to adopt parsed `AS_AuthReply` data into recovered mediator-owned tables/state instead of leaving it only in transient parse storage
 
 ## Immediate post-`AS_AuthReply` original continuation
@@ -297,11 +287,9 @@ So the current post-auth blocker is now more specific than “what comes after a
 sense. The immediate original continuation is helper11-driven **margin/loading progression**.
 
 Important current restraint:
-- auth auto-begin on the binder/scaffold path is now the default when the diagnostic login-controller sidecar exists
-- optional quick-test opt-out remains:
-  - `MXO_DISABLE_AUTH_CONNECTION=1`
-- so the launcher-owned auth wire logic no longer depends on the old explicit `MXO_BEGIN_AUTH_CONNECTION=1` trigger
-- but it still does **not** yet prove that the original launcher's full helper/state machine reaches the same transition automatically without the current binder/scaffold substitutions
+- auth auto-begin on the active launcher path is now the default when the login-controller sidecar exists
+- the launcher-owned auth wire logic no longer depends on old explicit auth-begin toggles
+- but it still does **not** yet prove that the original launcher's full helper/state machine reaches the same transition automatically without the current implementation substitutions
 
 ## 0x448050 / phase-2 bootstrap object note
 

@@ -110,7 +110,7 @@ New queue-thread clarification from the current focused pass:
     - `Queue_IsEmpty` <- `0x436b10` / client `0x62531c10` empty-check shape
     - `Queue_TryPopPair` <- `0x436d31..0x436ee7` consumer pop shape
   - launcher ABI glue now delegates queue init/push/free to those liblttcp helpers rather than carrying a fully separate duplicate queue implementation
-- newer lockstep source cleanup also added an explicit sidecar bridge for the recovered ownership mismatch in the current scaffold:
+- newer lockstep source cleanup also added an explicit sidecar bridge for the recovered ownership mismatch in the current implementation:
   - the runtime-visible queue fields still live on the launcher ABI object (`+0x0c` / `+0x34`)
   - but the liblttcp engine sidecar now exposes `AttachExternalQueuePair(queue0C, queue34)` so source-level `RunCompletedOperationQueue(bool)` can at least model the current best consumer ordering against the real launcher-visible queue storage
   - current source-level consumer skeleton now preserves these highest-confidence rules only:
@@ -216,7 +216,7 @@ So startup and teardown mirror each other around this object.
 
 The next correct experiments should try to reproduce the original launcher-owned creation path for this object and its registration through `0x4d2c58`, rather than seeding unrelated objects inside `client.dll`.
 
-## New clarification from current scaffold work
+## New clarification from current implementation work
 
 The custom launcher's arg5 probe has now been tightened to match more of the original ctor layout instead of using a fully zeroed `0xb4` block.
 
@@ -267,7 +267,7 @@ The custom launcher now also wires the first few original primary vtable slots f
 - slot 4 -> `0x42f7c0`-style 1-arg probe (`ret 4`)
 
 This is still **not** fully faithful behavior for those methods.
-But slot `3` is no longer just a neutral placeholder return: the current scaffold now routes it into the starter `CLTThreadPerClientTCPEngine::MonitorEphemeralUDPPort(...)` implementation instead of leaving it as a dormant future probe.
+But slot `3` is no longer just a neutral placeholder return: the current implementation now routes it into the starter `CLTThreadPerClientTCPEngine::MonitorEphemeralUDPPort(...)` implementation instead of leaving it as a dormant future probe.
 
 Practical result from the latest deep patched-client runs:
 
@@ -494,7 +494,7 @@ Static disassembly of `0x431840` shows a concrete empty-container behavior rathe
 - if the search misses the container head (`eax == [esi]` after `self += 0x80`), it writes `0` to the caller output pointer
 - and returns `0x7000004`
 
-That means the current scaffold can now reproduce one real launcher-observed miss result instead of only returning a generic neutral placeholder there.
+That means the current implementation can now reproduce one real launcher-observed miss result instead of only returning a generic neutral placeholder there.
 
 ### New clarification: `+0x80` / `+0x8c` are sentinel-headed tree/list containers, not simple counted lists
 
@@ -629,8 +629,8 @@ That ties several earlier partial observations together:
 Practical status of this update:
 
 - the widened arg5 vtable scaffold built successfully
-- a follow-up rerun with the usual deep path
-  - `cd /home/morgan/mxo/code/matrix_launcher && make run_binder_both`
+- a follow-up rerun with the usual active path
+  - `cd /home/morgan/mxo/code/matrix_launcher && make run`
   still showed **no** new arg5 logs before failure from:
   - primary vtable slots `5..10`
   - primary vtable slots `11..12`
@@ -643,17 +643,14 @@ Practical status of this update:
 
 That makes this update useful faithfulness groundwork for later differential runs, but still **not** a demonstrated fix.
 
-## New validation result from the in-launcher `ret` bypass
+## Historical validation result from the in-launcher `ret` bypass
 
-To test whether the current late `arg2` crash was merely blocking later arg5 traffic from becoming visible, the launcher now has an opt-in diagnostic path:
+To test whether the current late `arg2` crash was merely blocking later arg5 traffic from becoming visible, an earlier in-launcher diagnostic `ret` bypass path was tried.
 
-- `MXO_ARG2_RET_BYPASS=1`
-- optional limit override: `MXO_ARG2_RET_BYPASS_MAX=<n>`
+That path simulated a single x86 `ret` when a fault landed inside current `arg2 filteredArgv` storage.
 
-That path simulates a single x86 `ret` when a fault lands inside current `arg2 filteredArgv` storage.
-
-Representative validation run:
-- `cd /home/morgan/mxo/code/matrix_launcher && MXO_ARG2_RET_BYPASS=1 MXO_ARG2_RET_BYPASS_MAX=4 make run_binder_both`
+Representative earlier validation run family:
+- active launcher path with the temporary `ret` bypass enabled
 
 Observed result:
 - the first fault still lands at current `arg2+2`
@@ -685,17 +682,12 @@ Interpretation:
 
 ## New runtime validation after clean `InitClientDLL = 1` and deliberate `RunClientDLL`
 
-A newer binder/scaffold experiment changed that runtime picture materially.
+A newer active-path rerun changed that runtime picture materially.
 
 Command:
 
 ```bash
-cd /home/morgan/mxo/code/matrix_launcher && \
-  MXO_TRACE_WINDOWS=1 \
-  MXO_FORCE_RUNCLIENT=1 \
-  MXO_ARG7_SELECTION=0x0500002a \
-  MXO_MEDIATOR_SELECTION_NAME=Reality \
-  make run_binder_both
+cd /home/morgan/mxo/code/matrix_launcher && make run
 ```
 
 What is now statically confirmed first:
@@ -706,7 +698,7 @@ What is now statically confirmed first:
   - overall success return: `0x40a6fd` -> `al = 1`
 - so the current clean `InitClientDLL returned: 1` binder result is now evidence-backed success, not only a local launcher heuristic
 
-What the deliberate runtime experiment then shows:
+What the active runtime path then shows:
 - `RunClientDLL` no longer immediately reproduces the old forced-runtime crash at `client.dll+0x3b3573`
 - no fresh crash dump was produced during timed runs
 - window tracing shows a real `MATRIX_ONLINE` window appears and then transitions to fullscreen `800x600`
@@ -755,7 +747,7 @@ That comparison also explains an important runtime detail on the current client 
 - `client.dll:0x62532130` calls `0x62531c10(1)`
 - so `RunClientDLL` is currently driving the **non-blocking poll variant** of this shared arg5 queue-consumer logic
 
-A newer throttled runtime log on the same deliberate path now shows that state staying unchanged through repeated polling:
+A newer throttled runtime log on the same active path now shows that state staying unchanged through repeated polling:
 - queue0C: `current0 == current1 == block0 == block1`
 - queue34: `current0 == current1 == block0 == block1`
 - representative sampled counts still showing that exact state: `1`, `2`, `4`, `8`, `16`, `32`, `64`, `128`, `256`, `512`, `1024`
@@ -942,7 +934,7 @@ On the client side that is:
 
 That means the current absence of arg5 slot-12 runtime traffic on deliberate `RunClientDLL` runs is now explained more narrowly than before:
 - not because slot 12 is irrelevant,
-- but because the current scaffold never feeds the queue branch that would reach it.
+- but because the current implementation never feeds the queue branch that would reach it.
 
 Current best interpretation:
 - arg5 is now runtime-validated more concretely than before
@@ -951,7 +943,7 @@ Current best interpretation:
 - `RunClientDLL` is repeatedly exercising the **consumer** side of this engine in non-blocking poll mode
 - the original launcher producer side now has concrete xrefs and concrete queued pair shapes
 - and if queue0C were actually being fed, the next observable arg5 step would likely be primary slot `12` (`+0x30`)
-- but on the current scaffold that producer side still does not appear to be feeding even the now-best-understood queue0C path, so both queues remain in a stable **empty cursor** state rather than advancing
+- but on the current implementation that producer side still does not appear to be feeding even the now-best-understood queue0C path, so both queues remain in a stable **empty cursor** state rather than advancing
 - so the next arg5 problem is no longer just “which missing slot causes the old late crash?”
 - it is now more specifically “which missing launcher-owned state should populate or advance this arg5-owned runtime work path beyond the current empty-loop behavior?”
 
@@ -1117,7 +1109,7 @@ Important limitation:
 - they are therefore now best treated as **partially wired starter structure**, still far from faithful semantics but no longer only dormant future placeholders
 
 New practical rerun result after that partial wiring:
-- a fresh deliberate `MXO_FORCE_RUNCLIENT=1 make run` rerun was made after tightening the arg5-side producer/consumer scaffolds further
+- a fresh `make run` rerun was made after tightening the arg5-side producer/consumer scaffolds further
 - that rerun still showed the same stable consumer-side live surfaces:
   - mediator `+0x2c`
   - arg5 helper `+0x60` slot `0`
@@ -1139,4 +1131,4 @@ New practical rerun result after that partial wiring:
   - still no new live primary-slot traffic from slot `6` / `Connect`, slot `7` / `Close`, slot `8` / `SendBuffer`, or slot `12` / `CleanupConnection`
   - and in particular still no slot-12 traffic has appeared, which remains consistent with the recovered consumer rule that slot `12` is only reached for type-1 work items
 
-So the new class wiring is no longer just dormant cleanup: the auth-side queue0C consumer chain is now observably live on the deliberate runtime path. The next missing progression is later launcher-owned state after successful auth-side queue consumption, not proof that arg5 queue consumption itself is still dead.
+So the new class wiring is no longer just dormant cleanup: the auth-side queue0C consumer chain is now observably live on the active runtime path. The next missing progression is later launcher-owned state after successful auth-side queue consumption, not proof that arg5 queue consumption itself is still dead.
