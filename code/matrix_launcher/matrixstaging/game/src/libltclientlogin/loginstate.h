@@ -235,6 +235,13 @@ public:
     // anchor: launcher.exe:0x004395f0 (vtable 0x004b508c slot 10 initializer)
     CLTLoginState_State6() = default;
 
+private:
+    // anchor: launcher.exe:0x0043b8f0 stores a cached upstream/helper pointer at `this+4`.
+    // `0x00440780` then uses that cached object's vtable `+0x18` to choose the next helper-state
+    // target after opcode-`9` success.
+    void* cachedUpstreamOrArg_ = nullptr;
+
+public:
     // anchor: launcher.exe vtable 0x004b508c
     const char* DebugName() const override;
 

@@ -1230,8 +1230,9 @@ static void InitializeMediatorStub() {
     //   `0x41470 / 0x4429b0` challenge-material path, so treat it as shared transform/parameter
     //   machinery, not a state9-only byte copier
     // - current go/no-go decision remains **no live +0x18c entry yet**:
-    //   owner `+0xf18` still has no isolated non-init writer, and the shared `+0x85/+0xf8/+0xa8`
-    //   family is not source-owned tightly enough to fake faithfully
+    //   owner `+0xf18` now does have an isolated non-init writer (`0x00440780` / state6 opcode-`9`
+    //   success), but the shared `+0x85/+0xf8/+0xa8` family is still not source-owned tightly
+    //   enough to fake the broader callback84-side path faithfully
 
     ResetMediatorObjectState();
 }

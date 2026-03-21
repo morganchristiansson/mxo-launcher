@@ -641,8 +641,59 @@ The highest-value remaining auth-adjacent work is now:
                 - its second half now tightens a little further too:
                   - blob `+0x10..+0x1f` is best read as a 16-byte **in/out transform region**
                   - `0x41e690` seeds that region from owner dword `+0xf18`
-                  - newer init-side review shows owner `+0xf18` is zero-initialized in `0x41ee60`
-                  - no simple direct writer for that field is isolated yet
+                  - bounded `2026-03-21` launcher-side provenance pass over exactly:
+                    - `0x41ee60`
+                    - `0x41e690`
+                    - `0x41de40`
+                    - `0x439780`
+                    - `0x43c180`
+                    - `0x41b420`
+                    - `0x4401a0`
+                    - `0x41c1f0`
+                    - `0x41ecd0`
+                    - cross-check only: `0x4429b0`, `0x441470`
+                  - outcome of that bounded static pass:
+                    - `0x41ee60` is still the only checked writer and it zero-initializes owner `+0xf18`
+                    - `0x41e690` reads/seeds owner `+0xf18` into blob `+0x10`
+                    - no non-init launcher writer for owner `+0xf18` was found within that static scope
+                  - but immediate natural-original WineDbg follow-up on the same session tightened the practical read again:
+                    - natural breakpoints hit `0x439780 -> 0x41de40 -> 0x41e690`
+                    - owner at both later stops was `0x004d4e38`
+                    - owner `+0xf18` was already non-zero by that point
+                      - observed run 1: `0xfe3e2a9f`
+                      - observed run 2: `0x6e3c3dc5`
+                      - later EULA-stage attach rerun: `0xc006b2db`
+                    - that later rerun also armed a typed WineDbg watch on `*(int*)0x4d5d50` while the field was still zero before progression, but the watch only tripped late at `0x41de41`
+                    - newer breakpoint-ladder rerun from EULA then tightened the practical write window further:
+                      - `0x41ecd0` -> still `0`
+                      - `0x41c1f0` -> still `0`
+                      - `0x43bd20` (state8 slot3) -> still `0`
+                      - `0x43f930` (state8 slot6 entry) -> already non-zero (`0xc1206989`)
+                      - same value then persisted through `0x439780 -> 0x41de40 -> 0x41e690`
+                    - narrower static follow-up then isolated the concrete non-init launcher writer:
+                      - `0x00440780 = CLTLoginState_State6_Slot6_HandleMarginOpcode7Or9Reply`
+                      - checked context around the already-bracketed window:
+                        - `0x442d00`
+                        - `0x44af20`
+                        - `0x41f260`
+                        - `0x43f930`
+                      - on opcode-`9` success, `0x440780` writes owner byte `+0xf14 = 1` and owner dword `+0xf18 = parsedReply(+0x09)`
+                      - parsed reply `+0x09` is now best read as the opcode-`9` `UDPSessionSecret` / session-id dword
+                      - the next helper-state target is still chosen separately from cached upstream object `this+4` via vtable `+0x18`
+                      - canonical detail now lives in `VTABLES/0x004b508c.md`
+                      - this still explains why the earlier direct displacement search was misleading:
+                        launcher.exe whole-binary search for literal `[base+0xf18]` still finds only
+                        `0x41ee60` and `0x41e690`, because the real writer reaches `+0xf18` via
+                        base `+0xf14` plus `[eax+4]`
+                      - client.dll narrow mirror search still only finds the corresponding pair:
+                        - `0x6252a680` = client-side zero-init mirror
+                        - `0x62529f20` = client-side read/seed mirror for the `+0x18c` callback-blob path
+                        - `0x62006580 = ClientNetShell_FillCallback84Pair38` calls that client-side `+0x18c` mirror on the resolved mediator global before returning `(&DAT_629e0284, 0x20)`
+                    - practical consequence: the `owner +0xf18` question is now positively answered on the launcher side; the known non-init writer is `0x00440780`, and it lands before `0x43f930`
+                    - go/no-go for replacement source stays conservative:
+                      - do **not** mirror or synthesize `+0xf18` on unrelated paths
+                      - only a faithful source-owned mirror of state6 opcode-`9` success should write it
+                      - that future mirror should source the original opcode-`9` `UDPSessionSecret` / session-id field, not a placeholder value
                 - that same 16-byte region is then transformed/materialized in place from mediator
                   `+0xd4 = 0x41b4f0` (`owner +0x1c + 0x85`) through helper `0x41df60 / 0x44b190`
                 - that helper family is also reused by `AuthBootstrap680_SendAuthRequest`, and

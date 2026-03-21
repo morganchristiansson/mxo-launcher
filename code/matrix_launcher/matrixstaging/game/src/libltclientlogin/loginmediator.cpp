@@ -139,6 +139,7 @@ struct MarginBootstrapSessionState {
     std::vector<uint8_t> marginTwofishKeyBytes;
     std::vector<uint8_t> certChallengeBytes;
     uint32_t marginSessionId = 0;
+    uint32_t state6UdpSessionSecretF18 = 0;
 };
 
 // ABI-safety storage note:
@@ -163,6 +164,41 @@ static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOr
     key.portNetworkOrder = static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
     key.ipv4NetworkOrder = 0;
     return key;
+}
+
+static uint16_t ByteSwap16(uint16_t value) {
+    return static_cast<uint16_t>((value << 8) | (value >> 8));
+}
+
+static std::string FormatIpv4NetworkOrderDottedQuad(uint32_t ipv4NetworkOrder) {
+    return fmt::format(
+        "{}.{}.{}.{}",
+        static_cast<unsigned>((ipv4NetworkOrder >> 24) & 0xffu),
+        static_cast<unsigned>((ipv4NetworkOrder >> 16) & 0xffu),
+        static_cast<unsigned>((ipv4NetworkOrder >> 8) & 0xffu),
+        static_cast<unsigned>(ipv4NetworkOrder & 0xffu));
+}
+
+static std::string BuildState9SubmitTargetTextScaffold(
+    const mxo::liblttcp::LTTCPEndpointKey& endpoint,
+    uint16_t helperWord6,
+    bool appendPort) {
+    // anchor: launcher.exe:0x44afd0 / 0x44b0d0
+    // Current best read from the original helpers:
+    // - `0x44afd0` copies helper word `+6` into sockaddr-like bytes `+2..+3` after endian swap
+    // - `0x44b0d0` formats the IPv4 string from bytes `+4..+7`
+    // - when requested, it appends `":%d"` using the host-order port decoded back from `+2..+3`
+    if (endpoint.family != 2u || endpoint.ipv4NetworkOrder == 0u) {
+        return std::string();
+    }
+
+    const uint16_t portNetworkOrder = ByteSwap16(helperWord6);
+    const uint16_t portHostOrder = ByteSwap16(portNetworkOrder);
+    std::string out = FormatIpv4NetworkOrderDottedQuad(endpoint.ipv4NetworkOrder);
+    if (appendPort) {
+        out += fmt::format(":{}", static_cast<unsigned>(portHostOrder));
+    }
+    return out;
 }
 
 static bool EnsureWinsockReady() {
@@ -527,6 +563,15 @@ void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
 
 CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
+}
+
+uint32_t CLTLoginMediator::State6UdpSessionSecretF18() const {
+    const auto it = g_marginBootstrapStateByMediator.find(this);
+    return (it != g_marginBootstrapStateByMediator.end()) ? it->second.state6UdpSessionSecretF18 : 0u;
+}
+
+void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
+    MutableMarginBootstrapState(this).state6UdpSessionSecretF18 = value;
 }
 
 void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
@@ -1383,10 +1428,25 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     bool managedSendMode = false;
     const bool managedSendModeReady = TryState9Object88QueryManagedSendMode(ownerObject88_, &managedSendMode);
 
+    std::string submitTargetText;
+    std::string remoteHostName = "<empty>";
+    bool submitTargetReady = false;
+    uint32_t submitTargetIpv4NetworkOrder = 0u;
+    if (marginConnection_ != nullptr) {
+        const mxo::liblttcp::LTTCPEndpointKey& endpoint = marginConnection_->RemoteEndpoint();
+        submitTargetIpv4NetworkOrder = endpoint.ipv4NetworkOrder;
+        if (!marginConnection_->RemoteHostName().empty()) {
+            remoteHostName = marginConnection_->RemoteHostName();
+        }
+        submitTargetText = BuildState9SubmitTargetTextScaffold(endpoint, helperWord6, /*appendPort=*/true);
+        submitTargetReady = !submitTargetText.empty();
+    }
+
     spdlog::info(
-        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendModeReady={} managedSendMode={} (remaining gap now narrows onto 0x44afd0/0x44b0d0 plus object88 submit calls)",
+        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendModeReady={} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' (source now mirrors 0x44afd0/0x44b0d0 host:port formatting; remaining gap stays on callback84/object88 submit path)",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
+        static_cast<unsigned>(State6UdpSessionSecretF18()),
         fmt::ptr(ownerCallback84_),
         fmt::ptr(ownerObject88_),
         fmt::ptr(ownerObject8c_),
@@ -1396,7 +1456,11 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
         static_cast<unsigned>(callbackOutLow),
         static_cast<unsigned>(callbackOutHigh),
         managedSendModeReady ? 1u : 0u,
-        managedSendMode ? 1u : 0u);
+        managedSendMode ? 1u : 0u,
+        submitTargetReady ? 1u : 0u,
+        static_cast<unsigned>(submitTargetIpv4NetworkOrder),
+        submitTargetText,
+        remoteHostName);
     return 0u;
 }
 
@@ -2409,6 +2473,8 @@ void CLTLoginMediator::ResetMarginBootstrapState() {
     marginBootstrapState.marginTwofishKeyBytes.clear();
     marginBootstrapState.certChallengeBytes.clear();
     marginBootstrapState.marginSessionId = 0u;
+    marginBootstrapState.state6UdpSessionSecretF18 = 0u;
+    postAuthMarginLoadingState_.state10SendGateFlagF14 = 0u;
     stagedIncomingMarginPacketBytes_.clear();
 }
 
@@ -2595,18 +2661,34 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 
             marginBootstrapState.marginSessionId = reply.sessionId;
             marginBootstrapState.phase = MarginBootstrapPhase::kReady;
+
+            // Narrow live mirror of the anchored state6 opcode-`9` success core:
+            // - original `0x00440780` writes owner byte `+0xf14 = 1`
+            // - then writes owner dword `+0xf18 = parsedReply(+0x09)`
+            // - current best field read for that source dword is the opcode-`9`
+            //   `UDPSessionSecret` / session-id value
+            // Keep the live mirror limited to that proven write pair here; broader state6 wrapper
+            // behavior (metric-id list processing, cached-upstream helper-switch/event flow, opcode-7
+            // branch) remains source-owned but is not re-entered on the deliberate runtime path yet.
+            postAuthMarginLoadingState_.state10SendGateFlagF14 = 1u;
+            SetState6UdpSessionSecretF18(reply.sessionId);
+            const uint32_t state6Handled = 1u;
+
             expectedMarginRequestName_ =
                 (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u)
                     ? "existing-character state8 raw-0x0f margin packet"
                     : "post-auth helper state margin packet";
             Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap completed sessionId=0x%08x field0d=0x%04x field0f=0x%04x field11=0x%04x field13=0x%04x field15=0x%04x currentState=%s",
+                "DIAGNOSTIC: launcher-owned margin bootstrap completed sessionId=0x%08x field0d=0x%04x field0f=0x%04x field11=0x%04x field13=0x%04x field15=0x%04x state6Handled=0x%08x ownerF14=%u ownerF18=0x%08x currentState=%s",
                 (unsigned)reply.sessionId,
                 (unsigned)reply.field0d,
                 (unsigned)reply.field0f,
                 (unsigned)reply.field11,
                 (unsigned)reply.field13,
                 (unsigned)reply.field15,
+                (unsigned)state6Handled,
+                (unsigned)postAuthMarginLoadingState_.state10SendGateFlagF14,
+                (unsigned)State6UdpSessionSecretF18(),
                 currentState_ ? currentState_->DebugName() : "<null>");
             return currentState_ ? currentState_->Slot3_BeginOrContinue(currentState_, this) : 1u;
         }

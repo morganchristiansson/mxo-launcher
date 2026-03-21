@@ -1,52 +1,49 @@
-# winedbg guide for launcher/client startup work
+# winedbg guide for Matrix launcher work
 
-This note collects the current practical `winedbg` workflow for tracing the Matrix Online launcher startup path under Wine.
+This is the **current practical workflow** for debugging the original Matrix launcher path under Wine.
 
-Use it for two related jobs:
-- quick crash-dump triage
-- live stepping around `launcher.exe` / `resurrections.exe` and `client.dll!InitClientDLL`
+Keep it operational.
+Do not let this file become a long-running history log.
 
 ## Scope
 
-This guide is intentionally biased toward the current active investigation:
-- launcher-owned startup reconstruction
-- `client.dll!InitClientDLL`
-- the original `launcher.exe` / temp-copied `matrix.exe` login-state path under Wine
-- active auth/login-state progression into state-8 / margin work
-- the late crash family that lands in current `arg2 filteredArgv + 2`
+Use this guide for:
+- attaching to the original launcher-spawned temp `matrix.exe`
+- quick crash-dump triage
+- narrow live breakpoint passes on the launcher-owned state8/state9 path
 
-It is **not** a generic Windows debugging tutorial.
+It is **not** a general Windows or WineDbg tutorial.
 
-## New practical note: original launcher copies itself to `matrix.exe`
+## Core rule: debug the spawned temp `matrix.exe`
 
 For the original launcher path, the process you usually want is **not** `launcher.exe` itself.
-The launcher copies itself into a temp folder and runs as a temp `matrix.exe` process.
+The original launcher copies itself into Wine temp and runs as a temp `matrix.exe`.
 
-Current practical launcher-side workflow now used in-session:
+Normal launch:
 
 ```bash
 cd /home/morgan/mxo/code/matrix_launcher
 MXO_USER=morgan MXO_PASS='<pwd>' MXO_CHAR=Morg4n make run_original_launcher
 ```
 
-That target currently expands to a real-launcher run with:
+That uses the real launcher with:
 - `-noeula`
 - `-nopatch`
-- optional `-char $(MXO_CHAR)`
-- `-user $(MXO_USER)`
-- `-pwd $(MXO_PASS)`
+- optional `-char`
+- `-user`
+- `-pwd`
 
-Even with those flags, you still attach to the **spawned temp `matrix.exe`**, not the original
-`launcher.exe` process.
+Even then, the debugger target is the spawned temp `matrix.exe`.
 
-That means two practical rules matter a lot:
+## Always use the Wine PID
 
-1. use the **Wine internal PID**, not the Linux host PID, when attaching with `winedbg`
-2. verify the target with `wine tasklist`, not only `ps`
+Do **not** attach using the Linux host PID from `ps`.
+Use the Wine internal PID from `wine tasklist`.
 
 Useful commands:
 
 ```bash
+cd /home/morgan/MxO_7.6005
 wine tasklist /v
 wine cmd /c tasklist /FI "IMAGENAME eq matrix.exe"
 ```
@@ -63,273 +60,164 @@ and `wine tasklist` shows:
 matrix.exe   300
 ```
 
-then attach with:
+attach with:
 
 ```text
 winedbg 300
 ```
 
-not with the Linux PID from `ps`.
+not the Linux PID.
 
-## MCP / wrapper cautions from live runs
+## Current attach discipline
 
-The current `mcp-winedbg` wrapper is good enough for breakpoints, but has some important quirks:
+### Best collaborative workflow
 
-- `cont` may succeed even when the MCP call looks like it hangs
-- inspection commands like `bt`, `print`, `info ...` can auto-interrupt the target
-- output from one MCP request can visibly bleed into the next request's response
-- that can create a **fake stop** in:
-  - `ntdll!DbgUiRemoteBreakin`
-- after attach + breakpoint setup, one initial `cont` is usually needed just to unfreeze the target
+When working together interactively:
 
-So for live collaborative runs, prefer this discipline:
+1. launch with `make run_original_launcher`
+2. wait until the spawned `matrix.exe` is at a **stable UI point**
+   - patch notes / Continue button
+   - other visibly settled launcher UI
+3. attach to the spawned `matrix.exe`
+4. set the smallest breakpoint set possible
+5. `cont`
+6. only after breakpoints are armed and the debugger has continued, click the UI button that advances the launcher
 
-1. attach
-2. set the smallest possible breakpoint set
-3. `cont` once
-4. if the UI freezes, check whether it is just debugger stop state before assuming a real hit
-5. on a useful stop, prefer the smallest possible capture first
-   - e.g. `print $eip`, `print $ecx`, maybe one or two more values, then `cont`
-6. only use heavier `bt` / `print` / `info ...` once the stop is clearly worth the extra debugger churn
+### Important timing caution
 
-A backtrace rooted in:
+Recent live runs showed that attach timing can be **fragile**.
+If you attach too early in the temp `matrix.exe` startup window, you may see weird startup failures like:
+- `DLL initialisation failed`
+- `client.dll could not be found`
+- patch-system-looking behavior even though `-nopatch` was used
+
+Do **not** over-interpret those as normal launcher behavior.
+If that happens:
+- relaunch cleanly
+- attach later, at a stable UI point
+- keep the breakpoint set minimal
+
+### Continue-button coordination rule
+
+If the launcher is waiting on a **Continue** button:
+- do **not** click it before the debugger pass is armed
+- wait for explicit confirmation that:
+  - attach succeeded
+  - breakpoints are set
+  - debugger has already `cont`'d
+
+## MCP / wrapper cautions
+
+The current `mcp-winedbg` wrapper is good enough for breakpoint work, but it has quirks:
+- `cont` may succeed even when the MCP request looks hung
+- output from one request can bleed into the next response
+- inspection commands can auto-interrupt the target
+- a stop rooted in `ntdll!DbgUiRemoteBreakin` is often just debugger churn, not a real game-side hit
+
+Practical rule:
+- prefer small breakpoint sets
+- prefer tiny captures first:
+  - `print $eip`
+  - `print $ecx`
+  - one or two more values
+- only use heavier `bt` / `info ...` when the stop is clearly worth it
+
+## Do not run temp `matrix.exe` directly
+
+Do **not** treat direct temp-`matrix.exe` execution as the main workflow.
+Running the copied temp `matrix.exe` directly can hit the deprecation check:
 
 ```text
-ntdll!DbgUiRemoteBreakin
+Please run the game by using launcher.exe.
+Running matrix.exe directly or using -clone is deprecated.
 ```
 
-usually means the debugger tooling interrupted the process; it is **not** evidence of a real game-side branch hit.
+So the faithful and practical path remains:
+- run `launcher.exe`
+- attach to spawned `matrix.exe`
 
-## Current high-value addresses
+## Do not kill `matrix.exe` after a pass
 
-These are the most useful current anchors.
+Prefer **detach** over kill.
 
-### `resurrections.exe`
-- `main` = `0x0040f340`
+Killing `matrix.exe` does not gracefully log out and can leave the account/session stuck until the server expires it.
+That blocks quick relogin.
 
-### `client.dll`
-- `InitClientDLL` export = `0x620012a0`
-- current arg7/mediator helper call = `0x620015f8 -> 0x62170b00`
-- helper return check = `0x620015fd`
-- helper failure return = `0x62001629..0x62001633`
-- helper success return = `0x62001634..0x6200163c`
-- confirmed `+0xec` call site = `0x62170f48`
-- post-`+0xec` continuation = `0x62170f4e -> 0x62170f62`
+Practical rule:
+- when a debug pass is done, `detach`
+- let the game exit normally or close it intentionally outside the debugger
 
-### Current crash family
-- representative late crash = `EIP=0x003e5e8a`
-- stable higher-level signature = control later redirects into current `arg2 filteredArgv + 2`
-
-### Original launcher / `matrix.exe` active login-state branch
-
-These are the current highest-value original-launcher anchors for active-path work:
-
-- `0x0041ecd0`
-  - `CLTLoginMediator::ProcessLoginRequest`
-  - confirmed live on password submit
-  - current observed input shape:
-    - `param + 0x00` = username
-    - `param + 0x20` = password
-- `0x0041c1f0`
-  - `CLTLoginMediator_PersistSelectionContextAndSwitchToState8`
-  - confirmed live after the password-submit branch
-- `0x00439300`
-  - `CLTLoginState_State4::Slot3_BeginOrContinue`
-  - state-4 margin-route dispatch body
-- `0x0043bd20`
-  - `CLTLoginState_State8::Slot3_BeginOrContinue`
-  - active state-8 structured margin send
-- `0x0043f930`
-  - `CLTLoginState_State8::Slot6_HandleSecondaryMessage`
-  - active state-8 reply body
-- `0x00439780`
-  - `CLTLoginState_State9::Slot3_BeginOrContinue`
-  - first natural helper9/state9 follow-on after successful state8 completion
-- `0x0041de40`
-  - owner/helper submit path behind state9 slot 3
-- `0x0043c180`
-  - `CLTLoginState_State9::Slot6_HandleSecondaryMessage`
-  - later raw-`0x11` reply body
-  - now also live-proven naturally
-  - representative natural-success stop landed at `0x0043c1c2` with parsed status `0`
-
-Important current interpretation:
-- the original live password path is now better evidenced as:
-  - `0x41ecd0 -> 0x41c1f0 -> state8-side continuation`
-- not as an immediate helper11 / `0x41c3c0` path
-- newer live runs now move that natural branch later again:
-  - natural original reaches `0x43bd20`
-  - crosses the `0x41af70/0x41cf30` send bridge
-  - reaches `0x43f930`
-  - naturally continues into `0x00439780`
-  - and is now also live-proven one step deeper into `0x0041de40`
-  - representative live stop sequence showed:
-    - at `0x00439780`: helper9 local byte `this+4 = 0`, word `this+6 = 0x2710`
-    - at `0x0041de40`: `ECX = 0x004d4e38`, `EAX = 0x2710`, `EDX = 0x004b517c`
-- current remaining natural-original question is therefore later again:
-  - what happens after the now-proven `0x0043c180` success-side state-`0x0c` switch / event-`0x18`
-- representative live UI consequence at that boundary:
-  - a natural run was visibly at **Waiting for Regionserver** while stopped around the
-    `0x0043c180 / 0x0043c1c2` success-side window
-- so when debugging the original launcher, **start with the state-8 branch first** and now treat
-  deeper behavior under the state9 continuation (`0x41de40`, then `0x43c180`, then post-state9
-  state-`0x0c` continuation) as the current highest-value live boundary before trying to force
-  helper11-specific hypotheses
-
-## Fastest path: inspect the latest dump
-
-From the project directory:
+## Crash-dump fast path
 
 ```bash
 cd /home/morgan/mxo/code/matrix_launcher
 make crashdump
 ```
 
-That currently expands to a simple `winedbg` dump workflow against the newest `~/MxO_7.6005/MatrixOnline_0.0_crash_*.dmp`.
-
 Direct equivalent:
 
 ```bash
 cd /home/morgan/MxO_7.6005
-printf 'info reg\nbt\ninfo share\nquit\n' | winedbg MatrixOnline_0.0_crash_62.dmp
+printf 'info reg\nbt\ninfo share\nquit\n' | winedbg MatrixOnline_0.0_crash_<n>.dmp
 ```
 
-Good first checks in dump triage:
+Good first checks:
 - `info reg`
 - `bt`
 - `info share`
-- top of stack versus the preserved `InitClientDLL` frame in `resurrections.log`
 
-## Live-run baseline for the current deep startup path
+## Current high-value launcher addresses
 
-For the current reproduced loading-character / `+0xec` path, this is the most useful live configuration:
+### Active natural launcher branch
+- `0x0041ecd0`
+  - `CLTLoginMediator::ProcessLoginRequest`
+- `0x0041c1f0`
+  - `CLTLoginMediator_PersistSelectionContextAndSwitchToState8`
+- `0x0043bd20`
+  - `CLTLoginState_State8::Slot3_BeginOrContinue`
+- `0x0043f930`
+  - `CLTLoginState_State8::Slot6_HandleSecondaryMessage`
+- `0x00439780`
+  - `CLTLoginState_State9::Slot3_BeginOrContinue`
+- `0x0041de40`
+  - state9 submit followup
+- `0x0043c180`
+  - `CLTLoginState_State9::Slot6_HandleSecondaryMessage`
 
-```bash
-cd /home/morgan/MxO_7.6005
-MXO_BINDER_LOGIN_MEDIATOR=1 \
-MXO_STUB_LAUNCHER_OBJECT=1 \
-MXO_FORCE_INCOMPLETE_INIT=1 \
-MXO_ARG7_SELECTION=0x0500002a \
-MXO_MEDIATOR_SELECTION_NAME=Reality \
-winedbg ./resurrections.exe
-```
+### Receive-side bridge immediately before `0x43f930`
+- `0x004490c0`
+  - `CMessageConnection_OnOperationCompleted`
+- `0x004499a1`
+  - late dispatch call site inside `CMessageConnection_OnOperationCompleted`
+- `0x00442d00`
+  - `CBaseMarginConnection_DispatchMessage`
+- `0x0044af20`
+  - `CMarginConnection_DispatchMessage`
+- `0x0041f260`
+  - `CLTLoginMediator_DispatchCurrentHelperSlot6`
 
-Useful optional diagnostic toggles:
-- `MXO_ARG2_RET_BYPASS=1`
-- `MXO_ARG2_RET_BYPASS_MAX=4`
+### Newly proven owner `+0xf18` writer
+- `0x00440780`
+  - `CLTLoginState_State6_Slot6_HandleMarginOpcode7Or9Reply`
+  - on opcode-`9` success writes:
+    - owner byte `+0xf14 = 1`
+    - owner dword `+0xf18 = parsedReply(+0x09)`
 
-But keep that bypass strictly diagnostic-only; see:
-- `../client.dll/InitClientDLL/RET_BYPASS_HACK.md`
+## Current useful breakpoint sets
 
-## Breakpoint strategy that works well here
-
-### Active original-launcher breakpoint set
-
-For the current original launcher-spawned temp `matrix.exe` login-state work, this is the most useful **minimal** breakpoint set:
+### Minimal natural state8/state9 branch set
 
 ```text
 break *0x0041ecd0
 break *0x0041c1f0
 break *0x0043bd20
-break *0x0041af70
-break *0x0041cf30
 break *0x0043f930
 cont
 ```
 
-Practical use:
-- `0x0041ecd0` is chatty but confirms password-submit entry into the active branch
-- after confirming that once, it is often worth deleting that breakpoint so the UI can progress
-- `0x0041c1f0` confirms the active branch is persisting the `0xb4` selection/config object and
-  switching to state `8`
-- `0x0043bd20` confirms state8 sender entry
-- `0x0041af70` and `0x0041cf30` confirm the natural path crosses the send bridge, not just the
-  packet-builder body
-- `0x0043f930` is the now-proven later state8 reply stop and the best next deep inspection target
+Use this when you need to confirm the active password-submit branch and the state8 send/reply pair.
 
-### 1. Break in the custom launcher first
-
-Because `resurrections.exe` has usable DWARF symbols, the easiest first anchor is:
-
-```text
-break main
-cont
-```
-
-Current known good symbol:
-- `main` resolves at `0x0040f340`
-
-### 2. Prefer absolute client addresses after `client.dll` is loaded
-
-In current sessions, `client.dll` export-name breakpoints have been unreliable enough that absolute addresses are usually faster once the module is present.
-
-After `client.dll` is loaded, useful breakpoints are:
-
-```text
-break *0x620015fd
-break *0x62001634
-break *0x6200163c
-break *0x62170f48
-break *0x62170f4e
-```
-
-Practical meaning:
-- `0x620015fd`: did `0x62170b00` return success?
-- `0x62001634`: success epilogue of the enclosing `InitClientDLL` path
-- `0x6200163c`: exact `ret` that should leave that path cleanly
-- `0x62170f48`: confirmed mediator `+0xec` handoff
-- `0x62170f4e`: immediate post-`+0xec` continuation
-
-### 3. If you need deferred breakpoints by address
-
-If you try `break *0x620015fd` too early, before `client.dll` is loaded, `winedbg` will reject it.
-
-The debugger itself reports the workaround:
-- enable deferred breakpoints by address with `$CanDeferOnBPByAddr = 1`
-
-So in a fully interactive `winedbg` session, if you want to queue client absolute breakpoints before module load, set that option first.
-
-If you do **not** want to rely on that, use this simpler workflow instead:
-1. `break main`
-2. `cont`
-3. once startup has advanced and `client.dll` is loaded, add the absolute client breakpoints
-4. `cont` again
-
-### 4. Verify load state before assuming an address is valid
-
-Use:
-
-```text
-info share
-```
-
-On the current path, `client.dll` should appear at base `0x62000000`.
-
-## Current practical original-launcher workflow
-
-Use the Makefile helper so the launcher run is reproducible and fast to relaunch:
-
-```bash
-cd /home/morgan/mxo/code/matrix_launcher
-MXO_USER=morgan MXO_PASS='<pwd>' MXO_CHAR=Morg4n make run_original_launcher
-```
-
-Then in a second shell, identify the spawned temp `matrix.exe` and attach `winedbg` to that Wine PID:
-
-```bash
-cd /home/morgan/MxO_7.6005
-wine tasklist /v
-```
-
-Current late-breakpoint set for the active question is intentionally small:
-
-```text
-break *0x0041de40
-break *0x0043c180
-cont
-```
-
-Optional one-time sanity anchor on a fresh run:
+### Later state9 continuation set
 
 ```text
 break *0x00439780
@@ -338,15 +226,9 @@ break *0x0043c180
 cont
 ```
 
-Optional branch split once `0x0043c180` is proven:
+Use this once the state8 path is already proven and you want the later submit/reply continuation.
 
-```text
-break *0x0043c1c2
-break *0x0043c1e6
-cont
-```
-
-Preferred immediate post-success narrowing once `0x43c180` is proven:
+### Post-state9 success tail
 
 ```text
 break *0x0041b450
@@ -354,156 +236,58 @@ break *0x0041cfb0
 cont
 ```
 
-Optional later-continuation probes only after that helper-switch / event boundary is understood:
+Use this after `0x0043c180` success is already proven.
+
+### Receive-side bridge before state8 slot 6
 
 ```text
-break *0x004397e0
-break *0x0041c5c0
+break *0x004490c0
+break *0x004499a1
+break *0x00442d00
+break *0x0043f930
 cont
 ```
 
-Current caution from the first follow-up probe pass:
-- a natural run that already proved `0x43c180` success still produced **no** natural hit on
-  `0x004397e0` or `0x0041c5c0`
-- newer Ghidra review now explains why that non-hit is not surprising:
-  - success first goes through `0x41b420`, then `0x41b450(0x0c)`, then `0x41cfb0(0x18)`
-  - `0x41cfb0` walks the owner `+0x674` listener tree
-- newer breakpoint-only live proof now tightens that one step further too:
-  - after the proven `0x41cfb0(0x18)` post, the same natural run later hit `0x41cfb0(0x0f)`
-  - the run then entered game without any observed hit on `0x004397e0` or `0x0041c5c0`
-- so treat `0x004397e0` / `0x0041c5c0` as informed later probes, not as guaranteed immediate next
-  stops after state `0x0c`
+Use this only for the narrow question of what survives into state8 slot 6.
 
-Why this set is better now:
-- earlier state8 send-side hits have already been re-proven enough
-- natural original is now live through `0x43f930 -> 0x439780 -> 0x41de40 -> 0x43c180`
-- the next missing original-live question is no longer whether state9 slot 6 is reached, but what
-  the later post-state9 / state-`0x0c` continuation does after the now-proven success-side branch
-- newer Ghidra tightening now makes the first concrete post-success boundary:
-  - `0x41b420 -> 0x41b450(0x0c) -> 0x41cfb0(0x18)`
-  - and `0x41cfb0` delivers through the owner `+0x674` listener tree
-- newer breakpoint-only live proof now also shows a later event post on that same continuation:
-  - `0x41cfb0(0x0f)`
-  - before the run enters game
-- current practical live-status clue there is the visible **Waiting for Regionserver** phase
-- current practical negative-result clue there is also that the first late probes on
-  `0x004397e0` / `0x0041c5c0` stayed silent
+### Owner `+0xf18` watch syntax
 
-## Current preferred live trace target
-
-For original `matrix.exe` login-state work, the highest-value live question is no longer the old
-**state8 post-send boundary**. Natural original is now confirmed later on the state8 reply path.
-
-Current best proven target sequence:
-- `0x41ecd0`
-- `0x41c1f0`
-- `0x43bd20`
-- `0x41af70`
-- `0x41cf30`
-- `0x43f930`
-- `0x439780`
-- `0x41de40`
-- `0x43c180`
-
-Why this is the current priority:
-- newer original-launcher runs confirmed the password-submit branch through
-  `0x41c1f0`, `0x43bd20`, the send bridge, `0x43f930`, `0x439780`, `0x41de40`, and now `0x43c180`
-- the state9 slot-6 natural hit also reached the success-side branch at `0x43c1c2`
-- they still did **not** naturally hit `0x41c3c0`, `0x421220`, `0x420ef0`, or `0x43c020`
-
-Practical consequence:
-- if you are choosing between chasing helper11 writers and chasing the natural original branch,
-  prefer the now-proven state9 continuation through `0x43c180` and then move later into the
-  post-state9 / state-`0x0c` continuation
-- the next tight original-launcher breakpoints should now center on the helper-switch / event tail
-  behind that success:
-  - `0x0041b450`
-  - `0x0041cfb0`
-- yes, there is also a later concrete character-data path:
-  - `0x0041c3c0 = CLTLoginMediator_ProcessLoginCredentials`
-  - `0x0043c020 = CLTLoginState_State11_SendPostAuthMarginPacket0x4d`
-  - `0x0043e540` debug-printer confirms fields like SkinToneID, HairID, StartingHat,
-    StartingShirt, StartingCoat, RealFirstName, RealLastName, Background, GameSessionID
-- but keep that path secondary for the next natural-original pass unless the helper-switch / event
-  tail itself proves it feeds there
-- helper11 remains relevant for the forced scaffold runtime stall, but it is not the first
-  faithful original-live breakpoint target
-
-## Minimal live workflow for the current original-launcher question
-
-For the active original `matrix.exe` branch, a better minimal live workflow is now:
-
-1. attach to `matrix.exe`
-2. set only the late continuation breakpoints:
-   - `break *0x0041de40`
-   - `break *0x0043c180`
-3. optional on a fresh sanity run:
-   - add `break *0x00439780`
-4. `cont`
-5. once `0x43c180` is confirmed on a natural run, optionally split the branch with:
-   - `break *0x0043c1c2`
-   - `break *0x0043c1e6`
-6. on the next pass, prefer the immediate post-success tail:
-   - `break *0x0041b450`
-   - `break *0x0041cfb0`
-7. only after that, reuse the later probes:
-   - `break *0x004397e0`
-   - `break *0x0041c5c0`
-8. optional secondary sanity probes if the tail suggests helper11 re-entry later:
-   - `break *0x0041c3c0`
-   - `break *0x0043c020`
-9. keep the next pass centered on the later post-state9 / state-`0x0c` continuation instead of
-   repeatedly re-proving the earlier state8/state9 entries
-
-Keep the older `client.dll` / `InitClientDLL` workflow below for client-startup questions, but it is
-no longer the highest-value live path for the active original-launcher state8 investigation.
-
-## Useful interactive commands
-
-Common commands worth keeping handy:
+If you need to watch the field directly, use a **typed** expression:
 
 ```text
-info reg
-bt
-info share
-stepi
-nexti
-finish
-frame 0
-up
-down
+watch *(int*)0x4d5d50
 ```
 
-Useful memory checks:
+Do **not** rely on a raw address form.
 
-```text
-x/16wx $esp
-x/16i $eip
-```
+Important current limitation from live runs:
+- for this specific field, WineDbg watchpoints tended to trip **late** with the already-materialized value
+- they did **not** reliably expose the true earlier producer
+- so use them as a sanity check, not as the primary proof technique
 
-For this project, the most informative quick inspection is often:
-- current `eip`
-- current `esp`
-- first few dwords at `esp`
-- whether those dwords match preserved `InitClientDLL` arguments in `resurrections.log`
+## Current proven runtime bracket for owner `+0xf18`
 
-## How this relates to project logging
+Natural launcher runs already proved:
+- still `0` at:
+  - `0x0041ecd0`
+  - `0x0041c1f0`
+  - `0x0043bd20`
+  - `0x00442d00`
+  - `0x004499a1`
+- already non-zero by:
+  - `0x0043f930`
+  - then still non-zero through `0x00439780 -> 0x0041de40 -> 0x0041e690`
 
-`winedbg` is most useful here when paired with:
-- `~/MxO_7.6005/resurrections.log`
-- preserved `InitClientDLL` argument-frame logging from the custom launcher
-- canonical crash-family docs under `../client.dll/InitClientDLL/`
+This is now explained by the state6 slot-6 writer at `0x00440780`.
 
-The most useful cross-checks are:
-- does the client reach `MediatorStub::ConsumeSelectionContext(+0xec)`?
-- does the live stack at the late crash still match stale startup-frame values?
-- does execution ever cleanly return past `0x6200163c`?
+## Current practical recommendation
 
-## Current cautions
-
-- Do **not** treat the `arg2` landing as the root bug.
-- Do **not** treat `MXO_ARG2_RET_BYPASS` as a fix.
-- Do **not** jump straight to the later `0x62054cbd` / `+0x120` path until the enclosing `InitClientDLL` success-return path is accounted for.
+For live original-launcher work:
+- keep breakpoint sets small
+- attach only once the UI is stable enough to tolerate a stop
+- use `matrix.exe`, not `launcher.exe`
+- detach, do not kill
+- if attach timing starts causing weird startup failures, relaunch and attach later rather than assuming the launcher logic changed
 
 ## See also
 

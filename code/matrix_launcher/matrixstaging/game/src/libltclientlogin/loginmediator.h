@@ -303,10 +303,61 @@ public:
         //   - then the shared `0x41df60 / 0x44b190` FeedbackSize helper family mutates/copies the
         //     full 16 bytes in place using source material from mediator `+0xd4 -> owner +0x1c + 0x85`
         // Keep this as a source-owned layout sketch only for now.
-        // We do **not** expose a live replacement arg6 `+0x18c` yet because:
-        // - owner `+0xf18` still has no isolated non-init writer
-        // - the shared `+0x85/+0xf8/+0xa8` family is tighter, but still not source-owned enough
-        //   for a faithful live callback84 path.
+        // Bounded `+0xf18` provenance pass (`2026-03-21`) checked only:
+        // - `0x41ee60`
+        // - `0x41e690`
+        // - `0x41de40`
+        // - `0x439780`
+        // - `0x43c180`
+        // - `0x41b420`
+        // - `0x4401a0`
+        // - `0x41c1f0`
+        // - `0x41ecd0`
+        // - cross-check only: `0x4429b0`, `0x441470`
+        // Current bounded static result still found only:
+        // - zero-init writer at `0x41ee60` (`owner +0xf18 = 0`)
+        // - read/seed use at `0x41e690` (`blob +0x10 = owner +0xf18` before transform)
+        // No non-init launcher writer was isolated within that checked static scope.
+        // But a same-session natural-original WineDbg follow-up corrected the broader practical read:
+        // - natural stops at `0x41de40` and then `0x41e690` showed owner `0x004d4e38`
+        // - owner `+0xf18` was already non-zero there (`0xfe3e2a9f` on one run, `0x6e3c3dc5` on
+        //   another, `0xc006b2db` on a later EULA-stage attach rerun)
+        // - a newer breakpoint-ladder rerun from EULA also tightened the write window materially:
+        //   - still `0` at `0x41ecd0`
+        //   - still `0` at `0x41c1f0`
+        //   - still `0` at state8 slot3 `0x43bd20`
+        //   - already non-zero at state8 slot6 entry `0x43f930` (`0xc1206989` on that run)
+        //   - same non-zero value then survives through `0x439780 -> 0x41de40 -> 0x41e690`
+        // - that same EULA-stage rerun armed a typed WineDbg watch on `*(int*)0x4d5d50` while the
+        //   field was still zero, but the watch only tripped late at `0x41de41`
+        // - positive static follow-up then isolated the concrete non-init launcher writer:
+        //   - `0x00440780 = CLTLoginState_State6_Slot6_HandleMarginOpcode7Or9Reply`
+        //   - the paired opcode-`9` parser/debug family now bounds that source field more tightly:
+        //     - `0x0043a0b0 / 0x0043a060` build the reply view
+        //     - `0x0043c950` (launcher) and `0x6253f000` (client mirror) are the two current
+        //       `"UDPSessionSecret:"` string users
+        //     - those debug printers label parsed fields as:
+        //       - `+0x01` = `Status`
+        //       - `+0x05` = `GoHereAddr`
+        //       - `+0x09` = `UDPSessionSecret`
+        //       - `+0x0d` = offset to `MetrIds` array header
+        //   - open-server/proxy `MS_ConnectReply` mirrors place the changing session id in that
+        //     same wire slot, so current best cross-checked read is:
+        //     owner `+0xf18` = state6 opcode-`9` `UDPSessionSecret` / session-id dword
+        //   - on the opcode-`9` success side it writes:
+        //     - owner byte `+0xf14 = 1`
+        //     - owner dword `+0xf18 = parsedReply(+0x09)`
+        //   - assembly at `0x440ab9..0x440ac9` does this through the compact shape:
+        //     `mov eax,[0x004f78b8] ; mov edx,[edi+0x9] ; add eax,0xf14 ; mov [eax+4],edx ; mov byte ptr [eax],1`
+        // - direct displacement searches stayed deceptively weak because that writer reaches
+        //   `+0xf18` through base `+0xf14` plus `[eax+4]`, not a literal `[base+0xf18]`
+        // - client.dll narrow mirror search now also found only the corresponding pair:
+        //   `0x6252a680` (zero-init) and `0x62529f20` (read/seed into the client-side `+0x18c`
+        //   mirror used by `ClientNetShell_FillCallback84Pair38`)
+        // We still do **not** expose a live replacement arg6 `+0x18c` yet because the broader blob
+        // semantics and surrounding callback84 path are still not source-owned tightly enough.
+        // The shared `+0x85/+0xf8/+0xa8` family is tighter, but still not source-owned enough for
+        // a faithful live callback84 path.
         uint32_t currentSlotIdLow00 = 0;
         uint32_t currentSlotIdHigh04 = 0;
         uint32_t callerArg08 = 0;
@@ -454,7 +505,10 @@ public:
         uint32_t worldListCountOrStatus80 = 0;           // `+0x80`
 
         // owner byte `+0xf14`; shared send gate used by the active state8 path and later state10.
-        uint8_t state10SendGateFlagF14 = 1;             // `+0xf14`
+        // Strongest current writer is state6 opcode-`9` success, which sets it alongside owner
+        // `+0xf18 = parsed opcode-9 UDPSessionSecret / session-id dword`; later state9 success
+        // clears it again at `0x41b420`.
+        uint8_t state10SendGateFlagF14 = 0;             // `+0xf14`
 
         // Active state8 reply path prefers the current slot record (`+0x688[owner+0xcc8]`) as the
         // first-fragment seed for this name/world block, falling back to the older `+0x108` text.
@@ -1022,10 +1076,12 @@ public:
     PostAuthMarginLoadingState& MutablePostAuthMarginLoadingState() { return postAuthMarginLoadingState_; }
     const PostAuthMarginLoadingState& PostAuthMarginLoadingStateView() const { return postAuthMarginLoadingState_; }
 
-    // Helper11 HandleLoadCharacterReply outputs (0x440320):
+    // Helper11 HandleLoadCharacterReply outputs (0x440320) plus neighboring state6-gated send flag:
     uint32_t& WorldListCountOrStatus80() { return postAuthMarginLoadingState_.worldListCountOrStatus80; }
     uint8_t State10SendGateFlagF14() const { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
     uint8_t& State10SendGateFlagF14() { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
+    uint32_t State6UdpSessionSecretF18() const;
+    void SetState6UdpSessionSecretF18(uint32_t value);
     const char* CharacterNameBufferF1c() { return postAuthMarginLoadingState_.characterNameBufferF1c; }
     const std::array<uint32_t, 8>& CharacterFlagsF48() { return postAuthMarginLoadingState_.characterFlagsF48; }
     const std::array<uint32_t, 8>& SecondaryCharacterDataF68() { return postAuthMarginLoadingState_.secondaryCharacterDataF68; }
