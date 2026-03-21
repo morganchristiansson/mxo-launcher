@@ -68,6 +68,9 @@ static uint32_t g_LoginControllerSelectionSeedWorldIndexLow24 = 0;
 static bool g_LoginControllerEnableRecoveredProcessLoginCredentialsSeed = false;
 static char g_LoginControllerHelper11CharacterName[256] = {};
 static char g_LoginControllerHelper11GameSessionId[256] = {};
+static void* g_LoginControllerStartupNetShell124 = NULL;
+static void* g_LoginControllerStartupNetMgr124 = NULL;
+static void* g_LoginControllerStartupDistrObjExecutive124 = NULL;
 static const char* g_LoginControllerAuthName = "resurrections";
 static const char* g_LoginControllerAuthPassword = "";
 
@@ -477,6 +480,21 @@ static bool DiagnosticEnqueueConnectionStatusWorkItem(
     return true;
 }
 
+static void DiagnosticApplyState9StartupTriple() {
+    if (!g_DiagnosticLoginController) {
+        return;
+    }
+
+    // Strongest current runtime/source origin for owner `+0x84/+0x88/+0x8c`:
+    // - launcher.exe owner vtable `+0x124 / 0x41f1d0`
+    // - deeper client init calls arg6 `+0x124(netShell, netMgr, distrObjExecutive)`
+    // Keep the captured param order explicit instead of inventing a broader listener tree.
+    g_DiagnosticLoginController->SetState9CallbackObjectTriple84_88_8c(
+        g_LoginControllerStartupNetShell124,
+        g_LoginControllerStartupNetMgr124,
+        g_LoginControllerStartupDistrObjExecutive124);
+}
+
 static void DiagnosticApplyLoginControllerConfig() {
     if (!g_DiagnosticLoginController) return;
 
@@ -513,6 +531,7 @@ static void DiagnosticApplyLoginControllerConfig() {
     g_DiagnosticLoginController->RegisterScaffoldState12(&g_DiagnosticLoginStateState12);
     g_DiagnosticLoginController->RegisterScaffoldState13(&g_DiagnosticLoginStateState13);
     g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
+    DiagnosticApplyState9StartupTriple();
 
     const char* helper11RealFirstName = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_REAL_FIRST_NAME");
     const char* helper11RealLastName = DiagnosticGetEnvNonEmpty("MXO_DIAGNOSTIC_REAL_LAST_NAME");
@@ -633,6 +652,9 @@ void DiagnosticAuthResetState() {
     g_DiagnosticLoginController = NULL;
     g_DiagnosticCurrentOwner = NULL;
     g_DiagnosticPostAuthMarginBeginAttempted = false;
+    g_LoginControllerStartupNetShell124 = NULL;
+    g_LoginControllerStartupNetMgr124 = NULL;
+    g_LoginControllerStartupDistrObjExecutive124 = NULL;
 }
 
 void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
@@ -655,6 +677,19 @@ void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* auth
     g_LoginControllerAuthName = (authName && authName[0]) ? authName : "";
     g_LoginControllerAuthPassword = (authPassword && authPassword[0]) ? authPassword : "";
     DiagnosticApplyLoginControllerConfig();
+}
+
+void DiagnosticAuthConfigureMediatorStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) {
+    g_LoginControllerStartupNetShell124 = netShell;
+    g_LoginControllerStartupNetMgr124 = netMgr;
+    g_LoginControllerStartupDistrObjExecutive124 = distrObjExecutive;
+    DiagnosticApplyState9StartupTriple();
+    Log(
+        "DIAGNOSTIC: mirrored arg6 +0x124 startup triple into state9 collaborator owner fields +0x84/+0x88/+0x8c netShell=%p netMgr=%p distrObjExecutive=%p controller=%p",
+        netShell,
+        netMgr,
+        distrObjExecutive,
+        g_DiagnosticLoginController);
 }
 
 void DiagnosticAuthPollLiveConnectionTraffic(void* owner) {

@@ -645,6 +645,9 @@ public:
     void RegisterScaffoldState12(CLTLoginState* state);
     void RegisterScaffoldState13(CLTLoginState* state);
     // anchor: launcher.exe:0x41f1d0
+    // Strongest current runtime/source origin for this triple:
+    // - deeper client init calls arg6/owner vtable `+0x124(netShell, netMgr, distrObjExecutive)`
+    // - `0x41f1d0` stores those three parameters directly into owner `+0x84/+0x88/+0x8c`
     void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
     CLTLoginState* ScaffoldState3() const;
     CLTLoginState* ScaffoldState4() const;
@@ -1111,6 +1114,8 @@ private:
     std::string gameSessionId664_;             // owner `+0x664`
     // Narrow source-owned post-state9 / post-state12 owner collaborators from
     // `0x41f1d0` / `0x41de40` / `0x41c5c0` / `0x41c510`.
+    // Strongest current origin: deeper client init owner/arg6 vtable `+0x124`
+    // (`netShell, netMgr, distrObjExecutive`) copied directly into this triple by `0x41f1d0`.
     void* ownerCallback84_ = nullptr;          // owner `+0x84`
     void* ownerObject88_ = nullptr;            // owner `+0x88`
     void* ownerObject8c_ = nullptr;            // owner `+0x8c`

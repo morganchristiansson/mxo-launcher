@@ -958,6 +958,12 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
         self->field10 = pNetMgr;
         self->field14 = pDistrObjExecutive;
     }
+    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+        // Strongest current read for launcher owner `+0x84/+0x88/+0x8c` is that the same vtable
+        // `+0x124` triple captured here later feeds state9 submit followup `0x41de40`.
+        mediator->SetState9CallbackObjectTriple84_88_8c(pNetShell, pNetMgr, pDistrObjExecutive);
+    }
+    DiagnosticAuthConfigureMediatorStartupTriple(pNetShell, pNetMgr, pDistrObjExecutive);
     ++g_MediatorRuntimeState.provide124Count;
     Log(
         "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p self=%p) [count=%u caller=%p]",

@@ -599,17 +599,36 @@ The highest-value remaining auth-adjacent work is now:
       - practical consequence for the active blocker:
         - the old “missing first decrypted raw `0x10`” state8 blocker is now closed enough
         - focus has now moved later again onto helper9/state9 and the post-state9 continuation
-        - latest deliberate runtime tightening there now also proves one narrower immediate blocker:
+        - latest deliberate runtime tightening there first proved one narrower immediate blocker:
           - a narrow source-owned bridge now re-dispatches the proven state8 `event 0x0b` handoff into
             `CLTLoginState_State9::Slot3_BeginOrContinue`
           - that live run now reaches `CLTLoginMediator::State9SubmitFollowupScaffold`
-          - but the recovered owner collaborator triple is still null on the replacement path:
-            - owner `+0x84 = null`
-            - owner `+0x88 = null`
-            - owner `+0x8c = null`
-          - the current deliberate state9 stall is therefore no longer “did helper9/state9 run at all?”
-          - it is now the missing launcher-owned state9 submit collaborators behind `0x41de40`, before any
-            later raw `0x11` / state9 slot-6 progression can be expected
+          - the initially visible replacement-side gap there was the null owner collaborator triple at
+            `+0x84/+0x88/+0x8c`
+        - newer source/runtime tightening now narrows the origin of that triple further too:
+          - strongest current source/runtime origin is owner/arg6 vtable `+0x124`
+          - deeper client init already captures that call as:
+            `arg6->+0x124(netShell, netMgr, distrObjExecutive)`
+          - `0x41f1d0 = CLTLoginMediator_SetState9CallbackObjectTriple84_88_8c` then stores those
+            three parameters directly into owner `+0x84/+0x88/+0x8c`
+          - replacement source now mirrors that captured startup triple into the mediator-owned
+            state9 collaborator fields instead of leaving them null by default
+        - practical consequence for the active blocker:
+          - the state9 submit problem is now narrower than generic “missing collaborators”
+          - the remaining `0x41de40` gap is now weighted toward the deeper collaborator execution:
+            - owner callback84 query `+0x38`
+            - owner object88 branch query `(+0x44)->(+0x30)`
+            - packet-like payload builder `0x44afd0 / 0x44b0d0`
+            - final object88 submit calls `+0x28` or `+0x18/+0x24`
+          - only after that narrower `0x41de40` work should later raw `0x11` / state9 slot-6
+            progression be expected
+        - current rerun classification after landing the `+0x124 -> +0x84/+0x88/+0x8c` bridge:
+          - logs now do show the real captured startup triple becoming non-null on the replacement path
+          - but the specific short validation rerun did **not** re-hit helper9/state9 before stopping
+          - that run instead crashed later during state8 raw-`0x10` fragment accumulation after sections
+            through `0x0c`, with expected-count still `0` and handoff word still `0`
+          - treat that as the current rerun result, not as evidence that the earlier proved
+            helper9/state9 boundary is reopened or disproved
   - practical comparison against the natural original path:
     - this moves the replacement launcher later and closer to the natural-original shape than the
       old helper11-only stall

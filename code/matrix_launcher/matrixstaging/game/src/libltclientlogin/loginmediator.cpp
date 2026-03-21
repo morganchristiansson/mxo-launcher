@@ -346,6 +346,61 @@ static void AssignOwnedSmallString(
     dest.string60.capacity = dest.string60.current;
 }
 
+static bool TryState9Callback84FillPair(void* callback84, uint32_t* outLow, uint32_t* outHigh) {
+    if (outLow) {
+        *outLow = 0u;
+    }
+    if (outHigh) {
+        *outHigh = 0u;
+    }
+    if (!callback84) {
+        return false;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(callback84);
+    if (!vtable || !vtable[14]) {
+        return false;
+    }
+
+    using FillPairFn = void(__thiscall*)(void*, uint32_t*, uint32_t*);
+    const auto fillPairFn = reinterpret_cast<FillPairFn>(vtable[14]); // vtable +0x38
+    fillPairFn(callback84, outLow, outHigh);
+    return true;
+}
+
+static bool TryState9Object88QueryManagedSendMode(void* object88, bool* outManagedSendMode) {
+    if (outManagedSendMode) {
+        *outManagedSendMode = false;
+    }
+    if (!object88) {
+        return false;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(object88);
+    if (!vtable || !vtable[17]) {
+        return false;
+    }
+
+    using GetModeObjectFn = void*(__thiscall*)(void*);
+    const auto getModeObjectFn = reinterpret_cast<GetModeObjectFn>(vtable[17]); // vtable +0x44
+    void* modeObject = getModeObjectFn(object88);
+    if (!modeObject) {
+        return false;
+    }
+
+    void** modeVtable = *reinterpret_cast<void***>(modeObject);
+    if (!modeVtable || !modeVtable[12]) {
+        return false;
+    }
+
+    using QueryManagedSendModeFn = uint8_t(__thiscall*)(void*);
+    const auto queryManagedSendModeFn = reinterpret_cast<QueryManagedSendModeFn>(modeVtable[12]); // vtable +0x30
+    if (outManagedSendMode) {
+        *outManagedSendMode = (queryManagedSendModeFn(modeObject) != 0u);
+    }
+    return true;
+}
+
 }  // namespace
 
 CLTLoginMediator::CLTLoginMediator()
@@ -581,6 +636,11 @@ void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, v
     ownerCallback84_ = callback84;
     ownerObject88_ = object88;
     ownerObject8c_ = object8c;
+    spdlog::info(
+        "CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c callback84={} object88={} object8c={} (strongest current origin: owner/arg6 vtable +0x124 startup triple)",
+        fmt::ptr(ownerCallback84_),
+        fmt::ptr(ownerObject88_),
+        fmt::ptr(ownerObject8c_));
 }
 
 CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
@@ -1236,22 +1296,40 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     //   (`+0x1c`, `+0x18`, `+0x24`) after testing `(+0x44)->(+0x30)`
     // - representative natural-original stop also had non-null owner callback/object triple
     //   at `+0x84/+0x88/+0x8c`
+    // - strongest current source/runtime origin for that triple is now narrower too:
+    //   deeper client init calls owner/arg6 vtable `+0x124(netShell, netMgr, distrObjExecutive)`,
+    //   and `0x41f1d0` stores those three parameters directly into `+0x84/+0x88/+0x8c`
     // - owner dword `+0x90` is only forwarded when helper byte `+4 != 0`
     // - owner dword `+0x147c` caches the acquired handle on the managed-send branch
     //
-    // The concrete owner-side collaborators remain unresolved in source, so keep this helper
-    // narrow and structural for now. Returning `0` preserves the observed `0x439780` success-side
-    // event-post shape (`< 1` => post event `0x17`).
+    // Current source-owned tightening deliberately stops one step short of a fake submit:
+    // - it now samples the real collaborator query steps that are cheap and evidence-backed
+    //   (`+0x84 -> vtable +0x38`, `+0x88 -> (+0x44)->(+0x30)`) when the captured startup triple is live
+    // - but it still does not claim the deeper `0x44afd0/0x44b0d0` packet-like payload builder or
+    //   the final `+0x28 / +0x18 / +0x24` submit calls are reconstructed yet
+    // Returning `0` still preserves the observed `0x439780` success-side event-post shape
+    // (`< 1` => post event `0x17`) while narrowing the remaining blocker beyond mere null collaborators.
     const uint32_t forwardedArg90 = helperByte4 != 0u ? ownerOptionalField90_ : 0u;
+    uint32_t callbackOutLow = 0u;
+    uint32_t callbackOutHigh = 0u;
+    const bool callbackPairReady = TryState9Callback84FillPair(ownerCallback84_, &callbackOutLow, &callbackOutHigh);
+    bool managedSendMode = false;
+    const bool managedSendModeReady = TryState9Object88QueryManagedSendMode(ownerObject88_, &managedSendMode);
+
     spdlog::info(
-        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} (natural original now proven into 0x41de40; deeper owner collaborators unresolved)",
+        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendModeReady={} managedSendMode={} (remaining gap now narrows onto 0x44afd0/0x44b0d0 plus object88 submit calls)",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
         fmt::ptr(ownerCallback84_),
         fmt::ptr(ownerObject88_),
         fmt::ptr(ownerObject8c_),
         static_cast<unsigned>(forwardedArg90),
-        ownerCachedHandle147c_);
+        ownerCachedHandle147c_,
+        callbackPairReady ? 1u : 0u,
+        static_cast<unsigned>(callbackOutLow),
+        static_cast<unsigned>(callbackOutHigh),
+        managedSendModeReady ? 1u : 0u,
+        managedSendMode ? 1u : 0u);
     return 0u;
 }
 
