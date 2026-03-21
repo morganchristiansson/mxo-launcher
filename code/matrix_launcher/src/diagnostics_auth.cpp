@@ -37,6 +37,7 @@ struct DiagnosticRawMessageConnectionContext {
 };
 
 static mxo::ltlogin::CLTLoginMediator* g_DiagnosticLoginController = NULL;
+static unsigned char g_LoginControllerState9CallbackSeed85D4[16] = {0};
 static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAuthenticatePending = {};
 static mxo::ltlogin::CLTLoginState_State3 g_DiagnosticLoginStateState3 = {};
 static mxo::ltlogin::CLTLoginState_State4 g_DiagnosticLoginStateState4 = {};
@@ -751,6 +752,43 @@ void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionCo
         (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
         (unsigned)input.block04[0],
         (unsigned)input.blockA4[3]);
+}
+
+void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, void* object88, void* object8c) {
+    if (!g_DiagnosticLoginController) {
+        return;
+    }
+
+    g_DiagnosticLoginController->SetState9CallbackObjectTriple84_88_8c(callback84, object88, object8c);
+    Log(
+        "DIAGNOSTIC: mirrored state9 startup triple into CLTLoginMediator sidecar callback84=%p object88=%p object8c=%p",
+        callback84,
+        object88,
+        object8c);
+}
+
+uint32_t DiagnosticFillState9CallbackBlob18c(void* outBuffer, uint32_t arg2, uint32_t arg3) {
+    if (!g_DiagnosticLoginController || !outBuffer) {
+        return 1u;
+    }
+    return g_DiagnosticLoginController->FillState9CallbackBlob18cScaffold(
+        static_cast<uint32_t*>(outBuffer),
+        arg2,
+        arg3);
+}
+
+const void* DiagnosticGetState9CallbackSeedPointer85D4() {
+    if (!g_DiagnosticLoginController) {
+        return NULL;
+    }
+
+    std::array<uint8_t, 16> seed = {};
+    if (!g_DiagnosticLoginController->CopyMarginBootstrapTwofishKeyScaffold(&seed)) {
+        return NULL;
+    }
+
+    std::memcpy(g_LoginControllerState9CallbackSeed85D4, seed.data(), sizeof(g_LoginControllerState9CallbackSeed85D4));
+    return g_LoginControllerState9CallbackSeed85D4;
 }
 
 void DiagnosticConfigureLoginControllerSelectionSeed(

@@ -354,6 +354,21 @@ void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
     MutableMarginBootstrapState(this).state6UdpSessionSecretF18 = value;
 }
 
+bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const {
+    if (!outKey) {
+        return false;
+    }
+    outKey->fill(0u);
+
+    const auto it = g_marginBootstrapStateByMediator.find(this);
+    if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
+        return false;
+    }
+
+    std::copy_n(it->second.marginTwofishKeyBytes.begin(), 16u, outKey->begin());
+    return true;
+}
+
 void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
     // anchor: launcher.exe:0x41b450
     // Exact recovered shape from the current Ghidra pass:

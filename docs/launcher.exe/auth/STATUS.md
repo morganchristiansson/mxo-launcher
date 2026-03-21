@@ -716,29 +716,25 @@ The highest-value remaining auth-adjacent work is now:
               because callback84 is a wrapper around broader client-side mediator/global state,
               not a sealed standalone collaborator
             - backing that live runtime bridge back out restored the proven deliberate behavior
-        - current replacement status after backing that hook out again:
+        - newer replacement status now closes the old `0x41de40` blocker enough on the deliberate path:
           - encrypted margin transport still works
           - state8 raw `0x0f` still sends
           - decrypted raw `0x10` still routes through state8 slot 6
-          - state8 reply progression again completes with helper9/state9 handoff and event `0x0b`
-          - helper9/state9 slot 3 again re-hits `0x41de40` on the deliberate path
-          - the remaining `0x41de40` gap is therefore narrower than a generic null-triple story:
-            - first, reconstruct the correct launcher-owned callback84 side behind `+0x38`
-            - the host:port submit-target builder (`0x44afd0 / 0x44b0d0`) and the object88
-              direct-vs-managed split are now source-owned closely enough as branch/plan shape:
-              - `(+0x44)->(+0x30)`
-              - direct submit `+0x28`
-              - managed submit `+0x1c`, `+0x18`, `+0x24`
-            - newer natural-original + client-cross-check also makes the active object88 branch more
-              concrete:
-              - natural original takes the managed branch
-              - owner `+0x88` is the client `INetMgr.Default` wrapper global
-              - the inner submit family is now tightened by client strings/debug paths as
-                `CUDPDriver` / `JoinSession`
-            - but the live launcher-owned object88 collaborator itself is still unresolved, so the
-              current deliberate path still does **not** perform those submit calls yet
-          - only after that narrower `0x41de40` work should later raw `0x11` / state9 slot-6
-            progression be expected
+          - state8 reply progression still completes with helper9/state9 handoff and event `0x0b`
+          - launcher-side `+0x18c` callback blob fill is now source-owned/live on the active path
+            - current slot id pair + caller args
+            - one-block `AssemblyTwofish` tail transform over `[ownerF18, 0, 0, 0]`
+          - the replacement now also preserves the same-run startup `+0x124` callback/object triple
+            on the login-controller sidecar
+          - deliberate runtime now executes the real managed object88 submit branch on the active
+            existing-character path
+          - practical consequence:
+            - replacement now reaches the later state9 slot-6 raw `0x11` success side
+            - then runs `0x41b420`
+            - then switches to state `0x0c`
+            - then posts event `0x18`
+          - current next blocker therefore moves later again, into the post-state9 / state-`0x0c`
+            continuation instead of `0x41de40` itself
   - practical comparison against the natural original path:
     - this moves the replacement launcher later and closer to the natural-original shape than the
       old helper11-only stall

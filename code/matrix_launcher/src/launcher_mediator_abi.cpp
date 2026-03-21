@@ -78,7 +78,7 @@ static DiagnosticMediatorResolverNode g_DiagnosticMediatorResolver = {};
 static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
 static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
 static DiagnosticMediatorRuntimeState g_MediatorRuntimeState = {};
-static void* g_LoginMediatorVtable[96] = {0};
+static void* g_LoginMediatorVtable[104] = {0};
 static const char g_MediatorName[] = "ILTLoginMediator.Default";
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringC[] = "standalone";
@@ -687,16 +687,15 @@ extern "C" const char* Mediator_GetString1_Impl(MinimalLoginMediatorStub* self, 
 // vtable: ILTLoginMediator.Default slot +0x60
 __attribute__((naked)) static void Mediator_GetString1() {
     __asm__ volatile(
-        "push %%ebx\n\t"
-        "mov 8(%%esp), %%eax\n\t"
+        "mov 4(%%esp), %%eax\n\t"
         "push %%eax\n\t"
         "push %%ecx\n\t"
-        "call *%%ebx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
         "add $8, %%esp\n\t"
-        "pop %%ebx\n\t"
         "ret\n\t"
         :
-        : "b"(Mediator_GetString1_Impl)
+        : "i"(Mediator_GetString1_Impl)
         : "eax");
 }
 
@@ -714,16 +713,15 @@ extern "C" const char* Mediator_GetString2_Impl(MinimalLoginMediatorStub* self, 
 // vtable: ILTLoginMediator.Default slot +0x5c
 __attribute__((naked)) static void Mediator_GetString2() {
     __asm__ volatile(
-        "push %%ebx\n\t"
-        "mov 8(%%esp), %%eax\n\t"
+        "mov 4(%%esp), %%eax\n\t"
         "push %%eax\n\t"
         "push %%ecx\n\t"
-        "call *%%ebx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
         "add $8, %%esp\n\t"
-        "pop %%ebx\n\t"
         "ret\n\t"
         :
-        : "b"(Mediator_GetString2_Impl)
+        : "i"(Mediator_GetString2_Impl)
         : "eax");
 }
 
@@ -802,6 +800,17 @@ static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* se
         (unsigned)DiagnosticMediatorSelectedVariantIndexHigh8(),
         (unsigned)DiagnosticMediatorSelectedVariantState());
     return state;
+}
+
+// anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
+// Current active client-side state9 use from `0x620065e0`:
+// - returns the 16-byte source pointer then consumed with size `0x10` by `0x62530630`
+// - practical current read is the same launcher-owned Twofish key/seed family reused by `+0x18c`
+static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalLoginMediatorStub* self) {
+    (void)self;
+    const void* seedPointer = DiagnosticGetState9CallbackSeedPointer85D4();
+    Log("MediatorStub::GetState9CallbackSeedPointer85D4(+0xd4) -> %p", seedPointer);
+    return seedPointer;
 }
 
 // anchor: launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
@@ -928,18 +937,17 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
 // vtable: ILTLoginMediator.Default slot +0xec
 __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
     __asm__ volatile(
-        "push %%ebx\n\t"
-        "mov 8(%%esp), %%eax\n\t"
-        "mov 4(%%esp), %%edx\n\t"
+        "mov 4(%%esp), %%eax\n\t"
+        "mov 0(%%esp), %%edx\n\t"
         "push %%edx\n\t"
         "push %%eax\n\t"
         "push %%ecx\n\t"
-        "call *%%ebx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
         "add $12, %%esp\n\t"
-        "pop %%ebx\n\t"
         "ret $4\n\t"
         :
-        : "b"(Mediator_ConsumeSelectionContext_Impl)
+        : "i"(Mediator_ConsumeSelectionContext_Impl)
         : "eax", "edx");
 }
 
@@ -962,9 +970,19 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
         pNetShell,
         pNetMgr,
         pDistrObjExecutive);
+    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+        // Newer natural-original bounded lifecycle proof now justifies making the original
+        // `0x41f1d0` store live in the replacement path instead of keeping the startup triple only
+        // as deferred provenance:
+        // - owner `+0x84/+0x88/+0x8c` zero-init at `0x41ee60`
+        // - store at `0x41f1d0`
+        // - owner `+0x88` then stays unchanged through `0x439780 -> 0x41de40 -> 0x43c180`
+        mediator->SetState9CallbackObjectTriple84_88_8c(pNetShell, pNetMgr, pDistrObjExecutive);
+        DiagnosticMirrorState9StartupTripleIntoLoginController(pNetShell, pNetMgr, pDistrObjExecutive);
+    }
     ++g_MediatorRuntimeState.provide124Count;
     Log(
-        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p self=%p) [count=%u caller=%p]",
+        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p self=%p) [count=%u caller=%p liveState9Triple=1]",
         pNetShell,
         pNetMgr,
         pDistrObjExecutive,
@@ -979,31 +997,88 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
 
 // anchor: deeper client init hands netShell/netMgr/distrObjExecutive to arg6 +0x124
 // vtable: ILTLoginMediator.Default slot +0x124
-// Important later state9-submit caution from newer client.dll RE:
+// Important later state9-submit tightening from newer client.dll + launcher evidence:
 // - the captured `netShell` object is not a self-contained callback84-side answer source
 // - `ClientNetShell` vtable `+0x38` / `0x62006580` later re-enters the client-side resolved
 //   `ILTLoginMediator.Default` global at `0x629df7f0`, calls its `+0x18c` writer, and only then
 //   returns pair `(&DAT_629e0284, 0x20)`
-// - so keep this path as deferred provenance capture only; do not treat raw direct runtime reuse
-//   of the captured triple as a solved launcher-owned state9 reconstruction
+// - but newer bounded original-launcher lifecycle proof now also shows owner `+0x84/+0x88/+0x8c`
+//   are really zero-init -> `0x41f1d0` startup store -> later submit-side reads, with owner
+//   `+0x88` unchanged through `0x439780 -> 0x41de40 -> 0x43c180`
+// - so the live replacement path now preserves the same-run startup `+0x124` triple directly,
+//   while pairing that with a source-owned `+0x18c` implementation instead of cross-run object
+//   transplant or hardcoded callback bytes
 __attribute__((naked)) static void Mediator_ProvideStartupTriple() {
     __asm__ volatile(
-        "push %%ebx\n\t"
-        "mov 4(%%esp), %%eax\n\t"
+        "mov 0(%%esp), %%eax\n\t"
         "push %%eax\n\t"
-        "mov 20(%%esp), %%eax\n\t"
+        "mov 16(%%esp), %%eax\n\t"
         "push %%eax\n\t"
-        "mov 20(%%esp), %%eax\n\t"
+        "mov 16(%%esp), %%eax\n\t"
         "push %%eax\n\t"
-        "mov 20(%%esp), %%eax\n\t"
+        "mov 16(%%esp), %%eax\n\t"
         "push %%eax\n\t"
         "push %%ecx\n\t"
-        "call *%%ebx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
         "add $20, %%esp\n\t"
-        "pop %%ebx\n\t"
         "ret $12\n\t"
         :
-        : "b"(Mediator_ProvideStartupTriple_Impl)
+        : "i"(Mediator_ProvideStartupTriple_Impl)
+        : "eax");
+}
+
+// UNANCHORED: C helper behind the recovered +0x18c ABI wrapper.
+extern "C" uint32_t Mediator_FillState9CallbackBlob18c_Impl(
+    MinimalLoginMediatorStub* self,
+    void* outBuffer,
+    uint32_t arg2,
+    uint32_t arg3,
+    void* returnAddress) {
+    (void)self;
+    uint32_t result = 1u;
+    if (outBuffer) {
+        result = DiagnosticFillState9CallbackBlob18c(outBuffer, arg2, arg3);
+        if (result != 0u) {
+            if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+                result = mediator->FillState9CallbackBlob18cScaffold(
+                    static_cast<uint32_t*>(outBuffer),
+                    arg2,
+                    arg3);
+            }
+        }
+    }
+    Log(
+        "MediatorStub::FillState9CallbackBlob18c(+0x18c out=%p arg2=0x%08x arg3=0x%08x) -> 0x%08x [caller=%p]",
+        outBuffer,
+        (unsigned)arg2,
+        (unsigned)arg3,
+        (unsigned)result,
+        returnAddress);
+    if (result == 0u && outBuffer) {
+        LogWordBuffer("FillState9CallbackBlob18c out", outBuffer, 0x20u);
+    }
+    return result;
+}
+
+// anchor: launcher.exe:0x41e690 / arg6 vtable +0x18c
+__attribute__((naked)) static void Mediator_FillState9CallbackBlob18c() {
+    __asm__ volatile(
+        "mov 0(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "mov 16(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "mov 16(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "mov 16(%%esp), %%eax\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
+        "add $20, %%esp\n\t"
+        "ret $12\n\t"
+        :
+        : "i"(Mediator_FillState9CallbackBlob18c_Impl)
         : "eax");
 }
 
@@ -1029,18 +1104,17 @@ extern "C" void Mediator_FillLoadingCharacterState120_Impl(
 // vtable: ILTLoginMediator.Default slot +0x120
 __attribute__((naked)) static void Mediator_FillLoadingCharacterState120() {
     __asm__ volatile(
-        "push %%ebx\n\t"
-        "mov 8(%%esp), %%eax\n\t"
-        "mov 4(%%esp), %%edx\n\t"
+        "mov 4(%%esp), %%eax\n\t"
+        "mov 0(%%esp), %%edx\n\t"
         "push %%edx\n\t"
         "push %%eax\n\t"
         "push %%ecx\n\t"
-        "call *%%ebx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
         "add $12, %%esp\n\t"
-        "pop %%ebx\n\t"
         "ret $4\n\t"
         :
-        : "b"(Mediator_FillLoadingCharacterState120_Impl)
+        : "i"(Mediator_FillLoadingCharacterState120_Impl)
         : "eax", "edx");
 }
 
@@ -1089,18 +1163,17 @@ extern "C" void Mediator_AttachStartupContext_Impl(
 // vtable: ILTLoginMediator.Default slot +0x170
 __attribute__((naked)) static void Mediator_AttachStartupContext() {
     __asm__ volatile(
-        "push %%ebx\n\t"
-        "mov 8(%%esp), %%eax\n\t"
-        "mov 4(%%esp), %%edx\n\t"
+        "mov 4(%%esp), %%eax\n\t"
+        "mov 0(%%esp), %%edx\n\t"
         "push %%edx\n\t"
         "push %%eax\n\t"
         "push %%ecx\n\t"
-        "call *%%ebx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
         "add $12, %%esp\n\t"
-        "pop %%ebx\n\t"
         "ret $4\n\t"
         :
-        : "b"(Mediator_AttachStartupContext_Impl)
+        : "i"(Mediator_AttachStartupContext_Impl)
         : "eax", "edx");
 }
 
@@ -1197,6 +1270,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[22] = (void*)Mediator_GetString0;      // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetString2;      // +0x5c
     g_LoginMediatorVtable[24] = (void*)Mediator_GetString1;      // +0x60
+    g_LoginMediatorVtable[53] = (void*)Mediator_GetState9CallbackSeedPointer85D4; // +0xd4
     g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7SelectionUpperBoundExclusive; // +0xd8
     g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc
     g_LoginMediatorVtable[56] = (void*)Mediator_GetVariantWorldName; // +0xe0
@@ -1216,23 +1290,16 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[92] = (void*)Mediator_AttachStartupContext; // +0x170
     g_LoginMediatorVtable[93] = (void*)Mediator_AttachRuntimeObject; // +0x174
     g_LoginMediatorVtable[94] = (void*)Mediator_ConsumeRuntimeDescriptor; // +0x178
-    // Not yet source-owned/live here:
+    g_LoginMediatorVtable[99] = (void*)Mediator_FillState9CallbackBlob18c; // +0x18c
+    // New active late-login state9 result:
     // - original mediator vtable `+0x18c` = `0x41e690 = CLTLoginMediator_FillState9CallbackBlob18c`
-    // - current best read: state9-gated fixed `0x20`-byte callback blob builder used indirectly by
-    //   `client.dll:0x62006580` (`ClientNetShell +0x38`) behind launcher state9 submit
-    // - the first 16 bytes are straightforward:
-    //   current slot id low/high, then caller args
-    // - the second 16 bytes are **not** just a blind copy:
-    //   `0x41e690` seeds blob `+0x10` from owner `+0xf18`, then passes the whole `+0x10..+0x1f`
-    //   region through the shared `0x41df60 / 0x44b190` FeedbackSize transform family in place
-    //   using source material from mediator `+0xd4 = 0x41b4f0 -> owner +0x1c + 0x85`
-    // - that helper family also appears in `AuthBootstrap680_SendAuthRequest`, plus the bootstrap
-    //   `0x41470 / 0x4429b0` challenge-material path, so treat it as shared transform/parameter
-    //   machinery, not a state9-only byte copier
-    // - current go/no-go decision remains **no live +0x18c entry yet**:
-    //   owner `+0xf18` now does have an isolated non-init writer (`0x00440780` / state6 opcode-`9`
-    //   success), but the shared `+0x85/+0xf8/+0xa8` family is still not source-owned tightly
-    //   enough to fake the broader callback84-side path faithfully
+    // - current source-owned replacement now mirrors the state9 gate and fixed 0x20-byte layout
+    // - newer runtime + static proof closes the tail transform enough for a live implementation:
+    //   - string anchor `AssemblyTwofish`
+    //   - parameter names `IV` + `FeedbackSize`
+    //   - zero-IV source at `0x4d4d50`
+    //   - two natural-original samples matched exactly under a one-block Twofish transform of
+    //     input `[ownerF18, 0, 0, 0]` keyed by the current margin bootstrap 16-byte key
 
     ResetMediatorObjectState();
 }

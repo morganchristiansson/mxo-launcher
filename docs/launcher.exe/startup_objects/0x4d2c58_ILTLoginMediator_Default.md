@@ -25,6 +25,7 @@ Current replacement-launcher source split:
   - `matrixstaging/game/src/libltclientlogin/loginmediator_arg6.cpp`
 - focused late-login/state9 surface now lives under:
   - `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
+  - `matrixstaging/game/src/libltclientlogin/loginmediator_state9_submit_scaffold.h`
 - the replacement `ILTLoginMediator.Default` ABI/vtable shell now lives in `src/launcher_mediator_abi.cpp`
 - diagnostics-only window tracing remains in `src/diagnostics.cpp`
 
@@ -254,6 +255,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x58` | string-producing helper in early init logging/config path | medium |
 | `+0x5c` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
 | `+0x60` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
+| `+0xd4` | state9 follow-on client path (`0x620065e0`) fetches a 16-byte pointer here, then packages it through `0x62530630`; current best read = same launcher-owned Twofish seed/key family reused by state9 callback/blob work | medium |
 | `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
 | `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
@@ -264,7 +266,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x170` | consumes client startup context object in deeper init | medium |
 | `+0x174` | accepts runtime object handles in later setup paths | medium |
 | `+0x178` | consumes runtime descriptor object in later setup paths | medium |
-| `+0x18c` | later callback84-side writer queried indirectly through `ClientNetShell +0x38`; fills client scratch buffer later surfaced as pair `(&0x629e0284, 0x20)` | medium |
+| `+0x18c` | later callback84-side writer queried indirectly through `ClientNetShell +0x38`; fills client scratch buffer later surfaced as pair `(&0x629e0284, 0x20)`; active replacement now source-owns the state9-gated blob fill closely enough to run it live | high |
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
 
@@ -354,14 +356,22 @@ Current best read of `0x41e690`:
   - out `+0x0c` = arg3 (`0` on that path)
 - seeds the second half with one more owner field before the transform step:
   - out `+0x10` = owner dword `+0xf18`
-  - newer init-side tightening now shows owner `+0xf18` is zero-initialized in
-    `0x41ee60`, and no simple direct writer for that field has been isolated yet
+  - current provenance answer for that field is now materially tighter:
+    - `0x41ee60` zero-initializes owner `+0xf18`
+    - `0x440780 = CLTLoginState_State6_Slot6_HandleMarginOpcode7Or9Reply` is the concrete
+      non-init writer on opcode-`9` success
+    - current best cross-checked read there is:
+      owner `+0xf18` = opcode-`9` `UDPSessionSecret` / session-id dword
 - then materializes the trailing 16-byte half of the blob in place from a current
   margin-connection-side source:
   - mediator vtable `+0xd4` = `0x41b4f0 = CLTLoginMediator_GetMarginConnectionField85D4`
   - that tiny getter returns `owner + 0x1c + 0x85`
-  - `0x41df60` / `0x44b190` then use that source, together with the property string
-    `"FeedbackSize"`, to populate the trailing 16-byte region in place
+  - `0x41df60 = FeedbackSizeTransformAdapter_ConstructSmall` builds a small
+    `FeedbackSize` transform adapter around that source
+  - `0x44b190 = FeedbackSizeTransformAdapter_InvokeConfigure40` dispatches the adapter's
+    configure call
+  - `0x44b570 = FeedbackSizeTransformAdapter_TransformBuffer` then transforms one 16-byte block
+    in place
   - newer cross-use tightening matters here too:
     - the same helper family is reused by `AuthBootstrap680_SendAuthRequest`
     - neighboring helper vtables carry literals like `"ValueNames"` and `"EMSA-PKCS1-v1_5"`
@@ -377,26 +387,43 @@ So the callback84 pair is now tighter than just “some opaque scratch bytes”:
   - caller args
   - current margin-connection-side trailing material rooted at `owner +0x1c + 0x85`
 
+A separate launcher-side lifecycle answer is now tighter too:
+
+- within the bounded active mediator/state9 scope,
+  - `0x41ee60` zero-initializes owner `+0x84/+0x88/+0x8c`
+  - `0x41f1d0` is the concrete non-init triple store from `+0x124(netShell, netMgr, distrObjExecutive)`
+  - later active-path `0x41de40` only reads owner `+0x88`
+- no later launcher-side write to owner `+0x88` is isolated yet in that bounded active scope
+- practical current read therefore stays:
+  preserve the startup-provided netMgr wrapper provenance instead of assuming a later launcher-owned
+  rewrite of object88 without new proof
+
 Practical consequences:
 
 1. callback84 `+0x38` is **not** self-contained on the captured `netShell` object
 2. it depends on the client-side resolved mediator global at `0x629df7f0`
-3. it also depends on a later arg6 vtable slot `+0x18c` that our current launcher-side ABI/source
-   does not yet own
-4. the pair returned to launcher state9 submit is now concretely narrowed as:
+3. the pair returned to launcher state9 submit is concretely narrowed as:
    - first dword = pointer to client scratch buffer `0x629e0284`
    - second dword = fixed exposed length `0x20`
-5. the blob content itself is now materially tighter too:
+4. the blob content itself is materially tighter too:
    - first half = current slot id pair + caller args `(900, 0)`
    - second half starts from owner `+0xf18`
    - and its tail is materialized through shared `ValueNames` / `FeedbackSize` transform helpers
      fed from mediator `+0xd4 -> owner +0x1c + 0x85`
-6. a second launcher-side getter now also corroborates that `+0x85` family outside the immediate
+5. a second launcher-side getter now also corroborates that `+0x85` family outside the immediate
    state9 path:
    - `0x41f3a0` returns `owner + 0x680 -> +0xf4 + 0x85` when present, else static fallback
    - companion getter `0x41f3c0` returns that same object's `+0xf8`
    - practical consequence: the `+0x85` field family now looks shared/reusable, not unique to one
      state9-only object shape
+6. newer active replacement progress now closes the go/no-go question on live `+0x18c` enough for
+   the current state9 path:
+   - string anchor `AssemblyTwofish`
+   - parameter names `IV` + `FeedbackSize`
+   - zero-IV storage at `0x4d4d50`
+   - two natural-original samples matched exactly under a one-block Twofish transform of
+     `[ownerF18, 0, 0, 0]`
+   - the replacement now uses that live `+0x18c` path on the deliberate runtime branch
 
 This is the strongest current static explanation for the crashdump-backed result that raw direct reuse
 of the captured `+0x124` objects regressed the deliberate launcher run: callback84 is a wrapper around
