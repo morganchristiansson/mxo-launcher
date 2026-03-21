@@ -147,7 +147,7 @@ make run
 Current deliberate binder runtime path:
 ```bash
 cd /home/morgan/mxo/code/matrix_launcher
-MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both_runtime
+MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both_runtime
 ```
 
 ## Immediate next task

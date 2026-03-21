@@ -98,21 +98,27 @@ It also now consumes known launcher-only switches like:
 
 instead of forwarding them blindly into `InitClientDLL`.
 
-Optional diagnostic arg7/arg8 overrides for post-`IsReady()` experiments:
+Current live existing-character runtime path on the bounded `Reality` path is:
 
 ```bash
-MXO_ARG7_SELECTION=0x01000000 MXO_ARG8_FLAG=0 make run_stub_both
-```
-
-You can also mirror the original launcher split fields directly:
-
-```bash
-MXO_CLAUNCHER_A8=1 MXO_CLAUNCHER_AC=0 make run_stub_both
+MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both_runtime
 ```
 
 `resurrections.exe` now rebuilds arg7 the same way the original launcher does:
 - high 8 bits from `CLauncher+0xa8`
 - low 24 bits from `CLauncher+0xac`
+
+Current replacement status for the first live world path:
+- when the selected world name resolves to `Reality`, the launcher seeds recovered launcher-side
+  arg7 defaults (`0x0500002a`) from that world selection
+- `MXO_CLAUNCHER_A8` and `MXO_CLAUNCHER_AC` remain available only as split-field diagnostic
+  overrides
+
+Optional split-field arg7/arg8 diagnostics for post-`IsReady()` experiments:
+
+```bash
+MXO_CLAUNCHER_A8=1 MXO_CLAUNCHER_AC=0 MXO_ARG8_FLAG=0 make run_stub_both
+```
 
 Optional mediator selection name override:
 

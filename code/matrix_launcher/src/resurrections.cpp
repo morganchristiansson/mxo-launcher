@@ -126,6 +126,25 @@ static bool g_LauncherGlobal4D2C64 = false;     // original options.cfg/autodete
 static DWORD g_AutodetectExitCode = 0;
 static void* g_pClientDBFromCallback = NULL;
 
+static const char* kLauncherRegistryKeyPath = "Software\\Monolith Productions\\The Matrix Online\\";
+
+struct RecoveredLauncherSelectionRecord {
+    const char* worldName;
+    const char* routeHostPrefix;
+    uint32_t worldIndexLow24;
+    uint32_t variantIndexHigh8;
+    uint32_t worldType;
+    uint32_t variantState;
+};
+
+static const RecoveredLauncherSelectionRecord kRecoveredLauncherSelectionRecords[] = {
+    // Current live bounded-evidence entry for the first in-game replacement path:
+    // - selection name = Reality
+    // - arg7 packed selection = 0x0500002a
+    // - default route host prefix = reality
+    {"Reality", "reality", 0x00002au, 0x05u, 1u, 0u},
+};
+
 struct DiagnosticPreclientEnvironmentState {
     HANDLE threadHandle;
     DWORD threadId;
@@ -993,7 +1012,7 @@ static bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
     HKEY key = NULL;
     LONG openResult = RegOpenKeyExA(
         HKEY_LOCAL_MACHINE,
-        "Software\\Monolith Productions\\The Matrix Online\\",
+        kLauncherRegistryKeyPath,
         0,
         KEY_QUERY_VALUE,
         &key);
@@ -1020,6 +1039,98 @@ static bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
     out[outSize - 1] = '\0';
     Log("DIAGNOSTIC: loaded HKLM Last_WorldName='%s'", out);
     return out[0] != '\0';
+}
+
+static bool StoreLastWorldNameInRegistry(const char* worldName) {
+    if (!worldName || !worldName[0]) return false;
+
+    HKEY key = NULL;
+    DWORD disposition = 0;
+    LONG createResult = RegCreateKeyExA(
+        HKEY_LOCAL_MACHINE,
+        kLauncherRegistryKeyPath,
+        0,
+        NULL,
+        0,
+        KEY_SET_VALUE,
+        NULL,
+        &key,
+        &disposition);
+    if (createResult != ERROR_SUCCESS) {
+        spdlog::warn("DIAGNOSTIC: HKLM Last_WorldName key create/open for write failed ({})", (long)createResult);
+        return false;
+    }
+
+    const size_t byteCount = std::strlen(worldName) + 1;
+    LONG setResult = RegSetValueExA(
+        key,
+        "Last_WorldName",
+        0,
+        REG_SZ,
+        reinterpret_cast<const BYTE*>(worldName),
+        static_cast<DWORD>(byteCount));
+    RegCloseKey(key);
+    if (setResult != ERROR_SUCCESS) {
+        spdlog::warn("DIAGNOSTIC: HKLM Last_WorldName write failed ({})", (long)setResult);
+        return false;
+    }
+
+    spdlog::info(
+        "DIAGNOSTIC: persisted HKLM Last_WorldName='{}'{}",
+        worldName,
+        (disposition == REG_CREATED_NEW_KEY) ? " (created key)" : "");
+    return true;
+}
+
+static void CanonicalizeLauncherSelectionLookupName(char* destination, size_t destinationSize, const char* source) {
+    if (!destination || destinationSize == 0) return;
+    destination[0] = '\0';
+    if (!source) return;
+
+    while (*source == ' ' || *source == '\t' || *source == '\r' || *source == '\n') {
+        ++source;
+    }
+
+    size_t sourceLength = std::strlen(source);
+    while (sourceLength > 0) {
+        const char c = source[sourceLength - 1];
+        if (c != ' ' && c != '\t' && c != '\r' && c != '\n') break;
+        --sourceLength;
+    }
+
+    char trimmed[128] = {0};
+    const size_t copyLength = (sourceLength < sizeof(trimmed) - 1) ? sourceLength : (sizeof(trimmed) - 1);
+    if (copyLength != 0) {
+        std::memcpy(trimmed, source, copyLength);
+        trimmed[copyLength] = '\0';
+    }
+    LowercaseAsciiCopy(destination, destinationSize, trimmed);
+}
+
+static const RecoveredLauncherSelectionRecord* FindRecoveredLauncherSelectionRecord(const char* worldName) {
+    if (!worldName || !worldName[0]) return NULL;
+
+    char normalizedInput[128] = {0};
+    CanonicalizeLauncherSelectionLookupName(normalizedInput, sizeof(normalizedInput), worldName);
+    if (!normalizedInput[0]) return NULL;
+
+    for (size_t i = 0; i < sizeof(kRecoveredLauncherSelectionRecords) / sizeof(kRecoveredLauncherSelectionRecords[0]); ++i) {
+        const RecoveredLauncherSelectionRecord& record = kRecoveredLauncherSelectionRecords[i];
+
+        char normalizedRecordWorld[128] = {0};
+        CanonicalizeLauncherSelectionLookupName(normalizedRecordWorld, sizeof(normalizedRecordWorld), record.worldName);
+        if (normalizedRecordWorld[0] && std::strcmp(normalizedRecordWorld, normalizedInput) == 0) {
+            return &record;
+        }
+
+        char normalizedRoutePrefix[128] = {0};
+        CanonicalizeLauncherSelectionLookupName(normalizedRoutePrefix, sizeof(normalizedRoutePrefix), record.routeHostPrefix);
+        if (normalizedRoutePrefix[0] && std::strcmp(normalizedRoutePrefix, normalizedInput) == 0) {
+            return &record;
+        }
+    }
+
+    return NULL;
 }
 
 static uint32_t BuildPackedArg7Selection() {
@@ -1291,20 +1402,39 @@ int main(int argc, char* argv[]) {
         std::strcpy(mediatorSelectionName, "standalone");
     }
 
-    uint32_t packedArg7Override = 0;
-    if (EnvUint32Value("MXO_ARG7_SELECTION", &packedArg7Override)) {
-        g_CLauncherFieldA8 = (packedArg7Override >> 24) & 0xffu;
-        g_CLauncherFieldAC = packedArg7Override & 0x00ffffffu;
-        Log(
-            "DIAGNOSTIC: overridden arg7 packed selection from env = 0x%08x -> a8=0x%08x ac=0x%08x",
-            packedArg7Override,
+    const RecoveredLauncherSelectionRecord* recoveredSelection =
+        FindRecoveredLauncherSelectionRecord(mediatorSelectionName);
+    if (recoveredSelection) {
+        std::strncpy(mediatorSelectionName, recoveredSelection->worldName, sizeof(mediatorSelectionName) - 1);
+        mediatorSelectionName[sizeof(mediatorSelectionName) - 1] = '\0';
+        g_CLauncherFieldA8 = recoveredSelection->variantIndexHigh8;
+        g_CLauncherFieldAC = recoveredSelection->worldIndexLow24;
+        spdlog::info(
+            "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} worldType={} variantState={} routePrefix='{}'",
+            recoveredSelection->worldName,
             g_CLauncherFieldA8,
-            g_CLauncherFieldAC);
+            g_CLauncherFieldAC,
+            BuildPackedArg7Selection(),
+            (unsigned)recoveredSelection->worldType,
+            (unsigned)recoveredSelection->variantState,
+            recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
+    } else if (mediatorSelectionName[0] && lstrcmpiA(mediatorSelectionName, "standalone") != 0) {
+        spdlog::warn(
+            "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields unless split-field env overrides are provided",
+            mediatorSelectionName);
     }
-    if (EnvUint32Value("MXO_CLAUNCHER_A8", &g_CLauncherFieldA8)) {
+
+    uint32_t envLauncherFieldA8 = 0;
+    const bool launcherFieldA8Overridden = EnvUint32Value("MXO_CLAUNCHER_A8", &envLauncherFieldA8);
+    if (launcherFieldA8Overridden) {
+        g_CLauncherFieldA8 = envLauncherFieldA8;
         Log("DIAGNOSTIC: overridden CLauncher+0xa8 from env = 0x%08x", g_CLauncherFieldA8);
     }
-    if (EnvUint32Value("MXO_CLAUNCHER_AC", &g_CLauncherFieldAC)) {
+
+    uint32_t envLauncherFieldAC = 0;
+    const bool launcherFieldACOverridden = EnvUint32Value("MXO_CLAUNCHER_AC", &envLauncherFieldAC);
+    if (launcherFieldACOverridden) {
+        g_CLauncherFieldAC = envLauncherFieldAC;
         Log("DIAGNOSTIC: overridden CLauncher+0xac from env = 0x%08x", g_CLauncherFieldAC);
     }
     g_PackedArg7Selection = BuildPackedArg7Selection();
@@ -1315,11 +1445,11 @@ int main(int argc, char* argv[]) {
         Log("DIAGNOSTIC: overridden arg8 flag from env = 0x%08x", g_FlagByte);
     }
 
-    uint32_t mediatorSelectedWorldType = 1;
+    uint32_t mediatorSelectedWorldType = recoveredSelection ? recoveredSelection->worldType : 1u;
     if (EnvUint32Value("MXO_MEDIATOR_WORLD_TYPE", &mediatorSelectedWorldType)) {
         Log("DIAGNOSTIC: mediator selected-world type overridden from env = %u", (unsigned)mediatorSelectedWorldType);
     }
-    uint32_t mediatorSelectedVariantState = 0;
+    uint32_t mediatorSelectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
     if (EnvUint32Value("MXO_MEDIATOR_VARIANT_STATE", &mediatorSelectedVariantState)) {
         Log("DIAGNOSTIC: mediator selected-variant state overridden from env = %u", (unsigned)mediatorSelectedVariantState);
     }
@@ -1421,6 +1551,7 @@ int main(int argc, char* argv[]) {
             if (resolvedWorldName[0]) {
                 std::strncpy(g_LastWorldName, resolvedWorldName, sizeof(g_LastWorldName) - 1);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
+                StoreLastWorldNameInRegistry(g_LastWorldName);
             }
             Log(
                 "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x%08x ac=0x%08x packed=0x%08x world='%s'",
@@ -1456,7 +1587,16 @@ int main(int argc, char* argv[]) {
 
         char marginRoutePrefix[256] = {0};
         if (!EnvStringValue("MXO_MARGIN_ROUTE_PREFIX", marginRoutePrefix, sizeof(marginRoutePrefix))) {
-            LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), mediatorSelectionName);
+            if (recoveredSelection && recoveredSelection->routeHostPrefix && recoveredSelection->routeHostPrefix[0]) {
+                std::strncpy(marginRoutePrefix, recoveredSelection->routeHostPrefix, sizeof(marginRoutePrefix) - 1);
+                marginRoutePrefix[sizeof(marginRoutePrefix) - 1] = '\0';
+                spdlog::info(
+                    "DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'",
+                    marginRoutePrefix,
+                    recoveredSelection->worldName);
+            } else {
+                LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), mediatorSelectionName);
+            }
         }
 
         char exactMarginHostName[256] = {0};
