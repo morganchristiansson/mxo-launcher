@@ -63,7 +63,7 @@ Current source stance:
 - deeper old/new helper notification slots stay explicit/unresolved
 
 Source home:
-- `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
 
 ### `0x41cfb0 = CLTLoginMediator_PostEvent`
 Current best read:
@@ -73,13 +73,33 @@ Current best read:
 - natural path is now live-proven at least for:
   - event `0x18`
   - later event `0x0f`
+- practical immediate-continuation consequence is now tighter:
+  - `0x43c180` returns only after the synchronous listener walk inside `0x41cfb0(0x18)`
+  - so the immediate next path is best treated as observer/listener work first, not as an already
+    proven direct fall into `0x004397e0` / `0x0041c5c0`
 
 Current source stance:
 - event history and the narrow helper9 bridge are source-owned
 - the listener tree itself is still unresolved
 
 Source home:
-- `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
+
+### strongest current later `0x0f` bridge candidate
+Current best static chain:
+- `0x41b420` sets owner byte `+0x2d = 1`
+- shared gate `0x438df0` posts event `0x0f` when owner `+0x2d != 0`
+- static `CLTEvilBlockingLoginObserver::WaitForEvent` callers currently prove waits for events:
+  - `1`
+  - `8`
+  - `0x0f`
+- no static waiter is isolated yet for event `0x18`
+
+Practical consequence:
+- treat event `0x18` as the listener/observer handoff boundary
+- treat shared gate `0x438df0` as the strongest current later-source candidate for the natural
+  `0x41cfb0(0x0f)` tail
+- do **not** claim that as a fully proven immediate next call without a live late pass
 
 ### state `0x0c` / state12 final leaf
 Strongest current identity lead:
@@ -115,9 +135,9 @@ Most likely missing concrete work now lives in one of these areas:
 
 - `matrixstaging/game/src/libltclientlogin/loginstate_state9.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
+- `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginmediator_state9_submit_scaffold.h`
 - `matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp`
-- `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
 - `../../docs/launcher.exe/VTABLES/0x004b517c.md`
 - `../../docs/launcher.exe/VTABLES/0x004b5230.md`
 

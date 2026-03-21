@@ -67,10 +67,13 @@ Source of truth:
 - `matrixstaging/game/src/libltclientlogin/loginstate_state9.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
+- `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginmediator_state9_submit_scaffold.h`
-- `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
 - `src/launcher_mediator_state9_abi.cpp`
 - `src/launcher_mediator_abi.cpp`
+
+Open the broader `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` only when the late
+post-state9/event work forces a step back into shared mediator transport or auth/bootstrap code.
 
 ## Keep separate from the next post-state9 session unless needed
 
