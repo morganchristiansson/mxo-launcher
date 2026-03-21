@@ -148,14 +148,23 @@ Current unresolved inputs remain, but the active login-side blocker has narrowed
   - a narrow source-owned continuation bridge now also re-enters helper9/state9 slot 3 on that
     proven handoff
   - the immediate blocker has therefore tightened again:
-    - current deliberate state9 reached `0x41de40`-owned submit scaffolding on the proven run
+    - current deliberate state9 still reaches `0x41de40`-owned submit scaffolding on the proven run
     - the origin of the owner collaborator triple is now narrowed/source-owned:
       owner/arg6 vtable `+0x124(netShell, netMgr, distrObjExecutive)` -> `0x41f1d0`
       -> owner `+0x84/+0x88/+0x8c`
-    - so the next active blocker is no longer the generic origin of that triple; it is the deeper
-      `0x41de40` collaborator execution (`+0x84 -> +0x38`, `+0x88 -> (+0x44)->(+0x30)`,
-      `0x44afd0/0x44b0d0`, then the real submit calls) before later raw `0x11` / state9 slot-6
-      progression can be expected
+    - but keep one corrective runtime note explicit:
+      attempting to mirror that arg6 `+0x124` triple directly into the live replacement runtime path
+      regressed the deliberate binder run, so that bridge was backed back out
+    - newer crashdump proof now narrows that failed bridge further:
+      `MatrixOnline_0.0_crash_69.dmp` stops on the replacement `0x41de40` mirror at the first
+      callback84-side `+0x38` query, before any later object88 branch work runs
+    - newer client-side static tightening now also explains why that direct reuse is too weak:
+      callback84 currently resolves to `ClientNetShell +0x38 / 0x62006580`, and that wrapper
+      re-enters the client-side resolved `ILTLoginMediator.Default` global `0x629df7f0`, then
+      calls its `+0x18c(&0x629e0284, 900, 0)` writer before returning pair `(&0x629e0284, 0x20)`
+    - so the next active blocker remains the deeper `0x41de40` collaborator execution, with the
+      callback84 side now the first concrete subtarget before `+0x88 -> (+0x44)->(+0x30)` and the
+      later `0x44afd0/0x44b0d0` / submit-call work
 - keep two distinct truths explicit:
   - **original launcher live boundary now crossed**: natural original reaches the state8 send tail,
     `0x43f930`, `0x439780`, `0x41de40`, `0x43c180`, then `0x41b450(0x0c)`, `0x41cfb0(0x18)`, and
@@ -348,6 +357,20 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
    - source-own more of `0x41de40 = CLTLoginMediator_State9SubmitFollowup`
    - keep the now-identified owner collaborator origin explicit:
      owner/arg6 `+0x124(netShell, netMgr, distrObjExecutive)` -> `0x41f1d0` -> `+0x84/+0x88/+0x8c`
+   - do **not** force that arg6 `+0x124` triple directly into the live replacement runtime path
+     again until the deliberate state8/state9 path is locked back down
+   - use the new crashdump-backed narrowing to order the work inside `0x41de40`:
+     callback84 `+0x38` first, then only later object88 `(+0x44)->(+0x30)` / submit-path work
+   - callback84-first now specifically means:
+     `ClientNetShell +0x38 / 0x62006580 -> client resolved ILTLoginMediator.Default 0x629df7f0 -> +0x18c(&0x629e0284, 900, 0) -> pair (&0x629e0284, 0x20)`
+   - launcher-side `+0x18c` is now also narrowed:
+     `0x41e690 = CLTLoginMediator_FillState9CallbackBlob18c`
+     - state9-gated
+     - fills fixed `0x20` bytes
+     - first half = current slot id low/high + caller args
+     - blob `+0x10` also copies owner `+0xf18`
+     - tail is materialized through the shared `ValueNames` / `FeedbackSize` helper family from
+       mediator `+0xd4 = 0x41b4f0 -> owner +0x1c + 0x85`
    - tighten the remaining `0x41de40` gap on the deeper collaborator execution / submit path,
      not on generic placeholder stuffing
    - only then expect later raw `0x11` / state9 slot-6 progression

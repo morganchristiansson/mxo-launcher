@@ -357,6 +357,30 @@ static bool TryState9Callback84FillPair(void* callback84, uint32_t* outLow, uint
         return false;
     }
 
+    // New client-side callback84 tightening from `client.dll`:
+    // - the transplanted callback84 object currently resolves to the `ClientNetShell` family
+    // - its vtable `+0x38` callee is `client.dll:0x62006580`
+    // - that method is **not** self-contained on the callback object itself
+    // - it first checks the client-side resolved `ILTLoginMediator.Default` global at `0x629df7f0`
+    //   through vtable `+0x10`
+    // - then it calls that global's vtable `+0x18c(&DAT_629e0284, 900, 0)`
+    //   - launcher-side implementation of that slot is now tightened too:
+    //     `CLTLoginMediator_FillState9CallbackBlob18c` / `0x41e690`
+    //   - it is state9-gated and fills a fixed `0x20`-byte blob from:
+    //     - current slot id low/high
+    //     - caller args
+    //     - owner dword `+0xf18` copied into blob `+0x10`
+    //     - trailing material rooted at mediator `+0xd4 = 0x41b4f0 -> owner +0x1c + 0x85`
+    //   - the helper family used to materialize that tail (`0x41df60 / 0x44b190`) is not unique
+    //     to state9; the same family is also reused by `AuthBootstrap680_SendAuthRequest`
+    //     and carries string-backed `ValueNames` / `FeedbackSize` parameters, so current best
+    //     read is a shared Crypto++-style parameterized transform wrapper rather than ad-hoc
+    //     state9-only launcher glue
+    // - only after that does it return the pair `(&DAT_629e0284, 0x20)`
+    // Practical consequence for launcher-side state9 work:
+    // direct raw reuse of the captured `+0x124` callback84 object is insufficient by itself;
+    // the real dependency chain also includes the client-side binder-managed mediator/global state
+    // behind `0x629df7f0` and its later `+0x18c` writer.
     void** vtable = *reinterpret_cast<void***>(callback84);
     if (!vtable || !vtable[14]) {
         return false;
@@ -400,6 +424,15 @@ static bool TryState9Object88QueryManagedSendMode(void* object88, bool* outManag
     }
     return true;
 }
+
+struct DeferredState9CallbackTripleScaffold {
+    void* callback84 = nullptr;
+    void* object88 = nullptr;
+    void* object8c = nullptr;
+    bool valid = false;
+};
+
+static DeferredState9CallbackTripleScaffold g_deferredState9CallbackTripleScaffold;
 
 }  // namespace
 
@@ -641,6 +674,23 @@ void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, v
         fmt::ptr(ownerCallback84_),
         fmt::ptr(ownerObject88_),
         fmt::ptr(ownerObject8c_));
+}
+
+void CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold(
+    void* callback84,
+    void* object88,
+    void* object8c) {
+    g_deferredState9CallbackTripleScaffold.callback84 = callback84;
+    g_deferredState9CallbackTripleScaffold.object88 = object88;
+    g_deferredState9CallbackTripleScaffold.object8c = object8c;
+    g_deferredState9CallbackTripleScaffold.valid =
+        callback84 != nullptr || object88 != nullptr || object8c != nullptr;
+    spdlog::info(
+        "CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold callback84={} object88={} object8c={} valid={} (captured from owner/arg6 vtable +0x124 without touching live state yet)",
+        fmt::ptr(callback84),
+        fmt::ptr(object88),
+        fmt::ptr(object8c),
+        g_deferredState9CallbackTripleScaffold.valid ? 1u : 0u);
 }
 
 CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
@@ -1303,9 +1353,26 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     // - owner dword `+0x147c` caches the acquired handle on the managed-send branch
     //
     // Current source-owned tightening deliberately stops one step short of a fake submit:
-    // - it now samples the real collaborator query steps that are cheap and evidence-backed
-    //   (`+0x84 -> vtable +0x38`, `+0x88 -> (+0x44)->(+0x30)`) when the captured startup triple is live
-    // - but it still does not claim the deeper `0x44afd0/0x44b0d0` packet-like payload builder or
+    // - it can remember the client-side arg6 `+0x124` startup triple as a possible provenance clue
+    // - but direct replacement-side reuse of that captured triple is now crash-proven unsafe:
+    //   crashdump `MatrixOnline_0.0_crash_69.dmp` stopped at `0x4230dd -> callback84 vtable +0x38`
+    //   with top frame `client:0x629ddfc8`, before any later object88 `(+0x44)->(+0x30)` work ran
+    // - newer client-side static tightening now also explains *why* that direct reuse is too weak:
+    //   - callback84 currently resolves to `ClientNetShell` vtable `+0x38` / `client.dll:0x62006580`
+    //   - that wrapper does not answer from object-local state alone
+    //   - it checks client global `0x629df7f0 = resolved ILTLoginMediator.Default`
+    //   - then calls global vtable `+0x18c(&DAT_629e0284, 900, 0)`
+    //     - launcher-side `+0x18c` is now tightened as `0x41e690`
+    //     - that slot is state9-gated and fills a fixed `0x20`-byte callback blob from the
+    //       current slot id pair, caller args, owner `+0xf18`, and trailing material sourced via
+    //       mediator `+0xd4 = 0x41b4f0 -> owner +0x1c + 0x85`
+    //     - current best tail-side read is slightly stronger too:
+    //       `0x41df60 / 0x44b190` is part of a shared `ValueNames` / `FeedbackSize`
+    //       parameterized transform family also reused by `AuthBootstrap680_SendAuthRequest`
+    //   - and only then returns pair `(&DAT_629e0284, 0x20)` to the launcher-side submit path
+    // - practical consequence: the active state9 problem is not just “fill nulls”; it is to
+    //   reconstruct the correct launcher-owned collaborator/wrapper state behind `0x41de40`
+    // - and it still does not claim the deeper `0x44afd0/0x44b0d0` packet-like payload builder or
     //   the final `+0x28 / +0x18 / +0x24` submit calls are reconstructed yet
     // Returning `0` still preserves the observed `0x439780` success-side event-post shape
     // (`< 1` => post event `0x17`) while narrowing the remaining blocker beyond mere null collaborators.

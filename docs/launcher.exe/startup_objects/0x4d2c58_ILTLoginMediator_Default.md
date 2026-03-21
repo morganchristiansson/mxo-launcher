@@ -259,6 +259,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x170` | consumes client startup context object in deeper init | medium |
 | `+0x174` | accepts runtime object handles in later setup paths | medium |
 | `+0x178` | consumes runtime descriptor object in later setup paths | medium |
+| `+0x18c` | later callback84-side writer queried indirectly through `ClientNetShell +0x38`; fills client scratch buffer later surfaced as pair `(&0x629e0284, 0x20)` | medium |
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
 
@@ -278,6 +279,123 @@ Current practical note on `+0x120`:
   - static runtime loop at `0x62006cb1..0x62006cca` calls `arg6->+0x2c`, tests `al`, and only then feeds stored arg5 into `0x62532130`
   - current runtime logs show repeated `MediatorStub::IsConnected() -> 1` traffic on that loop
   - so `+0x2c` is now high-confidence live on the `RunClientDLL` path as a repeated runtime gate before arg5-owned work
+
+## New callback84 / state9 submit consequence from client.dll
+
+Newer client-side static tightening now gives a concrete reason why direct reuse of the captured
+`+0x124(netShell, netMgr, distrObjExecutive)` triple is still insufficient for the launcher-side
+state9 submit path.
+
+### Client-side binder/global proof
+
+`client.dll` keeps its own binder-managed resolved mediator slot:
+
+- interface string: `"ILTLoginMediator.Default"`
+- output slot: `0x629df7f0`
+- static init around `0x627c3bd0` mirrors the launcher-side binder pattern and zeroes that slot
+  before later registry/service resolution populates it
+
+Representative static-init bytes there are now best read as:
+
+```asm
+627c3bd0: push 0x1
+627c3bd2: push 0x628688a0      ; "ILTLoginMediator.Default"
+627c3bd7: mov  ecx, 0x629df8e8 ; client-side binder wrapper object
+...
+627c3beb: mov  dword ptr [0x629df8f4], 0x629df7f0
+627c3bf5: mov  dword ptr [0x629df7f0], 0x0
+```
+
+So the client callback side is not using a free-floating singleton chosen ad hoc at the `0x41de40`
+problem site; it is reusing the same binder/resolution model already known for launcher arg6.
+
+### Callback84 wrapper proof
+
+The transplanted callback84 object currently resolves to the client `ClientNetShell` family:
+
+- constructor bytes at `0x62006920` install vtable `0x6286d810`
+- nearby class-name getter returns string `"ClientNetShell"` from `0x6286d870`
+- vtable `+0x38` = `client.dll:0x62006580`
+
+That `+0x38` method is now best read as:
+
+```c
+if (g_ResolvedILTLoginMediatorDefault_629df7f0 != NULL &&
+    g_ResolvedILTLoginMediatorDefault_629df7f0->vtbl->IsReady10()) {
+    g_ResolvedILTLoginMediatorDefault_629df7f0->vtbl->FillBuffer18c(&DAT_629e0284, 900, 0);
+    *outLow  = (uint32_t)&DAT_629e0284;
+    *outHigh = 0x20;
+}
+```
+
+### Launcher-side implementation now identified
+
+The original launcher-side arg6 implementation behind that client call is now tightened too:
+
+- mediator vtable base: `0x004b01c8`
+- arg6 slot `+0x18c` = vtable entry `0x004b0354`
+- implementation: `0x0041e690 = CLTLoginMediator_FillState9CallbackBlob18c`
+
+Current best read of `0x41e690`:
+
+- first checks current helper/state id through owner `+0x10`
+  - if current state is not `9`, returns `0x12000009`
+- fetches the current slot record through owner vtable `+0x44`
+- copies current slot payload id pair into the output buffer:
+  - out `+0x00` = payload dword `+0x03` (current slot id low)
+  - out `+0x04` = payload dword `+0x07` (current slot id high)
+- copies caller arguments into the same buffer:
+  - out `+0x08` = arg2 (`900` on the client `ClientNetShell +0x38` path)
+  - out `+0x0c` = arg3 (`0` on that path)
+- seeds the second half with one more owner field before the transform step:
+  - out `+0x10` = owner dword `+0xf18`
+  - newer init-side tightening now shows owner `+0xf18` is zero-initialized in
+    `0x41ee60`, and no simple direct writer for that field has been isolated yet
+- then materializes the trailing 16-byte half of the blob in place from a current
+  margin-connection-side source:
+  - mediator vtable `+0xd4` = `0x41b4f0 = CLTLoginMediator_GetMarginConnectionField85D4`
+  - that tiny getter returns `owner + 0x1c + 0x85`
+  - `0x41df60` / `0x44b190` then use that source, together with the property string
+    `"FeedbackSize"`, to populate the trailing 16-byte region in place
+  - newer cross-use tightening matters here too:
+    - the same helper family is reused by `AuthBootstrap680_SendAuthRequest`
+    - neighboring helper vtables carry literals like `"ValueNames"` and `"EMSA-PKCS1-v1_5"`
+    - current best read is therefore shared Crypto++-style parameterized transform machinery,
+      not state9-only custom glue
+
+So the callback84 pair is now tighter than just “some opaque scratch bytes”:
+
+- pointer = `&DAT_629e0284`
+- length = `0x20`
+- contents = **state9 callback blob** built from:
+  - current slot id pair
+  - caller args
+  - current margin-connection-side trailing material rooted at `owner +0x1c + 0x85`
+
+Practical consequences:
+
+1. callback84 `+0x38` is **not** self-contained on the captured `netShell` object
+2. it depends on the client-side resolved mediator global at `0x629df7f0`
+3. it also depends on a later arg6 vtable slot `+0x18c` that our current launcher-side ABI/source
+   does not yet own
+4. the pair returned to launcher state9 submit is now concretely narrowed as:
+   - first dword = pointer to client scratch buffer `0x629e0284`
+   - second dword = fixed exposed length `0x20`
+5. the blob content itself is now materially tighter too:
+   - first half = current slot id pair + caller args `(900, 0)`
+   - second half starts from owner `+0xf18`
+   - and its tail is materialized through shared `ValueNames` / `FeedbackSize` transform helpers
+     fed from mediator `+0xd4 -> owner +0x1c + 0x85`
+6. a second launcher-side getter now also corroborates that `+0x85` family outside the immediate
+   state9 path:
+   - `0x41f3a0` returns `owner + 0x680 -> +0xf4 + 0x85` when present, else static fallback
+   - companion getter `0x41f3c0` returns that same object's `+0xf8`
+   - practical consequence: the `+0x85` field family now looks shared/reusable, not unique to one
+     state9-only object shape
+
+This is the strongest current static explanation for the crashdump-backed result that raw direct reuse
+of the captured `+0x124` objects regressed the deliberate launcher run: callback84 is a wrapper around
+broader binder-managed mediator state, not a sealed transport collaborator.
 
 ## What the stub experiments proved
 

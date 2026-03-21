@@ -958,12 +958,10 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
         self->field10 = pNetMgr;
         self->field14 = pDistrObjExecutive;
     }
-    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-        // Strongest current read for launcher owner `+0x84/+0x88/+0x8c` is that the same vtable
-        // `+0x124` triple captured here later feeds state9 submit followup `0x41de40`.
-        mediator->SetState9CallbackObjectTriple84_88_8c(pNetShell, pNetMgr, pDistrObjExecutive);
-    }
-    DiagnosticAuthConfigureMediatorStartupTriple(pNetShell, pNetMgr, pDistrObjExecutive);
+    mxo::ltlogin::CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold(
+        pNetShell,
+        pNetMgr,
+        pDistrObjExecutive);
     ++g_MediatorRuntimeState.provide124Count;
     Log(
         "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p self=%p) [count=%u caller=%p]",
@@ -981,6 +979,13 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
 
 // anchor: deeper client init hands netShell/netMgr/distrObjExecutive to arg6 +0x124
 // vtable: ILTLoginMediator.Default slot +0x124
+// Important later state9-submit caution from newer client.dll RE:
+// - the captured `netShell` object is not a self-contained callback84-side answer source
+// - `ClientNetShell` vtable `+0x38` / `0x62006580` later re-enters the client-side resolved
+//   `ILTLoginMediator.Default` global at `0x629df7f0`, calls its `+0x18c` writer, and only then
+//   returns pair `(&DAT_629e0284, 0x20)`
+// - so keep this path as deferred provenance capture only; do not treat raw direct runtime reuse
+//   of the captured triple as a solved launcher-owned state9 reconstruction
 __attribute__((naked)) static void Mediator_ProvideStartupTriple() {
     __asm__ volatile(
         "push %%ebx\n\t"
@@ -1211,6 +1216,22 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[92] = (void*)Mediator_AttachStartupContext; // +0x170
     g_LoginMediatorVtable[93] = (void*)Mediator_AttachRuntimeObject; // +0x174
     g_LoginMediatorVtable[94] = (void*)Mediator_ConsumeRuntimeDescriptor; // +0x178
+    // Not yet source-owned/live here:
+    // - original mediator vtable `+0x18c` = `0x41e690 = CLTLoginMediator_FillState9CallbackBlob18c`
+    // - current best read: state9-gated fixed `0x20`-byte callback blob builder used indirectly by
+    //   `client.dll:0x62006580` (`ClientNetShell +0x38`) behind launcher state9 submit
+    // - the first 16 bytes are straightforward:
+    //   current slot id low/high, then caller args
+    // - the second 16 bytes are **not** just a blind copy:
+    //   `0x41e690` seeds blob `+0x10` from owner `+0xf18`, then passes the whole `+0x10..+0x1f`
+    //   region through the shared `0x41df60 / 0x44b190` FeedbackSize transform family in place
+    //   using source material from mediator `+0xd4 = 0x41b4f0 -> owner +0x1c + 0x85`
+    // - that helper family also appears in `AuthBootstrap680_SendAuthRequest`, plus the bootstrap
+    //   `0x41470 / 0x4429b0` challenge-material path, so treat it as shared transform/parameter
+    //   machinery, not a state9-only byte copier
+    // - current go/no-go decision remains **no live +0x18c entry yet**:
+    //   owner `+0xf18` still has no isolated non-init writer, and the shared `+0x85/+0xf8/+0xa8`
+    //   family is not source-owned tightly enough to fake faithfully
 
     ResetMediatorObjectState();
 }

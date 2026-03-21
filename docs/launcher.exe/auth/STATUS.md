@@ -611,24 +611,74 @@ The highest-value remaining auth-adjacent work is now:
             `arg6->+0x124(netShell, netMgr, distrObjExecutive)`
           - `0x41f1d0 = CLTLoginMediator_SetState9CallbackObjectTriple84_88_8c` then stores those
             three parameters directly into owner `+0x84/+0x88/+0x8c`
-          - replacement source now mirrors that captured startup triple into the mediator-owned
-            state9 collaborator fields instead of leaving them null by default
         - practical consequence for the active blocker:
           - the state9 submit problem is now narrower than generic “missing collaborators”
-          - the remaining `0x41de40` gap is now weighted toward the deeper collaborator execution:
-            - owner callback84 query `+0x38`
-            - owner object88 branch query `(+0x44)->(+0x30)`
-            - packet-like payload builder `0x44afd0 / 0x44b0d0`
-            - final object88 submit calls `+0x28` or `+0x18/+0x24`
+          - but one attempted runtime bridge mattered in the wrong way:
+            - temporarily mirroring the captured arg6 `+0x124` startup triple into the live
+              replacement runtime path regressed the deliberate binder run
+            - newer crashdump-backed rerun tightening now makes that failure site concrete:
+              - dump: `~/MxO_7.6005/MatrixOnline_0.0_crash_69.dmp`
+              - top frame: `client:0x629ddfc8`
+              - replacement caller frame: `resurrections:0x004230df`
+                inside `CLTLoginMediator::State9SubmitFollowupScaffold`
+              - current rebuilt `0x41de40` map plus that return site now pin the crash to the
+                attempted owner callback84 query at `+0x38`, before any later object88
+                `(+0x44)->(+0x30)` branch work ran
+            - newer client-side static tightening now explains that crash one step further:
+              - the transplanted callback84 object currently resolves to the `ClientNetShell` family
+              - callback84 vtable `+0x38` is `client.dll:0x62006580`
+              - that method is not self-contained on the callback object:
+                it first checks client global `0x629df7f0 = resolved ILTLoginMediator.Default`
+                through `+0x10`
+              - it then calls that global's vtable `+0x18c(&DAT_629e0284, 900, 0)`
+              - and only then returns pair `(&DAT_629e0284, 0x20)` to the launcher-side submit path
+              - that later arg6 slot is now tightened on the launcher side too:
+                - mediator vtable base `0x004b01c8`
+                - `+0x18c` = `0x0041e690 = CLTLoginMediator_FillState9CallbackBlob18c`
+                - it is state9-gated (`current state must be 9` or it returns `0x12000009`)
+                - it writes a fixed `0x20`-byte blob whose first half is:
+                  current slot id low/high + caller args `(900, 0)`
+                - its second half now tightens a little further too:
+                  - blob `+0x10..+0x1f` is best read as a 16-byte **in/out transform region**
+                  - `0x41e690` seeds that region from owner dword `+0xf18`
+                  - newer init-side review shows owner `+0xf18` is zero-initialized in `0x41ee60`
+                  - no simple direct writer for that field is isolated yet
+                - that same 16-byte region is then transformed/materialized in place from mediator
+                  `+0xd4 = 0x41b4f0` (`owner +0x1c + 0x85`) through helper `0x41df60 / 0x44b190`
+                - that helper family is also reused by `AuthBootstrap680_SendAuthRequest`, and
+                  carries string-backed `ValueNames` / `FeedbackSize` parameters plus neighboring
+                  `EMSA-PKCS1-v1_5` literals, so current best read is shared Crypto++-style
+                  transform/parameter machinery rather than state9-only custom glue
+                - a second launcher-side getter now also corroborates the `+0x85` family outside
+                  immediate state9 submit:
+                  `0x41f3a0` returns `owner +0x680 -> +0xf4 + 0x85` when present, else static fallback;
+                  companion `0x41f3c0` returns that same object's `+0xf8`
+                - newer bootstrap-side decomp now tightens that shared family one step further too:
+                  `0x4429b0 -> 0x41470` writes decrypted challenge-derived bytes into bootstrap `+0x85`,
+                  then lazily wraps the same 16-byte source through sibling helper objects before later reuse
+              - the client-side resolved mediator slot itself is now also re-tightened as a binder-managed
+                output under the same service string `"ILTLoginMediator.Default"`, via static init
+                around `client.dll:0x627c3bd0`
+            - practical read from that crash:
+              direct raw reuse of the client-captured arg6 `+0x124` objects is **not** yet a valid
+              launcher-owned state9 collaborator reconstruction
+              because callback84 is a wrapper around broader client-side mediator/global state,
+              not a sealed standalone collaborator
+            - backing that live runtime bridge back out restored the proven deliberate behavior
+        - current replacement status after backing that hook out again:
+          - encrypted margin transport still works
+          - state8 raw `0x0f` still sends
+          - decrypted raw `0x10` still routes through state8 slot 6
+          - state8 reply progression again completes with helper9/state9 handoff and event `0x0b`
+          - helper9/state9 slot 3 again re-hits `0x41de40` on the deliberate path
+          - the remaining `0x41de40` gap is therefore narrower than a generic null-triple story:
+            - first, reconstruct the correct launcher-owned callback84 side behind `+0x38`
+            - only after that does it make sense to reopen the later object88 branch work:
+              - `(+0x44)->(+0x30)`
+              - packet-like payload builder `0x44afd0 / 0x44b0d0`
+              - final object88 submit calls `+0x28` or `+0x18/+0x24`
           - only after that narrower `0x41de40` work should later raw `0x11` / state9 slot-6
             progression be expected
-        - current rerun classification after landing the `+0x124 -> +0x84/+0x88/+0x8c` bridge:
-          - logs now do show the real captured startup triple becoming non-null on the replacement path
-          - but the specific short validation rerun did **not** re-hit helper9/state9 before stopping
-          - that run instead crashed later during state8 raw-`0x10` fragment accumulation after sections
-            through `0x0c`, with expected-count still `0` and handoff word still `0`
-          - treat that as the current rerun result, not as evidence that the earlier proved
-            helper9/state9 boundary is reopened or disproved
   - practical comparison against the natural original path:
     - this moves the replacement launcher later and closer to the natural-original shape than the
       old helper11-only stall

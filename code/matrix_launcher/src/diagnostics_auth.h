@@ -12,7 +12,6 @@ class CLTThreadPerClientTCPEngine;
 void DiagnosticAuthResetState();
 void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
 void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* authPassword);
-void DiagnosticAuthConfigureMediatorStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive);
 void DiagnosticAuthPollLiveConnectionTraffic(void* owner);
 
 // Bridge helpers implemented in src/launcher_network_object_abi.cpp so auth-side

@@ -272,18 +272,18 @@ public:
         std::array<uint8_t, 16> block40{};  // `+0x40 .. +0x4f`
         void* sendTarget50 = nullptr;       // `+0x50`
         uint32_t timestamp80 = 0;           // `+0x80`
-        std::array<uint8_t, 16> material85{}; // `+0x85 .. +0x94`
-        void* sideObject94 = nullptr;       // `+0x94`
-        void* sideObject98 = nullptr;       // `+0x98`
+        std::array<uint8_t, 16> material85{}; // `+0x85 .. +0x94`; current best shared 16-byte bootstrap/state9 source family
+        void* sideObject94 = nullptr;       // `+0x94`; lazy wrapper over `material85` built by `0x41470 -> 0x44da00/0x44d910`
+        void* sideObject98 = nullptr;       // `+0x98`; sibling wrapper over the same `material85` source through `0x41df60`
         uint32_t currentPublicKeyId9C = 0;  // `+0x9c`
         void* helperA0 = nullptr;           // `+0xa0`
         void* lazyRaw06StateA4 = nullptr;   // `+0xa4`
-        void* raw08AuxHandleA8 = nullptr;   // `+0xa8`
+        void* raw08AuxHandleA8 = nullptr;   // `+0xa8`; still provisional, but now clearly near the shared transform/parameter family, not just a string helper
         uint32_t fieldAC = 0;               // `+0xac`
         uint32_t stateFlagEC = 1;           // `+0xec` from base ctor `0x45500`
         void* fieldF0 = nullptr;            // `+0xf0`
-        void* fieldF4 = nullptr;            // `+0xf4`
-        void* fieldF8 = nullptr;            // `+0xf8`
+        void* fieldF4 = nullptr;            // `+0xf4`; pointer to the shared source/adapter object whose `+0x85/+0xa8` are surfaced by mediator `+0x5c/+0x50`
+        void* fieldF8 = nullptr;            // `+0xf8`; companion bootstrap pointer surfaced by mediator `+0x60`, precise role still open
         void* fieldFC = nullptr;            // `+0xfc`
         void* field100 = nullptr;           // `+0x100`
         uint32_t field108 = 0;              // `+0x108`
@@ -291,6 +291,27 @@ public:
         uint32_t field110 = 0;              // `+0x110`
         uint32_t field114 = 0;              // `+0x114`
         uint32_t field118 = 0;              // `+0x118`
+    };
+
+    struct State9CallbackBlob18cSketch {
+        // anchor: launcher.exe:0x41e690 / mediator vtable `+0x18c`
+        // Current best recovered fixed layout:
+        // - `+0x00/+0x04` = current slot-record id low/high
+        // - `+0x08/+0x0c` = caller args (`900, 0` on the client callback84 path)
+        // - `+0x10 .. +0x1f` = 16-byte in/out transform region
+        //   - first dword is seeded from owner `+0xf18`
+        //   - then the shared `0x41df60 / 0x44b190` FeedbackSize helper family mutates/copies the
+        //     full 16 bytes in place using source material from mediator `+0xd4 -> owner +0x1c + 0x85`
+        // Keep this as a source-owned layout sketch only for now.
+        // We do **not** expose a live replacement arg6 `+0x18c` yet because:
+        // - owner `+0xf18` still has no isolated non-init writer
+        // - the shared `+0x85/+0xf8/+0xa8` family is tighter, but still not source-owned enough
+        //   for a faithful live callback84 path.
+        uint32_t currentSlotIdLow00 = 0;
+        uint32_t currentSlotIdHigh04 = 0;
+        uint32_t callerArg08 = 0;
+        uint32_t callerArg0c = 0;
+        std::array<uint8_t, 16> transformedRegion10{};
     };
 
     struct SessionCallbackHelper65cSketch {
@@ -648,7 +669,22 @@ public:
     // Strongest current runtime/source origin for this triple:
     // - deeper client init calls arg6/owner vtable `+0x124(netShell, netMgr, distrObjExecutive)`
     // - `0x41f1d0` stores those three parameters directly into owner `+0x84/+0x88/+0x8c`
+    // Important callback84-side correction from newer client.dll RE:
+    // - the captured `netShell` object is not self-contained enough for later state9 submit work
+    // - its callback84 query path (`ClientNetShell` vtable `+0x38` / `0x62006580`) re-enters the
+    //   client-side resolved `ILTLoginMediator.Default` global at `0x629df7f0` and depends on
+    //   that object's later `+0x18c` writer before returning pair `(&DAT_629e0284, 0x20)`
+    // - launcher-side `+0x18c` is now tightened as `0x41e690`, a state9-gated fixed `0x20`-byte
+    //   callback blob builder fed from current slot ids, caller args, owner `+0xf18`, and
+    //   connection-side material rooted at mediator `+0xd4 = 0x41b4f0 -> owner +0x1c + 0x85`
+    // - the tail-material helper there (`0x41df60 / 0x44b190`) is also reused by
+    //   `AuthBootstrap680_SendAuthRequest` and carries `ValueNames` / `FeedbackSize`, so it now
+    //   looks more like shared Crypto++-style parameterized transform machinery than state9-only glue
     void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
+    static void CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold(
+        void* callback84,
+        void* object88,
+        void* object8c);
     CLTLoginState* ScaffoldState3() const;
     CLTLoginState* ScaffoldState4() const;
     CLTLoginState* ScaffoldState6() const;
