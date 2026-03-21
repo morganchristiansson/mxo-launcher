@@ -3,7 +3,7 @@
 #include "loginmediator_state9_submit_scaffold.h"
 #include "loginstate.h"
 #include "../../../runtime/src/libltcrypto/auth_internal.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include <array>
 #include <cstring>

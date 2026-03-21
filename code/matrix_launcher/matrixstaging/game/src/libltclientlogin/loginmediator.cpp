@@ -27,7 +27,7 @@
 
 #include "../../../../src/diagnostics.h"
 #include "loginstate.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -36,6 +36,7 @@
 #include <ctime>
 #include <memory>
 #include <unordered_map>
+#include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
 
@@ -473,7 +474,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     ResetMarginBootstrapState();
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
 
-    Log(
+    spdlog::info(
         "DIAGNOSTIC: CLTLoginMediator auth credentials configured username='%s' password=%s",
         authUsername_.empty() ? "<empty>" : authUsername_.c_str(),
         MaskedAuthValue(authPassword_));
@@ -492,7 +493,7 @@ void CLTLoginMediator::SetAuthBootstrapConfig(
     authUiConfigMd5_ = uiConfigMd5;
     SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
 
-    Log(
+    spdlog::info(
         "DIAGNOSTIC: CLTLoginMediator auth bootstrap configured launcherVersion=%u currentPublicKeyId=%u loginType=%u keyConfigMd5Len=%u uiConfigMd5Len=%u",
         (unsigned)authLauncherVersion_,
         (unsigned)authCurrentPublicKeyId_,
@@ -687,17 +688,17 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
     // - mediator only owns the launcher-side CERT/MS bootstrap progression that must complete on
     //   the connected margin transport before state8/state11 payload sends like raw `0x0f`
     if (!currentState_) {
-        Log("DIAGNOSTIC: BeginMarginHandshake has no active CLTLoginState to dispatch");
+        spdlog::warn("DIAGNOSTIC: BeginMarginHandshake has no active CLTLoginState to dispatch");
         return 0u;
     }
 
     MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
     switch (marginBootstrapState.phase) {
         case MarginBootstrapPhase::kReady:
-            Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap already complete; returning control to current state slot3 currentState=%s sessionId=0x%08x",
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap already complete; returning control to current state slot3 currentState={} sessionId=0x{:08x}",
                 currentState_->DebugName(),
-                (unsigned)marginBootstrapState.marginSessionId);
+                marginBootstrapState.marginSessionId);
             return currentState_->Slot3_BeginOrContinue(/*upstreamOrArg=*/currentState_, this);
 
         case MarginBootstrapPhase::kIdle:
@@ -707,9 +708,9 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
         case MarginBootstrapPhase::kSentCertChallengeResponse:
         case MarginBootstrapPhase::kSentMsConnectRequest:
         case MarginBootstrapPhase::kSentMsConnectChallengeResponse:
-            Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap already in progress phase=%u waitingOn='%s' currentState=%s",
-                (unsigned)marginBootstrapState.phase,
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap already in progress phase={} waitingOn='{}' currentState={}",
+                static_cast<uint32_t>(marginBootstrapState.phase),
                 expectedMarginRequestName_ ? expectedMarginRequestName_ : "<unset>",
                 currentState_->DebugName());
             return 1u;
@@ -717,8 +718,8 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
 
     if (!lastAuthReply_.signedData.valid || lastAuthReply_.signedData.rawBytes.empty() ||
         lastAuthReply_.authSignatureBytes.empty()) {
-        Log(
-            "DIAGNOSTIC: BeginMarginHandshake missing auth-reply signed-data material for CERT_ConnectRequest currentState=%s",
+        spdlog::info(
+            "DIAGNOSTIC: BeginMarginHandshake missing auth-reply signed-data material for CERT_ConnectRequest currentState={}",
             currentState_->DebugName());
         return 0u;
     }
@@ -728,7 +729,7 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
             lastAuthReply_,
             mxo::auth::kFrameModeAuto,
             &packet)) {
-        Log("DIAGNOSTIC: BeginMarginHandshake failed to build CERT_ConnectRequest");
+        spdlog::info("DIAGNOSTIC: BeginMarginHandshake failed to build CERT_ConnectRequest");
         return 0u;
     }
 
@@ -830,11 +831,11 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
         SwitchHelperStateScaffold(8u, scaffoldState8_);
     }
 
-    Log(
-        "DIAGNOSTIC: PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x%02x blockCd0_0=0x%08x blockD70_3=0x%08x currentState=%s",
-        (unsigned)state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8,
-        (unsigned)state8SelectionContextSnapshotState_.blockCd0[0],
-        (unsigned)state8SelectionContextSnapshotState_.blockD70[3],
+    spdlog::info(
+        "DIAGNOSTIC: PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} currentState={}",
+        state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8,
+        state8SelectionContextSnapshotState_.blockCd0[0],
+        state8SelectionContextSnapshotState_.blockD70[3],
         currentState_ ? currentState_->DebugName() : "<unchanged>");
     return 0u;
 }
@@ -1249,7 +1250,7 @@ uint32_t CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     }
 
     if (helper->flag2D != 0) {
-        Log(
+        spdlog::info(
             "DIAGNOSTIC: session helper GameSessionID commit deferred by helper flag2D helperString18='%s'",
             helper->string18.empty() ? "<empty>" : helper->string18.c_str());
         return 0u;
@@ -1258,10 +1259,10 @@ uint32_t CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     SetGameSessionId664(helper->string18.c_str());
     helper->field24 = 0;
 
-    Log(
-        "DIAGNOSTIC: committed helper GameSessionID owner660=0x%08x GameSessionID='%s'",
-        (unsigned)sharedMarginPacketField660_,
-        gameSessionId664_.empty() ? "<empty>" : gameSessionId664_.c_str());
+    spdlog::info(
+        "DIAGNOSTIC: committed helper GameSessionID owner660=0x{:08x} GameSessionID='{}'",
+        sharedMarginPacketField660_,
+        gameSessionId664_.empty() ? "<empty>" : gameSessionId664_);
     return 1u;
 }
 
@@ -1460,19 +1461,19 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
         "CLTLoginMediator::BeginMarginConnectionScaffold resolvedHost='{}' routeHostText='{}' selector=0x{:02x} beginCount={} selectedIpv4=0x{:08x} port={} ensureConnectedResult=0x{:08x}",
         marginHost.empty() ? std::string("<empty>") : marginHost,
         (routeHostText && routeHostText[0]) ? std::string(routeHostText) : std::string("<empty>"),
-        static_cast<unsigned>(cachedRouteSelector),
-        static_cast<unsigned>(marginBeginCount24_),
-        static_cast<unsigned>(marginEndpoint_.ipv4NetworkOrder),
-        static_cast<unsigned>(marginServerPortHostOrder_),
-        static_cast<unsigned>(result));
+        cachedRouteSelector,
+        marginBeginCount24_,
+        marginEndpoint_.ipv4NetworkOrder,
+        marginServerPortHostOrder_,
+        result);
     if (result == 0u) {
         spdlog::debug(
             "CLTLoginMediator::BeginMarginConnectionScaffold connect failed host='{}' port={} ip=0x{:08x} selector={} beginCount={}",
             marginHost.empty() ? std::string("<empty>") : marginHost,
-            static_cast<unsigned>(marginServerPortHostOrder_),
-            static_cast<unsigned>(marginEndpoint_.ipv4NetworkOrder),
-            static_cast<unsigned>(cachedRouteSelector),
-            static_cast<unsigned>(marginBeginCount24_));
+            marginServerPortHostOrder_,
+            marginEndpoint_.ipv4NetworkOrder,
+            cachedRouteSelector,
+            marginBeginCount24_);
     }
     return result;
 }
@@ -1523,14 +1524,14 @@ uint32_t CLTLoginMediator::SendAuthFramedPacket(
         packet.bytes.data(),
         static_cast<uint32_t>(packet.bytes.size()),
         nullptr);
-    Log(
-        "DIAGNOSTIC: launcher-owned auth send step='%s' rawCode=0x%02x message='%s' headerLen=%u payloadLen=%u byteCount=%u -> sendResult=0x%08x",
+    spdlog::info(
+        "DIAGNOSTIC: launcher-owned auth send step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} -> sendResult=0x{:08x}",
         (stepLabel && stepLabel[0]) ? stepLabel : "<unnamed>",
-        (unsigned)rawCode,
+        rawCode,
         mxo::auth::AuthOpcodeName(rawCode),
-        (unsigned)packet.headerBytes.size(),
-        (unsigned)packet.payloadBytes.size(),
-        (unsigned)packet.bytes.size(),
+        packet.headerBytes.size(),
+        packet.payloadBytes.size(),
+        packet.bytes.size(),
         (unsigned)sendResult);
     return sendResult;
 }
@@ -1552,15 +1553,15 @@ uint32_t CLTLoginMediator::SendMarginFramedPacket(
         packet.bytes.data(),
         static_cast<uint32_t>(packet.bytes.size()),
         nullptr);
-    Log(
-        "DIAGNOSTIC: launcher-owned margin bootstrap send step='%s' rawCode=0x%02x transportEncrypted=%u outerHeaderLen=%u outerPayloadLen=%u outerByteCount=%u -> sendResult=0x%08x",
+    spdlog::info(
+        "DIAGNOSTIC: launcher-owned margin bootstrap send step='{}' rawCode=0x{:02x} transportEncrypted={} outerHeaderLen={} outerPayloadLen={} outerByteCount={} -> sendResult=0x{:08x}",
         (stepLabel && stepLabel[0]) ? stepLabel : "<unnamed>",
-        (unsigned)plainRawCode,
+        plainRawCode,
         encryptedTransport ? 1u : 0u,
-        (unsigned)packet.headerBytes.size(),
-        (unsigned)packet.payloadBytes.size(),
-        (unsigned)packet.bytes.size(),
-        (unsigned)sendResult);
+        packet.headerBytes.size(),
+        packet.payloadBytes.size(),
+        packet.bytes.size(),
+        sendResult);
     return sendResult;
 }
 
@@ -1588,10 +1589,10 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
     const uint8_t rawCode = payloadBytes[0];
     switch (rawCode) {
         case 0x02u: {
-            Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_Challenge transportEncrypted=%u payloadLen=%u",
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_Challenge transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
-                (unsigned)payloadSize);
+                payloadSize);
 
             mxo::auth::MarginCertChallenge challenge;
             if (!mxo::auth::ParseMarginCertChallengePayload(
@@ -1600,10 +1601,10 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     lastAuthReply_.signedData,
                     marginBootstrapState.authReplyPrivateExponentBytes,
                     &challenge)) {
-                Log(
-                    "DIAGNOSTIC: launcher-owned margin failed to parse CERT_Challenge transportEncrypted=%u payloadLen=%u",
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned margin failed to parse CERT_Challenge transportEncrypted={} payloadLen={}",
                     transportEncrypted ? 1u : 0u,
-                    (unsigned)payloadSize);
+                    payloadSize);
                 return 0u;
             }
 
@@ -1616,7 +1617,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     marginBootstrapState.marginTwofishKeyBytes,
                     mxo::auth::kFrameModeAuto,
                     &response)) {
-                Log("DIAGNOSTIC: launcher-owned margin failed to build CERT_ChallengeResponse");
+                spdlog::info("DIAGNOSTIC: launcher-owned margin failed to build CERT_ChallengeResponse");
                 return 0u;
             }
 
@@ -1633,19 +1634,19 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
         }
 
         case 0x04u: {
-            Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_ConnectReply transportEncrypted=%u payloadLen=%u",
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_ConnectReply transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
-                (unsigned)payloadSize);
+                payloadSize);
 
             if (payloadSize < 5u) {
                 return 0u;
             }
             const uint32_t status = ReadU32LE(payloadBytes + 1u);
             if (status != 0u) {
-                Log(
-                    "DIAGNOSTIC: launcher-owned margin observed CERT_ConnectReply failure status=0x%08x",
-                    (unsigned)status);
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned margin observed CERT_ConnectReply failure status=0x{:08x}",
+                    status);
                 return 0u;
             }
 
@@ -1693,7 +1694,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     marginBootstrapState.marginTwofishKeyBytes,
                     mxo::auth::kFrameModeAuto,
                     &response)) {
-                Log("DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectRequest");
+                spdlog::info("DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectRequest");
                 return 0u;
             }
 
@@ -1710,10 +1711,10 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
         }
 
         case 0x07u: {
-            Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectChallenge transportEncrypted=%u payloadLen=%u",
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectChallenge transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
-                (unsigned)payloadSize);
+                payloadSize);
 
             std::array<uint8_t, 16> md5Bytes = {};
             if (authKeyConfigMd5_.size() >= md5Bytes.size()) {
@@ -1726,7 +1727,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     marginBootstrapState.marginTwofishKeyBytes,
                     mxo::auth::kFrameModeAuto,
                     &response)) {
-                Log("DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectChallengeResponse");
+                spdlog::info("DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectChallengeResponse");
                 return 0u;
             }
 
@@ -1743,17 +1744,17 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
         }
 
         case 0x09u: {
-            Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectReply transportEncrypted=%u payloadLen=%u",
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectReply transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
-                (unsigned)payloadSize);
+                payloadSize);
 
             mxo::auth::MarginConnectReply reply;
             if (!mxo::auth::ParseMarginConnectReplyPayload(payloadBytes, payloadSize, &reply)) {
-                Log(
-                    "DIAGNOSTIC: launcher-owned margin failed to parse MS_ConnectReply transportEncrypted=%u payloadLen=%u",
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned margin failed to parse MS_ConnectReply transportEncrypted={} payloadLen={}",
                     transportEncrypted ? 1u : 0u,
-                    (unsigned)payloadSize);
+                    payloadSize);
                 return 0u;
             }
 
@@ -1776,17 +1777,17 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u)
                     ? "existing-character state8 raw-0x0f margin packet"
                     : "post-auth helper state margin packet";
-            Log(
-                "DIAGNOSTIC: launcher-owned margin bootstrap completed sessionId=0x%08x field0d=0x%04x field0f=0x%04x field11=0x%04x field13=0x%04x field15=0x%04x state6Handled=0x%08x ownerF14=%u ownerF18=0x%08x currentState=%s",
-                (unsigned)reply.sessionId,
-                (unsigned)reply.field0d,
-                (unsigned)reply.field0f,
-                (unsigned)reply.field11,
-                (unsigned)reply.field13,
-                (unsigned)reply.field15,
-                (unsigned)state6Handled,
-                (unsigned)postAuthMarginLoadingState_.state10SendGateFlagF14,
-                (unsigned)State6UdpSessionSecretF18(),
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap completed sessionId=0x{:08x} field0d=0x{:04x} field0f=0x{:04x} field11=0x{:04x} field13=0x{:04x} field15=0x{:04x} state6Handled=0x{:08x} ownerF14={} ownerF18=0x{:08x} currentState={}",
+                reply.sessionId,
+                reply.field0d,
+                reply.field0f,
+                reply.field11,
+                reply.field13,
+                reply.field15,
+                state6Handled,
+                postAuthMarginLoadingState_.state10SendGateFlagF14,
+                State6UdpSessionSecretF18(),
                 currentState_ ? currentState_->DebugName() : "<null>");
             return currentState_ ? currentState_->Slot3_BeginOrContinue(currentState_, this) : 1u;
         }
@@ -1808,7 +1809,7 @@ uint32_t CLTLoginMediator::SendAuthGetPublicKeyRequest() {
             authCurrentPublicKeyId_,
             mxo::auth::kFrameModeAuto,
             &packet)) {
-        Log("DIAGNOSTIC: launcher-owned auth failed to build AS_GetPublicKeyRequest");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_GetPublicKeyRequest");
         return 0;
     }
 
@@ -1823,11 +1824,11 @@ uint32_t CLTLoginMediator::SendAuthRequestFromReply(const mxo::auth::GetPublicKe
     // - launcher.exe:0x448050 = branch site selecting raw 0x06 vs raw 0x08 path
     // - launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
     if (authUsername_.empty()) {
-        Log("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without a username");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without a username");
         return 0;
     }
     if (!reply.hasEmbeddedPublicKey) {
-        Log("DIAGNOSTIC: launcher-owned auth GetPublicKeyReply has no embedded public key material");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth GetPublicKeyReply has no embedded public key material");
         return 0;
     }
 
@@ -1849,7 +1850,7 @@ uint32_t CLTLoginMediator::SendAuthRequestFromReply(const mxo::auth::GetPublicKe
             requestLayout,
             mxo::auth::kFrameModeAuto,
             &buildResult)) {
-        Log("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthRequest");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthRequest");
         return 0;
     }
 
@@ -1857,7 +1858,7 @@ uint32_t CLTLoginMediator::SendAuthRequestFromReply(const mxo::auth::GetPublicKe
     const uint32_t sendResult = SendAuthFramedPacket(buildResult.packet, kMessageAsAuthRequest);
     authRequestSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
-        Log(
+        spdlog::info(
             "DIAGNOSTIC: launcher-owned auth built AS_AuthRequest publicKeyId=%u loginType=%u keySize=%u blobLen=%u usernameLengthField=%u usedReplyPublicKey=%u keyConfigMd5Len=%u uiConfigMd5Len=%u",
             (unsigned)reply.publicKeyId,
             (unsigned)authLoginType_,
@@ -1877,11 +1878,11 @@ uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChalle
     // - exact original raw 0x0a builder/send VA: [not yet isolated]
     // - launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
     if (authPassword_.empty()) {
-        Log("DIAGNOSTIC: launcher-owned auth received AS_AuthChallenge but has no password to send in AS_AuthChallengeResponse");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth received AS_AuthChallenge but has no password to send in AS_AuthChallengeResponse");
         return 0;
     }
     if (lastAuthRequestBuildResult_.twofishKeyBytes.size() != 16u) {
-        Log("DIAGNOSTIC: launcher-owned auth missing Twofish key from AS_AuthRequest build result");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth missing Twofish key from AS_AuthRequest build result");
         return 0;
     }
 
@@ -1895,7 +1896,7 @@ uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChalle
             layout,
             mxo::auth::kFrameModeAuto,
             &buildResult)) {
-        Log("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthChallengeResponse");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthChallengeResponse");
         return 0;
     }
 
@@ -1903,8 +1904,8 @@ uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChalle
     authChallengeResponseSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
         SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(buildResult);
-        Log(
-            "DIAGNOSTIC: launcher-owned auth built AS_AuthChallengeResponse passwordLengthField=%u soePasswordLengthField=%u plaintextLen=%u ciphertextLen=%u",
+        spdlog::info(
+            "DIAGNOSTIC: launcher-owned auth built AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={}",
             (unsigned)buildResult.passwordLengthField,
             (unsigned)buildResult.soePasswordLengthField,
             (unsigned)buildResult.plaintextBytes.size(),
@@ -1920,26 +1921,26 @@ void CLTLoginMediator::LogParsedAuthReply(const mxo::auth::AuthReply& reply) con
     // - launcher.exe:0x43b830 = later auth-side GetWorldList sender (upstream after success)
     // - launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
     if (reply.isErrorReply) {
-        Log(
-            "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply error errorCode=0x%08x zeroDword=0x%08x trailingWord=0x%04x",
-            (unsigned)reply.errorCode,
-            (unsigned)reply.zeroDword,
-            (unsigned)reply.trailingWord);
+        spdlog::info(
+            "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply error errorCode=0x{:08x} zeroDword=0x{:08x} trailingWord=0x{:04x}",
+            reply.errorCode,
+            reply.zeroDword,
+            reply.trailingWord);
         return;
     }
 
-    Log(
-        "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply success characterCount=%u worldCount=%u username='%s' authDataMarker=0x%04x signatureLen=%u encryptedPrivateExponentLen=%u",
-        (unsigned)reply.characterCount,
-        (unsigned)reply.worldCount,
-        reply.username.text.empty() ? "<empty>" : reply.username.text.c_str(),
-        (unsigned)reply.authDataMarker,
-        (unsigned)reply.authSignatureBytes.size(),
-        (unsigned)reply.encryptedPrivateExponentLength);
+    spdlog::info(
+        "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply success characterCount={} worldCount={} username='{}' authDataMarker=0x{:04x} signatureLen={} encryptedPrivateExponentLen={}",
+        reply.characterCount,
+        reply.worldCount,
+        reply.username.text.empty() ? "<empty>" : reply.username.text,
+        reply.authDataMarker,
+        reply.authSignatureBytes.size(),
+        reply.encryptedPrivateExponentLength);
 
     for (size_t i = 0; i < reply.characters.size(); ++i) {
         const mxo::auth::AuthCharacterEntry& entry = reply.characters[i];
-        Log(
+        spdlog::info(
             "DIAGNOSTIC: launcher-owned auth character[%u] handle='%s' characterId=%llu status=%u worldId=%u",
             (unsigned)i,
             entry.handle.text.empty() ? "<empty>" : entry.handle.text.c_str(),
@@ -1950,7 +1951,7 @@ void CLTLoginMediator::LogParsedAuthReply(const mxo::auth::AuthReply& reply) con
 
     for (size_t i = 0; i < reply.worlds.size(); ++i) {
         const mxo::auth::AuthWorldEntry& world = reply.worlds[i];
-        Log(
+        spdlog::info(
             "DIAGNOSTIC: launcher-owned auth world[%u] id=%u name='%s' status=%u type=%u clientVersion=%u load='%c'",
             (unsigned)i,
             (unsigned)world.worldId,
@@ -1967,7 +1968,7 @@ void CLTLoginMediator::LogParsedAuthReply(const mxo::auth::AuthReply& reply) con
             lastAuthRequestBuildResult_.twofishKeyBytes,
             lastAuthChallenge_.encryptedChallengeBytes,
             &decryptedPrivateExponentBytes)) {
-        Log(
+        spdlog::info(
             "DIAGNOSTIC: launcher-owned auth decrypted AS_AuthReply private exponent length=%u",
             (unsigned)decryptedPrivateExponentBytes.size());
     }
@@ -2208,7 +2209,7 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
         }
     }
 
-    Log(
+    spdlog::info(
         "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount=%u characterCount=%u currentCharacterOrRouteIndex=%u currentSlotWorldId=%u routeHostPrefix='%s' slotRecordHeapString='%s' currentWorldDescriptorName='%s'",
         (unsigned)worldCount,
         (unsigned)characterCount,
@@ -2241,7 +2242,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
             mxo::auth::GetPublicKeyReply reply;
             if (!mxo::auth::ParseGetPublicKeyReplyPayload(packetBytes, packetSize, &reply)) {
-                Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_GetPublicKeyReply");
+                spdlog::info("DIAGNOSTIC: launcher-owned auth failed to parse AS_GetPublicKeyReply");
                 return 0;
             }
 
@@ -2249,8 +2250,8 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             authCurrentPublicKeyId_ = reply.publicKeyId;
             SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
             SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(reply);
-            Log(
-                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status=%u currentTime=%u publicKeyId=%u keySize=%u modulusLength=%u signatureLength=%u exponentByte=0x%02x hasEmbeddedPublicKey=%u",
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={}",
                 (unsigned)reply.status,
                 (unsigned)reply.currentTime,
                 (unsigned)reply.publicKeyId,
@@ -2267,14 +2268,14 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
             mxo::auth::AuthChallenge challenge;
             if (!mxo::auth::ParseAuthChallengePayload(packetBytes, packetSize, &challenge)) {
-                Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthChallenge");
+                spdlog::info("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthChallenge");
                 return 0;
             }
 
             lastAuthChallenge_ = challenge;
-            Log(
-                "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen=%u",
-                (unsigned)challenge.encryptedChallengeBytes.size());
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
+                challenge.encryptedChallengeBytes.size());
             expectedAuthRequestName_ = "AS_AuthChallengeResponse";
             const uint32_t sendResult = SendAuthChallengeResponse(challenge);
             const bool preserveExistingCharacterState8Path =
@@ -2314,11 +2315,11 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
         }
 
         default:
-            Log(
-                "DIAGNOSTIC: launcher-owned auth received unhandled packet rawCode=0x%02x message='%s' payloadLen=%u",
-                (unsigned)rawCode,
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth received unhandled packet rawCode=0x{:02x} message='{}' payloadLen={}",
+                rawCode,
                 mxo::auth::AuthOpcodeName(rawCode),
-                (unsigned)packetSize);
+                packetSize);
             break;
     }
 
@@ -2422,7 +2423,7 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
             stagedIncomingAuthPacketBytes_.data(),
             stagedIncomingAuthPacketBytes_.size(),
             &reply)) {
-        Log("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
+        spdlog::warn("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
         return 0u;
     }
 
@@ -2436,7 +2437,7 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
             lastAuthChallenge_.encryptedChallengeBytes,
             &marginBootstrapState.authReplyPrivateExponentBytes)) {
         marginBootstrapState.authReplyPrivateExponentBytes.clear();
-        Log("DIAGNOSTIC: launcher-owned auth could not recover private exponent bytes needed for later margin CERT bootstrap");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth could not recover private exponent bytes needed for later margin CERT bootstrap");
     }
     AdoptAuthReplyIntoRecoveredMediatorState();
     LogParsedAuthReply(reply);

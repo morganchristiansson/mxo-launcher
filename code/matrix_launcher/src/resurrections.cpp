@@ -19,10 +19,15 @@
 #include <string>
 #include <sys/stat.h>
 
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 #include "spdlog/sinks/basic_file_sink.h"
 #include "diagnostics.h"
 #include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
+
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/basic_file_sink.h>
+// Initialize spdlog logger at startup that writes to resurrections.log (plain text, no colors)
+auto g_SpdlogLogger = spdlog::basic_logger_mt("resurrections", "resurrections.log", true);
 
 // Include the login mediator header for world list builder access
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
@@ -48,7 +53,6 @@ using InitClientDLLFunc = int (*)(
 using RunClientDLLFunc = int (*)();
 using TermClientDLLFunc = int (*)();
 
-static FILE* g_LogFile = NULL;
 static HMODULE g_hCres = NULL;
 static HMODULE g_hClient = NULL;
 static InitClientDLLFunc g_InitClientDLL = NULL;
@@ -101,7 +105,6 @@ static DiagnosticPreclientEnvironmentState g_PreclientEnvironment = {};
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase);
 
-void Log(const char* fmt, ...);
 
 #ifndef DBG_PRINTEXCEPTION_C
 #define DBG_PRINTEXCEPTION_C ((DWORD)0x40010006)
@@ -128,24 +131,16 @@ static T ResolveProc(HMODULE module, const char* name) {
     return typed;
 }
 
-void Log(const char* fmt, ...) {
-    if (!g_LogFile) return;
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(g_LogFile, fmt, args);
-    va_end(args);
-    fprintf(g_LogFile, "\n");
-    fflush(g_LogFile);
-}
+
 
 static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
     const uint32_t* words = static_cast<const uint32_t*>(base);
     if (!label || !base || wordCount == 0) return;
     for (size_t i = 0; i < wordCount; i += 4) {
-        Log(
-            "%s @ %p [+0x%02x]=%08x [+0x%02x]=%08x [+0x%02x]=%08x [+0x%02x]=%08x",
+        spdlog::info(
+            "{} @ {} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x}",
             label,
-            base,
+            fmt::ptr(base),
             static_cast<unsigned>(i * 4),
             words[i + 0],
             static_cast<unsigned>((i + 1) * 4),
@@ -205,26 +200,26 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
     EXCEPTION_RECORD* record = exceptionInfo->ExceptionRecord;
     CONTEXT* context = exceptionInfo->ContextRecord;
 
-    Log("=== %s ===", heading);
-    Log(
-        "exception code=%08lx (%s) classification=%s flags=%08lx address=%p",
+    spdlog::info("=== {} ===", heading);
+    spdlog::info(
+        "exception code=0x{:08lx} ({}) classification={} flags=0x{:08lx} address={}",
         (unsigned long)record->ExceptionCode,
         DiagnosticExceptionCodeName(record->ExceptionCode),
         DiagnosticExceptionClassification(record->ExceptionCode),
         (unsigned long)record->ExceptionFlags,
-        record->ExceptionAddress);
+        fmt::ptr(record->ExceptionAddress));
     if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->NumberParameters >= 2) {
         const char* accessKind = "unknown";
         if (record->ExceptionInformation[0] == 0) accessKind = "read";
         else if (record->ExceptionInformation[0] == 1) accessKind = "write";
         else if (record->ExceptionInformation[0] == 8) accessKind = "execute";
-        Log(
-            "access violation kind=%s target=%p",
+        spdlog::info(
+            "access violation kind={} target={}",
             accessKind,
-            reinterpret_cast<void*>(record->ExceptionInformation[1]));
+            fmt::ptr(reinterpret_cast<void*>(record->ExceptionInformation[1])));
     }
-    Log(
-        "registers: eip=%08lx esp=%08lx ebp=%08lx eax=%08lx ebx=%08lx ecx=%08lx edx=%08lx esi=%08lx edi=%08lx",
+    spdlog::info(
+        "registers: eip=0x{:08lx} esp=0x{:08lx} ebp=0x{:08lx} eax=0x{:08lx} ebx=0x{:08lx} ecx=0x{:08lx} edx=0x{:08lx} esi=0x{:08lx} edi=0x{:08lx}",
         (unsigned long)context->Eip,
         (unsigned long)context->Esp,
         (unsigned long)context->Ebp,
@@ -237,10 +232,10 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
 
     MEMORY_BASIC_INFORMATION mbi = {};
     if (VirtualQuery(reinterpret_cast<const void*>(context->Eip), &mbi, sizeof(mbi)) == sizeof(mbi)) {
-        Log(
-            "eip page: base=%p allocBase=%p regionSize=0x%08lx protect=0x%08lx state=0x%08lx type=0x%08lx",
-            mbi.BaseAddress,
-            mbi.AllocationBase,
+        spdlog::info(
+            "eip page: base={} allocBase={} regionSize=0x{:08lx} protect=0x{:08lx} state=0x{:08lx} type=0x{:08lx}",
+            fmt::ptr(mbi.BaseAddress),
+            fmt::ptr(mbi.AllocationBase),
             (unsigned long)mbi.RegionSize,
             (unsigned long)mbi.Protect,
             (unsigned long)mbi.State,
@@ -261,7 +256,7 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
 
 static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo) {
     if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
-        Log("DIAGNOSTIC: vectored exception handler invoked with incomplete state");
+        spdlog::info("DIAGNOSTIC: vectored exception handler invoked with incomplete state");
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
@@ -271,7 +266,7 @@ static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exce
 
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
     if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
-        Log("DIAGNOSTIC: unhandled exception filter invoked with incomplete state");
+        spdlog::info("DIAGNOSTIC: unhandled exception filter invoked with incomplete state");
         return EXCEPTION_CONTINUE_SEARCH;
     }
 
@@ -302,13 +297,13 @@ static const char* MaskedArgValue(const char* value) {
 }
 
 static void LogLauncherPreprocessingState() {
-    Log("=== Launcher switch preprocessing ===");
-    Log("auth username      = %s", MaskedArgValue(g_LauncherCommandLine.AuthUsername()));
-    Log("auth password      = %s", MaskedArgValue(g_LauncherCommandLine.AuthPassword()));
-    Log("launcher character  = %s", MaskedArgValue(g_LauncherCommandLine.LauncherCharacter()));
-    Log("launcher session    = %s", MaskedArgValue(g_LauncherCommandLine.LauncherSession()));
-    Log(
-        "launcher flags      = clone:%d silent:%d nopatch:%d recover:%d deletechar:%d justpatch:%d noeula:%d skiplaunch:%d lptest:%d",
+    spdlog::info("=== Launcher switch preprocessing ===");
+    spdlog::info("auth username      = {}", MaskedArgValue(g_LauncherCommandLine.AuthUsername()));
+    spdlog::info("auth password      = {}", MaskedArgValue(g_LauncherCommandLine.AuthPassword()));
+    spdlog::info("launcher character  = {}", MaskedArgValue(g_LauncherCommandLine.LauncherCharacter()));
+    spdlog::info("launcher session    = {}", MaskedArgValue(g_LauncherCommandLine.LauncherSession()));
+    spdlog::info(
+        "launcher flags      = clone:{} silent:{} nopatch:{} recover:{} deletechar:{} justpatch:{} noeula:{} skiplaunch:{} lptest:{}",
         g_LauncherCommandLine.SwitchClone() ? 1 : 0,
         g_LauncherCommandLine.SwitchSilent() ? 1 : 0,
         g_LauncherCommandLine.SwitchNoPatch() ? 1 : 0,
@@ -317,9 +312,9 @@ static void LogLauncherPreprocessingState() {
         g_LauncherCommandLine.SwitchJustPatch() ? 1 : 0,
         g_LauncherCommandLine.SwitchNoEula() ? 1 : 0,
         g_LauncherCommandLine.SwitchSkipLaunch() ? 1 : 0,
-        g_LauncherCommandLine.SwitchLPTest() ? 1 : 0);
-    Log(
-        "launcher globals    = 4c8b1c:%d 4c8b1d:%d 4d2c64:%d 4d2c65:%d 4d2c66:%d 4d2c6a:%d",
+        g_LauncherCommandLine.SwitchLPTest() ? "1" : "0");
+    spdlog::info(
+        "launcher globals    = 4c8b1c:{} 4c8b1d:{} 4d2c64:{} 4d2c65:{} 4d2c66:{} 4d2c6a:{}",
         g_LauncherCommandLine.LauncherGlobal4C8B1C() ? 1 : 0,
         g_LauncherCommandLine.LauncherGlobal4C8B1D() ? 1 : 0,
         g_LauncherCommandLine.LauncherGlobal4D2C64() ? 1 : 0,
@@ -327,8 +322,8 @@ static void LogLauncherPreprocessingState() {
         g_LauncherCommandLine.SwitchJustPatch() ? 1 : 0,
         g_LauncherCommandLine.SwitchClone() ? 1 : 0);
     if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
-        Log(
-            "launcher autodetect exitCode = %lu",
+        spdlog::info(
+            "launcher autodetect exitCode = {}",
             (unsigned long)g_LauncherCommandLine.AutodetectExitCode());
     }
 }
@@ -341,8 +336,8 @@ static void RunOptionsCfgAutodetectStepIfNeeded() {
     PROCESS_INFORMATION processInfo = {};
     char commandLine[] = "autodetect_settings.exe setopts hide";
 
-    Log("=== Original-style options.cfg autodetect step ===");
-    Log("DIAGNOSTIC: launching '%s' with currentDir='.'", commandLine);
+    spdlog::info("=== Original-style options.cfg autodetect step ===");
+    spdlog::info("DIAGNOSTIC: launching '{}' with currentDir='.'", commandLine);
 
     if (!CreateProcessA(
             NULL,
@@ -355,27 +350,27 @@ static void RunOptionsCfgAutodetectStepIfNeeded() {
             ".",
             &startupInfo,
             &processInfo)) {
-        Log(
-            "WARNING: CreateProcessA for autodetect_settings.exe failed (%lu); continuing original-path scaffold without that side effect",
-            (unsigned long)GetLastError());
+        spdlog::info(
+            "WARNING: CreateProcessA for autodetect_settings.exe failed ({}); continuing original-path scaffold without that side effect",
+            GetLastError());
         return;
     }
 
     DWORD waitResult = WaitForSingleObject(processInfo.hProcess, 60000);
-    Log("DIAGNOSTIC: autodetect wait result = %lu", (unsigned long)waitResult);
+    spdlog::info("DIAGNOSTIC: autodetect wait result = {}", waitResult);
 
     if (waitResult == WAIT_OBJECT_0) {
         DWORD exitCode = 0;
         if (GetExitCodeProcess(processInfo.hProcess, &exitCode)) {
             g_LauncherCommandLine.SetAutodetectExitCode(exitCode);
-            Log("DIAGNOSTIC: autodetect exit code = %lu (0x%08lx)", (unsigned long)exitCode, (unsigned long)exitCode);
+            spdlog::info("DIAGNOSTIC: autodetect exit code = {} (0x{:08lx})", (unsigned long)exitCode, (unsigned long)exitCode);
         } else {
-            Log("WARNING: GetExitCodeProcess for autodetect_settings.exe failed (%lu)", (unsigned long)GetLastError());
+            spdlog::info("WARNING: GetExitCodeProcess for autodetect_settings.exe failed ({})", GetLastError());
         }
     } else if (waitResult == WAIT_TIMEOUT) {
-        Log("WARNING: autodetect_settings.exe did not finish within 60000 ms");
+        spdlog::info("WARNING: autodetect_settings.exe did not finish within 60000 ms");
     } else {
-        Log("WARNING: WaitForSingleObject for autodetect_settings.exe failed (%lu)", (unsigned long)GetLastError());
+        spdlog::info("WARNING: WaitForSingleObject for autodetect_settings.exe failed ({})", GetLastError());
     }
 
     if (processInfo.hThread) CloseHandle(processInfo.hThread);
@@ -383,16 +378,16 @@ static void RunOptionsCfgAutodetectStepIfNeeded() {
 
     struct _stat optionsStat = {};
     if (_stat("options.cfg", &optionsStat) == 0) {
-        Log("DIAGNOSTIC: autodetect produced options.cfg size=%ld bytes", (long)optionsStat.st_size);
+        spdlog::info("DIAGNOSTIC: autodetect produced options.cfg size={} bytes", optionsStat.st_size);
     } else {
-        Log("DIAGNOSTIC: options.cfg not present after autodetect child returned");
+        spdlog::info("DIAGNOSTIC: options.cfg not present after autodetect child returned");
     }
 
     if (DeleteFileA("options.cfg")) {
-        Log("DIAGNOSTIC: deleted temporary options.cfg after autodetect step");
+        spdlog::info("DIAGNOSTIC: deleted temporary options.cfg after autodetect step");
     } else {
         DWORD deleteError = GetLastError();
-        Log("DIAGNOSTIC: DeleteFileA('options.cfg') failed (%lu)", (unsigned long)deleteError);
+        spdlog::info("DIAGNOSTIC: DeleteFileA('options.cfg') failed ({})", (unsigned long)deleteError);
     }
 }
 
@@ -404,12 +399,12 @@ static DWORD WINAPI DiagnosticPreclientThreadProc(LPVOID) {
     InterlockedExchange(&g_PreclientEnvironment.readyFlag44, 0);
     InterlockedExchange(&g_PreclientEnvironment.readyFlag45, 1);
     SetEvent(g_PreclientEnvironment.readyEvent);
-    Log(
-        "DIAGNOSTIC: pre-client launcher thread ready threadId=%lu state44=%ld state45=%ld state48=%p",
-        (unsigned long)GetCurrentThreadId(),
-        (long)g_PreclientEnvironment.readyFlag44,
-        (long)g_PreclientEnvironment.readyFlag45,
-        g_PreclientEnvironment.readyPointer48);
+    spdlog::info(
+        "DIAGNOSTIC: pre-client launcher thread ready threadId=0x{:08x} state44={} state45={} state48={}",
+        GetCurrentThreadId(),
+        g_PreclientEnvironment.readyFlag44,
+        g_PreclientEnvironment.readyFlag45,
+        fmt::ptr(g_PreclientEnvironment.readyPointer48));
 
     while (WaitForSingleObject(g_PreclientEnvironment.stopEvent, 10) == WAIT_TIMEOUT) {
         while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -418,7 +413,7 @@ static DWORD WINAPI DiagnosticPreclientThreadProc(LPVOID) {
         }
     }
 
-    Log("DIAGNOSTIC: pre-client launcher thread stopping");
+    spdlog::info("DIAGNOSTIC: pre-client launcher thread stopping");
     return 0;
 }
 
@@ -431,7 +426,7 @@ static bool DiagnosticInitializePreclientEnvironmentLike402EC0() {
     g_PreclientEnvironment.readyEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
     g_PreclientEnvironment.stopEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
     if (!g_PreclientEnvironment.readyEvent || !g_PreclientEnvironment.stopEvent) {
-        Log("DIAGNOSTIC: pre-client environment event creation failed (%lu)", (unsigned long)GetLastError());
+        spdlog::info("DIAGNOSTIC: pre-client environment event creation failed ({})", (unsigned long)GetLastError());
         return false;
     }
 
@@ -443,23 +438,23 @@ static bool DiagnosticInitializePreclientEnvironmentLike402EC0() {
         0,
         &g_PreclientEnvironment.threadId);
     if (!g_PreclientEnvironment.threadHandle) {
-        Log("DIAGNOSTIC: pre-client environment thread creation failed (%lu)", (unsigned long)GetLastError());
+        spdlog::info("DIAGNOSTIC: pre-client environment thread creation failed ({})", (unsigned long)GetLastError());
         return false;
     }
 
     DWORD waitResult = WaitForSingleObject(g_PreclientEnvironment.readyEvent, 5000);
     if (waitResult != WAIT_OBJECT_0) {
-        Log("DIAGNOSTIC: pre-client environment readiness wait failed (%lu)", (unsigned long)waitResult);
+        spdlog::info("DIAGNOSTIC: pre-client environment readiness wait failed ({})", (unsigned long)waitResult);
         return false;
     }
 
-    Log(
-        "DIAGNOSTIC: pre-client environment scaffold active threadHandle=%p threadId=%lu state44=%ld state45=%ld state48=%p",
-        g_PreclientEnvironment.threadHandle,
-        (unsigned long)g_PreclientEnvironment.threadId,
-        (long)g_PreclientEnvironment.readyFlag44,
-        (long)g_PreclientEnvironment.readyFlag45,
-        g_PreclientEnvironment.readyPointer48);
+    spdlog::info(
+        "DIAGNOSTIC: pre-client environment scaffold active threadHandle={} threadId=0x{:08x} state44={} state45={} state48={}",
+        fmt::ptr(g_PreclientEnvironment.threadHandle),
+        g_PreclientEnvironment.threadId,
+        g_PreclientEnvironment.readyFlag44,
+        g_PreclientEnvironment.readyFlag45,
+        fmt::ptr(g_PreclientEnvironment.readyPointer48));
     return true;
 }
 
@@ -490,15 +485,11 @@ static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
     DiagnosticShutdownPreclientEnvironment();
     g_LauncherCommandLine.Reset();
-    if (g_LogFile) {
-        fclose(g_LogFile);
-        g_LogFile = NULL;
-    }
     return code;
 }
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase) {
-    Log("launcher export SetMasterDatabase called: %p", pMasterDatabase);
+    spdlog::info("launcher export SetMasterDatabase called: {}", fmt::ptr(pMasterDatabase));
 }
 
 static bool PreloadDependencies() {
@@ -513,36 +504,36 @@ static bool PreloadDependencies() {
 
     for (int i = 0; dlls[i]; ++i) {
         HMODULE h = LoadLibraryA(dlls[i]);
-        Log("preload %-12s : %s (%p)", dlls[i], h ? "OK" : "FAIL", h);
+        spdlog::info("preload {:12s} : {} ({})", dlls[i], h ? "OK" : "FAIL", fmt::ptr(h));
         if (!h) return false;
     }
     return true;
 }
 
 static bool LoadCresDLL() {
-    Log("=== Load cres.dll ===");
+    spdlog::info("=== Load cres.dll ===");
     g_hCres = LoadLibraryA("cres.dll");
-    Log("cres.dll handle: %p", g_hCres);
+    spdlog::info("cres.dll handle: {}", fmt::ptr(g_hCres));
     return g_hCres != NULL;
 }
 
 static bool LoadClientDLL() {
-    Log("=== Load client.dll ===");
+    spdlog::info("=== Load client.dll ===");
     g_hClient = LoadLibraryA("client.dll");
-    Log("client.dll handle: %p", g_hClient);
+    spdlog::info("client.dll handle: {}", fmt::ptr(g_hClient));
     return g_hClient != NULL;
 }
 
 static bool ResolveClientExports() {
-    Log("=== Resolve client exports ===");
+    spdlog::info("=== Resolve client exports ===");
 
     g_InitClientDLL = ResolveProc<InitClientDLLFunc>(g_hClient, "InitClientDLL");
     g_RunClientDLL = ResolveProc<RunClientDLLFunc>(g_hClient, "RunClientDLL");
     g_TermClientDLL = ResolveProc<TermClientDLLFunc>(g_hClient, "TermClientDLL");
 
-    Log("InitClientDLL : %p", g_InitClientDLL);
-    Log("RunClientDLL  : %p", g_RunClientDLL);
-    Log("TermClientDLL : %p", g_TermClientDLL);
+    spdlog::info("InitClientDLL : {}", fmt::ptr(g_InitClientDLL));
+    spdlog::info("RunClientDLL  : {}", fmt::ptr(g_RunClientDLL));
+    spdlog::info("TermClientDLL : {}", fmt::ptr(g_TermClientDLL));
 
     return g_InitClientDLL && g_RunClientDLL && g_TermClientDLL;
 }
@@ -559,7 +550,7 @@ static bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
         KEY_QUERY_VALUE,
         &key);
     if (openResult != ERROR_SUCCESS) {
-        Log("DIAGNOSTIC: HKLM Last_WorldName key open failed (%ld)", (long)openResult);
+        spdlog::info("DIAGNOSTIC: HKLM Last_WorldName key open failed ({})", openResult);
         return false;
     }
 
@@ -568,18 +559,18 @@ static bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
     LONG queryResult = RegQueryValueExA(key, "Last_WorldName", NULL, &type, reinterpret_cast<LPBYTE>(out), &size);
     RegCloseKey(key);
     if (queryResult != ERROR_SUCCESS) {
-        Log("DIAGNOSTIC: HKLM Last_WorldName query failed (%ld)", (long)queryResult);
+        spdlog::info("DIAGNOSTIC: HKLM Last_WorldName query failed ({})", queryResult);
         out[0] = '\0';
         return false;
     }
     if (type != REG_SZ && type != REG_EXPAND_SZ) {
-        Log("DIAGNOSTIC: HKLM Last_WorldName unexpected registry type %lu", (unsigned long)type);
+        spdlog::info("DIAGNOSTIC: HKLM Last_WorldName unexpected registry type {}", type);
         out[0] = '\0';
         return false;
     }
 
     out[outSize - 1] = '\0';
-    Log("DIAGNOSTIC: loaded HKLM Last_WorldName='%s'", out);
+    spdlog::info("DIAGNOSTIC: loaded HKLM Last_WorldName='{}'", out);
     return out[0] != '\0';
 }
 
@@ -682,41 +673,41 @@ static uint32_t BuildPackedArg7Selection() {
 
 static void LogArgvContentsAsBytes(const char* label, char** argv, uint32_t count) {
     if (!argv || count == 0) return;
-    Log("%s pointer array @ %p:", label, argv);
+    spdlog::info("{} pointer array @ {}:", label, fmt::ptr(argv));
     for (uint32_t i = 0; i < count && i < 8; ++i) {
-        Log("  argv[%u] = %p", i, argv[i]);
+        spdlog::info("  argv[{}] = {}", i, fmt::ptr(argv[i]));
     }
     if (argv[0]) {
         const uint8_t* bytes = reinterpret_cast<const uint8_t*>(argv[0]);
-        Log(
-            "%s argv[0] data @ %p: %02x %02x %02x %02x %02x %02x %02x %02x",
+        spdlog::info(
+            "{} argv[0] data @ {}: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             label,
-            argv[0],
+            fmt::ptr(argv[0]),
             bytes[0], bytes[1], bytes[2], bytes[3],
             bytes[4], bytes[5], bytes[6], bytes[7]);
-        Log("%s argv[0] as string: \'%s\'", label, argv[0]);
+        spdlog::info("{} argv[0] as string: '{}'", label, argv[0]);
     }
 }
 
 static void LogKnownStartupState() {
-    Log("=== Known startup frame ===");
-    Log("arg1 filteredArgCount         = 0x%08x", g_LauncherCommandLine.FilteredArgCount());
-    Log("arg2 filteredArgv            = %p", g_LauncherCommandLine.FilteredArgv());
+    spdlog::info("=== Known startup frame ===");
+    spdlog::info("arg1 filteredArgCount        = 0x{:08x}", g_LauncherCommandLine.FilteredArgCount());
+    spdlog::info("arg2 filteredArgv            = {}", fmt::ptr(g_LauncherCommandLine.FilteredArgv()));
     if (g_LauncherCommandLine.FilteredArgv()) {
         LogArgvContentsAsBytes(
             "arg2",
             g_LauncherCommandLine.FilteredArgv(),
             g_LauncherCommandLine.FilteredArgCount());
     }
-    Log("arg3 hClientDll              = %p", g_hClient);
-    Log("arg4 hCresDll                = %p", g_hCres);
-    Log("arg5 launcherNetworkObject   = %p", g_pLauncherObject6304);
-    Log("arg6 ILTLoginMediatorDefault = %p", g_pILTLoginMediatorDefault);
-    Log("CLauncher+0xa8 placeholder   = 0x%08x", g_CLauncherFieldA8);
-    Log("CLauncher+0xac placeholder   = 0x%08x", g_CLauncherFieldAC);
-    Log("Last_WorldName               = %s", g_LastWorldName[0] ? g_LastWorldName : "<unavailable>");
-    Log("arg7 packedArg7Selection    = 0x%08x", g_PackedArg7Selection);
-    Log("arg8 flagByte                = 0x%08x", g_FlagByte);
+    spdlog::info("arg3 hClientDll              = {}", fmt::ptr(g_hClient));
+    spdlog::info("arg4 hCresDll                = {}", fmt::ptr(g_hCres));
+    spdlog::info("arg5 launcherNetworkObject   = {}", fmt::ptr(g_pLauncherObject6304));
+    spdlog::info("arg6 ILTLoginMediatorDefault = {}", fmt::ptr(g_pILTLoginMediatorDefault));
+    spdlog::info("CLauncher+0xa8 placeholder   = 0x{:08x}", g_CLauncherFieldA8);
+    spdlog::info("CLauncher+0xac placeholder   = 0x{:08x}", g_CLauncherFieldAC);
+    spdlog::info("Last_WorldName               = {}", g_LastWorldName[0] ? g_LastWorldName : "<unavailable>");
+    spdlog::info("arg7 packedArg7Selection     = 0x{:08x}", g_PackedArg7Selection);
+    spdlog::info("arg8 flagByte                = 0x{:08x}", g_FlagByte);
 }
 
 // Current replacement note:
@@ -761,9 +752,8 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
 }
 
 int main(int argc, char* argv[]) {
-    g_LogFile = fopen("resurrections.log", "w");
     try {
-        auto logger = spdlog::basic_logger_mt("clientstate", "resurrections_spdlog.log", true);
+        auto logger = spdlog::basic_logger_mt("resurrections", "resurrections.log", true);
         spdlog::set_default_logger(logger);
         spdlog::set_level(spdlog::level::debug);
         spdlog::flush_on(spdlog::level::debug);
@@ -772,19 +762,19 @@ int main(int argc, char* argv[]) {
     AddVectoredExceptionHandler(1, DiagnosticVectoredExceptionHandler);
     SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
 
-    Log("Matrix Online launcher reimplementation scaffold");
-    Log("===============================================");
-    Log("Mode: original startup order, no client-memory injection");
-    Log("Default branch target: nopatch path");
-    Log("DIAGNOSTIC: spdlog debug file = resurrections_spdlog.log");
-    Log("");
+    spdlog::info("Matrix Online launcher reimplementation scaffold");
+    spdlog::info("===============================================");
+    spdlog::info("Mode: original startup order, no client-memory injection");
+    spdlog::info("Default branch target: nopatch path");
+    spdlog::info("DIAGNOSTIC: spdlog debug file = resurrections_spdlog.log");
+    spdlog::info("");
 
-    Log("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
-    Log("NOTE: launcher-owned nopatch setup, arg5, arg6, arg7, and arg8 remain incomplete.");
+    spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
+    spdlog::info("NOTE: launcher-owned nopatch setup, arg5, arg6, arg7, and arg8 remain incomplete.");
     if (!ConfigureFilteredArgv(argc, argv)) {
         return FinishAndReturn(1);
     }
-    Log("");
+    spdlog::info("");
 
     spdlog::info(
         "DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher object scaffold + InitClientDLL/RunClientDLL + launcher-owned auth begin");
@@ -844,28 +834,28 @@ int main(int argc, char* argv[]) {
     const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionBits();
     const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionBits();
     if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
-        Log(
-            "DIAGNOSTIC: rebuilt nopatch launcher-version float from launcher.exe version info = '%s' (0x%08x)",
+        spdlog::info(
+            "DIAGNOSTIC: rebuilt nopatch launcher-version float from launcher.exe version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchLauncherVersionString(),
             nopatchLauncherVersionValue);
     } else {
-        Log(
-            "DIAGNOSTIC: nopatch launcher-version float is using fallback 0.1 (0x%08x)",
+        spdlog::info(
+            "DIAGNOSTIC: nopatch launcher-version float is using fallback 0.1 (0x{:08x})",
             nopatchLauncherVersionValue);
     }
     if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
-        Log(
-            "DIAGNOSTIC: rebuilt nopatch client-version float from client.dll version info = '%s' (0x%08x)",
+        spdlog::info(
+            "DIAGNOSTIC: rebuilt nopatch client-version float from client.dll version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchClientVersionString(),
             nopatchClientVersionValue);
     } else {
-        Log(
-            "DIAGNOSTIC: nopatch client-version float is using fallback 0.1 (0x%08x)",
+        spdlog::info(
+            "DIAGNOSTIC: nopatch client-version float is using fallback 0.1 (0x{:08x})",
             nopatchClientVersionValue);
     }
 
     if (!PreloadDependencies()) {
-        Log("ERROR: preload failed");
+        spdlog::info("ERROR: preload failed");
         return FinishAndReturn(1);
     }
 
@@ -875,8 +865,8 @@ int main(int argc, char* argv[]) {
     // arg6 / sibling mediator configuration for InitClientDLL
     // Address anchor: launcher.exe:0x4d3584 = ILTLoginMediator sibling slot used by launcher-side selection resolution
     // =============================================================================
-    Log("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
-    
+    spdlog::info("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
+
     const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
     const uint32_t selectionPackedLow24 = g_PackedArg7Selection & 0x00ffffffu;
     const uint32_t worldUpperBoundExclusive =
@@ -909,11 +899,13 @@ int main(int argc, char* argv[]) {
         nopatchLauncherVersionValue,
         nopatchClientVersionValue);
 
+    spdlog::info("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
+
     if (g_pILTLoginMediatorDefault) {
         g_pILTLoginMediatorSelection3584 = g_pILTLoginMediatorDefault;
-        Log(
-            "DIAGNOSTIC: reusing current ILTLoginMediator.Default object as sibling 0x4d3584 selection slot (%p)",
-            g_pILTLoginMediatorSelection3584);
+        spdlog::info(
+            "DIAGNOSTIC: reusing current ILTLoginMediator.Default object as sibling 0x4d3584 selection slot ({})",
+            fmt::ptr(g_pILTLoginMediatorSelection3584));
 
         uint32_t resolvedA8 = g_CLauncherFieldA8;
         uint32_t resolvedAC = g_CLauncherFieldAC;
@@ -934,8 +926,8 @@ int main(int argc, char* argv[]) {
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
                 StoreLastWorldNameInRegistry(g_LastWorldName);
             }
-            Log(
-                "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x%08x ac=0x%08x packed=0x%08x world='%s'",
+            spdlog::info(
+                "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x world='{}'",
                 g_CLauncherFieldA8,
                 g_CLauncherFieldAC,
                 g_PackedArg7Selection,
@@ -977,7 +969,7 @@ int main(int argc, char* argv[]) {
         exactMarginHostName);
 
     if (!DiagnosticInitializePreclientEnvironmentLike402EC0()) {
-        Log("WARNING: pre-client environment scaffold failed to initialize");
+        spdlog::info("WARNING: pre-client environment scaffold failed to initialize");
     }
 
     RunOptionsCfgAutodetectStepIfNeeded();
@@ -990,39 +982,39 @@ int main(int argc, char* argv[]) {
     //   0x40a420  -> LoadLibraryA("client.dll")
     //   0x40a4d0  -> resolve exports + Init/Run/Term/Error path
 
-    Log("=== Original-path gaps still missing ===");
-    Log("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
+    spdlog::info("=== Original-path gaps still missing ===");
+    spdlog::info("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
     spdlog::info("arg5 status: current launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
     spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
     if (g_pILTLoginMediatorSelection3584) {
         spdlog::info("arg7 status: sibling 0x4d3584-style ILTLoginMediator selection slot currently reuses the active mediator object and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
     } else {
-        Log("missing: reconstruct sibling ILTLoginMediator.Default-style slot at 0x4d3584 for launcher-owned arg7 selection resolution");
+        spdlog::info("missing: reconstruct sibling ILTLoginMediator.Default-style slot at 0x4d3584 for launcher-owned arg7 selection resolution");
     }
     if (g_PreclientEnvironment.threadHandle) {
         spdlog::info("pre-client env status: current 0x402ec0-style launcher thread/message scaffold active (not yet faithful original class/import path)");
     } else {
-        Log("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
+        spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
-    Log("");
+    spdlog::info("");
 
     if (!LoadCresDLL()) {
-        Log("ERROR: failed to load cres.dll");
+        spdlog::info("ERROR: failed to load cres.dll");
         return FinishAndReturn(1);
     }
 
     if (!LoadClientDLL()) {
-        Log("ERROR: failed to load client.dll");
+        spdlog::info("ERROR: failed to load client.dll");
         return FinishAndReturn(1);
     }
 
     if (!ResolveClientExports()) {
-        Log("ERROR: missing required client exports");
+        spdlog::info("ERROR: missing required client exports");
         return FinishAndReturn(1);
     }
 
     LogKnownStartupState();
-    Log("");
+    spdlog::info("");
 
     const bool allowInitWithCurrentStartupScaffold =
         g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
@@ -1036,11 +1028,11 @@ int main(int argc, char* argv[]) {
     spdlog::info("DIAGNOSTIC: proceeding because the current launcher path now provides arg5 build/register, binder-backed arg6, and sibling-slot arg7 rebuild");
 
     if (g_pILTLoginMediatorDefault) {
-        Log("arg6 mediator object prepared for InitClientDLL: %p", g_pILTLoginMediatorDefault);
+        spdlog::info("arg6 mediator object prepared for InitClientDLL: {}", fmt::ptr(g_pILTLoginMediatorDefault));
     } else {
-        Log("WARNING: arg6 mediator object is NULL");
+        spdlog::info("WARNING: arg6 mediator object is NULL");
     }
-    
+
     int initResult = g_InitClientDLL(
         g_LauncherCommandLine.FilteredArgCount(),
         g_LauncherCommandLine.FilteredArgv(),
@@ -1051,13 +1043,13 @@ int main(int argc, char* argv[]) {
         g_PackedArg7Selection,
         g_FlagByte);
 
-    Log("InitClientDLL returned: %d", initResult);
+    spdlog::info("InitClientDLL returned: {}", initResult);
 
     // Original client code returns 1 on the observed success path and 0 / negative values on failure paths.
     // Do not treat non-zero generically as failure here.
     const bool initSucceeded = (initResult > 0);
     if (!initSucceeded) {
-        Log("InitClientDLL failed.");
+        spdlog::info("InitClientDLL failed.");
         return FinishAndReturn(1);
     }
 
@@ -1067,16 +1059,16 @@ int main(int argc, char* argv[]) {
     // - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
     if (DiagnosticCanBeginAuthConnection()) {
         const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
-        Log("DIAGNOSTIC: post-init auth auto-begin result = 0x%08x", (unsigned)authConnectResult);
+        spdlog::info("DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x}", (unsigned)authConnectResult);
     }
 
     spdlog::info("=== Calling RunClientDLL on the active launcher path ===");
     const int runResult = g_RunClientDLL();
-    Log("RunClientDLL returned: %d", runResult);
+    spdlog::info("RunClientDLL returned: {}", runResult);
 
     const bool runSucceeded = (runResult > 0);
     if (!runSucceeded) {
-        Log("RunClientDLL failed.");
+        spdlog::info("RunClientDLL failed.");
         return FinishAndReturn(1);
     }
 
@@ -1090,11 +1082,11 @@ int main(int argc, char* argv[]) {
     //   let the real client run its own shutdown persistence path
     spdlog::info("=== Calling TermClientDLL on the active launcher path ===");
     const int termResult = g_TermClientDLL();
-    Log("TermClientDLL returned: %d", termResult);
+    spdlog::info("TermClientDLL returned: {}", termResult);
 
     const bool termSucceeded = (termResult > 0);
     if (!termSucceeded) {
-        Log("TermClientDLL failed.");
+        spdlog::info("TermClientDLL failed.");
         return FinishAndReturn(1);
     }
 

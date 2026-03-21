@@ -226,28 +226,28 @@ static uint32_t DiagnosticReadMediatorState8PersistenceBodyDword(size_t offset) 
 static void LogMediatorState8PersistenceSummary(const char* slotLabel, void* returnAddress) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    Log(
-        "MediatorStub::%s caller=%p [%s] persistence{f1c='%s' f3c=0x%08x f40=0x%08x f48[0..3]=[%08x %08x %08x %08x] f68[0..1]=[%08x %08x] f88_00=0x%08x f88_444=0x%08x f88_448=0x%08x overflow13f4=0x%04x mcdGate13f6=%u clGate1452=%u sec11_145c=0x%08x sec11_len=%u}",
+    spdlog::info(
+        "MediatorStub::{} caller={} [{}] persistence{f1c='{}' f3c=0x{:08x} f40=0x{:08x} f48[0..3]=[{:08x} {:08x} {:08x} {:08x}] f68[0..1]=[{:08x} {:08x}] f88_00=0x{:08x} f88_444=0x{:08x} f88_448=0x{:08x} overflow13f4=0x{:04x} mcdGate13f6={:u} clGate1452={:u} sec11_145c=0x{:08x} sec11_len={:u}}",
         slotLabel ? slotLabel : "State8Persistence",
-        returnAddress,
+        fmt::ptr(returnAddress),
         DescribeMediatorCaller(returnAddress),
         NonEmptyOrPlaceholder(g_MediatorState8PersistenceF1c.string00.data()),
-        (unsigned)g_MediatorState8PersistenceF1c.field20,
-        (unsigned)g_MediatorState8PersistenceF1c.field24,
-        (unsigned)g_MediatorState8PersistenceF1c.header2c[0],
-        (unsigned)g_MediatorState8PersistenceF1c.header2c[1],
-        (unsigned)g_MediatorState8PersistenceF1c.header2c[2],
-        (unsigned)g_MediatorState8PersistenceF1c.header2c[3],
-        (unsigned)g_MediatorState8PersistenceF1c.secondary4c[0],
-        (unsigned)g_MediatorState8PersistenceF1c.secondary4c[1],
-        (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x00),
-        (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x444),
-        (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x448),
-        (unsigned)g_MediatorState8Overflow13f4,
-        ownerState ? (unsigned)ownerState->section0Flag13f6 : 0u,
-        ownerState ? (unsigned)ownerState->flag1452 : 0u,
-        ownerState ? (unsigned)ownerState->state8Section11Dword145c : 0u,
-        ownerState ? (unsigned)ownerState->state8Section11String1460.size() : 0u);
+        g_MediatorState8PersistenceF1c.field20,
+        g_MediatorState8PersistenceF1c.field24,
+        g_MediatorState8PersistenceF1c.header2c[0],
+        g_MediatorState8PersistenceF1c.header2c[1],
+        g_MediatorState8PersistenceF1c.header2c[2],
+        g_MediatorState8PersistenceF1c.header2c[3],
+        g_MediatorState8PersistenceF1c.secondary4c[0],
+        g_MediatorState8PersistenceF1c.secondary4c[1],
+        DiagnosticReadMediatorState8PersistenceBodyDword(0x00),
+        DiagnosticReadMediatorState8PersistenceBodyDword(0x444),
+        DiagnosticReadMediatorState8PersistenceBodyDword(0x448),
+        g_MediatorState8Overflow13f4,
+        ownerState ? ownerState->section0Flag13f6 : 0u,
+        ownerState ? ownerState->flag1452 : 0u,
+        ownerState ? ownerState->state8Section11Dword145c : 0u,
+        ownerState ? ownerState->state8Section11String1460.size() : 0u);
 }
 
 // anchor: launcher.exe:0x41f150
@@ -260,7 +260,7 @@ static uint32_t __thiscall Mediator_HasState8PersistenceData8c(MinimalLoginMedia
     (void)self;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const uint32_t ready = mediator && mediator->PostAuthMarginLoadingStateView().section0Flag13f6 ? 1u : 0u;
-    Log("MediatorStub::HasState8PersistenceData8c(+0x8c) -> %u", (unsigned)ready);
+    spdlog::info("MediatorStub::HasState8PersistenceData8c(+0x8c) -> {}", ready);
     return ready;
 }
 
@@ -299,10 +299,10 @@ static void* __thiscall Mediator_GetState8PersistenceOverflowC4(MinimalLoginMedi
         *outLength = g_MediatorState8Overflow13f4;
     }
     LogMediatorState8PersistenceSummary("GetState8PersistenceOverflowC4(+0xc4)", returnAddress);
-    Log(
-        "MediatorStub::GetState8PersistenceOverflowC4(+0xc4) -> %p [length=0x%04x]",
-        g_MediatorState8Overflow13f4 ? g_MediatorState8Overflow13f0.data() : nullptr,
-        (unsigned)g_MediatorState8Overflow13f4);
+    spdlog::info(
+        "MediatorStub::GetState8PersistenceOverflowC4(+0xc4) -> {} [length=0x{:04x}]",
+        fmt::ptr(g_MediatorState8Overflow13f4 ? g_MediatorState8Overflow13f0.data() : nullptr),
+        g_MediatorState8Overflow13f4);
     return g_MediatorState8Overflow13f4 ? g_MediatorState8Overflow13f0.data() : nullptr;
 }
 
@@ -313,7 +313,7 @@ static uint32_t __thiscall Mediator_HasState8Section11DataC8(MinimalLoginMediato
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const uint32_t ready =
         mediator && mediator->PostAuthMarginLoadingStateView().state8Section11Dword145c != 0u ? 1u : 0u;
-    Log("MediatorStub::HasState8Section11DataC8(+0xc8) -> %u", (unsigned)ready);
+    spdlog::info("MediatorStub::HasState8Section11DataC8(+0xc8) -> {}", ready);
     return ready;
 }
 
@@ -323,7 +323,7 @@ static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediat
     (void)self;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const uint32_t value = mediator ? mediator->PostAuthMarginLoadingStateView().state8Section11Dword145c : 0u;
-    Log("MediatorStub::GetState8Section11DwordCc(+0xcc) -> 0x%08x", (unsigned)value);
+    spdlog::info("MediatorStub::GetState8Section11DwordCc(+0xcc) -> 0x{:08x}", value);
     return value;
 }
 
@@ -332,10 +332,10 @@ static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediat
 static DiagnosticSmallStringLike* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
     (void)self;
     PopulateMediatorState8PersistenceF1c();
-    Log(
-        "MediatorStub::GetState8Section11StringD0(+0xd0) -> begin=%p current=%p text='%s'",
-        g_MediatorState8Section11String1460.begin,
-        g_MediatorState8Section11String1460.current,
+    spdlog::info(
+        "MediatorStub::GetState8Section11StringD0(+0xd0) -> begin={} current={} text='{}'",
+        fmt::ptr(g_MediatorState8Section11String1460.begin),
+        fmt::ptr(g_MediatorState8Section11String1460.current),
         g_MediatorState8Section11String1460Owned.empty() ? "<empty>" : g_MediatorState8Section11String1460Owned.c_str());
     return &g_MediatorState8Section11String1460;
 }

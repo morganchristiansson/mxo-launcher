@@ -9,7 +9,7 @@
 #include <cstring>
 #include <string>
 
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 // Broad ILTLoginMediator.Default ABI shell:
 // - keep startup-selection and general arg6 surface here
@@ -165,8 +165,8 @@ static void DiagnosticMirrorSelectionContextIntoMediatorModel(const void* select
     mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch input = {};
     std::memcpy(&input, selectionContext, sizeof(input));
     mediator->PersistSelectionContextForState8(input);
-    Log(
-        "DIAGNOSTIC: mirrored arg6 +0xec selection context into CLTLoginMediator state3->8 snapshot slot=0x%02x firstBlock04=0x%08x lastBlockA4=0x%08x",
+    spdlog::info(
+        "DIAGNOSTIC: mirrored arg6 +0xec selection context into CLTLoginMediator state3->8 snapshot slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
         (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
         (unsigned)input.block04[0],
         (unsigned)input.blockA4[3]);
@@ -300,22 +300,22 @@ static const char* MaskIfMediatorPassword(const char* value) {
 // UNANCHORED: generic pointer-word dumper used by mediator diagnostics.
 void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
-        Log("%s: <null>", label ? label : "PointerWords");
+        spdlog::info("{}: <null>", label ? label : "PointerWords");
         return;
     }
 
     const uint32_t* words = static_cast<const uint32_t*>(ptr);
-    Log("%s @ %p [+0x00]=%08x [+0x04]=%08x [+0x08]=%08x [+0x0c]=%08x",
+    spdlog::info("{} @ {} [+0x00]=0x{:08x} [+0x04]=0x{:08x} [+0x08]=0x{:08x} [+0x0c]=0x{:08x}",
         label,
-        ptr,
+        fmt::ptr(ptr),
         words[0],
         (wordCount > 1) ? words[1] : 0,
         (wordCount > 2) ? words[2] : 0,
         (wordCount > 3) ? words[3] : 0);
     if (wordCount > 4) {
-        Log("%s @ %p [+0x10]=%08x [+0x14]=%08x [+0x18]=%08x [+0x1c]=%08x",
+        spdlog::info("{} @ {} [+0x10]=0x{:08x} [+0x14]=0x{:08x} [+0x18]=0x{:08x} [+0x1c]=0x{:08x}",
             label,
-            ptr,
+            fmt::ptr(ptr),
             words[4],
             (wordCount > 5) ? words[5] : 0,
             (wordCount > 6) ? words[6] : 0,
@@ -337,17 +337,17 @@ void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
     const uint32_t* words = static_cast<const uint32_t*>(ptr);
     const uint32_t wordCount = byteCount / 4;
     for (uint32_t i = 0; i < wordCount; i += 4) {
-        Log(
-            "%s @ %p [+0x%02x]=%08x [+0x%02x]=%08x [+0x%02x]=%08x [+0x%02x]=%08x",
+        spdlog::info(
+            "{} @ {} [+0x{:02x}]={:08x} [+0x{:02x}]={:08x} [+0x{:02x}]={:08x} [+0x{:02x}]={:08x}",
             label,
-            ptr,
-            (unsigned)(i * 4),
+            fmt::ptr(ptr),
+            i * 4,
             words[i + 0],
-            (unsigned)((i + 1) * 4),
+            (i + 1) * 4,
             (i + 1 < wordCount) ? words[i + 1] : 0,
-            (unsigned)((i + 2) * 4),
+            ((i + 2) * 4),
             (i + 2 < wordCount) ? words[i + 2] : 0,
-            (unsigned)((i + 3) * 4),
+            ((i + 3) * 4),
             (i + 3 < wordCount) ? words[i + 3] : 0);
     }
 }
@@ -390,10 +390,7 @@ static void LogSelectionContextDetails(const void* selectionContext, uint32_t by
             const uint32_t copyLength = ((j - i) < (sizeof(buffer) - 1)) ? (j - i) : (sizeof(buffer) - 1);
             std::memcpy(buffer, bytes + i, copyLength);
             buffer[copyLength] = '\0';
-            Log(
-                "SelectionContext ascii candidate [+0x%02x] = '%s'",
-                (unsigned)i,
-                buffer);
+            spdlog::info("SelectionContext ascii candidate [+0x{:02x}] = '{}'", (unsigned)i, buffer);
             loggedAnyString = true;
             i = j + 1;
             continue;
@@ -403,7 +400,7 @@ static void LogSelectionContextDetails(const void* selectionContext, uint32_t by
     }
 
     if (!loggedAnyString) {
-        Log("SelectionContext ascii candidate scan: none");
+        spdlog::info("SelectionContext ascii candidate scan: none");
     }
 }
 
@@ -442,7 +439,7 @@ static int __thiscall Mediator_RegisterEngine(MinimalLoginMediatorStub* self, vo
     if (self) {
         self->field04 = object;
     }
-    Log("MediatorStub::RegisterEngine(%p)", object);
+    spdlog::info("MediatorStub::RegisterEngine({})", object);
     return 1;
 }
 
@@ -450,14 +447,14 @@ static int __thiscall Mediator_RegisterEngine(MinimalLoginMediatorStub* self, vo
 // vtable: ILTLoginMediator.Default slot +0x0c
 static void __thiscall Mediator_ClearEngine(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::ClearEngine()");
+    spdlog::info("MediatorStub::ClearEngine()");
 }
 
 // anchor: client.dll early InitClientDLL readiness gate on arg6 +0x10
 // vtable: ILTLoginMediator.Default slot +0x10
 static uint32_t __thiscall Mediator_IsReady(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::IsReady() -> 1");
+    spdlog::info("MediatorStub::IsReady() -> 1");
     return 1;
 }
 
@@ -470,7 +467,7 @@ static void __thiscall Mediator_SetValue1(MinimalLoginMediatorStub* self, void* 
     } else {
         g_MediatorRuntimeState.lastNopatchValue2Ptr = value;
     }
-    Log("MediatorStub::SetValue1(%p)", value);
+    spdlog::info("MediatorStub::SetValue1({})", value);
 }
 
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
@@ -479,10 +476,10 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
     static uint32_t s_IsConnectedCount = 0;
     ++s_IsConnectedCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(s_IsConnectedCount)) {
-        Log("MediatorStub::IsConnected() -> 1 [count=%u self=%p registeredEngine=%p]",
-            (unsigned)s_IsConnectedCount,
-            self,
-            self ? self->field04 : NULL);
+        spdlog::info("MediatorStub::IsConnected() -> 1 [count={:08x} self={}, registeredEngine={}",
+            s_IsConnectedCount,
+            fmt::ptr(self),
+            (self ? self->field04 : NULL));
     }
     return 1;
 }
@@ -512,15 +509,15 @@ static void* __thiscall Mediator_GetBootstrapRaw08AuxHandle50(MinimalLoginMediat
 // vtable: ILTLoginMediator.Default slot +0x58
 static const char* __thiscall Mediator_GetString0(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::GetString0(+0x58) -> '%s'", g_MediatorStringA);
+    spdlog::info("MediatorStub::GetString0(+0x58) -> '{}'", g_MediatorStringA);
     return g_MediatorStringA;
 }
 
 // UNANCHORED: C helper behind the caller-clean +0x60 ABI wrapper.
 extern "C" const char* Mediator_GetString1_Impl(MinimalLoginMediatorStub* self, const char* value) {
     (void)self;
-    Log(
-        "MediatorStub::GetString1(+0x60 value='%s') -> %s",
+    spdlog::info(
+        "MediatorStub::GetString1(+0x60 value='{}') -> {}",
         value ? value : "<null>",
         MaskedSensitiveValue(DiagnosticMediatorAuthPassword()));
     return DiagnosticMediatorAuthPassword();
@@ -545,8 +542,8 @@ __attribute__((naked)) static void Mediator_GetString1() {
 // UNANCHORED: C helper behind the caller-clean +0x5c ABI wrapper.
 extern "C" const char* Mediator_GetString2_Impl(MinimalLoginMediatorStub* self, const char* value) {
     (void)self;
-    Log(
-        "MediatorStub::GetString2(+0x5c value='%s') -> '%s'",
+    spdlog::info(
+        "MediatorStub::GetString2(+0x5c value='{}') -> '{}'",
         MaskIfMediatorPassword(value),
         DiagnosticMediatorAuthName());
     return DiagnosticMediatorAuthName();
@@ -572,8 +569,8 @@ __attribute__((naked)) static void Mediator_GetString2() {
 // vtable: ILTLoginMediator.Default slot +0xd8
 static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log(
-        "MediatorStub::GetArg7VariantUpperBoundExclusive(+0xd8) -> %u",
+    spdlog::info(
+        "MediatorStub::GetArg7VariantUpperBoundExclusive(+0xd8) -> {}",
         (unsigned)DiagnosticMediatorVariantUpperBoundExclusive());
     return DiagnosticMediatorVariantUpperBoundExclusive();
 }
@@ -583,8 +580,8 @@ static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalL
 static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub* self, uint32_t selectionHighByte) {
     (void)self;
     const char* variantName = DiagnosticMediatorVariantNameForIndex(selectionHighByte);
-    Log(
-        "MediatorStub::MapSelectionName(selectionHighByte=%u) -> '%s'",
+    spdlog::info(
+        "MediatorStub::MapSelectionName(selectionHighByte={}) -> '{}'",
         (unsigned)selectionHighByte,
         variantName ? variantName : "<null>");
     return variantName;
@@ -594,7 +591,7 @@ static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub
 // vtable: ILTLoginMediator.Default slot +0x54
 static uint32_t __thiscall Mediator_IsLauncherSelectionTypeEnabled(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::IsLauncherSelectionTypeEnabled(+0x54) -> 1");
+    spdlog::info("MediatorStub::IsLauncherSelectionTypeEnabled(+0x54) -> 1");
     return 1;
 }
 
@@ -603,22 +600,24 @@ static uint32_t __thiscall Mediator_IsLauncherSelectionTypeEnabled(MinimalLoginM
 static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorStub* self, uint32_t variantIndex) {
     (void)self;
     ++g_GetSelectionCallCount;
-    if (g_GetSelectionCallCount % 5 == 0) { Log("DIAGNOSTIC: GetSelectionDescriptor count = %u", g_GetSelectionCallCount); }
+    if (g_GetSelectionCallCount % 5 == 0) {
+        spdlog::info("DIAGNOSTIC: GetSelectionDescriptor count = {}", g_GetSelectionCallCount);
+    }
     const char* worldName = DiagnosticMediatorWorldNameForIndex(DiagnosticMediatorSelectedWorldIndexLow24());
     if (!worldName ||
         variantIndex >= DiagnosticMediatorVariantUpperBoundExclusive() ||
         !DiagnosticMediatorVariantIndexMatchesConfiguredSelection(variantIndex)) {
-        Log(
-            "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x%02x) -> NULL (world='%s' configuredVariant=0x%02x variantUpperBoundExclusive=%u)",
+        spdlog::info(
+            "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> NULL (world='{}' configuredVariant=0x{:02x} variantUpperBoundExclusive={})",
             (unsigned)(variantIndex & 0xffu),
             worldName ? worldName : "<null>",
-            (unsigned)DiagnosticMediatorSelectedVariantIndexHigh8(),
+            DiagnosticMediatorSelectedVariantIndexHigh8(),
             (unsigned)DiagnosticMediatorVariantUpperBoundExclusive());
         return NULL;
     }
 
-    Log(
-        "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x%02x) -> '%s'",
+    spdlog::info(
+        "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> '{}'",
         (unsigned)(variantIndex & 0xffu),
         worldName);
     return worldName;
@@ -636,12 +635,12 @@ static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* se
             state = DiagnosticMediatorSelectedVariantState();
         }
     }
-    Log(
-        "MediatorStub::GetVariantState(+0xe4 variantIndex=%d) -> %u (configuredVariant=0x%02x configuredState=%u)",
-        (int)variantIndex,
-        (unsigned)state,
-        (unsigned)DiagnosticMediatorSelectedVariantIndexHigh8(),
-        (unsigned)DiagnosticMediatorSelectedVariantState());
+    spdlog::info(
+        "MediatorStub::GetVariantState(+0xe4 variantIndex={}) -> {} (configuredVariant=0x{:02x} configuredState={})",
+        variantIndex,
+        state,
+        DiagnosticMediatorSelectedVariantIndexHigh8(),
+        DiagnosticMediatorSelectedVariantState());
     return state;
 }
 
@@ -653,8 +652,8 @@ static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* se
 // vtable: launcher.exe:0x4d3584 slot +0xf8
 static uint32_t __thiscall Mediator_GetWorldCount(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log(
-        "MediatorStub::GetWorldCount(+0xf8) -> %u",
+    spdlog::info(
+        "MediatorStub::GetWorldCount(+0xf8) -> {}",
         (unsigned)DiagnosticMediatorWorldUpperBoundExclusive());
     return DiagnosticMediatorWorldUpperBoundExclusive();
 }
@@ -664,13 +663,15 @@ static uint32_t __thiscall Mediator_GetWorldCount(MinimalLoginMediatorStub* self
 static const char* __thiscall Mediator_GetWorldNameByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
     ++g_GetSelectionCallCount;
-    if (g_GetSelectionCallCount % 5 == 0) { Log("DIAGNOSTIC: GetSelectionDescriptor count = %u", g_GetSelectionCallCount); }
+    if (g_GetSelectionCallCount % 5 == 0) {
+        spdlog::info("DIAGNOSTIC: GetSelectionDescriptor count = {}", g_GetSelectionCallCount);
+    }
     const char* worldName = DiagnosticMediatorWorldNameForIndex(worldIndex);
-    Log(
-        "MediatorStub::GetWorldNameByIndex(+0xfc worldIndex=0x%06x) -> %s (configuredWorld=0x%06x)",
+    spdlog::info(
+        "MediatorStub::GetWorldNameByIndex(+0xfc worldIndex=0x{:06x}) -> '{}' (configuredWorld=0x{:06x})",
         (unsigned)(worldIndex & 0x00ffffffu),
         worldName ? worldName : "<null>",
-        (unsigned)DiagnosticMediatorSelectedWorldIndexLow24());
+        DiagnosticMediatorSelectedWorldIndexLow24());
     return worldName;
 }
 
@@ -683,11 +684,11 @@ static uint32_t __thiscall Mediator_GetWorldTypeByIndex(MinimalLoginMediatorStub
          DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
             ? DiagnosticMediatorSelectedWorldType()
             : 0u;
-    Log(
-        "MediatorStub::GetWorldTypeByIndex(+0x100 worldIndex=0x%06x) -> %u (configuredWorld=0x%06x configuredType=%u)",
+    spdlog::info(
+        "MediatorStub::GetWorldTypeByIndex(+0x100 worldIndex=0x{:06x}) -> {} (configuredWorld=0x{:06x} configuredType={})",
         (unsigned)(worldIndex & 0x00ffffffu),
         (unsigned)worldType,
-        (unsigned)DiagnosticMediatorSelectedWorldIndexLow24(),
+        DiagnosticMediatorSelectedWorldIndexLow24(),
         (unsigned)DiagnosticMediatorSelectedWorldType());
     return worldType;
 }
@@ -701,8 +702,8 @@ static uint32_t __thiscall Mediator_GetWorldFlag104(MinimalLoginMediatorStub* se
          DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
             ? 0u
             : 0u;
-    Log(
-        "MediatorStub::GetWorldFlag104(+0x104 worldIndex=0x%06x) -> %u",
+    spdlog::info(
+        "MediatorStub::GetWorldFlag104(+0x104 worldIndex=0x{:06x}) -> {}",
         (unsigned)(worldIndex & 0x00ffffffu),
         (unsigned)flagValue);
     return flagValue;
@@ -717,8 +718,8 @@ static const char* __thiscall Mediator_GetWorldExtra108(MinimalLoginMediatorStub
          DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
             ? DiagnosticMediatorMappedVariantName()
             : NULL;
-    Log(
-        "MediatorStub::GetWorldExtra108(+0x108 worldIndex=0x%06x) -> %s",
+    spdlog::info(
+        "MediatorStub::GetWorldExtra108(+0x108 worldIndex=0x{:06x}) -> '{}'",
         (unsigned)(worldIndex & 0x00ffffffu),
         value ? value : "<null>");
     return value;
@@ -740,10 +741,10 @@ static DiagnosticSmallStringLike* __thiscall Mediator_GetRouteDescriptor10c(Mini
         g_MediatorRouteDescriptor10cOwned.c_str() + g_MediatorRouteDescriptor10cOwned.size();
     g_MediatorRouteDescriptor10c.capacity = g_MediatorRouteDescriptor10c.current;
 
-    Log(
-        "MediatorStub::GetRouteDescriptor10c(+0x10c) -> begin=%p current=%p text='%s'",
-        g_MediatorRouteDescriptor10c.begin,
-        g_MediatorRouteDescriptor10c.current,
+    spdlog::info(
+        "MediatorStub::GetRouteDescriptor10c(+0x10c) -> begin={} current={} text='{}'",
+        fmt::ptr(g_MediatorRouteDescriptor10c.begin),
+        fmt::ptr(g_MediatorRouteDescriptor10c.current),
         g_MediatorRouteDescriptor10cOwned.empty() ? "<empty>" : g_MediatorRouteDescriptor10cOwned.c_str());
     return &g_MediatorRouteDescriptor10c;
 }
@@ -755,9 +756,9 @@ static DiagnosticSmallStringLike* __thiscall Mediator_GetRouteDescriptor10c(Mini
 // - client reads it as a vector-like begin/current/capacity triple of 12-byte entries
 static DiagnosticVectorLike* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log(
-        "MediatorStub::GetLateEntryList118(+0x118) -> begin=%p current=%p capacity=%p (empty scaffold)",
-        g_MediatorLateEntryList118.begin,
+    spdlog::info(
+        "MediatorStub::GetLateEntryList118(+0x118) -> begin={} current={} capacity={} (empty scaffold)",
+        fmt::ptr(g_MediatorLateEntryList118.begin),
         g_MediatorLateEntryList118.current,
         g_MediatorLateEntryList118.capacity);
     return &g_MediatorLateEntryList118;
@@ -783,25 +784,25 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
         self->field1C = &g_MediatorSelectionContextCopy;
     }
     ++g_MediatorRuntimeState.selection0ecCount;
-    Log(
-        "MediatorStub::ConsumeSelectionContext(%p) [count=%u caller=%p copied=%p size=0x%lx valid=%u configuredWorld=0x%06x configuredVariant=0x%02x profile='%s' world='%s']",
-        selectionContext,
+    spdlog::info(
+        "MediatorStub::ConsumeSelectionContext({}) [count={} caller={} copied={}] size=0x{} valid={} configuredWorld=0x{} configuredVariant=0x{} profile='{}' world='{}'",
+        fmt::ptr(selectionContext),
         (unsigned)g_MediatorRuntimeState.selection0ecCount,
-        returnAddress,
-        &g_MediatorSelectionContextCopy,
+        fmt::ptr(returnAddress),
+        fmt::ptr(&g_MediatorSelectionContextCopy),
         (unsigned long)sizeof(g_MediatorSelectionContextCopy),
         g_MediatorSelectionContextCopyValid ? 1u : 0u,
-        (unsigned)DiagnosticMediatorSelectedWorldIndexLow24(),
-        (unsigned)DiagnosticMediatorSelectedVariantIndexHigh8(),
+        DiagnosticMediatorSelectedWorldIndexLow24(),
+        DiagnosticMediatorSelectedVariantIndexHigh8(),
         DiagnosticMediatorProfileName(),
         DiagnosticMediatorMappedSelectionName());
     LogPointerWords("ConsumeSelectionContext copied", &g_MediatorSelectionContextCopy, 8);
     const uint32_t* copiedWords = reinterpret_cast<const uint32_t*>(&g_MediatorSelectionContextCopy);
-    Log(
-        "DIAGNOSTIC: selectionContext[0]=0x%08x (configuredVariant=0x%02x configuredWorld=0x%06x)",
-        (unsigned)copiedWords[0],
-        (unsigned)DiagnosticMediatorSelectedVariantIndexHigh8(),
-        (unsigned)DiagnosticMediatorSelectedWorldIndexLow24());
+    spdlog::info(
+        "DIAGNOSTIC: selectionContext[0]=0x{:08x} (configuredVariant=0x{:02x} configuredWorld=0x{:06x})",
+        copiedWords[0],
+        DiagnosticMediatorSelectedVariantIndexHigh8(),
+        DiagnosticMediatorSelectedWorldIndexLow24());
     LogSelectionContextDetails(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
 }
 
@@ -830,12 +831,12 @@ extern "C" void Mediator_FillLoadingCharacterState120_Impl(
     void* returnAddress) {
     g_MediatorRuntimeState.loadingState120 = loadingState;
     ++g_MediatorRuntimeState.loading120Count;
-    Log(
-        "MediatorStub::FillLoadingCharacterState(+0x120 out=%p self=%p) [count=%u caller=%p copiedFrom0ec=%u]",
-        loadingState,
-        self,
+    spdlog::info(
+        "MediatorStub::FillLoadingCharacterState(+0x120 out={} self={}) [count={:08x} caller={} copiedFrom0ec={}]}",
+        fmt::ptr(loadingState),
+        fmt::ptr(self),
         (unsigned)g_MediatorRuntimeState.loading120Count,
-        returnAddress,
+        fmt::ptr(returnAddress),
         g_MediatorSelectionContextCopyValid ? 1u : 0u);
     LogPointerWords("FillLoadingCharacterState self", self, 8);
     LogPointerWords("FillLoadingCharacterState out(before/after stub)", loadingState, 8);
@@ -883,17 +884,17 @@ extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
         ? DiagnosticEnsureMediatorModel()->RegisterLoginObserverScaffold(observer)
         : false;
 
-    Log(
-        "MediatorStub::RegisterLoginObserver(+0x170 observer=%p self=%p) [count=%u inserted=%u first=%p latest124=(%p,%p,%p) caller=%p]",
-        observer,
-        self,
+    spdlog::info(
+        "MediatorStub::RegisterLoginObserver(+0x170 observer={} self={}) [count={} inserted={} first={} latest124=({}, {}, {}) caller={}]",
+        fmt::ptr(observer),
+        fmt::ptr(self),
         (unsigned)g_MediatorRuntimeState.observerRegister170Count,
-        inserted ? 1u : 0u,
-        g_MediatorRuntimeState.firstObserver170,
-        g_MediatorRuntimeState.netShell124,
-        g_MediatorRuntimeState.netMgr124,
-        g_MediatorRuntimeState.distrObjExecutive124,
-        returnAddress);
+        inserted ? "1" : "0",
+        fmt::ptr(g_MediatorRuntimeState.firstObserver170),
+        fmt::ptr(g_MediatorRuntimeState.netShell124),
+        fmt::ptr(g_MediatorRuntimeState.netMgr124),
+        fmt::ptr(g_MediatorRuntimeState.distrObjExecutive124),
+        fmt::ptr(returnAddress));
     LogPointerWords("RegisterLoginObserver self", self, 8);
     LogPointerWords("RegisterLoginObserver observer", observer, 4);
     return inserted ? 1u : 0u;
@@ -959,11 +960,11 @@ static void __thiscall Mediator_AttachRuntimeObject148(MinimalLoginMediatorStub*
     void* returnAddress = __builtin_return_address(0);
     g_MediatorRuntimeState.runtimeObject148 = runtimeObject;
     ++g_MediatorRuntimeState.runtime148Count;
-    Log(
-        "MediatorStub::AttachRuntimeObject(+0x148 guess=%p) [count=%u caller=%p]",
-        runtimeObject,
+    spdlog::info(
+        "MediatorStub::AttachRuntimeObject(+0x148 guess={}) [count={} caller={}]",
+        fmt::ptr(runtimeObject),
         (unsigned)g_MediatorRuntimeState.runtime148Count,
-        returnAddress);
+        fmt::ptr(returnAddress));
 }
 
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
@@ -978,11 +979,11 @@ extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
         ? DiagnosticEnsureMediatorModel()->UnregisterLoginObserverScaffold(observer)
         : false;
 
-    Log(
-        "MediatorStub::UnregisterLoginObserver(+0x174 observer=%p self=%p) [count=%u removed=%u caller=%p]",
-        observer,
-        self,
-        (unsigned)g_MediatorRuntimeState.observerUnregister174Count,
+    spdlog::info(
+        "MediatorStub::UnregisterLoginObserver(+0x174 observer={} self={}) [count={} removed={} caller={}]",
+        fmt::ptr(observer),
+        fmt::ptr(self),
+        g_MediatorRuntimeState.observerUnregister174Count,
         removed ? 1u : 0u,
         returnAddress);
     LogPointerWords("UnregisterLoginObserver observer", observer, 4);
@@ -1015,10 +1016,10 @@ static uint32_t __thiscall Mediator_GetLastLoginStatus178(MinimalLoginMediatorSt
     const uint32_t status = mediator ? mediator->WorldListCountOrStatus80() : 0u;
     g_MediatorRuntimeState.lastStatus178 = status;
     ++g_MediatorRuntimeState.statusQuery178Count;
-    Log(
-        "MediatorStub::GetLastLoginStatus(+0x178) -> 0x%08x [count=%u]",
-        (unsigned)status,
-        (unsigned)g_MediatorRuntimeState.statusQuery178Count);
+    spdlog::info(
+        "MediatorStub::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
+        status,
+        g_MediatorRuntimeState.statusQuery178Count);
     return status;
 }
 
@@ -1147,12 +1148,12 @@ static DiagnosticMediatorResolverNode* DiagnosticLookupResolverNode(
     if (!registry || !serviceName) return NULL;
 
     for (DiagnosticMediatorResolverNode* node = registry->resolverList; node; node = node->next) {
-        Log(
-            "DIAGNOSTIC: registry node %p service='%s' object=%p next=%p",
-            node,
+        spdlog::info(
+            "DIAGNOSTIC: registry node {} service='{}' object={} next={}",
+            fmt::ptr(node),
             node->serviceName ? node->serviceName : "<null>",
-            node->resolvedObject,
-            node->next);
+            fmt::ptr(node->resolvedObject),
+            fmt::ptr(node->next));
 
         if (node->serviceName && std::strcmp(node->serviceName, serviceName) == 0) {
             return node;
@@ -1166,31 +1167,31 @@ static DiagnosticMediatorResolverNode* DiagnosticLookupResolverNode(
 static bool DiagnosticResolveBinderWrapper(DiagnosticBinderWrapper* wrapper) {
     if (!wrapper || !wrapper->outSlot || !wrapper->registry) return false;
 
-    Log(
-        "DIAGNOSTIC: binder wrapper lookup(service='%s', mode=%u, outSlot=%p)",
+    spdlog::info(
+        "DIAGNOSTIC: binder wrapper lookup(service='{}', mode={:08x}, outSlot={})",
         wrapper->serviceName ? wrapper->serviceName : "<null>",
         (unsigned)wrapper->mode,
-        wrapper->outSlot);
-    Log(
-        "DIAGNOSTIC: binder registry=%p resolverList(registry+0x18)=%p",
-        wrapper->registry,
-        wrapper->registry->resolverList);
+        fmt::ptr(wrapper->outSlot));
+    spdlog::info(
+        "DIAGNOSTIC: binder registry={} resolverList(registry+0x18)={}",
+        fmt::ptr(wrapper->registry),
+        fmt::ptr(wrapper->registry->resolverList));
 
     DiagnosticMediatorResolverNode* node =
         DiagnosticLookupResolverNode(wrapper->registry, wrapper->serviceName);
     wrapper->lastResolvedNode = node;
     if (!node) {
-        Log("DIAGNOSTIC: binder lookup failed for '%s'", wrapper->serviceName ? wrapper->serviceName : "<null>");
+        spdlog::info("DIAGNOSTIC: binder lookup failed for '{}'", wrapper->serviceName ? wrapper->serviceName : "<null>");
         return false;
     }
 
     *wrapper->outSlot = node->resolvedObject;
-    Log(
-        "DIAGNOSTIC: binder resolved '%s' via node %p -> wrote %p to slot %p",
-        wrapper->serviceName,
-        node,
-        node->resolvedObject,
-        wrapper->outSlot);
+    spdlog::info(
+        "DIAGNOSTIC: binder resolved '{}' via node {} -> wrote {} to slot {}",
+        wrapper->serviceName ? wrapper->serviceName : "<null>",
+        fmt::ptr(node),
+        fmt::ptr(node->resolvedObject),
+        fmt::ptr(wrapper->outSlot));
     return true;
 }
 
@@ -1198,19 +1199,19 @@ static bool DiagnosticResolveBinderWrapper(DiagnosticBinderWrapper* wrapper) {
 void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr) {
     DiagnosticInitializeBinderScaffold(outMediatorPtr);
 
-    Log(
-        "DIAGNOSTIC: binder scaffold prepared wrapper=%p registry=%p resolver=%p targetSlot=%p",
-        &g_DiagnosticBinderWrapper,
-        &g_DiagnosticBinderRegistry,
-        &g_DiagnosticMediatorResolver,
-        outMediatorPtr);
+    spdlog::info(
+        "DIAGNOSTIC: binder scaffold prepared wrapper={} registry={} resolver={} targetSlot={}",
+        fmt::ptr(&g_DiagnosticBinderWrapper),
+        fmt::ptr(&g_DiagnosticBinderRegistry),
+        fmt::ptr(&g_DiagnosticMediatorResolver),
+        fmt::ptr(outMediatorPtr));
 
     if (!DiagnosticResolveBinderWrapper(&g_DiagnosticBinderWrapper)) {
-        Log("DIAGNOSTIC: binder scaffold failed to materialize arg6");
+        spdlog::info("DIAGNOSTIC: binder scaffold failed to materialize arg6");
         return;
     }
 
-    Log("DIAGNOSTIC: binder scaffold materialized arg6 as %p", outMediatorPtr ? *outMediatorPtr : NULL);
+    spdlog::info("DIAGNOSTIC: binder scaffold materialized arg6 as {}", fmt::ptr(outMediatorPtr ? *outMediatorPtr : NULL));
 }
 
 // UNANCHORED: diagnostic selection configurator for the replacement arg6 sidecar model.
@@ -1225,7 +1226,7 @@ void DiagnosticConfigureMediatorSelection(
     uint32_t selectedVariantState) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     if (!mediator) {
-        Log("DIAGNOSTIC: mediator selection configuration skipped (no scaffold model)");
+        spdlog::info("DIAGNOSTIC: mediator selection configuration skipped (no scaffold model)");
         return;
     }
 
@@ -1242,16 +1243,16 @@ void DiagnosticConfigureMediatorSelection(
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(mediator->Arg6MappedSelectionName()));
     g_MediatorSelectionPacked.field07 = mediator->Arg6MappedSelectionId();
 
-    Log(
-        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive=%u variantUpperBoundExclusive=%u worldName='%s' variantName='%s' selectedWorldLow24=0x%06x selectedVariantHigh8=0x%02x selectedWorldType=%u selectedVariantState=%u",
-        (unsigned)mediator->Arg6WorldUpperBoundExclusive(),
-        (unsigned)mediator->Arg6VariantUpperBoundExclusive(),
+    spdlog::info(
+        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive={} variantUpperBoundExclusive={} worldName='{}' variantName='{}' selectedWorldLow24=0x{:06x} selectedVariantHigh8=0x{:02x} selectedWorldType={} selectedVariantState={}",
+        mediator->Arg6WorldUpperBoundExclusive(),
+        mediator->Arg6VariantUpperBoundExclusive(),
         mediator->Arg6MappedSelectionName(),
         mediator->Arg6MappedVariantName(),
-        (unsigned)mediator->Arg6SelectedWorldIndexLow24(),
-        (unsigned)mediator->Arg6SelectedVariantIndexHigh8(),
-        (unsigned)mediator->Arg6SelectedWorldType(),
-        (unsigned)mediator->Arg6SelectedVariantState());
+        mediator->Arg6SelectedWorldIndexLow24(),
+        mediator->Arg6SelectedVariantIndexHigh8(),
+        mediator->Arg6SelectedWorldType(),
+        mediator->Arg6SelectedVariantState());
 }
 
 // UNANCHORED: launcher-style selection resolver used to model the current arg7 reconstruction path.
@@ -1264,13 +1265,13 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     char* outWorldName,
     uint32_t outWorldNameCapacity) {
     if (!mediatorPtr || !outFieldA8 || !outFieldAC) {
-        Log("DIAGNOSTIC: launcher selection resolve skipped (mediator=%p outA8=%p outAC=%p)", mediatorPtr, outFieldA8, outFieldAC);
+        spdlog::info("DIAGNOSTIC: launcher selection resolve skipped (mediator={})", fmt::ptr(mediatorPtr));
         return false;
     }
 
     void** vtable = *(void***)mediatorPtr;
     if (!vtable || !vtable[21] || !vtable[57] || !vtable[63] || !vtable[64]) {
-        Log("DIAGNOSTIC: launcher selection resolve missing mediator slots (+0x54/+0xe4/+0xfc/+0x100)");
+        spdlog::info("DIAGNOSTIC: launcher selection resolve missing mediator slots (+0x54/+0xe4/+0xfc/+0x100)");
         return false;
     }
 
@@ -1301,14 +1302,14 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     const bool variantAccepted = (variantState == 0u || variantState == 7u);
 
     if (!worldName || !typeAccepted || !variantAccepted) {
-        Log(
-            "DIAGNOSTIC: launcher selection resolve failed worldIndexLow24=0x%06x variantIndexHigh8=0x%02x worldName=%s worldType=%u typeAccepted=%u variantState=%u variantAccepted=%u",
-            (unsigned)worldIndexLow24,
-            (unsigned)variantIndexHigh8,
+        spdlog::info(
+            "DIAGNOSTIC: launcher selection resolve failed worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} worldName={} worldType={} typeAccepted={} variantState={} variantAccepted={}",
+            worldIndexLow24,
+            variantIndexHigh8,
             worldName ? worldName : "<null>",
-            (unsigned)worldType,
+            worldType,
             typeAccepted ? 1u : 0u,
-            (unsigned)variantState,
+            variantState,
             variantAccepted ? 1u : 0u);
         return false;
     }
@@ -1322,16 +1323,16 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
         outWorldName[outWorldNameCapacity - 1] = '\0';
     }
 
-    Log(
-        "DIAGNOSTIC: launcher-style selection resolve via mediator worldIndexLow24=0x%06x variantIndexHigh8=0x%02x -> worldName='%s' worldType=%u variantState=%u a8=0x%08x ac=0x%08x packed=0x%08x",
-        (unsigned)worldIndexLow24,
-        (unsigned)variantIndexHigh8,
+    spdlog::info(
+        "DIAGNOSTIC: launcher-style selection resolve via mediator worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} -> worldName='{}' worldType={} variantState={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
+        worldIndexLow24,
+        variantIndexHigh8,
         worldName,
-        (unsigned)worldType,
-        (unsigned)variantState,
-        (unsigned)*outFieldA8,
-        (unsigned)*outFieldAC,
-        (unsigned)((*outFieldAC & 0x00ffffffu) | ((*outFieldA8 & 0xffu) << 24)));
+        worldType,
+        variantState,
+        *outFieldA8,
+        *outFieldAC,
+        (*outFieldAC & 0x00ffffffu) | ((*outFieldA8 & 0xffu) << 24));
     return true;
 }
 
@@ -1342,7 +1343,7 @@ void DiagnosticConfigureMediatorProfileName(const char* profileName) {
         mediator->SetArg6ProfileName(profileName);
     }
 
-    Log("DIAGNOSTIC: mediator profile/session name configured as '%s'", DiagnosticMediatorProfileName());
+    spdlog::info("DIAGNOSTIC: mediator profile/session name configured as '{}'", DiagnosticMediatorProfileName());
 }
 
 // UNANCHORED: diagnostic auth-name configurator for arg6 +0x5c.
@@ -1352,7 +1353,7 @@ void DiagnosticConfigureMediatorAuthName(const char* authName) {
         mediator->SetArg6AuthName(authName);
     }
 
-    Log("DIAGNOSTIC: mediator auth-name chain (+0x5c) configured as '%s'", DiagnosticMediatorAuthName());
+    spdlog::info("DIAGNOSTIC: mediator auth-name chain (+0x5c) configured as '{}'", DiagnosticMediatorAuthName());
     DiagnosticAuthSetMediatorCredentials(DiagnosticMediatorAuthName(), DiagnosticMediatorAuthPassword());
 }
 
@@ -1363,8 +1364,8 @@ void DiagnosticConfigureMediatorAuthPassword(const char* authPassword) {
         mediator->SetArg6AuthPassword(authPassword);
     }
 
-    Log(
-        "DIAGNOSTIC: mediator auth-password chain (+0x60) configured as %s",
+    spdlog::info(
+        "DIAGNOSTIC: mediator auth-password chain (+0x60) configured as {}",
         MaskedSensitiveValue(DiagnosticMediatorAuthPassword()));
     DiagnosticAuthSetMediatorCredentials(DiagnosticMediatorAuthName(), DiagnosticMediatorAuthPassword());
 }
@@ -1379,7 +1380,7 @@ void DiagnosticApplyDefaultNopatchMediatorConfig(
 
     void** vtable = *(void***)mediatorPtr;
     if (!vtable || !vtable[7] || !vtable[9]) {
-        Log("DIAGNOSTIC: mediator nopatch slots unavailable");
+        spdlog::info("DIAGNOSTIC: mediator nopatch slots unavailable");
         return;
     }
 
@@ -1387,11 +1388,11 @@ void DiagnosticApplyDefaultNopatchMediatorConfig(
     SetValueFn setValue1 = (SetValueFn)vtable[7];
     SetValueFn setValue2 = (SetValueFn)vtable[9];
 
-    setValue1(mediatorPtr, (void*)&parsedNoPatchValue);
-    Log("DIAGNOSTIC: applied default nopatch mediator +0x1c with value 0x%08x", parsedNoPatchValue);
+    setValue1(mediatorPtr, &parsedNoPatchValue);
+    spdlog::info("DIAGNOSTIC: applied default nopatch mediator +0x1c with value 0x{:08x}", parsedNoPatchValue);
 
-    setValue2(mediatorPtr, (void*)&clientVersionValue);
-    Log("DIAGNOSTIC: applied default nopatch mediator +0x24 with value 0x%08x", clientVersionValue);
+    setValue2(mediatorPtr, &clientVersionValue);
+    spdlog::info("DIAGNOSTIC: applied default nopatch mediator +0x24 with value 0x{:08x}", clientVersionValue);
 }
 
 

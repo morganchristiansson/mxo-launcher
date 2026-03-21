@@ -3,6 +3,8 @@
 #include "loginmediator.h"
 #include "../../../../src/diagnostics.h"
 
+#include <spdlog/spdlog.h>
+
 namespace mxo::ltlogin {
 
 namespace {
@@ -53,9 +55,9 @@ uint32_t LaunchPadClient::OnLoginRequestStatus(
     mediator->SetSharedMarginPacketField660(sharedMarginPacketField660);
     mediator->SetLaunchPadSourceBlock94FirstString(sourceBlock94FirstString);
 
-    Log(
-        "DIAGNOSTIC: mirrored launchpad login-request success owner660=0x%08x source94.inlineString00='%s' session='%s'",
-        (unsigned)sharedMarginPacketField660,
+    spdlog::info(
+        "DIAGNOSTIC: mirrored launchpad login-request success owner660=0x{:08x} source94.inlineString00='{}' session='{}'",
+        sharedMarginPacketField660,
         NonEmptyOrFallback(sourceBlock94FirstString, "<empty>"),
         NonEmptyOrFallback(sessionText, "<empty>"));
     return 1u;
@@ -81,7 +83,7 @@ uint32_t LaunchPadClient::OnPlayRequestStatus(
 
     mediator->SetGameSessionId664(gameSessionId);
 
-    Log(
+    spdlog::info(
         "DIAGNOSTIC: mirrored launchpad play-request success GameSessionID='%s'",
         NonEmptyOrFallback(gameSessionId, "<empty>"));
     return 1u;

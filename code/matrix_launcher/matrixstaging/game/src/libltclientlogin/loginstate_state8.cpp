@@ -4,7 +4,7 @@
 #include "loginstate_loadcharacterreply_scaffold.h"
 #include "loginstate_packet_builder_scaffold.h"
 #include "../../../../src/diagnostics.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -476,8 +476,8 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         if (CLTLoginState* fallbackState = mediator->ScaffoldState4()) {
             mediator->SwitchHelperStateScaffold(4u, fallbackState);
         }
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4 currentState=%s",
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4 currentState={}",
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
         return 0u;
     }
@@ -485,8 +485,8 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         if (CLTLoginState* fallbackState = mediator->ScaffoldState6()) {
             mediator->SwitchHelperStateScaffold(6u, fallbackState);
         }
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0xf14==0; original would switch helper state to 6 currentState=%s",
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0xf14==0; original would switch helper state to 6 currentState={}",
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
         return 0u;
     }
@@ -546,17 +546,17 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD70()));
     const char* gameSessionId = mediator->GetGameSessionId664();
 
-    Log(
-        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x%02x totalBytes=0x%02x gcidLow=0x%08x gcidHigh=0x%08x nonZeroSnapshotBlocks=%u/11 blockCd0_0=0x%08x blockD70_3=0x%08x GameSessionID='%s' -> sendResult=0x%08x then posts event=9",
-        (unsigned)State8StructuredMarginPacketFixedPayload::kFixedByteCount,
-        (unsigned)packetBuilder.PayloadByteCount(),
-        currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdLow03 : 0u,
-        currentSlotRecord ? (unsigned)currentSlotRecord->globalCharacterIdHigh07 : 0u,
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
+        State8StructuredMarginPacketFixedPayload::kFixedByteCount,
+        packetBuilder.PayloadByteCount(),
+        currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
+        currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u,
         nonZeroSnapshotBlockCount,
-        (unsigned)mediator->SelectionContextBlockCd0()[0],
-        (unsigned)mediator->SelectionContextBlockD70()[3],
+        mediator->SelectionContextBlockCd0()[0],
+        mediator->SelectionContextBlockD70()[3],
         gameSessionId ? gameSessionId : "<empty>",
-        (unsigned)sendResult);
+        sendResult);
     return sendResult;
 }
 
@@ -579,15 +579,15 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     if (!parsed.valid) {
         const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
-            Log(
-                "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 -> dispatchResult=0x%08x",
-                (unsigned)fallbackResult);
+            spdlog::info(
+                "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 -> dispatchResult=0x{:08x}",
+                fallbackResult);
             return 1u;
         }
         mediator->WorldListCountOrStatus80() = 0x12000005u;
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x%08x; mirrored owner+0x80=0x12000005",
-            (unsigned)fallbackResult);
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
+            fallbackResult);
         return 0u;
     }
 
@@ -601,9 +601,9 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             mediator->SwitchHelperStateScaffold(3u, failureState);
         }
         mediator->PostErrorScaffold(10u);
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x%08x; original would switch helper state to 3 and post error=10 currentState=%s",
-            (unsigned)parsed.status,
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would switch helper state to 3 and post error=10 currentState={}",
+            parsed.status,
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
         return 1u;
     }
@@ -637,28 +637,28 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
         mediator->PostEventScaffold(0x0bu);
 
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u firstFragment=%u usedCurrentSlotRecord=%u -> currentState=helper9 event=0x0b",
-            (unsigned)parsed.status,
-            (unsigned)parsed.sectionSelectorMinus2,
-            (unsigned)parsed.sectionByteCount,
-            (unsigned)parsed.handoffWord09,
-            (unsigned)replySectionsSeen_,
-            (unsigned)replySectionsExpected_,
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} usedCurrentSlotRecord={} -> currentState=helper9 event=0x0b",
+            parsed.status,
+            parsed.sectionSelectorMinus2,
+            parsed.sectionByteCount,
+            parsed.handoffWord09,
+            replySectionsSeen_,
+            replySectionsExpected_,
             firstFragment ? 1u : 0u,
             usedCurrentSlotRecord ? 1u : 0u);
         replySectionsSeen_ = 0;
         replySectionsExpected_ = 0;
         ownerState.state8Section10ChunkBitmap = 0u;
     } else {
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage routed state8 reply status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u seedCount=%u firstFragment=%u usedCurrentSlotRecord=%u",
-            (unsigned)parsed.status,
-            (unsigned)parsed.sectionSelectorMinus2,
-            (unsigned)parsed.sectionByteCount,
-            (unsigned)parsed.handoffWord09,
-            (unsigned)replySectionsSeen_,
-            (unsigned)replySectionsExpected_,
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage routed state8 reply status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} seedCount={} firstFragment={} usedCurrentSlotRecord={}",
+            parsed.status,
+            parsed.sectionSelectorMinus2,
+            parsed.sectionByteCount,
+            parsed.handoffWord09,
+            replySectionsSeen_,
+            replySectionsExpected_,
             parsed.shouldSeedExpectedSectionCount ? 1u : 0u,
             firstFragment ? 1u : 0u,
             usedCurrentSlotRecord ? 1u : 0u);

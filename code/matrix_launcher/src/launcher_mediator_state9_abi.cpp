@@ -4,6 +4,9 @@
 #include "diagnostics_auth.h"
 #include "loginmediator.h"
 
+#include <spdlog/spdlog.h>
+
+
 // Focused late-login arg6 ABI split:
 // - keep the state9-only ILTLoginMediator.Default slots out of the broad startup-selection ABI TU
 // - active surface here is deliberately narrow:
@@ -21,7 +24,7 @@
 static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalLoginMediatorStub* self) {
     (void)self;
     const void* seedPointer = DiagnosticGetState9CallbackSeedPointer85D4();
-    Log("MediatorStub::GetState9CallbackSeedPointer85D4(+0xd4) -> %p", seedPointer);
+    spdlog::info("MediatorStub::GetState9CallbackSeedPointer85D4(+0xd4) -> {}", (uintptr_t)seedPointer);
     return seedPointer;
 }
 
@@ -55,14 +58,14 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
         DiagnosticMirrorState9StartupTripleIntoLoginController(pNetShell, pNetMgr, pDistrObjExecutive);
     }
     ++g_MediatorRuntimeState.provide124Count;
-    Log(
-        "MediatorStub::ProvideStartupTriple(netShell=%p netMgr=%p distrObjExecutive=%p self=%p) [count=%u caller=%p liveState9Triple=1]",
-        pNetShell,
-        pNetMgr,
-        pDistrObjExecutive,
-        self,
+    spdlog::info(
+        "MediatorStub::ProvideStartupTriple(netShell={} netMgr={} distrObjExecutive={} self={}) [count={} caller={} liveState9Triple=1]",
+        (uintptr_t)pNetShell,
+        (uintptr_t)pNetMgr,
+        (uintptr_t)pDistrObjExecutive,
+        (uintptr_t)self,
         (unsigned)g_MediatorRuntimeState.provide124Count,
-        returnAddress);
+        (uintptr_t)returnAddress);
     LogPointerWords("ProvideStartupTriple self", self, 8);
     LogPointerWords("ProvideStartupTriple netShell", pNetShell, 8);
     LogPointerWords("ProvideStartupTriple netMgr", pNetMgr, 8);
@@ -122,13 +125,13 @@ extern "C" uint32_t Mediator_FillState9CallbackBlob18c_Impl(
             }
         }
     }
-    Log(
-        "MediatorStub::FillState9CallbackBlob18c(+0x18c out=%p arg2=0x%08x arg3=0x%08x) -> 0x%08x [caller=%p]",
-        outBuffer,
+    spdlog::info(
+        "MediatorStub::FillState9CallbackBlob18c(+0x18c out={} arg2=0x{:08x} arg3=0x{:08x}) -> 0x{:08x} [caller={}]'",
+        (uintptr_t)outBuffer,
         (unsigned)arg2,
         (unsigned)arg3,
         (unsigned)result,
-        returnAddress);
+        (uintptr_t)returnAddress);
     if (result == 0u && outBuffer) {
         LogWordBuffer("FillState9CallbackBlob18c out", outBuffer, 0x20u);
     }

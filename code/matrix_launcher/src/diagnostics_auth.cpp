@@ -6,10 +6,11 @@
 #include "loginmediator.h"
 #include "loginstate.h"
 #include "launchpad.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
+#include <spdlog/spdlog.h>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -72,11 +73,10 @@ static const char* g_LoginControllerAuthPassword = "";
 
 static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWorkItemStub* self) {
     if (self) {
-        Log(
-            "DIAGNOSTIC: releasing queued work item %p type=%u payload=0x%08x label='%s'",
-            self,
-            (unsigned)self->header.workType,
-            (unsigned)self->workPayload,
+        spdlog::info("DIAGNOSTIC: releasing queued work item {} type={} payload=0x{:08x} label='{}'",
+            fmt::ptr(self),
+            self->header.workType,
+            self->workPayload,
             self->debugLabel ? self->debugLabel : "<null>");
         std::free(self);
     }
@@ -84,9 +84,9 @@ static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWork
 }
 
 static uint32_t __thiscall DiagnosticRawMessageConnectionContext_Release(DiagnosticRawMessageConnectionContext* self) {
-    Log(
-        "DIAGNOSTIC: raw message-connection context release self=%p label='%s' autoRelease=%u",
-        self,
+    spdlog::info(
+        "DIAGNOSTIC: raw message-connection context release self={} label={}' autoRelease={}",
+        fmt::ptr(self),
         (self && self->debugLabel) ? self->debugLabel : "<null>",
         (self && self->autoReleaseFlag) ? 1u : 0u);
     return 1;
@@ -207,13 +207,13 @@ static void DiagnosticRouteConnectStatusToLoginController(
 static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationCompleted(
     DiagnosticRawMessageConnectionContext* self,
     DiagnosticQueuedWorkItemStub* workItem) {
-    Log(
-        "DIAGNOSTIC: raw message-connection context OnOperationCompleted self=%p label='%s' workItem=%p type=%u payload=0x%08x",
-        self,
+    spdlog::info(
+        "DIAGNOSTIC: raw message-connection context OnOperationCompleted self={} label={}' workItem={} type={} payload=0x{:08x}",
+        fmt::ptr(self),
         (self && self->debugLabel) ? self->debugLabel : "<null>",
-        workItem,
-        workItem ? (unsigned)workItem->header.workType : 0u,
-        workItem ? (unsigned)workItem->workPayload : 0u);
+        fmt::ptr(workItem),
+        workItem ? workItem->header.workType : 0u,
+        workItem ? workItem->workPayload : 0u);
 
     if (self && self->sidecarConnection && workItem) {
         if (workItem->header.workType == 2u) {
@@ -233,8 +233,8 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                     std::snprintf(out, 4, "%02x ", bytes[i]);
                     out += 3;
                 }
-                Log(
-                    "DIAGNOSTIC: received-bytes label='%s' total=%u preview=%s",
+                spdlog::info(
+                    "DIAGNOSTIC: received-bytes label={}' total={} preview={}",
                     self->debugLabel ? self->debugLabel : "<null>",
                     (unsigned)bytes.size(),
                     hexPreview);
@@ -252,35 +252,35 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                         &consumedBytes);
                     const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
                     if (!parsedFrame) {
-                        Log(
-                            "DIAGNOSTIC: auth receive buffering incomplete frame buffered=%u preview=%s",
-                            (unsigned)bytes.size(),
+                        spdlog::info(
+                            "DIAGNOSTIC: auth receive buffering incomplete frame buffered={} preview={}",
+                            bytes.size(),
                             hexPreview);
                         break;
                     }
 
-                    Log(
-                        "DIAGNOSTIC: auth receive framing payloadLength=%u headerBytes=%u rawCode=0x%02x likelyMessage='%s'",
-                        (unsigned)payloadSize,
-                        (unsigned)headerBytes,
-                        (unsigned)rawCode,
+                    spdlog::info(
+                        "DIAGNOSTIC: auth receive framing payloadLength={} headerBytes={} rawCode=0x{:02x} likelyMessage='{}",
+                        payloadSize,
+                        headerBytes,
+                        rawCode,
                         DiagnosticAuthRawCodeName(rawCode));
 
                     if (g_DiagnosticLoginController) {
                         const uint32_t handled =
                             g_DiagnosticLoginController->HandleAuthPacketBytes(payloadBytes, payloadSize);
-                        Log(
-                            "DIAGNOSTIC: launcher-owned auth packet handler label='%s' handled=%u rawCode=0x%02x",
+                        spdlog::info(
+                            "DIAGNOSTIC: launcher-owned auth packet handler label={} handled={} rawCode=0x{:02x}",
                             self->debugLabel ? self->debugLabel : "<null>",
-                            (unsigned)handled,
-                            (unsigned)rawCode);
+                            handled,
+                            rawCode);
 
                         if (handled != 0u && rawCode == 0x0b && !g_DiagnosticPostAuthMarginBeginAttempted) {
                             g_DiagnosticPostAuthMarginBeginAttempted = true;
                             const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
-                            Log(
-                                "DIAGNOSTIC: post-AS_AuthReply margin auto-begin result = 0x%08x",
-                                (unsigned)marginConnectResult);
+                            spdlog::info(
+                                "DIAGNOSTIC: post-AS_AuthReply margin auto-begin result = 0x{:08x}",
+                                marginConnectResult);
                         }
                     }
 
@@ -301,30 +301,30 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                         &consumedBytes);
                     const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
                     if (!parsedFrame) {
-                        Log(
-                            "DIAGNOSTIC: margin receive buffering incomplete frame buffered=%u preview=%s",
-                            (unsigned)bytes.size(),
+                        spdlog::info(
+                            "DIAGNOSTIC: margin receive buffering incomplete frame buffered={} preview={}",
+                            bytes.size(),
                             hexPreview);
                         break;
                     }
 
                     const bool looksLikePlainBootstrapReply =
                         rawCode == 0x02u || rawCode == 0x04u || rawCode == 0x07u || rawCode == 0x09u;
-                    Log(
-                        "DIAGNOSTIC: margin receive framing payloadLength=%u headerBytes=%u outerByte0=0x%02x framingHint='%s' logicalOpcode=resolved-later-by-mediator-after-optional-decrypt",
-                        (unsigned)payloadSize,
-                        (unsigned)headerBytes,
-                        (unsigned)rawCode,
+                    spdlog::info(
+                        "DIAGNOSTIC: margin receive framing payloadLength={} headerBytes={} outerByte0=0x{:02x} framingHint={} logicalOpcode=resolved-later-by-mediator-after-optional-decrypt",
+                        payloadSize,
+                        headerBytes,
+                        rawCode,
                         looksLikePlainBootstrapReply ? "plaintext-bootstrap-reply" : "possibly-encrypted-post-bootstrap-payload");
 
                     if (g_DiagnosticLoginController && payloadBytes && payloadSize != 0u) {
                         const uint32_t handled =
                             g_DiagnosticLoginController->HandleMarginPacketBytes(payloadBytes, payloadSize);
-                        Log(
-                            "DIAGNOSTIC: launcher-owned margin packet handler label='%s' handled=%u outerByte0=0x%02x decryptedOpcode=see-CLTLoginMediator-log-when-transportEncrypted=1",
+                        spdlog::info(
+                            "DIAGNOSTIC: launcher-owned margin packet handler label={} handled={} outerByte0=0x{:02x} decryptedOpcode=see-CLTLoginMediator-log-when-transportEncrypted=1",
                             self->debugLabel ? self->debugLabel : "<null>",
-                            (unsigned)handled,
-                            (unsigned)rawCode);
+                            handled,
+                            rawCode);
                     }
 
                     self->sidecarConnection->ConsumeReceivedBytesPrefix(consumedBytes);
@@ -355,7 +355,7 @@ static DiagnosticRawMessageConnectionContext* DiagnosticGetOrCreateRawConnection
     if (!*slot) {
         *slot = static_cast<DiagnosticRawMessageConnectionContext*>(std::calloc(1, sizeof(DiagnosticRawMessageConnectionContext)));
         if (!*slot) {
-            Log("DIAGNOSTIC: failed to allocate raw message-connection context for '%s'", label ? label : "<null>");
+            spdlog::info("DIAGNOSTIC: failed to allocate raw message-connection context for '{}'", label ? label : "<null>");
             return NULL;
         }
         (*slot)->vtable = g_DiagnosticMessageConnectionContextVtable;
@@ -377,7 +377,7 @@ static bool DiagnosticEnqueueConnectionStatusWorkItem(
 
     DiagnosticQueuedWorkItemStub* workItem = static_cast<DiagnosticQueuedWorkItemStub*>(std::calloc(1, sizeof(DiagnosticQueuedWorkItemStub)));
     if (!workItem) {
-        Log("DIAGNOSTIC: failed to allocate queued work item for '%s'", label ? label : "<null>");
+        spdlog::info("DIAGNOSTIC: failed to allocate queued work item for '{}'", label ? label : "<null>");
         return false;
     }
 
@@ -395,13 +395,13 @@ static bool DiagnosticEnqueueConnectionStatusWorkItem(
         return false;
     }
 
-    Log(
-        "DIAGNOSTIC: queued connection-status work item label='%s' workItem=%p context=%p type=%u payload=0x%08x",
+    spdlog::info(
+        "DIAGNOSTIC: queued connection-status work item label={}' workItem={} context={} type={} payload=0x{:08x}",
         label ? label : "<null>",
-        workItem,
-        context,
-        (unsigned)workType,
-        (unsigned)workPayload);
+        fmt::ptr(workItem),
+        fmt::ptr(context),
+        workType,
+        workPayload);
     return true;
 }
 
@@ -505,7 +505,7 @@ void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerC
         g_DiagnosticLoginController->SetNetworkEngine(engine);
         g_DiagnosticLoginController->InitializeConnectionHelpers();
         DiagnosticApplyLoginControllerConfig();
-        Log("DIAGNOSTIC: created CLTLoginMediator sidecar for launcher object %p", owner);
+        spdlog::info("DIAGNOSTIC: created CLTLoginMediator sidecar for launcher object {}", fmt::ptr(owner));
     }
 }
 
@@ -581,8 +581,8 @@ void DiagnosticConfigureLoginControllerNetwork(
     g_LoginControllerExactMarginHostName[sizeof(g_LoginControllerExactMarginHostName) - 1] = '\0';
 
     DiagnosticApplyLoginControllerConfig();
-    Log(
-        "DIAGNOSTIC: login controller network configured auth='%s':%u marginSuffix='%s' marginPort=%u marginRoutePrefix='%s' exactMarginHost='%s' ignoreAuthHosts=%u ignoreMarginHosts=%u",
+    spdlog::info(
+        "DIAGNOSTIC: login controller network configured auth='{}' port={} marginSuffix='{}' marginPort={} marginRoutePrefix='{}' exactMarginHost='{}' ignoreAuthHosts={} ignoreMarginHosts={}",
         g_LoginControllerAuthDnsName,
         (unsigned)g_LoginControllerAuthPortHostOrder,
         g_LoginControllerMarginDnsSuffix,
@@ -598,21 +598,21 @@ void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionCo
         return;
     }
     if (byteCount < sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch)) {
-        Log(
-            "DIAGNOSTIC: selection context mirror into login controller skipped byteCount=0x%lx required=0x%lx",
-            (unsigned long)byteCount,
-            (unsigned long)sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch));
+        spdlog::info(
+            "DIAGNOSTIC: selection context mirror into login controller skipped byteCount=0x{:x} required=0x{:x}",
+            byteCount,
+            sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch));
         return;
     }
 
     mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch input = {};
     std::memcpy(&input, selectionContext, sizeof(input));
     g_DiagnosticLoginController->PersistSelectionContextForState8(input);
-    Log(
-        "DIAGNOSTIC: mirrored selection context into CLTLoginMediator sidecar slot=0x%02x firstBlock04=0x%08x lastBlockA4=0x%08x",
-        (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
-        (unsigned)input.block04[0],
-        (unsigned)input.blockA4[3]);
+    spdlog::info(
+        "DIAGNOSTIC: mirrored selection context into CLTLoginMediator sidecar slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
+        input.slotOrSelectionIndex00 & 0xffu,
+        input.block04[0],
+        input.blockA4[3]);
 }
 
 void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, void* object88, void* object8c) {
@@ -621,11 +621,11 @@ void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, vo
     }
 
     g_DiagnosticLoginController->SetState9CallbackObjectTriple84_88_8c(callback84, object88, object8c);
-    Log(
-        "DIAGNOSTIC: mirrored state9 startup triple into CLTLoginMediator sidecar callback84=%p object88=%p object8c=%p",
-        callback84,
-        object88,
-        object8c);
+    spdlog::info(
+        "DIAGNOSTIC: mirrored state9 startup triple into CLTLoginMediator sidecar callback84={} object88={} object8c={}",
+        fmt::ptr(callback84),
+        fmt::ptr(object88),
+        fmt::ptr(object8c));
 }
 
 uint32_t DiagnosticFillState9CallbackBlob18c(void* outBuffer, uint32_t arg2, uint32_t arg3) {
@@ -788,7 +788,7 @@ bool DiagnosticCanBeginAuthConnection() {
 
 uint32_t DiagnosticBeginAuthConnection() {
     if (!g_DiagnosticLoginController) {
-        Log("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for auth connection");
+        spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for auth connection");
         return 0;
     }
 
@@ -821,7 +821,7 @@ uint32_t DiagnosticBeginAuthConnection() {
 
 uint32_t DiagnosticBeginMarginConnection() {
     if (!g_DiagnosticLoginController) {
-        Log("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for margin connection");
+        spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for margin connection");
         return 0;
     }
 

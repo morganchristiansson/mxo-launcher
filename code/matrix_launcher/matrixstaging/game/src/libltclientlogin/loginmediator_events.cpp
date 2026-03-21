@@ -2,7 +2,7 @@
 
 #include "../../../../src/diagnostics.h"
 #include "loginstate.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -91,8 +91,8 @@ void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLogi
             "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState=<null> (source scaffold leaves currentState unchanged)",
             static_cast<unsigned>(helperStateId),
             oldState ? oldState->DebugName() : "<null>");
-        Log(
-            "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x%02x oldState=%s newState=<null>",
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState=<null>",
             (unsigned)(helperStateId & 0xffu),
             oldState ? oldState->DebugName() : "<null>");
         return;
@@ -104,8 +104,8 @@ void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLogi
         static_cast<unsigned>(helperStateId),
         oldState ? oldState->DebugName() : "<null>",
         state->DebugName());
-    Log(
-        "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x%02x oldState=%s newState=%s",
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState={}",
         (unsigned)(helperStateId & 0xffu),
         oldState ? oldState->DebugName() : "<null>",
         state->DebugName());
@@ -215,8 +215,8 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
         static_cast<unsigned>(lastSwitchedHelperStateScaffold_ & 0xffu),
         recentEventsPreview,
         static_cast<unsigned>(registeredObservers.size()));
-    Log(
-        "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# %u currentState=%s lastSwitch=0x%02x recentEvents=%s",
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={}",
         (unsigned)eventId,
         currentState_ ? currentState_->DebugName() : "<null>",
         (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu),
@@ -253,10 +253,10 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
             "CLTLoginMediator::PostEventScaffold narrow helper9 continuation bridge event=0x0b currentState={} -> slot3Result=0x{:08x}",
             currentState_->DebugName(),
             static_cast<unsigned>(continueResult));
-        Log(
-            "DIAGNOSTIC: CLTLoginMediator::PostEvent() narrow helper9 continuation bridge event=0x0b currentState=%s -> slot3Result=0x%08x",
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginMediator::PostEvent() narrow helper9 continuation bridge event=0x0b currentState={} -> slot3Result=0x{:08x}",
             currentState_->DebugName(),
-            (unsigned)continueResult);
+            continueResult);
     }
 }
 

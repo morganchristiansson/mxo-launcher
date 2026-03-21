@@ -1,7 +1,7 @@
 #include "loginstate.h"
 
 #include "loginmediator.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
 namespace {

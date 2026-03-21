@@ -1,5 +1,7 @@
 #include "diagnostics.h"
 
+#include <spdlog/spdlog.h>
+
 struct WindowTraceEntry {
     HWND hwnd;
     LONG style;
@@ -21,12 +23,12 @@ static void LogCurrentDisplayMode(const char* prefix) {
     DEVMODEA mode = {};
     mode.dmSize = sizeof(mode);
     if (!EnumDisplaySettingsA(NULL, ENUM_CURRENT_SETTINGS, &mode)) {
-        Log("%s: EnumDisplaySettingsA failed", prefix);
+        spdlog::info("{}: EnumDisplaySettingsA failed", prefix);
         return;
     }
 
-    Log(
-        "%s: %lux%lu %lu-bpp @%luHz",
+    spdlog::info(
+        "{}: {}x{} {}-bpp @{}Hz",
         prefix,
         (unsigned long)mode.dmPelsWidth,
         (unsigned long)mode.dmPelsHeight,
@@ -68,9 +70,9 @@ static void UpsertWindowTraceEntry(
         previous.iconic != iconic;
 
     if (changed) {
-        Log(
-            "WindowTrace hwnd=%p visible=%d iconic=%d class='%s' title='%s' style=0x%08lx exStyle=0x%08lx rect=(%ld,%ld)-(%ld,%ld)",
-            hwnd,
+        spdlog::info(
+            "WindowTrace hwnd={} visible={} iconic={} class='{}' title='{}' style=0x{} exStyle=0x{} rect=({}:{})-({}:{})",
+            fmt::ptr(hwnd),
             visible ? 1 : 0,
             iconic ? 1 : 0,
             className,
@@ -136,7 +138,7 @@ static DWORD WINAPI WindowTraceThreadProc(LPVOID) {
     DWORD lastBpp = 0;
     DWORD lastHz = 0;
 
-    Log("WindowTrace: started for pid %lu", (unsigned long)g_MainProcessId);
+    spdlog::info("WindowTrace: started for pid {}", (unsigned long)g_MainProcessId);
     LogCurrentDisplayMode("WindowTrace display mode");
 
     while (InterlockedCompareExchange(&g_WindowTraceRunning, 0, 0) != 0) {
@@ -159,13 +161,13 @@ static DWORD WINAPI WindowTraceThreadProc(LPVOID) {
         EnumWindows(WindowTraceEnumProc, reinterpret_cast<LPARAM>(&count));
         if (count != g_LastWindowTraceCount) {
             g_LastWindowTraceCount = count;
-            Log("WindowTrace top-level window count: %d", count);
+            spdlog::info("WindowTrace top-level window count: {}", count);
         }
 
         Sleep(250);
     }
 
-    Log("WindowTrace: stopped");
+    spdlog::info("WindowTrace: stopped");
     return 0;
 }
 
@@ -177,7 +179,7 @@ void DiagnosticStartWindowTrace() {
     g_hWindowTraceThread = CreateThread(NULL, 0, WindowTraceThreadProc, NULL, 0, NULL);
     if (!g_hWindowTraceThread) {
         InterlockedExchange(&g_WindowTraceRunning, 0);
-        Log("WindowTrace: CreateThread failed (%lu)", (unsigned long)GetLastError());
+        spdlog::info("WindowTrace: CreateThread failed ({})", GetLastError());
     }
 }
 

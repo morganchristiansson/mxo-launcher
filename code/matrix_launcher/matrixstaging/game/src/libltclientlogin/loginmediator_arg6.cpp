@@ -1,5 +1,7 @@
 #include "loginmediator.h"
 
+#include <spdlog/spdlog.h>
+
 #include "../../../../src/diagnostics.h"
 
 namespace mxo::ltlogin {
@@ -46,12 +48,12 @@ void CLTLoginMediator::InitializeArg6DefaultObject() {
 
     arg6Selection_ = Arg6SelectionConfig();
 
-    Log(
-        "DIAGNOSTIC: InitializeArg6DefaultObject populated arg6 defaults worlds=%u active=%u selectedWorld=0x%06x selectedVariant=0x%02x",
-        (unsigned)arg6WorldList_.totalCount_,
-        (unsigned)arg6WorldList_.activeCount_,
-        (unsigned)arg6Selection_.selectedWorldIndexLow24_,
-        (unsigned)arg6Selection_.selectedVariantIndexHigh8_);
+    spdlog::info(
+        "DIAGNOSTIC: InitializeArg6DefaultObject populated arg6 defaults worlds={} active={} selectedWorld=0x{:06x} selectedVariant=0x{:02x}",
+        arg6WorldList_.totalCount_,
+        arg6WorldList_.activeCount_,
+        arg6Selection_.selectedWorldIndexLow24_,
+        arg6Selection_.selectedVariantIndexHigh8_);
 }
 
 void CLTLoginMediator::ConfigureArg6Selection(
@@ -223,7 +225,7 @@ const char* CLTLoginMediator::Arg6GetAvailableWorldName(uint32_t index) {
 void CLTLoginMediator::PopulateClientWorldView() {
     // Populate the client's world list view with launcher-provided data
     // This ensures client.dll receives populated world data when InitClientDLL passes arg6
-    Log("launcher-owned PopulateClientWorldView called");
+    spdlog::info("launcher-owned PopulateClientWorldView called");
 
     // Copy launcher-owned world list into the mediator's client-facing view
     for (uint32_t i = 0; i < kRecoveredWorldSlotCapacity && i < arg6WorldList_.totalCount_; ++i) {
@@ -233,7 +235,7 @@ void CLTLoginMediator::PopulateClientWorldView() {
         arg6WorldList_.available_[i] = true;
     }
 
-    Log("launcher-owned PopulateClientWorldView populated %u worlds", (unsigned)kRecoveredWorldSlotCapacity);
+    spdlog::info("launcher-owned PopulateClientWorldView populated {} worlds", kRecoveredWorldSlotCapacity);
 }
 
 }  // namespace mxo::ltlogin

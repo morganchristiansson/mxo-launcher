@@ -3,8 +3,6 @@
 #include <windows.h>
 #include <cstdint>
 
-void Log(const char* fmt, ...);
-
 void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr);
 void DiagnosticConfigureMediatorSelection(
     uint32_t worldUpperBoundExclusive,

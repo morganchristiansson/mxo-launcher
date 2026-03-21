@@ -4,12 +4,14 @@
 #include "loginstate_loadcharacterreply_scaffold.h"
 #include "loginstate_packet_builder_scaffold.h"
 #include "../../../../src/diagnostics.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <string>
+
+#include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
 namespace {
@@ -430,11 +432,11 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
 uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
     (void)workItem;
-    Log(
-        "DIAGNOSTIC: CLTLoginState_State6::Slot6_HandleSecondaryMessage entered this=%p mediator=%p stagedMarginBytes=%u currentState=%s",
-        this,
-        mediator,
-        mediator ? (unsigned)mediator->StagedIncomingMarginPacketBytes().size() : 0u,
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginState_State6::Slot6_HandleSecondaryMessage entered this={} mediator={} stagedMarginBytes={} currentState={}",
+        fmt::ptr(this),
+        fmt::ptr(mediator),
+        mediator ? mediator->StagedIncomingMarginPacketBytes().size() : 0u,
         (mediator && mediator->CurrentState()) ? mediator->CurrentState()->DebugName() : "<null>");
     if (!mediator) {
         return 0u;
@@ -585,12 +587,12 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     // - send through `0x41af70`
     // - post event `0x13`
     if (!mediator->State10HasReadyConnectionState2()) {
-        Log(
+        spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4");
         return 0u;
     }
     if (mediator->State10SendGateFlagF14() == 0) {
-        Log(
+        spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0xf14==0; original would switch helper state to 6");
         return 0u;
     }
@@ -602,12 +604,12 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.EnvelopeScaffold());
     mediator->PostEventScaffold(0x13u);
 
-    Log(
-        "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x%02x totalBytes=0x%02x CharacterName='%s' -> sendResult=0x%08x then posts event=0x13",
-        (unsigned)State10Packet0x0aFixedPayload::kFixedByteCount,
-        (unsigned)packetBuilder.PayloadByteCount(),
-        mediator->SourceLeadString108().data(),
-        (unsigned)sendResult);
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> sendResult=0x{:08x} then posts event=0x13",
+        State10Packet0x0aFixedPayload::kFixedByteCount,
+        packetBuilder.PayloadByteCount(),
+        std::string(reinterpret_cast<const char*>(mediator->SourceLeadString108().data())),
+        sendResult);
     return sendResult;
 }
 
@@ -631,7 +633,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem, CLT
     if (CLTLoginState* nextState = mediator->ScaffoldState11()) {
         mediator->SwitchHelperStateScaffold(0x0bu, nextState);
     } else {
-        Log(
+        spdlog::warn(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed AS_AuthReply but has no registered helper11 state");
     }
     return handled;
@@ -714,16 +716,16 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     mediator->PostEventScaffold(0x15u);
 
     spdlog::info(
-        "CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
-        static_cast<unsigned>(State11Packet0x4dFixedPayload::kPayloadTag0c),
-        static_cast<unsigned>(State11Packet0x4dFixedPayload::kFixedByteCount),
-        static_cast<unsigned>(packetBuilder.PayloadByteCount()),
-        static_cast<unsigned>(sourceDwords134[0]),
-        reinterpret_cast<const char*>(mediator->SourceBlock178().data()),
-        reinterpret_cast<const char*>(mediator->SourceBlock198().data()),
-        reinterpret_cast<const char*>(mediator->SourceBlock1b8().data()),
+        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
+        State11Packet0x4dFixedPayload::kPayloadTag0c,
+        State11Packet0x4dFixedPayload::kFixedByteCount,
+        packetBuilder.PayloadByteCount(),
+        sourceDwords134[0],
+        std::string(reinterpret_cast<const char*>(mediator->SourceBlock178().data())),
+        std::string(reinterpret_cast<const char*>(mediator->SourceBlock198().data())),
+        std::string(reinterpret_cast<const char*>(mediator->SourceBlock1b8().data())),
         mediator->GetGameSessionId664() ? mediator->GetGameSessionId664() : "<empty>",
-        static_cast<unsigned>(sendResult));
+        sendResult);
     spdlog::info(
         "CLTLoginState_State11::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
@@ -791,24 +793,24 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
         // anchor: launcher.exe:0x440320 completion tail posts event 0x16 after switching to helper9.
         mediator->PostEventScaffold(0x16u);
 
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u -> currentState=helper9 event=0x16",
-            (unsigned)parsed.status,
-            (unsigned)parsed.sectionSelectorMinus2,
-            (unsigned)parsed.sectionByteCount,
-            (unsigned)parsed.handoffWord09,
-            (unsigned)replySectionsSeen_,
-            (unsigned)replySectionsExpected_);
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} -> currentState=helper9 event=0x16",
+            parsed.status,
+            parsed.sectionSelectorMinus2,
+            parsed.sectionByteCount,
+            parsed.handoffWord09,
+            replySectionsSeen_,
+            replySectionsExpected_);
         replySectionsSeen_ = 0;
         replySectionsExpected_ = 0;
     } else {
-        Log(
-            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage routed helper11 reply status=0x%08x section=%u bytes=%u handoffWord=0x%04x seen=%u expected=%u seedCount=%u",
-            (unsigned)parsed.status,
-            (unsigned)parsed.sectionSelectorMinus2,
-            (unsigned)parsed.sectionByteCount,
-            (unsigned)parsed.handoffWord09,
-            (unsigned)replySectionsSeen_,
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage routed helper11 reply status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} seedCount={}",
+            parsed.status,
+            parsed.sectionSelectorMinus2,
+            parsed.sectionByteCount,
+            parsed.handoffWord09,
+            replySectionsSeen_,
             (unsigned)replySectionsExpected_,
             parsed.shouldSeedExpectedSectionCount ? 1u : 0u);
     }
