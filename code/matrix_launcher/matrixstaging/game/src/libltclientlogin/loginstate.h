@@ -279,6 +279,8 @@ public:
 // anchor: launcher.exe vtable 0x004b5104
 // docs: ../../docs/launcher.exe/VTABLES/0x004b5104.md
 // Provisional better-name suggestion: `CLTLoginState_MarginLoadCharacterPending`
+// Focused source home for the active state8 body:
+// - `loginstate_state8.cpp`
 class CLTLoginState_State8 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x004396c0 (vtable 0x004b5104 slot 10 initializer)
@@ -308,6 +310,8 @@ public:
 // anchor: launcher.exe vtable 0x004b517c
 // docs: ../../docs/launcher.exe/VTABLES/0x004b517c.md
 // Provisional better-name suggestion: `CLTLoginState_LoadCharacterFollowupPending`
+// Focused source home for the active late-login body:
+// - `loginstate_state9.cpp`
 class CLTLoginState_State9 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x00439750 (vtable 0x004b517c slot 10 initializer)

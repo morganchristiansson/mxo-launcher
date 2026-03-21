@@ -37,7 +37,11 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/messageconnection.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_arg6.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_state9.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state8.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state9.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/launchpad.o \
 	$(COMMON_AUTH_OBJS)
 
@@ -84,9 +88,6 @@ $(BUILD_DIR)/tools/%.o: tools/%.cpp
 
 # Target depends on launcher objects and cryptopp (spdlog is order-only prerequisite)
 $(TARGET): $(LAUNCHER_OBJS) $(CRYPTOPP_LIB) | $(SPDLOG_DIR)
-	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
-
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
 

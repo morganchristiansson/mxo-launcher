@@ -19,7 +19,12 @@ Relevant recovered source-file anchors nearby in the same launcher/login area:
 - `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
 
 Current replacement-launcher source split:
-- launcher-owned mediator state/model lives under `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- launcher-owned shared mediator/auth/margin state/model lives under:
+  - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- focused arg6 / startup-selection surface now lives under:
+  - `matrixstaging/game/src/libltclientlogin/loginmediator_arg6.cpp`
+- focused late-login/state9 surface now lives under:
+  - `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
 - the replacement `ILTLoginMediator.Default` ABI/vtable shell now lives in `src/launcher_mediator_abi.cpp`
 - diagnostics-only window tracing remains in `src/diagnostics.cpp`
 

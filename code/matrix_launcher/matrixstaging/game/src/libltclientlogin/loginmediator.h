@@ -835,6 +835,8 @@ public:
     // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
     // Faithful implementation of arg6 world list provider for InitClientDLL
     // Vtable at offset +0xc from object pointer at 0x4d2c58
+    // Focused source home for this surface:
+    // - `loginmediator_arg6.cpp`
     void InitializeArg6DefaultObject();
     void ConfigureArg6Selection(
         uint32_t worldUpperBoundExclusive,
