@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <string>
 #include <sys/stat.h>
 
 #include "spdlog/spdlog.h"
@@ -76,6 +77,22 @@ static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, g
 static DiagnosticMediatorSelectionObject g_MediatorSelectionObject = {};
 static DiagnosticMediatorSelectionContextCopy g_MediatorSelectionContextCopy = {};
 static bool g_MediatorSelectionContextCopyValid = false;
+
+struct DiagnosticSmallStringLike {
+    const char* begin = nullptr;
+    const char* current = nullptr;
+    const char* capacity = nullptr;
+};
+
+struct DiagnosticVectorLike {
+    const void* begin = nullptr;
+    const void* current = nullptr;
+    const void* capacity = nullptr;
+};
+
+static std::string g_MediatorRouteDescriptor10cOwned;
+static DiagnosticSmallStringLike g_MediatorRouteDescriptor10c = {};
+static DiagnosticVectorLike g_MediatorLateEntryList118 = {};
 
 // UNANCHORED: diagnostic masking helper for auth/password log surfaces.
 static const char* MaskedSensitiveValue(const char* value) {
@@ -618,7 +635,8 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
     return &g_MediatorSelectionObject;
 }
 
-// anchor: later client startup path calls arg6 +0x48 before AttachStartupContext/ProvideStartupTriple
+// anchor: later client startup path calls arg6 +0x48 before the now-better-understood
+// observer registration / startup-triple handoff sequence
 // vtable: ILTLoginMediator.Default slot +0x48
 static const char* __thiscall Mediator_GetWorldOrSelectionName(MinimalLoginMediatorStub* self) {
     (void)self;
@@ -850,6 +868,45 @@ static const char* __thiscall Mediator_GetWorldExtra108(MinimalLoginMediatorStub
     return value;
 }
 
+// anchor: launcher.exe:0x41f2c0
+// vtable: ILTLoginMediator.Default slot +0x10c
+// Current best late-runtime read from the event-0x18 observer callback:
+// - returns owner `+0x30`
+// - client immediately consumes the first two dwords there as a small-string begin/current pair
+static DiagnosticSmallStringLike* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    const char* routeDescriptor = mediator ? mediator->ResolveMarginRouteDescriptor() : nullptr;
+
+    g_MediatorRouteDescriptor10cOwned = routeDescriptor ? routeDescriptor : std::string();
+    g_MediatorRouteDescriptor10c.begin = g_MediatorRouteDescriptor10cOwned.c_str();
+    g_MediatorRouteDescriptor10c.current =
+        g_MediatorRouteDescriptor10cOwned.c_str() + g_MediatorRouteDescriptor10cOwned.size();
+    g_MediatorRouteDescriptor10c.capacity = g_MediatorRouteDescriptor10c.current;
+
+    Log(
+        "MediatorStub::GetRouteDescriptor10c(+0x10c) -> begin=%p current=%p text='%s'",
+        g_MediatorRouteDescriptor10c.begin,
+        g_MediatorRouteDescriptor10c.current,
+        g_MediatorRouteDescriptor10cOwned.empty() ? "<empty>" : g_MediatorRouteDescriptor10cOwned.c_str());
+    return &g_MediatorRouteDescriptor10c;
+}
+
+// anchor: launcher.exe:0x41af50
+// vtable: ILTLoginMediator.Default slot +0x118
+// Current best late-runtime read from the event-0x18 observer callback:
+// - returns owner `+0x1470`
+// - client reads it as a vector-like begin/current/capacity triple of 12-byte entries
+static DiagnosticVectorLike* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
+    (void)self;
+    Log(
+        "MediatorStub::GetLateEntryList118(+0x118) -> begin=%p current=%p capacity=%p (empty scaffold)",
+        g_MediatorLateEntryList118.begin,
+        g_MediatorLateEntryList118.current,
+        g_MediatorLateEntryList118.capacity);
+    return &g_MediatorLateEntryList118;
+}
+
 // UNANCHORED: C helper behind the recovered +0xec ABI wrapper.
 extern "C" void Mediator_ConsumeSelectionContext_Impl(
     MinimalLoginMediatorStub* self,
@@ -951,50 +1008,49 @@ __attribute__((naked)) static void Mediator_FillLoadingCharacterState120() {
         : "eax", "edx");
 }
 
-// UNANCHORED: C helper behind the recovered +0x170 ABI wrapper.
-extern "C" void Mediator_AttachStartupContext_Impl(
-    MinimalLoginMediatorStub* self,
-    void* startupContext,
-    void* returnAddress) {
-    if (!g_MediatorRuntimeState.firstContext170) {
-        g_MediatorRuntimeState.firstContext170 = startupContext;
-    }
-    g_MediatorRuntimeState.latestContext170 = startupContext;
-    if (self) {
-        if (!self->field08) {
-            self->field08 = startupContext;
-        }
-        self->field18 = startupContext;
-    }
-    ++g_MediatorRuntimeState.attach170Count;
+// anchor: launcher.exe:0x4202c0
+// vtable: ILTLoginMediator.Default slot +0x13c
+// WaitForEvent uses this repeatedly while blocked on registered observer notifications.
+static void __thiscall Mediator_InvokeSessionCallbackHelper13c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    (void)mediator;
+}
 
-    const bool sawTriple =
-        g_MediatorRuntimeState.netShell124 ||
-        g_MediatorRuntimeState.netMgr124 ||
-        g_MediatorRuntimeState.distrObjExecutive124;
-    const char* relation = "before-124";
-    if (sawTriple) {
-        relation = (startupContext == g_MediatorRuntimeState.firstContext170) ? "repeat-first-after-124" : "post-124";
+// UNANCHORED: C helper behind the recovered +0x170 observer-registration ABI wrapper.
+extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
+    MinimalLoginMediatorStub* self,
+    void* observer,
+    void* returnAddress) {
+    if (!g_MediatorRuntimeState.firstObserver170) {
+        g_MediatorRuntimeState.firstObserver170 = observer;
     }
+    g_MediatorRuntimeState.latestObserver170 = observer;
+    ++g_MediatorRuntimeState.observerRegister170Count;
+
+    const bool inserted = DiagnosticEnsureMediatorModel()
+        ? DiagnosticEnsureMediatorModel()->RegisterLoginObserverScaffold(observer)
+        : false;
 
     Log(
-        "MediatorStub::AttachStartupContext(%p self=%p) [count=%u relation=%s first=%p latest124=(%p,%p,%p) caller=%p]",
-        startupContext,
+        "MediatorStub::RegisterLoginObserver(+0x170 observer=%p self=%p) [count=%u inserted=%u first=%p latest124=(%p,%p,%p) caller=%p]",
+        observer,
         self,
-        (unsigned)g_MediatorRuntimeState.attach170Count,
-        relation,
-        g_MediatorRuntimeState.firstContext170,
+        (unsigned)g_MediatorRuntimeState.observerRegister170Count,
+        inserted ? 1u : 0u,
+        g_MediatorRuntimeState.firstObserver170,
         g_MediatorRuntimeState.netShell124,
         g_MediatorRuntimeState.netMgr124,
         g_MediatorRuntimeState.distrObjExecutive124,
         returnAddress);
-    LogPointerWords("AttachStartupContext self", self, 8);
-    LogPointerWords("AttachStartupContext context", startupContext, 8);
+    LogPointerWords("RegisterLoginObserver self", self, 8);
+    LogPointerWords("RegisterLoginObserver observer", observer, 4);
+    return inserted ? 1u : 0u;
 }
 
-// anchor: deeper client init attaches startup context to arg6 through +0x170 before/after +0x124
+// anchor: launcher.exe:0x41ddb0
 // vtable: ILTLoginMediator.Default slot +0x170
-__attribute__((naked)) static void Mediator_AttachStartupContext() {
+__attribute__((naked)) static void Mediator_RegisterLoginObserver170() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
         "mov 0(%%esp), %%edx\n\t"
@@ -1006,7 +1062,7 @@ __attribute__((naked)) static void Mediator_AttachStartupContext() {
         "add $12, %%esp\n\t"
         "ret $4\n\t"
         :
-        : "i"(Mediator_AttachStartupContext_Impl)
+        : "i"(Mediator_RegisterLoginObserver170_Impl)
         : "eax", "edx");
 }
 
@@ -1026,43 +1082,74 @@ static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediato
     return &g_MediatorSelectionContextCopy;
 }
 
-// anchor: later runtime setup uses arg6 +0x148 and +0x174 for runtime-object handoff
-// vtable: ILTLoginMediator.Default slots +0x148 and +0x174
-static void __thiscall Mediator_AttachRuntimeObject(MinimalLoginMediatorStub* self, void* runtimeObject) {
+// anchor: later runtime setup uses arg6 +0x148 for runtime-object handoff
+// vtable: ILTLoginMediator.Default slot +0x148
+static void __thiscall Mediator_AttachRuntimeObject148(MinimalLoginMediatorStub* self, void* runtimeObject) {
     (void)self;
     void* returnAddress = __builtin_return_address(0);
-    if (g_MediatorRuntimeState.provide124Count == 0) {
-        g_MediatorRuntimeState.runtimeObject148 = runtimeObject;
-        ++g_MediatorRuntimeState.runtime148Count;
-        Log(
-            "MediatorStub::AttachRuntimeObject(+0x148 guess=%p) [count=%u caller=%p]",
-            runtimeObject,
-            (unsigned)g_MediatorRuntimeState.runtime148Count,
-            returnAddress);
-        return;
-    }
-
-    g_MediatorRuntimeState.runtimeObject174 = runtimeObject;
-    ++g_MediatorRuntimeState.runtime174Count;
+    g_MediatorRuntimeState.runtimeObject148 = runtimeObject;
+    ++g_MediatorRuntimeState.runtime148Count;
     Log(
-        "MediatorStub::AttachRuntimeObject(+0x174 guess=%p) [count=%u caller=%p]",
+        "MediatorStub::AttachRuntimeObject(+0x148 guess=%p) [count=%u caller=%p]",
         runtimeObject,
-        (unsigned)g_MediatorRuntimeState.runtime174Count,
+        (unsigned)g_MediatorRuntimeState.runtime148Count,
         returnAddress);
 }
 
-// anchor: later runtime setup uses arg6 +0x178 for runtime-descriptor handoff
-// vtable: ILTLoginMediator.Default slot +0x178
-static void __thiscall Mediator_ConsumeRuntimeDescriptor(MinimalLoginMediatorStub* self, void* runtimeDescriptor) {
-    (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    g_MediatorRuntimeState.runtimeDescriptor178 = runtimeDescriptor;
-    ++g_MediatorRuntimeState.descriptor178Count;
+// UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
+extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
+    MinimalLoginMediatorStub* self,
+    void* observer,
+    void* returnAddress) {
+    g_MediatorRuntimeState.latestObserver174 = observer;
+    ++g_MediatorRuntimeState.observerUnregister174Count;
+
+    const bool removed = DiagnosticEnsureMediatorModel()
+        ? DiagnosticEnsureMediatorModel()->UnregisterLoginObserverScaffold(observer)
+        : false;
+
     Log(
-        "MediatorStub::ConsumeRuntimeDescriptor(%p) [count=%u caller=%p]",
-        runtimeDescriptor,
-        (unsigned)g_MediatorRuntimeState.descriptor178Count,
+        "MediatorStub::UnregisterLoginObserver(+0x174 observer=%p self=%p) [count=%u removed=%u caller=%p]",
+        observer,
+        self,
+        (unsigned)g_MediatorRuntimeState.observerUnregister174Count,
+        removed ? 1u : 0u,
         returnAddress);
+    LogPointerWords("UnregisterLoginObserver observer", observer, 4);
+    return removed ? 1u : 0u;
+}
+
+// anchor: launcher.exe:0x41dde0
+// vtable: ILTLoginMediator.Default slot +0x174
+__attribute__((naked)) static void Mediator_UnregisterLoginObserver174() {
+    __asm__ volatile(
+        "mov 4(%%esp), %%eax\n\t"
+        "mov 0(%%esp), %%edx\n\t"
+        "push %%edx\n\t"
+        "push %%eax\n\t"
+        "push %%ecx\n\t"
+        "mov %0, %%eax\n\t"
+        "call *%%eax\n\t"
+        "add $12, %%esp\n\t"
+        "ret $4\n\t"
+        :
+        : "i"(Mediator_UnregisterLoginObserver174_Impl)
+        : "eax", "edx");
+}
+
+// anchor: launcher.exe:0x41f240
+// vtable: ILTLoginMediator.Default slot +0x178
+static uint32_t __thiscall Mediator_GetLastLoginStatus178(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    const uint32_t status = mediator ? mediator->WorldListCountOrStatus80() : 0u;
+    g_MediatorRuntimeState.lastStatus178 = status;
+    ++g_MediatorRuntimeState.statusQuery178Count;
+    Log(
+        "MediatorStub::GetLastLoginStatus(+0x178) -> 0x%08x [count=%u]",
+        (unsigned)status,
+        (unsigned)g_MediatorRuntimeState.statusQuery178Count);
+    return status;
 }
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 conditionally checks arg6 +0x164
@@ -1115,13 +1202,16 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[64] = (void*)Mediator_GetWorldTypeByIndex; // +0x100
     g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldFlag104; // +0x104
     g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldExtra108; // +0x108
+    g_LoginMediatorVtable[67] = (void*)Mediator_GetRouteDescriptor10c; // +0x10c
+    g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
     g_LoginMediatorVtable[72] = (void*)Mediator_FillLoadingCharacterState120; // +0x120
-    g_LoginMediatorVtable[82] = (void*)Mediator_AttachRuntimeObject; // +0x148
+    g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
+    g_LoginMediatorVtable[82] = (void*)Mediator_AttachRuntimeObject148; // +0x148
     g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164
     g_LoginMediatorVtable[91] = (void*)Mediator_ShouldExportB;   // +0x16c
-    g_LoginMediatorVtable[92] = (void*)Mediator_AttachStartupContext; // +0x170
-    g_LoginMediatorVtable[93] = (void*)Mediator_AttachRuntimeObject; // +0x174
-    g_LoginMediatorVtable[94] = (void*)Mediator_ConsumeRuntimeDescriptor; // +0x178
+    g_LoginMediatorVtable[92] = (void*)Mediator_RegisterLoginObserver170; // +0x170
+    g_LoginMediatorVtable[93] = (void*)Mediator_UnregisterLoginObserver174; // +0x174
+    g_LoginMediatorVtable[94] = (void*)Mediator_GetLastLoginStatus178; // +0x178
 
     ResetMediatorObjectState();
 }

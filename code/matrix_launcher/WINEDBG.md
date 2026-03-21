@@ -203,6 +203,19 @@ Good first checks:
     - owner byte `+0xf14 = 1`
     - owner dword `+0xf18 = parsedReply(+0x09)`
 
+### Late post-state9 event bridge
+- `0x0041afc0`
+  - `CLTLoginMediator_HandleMarginConnectionCompletionFallback`
+  - late natural-original pass now places this concretely on the later tail:
+    - re-enters current helper vtable `+0x04` / current best read: slot 2
+    - then reaches `0x00438df0`
+- `0x00438df0`
+  - `CLTLoginState_SharedSlot2Gate`
+  - late natural-original pass now proves:
+    - hit after the state9 success tail
+    - owner `DAT_004f78b8 + 0x2d = 1`
+    - continuing from there immediately reaches `0x0041cfb0(0x0f)`
+
 ## Current useful breakpoint sets
 
 ### Minimal natural state8/state9 branch set
@@ -237,6 +250,21 @@ cont
 ```
 
 Use this after `0x0043c180` success is already proven.
+
+### Later post-state9 / event-`0x0f` bridge
+
+```text
+break *0x0041afc0
+break *0x0041cfb0
+break *0x00438df0
+break *0x004397e0
+break *0x0041c5c0
+cont
+```
+
+Use this once the state9 success tail is already proven and you want the narrower question:
+- does the later natural `0x0f` come through `0x0041afc0 -> 0x00438df0`?
+- or does the run instead enter `0x004397e0` / `0x0041c5c0` first?
 
 ### Receive-side bridge before state8 slot 6
 

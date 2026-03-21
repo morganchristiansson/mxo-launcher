@@ -271,10 +271,11 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0xf4` | later runtime/config paths treat return value like a persisted selection/config snapshot, not a plain C-string | medium |
 | `+0x120` | later loading-character path passes a large stack-built state object here before UI teardown / transition work | medium |
 | `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
+| `+0x13c` | `WaitForEvent` loop pump; calls launcher owner helper `+0x65c` vtable `+0x04` when present (`0x4202c0`) | medium |
 | `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
-| `+0x170` | consumes client startup context object in deeper init | medium |
-| `+0x174` | accepts runtime object handles in later setup paths | medium |
-| `+0x178` | consumes runtime descriptor object in later setup paths | medium |
+| `+0x170` | registers an observer/listener object into launcher owner `+0x674` (`0x41ddb0`) | high |
+| `+0x174` | unregisters an observer/listener object from launcher owner `+0x674` (`0x41dde0`) | high |
+| `+0x178` | returns launcher owner status/result dword `+0x80` (`0x41f240`) | high |
 | `+0x18c` | later callback84-side writer queried indirectly through `ClientNetShell +0x38`; fills client scratch buffer later surfaced as pair `(&0x629e0284, 0x20)`; active replacement now source-owns the state9-gated blob fill closely enough to run it live | high |
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
@@ -449,7 +450,22 @@ The opt-in mediator stub in the custom launcher showed this progression:
 5. after adding diagnostic implementations for `+0x48` and `+0x4c`, startup advanced again into the post-selection path and hit `+0x170` / `+0x124` with concrete objects (`startupContext`, `INetShell`, `INetMgr`, `ILTDistrObjExecutive`) before the next crash.
 6. the latest patched-client progress dump no longer shows `EIP=0`; it lands at `EIP=0x003e3b90`, which suggests later bad state / signature mismatch is now more likely than a simple missing-slot crash.
 
-## New clarification: current post-`+170` / post-`+124` evidence
+## Historical note: older `+0x170` interpretation is superseded
+
+Later original-launcher runtime + vtable proof materially corrected the old read on this area:
+
+- `+0x170` is now better read as **observer/listener registration** into launcher owner `+0x674`
+  (`0x41ddb0`), not as a generic startup-context adoption slot
+- `+0x174` is now better read as **observer/listener unregistration** (`0x41dde0`)
+- `+0x178` is now better read as **return owner status/result dword `+0x80`** (`0x41f240`)
+- `+0x13c` is now better read as the `WaitForEvent` loop pump that invokes owner helper `+0x65c`
+  vtable `+0x04` when present (`0x4202c0`)
+- the old scaffold log names `AttachStartupContext`, `AttachRuntimeObject(+0x174)`, and
+  `ConsumeRuntimeDescriptor` are historical and misleading for these late-runtime slots
+
+Keep the older notes below only as startup-era diagnostic history.
+
+## Historical diagnostic record: old post-`+170` / post-`+124` evidence
 
 Static analysis of `client.dll` around `0x62170d6a..0x62170f48` now gives a tighter interpretation of the observed deep path.
 

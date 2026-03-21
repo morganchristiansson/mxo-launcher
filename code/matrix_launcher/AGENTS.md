@@ -37,6 +37,13 @@ Source of truth:
   - `0x41b420`
   - switch to state `0x0c`
   - event `0x18`
+- late arg6 / observer bridge is now source-owned enough for the first game-entry pass:
+  - arg6 `+0x170` observer registration
+  - arg6 `+0x174` observer unregistration
+  - arg6 `+0x178` status `+0x80` getter
+  - event-`0x18` observer callback path now gets past arg6 `+0x10c`
+  - event-`0x18` observer callback currently tolerates an empty arg6 `+0x118` late-entry list scaffold
+- deliberate replacement has now entered game for the first time on the active existing-character path
 
 ### Natural-original boundary already proven later than that
 - natural original reaches:
@@ -46,11 +53,14 @@ Source of truth:
   - `0x43c180`
   - `0x41b450(0x0c)`
   - `0x41cfb0(0x18)`
-  - later `0x41cfb0(0x0f)`
+  - later `0x438df0`
+  - then `0x41cfb0(0x0f)`
   - then entry into game
 
 ### Current blocker
-- the replacement launcher is now blocked on the later post-state9 / state-`0x0c` continuation
+- the old post-state9 / state-`0x0c` continuation blocker is no longer the active one
+- current open work is the later late-runtime / in-game transition fidelity behind the now-live
+  arg6 observer bridge
 - do **not** reopen old auth/bootstrap or helper11/create-character history unless new evidence
   forces a branch change
 
@@ -88,13 +98,14 @@ re-expanding this file.
 
 ## Current implementation priorities
 
-1. Tighten the post-state9 / state-`0x0c` continuation after the now-live state9 success tail
-2. Keep `0x41b420`, `0x41b450`, and `0x41cfb0` treated as the immediate bridge, not the old
-   immediate-final-leaf theory
-3. Treat state12 as the strongest current state-identity lead, but not yet a proven immediate next
-   execution leaf
+1. Stabilize and document the late arg6 observer bridge now that it can carry the deliberate
+   existing-character path into game
+2. Keep `0x41b420`, `0x41b450`, and `0x41cfb0` treated as the immediate bridge, with later arg6
+   observer slots (`+0x170/+0x174/+0x178/+0x10c/+0x118`) as the next fidelity surface behind it
+3. Determine what the later second observer registration (`client.dll:0x62031136`, object `0x6298a5e8`)
+   really is and which late events it consumes
 4. Keep auth launcher-owned, not client-owned
-5. Keep work in lockstep across source, Ghidra names/types, and canonical docs
+5. Keep work in lockstep across source, Ghidra names/types, runtime evidence, and canonical docs
 
 ## Documentation / ownership rules
 
@@ -141,11 +152,10 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
 
 ## Immediate next task
 
-Use natural-original proof to push past the current replacement boundary after:
-- state9 raw `0x11` success
-- `0x41b420`
-- `0x41b450(0x0c)`
-- `0x41cfb0(0x18)`
+Now that the deliberate replacement has entered game for the first time, focus on the next
+late-runtime fidelity surface behind that breakthrough:
+- the arg6 observer bridge after event `0x18`
+- the second observer registration later reached from `client.dll:0x62031136`
+- and any later natural-original parity still missing around the old `0x438df0 -> 0x41cfb0(0x0f)` tail
 
-Focus on the concrete post-state9 / state-`0x0c` continuation and the listener/event consumers
-behind it, not on old auth/bootstrap history.
+Do not reopen old auth/bootstrap or helper11/create-character history unless new evidence forces it.

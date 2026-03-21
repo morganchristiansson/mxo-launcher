@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace mxo::ltlogin {
 namespace {
@@ -34,6 +35,36 @@ static std::string BuildRecentEventHistoryPreview(const std::array<uint32_t, 8>&
     }
     out += "]";
     return out;
+}
+
+using LoginObserverOnEventFn = void(__thiscall*)(void*, uint32_t);
+
+static std::vector<void*> g_registeredLoginObservers;
+
+static std::vector<void*>& MutableRegisteredLoginObservers() {
+    return g_registeredLoginObservers;
+}
+
+static const std::vector<void*>& RegisteredLoginObservers() {
+    return g_registeredLoginObservers;
+}
+
+static bool LooksLikeLoginObserverEventVtable(void* observer) {
+    if (!observer) {
+        return false;
+    }
+    void** vtable = *reinterpret_cast<void***>(observer);
+    return vtable != nullptr && vtable[0] != nullptr;
+}
+
+static void DispatchLoginObserverEvent(void* observer, uint32_t eventId) {
+    if (!LooksLikeLoginObserverEventVtable(observer)) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(observer);
+    const auto fn = reinterpret_cast<LoginObserverOnEventFn>(vtable[0]);
+    fn(observer, eventId);
 }
 
 }  // namespace
@@ -80,6 +111,65 @@ void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLogi
         state->DebugName());
 }
 
+bool CLTLoginMediator::RegisterLoginObserverScaffold(void* observer) {
+    // anchor: launcher.exe:0x41ddb0
+    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
+    // identifies `+0x170` as insertion into the owner `+0x674` listener tree, not as a startup
+    // context handoff.
+    if (!observer) {
+        return false;
+    }
+
+    std::vector<void*>& observers = MutableRegisteredLoginObservers();
+    const auto it = std::find(
+        observers.begin(),
+        observers.end(),
+        observer);
+    if (it != observers.end()) {
+        spdlog::info(
+            "CLTLoginMediator::RegisterLoginObserverScaffold observer={} already registered count={}",
+            fmt::ptr(observer),
+            static_cast<unsigned>(observers.size()));
+        return false;
+    }
+
+    observers.push_back(observer);
+    spdlog::info(
+        "CLTLoginMediator::RegisterLoginObserverScaffold observer={} count={} (minimal source-owned bridge for owner+0x674 listener registration)",
+        fmt::ptr(observer),
+        static_cast<unsigned>(observers.size()));
+    return true;
+}
+
+bool CLTLoginMediator::UnregisterLoginObserverScaffold(void* observer) {
+    // anchor: launcher.exe:0x41dde0
+    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
+    // identifies `+0x174` as removal from the owner `+0x674` listener tree.
+    if (!observer) {
+        return false;
+    }
+
+    std::vector<void*>& observers = MutableRegisteredLoginObservers();
+    const auto it = std::find(
+        observers.begin(),
+        observers.end(),
+        observer);
+    if (it == observers.end()) {
+        spdlog::info(
+            "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} not found count={}",
+            fmt::ptr(observer),
+            static_cast<unsigned>(observers.size()));
+        return false;
+    }
+
+    observers.erase(it);
+    spdlog::info(
+        "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} count={}",
+        fmt::ptr(observer),
+        static_cast<unsigned>(observers.size()));
+    return true;
+}
+
 void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     // anchor: launcher.exe:0x41cfb0
     // Current post-state9 continuation read:
@@ -89,15 +179,21 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     //   `0x41b420 -> 0x41b450(0x0c) -> 0x41cfb0(0x18)`
     // - no natural hit is proven yet on `0x004397e0` / `0x0041c5c0` on that same continuation,
     //   so the immediate next path is best treated as observer/listener work first
-    // - strongest current later `0x0f` bridge is narrower now too:
+    // - stronger later `0x0f` bridge is now live-backed too:
     //   - `0x41b420` sets owner byte `+0x2d = 1`
-    //   - shared gate `0x438df0` posts event `0x0f` when owner `+0x2d != 0`
+    //   - a late natural-original pass then hit shared gate `0x438df0`
+    //   - live backtrace there showed caller `0x41afc0`, i.e. the margin-completion fallback that
+    //     re-enters current helper vtable `+0x04` / current best read: slot 2
+    //   - at that stop:
+    //     - helper/object `this+4 = 1`
+    //     - owner `DAT_004f78b8 + 0x2d = 1`
+    //   - continuing from there immediately hit `0x41cfb0` with event `0x0f`
     //   - static `CLTEvilBlockingLoginObserver::WaitForEvent` callers currently prove waits for
     //     events `1`, `8`, and `0x0f`, but not for `0x18`
     // - practical scaffold consequence:
-    //   keep explicit event-history logging here so replacement-launcher runs can be compared
-    //   against the natural original event sequence without pretending the listener tree is already
-    //   reconstructed.
+    //   keep explicit event-history logging here and bridge arg6 `+0x170/+0x174` observer
+    //   registration into a minimal source-owned listener list, without pretending the original
+    //   red-black-tree container at owner `+0x674` is fully reconstructed.
     lastPostedEventScaffold_ = eventId;
     if (recentPostedEventCountScaffold_ < recentPostedEventsScaffold_.size()) {
         recentPostedEventsScaffold_[recentPostedEventCountScaffold_++] = eventId;
@@ -110,19 +206,32 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     }
     const std::string recentEventsPreview =
         BuildRecentEventHistoryPreview(recentPostedEventsScaffold_, recentPostedEventCountScaffold_);
+    const std::vector<void*>& registeredObservers = RegisteredLoginObservers();
     spdlog::info(
-        "{} Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={} (listener tree at owner+0x674 not yet scaffolded)",
+        "{} Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={} registeredObservers={} (minimal owner+0x674 observer bridge active; full tree container still not scaffolded)",
         kLogPrefixPostEvent,
         static_cast<unsigned>(eventId),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(lastSwitchedHelperStateScaffold_ & 0xffu),
-        recentEventsPreview);
+        recentEventsPreview,
+        static_cast<unsigned>(registeredObservers.size()));
     Log(
         "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# %u currentState=%s lastSwitch=0x%02x recentEvents=%s",
         (unsigned)eventId,
         currentState_ ? currentState_->DebugName() : "<null>",
         (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu),
         recentEventsPreview.c_str());
+
+    // Current implementation keeps observer dispatch deliberately late-scoped:
+    // - client-facing `+0x170/+0x174` registration is now source-owned
+    // - but broad event fanout is still risky because early observers remain under-typed
+    // - so only the active late-login continuation events are dispatched through this bridge
+    if (eventId == 0x18u || eventId == 0x0fu) {
+        const std::vector<void*> observers = registeredObservers;
+        for (void* observer : observers) {
+            DispatchLoginObserverEvent(observer, eventId);
+        }
+    }
 
     // Narrow source-owned continuation bridge for the now-live state8 -> helper9/state9 path:
     // - natural original switches to helper9, then posts event `0x0b`, and helper9 slot 3
@@ -144,8 +253,18 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
 }
 
 void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
+    // anchor: launcher.exe:0x41d090
+    // The original walks the owner `+0x674` listener tree here and calls each observer's second
+    // vtable slot (`+0x04` / current best read: OnLoginError).
+    // Current replacement keeps this late observer bridge narrower than events for now: error-side
+    // fanout stays logged but not yet dispatched until the active event-`0x18` continuation proves
+    // which registered observers are safe to call on the replacement path.
     lastPostedErrorScaffold_ = errorId;
-    spdlog::info("{} Error# {}", kLogPrefixPostError, static_cast<unsigned>(errorId));
+    spdlog::info(
+        "{} Error# {} registeredObservers={} (late observer bridge not yet enabled for errors)",
+        kLogPrefixPostError,
+        static_cast<unsigned>(errorId),
+        static_cast<unsigned>(RegisteredLoginObservers().size()));
 }
 
 }  // namespace mxo::ltlogin

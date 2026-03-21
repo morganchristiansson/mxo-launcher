@@ -649,10 +649,12 @@ public:
 
     // Narrow source-owned scaffolds for the launcher.exe logging/event side effects at
     // `0x41cfb0` / `0x41d090`.
-    // Current implementation keeps these as lightweight source-owned event/error markers instead of
-    // attempting the original listener container at owner `+0x674`.
+    // Current implementation now keeps lightweight event/error history together with a minimal
+    // observer registration bridge for arg6/`ILTLoginMediator.Default` slots `+0x170/+0x174`.
     void PostEventScaffold(uint32_t eventId);
     void PostErrorScaffold(uint32_t errorId);
+    bool RegisterLoginObserverScaffold(void* observer);
+    bool UnregisterLoginObserverScaffold(void* observer);
     uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }
     uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
     const std::array<uint32_t, 8>& RecentPostedEventsScaffold() const { return recentPostedEventsScaffold_; }
@@ -1118,6 +1120,8 @@ private:
     //     - `0x41afc0` is the margin-completion fallback that re-enters current helper vtable
     //       `+0x04` (current best read: slot 2), and can also clear owner `+0x1c/+0x20` on
     //       work type `1`
+    //     - newer late natural-original proof now places that fallback concretely on the later
+    //       post-state9 tail: `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)`
     // - `+0x18` = auth connection, `+0x1c` = margin connection
     // - `+0x4c/+0x5c` = auth route + endpoint
     // - `+0x6c` = margin endpoint
