@@ -598,7 +598,18 @@ The highest-value remaining auth-adjacent work is now:
           the full payload bytes
       - practical consequence for the active blocker:
         - the old “missing first decrypted raw `0x10`” state8 blocker is now closed enough
-        - focus should move later again onto helper9/state9 and the post-state9 continuation
+        - focus has now moved later again onto helper9/state9 and the post-state9 continuation
+        - latest deliberate runtime tightening there now also proves one narrower immediate blocker:
+          - a narrow source-owned bridge now re-dispatches the proven state8 `event 0x0b` handoff into
+            `CLTLoginState_State9::Slot3_BeginOrContinue`
+          - that live run now reaches `CLTLoginMediator::State9SubmitFollowupScaffold`
+          - but the recovered owner collaborator triple is still null on the replacement path:
+            - owner `+0x84 = null`
+            - owner `+0x88 = null`
+            - owner `+0x8c = null`
+          - the current deliberate state9 stall is therefore no longer “did helper9/state9 run at all?”
+          - it is now the missing launcher-owned state9 submit collaborators behind `0x41de40`, before any
+            later raw `0x11` / state9 slot-6 progression can be expected
   - practical comparison against the natural original path:
     - this moves the replacement launcher later and closer to the natural-original shape than the
       old helper11-only stall

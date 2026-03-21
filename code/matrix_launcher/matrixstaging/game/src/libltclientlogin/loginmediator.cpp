@@ -515,6 +515,24 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
         currentState_ ? currentState_->DebugName() : "<null>",
         (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu),
         recentEventsPreview.c_str());
+
+    // Narrow source-owned continuation bridge for the now-live state8 -> helper9/state9 path:
+    // - natural original switches to helper9, then posts event `0x0b`, and helper9 slot 3
+    //   (`0x439780`) is immediately part of the same active progression family
+    // - the full owner `+0x674` listener tree behind `0x41cfb0` is still unresolved
+    // - keep this bridge narrow to the already-proven helper9 handoff instead of claiming a
+    //   general event-listener reconstruction
+    if (eventId == 0x0bu && currentState_ != nullptr && currentState_->DispatchPhaseCode() == 9u) {
+        const uint32_t continueResult = currentState_->Slot3_BeginOrContinue(currentState_, this);
+        spdlog::info(
+            "CLTLoginMediator::PostEventScaffold narrow helper9 continuation bridge event=0x0b currentState={} -> slot3Result=0x{:08x}",
+            currentState_->DebugName(),
+            static_cast<unsigned>(continueResult));
+        Log(
+            "DIAGNOSTIC: CLTLoginMediator::PostEvent() narrow helper9 continuation bridge event=0x0b currentState=%s -> slot3Result=0x%08x",
+            currentState_->DebugName(),
+            (unsigned)continueResult);
+    }
 }
 
 void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {

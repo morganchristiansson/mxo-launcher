@@ -145,8 +145,14 @@ Current unresolved inputs remain, but the active login-side blocker has narrowed
   - encrypted post-bootstrap state8 raw `0x0f` send is now live-proven
   - decrypted incoming raw `0x10` traffic is now live-proven and routed through state8 slot 6
   - state8 reply progression now completes and switches into helper9/state9 with event `0x0b`
-  - so the immediate blocker is no longer the old state8/bootstrap gap; it has moved later into the
-    state9 / post-state9 continuation
+  - a narrow source-owned continuation bridge now also re-enters helper9/state9 slot 3 on that
+    proven handoff
+  - the immediate blocker has therefore tightened again:
+    - current deliberate state9 now reaches `0x41de40`-owned submit scaffolding
+    - but the recovered owner collaborator triple behind that submit is still null on the
+      replacement path (`+0x84/+0x88/+0x8c`)
+    - so the next active blocker is now the missing launcher-owned state9 submit collaborators,
+      before later raw `0x11` / state9 slot-6 progression can be expected
 - keep two distinct truths explicit:
   - **original launcher live boundary now crossed**: natural original reaches the state8 send tail,
     `0x43f930`, `0x439780`, `0x41de40`, `0x43c180`, then `0x41b450(0x0c)`, `0x41cfb0(0x18)`, and
@@ -334,9 +340,11 @@ MXO_ARG7_SELECTION=0x0500002a MXO_MEDIATOR_SELECTION_NAME=Reality make run_binde
    - launcher-owned margin bootstrap now completes on the active path
    - encrypted state8 raw `0x0f` send is live
    - decrypted raw `0x10` receive is live and routed through state8 slot 6
-2. Retighten the immediate replacement-launcher question later again:
-   - helper9/state9 handoff after completed state8 reply progression
-   - the later state9 / post-state9 continuation toward the already-proven natural-original tail
+2. Retighten the immediate replacement-launcher question on helper9/state9 specifically:
+   - keep the narrow helper9 continuation bridge explicit
+   - source-own more of `0x41de40 = CLTLoginMediator_State9SubmitFollowup`
+   - identify/populate the missing owner collaborator triple at `+0x84/+0x88/+0x8c`
+   - only then expect later raw `0x11` / state9 slot-6 progression
 3. Keep state `8` closed enough in source while doing that:
    - keep only the narrow explicit leftovers:
      - non-`0x10` fallback through `0x41c5c0`
