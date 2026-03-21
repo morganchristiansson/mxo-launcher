@@ -396,7 +396,11 @@ public:
 };
 
 // anchor: launcher.exe vtable 0x004b5230
-// docs: ../../docs/launcher.exe/VTABLES/0x004b5230.md
+// docs:
+// - ../../docs/launcher.exe/VTABLES/0x004b5230.md
+// - ../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md
+// Focused source home for the current state-0x0c leaf identity:
+// - `loginstate_state12.cpp`
 // Provisional better-name suggestion: `CLTLoginState_FinalMarginLeaf12`
 class CLTLoginState_State12 : public CLTLoginState_AbstractFinalLeafBase {
 public:

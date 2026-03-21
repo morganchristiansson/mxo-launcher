@@ -12,8 +12,10 @@
  *
  * Canonical references:
  * - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+ * - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
  * - `../../../../docs/launcher.exe/VTABLES/0x004b01c8.md`
  * - `../../../../docs/launcher.exe/VTABLES/0x004b517c.md`
+ * - `../../../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md`
  * - `../../../../docs/launcher.exe/auth/STATUS.md`
  */
 

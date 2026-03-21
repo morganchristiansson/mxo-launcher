@@ -32,6 +32,7 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/src/diagnostics.o \
 	$(BUILD_DIR)/src/diagnostics_auth.o \
 	$(BUILD_DIR)/src/launcher_mediator_abi.o \
+	$(BUILD_DIR)/src/launcher_mediator_state9_abi.o \
 	$(BUILD_DIR)/src/launcher_network_object_abi.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/lttcpconnection.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.o \
@@ -42,6 +43,7 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state8.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state9.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state12.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/launchpad.o \
 	$(COMMON_AUTH_OBJS)
 

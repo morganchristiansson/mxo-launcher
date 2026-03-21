@@ -24,7 +24,9 @@ class CLTLoginState_WorldListPending;
 // but keep uncertain field meanings clearly labeled in comments.
 // Canonical runtime/cross-component references remain:
 // - docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md
+// - docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md
 // - docs/launcher.exe/startup_objects/0x4d6304_network_engine.md
+// - docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md
 // - docs/client.dll/RunClientDLL/README.md
 //
 // Current best identity:

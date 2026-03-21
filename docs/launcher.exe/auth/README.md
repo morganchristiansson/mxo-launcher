@@ -321,6 +321,9 @@ Keep detailed packet/auth-loop behavior here in `docs/launcher.exe/auth/` and ke
 
 ## Related docs
 
+- `STATUS.md`
 - `../startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+- `../startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 - `../startup_objects/0x4d2c58_RESOLUTION_MECHANISM.md`
 - `../startup_objects/README.md`
+- `../state_machine/POST_STATE9_CONTINUATION.md`

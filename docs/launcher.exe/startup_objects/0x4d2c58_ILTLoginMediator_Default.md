@@ -26,8 +26,17 @@ Current replacement-launcher source split:
 - focused late-login/state9 surface now lives under:
   - `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
   - `matrixstaging/game/src/libltclientlogin/loginmediator_state9_submit_scaffold.h`
-- the replacement `ILTLoginMediator.Default` ABI/vtable shell now lives in `src/launcher_mediator_abi.cpp`
+  - `matrixstaging/game/src/libltclientlogin/loginstate_state9.cpp`
+  - `matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp`
+  - `src/launcher_mediator_state9_abi.cpp`
+- the broader replacement `ILTLoginMediator.Default` ABI/vtable shell now lives in `src/launcher_mediator_abi.cpp`
 - diagnostics-only window tracing remains in `src/diagnostics.cpp`
+
+Focused docs:
+- late-login arg6 subset (`+0xd4`, `+0x124`, `+0x18c`):
+  - `0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
+- post-state9 / state-`0x0c` continuation:
+  - `../state_machine/POST_STATE9_CONTINUATION.md`
 
 Those path strings do **not** by themselves prove exact class ownership for every auth/login packet path, but they do support treating this interface as part of the launcher/game-side login layer rather than a generic runtime-only socket helper.
 

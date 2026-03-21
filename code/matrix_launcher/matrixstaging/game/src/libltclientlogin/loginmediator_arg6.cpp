@@ -7,8 +7,10 @@ namespace mxo::ltlogin {
 // Focused arg6/selection split:
 // - keep `ILTLoginMediator.Default` world-list/selection scaffolding out of the main mediator TU
 // - this lets active auth/state8/state9 work avoid rereading arg6 startup-selection code
-// - canonical RE reference remains:
-//   `../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+// - canonical RE references:
+//   - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+//   - late-login arg6 slots `+0xd4/+0x124/+0x18c` live separately under:
+//     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
 // Address anchor: launcher.exe:0x4d2c58 = ILTLoginMediator_Default object (arg6)
 void* CLTLoginMediator::WorldSlot(uint32_t index) const {

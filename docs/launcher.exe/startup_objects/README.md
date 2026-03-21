@@ -7,6 +7,9 @@ This folder documents launcher-owned globals and heap objects that are part of t
 - `0x4d2c58_ILTLoginMediator_Default.md`
   - runtime interface pointer used by nopatch setup, client startup, and teardown
 
+- `0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
+  - focused late-login subset for arg6 slots `+0xd4`, `+0x124`, and `+0x18c`
+
 - `0x4d2c58_RESOLUTION_MECHANISM.md`
   - how the launcher resolves and fills the `ILTLoginMediator.Default` pointer slot through registry state
 

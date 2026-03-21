@@ -8,7 +8,9 @@ namespace {
 
 // Focused late-login/state9 split:
 // - keep the state9 slot3/slot6 body in its own TU so the next join-session deep dive can stay
-//   scoped to `0x439780 -> 0x41de40 -> 0x43c180`.
+//   scoped to `0x439780 -> 0x41de40 -> 0x43c180`
+// - canonical continuation reference:
+//   `../../../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md`
 
 static uint32_t ReadU32LEState9(const uint8_t* p) {
     return static_cast<uint32_t>(p[0]) |

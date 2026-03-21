@@ -17,6 +17,9 @@ namespace state9submit = mxo::ltlogin::state9submit_scaffold;
 // - `loginmediator_state9.cpp` now keeps only the mediator-owned state9 methods
 // - callback84/object88/submit-helper detail lives in
 //   `loginmediator_state9_submit_scaffold.h`
+// - canonical docs:
+//   - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
+//   - `../../../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md`
 // - this keeps future INetMgr.Default / CUDPDriver::JoinSession work scoped to the active
 //   late-login surface instead of forcing rereads of broader mediator/auth files
 
