@@ -70,3 +70,4 @@ Document the mismatch and adjust the implementation/docs.
   - Suggest cleanup and pruing of code that is no longer needed and can be cleaned up
   - finish with a self-contained prompt to start next session; include current state, source-of-truth docs/files, exact next target, and any important context, commands or env flags
 - avoid duplicate documentation; merge/prune overlapping docs and keep each topic in the smallest obvious canonical home instead of letting one large doc sprawl across many components
+- added and updated log statements should use spdlog

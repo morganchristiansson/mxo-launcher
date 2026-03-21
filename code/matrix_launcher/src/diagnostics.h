@@ -37,10 +37,10 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
-void DiagnosticConfigureLoginControllerSelectedWorldIndex(uint32_t selectedWorldIndexLow24);
 void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* characterName,
-    const char* gameSessionId);
+    const char* gameSessionId,
+    uint32_t selectedWorldIndexLow24);
 void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionContext, uint32_t byteCount);
 void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, void* object88, void* object8c);
 uint32_t DiagnosticFillState9CallbackBlob18c(void* outBuffer, uint32_t arg2, uint32_t arg3);

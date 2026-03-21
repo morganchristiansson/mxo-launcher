@@ -189,22 +189,18 @@ static void DiagnosticRouteConnectStatusToLoginController(
         return;
     }
 
-    const char* expectedNextRequest = "";
     const char* incomingReplyAnchor = "";
     if (self == g_DiagnosticAuthContext) {
-        expectedNextRequest = g_DiagnosticLoginController->ExpectedAuthRequestName();
         incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
     } else if (self == g_DiagnosticMarginContext) {
-        expectedNextRequest = g_DiagnosticLoginController->ExpectedMarginRequestName();
         incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply;
     }
 
-    Log(
-        "DIAGNOSTIC: routed %s type-2 connect-status payload=0x%08x into CLTLoginMediator scaffold -> handled=%u nextOutboundRequest='%s' laterIncomingReplyAnchor='%s'",
+    spdlog::info(
+        "DIAGNOSTIC: routed {} type-2 connect-status payload=0x{:08x} into CLTLoginMediator scaffold -> handled={} laterIncomingReplyAnchor='{}'",
         routeLabel,
-        (unsigned)workItem->workPayload,
-        (unsigned)handled,
-        (expectedNextRequest && expectedNextRequest[0]) ? expectedNextRequest : "<unresolved>",
+        static_cast<unsigned>(workItem->workPayload),
+        static_cast<unsigned>(handled),
         (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
 }
 
@@ -652,17 +648,11 @@ const void* DiagnosticGetState9CallbackSeedPointer85D4() {
     return g_LoginControllerState9CallbackSeed85D4;
 }
 
-void DiagnosticConfigureLoginControllerSelectedWorldIndex(uint32_t selectedWorldIndexLow24) {
-    g_LoginControllerSelectedWorldIndexLow24 = selectedWorldIndexLow24 & 0x00ffffffu;
-    DiagnosticApplyLoginControllerConfig();
-    Log(
-        "DIAGNOSTIC: recovered 0x41c3c0 selectedWorldIndexLow24 configured value=0x%06x",
-        (unsigned)g_LoginControllerSelectedWorldIndexLow24);
-}
-
 void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* characterName,
-    const char* gameSessionId) {
+    const char* gameSessionId,
+    uint32_t selectedWorldIndexLow24) {
+    g_LoginControllerSelectedWorldIndexLow24 = selectedWorldIndexLow24 & 0x00ffffffu;
     std::strncpy(
         g_LoginControllerCharacterNameSeed,
         characterName ? characterName : "",
@@ -674,10 +664,11 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
         sizeof(g_LoginControllerGameSessionIdSeed) - 1);
     g_LoginControllerGameSessionIdSeed[sizeof(g_LoginControllerGameSessionIdSeed) - 1] = '\0';
     DiagnosticApplyLoginControllerConfig();
-    Log(
-        "DIAGNOSTIC: login-controller character seed configured character='%s' session='%s' (bridge into confirmed 0x41c3c0 / 0x420ef0 writers; original upstream producer still unresolved)",
+    spdlog::info(
+        "DIAGNOSTIC: login-controller character seed configured character='{}' session='{}' selectedWorldIndexLow24=0x{:06x} (bridge into confirmed 0x41c3c0 / 0x420ef0 writers; original upstream producer still unresolved)",
         g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : "<empty>",
-        g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : "<empty>");
+        g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : "<empty>",
+        static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24));
 }
 
 bool DiagnosticCanBeginAuthConnection() {
@@ -711,11 +702,9 @@ uint32_t DiagnosticBeginAuthConnection() {
             "AuthConnectStatus");
     }
 
-    Log(
-        "DIAGNOSTIC: CLTLoginMediator::BeginAuthConnection() authHost='%s' port=%u -> 0x%08x",
-        g_DiagnosticLoginController->AuthServerDnsName().c_str(),
-        (unsigned)g_DiagnosticLoginController->AuthServerPortHostOrder(),
-        (unsigned)result);
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginMediator::BeginAuthConnection() -> 0x{:08x}",
+        static_cast<unsigned>(result));
     return result;
 }
 
@@ -749,10 +738,9 @@ uint32_t DiagnosticBeginMarginConnection() {
             "MarginConnectStatus");
     }
 
-    Log(
-        "DIAGNOSTIC: CLTLoginState_State4::Slot3_BeginOrContinue() marginHost='%s' port=%u -> 0x%08x",
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginState_State4::Slot3_BeginOrContinue() marginHost='{}' -> 0x{:08x}",
         marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
-        (unsigned)g_DiagnosticLoginController->MarginServerPortHostOrder(),
-        (unsigned)result);
+        static_cast<unsigned>(result));
     return result;
 }

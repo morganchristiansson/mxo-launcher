@@ -72,7 +72,7 @@ uint32_t LaunchPadClient::OnPlayRequestStatus(
     // - state8/state11 packet builders later read that same string through owner vtable `+0x148`
     //   / `0x41f320` as `GameSessionID`
     // - current best concrete read is therefore that `GameSessionID` is launchpad/play-session
-    //   owned, not part of the branch-specific `0x41c3c0` helper11 source writer
+    //   owned, not part of the branch-specific `0x41c3c0` post-auth source writer
     // - keep that ownership split explicit: this write belongs to LaunchPadClient's vtable path,
     //   even though the destination storage lives on the mediator owner object
     if (!mediator || resultCode != 0u) {

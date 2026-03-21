@@ -377,7 +377,7 @@ public:
 
     struct ProcessLoginCredentialsInputSketch {
         // owner vtable `+0x120` / `0x41c3c0`
-        // Real later branch-specific writer for the helper11 source block, but not the currently
+        // Real later branch-specific writer for the post-auth source block, but not the currently
         // proven default password-submit branch.
         // Current field read:
         // - `+0x00`  -> CharacterName (`owner +0x108`)
@@ -400,7 +400,7 @@ public:
 
     struct State8SelectionContextSnapshotState {
         // owner writeback area filled by `0x41c1f0` on the active state `3 -> 8` branch.
-        // This is the persisted selection/config snapshot, not the helper11 appearance/name block.
+        // This is the persisted selection/config snapshot, not the later post-auth appearance/name block.
         uint8_t slotOrSelectionIndexCc8 = 0;           // `+0xcc8`
         std::array<uint8_t, 7> paddingCc9{};           // `+0xcc9 .. +0xccf`
         std::array<uint32_t, 4> blockCd0{};            // `+0xcd0 .. +0xcdf`
@@ -458,7 +458,7 @@ public:
         std::array<uint8_t, 0x20> sourceBlock1b8{};      // `+0x1b8 .. +0x1d7` = Background
 
         // ========================================================================
-        // Helper11 HandleLoadCharacterReply outputs (0x440320)
+        // Post-auth HandleLoadCharacterReply outputs (0x440320)
         // ========================================================================
         uint32_t worldListCountOrStatus80 = 0;           // `+0x80`
 
@@ -475,10 +475,10 @@ public:
         uint32_t characterReplyFieldF40 = 0;             // `+0xf40`
         std::array<uint32_t, 8> characterFlagsF48{};     // `+0xf48 .. +0xf67`
         std::array<uint32_t, 8> secondaryCharacterDataF68{}; // `+0xf68 .. +0xf87` (provisional world/status seed area)
-        std::array<uint32_t, 10> characterRecordPointersF88{}; // helper11/scaffold parsed subview
-        std::array<char, 0x20> section0StringF8c{};      // helper11/scaffold parsed subview
-        std::array<char, 0x20> section0StringFac{};      // helper11/scaffold parsed subview
-        std::array<char, 0x20> section0StringFcc{};      // helper11/scaffold parsed subview
+        std::array<uint32_t, 10> characterRecordPointersF88{}; // post-auth/scaffold parsed subview
+        std::array<char, 0x20> section0StringF8c{};      // post-auth/scaffold parsed subview
+        std::array<char, 0x20> section0StringFac{};      // post-auth/scaffold parsed subview
+        std::array<char, 0x20> section0StringFcc{};      // post-auth/scaffold parsed subview
         std::array<uint8_t, 0x465> state8Section0RawF88{}; // source-owned raw mirror of state8 `0x43f930` section-0 copy span
 
         // state8 case `0x00` also has a one-shot overflow tail at `+0x13f0/+0x13f4` when the
@@ -628,7 +628,6 @@ public:
     ~CLTLoginMediator();
 
     void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
-    mxo::liblttcp::CLTThreadPerClientTCPEngine* NetworkEngine() const;
 
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
@@ -660,7 +659,7 @@ public:
     const std::array<uint32_t, 8>& RecentPostedEventsScaffold() const { return recentPostedEventsScaffold_; }
     uint32_t RecentPostedEventCountScaffold() const { return recentPostedEventCountScaffold_; }
 
-    // Narrow helper11 receive-boundary counters used only for short runtime discrimination:
+    // Narrow post-auth receive-boundary counters used only for short runtime discrimination:
     // - no packet arrived yet
     // - packet arrived but would be consumed by base margin dispatch before slot 6
     // - packet survived into current helper slot 6
@@ -722,28 +721,14 @@ public:
     void SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile = false);
     void SetMarginServerConfig(const char* dnsSuffix, uint16_t portHostOrder, bool ignoreHostsFile = false);
 
-    const std::string& AuthServerDnsName() const;
-    uint16_t AuthServerPortHostOrder() const;
-    bool IgnoreHostsFileForAuth() const;
-
-    const std::string& MarginServerDnsSuffix() const;
-    uint16_t MarginServerPortHostOrder() const;
-    bool IgnoreHostsFileForMargin() const;
     std::string ResolvedMarginHostName() const;
-
-    const mxo::liblttcp::LTTCPEndpointKey& AuthEndpoint() const;
-    const mxo::liblttcp::LTTCPEndpointKey& MarginEndpoint() const;
 
     mxo::liblttcp::CMessageConnection* AuthConnection() const;
     mxo::liblttcp::CMessageConnection* MarginConnection() const;
 
-    void SetMarginRouteState(uint8_t currentCharacterOrRouteIndex, uint32_t pendingWorldId, int32_t currentWorldId);
     void SetMarginRouteHostPrefix(const char* routeHostPrefix);
     void SetExactMarginHostName(const char* exactMarginHostName);
     const MarginRouteState& CurrentMarginRouteState() const;
-
-    const ConnectionHelperFamily& Helpers() const;
-    const AuthBootstrapState680Sketch& AuthBootstrap680() const;
 
     // launcher.exe:0x43b300
     // Current best read:
@@ -853,8 +838,8 @@ public:
     //   current-state dispatch rather than being fully handled by optional helper slots alone
     // - active default password-submit continuation is now:
     //   `0x41ecd0 -> 0x41c1f0 -> 0x439300 -> 0x43bd20 / 0x43f930`
-    // - helper11/state11 remains a later real branch after auth-reply handling, not the first
-    //   active branch to prioritize
+    // - state11 remains a later real branch after auth-reply handling, not the first active
+    //   branch to prioritize
     // - the earlier auth bootstrap/send lead is still the helper2 / `0x448050` family, not the
     //   later world-list sender
     uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
@@ -870,11 +855,11 @@ public:
         const std::vector<uint8_t>& keyConfigMd5,
         const std::vector<uint8_t>& uiConfigMd5);
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
-    // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the helper11 receive boundary
-    // explicit in source too:
+    // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
+    // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
     // - only other codes survive into owner `+0x184` / current helper slot 6
-    // - practical helper11 consequence: the first real `MS_LoadCharacterReply` candidate must
+    // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
     uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
 
@@ -885,11 +870,7 @@ public:
     // - mediator only keeps the staged bytes plus owner-state writeback helpers
     uint32_t HandleStagedAuthReplyPacketScaffold();
     uint32_t HandleStagedMarginLoadCharacterReplyPacketScaffold();
-    const std::vector<uint8_t>& StagedIncomingAuthPacketBytes() const;
     const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
-
-    const char* ExpectedAuthRequestName() const;
-    const char* ExpectedMarginRequestName() const;
 
     static constexpr uint32_t kConnectStatusSuccess = 0x7000001u;
 
@@ -910,8 +891,6 @@ public:
     const SlotRecordState004b5328* GetCurrentSlotRecord() const;
     // anchor: launcher.exe:0x41b220 / owner vtable +0xdc
     const char* GetSlotRecordHeapStringByIndex(uint8_t slotIndex) const;
-    // anchor: launcher.exe:0x41f310 / owner vtable +0x130
-    void* GetSessionCallbackHelper65c() const;
     // anchor: launcher.exe:0x41f320 / owner vtable +0x148
     const char* GetGameSessionId664() const;
     // UNANCHORED: source-owned owner-field setter used by separate LaunchPad/session callback paths
@@ -926,6 +905,8 @@ public:
     uint32_t CommitSessionCallbackHelperGameSessionId664();
     // source-owned shared helper used by `CLTLoginState_State18` slot 3 / `0x421a50`
     uint32_t RefreshSessionHelperGameSessionId664FromSourceBlock94();
+    // anchor: launcher.exe:0x41f310 / owner vtable +0x130
+    void* GetSessionCallbackHelper65c() const;
     // anchor: launcher.exe:0x41b260 / owner vtable +0xe0
     const char* GetRouteHostPrefixBySlot(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b2a0 / owner vtable +0xe4? / current slot-record payload reader
@@ -940,9 +921,9 @@ public:
     uint8_t GetDescriptorLowNibble1fByIndex(uint8_t slotIndex) const;
 
     // =============================================================================
-    // HELPER11: Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
+    // Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
     // =============================================================================
-    // Recovered from Ghidra analysis of launcher.exe helper/state11 functions:
+    // Recovered from Ghidra analysis of launcher.exe state10/state11-era functions:
     // - 0x43c020 = CLTLoginState_State11 slot 3 send body
     //   Builds/sends margin packet with first payload byte 0x4d, posts event 0x15
     // - 0x440320 = CLTLoginState_State11 slot 6 reply body
@@ -1012,7 +993,7 @@ public:
 
     // Post-Auth Margin/Loading State Accessors (launcher.exe:0x4f78b8)
     // =============================================================================
-    // These methods expose the owner fields recovered from Ghidra analysis of helper11.
+    // These methods expose the owner fields used by the later post-auth margin/loading path.
     // They are used to faithfully reconstruct the original launcher's margin packet building
     // and load character reply handling logic.
     // =============================================================================
@@ -1031,7 +1012,7 @@ public:
     const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return state8SelectionContextSnapshotState_.blockD60; }
     const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return state8SelectionContextSnapshotState_.blockD70; }
 
-    // Helper11 source block (`0x43c020`, `0x440320`):
+    // Later post-auth source block (`0x43c020`, `0x440320`):
     const std::array<char, 0x20>& SourceLeadString108() const { return postAuthMarginLoadingState_.sourceLeadString108; }
     uint32_t SourceField12c() const { return postAuthMarginLoadingState_.sourceField12c; }
     const std::array<uint32_t, 17>& SourceDwords134() const { return postAuthMarginLoadingState_.sourceDwords134; }
@@ -1044,7 +1025,7 @@ public:
     PostAuthMarginLoadingState& MutablePostAuthMarginLoadingState() { return postAuthMarginLoadingState_; }
     const PostAuthMarginLoadingState& PostAuthMarginLoadingStateView() const { return postAuthMarginLoadingState_; }
 
-    // Helper11 HandleLoadCharacterReply outputs (0x440320) plus neighboring state6-gated send flag:
+    // Post-auth load-character reply outputs (0x440320) plus neighboring state6-gated send flag:
     uint32_t& WorldListCountOrStatus80() { return postAuthMarginLoadingState_.worldListCountOrStatus80; }
     uint8_t State10SendGateFlagF14() const { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
     uint8_t& State10SendGateFlagF14() { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
@@ -1087,7 +1068,7 @@ private:
     void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
-    void SeedHelper11SourceBlockFromRecoveredPostAuthStateIfUnset();
+    void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
     void AdoptAuthReplyIntoRecoveredMediatorState();
 
     uint32_t SendMarginFramedPacket(

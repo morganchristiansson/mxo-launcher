@@ -45,7 +45,6 @@ using InitClientDLLFunc = int (*)(
 
 using RunClientDLLFunc = int (*)();
 using TermClientDLLFunc = int (*)();
-using ErrorClientDLLFunc = void (*)();
 
 static FILE* g_LogFile = NULL;
 static HMODULE g_hCres = NULL;
@@ -53,7 +52,6 @@ static HMODULE g_hClient = NULL;
 static InitClientDLLFunc g_InitClientDLL = NULL;
 static RunClientDLLFunc g_RunClientDLL = NULL;
 static TermClientDLLFunc g_TermClientDLL = NULL;
-static ErrorClientDLLFunc g_ErrorClientDLL = NULL;
 
 // Launcher-owned runtime values mirrored from the original startup path.
 // arg1/arg2 now use launcher-owned filtered storage again, but the original
@@ -63,14 +61,7 @@ static char** g_FilteredArgv = NULL;
 static char** g_FilteredArgvOwned = NULL;
 static uint32_t g_FilteredArgvOwnedCapacity = 0;
 
-// Diagnostic state tracking for pre-crash analysis
-static const char* g_LastMediatorMethod = NULL;
-static uint32_t g_LastMediatorCallCount = 0;
-static void* g_LastMediatorSelf = NULL;
-
-// Buffer to store raw bytes around potential crash points for pattern matching
-static uint8_t g_ArgvSnapshot[64] = {0};
-static bool g_ArgvSnapshotValid = false;
+// Launcher-owned startup/auth state.
 static char g_AuthUsername[256] = {};
 static char g_AuthPassword[256] = {};
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
@@ -83,7 +74,6 @@ static uint32_t g_FlagByte = 0;                  // original: [0x4d2c69]
 static char g_LastWorldName[256] = {0};         // original registry value: Last_WorldName
 static char g_LauncherCharacter[256] = {};
 static char g_LauncherSession[256] = {};
-static char g_LauncherQlVersion[256] = {};
 static bool g_LauncherSwitchClone = false;
 static bool g_LauncherSwitchSilent = false;
 static bool g_LauncherSwitchNoPatch = false;
@@ -97,7 +87,6 @@ static bool g_LauncherGlobal4C8B1C = true;      // original .data init = 1, clea
 static bool g_LauncherGlobal4C8B1D = true;      // original .data init = 1, cleared by -nopatch
 static bool g_LauncherGlobal4D2C64 = false;     // original options.cfg/autodetect gate
 static DWORD g_AutodetectExitCode = 0;
-static void* g_pClientDBFromCallback = NULL;
 
 static const char* kLauncherRegistryKeyPath = "Software\\Monolith Productions\\The Matrix Online\\";
 
@@ -128,13 +117,7 @@ struct DiagnosticPreclientEnvironmentState {
     void* readyPointer48;
 };
 
-struct DiagnosticInitClientFrameSnapshot {
-    bool valid;
-    uint32_t args[8];
-};
-
 static DiagnosticPreclientEnvironmentState g_PreclientEnvironment = {};
-static DiagnosticInitClientFrameSnapshot g_InitClientFrameSnapshot = {};
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase);
 
@@ -179,76 +162,6 @@ static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
             static_cast<unsigned>((i + 3) * 4),
             (i + 3 < wordCount) ? words[i + 3] : 0);
     }
-}
-
-static const char* InitClientArgName(size_t index) {
-    switch (index) {
-        case 0: return "arg1 filteredArgCount";
-        case 1: return "arg2 filteredArgv";
-        case 2: return "arg3 hClientDll";
-        case 3: return "arg4 hCresDll";
-        case 4: return "arg5 launcherNetworkObject";
-        case 5: return "arg6 ILTLoginMediatorDefault";
-        case 6: return "arg7 packedArg7Selection";
-        case 7: return "arg8 flagByte";
-        default: return NULL;
-    }
-}
-
-static void CaptureInitClientFrameSnapshot() {
-    g_InitClientFrameSnapshot.valid = true;
-    g_InitClientFrameSnapshot.args[0] = g_FilteredArgCount;
-    g_InitClientFrameSnapshot.args[1] = reinterpret_cast<uint32_t>(g_FilteredArgv);
-    g_InitClientFrameSnapshot.args[2] = reinterpret_cast<uint32_t>(g_hClient);
-    g_InitClientFrameSnapshot.args[3] = reinterpret_cast<uint32_t>(g_hCres);
-    g_InitClientFrameSnapshot.args[4] = reinterpret_cast<uint32_t>(g_pLauncherObject6304);
-    g_InitClientFrameSnapshot.args[5] = reinterpret_cast<uint32_t>(g_pILTLoginMediatorDefault);
-    g_InitClientFrameSnapshot.args[6] = g_PackedArg7Selection;
-    g_InitClientFrameSnapshot.args[7] = g_FlagByte;
-
-    spdlog::info("DIAGNOSTIC: preserved InitClientDLL argument frame snapshot");
-    for (size_t i = 0; i < 8; ++i) {
-        spdlog::info(
-            "  {} = {:08x}",
-            InitClientArgName(i),
-            (unsigned)g_InitClientFrameSnapshot.args[i]);
-    }
-}
-
-static void LogCrashStackVsInitFrame(uint32_t crashEsp) {
-    if (!g_InitClientFrameSnapshot.valid || crashEsp == 0) return;
-
-    Log("DIAGNOSTIC: comparing crash stack against preserved InitClientDLL argument frame");
-    for (size_t i = 0; i < 8; ++i) {
-        Log(
-            "  saved %s = %08x",
-            InitClientArgName(i),
-            (unsigned)g_InitClientFrameSnapshot.args[i]);
-    }
-
-    const uint32_t* stackWords = reinterpret_cast<const uint32_t*>(crashEsp);
-    for (size_t stackIndex = 0; stackIndex < 8; ++stackIndex) {
-        const uint32_t value = stackWords[stackIndex];
-        for (size_t argIndex = 0; argIndex < 8; ++argIndex) {
-            if (value != 0 && value == g_InitClientFrameSnapshot.args[argIndex]) {
-                Log(
-                    "  crash esp[%u] = %08x matches %s",
-                    (unsigned)stackIndex,
-                    (unsigned)value,
-                    InitClientArgName(argIndex));
-            }
-        }
-    }
-}
-
-static void DiagnosticSnapshotArgvMemory() {
-  if (!g_FilteredArgv || !g_FilteredArgvOwned) return;
-  // Take a snapshot of argv array memory for post-crash analysis
-  std::memcpy(g_ArgvSnapshot, &g_FilteredArgv[0],
-              (g_FilteredArgCount + 2) * sizeof(char*) > sizeof(g_ArgvSnapshot)
-                  ? sizeof(g_ArgvSnapshot)
-                  : (g_FilteredArgCount + 2) * sizeof(char*));
-  g_ArgvSnapshotValid = true;
 }
 
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
@@ -301,34 +214,14 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
     }
 
     LogWordSpan("crash stack", reinterpret_cast<const void*>(context->Esp), 16);
-    LogCrashStackVsInitFrame(context->Esp);
     if (g_FilteredArgv) {
         LogWordSpan("current arg2 filteredArgv", g_FilteredArgv, 4);
-
-      // Analyze if crash is in argv memory (arg2+2 pattern detection)
-      uintptr_t eip = static_cast<uintptr_t>(context->Eip);
-      uintptr_t argvStart = reinterpret_cast<uintptr_t>(g_FilteredArgv);
-      size_t argvSize = (g_FilteredArgCount + 1) * sizeof(char*);
-      if (eip >= argvStart && eip < argvStart + argvSize) {
-        Log("!!! CRASH IN ARGV MEMORY !!!");
-        Log("    eip=%p is at argv+%zu (argv[%zu])",
-            reinterpret_cast<void*>(eip),
-            eip - argvStart,
-            (eip - argvStart) / sizeof(char*));
-      }
-      if (g_ArgvSnapshotValid) {
-        LogWordSpan("argv memory snapshot", g_ArgvSnapshot, 8);
-      }
     }
     if (g_pLauncherObject6304) {
         LogWordSpan("current arg5 launcherObject", g_pLauncherObject6304, 8);
     }
     if (g_pILTLoginMediatorDefault) {
         LogWordSpan("current arg6 mediator", g_pILTLoginMediatorDefault, 8);
-    }
-    if (g_LastMediatorMethod) {
-      Log("last mediator method: %s (call#%u, self=%p)",
-          g_LastMediatorMethod, g_LastMediatorCallCount, g_LastMediatorSelf);
     }
 
     return EXCEPTION_CONTINUE_SEARCH;
@@ -442,7 +335,6 @@ static void ResetLauncherPreprocessingState() {
     std::memset(g_AuthPassword, 0, sizeof(g_AuthPassword));
     std::memset(g_LauncherCharacter, 0, sizeof(g_LauncherCharacter));
     std::memset(g_LauncherSession, 0, sizeof(g_LauncherSession));
-    std::memset(g_LauncherQlVersion, 0, sizeof(g_LauncherQlVersion));
     g_LauncherSwitchClone = false;
     g_LauncherSwitchSilent = false;
     g_LauncherSwitchNoPatch = false;
@@ -536,7 +428,6 @@ static void LogLauncherPreprocessingState() {
     Log("auth password      = %s", MaskedArgValue(g_AuthPassword));
     Log("launcher character  = %s", MaskedArgValue(g_LauncherCharacter));
     Log("launcher session    = %s", MaskedArgValue(g_LauncherSession));
-    Log("launcher qlver      = %s", MaskedArgValue(g_LauncherQlVersion));
     Log(
         "launcher flags      = clone:%d silent:%d nopatch:%d recover:%d deletechar:%d justpatch:%d noeula:%d skiplaunch:%d lptest:%d",
         g_LauncherSwitchClone ? 1 : 0,
@@ -818,7 +709,6 @@ static int FinishAndReturn(int code) {
 }
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase) {
-    g_pClientDBFromCallback = pMasterDatabase;
     Log("launcher export SetMasterDatabase called: %p", pMasterDatabase);
 }
 
@@ -860,14 +750,12 @@ static bool ResolveClientExports() {
     g_InitClientDLL = ResolveProc<InitClientDLLFunc>(g_hClient, "InitClientDLL");
     g_RunClientDLL = ResolveProc<RunClientDLLFunc>(g_hClient, "RunClientDLL");
     g_TermClientDLL = ResolveProc<TermClientDLLFunc>(g_hClient, "TermClientDLL");
-    g_ErrorClientDLL = ResolveProc<ErrorClientDLLFunc>(g_hClient, "ErrorClientDLL");
 
     Log("InitClientDLL : %p", g_InitClientDLL);
     Log("RunClientDLL  : %p", g_RunClientDLL);
     Log("TermClientDLL : %p", g_TermClientDLL);
-    Log("ErrorClientDLL: %p", g_ErrorClientDLL);
 
-    return g_InitClientDLL && g_RunClientDLL && g_TermClientDLL && g_ErrorClientDLL;
+    return g_InitClientDLL && g_RunClientDLL && g_TermClientDLL;
 }
 
 static bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
@@ -1036,7 +924,6 @@ static void LogKnownStartupState() {
 
 static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     ResetLauncherPreprocessingState();
-    g_ArgvSnapshotValid = false;
 
     spdlog::info("=== Launcher argv preprocessing ===");
     spdlog::info("DIAGNOSTIC: launcher auth/state expected through launcher-style switches (e.g. -user / -pwd)");
@@ -1070,14 +957,7 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
                 FreeFilteredArgvOwned();
                 return false;
             }
-            if (consumedTarget == LauncherValueTarget::QlVersionIgnored) {
-                spdlog::info(
-                    "DIAGNOSTIC: consumed launcher switch value argv[{}] = {} (original 0x409950 appears to ignore retained qlver storage)",
-                    src,
-                    MaskedArgValue(value));
-            } else {
-                spdlog::info("DIAGNOSTIC: consumed launcher switch value argv[{}] = {}", src, MaskedArgValue(value));
-            }
+            spdlog::info("DIAGNOSTIC: consumed launcher switch value argv[{}] = {}", src, MaskedArgValue(value));
             pendingValueTarget = LauncherValueTarget::None;
             continue;
         }
@@ -1259,10 +1139,10 @@ int main(int argc, char* argv[]) {
     DiagnosticConfigureMediatorAuthName(g_AuthUsername[0] ? g_AuthUsername : NULL);
     DiagnosticConfigureMediatorAuthPassword(g_AuthPassword[0] ? g_AuthPassword : NULL);
 
-    DiagnosticConfigureLoginControllerSelectedWorldIndex(selectionPackedLow24);
     DiagnosticConfigureLoginControllerCharacterSeed(
         g_LauncherCharacter[0] ? g_LauncherCharacter : NULL,
-        g_LauncherSession[0] ? g_LauncherSession : NULL);
+        g_LauncherSession[0] ? g_LauncherSession : NULL,
+        selectionPackedLow24);
 
     DiagnosticApplyDefaultNopatchMediatorConfig(
         g_pILTLoginMediatorDefault,
@@ -1394,10 +1274,7 @@ int main(int argc, char* argv[]) {
 
     spdlog::info("=== Calling InitClientDLL with current active startup scaffold ===");
     spdlog::info("DIAGNOSTIC: proceeding because the current launcher path now provides arg5 build/register, binder-backed arg6, and sibling-slot arg7 rebuild");
-    CaptureInitClientFrameSnapshot();
-    DiagnosticSnapshotArgvMemory();
-    Log("DIAGNOSTIC: argv memory snapshotted for crash analysis");
-    
+
     if (g_pILTLoginMediatorDefault) {
         Log("arg6 mediator object prepared for InitClientDLL: %p", g_pILTLoginMediatorDefault);
     } else {
@@ -1415,7 +1292,6 @@ int main(int argc, char* argv[]) {
         g_FlagByte);
 
     Log("InitClientDLL returned: %d", initResult);
-    Log("launcher export SetMasterDatabase observed: %p", g_pClientDBFromCallback);
 
     // Original client code returns 1 on the observed success path and 0 / negative values on failure paths.
     // Do not treat non-zero generically as failure here.
