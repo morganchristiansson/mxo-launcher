@@ -54,13 +54,21 @@ Source home:
 ### `0x41b450 = CLTLoginMediator_SwitchHelperState`
 Current best read:
 - not just a raw current-state assignment
-- notifies old helper with new helper object
+- calls old helper vtable `+0x0c` with the new helper object
 - installs the new helper into owner `+0x10`
-- then notifies the new helper with the old helper object
+- then calls new helper vtable `+0x08` with the old helper object
+- direct vtable reads now tighten those offsets to:
+  - old helper `+0x0c` -> slot 4
+  - new helper `+0x08` -> slot 3 / BeginOrContinue
+- active post-state9 consequence:
+  - on the state9 -> state12 switch, old helper slot 4 is the shared tiny stub
+  - new helper state12 slot 3 is also the shared tiny stub
+  - so `0x41b450` itself is **not** the missing immediate state-`0x0c` body
 
 Current source stance:
 - visible state switch is mirrored
-- deeper old/new helper notification slots stay explicit/unresolved
+- the exact old/new helper call-shape is now source-commented with slot mapping
+- no extra active-path behavior is claimed there beyond that evidence
 
 Source home:
 - `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
@@ -128,8 +136,9 @@ The active replacement boundary is now:
 
 Most likely missing concrete work now lives in one of these areas:
 1. owner `+0x674` listener-tree consumers behind `0x41cfb0`
-2. state-`0x0c` body/observer continuation after event `0x18`
-3. later event-driven bridge that leads to the natural-original `0x41cfb0(0x0f)` hit before game entry
+2. later event-driven bridge that leads to the natural-original `0x41cfb0(0x0f)` hit before game entry
+3. only after new live evidence forces it, any deeper state-`0x0c` body beyond the already-bounded
+   `0x41b450` slot-call stubs
 
 ## First files to read next session
 

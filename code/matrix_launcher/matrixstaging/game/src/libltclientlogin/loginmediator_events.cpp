@@ -40,13 +40,19 @@ static std::string BuildRecentEventHistoryPreview(const std::array<uint32_t, 8>&
 
 void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
     // anchor: launcher.exe:0x41b450
-    // Exact recovered shape from the current Ghidra pass:
+    // Tightened recovered shape from the current Ghidra pass plus direct vtable reads:
     // - if an old helper exists, call its vtable `+0x0c` with the new helper object
     // - install the dispatch-table target into owner `+0x10`
     // - then call the new helper's vtable `+0x08` with the old helper object
-    // Current source scaffold keeps that boundary explicit and records the target helper id, but
-    // does not yet claim the exact old/new helper notification slot semantics beyond the proven
-    // call shape.
+    // Because the concrete login-state vtables begin directly at slot 1, those offsets now map to:
+    // - old helper `+0x0c` -> slot 4
+    // - new helper `+0x08` -> slot 3 / BeginOrContinue
+    // Active post-state9 consequence:
+    // - on the state9 -> state12 switch, old helper slot 4 is the shared tiny stub
+    // - new helper state12 slot 3 is also the shared tiny stub
+    // - so the immediate post-state9 work is not another hidden state body inside `0x41b450`; it
+    //   returns to the caller and the next concrete work stays the explicit `0x41cfb0(0x18)`
+    //   observer/listener walk.
     lastSwitchedHelperStateScaffold_ = helperStateId;
     CLTLoginState* oldState = currentState_;
     if (!state) {

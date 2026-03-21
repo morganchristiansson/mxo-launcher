@@ -636,11 +636,14 @@ public:
     // anchor: launcher.exe:0x41b450
     // Recovered helper-state switcher:
     // - not just a raw assignment
-    // - notifies the old helper with the new helper object
+    // - calls old helper vtable `+0x0c` with the new helper object
     // - installs the new helper from the dispatch table
-    // - then notifies the new helper with the old helper object
-    // Current source scaffold keeps the same transition boundary explicit even though the exact
-    // old/new helper notification slots are still unresolved.
+    // - then calls new helper vtable `+0x08` with the old helper object
+    // Direct vtable reads now tighten that to:
+    // - old helper `+0x0c` -> slot 4
+    // - new helper `+0x08` -> slot 3 / BeginOrContinue
+    // Active post-state9 consequence: the state9 -> state12 pair maps both of those to tiny stubs,
+    // so the immediate continuation stays the later explicit PostEvent/listener work.
     void SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state);
     uint32_t LastSwitchedHelperStateScaffold() const { return lastSwitchedHelperStateScaffold_; }
 
