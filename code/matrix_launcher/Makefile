@@ -32,9 +32,15 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/src/resurrections.o \
 	$(BUILD_DIR)/src/diagnostics.o \
 	$(BUILD_DIR)/src/diagnostics_auth.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/launchercommandline.o \
 	$(BUILD_DIR)/src/launcher_mediator_abi.o \
 	$(BUILD_DIR)/src/launcher_mediator_state9_abi.o \
 	$(BUILD_DIR)/src/launcher_network_object_abi.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/consolevar.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/consoleint.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/consolestring.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/consolebool.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/consolefloat.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/lttcpconnection.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/messageconnection.o \

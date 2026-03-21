@@ -16,11 +16,13 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
+#include <string>
 #include <sys/stat.h>
 
 #include "spdlog/spdlog.h"
 #include "spdlog/sinks/basic_file_sink.h"
 #include "diagnostics.h"
+#include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
 
 // Include the login mediator header for world list builder access
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
@@ -53,17 +55,10 @@ static InitClientDLLFunc g_InitClientDLL = NULL;
 static RunClientDLLFunc g_RunClientDLL = NULL;
 static TermClientDLLFunc g_TermClientDLL = NULL;
 
-// Launcher-owned runtime values mirrored from the original startup path.
-// arg1/arg2 now use launcher-owned filtered storage again, but the original
-// 0x409950 switch-consumption/options.cfg preprocessing path is still incomplete.
-static uint32_t g_FilteredArgCount = 0;
-static char** g_FilteredArgv = NULL;
-static char** g_FilteredArgvOwned = NULL;
-static uint32_t g_FilteredArgvOwnedCapacity = 0;
+// Launcher-owned command-line preprocessing now lives in a dedicated recovered model.
+static mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 
-// Launcher-owned startup/auth state.
-static char g_AuthUsername[256] = {};
-static char g_AuthPassword[256] = {};
+// Launcher-owned startup/auth state outside the command-line parser.
 static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
 static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
 static void* g_pILTLoginMediatorSelection3584 = NULL; // original sibling slot: [0x4d3584]
@@ -72,21 +67,6 @@ static uint32_t g_CLauncherFieldAC = 0;          // original: [CLauncher+0xac], 
 static uint32_t g_PackedArg7Selection = 0;       // packed from [this+0xa8]/[this+0xac]
 static uint32_t g_FlagByte = 0;                  // original: [0x4d2c69]
 static char g_LastWorldName[256] = {0};         // original registry value: Last_WorldName
-static char g_LauncherCharacter[256] = {};
-static char g_LauncherSession[256] = {};
-static bool g_LauncherSwitchClone = false;
-static bool g_LauncherSwitchSilent = false;
-static bool g_LauncherSwitchNoPatch = false;
-static bool g_LauncherSwitchRecover = false;
-static bool g_LauncherSwitchDeleteChar = false;
-static bool g_LauncherSwitchJustPatch = false;
-static bool g_LauncherSwitchNoEula = false;
-static bool g_LauncherSwitchSkipLaunch = false;
-static bool g_LauncherSwitchLPTest = false;
-static bool g_LauncherGlobal4C8B1C = true;      // original .data init = 1, cleared by -justpatch / -noeula
-static bool g_LauncherGlobal4C8B1D = true;      // original .data init = 1, cleared by -nopatch
-static bool g_LauncherGlobal4D2C64 = false;     // original options.cfg/autodetect gate
-static DWORD g_AutodetectExitCode = 0;
 
 static const char* kLauncherRegistryKeyPath = "Software\\Monolith Productions\\The Matrix Online\\";
 
@@ -214,8 +194,8 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
     }
 
     LogWordSpan("crash stack", reinterpret_cast<const void*>(context->Esp), 16);
-    if (g_FilteredArgv) {
-        LogWordSpan("current arg2 filteredArgv", g_FilteredArgv, 4);
+    if (g_LauncherCommandLine.FilteredArgv()) {
+        LogWordSpan("current arg2 filteredArgv", g_LauncherCommandLine.FilteredArgv(), 4);
     }
     if (g_pLauncherObject6304) {
         LogWordSpan("current arg5 launcherObject", g_pLauncherObject6304, 8);
@@ -249,276 +229,40 @@ static const char* MaskedArgValue(const char* value) {
     return "<provided>";
 }
 
-enum class LauncherValueTarget {
-    None,
-    User,
-    Password,
-    Character,
-    Session,
-    QlVersionIgnored,
-};
-
-static bool CopyLauncherString(char* destination, size_t destinationSize, const char* value) {
-    if (!destination || destinationSize < 2) return false;
-    if (!value) value = "";
-    std::strncpy(destination, value, destinationSize - 1);
-    destination[destinationSize - 1] = '\0';
-    return true;
-}
-
-static uint32_t FloatBitsFromCString(const char* value) {
-    float parsed = value ? std::strtof(value, NULL) : 0.0f;
-    uint32_t bits = 0;
-    std::memcpy(&bits, &parsed, sizeof(bits));
-    return bits;
-}
-
-static bool TryBuildOriginalClientVersionFloatString(char* out, size_t outSize, uint32_t* outBits) {
-    if (!out || outSize < 8 || !outBits) return false;
-    out[0] = '\0';
-    *outBits = 0;
-
-    DWORD handle = 0;
-    DWORD versionInfoSize = GetFileVersionInfoSizeA("client.dll", &handle);
-    if (versionInfoSize == 0) {
-        Log("DIAGNOSTIC: GetFileVersionInfoSizeA('client.dll') failed (%lu)", (unsigned long)GetLastError());
-        return false;
-    }
-
-    void* versionInfo = std::malloc(versionInfoSize);
-    if (!versionInfo) {
-        Log("DIAGNOSTIC: failed to allocate client.dll version-info buffer (%lu bytes)", (unsigned long)versionInfoSize);
-        return false;
-    }
-
-    bool ok = false;
-    do {
-        if (!GetFileVersionInfoA("client.dll", 0, versionInfoSize, versionInfo)) {
-            Log("DIAGNOSTIC: GetFileVersionInfoA('client.dll') failed (%lu)", (unsigned long)GetLastError());
-            break;
-        }
-
-        VS_FIXEDFILEINFO* fixedInfo = NULL;
-        UINT fixedInfoSize = 0;
-        if (!VerQueryValueA(versionInfo, "\\", reinterpret_cast<LPVOID*>(&fixedInfo), &fixedInfoSize) ||
-            !fixedInfo || fixedInfoSize < sizeof(VS_FIXEDFILEINFO)) {
-            Log("DIAGNOSTIC: VerQueryValueA('client.dll', '\\') failed");
-            break;
-        }
-
-        const uint32_t major = HIWORD(fixedInfo->dwFileVersionMS);
-        const uint32_t minor = LOWORD(fixedInfo->dwFileVersionMS);
-        const uint32_t build = HIWORD(fixedInfo->dwFileVersionLS);
-        const uint32_t revision = LOWORD(fixedInfo->dwFileVersionLS);
-        const uint32_t majorQuotient = major / 10u;
-        const uint32_t majorRemainder = major % 10u;
-
-        std::snprintf(
-            out,
-            outSize,
-            "%u.%u%u%u%u",
-            (unsigned)majorQuotient,
-            (unsigned)majorRemainder,
-            (unsigned)minor,
-            (unsigned)build,
-            (unsigned)revision);
-        *outBits = FloatBitsFromCString(out);
-        ok = true;
-    } while (false);
-
-    std::free(versionInfo);
-    return ok;
-}
-
-static void ResetLauncherPreprocessingState() {
-    std::memset(g_AuthUsername, 0, sizeof(g_AuthUsername));
-    std::memset(g_AuthPassword, 0, sizeof(g_AuthPassword));
-    std::memset(g_LauncherCharacter, 0, sizeof(g_LauncherCharacter));
-    std::memset(g_LauncherSession, 0, sizeof(g_LauncherSession));
-    g_LauncherSwitchClone = false;
-    g_LauncherSwitchSilent = false;
-    g_LauncherSwitchNoPatch = false;
-    g_LauncherSwitchRecover = false;
-    g_LauncherSwitchDeleteChar = false;
-    g_LauncherSwitchJustPatch = false;
-    g_LauncherSwitchNoEula = false;
-    g_LauncherSwitchSkipLaunch = false;
-    g_LauncherSwitchLPTest = false;
-    g_LauncherGlobal4C8B1C = true;
-    g_LauncherGlobal4C8B1D = true;
-    g_LauncherGlobal4D2C64 = false;
-    g_AutodetectExitCode = 0;
-}
-
-static LauncherValueTarget LauncherValueTargetForSwitch(const char* value) {
-    if (!value || !value[0]) return LauncherValueTarget::None;
-    if (lstrcmpiA(value, "-user") == 0 || lstrcmpiA(value, "-qluser") == 0) return LauncherValueTarget::User;
-    if (lstrcmpiA(value, "-pwd") == 0 || lstrcmpiA(value, "-qlpwd") == 0) return LauncherValueTarget::Password;
-    if (lstrcmpiA(value, "-char") == 0 || lstrcmpiA(value, "-qlchar") == 0) return LauncherValueTarget::Character;
-    if (lstrcmpiA(value, "-session") == 0 || lstrcmpiA(value, "-qlsession") == 0) return LauncherValueTarget::Session;
-    if (lstrcmpiA(value, "-qlver") == 0) return LauncherValueTarget::QlVersionIgnored;
-    return LauncherValueTarget::None;
-}
-
-static bool ConsumeLauncherBooleanSwitch(const char* value) {
-    if (!value || !value[0]) return false;
-    if (lstrcmpiA(value, "-clone") == 0) {
-        g_LauncherSwitchClone = true;
-        return true;
-    }
-    if (lstrcmpiA(value, "-silent") == 0) {
-        g_LauncherSwitchSilent = true;
-        return true;
-    }
-    if (lstrcmpiA(value, "-nopatch") == 0) {
-        g_LauncherSwitchNoPatch = true;
-        g_LauncherGlobal4C8B1D = false;
-        return true;
-    }
-    if (lstrcmpiA(value, "-recover") == 0) {
-        g_LauncherSwitchRecover = true;
-        return true;
-    }
-    if (lstrcmpiA(value, "-deletechar") == 0) {
-        g_LauncherSwitchDeleteChar = true;
-        return true;
-    }
-    if (lstrcmpiA(value, "-justpatch") == 0) {
-        g_LauncherSwitchJustPatch = true;
-        g_LauncherGlobal4C8B1C = false;
-        return true;
-    }
-    if (lstrcmpiA(value, "-noeula") == 0) {
-        g_LauncherSwitchNoEula = true;
-        g_LauncherGlobal4C8B1C = false;
-        return true;
-    }
-    if (lstrcmpiA(value, "-skiplaunch") == 0) {
-        g_LauncherSwitchSkipLaunch = true;
-        return true;
-    }
-    if (lstrcmpiA(value, "-lptest") == 0) {
-        g_LauncherSwitchLPTest = true;
-        return true;
-    }
-    return false;
-}
-
-static bool ConsumeLauncherValueSwitch(LauncherValueTarget target, const char* value) {
-    switch (target) {
-        case LauncherValueTarget::User:
-            return CopyLauncherString(g_AuthUsername, sizeof(g_AuthUsername), value);
-        case LauncherValueTarget::Password:
-            return CopyLauncherString(g_AuthPassword, sizeof(g_AuthPassword), value);
-        case LauncherValueTarget::Character:
-            return CopyLauncherString(g_LauncherCharacter, sizeof(g_LauncherCharacter), value);
-        case LauncherValueTarget::Session:
-            return CopyLauncherString(g_LauncherSession, sizeof(g_LauncherSession), value);
-        case LauncherValueTarget::QlVersionIgnored:
-            return true;
-        case LauncherValueTarget::None:
-        default:
-            return false;
-    }
-}
-
 static void LogLauncherPreprocessingState() {
     Log("=== Launcher switch preprocessing ===");
-    Log("auth username      = %s", MaskedArgValue(g_AuthUsername));
-    Log("auth password      = %s", MaskedArgValue(g_AuthPassword));
-    Log("launcher character  = %s", MaskedArgValue(g_LauncherCharacter));
-    Log("launcher session    = %s", MaskedArgValue(g_LauncherSession));
+    Log("auth username      = %s", MaskedArgValue(g_LauncherCommandLine.AuthUsername()));
+    Log("auth password      = %s", MaskedArgValue(g_LauncherCommandLine.AuthPassword()));
+    Log("launcher character  = %s", MaskedArgValue(g_LauncherCommandLine.LauncherCharacter()));
+    Log("launcher session    = %s", MaskedArgValue(g_LauncherCommandLine.LauncherSession()));
     Log(
         "launcher flags      = clone:%d silent:%d nopatch:%d recover:%d deletechar:%d justpatch:%d noeula:%d skiplaunch:%d lptest:%d",
-        g_LauncherSwitchClone ? 1 : 0,
-        g_LauncherSwitchSilent ? 1 : 0,
-        g_LauncherSwitchNoPatch ? 1 : 0,
-        g_LauncherSwitchRecover ? 1 : 0,
-        g_LauncherSwitchDeleteChar ? 1 : 0,
-        g_LauncherSwitchJustPatch ? 1 : 0,
-        g_LauncherSwitchNoEula ? 1 : 0,
-        g_LauncherSwitchSkipLaunch ? 1 : 0,
-        g_LauncherSwitchLPTest ? 1 : 0);
+        g_LauncherCommandLine.SwitchClone() ? 1 : 0,
+        g_LauncherCommandLine.SwitchSilent() ? 1 : 0,
+        g_LauncherCommandLine.SwitchNoPatch() ? 1 : 0,
+        g_LauncherCommandLine.SwitchRecover() ? 1 : 0,
+        g_LauncherCommandLine.SwitchDeleteChar() ? 1 : 0,
+        g_LauncherCommandLine.SwitchJustPatch() ? 1 : 0,
+        g_LauncherCommandLine.SwitchNoEula() ? 1 : 0,
+        g_LauncherCommandLine.SwitchSkipLaunch() ? 1 : 0,
+        g_LauncherCommandLine.SwitchLPTest() ? 1 : 0);
     Log(
         "launcher globals    = 4c8b1c:%d 4c8b1d:%d 4d2c64:%d 4d2c65:%d 4d2c66:%d 4d2c6a:%d",
-        g_LauncherGlobal4C8B1C ? 1 : 0,
-        g_LauncherGlobal4C8B1D ? 1 : 0,
-        g_LauncherGlobal4D2C64 ? 1 : 0,
-        g_LauncherSwitchRecover ? 1 : 0,
-        g_LauncherSwitchJustPatch ? 1 : 0,
-        g_LauncherSwitchClone ? 1 : 0);
-    if (g_LauncherGlobal4D2C64) {
-        Log("launcher autodetect exitCode = %lu", (unsigned long)g_AutodetectExitCode);
-    }
-}
-
-static bool IsTmBeforeAutodetectCutoff(const std::tm* value) {
-    if (!value) return false;
-
-    const int year = value->tm_year + 1900;
-    const int month = value->tm_mon;
-    const int day = value->tm_mday;
-
-    if (year != 2005) return year < 2005;
-    if (month != 3) return month < 3;
-    return day < 25;
-}
-
-static bool IsTmOnOrAfterAutodetectCutoff(const std::tm* value) {
-    return value && !IsTmBeforeAutodetectCutoff(value);
-}
-
-static void ProbeOptionsCfgAutodetectGate() {
-    g_LauncherGlobal4D2C64 = false;
-
-    struct _stat optionsStat = {};
-    if (_stat("options.cfg", &optionsStat) != 0) {
-        g_LauncherGlobal4D2C64 = true;
-        Log("DIAGNOSTIC: options.cfg probe -> missing/unstatable, setting 4d2c64=1");
-        return;
-    }
-
-    std::tm* optionsLocalTime = std::localtime(&optionsStat.st_mtime);
-    if (!optionsLocalTime) {
-        Log("DIAGNOSTIC: options.cfg probe -> localtime(mtime) failed, keeping 4d2c64=0");
-        return;
-    }
-
-    Log(
-        "DIAGNOSTIC: options.cfg mtime local = %04d-%02d-%02d",
-        optionsLocalTime->tm_year + 1900,
-        optionsLocalTime->tm_mon + 1,
-        optionsLocalTime->tm_mday);
-
-    if (!IsTmBeforeAutodetectCutoff(optionsLocalTime)) {
-        Log("DIAGNOSTIC: options.cfg is not older than original 2005-04-25 cutoff, keeping 4d2c64=0");
-        return;
-    }
-
-    std::time_t currentTime = std::time(NULL);
-    std::tm* currentLocalTime = std::localtime(&currentTime);
-    if (!currentLocalTime) {
-        g_LauncherGlobal4D2C64 = true;
-        Log("DIAGNOSTIC: current localtime probe failed after stale options.cfg, setting 4d2c64=1");
-        return;
-    }
-
-    Log(
-        "DIAGNOSTIC: current local date = %04d-%02d-%02d",
-        currentLocalTime->tm_year + 1900,
-        currentLocalTime->tm_mon + 1,
-        currentLocalTime->tm_mday);
-
-    if (IsTmOnOrAfterAutodetectCutoff(currentLocalTime)) {
-        g_LauncherGlobal4D2C64 = true;
-        Log("DIAGNOSTIC: options.cfg is stale relative to original cutoff, setting 4d2c64=1");
-    } else {
-        Log("DIAGNOSTIC: current date is still before original cutoff, keeping 4d2c64=0");
+        g_LauncherCommandLine.LauncherGlobal4C8B1C() ? 1 : 0,
+        g_LauncherCommandLine.LauncherGlobal4C8B1D() ? 1 : 0,
+        g_LauncherCommandLine.LauncherGlobal4D2C64() ? 1 : 0,
+        g_LauncherCommandLine.SwitchRecover() ? 1 : 0,
+        g_LauncherCommandLine.SwitchJustPatch() ? 1 : 0,
+        g_LauncherCommandLine.SwitchClone() ? 1 : 0);
+    if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
+        Log(
+            "launcher autodetect exitCode = %lu",
+            (unsigned long)g_LauncherCommandLine.AutodetectExitCode());
     }
 }
 
 static void RunOptionsCfgAutodetectStepIfNeeded() {
-    if (!g_LauncherGlobal4D2C64) return;
+    if (!g_LauncherCommandLine.LauncherGlobal4D2C64()) return;
 
     STARTUPINFOA startupInfo = {};
     startupInfo.cb = sizeof(startupInfo);
@@ -551,7 +295,7 @@ static void RunOptionsCfgAutodetectStepIfNeeded() {
     if (waitResult == WAIT_OBJECT_0) {
         DWORD exitCode = 0;
         if (GetExitCodeProcess(processInfo.hProcess, &exitCode)) {
-            g_AutodetectExitCode = exitCode;
+            g_LauncherCommandLine.SetAutodetectExitCode(exitCode);
             Log("DIAGNOSTIC: autodetect exit code = %lu (0x%08lx)", (unsigned long)exitCode, (unsigned long)exitCode);
         } else {
             Log("WARNING: GetExitCodeProcess for autodetect_settings.exe failed (%lu)", (unsigned long)GetLastError());
@@ -578,33 +322,6 @@ static void RunOptionsCfgAutodetectStepIfNeeded() {
         DWORD deleteError = GetLastError();
         Log("DIAGNOSTIC: DeleteFileA('options.cfg') failed (%lu)", (unsigned long)deleteError);
     }
-}
-
-static char* DuplicateArgString(const char* value) {
-    if (!value) value = "";
-    const size_t len = std::strlen(value);
-    char* copy = static_cast<char*>(std::malloc(len + 1));
-    if (!copy) return NULL;
-    std::memcpy(copy, value, len + 1);
-    return copy;
-}
-
-static void FreeFilteredArgvOwned() {
-    if (!g_FilteredArgvOwned) {
-        g_FilteredArgvOwnedCapacity = 0;
-        return;
-    }
-
-    for (uint32_t i = 0; i < g_FilteredArgvOwnedCapacity; ++i) {
-        if (g_FilteredArgvOwned[i]) {
-            std::free(g_FilteredArgvOwned[i]);
-            g_FilteredArgvOwned[i] = NULL;
-        }
-    }
-
-    std::free(g_FilteredArgvOwned);
-    g_FilteredArgvOwned = NULL;
-    g_FilteredArgvOwnedCapacity = 0;
 }
 
 static DWORD WINAPI DiagnosticPreclientThreadProc(LPVOID) {
@@ -700,7 +417,7 @@ static void DiagnosticShutdownPreclientEnvironment() {
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
     DiagnosticShutdownPreclientEnvironment();
-    FreeFilteredArgvOwned();
+    g_LauncherCommandLine.Reset();
     if (g_LogFile) {
         fclose(g_LogFile);
         g_LogFile = NULL;
@@ -892,25 +609,33 @@ static uint32_t BuildPackedArg7Selection() {
 
 
 static void LogArgvContentsAsBytes(const char* label, char** argv, uint32_t count) {
-  if (!argv || count == 0) return;
-  Log("%s pointer array @ %p:", label, argv);
-  for (uint32_t i = 0; i < count + 3 && i < 8; ++i) {
-    Log("  argv[%u] = %p", i, argv[i]);
-  }
-  if (argv[0]) {
-    const uint8_t* bytes = reinterpret_cast<const uint8_t*>(argv[0]);
-    Log("%s argv[0] data @ %p: %02x %02x %02x %02x %02x %02x %02x %02x",
-        label, argv[0],
-        bytes[0], bytes[1], bytes[2], bytes[3],
-        bytes[4], bytes[5], bytes[6], bytes[7]);
-    Log("%s argv[0] as string: \'%s\'", label, argv[0]);
-  }
+    if (!argv || count == 0) return;
+    Log("%s pointer array @ %p:", label, argv);
+    for (uint32_t i = 0; i < count && i < 8; ++i) {
+        Log("  argv[%u] = %p", i, argv[i]);
+    }
+    if (argv[0]) {
+        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(argv[0]);
+        Log(
+            "%s argv[0] data @ %p: %02x %02x %02x %02x %02x %02x %02x %02x",
+            label,
+            argv[0],
+            bytes[0], bytes[1], bytes[2], bytes[3],
+            bytes[4], bytes[5], bytes[6], bytes[7]);
+        Log("%s argv[0] as string: \'%s\'", label, argv[0]);
+    }
 }
+
 static void LogKnownStartupState() {
     Log("=== Known startup frame ===");
-    Log("arg1 filteredArgCount         = 0x%08x", g_FilteredArgCount);
-    Log("arg2 filteredArgv            = %p", g_FilteredArgv);
-  if (g_FilteredArgv) { LogArgvContentsAsBytes("arg2", g_FilteredArgv, g_FilteredArgCount); }
+    Log("arg1 filteredArgCount         = 0x%08x", g_LauncherCommandLine.FilteredArgCount());
+    Log("arg2 filteredArgv            = %p", g_LauncherCommandLine.FilteredArgv());
+    if (g_LauncherCommandLine.FilteredArgv()) {
+        LogArgvContentsAsBytes(
+            "arg2",
+            g_LauncherCommandLine.FilteredArgv(),
+            g_LauncherCommandLine.FilteredArgCount());
+    }
     Log("arg3 hClientDll              = %p", g_hClient);
     Log("arg4 hCresDll                = %p", g_hCres);
     Log("arg5 launcherNetworkObject   = %p", g_pLauncherObject6304);
@@ -922,90 +647,44 @@ static void LogKnownStartupState() {
     Log("arg8 flagByte                = 0x%08x", g_FlagByte);
 }
 
+// Current replacement note:
+// - original CWinApp_InitInstance does a two-step parse sequence, not one raw pass:
+//   - launcher.exe:0x409950 ParseCommandLine
+//   - launcher.exe:0x4173d0 CConsoleVar_ParseCommandLineAndConfig(filteredArgc, filteredArgv, 0)
+// - 0x409950 consumes launcher-owned switches such as -user / -pwd / -char / -session / -nopatch
+//   / -clone / -recover / -justpatch / -noeula / -skiplaunch / -lptest and builds the filtered
+//   argv that the runtime console parser sees afterward
+// - so the faithful target is not "bypass launcher preprocessing and feed raw argv straight into
+//   CConsoleVar_ParseCommandLineAndConfig"; it is "reimplement 0x409950 faithfully, then call the
+//   runtime console parser on its filtered argv output"
 static bool ConfigureFilteredArgv(int argc, char* argv[]) {
-    ResetLauncherPreprocessingState();
-
     spdlog::info("=== Launcher argv preprocessing ===");
-    spdlog::info("DIAGNOSTIC: launcher auth/state expected through launcher-style switches (e.g. -user / -pwd)");
+    spdlog::info(
+        "DIAGNOSTIC: launcher.exe uses ParseCommandLine(0x409950) followed by "
+        "CConsoleVar_ParseCommandLineAndConfig(0x4173d0)");
 
-    FreeFilteredArgvOwned();
-    g_FilteredArgvOwned = static_cast<char**>(std::calloc(argc + 1, sizeof(char*)));
-    if (!g_FilteredArgvOwned) {
-        spdlog::error("ERROR: failed to allocate launcher-owned filtered argv pointer array");
+    if (!g_LauncherCommandLine.ParseCommandLine(argc, argv)) {
+        spdlog::error("ERROR: launcher ParseCommandLine scaffold failed");
         return false;
     }
-    g_FilteredArgvOwnedCapacity = static_cast<uint32_t>(argc + 1);
 
-    g_FilteredArgvOwned[0] = DuplicateArgString((argc > 0 && argv[0]) ? argv[0] : "");
-    if (!g_FilteredArgvOwned[0]) {
-        spdlog::error("ERROR: failed to duplicate filtered argv[0]");
-        FreeFilteredArgvOwned();
+    if (!g_LauncherCommandLine.ParseRuntimeConsoleVariables()) {
+        for (const std::string& errorLine : g_LauncherCommandLine.RuntimeConsoleErrors().lines) {
+            spdlog::error("{}", errorLine);
+        }
+        spdlog::error("ERROR: CConsoleVar_ParseCommandLineAndConfig rejected the filtered argv");
         return false;
     }
-    spdlog::info("DIAGNOSTIC: filtered argv[0] duplicated at {} -> '{}'", static_cast<void*>(g_FilteredArgvOwned[0]), g_FilteredArgvOwned[0]);
 
-    LauncherValueTarget pendingValueTarget = LauncherValueTarget::None;
-    int filteredCount = 1;
-
-    for (int src = 1; src < argc; ++src) {
-        const char* value = argv[src] ? argv[src] : "";
-
-        if (pendingValueTarget != LauncherValueTarget::None) {
-            LauncherValueTarget consumedTarget = pendingValueTarget;
-            if (!ConsumeLauncherValueSwitch(consumedTarget, value)) {
-                spdlog::error("ERROR: failed to consume launcher switch value from argv[{}]", src);
-                FreeFilteredArgvOwned();
-                return false;
-            }
-            spdlog::info("DIAGNOSTIC: consumed launcher switch value argv[{}] = {}", src, MaskedArgValue(value));
-            pendingValueTarget = LauncherValueTarget::None;
-            continue;
-        }
-
-        LauncherValueTarget newTarget = LauncherValueTargetForSwitch(value);
-        if (newTarget != LauncherValueTarget::None) {
-            pendingValueTarget = newTarget;
-            spdlog::info("DIAGNOSTIC: consumed launcher switch '{}' during filtered argv build", value);
-            continue;
-        }
-
-        if (ConsumeLauncherBooleanSwitch(value)) {
-            spdlog::info("DIAGNOSTIC: consumed launcher switch '{}' during filtered argv build", value);
-            continue;
-        }
-
-        g_FilteredArgvOwned[filteredCount] = DuplicateArgString(value);
-        if (!g_FilteredArgvOwned[filteredCount]) {
-            spdlog::error("ERROR: failed to duplicate filtered argv[{}] from src argv[{}]", filteredCount, src);
-            FreeFilteredArgvOwned();
-            return false;
-        }
-        spdlog::info(
-            "DIAGNOSTIC: filtered argv[{}] duplicated at {} from src argv[{}] -> '{}'",
-            filteredCount,
-            static_cast<void*>(g_FilteredArgvOwned[filteredCount]),
-            src,
-            g_FilteredArgvOwned[filteredCount]);
-        ++filteredCount;
-    }
-
-    if (pendingValueTarget != LauncherValueTarget::None) {
-        spdlog::warn("WARNING: final launcher switch expected a value but argv ended early");
-    }
-
-    g_FilteredArgvOwned[filteredCount] = NULL;
-    g_FilteredArgCount = static_cast<uint32_t>(filteredCount);
-    g_FilteredArgv = g_FilteredArgvOwned;
-
-    if (!g_LauncherSwitchNoPatch) {
-        g_LauncherSwitchNoPatch = true;
-        g_LauncherGlobal4C8B1D = false;
+    if (!g_LauncherCommandLine.SwitchNoPatch()) {
+        g_LauncherCommandLine.ForceDefaultNoPatchBranch();
         spdlog::info("DIAGNOSTIC: forcing default nopatch branch semantics in replacement launcher");
     }
 
-    ProbeOptionsCfgAutodetectGate();
     LogLauncherPreprocessingState();
-    spdlog::info("DIAGNOSTIC: filtered argv final count = {}", filteredCount);
+    spdlog::info(
+        "DIAGNOSTIC: filtered argv final count = {}",
+        g_LauncherCommandLine.FilteredArgCount());
     return true;
 }
 
@@ -1028,7 +707,7 @@ int main(int argc, char* argv[]) {
     Log("DIAGNOSTIC: spdlog debug file = resurrections_spdlog.log");
     Log("");
 
-    Log("NOTE: arg1/arg2 now use launcher-owned filtered argv storage, but launcher switch parsing/options.cfg preprocessing are still incomplete.");
+    Log("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
     Log("NOTE: launcher-owned nopatch setup, arg5, arg6, arg7, and arg8 remain incomplete.");
     if (!ConfigureFilteredArgv(argc, argv)) {
         return FinishAndReturn(1);
@@ -1090,20 +769,26 @@ int main(int argc, char* argv[]) {
     const uint32_t mediatorSelectedWorldType = recoveredSelection ? recoveredSelection->worldType : 1u;
     const uint32_t mediatorSelectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
 
-    const uint32_t nopatchParsedValue = FloatBitsFromCString("0.1");
-    uint32_t nopatchClientVersionValue = nopatchParsedValue;
-    char nopatchClientVersionString[32] = {0};
-    if (TryBuildOriginalClientVersionFloatString(
-            nopatchClientVersionString,
-            sizeof(nopatchClientVersionString),
-            &nopatchClientVersionValue)) {
+    const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionBits();
+    const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionBits();
+    if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
+        Log(
+            "DIAGNOSTIC: rebuilt nopatch launcher-version float from launcher.exe version info = '%s' (0x%08x)",
+            g_LauncherCommandLine.NoPatchLauncherVersionString(),
+            nopatchLauncherVersionValue);
+    } else {
+        Log(
+            "DIAGNOSTIC: nopatch launcher-version float is using fallback 0.1 (0x%08x)",
+            nopatchLauncherVersionValue);
+    }
+    if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
         Log(
             "DIAGNOSTIC: rebuilt nopatch client-version float from client.dll version info = '%s' (0x%08x)",
-            nopatchClientVersionString,
+            g_LauncherCommandLine.NoPatchClientVersionString(),
             nopatchClientVersionValue);
     } else {
         Log(
-            "DIAGNOSTIC: failed to rebuild nopatch client-version float from client.dll version info; falling back to 0.1 (0x%08x)",
+            "DIAGNOSTIC: nopatch client-version float is using fallback 0.1 (0x%08x)",
             nopatchClientVersionValue);
     }
 
@@ -1135,18 +820,21 @@ int main(int argc, char* argv[]) {
         selectedHighByte,
         mediatorSelectedWorldType,
         mediatorSelectedVariantState);
-    DiagnosticConfigureMediatorProfileName(g_AuthUsername[0] ? g_AuthUsername : NULL);
-    DiagnosticConfigureMediatorAuthName(g_AuthUsername[0] ? g_AuthUsername : NULL);
-    DiagnosticConfigureMediatorAuthPassword(g_AuthPassword[0] ? g_AuthPassword : NULL);
+    DiagnosticConfigureMediatorProfileName(
+        g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
+    DiagnosticConfigureMediatorAuthName(
+        g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
+    DiagnosticConfigureMediatorAuthPassword(
+        g_LauncherCommandLine.AuthPassword()[0] ? g_LauncherCommandLine.AuthPassword() : NULL);
 
     DiagnosticConfigureLoginControllerCharacterSeed(
-        g_LauncherCharacter[0] ? g_LauncherCharacter : NULL,
-        g_LauncherSession[0] ? g_LauncherSession : NULL,
+        g_LauncherCommandLine.LauncherCharacter()[0] ? g_LauncherCommandLine.LauncherCharacter() : NULL,
+        g_LauncherCommandLine.LauncherSession()[0] ? g_LauncherCommandLine.LauncherSession() : NULL,
         selectionPackedLow24);
 
     DiagnosticApplyDefaultNopatchMediatorConfig(
         g_pILTLoginMediatorDefault,
-        nopatchParsedValue,
+        nopatchLauncherVersionValue,
         nopatchClientVersionValue);
 
     if (g_pILTLoginMediatorDefault) {
@@ -1231,7 +919,7 @@ int main(int argc, char* argv[]) {
     //   0x40a4d0  -> resolve exports + Init/Run/Term/Error path
 
     Log("=== Original-path gaps still missing ===");
-    Log("arg1/arg2 status: launcher-owned filtered argv storage present, but original 0x409950 switch handling / options.cfg preprocessing are still incomplete");
+    Log("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
     spdlog::info("arg5 status: current launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
     spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
     if (g_pILTLoginMediatorSelection3584) {
@@ -1282,8 +970,8 @@ int main(int argc, char* argv[]) {
     }
     
     int initResult = g_InitClientDLL(
-        g_FilteredArgCount,
-        g_FilteredArgv,
+        g_LauncherCommandLine.FilteredArgCount(),
+        g_LauncherCommandLine.FilteredArgv(),
         g_hClient,
         g_hCres,
         g_pLauncherObject6304,

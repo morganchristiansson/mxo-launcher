@@ -63,7 +63,11 @@ Current scaffold note:
   - `-qlver`
   - `-recover`, `-deletechar`, `-justpatch`, `-noeula`, `-skiplaunch`, `-lptest`
 - it now stores launcher-owned copies for the user/password/character/session-style values instead of treating all non-client args as generic placeholders
-- however, the broader `0x409950` behavior is still incomplete, especially the surrounding launcher-global side effects, exact per-switch state meaning, and the `options.cfg` / autodetect branch
+- the replacement now also preserves the original two-stage parse boundary by running the recovered
+  `0x4173d0 CConsoleVar_ParseCommandLineAndConfig` over the filtered argv after launcher parsing
+- remaining parser-side gaps are now narrower:
+  - runtime console-variable registration is still scaffold-level in source
+  - runtime config-file fidelity is source-owned enough to scaffold but not yet claim fully original parity
 
 ### New clarification: exact switch/state handling is now better mapped
 
@@ -127,6 +131,23 @@ The strongest current model is:
 5. and only then continues toward `cres.dll` / `client.dll` loading.
 
 This is currently better supported than any claim that the launcher literally injects `+Windowed 1` into forwarded argv.
+
+### 0b. Run the runtime console/config parser on the filtered argv
+Call site on the broader startup path:
+- `0x40b5aa -> 0x4173d0`
+
+What `0x4173d0` does:
+- stores filtered argv count/pointer into the console-var globals
+- calls `0x4165b0 = CConsoleVar_ParseCommandLine`
+- then calls `0x417130 = CConsoleVar_ParseConfigFile`
+
+Practical consequence:
+- the original launcher does **not** feed raw CRT `argc/argv` directly into the runtime console parser
+- the real order is:
+  1. launcher-specific `0x409950 ParseCommandLine`
+  2. runtime `0x4173d0 CConsoleVar_ParseCommandLineAndConfig`
+- faithful replacement code should preserve that two-stage boundary instead of collapsing launcher
+  auth/switch handling and runtime `+VarName value` handling into one parser
 
 ### 1. Build launcher object at `0x4d6304`
 Call site:
