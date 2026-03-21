@@ -98,10 +98,10 @@ It also now consumes known launcher-only switches like:
 
 instead of forwarding them blindly into `InitClientDLL`.
 
-Current live existing-character runtime path on the bounded `Reality` path is:
+Current live existing-character runtime path is:
 
 ```bash
-MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both_runtime
+make run
 ```
 
 `resurrections.exe` now rebuilds arg7 the same way the original launcher does:
@@ -111,50 +111,12 @@ MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both_runtime
 Current replacement status for the first live world path:
 - when the selected world name resolves to `Reality`, the launcher seeds recovered launcher-side
   arg7 defaults (`0x0500002a`) from that world selection
-- `MXO_CLAUNCHER_A8` and `MXO_CLAUNCHER_AC` remain available only as split-field diagnostic
-  overrides
+- the old split-field arg7 env shims are no longer part of the active launcher path
 
-Optional split-field arg7/arg8 diagnostics for post-`IsReady()` experiments:
-
-```bash
-MXO_CLAUNCHER_A8=1 MXO_CLAUNCHER_AC=0 MXO_ARG8_FLAG=0 make run_stub_both
-```
-
-Optional mediator selection name override:
-
-```bash
-MXO_MEDIATOR_SELECTION_NAME=Reality make run_stub_both
-```
-
-By default the launcher now also probes the original registry location for:
+By default the launcher now probes the original registry location for:
 - `HKLM\\Software\\Monolith Productions\\The Matrix Online\\Last_WorldName`
 
-and reuses that string as the diagnostic mediator selection name when no explicit override is provided.
-
-Forced incomplete-init experiment:
-
-```bash
-make run_incomplete_init
-```
-
-Forced runtime after failed init (diagnostic only):
-
-```bash
-make run_forced_runtime
-```
-
-Arg6 stub experiment:
-
-```bash
-make run_stub_mediator
-```
-
-Combined arg5+arg6 diagnostic experiments:
-
-```bash
-make run_stub_both
-make run_binder_both
-```
+and reuses that persisted world selection when rebuilding launcher-owned arg7 state.
 
 Latest crash dump summary:
 

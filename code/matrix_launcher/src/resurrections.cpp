@@ -174,15 +174,15 @@ static bool EnvUint32Value(const char* name, uint32_t* outValue);
 
 struct DiagnosticRuntimeModeFlags {
     bool forceIncompleteInit = false;
-    bool forceRunClient = false;
+    bool forceRunClient = true;
     bool forceRunAfterInitFailure = false;
     bool requestedMediatorStub = false;
-    bool requestedMediatorBinderScaffold = false;
-    bool requestedLauncherObjectStub = false;
+    bool requestedMediatorBinderScaffold = true;
+    bool requestedLauncherObjectStub = true;
     bool autoEnableStartupObjectScaffold = false;
     bool useMediatorStub = false;
-    bool useMediatorBinderScaffold = false;
-    bool useLauncherObjectStub = false;
+    bool useMediatorBinderScaffold = true;
+    bool useLauncherObjectStub = true;
     bool traceWindows = false;
     bool useArg2RetBypass = false;
     bool disableAuthConnection = false;
@@ -446,26 +446,7 @@ static bool EnvUint32Value(const char* name, uint32_t* outValue) {
 }
 
 static DiagnosticRuntimeModeFlags ReadDiagnosticRuntimeModeFlags() {
-    DiagnosticRuntimeModeFlags flags = {};
-    flags.forceIncompleteInit = EnvFlagEnabled("MXO_FORCE_INCOMPLETE_INIT");
-    flags.forceRunClient = EnvFlagEnabled("MXO_FORCE_RUNCLIENT");
-    flags.forceRunAfterInitFailure = EnvFlagEnabled("MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE");
-    flags.requestedMediatorStub = EnvFlagEnabled("MXO_STUB_LOGIN_MEDIATOR");
-    flags.requestedMediatorBinderScaffold = EnvFlagEnabled("MXO_BINDER_LOGIN_MEDIATOR");
-    flags.requestedLauncherObjectStub = EnvFlagEnabled("MXO_STUB_LAUNCHER_OBJECT");
-    flags.autoEnableStartupObjectScaffold =
-        !flags.requestedMediatorStub &&
-        !flags.requestedMediatorBinderScaffold &&
-        !flags.requestedLauncherObjectStub;
-    flags.useMediatorStub = flags.requestedMediatorStub;
-    flags.useMediatorBinderScaffold =
-        flags.requestedMediatorBinderScaffold || flags.autoEnableStartupObjectScaffold;
-    flags.useLauncherObjectStub =
-        flags.requestedLauncherObjectStub || flags.autoEnableStartupObjectScaffold;
-    flags.traceWindows = EnvFlagEnabled("MXO_TRACE_WINDOWS");
-    flags.useArg2RetBypass = EnvFlagEnabled("MXO_ARG2_RET_BYPASS");
-    flags.disableAuthConnection = EnvFlagEnabled("MXO_DISABLE_AUTH_CONNECTION");
-    flags.beginMarginConnection = EnvFlagEnabled("MXO_BEGIN_MARGIN_CONNECTION");
+    DiagnosticRuntimeModeFlags flags;
     return flags;
 }
 
@@ -1365,41 +1346,29 @@ int main(int argc, char* argv[]) {
 
     const DiagnosticRuntimeModeFlags runtimeFlags = ReadDiagnosticRuntimeModeFlags();
 
-    Log(
-        "DIAGNOSTIC: runtime flags incompleteInit=%u forceRunClient=%u forceRunAfterInitFailure=%u binderMediator=%u stubMediator=%u stubLauncherObject=%u autoStartupScaffold=%u disableAuth=%u beginMargin=%u arg2RetBypass=%u traceWindows=%u",
-        runtimeFlags.forceIncompleteInit ? 1u : 0u,
-        runtimeFlags.forceRunClient ? 1u : 0u,
-        runtimeFlags.forceRunAfterInitFailure ? 1u : 0u,
-        runtimeFlags.requestedMediatorBinderScaffold ? 1u : 0u,
-        runtimeFlags.requestedMediatorStub ? 1u : 0u,
-        runtimeFlags.requestedLauncherObjectStub ? 1u : 0u,
-        runtimeFlags.autoEnableStartupObjectScaffold ? 1u : 0u,
-        runtimeFlags.disableAuthConnection ? 1u : 0u,
-        runtimeFlags.beginMarginConnection ? 1u : 0u,
-        runtimeFlags.useArg2RetBypass ? 1u : 0u,
-        runtimeFlags.traceWindows ? 1u : 0u);
-
-    if (runtimeFlags.useArg2RetBypass) {
-        uint32_t maxBypasses = 1;
-        EnvUint32Value("MXO_ARG2_RET_BYPASS_MAX", &maxBypasses);
-        Log("DIAGNOSTIC: enabled MXO_ARG2_RET_BYPASS with max bypasses = %u", (unsigned)maxBypasses);
-    }
-
-    if (runtimeFlags.autoEnableStartupObjectScaffold) {
-        Log("DIAGNOSTIC: auto-enabling current startup-object scaffold for default run (binder arg6 + arg5 build/register path)");
-    }
+    spdlog::info(
+        "DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher object scaffold + InitClientDLL/RunClientDLL + launcher-owned auth begin");
 
     LoadLastWorldNameFromRegistry(g_LastWorldName, sizeof(g_LastWorldName));
 
     char mediatorSelectionName[64] = {0};
-    if (EnvStringValue("MXO_MEDIATOR_SELECTION_NAME", mediatorSelectionName, sizeof(mediatorSelectionName))) {
-        Log("DIAGNOSTIC: mediator selection name overridden from env = '%s'", mediatorSelectionName);
-    } else if (g_LastWorldName[0]) {
-        std::strncpy(mediatorSelectionName, g_LastWorldName, sizeof(mediatorSelectionName) - 1);
+    if (g_LastWorldName[0]) {
+        lstrcpynA(mediatorSelectionName, g_LastWorldName, sizeof(mediatorSelectionName));
+        spdlog::info("DIAGNOSTIC: using persisted Last_WorldName as launcher selection name = '{}'", mediatorSelectionName);
+    } else if (sizeof(kRecoveredLauncherSelectionRecords) / sizeof(kRecoveredLauncherSelectionRecords[0]) > 0) {
+        std::strncpy(
+            mediatorSelectionName,
+            kRecoveredLauncherSelectionRecords[0].worldName,
+            sizeof(mediatorSelectionName) - 1);
         mediatorSelectionName[sizeof(mediatorSelectionName) - 1] = '\0';
-        Log("DIAGNOSTIC: using Last_WorldName as mediator selection name = '%s'", mediatorSelectionName);
+        spdlog::info(
+            "DIAGNOSTIC: no persisted Last_WorldName; defaulting launcher selection name to first recovered world '{}'",
+            mediatorSelectionName);
     } else {
         std::strcpy(mediatorSelectionName, "standalone");
+        spdlog::warn(
+            "DIAGNOSTIC: no persisted Last_WorldName and no recovered launcher selection records are available; falling back to '{}'",
+            mediatorSelectionName);
     }
 
     const RecoveredLauncherSelectionRecord* recoveredSelection =
@@ -1420,23 +1389,10 @@ int main(int argc, char* argv[]) {
             recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
     } else if (mediatorSelectionName[0] && lstrcmpiA(mediatorSelectionName, "standalone") != 0) {
         spdlog::warn(
-            "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields unless split-field env overrides are provided",
+            "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields until that world has a recovered launcher-owned selection record",
             mediatorSelectionName);
     }
 
-    uint32_t envLauncherFieldA8 = 0;
-    const bool launcherFieldA8Overridden = EnvUint32Value("MXO_CLAUNCHER_A8", &envLauncherFieldA8);
-    if (launcherFieldA8Overridden) {
-        g_CLauncherFieldA8 = envLauncherFieldA8;
-        Log("DIAGNOSTIC: overridden CLauncher+0xa8 from env = 0x%08x", g_CLauncherFieldA8);
-    }
-
-    uint32_t envLauncherFieldAC = 0;
-    const bool launcherFieldACOverridden = EnvUint32Value("MXO_CLAUNCHER_AC", &envLauncherFieldAC);
-    if (launcherFieldACOverridden) {
-        g_CLauncherFieldAC = envLauncherFieldAC;
-        Log("DIAGNOSTIC: overridden CLauncher+0xac from env = 0x%08x", g_CLauncherFieldAC);
-    }
     g_PackedArg7Selection = BuildPackedArg7Selection();
     if ((g_CLauncherFieldA8 | g_CLauncherFieldAC) != 0) {
         Log("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x%08x", g_PackedArg7Selection);
@@ -1474,10 +1430,6 @@ int main(int argc, char* argv[]) {
     if (!PreloadDependencies()) {
         Log("ERROR: preload failed");
         return FinishAndReturn(1);
-    }
-
-    if (runtimeFlags.useMediatorBinderScaffold && runtimeFlags.useMediatorStub) {
-        Log("WARNING: both MXO_BINDER_LOGIN_MEDIATOR and MXO_STUB_LOGIN_MEDIATOR set; binder scaffold wins.");
     }
 
     if (runtimeFlags.useMediatorBinderScaffold) {
@@ -1636,24 +1588,24 @@ int main(int argc, char* argv[]) {
     Log("=== Original-path gaps still missing ===");
     Log("arg1/arg2 status: launcher-owned filtered argv storage present, but original 0x409950 switch handling / options.cfg preprocessing are still incomplete");
     if (runtimeFlags.useLauncherObjectStub) {
-        Log("arg5 status: diagnostic launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
+        spdlog::info("arg5 status: current launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
     } else {
         Log("missing: build/register launcher object at 0x4d6304");
     }
     if (runtimeFlags.useMediatorBinderScaffold) {
-        Log("arg6 status: diagnostic binder scaffold materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
+        spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
     } else if (runtimeFlags.useMediatorStub) {
-        Log("arg6 status: direct diagnostic stub materialized ILTLoginMediator.Default (bypasses binder path)");
+        Log("arg6 status: direct stub materialized ILTLoginMediator.Default (bypasses binder path)");
     } else {
         Log("missing: resolve ILTLoginMediator.Default into 0x4d2c58");
     }
     if (g_pILTLoginMediatorSelection3584) {
-        Log("arg7 status: sibling 0x4d3584-style ILTLoginMediator selection slot currently reuses the diagnostic mediator object and now rebuilds a8/ac through +0xfc/+0x100/+0xe4");
+        spdlog::info("arg7 status: sibling 0x4d3584-style ILTLoginMediator selection slot currently reuses the active mediator object and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
     } else {
         Log("missing: reconstruct sibling ILTLoginMediator.Default-style slot at 0x4d3584 for launcher-owned arg7 selection resolution");
     }
     if (g_PreclientEnvironment.threadHandle) {
-        Log("pre-client env status: diagnostic 0x402ec0-style launcher thread/message scaffold active (not yet faithful original class/import path)");
+        spdlog::info("pre-client env status: current 0x402ec0-style launcher thread/message scaffold active (not yet faithful original class/import path)");
     } else {
         Log("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
@@ -1681,18 +1633,13 @@ int main(int argc, char* argv[]) {
         runtimeFlags.useMediatorBinderScaffold && runtimeFlags.useLauncherObjectStub &&
         g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
 
-    if (!runtimeFlags.forceIncompleteInit && !allowInitWithCurrentStartupScaffold) {
-        Log("Refusing to call InitClientDLL with knowingly incomplete launcher state.");
-        Log("Set MXO_FORCE_INCOMPLETE_INIT=1 to run a deliberate original-path experiment.");
+    if (!allowInitWithCurrentStartupScaffold) {
+        spdlog::error("Refusing to call InitClientDLL with incomplete launcher state.");
         return FinishAndReturn(2);
     }
 
-    if (runtimeFlags.forceIncompleteInit) {
-        Log("=== Forced experiment: calling InitClientDLL with incomplete original-path state ===");
-    } else {
-        Log("=== Calling InitClientDLL with current default startup-object scaffold ===");
-        Log("DIAGNOSTIC: proceeding because the original 0x40a380-style arg5 build/register path and binder-backed arg6 slot are now present on the default run path");
-    }
+    spdlog::info("=== Calling InitClientDLL with current active startup scaffold ===");
+    spdlog::info("DIAGNOSTIC: proceeding because the current launcher path now provides arg5 build/register, binder-backed arg6, and sibling-slot arg7 rebuild");
     CaptureInitClientFrameSnapshot();
     DiagnosticSnapshotArgvMemory();
     Log("DIAGNOSTIC: argv memory snapshotted for crash analysis");
@@ -1721,32 +1668,16 @@ int main(int argc, char* argv[]) {
     const bool initSucceeded = (initResult > 0);
     if (!initSucceeded) {
         Log("InitClientDLL failed.");
-        if (!runtimeFlags.forceRunAfterInitFailure) {
-            Log("Stopping. Set MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE=1 for a diagnostic-only crash experiment.");
-            return FinishAndReturn(1);
-        }
-        Log("DIAGNOSTIC OVERRIDE: continuing to RunClientDLL despite InitClientDLL failure.");
+        return FinishAndReturn(1);
     }
 
-    if (initSucceeded) {
-        // Address anchors for the original launcher-owned auth start handoff:
-        // - launcher.exe:0x4207c0 = LaunchPadClient_OnConnectionStatusCheck
-        // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection
-        // - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
-        //
-        // Current project direction:
-        // - launcher-owned auth should begin by default on the binder/scaffold path
-        // - keep an opt-out only for quick offline/isolated diagnostics
-        if (!runtimeFlags.disableAuthConnection && DiagnosticCanBeginAuthConnection()) {
-            const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
-            Log("DIAGNOSTIC: post-init auth auto-begin result = 0x%08x", (unsigned)authConnectResult);
-        } else if (runtimeFlags.disableAuthConnection) {
-            Log("DIAGNOSTIC: auth auto-begin disabled by MXO_DISABLE_AUTH_CONNECTION=1");
-        }
-        if (runtimeFlags.beginMarginConnection) {
-            const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
-            Log("DIAGNOSTIC: post-init margin connection attempt result = 0x%08x", (unsigned)marginConnectResult);
-        }
+    // Address anchors for the original launcher-owned auth start handoff:
+    // - launcher.exe:0x4207c0 = LaunchPadClient_OnConnectionStatusCheck
+    // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection
+    // - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
+    if (DiagnosticCanBeginAuthConnection()) {
+        const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
+        Log("DIAGNOSTIC: post-init auth auto-begin result = 0x%08x", (unsigned)authConnectResult);
     }
 
     if (initSucceeded && EnvFlagEnabled("MXO_DIAGNOSTIC_CRASH_AFTER_INIT_SUCCESS")) {
@@ -1755,13 +1686,7 @@ int main(int argc, char* argv[]) {
         *crashPtr = 0xdeadbeef;
     }
 
-    if (!runtimeFlags.forceRunClient) {
-        Log("InitClientDLL succeeded, but RunClientDLL is gated.");
-        Log("Set MXO_FORCE_RUNCLIENT=1 for a deliberate runtime experiment.");
-        return FinishAndReturn(0);
-    }
-
-    Log("=== Forced experiment: calling RunClientDLL ===");
+    spdlog::info("=== Calling RunClientDLL on the active launcher path ===");
     const int runResult = g_RunClientDLL();
     Log("RunClientDLL returned: %d", runResult);
 

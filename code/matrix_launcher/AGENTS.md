@@ -144,10 +144,10 @@ Safe run:
 make run
 ```
 
-Current deliberate binder runtime path:
+Current active runtime path:
 ```bash
 cd /home/morgan/mxo/code/matrix_launcher
-MXO_MEDIATOR_SELECTION_NAME=Reality make run_binder_both_runtime
+make run
 ```
 
 ## Immediate next task

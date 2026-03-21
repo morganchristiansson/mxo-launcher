@@ -61,11 +61,6 @@ SPDLOG_LIB = $(BUILD_DIR)/libspdlog.a
 -include secrets/launcher_login.local.mk
 
 LAUNCHER_ARGS = $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_PASS)) $(if $(MXO_SESSION),-session $(MXO_SESSION)) $(if $(MXO_CHAR),-char $(MXO_CHAR))
-# Current original-launcher WineDbg workflow:
-# - use the real launcher, not direct `matrix.exe`
-# - skip EULA / patch-notes friction when possible
-# - still rely on the launcher-spawned temp `matrix.exe` and attach to that with winedbg
-ORIGINAL_LAUNCHER_ARGS = -noeula -nopatch $(if $(MXO_CHAR),-char $(MXO_CHAR)) $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_PASS),-pwd $(MXO_PASS))
 
 all: $(TARGET)
 
@@ -127,9 +122,6 @@ $(AUTH_PROBE): $(TOOLS_OBJS) $(CRYPTOPP_LIB) | $(SPDLOG_DIR)
 run: $(TARGET)
 	cd $(GAME_DIR) && wine ./resurrections.exe $(LAUNCHER_ARGS)
 
-run_original_launcher:
-	cd $(GAME_DIR) && wine ./launcher.exe $(ORIGINAL_LAUNCHER_ARGS)
-
 run_auth_probe: $(AUTH_PROBE)
 	@cd $(GAME_DIR) && MXO_AUTH_PROBE_USERNAME="$(or $(MXO_AUTH_PROBE_USERNAME),$(MXO_USER))" \
 	MXO_AUTH_PROBE_PASSWORD="$(or $(MXO_AUTH_PROBE_PASSWORD),$(MXO_PASS))" \
@@ -143,63 +135,6 @@ crashdump:
 	fi; \
 	echo "Latest crash dump: $(GAME_DIR)/$$latest"; \
 	cd $(GAME_DIR) && printf 'info reg\nbt\ninfo share\nquit\n' | winedbg "$$latest"
-
-run_incomplete_init: $(TARGET)
-	cd $(GAME_DIR) && MXO_FORCE_INCOMPLETE_INIT=1 wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_forced_runtime: $(TARGET)
-	cd $(GAME_DIR) && \
-		MXO_FORCE_INCOMPLETE_INIT=1 \
-		MXO_FORCE_RUNCLIENT=1 \
-		MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_stub_mediator: $(TARGET)
-	cd $(GAME_DIR) && \
-		MXO_STUB_LOGIN_MEDIATOR=1 \
-		MXO_FORCE_INCOMPLETE_INIT=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_binder_mediator: $(TARGET)
-	cd $(GAME_DIR) && \
-		env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE \
-		MXO_BINDER_LOGIN_MEDIATOR=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_binder_mediator_incomplete: $(TARGET)
-	cd $(GAME_DIR) && \
-		MXO_BINDER_LOGIN_MEDIATOR=1 \
-		MXO_FORCE_INCOMPLETE_INIT=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_stub_both: $(TARGET)
-	cd $(GAME_DIR) && \
-		MXO_STUB_LOGIN_MEDIATOR=1 \
-		MXO_STUB_LAUNCHER_OBJECT=1 \
-		MXO_FORCE_INCOMPLETE_INIT=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_binder_both: $(TARGET)
-	cd $(GAME_DIR) && \
-		env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE \
-		MXO_BINDER_LOGIN_MEDIATOR=1 \
-		MXO_STUB_LAUNCHER_OBJECT=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_binder_both_runtime: $(TARGET)
-	cd $(GAME_DIR) && \
-		env -u MXO_FORCE_INCOMPLETE_INIT -u MXO_FORCE_RUNCLIENT_AFTER_INIT_FAILURE \
-		MXO_BINDER_LOGIN_MEDIATOR=1 \
-		MXO_STUB_LAUNCHER_OBJECT=1 \
-		MXO_FORCE_RUNCLIENT=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
-
-run_binder_both_incomplete: $(TARGET)
-	cd $(GAME_DIR) && \
-		MXO_BINDER_LOGIN_MEDIATOR=1 \
-		MXO_STUB_LAUNCHER_OBJECT=1 \
-		MXO_FORCE_INCOMPLETE_INIT=1 \
-		wine ./resurrections.exe $(LAUNCHER_ARGS)
 
 install_crashreporter_stub: $(CRASHREPORTER_STUB)
 	cd $(GAME_DIR) && \
@@ -215,4 +150,4 @@ clean:
 	rm -f $(TARGET) $(CRASHREPORTER_STUB)
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all auth_probe run run_original_launcher run_auth_probe crashdump run_incomplete_init run_forced_runtime run_stub_mediator run_binder_mediator run_binder_mediator_incomplete run_stub_both run_binder_both run_binder_both_runtime run_binder_both_incomplete install_crashreporter_stub restore_crashreporter clean
+.PHONY: all auth_probe run run_auth_probe crashdump install_crashreporter_stub restore_crashreporter clean
