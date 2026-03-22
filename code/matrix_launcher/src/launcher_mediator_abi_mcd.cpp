@@ -227,7 +227,7 @@ static void LogMediatorState8PersistenceSummary(const char* slotLabel, void* ret
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
     Log(
-        "MediatorStub::%s caller=%p [%s] persistence{f1c='%s' f3c=0x%08x f40=0x%08x f48[0..3]=[%08x %08x %08x %08x] f68[0..1]=[%08x %08x] f88_00=0x%08x f88_444=0x%08x f88_448=0x%08x overflow13f4=0x%04x gate1452=%u sec11_145c=0x%08x sec11_len=%u}",
+        "MediatorStub::%s caller=%p [%s] persistence{f1c='%s' f3c=0x%08x f40=0x%08x f48[0..3]=[%08x %08x %08x %08x] f68[0..1]=[%08x %08x] f88_00=0x%08x f88_444=0x%08x f88_448=0x%08x overflow13f4=0x%04x mcdGate13f6=%u clGate1452=%u sec11_145c=0x%08x sec11_len=%u}",
         slotLabel ? slotLabel : "State8Persistence",
         returnAddress,
         DescribeMediatorCaller(returnAddress),
@@ -244,6 +244,7 @@ static void LogMediatorState8PersistenceSummary(const char* slotLabel, void* ret
         (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x444),
         (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x448),
         (unsigned)g_MediatorState8Overflow13f4,
+        ownerState ? (unsigned)ownerState->section0Flag13f6 : 0u,
         ownerState ? (unsigned)ownerState->flag1452 : 0u,
         ownerState ? (unsigned)ownerState->state8Section11Dword145c : 0u,
         ownerState ? (unsigned)ownerState->state8Section11String1460.size() : 0u);
@@ -252,10 +253,13 @@ static void LogMediatorState8PersistenceSummary(const char* slotLabel, void* ret
 // anchor: launcher.exe:0x41f150
 // vtable: ILTLoginMediator.Default slot +0x8c
 // Live original `client.dll:0x62198fa0` mcd.cfg family uses this as the mediator-backed/live-data gate.
+// Exact corrected original getter proof from launcher disassembly:
+// - `0x41f150` returns owner byte `+0x13f6`
+// - `+0x1452` is instead the neighboring `cl.cfg` gate used by arg6 `+0x88`
 static uint32_t __thiscall Mediator_HasState8PersistenceData8c(MinimalLoginMediatorStub* self) {
     (void)self;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const uint32_t ready = mediator && mediator->PostAuthMarginLoadingStateView().flag1452 ? 1u : 0u;
+    const uint32_t ready = mediator && mediator->PostAuthMarginLoadingStateView().section0Flag13f6 ? 1u : 0u;
     Log("MediatorStub::HasState8PersistenceData8c(+0x8c) -> %u", (unsigned)ready);
     return ready;
 }

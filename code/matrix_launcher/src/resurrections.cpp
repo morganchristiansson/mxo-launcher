@@ -1074,5 +1074,29 @@ int main(int argc, char* argv[]) {
     const int runResult = g_RunClientDLL();
     Log("RunClientDLL returned: %d", runResult);
 
+    const bool runSucceeded = (runResult > 0);
+    if (!runSucceeded) {
+        Log("RunClientDLL failed.");
+        return FinishAndReturn(1);
+    }
+
+    // Narrow selection-cfg corpus follow-up:
+    // - original launcher tests `RunClientDLL` for positive success, then continues into
+    //   `TermClientDLL`
+    // - bounded original runtime proof now shows shutdown-side `TermClientDLL -> 0x62198490 ->
+    //   0x621966d0` as the strongest concrete later direct-save path for the saved `cs.cfg`
+    //   low-bit pattern on the active route
+    // - keep this intentionally narrow: just preserve the original positive-success contract and
+    //   let the real client run its own shutdown persistence path
+    spdlog::info("=== Calling TermClientDLL on the active launcher path ===");
+    const int termResult = g_TermClientDLL();
+    Log("TermClientDLL returned: %d", termResult);
+
+    const bool termSucceeded = (termResult > 0);
+    if (!termSucceeded) {
+        Log("TermClientDLL failed.");
+        return FinishAndReturn(1);
+    }
+
     return FinishAndReturn(0);
 }

@@ -83,8 +83,9 @@ Current best original chain:
 
 Original live + static tightening now proves this getter family on the active `mcd.cfg` path:
 
-- `+0x8c  -> 0x41f150 = CLTLoginMediator_HasState8PersistenceData1452`
-  - returns owner byte `+0x1452`
+- `+0x8c  -> 0x41f150 = CLTLoginMediator_HasState8PersistenceData8c`
+  - returns owner byte `+0x13f6`
+  - corrected sibling distinction: owner byte `+0x1452` belongs to the neighboring live `cl.cfg` gate at arg6 `+0x88`, not the `mcd.cfg` gate
 - `+0xbc -> 0x41f170 = CLTLoginMediator_GetState8PersistenceHeaderF48`
   - returns owner `+0xf48`
 - `+0xc0 -> 0x41f180 = CLTLoginMediator_GetState8PersistenceBodyF88`
@@ -110,7 +111,7 @@ Current strongest owner fields there:
 - `+0xf48`
 - `+0xf88`
 - `+0x13f0/+0x13f4`
-- `+0x1452`
+- `+0x13f6`
 - `+0x145c/+0x1460`
 
 ## Replacement current status
@@ -138,7 +139,7 @@ Replacement-side state8 producer logs still match the key original header/body f
 - `f48[0..3] = [0x00000006 0x00000069 0x00000082 0x00000071]`
 - `f88_00 = 0x00000130`
 - `overflow13f4 = 0x0029`
-- `gate1452 = 1`
+- neighboring `cl.cfg` gate `1452 = 1` is also present on the same active reply materialization path, but that field is no longer the `mcd.cfg` gate after the corrected `0x41f150 -> +0x13f6` proof
 
 And the replacement now also shows the later client-side save chain concretely enough to close the
 mcd-content parity question:

@@ -511,33 +511,33 @@ public:
         // Allocated buffer pointers for load-character fragment families.
         // Keep the owner offsets explicit because state8 (`0x43f930`) and state11 (`0x440320`)
         // both reuse this wider owner region with different section selectors.
-        void* allocatedBuffer13f8 = nullptr;             // `+0x13f8` (state8 case 0x01)
-        uint16_t allocatedBufferLength13fc = 0;         // `+0x13fc`
-        uint8_t flag13fe = 0;                            // `+0x13fe`
+        void* allocatedBuffer13f8 = nullptr;             // `+0x13f8` (state8 case 0x01); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x7c/+0xa8` / `bl.cfg`
+        uint16_t allocatedBufferLength13fc = 0;         // `+0x13fc` out-length paired with the same arg6 `+0xa8` getter
+        uint8_t flag13fe = 0;                            // `+0x13fe` bool gate paired with arg6 `+0x7c`
 
-        void* allocatedBuffer1400 = nullptr;             // `+0x1400` (state8 case 0x02)
-        uint16_t allocatedBufferLength1404 = 0;         // `+0x1404`
-        uint8_t flag1406 = 0;                            // `+0x1406`
+        void* allocatedBuffer1400 = nullptr;             // `+0x1400` (state8 case 0x02); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x80/+0xac` / `il.cfg`
+        uint16_t allocatedBufferLength1404 = 0;         // `+0x1404` out-length paired with the same arg6 `+0xac` getter
+        uint8_t flag1406 = 0;                            // `+0x1406` bool gate paired with arg6 `+0x80`
 
-        void* allocatedBuffer1408 = nullptr;             // `+0x1408` (state8 case 0x06 / state11 case 0x06)
-        uint16_t allocatedBufferLength140c = 0;         // `+0x140c`
-        uint8_t allocatedBufferFlag140e = 0;             // `+0x140e`
+        void* allocatedBuffer1408 = nullptr;             // `+0x1408` (state8 case 0x06 / state11 case 0x06); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x68/+0x94` / `hl.cfg`
+        uint16_t allocatedBufferLength140c = 0;         // `+0x140c` out-length paired with the same arg6 `+0x94` getter
+        uint8_t allocatedBufferFlag140e = 0;             // `+0x140e` bool gate paired with arg6 `+0x68`
 
-        void* allocatedBuffer1410 = nullptr;             // `+0x1410` (state8 case 0x07)
-        uint16_t allocatedBufferLength1414 = 0;         // `+0x1414`
-        uint8_t flag1416 = 0;                            // `+0x1416`
+        void* allocatedBuffer1410 = nullptr;             // `+0x1410` (state8 case 0x07); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x6c/+0x98` / `an.cfg`
+        uint16_t allocatedBufferLength1414 = 0;         // `+0x1414` out-length paired with the same arg6 `+0x98` getter
+        uint8_t flag1416 = 0;                            // `+0x1416` bool gate paired with arg6 `+0x6c`
 
-        void* allocatedBuffer1418 = nullptr;             // `+0x1418` (state8 case 0x03 tail / state11 case 0x03)
-        uint16_t allocatedBufferLength141c = 0;         // `+0x141c`
-        uint8_t allocatedBufferFlag141e = 0;             // `+0x141e`
+        void* allocatedBuffer1418 = nullptr;             // `+0x1418` (state8 case 0x03 / state11 case 0x03); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x70/+0x9c` / `pi.cfg`
+        uint16_t allocatedBufferLength141c = 0;         // `+0x141c` out-length paired with the same arg6 `+0x9c` getter
+        uint8_t allocatedBufferFlag141e = 0;             // `+0x141e` bool gate paired with arg6 `+0x70`
 
-        void* allocatedBuffer1420 = nullptr;             // `+0x1420` (state8 case 0x04 / state11 case 0x04)
-        uint16_t allocatedBufferLength1424 = 0;         // `+0x1424`
-        uint8_t allocatedBufferFlag1426 = 0;             // `+0x1426`
+        void* allocatedBuffer1420 = nullptr;             // `+0x1420` (state8 case 0x04 / state11 case 0x04); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x74/+0xa0` / `ai.cfg`
+        uint16_t allocatedBufferLength1424 = 0;         // `+0x1424` out-length paired with the same arg6 `+0xa0` getter
+        uint8_t allocatedBufferFlag1426 = 0;             // `+0x1426` bool gate paired with arg6 `+0x74`
 
-        void* allocatedBuffer1428 = nullptr;             // `+0x1428` (state8 case 0x05 / state11 case 0x05)
-        uint16_t allocatedBufferLength142c = 0;         // `+0x142c`
-        uint8_t allocatedBufferFlag142e = 0;             // `+0x142e`
+        void* allocatedBuffer1428 = nullptr;             // `+0x1428` (state8 case 0x05 / state11 case 0x05); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x78/+0xa4` / `cs.cfg`
+        uint16_t allocatedBufferLength142c = 0;         // `+0x142c` out-length paired with the same arg6 `+0xa4` getter
+        uint8_t allocatedBufferFlag142e = 0;             // `+0x142e` bool gate paired with arg6 `+0x78`
 
         void* allocatedBuffer1430 = nullptr;             // `+0x1430` (state8 case 0x0c)
         uint16_t allocatedBufferLength1434 = 0;         // `+0x1434`
@@ -547,17 +547,17 @@ public:
         uint16_t allocatedBufferLength143c = 0;         // `+0x143c`
         uint8_t flag143e = 0;                            // `+0x143e`
 
-        void* allocatedBuffer1440 = nullptr;             // `+0x1440` (state8 case 0x08)
-        uint32_t allocatedBufferLength1444 = 0;         // `+0x1444`
-        uint8_t flag1448 = 0;                            // `+0x1448`
+        void* allocatedBuffer1440 = nullptr;             // `+0x1440` (state8 case 0x08); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x84/+0xb0` / `rl.cfg`
+        uint32_t allocatedBufferLength1444 = 0;         // `+0x1444` out-length paired with the same arg6 `+0xb0` getter
+        uint8_t flag1448 = 0;                            // `+0x1448` bool gate paired with arg6 `+0x84`
 
-        void* allocatedBuffer144c = nullptr;             // `+0x144c` (state8 case 0x09)
-        uint16_t allocatedBufferLength1450 = 0;         // `+0x1450`
-        uint8_t flag1452 = 0;                            // `+0x1452`; original getter `0x41f150` / arg6 `+0x8c` gates the mediator-backed `mcd.cfg` branch
+        void* allocatedBuffer144c = nullptr;             // `+0x144c` (state8 case 0x09); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x88/+0xb4` / `cl.cfg`
+        uint16_t allocatedBufferLength1450 = 0;         // `+0x1450` out-length paired with the same arg6 `+0xb4` getter
+        uint8_t flag1452 = 0;                            // `+0x1452` bool gate paired with arg6 `+0x88`
 
-        void* allocatedBuffer1454 = nullptr;             // `+0x1454` (state8 case 0x0a)
-        uint16_t allocatedBufferLength1458 = 0;         // `+0x1458`
-        uint8_t flag145a = 0;                            // `+0x145a`
+        void* allocatedBuffer1454 = nullptr;             // `+0x1454` (state8 case 0x0a); exact current non-`mcd.cfg` live-corpus pair = arg6 `+0x90/+0xb8` / `cui.cfg`
+        uint16_t allocatedBufferLength1458 = 0;         // `+0x1458` out-length paired with the same arg6 `+0xb8` getter
+        uint8_t flag145a = 0;                            // `+0x145a` bool gate paired with arg6 `+0x90`
         uint32_t state8Section10ChunkBitmap = 0;         // source-owned mirror of the original `DAT_004f79e4` bitmap
 
         // state8 case `0x0b` / `0x43f8c0` side effect:
@@ -574,7 +574,7 @@ public:
         std::array<uint8_t, 8> replyParseBuffer{};       // `+0x13cc .. +0x13d3` scratch family
         uint32_t replySectionData13cc = 0;               // `+0x13cc`
         uint32_t replySectionData13d0 = 0;               // `+0x13d0`
-        uint8_t section0Flag13f6 = 0;                    // `+0x13f6`
+        uint8_t section0Flag13f6 = 0;                    // `+0x13f6`; exact corrected mediator-backed `mcd.cfg` gate for arg6 `+0x8c`
 
         // +0xcc8 = character/route index byte (mirrored from auth reply)
         uint8_t characterRouteIndexCc8 = 0;              // `+0xcc8`

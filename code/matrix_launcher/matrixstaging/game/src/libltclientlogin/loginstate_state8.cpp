@@ -311,7 +311,7 @@ static void HandleState8ReplySection(
         case 9u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag1452 = 1u;
-            LogState8PersistenceFamilySnapshot(ownerState, "section9_gate1452", parsed.sectionSelectorMinus2, parsed.sectionByteCount, false);
+            LogState8PersistenceFamilySnapshot(ownerState, "section9_clcfg1452", parsed.sectionSelectorMinus2, parsed.sectionByteCount, false);
             break;
         case 10u:
             if (ownerState.allocatedBuffer1454 == nullptr) {

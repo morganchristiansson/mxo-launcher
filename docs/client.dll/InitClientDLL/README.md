@@ -199,7 +199,117 @@ Newer writer-side tightening also identifies a sibling **client-owned** save fam
   - `0x62196400` = `an.cfg`
   - `0x621964f0` = `pi.cfg`
   - `0x621966d0` = `cs.cfg`
+  - `0x62197050` = `cui.cfg`
+- `client.dll:0x621993d0` is the paired `cui.cfg` live/load helper:
+  - when arg6 `+0x90` is false, it only tries to load an already-existing on-disk `cui.cfg`
+  - when arg6 `+0x90` is true, it can adopt live mediator data from `+0xb8`
 - those writers emit binary cfg payloads, not simple text placeholders
+- practical consequence:
+  - a later on-disk `cui.cfg` file is not by itself proof that the earlier live mediator pair `+0x90/+0xb8` was present on that run
+
+### New clarification: live `cs.cfg` and saved `cs.cfg` are different formats
+
+Client-side static proof now explains the formerly suspicious `cs.cfg` size split:
+- live mediator load path:
+  - `0x62198a70 -> arg6 +0x78/+0xa4 -> 0x621cd550`
+  - `0x621cd550` consumes **6-byte** compact records and writes only the first dword of an 8-byte in-memory slot
+- saved-file path:
+  - `0x621966d0 -> 0x621c9e20`
+  - `0x621c9e20` emits **10-byte** on-disk records: `u16 index + full 8-byte slot`
+
+That makes this length split expected rather than automatically suspicious:
+- live compact payload `2706 = 451 * 6`
+- saved `cs.cfg` file `4510 = 451 * 10`
+
+Practical launcher-side consequence:
+- a shorter live mediator `cs.cfg` payload is **not by itself** evidence of missing entries
+- the real fidelity question becomes which parts of the later full 8-byte client-owned slot matter,
+  not whether the compact live record count is too small
+
+### New clarification: the saved `cs.cfg` second dword carries a low-bit/byte availability flag, while the upper 24 bits look like stack carry
+
+Current bounded client-side proof on the `+0x6dc/+0x6e0` slot family:
+- `0x621ca0c0` reads the low byte at `+0x6e0 + index*8`
+- `0x621e0a10` clears that low byte
+- `0x621e3b50` sets that low byte to `1` when the first dword at `+0x6dc + index*8` is already non-zero
+- `0x621e1a70` can copy a full 8-byte slot in from another source object
+- current scaled-index search now tightens the writer side further:
+  - `0x621e1a70` is the only currently isolated full-dword writer for slot dword2
+  - both current callsites into it (`0x621c8ba0` and `0x621798d6`) pass a stack temp where only the low byte of dword2 is explicitly initialized, leaving the upper 24 bits as process/stack carry
+
+Reference-corpus correlation now tightens that further:
+- original saved `cs.cfg` has low-bit `1` on exactly five record ids: `{0, 1, 7, 15, 19}`
+- original `ai.cfg` also contains exactly five compact records for ids `{0, 1, 7, 15, 19}`
+- across bounded runs, saved `cs.cfg` dword2 still reads best as:
+  - low byte = meaningful availability state
+  - upper 24 bits = process/stack-carried noise rather than stable authored metadata
+
+Newer object-instance proof removes the most tempting wrong answer:
+- `0x62198a70` loads live `cs.cfg` into `0x629ea4e8` before calling `0x621cd550`
+- `0x621966d0` does touch `0x629e95a8`, but only for path/profile-root building through `0x62195ff0`
+- the actual save tail inside `0x621966d0` is `0x6219679d: mov ecx,0x629ea4e8 ; call 0x621c9e20`
+- the low-byte setters and current isolated full-slot writer also use that same live table object:
+  - `0x62179c47/0x62179c9e -> ecx=0x629ea4e8 -> 0x621e3b50/0x621e0a10`
+  - `0x621798d1` and `0x621c8be1 -> ecx=0x629ea4e8 -> 0x621e1a70`
+- so the meaningful saved-slot source is the same live `0x629ea4e8` table object, not a separate save-only slot instance
+
+Current best narrow read:
+- the low bit/byte of saved `cs.cfg` dword2 is the same broader availability family that the
+  `ai.cfg` path manipulates
+- the upper 24 bits of saved `cs.cfg` dword2 are likely not meaningful authored state at all;
+  they currently read best as uninitialized stack carry propagated by the client's full-slot copy path
+- practical consequence of the new object proof:
+  - the replacement/original low-bit gap is **not** explained by `0x621c9e20` saving from the wrong object instance
+
+Important caution:
+- on the currently proven `0x62170b00` path, `ai.cfg` and `cs.cfg` are loaded through different
+  stack objects (`+0x84` vs `+0x94`)
+- so this is a proven semantic correlation, not proof that both loaders mutate the exact same object instance
+- there is also an important save-order consequence from `PersistSelectionCfgCorpusIfDirty`:
+  - `0x62198a70` (`cs.cfg`) runs before `0x62198970` (`ai.cfg`)
+  - so the same event-`0x0b` save walk cannot first get its low-bit `1` values from that later mediator-backed `ai.cfg` load
+  - the remaining exact question is therefore which **earlier** live mutation of `0x629ea4e8` natural-original reaches before `0x62198a70 -> 0x621966d0 -> 0x621c9e20`
+- a bounded original-runtime WineDbg pass on spawned temp `matrix.exe` now tightens that too:
+  - attach at a stable pre-`InitClientDLL` UI point using the Wine PID workflow from `WINEDBG.md`
+  - arm `matrix:0x40a4d0`, `client:0x620012a0`, then the narrow `cs/ai` breakpoints
+  - observed stop order on that pass:
+    - `0x62198a70`
+    - `0x621966d0`
+    - `0x62198970`
+    - then first visible `0x621e3b50`
+  - later breakpoint counts on the same pass also show `0x621e0a10` and `0x621e1a70` each hitting once
+  - strongest corrected runtime proof then came from inspecting the exact five saved-slot dword2s on the same live table object:
+    - at `0x62198ab4` (inside `0x62198a70`, after `0x621cd550`, before the same-pass `0x621966d0` save tail)
+      - ids `{0,1,7,15,19}` all showed `0x627d7b00`
+      - nearby control ids `{2,3,4,5,6}` also remained `0x627d7b00`
+    - at `0x621989b4` (inside `0x62198970`, after `0x621e2310`, before `ai.cfg` save)
+      - ids `{0,1,7,15,19}` all showed `0x627d7b01`
+      - nearby control ids `{2,3,4,5,6}` remained `0x627d7b00`
+    - on the later shutdown direct-save stop at `0x621966d0` from `TermClientDLL`
+      - the same five ids `{0,1,7,15,19}` still showed `0x627d7b01`
+      - nearby control ids still remained `0x627d7b00`
+  - practical consequence is now much sharper than before:
+    - the in-run `cs.cfg` save pair does **not** see low-bit `1` yet for the interesting five ids
+    - the live `ai.cfg` load is exactly what flips those five low bits in the shared `0x629ea4e8` slot table
+    - and the later direct/shutdown `0x621966d0` save can therefore naturally persist the original reference pattern `{0,1,7,15,19}`
+  - newer bounded-pass tightening on the broader later-save family:
+    - static xrefs also show later direct-save candidates through `0x62198490` and `0x62197db0`
+    - and `0x62198490` is callable from `0x621707e0`, `0x62171600`, and `TermClientDLL`
+    - but on the bounded active original route we observed event sequence `0x10,0x0e,0x11,0x09,0x12,0x17,0x0b,0x18,0x0f` before the later tail
+    - and we did **not** stop on `0x62171600` or `0x62197db0` before entry / before exit
+    - the next later direct-save-family hit after the in-run `0x62198a70 -> 0x621966d0 -> 0x62198970` sequence was instead `0x62198490` with backtrace through `TermClientDLL`
+    - so for the currently bounded active route, shutdown remains the strongest concrete later-save explanation rather than a generic abstract later caller list
+  - extra first-hit note:
+    - at the visible `0x621e3b50` stop, `ecx = 0x629ea4e8`
+    - and the observed slot id from `*(ushort*)(*(int*)(param_2+0x10)+6)` was `0x208`, i.e. the first visible post-save setter stop was not immediately one of the five `{0,1,7,15,19}` ids
+  - important shutdown-path clarification from the same original runtime pass:
+    - on soft exit, the debugger later hit `0x621966d0` again
+    - that hit came from `TermClientDLL (0x620011a0)` via `0x6216a2f0 -> 0x62198490 = PersistSelectionCfgCorpusFromEnableFlags`
+    - that shutdown helper calls `0x621966d0` directly, without first going through `0x62198a70` or `0x62198970`
+    - so an exit-time `0x621966d0` stop is a real save, but it is **also** the clean bounded example of a later save that can see the already-mutated `{0,1,7,15,19}` low-bit pattern
+  - later bounded replacement validation now lines up with that same explanation too:
+    - a narrow launcher change that simply followed positive `RunClientDLL` with `TermClientDLL` produced a replacement saved `cs.cfg` bit-identical to the refreshed original reference file on the active route
+    - practical consequence: the remaining replacement/original `cs.cfg` low-bit gap was a later-save sequencing issue, not evidence that the live mediator corpus mapping was still wrong
 
 Important ownership caution:
 - this is evidence about what the pristine original `client.dll` reads and writes
