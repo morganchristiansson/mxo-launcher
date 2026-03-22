@@ -269,7 +269,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
 | `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
-| `+0xf4` | later runtime/config paths treat return value like a persisted selection/config snapshot, not a plain C-string | medium |
+| `+0xf4` | later runtime/profile paths treat return value like a broader profile / character-info block: current client-side proof uses the base as a C-string and also reads strings at `+0x70/+0x90/+0xb0` for UI + `mcd.cfg` persistence; the older plain selection/config-snapshot read is now known to be incomplete | high |
 | `+0x120` | later loading-character path passes a large stack-built state object here before UI teardown / transition work | medium |
 | `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
 | `+0x13c` | `WaitForEvent` loop pump; calls launcher owner helper `+0x65c` vtable `+0x04` when present (`0x4202c0`) | medium |
@@ -589,7 +589,11 @@ That materially strengthens the interpretation that:
 - `+0x38` is a **profile-root string input** to the client's config-path builder,
 - `+0x40` maps an arg7-derived selection request into a descriptor payload whose fields at `+3` and `+7` feed the `%s_%X` path suffix formatting,
 - `+0xec` is a **selection/config state handoff**,
-- and `+0xf4` is more likely a later accessor for persisted selection/config state than a simple string-returning helper.
+- and `+0xf4` is **not** just a plain string helper and now also appears broader than the older plain selection/config-snapshot read.
+  Newer client-side UI/persistence proof later tightens that further:
+  - `client.dll:0x620f1c60` (`P` / character-info dialog family) calls `arg6->+0xf4`, treats the base return value like a C-string, and also reads strings at `+0x70` and `+0x90`
+  - `client.dll:0x62197830` (`mcd.cfg` persistence family) calls `arg6->+0xf4` and copies strings from `+0x70`, `+0x90`, and `+0xb0` into the saved profile file
+  - practical consequence: replacement `+0xf4` work should now target a **late profile / character-info block** shape first, not only the copied `+0xec` selection blob
 
 ### What the newer reruns showed
 

@@ -13,6 +13,12 @@ void DiagnosticAuthResetState();
 void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
 void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* authPassword);
 void DiagnosticAuthPollLiveConnectionTraffic(void* owner);
+const char* DiagnosticAuthCurrentCharacterName();
+uint32_t DiagnosticAuthCurrentCharacterIdLow();
+uint32_t DiagnosticAuthCurrentCharacterIdHigh();
+const char* DiagnosticAuthCurrentRealFirstName();
+const char* DiagnosticAuthCurrentRealLastName();
+const char* DiagnosticAuthCurrentBackground();
 
 // Bridge helpers implemented in src/launcher_network_object_abi.cpp so auth-side
 // diagnostics can stay split without duplicating launcher-object queue/layout logic.

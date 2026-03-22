@@ -95,6 +95,24 @@ static void CopyBoundedRawBytes(uint8_t* dest, size_t destSize, const uint8_t* s
     std::memcpy(dest, src, std::min(destSize, srcSize));
 }
 
+static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src, size_t srcAvailable) {
+    if (!dest || destSize == 0u) {
+        return;
+    }
+
+    std::fill(dest, dest + destSize, '\0');
+    if (!src || srcAvailable == 0u) {
+        return;
+    }
+
+    size_t copyLen = 0u;
+    while (copyLen + 1u < destSize && copyLen < srcAvailable && src[copyLen] != '\0') {
+        dest[copyLen] = static_cast<char>(src[copyLen]);
+        ++copyLen;
+    }
+    dest[copyLen] = '\0';
+}
+
 static void ResetState8ReplyOwnerState(PostAuthMarginLoadingState& ownerState) {
     std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
     ownerState.characterReplyFieldF3c = 0u;
@@ -207,6 +225,30 @@ static void HandleState8ReplySection(
                         parsed.sectionData + 0x20u,
                         parsed.sectionByteCount - 0x20u);
                 }
+                if (parsed.sectionByteCount >= 4u) {
+                    ownerState.characterRecordPointersF88[0] = ReadU32LE(parsed.sectionData + 0x00u);
+                }
+                if (parsed.sectionByteCount > 0x444u) {
+                    ownerState.replySectionData13cc = ReadU32LE(parsed.sectionData + 0x444u);
+                }
+                if (parsed.sectionByteCount > 0x448u) {
+                    ownerState.replySectionData13d0 = ReadU32LE(parsed.sectionData + 0x448u);
+                }
+                CopyCStringIntoFixed(
+                    ownerState.section0StringF8c.data(),
+                    ownerState.section0StringF8c.size(),
+                    parsed.sectionByteCount > 0x04u ? (parsed.sectionData + 0x04u) : nullptr,
+                    parsed.sectionByteCount > 0x04u ? parsed.sectionByteCount - 0x04u : 0u);
+                CopyCStringIntoFixed(
+                    ownerState.section0StringFac.data(),
+                    ownerState.section0StringFac.size(),
+                    parsed.sectionByteCount > 0x24u ? (parsed.sectionData + 0x24u) : nullptr,
+                    parsed.sectionByteCount > 0x24u ? parsed.sectionByteCount - 0x24u : 0u);
+                CopyCStringIntoFixed(
+                    ownerState.section0StringFcc.data(),
+                    ownerState.section0StringFcc.size(),
+                    parsed.sectionByteCount > 0x44u ? (parsed.sectionData + 0x44u) : nullptr,
+                    parsed.sectionByteCount > 0x44u ? parsed.sectionByteCount - 0x44u : 0u);
                 if (parsed.sectionByteCount > 0x485u && ownerState.state8Section0OverflowBuffer13f0 == nullptr) {
                     AppendOwnedSectionBytesU16(
                         ownerState.state8Section0OverflowBuffer13f0,
@@ -215,6 +257,15 @@ static void HandleState8ReplySection(
                         static_cast<uint16_t>(parsed.sectionByteCount - 0x485u));
                 }
                 ownerState.section0Flag13f6 = 1u;
+                spdlog::info(
+                    "CLTLoginState_State8 section0 parsed name='{}' first='{}' last='{}' background='{}' ptr0=0x{:08x} extra13cc=0x{:08x} extra13d0=0x{:08x}",
+                    ownerState.characterNameBufferF1c[0] ? std::string(ownerState.characterNameBufferF1c) : std::string("<empty>"),
+                    ownerState.section0StringF8c[0] ? std::string(ownerState.section0StringF8c.data()) : std::string("<empty>"),
+                    ownerState.section0StringFac[0] ? std::string(ownerState.section0StringFac.data()) : std::string("<empty>"),
+                    ownerState.section0StringFcc[0] ? std::string(ownerState.section0StringFcc.data()) : std::string("<empty>"),
+                    static_cast<unsigned>(ownerState.characterRecordPointersF88[0]),
+                    static_cast<unsigned>(ownerState.replySectionData13cc),
+                    static_cast<unsigned>(ownerState.replySectionData13d0));
             }
             break;
         case 1u:

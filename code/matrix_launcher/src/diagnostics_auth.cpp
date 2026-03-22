@@ -671,6 +671,113 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
         static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24));
 }
 
+const char* DiagnosticAuthCurrentCharacterName() {
+    if (g_DiagnosticLoginController) {
+        if (const auto* currentSlotRecord = g_DiagnosticLoginController->GetCurrentSlotRecord()) {
+            if (!currentSlotRecord->heapString14.empty()) {
+                return currentSlotRecord->heapString14.c_str();
+            }
+        }
+        if (const char* slotZeroName = g_DiagnosticLoginController->GetSlotRecordHeapStringByIndex(0)) {
+            return slotZeroName;
+        }
+        if (const char* materializedName = g_DiagnosticLoginController->CharacterNameBufferF1c()) {
+            if (materializedName[0] != '\0') {
+                return materializedName;
+            }
+        }
+        const auto& sourceLeadString108 = g_DiagnosticLoginController->SourceLeadString108();
+        if (sourceLeadString108[0] != '\0') {
+            return sourceLeadString108.data();
+        }
+    }
+    return g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : nullptr;
+}
+
+uint32_t DiagnosticAuthCurrentCharacterIdLow() {
+    if (!g_DiagnosticLoginController) {
+        return 0u;
+    }
+    if (const auto* currentSlotRecord = g_DiagnosticLoginController->GetCurrentSlotRecord()) {
+        return currentSlotRecord->globalCharacterIdLow03;
+    }
+    if (const auto* slotZeroRecord = g_DiagnosticLoginController->GetSlotRecordByIndex(0)) {
+        return slotZeroRecord->globalCharacterIdLow03;
+    }
+    return 0u;
+}
+
+uint32_t DiagnosticAuthCurrentCharacterIdHigh() {
+    if (!g_DiagnosticLoginController) {
+        return 0u;
+    }
+    if (const auto* currentSlotRecord = g_DiagnosticLoginController->GetCurrentSlotRecord()) {
+        return currentSlotRecord->globalCharacterIdHigh07;
+    }
+    if (const auto* slotZeroRecord = g_DiagnosticLoginController->GetSlotRecordByIndex(0)) {
+        return slotZeroRecord->globalCharacterIdHigh07;
+    }
+    return 0u;
+}
+
+static bool IsLikelyMiddleInitialOnly(const char* value) {
+    return value != nullptr && std::char_traits<char>::length(value) == 1u;
+}
+
+const char* DiagnosticAuthCurrentRealFirstName() {
+    if (!g_DiagnosticLoginController) {
+        return nullptr;
+    }
+    const char* sourceBlock178 = reinterpret_cast<const char*>(g_DiagnosticLoginController->SourceBlock178().data());
+    if (sourceBlock178[0] != '\0') {
+        return sourceBlock178;
+    }
+    const auto& ownerState = g_DiagnosticLoginController->PostAuthMarginLoadingStateView();
+    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
+    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
+    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
+    if (IsLikelyMiddleInitialOnly(section0F8c) && section0Fac && section0Fcc) {
+        return section0Fac;
+    }
+    return section0F8c;
+}
+
+const char* DiagnosticAuthCurrentRealLastName() {
+    if (!g_DiagnosticLoginController) {
+        return nullptr;
+    }
+    const char* sourceBlock198 = reinterpret_cast<const char*>(g_DiagnosticLoginController->SourceBlock198().data());
+    if (sourceBlock198[0] != '\0') {
+        return sourceBlock198;
+    }
+    const auto& ownerState = g_DiagnosticLoginController->PostAuthMarginLoadingStateView();
+    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
+    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
+    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
+    if (IsLikelyMiddleInitialOnly(section0F8c) && section0Fac && section0Fcc) {
+        return section0Fcc;
+    }
+    return section0Fac;
+}
+
+const char* DiagnosticAuthCurrentBackground() {
+    if (!g_DiagnosticLoginController) {
+        return nullptr;
+    }
+    const char* sourceBlock1b8 = reinterpret_cast<const char*>(g_DiagnosticLoginController->SourceBlock1b8().data());
+    if (sourceBlock1b8[0] != '\0') {
+        return sourceBlock1b8;
+    }
+    const auto& ownerState = g_DiagnosticLoginController->PostAuthMarginLoadingStateView();
+    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
+    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
+    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
+    if (IsLikelyMiddleInitialOnly(section0F8c) && section0Fac && section0Fcc) {
+        return nullptr;
+    }
+    return section0Fcc;
+}
+
 bool DiagnosticCanBeginAuthConnection() {
     return g_DiagnosticLoginController != NULL;
 }

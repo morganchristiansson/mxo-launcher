@@ -72,6 +72,22 @@ struct DiagnosticMediatorSelectionContextCopy {
 
 static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
 static DiagnosticMediatorSelectionObject g_MediatorSelectionObject = {};
+
+struct __attribute__((packed)) DiagnosticMediatorCharacterSelectionPacked {
+    uint8_t reserved0;
+    uint8_t reserved1;
+    uint8_t reserved2;
+    uint32_t characterIdLow03;
+    uint32_t characterIdHigh07;
+};
+
+struct DiagnosticMediatorCharacterSelectionObject {
+    uint8_t reserved[0x10];
+    DiagnosticMediatorCharacterSelectionPacked* packed; // client profile-path family reads id dwords via packed +0x03/+0x07
+};
+
+static DiagnosticMediatorCharacterSelectionPacked g_MediatorCharacterSelectionPacked = {0, 0, 0, 0, 0};
+static DiagnosticMediatorCharacterSelectionObject g_MediatorCharacterSelectionObject = {};
 static DiagnosticMediatorSelectionContextCopy g_MediatorSelectionContextCopy = {};
 static bool g_MediatorSelectionContextCopyValid = false;
 
@@ -97,9 +113,30 @@ static const char* MaskedSensitiveValue(const char* value) {
     return "<provided>";
 }
 
+using DiagnosticMediatorProfileCharacterInfoF4 =
+    mxo::ltlogin::CLTLoginMediator::ProcessLoginCredentialsInputSketch;
+
 static_assert(
     sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch) == kDiagnosticSelectionContextSize,
     "State3SelectionContextInputSketch must stay layout-compatible with the recovered arg6 +0xec 0xb4 snapshot");
+
+static DiagnosticMediatorProfileCharacterInfoF4 g_MediatorProfileCharacterInfoF4 = {};
+
+template <size_t N>
+static void CopyCStringIntoFixed(std::array<char, N>& dest, const char* src) {
+    dest.fill('\0');
+    if (!src || !src[0]) {
+        return;
+    }
+    const size_t sourceLength = std::char_traits<char>::length(src);
+    const size_t copyCount = (sourceLength < (N - 1u)) ? sourceLength : (N - 1u);
+    std::memcpy(dest.data(), src, copyCount);
+    dest[copyCount] = '\0';
+}
+
+static const char* PreferNonEmpty(const char* primary, const char* fallback) {
+    return (primary && primary[0]) ? primary : fallback;
+}
 
 // UNANCHORED: sidecar-model accessor for the replacement arg6 ABI shell.
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
@@ -182,6 +219,181 @@ static void DiagnosticMirrorSelectionContextIntoMediatorModel(const void* select
         (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
         (unsigned)input.block04[0],
         (unsigned)input.blockA4[3]);
+}
+
+static const char* NonEmptyOrPlaceholder(const char* value) {
+    return (value && value[0]) ? value : "<empty>";
+}
+
+static bool IsProfilePathBuilderCaller(void* returnAddress) {
+    const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
+    return address >= 0x62195ff0u && address <= 0x62196121u;
+}
+
+static bool IsMcdPersistenceCaller(void* returnAddress) {
+    const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
+    return address >= 0x62197830u && address <= 0x621983d0u;
+}
+
+static bool IsCharacterProfileSelectionCaller(void* returnAddress) {
+    return IsProfilePathBuilderCaller(returnAddress) || IsMcdPersistenceCaller(returnAddress);
+}
+
+static const char* DescribeMediatorCaller(void* returnAddress) {
+    const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
+    if (address >= 0x62170b00u && address <= 0x62170fbbu) {
+        return "client.dll:FUN_62170b00 init/selection family";
+    }
+    if (IsProfilePathBuilderCaller(returnAddress)) {
+        return "client.dll:profile-path builder family";
+    }
+    if (IsMcdPersistenceCaller(returnAddress)) {
+        return "client.dll:mcd.cfg persistence family";
+    }
+    if (address >= 0x620f1c60u && address <= 0x620f202fu) {
+        return "client.dll:character-info dialog family";
+    }
+    if (address >= 0x620547c0u && address <= 0x62054eacu) {
+        return "client.dll:loading-character family";
+    }
+    if (address >= 0x62056500u && address <= 0x62056600u) {
+        return "client.dll:observer/late-runtime family";
+    }
+    if (address >= 0x625c86d0u && address <= 0x625c8700u) {
+        return "client.dll:RCC/bootstrap family";
+    }
+    return "client.dll:<unclassified>";
+}
+
+static void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        return;
+    }
+
+    const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
+    const auto* currentState = mediator->CurrentState();
+    const auto* currentSlotRecord = mediator->GetCurrentSlotRecord();
+    const char* currentSlotName =
+        (currentSlotRecord && !currentSlotRecord->heapString14.empty())
+            ? currentSlotRecord->heapString14.c_str()
+            : "<empty>";
+    const char* sourceLeadString108 = ownerState.sourceLeadString108[0]
+        ? ownerState.sourceLeadString108.data()
+        : "<empty>";
+    const char* characterNameBufferF1c = ownerState.characterNameBufferF1c[0]
+        ? ownerState.characterNameBufferF1c
+        : "<empty>";
+    const char* section0StringF8c = ownerState.section0StringF8c[0]
+        ? ownerState.section0StringF8c.data()
+        : "<empty>";
+    const char* section0StringFac = ownerState.section0StringFac[0]
+        ? ownerState.section0StringFac.data()
+        : "<empty>";
+    const char* section0StringFcc = ownerState.section0StringFcc[0]
+        ? ownerState.section0StringFcc.data()
+        : "<empty>";
+    const char* authCharacterName = NonEmptyOrPlaceholder(DiagnosticAuthCurrentCharacterName());
+    const uint32_t authCharacterIdLow = DiagnosticAuthCurrentCharacterIdLow();
+    const uint32_t authCharacterIdHigh = DiagnosticAuthCurrentCharacterIdHigh();
+
+    spdlog::info(
+        "MediatorStub::{} caller={} [{}] context{{mappedWorld='{}' profile='{}' currentSlot='{}' source108='{}' f1c='{}' section0f8c='{}' section0fac='{}' section0fcc='{}' authChar='{}' authIdLow=0x{:08x} authIdHigh=0x{:08x} authIdLow16=0x{:04x} currentState={} worldId=0x{:04x} status=0x{:02x}}}",
+        slotLabel ? slotLabel : "<slot>",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        NonEmptyOrPlaceholder(DiagnosticMediatorMappedSelectionName()),
+        NonEmptyOrPlaceholder(DiagnosticMediatorProfileName()),
+        currentSlotName,
+        sourceLeadString108,
+        characterNameBufferF1c,
+        section0StringF8c,
+        section0StringFac,
+        section0StringFcc,
+        authCharacterName,
+        authCharacterIdLow,
+        authCharacterIdHigh,
+        static_cast<unsigned>(authCharacterIdLow & 0xffffu),
+        fmt::ptr(currentState),
+        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->worldId0c) : 0u,
+        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->status0b) : 0u);
+}
+
+static void LogMediatorNameGetterDetails(
+    const char* slotLabel,
+    void* returnAddress,
+    const char* returnedText) {
+    spdlog::info(
+        "MediatorStub::{} caller={} [{}] -> '{}'",
+        slotLabel ? slotLabel : "<slot>",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        NonEmptyOrPlaceholder(returnedText));
+    LogMediatorCharacterStateContext(slotLabel, returnAddress);
+}
+
+static void PopulateMediatorProfileCharacterInfoF4() {
+    g_MediatorProfileCharacterInfoF4 = {};
+
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    const char* characterName = nullptr;
+    const char* realFirstName = nullptr;
+    const char* realLastName = nullptr;
+    const char* background = nullptr;
+
+    if (mediator) {
+        if (const auto* currentSlotRecord = mediator->GetCurrentSlotRecord()) {
+            if (!currentSlotRecord->heapString14.empty()) {
+                characterName = currentSlotRecord->heapString14.c_str();
+            }
+        }
+        characterName = PreferNonEmpty(characterName, mediator->GetSlotRecordHeapStringByIndex(0));
+        characterName = PreferNonEmpty(characterName, mediator->CharacterNameBufferF1c());
+        characterName = PreferNonEmpty(characterName, mediator->SourceLeadString108().data());
+
+        const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
+        const char* sourceBlock178 = reinterpret_cast<const char*>(mediator->SourceBlock178().data());
+        const char* sourceBlock198 = reinterpret_cast<const char*>(mediator->SourceBlock198().data());
+        const char* sourceBlock1b8 = reinterpret_cast<const char*>(mediator->SourceBlock1b8().data());
+        const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
+        const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
+        const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
+        const bool section0LooksLikeMiddleFirstLast =
+            section0F8c != nullptr &&
+            std::char_traits<char>::length(section0F8c) == 1u &&
+            section0Fac != nullptr && section0Fac[0] != '\0' &&
+            section0Fcc != nullptr && section0Fcc[0] != '\0';
+
+        if (section0LooksLikeMiddleFirstLast) {
+            realFirstName = PreferNonEmpty(sourceBlock178, section0Fac);
+            realLastName = PreferNonEmpty(sourceBlock198, section0Fcc);
+            background = PreferNonEmpty(sourceBlock1b8, nullptr);
+        } else {
+            realFirstName = PreferNonEmpty(sourceBlock178, section0F8c);
+            realLastName = PreferNonEmpty(sourceBlock198, section0Fac);
+            background = PreferNonEmpty(sourceBlock1b8, section0Fcc);
+        }
+
+        g_MediatorProfileCharacterInfoF4.field24 = mediator->SourceField12c();
+    }
+
+    characterName = PreferNonEmpty(characterName, DiagnosticAuthCurrentCharacterName());
+    realFirstName = PreferNonEmpty(realFirstName, DiagnosticAuthCurrentRealFirstName());
+    realLastName = PreferNonEmpty(realLastName, DiagnosticAuthCurrentRealLastName());
+    background = PreferNonEmpty(background, DiagnosticAuthCurrentBackground());
+
+    if ((!realFirstName || !realFirstName[0]) && characterName && characterName[0]) {
+        realFirstName = characterName;
+    }
+
+    CopyCStringIntoFixed(g_MediatorProfileCharacterInfoF4.string00, characterName);
+    CopyCStringIntoFixed(g_MediatorProfileCharacterInfoF4.string70, realFirstName);
+    CopyCStringIntoFixed(g_MediatorProfileCharacterInfoF4.string90, realLastName);
+    CopyCStringIntoFixed(g_MediatorProfileCharacterInfoF4.stringB0, background);
+
+    if (g_MediatorProfileCharacterInfoF4.field24 == 0u) {
+        g_MediatorProfileCharacterInfoF4.field24 = DiagnosticMediatorSelectedWorldIndexLow24();
+    }
 }
 
 // UNANCHORED: masks reflected password arguments in mediator-chain logs.
@@ -309,6 +521,7 @@ static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
     std::memset(&g_MediatorSelectionObject, 0, sizeof(g_MediatorSelectionObject));
     std::memset(&g_MediatorSelectionContextCopy, 0, sizeof(g_MediatorSelectionContextCopy));
+    g_MediatorProfileCharacterInfoF4 = {};
     g_MediatorSelectionContextCopyValid = false;
     delete g_DiagnosticMediatorModel;
     g_DiagnosticMediatorModel = new mxo::ltlogin::CLTLoginMediator();
@@ -379,8 +592,10 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 // vtable: ILTLoginMediator.Default slot +0x38
 static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::GetProfileRootName(+0x38) -> '%s'", DiagnosticMediatorProfileName());
-    return DiagnosticMediatorProfileName();
+    void* returnAddress = __builtin_return_address(0);
+    const char* profileName = DiagnosticMediatorProfileName();
+    LogMediatorNameGetterDetails("GetProfileRootName(+0x38)", returnAddress, profileName);
+    return profileName;
 }
 
 static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex);
@@ -427,13 +642,26 @@ static bool DiagnosticMediatorSelectionDescriptorMatchesConfiguredRequest(uint32
     return mediator ? mediator->Arg6SelectionDescriptorMatchesRequest(selectionIndex) : false;
 }
 
+static const char* DiagnosticMediatorProfileSelectionName() {
+    const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
+    return (authCharacterName && authCharacterName[0]) ? authCharacterName : DiagnosticMediatorMappedSelectionName();
+}
+
+static uint32_t DiagnosticMediatorProfileSelectionId() {
+    const uint32_t authCharacterIdLow = DiagnosticAuthCurrentCharacterIdLow();
+    return authCharacterIdLow != 0u ? (authCharacterIdLow & 0xffffu) : DiagnosticMediatorMappedSelectionId();
+}
+
 // anchor: client.dll fallback-selection path asks arg6 +0x3c for the default selection index when given 0xff
 // vtable: ILTLoginMediator.Default slot +0x3c
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log(
-        "MediatorStub::GetDefaultSelectionIndex() -> 0x%06x",
-        (unsigned)DiagnosticMediatorSelectedWorldIndexLow24());
+    void* returnAddress = __builtin_return_address(0);
+    spdlog::info(
+        "MediatorStub::GetDefaultSelectionIndex() caller={} [{}] -> 0x{:06x}",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        static_cast<unsigned>(DiagnosticMediatorSelectedWorldIndexLow24()));
     return DiagnosticMediatorSelectedWorldIndexLow24();
 }
 
@@ -443,6 +671,7 @@ static uint32_t g_GetSelectionCallCount = 0;
 static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub* self, uint32_t selectionIndex) {
     (void)self;
 
+    void* returnAddress = __builtin_return_address(0);
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
     const uint32_t expectedScratchRequest = DiagnosticMediatorExpectedSelectionDescriptorScratchRequest();
@@ -450,15 +679,18 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
     const char* worldName = matchedConfiguredRequest ? DiagnosticMediatorMappedSelectionName() : NULL;
 
     if (!worldName) {
-        Log(
-            "MediatorStub::GetSelectionDescriptor(selectionIndex=0x%08x low24=0x%06x high8=0x%02x) -> NULL (configuredWorld=0x%06x configuredVariant=0x%02x expectedScratchRequest=0x%08x worldUpperBoundExclusive=%u)",
-            (unsigned)selectionIndex,
-            (unsigned)low24,
-            (unsigned)high8,
-            (unsigned)DiagnosticMediatorSelectedWorldIndexLow24(),
-            (unsigned)DiagnosticMediatorSelectedVariantIndexHigh8(),
-            (unsigned)expectedScratchRequest,
-            (unsigned)DiagnosticMediatorWorldUpperBoundExclusive());
+        spdlog::info(
+            "MediatorStub::GetSelectionDescriptor(selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
+            static_cast<unsigned>(selectionIndex),
+            static_cast<unsigned>(low24),
+            static_cast<unsigned>(high8),
+            fmt::ptr(returnAddress),
+            DescribeMediatorCaller(returnAddress),
+            static_cast<unsigned>(DiagnosticMediatorSelectedWorldIndexLow24()),
+            static_cast<unsigned>(DiagnosticMediatorSelectedVariantIndexHigh8()),
+            static_cast<unsigned>(expectedScratchRequest),
+            static_cast<unsigned>(DiagnosticMediatorWorldUpperBoundExclusive()));
+        LogMediatorCharacterStateContext("GetSelectionDescriptor(+0x40)", returnAddress);
         return NULL;
     }
 
@@ -469,18 +701,21 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         ((low24 == DiagnosticMediatorSelectedWorldIndexLow24()) ? "low24-world-match" : "other-match");
-    Log(
-        "MediatorStub::GetSelectionDescriptor(selectionIndex=0x%08x low24=0x%06x high8=0x%02x) -> %p (matchMode=%s mappedName='%s' packedSelectionId=0x%06x configuredWorld=0x%06x configuredVariant=0x%02x expectedScratchRequest=0x%08x)",
-        (unsigned)selectionIndex,
-        (unsigned)low24,
-        (unsigned)high8,
-        &g_MediatorSelectionObject,
+    spdlog::info(
+        "MediatorStub::GetSelectionDescriptor(selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> {} (matchMode={} mappedName='{}' packedSelectionId=0x{:06x} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
+        static_cast<unsigned>(selectionIndex),
+        static_cast<unsigned>(low24),
+        static_cast<unsigned>(high8),
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        fmt::ptr(&g_MediatorSelectionObject),
         matchMode,
         worldName,
-        (unsigned)g_MediatorSelectionPacked.selectionId,
-        (unsigned)DiagnosticMediatorSelectedWorldIndexLow24(),
-        (unsigned)DiagnosticMediatorSelectedVariantIndexHigh8(),
-        (unsigned)expectedScratchRequest);
+        static_cast<unsigned>(g_MediatorSelectionPacked.selectionId),
+        static_cast<unsigned>(DiagnosticMediatorSelectedWorldIndexLow24()),
+        static_cast<unsigned>(DiagnosticMediatorSelectedVariantIndexHigh8()),
+        static_cast<unsigned>(expectedScratchRequest));
+    LogMediatorCharacterStateContext("GetSelectionDescriptor(+0x40)", returnAddress);
     return &g_MediatorSelectionObject;
 }
 
@@ -489,16 +724,20 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
 // vtable: ILTLoginMediator.Default slot +0x48
 static const char* __thiscall Mediator_GetWorldOrSelectionName(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::GetWorldOrSelectionName() -> '%s'", DiagnosticMediatorMappedSelectionName());
-    return DiagnosticMediatorMappedSelectionName();
+    void* returnAddress = __builtin_return_address(0);
+    const char* worldOrSelectionName = DiagnosticMediatorMappedSelectionName();
+    LogMediatorNameGetterDetails("GetWorldOrSelectionName(+0x48)", returnAddress, worldOrSelectionName);
+    return worldOrSelectionName;
 }
 
 // anchor: later client startup path calls arg6 +0x4c immediately after +0x48
 // vtable: ILTLoginMediator.Default slot +0x4c
 static const char* __thiscall Mediator_GetProfileOrSessionName(MinimalLoginMediatorStub* self) {
     (void)self;
-    Log("MediatorStub::GetProfileOrSessionName() -> '%s'", DiagnosticMediatorProfileName());
-    return DiagnosticMediatorProfileName();
+    void* returnAddress = __builtin_return_address(0);
+    const char* profileOrSessionName = DiagnosticMediatorProfileName();
+    LogMediatorNameGetterDetails("GetProfileOrSessionName(+0x4c)", returnAddress, profileOrSessionName);
+    return profileOrSessionName;
 }
 
 // anchor: client.dll:0x625c86d0 later calls arg6 +0x50 and converts null/non-null into flag 0x30
@@ -933,20 +1172,30 @@ __attribute__((naked)) static void Mediator_RegisterLoginObserver170() {
         : "eax", "edx");
 }
 
-// anchor: later runtime/config paths treat arg6 +0xf4 as a persisted selection/config snapshot
+// anchor: later runtime/config paths treat arg6 +0xf4 as a broader persisted profile/character-info surface
 // vtable: ILTLoginMediator.Default slot +0xf4
 static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediatorStub* self) {
     (void)self;
+    void* returnAddress = __builtin_return_address(0);
     ++g_MediatorRuntimeState.profile0f4Count;
-    Log(
-        "MediatorStub::GetSelectionContextSnapshot(+0xf4) -> %p [count=%u copiedFrom0ec=%u raw0ec=%p]",
-        &g_MediatorSelectionContextCopy,
-        (unsigned)g_MediatorRuntimeState.profile0f4Count,
+    PopulateMediatorProfileCharacterInfoF4();
+
+    spdlog::info(
+        "MediatorStub::GetSelectionContextSnapshot(+0xf4) caller={} [{}] -> {} [count={} copiedFrom0ec={} raw0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x}]",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        fmt::ptr(&g_MediatorProfileCharacterInfoF4),
+        static_cast<unsigned>(g_MediatorRuntimeState.profile0f4Count),
         g_MediatorSelectionContextCopyValid ? 1u : 0u,
-        g_MediatorRuntimeState.selectionContext0ec);
-    LogPointerWords("GetSelectionContextSnapshot copy", &g_MediatorSelectionContextCopy, 8);
-    LogSelectionContextDetails(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
-    return &g_MediatorSelectionContextCopy;
+        fmt::ptr(g_MediatorRuntimeState.selectionContext0ec),
+        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.string00.data()),
+        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.string70.data()),
+        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.string90.data()),
+        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.stringB0.data()),
+        static_cast<unsigned>(g_MediatorProfileCharacterInfoF4.field24));
+    LogMediatorCharacterStateContext("GetSelectionContextSnapshot(+0xf4)", returnAddress);
+    LogPointerWords("GetSelectionContextSnapshot syntheticF4", &g_MediatorProfileCharacterInfoF4, 8);
+    return &g_MediatorProfileCharacterInfoF4;
 }
 
 // anchor: later runtime setup uses arg6 +0x148 for runtime-object handoff
