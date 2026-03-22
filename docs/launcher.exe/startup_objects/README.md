@@ -13,6 +13,9 @@ This folder documents launcher-owned globals and heap objects that are part of t
 - `0x4d2c58_MCD_CFG_PERSISTENCE.md`
   - focused `mcd.cfg` persistence subset for arg6/owner fields `+0xf1c/+0xf48/+0xf88/+0x13f0` and the client save chain that consumes them
 
+- `0x4d2c58_SELECTION_CFG_CORPUS.md`
+  - focused non-`mcd.cfg` selection cfg corpus subset for the remaining client helper family at `+0x68 .. +0xb8`
+
 - `0x4d2c58_RESOLUTION_MECHANISM.md`
   - how the launcher resolves and fills the `ILTLoginMediator.Default` pointer slot through registry state
 

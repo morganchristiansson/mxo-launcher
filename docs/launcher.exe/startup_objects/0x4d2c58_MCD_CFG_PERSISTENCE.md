@@ -184,7 +184,11 @@ Producer-side logs:
   - `CLTLoginState_State8 persistence family [...]`
 
 Getter-side logs:
-- `src/launcher_mediator_abi.cpp`
+- focused source-owned ABI home now lives under:
+  - `src/launcher_mediator_abi_mcd.cpp`
+- broader shell / registration still roots at:
+  - `src/launcher_mediator_abi.cpp`
+- key log anchors:
   - `MediatorStub::GetState8PersistenceHeaderBc(+0xbc)`
   - `MediatorStub::GetState8PersistenceBodyC0(+0xc0)`
   - `MediatorStub::GetState8PersistenceOverflowC4(+0xc4)`

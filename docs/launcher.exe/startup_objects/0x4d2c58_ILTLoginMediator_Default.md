@@ -29,12 +29,21 @@ Current replacement-launcher source split:
   - `matrixstaging/game/src/libltclientlogin/loginstate_state9.cpp`
   - `matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp`
   - `src/launcher_mediator_state9_abi.cpp`
-- the broader replacement `ILTLoginMediator.Default` ABI/vtable shell now lives in `src/launcher_mediator_abi.cpp`
+- the broader replacement `ILTLoginMediator.Default` ABI/vtable shell remains rooted in:
+  - `src/launcher_mediator_abi.cpp`
+- that broader ABI shell is now source-split into focused implementation files for lower-noise RE work:
+  - `src/launcher_mediator_abi_profile_paths.cpp`
+  - `src/launcher_mediator_abi_selection_cfg.cpp`
+  - `src/launcher_mediator_abi_mcd.cpp`
 - diagnostics-only window tracing remains in `src/diagnostics.cpp`
 
 Focused docs:
 - late-login arg6 subset (`+0xd4`, `+0x124`, `+0x18c`):
   - `0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
+- non-`mcd.cfg` selection cfg corpus subset (`+0x68 .. +0xb8`):
+  - `0x4d2c58_SELECTION_CFG_CORPUS.md`
+- `mcd.cfg` persistence subset:
+  - `0x4d2c58_MCD_CFG_PERSISTENCE.md`
 - post-state9 / state-`0x0c` continuation:
   - `../state_machine/POST_STATE9_CONTINUATION.md`
 
