@@ -9,6 +9,8 @@
 #include <cstring>
 #include <string>
 
+#include "spdlog/spdlog.h"
+
 // Broad ILTLoginMediator.Default ABI shell:
 // - keep startup-selection and general arg6 surface here
 // - keep late-login state9-only slots (`+0xd4`, `+0x124`, `+0x18c`) in
@@ -497,6 +499,27 @@ static const char* __thiscall Mediator_GetProfileOrSessionName(MinimalLoginMedia
     (void)self;
     Log("MediatorStub::GetProfileOrSessionName() -> '%s'", DiagnosticMediatorProfileName());
     return DiagnosticMediatorProfileName();
+}
+
+// anchor: client.dll:0x625c86d0 later calls arg6 +0x50 and converts null/non-null into flag 0x30
+// vtable: ILTLoginMediator.Default slot +0x50
+static void* __thiscall Mediator_GetBootstrapRaw08AuxHandle50(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    void* value = mediator ? mediator->BootstrapRaw08AuxHandle50() : nullptr;
+
+    static bool loggedOnce = false;
+    static void* lastValue = nullptr;
+    if (!loggedOnce || lastValue != value) {
+        spdlog::info(
+            "MediatorStub::GetBootstrapRaw08AuxHandle(+0x50) -> {}{}",
+            fmt::ptr(value),
+            loggedOnce ? " [changed]" : " [first]");
+        loggedOnce = true;
+        lastValue = value;
+    }
+
+    return value;
 }
 
 // anchor: client.dll early auth-name chain at 0x62001325..0x62001362 first calls arg6 +0x58
@@ -1030,6 +1053,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor; // +0x40
     g_LoginMediatorVtable[18] = (void*)Mediator_GetWorldOrSelectionName; // +0x48
     g_LoginMediatorVtable[19] = (void*)Mediator_GetProfileOrSessionName; // +0x4c
+    g_LoginMediatorVtable[20] = (void*)Mediator_GetBootstrapRaw08AuxHandle50; // +0x50
     g_LoginMediatorVtable[21] = (void*)Mediator_IsLauncherSelectionTypeEnabled; // +0x54
     g_LoginMediatorVtable[22] = (void*)Mediator_GetString0;      // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetString2;      // +0x5c

@@ -34,6 +34,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <memory>
 #include <unordered_map>
 
 namespace mxo::ltlogin {
@@ -66,12 +67,40 @@ struct MarginBootstrapSessionState {
 static std::unordered_map<const CLTLoginMediator*, MarginBootstrapSessionState>
     g_marginBootstrapStateByMediator;
 
+struct RecoveredAuthBootstrapSidecarState {
+    CLTLoginMediator::AuthBootstrapReplyShadowF4Sketch fieldF4Shadow{};
+    uint32_t raw08AuxHandleAvailabilityMarker = 0u;
+};
+
+static std::unordered_map<const CLTLoginMediator*, std::unique_ptr<RecoveredAuthBootstrapSidecarState>>
+    g_recoveredAuthBootstrapSidecarByMediator;
+
 static MarginBootstrapSessionState& MutableMarginBootstrapState(const CLTLoginMediator* mediator) {
     return g_marginBootstrapStateByMediator[mediator];
 }
 
+static RecoveredAuthBootstrapSidecarState* FindRecoveredAuthBootstrapSidecar(const CLTLoginMediator* mediator) {
+    const auto it = g_recoveredAuthBootstrapSidecarByMediator.find(mediator);
+    return (it != g_recoveredAuthBootstrapSidecarByMediator.end() && it->second)
+        ? it->second.get()
+        : nullptr;
+}
+
+static RecoveredAuthBootstrapSidecarState& MutableRecoveredAuthBootstrapSidecar(const CLTLoginMediator* mediator) {
+    std::unique_ptr<RecoveredAuthBootstrapSidecarState>& slot =
+        g_recoveredAuthBootstrapSidecarByMediator[mediator];
+    if (!slot) {
+        slot = std::make_unique<RecoveredAuthBootstrapSidecarState>();
+    }
+    return *slot;
+}
+
 static void EraseMarginBootstrapState(const CLTLoginMediator* mediator) {
     g_marginBootstrapStateByMediator.erase(mediator);
+}
+
+static void EraseRecoveredAuthBootstrapSidecar(const CLTLoginMediator* mediator) {
+    g_recoveredAuthBootstrapSidecarByMediator.erase(mediator);
 }
 
 static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOrder) {
@@ -291,6 +320,7 @@ CLTLoginMediator::CLTLoginMediator()
       worldSlots_{},
       worldPayloadSlots_{} {
     SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
+    ResetRecoveredAuthBootstrapDynamicStateScaffold();
     InitializeArg6DefaultObject();
 }
 
@@ -302,6 +332,7 @@ CLTLoginMediator::~CLTLoginMediator() {
         delete marginConnection_;
     }
     EraseMarginBootstrapState(this);
+    EraseRecoveredAuthBootstrapSidecar(this);
 }
 
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
@@ -440,6 +471,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
     ResetMarginBootstrapState();
+    ResetRecoveredAuthBootstrapDynamicStateScaffold();
 
     Log(
         "DIAGNOSTIC: CLTLoginMediator auth credentials configured username='%s' password=%s",
@@ -596,6 +628,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
     ResetMarginBootstrapState();
+    ResetRecoveredAuthBootstrapDynamicStateScaffold();
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();
@@ -1869,6 +1902,7 @@ uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChalle
     const uint32_t sendResult = SendAuthFramedPacket(buildResult.packet, "AS_AuthChallengeResponse");
     authChallengeResponseSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
+        SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(buildResult);
         Log(
             "DIAGNOSTIC: launcher-owned auth built AS_AuthChallengeResponse passwordLengthField=%u soePasswordLengthField=%u plaintextLen=%u ciphertextLen=%u",
             (unsigned)buildResult.passwordLengthField,
@@ -1945,6 +1979,72 @@ void CLTLoginMediator::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig() 
     authBootstrap680_.block30 = CopyPrefix16(authKeyConfigMd5_);
     authBootstrap680_.block40 = CopyPrefix16(authUiConfigMd5_);
     authBootstrap680_.currentPublicKeyId9C = authCurrentPublicKeyId_;
+}
+
+void CLTLoginMediator::ResetRecoveredAuthBootstrapDynamicStateScaffold() {
+    authBootstrap680_.timestamp80 = 0u;
+    authBootstrap680_.sendTarget50 = nullptr;
+    std::fill(authBootstrap680_.material85.begin(), authBootstrap680_.material85.end(), 0u);
+    authBootstrap680_.sideObject94 = nullptr;
+    authBootstrap680_.sideObject98 = nullptr;
+    authBootstrap680_.helperA0 = nullptr;
+    authBootstrap680_.lazyRaw06StateA4 = nullptr;
+    authBootstrap680_.raw08AuxHandleA8 = nullptr;
+    authBootstrap680_.fieldAC = nullptr;
+    authBootstrap680_.fieldF0 = nullptr;
+    authBootstrap680_.fieldF4 = nullptr;
+    authBootstrap680_.fieldF8 = nullptr;
+    authBootstrap680_.fieldFC = nullptr;
+    authBootstrap680_.field100 = nullptr;
+    authBootstrap680_.field108 = 0u;
+    authBootstrap680_.field10C = 0u;
+    authBootstrap680_.field110 = 0u;
+    authBootstrap680_.field114 = 0u;
+    authBootstrap680_.field118 = 0u;
+    EraseRecoveredAuthBootstrapSidecar(this);
+}
+
+void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
+    const mxo::auth::GetPublicKeyReply& reply) {
+    authBootstrap680_.currentPublicKeyId9C = reply.publicKeyId;
+    RecoveredAuthBootstrapSidecarState& sidecar = MutableRecoveredAuthBootstrapSidecar(this);
+    sidecar.raw08AuxHandleAvailabilityMarker = (reply.publicKeyId != 0u) ? reply.publicKeyId : 1u;
+    authBootstrap680_.helperA0 = &sidecar.raw08AuxHandleAvailabilityMarker;
+    authBootstrap680_.raw08AuxHandleA8 = &sidecar.raw08AuxHandleAvailabilityMarker;
+    authBootstrap680_.fieldAC = &sidecar.raw08AuxHandleAvailabilityMarker;
+}
+
+void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
+    const mxo::auth::AuthChallengeResponseBuildResult& buildResult) {
+    authBootstrap680_.material85 = CopyPrefix16(buildResult.decryptedChallengeBytes);
+}
+
+void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mxo::auth::AuthReply& reply) {
+    authBootstrap680_.fieldF4 = nullptr;
+
+    RecoveredAuthBootstrapSidecarState* sidecar = FindRecoveredAuthBootstrapSidecar(this);
+    if (sidecar) {
+        sidecar->fieldF4Shadow = {};
+    }
+
+    if (reply.isErrorReply || !reply.valid || !reply.hasAuthDataMarker ||
+        reply.authDataMarker != 0x0136u || authBootstrap680_.raw08AuxHandleA8 == nullptr) {
+        return;
+    }
+
+    RecoveredAuthBootstrapSidecarState& materializedSidecar = MutableRecoveredAuthBootstrapSidecar(this);
+    materializedSidecar.fieldF4Shadow.material85 = authBootstrap680_.material85;
+    materializedSidecar.fieldF4Shadow.raw08AuxHandleA8 = authBootstrap680_.raw08AuxHandleA8;
+    authBootstrap680_.fieldF4 = &materializedSidecar.fieldF4Shadow;
+
+    spdlog::info(
+        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold material85='{}' raw08AuxHandle={} authDataMarker=0x{:04x}",
+        BuildHexPreview(
+            materializedSidecar.fieldF4Shadow.material85.data(),
+            materializedSidecar.fieldF4Shadow.material85.size(),
+            materializedSidecar.fieldF4Shadow.material85.size()),
+        fmt::ptr(materializedSidecar.fieldF4Shadow.raw08AuxHandleA8),
+        static_cast<unsigned>(reply.authDataMarker));
 }
 
 // UNANCHORED: source-owned table mirror fed from parsed auth reply worlds
@@ -2148,6 +2248,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             lastAuthPublicKeyReply_ = reply;
             authCurrentPublicKeyId_ = reply.publicKeyId;
             SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
+            SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(reply);
             Log(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status=%u currentTime=%u publicKeyId=%u keySize=%u modulusLength=%u signatureLength=%u exponentByte=0x%02x hasEmbeddedPublicKey=%u",
                 (unsigned)reply.status,
@@ -2326,6 +2427,7 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     }
 
     lastAuthReply_ = reply;
+    SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
     ResetMarginBootstrapState();
     MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
     if (!mxo::auth::DecryptAuthReplyPrivateExponent(

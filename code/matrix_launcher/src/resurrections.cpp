@@ -103,7 +103,20 @@ extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase);
 
 void Log(const char* fmt, ...);
 
+#ifndef DBG_PRINTEXCEPTION_C
+#define DBG_PRINTEXCEPTION_C ((DWORD)0x40010006)
+#endif
+#ifndef DBG_PRINTEXCEPTION_WIDE_C
+#define DBG_PRINTEXCEPTION_WIDE_C ((DWORD)0x4001000A)
+#endif
+
+static constexpr DWORD kMsvcThreadNameException = 0x406d1388u;
+
 static void LogWordSpan(const char* label, const void* base, size_t wordCount);
+static const char* DiagnosticExceptionCodeName(DWORD exceptionCode);
+static const char* DiagnosticExceptionClassification(DWORD exceptionCode);
+static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTERS* exceptionInfo);
+static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo);
 
 template <typename T>
@@ -144,19 +157,60 @@ static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
     }
 }
 
-static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
-    if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
-        Log("DIAGNOSTIC: unhandled exception filter invoked with incomplete state");
-        return EXCEPTION_CONTINUE_SEARCH;
+static const char* DiagnosticExceptionCodeName(DWORD exceptionCode) {
+    switch (exceptionCode) {
+        case EXCEPTION_ACCESS_VIOLATION: return "EXCEPTION_ACCESS_VIOLATION";
+        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: return "EXCEPTION_ARRAY_BOUNDS_EXCEEDED";
+        case EXCEPTION_BREAKPOINT: return "EXCEPTION_BREAKPOINT";
+        case EXCEPTION_DATATYPE_MISALIGNMENT: return "EXCEPTION_DATATYPE_MISALIGNMENT";
+        case EXCEPTION_FLT_DENORMAL_OPERAND: return "EXCEPTION_FLT_DENORMAL_OPERAND";
+        case EXCEPTION_FLT_DIVIDE_BY_ZERO: return "EXCEPTION_FLT_DIVIDE_BY_ZERO";
+        case EXCEPTION_FLT_INEXACT_RESULT: return "EXCEPTION_FLT_INEXACT_RESULT";
+        case EXCEPTION_FLT_INVALID_OPERATION: return "EXCEPTION_FLT_INVALID_OPERATION";
+        case EXCEPTION_FLT_OVERFLOW: return "EXCEPTION_FLT_OVERFLOW";
+        case EXCEPTION_FLT_STACK_CHECK: return "EXCEPTION_FLT_STACK_CHECK";
+        case EXCEPTION_FLT_UNDERFLOW: return "EXCEPTION_FLT_UNDERFLOW";
+        case EXCEPTION_ILLEGAL_INSTRUCTION: return "EXCEPTION_ILLEGAL_INSTRUCTION";
+        case EXCEPTION_IN_PAGE_ERROR: return "EXCEPTION_IN_PAGE_ERROR";
+        case EXCEPTION_INT_DIVIDE_BY_ZERO: return "EXCEPTION_INT_DIVIDE_BY_ZERO";
+        case EXCEPTION_INT_OVERFLOW: return "EXCEPTION_INT_OVERFLOW";
+        case EXCEPTION_INVALID_DISPOSITION: return "EXCEPTION_INVALID_DISPOSITION";
+        case EXCEPTION_NONCONTINUABLE_EXCEPTION: return "EXCEPTION_NONCONTINUABLE_EXCEPTION";
+        case EXCEPTION_PRIV_INSTRUCTION: return "EXCEPTION_PRIV_INSTRUCTION";
+        case EXCEPTION_SINGLE_STEP: return "EXCEPTION_SINGLE_STEP";
+        case EXCEPTION_STACK_OVERFLOW: return "EXCEPTION_STACK_OVERFLOW";
+        case DBG_PRINTEXCEPTION_C: return "DBG_PRINTEXCEPTION_C";
+        case DBG_PRINTEXCEPTION_WIDE_C: return "DBG_PRINTEXCEPTION_WIDE_C";
+        default: break;
     }
 
+    if (exceptionCode == kMsvcThreadNameException) {
+        return "MSVC_THREAD_NAME_EXCEPTION";
+    }
+
+    return "unknown";
+}
+
+static const char* DiagnosticExceptionClassification(DWORD exceptionCode) {
+    if (exceptionCode == kMsvcThreadNameException) {
+        return "debugger thread-name notification";
+    }
+    if (exceptionCode == DBG_PRINTEXCEPTION_C || exceptionCode == DBG_PRINTEXCEPTION_WIDE_C) {
+        return "debugger print notification";
+    }
+    return "ordinary exception";
+}
+
+static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTERS* exceptionInfo) {
     EXCEPTION_RECORD* record = exceptionInfo->ExceptionRecord;
     CONTEXT* context = exceptionInfo->ContextRecord;
 
-    Log("=== Unhandled exception ===");
+    Log("=== %s ===", heading);
     Log(
-        "exception code=%08lx flags=%08lx address=%p",
+        "exception code=%08lx (%s) classification=%s flags=%08lx address=%p",
         (unsigned long)record->ExceptionCode,
+        DiagnosticExceptionCodeName(record->ExceptionCode),
+        DiagnosticExceptionClassification(record->ExceptionCode),
         (unsigned long)record->ExceptionFlags,
         record->ExceptionAddress);
     if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->NumberParameters >= 2) {
@@ -193,7 +247,7 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
             (unsigned long)mbi.Type);
     }
 
-    LogWordSpan("crash stack", reinterpret_cast<const void*>(context->Esp), 16);
+    LogWordSpan("exception stack", reinterpret_cast<const void*>(context->Esp), 16);
     if (g_LauncherCommandLine.FilteredArgv()) {
         LogWordSpan("current arg2 filteredArgv", g_LauncherCommandLine.FilteredArgv(), 4);
     }
@@ -203,7 +257,25 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
     if (g_pILTLoginMediatorDefault) {
         LogWordSpan("current arg6 mediator", g_pILTLoginMediatorDefault, 8);
     }
+}
 
+static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo) {
+    if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
+        Log("DIAGNOSTIC: vectored exception handler invoked with incomplete state");
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    LogDiagnosticExceptionSnapshot("Vectored exception (continuing search)", exceptionInfo);
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo) {
+    if (!exceptionInfo || !exceptionInfo->ExceptionRecord || !exceptionInfo->ContextRecord) {
+        Log("DIAGNOSTIC: unhandled exception filter invoked with incomplete state");
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    LogDiagnosticExceptionSnapshot("Unhandled exception", exceptionInfo);
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
@@ -697,7 +769,7 @@ int main(int argc, char* argv[]) {
         spdlog::flush_on(spdlog::level::debug);
     } catch (const spdlog::spdlog_ex&) {
     }
-    AddVectoredExceptionHandler(1, reinterpret_cast<PVECTORED_EXCEPTION_HANDLER>(DiagnosticUnhandledExceptionFilter));
+    AddVectoredExceptionHandler(1, DiagnosticVectoredExceptionHandler);
     SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
 
     Log("Matrix Online launcher reimplementation scaffold");

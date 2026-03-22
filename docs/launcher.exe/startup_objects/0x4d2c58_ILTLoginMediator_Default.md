@@ -261,6 +261,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x40` | returns selection-descriptor object for the arg7-derived selection index, including name + low-24-bit id data | medium |
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
+| `+0x50` | later runtime distributed-object/RCC path calls this as a nullable pointer getter; `client.dll:0x625c86d0` converts non-null into flag `0x30`, and launcher-side static analysis currently maps it to `owner +0x680 -> +0xf4 -> +0xa8` when present | high |
 | `+0x58` | string-producing helper in early init logging/config path | medium |
 | `+0x5c` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
 | `+0x60` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
@@ -279,6 +280,22 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x18c` | later callback84-side writer queried indirectly through `ClientNetShell +0x38`; fills client scratch buffer later surfaced as pair `(&0x629e0284, 0x20)`; active replacement now source-owns the state9-gated blob fill closely enough to run it live | high |
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
+
+New late-runtime crash consequence from the current in-game path:
+- replacement-launcher crash dumps `MatrixOnline_0.0_crash_95.dmp` / `_96.dmp` now pin one missing arg6 ABI slot concretely
+- both dumps stop at `EIP=0x00000000` with top return address `0x625c86db`
+- direct disassembly of `client.dll:0x625c86d0` shows:
+  - load resolved mediator global `0x629df7f0`
+  - call mediator vtable `+0x50`
+  - convert null/non-null into `0` or `0x30`
+- so a null **function pointer** at arg6 `+0x50`, not merely a null return value, is enough to produce that crash shape
+- this makes arg6 `+0x50` a proven required late-runtime surface on the active in-game path
+- newer launcher-side bootstrap review now tightens the original producer chain behind that getter too:
+  - post-`0x07` bootstrap path `0x47f50 -> 0x47780` materializes the broader `+0xa0/+0xa8/+0xac` helper family
+  - later challenge path `0x4429b0` writes the shared `+0x85` material family
+  - later auth-reply bootstrap handler `0x448140` validates a `0x136` block and heap-copies it into bootstrap `+0xf4`
+  - only after that does `0x41f370` expose `+0xf4 -> +0xa8`
+- the replacement now mirrors that timing more closely by keeping `+0x50` null until successful auth-reply adoption instead of returning a permanent flat null stub
 
 Current practical note on `+0x120`:
 - newer static review places one `+0x120` use inside a broader loading-character path (`0x620547c0..0x62054eac`) that also directly reads client-side `CreateCharacterWorldIndex` current value `0x629e1cb0`

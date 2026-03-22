@@ -250,6 +250,22 @@ public:
         uint8_t flag6C = 0;
     };
 
+    struct AuthBootstrapReplyShadowF4Sketch {
+        // Bounded source-owned mirror of the heap block copied into bootstrap `+0xf4` by the
+        // opcode-`0x0b` / auth-reply bootstrap handler (`0x448140`).
+        //
+        // Current strongest anchored fields inside that copied `0x136` block are exactly the two
+        // later mediator-vtable exposures we care about on the active runtime path:
+        // - `+0x85 .. +0x94` = challenge-material family
+        // - `+0xa8`         = raw08 aux-handle / availability family
+        std::array<uint8_t, 0x85> prefix00{};
+        std::array<uint8_t, 16> material85{};
+        std::array<uint8_t, 0x13> gap95ToA7{};
+        void* raw08AuxHandleA8 = nullptr;
+    };
+    static_assert(offsetof(AuthBootstrapReplyShadowF4Sketch, material85) == 0x85);
+    static_assert(offsetof(AuthBootstrapReplyShadowF4Sketch, raw08AuxHandleA8) == 0xa8);
+
     struct AuthBootstrapState680Sketch {
         // Current best read of the extra owner child allocated through `0x41290` and stored at
         // owner `+0x680` by `0x41b160`.
@@ -263,6 +279,10 @@ public:
         // - later challenge/crypto continuation `0x429b0`:
         //   - writes 16-byte material to `+0x85`
         //   - derives / caches the current/public key id at `+0x9c` via `0x41470`
+        // - later auth-reply bootstrap handler `0x448140`:
+        //   - validates a parsed `0x136` auth-reply block
+        //   - heap-copies that block into `+0xf4`
+        //   - later mediator getters `0x41f370` / `0x41f3a0` surface `+0xf4 -> +0xa8/+0x85`
         //
         // Current field sketch from launcher.exe:0x45500 + launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch + launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest + launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest:
         std::string string04;               // `+0x04`
@@ -280,11 +300,11 @@ public:
         uint32_t currentPublicKeyId9C = 0;  // `+0x9c`
         void* helperA0 = nullptr;           // `+0xa0`
         void* lazyRaw06StateA4 = nullptr;   // `+0xa4`
-        void* raw08AuxHandleA8 = nullptr;   // `+0xa8`; still provisional, but now clearly near the shared transform/parameter family, not just a string helper
-        uint32_t fieldAC = 0;               // `+0xac`
+        void* raw08AuxHandleA8 = nullptr;   // `+0xa8`; current best source-owned mirror of the availability/worker family created on the post-`0x07` path (`0x47f50 -> 0x47780`)
+        void* fieldAC = nullptr;            // `+0xac`; sibling helper/object family paired with `+0xa8` on the same post-`0x07` path
         uint32_t stateFlagEC = 1;           // `+0xec` from base ctor `0x45500`
         void* fieldF0 = nullptr;            // `+0xf0`
-        void* fieldF4 = nullptr;            // `+0xf4`; pointer to the shared source/adapter object whose `+0x85/+0xa8` are surfaced by mediator `+0x5c/+0x50`
+        void* fieldF4 = nullptr;            // `+0xf4`; pointer to the auth-reply-derived block whose `+0x85/+0xa8` are surfaced later by mediator `+0x5c/+0x50`; keep the replacement mirror in sidecar storage so the owner size stays stable
         void* fieldF8 = nullptr;            // `+0xf8`; companion bootstrap pointer surfaced by mediator `+0x60`, precise role still open
         void* fieldFC = nullptr;            // `+0xfc`
         void* field100 = nullptr;           // `+0x100`
@@ -1032,6 +1052,13 @@ public:
     uint32_t State6UdpSessionSecretF18() const;
     void SetState6UdpSessionSecretF18(uint32_t value);
     bool CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const;
+    // anchor: launcher.exe:0x41f370 / owner vtable +0x50
+    // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
+    // bootstrap `+0xa8` field. Keep that extra level explicit in source too.
+    void* BootstrapRaw08AuxHandle50() const {
+        const auto* fieldF4 = static_cast<const AuthBootstrapReplyShadowF4Sketch*>(authBootstrap680_.fieldF4);
+        return fieldF4 ? fieldF4->raw08AuxHandleA8 : nullptr;
+    }
     const char* CharacterNameBufferF1c() { return postAuthMarginLoadingState_.characterNameBufferF1c; }
     const std::array<uint32_t, 8>& CharacterFlagsF48() { return postAuthMarginLoadingState_.characterFlagsF48; }
     const std::array<uint32_t, 8>& SecondaryCharacterDataF68() { return postAuthMarginLoadingState_.secondaryCharacterDataF68; }
@@ -1065,6 +1092,11 @@ private:
     uint32_t SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge);
     void LogParsedAuthReply(const mxo::auth::AuthReply& reply) const;
     void SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
+    void ResetRecoveredAuthBootstrapDynamicStateScaffold();
+    void SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(const mxo::auth::GetPublicKeyReply& reply);
+    void SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
+        const mxo::auth::AuthChallengeResponseBuildResult& buildResult);
+    void SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mxo::auth::AuthReply& reply);
     void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
