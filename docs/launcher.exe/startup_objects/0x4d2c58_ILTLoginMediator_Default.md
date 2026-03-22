@@ -259,17 +259,25 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x38` | returns profile-root string used by client `Profiles\\%s\\...` formatting path | high |
 | `+0x3c` | returns default selection index when the client asks for `0xff` fallback selection | medium |
 | `+0x40` | returns selection-descriptor object for the arg7-derived selection index, including name + low-24-bit id data | medium |
+| `+0x44` | returns the current character-slot record from owner `+0x688[owner+0xcc8]`; the replacement had to source-own a minimal non-null current-slot record here to get past client `0x62197560` on the live `mcd.cfg` save path | high |
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
 | `+0x50` | later runtime distributed-object/RCC path calls this as a nullable pointer getter; `client.dll:0x625c86d0` converts non-null into flag `0x30`, and launcher-side static analysis currently maps it to `owner +0x680 -> +0xf4 -> +0xa8` when present | high |
 | `+0x58` | string-producing helper in early init logging/config path | medium |
 | `+0x5c` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
 | `+0x60` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
+| `+0x8c` | live `mcd.cfg` mediator-backed gate; original `client.dll:0x62198fa0` calls this first and branches to on-disk fallback only when it returns `0`; launcher getter is now anchored as `0x41f150` returning owner byte `+0x1452` | high |
+| `+0xbc` | live `mcd.cfg` mediator-backed header getter; original `client.dll:0x62198fa0` copies `0x20` bytes from here into `DAT_629ea67c`; launcher getter is now anchored as `0x41f170` returning owner `+0xf48` | high |
+| `+0xc0` | live `mcd.cfg` mediator-backed body getter; original `client.dll:0x62198fa0` copies `0x465` bytes from here into its local/global `mcd` body state; launcher getter is now anchored as `0x41f180` returning owner `+0xf88` | high |
+| `+0xc4` | live `mcd.cfg` mediator-backed overflow-tail getter; original `client.dll:0x62198fa0` asks for pointer+length here; launcher getter is now anchored as `0x41aec0` returning owner `+0x13f0` and optional out-length `+0x13f4` | high |
+| `+0xc8` | sibling state8 section-`0x0b` bool getter; launcher getter now anchored as `0x41f190` testing owner dword `+0x145c` | medium |
+| `+0xcc` | sibling state8 section-`0x0b` dword getter; launcher getter now anchored as `0x41f1a0` returning owner dword `+0x145c` | medium |
+| `+0xd0` | sibling state8 section-`0x0b` small-string-like getter; launcher getter now anchored as `0x41f1b0` returning owner `+0x1460` | medium |
 | `+0xd4` | state9 follow-on client path (`0x620065e0`) fetches a 16-byte pointer here, then packages it through `0x62530630`; current best read = same launcher-owned Twofish seed/key family reused by state9 callback/blob work | medium |
 | `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
 | `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
-| `+0xf4` | later runtime/profile paths treat return value like a broader profile / character-info block: current client-side proof uses the base as a C-string and also reads strings at `+0x70/+0x90/+0xb0` for UI + `mcd.cfg` persistence; the older plain selection/config-snapshot read is now known to be incomplete | high |
+| `+0xf4` | later runtime/profile paths treat return value like a broader profile / character-info block; launcher getter is now anchored as `0x41f1c0 = return owner + 0xf1c`, while the real producer is the earlier state8/load-character reply path `0x43f930` that materializes the broader `+0xf1c/+0xf48/+0xf88/+0x13f0` family later consumed by UI + `mcd.cfg` persistence | high |
 | `+0x120` | later loading-character path passes a large stack-built state object here before UI teardown / transition work | medium |
 | `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
 | `+0x13c` | `WaitForEvent` loop pump; calls launcher owner helper `+0x65c` vtable `+0x04` when present (`0x4202c0`) | medium |
@@ -593,7 +601,23 @@ That materially strengthens the interpretation that:
   Newer client-side UI/persistence proof later tightens that further:
   - `client.dll:0x620f1c60` (`P` / character-info dialog family) calls `arg6->+0xf4`, treats the base return value like a C-string, and also reads strings at `+0x70` and `+0x90`
   - `client.dll:0x62197830` (`mcd.cfg` persistence family) calls `arg6->+0xf4` and copies strings from `+0x70`, `+0x90`, and `+0xb0` into the saved profile file
-  - practical consequence: replacement `+0xf4` work should now target a **late profile / character-info block** shape first, not only the copied `+0xec` selection blob
+  - newer live original WineDbg now closes the getter itself too:
+    - original run reached `client.dll:0x62198fa0`
+    - took the mediator-backed branch (`+0x8c != 0`), not the on-disk fallback
+    - then called launcher getters in this exact order:
+      - `+0xbc -> 0x41f170 -> owner +0xf48`
+      - `+0xc0 -> 0x41f180 -> owner +0xf88`
+      - `+0xc4 -> 0x41aec0 -> owner +0x13f0` with out-length from `+0x13f4`
+      - then entered `0x62197830`
+    - static review plus the same bounded vtable recovery also close `+0xf4` itself:
+      - `+0xf4 -> 0x41f1c0 = return owner +0xf1c`
+      - so the real missing/interesting producer is not a late ad-hoc `+0xf4` builder, but the earlier owner materialization path, currently best anchored as state8/load-character reply `0x43f930`
+  - practical consequence: replacement work should now target the **owner `+0xf1c/+0xf48/+0xf88/+0x13f0` persistence family** first, not only a free-standing synthetic `+0xf4` string block
+  - source ownership/logging consequence:
+    - replacement source now keeps focused persistence-family logs at both ends of that bridge
+    - producer-side logs live in `CLTLoginState_State8::Slot6_HandleSecondaryMessage`
+    - getter-side logs live in launcher arg6 slots `+0xbc/+0xc0/+0xc4/+0xf4`
+    - those are meant as future grep-able anchors if later in-game regressions disturb the same family
 
 ### What the newer reruns showed
 

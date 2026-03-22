@@ -222,13 +222,21 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
         (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu),
         recentEventsPreview.c_str());
 
-    // Current implementation keeps observer dispatch deliberately late-scoped:
+    // Current implementation keeps observer dispatch deliberately narrow and evidence-backed:
     // - client-facing `+0x170/+0x174` registration is now source-owned
-    // - but broad event fanout is still risky because early observers remain under-typed
-    // - so only the active late-login continuation events are dispatched through this bridge
-    if (eventId == 0x18u || eventId == 0x0fu) {
+    // - newer `mcd.cfg` persistence tightening makes one more event concretely valuable here:
+    //   original client-side save family `0x62199ed0 -> 0x62198fa0 -> 0x62197830` is reached
+    //   from client event handler `0x621707e0` on event `0x0b` (and sibling `0x16`)
+    // - active existing-character path posts `0x0b` immediately after the state8 -> helper9 switch
+    // - so keep the bridge narrow, but now include `0x0b` alongside the already-proven later
+    //   observer-driven `0x18/0x0f` work
+    if (eventId == 0x0bu || eventId == 0x18u || eventId == 0x0fu) {
         const std::vector<void*> observers = registeredObservers;
         for (void* observer : observers) {
+            spdlog::info(
+                "CLTLoginMediator::PostEventScaffold dispatching observer={} event=0x{:02x}",
+                fmt::ptr(observer),
+                static_cast<unsigned>(eventId & 0xffu));
             DispatchLoginObserverEvent(observer, eventId);
         }
     }

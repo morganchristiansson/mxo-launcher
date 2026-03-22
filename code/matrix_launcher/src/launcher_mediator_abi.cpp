@@ -73,21 +73,43 @@ struct DiagnosticMediatorSelectionContextCopy {
 static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
 static DiagnosticMediatorSelectionObject g_MediatorSelectionObject = {};
 
-struct __attribute__((packed)) DiagnosticMediatorCharacterSelectionPacked {
+struct __attribute__((packed)) DiagnosticMediatorCurrentSlotRecordPayload {
     uint8_t reserved0;
     uint8_t reserved1;
     uint8_t reserved2;
-    uint32_t characterIdLow03;
-    uint32_t characterIdHigh07;
+    uint32_t characterIdLow03;  // payload `+0x03`
+    uint32_t characterIdHigh07; // payload `+0x07`
+    uint8_t status0b;           // payload `+0x0b`
+    uint16_t worldId0c;         // payload `+0x0c`
+    uint8_t reserved0e;
+    uint8_t reserved0f;
 };
 
-struct DiagnosticMediatorCharacterSelectionObject {
-    uint8_t reserved[0x10];
-    DiagnosticMediatorCharacterSelectionPacked* packed; // client profile-path family reads id dwords via packed +0x03/+0x07
+struct DiagnosticMediatorCurrentSlotRecordObject {
+    void** vtable;                                      // object `+0x00`
+    void* bufferBase04;                                 // object `+0x04`
+    void* backingObject08;                              // object `+0x08`
+    uint8_t flag0c;                                     // object `+0x0c`
+    uint8_t padding0d[3];
+    DiagnosticMediatorCurrentSlotRecordPayload* payload10; // object `+0x10`
+    const char* heapString14;                           // object `+0x14`
+    uint16_t heapStringLen18;                           // object `+0x18`
+    uint8_t padding1a[2];
 };
 
-static DiagnosticMediatorCharacterSelectionPacked g_MediatorCharacterSelectionPacked = {0, 0, 0, 0, 0};
-static DiagnosticMediatorCharacterSelectionObject g_MediatorCharacterSelectionObject = {};
+static_assert(offsetof(DiagnosticMediatorCurrentSlotRecordPayload, characterIdLow03) == 0x03);
+static_assert(offsetof(DiagnosticMediatorCurrentSlotRecordPayload, characterIdHigh07) == 0x07);
+static_assert(offsetof(DiagnosticMediatorCurrentSlotRecordPayload, status0b) == 0x0b);
+static_assert(offsetof(DiagnosticMediatorCurrentSlotRecordPayload, worldId0c) == 0x0c);
+static_assert(offsetof(DiagnosticMediatorCurrentSlotRecordObject, payload10) == 0x10);
+static_assert(offsetof(DiagnosticMediatorCurrentSlotRecordObject, heapString14) == 0x14);
+static_assert(offsetof(DiagnosticMediatorCurrentSlotRecordObject, heapStringLen18) == 0x18);
+static_assert(sizeof(DiagnosticMediatorCurrentSlotRecordObject) == 0x1c);
+
+static DiagnosticMediatorCurrentSlotRecordPayload g_MediatorCurrentSlotRecordPayload = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+static DiagnosticMediatorCurrentSlotRecordObject g_MediatorCurrentSlotRecordObject = {};
+static void* g_MediatorCurrentSlotRecordVtable[5] = {0};
+static std::string g_MediatorCurrentSlotRecordNameOwned;
 static DiagnosticMediatorSelectionContextCopy g_MediatorSelectionContextCopy = {};
 static bool g_MediatorSelectionContextCopyValid = false;
 
@@ -106,6 +128,8 @@ struct DiagnosticVectorLike {
 static std::string g_MediatorRouteDescriptor10cOwned;
 static DiagnosticSmallStringLike g_MediatorRouteDescriptor10c = {};
 static DiagnosticVectorLike g_MediatorLateEntryList118 = {};
+static std::string g_MediatorState8Section11String1460Owned;
+static DiagnosticSmallStringLike g_MediatorState8Section11String1460 = {};
 
 // UNANCHORED: diagnostic masking helper for auth/password log surfaces.
 static const char* MaskedSensitiveValue(const char* value) {
@@ -116,11 +140,34 @@ static const char* MaskedSensitiveValue(const char* value) {
 using DiagnosticMediatorProfileCharacterInfoF4 =
     mxo::ltlogin::CLTLoginMediator::ProcessLoginCredentialsInputSketch;
 
+static constexpr size_t kDiagnosticMediatorState8BodyF88Size = 0x465;
+static constexpr size_t kDiagnosticMediatorState8OverflowMax13f0 = 0x1000;
+
+struct DiagnosticMediatorState8PersistenceF1c {
+    std::array<char, 0x20> string00{};               // owner `+0xf1c .. +0xf3b`
+    uint32_t field20 = 0;                            // owner `+0xf3c`
+    uint32_t field24 = 0;                            // owner `+0xf40`
+    uint32_t field28 = 0;                            // owner `+0xf44`
+    std::array<uint32_t, 8> header2c{};             // owner `+0xf48 .. +0xf67`
+    std::array<uint32_t, 8> secondary4c{};          // owner `+0xf68 .. +0xf87`
+    std::array<uint8_t, kDiagnosticMediatorState8BodyF88Size> body6c{}; // owner `+0xf88 .. +0x13ec`
+};
+
 static_assert(
     sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch) == kDiagnosticSelectionContextSize,
     "State3SelectionContextInputSketch must stay layout-compatible with the recovered arg6 +0xec 0xb4 snapshot");
+static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, string00) == 0x00);
+static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, field20) == 0x20);
+static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, field24) == 0x24);
+static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, field28) == 0x28);
+static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, header2c) == 0x2c);
+static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, secondary4c) == 0x4c);
+static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, body6c) == 0x6c);
 
 static DiagnosticMediatorProfileCharacterInfoF4 g_MediatorProfileCharacterInfoF4 = {};
+static DiagnosticMediatorState8PersistenceF1c g_MediatorState8PersistenceF1c = {};
+static std::array<uint8_t, kDiagnosticMediatorState8OverflowMax13f0> g_MediatorState8Overflow13f0 = {};
+static uint16_t g_MediatorState8Overflow13f4 = 0u;
 
 template <size_t N>
 static void CopyCStringIntoFixed(std::array<char, N>& dest, const char* src) {
@@ -134,6 +181,22 @@ static void CopyCStringIntoFixed(std::array<char, N>& dest, const char* src) {
     dest[copyCount] = '\0';
 }
 
+static void CopyCStringIntoByteSpan(uint8_t* dest, size_t destSize, const char* src) {
+    if (!dest || destSize == 0u) {
+        return;
+    }
+
+    std::memset(dest, 0, destSize);
+    if (!src || !src[0]) {
+        return;
+    }
+
+    const size_t sourceLength = std::char_traits<char>::length(src);
+    const size_t copyCount = (sourceLength < (destSize - 1u)) ? sourceLength : (destSize - 1u);
+    std::memcpy(dest, src, copyCount);
+    dest[copyCount] = '\0';
+}
+
 static const char* PreferNonEmpty(const char* primary, const char* fallback) {
     return (primary && primary[0]) ? primary : fallback;
 }
@@ -144,6 +207,13 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
         g_DiagnosticMediatorModel = new mxo::ltlogin::CLTLoginMediator();
     }
     return g_DiagnosticMediatorModel;
+}
+
+static mxo::ltlogin::CLTLoginMediator* DiagnosticGetActiveMediatorForCharacterState() {
+    if (mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticAuthGetLoginController()) {
+        return loginController;
+    }
+    return DiagnosticEnsureMediatorModel();
 }
 
 // UNANCHORED: trivial accessors into the recovered CLTLoginMediator sidecar model.
@@ -266,7 +336,7 @@ static const char* DescribeMediatorCaller(void* returnAddress) {
 }
 
 static void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     if (!mediator) {
         return;
     }
@@ -335,7 +405,7 @@ static void LogMediatorNameGetterDetails(
 static void PopulateMediatorProfileCharacterInfoF4() {
     g_MediatorProfileCharacterInfoF4 = {};
 
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const char* characterName = nullptr;
     const char* realFirstName = nullptr;
     const char* realLastName = nullptr;
@@ -394,6 +464,123 @@ static void PopulateMediatorProfileCharacterInfoF4() {
     if (g_MediatorProfileCharacterInfoF4.field24 == 0u) {
         g_MediatorProfileCharacterInfoF4.field24 = DiagnosticMediatorSelectedWorldIndexLow24();
     }
+}
+
+static void PopulateMediatorState8PersistenceF1c() {
+    PopulateMediatorProfileCharacterInfoF4();
+    g_MediatorState8PersistenceF1c = {};
+    g_MediatorState8Overflow13f0.fill(0u);
+    g_MediatorState8Overflow13f4 = 0u;
+    g_MediatorState8Section11String1460Owned.clear();
+    g_MediatorState8Section11String1460 = {};
+
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
+    const char* characterName = g_MediatorProfileCharacterInfoF4.string00.data();
+    const char* firstName = g_MediatorProfileCharacterInfoF4.string70.data();
+    const char* lastName = g_MediatorProfileCharacterInfoF4.string90.data();
+    const char* background = g_MediatorProfileCharacterInfoF4.stringB0.data();
+
+    if (!mediator) {
+        CopyCStringIntoFixed(g_MediatorState8PersistenceF1c.string00, characterName);
+        g_MediatorState8PersistenceF1c.field24 = g_MediatorProfileCharacterInfoF4.field24;
+        CopyCStringIntoByteSpan(g_MediatorState8PersistenceF1c.body6c.data() + 0x04, 0x20, firstName);
+        CopyCStringIntoByteSpan(g_MediatorState8PersistenceF1c.body6c.data() + 0x24, 0x20, lastName);
+        CopyCStringIntoByteSpan(g_MediatorState8PersistenceF1c.body6c.data() + 0x44, 0x400, background);
+        return;
+    }
+
+    const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
+    characterName = PreferNonEmpty(ownerState.characterNameBufferF1c, characterName);
+    firstName = PreferNonEmpty(g_MediatorProfileCharacterInfoF4.string70.data(), firstName);
+    lastName = PreferNonEmpty(g_MediatorProfileCharacterInfoF4.string90.data(), lastName);
+    background = PreferNonEmpty(g_MediatorProfileCharacterInfoF4.stringB0.data(), background);
+
+    CopyCStringIntoFixed(g_MediatorState8PersistenceF1c.string00, characterName);
+    g_MediatorState8PersistenceF1c.field20 = ownerState.characterReplyFieldF3c;
+    g_MediatorState8PersistenceF1c.field24 =
+        ownerState.characterReplyFieldF40 ? ownerState.characterReplyFieldF40 : g_MediatorProfileCharacterInfoF4.field24;
+    g_MediatorState8PersistenceF1c.field28 = 0u;
+    std::copy(
+        ownerState.characterFlagsF48.begin(),
+        ownerState.characterFlagsF48.end(),
+        g_MediatorState8PersistenceF1c.header2c.begin());
+    std::copy(
+        ownerState.secondaryCharacterDataF68.begin(),
+        ownerState.secondaryCharacterDataF68.end(),
+        g_MediatorState8PersistenceF1c.secondary4c.begin());
+    std::memcpy(
+        g_MediatorState8PersistenceF1c.body6c.data(),
+        ownerState.state8Section0RawF88.data(),
+        g_MediatorState8PersistenceF1c.body6c.size());
+
+    CopyCStringIntoByteSpan(g_MediatorState8PersistenceF1c.body6c.data() + 0x04, 0x20, firstName);
+    CopyCStringIntoByteSpan(g_MediatorState8PersistenceF1c.body6c.data() + 0x24, 0x20, lastName);
+    CopyCStringIntoByteSpan(g_MediatorState8PersistenceF1c.body6c.data() + 0x44, 0x400, background);
+
+    if (ownerState.replySectionData13cc != 0u) {
+        std::memcpy(
+            g_MediatorState8PersistenceF1c.body6c.data() + 0x444,
+            &ownerState.replySectionData13cc,
+            sizeof(uint32_t));
+    }
+    if (ownerState.replySectionData13d0 != 0u) {
+        std::memcpy(
+            g_MediatorState8PersistenceF1c.body6c.data() + 0x448,
+            &ownerState.replySectionData13d0,
+            sizeof(uint32_t));
+    }
+
+    if (ownerState.state8Section0OverflowBuffer13f0 != nullptr && ownerState.state8Section0OverflowLength13f4 != 0u) {
+        g_MediatorState8Overflow13f4 = std::min<uint16_t>(
+            ownerState.state8Section0OverflowLength13f4,
+            static_cast<uint16_t>(g_MediatorState8Overflow13f0.size()));
+        std::memcpy(
+            g_MediatorState8Overflow13f0.data(),
+            ownerState.state8Section0OverflowBuffer13f0,
+            g_MediatorState8Overflow13f4);
+    }
+
+    g_MediatorState8Section11String1460Owned = ownerState.state8Section11String1460;
+    if (!g_MediatorState8Section11String1460Owned.empty()) {
+        const char* begin = g_MediatorState8Section11String1460Owned.c_str();
+        g_MediatorState8Section11String1460.begin = begin;
+        g_MediatorState8Section11String1460.current = begin + g_MediatorState8Section11String1460Owned.size();
+        g_MediatorState8Section11String1460.capacity = g_MediatorState8Section11String1460.current;
+    }
+}
+
+static uint32_t DiagnosticReadMediatorState8PersistenceBodyDword(size_t offset) {
+    uint32_t value = 0u;
+    if (offset + sizeof(value) <= g_MediatorState8PersistenceF1c.body6c.size()) {
+        std::memcpy(&value, g_MediatorState8PersistenceF1c.body6c.data() + offset, sizeof(value));
+    }
+    return value;
+}
+
+static void LogMediatorState8PersistenceSummary(const char* slotLabel, void* returnAddress) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    Log(
+        "MediatorStub::%s caller=%p [%s] persistence{f1c='%s' f3c=0x%08x f40=0x%08x f48[0..3]=[%08x %08x %08x %08x] f68[0..1]=[%08x %08x] f88_00=0x%08x f88_444=0x%08x f88_448=0x%08x overflow13f4=0x%04x gate1452=%u sec11_145c=0x%08x sec11_len=%u}",
+        slotLabel ? slotLabel : "State8Persistence",
+        returnAddress,
+        DescribeMediatorCaller(returnAddress),
+        NonEmptyOrPlaceholder(g_MediatorState8PersistenceF1c.string00.data()),
+        (unsigned)g_MediatorState8PersistenceF1c.field20,
+        (unsigned)g_MediatorState8PersistenceF1c.field24,
+        (unsigned)g_MediatorState8PersistenceF1c.header2c[0],
+        (unsigned)g_MediatorState8PersistenceF1c.header2c[1],
+        (unsigned)g_MediatorState8PersistenceF1c.header2c[2],
+        (unsigned)g_MediatorState8PersistenceF1c.header2c[3],
+        (unsigned)g_MediatorState8PersistenceF1c.secondary4c[0],
+        (unsigned)g_MediatorState8PersistenceF1c.secondary4c[1],
+        (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x00),
+        (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x444),
+        (unsigned)DiagnosticReadMediatorState8PersistenceBodyDword(0x448),
+        (unsigned)g_MediatorState8Overflow13f4,
+        ownerState ? (unsigned)ownerState->flag1452 : 0u,
+        ownerState ? (unsigned)ownerState->state8Section11Dword145c : 0u,
+        ownerState ? (unsigned)ownerState->state8Section11String1460.size() : 0u);
 }
 
 // UNANCHORED: masks reflected password arguments in mediator-chain logs.
@@ -520,8 +707,16 @@ static void LogSelectionContextDetails(const void* selectionContext, uint32_t by
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
     std::memset(&g_MediatorSelectionObject, 0, sizeof(g_MediatorSelectionObject));
+    std::memset(&g_MediatorCurrentSlotRecordObject, 0, sizeof(g_MediatorCurrentSlotRecordObject));
     std::memset(&g_MediatorSelectionContextCopy, 0, sizeof(g_MediatorSelectionContextCopy));
     g_MediatorProfileCharacterInfoF4 = {};
+    g_MediatorState8PersistenceF1c = {};
+    g_MediatorState8Overflow13f0.fill(0u);
+    g_MediatorState8Overflow13f4 = 0u;
+    g_MediatorState8Section11String1460Owned.clear();
+    g_MediatorState8Section11String1460 = {};
+    g_MediatorCurrentSlotRecordPayload = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    g_MediatorCurrentSlotRecordNameOwned.clear();
     g_MediatorSelectionContextCopyValid = false;
     delete g_DiagnosticMediatorModel;
     g_DiagnosticMediatorModel = new mxo::ltlogin::CLTLoginMediator();
@@ -719,6 +914,99 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
     return &g_MediatorSelectionObject;
 }
 
+static uint32_t __thiscall MediatorCurrentSlotRecord_Destroy(DiagnosticMediatorCurrentSlotRecordObject* self) {
+    (void)self;
+    return 1u;
+}
+
+static uint32_t __thiscall MediatorCurrentSlotRecord_TinyGetter(DiagnosticMediatorCurrentSlotRecordObject* self) {
+    (void)self;
+    return 0u;
+}
+
+static uint32_t __thiscall MediatorCurrentSlotRecord_AppendDebugString(DiagnosticMediatorCurrentSlotRecordObject* self) {
+    (void)self;
+    return 1u;
+}
+
+static uint32_t __thiscall MediatorCurrentSlotRecord_ResetPayloadForSourceDescriptor(DiagnosticMediatorCurrentSlotRecordObject* self) {
+    (void)self;
+    return 1u;
+}
+
+static uint32_t __thiscall MediatorCurrentSlotRecord_TinyHelper(DiagnosticMediatorCurrentSlotRecordObject* self) {
+    (void)self;
+    return 0u;
+}
+
+static void PopulateMediatorCurrentSlotRecordObject() {
+    g_MediatorCurrentSlotRecordPayload = {0, 0, 0, 0, 0, 0, 0, 0, 0};
+    g_MediatorCurrentSlotRecordObject = {};
+    g_MediatorCurrentSlotRecordObject.vtable = g_MediatorCurrentSlotRecordVtable;
+    g_MediatorCurrentSlotRecordObject.payload10 = &g_MediatorCurrentSlotRecordPayload;
+    g_MediatorCurrentSlotRecordNameOwned.clear();
+
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
+    const mxo::ltlogin::CLTLoginMediator::SlotRecordState004b5328* currentSlotRecord =
+        mediator ? mediator->GetCurrentSlotRecord() : nullptr;
+    if (!currentSlotRecord && mediator) {
+        currentSlotRecord = mediator->GetSlotRecordByIndex(0u);
+    }
+
+    if (currentSlotRecord) {
+        g_MediatorCurrentSlotRecordPayload.characterIdLow03 = currentSlotRecord->globalCharacterIdLow03;
+        g_MediatorCurrentSlotRecordPayload.characterIdHigh07 = currentSlotRecord->globalCharacterIdHigh07;
+        g_MediatorCurrentSlotRecordPayload.status0b = currentSlotRecord->status0b;
+        g_MediatorCurrentSlotRecordPayload.worldId0c = currentSlotRecord->worldId0c;
+        g_MediatorCurrentSlotRecordNameOwned = currentSlotRecord->heapString14;
+    } else {
+        g_MediatorCurrentSlotRecordPayload.characterIdLow03 = DiagnosticAuthCurrentCharacterIdLow();
+        g_MediatorCurrentSlotRecordPayload.characterIdHigh07 = DiagnosticAuthCurrentCharacterIdHigh();
+        const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
+        if (authCharacterName && authCharacterName[0]) {
+            g_MediatorCurrentSlotRecordNameOwned = authCharacterName;
+        }
+    }
+
+    if (!g_MediatorCurrentSlotRecordNameOwned.empty()) {
+        g_MediatorCurrentSlotRecordObject.heapString14 = g_MediatorCurrentSlotRecordNameOwned.c_str();
+        const size_t nameLength = g_MediatorCurrentSlotRecordNameOwned.size();
+        g_MediatorCurrentSlotRecordObject.heapStringLen18 =
+            static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
+    }
+}
+
+// anchor: launcher.exe:0x41f300
+// vtable: ILTLoginMediator.Default slot +0x44
+// Current mcd.cfg crash stopper: `client.dll:0x62197560` only gates on non-null here before the
+// later dirty-corpus save walk continues into the actual save-enable/save-writer chain.
+static void* __thiscall Mediator_GetCurrentSlotRecord44(MinimalLoginMediatorStub* self) {
+    (void)self;
+    void* returnAddress = __builtin_return_address(0);
+    PopulateMediatorCurrentSlotRecordObject();
+
+    const bool hasCurrentSlot =
+        g_MediatorCurrentSlotRecordObject.heapString14 != nullptr ||
+        g_MediatorCurrentSlotRecordPayload.characterIdLow03 != 0u ||
+        g_MediatorCurrentSlotRecordPayload.characterIdHigh07 != 0u;
+    const void* currentSlotRecordPtr = hasCurrentSlot
+        ? static_cast<const void*>(&g_MediatorCurrentSlotRecordObject)
+        : nullptr;
+
+    spdlog::info(
+        "MediatorStub::GetCurrentSlotRecord(+0x44) caller={} [{}] -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        fmt::ptr(currentSlotRecordPtr),
+        g_MediatorCurrentSlotRecordObject.heapString14 ? g_MediatorCurrentSlotRecordObject.heapString14 : "<empty>",
+        static_cast<unsigned>(g_MediatorCurrentSlotRecordPayload.characterIdLow03),
+        static_cast<unsigned>(g_MediatorCurrentSlotRecordPayload.characterIdHigh07),
+        static_cast<unsigned>(g_MediatorCurrentSlotRecordPayload.status0b),
+        static_cast<unsigned>(g_MediatorCurrentSlotRecordPayload.worldId0c));
+    LogMediatorCharacterStateContext("GetCurrentSlotRecord(+0x44)", returnAddress);
+    return hasCurrentSlot ? &g_MediatorCurrentSlotRecordObject : nullptr;
+}
+
 // anchor: later client startup path calls arg6 +0x48 before the now-better-understood
 // observer registration / startup-triple handoff sequence
 // vtable: ILTLoginMediator.Default slot +0x48
@@ -819,6 +1107,131 @@ __attribute__((naked)) static void Mediator_GetString2() {
         :
         : "i"(Mediator_GetString2_Impl)
         : "eax");
+}
+
+static uint32_t LogMediatorPreMcdLiveCorpusFlagMissing(const char* slotLabel, void* returnAddress) {
+    spdlog::info(
+        "MediatorStub::{} caller={} [{}] -> 0 [unrecovered pre-mcd live-corpus flag; forcing client fallback-to-disk/default path before 0x62198fa0]",
+        slotLabel ? slotLabel : "<slot>",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress));
+    return 0u;
+}
+
+static void* LogMediatorPreMcdLiveCorpusGetterMissing(
+    const char* slotLabel,
+    void* returnAddress,
+    uint32_t* outLength) {
+    if (outLength) {
+        *outLength = 0u;
+    }
+    spdlog::info(
+        "MediatorStub::{} caller={} [{}] -> {} [length=0 unrecovered pre-mcd live-corpus getter; forcing client fallback-to-disk/default path before 0x62198fa0]",
+        slotLabel ? slotLabel : "<slot>",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        fmt::ptr(static_cast<void*>(nullptr)));
+    return nullptr;
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus68(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus68(+0x68)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus6c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus6C(+0x6c)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus70(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus70(+0x70)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus74(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus74(+0x74)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus78(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus78(+0x78)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus7c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus7C(+0x7c)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus80(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus80(+0x80)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus84(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus84(+0x84)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus88(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus88(+0x88)", __builtin_return_address(0));
+}
+
+static uint32_t __thiscall Mediator_HasLiveCorpus90(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusFlagMissing("HasLiveCorpus90(+0x90)", __builtin_return_address(0));
+}
+
+static void* __thiscall Mediator_GetLiveCorpus94(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpus94(+0x94)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpus98(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpus98(+0x98)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpus9c(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpus9C(+0x9c)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpusA0(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpusA0(+0xa0)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpusA4(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpusA4(+0xa4)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpusA8(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpusA8(+0xa8)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpusAc(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpusAC(+0xac)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpusB0(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpusB0(+0xb0)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpusB4(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpusB4(+0xb4)", __builtin_return_address(0), outLength);
+}
+
+static void* __thiscall Mediator_GetLiveCorpusB8(MinimalLoginMediatorStub* self, uint32_t* outLength) {
+    (void)self;
+    return LogMediatorPreMcdLiveCorpusGetterMissing("GetLiveCorpusB8(+0xb8)", __builtin_return_address(0), outLength);
 }
 
 // anchor: client.dll:0x62170b00 gates arg7 high-byte selection flow through arg6 +0xd8
@@ -1076,6 +1489,92 @@ __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
         : "eax", "edx");
 }
 
+// anchor: launcher.exe:0x41f150
+// vtable: ILTLoginMediator.Default slot +0x8c
+// Live original `client.dll:0x62198fa0` mcd.cfg family uses this as the mediator-backed/live-data gate.
+static uint32_t __thiscall Mediator_HasState8PersistenceData8c(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
+    const uint32_t ready = mediator && mediator->PostAuthMarginLoadingStateView().flag1452 ? 1u : 0u;
+    Log("MediatorStub::HasState8PersistenceData8c(+0x8c) -> %u", (unsigned)ready);
+    return ready;
+}
+
+// anchor: launcher.exe:0x41f170
+// vtable: ILTLoginMediator.Default slot +0xbc
+// Live original `client.dll:0x62198fa0` copies 0x20 bytes from this pointer into DAT_629ea67c.
+static void* __thiscall Mediator_GetState8PersistenceHeaderBc(MinimalLoginMediatorStub* self) {
+    (void)self;
+    void* returnAddress = __builtin_return_address(0);
+    PopulateMediatorState8PersistenceF1c();
+    LogMediatorState8PersistenceSummary("GetState8PersistenceHeaderBc(+0xbc)", returnAddress);
+    LogPointerWords("MediatorStub::GetState8PersistenceHeaderBc(+0xbc)", g_MediatorState8PersistenceF1c.header2c.data(), 8);
+    return g_MediatorState8PersistenceF1c.header2c.data();
+}
+
+// anchor: launcher.exe:0x41f180
+// vtable: ILTLoginMediator.Default slot +0xc0
+// Live original `client.dll:0x62198fa0` copies 0x465 bytes from this pointer into DAT_629ea648-backed state.
+static void* __thiscall Mediator_GetState8PersistenceBodyC0(MinimalLoginMediatorStub* self) {
+    (void)self;
+    void* returnAddress = __builtin_return_address(0);
+    PopulateMediatorState8PersistenceF1c();
+    LogMediatorState8PersistenceSummary("GetState8PersistenceBodyC0(+0xc0)", returnAddress);
+    LogPointerWords("MediatorStub::GetState8PersistenceBodyC0(+0xc0)", g_MediatorState8PersistenceF1c.body6c.data(), 8);
+    return g_MediatorState8PersistenceF1c.body6c.data();
+}
+
+// anchor: launcher.exe:0x41aec0
+// vtable: ILTLoginMediator.Default slot +0xc4
+// Live original `client.dll:0x62198fa0` asks for the optional overflow tail pointer plus out-length.
+static void* __thiscall Mediator_GetState8PersistenceOverflowC4(MinimalLoginMediatorStub* self, uint16_t* outLength) {
+    (void)self;
+    void* returnAddress = __builtin_return_address(0);
+    PopulateMediatorState8PersistenceF1c();
+    if (outLength) {
+        *outLength = g_MediatorState8Overflow13f4;
+    }
+    LogMediatorState8PersistenceSummary("GetState8PersistenceOverflowC4(+0xc4)", returnAddress);
+    Log(
+        "MediatorStub::GetState8PersistenceOverflowC4(+0xc4) -> %p [length=0x%04x]",
+        g_MediatorState8Overflow13f4 ? g_MediatorState8Overflow13f0.data() : nullptr,
+        (unsigned)g_MediatorState8Overflow13f4);
+    return g_MediatorState8Overflow13f4 ? g_MediatorState8Overflow13f0.data() : nullptr;
+}
+
+// anchor: launcher.exe:0x41f190
+// vtable: ILTLoginMediator.Default slot +0xc8
+static uint32_t __thiscall Mediator_HasState8Section11DataC8(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
+    const uint32_t ready =
+        mediator && mediator->PostAuthMarginLoadingStateView().state8Section11Dword145c != 0u ? 1u : 0u;
+    Log("MediatorStub::HasState8Section11DataC8(+0xc8) -> %u", (unsigned)ready);
+    return ready;
+}
+
+// anchor: launcher.exe:0x41f1a0
+// vtable: ILTLoginMediator.Default slot +0xcc
+static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediatorStub* self) {
+    (void)self;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
+    const uint32_t value = mediator ? mediator->PostAuthMarginLoadingStateView().state8Section11Dword145c : 0u;
+    Log("MediatorStub::GetState8Section11DwordCc(+0xcc) -> 0x%08x", (unsigned)value);
+    return value;
+}
+
+// anchor: launcher.exe:0x41f1b0
+// vtable: ILTLoginMediator.Default slot +0xd0
+static DiagnosticSmallStringLike* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
+    (void)self;
+    PopulateMediatorState8PersistenceF1c();
+    Log(
+        "MediatorStub::GetState8Section11StringD0(+0xd0) -> begin=%p current=%p text='%s'",
+        g_MediatorState8Section11String1460.begin,
+        g_MediatorState8Section11String1460.current,
+        g_MediatorState8Section11String1460Owned.empty() ? "<empty>" : g_MediatorState8Section11String1460Owned.c_str());
+    return &g_MediatorState8Section11String1460;
+}
 
 
 // UNANCHORED: C helper behind the recovered +0x120 ABI wrapper.
@@ -1172,30 +1671,39 @@ __attribute__((naked)) static void Mediator_RegisterLoginObserver170() {
         : "eax", "edx");
 }
 
-// anchor: later runtime/config paths treat arg6 +0xf4 as a broader persisted profile/character-info surface
+// anchor: launcher.exe:0x41f1c0
 // vtable: ILTLoginMediator.Default slot +0xf4
+// Original getter is tiny: returns owner `+0xf1c`; the real producer is the earlier state8
+// load-character reply path (`0x43f930`) that materializes the broader `+0xf1c/+0xf48/+0xf88/+0x13f0`
+// family later consumed by client `mcd.cfg` and character-info paths.
 static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediatorStub* self) {
     (void)self;
     void* returnAddress = __builtin_return_address(0);
     ++g_MediatorRuntimeState.profile0f4Count;
-    PopulateMediatorProfileCharacterInfoF4();
+    PopulateMediatorState8PersistenceF1c();
+
+    const char* firstName = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x04);
+    const char* lastName = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x24);
+    const char* background = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x44);
 
     spdlog::info(
-        "MediatorStub::GetSelectionContextSnapshot(+0xf4) caller={} [{}] -> {} [count={} copiedFrom0ec={} raw0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x}]",
+        "MediatorStub::GetSelectionContextSnapshot(+0xf4) caller={} [{}] -> {} [count={} copiedFrom0ec={} raw0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x} overflow13f4=0x{:04x}]",
         fmt::ptr(returnAddress),
         DescribeMediatorCaller(returnAddress),
-        fmt::ptr(&g_MediatorProfileCharacterInfoF4),
+        fmt::ptr(&g_MediatorState8PersistenceF1c),
         static_cast<unsigned>(g_MediatorRuntimeState.profile0f4Count),
         g_MediatorSelectionContextCopyValid ? 1u : 0u,
         fmt::ptr(g_MediatorRuntimeState.selectionContext0ec),
-        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.string00.data()),
-        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.string70.data()),
-        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.string90.data()),
-        NonEmptyOrPlaceholder(g_MediatorProfileCharacterInfoF4.stringB0.data()),
-        static_cast<unsigned>(g_MediatorProfileCharacterInfoF4.field24));
+        NonEmptyOrPlaceholder(g_MediatorState8PersistenceF1c.string00.data()),
+        NonEmptyOrPlaceholder(firstName),
+        NonEmptyOrPlaceholder(lastName),
+        NonEmptyOrPlaceholder(background),
+        static_cast<unsigned>(g_MediatorState8PersistenceF1c.field24),
+        static_cast<unsigned>(g_MediatorState8Overflow13f4));
+    LogMediatorState8PersistenceSummary("GetSelectionContextSnapshot(+0xf4)", returnAddress);
     LogMediatorCharacterStateContext("GetSelectionContextSnapshot(+0xf4)", returnAddress);
-    LogPointerWords("GetSelectionContextSnapshot syntheticF4", &g_MediatorProfileCharacterInfoF4, 8);
-    return &g_MediatorProfileCharacterInfoF4;
+    LogPointerWords("GetSelectionContextSnapshot ownerF1c", &g_MediatorState8PersistenceF1c, 8);
+    return &g_MediatorState8PersistenceF1c;
 }
 
 // anchor: later runtime setup uses arg6 +0x148 for runtime-object handoff
@@ -1290,6 +1798,12 @@ static void InitializeMediatorStub() {
 
     std::memset(&g_MediatorRuntimeState, 0, sizeof(g_MediatorRuntimeState));
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
+    std::memset(g_MediatorCurrentSlotRecordVtable, 0, sizeof(g_MediatorCurrentSlotRecordVtable));
+    g_MediatorCurrentSlotRecordVtable[0] = (void*)MediatorCurrentSlotRecord_Destroy;
+    g_MediatorCurrentSlotRecordVtable[1] = (void*)MediatorCurrentSlotRecord_TinyGetter;
+    g_MediatorCurrentSlotRecordVtable[2] = (void*)MediatorCurrentSlotRecord_AppendDebugString;
+    g_MediatorCurrentSlotRecordVtable[3] = (void*)MediatorCurrentSlotRecord_ResetPayloadForSourceDescriptor;
+    g_MediatorCurrentSlotRecordVtable[4] = (void*)MediatorCurrentSlotRecord_TinyHelper;
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
     g_LoginMediatorVtable[2] = (void*)Mediator_RegisterEngine;   // +0x08
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
@@ -1300,6 +1814,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[14] = (void*)Mediator_GetDisplayName;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor; // +0x40
+    g_LoginMediatorVtable[17] = (void*)Mediator_GetCurrentSlotRecord44; // +0x44
     g_LoginMediatorVtable[18] = (void*)Mediator_GetWorldOrSelectionName; // +0x48
     g_LoginMediatorVtable[19] = (void*)Mediator_GetProfileOrSessionName; // +0x4c
     g_LoginMediatorVtable[20] = (void*)Mediator_GetBootstrapRaw08AuxHandle50; // +0x50
@@ -1307,6 +1822,33 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[22] = (void*)Mediator_GetString0;      // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetString2;      // +0x5c
     g_LoginMediatorVtable[24] = (void*)Mediator_GetString1;      // +0x60
+    g_LoginMediatorVtable[26] = (void*)Mediator_HasLiveCorpus68; // +0x68
+    g_LoginMediatorVtable[27] = (void*)Mediator_HasLiveCorpus6c; // +0x6c
+    g_LoginMediatorVtable[28] = (void*)Mediator_HasLiveCorpus70; // +0x70
+    g_LoginMediatorVtable[29] = (void*)Mediator_HasLiveCorpus74; // +0x74
+    g_LoginMediatorVtable[30] = (void*)Mediator_HasLiveCorpus78; // +0x78
+    g_LoginMediatorVtable[31] = (void*)Mediator_HasLiveCorpus7c; // +0x7c
+    g_LoginMediatorVtable[32] = (void*)Mediator_HasLiveCorpus80; // +0x80
+    g_LoginMediatorVtable[33] = (void*)Mediator_HasLiveCorpus84; // +0x84
+    g_LoginMediatorVtable[34] = (void*)Mediator_HasLiveCorpus88; // +0x88
+    g_LoginMediatorVtable[35] = (void*)Mediator_HasState8PersistenceData8c; // +0x8c
+    g_LoginMediatorVtable[36] = (void*)Mediator_HasLiveCorpus90; // +0x90
+    g_LoginMediatorVtable[37] = (void*)Mediator_GetLiveCorpus94; // +0x94
+    g_LoginMediatorVtable[38] = (void*)Mediator_GetLiveCorpus98; // +0x98
+    g_LoginMediatorVtable[39] = (void*)Mediator_GetLiveCorpus9c; // +0x9c
+    g_LoginMediatorVtable[40] = (void*)Mediator_GetLiveCorpusA0; // +0xa0
+    g_LoginMediatorVtable[41] = (void*)Mediator_GetLiveCorpusA4; // +0xa4
+    g_LoginMediatorVtable[42] = (void*)Mediator_GetLiveCorpusA8; // +0xa8
+    g_LoginMediatorVtable[43] = (void*)Mediator_GetLiveCorpusAc; // +0xac
+    g_LoginMediatorVtable[44] = (void*)Mediator_GetLiveCorpusB0; // +0xb0
+    g_LoginMediatorVtable[45] = (void*)Mediator_GetLiveCorpusB4; // +0xb4
+    g_LoginMediatorVtable[46] = (void*)Mediator_GetLiveCorpusB8; // +0xb8
+    g_LoginMediatorVtable[47] = (void*)Mediator_GetState8PersistenceHeaderBc; // +0xbc
+    g_LoginMediatorVtable[48] = (void*)Mediator_GetState8PersistenceBodyC0; // +0xc0
+    g_LoginMediatorVtable[49] = (void*)Mediator_GetState8PersistenceOverflowC4; // +0xc4
+    g_LoginMediatorVtable[50] = (void*)Mediator_HasState8Section11DataC8; // +0xc8
+    g_LoginMediatorVtable[51] = (void*)Mediator_GetState8Section11DwordCc; // +0xcc
+    g_LoginMediatorVtable[52] = (void*)Mediator_GetState8Section11StringD0; // +0xd0
     RegisterMediatorState9AbiSlots();
     g_LoginMediatorVtable[54] = (void*)Mediator_GetArg7SelectionUpperBoundExclusive; // +0xd8
     g_LoginMediatorVtable[55] = (void*)Mediator_MapSelectionName;     // +0xdc

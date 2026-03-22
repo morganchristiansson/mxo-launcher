@@ -106,6 +106,38 @@ If the launcher is waiting on a **Continue** button:
   - breakpoints are set
   - debugger has already `cont`'d
 
+## Replacement-launcher note
+
+For `resurrections.exe`:
+- there is no temp self-relaunch step like the original launcher path
+- you can usually run it directly and debug that same process
+- practical caution from recent runs:
+  - startup may spawn short-lived helper processes such as `autodetect_settings.exe`
+  - do not confuse those with the main replacement launcher process
+  - prefer checking `info share` / `wine tasklist` before assuming a breakpoint miss means `client.dll` never loaded
+
+## Client.dll breakpoint note
+
+A practical current rule from recent runs:
+- **before** `client.dll` is loaded, raw client addresses like `0x6219....` are not valid breakpoint targets
+- for the original launcher path, use one tiny launcher-side bridge breakpoint first, e.g.:
+  - `*0x40a4d0`
+  - or `*0x40b7c7`
+- once `client.dll` is loaded, check `info share`
+  - note the actual loaded `client` base
+  - then set breakpoints using that loaded base, not by assuming a fixed `0x62000000`
+
+Example from a recent original-launcher run:
+- `client` loaded at `0x03a70000`
+- so `client.dll:0x621707e0` had to be set as:
+  - `*0x03be07e0`
+- while on replacement runs `client` may still land at the expected preferred base `0x62000000`
+
+Practical consequence:
+- if `break *0x6217....` says invalid address on an original-launcher pass,
+  that does **not** by itself mean the target is wrong
+- first check whether the module was rebased and recompute the live address from `info share`
+
 ## MCP / wrapper cautions
 
 The current `mcp-winedbg` wrapper is good enough for breakpoint work, but it has quirks:

@@ -493,20 +493,20 @@ public:
         char characterNameBufferF1c[32] = {0};           // `+0xf1c .. +0xf3b`
         uint32_t characterReplyFieldF3c = 0;             // `+0xf3c`
         uint32_t characterReplyFieldF40 = 0;             // `+0xf40`
-        std::array<uint32_t, 8> characterFlagsF48{};     // `+0xf48 .. +0xf67`
+        std::array<uint32_t, 8> characterFlagsF48{};     // `+0xf48 .. +0xf67`; original getter `0x41f170` / arg6 `+0xbc`
         std::array<uint32_t, 8> secondaryCharacterDataF68{}; // `+0xf68 .. +0xf87` (provisional world/status seed area)
         std::array<uint32_t, 10> characterRecordPointersF88{}; // post-auth/scaffold parsed subview
         std::array<char, 0x20> section0StringF8c{};      // post-auth/scaffold parsed subview
         std::array<char, 0x20> section0StringFac{};      // post-auth/scaffold parsed subview
         std::array<char, 0x20> section0StringFcc{};      // post-auth/scaffold parsed subview
-        std::array<uint8_t, 0x465> state8Section0RawF88{}; // source-owned raw mirror of state8 `0x43f930` section-0 copy span
+        std::array<uint8_t, 0x465> state8Section0RawF88{}; // source-owned raw mirror of original owner `+0xf88 .. +0x13ec`; original getter `0x41f180` / arg6 `+0xc0`
 
         // state8 case `0x00` also has a one-shot overflow tail at `+0x13f0/+0x13f4` when the
         // incoming section exceeds `0x485` bytes. Keep that separate from the append families
         // below because the original only allocates it once on the case-0 path instead of using
         // the later generic append buffers.
-        void* state8Section0OverflowBuffer13f0 = nullptr; // `+0x13f0` (state8 case 0x00 overflow tail)
-        uint16_t state8Section0OverflowLength13f4 = 0;    // `+0x13f4`
+        void* state8Section0OverflowBuffer13f0 = nullptr; // `+0x13f0` (state8 case 0x00 overflow tail); original getter `0x41aec0` / arg6 `+0xc4`
+        uint16_t state8Section0OverflowLength13f4 = 0;    // `+0x13f4` out-length paired with the same `+0xc4` getter
 
         // Allocated buffer pointers for load-character fragment families.
         // Keep the owner offsets explicit because state8 (`0x43f930`) and state11 (`0x440320`)
@@ -553,7 +553,7 @@ public:
 
         void* allocatedBuffer144c = nullptr;             // `+0x144c` (state8 case 0x09)
         uint16_t allocatedBufferLength1450 = 0;         // `+0x1450`
-        uint8_t flag1452 = 0;                            // `+0x1452`
+        uint8_t flag1452 = 0;                            // `+0x1452`; original getter `0x41f150` / arg6 `+0x8c` gates the mediator-backed `mcd.cfg` branch
 
         void* allocatedBuffer1454 = nullptr;             // `+0x1454` (state8 case 0x0a)
         uint16_t allocatedBufferLength1458 = 0;         // `+0x1458`
@@ -563,6 +563,10 @@ public:
         // state8 case `0x0b` / `0x43f8c0` side effect:
         // - owner `+0x145c` = first dword of the section payload when byteCount > 4
         // - owner `+0x1460` = trailing small-string-like copy of the remaining payload bytes
+        // - sibling original getters now anchored too:
+        //   - `0x41f190` / arg6 `+0xc8` = bool-style test for non-zero `+0x145c`
+        //   - `0x41f1a0` / arg6 `+0xcc` = return dword `+0x145c`
+        //   - `0x41f1b0` / arg6 `+0xd0` = return small-string-like `+0x1460`
         uint32_t state8Section11Dword145c = 0;          // `+0x145c`
         std::string state8Section11String1460;          // `+0x1460` small-string-like mirror
 

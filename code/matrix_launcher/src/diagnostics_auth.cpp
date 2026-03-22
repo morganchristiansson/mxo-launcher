@@ -515,6 +515,10 @@ void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* auth
     DiagnosticApplyLoginControllerConfig();
 }
 
+mxo::ltlogin::CLTLoginMediator* DiagnosticAuthGetLoginController() {
+    return g_DiagnosticLoginController;
+}
+
 void DiagnosticAuthPollLiveConnectionTraffic(void* owner) {
     if (!owner) return;
 

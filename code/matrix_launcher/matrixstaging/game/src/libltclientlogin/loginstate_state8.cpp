@@ -182,6 +182,13 @@ static bool SeedState8FirstFragment(
     return false;
 }
 
+static void LogState8PersistenceFamilySnapshot(
+    const PostAuthMarginLoadingState& ownerState,
+    const char* reason,
+    uint32_t sectionSelectorMinus2,
+    uint16_t sectionByteCount,
+    bool completed);
+
 static void ApplyState8Section11SideEffect(
     PostAuthMarginLoadingState& ownerState,
     const ParsedState11LoadCharacterReplyScaffold& parsed) {
@@ -266,6 +273,7 @@ static void HandleState8ReplySection(
                     static_cast<unsigned>(ownerState.characterRecordPointersF88[0]),
                     static_cast<unsigned>(ownerState.replySectionData13cc),
                     static_cast<unsigned>(ownerState.replySectionData13d0));
+                LogState8PersistenceFamilySnapshot(ownerState, "section0", parsed.sectionSelectorMinus2, parsed.sectionByteCount, false);
             }
             break;
         case 1u:
@@ -303,6 +311,7 @@ static void HandleState8ReplySection(
         case 9u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag1452 = 1u;
+            LogState8PersistenceFamilySnapshot(ownerState, "section9_gate1452", parsed.sectionSelectorMinus2, parsed.sectionByteCount, false);
             break;
         case 10u:
             if (ownerState.allocatedBuffer1454 == nullptr) {
@@ -365,6 +374,45 @@ static void FinalizeState8ChunkedSection10Buffer(PostAuthMarginLoadingState& own
     if (void* compacted = std::realloc(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458)) {
         ownerState.allocatedBuffer1454 = compacted;
     }
+}
+
+static void LogState8PersistenceFamilySnapshot(
+    const PostAuthMarginLoadingState& ownerState,
+    const char* reason,
+    uint32_t sectionSelectorMinus2,
+    uint16_t sectionByteCount,
+    bool completed) {
+    const uint32_t bodyWord00 = ReadU32LE(ownerState.state8Section0RawF88.data());
+    const uint32_t headerWord00 = ownerState.characterFlagsF48[0];
+    const uint32_t headerWord04 = ownerState.characterFlagsF48[1];
+    const uint32_t headerWord08 = ownerState.characterFlagsF48[2];
+    const uint32_t headerWord0c = ownerState.characterFlagsF48[3];
+    const uint32_t secondaryWord00 = ownerState.secondaryCharacterDataF68[0];
+    const uint32_t secondaryWord04 = ownerState.secondaryCharacterDataF68[1];
+    const uint32_t section11Length = static_cast<uint32_t>(ownerState.state8Section11String1460.size());
+
+    spdlog::info(
+        "CLTLoginState_State8 persistence family [{}] completed={} section={} bytes={} f1c='{}' f3c=0x{:08x} f40=0x{:08x} f48[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] f68[0..1]=[0x{:08x} 0x{:08x}] f88_00=0x{:08x} f88_444=0x{:08x} f88_448=0x{:08x} overflow13f4=0x{:04x} gate1452={} sec11_145c=0x{:08x} sec11_len={}",
+        reason ? reason : "<unknown>",
+        completed ? 1u : 0u,
+        static_cast<unsigned>(sectionSelectorMinus2),
+        static_cast<unsigned>(sectionByteCount),
+        ownerState.characterNameBufferF1c[0] ? ownerState.characterNameBufferF1c : "<empty>",
+        static_cast<unsigned>(ownerState.characterReplyFieldF3c),
+        static_cast<unsigned>(ownerState.characterReplyFieldF40),
+        static_cast<unsigned>(headerWord00),
+        static_cast<unsigned>(headerWord04),
+        static_cast<unsigned>(headerWord08),
+        static_cast<unsigned>(headerWord0c),
+        static_cast<unsigned>(secondaryWord00),
+        static_cast<unsigned>(secondaryWord04),
+        static_cast<unsigned>(bodyWord00),
+        static_cast<unsigned>(ownerState.replySectionData13cc),
+        static_cast<unsigned>(ownerState.replySectionData13d0),
+        static_cast<unsigned>(ownerState.state8Section0OverflowLength13f4),
+        static_cast<unsigned>(ownerState.flag1452),
+        static_cast<unsigned>(ownerState.state8Section11Dword145c),
+        static_cast<unsigned>(section11Length));
 }
 
 }  // namespace
@@ -578,6 +626,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
     if (completed) {
         FinalizeState8ChunkedSection10Buffer(ownerState);
+        LogState8PersistenceFamilySnapshot(ownerState, "completed", parsed.sectionSelectorMinus2, parsed.sectionByteCount, true);
 
         if (CLTLoginState* nextBase = mediator->ScaffoldState9()) {
             if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
