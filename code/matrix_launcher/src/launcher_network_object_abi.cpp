@@ -6,25 +6,26 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <spdlog/spdlog.h>
 
 static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
-        Log("%s: <null>", label ? label : "PointerWords");
+        spdlog::info("{}: <null>", label ? label : "PointerWords");
         return;
     }
 
     const uint32_t* words = static_cast<const uint32_t*>(ptr);
-    Log("%s @ %p [+0x00]=%08x [+0x04]=%08x [+0x08]=%08x [+0x0c]=%08x",
+    spdlog::info("{} @ {} [+0x00]=0x{:08x} [+0x04]=0x{:08x} [+0x08]=0x{:08x} [+0x0c]=0x{:08x}",
         label,
-        ptr,
+        fmt::ptr(ptr),
         words[0],
         (wordCount > 1) ? words[1] : 0,
         (wordCount > 2) ? words[2] : 0,
         (wordCount > 3) ? words[3] : 0);
     if (wordCount > 4) {
-        Log("%s @ %p [+0x10]=%08x [+0x14]=%08x [+0x18]=%08x [+0x1c]=%08x",
+        spdlog::info("{} @ {} [+0x10]=0x{:08x} [+0x14]=0x{:08x} [+0x18]=0x{:08x} [+0x1c]=0x{:08x}",
             label,
-            ptr,
+            fmt::ptr(ptr),
             words[4],
             (wordCount > 5) ? words[5] : 0,
             (wordCount > 6) ? words[6] : 0,
@@ -142,8 +143,7 @@ static void DiagnosticFreeLauncherQueue(DiagnosticLauncherQueue* queue) {
 static bool DiagnosticInitializeLauncherQueue(DiagnosticLauncherQueue* queue, uint32_t initialSize) {
     const bool ok = mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_Init(queue, initialSize);
     if (!ok) {
-        Log("DIAGNOSTIC: failed to initialize launcher queue via liblttcp Queue_Init(initialSize=%u)",
-            (unsigned)initialSize);
+        spdlog::info("DIAGNOSTIC: failed to initialize launcher queue via liblttcp Queue_Init(initialSize={})", initialSize);
     }
     return ok;
 }
@@ -155,8 +155,8 @@ static bool DiagnosticPushLauncherQueue(
     uint32_t value1) {
     const bool ok = mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_PushPair(queue, value0, value1);
     if (!ok) {
-        Log("DIAGNOSTIC: liblttcp Queue_PushPair failed for queue=%p value0=0x%08x value1=0x%08x",
-            queue,
+        spdlog::info("DIAGNOSTIC: liblttcp Queue_PushPair failed for queue={} value0=0x{:08x} value1=0x{:08x}",
+            fmt::ptr(queue),
             (unsigned)value0,
             (unsigned)value1);
     }
@@ -199,10 +199,10 @@ static bool DiagnosticEnqueueCompletedOperation(
         (void)signalQueue(&owner->subVtable5C);
     }
 
-    Log(
-        "DIAGNOSTIC: enqueue completed-op label='%s' owner=%p queue=%s workItem=0x%08x context=0x%08x pairWasEmpty=%u pushed=%u",
+    spdlog::info(
+        "DIAGNOSTIC: enqueue completed-op label={} owner={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} pushed={:08x}",
         label ? label : "<null>",
-        owner,
+        fmt::ptr(owner),
         useQueue34 ? "queue34" : "queue0C",
         (unsigned)value0,
         (unsigned)value1,
@@ -241,7 +241,7 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
     if (!g_DiagnosticLttcpBinding) {
         g_DiagnosticLttcpBinding = new mxo::liblttcp::CLTThreadPerClientTCPEngineBinding();
         if (!g_DiagnosticLttcpBinding) {
-            Log("DIAGNOSTIC: failed to allocate CLTThreadPerClientTCPEngine binding for %p", owner);
+            spdlog::info("DIAGNOSTIC: failed to allocate CLTThreadPerClientTCPEngine binding for {}", fmt::ptr(owner));
             return NULL;
         }
     }
@@ -249,11 +249,11 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
     if (g_DiagnosticLttcpBinding->Owner() != owner) {
         DiagnosticAuthResetState();
         if (!g_DiagnosticLttcpBinding->Bind(owner)) {
-            Log("DIAGNOSTIC: failed to bind CLTThreadPerClientTCPEngine sidecar for %p", owner);
+            spdlog::info("DIAGNOSTIC: failed to bind CLTThreadPerClientTCPEngine sidecar for {}", fmt::ptr(owner));
             return NULL;
         }
         DiagnosticAuthInitializeForEngine(owner, g_DiagnosticLttcpBinding->Engine());
-        Log("DIAGNOSTIC: created CLTThreadPerClientTCPEngine sidecar for launcher object %p", owner);
+        spdlog::info("DIAGNOSTIC: created CLTThreadPerClientTCPEngine sidecar for launcher object {}", fmt::ptr(owner));
     }
 
     return g_DiagnosticLttcpBinding->Engine();
@@ -328,7 +328,7 @@ static void DiagnosticFreeLauncherObjectInternals(MinimalLauncherObjectStub* sel
 // anchor: launcher.exe:0x4319a0
 // vtable: launcher.exe:0x004b2768 slot +0x00
 static int __thiscall LauncherObject_Release(MinimalLauncherObjectStub* self, uint32_t flags) {
-    Log("LauncherObjectStub::Release(flags=%u self=%p)", flags, self);
+    spdlog::info("LauncherObjectStub::Release(flags={} self={})", flags, fmt::ptr(self));
     DiagnosticFreeLauncherObjectInternals(self);
     return 1;
 }
@@ -341,12 +341,12 @@ static uint32_t __thiscall LauncherObject_Slot1_431CE0(
     void* arg2,
     void* arg3) {
     ++g_LauncherObjectBuildState.slot1CallCount;
-    Log(
-        "LauncherObjectStub::Slot1_431CE0(self=%p arg1=%p arg2=%p arg3=%p) [count=%u]",
-        self,
-        arg1,
-        arg2,
-        arg3,
+    spdlog::info(
+        "LauncherObjectStub::Slot1_431CE0(self={} arg1={} arg2={} arg3={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(arg2),
+        fmt::ptr(arg3),
         (unsigned)g_LauncherObjectBuildState.slot1CallCount);
     LogPointerWords("LauncherObject slot1 self", self, 8);
 
@@ -358,7 +358,7 @@ static uint32_t __thiscall LauncherObject_Slot1_431CE0(
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 
-    Log("LauncherObjectStub::Slot1_431CE0 -> sidecar MonitorPort result=0x%08x", (unsigned)result);
+    spdlog::info("LauncherObjectStub::Slot1_431CE0 -> sidecar MonitorPort result=0x{:08x}", result);
     (void)arg3;
     return result;
 }
@@ -371,13 +371,13 @@ static uint32_t __thiscall LauncherObject_Slot2_4325D0(
     void* arg2,
     void* arg3) {
     ++g_LauncherObjectBuildState.slot2CallCount;
-    Log(
-        "LauncherObjectStub::Slot2_4325D0(self=%p arg1=%p arg2=%p arg3=%p) [count=%u]",
-        self,
-        arg1,
-        arg2,
-        arg3,
-        (unsigned)g_LauncherObjectBuildState.slot2CallCount);
+    spdlog::info(
+        "LauncherObjectStub::Slot2_4325D0(self={} arg1={} arg2={} arg3={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(arg2),
+        fmt::ptr(arg3),
+        g_LauncherObjectBuildState.slot2CallCount);
     LogPointerWords("LauncherObject slot2 self", self, 8);
 
     uint32_t result = 0;
@@ -389,7 +389,7 @@ static uint32_t __thiscall LauncherObject_Slot2_4325D0(
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 
-    Log("LauncherObjectStub::Slot2_4325D0 -> sidecar UDPMonitorPort result=0x%08x", (unsigned)result);
+    spdlog::info("LauncherObjectStub::Slot2_4325D0 -> sidecar UDPMonitorPort result=0x{:08x}", result);
     return result;
 }
 
@@ -401,12 +401,12 @@ static uint32_t __thiscall LauncherObject_Slot3_436000(
     void* arg2,
     void* arg3) {
     ++g_LauncherObjectBuildState.slot3CallCount;
-    Log(
-        "LauncherObjectStub::Slot3_436000(self=%p arg1=%p arg2=%p arg3=%p) [count=%u]",
-        self,
-        arg1,
-        arg2,
-        arg3,
+    spdlog::info(
+        "LauncherObjectStub::Slot3_436000(self={} arg1={} arg2={} arg3={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(arg2),
+        fmt::ptr(arg3),
         (unsigned)g_LauncherObjectBuildState.slot3CallCount);
     LogPointerWords("LauncherObject slot3 self", self, 8);
 
@@ -420,11 +420,11 @@ static uint32_t __thiscall LauncherObject_Slot3_436000(
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 
-    Log(
-        "LauncherObjectStub::Slot3_436000 -> sidecar MonitorEphemeralUDPPort result=0x%08x boundPort=%u context=%p",
-        (unsigned)result,
+    spdlog::info(
+        "LauncherObjectStub::Slot3_436000 -> sidecar MonitorEphemeralUDPPort result=0x{:08x} boundPort={:08x} context={}",
+        result,
         (unsigned)(arg1 ? *static_cast<uint16_t*>(arg1) : boundPortHostOrder),
-        arg2);
+        fmt::ptr(arg2));
     return result;
 }
 
@@ -434,10 +434,10 @@ static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
     MinimalLauncherObjectStub* self,
     void* arg1) {
     ++g_LauncherObjectBuildState.slot4CallCount;
-    Log(
-        "LauncherObjectStub::Slot4_42F7C0(self=%p arg1=%p) [count=%u]",
-        self,
-        arg1,
+    spdlog::info(
+        "LauncherObjectStub::Slot4_42F7C0(self={} arg1={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
         (unsigned)g_LauncherObjectBuildState.slot4CallCount);
     LogPointerWords("LauncherObject slot4 self", self, 8);
     // Keep slot4 as a logged placeholder for now.
@@ -460,21 +460,21 @@ static uint32_t __thiscall LauncherObject_Slot5_431840(
     const bool listLooksEmpty =
         !self || !list80 || !list80->root || list80->first == list80;
 
-    Log(
-        "LauncherObjectStub::Slot5_431840(self=%p arg1=%p out0=%p arg3=%p root=%p first=%p last=%p empty=%u) [count=%u]",
-        self,
-        arg1,
-        out0,
-        arg3,
-        list80 ? list80->root : NULL,
-        list80 ? list80->first : NULL,
-        list80 ? list80->last : NULL,
-        listLooksEmpty ? 1u : 0u,
+    spdlog::info(
+        "LauncherObjectStub::Slot5_431840(self={} arg1={} out0={} arg3={} root={} first={} last={} empty={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(out0),
+        fmt::ptr(arg3),
+        fmt::ptr(list80 ? list80->root : NULL),
+        fmt::ptr(list80 ? list80->first : NULL),
+        fmt::ptr(list80 ? list80->last : NULL),
+        (unsigned)(listLooksEmpty ? 1u : 0u),
         (unsigned)g_LauncherObjectBuildState.slot5CallCount);
     LogPointerWords("LauncherObject slot5 self", self, 8);
 
     if (listLooksEmpty) {
-        Log("LauncherObjectStub::Slot5_431840 -> faithful empty-list80 miss path (return 0x7000004, out0=0)");
+        spdlog::info("LauncherObjectStub::Slot5_431840 -> faithful empty-list80 miss path (return 0x7000004, out0=0)");
         return 0x7000004u;
     }
 
@@ -487,9 +487,9 @@ static uint32_t __thiscall LauncherObject_Slot5_431840(
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 
-    Log(
-        "LauncherObjectStub::Slot5_431840 -> sidecar UnmonitorPort result=0x%08x outSocketHandle=0x%08x",
-        (unsigned)result,
+    spdlog::info(
+        "LauncherObjectStub::Slot5_431840 -> sidecar UnmonitorPort result=0x{:08x} outSocketHandle=0x{:08x}",
+        result,
         (unsigned)(out0 ? *out0 : 0u));
     return result;
 }
@@ -500,10 +500,10 @@ static uint32_t __thiscall LauncherObject_Slot6_4328A0(
     MinimalLauncherObjectStub* self,
     void* arg1) {
     ++g_LauncherObjectBuildState.slot6CallCount;
-    Log(
-        "LauncherObjectStub::Slot6_4328A0(self=%p arg1=%p) [count=%u]",
-        self,
-        arg1,
+    spdlog::info(
+        "LauncherObjectStub::Slot6_4328A0(self={} arg1={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
         (unsigned)g_LauncherObjectBuildState.slot6CallCount);
     LogPointerWords("LauncherObject slot6 self", self, 8);
 
@@ -513,7 +513,7 @@ static uint32_t __thiscall LauncherObject_Slot6_4328A0(
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 
-    Log("LauncherObjectStub::Slot6_4328A0 -> sidecar Connect result=0x%08x context=%p", (unsigned)result, arg1);
+    spdlog::info("LauncherObjectStub::Slot6_4328A0 -> sidecar Connect result=0x{:08x} context={}", result, fmt::ptr(arg1));
     return result;
 }
 
@@ -524,12 +524,12 @@ static uint32_t __thiscall LauncherObject_Slot7_42F970(
     void* arg1,
     uint32_t arg2) {
     ++g_LauncherObjectBuildState.slot7CallCount;
-    Log(
-        "LauncherObjectStub::Slot7_42F970(self=%p arg1=%p arg2=0x%08x) [count=%u]",
-        self,
-        arg1,
-        (unsigned)arg2,
-        (unsigned)g_LauncherObjectBuildState.slot7CallCount);
+    spdlog::info(
+        "LauncherObjectStub::Slot7_42F970(self={} arg1={} arg2=0x{:08x}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        arg2,
+        g_LauncherObjectBuildState.slot7CallCount);
     LogPointerWords("LauncherObject slot7 self", self, 8);
 
     uint32_t result = 0;
@@ -538,7 +538,7 @@ static uint32_t __thiscall LauncherObject_Slot7_42F970(
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 
-    Log("LauncherObjectStub::Slot7_42F970 -> sidecar Close result=0x%08x context=%p", (unsigned)result, arg1);
+    spdlog::info("LauncherObjectStub::Slot7_42F970 -> sidecar Close result=0x{:08x} context={}", result, fmt::ptr(arg1));
     return result;
 }
 
@@ -551,13 +551,13 @@ static uint32_t __thiscall LauncherObject_Slot8_42FBD0(
     void* arg3,
     void* arg4) {
     ++g_LauncherObjectBuildState.slot8CallCount;
-    Log(
-        "LauncherObjectStub::Slot8_42FBD0(self=%p arg1=%p arg2=%p arg3=%p arg4=%p) [count=%u]",
-        self,
-        arg1,
-        arg2,
-        arg3,
-        arg4,
+    spdlog::info(
+        "LauncherObjectStub::Slot8_42FBD0(self={} arg1={} arg2={} arg3={} arg4={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(arg2),
+        fmt::ptr(arg3),
+        fmt::ptr(arg4),
         (unsigned)g_LauncherObjectBuildState.slot8CallCount);
     LogPointerWords("LauncherObject slot8 self", self, 8);
 
@@ -571,7 +571,7 @@ static uint32_t __thiscall LauncherObject_Slot8_42FBD0(
         DiagnosticSyncLauncherObjectSidecarState(self);
     }
 
-    Log("LauncherObjectStub::Slot8_42FBD0 -> sidecar SendPacket/SendBuffer result=0x%08x context=%p", (unsigned)result, arg1);
+    spdlog::info("LauncherObjectStub::Slot8_42FBD0 -> sidecar SendPacket/SendBuffer result=0x{:08x} context={}", result, fmt::ptr(arg1));
     return result;
 }
 
@@ -585,14 +585,14 @@ static uint32_t __thiscall LauncherObject_Slot9_42FD10(
     void* arg4,
     void* arg5) {
     ++g_LauncherObjectBuildState.slot9CallCount;
-    Log(
-        "LauncherObjectStub::Slot9_42FD10(self=%p arg1=%p arg2=%p arg3=%p arg4=%p arg5=%p) [count=%u]",
-        self,
-        arg1,
-        arg2,
-        arg3,
-        arg4,
-        arg5,
+    spdlog::info(
+        "LauncherObjectStub::Slot9_42FD10(self={} arg1={} arg2={} arg3={} arg4={} arg5={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(arg2),
+        fmt::ptr(arg3),
+        fmt::ptr(arg4),
+        fmt::ptr(arg5),
         (unsigned)g_LauncherObjectBuildState.slot9CallCount);
     LogPointerWords("LauncherObject slot9 self", self, 8);
     return 0;
@@ -604,10 +604,10 @@ static uint32_t __thiscall LauncherObject_Slot10_443810(
     MinimalLauncherObjectStub* self,
     void* arg1) {
     ++g_LauncherObjectBuildState.slot10CallCount;
-    Log(
-        "LauncherObjectStub::Slot10_443810(self=%p arg1=%p) [count=%u]",
-        self,
-        arg1,
+    spdlog::info(
+        "LauncherObjectStub::Slot10_443810(self={} arg1={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
         (unsigned)g_LauncherObjectBuildState.slot10CallCount);
     LogPointerWords("LauncherObject slot10 self", self, 8);
     return 0;
@@ -636,13 +636,13 @@ static uint32_t __thiscall LauncherObject_Slot11_431670(
     ++g_LauncherObjectBuildState.slot11CallCount;
     if (out0) *out0 = 0;
     if (out1) *out1 = 0;
-    Log(
-        "LauncherObjectStub::Slot11_431670(self=%p arg1=%p out0=%p out1=%p) [count=%u]",
-        self,
-        arg1,
-        out0,
-        out1,
-        (unsigned)g_LauncherObjectBuildState.slot11CallCount);
+    spdlog::info(
+        "LauncherObjectStub::Slot11_431670(self={} arg1={} out0={} out1={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(out0),
+        fmt::ptr(out1),
+        g_LauncherObjectBuildState.slot11CallCount);
     LogPointerWords("LauncherObject slot11 self", self, 8);
     return 0;
 }
@@ -668,23 +668,23 @@ static uint32_t __thiscall LauncherObject_Slot12_4316A0(
     const bool listLooksEmpty =
         !self || !list8C || !list8C->root || list8C->first == list8C;
 
-    Log(
-        "LauncherObjectStub::Slot12_4316A0(self=%p arg1=%p root=%p first=%p last=%p empty=%u cleanupResult=0x%08x droppedConnection=%u) [count=%u]",
-        self,
-        arg1,
-        list8C ? list8C->root : NULL,
-        list8C ? list8C->first : NULL,
-        list8C ? list8C->last : NULL,
+    spdlog::info(
+        "LauncherObjectStub::Slot12_4316A0(self={} arg1={} root={} first={} last={} empty={} cleanupResult=0x{:08x} droppedConnection={} count={}]",
+        fmt::ptr(self),
+        fmt::ptr(arg1),
+        fmt::ptr(list8C ? list8C->root : NULL),
+        fmt::ptr(list8C ? list8C->first : NULL),
+        fmt::ptr(list8C ? list8C->last : NULL),
         listLooksEmpty ? 1u : 0u,
-        (unsigned)cleanupResult,
+        cleanupResult,
         droppedConnection ? 1u : 0u,
-        (unsigned)g_LauncherObjectBuildState.slot12CallCount);
+        g_LauncherObjectBuildState.slot12CallCount);
     LogPointerWords("LauncherObject slot12 self", self, 8);
 
     if (listLooksEmpty) {
-        Log("LauncherObjectStub::Slot12_4316A0 -> sidecar CleanupConnection now leaves list8C empty");
+        spdlog::info("LauncherObjectStub::Slot12_4316A0 -> sidecar CleanupConnection now leaves list8C empty");
     } else {
-        Log("LauncherObjectStub::Slot12_4316A0 -> sidecar CleanupConnection left list8C non-empty");
+        spdlog::info("LauncherObjectStub::Slot12_4316A0 -> sidecar CleanupConnection left list8C non-empty");
     }
 
     LauncherObject_Subobject98_Slot1(&self->helper98);
@@ -718,28 +718,26 @@ static void DiagnosticLogLauncherRuntimeQueueState(
     const bool queue0SameBlock = (object->queue0C.block0 == object->queue0C.block1);
     const bool queue34SameBlock = (object->queue34.block0 == object->queue34.block1);
 
-    Log(
-        "LauncherObject runtime state[%s count=%u]: self=%p field04=%u field08=%p field7C=%p q0(current0=%p current1=%p block0=%p block1=%p slotsCurrent=%p slotsLast=%p sameCursor=%u sameBlock=%u) q34(current0=%p current1=%p block0=%p block1=%p slotsCurrent=%p slotsLast=%p sameCursor=%u sameBlock=%u)",
+    spdlog::info(
+        "LauncherObject runtime state[{}] count={}]: self={}, field04={}, field7C={}, q0(current0={}, current1={}, block0={}, block1={}, slotsCurrent={}, slotsLast={}, sameCursor={}, sameBlock={}) q34(current0={}, current1={}, block0={},",
         source,
         (unsigned)count,
-        object,
+        fmt::ptr(object),
         (unsigned)object->field04,
-        object->field08,
-        object->field7C,
-        object->queue0C.current0,
-        object->queue0C.current1,
-        object->queue0C.block0,
-        object->queue0C.block1,
-        object->queue0C.slotsCurrent,
-        object->queue0C.slotsLast,
+        fmt::ptr(object->field08),
+        fmt::ptr(object->field7C),
+        fmt::ptr(object->queue0C.current0),
+        fmt::ptr(object->queue0C.current1),
+        fmt::ptr(object->queue0C.block0),
+        fmt::ptr(object->queue0C.block1),
+        fmt::ptr(object->queue0C.slotsCurrent),
+        fmt::ptr(object->queue0C.slotsLast),
         queue0CursorEqual ? 1u : 0u,
         queue0SameBlock ? 1u : 0u,
-        object->queue34.current0,
-        object->queue34.current1,
-        object->queue34.block0,
-        object->queue34.block1,
-        object->queue34.slotsCurrent,
-        object->queue34.slotsLast,
+        fmt::ptr(object->queue34.current0),
+        fmt::ptr(object->queue34.block1),
+        fmt::ptr(object->queue34.slotsCurrent),
+        fmt::ptr(object->queue34.slotsLast),
         queue34CursorEqual ? 1u : 0u,
         queue34SameBlock ? 1u : 0u);
 }
@@ -750,10 +748,10 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
     ++g_LauncherObjectBuildState.subobject5CSlot0CallCount;
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
     BOOL result = eventHandle ? SetEvent(eventHandle) : FALSE;
-    Log(
-        "LauncherObjectStub::Subobject5C::Slot0(self=%p event=%p SetEvent=%ld) [count=%u]",
-        self,
-        eventHandle,
+    spdlog::info(
+        "LauncherObjectStub::Subobject5C::Slot0(self={} event={} SetEvent={}) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(eventHandle),
         (long)result,
         (unsigned)g_LauncherObjectBuildState.subobject5CSlot0CallCount);
     LogPointerWords("LauncherObject subobject5C self", self, 8);
@@ -785,14 +783,14 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
         result = 3;
     }
 
-    Log(
-        "LauncherObjectStub::Subobject5C::Slot1(self=%p reason=%d event=%p wait=%lu result=%u) [count=%u]",
-        self,
+    spdlog::info(
+        "LauncherObjectStub::Subobject5C::Slot1(self={} reason={} event={} wait={} result={} [count={}]",
+        fmt::ptr(self),
         reason,
-        eventHandle,
-        (unsigned long)waitResult,
-        (unsigned)result,
-        (unsigned)g_LauncherObjectBuildState.subobject5CSlot1CallCount);
+        fmt::ptr(eventHandle),
+        waitResult,
+        result,
+        g_LauncherObjectBuildState.subobject5CSlot1CallCount);
     LogPointerWords("LauncherObject subobject5C self", self, 8);
     return result;
 }
@@ -809,11 +807,11 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     DiagnosticAuthPollLiveConnectionTraffic(owner);
     const uint32_t count = g_LauncherObjectBuildState.subobject60Slot0CallCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
-        Log(
-            "LauncherObjectStub::Subobject60::Slot0(self=%p crit=%p EnterCriticalSection) [count=%u]",
-            self,
-            crit,
-            (unsigned)count);
+        spdlog::info(
+            "LauncherObjectStub::Subobject60::Slot0(self={} crit={} EnterCriticalSection) [count={}]",
+            fmt::ptr(self),
+            fmt::ptr(crit),
+            count);
         LogPointerWords("LauncherObject subobject60 self", self, 4);
         DiagnosticLogLauncherRuntimeQueueState(
             "sub60.enter",
@@ -833,11 +831,11 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self) {
     }
     const uint32_t count = g_LauncherObjectBuildState.subobject60Slot1CallCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
-        Log(
-            "LauncherObjectStub::Subobject60::Slot1(self=%p crit=%p LeaveCriticalSection) [count=%u]",
-            self,
-            crit,
-            (unsigned)count);
+        spdlog::info(
+            "LauncherObjectStub::Subobject60::Slot1(self={} crit={} LeaveCriticalSection) [count={}]",
+            fmt::ptr(self),
+            fmt::ptr(crit),
+            count);
         LogPointerWords("LauncherObject subobject60 self", self, 4);
         DiagnosticLogLauncherRuntimeQueueState(
             "sub60.leave",
@@ -855,11 +853,11 @@ static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self) {
     if (crit) {
         EnterCriticalSection(crit);
     }
-    Log(
-        "LauncherObjectStub::Subobject98::Slot0(self=%p crit=%p EnterCriticalSection) [count=%u]",
-        self,
-        crit,
-        (unsigned)g_LauncherObjectBuildState.subobject98Slot0CallCount);
+    spdlog::info(
+        "LauncherObjectStub::Subobject98::Slot0(self={} crit={} EnterCriticalSection) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(crit),
+        g_LauncherObjectBuildState.subobject98Slot0CallCount);
     LogPointerWords("LauncherObject subobject98 self", self, 4);
     return 0;
 }
@@ -872,11 +870,11 @@ static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self) {
     if (crit) {
         LeaveCriticalSection(crit);
     }
-    Log(
-        "LauncherObjectStub::Subobject98::Slot1(self=%p crit=%p LeaveCriticalSection) [count=%u]",
-        self,
-        crit,
-        (unsigned)g_LauncherObjectBuildState.subobject98Slot1CallCount);
+    spdlog::info(
+        "LauncherObjectStub::Subobject98::Slot1(self={} crit={} LeaveCriticalSection) [count={}]",
+        fmt::ptr(self),
+        fmt::ptr(crit),
+        g_LauncherObjectBuildState.subobject98Slot1CallCount);
     LogPointerWords("LauncherObject subobject98 self", self, 4);
     return 0;
 }
@@ -918,10 +916,10 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     InitializeLauncherObjectStub();
 
     if (g_LauncherObjectBuildState.currentObject) {
-        Log(
-            "DIAGNOSTIC: replacing prior launcher object scaffold generation=%u ptr=%p",
+        spdlog::info(
+            "DIAGNOSTIC: replacing prior launcher object scaffold generation={} ptr={}",
             (unsigned)g_LauncherObjectBuildState.buildGeneration,
-            g_LauncherObjectBuildState.currentObject);
+            fmt::ptr(g_LauncherObjectBuildState.currentObject));
         DiagnosticFreeLauncherObjectInternals(g_LauncherObjectBuildState.currentObject);
         std::free(g_LauncherObjectBuildState.currentObject);
         g_LauncherObjectBuildState.currentObject = NULL;
@@ -930,7 +928,7 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     MinimalLauncherObjectStub* object =
         static_cast<MinimalLauncherObjectStub*>(std::malloc(sizeof(MinimalLauncherObjectStub)));
     if (!object) {
-        Log("DIAGNOSTIC: failed to allocate launcher object scaffold (size=0x%zx)", sizeof(MinimalLauncherObjectStub));
+        spdlog::info("DIAGNOSTIC: failed to allocate launcher object scaffold (size=0x{:zx})", sizeof(MinimalLauncherObjectStub));
         return NULL;
     }
 
@@ -949,14 +947,14 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     object->helper98.vtable = g_LauncherObjectSubVtable98;
     InitializeCriticalSection(&object->helper98.crit);
     if (!object->field7C) {
-        Log("DIAGNOSTIC: failed to create launcher object +0x7c event (%lu)", (unsigned long)GetLastError());
+        spdlog::info("DIAGNOSTIC: failed to create launcher object +0x7c event ({})", (unsigned long)GetLastError());
         DiagnosticFreeLauncherObjectInternals(object);
         std::free(object);
         return NULL;
     }
     if (!DiagnosticInitializeLauncherQueue(&object->queue0C, 0) ||
         !DiagnosticInitializeLauncherQueue(&object->queue34, 0)) {
-        Log("DIAGNOSTIC: failed to initialize launcher object base queues");
+        spdlog::info("DIAGNOSTIC: failed to initialize launcher object base queues");
         DiagnosticFreeLauncherObjectInternals(object);
         std::free(object);
         return NULL;
@@ -965,7 +963,7 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     DiagnosticIntrusiveListHead* list80 =
         static_cast<DiagnosticIntrusiveListHead*>(std::malloc(sizeof(DiagnosticIntrusiveListHead)));
     if (!list80) {
-        Log("DIAGNOSTIC: failed to allocate launcher object +0x80 list head");
+        spdlog::info("DIAGNOSTIC: failed to allocate launcher object +0x80 list head");
         std::free(object);
         return NULL;
     }
@@ -975,7 +973,7 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     DiagnosticIntrusiveListHeadSmall* list8C =
         static_cast<DiagnosticIntrusiveListHeadSmall*>(std::malloc(sizeof(DiagnosticIntrusiveListHeadSmall)));
     if (!list8C) {
-        Log("DIAGNOSTIC: failed to allocate launcher object +0x8c list head");
+        spdlog::info("DIAGNOSTIC: failed to allocate launcher object +0x8c list head");
         std::free(list80);
         std::free(object);
         return NULL;
@@ -986,12 +984,12 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     ++g_LauncherObjectBuildState.buildGeneration;
     g_LauncherObjectBuildState.currentObject = object;
 
-    Log(
-        "DIAGNOSTIC: built launcher object scaffold like 0x40a380/0x431c30 ptr=%p size=0x%zx generation=%u",
-        object,
+    spdlog::info(
+        "DIAGNOSTIC: built launcher object scaffold like 0x40a380/0x431c30 ptr={} size={} generation={}",
+        fmt::ptr(object),
         sizeof(MinimalLauncherObjectStub),
-        (unsigned)g_LauncherObjectBuildState.buildGeneration);
-    Log(
+        g_LauncherObjectBuildState.buildGeneration);
+    spdlog::info(
         "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x0c/+0x34 faithful queue skeletons initialized +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to faithful placeholders, full primary 13-slot vtable surface now exposed; slot5 models the proven empty-list80 miss path and slot10 matches the original zero-return stub");
     LogPointerWords("LauncherObject self", object, 8);
     LogPointerWords("LauncherObject queue0C", &object->queue0C, 8);
@@ -1008,16 +1006,16 @@ static void DiagnosticRegisterLauncherObjectWithMediator(void* mediatorPtr, void
 
     void** vtable = *(void***)mediatorPtr;
     if (!vtable || !vtable[2]) {
-        Log("DIAGNOSTIC: mediator register slot unavailable for launcher object handoff");
+        spdlog::info("DIAGNOSTIC: mediator register slot unavailable for launcher object handoff");
         return;
     }
 
     typedef int (__thiscall *RegisterEngineFn)(void*, void*);
     RegisterEngineFn fn = (RegisterEngineFn)vtable[2];
     int result = fn(mediatorPtr, launcherObjectPtr);
-    Log(
-        "DIAGNOSTIC: mediator +0x08 register launcher object(%p) -> %d",
-        launcherObjectPtr,
+    spdlog::info(
+        "DIAGNOSTIC: mediator +0x08 register launcher object({}) -> {}",
+        fmt::ptr(launcherObjectPtr),
         result);
 }
 
@@ -1028,9 +1026,9 @@ void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* medi
         *outLauncherObjectPtr = object;
     }
 
-    Log(
-        "DIAGNOSTIC: using launcher object scaffold for arg5 (%p, size=0x%zx)",
-        object,
+    spdlog::info(
+        "DIAGNOSTIC: using launcher object scaffold for arg5 ptr={} size={}",
+        fmt::ptr(object),
         sizeof(MinimalLauncherObjectStub));
 
     if (object) {
@@ -1039,7 +1037,7 @@ void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* medi
     }
 
     if (mediatorPtr && object) {
-        Log("DIAGNOSTIC: mirroring original handoff: registering arg5 through arg6 before InitClientDLL");
+        spdlog::info("DIAGNOSTIC: mirroring original handoff: registering arg5 through arg6 before InitClientDLL");
         DiagnosticRegisterLauncherObjectWithMediator(mediatorPtr, object);
     }
 }
