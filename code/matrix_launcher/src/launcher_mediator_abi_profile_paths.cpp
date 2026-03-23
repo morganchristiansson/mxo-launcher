@@ -6,8 +6,8 @@ struct __attribute__((packed)) DiagnosticMediatorSelectionPacked {
     uint8_t reserved0;
     uint8_t reserved1;
     uint8_t reserved2;
-    const char* mappedName; // read by client as dword at +0x03
-    uint32_t selectionId;   // read by client as dword at +0x07
+    uint32_t field03; // read by client as dword at +0x03
+    uint32_t field07; // read by client as dword at +0x07
 };
 
 struct DiagnosticMediatorSelectionObject {
@@ -15,7 +15,11 @@ struct DiagnosticMediatorSelectionObject {
     DiagnosticMediatorSelectionPacked* packed; // read by client as dword at +0x10
 };
 
-static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
+static_assert(offsetof(DiagnosticMediatorSelectionPacked, field03) == 0x03);
+static_assert(offsetof(DiagnosticMediatorSelectionPacked, field07) == 0x07);
+static_assert(offsetof(DiagnosticMediatorSelectionObject, packed) == 0x10);
+
+static DiagnosticMediatorSelectionPacked g_MediatorSelectionPacked = {0, 0, 0, 0u, 0u};
 static DiagnosticMediatorSelectionObject g_MediatorSelectionObject = {};
 
 struct __attribute__((packed)) DiagnosticMediatorCurrentSlotRecordPayload {
@@ -68,6 +72,7 @@ static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* 
 
 static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex);
 static bool DiagnosticMediatorVariantIndexMatchesConfiguredSelection(uint32_t variantIndex);
+static void PopulateMediatorCurrentSlotRecordObject();
 
 // UNANCHORED: scaffold selection-resolution helpers layered over the CLTLoginMediator sidecar model.
 static const char* DiagnosticMediatorWorldNameForIndex(uint32_t worldIndex) {
@@ -152,15 +157,31 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
         return NULL;
     }
 
-    g_MediatorSelectionPacked.mappedName = worldName;
-    g_MediatorSelectionPacked.selectionId = DiagnosticMediatorMappedSelectionId();
+    PopulateMediatorCurrentSlotRecordObject();
+
+    const bool profilePathCaller = IsProfilePathBuilderCaller(returnAddress);
+    const char* descriptorShape = "world-shaped";
+    uint32_t field03 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worldName));
+    uint32_t field07 = DiagnosticMediatorMappedSelectionId();
+    if (profilePathCaller) {
+        descriptorShape = "current-slot-id-shaped";
+        field03 = g_MediatorCurrentSlotRecordPayload.characterIdLow03;
+        field07 = g_MediatorCurrentSlotRecordPayload.characterIdHigh07;
+        if (field03 == 0u && field07 == 0u) {
+            field03 = DiagnosticAuthCurrentCharacterIdLow();
+            field07 = DiagnosticAuthCurrentCharacterIdHigh();
+        }
+    }
+
+    g_MediatorSelectionPacked.field03 = field03;
+    g_MediatorSelectionPacked.field07 = field07;
     g_MediatorSelectionObject.packed = &g_MediatorSelectionPacked;
 
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         ((low24 == DiagnosticMediatorSelectedWorldIndexLow24()) ? "low24-world-match" : "other-match");
     spdlog::info(
-        "MediatorStub::GetSelectionDescriptor(selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> {} (matchMode={} mappedName='{}' packedSelectionId=0x{:06x} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
+        "MediatorStub::GetSelectionDescriptor(selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> {} (matchMode={} descriptorShape={} mappedName='{}' field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
         static_cast<unsigned>(selectionIndex),
         static_cast<unsigned>(low24),
         static_cast<unsigned>(high8),
@@ -168,8 +189,11 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
         DescribeMediatorCaller(returnAddress),
         fmt::ptr(&g_MediatorSelectionObject),
         matchMode,
+        descriptorShape,
         worldName,
-        static_cast<unsigned>(g_MediatorSelectionPacked.selectionId),
+        static_cast<unsigned>(g_MediatorSelectionPacked.field03),
+        static_cast<unsigned>(g_MediatorSelectionPacked.field07),
+        fmt::ptr(reinterpret_cast<const void*>(static_cast<uintptr_t>(g_MediatorSelectionPacked.field03))),
         static_cast<unsigned>(DiagnosticMediatorSelectedWorldIndexLow24()),
         static_cast<unsigned>(DiagnosticMediatorSelectedVariantIndexHigh8()),
         static_cast<unsigned>(expectedScratchRequest));
@@ -239,6 +263,31 @@ static void PopulateMediatorCurrentSlotRecordObject() {
     }
 }
 
+static const char* DiagnosticMediatorCurrentCharacterNameForProfilePath() {
+    PopulateMediatorCurrentSlotRecordObject();
+    if (g_MediatorCurrentSlotRecordObject.heapString14 && g_MediatorCurrentSlotRecordObject.heapString14[0]) {
+        return g_MediatorCurrentSlotRecordObject.heapString14;
+    }
+
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
+    if (mediator) {
+        const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
+        if (ownerState.characterNameBufferF1c[0]) {
+            return ownerState.characterNameBufferF1c;
+        }
+        if (ownerState.sourceLeadString108[0]) {
+            return ownerState.sourceLeadString108.data();
+        }
+    }
+
+    const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
+    if (authCharacterName && authCharacterName[0]) {
+        return authCharacterName;
+    }
+
+    return DiagnosticMediatorMappedSelectionName();
+}
+
 // anchor: launcher.exe:0x41f300
 // vtable: ILTLoginMediator.Default slot +0x44
 // Current mcd.cfg crash stopper: `client.dll:0x62197560` only gates on non-null here before the
@@ -272,11 +321,16 @@ static void* __thiscall Mediator_GetCurrentSlotRecord44(MinimalLoginMediatorStub
 
 // anchor: later client startup path calls arg6 +0x48 before the now-better-understood
 // observer registration / startup-triple handoff sequence
+// practical current note from client.dll profile-path work:
+// - the broader client path later formats `Profiles\%s\%s_%X\`
+// - and the middle `%s` is sourced from client-global `DAT_629de48c`
+// - current replacement evidence points to the earlier +0x48-fed name path as the highest-value
+//   narrow source to keep character-shaped instead of world-shaped on the active route
 // vtable: ILTLoginMediator.Default slot +0x48
 static const char* __thiscall Mediator_GetWorldOrSelectionName(MinimalLoginMediatorStub* self) {
     (void)self;
     void* returnAddress = __builtin_return_address(0);
-    const char* worldOrSelectionName = DiagnosticMediatorMappedSelectionName();
+    const char* worldOrSelectionName = DiagnosticMediatorCurrentCharacterNameForProfilePath();
     LogMediatorNameGetterDetails("GetWorldOrSelectionName(+0x48)", returnAddress, worldOrSelectionName);
     return worldOrSelectionName;
 }

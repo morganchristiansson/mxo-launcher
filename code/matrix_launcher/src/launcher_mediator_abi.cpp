@@ -424,7 +424,7 @@ static void ResetMediatorObjectState() {
     g_MediatorSelectionContextCopyValid = false;
     delete g_DiagnosticMediatorModel;
     g_DiagnosticMediatorModel = new mxo::ltlogin::CLTLoginMediator();
-    g_MediatorSelectionPacked = {0, 0, 0, g_MediatorStringC, 0};
+    g_MediatorSelectionPacked = DiagnosticMediatorSelectionPacked{0, 0, 0, 0u, 0u};
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
 
@@ -1238,8 +1238,9 @@ void DiagnosticConfigureMediatorSelection(
         selectedVariantIndexHigh8,
         selectedWorldType,
         selectedVariantState);
-    g_MediatorSelectionPacked.mappedName = mediator->Arg6MappedSelectionName();
-    g_MediatorSelectionPacked.selectionId = mediator->Arg6MappedSelectionId();
+    g_MediatorSelectionPacked.field03 =
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(mediator->Arg6MappedSelectionName()));
+    g_MediatorSelectionPacked.field07 = mediator->Arg6MappedSelectionId();
 
     Log(
         "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive=%u variantUpperBoundExclusive=%u worldName='%s' variantName='%s' selectedWorldLow24=0x%06x selectedVariantHigh8=0x%02x selectedWorldType=%u selectedVariantState=%u",
