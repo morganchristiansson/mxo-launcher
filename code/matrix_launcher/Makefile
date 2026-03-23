@@ -79,9 +79,9 @@ $(BUILD_DIR)/matrixstaging/%.o: matrixstaging/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 # Target depends on launcher objects and cryptopp (spdlog is order-only prerequisite)
-$(TARGET): $(LAUNCHER_OBJS) $(CRYPTOPP_LIB) | $(SPDLOG_DIR)
+$(TARGET): $(LAUNCHER_OBJS) | $(SPDLOG_DIR) $(CRYPTOPP_LIB)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32
+	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32 -lcryptopp -Lbuild
 
 # Download cryptopp and spdlog if they don't exist
 $(CRYPTOPP_DIR):
@@ -134,7 +134,7 @@ restore_crashreporter:
 		rm -f crashreporter.stub.exe
 
 clean:
-	rm -f $(TARGET) $(CRASHREPORTER_STUB)
+	rm -f $(TARGET)
 	rm -rf $(BUILD_DIR)
 
 .PHONY: all run crashdump install_crashreporter_stub restore_crashreporter clean
