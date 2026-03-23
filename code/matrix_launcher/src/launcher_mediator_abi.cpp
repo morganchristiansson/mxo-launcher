@@ -46,11 +46,9 @@ static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
 static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
 DiagnosticMediatorRuntimeState g_MediatorRuntimeState = {};
 void* g_LoginMediatorVtable[104] = {0};
-static const char g_MediatorName[] = "ILTLoginMediator.Default";
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringC[] = "standalone";
 static const char g_MediatorEmptyString[] = "";
-static mxo::ltlogin::CLTLoginMediator* g_DiagnosticMediatorModel = NULL;
 
 static constexpr size_t kDiagnosticSelectionContextSize = 0xb4; // from client.dll:6211d3e0 zero-init of the +0xec handoff object
 struct DiagnosticMediatorSelectionContextCopy {
@@ -84,10 +82,10 @@ static const char* MaskedSensitiveValue(const char* value) {
 
 // UNANCHORED: sidecar-model accessor for the replacement arg6 ABI shell.
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
-    if (!g_DiagnosticMediatorModel) {
-        g_DiagnosticMediatorModel = new mxo::ltlogin::CLTLoginMediator();
+    if (!mxo::ltlogin::ILTLoginMediator::Default) {
+        mxo::ltlogin::ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
     }
-    return g_DiagnosticMediatorModel;
+    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
 }
 
 static mxo::ltlogin::CLTLoginMediator* DiagnosticGetActiveMediatorForCharacterState() {
@@ -419,8 +417,8 @@ static void ResetMediatorObjectState() {
     g_MediatorCurrentSlotRecordPayload = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     g_MediatorCurrentSlotRecordNameOwned.clear();
     g_MediatorSelectionContextCopyValid = false;
-    delete g_DiagnosticMediatorModel;
-    g_DiagnosticMediatorModel = new mxo::ltlogin::CLTLoginMediator();
+    delete mxo::ltlogin::ILTLoginMediator::Default;
+    mxo::ltlogin::ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
     g_MediatorSelectionPacked = DiagnosticMediatorSelectionPacked{0, 0, 0, 0u, 0u};
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
@@ -429,33 +427,33 @@ static void ResetMediatorObjectState() {
 // vtable: ILTLoginMediator.Default slot +0x00
 static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
     (void)self;
-    return g_MediatorName;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetName();
 }
 
 // anchor: launcher.exe:0x40a3e9..0x40a3fe hands the freshly built 0x4d6304 object into arg6 before InitClientDLL
 // vtable: ILTLoginMediator.Default slot +0x08
-static int __thiscall Mediator_RegisterEngine(MinimalLoginMediatorStub* self, void* object) {
+static int __thiscall Mediator_SetNetworkEngine(MinimalLoginMediatorStub* self, void* object) {
+    // return mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine();
     g_MediatorRuntimeState.registeredLauncherObject = object;
     if (self) {
         self->field04 = object;
     }
-    spdlog::info("MediatorStub::RegisterEngine({})", object);
+    spdlog::info("MediatorStub::SetNetworkEngine({})", object);
     return 1;
-}
-
-// anchor: launcher.exe teardown path 0x40b360..0x40b409 clears the registered launcher object through arg6
-// vtable: ILTLoginMediator.Default slot +0x0c
-static void __thiscall Mediator_ClearEngine(MinimalLoginMediatorStub* self) {
-    (void)self;
-    spdlog::info("MediatorStub::ClearEngine()");
 }
 
 // anchor: client.dll early InitClientDLL readiness gate on arg6 +0x10
 // vtable: ILTLoginMediator.Default slot +0x10
 static uint32_t __thiscall Mediator_IsReady(MinimalLoginMediatorStub* self) {
     (void)self;
-    spdlog::info("MediatorStub::IsReady() -> 1");
-    return 1;
+    return mxo::ltlogin::ILTLoginMediator::Default->IsReady();
+}
+
+// anchor: launcher.exe teardown path 0x40b360..0x40b409 clears the registered launcher object through arg6
+// vtable: ILTLoginMediator.Default slot +0x0c
+static void __thiscall Mediator_ClearEngine(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator::Default->ClearEngine();
 }
 
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
@@ -1051,8 +1049,9 @@ static void InitializeMediatorStub() {
     g_MediatorCurrentSlotRecordVtable[2] = (void*)MediatorCurrentSlotRecord_AppendDebugString;
     g_MediatorCurrentSlotRecordVtable[3] = (void*)MediatorCurrentSlotRecord_ResetPayloadForSourceDescriptor;
     g_MediatorCurrentSlotRecordVtable[4] = (void*)MediatorCurrentSlotRecord_TinyHelper;
+    // Forward to ILTLoginMediator::Default vtable slot 0 (original Mediator_GetName)
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
-    g_LoginMediatorVtable[2] = (void*)Mediator_RegisterEngine;   // +0x08
+    g_LoginMediatorVtable[2] = (void*)Mediator_SetNetworkEngine; // +0x08
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
     g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c

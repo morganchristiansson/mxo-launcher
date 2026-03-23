@@ -15,7 +15,7 @@ namespace mxo::ltlogin {
 namespace {
 
 using PostAuthMarginLoadingState = CLTLoginMediator::PostAuthMarginLoadingState;
-using SlotRecordState = CLTLoginMediator::SlotRecordState004b5328;
+using SlotRecordState = SlotRecordState004b5328;
 
 static std::string FormatU32x4Block(const std::array<uint32_t, 4>& block) {
     return fmt::format(
@@ -493,7 +493,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
-    const CLTLoginMediator::SlotRecordState004b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
+    const SlotRecordState004b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
     State8StructuredMarginPacketBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();
 

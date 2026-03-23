@@ -50,3 +50,5 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel();
 void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount);
 void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount);
 void RegisterMediatorState9AbiSlots();
+
+static const char g_MediatorName[] = "ILTLoginMediator.Default";

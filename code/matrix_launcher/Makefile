@@ -65,7 +65,7 @@ LAUNCHER_ARGS = -nopatch -noeula $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_
 
 all: $(TARGET)
 
-CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp
+CXXFLAGS = -Wall -Wextra -O2 -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -I$(CURDIR)/matrixstaging/game/src/libltclientlogin -I$(CURDIR)/matrixstaging/runtime/src/liblttcp -I$(CURDIR)/src/liblttcp -Isrc
 
 # Object file for each source
 # Object file for each source - pattern rule handles all src/*.cpp files

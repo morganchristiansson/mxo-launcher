@@ -10,6 +10,9 @@
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
 #include "../../../runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
+// Include after forward declaration to avoid circular dependency
+#include "loginmediator_base.h"
+
 namespace mxo {
 namespace ltlogin {
 
@@ -53,7 +56,8 @@ class CLTLoginState_WorldListPending;
 //   - keep launcher-owned auth/session state transitions here
 //   - do not collapse `LaunchPadClient`-style pre-game account/subscription handling into the
 //     direct auth TCP packet layer just because both live under `libltclientlogin`
-class CLTLoginMediator {
+
+class CLTLoginMediator : public ILTLoginMediator {
 public:
     static constexpr uint32_t kRecoveredWorldSlotCapacity = 100;
 
@@ -192,64 +196,6 @@ public:
         size_t nextIndex = 0;
     };
 
-    struct AuthBootstrapSelectedSource38Sketch {
-        struct SmallStringLike60Sketch {
-            // Same three-dword small-string family used by `0x407dd0`:
-            // - `+0x00` = begin/data pointer
-            // - `+0x04` = current/end pointer
-            // - `+0x08` = capacity/end-of-storage pointer
-            // launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch only consumes the first dword here as a raw `char*` for its arg9 path,
-            // but `0x41eb80` proves the full embedded small-string object still lives here.
-            const char* begin = nullptr;
-            const char* current = nullptr;
-            const char* capacity = nullptr;
-        };
-
-        // Current best concrete family returned by owner vtable `+0x38`:
-        // - getter is tiny function `0x41f0a0 = lea eax,[ecx+0x94] ; ret`
-        // - so this is an **embedded owner subobject at `0x4f78b8 + 0x94`**, not a separate heap object
-        // - owner vtable `+0x30` / `0x41ecd0` then acts as the corresponding setter/consumer and
-        //   uses `0x41eb80` to copy the same family into owner `+0x94`
-        // - owner vtable `+0x150` / `0x41f270` is now also a direct first-string writer for the
-        //   same block and copies up to `0x20` bytes into owner `+0x94`
-        //
-        // Current best recovered layout from launcher.exe:0x41f0a0 + launcher.exe:0x41ecd0 + launcher.exe:0x41eb80 + launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
-        // plus later owner-path uses like `0x43f300`, `0x41330`, `0x21a50`, and `0x20720`:
-        // - `+0x00 .. +0x1f` = first inline 32-byte NUL-terminated string
-        // - `+0x20 .. +0x3f` = second inline 32-byte NUL-terminated string
-        // - `+0x40 .. +0x4f` = first copied 16-byte block
-        // - `+0x50 .. +0x5f` = second copied 16-byte block
-        // - `+0x60 .. +0x68` = embedded small-string object
-        // - `+0x6c` = trailing byte/flag
-        //
-        // Newer semantic anchors on individual fields:
-        // - `+0x00` first string:
-        //   - owner vtable `+0x150` / `0x41f270` writes it directly
-        //   - later auth-reply path `0x43f300 -> owner +0x150` feeds it from `0x43d480(...)`
-        // - `+0x20` second string:
-        //   - later copied into bootstrap `+0xf8` by `0x41330`
-        //   - `0x41330 -> 0x456c40` validates it against a concrete slash+6-digit shape
-        // - `+0x60` embedded small string:
-        //   - empty case falls through a literal `"STATION"` default path in `0x489bc0`
-        //   - non-empty case is later copied into owner `+0x65c + 0x18` through `0x21a50`
-        //   - that same helper-local string is then copied onward into owner `+0x664`
-        //     (`GameSessionID`) by `0x420e70` when helper flag `+0x2d` is clear
-        //
-        // Current best semantic read is therefore stronger than a generic auth blob but still
-        // deliberately provisional on exact original class name:
-        // an owner-side **station/bootstrap phase-2 auth source block** that later separate
-        // LaunchPad/session helpers also touch.
-        // Keep this on the mediator owner because it is shared state, not because the mediator and
-        // LaunchPadClient are the same class.
-        std::array<char, 0x20> inlineString00{};
-        std::array<char, 0x20> inlineString20{};
-        std::array<uint8_t, 16> block40{};
-        std::array<uint8_t, 16> block50{};
-        SmallStringLike60Sketch string60;
-        std::string string60Owned;         // source-owned backing storage for the copied `+0x60` small-string mirror
-        uint8_t flag6C = 0;
-    };
-
     struct AuthBootstrapReplyShadowF4Sketch {
         // Bounded source-owned mirror of the heap block copied into bootstrap `+0xf4` by the
         // opcode-`0x0b` / auth-reply bootstrap handler (`0x448140`).
@@ -343,22 +289,6 @@ public:
         std::array<uint8_t, 16> transformedRegion10{};
     };
 
-    struct SessionCallbackHelper65cSketch {
-        // Current best source-owned mirror of the lazy helper at owner `+0x65c`.
-        // Concrete chain now in scope:
-        // - owner vtable `+0x130` / `0x41f310` returns this helper
-        // - owner vtable `+0x134` / `0x420d00` lazy-allocates it through `0x420ca0`
-        // - helper `+0x18` is a small-string object
-        // - `0x421a50` refreshes that helper string from owner `+0x94 + 0x60`
-        // - `0x420e70` then copies helper `+0x18` into owner `+0x664`
-        void* owner10 = nullptr;            // helper `+0x10`
-        std::string string18;               // helper `+0x18`
-        uint32_t field24 = 0;               // helper `+0x24`
-        uint32_t field28 = 0;               // helper `+0x28`
-        uint8_t flag2C = 0;                 // helper `+0x2c`
-        uint8_t flag2D = 0;                 // helper `+0x2d`
-    };
-
     // launcher.exe owner object `0x4f78b8` - active login / margin / load-character state.
     // Keep only the source-owned field sketches needed by current code here; deeper evidence lives
     // in the canonical docs.
@@ -378,21 +308,6 @@ public:
         std::array<uint32_t, 4> block84{};             // input `+0x84 .. +0x93`
         std::array<uint32_t, 4> block94{};             // input `+0x94 .. +0xa3`
         std::array<uint32_t, 4> blockA4{};             // input `+0xa4 .. +0xb3`
-    };
-
-    struct ProcessLoginRequestInputSketch {
-        // owner vtable `+0x30` / `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest`
-        // Live input shape confirmed:
-        // - `+0x00` = username
-        // - `+0x20` = password
-        // Default branch copies this into owner `+0x94`, clears owner `+0xf4`, then moves to
-        // helper/state `2`.
-        std::array<char, 0x20> inlineString00{};     // input `+0x00 .. +0x1f` = username
-        std::array<char, 0x20> inlineString20{};     // input `+0x20 .. +0x3f` = password
-        std::array<uint8_t, 16> block40{};           // input `+0x40 .. +0x4f`
-        std::array<uint8_t, 16> block50{};           // input `+0x50 .. +0x5f`
-        AuthBootstrapSelectedSource38Sketch::SmallStringLike60Sketch string60; // input `+0x60 .. +0x68`
-        uint8_t flag6C = 0;                          // input `+0x6c`
     };
 
     struct ProcessLoginCredentialsInputSketch {
@@ -626,32 +541,17 @@ public:
         uint8_t populationLevel1f = 0;
     };
 
-    struct SlotRecordState004b5328 {
-        // Current best source-owned mirror of the heap object allocated by `0x4398b0` and stored
-        // under owner `+0x688[index]` by `0x4401a0`.
-        // Address / vtable anchors:
-        // - ctor/init: `0x4398b0`
-        // - dtor: `0x439910`
-        // - debug printer: `0x43dc80`
-        // - payload reset/prepare: `0x439940`
-        // - heap-string copy helper: `0x43aa80`
-        // Current recovered fields of interest:
-        // - object `+0x14` = heap string written by `0x43aa80`
-        // - object `+0x10 + 0x03` = paired id low dword
-        // - object `+0x10 + 0x07` = paired id high dword
-        // - object `+0x10 + 0x0b` = status byte
-        // - object `+0x10 + 0x0c` = world id word
-        std::string heapString14;
-        uint32_t globalCharacterIdLow03 = 0;
-        uint32_t globalCharacterIdHigh07 = 0;
-        uint8_t status0b = 0;
-        uint16_t worldId0c = 0;
-    };
-
     CLTLoginMediator();
     ~CLTLoginMediator();
 
+    // +0x00
+    const char* GetName() override;
+    // +0x08
     void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
+    // +0x0c
+    void ClearEngine() override;
+    // +0x10
+    uint32_t IsReady() override;
 
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
@@ -955,6 +855,7 @@ public:
     //   posts event 0x16 on completion
     // =============================================================================
 
+    // +0x24
     // anchor: launcher.exe:0x41ecd0
     uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input);
 

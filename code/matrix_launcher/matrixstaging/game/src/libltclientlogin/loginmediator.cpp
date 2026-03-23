@@ -27,6 +27,7 @@
 
 #include "../../../../src/diagnostics.h"
 #include "loginstate.h"
+#include "launcher_mediator_abi_shared.h"
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -248,7 +249,7 @@ static void AppendOwnedSectionBytes(void*& buffer, uint16_t& length, const uint8
 }
 
 static void AssignOwnedSmallString(
-    CLTLoginMediator::AuthBootstrapSelectedSource38Sketch& dest,
+    AuthBootstrapSelectedSource38Sketch& dest,
     const char* begin,
     const char* current) {
     dest.string60Owned.clear();
@@ -336,6 +337,12 @@ CLTLoginMediator::~CLTLoginMediator() {
     EraseRecoveredAuthBootstrapSidecar(this);
 }
 
+// +0x00
+const char* CLTLoginMediator::GetName() {
+    return g_MediatorName;
+}
+
+// +0x08
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
     engine_ = engine;
     if (authConnection_) {
@@ -347,6 +354,17 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
             marginConnection->SetMarginEngine(engine_);
         }
     }
+}
+
+// +0x0c
+// anchor launcher.exe!0x0041f060
+void CLTLoginMediator::ClearEngine() {
+    spdlog::info("MediatorStub::ClearEngine()");
+}
+// +0x10
+uint32_t CLTLoginMediator::IsReady() {
+    spdlog::info("CLTLoginMediator::IsReady() -> 1");
+    return 1;
 }
 
 void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
@@ -663,7 +681,7 @@ uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
 }
 
 uint32_t CLTLoginMediator::BeginAuthHandshake() {
-    // Address anchors (NOW WITH ACTUAL FUNCTION NAMES):
+    // Address anchors:
     // - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
     // - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch (upstream dispatcher)
     // - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (raw 0x06 send builder)
@@ -1090,7 +1108,7 @@ uint32_t CLTLoginMediator::State11HandleLoadCharacterReplyScaffold(const uint8_t
 }
 
 // anchor: launcher.exe:0x41f2e0
-const CLTLoginMediator::SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
+const SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
     if (slotIndex >= slotRecordValid688_.size() || !slotRecordValid688_[slotIndex]) {
         return nullptr;
     }
@@ -1098,7 +1116,7 @@ const CLTLoginMediator::SlotRecordState004b5328* CLTLoginMediator::GetSlotRecord
 }
 
 // anchor: launcher.exe:0x41f300
-const CLTLoginMediator::SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
+const SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
     return GetSlotRecordByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8);
 }
 
@@ -1233,7 +1251,7 @@ void CLTLoginMediator::SetSharedMarginPacketField660(uint32_t value) {
 }
 
 // anchor: launcher.exe:0x420d00
-CLTLoginMediator::SessionCallbackHelper65cSketch* CLTLoginMediator::EnsureSessionCallbackHelper65c() {
+SessionCallbackHelper65cSketch* CLTLoginMediator::EnsureSessionCallbackHelper65c() {
     if (sessionCallbackHelper65c_ == nullptr) {
         sessionCallbackHelper65cState_ = SessionCallbackHelper65cSketch();
         sessionCallbackHelper65cState_.owner10 = this;
@@ -2560,5 +2578,8 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
     }
     return marginConnection_;
 }
+
+// ILTLoginMediator::Default - static member initialization (original: launcher.exe:0x4d2c58)
+ILTLoginMediator* ILTLoginMediator::Default = nullptr;
 
 }  // namespace mxo::ltlogin

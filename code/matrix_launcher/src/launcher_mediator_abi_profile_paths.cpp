@@ -234,7 +234,7 @@ static void PopulateMediatorCurrentSlotRecordObject() {
     g_MediatorCurrentSlotRecordNameOwned.clear();
 
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const mxo::ltlogin::CLTLoginMediator::SlotRecordState004b5328* currentSlotRecord =
+    const mxo::ltlogin::SlotRecordState004b5328* currentSlotRecord =
         mediator ? mediator->GetCurrentSlotRecord() : nullptr;
     if (!currentSlotRecord && mediator) {
         currentSlotRecord = mediator->GetSlotRecordByIndex(0u);
