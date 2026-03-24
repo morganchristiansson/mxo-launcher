@@ -137,11 +137,11 @@ class ILTLoginMediator {
 public:
     static ILTLoginMediator* Default;
     // +0x00
-    virtual const char* GetName();
+    virtual const char* GetName() = 0;
     // +0x04
     void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride);
     // +0x08
-    virtual void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
+    virtual void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) = 0;
     // +0x0c
     virtual void ClearEngine();
     // +0x10
@@ -183,9 +183,9 @@ public:
     // +0x58
     uint8_t UnknownSlot21();
     // +0x5c
-    void* UnknownSlot22();
+    virtual const char* GetString2(const char* value) = 0;
     // +0x60
-    void* UnknownSlot23();
+    virtual const char* GetString1(const char* value) = 0;
     // +0x64
     void UnknownSlot24();
     // +0x68

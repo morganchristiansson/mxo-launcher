@@ -367,6 +367,24 @@ uint32_t CLTLoginMediator::IsReady() {
     return 1;
 }
 
+// +0x5c
+const char* CLTLoginMediator::GetString2(const char* value) {
+    spdlog::info(
+        "MediatorStub::GetString2(+0x5c value='{}') -> '{}'",
+        MaskIfMediatorPassword(value),
+        DiagnosticMediatorAuthName());
+    return DiagnosticMediatorAuthName();
+}
+
+// +0x60
+const char* CLTLoginMediator::GetString1(const char* value) {
+    spdlog::info(
+        "MediatorStub::GetString1(+0x60 value='{}') -> {}",
+        value ? value : "<null>",
+        MaskedSensitiveValue(DiagnosticMediatorAuthPassword()));
+    return DiagnosticMediatorAuthPassword();
+}
+
 void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
     currentState_ = state;
 }

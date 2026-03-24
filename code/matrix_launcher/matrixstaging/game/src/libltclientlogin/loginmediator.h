@@ -552,6 +552,10 @@ public:
     void ClearEngine() override;
     // +0x10
     uint32_t IsReady() override;
+    // +0x5c
+    const char* GetString2(const char* value) override;
+    // +0x60
+    const char* GetString1(const char* value) override;
 
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;

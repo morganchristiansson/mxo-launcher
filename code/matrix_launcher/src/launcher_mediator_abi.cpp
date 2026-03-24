@@ -75,7 +75,7 @@ static DiagnosticSmallStringLike g_MediatorRouteDescriptor10c = {};
 static DiagnosticVectorLike g_MediatorLateEntryList118 = {};
 
 // UNANCHORED: diagnostic masking helper for auth/password log surfaces.
-static const char* MaskedSensitiveValue(const char* value) {
+const char* MaskedSensitiveValue(const char* value) {
     if (!value || !value[0]) return "<empty>";
     return "<provided>";
 }
@@ -146,12 +146,12 @@ static const char* DiagnosticMediatorProfileName() {
     return mediator ? mediator->Arg6ProfileName() : g_MediatorStringA;
 }
 
-static const char* DiagnosticMediatorAuthName() {
+const char* DiagnosticMediatorAuthName() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6AuthName() : DiagnosticMediatorProfileName();
 }
 
-static const char* DiagnosticMediatorAuthPassword() {
+const char* DiagnosticMediatorAuthPassword() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6AuthPassword() : g_MediatorEmptyString;
 }
@@ -286,7 +286,7 @@ static void LogMediatorNameGetterDetails(
 #include "launcher_mediator_abi_mcd.cpp"
 
 // UNANCHORED: masks reflected password arguments in mediator-chain logs.
-static const char* MaskIfMediatorPassword(const char* value) {
+const char* MaskIfMediatorPassword(const char* value) {
     if (!value) return "<null>";
     const char* authPassword = DiagnosticMediatorAuthPassword();
     if (authPassword && authPassword[0] && std::strcmp(value, authPassword) == 0) {
