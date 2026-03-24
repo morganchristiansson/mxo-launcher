@@ -1878,11 +1878,11 @@ uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChalle
     // - exact original raw 0x0a builder/send VA: [not yet isolated]
     // - launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
     if (authPassword_.empty()) {
-        spdlog::info("DIAGNOSTIC: launcher-owned auth received AS_AuthChallenge but has no password to send in AS_AuthChallengeResponse");
+        spdlog::error("launcher-owned auth received AS_AuthChallenge but has no password to send in AS_AuthChallengeResponse");
         return 0;
     }
     if (lastAuthRequestBuildResult_.twofishKeyBytes.size() != 16u) {
-        spdlog::info("DIAGNOSTIC: launcher-owned auth missing Twofish key from AS_AuthRequest build result");
+        spdlog::error("launcher-owned auth missing Twofish key from AS_AuthRequest build result");
         return 0;
     }
 
@@ -1896,7 +1896,7 @@ uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChalle
             layout,
             mxo::auth::kFrameModeAuto,
             &buildResult)) {
-        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthChallengeResponse");
+        spdlog::error("launcher-owned auth failed to build AS_AuthChallengeResponse");
         return 0;
     }
 

@@ -10,12 +10,12 @@
 
 static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
-        spdlog::info("{}: <null>", label ? label : "PointerWords");
+        spdlog::debug("{}: <null>", label ? label : "PointerWords");
         return;
     }
 
     const uint32_t* words = static_cast<const uint32_t*>(ptr);
-    spdlog::info("{} @ {} [+0x00]=0x{:08x} [+0x04]=0x{:08x} [+0x08]=0x{:08x} [+0x0c]=0x{:08x}",
+    spdlog::debug("{} @ {} [+0x00]=0x{:08x} [+0x04]=0x{:08x} [+0x08]=0x{:08x} [+0x0c]=0x{:08x}",
         label,
         fmt::ptr(ptr),
         words[0],
@@ -23,7 +23,7 @@ static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCou
         (wordCount > 2) ? words[2] : 0,
         (wordCount > 3) ? words[3] : 0);
     if (wordCount > 4) {
-        spdlog::info("{} @ {} [+0x10]=0x{:08x} [+0x14]=0x{:08x} [+0x18]=0x{:08x} [+0x1c]=0x{:08x}",
+        spdlog::debug("{} @ {} [+0x10]=0x{:08x} [+0x14]=0x{:08x} [+0x18]=0x{:08x} [+0x1c]=0x{:08x}",
             label,
             fmt::ptr(ptr),
             words[4],
@@ -718,7 +718,7 @@ static void DiagnosticLogLauncherRuntimeQueueState(
     const bool queue0SameBlock = (object->queue0C.block0 == object->queue0C.block1);
     const bool queue34SameBlock = (object->queue34.block0 == object->queue34.block1);
 
-    spdlog::info(
+    spdlog::debug(
         "LauncherObject runtime state[{}] count={}]: self={}, field04={}, field7C={}, q0(current0={}, current1={}, block0={}, block1={}, slotsCurrent={}, slotsLast={}, sameCursor={}, sameBlock={}) q34(current0={}, current1={}, block0={},",
         source,
         (unsigned)count,
@@ -807,7 +807,7 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     DiagnosticAuthPollLiveConnectionTraffic(owner);
     const uint32_t count = g_LauncherObjectBuildState.subobject60Slot0CallCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
-        spdlog::info(
+        spdlog::debug(
             "LauncherObjectStub::Subobject60::Slot0(self={} crit={} EnterCriticalSection) [count={}]",
             fmt::ptr(self),
             fmt::ptr(crit),
@@ -831,7 +831,7 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self) {
     }
     const uint32_t count = g_LauncherObjectBuildState.subobject60Slot1CallCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
-        spdlog::info(
+        spdlog::debug(
             "LauncherObjectStub::Subobject60::Slot1(self={} crit={} LeaveCriticalSection) [count={}]",
             fmt::ptr(self),
             fmt::ptr(crit),

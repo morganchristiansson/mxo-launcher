@@ -476,7 +476,7 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
     static uint32_t s_IsConnectedCount = 0;
     ++s_IsConnectedCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(s_IsConnectedCount)) {
-        spdlog::info("MediatorStub::IsConnected() -> 1 [count={:08x} self={}, registeredEngine={}",
+        spdlog::debug("MediatorStub::IsConnected() -> 1 [count={:08x} self={}, registeredEngine={}",
             s_IsConnectedCount,
             fmt::ptr(self),
             (self ? self->field04 : NULL));
