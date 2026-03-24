@@ -289,50 +289,6 @@ public:
         std::array<uint8_t, 16> transformedRegion10{};
     };
 
-    // launcher.exe owner object `0x4f78b8` - active login / margin / load-character state.
-    // Keep only the source-owned field sketches needed by current code here; deeper evidence lives
-    // in the canonical docs.
-    struct State3SelectionContextInputSketch {
-        // owner vtable `+0xec` / `0x41c1f0`
-        // Active password-submit branch persists this `0xb4` selection/config snapshot and then
-        // switches from state `3` to state `8`.
-        uint32_t slotOrSelectionIndex00 = 0;            // input `+0x00`, must be `< 100`
-        std::array<uint32_t, 4> block04{};             // input `+0x04 .. +0x13`
-        std::array<uint32_t, 4> block14{};             // input `+0x14 .. +0x23`
-        std::array<uint32_t, 4> block24{};             // input `+0x24 .. +0x33`
-        std::array<uint32_t, 4> block34{};             // input `+0x34 .. +0x43`
-        std::array<uint32_t, 4> block44{};             // input `+0x44 .. +0x53`
-        std::array<uint32_t, 4> block54{};             // input `+0x54 .. +0x63`
-        std::array<uint32_t, 4> block64{};             // input `+0x64 .. +0x73`
-        std::array<uint32_t, 4> block74{};             // input `+0x74 .. +0x83`
-        std::array<uint32_t, 4> block84{};             // input `+0x84 .. +0x93`
-        std::array<uint32_t, 4> block94{};             // input `+0x94 .. +0xa3`
-        std::array<uint32_t, 4> blockA4{};             // input `+0xa4 .. +0xb3`
-    };
-
-    struct ProcessLoginCredentialsInputSketch {
-        // owner vtable `+0x120` / `0x41c3c0`
-        // Real later branch-specific writer for the post-auth source block, but not the currently
-        // proven default password-submit branch.
-        // Current field read:
-        // - `+0x00`  -> CharacterName (`owner +0x108`)
-        // - `+0x24`  -> selected world-descriptor index / selector (`owner +0x12c`)
-        // - `+0x2c .. +0x6f` -> 17 appearance/customization ids (`owner +0x134 .. +0x177`)
-        // - `+0x70`  -> RealFirstName (`owner +0x178`)
-        // - `+0x90`  -> RealLastName (`owner +0x198`)
-        // - `+0xb0`  -> Background (`owner +0x1b8`)
-        std::array<char, 0x20> string00{};              // input `+0x00 .. +0x1f` = CharacterName
-        uint32_t field20 = 0;                           // input `+0x20`
-        uint32_t field24 = 0;                           // input `+0x24`
-        uint32_t field28 = 0;                           // input `+0x28`
-        std::array<uint32_t, 8> dwords2c{};            // input `+0x2c .. +0x4b` = appearance ids 0..7
-        std::array<uint32_t, 8> dwords4c{};            // input `+0x4c .. +0x6b` = appearance ids 8..15
-        std::array<uint8_t, 4> bytes6c{};              // input `+0x6c .. +0x6f` = trailing appearance id 16
-        std::array<char, 0x20> string70{};             // input `+0x70 .. +0x8f` = RealFirstName
-        std::array<char, 0x20> string90{};             // input `+0x90 .. +0xaf` = RealLastName
-        std::array<char, 0x20> stringB0{};             // input `+0xb0 .. +0xcf` = Background
-    };
-
     struct State8SelectionContextSnapshotState {
         // owner writeback area filled by `0x41c1f0` on the active state `3 -> 8` branch.
         // This is the persisted selection/config snapshot, not the later post-auth appearance/name block.
@@ -581,7 +537,8 @@ public:
     void PostEventScaffold(uint32_t eventId);
     void PostErrorScaffold(uint32_t errorId);
     bool RegisterLoginObserverScaffold(void* observer);
-    bool UnregisterLoginObserverScaffold(void* observer);
+    // +0x174
+    bool UnregisterLoginObserver(void* observer) override;
     uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }
     uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
     const std::array<uint32_t, 8>& RecentPostedEventsScaffold() const { return recentPostedEventsScaffold_; }
@@ -741,7 +698,8 @@ public:
     bool Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const;
     uint32_t Arg6ExpectedSelectionDescriptorScratchRequest() const;
     bool Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
-    const char* Arg6GetWorldNameByIndex(uint32_t index);
+    // +0xfc
+    const char* GetWorldNameByIndex(uint32_t index) override;
     uint8_t Arg6GetWorldVariantByIndex(uint32_t index);
     uint8_t Arg6ValidateWorldSelection(uint8_t variant);
     uint32_t Arg6GetWorldListCount() const;
@@ -863,11 +821,13 @@ public:
     // anchor: launcher.exe:0x41ecd0
     uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input);
 
+    // +0xec
     // anchor: launcher.exe:0x41c1f0
-    uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input);
+    uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) override;
 
+    // +0x120
     // anchor: launcher.exe:0x41c3c0
-    uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input);
+    uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) override;
 
     // Internal source-owned scaffolds for active CLTLoginState vtable bodies:
     // - owner callback84 secondary-message bridge shared by state8/state9 fallbacks and state12
@@ -964,10 +924,7 @@ public:
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50
     // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
     // bootstrap `+0xa8` field. Keep that extra level explicit in source too.
-    void* BootstrapRaw08AuxHandle50() const {
-        const auto* fieldF4 = static_cast<const AuthBootstrapReplyShadowF4Sketch*>(authBootstrap680_.fieldF4);
-        return fieldF4 ? fieldF4->raw08AuxHandleA8 : nullptr;
-    }
+    void* BootstrapRaw08AuxHandle50() const override;
     const char* CharacterNameBufferF1c() { return postAuthMarginLoadingState_.characterNameBufferF1c; }
     const std::array<uint32_t, 8>& CharacterFlagsF48() { return postAuthMarginLoadingState_.characterFlagsF48; }
     const std::array<uint32_t, 8>& SecondaryCharacterDataF68() { return postAuthMarginLoadingState_.secondaryCharacterDataF68; }
@@ -1173,7 +1130,7 @@ private:
     // Address anchors for arg6 world list provider:
     // launcher.exe:0x4d3584 +0xc = vtable (ILTLoginMediator)
     // launcher.exe:0x4d3584 +0x10 = ILTLoginMediator_BuildWorldList()
-    // launcher.exe:0x4d3584 +0x14 = Arg6GetWorldNameByIndex(char*)
+    // launcher.exe:0x4d3584 +0x14 = GetWorldNameByIndex(char*)
     // launcher.exe:0x4d3584 +0x18 = Arg6GetWorldVariantByIndex(uint)
     // launcher.exe:0x4d3584 +0x1c = Arg6ValidateWorldSelection(uint -> 0 or 7)
     // launcher.exe:0x4d3584 +0x20 = Arg6GetWorldListCount(uint)

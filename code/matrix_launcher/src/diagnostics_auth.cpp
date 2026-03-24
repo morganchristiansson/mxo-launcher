@@ -451,7 +451,7 @@ static void DiagnosticApplyLoginControllerConfig() {
         // - the exact original upstream producer feeding that blob is still unresolved
         // - the replacement launcher therefore lets explicit launcher seed inputs exercise the
         //   confirmed writer without pretending we already recovered the original producer
-        mxo::ltlogin::CLTLoginMediator::ProcessLoginCredentialsInputSketch input = {};
+        mxo::ltlogin::ProcessLoginCredentialsInputSketch input = {};
         DiagnosticCopyCStringIntoFixed(
             input.string00.data(),
             input.string00.size(),
@@ -597,15 +597,15 @@ void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionCo
     if (!g_DiagnosticLoginController || !selectionContext) {
         return;
     }
-    if (byteCount < sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch)) {
+    if (byteCount < sizeof(mxo::ltlogin::State3SelectionContextInputSketch)) {
         spdlog::info(
             "DIAGNOSTIC: selection context mirror into login controller skipped byteCount=0x{:x} required=0x{:x}",
             byteCount,
-            sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch));
+            sizeof(mxo::ltlogin::State3SelectionContextInputSketch));
         return;
     }
 
-    mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch input = {};
+    mxo::ltlogin::State3SelectionContextInputSketch input = {};
     std::memcpy(&input, selectionContext, sizeof(input));
     g_DiagnosticLoginController->PersistSelectionContextForState8(input);
     spdlog::info(

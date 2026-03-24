@@ -3,7 +3,7 @@
 // already defined there.
 
 using DiagnosticMediatorProfileCharacterInfoF4 =
-    mxo::ltlogin::CLTLoginMediator::ProcessLoginCredentialsInputSketch;
+    mxo::ltlogin::ProcessLoginCredentialsInputSketch;
 
 static constexpr size_t kDiagnosticMediatorState8BodyF88Size = 0x465;
 static constexpr size_t kDiagnosticMediatorState8OverflowMax13f0 = 0x1000;
@@ -19,7 +19,7 @@ struct DiagnosticMediatorState8PersistenceF1c {
 };
 
 static_assert(
-    sizeof(mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch) == kDiagnosticSelectionContextSize,
+    sizeof(mxo::ltlogin::State3SelectionContextInputSketch) == kDiagnosticSelectionContextSize,
     "State3SelectionContextInputSketch must stay layout-compatible with the recovered arg6 +0xec 0xb4 snapshot");
 static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, string00) == 0x00);
 static_assert(offsetof(DiagnosticMediatorState8PersistenceF1c, field20) == 0x20);

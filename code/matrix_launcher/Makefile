@@ -45,7 +45,6 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/messageconnection.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator.o \
-	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_arg6.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_events.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_state9.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate.o \

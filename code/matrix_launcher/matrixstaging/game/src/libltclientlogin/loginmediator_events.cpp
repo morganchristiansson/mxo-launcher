@@ -141,7 +141,7 @@ bool CLTLoginMediator::RegisterLoginObserverScaffold(void* observer) {
     return true;
 }
 
-bool CLTLoginMediator::UnregisterLoginObserverScaffold(void* observer) {
+bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     // anchor: launcher.exe:0x41dde0
     // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
     // identifies `+0x174` as removal from the owner `+0x674` listener tree.
@@ -156,7 +156,7 @@ bool CLTLoginMediator::UnregisterLoginObserverScaffold(void* observer) {
         observer);
     if (it == observers.end()) {
         spdlog::info(
-            "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} not found count={}",
+            "CLTLoginMediator::UnregisterLoginObserver observer={} not found count={}",
             fmt::ptr(observer),
             static_cast<unsigned>(observers.size()));
         return false;

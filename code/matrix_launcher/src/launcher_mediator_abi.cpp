@@ -82,9 +82,6 @@ const char* MaskedSensitiveValue(const char* value) {
 
 // UNANCHORED: sidecar-model accessor for the replacement arg6 ABI shell.
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
-    if (!mxo::ltlogin::ILTLoginMediator::Default) {
-        mxo::ltlogin::ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
-    }
     return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
 }
 
@@ -157,12 +154,9 @@ const char* DiagnosticMediatorAuthPassword() {
 }
 
 static void DiagnosticMirrorSelectionContextIntoMediatorModel(const void* selectionContext) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (!mediator || !selectionContext) return;
-
-    mxo::ltlogin::CLTLoginMediator::State3SelectionContextInputSketch input = {};
+    mxo::ltlogin::State3SelectionContextInputSketch input = {};
     std::memcpy(&input, selectionContext, sizeof(input));
-    mediator->PersistSelectionContextForState8(input);
+    mxo::ltlogin::ILTLoginMediator::Default->PersistSelectionContextForState8(input);
     spdlog::info(
         "DIAGNOSTIC: mirrored arg6 +0xec selection context into CLTLoginMediator state3->8 snapshot slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
         (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
@@ -486,8 +480,7 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 // vtable: ILTLoginMediator.Default slot +0x50
 static void* __thiscall Mediator_GetBootstrapRaw08AuxHandle50(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    void* value = mediator ? mediator->BootstrapRaw08AuxHandle50() : nullptr;
+    void* value = mxo::ltlogin::ILTLoginMediator::Default->BootstrapRaw08AuxHandle50();
 
     static bool loggedOnce = false;
     static void* lastValue = nullptr;
@@ -973,9 +966,7 @@ extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
     g_MediatorRuntimeState.latestObserver174 = observer;
     ++g_MediatorRuntimeState.observerUnregister174Count;
 
-    const bool removed = DiagnosticEnsureMediatorModel()
-        ? DiagnosticEnsureMediatorModel()->UnregisterLoginObserverScaffold(observer)
-        : false;
+    const bool removed = mxo::ltlogin::ILTLoginMediator::Default->UnregisterLoginObserver(observer);
 
     spdlog::info(
         "MediatorStub::UnregisterLoginObserver(+0x174 observer={} self={}) [count={} removed={} caller={}]",

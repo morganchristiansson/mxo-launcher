@@ -121,6 +121,50 @@ struct ProcessLoginRequestInputSketch {
     uint8_t flag6C = 0;                          // input `+0x6c`
 };
 
+// launcher.exe owner object `0x4f78b8` - active login / margin / load-character state.
+// Keep only the source-owned field sketches needed by current code here; deeper evidence lives
+// in the canonical docs.
+struct State3SelectionContextInputSketch {
+    // owner vtable `+0xec` / `0x41c1f0`
+    // Active password-submit branch persists this `0xb4` selection/config snapshot and then
+    // switches from state `3` to state `8`.
+    uint32_t slotOrSelectionIndex00 = 0;            // input `+0x00`, must be `< 100`
+    std::array<uint32_t, 4> block04{};             // input `+0x04 .. +0x13`
+    std::array<uint32_t, 4> block14{};             // input `+0x14 .. +0x23`
+    std::array<uint32_t, 4> block24{};             // input `+0x24 .. +0x33`
+    std::array<uint32_t, 4> block34{};             // input `+0x34 .. +0x43`
+    std::array<uint32_t, 4> block44{};             // input `+0x44 .. +0x53`
+    std::array<uint32_t, 4> block54{};             // input `+0x54 .. +0x63`
+    std::array<uint32_t, 4> block64{};             // input `+0x64 .. +0x73`
+    std::array<uint32_t, 4> block74{};             // input `+0x74 .. +0x83`
+    std::array<uint32_t, 4> block84{};             // input `+0x84 .. +0x93`
+    std::array<uint32_t, 4> block94{};             // input `+0x94 .. +0xa3`
+    std::array<uint32_t, 4> blockA4{};             // input `+0xa4 .. +0xb3`
+};
+
+struct ProcessLoginCredentialsInputSketch {
+    // owner vtable `+0x120` / `0x41c3c0`
+    // Real later branch-specific writer for the post-auth source block, but not the currently
+    // proven default password-submit branch.
+    // Current field read:
+    // - `+0x00`  -> CharacterName (`owner +0x108`)
+    // - `+0x24`  -> selected world-descriptor index / selector (`owner +0x12c`)
+    // - `+0x2c .. +0x6f` -> 17 appearance/customization ids (`owner +0x134 .. +0x177`)
+    // - `+0x70`  -> RealFirstName (`owner +0x178`)
+    // - `+0x90`  -> RealLastName (`owner +0x198`)
+    // - `+0xb0`  -> Background (`owner +0x1b8`)
+    std::array<char, 0x20> string00{};              // input `+0x00 .. +0x1f` = CharacterName
+    uint32_t field20 = 0;                           // input `+0x20`
+    uint32_t field24 = 0;                           // input `+0x24`
+    uint32_t field28 = 0;                           // input `+0x28`
+    std::array<uint32_t, 8> dwords2c{};            // input `+0x2c .. +0x4b` = appearance ids 0..7
+    std::array<uint32_t, 8> dwords4c{};            // input `+0x4c .. +0x6b` = appearance ids 8..15
+    std::array<uint8_t, 4> bytes6c{};              // input `+0x6c .. +0x6f` = trailing appearance id 16
+    std::array<char, 0x20> string70{};             // input `+0x70 .. +0x8f` = RealFirstName
+    std::array<char, 0x20> string90{};             // input `+0x90 .. +0xaf` = RealLastName
+    std::array<char, 0x20> stringB0{};             // input `+0xb0 .. +0xcf` = Background
+};
+
 // =============================================================================
 // ILTLoginMediator - VTable 0x004b01c8 pure virtual interface
 // =============================================================================
@@ -177,7 +221,7 @@ public:
     // +0x4c
     void UnknownSlot18();
     // +0x50
-    uint8_t UnknownSlot19();
+    virtual void* BootstrapRaw08AuxHandle50() const = 0;
     // +0x54
     bool UnknownSlot20();
     // +0x58
@@ -255,7 +299,7 @@ public:
     // +0xe8
     void UnknownSlot59();
     // +0xec
-    // virtual void PersistSelectionContextAndSwitchToState8(const Arg6SelectionConfig& config) = 0;
+    virtual uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) = 0;
     // +0xf0
     // virtual void SetSelectionIndexAndSwitchToState7(uint8_t selectionIndex) = 0;
     // +0xf4
@@ -263,7 +307,7 @@ public:
     // +0xf8
     void UnknownSlot65();
     // +0xfc
-    // virtual const char* GetDescriptorInlineNameByIndex(uint32_t index) const = 0;
+    virtual const char* GetWorldNameByIndex(uint32_t index) = 0;
     // +0x100
     // virtual uint8_t GetDescriptorField18ByIndex(uint32_t index) const = 0;
     // +0x104
@@ -281,7 +325,7 @@ public:
     // +0x11c
     void UnknownSlot73();
     // +0x120
-    // virtual void ProcessLoginCredentials(const char* username, const char* password) = 0;
+    virtual uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) = 0;
     // +0x124
     void UnknownSlot75();
     // +0x128
@@ -323,7 +367,7 @@ public:
     // +0x170
     // virtual void RegisterLoginObserver(void* observer) = 0;
     // +0x174
-    // virtual void UnregisterLoginObserver(void* observer) = 0;
+    virtual bool UnregisterLoginObserver(void* observer) = 0;
     // +0x178
     // virtual uint8_t GetLastStatus80() const = 0;
     // +0x17c
