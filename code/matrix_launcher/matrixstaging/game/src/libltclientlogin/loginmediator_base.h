@@ -365,7 +365,7 @@ public:
     // +0x16c
     // virtual uint32_t HandleState9Opcode11SuccessSideEffect() = 0;
     // +0x170
-    // virtual void RegisterLoginObserver(void* observer) = 0;
+    virtual bool RegisterLoginObserver(void* observer) = 0;
     // +0x174
     virtual bool UnregisterLoginObserver(void* observer) = 0;
     // +0x178

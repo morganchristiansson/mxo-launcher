@@ -111,7 +111,7 @@ void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLogi
         state->DebugName());
 }
 
-bool CLTLoginMediator::RegisterLoginObserverScaffold(void* observer) {
+bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
     // anchor: launcher.exe:0x41ddb0
     // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
     // identifies `+0x170` as insertion into the owner `+0x674` listener tree, not as a startup
@@ -127,7 +127,7 @@ bool CLTLoginMediator::RegisterLoginObserverScaffold(void* observer) {
         observer);
     if (it != observers.end()) {
         spdlog::info(
-            "CLTLoginMediator::RegisterLoginObserverScaffold observer={} already registered count={}",
+            "CLTLoginMediator::RegisterLoginObserver observer={} already registered count={}",
             fmt::ptr(observer),
             static_cast<unsigned>(observers.size()));
         return false;
@@ -135,7 +135,7 @@ bool CLTLoginMediator::RegisterLoginObserverScaffold(void* observer) {
 
     observers.push_back(observer);
     spdlog::info(
-        "CLTLoginMediator::RegisterLoginObserverScaffold observer={} count={} (minimal source-owned bridge for owner+0x674 listener registration)",
+        "CLTLoginMediator::RegisterLoginObserver observer={} count={} (minimal source-owned bridge for owner+0x674 listener registration)",
         fmt::ptr(observer),
         static_cast<unsigned>(observers.size()));
     return true;

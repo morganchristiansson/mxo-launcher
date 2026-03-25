@@ -536,7 +536,7 @@ public:
     // observer registration bridge for arg6/`ILTLoginMediator.Default` slots `+0x170/+0x174`.
     void PostEventScaffold(uint32_t eventId);
     void PostErrorScaffold(uint32_t errorId);
-    bool RegisterLoginObserverScaffold(void* observer);
+    bool RegisterLoginObserver(void* observer) override;
     // +0x174
     bool UnregisterLoginObserver(void* observer) override;
     uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }

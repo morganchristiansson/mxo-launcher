@@ -871,9 +871,7 @@ extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
     g_MediatorRuntimeState.latestObserver170 = observer;
     ++g_MediatorRuntimeState.observerRegister170Count;
 
-    const bool inserted = DiagnosticEnsureMediatorModel()
-        ? DiagnosticEnsureMediatorModel()->RegisterLoginObserverScaffold(observer)
-        : false;
+    const bool inserted = mxo::ltlogin::ILTLoginMediator::Default->RegisterLoginObserver(observer);
 
     spdlog::info(
         "MediatorStub::RegisterLoginObserver(+0x170 observer={} self={}) [count={} inserted={} first={} latest124=({}, {}, {}) caller={}]",
@@ -1384,5 +1382,3 @@ void DiagnosticApplyDefaultNopatchMediatorConfig(
     setValue2(mediatorPtr, &clientVersionValue);
     spdlog::info("DIAGNOSTIC: applied default nopatch mediator +0x24 with value 0x{:08x}", clientVersionValue);
 }
-
-
