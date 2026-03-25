@@ -500,6 +500,21 @@ public:
     CLTLoginMediator();
     ~CLTLoginMediator();
 
+    // ============================================================================
+    // Migrated state fields (formerly in g_MediatorRuntimeState)
+    // These fields are now instance-owned instead of global runtime state.
+    // ============================================================================
+    const void* lastNopatchValue1Ptr_ = nullptr;  // +0x1c / Mediator_SetValue1
+    const void* lastNopatchValue2Ptr_ = nullptr;  // +0x20 / Mediator_SetValue2
+    uint32_t lastStatus178_ = 0u;                 // +0x178 / Mediator_GetLastLoginStatus
+    uint32_t statusQuery178Count_ = 0u;           // +0x178 / Mediator_GetLastLoginStatus
+
+    // Accessors for migrated state fields (diagnostics only)
+    const void* LastNopatchValue1Ptr() const;
+    const void* LastNopatchValue2Ptr() const;
+    uint32_t LastStatus178() const;
+    uint32_t StatusQuery178Count() const;
+
     // +0x00
     const char* GetName() override;
     // +0x08

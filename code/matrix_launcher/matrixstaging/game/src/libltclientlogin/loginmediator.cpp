@@ -321,7 +321,11 @@ CLTLoginMediator::CLTLoginMediator()
       expectedAuthRequestName_(nullptr),
       expectedMarginRequestName_(nullptr),
       worldSlots_{},
-      worldPayloadSlots_{} {
+      worldPayloadSlots_{},
+      lastNopatchValue1Ptr_(nullptr),
+      lastNopatchValue2Ptr_(nullptr),
+      lastStatus178_(0u),
+      statusQuery178Count_(0u) {
     SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
     InitializeArg6DefaultObject();
@@ -372,24 +376,24 @@ uint32_t CLTLoginMediator::IsReady() {
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
 // vtable: ILTLoginMediator.Default slots +0x1c and +0x24
 void CLTLoginMediator::SetValue1(void* value) {
-    if (!g_MediatorRuntimeState.lastNopatchValue1Ptr) {
-        g_MediatorRuntimeState.lastNopatchValue1Ptr = value;
+    if (!this->lastNopatchValue1Ptr_) {
+        this->lastNopatchValue1Ptr_ = value;
     } else {
-        g_MediatorRuntimeState.lastNopatchValue2Ptr = value;
+        this->lastNopatchValue2Ptr_ = value;
     }
-    spdlog::info("MediatorStub::SetValue1({})", value);
+    spdlog::debug("CLTLoginMediator::SetValue1({})", value);
 }
 
 // +0x20
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
 // vtable: ILTLoginMediator.Default slots +0x1c and +0x24
 void CLTLoginMediator::SetValue2(void* value) {
-    if (!g_MediatorRuntimeState.lastNopatchValue1Ptr) {
-        g_MediatorRuntimeState.lastNopatchValue1Ptr = value;
+    if (!this->lastNopatchValue1Ptr_) {
+        this->lastNopatchValue1Ptr_ = value;
     } else {
-        g_MediatorRuntimeState.lastNopatchValue2Ptr = value;
+        this->lastNopatchValue2Ptr_ = value;
     }
-    spdlog::info("MediatorStub::SetValue2({})", value);
+    spdlog::debug("CLTLoginMediator::SetValue2({})", value);
 }
 
 // UNANCHORED: shared diagnostic log-throttling helper.
@@ -458,12 +462,11 @@ uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
 // vtable: ILTLoginMediator.Default slot +0x178
 uint32_t CLTLoginMediator::GetLastLoginStatus() {
     const uint32_t status = this->WorldListCountOrStatus80();
-    g_MediatorRuntimeState.lastStatus178 = status;
-    ++g_MediatorRuntimeState.statusQuery178Count;
-    spdlog::info(
-        "MediatorStub::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
+    this->lastStatus178_ = status;
+    ++this->statusQuery178Count_;
+    spdlog::debug("CLTLoginMediator::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
         status,
-        g_MediatorRuntimeState.statusQuery178Count);
+        this->statusQuery178Count_);
     return status;
 }
 
@@ -1219,6 +1222,23 @@ const SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t sl
 // anchor: launcher.exe:0x41f300
 const SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
     return GetSlotRecordByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8);
+}
+
+// Accessors for migrated state fields (diagnostics only)
+const void* CLTLoginMediator::LastNopatchValue1Ptr() const {
+    return lastNopatchValue1Ptr_;
+}
+
+const void* CLTLoginMediator::LastNopatchValue2Ptr() const {
+    return lastNopatchValue2Ptr_;
+}
+
+uint32_t CLTLoginMediator::LastStatus178() const {
+    return lastStatus178_;
+}
+
+uint32_t CLTLoginMediator::StatusQuery178Count() const {
+    return statusQuery178Count_;
 }
 
 // anchor: launcher.exe:0x41b220

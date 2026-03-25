@@ -19,8 +19,6 @@ struct MinimalLoginMediatorStub {
 };
 
 struct DiagnosticMediatorRuntimeState {
-    const void* lastNopatchValue1Ptr;
-    const void* lastNopatchValue2Ptr;
     void* firstObserver170;
     void* latestObserver170;
     void* netShell124;
@@ -30,14 +28,12 @@ struct DiagnosticMediatorRuntimeState {
     void* selectionContext0ec;
     void* selectionContext0ecCopy;
     void* latestObserver174;
-    uint32_t lastStatus178;
     uint32_t observerRegister170Count;
     uint32_t provide124Count;
     uint32_t loading120Count;
     uint32_t selection0ecCount;
     uint32_t profile0f4Count;
     uint32_t observerUnregister174Count;
-    uint32_t statusQuery178Count;
 };
 
 extern DiagnosticMediatorRuntimeState g_MediatorRuntimeState;
