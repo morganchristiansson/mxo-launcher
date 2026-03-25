@@ -231,7 +231,7 @@ static void LogMediatorCharacterStateContext(const char* slotLabel, void* return
     const uint32_t authCharacterIdLow = DiagnosticAuthCurrentCharacterIdLow();
     const uint32_t authCharacterIdHigh = DiagnosticAuthCurrentCharacterIdHigh();
 
-    spdlog::info(
+    spdlog::debug(
         "MediatorStub::{} caller={} [{}] context{{mappedWorld='{}' profile='{}' currentSlot='{}' source108='{}' f1c='{}' section0f8c='{}' section0fac='{}' section0fcc='{}' authChar='{}' authIdLow=0x{:08x} authIdHigh=0x{:08x} authIdLow16=0x{:04x} currentState={} worldId=0x{:04x} status=0x{:02x}}}",
         slotLabel ? slotLabel : "<slot>",
         fmt::ptr(returnAddress),
@@ -257,7 +257,7 @@ static void LogMediatorNameGetterDetails(
     const char* slotLabel,
     void* returnAddress,
     const char* returnedText) {
-    spdlog::info(
+    spdlog::debug(
         "MediatorStub::{} caller={} [{}] -> '{}'",
         slotLabel ? slotLabel : "<slot>",
         fmt::ptr(returnAddress),
@@ -905,7 +905,7 @@ static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediato
     const char* lastName = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x24);
     const char* background = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x44);
 
-    spdlog::info(
+    spdlog::debug(
         "MediatorStub::GetSelectionContextSnapshot(+0xf4) caller={} [{}] -> {} [count={} copiedFrom0ec={} raw0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x} overflow13f4=0x{:04x}]",
         fmt::ptr(returnAddress),
         DescribeMediatorCaller(returnAddress),

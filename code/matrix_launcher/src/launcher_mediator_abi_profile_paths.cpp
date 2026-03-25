@@ -120,7 +120,7 @@ static bool DiagnosticMediatorSelectionDescriptorMatchesConfiguredRequest(uint32
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
     (void)self;
     void* returnAddress = __builtin_return_address(0);
-    spdlog::info(
+    spdlog::debug(
         "MediatorStub::GetDefaultSelectionIndex() caller={} [{}] -> 0x{:06x}",
         fmt::ptr(returnAddress),
         DescribeMediatorCaller(returnAddress),
@@ -142,7 +142,7 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
     const char* worldName = matchedConfiguredRequest ? DiagnosticMediatorMappedSelectionName() : NULL;
 
     if (!worldName) {
-        spdlog::info(
+        spdlog::debug(
             "MediatorStub::GetSelectionDescriptor(selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
             static_cast<unsigned>(selectionIndex),
             static_cast<unsigned>(low24),
@@ -180,7 +180,7 @@ static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         ((low24 == DiagnosticMediatorSelectedWorldIndexLow24()) ? "low24-world-match" : "other-match");
-    spdlog::info(
+    spdlog::debug(
         "MediatorStub::GetSelectionDescriptor(selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> {} (matchMode={} descriptorShape={} mappedName='{}' field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
         static_cast<unsigned>(selectionIndex),
         static_cast<unsigned>(low24),

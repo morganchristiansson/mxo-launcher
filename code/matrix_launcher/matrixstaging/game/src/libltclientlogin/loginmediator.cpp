@@ -1923,7 +1923,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
     switch (rawCode) {
         case 0x02u: {
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_Challenge transportEncrypted={} payloadLen={}",
+                "launcher-owned margin bootstrap received CERT_Challenge transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
                 payloadSize);
 
@@ -1968,7 +1968,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 
         case 0x04u: {
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received CERT_ConnectReply transportEncrypted={} payloadLen={}",
+                "launcher-owned margin bootstrap received CERT_ConnectReply transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
                 payloadSize);
 
@@ -2045,7 +2045,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 
         case 0x07u: {
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectChallenge transportEncrypted={} payloadLen={}",
+                "launcher-owned margin bootstrap received MS_ConnectChallenge transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
                 payloadSize);
 
@@ -2078,7 +2078,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 
         case 0x09u: {
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned margin bootstrap received MS_ConnectReply transportEncrypted={} payloadLen={}",
+                "launcher-owned margin bootstrap received MS_ConnectReply transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
                 payloadSize);
 
@@ -2689,7 +2689,7 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     lastMarginPacketOpcodeScaffold_ = rawCode;
     lastMarginPacketSizeScaffold_ = static_cast<uint32_t>(effectivePacketSize);
 
-    spdlog::info(
+    spdlog::debug(
         "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} transportEncrypted={} currentState={} receiveCount={} filteredBeforeSlot6={} slot6DispatchCount={} bootstrapPhase={}",
         static_cast<unsigned>(rawCode),
         static_cast<unsigned>(effectivePacketSize),
@@ -2718,7 +2718,7 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     // - only other decoded codes survive into owner +0x184 / current helper slot 6
     if (rawCode == 2u || rawCode == 4u || rawCode == 5u) {
         ++marginPacketFilteredBeforeSlot6CountScaffold_;
-        spdlog::info(
+        spdlog::debug(
             "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} would be consumed by base margin dispatch before helper slot6 receiveCount={} filteredBeforeSlot6={} currentState={}",
             static_cast<unsigned>(rawCode),
             static_cast<unsigned>(effectivePacketSize),
@@ -2730,7 +2730,7 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
 
     if (currentState_ != nullptr) {
         ++marginPacketSlot6DispatchCountScaffold_;
-        spdlog::info(
+        spdlog::debug(
             "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} routing post-bootstrap packet to current helper slot6 dispatchCount={} currentState={}",
             static_cast<unsigned>(rawCode),
             static_cast<unsigned>(effectivePacketSize),
@@ -2739,7 +2739,7 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
         return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
     }
 
-    spdlog::info(
+    spdlog::debug(
         "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} has no active helper state; using direct state11/post-auth scaffold parser",
         static_cast<unsigned>(rawCode),
         static_cast<unsigned>(effectivePacketSize));
