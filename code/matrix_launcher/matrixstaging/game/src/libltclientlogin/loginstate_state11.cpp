@@ -72,7 +72,7 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     packetBuilder.SetRealFirstName(reinterpret_cast<const char*>(mediator->SourceBlock178().data()));
     packetBuilder.SetRealLastName(reinterpret_cast<const char*>(mediator->SourceBlock198().data()));
     packetBuilder.SetBackground(reinterpret_cast<const char*>(mediator->SourceBlock1b8().data()));
-    packetBuilder.SetGameSessionId(mediator->GetGameSessionId664());
+    packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.EnvelopeScaffold());
     mediator->PostEventScaffold(0x15u);
@@ -86,7 +86,7 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
         std::string(reinterpret_cast<const char*>(mediator->SourceBlock178().data())),
         std::string(reinterpret_cast<const char*>(mediator->SourceBlock198().data())),
         std::string(reinterpret_cast<const char*>(mediator->SourceBlock1b8().data())),
-        mediator->GetGameSessionId664() ? mediator->GetGameSessionId664() : "<empty>",
+        mediator->GetGameSessionId() ? mediator->GetGameSessionId() : "<empty>",
         sendResult);
     spdlog::info(
         "CLTLoginState_State11::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",

@@ -942,18 +942,14 @@ static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediato
     return &g_MediatorState8PersistenceF1c;
 }
 
-// anchor: later runtime setup uses arg6 +0x148 for runtime-object handoff
+// anchor: launcher.exe:0x41f320 / owner vtable +0x148
 // vtable: ILTLoginMediator.Default slot +0x148
-static void __thiscall Mediator_AttachRuntimeObject148(MinimalLoginMediatorStub* self, void* runtimeObject) {
+// Historical wrapper note:
+// - this wrapper slot used to carry the stale local name `Mediator_AttachRuntimeObject148`
+// - current source now aligns it with the concrete launcher-owned `GameSessionID` getter
+static const char* __thiscall Mediator_GetGameSessionId(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    g_MediatorRuntimeState.runtimeObject148 = runtimeObject;
-    ++g_MediatorRuntimeState.runtime148Count;
-    spdlog::info(
-        "MediatorStub::AttachRuntimeObject(+0x148 guess={}) [count={} caller={}]",
-        fmt::ptr(runtimeObject),
-        (unsigned)g_MediatorRuntimeState.runtime148Count,
-        fmt::ptr(returnAddress));
+    return mxo::ltlogin::ILTLoginMediator::Default->GetGameSessionId();
 }
 
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
@@ -1100,7 +1096,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
     g_LoginMediatorVtable[72] = (void*)Mediator_FillLoadingCharacterState120; // +0x120
     g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
-    g_LoginMediatorVtable[82] = (void*)Mediator_AttachRuntimeObject148; // +0x148
+    g_LoginMediatorVtable[82] = (void*)Mediator_GetGameSessionId; // +0x148
     g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164
     g_LoginMediatorVtable[91] = (void*)Mediator_ShouldExportB;   // +0x16c
     g_LoginMediatorVtable[92] = (void*)Mediator_RegisterLoginObserver170; // +0x170

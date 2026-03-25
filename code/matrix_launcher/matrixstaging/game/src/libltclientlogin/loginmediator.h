@@ -778,7 +778,7 @@ public:
     // anchor: launcher.exe:0x41b220 / owner vtable +0xdc
     const char* GetSlotRecordHeapStringByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41f320 / owner vtable +0x148
-    const char* GetGameSessionId664() const;
+    const char* GetGameSessionId() const override;
     // UNANCHORED: source-owned owner-field setter used by separate LaunchPad/session callback paths
     void SetGameSessionId664(const char* value);
     // anchor: launcher.exe:0x41f270 / owner vtable +0x150

@@ -1163,7 +1163,7 @@ void* CLTLoginMediator::GetSessionCallbackHelper65c() const {
 }
 
 // anchor: launcher.exe:0x41f320
-const char* CLTLoginMediator::GetGameSessionId664() const {
+const char* CLTLoginMediator::GetGameSessionId() const {
     // Important fidelity correction from fresh original-launcher WineDbg on the natural first
     // state8 send:
     // - original `0x41f320` returns owner `this + 0x664` directly

@@ -30,7 +30,6 @@ struct DiagnosticMediatorRuntimeState {
     void* loadingState120;
     void* selectionContext0ec;
     void* selectionContext0ecCopy;
-    void* runtimeObject148;
     void* latestObserver174;
     uint32_t lastStatus178;
     uint32_t observerRegister170Count;
@@ -38,7 +37,6 @@ struct DiagnosticMediatorRuntimeState {
     uint32_t loading120Count;
     uint32_t selection0ecCount;
     uint32_t profile0f4Count;
-    uint32_t runtime148Count;
     uint32_t observerUnregister174Count;
     uint32_t statusQuery178Count;
 };

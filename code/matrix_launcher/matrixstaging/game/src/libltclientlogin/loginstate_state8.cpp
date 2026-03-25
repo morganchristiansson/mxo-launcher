@@ -447,7 +447,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //       shared message object, write the resulting payload-relative offset back to fixed field
     //       `+0xb9`, then copy the text into that reservation
     //     - but fresh original-launcher WineDbg validation on the natural first state8 send now
-    //       shows owner `+0x664` / `GetGameSessionId664()` returning `""` there
+    //       shows owner `+0x664` / `GetGameSessionId()` returning `""` there
     //     - practical consequence: the natural `0x0bb -> 0x13b` growth is **not** explained by a
     //       non-empty `GameSessionID` append on that first existing-character send
     //   - send through `0x41af70`
@@ -513,7 +513,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     packetBuilder.SetSelectionBlock(0x59, mediator->SelectionContextBlockD20());
     packetBuilder.SetSelectionBlock(0x69, mediator->SelectionContextBlockD30());
 
-    packetBuilder.SetGameSessionId(mediator->GetGameSessionId664());
+    packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.EnvelopeScaffold());
     mediator->PostEventScaffold(0x09u);
@@ -544,7 +544,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD50())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD60())) +
         static_cast<unsigned>(U32x4BlockHasAnyNonZero(mediator->SelectionContextBlockD70()));
-    const char* gameSessionId = mediator->GetGameSessionId664();
+    const char* gameSessionId = mediator->GetGameSessionId();
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",

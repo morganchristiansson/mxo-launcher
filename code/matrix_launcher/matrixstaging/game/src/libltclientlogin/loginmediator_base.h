@@ -347,7 +347,10 @@ public:
     // +0x144
     void UnknownSlot80();
     // +0x148
-    virtual const char* GetGameSessionId664() const = 0;
+    // anchor: launcher.exe:0x41f320 / owner vtable +0x148
+    // Current replacement-wrapper cleanup now treats this as the shared `GameSessionID` getter.
+    // Older wrapper-side `AttachRuntimeObject148` naming was a stale low-confidence guess.
+    virtual const char* GetGameSessionId() const = 0;
     // +0x14c
     virtual void SetSharedMarginPacketField660(uint32_t value) = 0;
     // +0x150
