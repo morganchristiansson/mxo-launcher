@@ -564,6 +564,11 @@ public:
     bool RegisterLoginObserver(void* observer) override;
     // +0x174
     bool UnregisterLoginObserver(void* observer) override;
+    // Observer count getters for wrapper diagnostics (moved from g_MediatorRuntimeState):
+    uint32_t ObserverRegisterCount() const { return observerRegister170Count_; }
+    uint32_t ObserverUnregisterCount() const { return observerUnregister174Count_; }
+    void* FirstObserver() const { return firstObserver170_; }
+    void* LatestObserver() const { return latestObserver170_; }
     uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }
     uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
     const std::array<uint32_t, 8>& RecentPostedEventsScaffold() const { return recentPostedEventsScaffold_; }
@@ -1103,6 +1108,16 @@ private:
     std::array<WorldDescriptorState004b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
     std::array<bool, kRecoveredWorldSlotCapacity> worldDescriptorValidD84_{};
     uint8_t worldDescriptorCountD80_ = 0;
+
+    // Observer/listener state for late-login arg6 +0x170/+0x174 bridge:
+    // - +0x170 (RegisterLoginObserver) inserts into owner `+0x674` listener tree
+    // - +0x174 (UnregisterLoginObserver) removes from the same tree
+    // These fields mirror launcher.exe runtime state for diagnostic logging.
+    void* firstObserver170_ = nullptr;          // owner `+0x674` first registered observer
+    void* latestObserver170_ = nullptr;         // owner `+0x674` most recent register call
+    void* latestObserver174_ = nullptr;         // owner `+0x674` most recent unregister call
+    uint32_t observerRegister170Count_ = 0;     // owner `+0x674` register call count
+    uint32_t observerUnregister174Count_ = 0;   // owner `+0x674` unregister call count
 
     std::string authServerDnsName_;
     uint16_t authServerPortHostOrder_;

@@ -19,21 +19,20 @@ struct MinimalLoginMediatorStub {
 };
 
 struct DiagnosticMediatorRuntimeState {
-    void* firstObserver170;
-    void* latestObserver170;
+    // Observer state moved to CLTLoginMediator instance:
+    // - firstObserver170, latestObserver170, latestObserver174
+    // - observerRegister170Count, observerUnregister174Count
+    //
     void* netShell124;
     void* netMgr124;
     void* distrObjExecutive124;
     void* loadingState120;
     void* selectionContext0ec;
     void* selectionContext0ecCopy;
-    void* latestObserver174;
-    uint32_t observerRegister170Count;
     uint32_t provide124Count;
     uint32_t loading120Count;
     uint32_t selection0ecCount;
     uint32_t profile0f4Count;
-    uint32_t observerUnregister174Count;
 };
 
 extern DiagnosticMediatorRuntimeState g_MediatorRuntimeState;
@@ -43,6 +42,10 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel();
 void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount);
 void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount);
 void RegisterMediatorState9AbiSlots();
+
+// Observer state accessors (moved from g_MediatorRuntimeState to CLTLoginMediator):
+uint32_t DiagnosticMediatorObserverRegisterCount();
+uint32_t DiagnosticMediatorObserverUnregisterCount();
 
 const char g_MediatorName[] = "ILTLoginMediator.Default";
 const char* DiagnosticMediatorAuthName();

@@ -138,6 +138,17 @@ static const char* DiagnosticMediatorProfileName() {
     return mediator ? mediator->Arg6ProfileName() : g_MediatorStringA;
 }
 
+// Observer state accessors (moved from g_MediatorRuntimeState to CLTLoginMediator):
+uint32_t DiagnosticMediatorObserverRegisterCount() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->ObserverRegisterCount() : 0u;
+}
+
+uint32_t DiagnosticMediatorObserverUnregisterCount() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->ObserverUnregisterCount() : 0u;
+}
+
 const char* DiagnosticMediatorAuthName() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6AuthName() : DiagnosticMediatorProfileName();
@@ -829,32 +840,15 @@ static void __thiscall Mediator_InvokeSessionCallbackHelper13c(MinimalLoginMedia
 }
 
 // UNANCHORED: C helper behind the recovered +0x170 observer-registration ABI wrapper.
+// Wrapper now forwards to CLTLoginMediator::RegisterLoginObserver; all state/logging moved to owner.
 extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
     MinimalLoginMediatorStub* self,
     void* observer,
     void* returnAddress) {
-    if (!g_MediatorRuntimeState.firstObserver170) {
-        g_MediatorRuntimeState.firstObserver170 = observer;
-    }
-    g_MediatorRuntimeState.latestObserver170 = observer;
-    ++g_MediatorRuntimeState.observerRegister170Count;
+    (void)self;
+    (void)returnAddress;
 
-    const bool inserted = mxo::ltlogin::ILTLoginMediator::Default->RegisterLoginObserver(observer);
-
-    spdlog::info(
-        "MediatorStub::RegisterLoginObserver(+0x170 observer={} self={}) [count={} inserted={} first={} latest124=({}, {}, {}) caller={}]",
-        fmt::ptr(observer),
-        fmt::ptr(self),
-        (unsigned)g_MediatorRuntimeState.observerRegister170Count,
-        inserted ? "1" : "0",
-        fmt::ptr(g_MediatorRuntimeState.firstObserver170),
-        fmt::ptr(g_MediatorRuntimeState.netShell124),
-        fmt::ptr(g_MediatorRuntimeState.netMgr124),
-        fmt::ptr(g_MediatorRuntimeState.distrObjExecutive124),
-        fmt::ptr(returnAddress));
-    LogPointerWords("RegisterLoginObserver self", self, 8);
-    LogPointerWords("RegisterLoginObserver observer", observer, 4);
-    return inserted ? 1u : 0u;
+    return mxo::ltlogin::ILTLoginMediator::Default->RegisterLoginObserver(observer);
 }
 
 // anchor: launcher.exe:0x41ddb0
@@ -921,24 +915,15 @@ static const char* __thiscall Mediator_GetGameSessionId(MinimalLoginMediatorStub
 }
 
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
+// Wrapper now forwards to CLTLoginMediator::UnregisterLoginObserver; all state/logging moved to owner.
 extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
     MinimalLoginMediatorStub* self,
     void* observer,
     void* returnAddress) {
-    g_MediatorRuntimeState.latestObserver174 = observer;
-    ++g_MediatorRuntimeState.observerUnregister174Count;
+    (void)self;
+    (void)returnAddress;
 
-    const bool removed = mxo::ltlogin::ILTLoginMediator::Default->UnregisterLoginObserver(observer);
-
-    spdlog::info(
-        "MediatorStub::UnregisterLoginObserver(+0x174 observer={} self={}) [count={} removed={} caller={}]",
-        fmt::ptr(observer),
-        fmt::ptr(self),
-        g_MediatorRuntimeState.observerUnregister174Count,
-        removed ? 1u : 0u,
-        returnAddress);
-    LogPointerWords("UnregisterLoginObserver observer", observer, 4);
-    return removed ? 1u : 0u;
+    return mxo::ltlogin::ILTLoginMediator::Default->UnregisterLoginObserver(observer);
 }
 
 // anchor: launcher.exe:0x41dde0
