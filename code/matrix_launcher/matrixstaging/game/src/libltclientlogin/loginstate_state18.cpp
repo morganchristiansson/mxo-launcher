@@ -1,0 +1,44 @@
+#include "loginstate.h"
+#include "loginmediator.h"
+
+namespace mxo::ltlogin {
+
+// anchor: launcher.exe vtable 0x004b0c00
+const char* CLTLoginState_State18::DebugName() const {
+    return "CLTLoginState_State18";
+}
+
+// anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
+uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+    // Stronger current read from disassembly review:
+    // - this is a later launchpad/session helper path, not a direct helper11 writer
+    // - it fetches owner vtable `+0x130` helper `+0x65c`
+    // - when conditions permit, it refreshes helper string `+0x18` from owner `+0x94 + 0x60`
+    //   (the embedded small-string in the recovered auth/bootstrap source block)
+    // - it then reaches `0x420e70`, which copies helper `+0x18` into owner `+0x664`
+    //   (`GameSessionID`) when helper flag `+0x2d` is clear
+    (void)upstreamOrArg;
+    return mediator ? mediator->RefreshSessionHelperGameSessionId664FromSourceBlock94() : 0u;
+}
+
+// anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
+uint32_t CLTLoginState_State18::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+    (void)workItem;
+    (void)mediator;
+    return PlaceholderStateAction(DebugName(), "launcher.exe:0x004208e0");
+}
+
+// anchor: launcher.exe:0x00420340 (vtable 0x004b0c00 slot 7)
+uint32_t CLTLoginState_State18::Slot7_GetStateId() const {
+    return 18;
+}
+
+// anchor: launcher.exe:0x00420960 (vtable 0x004b0c00 slot 8)
+uint32_t CLTLoginState_State18::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) {
+    (void)param1;
+    (void)context;
+    (void)mediator;
+    return PlaceholderStateAction(DebugName(), "launcher.exe:0x00420960");
+}
+
+}  // namespace mxo::ltlogin

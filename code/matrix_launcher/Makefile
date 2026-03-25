@@ -48,9 +48,26 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_events.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_state9.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state0.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state1.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state2.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state3.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state4.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state5.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state6.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state7.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state8.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state9.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state10.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state11.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state12.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state13.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state14.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state15.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state16.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state17.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state18.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state19.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/launchpad.o \
 	$(COMMON_AUTH_OBJS)
 

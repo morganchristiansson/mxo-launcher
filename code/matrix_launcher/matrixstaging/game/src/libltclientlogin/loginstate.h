@@ -6,6 +6,11 @@ namespace mxo::ltlogin {
 
 class CLTLoginMediator;
 
+uint32_t RecoverCachedUpstreamPhaseCode(const void* cachedUpstreamOrArg);
+
+// anchor: launcher.exe:0x004397d0 (slot 3 no-op stub on multiple vtables)
+uint32_t PlaceholderStateAction(const char* debugName, const char* anchor);
+
 // anchor: reconstructed shared login-state surface spanning launcher.exe vtable families
 // - 0x004b0b88
 // - 0x004b0bb0
