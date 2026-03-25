@@ -8,7 +8,7 @@ class CLTLoginMediator;
 
 struct MinimalLoginMediatorStub {
     void** vtable;
-    void* field04;
+    void* reserved04; // keep +0x04 layout placeholder; old wrapper-side registered-engine stash removed
     void* field08;
     void* field0C;
     void* field10;
@@ -19,7 +19,6 @@ struct MinimalLoginMediatorStub {
 };
 
 struct DiagnosticMediatorRuntimeState {
-    void* registeredLauncherObject;
     const void* lastNopatchValue1Ptr;
     const void* lastNopatchValue2Ptr;
     void* firstObserver170;

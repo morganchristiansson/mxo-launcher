@@ -310,11 +310,6 @@ void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     }
 }
 
-// UNANCHORED: shared diagnostic log-throttling helper.
-static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
-    return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
-}
-
 // UNANCHORED: generic dword-buffer logger for copied mediator state blobs.
 void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
     if (!label || !ptr || byteCount == 0) {
@@ -422,12 +417,9 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 // anchor: launcher.exe:0x40a3e9..0x40a3fe hands the freshly built 0x4d6304 object into arg6 before InitClientDLL
 // vtable: ILTLoginMediator.Default slot +0x08
 static int __thiscall Mediator_SetNetworkEngine(MinimalLoginMediatorStub* self, void* object) {
-    // return mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine();
-    g_MediatorRuntimeState.registeredLauncherObject = object;
-    if (self) {
-        self->field04 = object;
-    }
-    spdlog::info("MediatorStub::SetNetworkEngine({})", object);
+    (void)self;
+    mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(
+        static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine*>(object));
     return 1;
 }
 
@@ -462,6 +454,7 @@ static void __thiscall Mediator_SetValue2(MinimalLoginMediatorStub* self, void* 
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
 // vtable: ILTLoginMediator.Default slot +0x2c
 static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) {
+    (void)self;
     return mxo::ltlogin::ILTLoginMediator::Default->IsConnected();
 }
 
