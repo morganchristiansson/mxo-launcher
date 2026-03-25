@@ -394,6 +394,40 @@ const char* CLTLoginMediator::GetString1(const char* value) {
     return DiagnosticMediatorAuthPassword();
 }
 
+// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4
+// vtable: ILTLoginMediator.Default slot +0xe4
+uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
+    uint32_t state = 3u;
+    if (variantIndex >= 0) {
+        const uint32_t unsignedVariantIndex = static_cast<uint32_t>(variantIndex);
+        if (unsignedVariantIndex < this->Arg6VariantUpperBoundExclusive() &&
+            this->Arg6VariantIndexMatchesSelection(unsignedVariantIndex)) {
+            state = this->Arg6SelectedVariantState();
+        }
+    }
+    spdlog::info(
+        "MediatorStub::GetVariantState(+0xe4 variantIndex={}) -> {} (configuredVariant=0x{:02x} configuredState={})",
+        variantIndex,
+        state,
+        this->Arg6SelectedVariantIndexHigh8(),
+        this->Arg6SelectedVariantState());
+    return state;
+}
+
+// anchor: launcher.exe:0x41f240
+// vtable: ILTLoginMediator.Default slot +0x178
+uint32_t CLTLoginMediator::GetLastLoginStatus() {
+    const uint32_t status = this->WorldListCountOrStatus80();
+    g_MediatorRuntimeState.lastStatus178 = status;
+    ++g_MediatorRuntimeState.statusQuery178Count;
+    spdlog::info(
+        "MediatorStub::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
+        status,
+        g_MediatorRuntimeState.statusQuery178Count);
+    return status;
+}
+
+
 void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
     currentState_ = state;
 }

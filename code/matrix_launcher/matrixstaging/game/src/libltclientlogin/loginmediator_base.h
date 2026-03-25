@@ -297,7 +297,7 @@ public:
     // +0xe0
     // virtual uint32_t GetRouteHostPrefixBySlot(uint32_t index) const = 0;
     // +0xe4
-    // virtual uint8_t GetSlotRecordStatusByIndex(uint32_t index) const = 0;
+    virtual uint8_t GetVariantState(int32_t variantIndex) const = 0;
     // +0xe8
     void UnknownSlot59();
     // +0xec
@@ -374,7 +374,7 @@ public:
     // +0x174
     virtual bool UnregisterLoginObserver(void* observer) = 0;
     // +0x178
-    // virtual uint8_t GetLastStatus80() const = 0;
+    virtual uint32_t GetLastLoginStatus() = 0;
     // +0x17c
     void UnknownSlot93();
     // +0x180

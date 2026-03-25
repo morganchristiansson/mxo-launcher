@@ -512,6 +512,10 @@ public:
     const char* GetString2(const char* value) override;
     // +0x60
     const char* GetString1(const char* value) override;
+    // +0xe4
+    uint8_t GetVariantState(int32_t variantIndex) const override;
+    // +0x178
+    uint32_t GetLastLoginStatus() override;
 
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;

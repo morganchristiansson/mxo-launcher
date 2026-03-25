@@ -118,11 +118,6 @@ static uint32_t DiagnosticMediatorSelectedWorldType() {
     return mediator ? mediator->Arg6SelectedWorldType() : 1u;
 }
 
-static uint32_t DiagnosticMediatorSelectedVariantState() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6SelectedVariantState() : 0u;
-}
-
 static uint32_t DiagnosticMediatorMappedSelectionId() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6MappedSelectionId() : 0u;
@@ -618,21 +613,7 @@ static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorS
 // vtable: ILTLoginMediator.Default slot +0xe4
 static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* self, int32_t variantIndex) {
     (void)self;
-    uint32_t state = 3u;
-    if (variantIndex >= 0) {
-        const uint32_t unsignedVariantIndex = static_cast<uint32_t>(variantIndex);
-        if (unsignedVariantIndex < DiagnosticMediatorVariantUpperBoundExclusive() &&
-            DiagnosticMediatorVariantIndexMatchesConfiguredSelection(unsignedVariantIndex)) {
-            state = DiagnosticMediatorSelectedVariantState();
-        }
-    }
-    spdlog::info(
-        "MediatorStub::GetVariantState(+0xe4 variantIndex={}) -> {} (configuredVariant=0x{:02x} configuredState={})",
-        variantIndex,
-        state,
-        DiagnosticMediatorSelectedVariantIndexHigh8(),
-        DiagnosticMediatorSelectedVariantState());
-    return state;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetVariantState(variantIndex);
 }
 
 // Late-login arg6 ABI slots `+0xd4`, `+0x124`, and `+0x18c` now live in
@@ -993,17 +974,9 @@ __attribute__((naked)) static void Mediator_UnregisterLoginObserver174() {
 
 // anchor: launcher.exe:0x41f240
 // vtable: ILTLoginMediator.Default slot +0x178
-static uint32_t __thiscall Mediator_GetLastLoginStatus178(MinimalLoginMediatorStub* self) {
+static uint32_t __thiscall Mediator_GetLastLoginStatus(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    const uint32_t status = mediator ? mediator->WorldListCountOrStatus80() : 0u;
-    g_MediatorRuntimeState.lastStatus178 = status;
-    ++g_MediatorRuntimeState.statusQuery178Count;
-    spdlog::info(
-        "MediatorStub::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
-        status,
-        g_MediatorRuntimeState.statusQuery178Count);
-    return status;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetLastLoginStatus();
 }
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 conditionally checks arg6 +0x164
@@ -1101,7 +1074,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[91] = (void*)Mediator_ShouldExportB;   // +0x16c
     g_LoginMediatorVtable[92] = (void*)Mediator_RegisterLoginObserver170; // +0x170
     g_LoginMediatorVtable[93] = (void*)Mediator_UnregisterLoginObserver174; // +0x174
-    g_LoginMediatorVtable[94] = (void*)Mediator_GetLastLoginStatus178; // +0x178
+    g_LoginMediatorVtable[94] = (void*)Mediator_GetLastLoginStatus; // +0x178
 
     ResetMediatorObjectState();
 }
