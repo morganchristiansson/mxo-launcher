@@ -512,6 +512,8 @@ public:
     void SetValue1(void* value) override;
     // +0x20
     void SetValue2(void* value) override;
+    // +0x2c
+    uint32_t IsConnected() override;
     // +0x5c
     const char* GetString2(const char* value) override;
     // +0x60

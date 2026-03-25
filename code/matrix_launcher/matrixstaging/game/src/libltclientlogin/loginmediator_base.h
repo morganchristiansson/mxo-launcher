@@ -205,7 +205,7 @@ public:
     // +0x28
     void UnknownSlot9();
     // +0x2c
-    void UnknownSlot10();
+    virtual uint32_t IsConnected() = 0;
     // +0x30
     virtual const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t index) const = 0;
     // +0x34

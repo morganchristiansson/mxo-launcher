@@ -462,15 +462,7 @@ static void __thiscall Mediator_SetValue2(MinimalLoginMediatorStub* self, void* 
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
 // vtable: ILTLoginMediator.Default slot +0x2c
 static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) {
-    static uint32_t s_IsConnectedCount = 0;
-    ++s_IsConnectedCount;
-    if (DiagnosticShouldLogRepeatedRuntimeCount(s_IsConnectedCount)) {
-        spdlog::debug("MediatorStub::IsConnected() -> 1 [count={:08x} self={}, registeredEngine={}",
-            s_IsConnectedCount,
-            fmt::ptr(self),
-            (self ? self->field04 : NULL));
-    }
-    return 1;
+    return mxo::ltlogin::ILTLoginMediator::Default->IsConnected();
 }
 
 // anchor: client.dll:0x625c86d0 later calls arg6 +0x50 and converts null/non-null into flag 0x30

@@ -392,6 +392,22 @@ void CLTLoginMediator::SetValue2(void* value) {
     spdlog::info("MediatorStub::SetValue2({})", value);
 }
 
+// UNANCHORED: shared diagnostic log-throttling helper.
+static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
+    return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
+}
+
+// anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
+// vtable: ILTLoginMediator.Default slot +0x2c
+uint32_t CLTLoginMediator::IsConnected() {
+    static uint32_t s_IsConnectedCount = 0;
+    ++s_IsConnectedCount;
+    if (DiagnosticShouldLogRepeatedRuntimeCount(s_IsConnectedCount)) {
+        spdlog::debug("MediatorStub::IsConnected() -> 1 [count={:08x}]", s_IsConnectedCount);
+    }
+    return 1;
+}
+
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
 // bootstrap `+0xa8` field. Keep that extra level explicit in source too.
