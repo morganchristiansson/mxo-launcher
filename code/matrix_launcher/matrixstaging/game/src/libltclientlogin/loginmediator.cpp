@@ -325,7 +325,11 @@ CLTLoginMediator::CLTLoginMediator()
       lastNopatchValue1Ptr_(nullptr),
       lastNopatchValue2Ptr_(nullptr),
       lastStatus178_(0u),
-      statusQuery178Count_(0u) {
+      statusQuery178Count_(0u),
+      provideStartupTripleNetShell_(nullptr),
+      provideStartupTripleNetMgr_(nullptr),
+      provideStartupTripleDistrObjExecutive_(nullptr),
+      provideStartupTripleCount_(0u) {
     SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
     InitializeArg6DefaultObject();

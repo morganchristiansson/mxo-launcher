@@ -3,6 +3,7 @@
 #include "loginmediator_state9_submit_scaffold.h"
 #include "loginstate.h"
 #include "../../../runtime/src/libltcrypto/auth_internal.h"
+#include "../../../../src/diagnostics.h"
 #include <spdlog/spdlog.h>
 
 #include <array>
@@ -23,13 +24,34 @@ namespace state9submit = mxo::ltlogin::state9submit_scaffold;
 // - this keeps future INetMgr.Default / CUDPDriver::JoinSession work scoped to the active
 //   late-login surface instead of forcing rereads of broader mediator/auth files
 
-// anchor: launcher.exe:0x41f1d0
+// wrapper-facing +0x124 startup triple capture; owner-side mirror remains explicit below.
+void CLTLoginMediator::ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) {
+    provideStartupTripleNetShell_ = netShell;
+    provideStartupTripleNetMgr_ = netMgr;
+    provideStartupTripleDistrObjExecutive_ = distrObjExecutive;
+    ++provideStartupTripleCount_;
+
+    // Keep the wrapper-facing capture and the live diagnostic controller in sync:
+    // - this object owns the wrapper-facing +0x124 triple state
+    // - the active late-login submit path still reads the separate diagnostic controller instance
+    SetState9CallbackObjectTriple84_88_8c(netShell, netMgr, distrObjExecutive);
+    DiagnosticMirrorState9StartupTripleIntoLoginController(netShell, netMgr, distrObjExecutive);
+
+    spdlog::info(
+        "CLTLoginMediator::ProvideStartupTriple(+0x124 wrapper-facing netShell={} netMgr={} distrObjExecutive={} [count={}] ownerMirror=+0x84/+0x88/+0x8c + diagnosticControllerMirror)",
+        fmt::ptr(provideStartupTripleNetShell_),
+        fmt::ptr(provideStartupTripleNetMgr_),
+        fmt::ptr(provideStartupTripleDistrObjExecutive_),
+        provideStartupTripleCount_);
+}
+
+// anchor: launcher.exe:0x41f1d0 / owner-side mirror of the startup triple into +0x84/+0x88/+0x8c
 void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c) {
     ownerCallback84_ = callback84;
     ownerObject88_ = object88;
     ownerObject8c_ = object8c;
     spdlog::info(
-        "CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c callback84={} object88={} object8c={} (active bounded launcher scope still reads this as init-zero at 0x41ee60, startup triple store at 0x41f1d0, then submit-side reads at 0x41de40)",
+        "CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c (owner-side mirror) callback84={} object88={} object8c={} (active bounded launcher scope still reads this as init-zero at 0x41ee60, startup triple store at 0x41f1d0, then submit-side reads at 0x41de40)",
         fmt::ptr(ownerCallback84_),
         fmt::ptr(ownerObject88_),
         fmt::ptr(ownerObject8c_));

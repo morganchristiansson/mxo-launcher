@@ -28,48 +28,18 @@ static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalL
     return seedPointer;
 }
 
-// UNANCHORED: C helper behind the recovered +0x124 ABI wrapper.
+// UNANCHORED: near-direct C helper behind the recovered wrapper-facing +0x124 ABI slot.
 extern "C" void Mediator_ProvideStartupTriple_Impl(
     MinimalLoginMediatorStub* self,
     void* pNetShell,
     void* pNetMgr,
     void* pDistrObjExecutive,
     void* returnAddress) {
-    g_MediatorRuntimeState.netShell124 = pNetShell;
-    g_MediatorRuntimeState.netMgr124 = pNetMgr;
-    g_MediatorRuntimeState.distrObjExecutive124 = pDistrObjExecutive;
-    if (self) {
-        self->field0C = pNetShell;
-        self->field10 = pNetMgr;
-        self->field14 = pDistrObjExecutive;
-    }
-    mxo::ltlogin::CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold(
-        pNetShell,
-        pNetMgr,
-        pDistrObjExecutive);
+    (void)self;
+    (void)returnAddress;
     if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-        // Newer natural-original bounded lifecycle proof now justifies making the original
-        // `0x41f1d0` store live in the replacement path instead of keeping the startup triple only
-        // as deferred provenance:
-        // - owner `+0x84/+0x88/+0x8c` zero-init at `0x41ee60`
-        // - store at `0x41f1d0`
-        // - owner `+0x88` then stays unchanged through `0x439780 -> 0x41de40 -> 0x43c180`
-        mediator->SetState9CallbackObjectTriple84_88_8c(pNetShell, pNetMgr, pDistrObjExecutive);
-        DiagnosticMirrorState9StartupTripleIntoLoginController(pNetShell, pNetMgr, pDistrObjExecutive);
+        mediator->ProvideStartupTriple(pNetShell, pNetMgr, pDistrObjExecutive);
     }
-    ++g_MediatorRuntimeState.provide124Count;
-    spdlog::info(
-        "MediatorStub::ProvideStartupTriple(netShell={} netMgr={} distrObjExecutive={} self={}) [count={} caller={} liveState9Triple=1]",
-        (uintptr_t)pNetShell,
-        (uintptr_t)pNetMgr,
-        (uintptr_t)pDistrObjExecutive,
-        (uintptr_t)self,
-        (unsigned)g_MediatorRuntimeState.provide124Count,
-        (uintptr_t)returnAddress);
-    LogPointerWords("ProvideStartupTriple self", self, 8);
-    LogPointerWords("ProvideStartupTriple netShell", pNetShell, 8);
-    LogPointerWords("ProvideStartupTriple netMgr", pNetMgr, 8);
-    LogPointerWords("ProvideStartupTriple distrObjExecutive", pDistrObjExecutive, 8);
 }
 
 // anchor: deeper client init hands netShell/netMgr/distrObjExecutive to arg6 +0x124
@@ -161,6 +131,6 @@ __attribute__((naked)) static void Mediator_FillState9CallbackBlob18c() {
 
 void RegisterMediatorState9AbiSlots() {
     g_LoginMediatorVtable[53] = (void*)Mediator_GetState9CallbackSeedPointer85D4; // +0xd4
-    g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple;              // +0x124
+    g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple;              // +0x124 wrapper-facing ProvideStartupTriple
     g_LoginMediatorVtable[99] = (void*)Mediator_FillState9CallbackBlob18c;         // +0x18c
 }

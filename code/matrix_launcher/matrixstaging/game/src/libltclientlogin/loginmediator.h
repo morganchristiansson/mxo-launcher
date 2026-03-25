@@ -601,13 +601,15 @@ public:
     // - `loginmediator_state9.cpp`
     // - `loginmediator_state9_submit_scaffold.h`
     // Current best provenance read:
-    // - deeper client init calls arg6/owner vtable `+0x124(netShell, netMgr, distrObjExecutive)`
+    // - deeper client init calls arg6 vtable `+0x124(netShell, netMgr, distrObjExecutive)`
     // - `0x41f1d0` stores that triple into owner `+0x84/+0x88/+0x8c`
     // - within the bounded active mediator/state9 scope, `0x41ee60` zero-inits the triple,
     //   `0x41f1d0` writes it, and `0x41de40` later reads it
     // Important callback84 correction:
     // - `netShell +0x38` is not a self-contained answer source; it re-enters resolved
     //   `ILTLoginMediator.Default +0x18c`
+    // Wrapper-facing `+0x124` capture remains separate from the owner-side triple mirror.
+    void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) override;
     void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
     static void CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold(
         void* callback84,
@@ -1091,7 +1093,13 @@ private:
     void* ownerCallback84_ = nullptr;          // owner `+0x84`; bounded active-scope writes now read as init-zero at `0x41ee60`, startup-triple store at `0x41f1d0`, then submit-side reads
     void* ownerObject88_ = nullptr;            // owner `+0x88`; natural-original object88 cross-checks as client `INetMgr.Default` wrapper and no later bounded active-scope launcher write is isolated yet beyond `0x41f1d0`
     void* ownerObject8c_ = nullptr;            // owner `+0x8c`
-    uint32_t ownerOptionalField90_ = 0;        // owner `+0x90`, only forwarded when helper byte `+4 != 0`
+    // +0x124 wrapper-facing startup triple capture state (owner-side mirror remains explicit in
+    // `SetState9CallbackObjectTriple84_88_8c`).
+    void* provideStartupTripleNetShell_ = nullptr;         // +0x124 netShell
+    void* provideStartupTripleNetMgr_ = nullptr;           // +0x124 netMgr
+    void* provideStartupTripleDistrObjExecutive_ = nullptr; // +0x124 distrObjExecutive
+    uint32_t provideStartupTripleCount_ = 0u;              // +0x124 call count
+    uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
     State8SelectionContextSnapshotState state8SelectionContextSnapshotState_;

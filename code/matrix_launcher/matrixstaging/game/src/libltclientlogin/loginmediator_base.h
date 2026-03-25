@@ -329,7 +329,9 @@ public:
     // +0x120
     virtual uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) = 0;
     // +0x124
-    void UnknownSlot75();
+    // Wrapper-facing capture of the deeper-init startup triple; owner-side mirroring stays
+    // explicit in `CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c`.
+    virtual void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) = 0;
     // +0x128
     void UnknownSlot76();
     // +0x12c

@@ -23,13 +23,12 @@ struct DiagnosticMediatorRuntimeState {
     // - firstObserver170, latestObserver170, latestObserver174
     // - observerRegister170Count, observerUnregister174Count
     //
-    void* netShell124;
-    void* netMgr124;
-    void* distrObjExecutive124;
+    // +0x124 state moved to CLTLoginMediator instance:
+    // - provideStartupTripleNetShell_, provideStartupTripleNetMgr_, provideStartupTripleDistrObjExecutive_
+    // - provideStartupTripleCount_
     void* loadingState120;
     void* selectionContext0ec;
     void* selectionContext0ecCopy;
-    uint32_t provide124Count;
     uint32_t loading120Count;
     uint32_t selection0ecCount;
     uint32_t profile0f4Count;

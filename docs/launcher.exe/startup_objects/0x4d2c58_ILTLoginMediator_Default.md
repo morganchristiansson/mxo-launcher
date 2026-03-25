@@ -288,7 +288,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
 | `+0xf4` | later runtime/profile paths treat return value like a broader profile / character-info block; launcher getter is now anchored as `0x41f1c0 = return owner + 0xf1c`, while the real producer is the earlier state8/load-character reply path `0x43f930` that materializes the broader `+0xf1c/+0xf48/+0xf88/+0x13f0` family later consumed by UI + `mcd.cfg` persistence | high |
 | `+0x120` | later loading-character path passes a large stack-built state object here before UI teardown / transition work | medium |
-| `+0x124` | accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
+| `+0x124` | wrapper-facing `ProvideStartupTriple`: accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
 | `+0x13c` | `WaitForEvent` loop pump; calls launcher owner helper `+0x65c` vtable `+0x04` when present (`0x4202c0`) | medium |
 | `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
 | `+0x170` | registers an observer/listener object into launcher owner `+0x674` (`0x41ddb0`) | high |

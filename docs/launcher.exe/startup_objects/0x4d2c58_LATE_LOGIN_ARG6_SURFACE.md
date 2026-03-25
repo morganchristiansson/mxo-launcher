@@ -32,13 +32,13 @@ These three slots are the arg6-side inputs that matter most for the current
 | Slot | Anchor | Current role |
 |---:|---|---|
 | `+0xd4` | `launcher.exe:0x41b4f0` | returns the 16-byte seed/key pointer reused by the state9 callback-blob path |
-| `+0x124` | `launcher.exe:0x41f1d0` store behind deeper init handoff | preserves the startup triple `netShell/netMgr/distrObjExecutive` into owner `+0x84/+0x88/+0x8c` |
+| `+0x124` | wrapper-facing `ProvideStartupTriple` / `launcher.exe:0x41f1d0` store behind deeper init handoff | preserves the startup triple `netShell/netMgr/distrObjExecutive` into owner `+0x84/+0x88/+0x8c` |
 | `+0x18c` | `launcher.exe:0x41e690` | fills the fixed `0x20`-byte state9 callback blob used by callback84/client-side `ClientNetShell +0x38` |
 
 ## `+0x124` startup triple
 
 Current bounded read:
-- deeper client init calls arg6 `+0x124(netShell, netMgr, distrObjExecutive)`
+- deeper client init calls wrapper-facing arg6 `ProvideStartupTriple(netShell, netMgr, distrObjExecutive)`
 - launcher-side owner fields `+0x84/+0x88/+0x8c` are zero-initialized earlier at `0x41ee60`
 - `0x41f1d0` is the concrete non-init store for that triple
 - within the active late-login scope, later `0x41de40` reads those fields; no stronger later
