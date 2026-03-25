@@ -73,18 +73,6 @@ Source of truth:
 - `../../docs/launcher.exe/VTABLES/0x004b517c.md`
 - `../../docs/launcher.exe/VTABLES/0x004b5230.md`
 
-### Active source files
-- `matrixstaging/game/src/libltclientlogin/loginstate_state9.cpp`
-- `matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp`
-- `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
-- `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
-- `matrixstaging/game/src/libltclientlogin/loginmediator_state9_submit_scaffold.h`
-- `src/launcher_mediator_state9_abi.cpp`
-- `src/launcher_mediator_abi.cpp`
-
-Open the broader `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` only when the late
-post-state9/event work forces a step back into shared mediator transport or auth/bootstrap code.
-
 ## Keep separate from the next post-state9 session unless needed
 
 These still matter globally, but they are not first-read context for the next late-login pass:
@@ -98,23 +86,12 @@ re-expanding this file.
 
 ## Current implementation priorities
 
-1. Stabilize and document the late arg6 observer bridge now that it can carry the deliberate
-   existing-character path into game
-2. Keep `0x41b420`, `0x41b450`, and `0x41cfb0` treated as the immediate bridge, with later arg6
-   observer slots (`+0x170/+0x174/+0x178/+0x10c/+0x118`) as the next fidelity surface behind it
-3. Determine what the later second observer registration (`client.dll:0x62031136`, object `0x6298a5e8`)
-   really is and which late events it consumes
-4. Keep auth launcher-owned, not client-owned
-5. Keep work in lockstep across source, Ghidra names/types, runtime evidence, and canonical docs
+1. Keep auth launcher-owned, not client-owned
+2. Keep work in lockstep across source, Ghidra names/types, runtime evidence, and canonical docs
 
 ## Documentation / ownership rules
 
 ### Prefer source ownership for recovered code structure
-Own recovered active-path structure in:
-- `matrixstaging/game/src/libltclientlogin/`
-- `matrixstaging/runtime/src/liblttcp/`
-- `matrixstaging/runtime/src/libltmessaging/`
-- `src/launcher_*_abi.cpp`
 
 Use inline comments like:
 - `anchor: launcher.exe:0x...`
@@ -129,32 +106,14 @@ Use `../../docs/` for:
 
 Prefer updating an existing canonical doc over adding new overlapping notes.
 
-### Logging
-- use `spdlog`
-
 ## Build / run
 
 Build:
-```bash
-make
+```
+make -j6
 ```
 
-Safe run:
-```bash
+Run:
+```
 make run
 ```
-
-Current active runtime path:
-```bash
-make run
-```
-
-## Immediate next task
-
-Now that the replacement launcher has entered game on the active path, focus on the next
-late-runtime fidelity surface behind that breakthrough:
-- the arg6 observer bridge after event `0x18`
-- the second observer registration later reached from `client.dll:0x62031136`
-- and any later natural-original parity still missing around the old `0x438df0 -> 0x41cfb0(0x0f)` tail
-
-Do not reopen old auth/bootstrap or helper11/create-character history unless new evidence forces it.
