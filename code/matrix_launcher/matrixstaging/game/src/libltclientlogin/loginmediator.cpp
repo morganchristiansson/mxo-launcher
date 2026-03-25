@@ -507,6 +507,20 @@ bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t,
     return true;
 }
 
+const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
+    const auto it = g_marginBootstrapStateByMediator.find(this);
+    if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
+        spdlog::info("CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> <null> (missing 16-byte margin Twofish key)");
+        return nullptr;
+    }
+
+    const void* seedPointer = it->second.marginTwofishKeyBytes.data();
+    spdlog::info(
+        "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {}",
+        fmt::ptr(seedPointer));
+    return seedPointer;
+}
+
 void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
     scaffoldState3_ = state;
 }

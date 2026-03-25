@@ -632,7 +632,7 @@ uint32_t DiagnosticFillState9CallbackBlob18c(void* outBuffer, uint32_t arg2, uin
     if (!g_DiagnosticLoginController || !outBuffer) {
         return 1u;
     }
-    return g_DiagnosticLoginController->FillState9CallbackBlob18cScaffold(
+    return g_DiagnosticLoginController->FillState9CallbackBlob18c(
         static_cast<uint32_t*>(outBuffer),
         arg2,
         arg3);

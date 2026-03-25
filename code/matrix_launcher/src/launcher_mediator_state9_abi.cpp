@@ -4,8 +4,6 @@
 #include "diagnostics_auth.h"
 #include "loginmediator.h"
 
-#include <spdlog/spdlog.h>
-
 
 // Focused late-login arg6 ABI split:
 // - keep the state9-only ILTLoginMediator.Default slots out of the broad startup-selection ABI TU
@@ -23,9 +21,7 @@
 // - practical current read is the same launcher-owned Twofish key/seed family reused by `+0x18c`
 static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalLoginMediatorStub* self) {
     (void)self;
-    const void* seedPointer = DiagnosticGetState9CallbackSeedPointer85D4();
-    spdlog::info("MediatorStub::GetState9CallbackSeedPointer85D4(+0xd4) -> {}", (uintptr_t)seedPointer);
-    return seedPointer;
+    return DiagnosticGetState9CallbackSeedPointer85D4();
 }
 
 // UNANCHORED: near-direct C helper behind the recovered wrapper-facing +0x124 ABI slot.
@@ -83,29 +79,8 @@ extern "C" uint32_t Mediator_FillState9CallbackBlob18c_Impl(
     uint32_t arg3,
     void* returnAddress) {
     (void)self;
-    uint32_t result = 1u;
-    if (outBuffer) {
-        result = DiagnosticFillState9CallbackBlob18c(outBuffer, arg2, arg3);
-        if (result != 0u) {
-            if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-                result = mediator->FillState9CallbackBlob18cScaffold(
-                    static_cast<uint32_t*>(outBuffer),
-                    arg2,
-                    arg3);
-            }
-        }
-    }
-    spdlog::info(
-        "MediatorStub::FillState9CallbackBlob18c(+0x18c out={} arg2=0x{:08x} arg3=0x{:08x}) -> 0x{:08x} [caller={}]'",
-        (uintptr_t)outBuffer,
-        (unsigned)arg2,
-        (unsigned)arg3,
-        (unsigned)result,
-        (uintptr_t)returnAddress);
-    if (result == 0u && outBuffer) {
-        LogWordBuffer("FillState9CallbackBlob18c out", outBuffer, 0x20u);
-    }
-    return result;
+    (void)returnAddress;
+    return DiagnosticFillState9CallbackBlob18c(outBuffer, arg2, arg3);
 }
 
 // anchor: launcher.exe:0x41e690 / arg6 vtable +0x18c

@@ -596,6 +596,10 @@ public:
     void RegisterScaffoldState11(CLTLoginState* state);
     void RegisterScaffoldState12(CLTLoginState* state);
     void RegisterScaffoldState13(CLTLoginState* state);
+    // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
+    // Late-login state9 callback-seed getter. Returns the same 16-byte margin bootstrap key
+    // family consumed by the callback-blob fill path.
+    const void* GetState9CallbackSeedPointer85D4() const override;
     // anchor: launcher.exe:0x41f1d0
     // Focused late-login source home:
     // - `loginmediator_state9.cpp`
@@ -616,6 +620,7 @@ public:
         void* object88,
         void* object8c);
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
+    uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
     CLTLoginState* ScaffoldState3() const;
     CLTLoginState* ScaffoldState4() const;

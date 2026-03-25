@@ -289,7 +289,7 @@ public:
     // +0xd0
     char* UnknownSlot53();
     // +0xd4
-    void* UnknownSlot54();
+    virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8
     void UnknownSlot55();
     // +0xdc
@@ -386,7 +386,7 @@ public:
     // +0x188
     void UnknownSlot96();
     // +0x18c
-    // virtual void FillState9CallbackBlob18c() = 0;
+    virtual uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) = 0;
     // +0x190
     // virtual void AppendRouteHostStringTriple(uint32_t index, const char* begin, const char* current) = 0;
     // virtual ~ILTLoginMediator() {}

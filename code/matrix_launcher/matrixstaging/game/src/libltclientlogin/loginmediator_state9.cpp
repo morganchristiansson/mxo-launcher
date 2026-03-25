@@ -152,6 +152,10 @@ uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t f
 }
 
 // anchor: launcher.exe:0x41e690
+uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) {
+    return FillState9CallbackBlob18cScaffold(outDwords, arg2, arg3);
+}
+
 uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) {
     if (!outDwords) {
         return 1u;
