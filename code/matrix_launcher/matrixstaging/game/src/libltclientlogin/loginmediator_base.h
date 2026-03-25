@@ -197,9 +197,9 @@ public:
     // +0x18
     void UnknownSlot6();
     // +0x1c
-    void UnknownSlot7();
+    virtual void SetValue1(void* value) = 0;
     // +0x20
-    void UnknownSlot8();
+    virtual void SetValue2(void* value) = 0;
     // +0x24
     virtual uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) = 0;
     // +0x28

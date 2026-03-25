@@ -449,12 +449,14 @@ static void __thiscall Mediator_ClearEngine(MinimalLoginMediatorStub* self) {
 // vtable: ILTLoginMediator.Default slots +0x1c and +0x24
 static void __thiscall Mediator_SetValue1(MinimalLoginMediatorStub* self, void* value) {
     (void)self;
-    if (!g_MediatorRuntimeState.lastNopatchValue1Ptr) {
-        g_MediatorRuntimeState.lastNopatchValue1Ptr = value;
-    } else {
-        g_MediatorRuntimeState.lastNopatchValue2Ptr = value;
-    }
-    spdlog::info("MediatorStub::SetValue1({})", value);
+    mxo::ltlogin::ILTLoginMediator::Default->SetValue1(value);
+}
+
+// anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
+// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+static void __thiscall Mediator_SetValue2(MinimalLoginMediatorStub* self, void* value) {
+    (void)self;
+    mxo::ltlogin::ILTLoginMediator::Default->SetValue2(value);
 }
 
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
@@ -1013,7 +1015,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
     g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c
-    g_LoginMediatorVtable[9] = (void*)Mediator_SetValue1;        // +0x24
+    g_LoginMediatorVtable[9] = (void*)Mediator_SetValue2;        // +0x24
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[14] = (void*)Mediator_GetDisplayName;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c

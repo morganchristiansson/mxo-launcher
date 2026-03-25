@@ -368,6 +368,30 @@ uint32_t CLTLoginMediator::IsReady() {
     return 1;
 }
 
+// +0x1c
+// anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
+// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+void CLTLoginMediator::SetValue1(void* value) {
+    if (!g_MediatorRuntimeState.lastNopatchValue1Ptr) {
+        g_MediatorRuntimeState.lastNopatchValue1Ptr = value;
+    } else {
+        g_MediatorRuntimeState.lastNopatchValue2Ptr = value;
+    }
+    spdlog::info("MediatorStub::SetValue1({})", value);
+}
+
+// +0x20
+// anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
+// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+void CLTLoginMediator::SetValue2(void* value) {
+    if (!g_MediatorRuntimeState.lastNopatchValue1Ptr) {
+        g_MediatorRuntimeState.lastNopatchValue1Ptr = value;
+    } else {
+        g_MediatorRuntimeState.lastNopatchValue2Ptr = value;
+    }
+    spdlog::info("MediatorStub::SetValue2({})", value);
+}
+
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
 // bootstrap `+0xa8` field. Keep that extra level explicit in source too.
