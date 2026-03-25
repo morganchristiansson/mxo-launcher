@@ -40,6 +40,7 @@
 #include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
+// ILTLoginMediator::~ILTLoginMediator() = default;
 
 namespace {
 
@@ -357,7 +358,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 }
 
 // +0x0c
-// anchor launcher.exe!0x0041f060
+// anchor launcher.exe:0x0041f060
 void CLTLoginMediator::ClearEngine() {
     spdlog::info("MediatorStub::ClearEngine()");
 }

@@ -180,6 +180,8 @@ struct ProcessLoginCredentialsInputSketch {
 class ILTLoginMediator {
 public:
     static ILTLoginMediator* Default;
+    // virtual ~ILTLoginMediator();
+
     // +0x00
     virtual const char* GetName() = 0;
     // +0x04
@@ -187,9 +189,9 @@ public:
     // +0x08
     virtual void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) = 0;
     // +0x0c
-    virtual void ClearEngine();
+    virtual void ClearEngine() = 0;
     // +0x10
-    virtual uint32_t IsReady();
+    virtual uint32_t IsReady() = 0;
     // +0x14
     void UnknownSlot5();
     // +0x18
