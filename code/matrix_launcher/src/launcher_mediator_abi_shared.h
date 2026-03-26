@@ -27,11 +27,7 @@ struct DiagnosticMediatorRuntimeState {
     // - provideStartupTripleNetShell_, provideStartupTripleNetMgr_, provideStartupTripleDistrObjExecutive_
     // - provideStartupTripleCount_
     void* loadingState120;
-    void* selectionContext0ec;
-    void* selectionContext0ecCopy;
     uint32_t loading120Count;
-    uint32_t selection0ecCount;
-    uint32_t profile0f4Count;
 };
 
 extern DiagnosticMediatorRuntimeState g_MediatorRuntimeState;

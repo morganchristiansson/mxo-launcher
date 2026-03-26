@@ -305,7 +305,7 @@ public:
     // +0xf0
     // virtual void SetSelectionIndexAndSwitchToState7(uint8_t selectionIndex) = 0;
     // +0xf4
-    // virtual const char* GetState8PersistenceF1c() const = 0;
+    virtual const void* GetState8PersistenceF1c() const = 0;
     // +0xf8
     void UnknownSlot65();
     // +0xfc

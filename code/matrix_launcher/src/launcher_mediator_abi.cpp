@@ -51,12 +51,6 @@ static const char g_MediatorStringC[] = "standalone";
 static const char g_MediatorEmptyString[] = "";
 
 static constexpr size_t kDiagnosticSelectionContextSize = 0xb4; // from client.dll:6211d3e0 zero-init of the +0xec handoff object
-struct DiagnosticMediatorSelectionContextCopy {
-    unsigned char bytes[kDiagnosticSelectionContextSize];
-};
-
-static DiagnosticMediatorSelectionContextCopy g_MediatorSelectionContextCopy = {};
-static bool g_MediatorSelectionContextCopyValid = false;
 
 struct DiagnosticSmallStringLike {
     const char* begin = nullptr;
@@ -157,17 +151,6 @@ const char* DiagnosticMediatorAuthName() {
 const char* DiagnosticMediatorAuthPassword() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6AuthPassword() : g_MediatorEmptyString;
-}
-
-static void DiagnosticMirrorSelectionContextIntoMediatorModel(const void* selectionContext) {
-    mxo::ltlogin::State3SelectionContextInputSketch input = {};
-    std::memcpy(&input, selectionContext, sizeof(input));
-    mxo::ltlogin::ILTLoginMediator::Default->PersistSelectionContextForState8(input);
-    spdlog::info(
-        "DIAGNOSTIC: mirrored arg6 +0xec selection context into CLTLoginMediator state3->8 snapshot slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
-        (unsigned)(input.slotOrSelectionIndex00 & 0xffu),
-        (unsigned)input.block04[0],
-        (unsigned)input.blockA4[3]);
 }
 
 static const char* NonEmptyOrPlaceholder(const char* value) {
@@ -345,73 +328,15 @@ void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
     }
 }
 
-// UNANCHORED: heuristic ascii detector for selection-context dumps.
-static bool IsMostlyPrintableAscii(const unsigned char* data, uint32_t length) {
-    if (!data || length < 4) return false;
-    for (uint32_t i = 0; i < length; ++i) {
-        const unsigned char c = data[i];
-        if (c < 0x20 || c > 0x7e) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// UNANCHORED: expanded logger for the copied +0xec selection-context handoff.
-static void LogSelectionContextDetails(const void* selectionContext, uint32_t byteCount) {
-    if (!selectionContext || byteCount == 0) {
-        return;
-    }
-
-    LogWordBuffer("SelectionContext words", selectionContext, byteCount);
-
-    const unsigned char* bytes = static_cast<const unsigned char*>(selectionContext);
-    bool loggedAnyString = false;
-    for (uint32_t i = 0; i < byteCount;) {
-        if (bytes[i] == '\0') {
-            ++i;
-            continue;
-        }
-
-        uint32_t j = i;
-        while (j < byteCount && bytes[j] != '\0' && bytes[j] >= 0x20 && bytes[j] <= 0x7e) {
-            ++j;
-        }
-
-        if (j > i && j < byteCount && IsMostlyPrintableAscii(bytes + i, j - i)) {
-            char buffer[128] = {0};
-            const uint32_t copyLength = ((j - i) < (sizeof(buffer) - 1)) ? (j - i) : (sizeof(buffer) - 1);
-            std::memcpy(buffer, bytes + i, copyLength);
-            buffer[copyLength] = '\0';
-            spdlog::info("SelectionContext ascii candidate [+0x{:02x}] = '{}'", (unsigned)i, buffer);
-            loggedAnyString = true;
-            i = j + 1;
-            continue;
-        }
-
-        ++i;
-    }
-
-    if (!loggedAnyString) {
-        spdlog::info("SelectionContext ascii candidate scan: none");
-    }
-}
-
 // UNANCHORED: resets the replacement mediator object and sidecar model to default state.
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
     std::memset(&g_MediatorSelectionObject, 0, sizeof(g_MediatorSelectionObject));
     std::memset(&g_MediatorCurrentSlotRecordObject, 0, sizeof(g_MediatorCurrentSlotRecordObject));
-    std::memset(&g_MediatorSelectionContextCopy, 0, sizeof(g_MediatorSelectionContextCopy));
-    g_MediatorProfileCharacterInfoF4 = {};
-    g_MediatorState8PersistenceF1c = {};
-    g_MediatorState8Overflow13f0.fill(0u);
-    g_MediatorState8Overflow13f4 = 0u;
     g_MediatorState8Section11String1460Owned.clear();
     g_MediatorState8Section11String1460 = {};
     g_MediatorCurrentSlotRecordPayload = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     g_MediatorCurrentSlotRecordNameOwned.clear();
-    g_MediatorSelectionContextCopyValid = false;
     delete mxo::ltlogin::ILTLoginMediator::Default;
     mxo::ltlogin::ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
     g_MediatorSelectionPacked = DiagnosticMediatorSelectionPacked{0, 0, 0, 0u, 0u};
@@ -739,41 +664,30 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
     MinimalLoginMediatorStub* self,
     void* selectionContext,
     void* returnAddress) {
-    g_MediatorRuntimeState.selectionContext0ec = selectionContext;
-    g_MediatorRuntimeState.selectionContext0ecCopy = &g_MediatorSelectionContextCopy;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        return;
+    }
+
     if (selectionContext) {
-        std::memcpy(&g_MediatorSelectionContextCopy, selectionContext, sizeof(g_MediatorSelectionContextCopy));
-        g_MediatorSelectionContextCopyValid = true;
-        DiagnosticMirrorSelectionContextIntoMediatorModel(&g_MediatorSelectionContextCopy);
-        DiagnosticMirrorSelectionContextIntoLoginController(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
+        mxo::ltlogin::State3SelectionContextInputSketch input = {};
+        std::memcpy(&input, selectionContext, sizeof(input));
+        mediator->PersistSelectionContextForState8(input);
+        DiagnosticMirrorSelectionContextIntoLoginController(selectionContext, sizeof(input));
     } else {
-        std::memset(&g_MediatorSelectionContextCopy, 0, sizeof(g_MediatorSelectionContextCopy));
-        g_MediatorSelectionContextCopyValid = false;
+        mediator->ResetSelectionContext0ecMirror();
     }
+
+    // Keep the wrapper-facing arg6 `+0x1c` semantic split explicit.
+    // The copy now lives on `CLTLoginMediator`, but the stub object still exposes a direct
+    // pointer-shaped field that client-side code may read without going back through the owner
+    // vtable family.
     if (self) {
-        self->field1C = &g_MediatorSelectionContextCopy;
+        self->field1C = const_cast<mxo::ltlogin::State3SelectionContextInputSketch*>(
+            &mediator->SelectionContext0ecCopy());
     }
-    ++g_MediatorRuntimeState.selection0ecCount;
-    spdlog::info(
-        "MediatorStub::ConsumeSelectionContext({}) [count={} caller={} copied={}] size=0x{} valid={} configuredWorld=0x{} configuredVariant=0x{} profile='{}' world='{}'",
-        fmt::ptr(selectionContext),
-        (unsigned)g_MediatorRuntimeState.selection0ecCount,
-        fmt::ptr(returnAddress),
-        fmt::ptr(&g_MediatorSelectionContextCopy),
-        (unsigned long)sizeof(g_MediatorSelectionContextCopy),
-        g_MediatorSelectionContextCopyValid ? 1u : 0u,
-        DiagnosticMediatorSelectedWorldIndexLow24(),
-        DiagnosticMediatorSelectedVariantIndexHigh8(),
-        DiagnosticMediatorProfileName(),
-        DiagnosticMediatorMappedSelectionName());
-    LogPointerWords("ConsumeSelectionContext copied", &g_MediatorSelectionContextCopy, 8);
-    const uint32_t* copiedWords = reinterpret_cast<const uint32_t*>(&g_MediatorSelectionContextCopy);
-    spdlog::info(
-        "DIAGNOSTIC: selectionContext[0]=0x{:08x} (configuredVariant=0x{:02x} configuredWorld=0x{:06x})",
-        copiedWords[0],
-        DiagnosticMediatorSelectedVariantIndexHigh8(),
-        DiagnosticMediatorSelectedWorldIndexLow24());
-    LogSelectionContextDetails(&g_MediatorSelectionContextCopy, sizeof(g_MediatorSelectionContextCopy));
+
+    (void)returnAddress;
 }
 
 // anchor: client.dll:0x62170f48 consumes the assembled 0xb4 selection/config handoff through arg6 +0xec
@@ -801,13 +715,14 @@ extern "C" void Mediator_FillLoadingCharacterState120_Impl(
     void* returnAddress) {
     g_MediatorRuntimeState.loadingState120 = loadingState;
     ++g_MediatorRuntimeState.loading120Count;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     spdlog::info(
         "MediatorStub::FillLoadingCharacterState(+0x120 out={} self={}) [count={:08x} caller={} copiedFrom0ec={}]}",
         fmt::ptr(loadingState),
         fmt::ptr(self),
         (unsigned)g_MediatorRuntimeState.loading120Count,
         fmt::ptr(returnAddress),
-        g_MediatorSelectionContextCopyValid ? 1u : 0u);
+        mediator && mediator->SelectionContext0ecCopyValid() ? 1u : 0u);
     LogPointerWords("FillLoadingCharacterState self", self, 8);
     LogPointerWords("FillLoadingCharacterState out(before/after stub)", loadingState, 8);
 }
@@ -871,37 +786,10 @@ __attribute__((naked)) static void Mediator_RegisterLoginObserver170() {
 
 // anchor: launcher.exe:0x41f1c0
 // vtable: ILTLoginMediator.Default slot +0xf4
-// Original getter is tiny: returns owner `+0xf1c`; the real producer is the earlier state8
-// load-character reply path (`0x43f930`) that materializes the broader `+0xf1c/+0xf48/+0xf88/+0x13f0`
-// family later consumed by client `mcd.cfg` and character-info paths.
-static void* __thiscall Mediator_GetSelectionContextSnapshot(MinimalLoginMediatorStub* self) {
+static void* __thiscall Mediator_GetState8PersistenceF1c(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    ++g_MediatorRuntimeState.profile0f4Count;
-    PopulateMediatorState8PersistenceF1c();
-
-    const char* firstName = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x04);
-    const char* lastName = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x24);
-    const char* background = reinterpret_cast<const char*>(g_MediatorState8PersistenceF1c.body6c.data() + 0x44);
-
-    spdlog::debug(
-        "MediatorStub::GetSelectionContextSnapshot(+0xf4) caller={} [{}] -> {} [count={} copiedFrom0ec={} raw0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x} overflow13f4=0x{:04x}]",
-        fmt::ptr(returnAddress),
-        DescribeMediatorCaller(returnAddress),
-        fmt::ptr(&g_MediatorState8PersistenceF1c),
-        static_cast<unsigned>(g_MediatorRuntimeState.profile0f4Count),
-        g_MediatorSelectionContextCopyValid ? 1u : 0u,
-        fmt::ptr(g_MediatorRuntimeState.selectionContext0ec),
-        NonEmptyOrPlaceholder(g_MediatorState8PersistenceF1c.string00.data()),
-        NonEmptyOrPlaceholder(firstName),
-        NonEmptyOrPlaceholder(lastName),
-        NonEmptyOrPlaceholder(background),
-        static_cast<unsigned>(g_MediatorState8PersistenceF1c.field24),
-        static_cast<unsigned>(g_MediatorState8Overflow13f4));
-    LogMediatorState8PersistenceSummary("GetSelectionContextSnapshot(+0xf4)", returnAddress);
-    LogMediatorCharacterStateContext("GetSelectionContextSnapshot(+0xf4)", returnAddress);
-    LogPointerWords("GetSelectionContextSnapshot ownerF1c", &g_MediatorState8PersistenceF1c, 8);
-    return &g_MediatorState8PersistenceF1c;
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? const_cast<void*>(mediator->GetState8PersistenceF1c()) : nullptr;
 }
 
 // anchor: launcher.exe:0x41f320 / owner vtable +0x148
@@ -1031,7 +919,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[56] = (void*)Mediator_GetVariantWorldName; // +0xe0
     g_LoginMediatorVtable[57] = (void*)Mediator_GetVariantState; // +0xe4
     g_LoginMediatorVtable[59] = (void*)Mediator_ConsumeSelectionContext; // +0xec
-    g_LoginMediatorVtable[61] = (void*)Mediator_GetSelectionContextSnapshot; // +0xf4
+    g_LoginMediatorVtable[61] = (void*)Mediator_GetState8PersistenceF1c; // +0xf4
     g_LoginMediatorVtable[62] = (void*)Mediator_GetWorldCount; // +0xf8
     g_LoginMediatorVtable[63] = (void*)Mediator_GetWorldNameByIndex; // +0xfc
     g_LoginMediatorVtable[64] = (void*)Mediator_GetWorldTypeByIndex; // +0x100

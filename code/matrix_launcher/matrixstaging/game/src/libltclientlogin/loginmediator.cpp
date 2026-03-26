@@ -293,6 +293,11 @@ CLTLoginMediator::CLTLoginMediator()
       authBootstrap680_{},
       sessionCallbackHelper65c_(nullptr),
       state8SelectionContextSnapshotState_{},
+      selectionContext0ecCopy_{},
+      selectionContext0ecCopyValid_(false),
+      selection0ecCount_(0),
+      state8PersistenceF1c_{},
+      profile0f4Count_(0),
       postAuthMarginLoadingState_{},
       authServerPortHostOrder_(11000),
       ignoreHostsFileForAuth_(false),
@@ -943,12 +948,30 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         "DIAGNOSTIC: ProcessLoginRequest mirrored default DAT_004d66ec==0 branch by clearing owner+0xf4 small-string state");
     return 0u;
 }
+void CLTLoginMediator::ResetSelectionContext0ecMirror() {
+    selectionContext0ecCopy_ = {};
+    selectionContext0ecCopyValid_ = false;
+    ++selection0ecCount_;
+    spdlog::info(
+        "CLTLoginMediator::ResetSelectionContext0ecMirror cleared selection mirror [count={}]",
+        selection0ecCount_);
+}
+
 // +0xec
 // anchor: launcher.exe:0x41c1f0
 uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) {
     // anchor: launcher.exe:0x41c1f0
     // Writes the state3 selection/config snapshot into owner `+0xcc8/+0xcd0..+0xd7f`, then
     // switches to helper/state `8`.
+    selectionContext0ecCopy_ = input;
+    selectionContext0ecCopyValid_ = true;
+    ++selection0ecCount_;
+    spdlog::info(
+        "CLTLoginMediator::PersistSelectionContextForState8 captured selection mirror [count={}] slot=0x{:02x} block04_0=0x{:08x} blockA4_3=0x{:08x}",
+        selection0ecCount_,
+        static_cast<unsigned>(selectionContext0ecCopy_.slotOrSelectionIndex00 & 0xffu),
+        selectionContext0ecCopy_.block04[0],
+        selectionContext0ecCopy_.blockA4[3]);
     if (input.slotOrSelectionIndex00 >= 100u) {
         return 0u;
     }
@@ -972,12 +995,138 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     }
 
     spdlog::info(
-        "DIAGNOSTIC: PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} currentState={}",
+        "CLTLoginMediator::PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} currentState={}",
         state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8,
         state8SelectionContextSnapshotState_.blockCd0[0],
         state8SelectionContextSnapshotState_.blockD70[3],
         currentState_ ? currentState_->DebugName() : "<unchanged>");
     return 0u;
+}
+
+const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8PersistenceF1cView() const {
+    auto copyCStringIntoFixed = [](std::array<char, 0x20>& dest, const char* src) {
+        std::fill(dest.begin(), dest.end(), '\0');
+        if (!src || !src[0]) {
+            return;
+        }
+        const size_t copyCount = std::min(std::char_traits<char>::length(src), dest.size() - 1u);
+        std::memcpy(dest.data(), src, copyCount);
+        dest[copyCount] = '\0';
+    };
+    auto copyCStringIntoByteSpan = [](uint8_t* dest, size_t destSize, const char* src) {
+        if (!dest || destSize == 0u) {
+            return;
+        }
+        std::memset(dest, 0, destSize);
+        if (!src || !src[0]) {
+            return;
+        }
+        const size_t copyCount = std::min(std::char_traits<char>::length(src), destSize - 1u);
+        std::memcpy(dest, src, copyCount);
+        dest[copyCount] = '\0';
+    };
+    auto preferNonEmpty = [](const char* primary, const char* fallback) {
+        return (primary && primary[0]) ? primary : fallback;
+    };
+
+    state8PersistenceF1c_ = {};
+
+    const char* characterName = nullptr;
+    const char* realFirstName = nullptr;
+    const char* realLastName = nullptr;
+    const char* background = nullptr;
+
+    if (const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord()) {
+        if (!currentSlotRecord->heapString14.empty()) {
+            characterName = currentSlotRecord->heapString14.c_str();
+        }
+    }
+    characterName = preferNonEmpty(characterName, GetSlotRecordHeapStringByIndex(0));
+    const auto& ownerState = PostAuthMarginLoadingStateView();
+    characterName = preferNonEmpty(characterName, ownerState.characterNameBufferF1c);
+    characterName = preferNonEmpty(characterName, SourceLeadString108().data());
+
+    const char* sourceBlock178 = reinterpret_cast<const char*>(SourceBlock178().data());
+    const char* sourceBlock198 = reinterpret_cast<const char*>(SourceBlock198().data());
+    const char* sourceBlock1b8 = reinterpret_cast<const char*>(SourceBlock1b8().data());
+    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
+    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
+    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
+    const bool section0LooksLikeMiddleFirstLast =
+        section0F8c != nullptr &&
+        std::char_traits<char>::length(section0F8c) == 1u &&
+        section0Fac != nullptr && section0Fac[0] != '\0' &&
+        section0Fcc != nullptr && section0Fcc[0] != '\0';
+
+    if (section0LooksLikeMiddleFirstLast) {
+        realFirstName = preferNonEmpty(sourceBlock178, section0Fac);
+        realLastName = preferNonEmpty(sourceBlock198, section0Fcc);
+        background = preferNonEmpty(sourceBlock1b8, nullptr);
+    } else {
+        realFirstName = preferNonEmpty(sourceBlock178, section0F8c);
+        realLastName = preferNonEmpty(sourceBlock198, section0Fac);
+        background = preferNonEmpty(sourceBlock1b8, section0Fcc);
+    }
+
+    state8PersistenceF1c_.field24 = SourceField12c();
+    if (state8PersistenceF1c_.field24 == 0u) {
+        state8PersistenceF1c_.field24 = Arg6SelectedWorldIndexLow24();
+    }
+
+    characterName = preferNonEmpty(characterName, ownerState.characterNameBufferF1c);
+    realFirstName = preferNonEmpty(realFirstName, ownerState.characterNameBufferF1c);
+    realLastName = preferNonEmpty(realLastName, ownerState.characterNameBufferF1c);
+    background = preferNonEmpty(background, ownerState.characterNameBufferF1c);
+
+    copyCStringIntoFixed(state8PersistenceF1c_.string00, characterName);
+    state8PersistenceF1c_.field20 = ownerState.characterReplyFieldF3c;
+    state8PersistenceF1c_.field24 =
+        ownerState.characterReplyFieldF40 ? ownerState.characterReplyFieldF40 : state8PersistenceF1c_.field24;
+    state8PersistenceF1c_.field28 = 0u;
+    std::copy(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), state8PersistenceF1c_.header2c.begin());
+    std::copy(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), state8PersistenceF1c_.secondary4c.begin());
+    std::memcpy(state8PersistenceF1c_.body6c.data(), ownerState.state8Section0RawF88.data(), state8PersistenceF1c_.body6c.size());
+
+    copyCStringIntoByteSpan(state8PersistenceF1c_.body6c.data() + 0x04, 0x20, realFirstName);
+    copyCStringIntoByteSpan(state8PersistenceF1c_.body6c.data() + 0x24, 0x20, realLastName);
+    copyCStringIntoByteSpan(state8PersistenceF1c_.body6c.data() + 0x44, 0x400, background);
+
+    if (ownerState.replySectionData13cc != 0u) {
+        std::memcpy(
+            state8PersistenceF1c_.body6c.data() + 0x444,
+            &ownerState.replySectionData13cc,
+            sizeof(uint32_t));
+    }
+    if (ownerState.replySectionData13d0 != 0u) {
+        std::memcpy(
+            state8PersistenceF1c_.body6c.data() + 0x448,
+            &ownerState.replySectionData13d0,
+            sizeof(uint32_t));
+    }
+
+    return state8PersistenceF1c_;
+}
+
+const void* CLTLoginMediator::GetState8PersistenceF1c() const {
+    const State8PersistenceF1cSnapshot& snapshot = State8PersistenceF1cView();
+    ++profile0f4Count_;
+    const auto& ownerState = PostAuthMarginLoadingStateView();
+    const char* firstName = reinterpret_cast<const char*>(snapshot.body6c.data() + 0x04);
+    const char* lastName = reinterpret_cast<const char*>(snapshot.body6c.data() + 0x24);
+    const char* background = reinterpret_cast<const char*>(snapshot.body6c.data() + 0x44);
+    spdlog::debug(
+        "CLTLoginMediator::GetState8PersistenceF1c(+0xf4) -> {} [count={} copiedFrom0ec={} valid0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x} overflow13f4=0x{:04x}]",
+        fmt::ptr(&snapshot),
+        profile0f4Count_,
+        selection0ecCount_,
+        selectionContext0ecCopyValid_ ? 1u : 0u,
+        snapshot.string00[0] ? snapshot.string00.data() : "<empty>",
+        firstName && firstName[0] ? firstName : "<empty>",
+        lastName && lastName[0] ? lastName : "<empty>",
+        background && background[0] ? background : "<empty>",
+        static_cast<unsigned>(snapshot.field24),
+        static_cast<unsigned>(ownerState.state8Section0OverflowLength13f4));
+    return &snapshot;
 }
 
 // anchor: launcher.exe:0x41c3c0

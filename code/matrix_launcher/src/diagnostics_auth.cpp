@@ -10,7 +10,6 @@
 
 #include <algorithm>
 #include <array>
-#include <spdlog/spdlog.h>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -448,9 +447,8 @@ static void DiagnosticApplyLoginControllerConfig() {
         // Diagnostic bridge only:
         // - `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the strongest concrete
         //   writer for the owner source block `+0x108/+0x12c/+0x134..+0x1b8`
-        // - the exact original upstream producer feeding that blob is still unresolved
-        // - the replacement launcher therefore lets explicit launcher seed inputs exercise the
-        //   confirmed writer without pretending we already recovered the original producer
+        // - the sidecar continues to exercise that recovered writer without mutating the live
+        //   launcher mediator outside the targeted wrapper-minimization scope
         mxo::ltlogin::ProcessLoginCredentialsInputSketch input = {};
         DiagnosticCopyCStringIntoFixed(
             input.string00.data(),
@@ -458,11 +456,24 @@ static void DiagnosticApplyLoginControllerConfig() {
             characterNameSeed);
         input.field24 = g_LoginControllerSelectedWorldIndexLow24;
 
+        if (const char* realFirstName = DiagnosticAuthCurrentRealFirstName()) {
+            DiagnosticCopyCStringIntoFixed(input.string70.data(), input.string70.size(), realFirstName);
+        }
+        if (const char* realLastName = DiagnosticAuthCurrentRealLastName()) {
+            DiagnosticCopyCStringIntoFixed(input.string90.data(), input.string90.size(), realLastName);
+        }
+        if (const char* background = DiagnosticAuthCurrentBackground()) {
+            DiagnosticCopyCStringIntoFixed(input.stringB0.data(), input.stringB0.size(), background);
+        }
+
         g_DiagnosticLoginController->ProcessLoginCredentials(input);
         spdlog::info(
-            "DiagnosticApplyLoginControllerConfig applied recovered 0x41c3c0 character seed characterName='{}' selectedWorldIndexLow24=0x{:06x}",
+            "DiagnosticApplyLoginControllerConfig applied recovered 0x41c3c0 character seed to diagnostic mediator characterName='{}' selectedWorldIndexLow24=0x{:06x} realFirst='{}' realLast='{}' background='{}'",
             characterNameSeed,
-            static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24));
+            static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24),
+            input.string70.data(),
+            input.string90.data(),
+            input.stringB0.data());
     }
 
     mxo::ltlogin::LaunchPadClient launchPad;
@@ -471,7 +482,7 @@ static void DiagnosticApplyLoginControllerConfig() {
     if (playRequestSessionId) {
         launchPad.OnPlayRequestStatus(g_DiagnosticLoginController, /*resultCode=*/0u, playRequestSessionId);
         spdlog::info(
-            "DiagnosticApplyLoginControllerConfig routed launcher LaunchPadClient::OnPlayRequestStatus GameSessionID='{}'",
+            "DiagnosticApplyLoginControllerConfig routed diagnostic LaunchPadClient::OnPlayRequestStatus GameSessionID='{}'",
             playRequestSessionId);
     }
 }
@@ -783,6 +794,7 @@ const char* DiagnosticAuthCurrentBackground() {
 }
 
 bool DiagnosticCanBeginAuthConnection() {
+
     return g_DiagnosticLoginController != NULL;
 }
 

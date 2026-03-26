@@ -307,6 +307,16 @@ public:
         std::array<uint32_t, 4> blockD70{};            // `+0xd70 .. +0xd7f`
     };
 
+    struct State8PersistenceF1cSnapshot {
+        std::array<char, 0x20> string00{};
+        uint32_t field20 = 0;
+        uint32_t field24 = 0;
+        uint32_t field28 = 0;
+        std::array<uint32_t, 8> header2c{};
+        std::array<uint32_t, 8> secondary4c{};
+        std::array<uint8_t, 0x465> body6c{};
+    };
+
     struct PostAuthMarginLoadingState {
         // owner post-auth margin/loading block shared by the active state8 path and the later
         // state10/state11 path.
@@ -861,6 +871,13 @@ public:
     // +0xec
     // anchor: launcher.exe:0x41c1f0
     uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) override;
+    const State8PersistenceF1cSnapshot& State8PersistenceF1cView() const;
+    const void* GetState8PersistenceF1c() const override;
+    const State3SelectionContextInputSketch& SelectionContext0ecCopy() const { return selectionContext0ecCopy_; }
+    bool SelectionContext0ecCopyValid() const { return selectionContext0ecCopyValid_; }
+    uint32_t SelectionContext0ecCount() const { return selection0ecCount_; }
+    uint32_t Profile0f4Count() const { return profile0f4Count_; }
+    void ResetSelectionContext0ecMirror();
 
     // +0x120
     // anchor: launcher.exe:0x41c3c0
@@ -1108,6 +1125,13 @@ private:
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
     State8SelectionContextSnapshotState state8SelectionContextSnapshotState_;
+    // +0xec / +0xf4 wrapper-owned mirrors now live on the mediator instance instead of in the
+    // launcher ABI shell.
+    State3SelectionContextInputSketch selectionContext0ecCopy_{};
+    bool selectionContext0ecCopyValid_ = false;
+    uint32_t selection0ecCount_ = 0;
+    mutable State8PersistenceF1cSnapshot state8PersistenceF1c_{};
+    mutable uint32_t profile0f4Count_ = 0;
     // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.
     PostAuthMarginLoadingState postAuthMarginLoadingState_;
     // launcher.exe:0x4f78b8 owner-side current-slot character record table (`+0x688`).
