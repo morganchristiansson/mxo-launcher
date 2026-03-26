@@ -113,14 +113,4 @@ uint32_t LaunchPadClient::OnSubscriptionValidation() {
     return 0;
 }
 
-uint32_t LaunchPadClient::OnConnectionStatusCheck() {
-    // anchor: launcher.exe:0x4207c0
-    // string-backed anchor:
-    // - "LaunchPad login successful."
-    // important handoff:
-    // - success switches mediator helper state 1
-    // - helper state 1 then reaches 0x439090 -> 0x41d170
-    return 0;
-}
-
 }  // namespace mxo::ltlogin

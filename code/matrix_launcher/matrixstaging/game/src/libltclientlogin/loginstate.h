@@ -122,6 +122,12 @@ public:
     // anchor: launcher.exe:0x00439060 (vtable 0x004b4fc4 slot 10 initializer)
     CLTLoginState_State1() = default;
 
+private:
+    // anchor: launcher.exe:0x00439090 stores the upstream/helper object at `this+4` before
+    // starting the auth connection.
+    void* cachedUpstreamOrArg_ = nullptr;
+
+public:
     // anchor: launcher.exe vtable 0x004b4fc4
     const char* DebugName() const override;
 

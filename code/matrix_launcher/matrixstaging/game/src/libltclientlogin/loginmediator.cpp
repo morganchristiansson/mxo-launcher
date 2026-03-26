@@ -1509,51 +1509,50 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
 
 void CLTLoginMediator::InitializeHelperDispatchSlot15() {
     // Address anchor: launcher.exe:0x420640 = InitializeHelperDispatchSlot15
-    // Original: allocates 8 bytes, stores vtable 0x4b51e0 (`CLTLoginState_State0`)
-    // Current best concrete object identity: heap object with vtable `0x4b51e0` (`CLTLoginState_State0`).
+    // Original: allocates 8 bytes, stores vtable 0x4b0b88 (`CLTLoginState_State15`).
     void* ptr = malloc(8);
     if (ptr) {
-        *(void**)ptr = reinterpret_cast<void*>(0x4b51e0);
+        *(void**)ptr = reinterpret_cast<void*>(0x4b0b88);
         helpers_.helper78A4 = ptr;
     }
 }
 
 void CLTLoginMediator::InitializeHelperDispatchSlot16() {
     // Address anchor: launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16
-    // Original: allocates 4 bytes, stores vtable 0x4b4fec (`CLTLoginState_WorldListPending`)
+    // Original: allocates 4 bytes, stores vtable 0x4b0bb0 (`CLTLoginState_State16`).
     void* ptr = malloc(4);
     if (ptr) {
-        *(void**)ptr = reinterpret_cast<void*>(0x4b4fec);
+        *(void**)ptr = reinterpret_cast<void*>(0x4b0bb0);
         helpers_.helper78A8 = ptr;
     }
 }
 
 void CLTLoginMediator::InitializeHelperDispatchSlot17() {
     // Address anchor: launcher.exe:0x420850 = InitializeHelperDispatchSlot17
-    // Original: allocates 4 bytes, stores vtable 0x4b4fc4 (`CLTLoginState_State1`)
+    // Original: allocates 4 bytes, stores vtable 0x4b0bd8 (`CLTLoginState_State17`).
     void* ptr = malloc(4);
     if (ptr) {
-        *(void**)ptr = reinterpret_cast<void*>(0x4b4fc4);
+        *(void**)ptr = reinterpret_cast<void*>(0x4b0bd8);
         helpers_.helper78AC = ptr;
     }
 }
 
 void CLTLoginMediator::InitializeHelperDispatchSlot18() {
     // Address anchor: launcher.exe:0x420920 = InitializeHelperDispatchSlot18
-    // Original: allocates 8 bytes, stores vtable 0x4b5014 (`CLTLoginState_AuthenticatePending`)
+    // Original: allocates 8 bytes, stores vtable 0x4b0c00 (`CLTLoginState_State18`).
     void* ptr = malloc(8);
     if (ptr) {
-        *(void**)ptr = reinterpret_cast<void*>(0x4b5014);
+        *(void**)ptr = reinterpret_cast<void*>(0x4b0c00);
         helpers_.helper78B0 = ptr;
     }
 }
 
 void CLTLoginMediator::InitializeHelperDispatchSlot19() {
     // Address anchor: launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19
-    // Original: allocates 4 bytes, stores vtable 0x4b508c (`CLTLoginState_State6`)
+    // Original: allocates 4 bytes, stores vtable 0x4b0c28 (`CLTLoginState_State19`).
     void* ptr = malloc(4);
     if (ptr) {
-        *(void**)ptr = reinterpret_cast<void*>(0x4b508c);
+        *(void**)ptr = reinterpret_cast<void*>(0x4b0c28);
         helpers_.helper78B4 = ptr;
     }
 }
@@ -1593,6 +1592,17 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
 uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
     lastAuthConnectStatus_ = workResultCode;
     ++authConnectStatusCount_;
+
+    // State-1 ownership note:
+    // - original connect-status handling belongs to `CLTLoginState_State1` slot 1 (`0x4390b0`)
+    // - current replacement still has a non-faithful direct-auth startup path, so keep the old
+    //   mediator-owned success fallback for non-state1 callers
+    // - but if the active helper is already state `1`, hand the continuation back to the concrete
+    //   state object so the owner logic can keep moving out of `loginmediator.cpp`
+    if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 1u) {
+        return currentState_->Slot1_HandlePrimaryGate(this);
+    }
+
     return (workResultCode == kConnectStatusSuccess) ? BeginAuthHandshake() : 0u;
 }
 

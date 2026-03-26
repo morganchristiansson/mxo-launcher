@@ -29,6 +29,12 @@ uint32_t CLTLoginState_State16::Slot7_GetStateId() const {
 
 // anchor: launcher.exe:0x004207c0 (vtable 0x004b0bb0 slot 8)
 uint32_t CLTLoginState_State16::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) {
+    // Classification correction from the latest vtable/xref pass:
+    // - despite the string `"LaunchPad login successful."`, `0x4207c0` is not a
+    //   `LaunchPadClient` method
+    // - its concrete data xref is slot 8 of `CLTLoginState_State16` vtable `0x004b0bb0`
+    // - on `param1 == 1` the original logs success and switches helper state `1`, which then
+    //   enters `0x439090 -> 0x41d170` on the auth-connect path
     (void)param1;
     (void)context;
     (void)mediator;

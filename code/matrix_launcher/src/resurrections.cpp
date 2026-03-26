@@ -1055,8 +1055,8 @@ int main(int argc, char* argv[]) {
     }
 
     // Address anchors for the original launcher-owned auth start handoff:
-    // - launcher.exe:0x4207c0 = LaunchPadClient_OnConnectionStatusCheck
-    // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection
+    // - launcher.exe:0x4207c0 = `CLTLoginState_State16` slot 8 success handoff
+    // - launcher.exe:0x439090 = `CLTLoginState_State1` slot 3 / StartAuthConnection
     // - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
     if (DiagnosticCanBeginAuthConnection()) {
         const uint32_t authConnectResult = DiagnosticBeginAuthConnection();

@@ -38,6 +38,7 @@ struct DiagnosticRawMessageConnectionContext {
 
 static mxo::ltlogin::CLTLoginMediator* g_DiagnosticLoginController = NULL;
 static unsigned char g_LoginControllerState9CallbackSeed85D4[16] = {0};
+static mxo::ltlogin::CLTLoginState_State1 g_DiagnosticLoginStateState1 = {};
 static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAuthenticatePending = {};
 static mxo::ltlogin::CLTLoginState_State3 g_DiagnosticLoginStateState3 = {};
 static mxo::ltlogin::CLTLoginState_State4 g_DiagnosticLoginStateState4 = {};
@@ -810,7 +811,11 @@ uint32_t DiagnosticBeginAuthConnection() {
         g_DiagnosticLoginController->SetAuthConnectionContextKey(context);
     }
 
-    const uint32_t result = g_DiagnosticLoginController->BeginAuthConnection();
+    mxo::ltlogin::CLTLoginState* upstreamState = g_DiagnosticLoginController->CurrentState();
+    g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateState1);
+    const uint32_t result = g_DiagnosticLoginStateState1.Slot3_BeginOrContinue(
+        upstreamState,
+        g_DiagnosticLoginController);
     if (context) {
         context->sidecarConnection = g_DiagnosticLoginController->AuthConnection();
     }
@@ -826,7 +831,7 @@ uint32_t DiagnosticBeginAuthConnection() {
     }
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator::BeginAuthConnection() -> 0x{:08x}",
+        "DIAGNOSTIC: CLTLoginState_State1::Slot3_BeginOrContinue() -> 0x{:08x}",
         static_cast<unsigned>(result));
     return result;
 }

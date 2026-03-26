@@ -792,15 +792,15 @@ public:
     // launcher.exe:0x420640..0x4209a0 = InitializeHelperDispatchSlot15..Slot19 for additional slots at 0x4f78a4..0x4f78b4
     // ==============================================================================
     // launcher.exe:0x420640 = InitializeHelperDispatchSlot15 (slot at 0x4f78a4)
-    //   Original: allocates 8 bytes, stores vtable 0x4b51e0 (`CLTLoginState_State0`)
+    //   Original: allocates 8 bytes, stores vtable 0x4b0b88 (`CLTLoginState_State15`)
     // launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16 (slot at 0x4f78a8)
-    //   Original: allocates 4 bytes, stores vtable 0x4b4fec (`CLTLoginState_WorldListPending`)
+    //   Original: allocates 4 bytes, stores vtable 0x4b0bb0 (`CLTLoginState_State16`)
     // launcher.exe:0x420850 = InitializeHelperDispatchSlot17 (slot at 0x4f78ac)
-    //   Original: allocates 4 bytes, stores vtable 0x4b4fc4 (`CLTLoginState_State1`)
+    //   Original: allocates 4 bytes, stores vtable 0x4b0bd8 (`CLTLoginState_State17`)
     // launcher.exe:0x420920 = InitializeHelperDispatchSlot18 (slot at 0x4f78b0)
-    //   Original: allocates 8 bytes, stores vtable 0x4b5014 (`CLTLoginState_AuthenticatePending`)
+    //   Original: allocates 8 bytes, stores vtable 0x4b0c00 (`CLTLoginState_State18`)
     // launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19 (slot at 0x4f78b4)
-    //   Original: allocates 4 bytes, stores vtable 0x4b508c (`CLTLoginState_State6`)
+    //   Original: allocates 4 bytes, stores vtable 0x4b0c28 (`CLTLoginState_State19`)
     void InitializeHelperDispatchSlot15();
     void InitializeHelperDispatchSlot16();
     void InitializeHelperDispatchSlot17();
@@ -812,11 +812,11 @@ public:
     // launcher.exe:0x4f787c = slot 6, launcher.exe:0x4f7880 = slot 7, launcher.exe:0x4f7884 = slot 8,
     // launcher.exe:0x4f7888 = slot 9, launcher.exe:0x4f7890 = slot 10, launcher.exe:0x4f7894 = slot 11,
     // launcher.exe:0x4f788c = slot 12, launcher.exe:0x4f7898 = slot 13, launcher.exe:0x4f789c = slot 14,
-    // launcher.exe:0x4f78a4 = slot 15 (`CLTLoginState_State0`, vtable `0x4b51e0`)
-    // launcher.exe:0x4f78a8 = slot 16 (`CLTLoginState_WorldListPending`, vtable `0x4b4fec`)
-    // launcher.exe:0x4f78ac = slot 17 (`CLTLoginState_State1`, vtable `0x4b4fc4`)
-    // launcher.exe:0x4f78b0 = slot 18 (`CLTLoginState_AuthenticatePending`, vtable `0x4b5014`)
-    // launcher.exe:0x4f78b4 = slot 19 (`CLTLoginState_State6`, vtable `0x4b508c`)
+    // launcher.exe:0x4f78a4 = slot 15 (`CLTLoginState_State15`, vtable `0x4b0b88`)
+    // launcher.exe:0x4f78a8 = slot 16 (`CLTLoginState_State16`, vtable `0x4b0bb0`)
+    // launcher.exe:0x4f78ac = slot 17 (`CLTLoginState_State17`, vtable `0x4b0bd8`)
+    // launcher.exe:0x4f78b0 = slot 18 (`CLTLoginState_State18`, vtable `0x4b0c00`)
+    // launcher.exe:0x4f78b4 = slot 19 (`CLTLoginState_State19`, vtable `0x4b0c28`)
     // ==============================================================================
 
     // Minimal placeholder accessors for recovered world/selection storage families.
@@ -909,6 +909,8 @@ public:
     uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
     uint32_t BeginAuthHandshake();
     uint32_t BeginMarginHandshake();
+    uint32_t LastAuthConnectStatus() const { return lastAuthConnectStatus_; }
+    uint32_t AuthConnectStatusCount() const { return authConnectStatusCount_; }
 
     void SetAuthCredentials(const char* username, const char* password);
     void SetAuthBootstrapConfig(
@@ -1142,8 +1144,10 @@ public:
     PostAuthMarginLoadingState& MutablePostAuthMarginLoadingState() { return postAuthMarginLoadingState_; }
     const PostAuthMarginLoadingState& PostAuthMarginLoadingStateView() const { return postAuthMarginLoadingState_; }
 
-    // Post-auth load-character reply outputs (0x440320) plus neighboring state6-gated send flag:
+    // Post-auth load-character reply outputs (0x440320) plus neighboring auth/margin send flags:
     uint32_t& WorldListCountOrStatus80() { return postAuthMarginLoadingState_.worldListCountOrStatus80; }
+    uint8_t AuthConnectionFlag2c() const { return authConnectionFlag2c_; }
+    uint8_t& AuthConnectionFlag2c() { return authConnectionFlag2c_; }
     uint8_t State10SendGateFlagF14() const { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
     uint8_t& State10SendGateFlagF14() { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
     uint32_t State6UdpSessionSecretF18() const;
