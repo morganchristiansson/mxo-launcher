@@ -666,6 +666,26 @@ public:
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
 
+    struct ActiveCharacterStateViewScaffold {
+        const char* characterName = nullptr;
+        uint32_t characterIdLow = 0;
+        uint32_t characterIdHigh = 0;
+        const char* realFirstName = nullptr;
+        const char* realLastName = nullptr;
+        const char* background = nullptr;
+    };
+
+    // Narrow active-state-source bridge for wrapper-facing/model code.
+    // Current runtime still lets diagnostics register a separate live controller instance here,
+    // but callers should depend on this generic hook instead of reaching back into diagnostics
+    // globals so future ownership can move without a broad rewrite.
+    static void RegisterActiveStateSourceScaffold(CLTLoginMediator* mediator);
+    static bool UnregisterActiveStateSourceScaffold(const CLTLoginMediator* mediator);
+    static CLTLoginMediator* ActiveStateSourceScaffold();
+    const CLTLoginMediator* ResolveActiveStateSourceScaffold() const;
+    ActiveCharacterStateViewScaffold DescribeOwnCharacterStateScaffold() const;
+    ActiveCharacterStateViewScaffold DescribeActiveCharacterStateScaffold() const;
+
     // anchor: launcher.exe:0x41b450
     // Recovered helper-state switcher:
     // - not just a raw assignment

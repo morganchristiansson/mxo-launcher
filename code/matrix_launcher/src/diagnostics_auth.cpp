@@ -38,8 +38,9 @@ struct DiagnosticRawMessageConnectionContext {
 };
 
 // Diagnostic-only owner/session wrapper for the launcher-owned login sidecar.
-// Keep controller creation, reset, and auth/margin context lifetime in one place so
-// diagnostics code can query the active controller without directly owning raw new/delete.
+// Keep controller creation, reset, auth/margin context lifetime, and the current generic
+// CLTLoginMediator active-state-source registration in one place so diagnostics code can query the
+// active controller without directly owning raw new/delete.
 struct DiagnosticLoginControllerSession {
     ~DiagnosticLoginControllerSession();
 
@@ -121,6 +122,7 @@ void DiagnosticLoginControllerSession::Reset() {
         std::free(marginContext_);
         marginContext_ = NULL;
     }
+    mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(controller_.get());
     controller_.reset();
     currentOwner_ = NULL;
     postAuthMarginBeginAttempted_ = false;
@@ -133,6 +135,7 @@ void DiagnosticLoginControllerSession::BeginForOwner(void* owner) {
 
 mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::RecreateForEngine(
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
+    mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(controller_.get());
     controller_.reset();
     if (!engine) {
         return NULL;
@@ -142,6 +145,7 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::RecreateForEng
     if (controller_) {
         controller_->SetNetworkEngine(engine);
         controller_->InitializeConnectionHelpers();
+        mxo::ltlogin::CLTLoginMediator::RegisterActiveStateSourceScaffold(controller_.get());
     }
     return controller_.get();
 }
@@ -619,19 +623,20 @@ static void DiagnosticApplyLoginControllerConfig() {
         // - the sidecar continues to exercise that recovered writer without mutating the live
         //   launcher mediator outside the targeted wrapper-minimization scope
         mxo::ltlogin::ProcessLoginCredentialsInputSketch input = {};
+        const auto characterState = loginController->DescribeOwnCharacterStateScaffold();
         DiagnosticCopyCStringIntoFixed(
             input.string00.data(),
             input.string00.size(),
             characterNameSeed);
         input.field24 = g_LoginControllerSelectedWorldIndexLow24;
 
-        if (const char* realFirstName = DiagnosticAuthCurrentRealFirstName()) {
+        if (const char* realFirstName = characterState.realFirstName) {
             DiagnosticCopyCStringIntoFixed(input.string70.data(), input.string70.size(), realFirstName);
         }
-        if (const char* realLastName = DiagnosticAuthCurrentRealLastName()) {
+        if (const char* realLastName = characterState.realLastName) {
             DiagnosticCopyCStringIntoFixed(input.string90.data(), input.string90.size(), realLastName);
         }
-        if (const char* background = DiagnosticAuthCurrentBackground()) {
+        if (const char* background = characterState.background) {
             DiagnosticCopyCStringIntoFixed(input.stringB0.data(), input.stringB0.size(), background);
         }
 
@@ -678,10 +683,6 @@ void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* auth
     g_LoginControllerAuthName = (authName && authName[0]) ? authName : "";
     g_LoginControllerAuthPassword = (authPassword && authPassword[0]) ? authPassword : "";
     DiagnosticApplyLoginControllerConfig();
-}
-
-mxo::ltlogin::CLTLoginMediator* DiagnosticAuthGetLoginController() {
-    return GetDiagnosticLoginController();
 }
 
 void DiagnosticAuthPollLiveConnectionTraffic(void* owner) {
@@ -842,119 +843,6 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
         g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : "<empty>",
         g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : "<empty>",
         static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24));
-}
-
-const char* DiagnosticAuthCurrentCharacterName() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (loginController) {
-        if (const auto* currentSlotRecord = loginController->GetCurrentSlotRecord()) {
-            if (!currentSlotRecord->heapString14.empty()) {
-                return currentSlotRecord->heapString14.c_str();
-            }
-        }
-        if (const char* slotZeroName = loginController->LookupSlotRecordHeapStringByIndex(0)) {
-            return slotZeroName;
-        }
-        if (const char* materializedName = loginController->CharacterNameBufferF1c()) {
-            if (materializedName[0] != '\0') {
-                return materializedName;
-            }
-        }
-        const auto& sourceLeadString108 = loginController->SourceLeadString108();
-        if (sourceLeadString108[0] != '\0') {
-            return sourceLeadString108.data();
-        }
-    }
-    return g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : nullptr;
-}
-
-uint32_t DiagnosticAuthCurrentCharacterIdLow() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) {
-        return 0u;
-    }
-    if (const auto* currentSlotRecord = loginController->GetCurrentSlotRecord()) {
-        return currentSlotRecord->globalCharacterIdLow03;
-    }
-    if (const auto* slotZeroRecord = loginController->GetSlotRecordByIndex(0)) {
-        return slotZeroRecord->globalCharacterIdLow03;
-    }
-    return 0u;
-}
-
-uint32_t DiagnosticAuthCurrentCharacterIdHigh() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) {
-        return 0u;
-    }
-    if (const auto* currentSlotRecord = loginController->GetCurrentSlotRecord()) {
-        return currentSlotRecord->globalCharacterIdHigh07;
-    }
-    if (const auto* slotZeroRecord = loginController->GetSlotRecordByIndex(0)) {
-        return slotZeroRecord->globalCharacterIdHigh07;
-    }
-    return 0u;
-}
-
-static bool IsLikelyMiddleInitialOnly(const char* value) {
-    return value != nullptr && std::char_traits<char>::length(value) == 1u;
-}
-
-const char* DiagnosticAuthCurrentRealFirstName() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) {
-        return nullptr;
-    }
-    const char* sourceBlock178 = reinterpret_cast<const char*>(loginController->SourceBlock178().data());
-    if (sourceBlock178[0] != '\0') {
-        return sourceBlock178;
-    }
-    const auto& ownerState = loginController->PostAuthMarginLoadingStateView();
-    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
-    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
-    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
-    if (IsLikelyMiddleInitialOnly(section0F8c) && section0Fac && section0Fcc) {
-        return section0Fac;
-    }
-    return section0F8c;
-}
-
-const char* DiagnosticAuthCurrentRealLastName() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) {
-        return nullptr;
-    }
-    const char* sourceBlock198 = reinterpret_cast<const char*>(loginController->SourceBlock198().data());
-    if (sourceBlock198[0] != '\0') {
-        return sourceBlock198;
-    }
-    const auto& ownerState = loginController->PostAuthMarginLoadingStateView();
-    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
-    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
-    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
-    if (IsLikelyMiddleInitialOnly(section0F8c) && section0Fac && section0Fcc) {
-        return section0Fcc;
-    }
-    return section0Fac;
-}
-
-const char* DiagnosticAuthCurrentBackground() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) {
-        return nullptr;
-    }
-    const char* sourceBlock1b8 = reinterpret_cast<const char*>(loginController->SourceBlock1b8().data());
-    if (sourceBlock1b8[0] != '\0') {
-        return sourceBlock1b8;
-    }
-    const auto& ownerState = loginController->PostAuthMarginLoadingStateView();
-    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
-    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
-    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
-    if (IsLikelyMiddleInitialOnly(section0F8c) && section0Fac && section0Fcc) {
-        return nullptr;
-    }
-    return section0Fcc;
 }
 
 bool DiagnosticCanBeginAuthConnection() {

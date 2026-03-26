@@ -1,5 +1,4 @@
 #include "diagnostics.h"
-#include "diagnostics_auth.h"
 #include "launcher_mediator_abi_shared.h"
 #include "loginmediator.h"
 
@@ -63,10 +62,10 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
 }
 
 static mxo::ltlogin::CLTLoginMediator* DiagnosticGetActiveMediatorForCharacterState() {
-    if (mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticAuthGetLoginController()) {
-        return loginController;
+    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+        return const_cast<mxo::ltlogin::CLTLoginMediator*>(mediator->ResolveActiveStateSourceScaffold());
     }
-    return DiagnosticEnsureMediatorModel();
+    return mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
 }
 
 // UNANCHORED: trivial accessors into the recovered CLTLoginMediator sidecar model.
@@ -148,6 +147,7 @@ void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress
     }
 
     const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
+    const auto characterState = mediator->DescribeOwnCharacterStateScaffold();
     const auto* currentState = mediator->CurrentState();
     const auto* currentSlotRecord = mediator->GetCurrentSlotRecord();
     const char* currentSlotName =
@@ -169,12 +169,12 @@ void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress
     const char* section0StringFcc = ownerState.section0StringFcc[0]
         ? ownerState.section0StringFcc.data()
         : "<empty>";
-    const char* authCharacterName = NonEmptyOrPlaceholder(DiagnosticAuthCurrentCharacterName());
-    const uint32_t authCharacterIdLow = DiagnosticAuthCurrentCharacterIdLow();
-    const uint32_t authCharacterIdHigh = DiagnosticAuthCurrentCharacterIdHigh();
+    const char* activeCharacterName = NonEmptyOrPlaceholder(characterState.characterName);
+    const uint32_t activeCharacterIdLow = characterState.characterIdLow;
+    const uint32_t activeCharacterIdHigh = characterState.characterIdHigh;
 
     spdlog::debug(
-        "MediatorStub::{} caller={} [{}] context{{mappedWorld='{}' profile='{}' currentSlot='{}' source108='{}' f1c='{}' section0f8c='{}' section0fac='{}' section0fcc='{}' authChar='{}' authIdLow=0x{:08x} authIdHigh=0x{:08x} authIdLow16=0x{:04x} currentState={} worldId=0x{:04x} status=0x{:02x}}}",
+        "MediatorStub::{} caller={} [{}] context{{mappedWorld='{}' profile='{}' currentSlot='{}' source108='{}' f1c='{}' section0f8c='{}' section0fac='{}' section0fcc='{}' activeChar='{}' activeIdLow=0x{:08x} activeIdHigh=0x{:08x} activeIdLow16=0x{:04x} currentState={} worldId=0x{:04x} status=0x{:02x}}}",
         slotLabel ? slotLabel : "<slot>",
         fmt::ptr(returnAddress),
         DescribeMediatorCaller(returnAddress),
@@ -186,10 +186,10 @@ void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress
         section0StringF8c,
         section0StringFac,
         section0StringFcc,
-        authCharacterName,
-        authCharacterIdLow,
-        authCharacterIdHigh,
-        static_cast<unsigned>(authCharacterIdLow & 0xffffu),
+        activeCharacterName,
+        activeCharacterIdLow,
+        activeCharacterIdHigh,
+        static_cast<unsigned>(activeCharacterIdLow & 0xffffu),
         fmt::ptr(currentState),
         currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->worldId0c) : 0u,
         currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->status0b) : 0u);
@@ -256,6 +256,8 @@ void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
 // UNANCHORED: resets the replacement mediator object and sidecar model to default state.
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
+    mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(
+        dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default));
     delete mxo::ltlogin::ILTLoginMediator::Default;
     mxo::ltlogin::ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
@@ -566,7 +568,7 @@ __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
 //   create-character transition
 // - the populated offsets line up with owner `+0x120 / 0x41c3c0`
 // - keep the slot meaning unified as `ProcessLoginCredentials`, but preserve the instance-role
-//   split between the wrapper mirror and the live owner/controller
+//   split between the wrapper mirror and whichever mediator currently owns the active state source
 extern "C" uint32_t Mediator_ProcessLoginCredentials120_Impl(
     MinimalLoginMediatorStub* self,
     void* input120,
@@ -575,18 +577,19 @@ extern "C" uint32_t Mediator_ProcessLoginCredentials120_Impl(
 
     uint32_t result = 1u;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticAuthGetLoginController();
+    mxo::ltlogin::CLTLoginMediator* activeStateSource =
+        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
 
     if (mediator) {
-        const bool applyOwnerSemantics = (loginController == nullptr || loginController == mediator);
+        const bool applyOwnerSemantics = (activeStateSource == nullptr || activeStateSource == mediator);
         result = mediator->CaptureProcessLoginCredentialsArg6Slot120(
             input120,
             returnAddress,
             applyOwnerSemantics);
     }
 
-    if (loginController && loginController != mediator) {
-        result = loginController->CaptureProcessLoginCredentialsArg6Slot120(
+    if (activeStateSource && activeStateSource != mediator) {
+        result = activeStateSource->CaptureProcessLoginCredentialsArg6Slot120(
             input120,
             returnAddress,
             true);

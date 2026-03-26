@@ -5,6 +5,8 @@
  * - keep this file focused on shared mediator logic, auth/bootstrap packet handling, and margin transport
  * - keep early auth/state-entry scaffolding in:
  *   - `loginmediator_auth_entry.cpp`
+ * - keep active-state-source / character-view helpers in:
+ *   - `loginmediator_active_state.cpp`
  * - keep arg6/startup-selection scaffolding in:
  *   - `loginmediator_arg6.cpp`
  * - keep active late-login/state9 submit work in:
@@ -27,8 +29,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-#include "../../../../src/diagnostics.h"
-#include "../../../../src/diagnostics_auth.h"
 #include "loginstate.h"
 #include "launcher_mediator_abi_shared.h"
 
@@ -311,20 +311,15 @@ struct LiveSelectionCfgCorpusView {
 };
 
 static const CLTLoginMediator* ResolveActiveSelectionCfgCorpusOwner(const CLTLoginMediator* mediator) {
-    if (const auto* loginController = DiagnosticAuthGetLoginController()) {
-        return loginController;
-    }
-    return mediator;
+    return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
 }
 
 static const CLTLoginMediator* ResolveActiveState8PersistenceOwner(const CLTLoginMediator* mediator) {
     // Keep the wrapper-facing split explicit:
     // - arg6 `ILTLoginMediator.Default` entrypoints may be invoked on the binder-owned stub object
-    // - the live `mcd.cfg` family still belongs to the active login-controller owner when one exists
-    if (const auto* loginController = DiagnosticAuthGetLoginController()) {
-        return loginController;
-    }
-    return mediator;
+    // - the live `mcd.cfg` family still belongs to whichever mediator instance currently owns the
+    //   active character/load state when one is registered
+    return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
 }
 
 static uint32_t LogLiveSelectionCfgCorpusFlag(
@@ -439,6 +434,7 @@ CLTLoginMediator::CLTLoginMediator()
 }
 
 CLTLoginMediator::~CLTLoginMediator() {
+    UnregisterActiveStateSourceScaffold(this);
     if (authConnectionOwnedByMediator_) {
         delete authConnection_;
     }
@@ -528,10 +524,7 @@ const char* CLTLoginMediator::GetProfileRootName() const {
 }
 
 const SlotRecordState004b5328* CLTLoginMediator::ResolveArg6CurrentSlotRecord44Source() const {
-    const CLTLoginMediator* currentCharacterStateMediator = DiagnosticAuthGetLoginController();
-    if (!currentCharacterStateMediator) {
-        currentCharacterStateMediator = this;
-    }
+    const CLTLoginMediator* currentCharacterStateMediator = ResolveActiveStateSourceScaffold();
 
     const SlotRecordState004b5328* currentSlotRecord =
         currentCharacterStateMediator->GetCurrentSlotRecord();
@@ -555,11 +548,11 @@ bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
         arg6CurrentSlotRecord44Payload_.worldId0c = currentSlotRecord->worldId0c;
         arg6CurrentSlotRecord44NameOwned_ = currentSlotRecord->heapString14;
     } else {
-        arg6CurrentSlotRecord44Payload_.characterIdLow03 = DiagnosticAuthCurrentCharacterIdLow();
-        arg6CurrentSlotRecord44Payload_.characterIdHigh07 = DiagnosticAuthCurrentCharacterIdHigh();
-        const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
-        if (authCharacterName && authCharacterName[0]) {
-            arg6CurrentSlotRecord44NameOwned_ = authCharacterName;
+        const ActiveCharacterStateViewScaffold characterState = DescribeActiveCharacterStateScaffold();
+        arg6CurrentSlotRecord44Payload_.characterIdLow03 = characterState.characterIdLow;
+        arg6CurrentSlotRecord44Payload_.characterIdHigh07 = characterState.characterIdHigh;
+        if (characterState.characterName && characterState.characterName[0]) {
+            arg6CurrentSlotRecord44NameOwned_ = characterState.characterName;
         }
     }
 
@@ -605,6 +598,7 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
     RefreshArg6CurrentSlotRecordObject44();
 
     const bool profilePathCaller = IsProfilePathBuilderCaller(returnAddress);
+    const ActiveCharacterStateViewScaffold characterState = DescribeActiveCharacterStateScaffold();
     const char* descriptorShape = "world-shaped";
     uint32_t field03 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worldName));
     uint32_t field07 = Arg6MappedSelectionId();
@@ -613,8 +607,8 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
         field03 = arg6CurrentSlotRecord44Payload_.characterIdLow03;
         field07 = arg6CurrentSlotRecord44Payload_.characterIdHigh07;
         if (field03 == 0u && field07 == 0u) {
-            field03 = DiagnosticAuthCurrentCharacterIdLow();
-            field07 = DiagnosticAuthCurrentCharacterIdHigh();
+            field03 = characterState.characterIdLow;
+            field07 = characterState.characterIdHigh;
         }
     }
 
@@ -676,7 +670,7 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     }
 
     const auto& ownerState = PostAuthMarginLoadingStateView();
-    const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
+    const ActiveCharacterStateViewScaffold characterState = DescribeActiveCharacterStateScaffold();
     const char* worldOrSelectionName = Arg6MappedSelectionName();
     const char* source = "arg6-selection";
 
@@ -689,9 +683,9 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     } else if (ownerState.sourceLeadString108[0]) {
         worldOrSelectionName = ownerState.sourceLeadString108.data();
         source = "owner+0x108";
-    } else if (authCharacterName && authCharacterName[0]) {
-        worldOrSelectionName = authCharacterName;
-        source = "auth-current-character";
+    } else if (characterState.characterName && characterState.characterName[0]) {
+        worldOrSelectionName = characterState.characterName;
+        source = "active-character-state";
     }
 
     spdlog::debug(
@@ -1561,42 +1555,12 @@ const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8Pe
 
     state8PersistenceF1c_ = {};
 
-    const char* characterName = nullptr;
-    const char* realFirstName = nullptr;
-    const char* realLastName = nullptr;
-    const char* background = nullptr;
-
-    if (const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord()) {
-        if (!currentSlotRecord->heapString14.empty()) {
-            characterName = currentSlotRecord->heapString14.c_str();
-        }
-    }
-    characterName = preferNonEmpty(characterName, LookupSlotRecordHeapStringByIndex(0));
+    const ActiveCharacterStateViewScaffold characterState = DescribeOwnCharacterStateScaffold();
     const auto& ownerState = PostAuthMarginLoadingStateView();
-    characterName = preferNonEmpty(characterName, ownerState.characterNameBufferF1c);
-    characterName = preferNonEmpty(characterName, SourceLeadString108().data());
-
-    const char* sourceBlock178 = reinterpret_cast<const char*>(SourceBlock178().data());
-    const char* sourceBlock198 = reinterpret_cast<const char*>(SourceBlock198().data());
-    const char* sourceBlock1b8 = reinterpret_cast<const char*>(SourceBlock1b8().data());
-    const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
-    const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
-    const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
-    const bool section0LooksLikeMiddleFirstLast =
-        section0F8c != nullptr &&
-        std::char_traits<char>::length(section0F8c) == 1u &&
-        section0Fac != nullptr && section0Fac[0] != '\0' &&
-        section0Fcc != nullptr && section0Fcc[0] != '\0';
-
-    if (section0LooksLikeMiddleFirstLast) {
-        realFirstName = preferNonEmpty(sourceBlock178, section0Fac);
-        realLastName = preferNonEmpty(sourceBlock198, section0Fcc);
-        background = preferNonEmpty(sourceBlock1b8, nullptr);
-    } else {
-        realFirstName = preferNonEmpty(sourceBlock178, section0F8c);
-        realLastName = preferNonEmpty(sourceBlock198, section0Fac);
-        background = preferNonEmpty(sourceBlock1b8, section0Fcc);
-    }
+    const char* characterName = characterState.characterName;
+    const char* realFirstName = characterState.realFirstName;
+    const char* realLastName = characterState.realLastName;
+    const char* background = characterState.background;
 
     state8PersistenceF1c_.field24 = SourceField12c();
     if (state8PersistenceF1c_.field24 == 0u) {
