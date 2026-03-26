@@ -24,10 +24,11 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     // - if not connected yet, switch to helper/state 1 so its slot-3 body starts the auth
     //   transport connection
     // - if already connected, this state2 body owns the ready-side bootstrap entry: static
-    //   `0x439210` gathers the owner/bootstrap inputs and forwards them to `0x448050`
-    // - current source still keeps that deeper ready-side dispatcher bridge behind
-    //   `CLTLoginMediator::BeginAuthHandshake()` while the state-owned body is migrated out of
-    //   mediator code incrementally
+    //   `0x439210` gathers the owner/bootstrap inputs and forwards them to the separate phase-2
+    //   child/module dispatcher `0x448050`
+    // - current source mirrors that split explicitly:
+    //   `CLTLoginMediator::BeginAuthHandshake()` is only a thin bridge into
+    //   `AuthBootstrap680Ops::PrepareAndDispatchPhase2(...)`
     const uint32_t incomingUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
     if (incomingUpstreamPhaseCode != 1u) {
         cachedUpstreamOrArg_ = upstreamOrArg;

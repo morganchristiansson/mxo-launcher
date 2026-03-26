@@ -232,7 +232,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator auth credentials configured username='%s' password=%s",
+        "DIAGNOSTIC: CLTLoginMediator auth credentials configured username='{}' password={}",
         authUsername_.empty() ? "<empty>" : authUsername_.c_str(),
         MaskedAuthValue(authPassword_));
 }
@@ -251,12 +251,12 @@ void CLTLoginMediator::SetAuthBootstrapConfig(
     SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator auth bootstrap configured launcherVersion=%u currentPublicKeyId=%u loginType=%u keyConfigMd5Len=%u uiConfigMd5Len=%u",
-        (unsigned)authLauncherVersion_,
-        (unsigned)authCurrentPublicKeyId_,
-        (unsigned)authLoginType_,
-        (unsigned)authKeyConfigMd5_.size(),
-        (unsigned)authUiConfigMd5_.size());
+        "DIAGNOSTIC: CLTLoginMediator auth bootstrap configured launcherVersion={} currentPublicKeyId={} loginType={} keyConfigMd5Len={} uiConfigMd5Len={}",
+        static_cast<unsigned>(authLauncherVersion_),
+        static_cast<unsigned>(authCurrentPublicKeyId_),
+        static_cast<unsigned>(authLoginType_),
+        static_cast<unsigned>(authKeyConfigMd5_.size()),
+        static_cast<unsigned>(authUiConfigMd5_.size()));
 }
 
 void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile) {
@@ -665,24 +665,21 @@ uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
     return ContinueRecordedAuthConnectStatusScaffold();
 }
 
+// UNANCHORED: thin mediator wrapper over the state2 ready-side `0x439210 -> 0x448050`
+// phase-2 child/module dispatch.
 uint32_t CLTLoginMediator::BeginAuthHandshake() {
     // Address anchors:
-    // - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap / state2 slot 3
-    // - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch (ready-side dispatcher)
-    // - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (raw 0x06 send builder)
-    // - launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest (raw 0x08 send builder)
-    // - launcher.exe:0x448050 = branch site selecting raw 0x06 vs raw 0x08 path
+    // - launcher.exe:0x439210 = CLTLoginState_AuthenticatePending slot 3 ready/not-ready split
+    // - launcher.exe:0x448050 = phase-2 child dispatcher rooted at owner `+0x680`
+    // - launcher.exe:0x447eb0 = raw `0x06` builder on that child
+    // - launcher.exe:0x4474f0 = raw `0x08` builder on that child
     //
-    // Static `0x439210` now narrows the ready-side ownership better:
-    // - state2 slot 3, not the mediator owner, owns the ready/not-ready split
-    // - on the ready side it gathers owner/bootstrap inputs and forwards them into `0x448050`
-    // - the current source still keeps that dispatcher bridge narrow here while the deeper
-    //   state2-owned bootstrap body is migrated out of mediator code incrementally
-    // The standalone auth probe remains the current wire/reference implementation for the
-    // launcher-owned auth loop, so reuse the shared low-level runtime-style auth helpers here
-    // instead of keeping a second launcher-only packet path.
-    expectedAuthRequestName_ = kMessageAsGetPublicKeyRequest;
-    return SendAuthGetPublicKeyRequest();
+    // Keep the ownership boundary explicit in source:
+    // - state2 owns the decision to enter the child
+    // - this mediator method is only a thin bridge
+    // - the child/module ops own the copy-from-owner `+0x94`, branch on child `+0xa0`, and send
+    //   selection
+    return AuthBootstrap680Ops::PrepareAndDispatchPhase2(*this);
 }
 
 void CLTLoginMediator::BuildAuthEndpoint() {

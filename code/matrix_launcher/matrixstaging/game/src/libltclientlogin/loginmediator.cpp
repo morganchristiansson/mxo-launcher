@@ -348,7 +348,7 @@ CLTLoginMediator::CLTLoginMediator()
       marginRouteState_{},
       marginAddressList3c_{},
       authBootstrapSource38_{},
-      authBootstrap680_{},
+      authBootstrapChild680_{},
       sessionCallbackHelper65c_(nullptr),
       state8SelectionContextSnapshotState_{},
       selectionContext0ecCopy_{},

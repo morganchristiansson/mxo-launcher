@@ -10,8 +10,8 @@
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
 #include "../../../runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
-// Include after forward declaration to avoid circular dependency
 #include "loginmediator_base.h"
+#include "authbootstrap680_internal.h"
 
 namespace mxo {
 namespace ltlogin {
@@ -19,7 +19,6 @@ namespace ltlogin {
 class CLTLoginState;
 class CLTLoginState_AuthenticatePending;
 class CLTLoginState_WorldListPending;
-struct AuthBootstrap680Ops;
 
 // Reimplementation note:
 // This file is intended to mirror the concrete launcher-side login/controller structure
@@ -205,72 +204,6 @@ public:
         size_t nextIndex = 0;
     };
 
-    struct AuthBootstrapReplyShadowF4Sketch {
-        // Bounded source-owned mirror of the heap block copied into bootstrap `+0xf4` by the
-        // opcode-`0x0b` / auth-reply bootstrap handler (`0x448140`).
-        //
-        // Current strongest anchored fields inside that copied `0x136` block are exactly the two
-        // later mediator-vtable exposures we care about on the active runtime path:
-        // - `+0x85 .. +0x94` = challenge-material family
-        // - `+0xa8`         = raw08 aux-handle / availability family
-        std::array<uint8_t, 0x85> prefix00{};
-        std::array<uint8_t, 16> material85{};
-        std::array<uint8_t, 0x13> gap95ToA7{};
-        void* raw08AuxHandleA8 = nullptr;
-    };
-    static_assert(offsetof(AuthBootstrapReplyShadowF4Sketch, material85) == 0x85);
-    static_assert(offsetof(AuthBootstrapReplyShadowF4Sketch, raw08AuxHandleA8) == 0xa8);
-
-    struct AuthBootstrapState680Sketch {
-        // Current best read of the extra owner child allocated through `0x41290` and stored at
-        // owner `+0x680` by `0x41b160`.
-        //
-        // High-value phase-2 auth/bootstrap anchors:
-        // - base ctor `0x45500`, size `0x11c`
-        // - preparation/fill helper launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch
-        // - branch condition at `0x44811e`: low-byte null test on dword field `+0xa0`
-        //   - later `0x429b0` still uses that same field as a helper/pointer object via `+0x1c`
-        //   - current best read therefore remains a helper/pointer family at `+0xa0`
-        // - later challenge/crypto continuation `0x429b0`:
-        //   - writes 16-byte material to `+0x85`
-        //   - derives / caches the current/public key id at `+0x9c` via `0x41470`
-        // - later auth-reply bootstrap handler `0x448140`:
-        //   - validates a parsed `0x136` auth-reply block
-        //   - heap-copies that block into `+0xf4`
-        //   - later mediator getters `0x41f370` / `0x41f3a0` surface `+0xf4 -> +0xa8/+0x85`
-        //
-        // Current field sketch from launcher.exe:0x45500 + launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch + launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest + launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest:
-        std::string string04;               // `+0x04`
-        std::string string10;               // `+0x10`
-        std::string string1C;               // `+0x1c`
-        uint32_t loginType28 = 0;           // `+0x28`
-        uint32_t launcherVersion2C = 0;     // `+0x2c`
-        std::array<uint8_t, 16> block30{};  // `+0x30 .. +0x3f`
-        std::array<uint8_t, 16> block40{};  // `+0x40 .. +0x4f`
-        void* sendTarget50 = nullptr;       // `+0x50`
-        uint32_t timestamp80 = 0;           // `+0x80`
-        std::array<uint8_t, 16> material85{}; // `+0x85 .. +0x94`; current best shared 16-byte bootstrap/state9 source family
-        void* sideObject94 = nullptr;       // `+0x94`; lazy wrapper over `material85` built by `0x41470 -> 0x44da00/0x44d910`
-        void* sideObject98 = nullptr;       // `+0x98`; sibling wrapper over the same `material85` source through `0x41df60`
-        uint32_t currentPublicKeyId9C = 0;  // `+0x9c`
-        void* helperA0 = nullptr;           // `+0xa0`
-        void* lazyRaw06StateA4 = nullptr;   // `+0xa4`
-        void* raw08AuxHandleA8 = nullptr;   // `+0xa8`; current best source-owned mirror of the availability/worker family created on the post-`0x07` path (`0x47f50 -> 0x47780`)
-        void* fieldAC = nullptr;            // `+0xac`; sibling helper/object family paired with `+0xa8` on the same post-`0x07` path
-        uint32_t stateFlagEC = 1;           // `+0xec` from base ctor `0x45500`
-        void* fieldF0 = nullptr;            // `+0xf0`
-        void* fieldF4 = nullptr;            // `+0xf4`; pointer to the auth-reply-derived block whose `+0x85/+0xa8` are surfaced later by mediator `+0x5c/+0x50`; keep the replacement mirror in sidecar storage so the owner size stays stable
-        void* fieldF8 = nullptr;            // `+0xf8`; companion bootstrap pointer surfaced by mediator `+0x60`, precise role still open
-        void* fieldFC = nullptr;            // `+0xfc`
-        void* field100 = nullptr;           // `+0x100`
-        uint8_t crashReporterPromptForSecurId104 = 1; // `+0x104`; owner byte returned by mediator `+0x58`; launcher/client wrapper-facing consumers use the low byte as crashreporter `PromptForSecurId`
-        std::array<uint8_t, 3> padding105{}; // `+0x105 .. +0x107`
-        uint32_t field108 = 0;              // `+0x108`
-        uint32_t field10C = 0;              // `+0x10c`
-        uint32_t field110 = 0;              // `+0x110`
-        uint32_t field114 = 0;              // `+0x114`
-        uint32_t field118 = 0;              // `+0x118`
-    };
 
     struct State9CallbackBlob18cSketch {
         // anchor: launcher.exe:0x41e690 / mediator vtable `+0x18c`
@@ -1385,7 +1318,10 @@ private:
     uint8_t marginConnectionFlag2d_ = 0;
     uint32_t marginSelectedIpv4_7c_ = 0;
     AuthBootstrapSelectedSource38Sketch authBootstrapSource38_;
-    AuthBootstrapState680Sketch authBootstrap680_;
+    // Separate phase-2 auth/bootstrap child rooted at owner `+0x680`.
+    // Keep this as a distinct child/module mirror rather than folding its fields back into the
+    // mediator body comments or generic mediator helpers.
+    AuthBootstrap680ChildSketch authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
     // Lazily allocated session callback helper whose `+0x18` string can later feed owner `+0x664`.

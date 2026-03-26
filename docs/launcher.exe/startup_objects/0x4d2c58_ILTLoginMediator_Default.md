@@ -467,7 +467,9 @@ Practical consequences:
 5. a second launcher-side getter now also corroborates that `+0x85` family outside the immediate
    state9 path:
    - `0x41f3a0` returns `owner + 0x680 -> +0xf4 + 0x85` when present, else static fallback
-   - companion getter `0x41f3c0` returns that same object's `+0xf8`
+   - companion getter `0x41f3c0` returns the first dword of that same child's `+0xf8`
+     - newer ctor review of `0x41290` now shows `+0xf8` is itself a three-dword small-string object,
+       so the getter returns its begin/data pointer rather than a standalone heap pointer
    - practical consequence: the `+0x85` field family now looks shared/reusable, not unique to one
      state9-only object shape
 6. newer active replacement progress now closes the go/no-go question on live `+0x18c` enough for
