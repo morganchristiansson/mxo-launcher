@@ -545,6 +545,8 @@ public:
     // +0x38
     // Current best wrapper-facing name from the client `Profiles\%s\...` builder.
     const char* GetProfileRootName() const override;
+    // +0x3c
+    uint32_t GetDefaultSelectionIndex() const override;
     // +0x48
     // Current best wrapper-facing name from the later `Profiles\%s\%s_%X\` builder.
     const char* GetWorldOrSelectionName() const override;
@@ -554,6 +556,12 @@ public:
     const char* GetString2(const char* value) override;
     // +0x60
     const char* GetString1(const char* value) override;
+    // +0xd8
+    uint32_t GetArg7SelectionUpperBoundExclusive() const override;
+    // +0xdc
+    const char* MapSelectionName(uint32_t selectionHighByte) const override;
+    // +0xe0
+    const char* GetVariantWorldName(uint32_t variantIndex) override;
     // +0xe4
     uint8_t GetVariantState(int32_t variantIndex) const override;
     // +0x178
@@ -822,7 +830,7 @@ public:
     // Keep these helpers narrow and structural:
     // - `0x439300` decides which helper to call
     // - these mediator methods only mirror the owner-side route-string getters that feed `0x41e500`
-    const char* ResolveMarginRouteFromCurrentCharacterSlot() const;            // current best anchor: owner vtable +0xe0
+    const char* ResolveMarginRouteFromCurrentCharacterSlot() const;            // current best anchor: recovered route-host helper `0x41b260`
     const char* ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const; // current best anchor: owner vtable +0xfc when fed owner `+0x12c`
     const char* ResolveMarginRouteFromWorldId(uint32_t worldId) const;         // provisional fallback helper for world-id keyed route recovery
     const char* ResolveMarginRouteDescriptor() const;                          // current best owner-side route-text resolver used to back arg6 `+0x10c`
@@ -841,8 +849,10 @@ public:
     const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41f300 / owner vtable +0x44
     const SlotRecordState004b5328* GetCurrentSlotRecord() const;
-    // anchor: launcher.exe:0x41b220 / owner vtable +0xdc
-    const char* GetSlotRecordHeapStringByIndex(uint8_t slotIndex) const;
+    // anchor: launcher.exe:0x41b220
+    // Source-owned helper over the recovered slot-record table; do not treat this as the current
+    // `ILTLoginMediator` vtable slot `+0xdc` name.
+    const char* LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41f320 / owner vtable +0x148
     const char* GetGameSessionId() const override;
     // UNANCHORED: source-owned owner-field setter used by separate LaunchPad/session callback paths
@@ -862,8 +872,10 @@ public:
     SessionCallbackHelper65cSketch* GetSessionCallbackHelper65c() const override;
     // anchor: launcher.exe:0x4202c0 / owner vtable +0x13c
     void HelperSlot13c_InvokeSessionHelperVtable4() override;
-    // anchor: launcher.exe:0x41b260 / owner vtable +0xe0
-    const char* GetRouteHostPrefixBySlot(uint8_t slotIndex) const;
+    // anchor: launcher.exe:0x41b260
+    // Source-owned helper over the recovered route-host string table; do not treat this as the
+    // current `ILTLoginMediator` vtable slot `+0xe0` name.
+    const char* LookupRouteHostPrefixBySlot(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b2a0 / owner vtable +0xe4? / current slot-record payload reader
     uint8_t GetSlotRecordStatusByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b2e0 / owner vtable +0xfc
@@ -1293,6 +1305,7 @@ private:
 
     Arg6WorldListData arg6WorldList_;
     Arg6SelectionConfig arg6Selection_;
+    uint32_t arg6VariantWorldNameQueryCountE0_ = 0u; // wrapper-facing arg6 `+0xe0` query count
 
     // launcher.dll export that populates the client.dll's world list view for InitClientDLL
     // This should be called before InitClientDLL so client.dll receives populated world data

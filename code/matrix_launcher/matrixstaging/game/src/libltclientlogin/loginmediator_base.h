@@ -249,7 +249,7 @@ public:
     // +0x38
     virtual const char* GetProfileRootName() const = 0;
     // +0x3c
-    void UnknownSlot14();
+    virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
     virtual const SlotRecordState004b5328* GetCurrentSlotRecord() const = 0;
     // +0x44
@@ -327,11 +327,11 @@ public:
     // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8
-    void UnknownSlot55();
+    virtual uint32_t GetArg7SelectionUpperBoundExclusive() const = 0;
     // +0xdc
-    // virtual const char* GetSlotRecordHeapStringByIndex(uint32_t index) const = 0;
+    virtual const char* MapSelectionName(uint32_t selectionHighByte) const = 0;
     // +0xe0
-    // virtual uint32_t GetRouteHostPrefixBySlot(uint32_t index) const = 0;
+    virtual const char* GetVariantWorldName(uint32_t variantIndex) = 0;
     // +0xe4
     virtual uint8_t GetVariantState(int32_t variantIndex) const = 0;
     // +0xe8

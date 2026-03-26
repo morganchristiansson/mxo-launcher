@@ -68,7 +68,6 @@ static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* 
 }
 
 static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex);
-static bool DiagnosticMediatorVariantIndexMatchesConfiguredSelection(uint32_t variantIndex);
 static void PopulateMediatorCurrentSlotRecordObject();
 
 // UNANCHORED: scaffold selection-resolution helpers layered over the CLTLoginMediator sidecar model.
@@ -82,24 +81,9 @@ static const char* DiagnosticMediatorWorldNameForIndex(uint32_t worldIndex) {
     return DiagnosticMediatorMappedSelectionName();
 }
 
-static const char* DiagnosticMediatorVariantNameForIndex(uint32_t variantIndex) {
-    if (variantIndex >= DiagnosticMediatorVariantUpperBoundExclusive()) {
-        return NULL;
-    }
-    if (!DiagnosticMediatorVariantIndexMatchesConfiguredSelection(variantIndex)) {
-        return NULL;
-    }
-    return DiagnosticMediatorMappedVariantName();
-}
-
 static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6WorldIndexMatchesSelection(worldIndex) : false;
-}
-
-static bool DiagnosticMediatorVariantIndexMatchesConfiguredSelection(uint32_t variantIndex) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6VariantIndexMatchesSelection(variantIndex) : false;
 }
 
 static uint32_t DiagnosticMediatorExpectedSelectionDescriptorScratchRequest() {
@@ -116,16 +100,9 @@ static bool DiagnosticMediatorSelectionDescriptorMatchesConfiguredRequest(uint32
 // vtable: ILTLoginMediator.Default slot +0x3c
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    spdlog::debug(
-        "MediatorStub::GetDefaultSelectionIndex() caller={} [{}] -> 0x{:06x}",
-        fmt::ptr(returnAddress),
-        DescribeMediatorCaller(returnAddress),
-        static_cast<unsigned>(DiagnosticMediatorSelectedWorldIndexLow24()));
-    return DiagnosticMediatorSelectedWorldIndexLow24();
+    return mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
 }
 
-static uint32_t g_GetSelectionCallCount = 0;
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
 // vtable: ILTLoginMediator.Default slot +0x40
 static void* __thiscall Mediator_GetSelectionDescriptor(MinimalLoginMediatorStub* self, uint32_t selectionIndex) {

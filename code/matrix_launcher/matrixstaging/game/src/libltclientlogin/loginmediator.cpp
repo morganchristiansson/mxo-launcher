@@ -1101,7 +1101,7 @@ const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8Pe
             characterName = currentSlotRecord->heapString14.c_str();
         }
     }
-    characterName = preferNonEmpty(characterName, GetSlotRecordHeapStringByIndex(0));
+    characterName = preferNonEmpty(characterName, LookupSlotRecordHeapStringByIndex(0));
     const auto& ownerState = PostAuthMarginLoadingStateView();
     characterName = preferNonEmpty(characterName, ownerState.characterNameBufferF1c);
     characterName = preferNonEmpty(characterName, SourceLeadString108().data());
@@ -1567,7 +1567,7 @@ uint32_t CLTLoginMediator::StatusQuery178Count() const {
 }
 
 // anchor: launcher.exe:0x41b220
-const char* CLTLoginMediator::GetSlotRecordHeapStringByIndex(uint8_t slotIndex) const {
+const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const {
     const SlotRecordState004b5328* record = GetSlotRecordByIndex(slotIndex);
     if (!record || record->heapString14.empty()) {
         return nullptr;
@@ -1810,7 +1810,7 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 }
 
 // anchor: launcher.exe:0x41b260
-const char* CLTLoginMediator::GetRouteHostPrefixBySlot(uint8_t slotIndex) const {
+const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) const {
     if (slotIndex >= routeHostStrings818_.size()) {
         return nullptr;
     }
@@ -1866,7 +1866,7 @@ const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const
     //
     // Current best source-owned mirror returns the reconstructed route-host string triple's first
     // string for the current slot/index.
-    return GetRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8);
+    return LookupRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8);
 }
 
 const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const {
@@ -1914,7 +1914,7 @@ const char* CLTLoginMediator::ResolveMarginRouteDescriptor() const {
     // - then uses the first dword of that object as the string argument into `0x41e500`
     // - current scaffold keeps this narrow by preferring the already mirrored current-slot
     //   route-host string and only falling back to older diagnostic route text when needed
-    if (const char* currentSlotRouteHost = GetRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
+    if (const char* currentSlotRouteHost = LookupRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
         return currentSlotRouteHost;
     }
     return marginRouteState_.routeHostPrefix.empty() ? nullptr : marginRouteState_.routeHostPrefix.c_str();
@@ -2184,6 +2184,69 @@ bool CLTLoginMediator::Arg6SelectionDescriptorMatchesRequest(uint32_t selectionI
         return true;
     }
     return normalizedSelectionIndex == Arg6ExpectedSelectionDescriptorScratchRequest();
+}
+
+uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
+    const uint32_t selectionIndex = Arg6SelectedWorldIndexLow24();
+    spdlog::debug(
+        "CLTLoginMediator::GetDefaultSelectionIndex(+0x3c) -> 0x{:06x}",
+        static_cast<unsigned>(selectionIndex));
+    return selectionIndex;
+}
+
+uint32_t CLTLoginMediator::GetArg7SelectionUpperBoundExclusive() const {
+    const uint32_t upperBoundExclusive = Arg6VariantUpperBoundExclusive();
+    spdlog::info(
+        "CLTLoginMediator::GetArg7SelectionUpperBoundExclusive(+0xd8) -> {}",
+        static_cast<unsigned>(upperBoundExclusive));
+    return upperBoundExclusive;
+}
+
+const char* CLTLoginMediator::MapSelectionName(uint32_t selectionHighByte) const {
+    const char* selectionName = nullptr;
+    if (selectionHighByte < Arg6VariantUpperBoundExclusive() &&
+        Arg6VariantIndexMatchesSelection(selectionHighByte)) {
+        selectionName = Arg6MappedVariantName();
+    }
+
+    spdlog::info(
+        "CLTLoginMediator::MapSelectionName(+0xdc selectionHighByte={}) -> '{}'",
+        static_cast<unsigned>(selectionHighByte),
+        selectionName ? selectionName : "<null>");
+    return selectionName;
+}
+
+const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
+    ++arg6VariantWorldNameQueryCountE0_;
+    if ((arg6VariantWorldNameQueryCountE0_ % 5u) == 0u) {
+        spdlog::info(
+            "CLTLoginMediator::GetVariantWorldName(+0xe0) queryCount={}",
+            arg6VariantWorldNameQueryCountE0_);
+    }
+
+    const uint32_t worldIndex = Arg6SelectedWorldIndexLow24();
+    const char* worldName = nullptr;
+    if (worldIndex < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(worldIndex)) {
+        worldName = Arg6MappedSelectionName();
+    }
+
+    if (!worldName ||
+        variantIndex >= Arg6VariantUpperBoundExclusive() ||
+        !Arg6VariantIndexMatchesSelection(variantIndex)) {
+        spdlog::info(
+            "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> NULL (world='{}' configuredVariant=0x{:02x} variantUpperBoundExclusive={})",
+            static_cast<unsigned>(variantIndex & 0xffu),
+            worldName ? worldName : "<null>",
+            Arg6SelectedVariantIndexHigh8(),
+            static_cast<unsigned>(Arg6VariantUpperBoundExclusive()));
+        return nullptr;
+    }
+
+    spdlog::info(
+        "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> '{}'",
+        static_cast<unsigned>(variantIndex & 0xffu),
+        worldName);
+    return worldName;
 }
 
 // anchor: launcher.exe:0x40cd10
@@ -2942,7 +3005,7 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
         marginRouteState_.currentWorldId = static_cast<int32_t>(firstWorld.worldId);
     }
 
-    if (const char* routeHostPrefix = GetRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
+    if (const char* routeHostPrefix = LookupRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
         marginRouteState_.routeHostPrefix = routeHostPrefix;
     } else {
         marginRouteState_.routeHostPrefix.clear();
@@ -2971,8 +3034,8 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
         (unsigned)marginRouteState_.currentCharacterOrRouteIndex,
         characterCount == 0 ? 0u : (unsigned)slotRecords688_[0].worldId0c,
         marginRouteState_.routeHostPrefix.empty() ? "<empty>" : marginRouteState_.routeHostPrefix.c_str(),
-        GetSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
-            ? GetSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
+        LookupSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
+            ? LookupSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
             : "<empty>",
         currentDescriptorName);
 }

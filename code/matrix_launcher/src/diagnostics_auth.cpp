@@ -693,7 +693,7 @@ const char* DiagnosticAuthCurrentCharacterName() {
                 return currentSlotRecord->heapString14.c_str();
             }
         }
-        if (const char* slotZeroName = g_DiagnosticLoginController->GetSlotRecordHeapStringByIndex(0)) {
+        if (const char* slotZeroName = g_DiagnosticLoginController->LookupSlotRecordHeapStringByIndex(0)) {
             return slotZeroName;
         }
         if (const char* materializedName = g_DiagnosticLoginController->CharacterNameBufferF1c()) {

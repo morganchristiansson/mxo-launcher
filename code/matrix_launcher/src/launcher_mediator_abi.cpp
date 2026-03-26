@@ -75,11 +75,6 @@ static uint32_t DiagnosticMediatorWorldUpperBoundExclusive() {
     return mediator ? mediator->Arg6WorldUpperBoundExclusive() : 1u;
 }
 
-static uint32_t DiagnosticMediatorVariantUpperBoundExclusive() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6VariantUpperBoundExclusive() : 1u;
-}
-
 static uint32_t DiagnosticMediatorSelectedWorldIndexLow24() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6SelectedWorldIndexLow24() : 0u;
@@ -448,22 +443,14 @@ __attribute__((naked)) static void Mediator_GetString2() {
 // vtable: ILTLoginMediator.Default slot +0xd8
 static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalLoginMediatorStub* self) {
     (void)self;
-    spdlog::info(
-        "MediatorStub::GetArg7VariantUpperBoundExclusive(+0xd8) -> {}",
-        (unsigned)DiagnosticMediatorVariantUpperBoundExclusive());
-    return DiagnosticMediatorVariantUpperBoundExclusive();
+    return mxo::ltlogin::ILTLoginMediator::Default->GetArg7SelectionUpperBoundExclusive();
 }
 
 // anchor: deeper client init maps arg7-derived selection names through arg6 +0xdc
 // vtable: ILTLoginMediator.Default slot +0xdc
 static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub* self, uint32_t selectionHighByte) {
     (void)self;
-    const char* variantName = DiagnosticMediatorVariantNameForIndex(selectionHighByte);
-    spdlog::info(
-        "MediatorStub::MapSelectionName(selectionHighByte={}) -> '{}'",
-        (unsigned)selectionHighByte,
-        variantName ? variantName : "<null>");
-    return variantName;
+    return mxo::ltlogin::ILTLoginMediator::Default->MapSelectionName(selectionHighByte);
 }
 
 // anchor: launcher selection resolution checks arg6 +0x54 before accepting world types 2/5
@@ -478,28 +465,7 @@ static uint32_t __thiscall Mediator_IsLauncherSelectionTypeEnabled(MinimalLoginM
 // vtable: ILTLoginMediator.Default slot +0xe0
 static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorStub* self, uint32_t variantIndex) {
     (void)self;
-    ++g_GetSelectionCallCount;
-    if (g_GetSelectionCallCount % 5 == 0) {
-        spdlog::info("DIAGNOSTIC: GetSelectionDescriptor count = {}", g_GetSelectionCallCount);
-    }
-    const char* worldName = DiagnosticMediatorWorldNameForIndex(DiagnosticMediatorSelectedWorldIndexLow24());
-    if (!worldName ||
-        variantIndex >= DiagnosticMediatorVariantUpperBoundExclusive() ||
-        !DiagnosticMediatorVariantIndexMatchesConfiguredSelection(variantIndex)) {
-        spdlog::info(
-            "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> NULL (world='{}' configuredVariant=0x{:02x} variantUpperBoundExclusive={})",
-            (unsigned)(variantIndex & 0xffu),
-            worldName ? worldName : "<null>",
-            DiagnosticMediatorSelectedVariantIndexHigh8(),
-            (unsigned)DiagnosticMediatorVariantUpperBoundExclusive());
-        return NULL;
-    }
-
-    spdlog::info(
-        "MediatorStub::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> '{}'",
-        (unsigned)(variantIndex & 0xffu),
-        worldName);
-    return worldName;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetVariantWorldName(variantIndex);
 }
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4
@@ -527,10 +493,6 @@ static uint32_t __thiscall Mediator_GetWorldCount(MinimalLoginMediatorStub* self
 // vtable: launcher.exe:0x4d3584 slot +0xfc
 static const char* __thiscall Mediator_GetWorldNameByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    ++g_GetSelectionCallCount;
-    if (g_GetSelectionCallCount % 5 == 0) {
-        spdlog::info("DIAGNOSTIC: GetSelectionDescriptor count = {}", g_GetSelectionCallCount);
-    }
     const char* worldName = DiagnosticMediatorWorldNameForIndex(worldIndex);
     spdlog::info(
         "MediatorStub::GetWorldNameByIndex(+0xfc worldIndex=0x{:06x}) -> '{}' (configuredWorld=0x{:06x})",
