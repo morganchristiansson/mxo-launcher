@@ -86,7 +86,7 @@ uint32_t LaunchPadClient::OnPlayRequestStatus(
     mediator->SetGameSessionId664(gameSessionId);
 
     spdlog::info(
-        "DIAGNOSTIC: mirrored launchpad play-request success GameSessionID='%s'",
+        "DIAGNOSTIC: mirrored launchpad play-request success GameSessionID='{}'",
         NonEmptyOrFallback(gameSessionId, "<empty>"));
     return 1u;
 }

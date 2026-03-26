@@ -202,11 +202,11 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
 
     spdlog::info("=== {} ===", heading);
     spdlog::info(
-        "exception code=0x{:08lx} ({}) classification={} flags=0x{:08lx} address={}",
-        (unsigned long)record->ExceptionCode,
+        "exception code=0x{:08x} ({}) classification={} flags=0x{:08x} address={}",
+        static_cast<unsigned long>(record->ExceptionCode),
         DiagnosticExceptionCodeName(record->ExceptionCode),
         DiagnosticExceptionClassification(record->ExceptionCode),
-        (unsigned long)record->ExceptionFlags,
+        static_cast<unsigned long>(record->ExceptionFlags),
         fmt::ptr(record->ExceptionAddress));
     if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->NumberParameters >= 2) {
         const char* accessKind = "unknown";
@@ -219,27 +219,27 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
             fmt::ptr(reinterpret_cast<void*>(record->ExceptionInformation[1])));
     }
     spdlog::info(
-        "registers: eip=0x{:08lx} esp=0x{:08lx} ebp=0x{:08lx} eax=0x{:08lx} ebx=0x{:08lx} ecx=0x{:08lx} edx=0x{:08lx} esi=0x{:08lx} edi=0x{:08lx}",
-        (unsigned long)context->Eip,
-        (unsigned long)context->Esp,
-        (unsigned long)context->Ebp,
-        (unsigned long)context->Eax,
-        (unsigned long)context->Ebx,
-        (unsigned long)context->Ecx,
-        (unsigned long)context->Edx,
-        (unsigned long)context->Esi,
-        (unsigned long)context->Edi);
+        "registers: eip=0x{:08x} esp=0x{:08x} ebp=0x{:08x} eax=0x{:08x} ebx=0x{:08x} ecx=0x{:08x} edx=0x{:08x} esi=0x{:08x} edi=0x{:08x}",
+        static_cast<unsigned long>(context->Eip),
+        static_cast<unsigned long>(context->Esp),
+        static_cast<unsigned long>(context->Ebp),
+        static_cast<unsigned long>(context->Eax),
+        static_cast<unsigned long>(context->Ebx),
+        static_cast<unsigned long>(context->Ecx),
+        static_cast<unsigned long>(context->Edx),
+        static_cast<unsigned long>(context->Esi),
+        static_cast<unsigned long>(context->Edi));
 
     MEMORY_BASIC_INFORMATION mbi = {};
     if (VirtualQuery(reinterpret_cast<const void*>(context->Eip), &mbi, sizeof(mbi)) == sizeof(mbi)) {
         spdlog::info(
-            "eip page: base={} allocBase={} regionSize=0x{:08lx} protect=0x{:08lx} state=0x{:08lx} type=0x{:08lx}",
+            "eip page: base={} allocBase={} regionSize=0x{:08x} protect=0x{:08x} state=0x{:08x} type=0x{:08x}",
             fmt::ptr(mbi.BaseAddress),
             fmt::ptr(mbi.AllocationBase),
-            (unsigned long)mbi.RegionSize,
-            (unsigned long)mbi.Protect,
-            (unsigned long)mbi.State,
-            (unsigned long)mbi.Type);
+            static_cast<unsigned long>(mbi.RegionSize),
+            static_cast<unsigned long>(mbi.Protect),
+            static_cast<unsigned long>(mbi.State),
+            static_cast<unsigned long>(mbi.Type));
     }
 
     LogWordSpan("exception stack", reinterpret_cast<const void*>(context->Esp), 16);
@@ -363,7 +363,10 @@ static void RunOptionsCfgAutodetectStepIfNeeded() {
         DWORD exitCode = 0;
         if (GetExitCodeProcess(processInfo.hProcess, &exitCode)) {
             g_LauncherCommandLine.SetAutodetectExitCode(exitCode);
-            spdlog::info("DIAGNOSTIC: autodetect exit code = {} (0x{:08lx})", (unsigned long)exitCode, (unsigned long)exitCode);
+            spdlog::info(
+                "DIAGNOSTIC: autodetect exit code = {} (0x{:08x})",
+                static_cast<unsigned long>(exitCode),
+                static_cast<unsigned long>(exitCode));
         } else {
             spdlog::info("WARNING: GetExitCodeProcess for autodetect_settings.exe failed ({})", GetLastError());
         }
@@ -965,7 +968,7 @@ int main(int argc, char* argv[]) {
                 StoreLastWorldNameInRegistry(g_LastWorldName);
             }
             spdlog::info(
-                "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x world='{}'",
+                "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
                 g_CLauncherFieldA8,
                 g_CLauncherFieldAC,
                 g_PackedArg7Selection,

@@ -928,7 +928,9 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     MinimalLauncherObjectStub* object =
         static_cast<MinimalLauncherObjectStub*>(std::malloc(sizeof(MinimalLauncherObjectStub)));
     if (!object) {
-        spdlog::info("DIAGNOSTIC: failed to allocate launcher object scaffold (size=0x{:zx})", sizeof(MinimalLauncherObjectStub));
+        spdlog::info(
+            "DIAGNOSTIC: failed to allocate launcher object scaffold (size=0x{:x})",
+            static_cast<size_t>(sizeof(MinimalLauncherObjectStub)));
         return NULL;
     }
 

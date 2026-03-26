@@ -3236,11 +3236,11 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
     }
 
     spdlog::info(
-        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount=%u characterCount=%u currentCharacterOrRouteIndex=%u currentSlotWorldId=%u routeHostPrefix='%s' slotRecordHeapString='%s' currentWorldDescriptorName='%s'",
-        (unsigned)worldCount,
-        (unsigned)characterCount,
-        (unsigned)marginRouteState_.currentCharacterOrRouteIndex,
-        characterCount == 0 ? 0u : (unsigned)slotRecords688_[0].worldId0c,
+        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount={} characterCount={} currentCharacterOrRouteIndex={} currentSlotWorldId={} routeHostPrefix='{}' slotRecordHeapString='{}' currentWorldDescriptorName='{}'",
+        static_cast<unsigned>(worldCount),
+        static_cast<unsigned>(characterCount),
+        static_cast<unsigned>(marginRouteState_.currentCharacterOrRouteIndex),
+        characterCount == 0 ? 0u : static_cast<unsigned>(slotRecords688_[0].worldId0c),
         marginRouteState_.routeHostPrefix.empty() ? "<empty>" : marginRouteState_.routeHostPrefix.c_str(),
         LookupSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
             ? LookupSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
