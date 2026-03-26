@@ -13,12 +13,11 @@ class CLTLoginMediator;
 // - pre-game account / subscription / play-request layer
 // - launches or validates the external/launcher-side login flow before the direct MxO auth
 //   helper chain becomes active
-// - important classification correction:
-//   - launcher.exe:0x4207c0 is **not** a `LaunchPadClient` vtable method
-//   - it is slot 8 on `CLTLoginState_State16` vtable `0x004b0bb0`
-//   - that state-level success handoff logs `LaunchPad login successful.` then switches helper
-//     state `1`, after which state `1` reaches launcher.exe:0x439090 -> 0x41d170
-//     (`CLTLoginMediator_Helper1_StartAuthConnection` -> `CLTLoginMediator_BeginAuthConnection`)
+// - boundary note:
+//   - do not classify the `"LaunchPad login successful."` body at `0x4207c0` as
+//     `LaunchPadClient` ownership
+//   - that success handoff belongs to `CLTLoginState_State16` slot 8 on vtable `0x004b0bb0`
+//     and stays documented on the login-state side
 //
 // Current high-confidence function anchors in this family:
 // - `0x420440` = `LaunchPadClient_OnConnectionOpened`

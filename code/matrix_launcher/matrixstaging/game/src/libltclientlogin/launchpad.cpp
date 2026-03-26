@@ -23,6 +23,8 @@ static const char* NonEmptyOrFallback(const char* value, const char* fallback) {
 // - this is also separate from the `CLTLoginState_*` family
 // - keep LaunchPad-owned status-handler behavior here instead of re-describing it from the
 //   mediator implementation files
+// - keep shared `CLTLoginState_*` gates and the state16 success handoff on the login-state side,
+//   even when nearby strings mention LaunchPad
 // - key vtable entries now kept here:
 //   - `0x420440` = `LaunchPadClient_OnConnectionOpened`
 //   - `0x4204f0` = `LaunchPadClient_OnSessionClosed`

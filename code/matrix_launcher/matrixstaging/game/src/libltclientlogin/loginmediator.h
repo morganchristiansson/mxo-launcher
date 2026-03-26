@@ -43,10 +43,11 @@ class CLTLoginState_WorldListPending;
 // - current best read: this object owns the launcher-side auth/margin connection flow,
 //   while `ILTLoginMediator.Default` remains the runtime interface slot passed into client.dll
 // - discovered helper dispatch structure from Ghidra analysis of 0x43b300:
-//   - `CLTLoginMediator_InitializeHelperDispatchTable` allocates 16 heap-allocated dispatch tables
-//   - each table stores a function pointer to `LaunchPadClient_ProcessEvent0x17` (0x438d80)
-//   - keep that symbol name as an analysis anchor only: it is a shared launcher-side event gate,
-//     not evidence that the mediator object itself is a `LaunchPadClient`
+//   - `CLTLoginMediator_InitializeHelperDispatchTable` allocates / installs the mediator-owned
+//     `CLTLoginState_*` dispatch objects
+//   - many of those state-family vtables reuse shared slot-1 gate `0x438d80`
+//   - older Ghidra label `LaunchPadClient_ProcessEvent0x17` is kept only as a cross-reference,
+//     not as a class-ownership claim
 //   - this is the launcher-side event handler system for auth/margin state transitions
 // - recovered logging string anchors:
 //   - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (logs "CLTLoginMediator::PostEvent(): Event# %d\n")
@@ -109,22 +110,21 @@ public:
         // From Ghidra decompilation of 0x43b300 (CLTLoginMediator_InitializeHelperDispatchTable):
         // - Allocates the helper/state objects installed into 0x4f7868..0x4f78b4
         // - Those objects carry `CLTLoginState_*` vtables such as `0x4b4fc4`, `0x4b4fec`, `0x4b5014`
-        // - slot 1 on many of those vtables points to `0x438d80`
-        // - Helper functions InitializeHelperDispatchSlot15..Slot19 (0x420640..0x4209a0)
-        //   set up PTR references to the event handler for additional slots at 0x4f78a4..0x4f78b4
+        // - slot 1 on many of those vtables reuses shared gate `0x438d80`
+        // - InitializeHelperDispatchSlot15..Slot19 (0x420640..0x4209a0) populate the late
+        //   `CLTLoginState_State15..State19` tail at 0x4f78a4..0x4f78b4
         //
         // Discovered function names from Ghidra renaming:
-        // - launcher.exe:0x438d80 = current shared launcher-side event gate symbolized as
-        //   `LaunchPadClient_ProcessEvent0x17`
-        // - launcher.exe:0x4816f0 = reused inline helper symbolized as
-        //   `LaunchPadClient_GetVtableOffset` (anchor only; not a mediator-class identity claim)
+        // - launcher.exe:0x438d80 = shared `CLTLoginState_*` slot-1 gate
+        //   - older Ghidra label: `LaunchPadClient_ProcessEvent0x17`
+        // - launcher.exe:0x4816f0 = reused inline helper that returns a vtable offset
+        //   - older Ghidra label: `LaunchPadClient_GetVtableOffset`
         // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
         // - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
         // - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf)
         //
         // Disassembly of 0x438d80 shows:
-        //   - Calls the helper currently named `LaunchPadClient_GetVtableOffset(this+8)` to get a
-        //     vtable offset
+        //   - Calls reused inline helper `0x4816f0(this+8)` to get a vtable offset
         //   - Checks if event flag at [this+0x2c] is set
         //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
         //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]
@@ -162,11 +162,11 @@ public:
         void* helper7898 = nullptr;  // slot 12 / phase-code 12
         void* helper789C = nullptr;  // slot 13 / phase-code 13
         void* helper78A0 = nullptr;  // slot 14 / phase-code 14
-        void* helper78A4 = nullptr;  // slot 15 / phase-code 15 (FUN_00420640)
-        void* helper78A8 = nullptr;  // slot 16 / phase-code 16 (FUN_004206e0)
-        void* helper78AC = nullptr;  // slot 17 / phase-code 17 (FUN_00420850)
-        void* helper78B0 = nullptr;  // slot 18 / phase-code 18 (FUN_00420920)
-        void* helper78B4 = nullptr;  // slot 19 / phase-code 19 (FUN_004209a0)
+        void* helper78A4 = nullptr;  // slot 15 / phase-code 15 / CLTLoginState_State15
+        void* helper78A8 = nullptr;  // slot 16 / phase-code 16 / CLTLoginState_State16
+        void* helper78AC = nullptr;  // slot 17 / phase-code 17 / CLTLoginState_State17
+        void* helper78B0 = nullptr;  // slot 18 / phase-code 18 / CLTLoginState_State18
+        void* helper78B4 = nullptr;  // slot 19 / phase-code 19 / CLTLoginState_State19
     };
 
     struct MarginRouteState {
@@ -792,18 +792,18 @@ public:
 
     // launcher.exe:0x43b300
     // Current best read:
-    // - allocates / initializes a contiguous 15-slot launcher-global helper/state array
-    //   rooted at `0x4f7868 .. 0x4f78a0`
-    // - this happens immediately after `0x4f78b8 = esi`
-    // - the slot index and each helper's vtable `+0x18` phase-code getter now match across
-    //   the recovered table (`0..14`)
-    // - exact class names for most helper objects are still being recovered
+    // - allocates / initializes the mediator-owned helper/state dispatch array
+    // - the earlier recovered block covers slots `0..14` at `0x4f7868 .. 0x4f78a0`
+    // - the late recovered tail covers slots `15..19` at `0x4f78a4 .. 0x4f78b4` and is now
+    //   concretely typed as `CLTLoginState_State15..State19`
+    // - exact class names for most earlier helper objects are still being recovered
     void InitializeConnectionHelpers();
 
-    // HELPER DISPATCH TABLE INITIALIZATION HELPERS (from Ghidra analysis of 0x43b300):
+    // HELPER / STATE DISPATCH TABLE INITIALIZATION HELPERS (from Ghidra analysis of 0x43b300):
     // ==============================================================================
-    // launcher.exe:0x4f7868..0x4f78a0 = contiguous helper/state array (16 slots)
-    // launcher.exe:0x420640..0x4209a0 = InitializeHelperDispatchSlot15..Slot19 for additional slots at 0x4f78a4..0x4f78b4
+    // launcher.exe:0x4f7868..0x4f78a0 = recovered earlier helper/state block (`0..14`)
+    // launcher.exe:0x420640..0x4209a0 = InitializeHelperDispatchSlot15..Slot19 for the late
+    // `CLTLoginState_State15..State19` tail at `0x4f78a4..0x4f78b4`
     // ==============================================================================
     // launcher.exe:0x420640 = InitializeHelperDispatchSlot15 (slot at 0x4f78a4)
     //   Original: allocates 8 bytes, stores vtable 0x4b0b88 (`CLTLoginState_State15`)

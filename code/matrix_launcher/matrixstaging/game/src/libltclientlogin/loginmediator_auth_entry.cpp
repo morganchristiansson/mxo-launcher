@@ -223,8 +223,9 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     // Initializes the helper/state dispatch table rooted at `0x4f7868..0x4f78b4`.
     // Early concrete states that now have source-owned bodies/scaffolds (for example state1,
     // state2, and state14) are registered separately through RegisterScaffoldState*.
-    // This initializer therefore still only materializes the late slot tail recovered concretely
-    // so far (`0x420640/0x4206e0/0x420850/0x420920/0x4209a0`).
+    // This initializer therefore still only materializes the late
+    // `CLTLoginState_State15..State19` tail recovered concretely so far
+    // (`0x420640/0x4206e0/0x420850/0x420920/0x4209a0`).
     InitializeHelperDispatchSlot15();
     InitializeHelperDispatchSlot16();
     InitializeHelperDispatchSlot17();
