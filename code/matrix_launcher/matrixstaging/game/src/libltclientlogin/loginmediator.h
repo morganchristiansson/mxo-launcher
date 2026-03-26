@@ -525,6 +525,7 @@ public:
     uint32_t statusQuery178Count_ = 0u;           // +0x178 / Mediator_GetLastLoginStatus
     mutable bool bootstrapRaw08AuxHandle50Logged_ = false; // +0x50 change-log state moved from ABI wrapper
     mutable void* lastBootstrapRaw08AuxHandle50_ = nullptr; // +0x50 last logged value moved from ABI wrapper
+    mutable bool liveCuiCfgAbsentNoteLogged90_ = false;     // +0x90 one-shot caveat log moved from ABI wrapper
 
     // Accessors for migrated state fields (diagnostics only)
     const void* LastNopatchValue1Ptr() const;
@@ -585,6 +586,15 @@ public:
     // +0x80
     // client.dll:0x62198c60 = `il.cfg` live-corpus gate; launcher getter returns owner byte `+0x1406`
     uint32_t HasLiveIlCfg80() const override;
+    // +0x84
+    // client.dll:0x62198d50 = `rl.cfg` live-corpus gate; launcher getter returns owner byte `+0x1448`
+    uint32_t HasLiveRlCfg84() const override;
+    // +0x88
+    // client.dll:0x62198e50 = `cl.cfg` live-corpus gate; launcher getter returns owner byte `+0x1452`
+    uint32_t HasLiveClCfg88() const override;
+    // +0x90
+    // client.dll:0x621993d0 = `cui.cfg` live-corpus gate; launcher getter returns owner byte `+0x145a`
+    uint32_t HasLiveCuiCfg90() const override;
     // +0x94
     // client.dll:0x62198670 = `hl.cfg` live-corpus getter; launcher getter returns owner `+0x1408`, out-length `+0x140c`
     void* GetLiveHlCfg94(uint32_t* outLength) const override;
@@ -606,6 +616,15 @@ public:
     // +0xac
     // client.dll:0x62198c60 = `il.cfg` live-corpus getter; launcher getter returns owner `+0x1400`, out-length `+0x1404`
     void* GetLiveIlCfgAc(uint32_t* outLength) const override;
+    // +0xb0
+    // client.dll:0x62198d50 = `rl.cfg` live-corpus getter; launcher getter returns owner `+0x1440`, out-length `+0x1444`
+    void* GetLiveRlCfgB0(uint32_t* outLength) const override;
+    // +0xb4
+    // client.dll:0x62198e50 = `cl.cfg` live-corpus getter; launcher getter returns owner `+0x144c`, out-length `+0x1450`
+    void* GetLiveClCfgB4(uint32_t* outLength) const override;
+    // +0xb8
+    // client.dll:0x621993d0 = `cui.cfg` live-corpus getter; launcher getter returns owner `+0x1454`, out-length `+0x1458`
+    void* GetLiveCuiCfgB8(uint32_t* outLength) const override;
     // +0xd8
     uint32_t GetArg7SelectionUpperBoundExclusive() const override;
     // +0xdc

@@ -522,8 +522,10 @@ Focused replacement source files:
 - `src/launcher_mediator_abi_selection_cfg.cpp`
   - non-`mcd.cfg` corpus wrapper surface `+0x68 .. +0xb8`
   - current cleanup status:
-    - `+0x68/+0x94`, `+0x6c/+0x98`, `+0x70/+0x9c`, `+0x74/+0xa0`, `+0x78/+0xa4`, `+0x7c/+0xa8`, and `+0x80/+0xac`
-      now thin-forward into named `CLTLoginMediator` accessors
+    - the full non-`mcd.cfg` corpus family `+0x68 .. +0xb8`
+      now thin-forwards into named `CLTLoginMediator` accessors
+    - the `cui.cfg` caveat stays explicit on the class-owned `+0x90/+0xb8` pair:
+      live mediator data is still absent on the active replacement path even though later client-owned shutdown persistence may still emit on-disk `cui.cfg`
 - `src/launcher_mediator_abi_profile_paths.cpp`
   - neighboring profile-path / current-slot / selection-descriptor surface `+0x3c/+0x40/+0x44`
 - `src/launcher_mediator_abi_mcd.cpp`
