@@ -709,6 +709,8 @@ public:
     uint16_t LastMarginPacketOpcodeScaffold() const { return lastMarginPacketOpcodeScaffold_; }
     uint32_t LastMarginPacketSizeScaffold() const { return lastMarginPacketSizeScaffold_; }
 
+    // Focused source home for this early auth/state-entry wiring:
+    // - `loginmediator_auth_entry.cpp`
     // Source-owned scaffold registration for concrete CLTLoginState objects that live outside the
     // mediator header. This preserves the original helper-state ownership on the login-state
     // vtables while still letting the mediator switch between the active scaffold states.
@@ -895,6 +897,8 @@ public:
     uint32_t Arg6GetActiveWorldListCount() const;
     bool Arg6GetAvailableWorlds(uint32_t index) const;
 
+    // Focused source home for auth-entry/connect-status scaffolding:
+    // - `loginmediator_auth_entry.cpp`
     // Current best auth-side connection-init path:
     // - launcher `0x43909f -> 0x41d170`
     // - copies auth DNS into owner `+0x4c`
