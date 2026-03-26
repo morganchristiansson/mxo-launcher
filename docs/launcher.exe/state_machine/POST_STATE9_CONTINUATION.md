@@ -53,6 +53,10 @@ Current best read:
 - clears owner byte `+0xf14`
 - sets owner byte `+0x2d`
 - if margin connection state is `1` or `2`, calls connection vtable `+0x0c(1)`
+- important slot-split note:
+  - owner-side strongest meaning is still this state9 opcode-`0x11` success side effect
+  - launcher teardown also reuses the same vtable slot as a wrapper-facing
+    close-and-wait-event-`0x0f` predicate before `WaitForEvent(0x0f)`
 
 Source home:
 - `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`

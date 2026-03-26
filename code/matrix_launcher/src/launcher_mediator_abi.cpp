@@ -683,16 +683,22 @@ static uint32_t __thiscall Mediator_GetLastLoginStatus(MinimalLoginMediatorStub*
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 conditionally checks arg6 +0x164
 // vtable: ILTLoginMediator.Default slot +0x164
-static uint32_t __thiscall Mediator_ShouldExportA(MinimalLoginMediatorStub* self) {
+// Wrapper-minimization note:
+// - keep the wrapper-facing teardown meaning explicit here (`WaitForEvent(1)` predicate)
+// - owner-side state/logging lives on `CLTLoginMediator`
+static uint32_t __thiscall Mediator_RequestAuthConnectionCloseWaitEvent1(MinimalLoginMediatorStub* self) {
     (void)self;
-    return 0;
+    return mxo::ltlogin::ILTLoginMediator::Default->RequestAuthConnectionCloseWaitEvent1() ? 1u : 0u;
 }
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 conditionally checks arg6 +0x16c
 // vtable: ILTLoginMediator.Default slot +0x16c
-static uint32_t __thiscall Mediator_ShouldExportB(MinimalLoginMediatorStub* self) {
+// Keep the wrapper-facing split explicit:
+// - teardown uses this as the `WaitForEvent(0x0f)` predicate
+// - owner-side state9 success still has its own method name on `CLTLoginMediator`
+static uint32_t __thiscall Mediator_RequestMarginConnectionCloseWaitEvent0f(MinimalLoginMediatorStub* self) {
     (void)self;
-    return 0;
+    return mxo::ltlogin::ILTLoginMediator::Default->RequestMarginConnectionCloseWaitEvent0f() ? 1u : 0u;
 }
 
 // UNANCHORED: seeds the replacement ILTLoginMediator.Default ABI vtable from recovered slot usage.
@@ -765,8 +771,8 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[72] = (void*)Mediator_ProcessLoginCredentials120; // +0x120
     g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
     g_LoginMediatorVtable[82] = (void*)Mediator_GetGameSessionId; // +0x148
-    g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164
-    g_LoginMediatorVtable[91] = (void*)Mediator_ShouldExportB;   // +0x16c
+    g_LoginMediatorVtable[89] = (void*)Mediator_RequestAuthConnectionCloseWaitEvent1;   // +0x164
+    g_LoginMediatorVtable[91] = (void*)Mediator_RequestMarginConnectionCloseWaitEvent0f;   // +0x16c
     g_LoginMediatorVtable[92] = (void*)Mediator_RegisterLoginObserver170; // +0x170
     g_LoginMediatorVtable[93] = (void*)Mediator_UnregisterLoginObserver174; // +0x174
     g_LoginMediatorVtable[94] = (void*)Mediator_GetLastLoginStatus; // +0x178

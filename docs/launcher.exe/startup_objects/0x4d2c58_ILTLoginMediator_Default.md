@@ -194,8 +194,18 @@ From original `launcher.exe` startup/teardown:
 | `+0x58` | launcher crashreporter/auth seeding path reads the low byte later stored as crashreporter `PromptForSecurId` | medium |
 | `+0x5c` | launcher crashreporter/auth seeding path reads the value later used as crashreporter **username** | high |
 | `+0x60` | launcher crashreporter/auth seeding path reads the value later used as crashreporter **password** | high |
-| `+0x164` | teardown conditional check | medium |
-| `+0x16c` | teardown conditional check | medium |
+| `+0x164` | teardown auth-close / wait-event-`1` predicate; tiny body `0x41b3f0` sets owner byte `+0x2c` and may call auth connection `+0x0c(1)` | medium |
+| `+0x16c` | teardown margin-close / wait-event-`0x0f` predicate, but the strongest owner-side anchor is still state9 success helper `0x41b420` | medium |
+
+New teardown-slot clarification:
+- `+0x164` and `+0x16c` are not anonymous export-style booleans.
+- direct launcher teardown `0x40b360` now reads as:
+  - call `+0x164`, then wait for event `1` only when it returns non-zero
+  - call `+0x16c`, then wait for event `0x0f` only when it returns non-zero
+- current best slot split is therefore:
+  - `+0x164` = auth-connection close / shared-slot1-event-`1` arm
+  - `+0x16c` = wrapper-facing margin-connection close / shared-slot2-event-`0x0f` arm
+    even though the same tiny body is also the owner-side state9 opcode-`0x11` success helper
 
 Current implementation note:
 - the replacement launcher now still uses parsed `"0.1"` for `+0x1c`,

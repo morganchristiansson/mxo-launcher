@@ -1244,6 +1244,33 @@ uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
     return state;
 }
 
+// anchor: launcher.exe:0x41b3f0 / owner vtable +0x164
+// Wrapper-facing teardown meaning:
+// - launcher `0x40b360` waits for event `1` only when this returns true
+// - tiny slot body uses owner auth-connection state (`+0x18`, `+0x2c`)
+// - keep that explicit instead of conflating it with the margin/state9 `+0x16c` family
+bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
+    if (!authConnection_) {
+        spdlog::info(
+            "CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1(+0x164 wrapper-facing) -> 0 [authConnection=<null> owner+0x2c={}]",
+            static_cast<unsigned>(authConnectionFlag2c_));
+        return false;
+    }
+
+    authConnectionFlag2c_ = 1u;
+    const uint32_t rawState = static_cast<uint32_t>(authConnection_->State());
+    const bool wouldCallConnectionClose0c =
+        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
+        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+
+    spdlog::info(
+        "CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1(+0x164 wrapper-facing) -> 1 [owner+0x2c={} authConnectionState={} wouldCallConnectionClose0cArg1={} currentReplacementDoesNotInvokeCloseYet=1]",
+        static_cast<unsigned>(authConnectionFlag2c_),
+        rawState,
+        wouldCallConnectionClose0c ? 1u : 0u);
+    return true;
+}
+
 // anchor: launcher.exe:0x41f240
 // vtable: ILTLoginMediator.Default slot +0x178
 uint32_t CLTLoginMediator::GetLastLoginStatus() {
@@ -1546,6 +1573,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     authGetPublicKeyRequestSent_ = false;
     authRequestSent_ = false;
     authChallengeResponseSent_ = false;
+    authConnectionFlag2c_ = 0u;
     lastAuthPublicKeyReply_ = mxo::auth::GetPublicKeyReply();
     lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
     lastAuthChallenge_ = mxo::auth::AuthChallenge();

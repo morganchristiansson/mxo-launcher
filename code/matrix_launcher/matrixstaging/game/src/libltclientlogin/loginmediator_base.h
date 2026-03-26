@@ -479,11 +479,11 @@ public:
     // +0x160
     // virtual void ForwardThroughReadyMarginConnection24(void* workItem) = 0;
     // +0x164
-    void UnknownSlot88();
+    virtual bool RequestAuthConnectionCloseWaitEvent1() = 0;
     // +0x168
     void UnknownSlot89();
     // +0x16c
-    // virtual uint32_t HandleState9Opcode11SuccessSideEffect() = 0;
+    virtual bool RequestMarginConnectionCloseWaitEvent0f() = 0;
     // +0x170
     virtual bool RegisterLoginObserver(void* observer) = 0;
     // +0x174

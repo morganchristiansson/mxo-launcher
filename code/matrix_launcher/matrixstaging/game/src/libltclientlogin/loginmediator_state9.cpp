@@ -318,6 +318,63 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     return submitResult;
 }
 
+bool CLTLoginMediator::PrepareMarginConnectionCloseWaitEvent0fScaffold(
+    uint32_t* outConnectionState,
+    bool* outWouldCallConnectionClose0c,
+    bool clearState10SendGateF14) {
+    if (outConnectionState) {
+        *outConnectionState = 0u;
+    }
+    if (outWouldCallConnectionClose0c) {
+        *outWouldCallConnectionClose0c = false;
+    }
+    if (!marginConnection_) {
+        return false;
+    }
+
+    if (clearState10SendGateF14) {
+        postAuthMarginLoadingState_.state10SendGateFlagF14 = 0u;
+    }
+    marginConnectionFlag2d_ = 1u;
+
+    const uint32_t rawState = static_cast<uint32_t>(marginConnection_->State());
+    const bool wouldCallConnectionClose0c =
+        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
+        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+
+    if (outConnectionState) {
+        *outConnectionState = rawState;
+    }
+    if (outWouldCallConnectionClose0c) {
+        *outWouldCallConnectionClose0c = wouldCallConnectionClose0c;
+    }
+    return true;
+}
+
+// anchor: launcher.exe teardown path 0x40b360..0x40b3df / wrapper-facing arg6 slot +0x16c
+// Keep the split explicit:
+// - launcher teardown treats this as a close-and-wait-event-`0x0f` predicate
+// - the same underlying owner body is also the state9 success-side helper anchored below at
+//   `0x41b420`
+bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
+    uint32_t rawState = 0u;
+    bool wouldCallConnectionClose0c = false;
+    const bool armed = PrepareMarginConnectionCloseWaitEvent0fScaffold(
+        &rawState,
+        &wouldCallConnectionClose0c,
+        /*clearState10SendGateF14=*/true);
+
+    spdlog::info(
+        "CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f(+0x16c wrapper-facing) -> {} [owner+0xf14={} owner+0x2d={} marginConnectionState={} wouldCallConnectionClose0cArg1={} currentState={} split=teardown-wait-event-0x0f vs owner-state9-success-helper currentReplacementDoesNotInvokeCloseYet=1]",
+        armed ? 1u : 0u,
+        static_cast<unsigned>(postAuthMarginLoadingState_.state10SendGateFlagF14),
+        static_cast<unsigned>(marginConnectionFlag2d_),
+        rawState,
+        wouldCallConnectionClose0c ? 1u : 0u,
+        currentState_ ? currentState_->DebugName() : "<null>");
+    return armed;
+}
+
 // anchor: launcher.exe:0x41b420
 uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
     // Current best read from `0x41b420`, reached by state9 slot 6 / `0x43c180` success:
@@ -329,25 +386,21 @@ uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
     // - set owner byte `+0x2d`
     // - if margin connection state `+0x34` is `1` or `2`, call connection vtable `+0x0c(1)`
     //
-    // Keep the vtable `+0x0c` call explicit but unresolved at the class level for now; the
-    // evidence-backed owner-side state mutation is enough to keep the active state9 path faithful.
-    if (!marginConnection_) {
-        return 0u;
-    }
-
-    postAuthMarginLoadingState_.state10SendGateFlagF14 = 0u;
-    marginConnectionFlag2d_ = 1u;
-
-    const uint32_t rawState = static_cast<uint32_t>(marginConnection_->State());
-    const bool wouldCallConnectionVtable0c =
-        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
-        rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+    // Keep the wrapper/owner split explicit in source too:
+    // - wrapper-facing arg6 `+0x16c` is teardown-visible close/wait-event-`0x0f`
+    // - owner-side `0x41b420` is still the concrete state9 opcode-`0x11` success-side effect
+    uint32_t rawState = 0u;
+    bool wouldCallConnectionClose0c = false;
+    const bool armed = PrepareMarginConnectionCloseWaitEvent0fScaffold(
+        &rawState,
+        &wouldCallConnectionClose0c,
+        /*clearState10SendGateF14=*/true);
 
     spdlog::info(
-        "CLTLoginMediator::HandleState9Opcode11SuccessSideEffect cleared owner+0xf14, set owner+0x2d, marginConnectionState={} wouldCallConnectionVtable0cArg1={}",
+        "CLTLoginMediator::HandleState9Opcode11SuccessSideEffect cleared owner+0xf14, set owner+0x2d, marginConnectionState={} wouldCallConnectionClose0cArg1={} currentReplacementDoesNotInvokeCloseYet=1",
         rawState,
-        wouldCallConnectionVtable0c ? 1u : 0u);
-    return 1u;
+        wouldCallConnectionClose0c ? 1u : 0u);
+    return armed ? 1u : 0u;
 }
 
 }  // namespace mxo::ltlogin

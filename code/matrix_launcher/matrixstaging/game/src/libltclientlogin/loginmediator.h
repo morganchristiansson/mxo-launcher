@@ -654,6 +654,11 @@ public:
     const char* GetVariantWorldName(uint32_t variantIndex) override;
     // +0xe4
     uint8_t GetVariantState(int32_t variantIndex) const override;
+    // +0x164
+    bool RequestAuthConnectionCloseWaitEvent1() override;
+    // +0x16c
+    // Wrapper-facing split kept explicit from the owner-side state9 helper below.
+    bool RequestMarginConnectionCloseWaitEvent0f() override;
     // +0x178
     uint32_t GetLastLoginStatus() override;
 
@@ -1061,6 +1066,12 @@ public:
     //     - direct submit `+0x28`
     //     - managed submit `+0x1c`, `+0x18`, `+0x24`
     uint32_t State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6);
+    // Shared owner-side helper for the wrapper-facing `+0x16c` close/wait-event-`0x0f` surface
+    // and the owner-anchored state9 success-side effect at `0x41b420`.
+    bool PrepareMarginConnectionCloseWaitEvent0fScaffold(
+        uint32_t* outConnectionState,
+        bool* outWouldCallConnectionClose0c,
+        bool clearState10SendGateF14);
     // - state9 slot 6 success side effect / launcher.exe:0x41b420 (owner vtable +0x16c)
     uint32_t HandleState9Opcode11SuccessSideEffect();
     // - state11 slot 6 / launcher.exe:0x440320
@@ -1260,7 +1271,13 @@ private:
     ConnectionHelperFamily helpers_;
     MarginRouteState marginRouteState_;
     MarginAddressListState marginAddressList3c_{};
+    // owner `+0x24/+0x2c/+0x2d/+0x7c` connection-routing/teardown family:
+    // - `+0x24` = margin begin-count from `0x41e500`
+    // - `+0x2c` = shared slot1 / event-`1` gate armed by vtable `+0x164 / 0x41b3f0`
+    // - `+0x2d` = shared slot2 / event-`0x0f` gate armed by vtable `+0x16c / 0x41b420`
+    // - `+0x7c` = selected IPv4 for margin endpoint materialization
     uint32_t marginBeginCount24_ = 0;
+    uint8_t authConnectionFlag2c_ = 0;
     uint8_t marginConnectionFlag2d_ = 0;
     uint32_t marginSelectedIpv4_7c_ = 0;
     AuthBootstrapSelectedSource38Sketch authBootstrapSource38_;
