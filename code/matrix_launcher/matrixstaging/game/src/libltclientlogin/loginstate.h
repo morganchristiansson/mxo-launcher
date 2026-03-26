@@ -102,10 +102,20 @@ public:
 
 // anchor: launcher.exe vtable 0x004b51e0
 // docs: ../../docs/launcher.exe/VTABLES/0x004b51e0.md
+// Current tighter startup role:
+// - mediator init installs this as the initial idle/start current helper
+// - slot 3 stays the inherited shared no-op stub
+// - the first happy-path submit transition remains owner-owned
+//   (`CLTLoginMediator::ProcessLoginRequest`), which switches into helper/state `2`
+// So state0 is the startup helper, not the startup submit coordinator.
 class CLTLoginState_State0 : public CLTLoginState_AbstractFinalLeafBase {
 public:
     // anchor: launcher.exe:0x00439d80 (vtable 0x004b51e0 slot 10 shared initializer)
     CLTLoginState_State0() = default;
+
+    // Intentionally no Slot3 override here:
+    // original slot 3 is the shared no-op stub, so submit ownership stays on the mediator/owner
+    // path rather than moving into a state0-local body.
 
     // anchor: launcher.exe vtable 0x004b51e0
     const char* DebugName() const override;

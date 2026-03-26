@@ -17,6 +17,8 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     }
 
     // Current tighter source-owned mirror of `0x439210`:
+    // - this is the post-submit helper entered from owner-owned `ProcessLoginRequest`, not the
+    //   startup default helper
     // - cache the incoming upstream/helper unless that object's phase/state code is already `1`
     // - gate on `0x41b490` / auth connection state `+0x34 == 2`
     // - if not connected yet, switch to helper/state 1 so its slot-3 body starts the auth

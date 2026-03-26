@@ -737,9 +737,10 @@ public:
     // Early concrete auth-side states with real current value now use the same mediator-owned
     // registration/access pattern too.
     // Current practical startup/auth focus:
-    // - state 0  = initial current helper installed by mediator init
+    // - state 0  = initial idle/start current helper installed by mediator init
     // - state 1  = auth-connect pending
-    // - state 2  = auth/bootstrap coordinator
+    // - state 2  = post-submit auth/bootstrap coordinator, entered from owner
+    //              `ProcessLoginRequest` rather than installed as the startup default helper
     // - state 14 = world-list pending
     // Late Family-A states 15..19 stay non-happy / later-flow scaffolds for now, but keep
     // registration points source-owned so future work can switch to them without reopening the
@@ -806,7 +807,9 @@ public:
     CLTLoginState* ScaffoldState17() const;
     CLTLoginState* ScaffoldState18() const;
     CLTLoginState* ScaffoldState19() const;
-    // Installs the source-owned initial helper convention (`state0`) after registration.
+    // Installs the source-owned initial idle/start helper convention (`state0`) after
+    // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
+    // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.
     void InstallInitialState0Scaffold();
 
     void SetAuthConnectionContextKey(void* contextKey);

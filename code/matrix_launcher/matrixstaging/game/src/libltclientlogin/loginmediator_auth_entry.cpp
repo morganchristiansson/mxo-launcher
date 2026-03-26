@@ -199,9 +199,14 @@ void CLTLoginMediator::InstallInitialState0Scaffold() {
         return;
     }
 
+    // Fresh happy-path proof keeps startup ownership split explicit:
+    // - mediator init installs state0 as the initial idle/start helper
+    // - state0 itself does not own the first submit transition because its slot 3 is the shared
+    //   no-op stub
+    // - `ProcessLoginRequest` later performs the first happy-path state switch (`state0 -> state2`)
     currentState_ = scaffoldState0_;
     spdlog::info(
-        "ROUTE CHECKPOINT: startup installed initial helper state0 currentState={} (anchor: launcher.exe:0x41b160 -> owner+0x10 = helper0 / 0x4f7868)",
+        "ROUTE CHECKPOINT: startup installed initial helper state0 currentState={} role=idle/start anchor=(launcher.exe:0x41b160 -> owner+0x10 = helper0 / 0x4f7868)",
         currentState_->DebugName());
 }
 
@@ -391,7 +396,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, input.string60.begin, input.string60.current);
 
     spdlog::info(
-        "CLTLoginMediator::ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} currentState={} stateCode={} altState16Branch={} helper65cPresent={}",
+        "CLTLoginMediator::ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} currentState={} stateCode={} altState16Branch={} helper65cPresent={} submitOwnership=owner",
         authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
         authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
         static_cast<unsigned>(authBootstrapSource38_.string60Owned.size()),
@@ -403,12 +408,14 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     CLTLoginState* const upstreamState = currentState_;
     if (!processLoginRequestAlternateState16BranchScaffold_) {
         // Active original branch observed under WineDbg had `DAT_004d66ec == 0`, which means:
+        // - while current helper is still the initial idle/start state0, owner code handles submit
         // - clear owner `+0xf4` (`+0x94 + 0x60`) through the small-string helper
         // - switch helper state to `2`
         // - let `0x41b450` immediately enter helper2 slot 3 with the old helper object
+        // This keeps state2 firmly on the post-submit side of the startup chain.
         AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, nullptr, nullptr);
         spdlog::info(
-            "ROUTE CHECKPOINT: early-auth state0/owner-submit -> state2 (default DAT_004d66ec==0 branch) upstreamState={} clearedOwnerF4=1",
+            "ROUTE CHECKPOINT: early-auth state0/owner-submit -> state2 (initial idle/start helper hands off after owner submit; DAT_004d66ec==0 branch) upstreamState={} clearedOwnerF4=1",
             upstreamState ? upstreamState->DebugName() : "<null>");
         if (scaffoldState2_ != nullptr) {
             const uint32_t state2EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
@@ -499,8 +506,9 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
 void CLTLoginMediator::InitializeConnectionHelpers() {
     // anchor: launcher.exe:0x43b300
     // Initializes the helper/state dispatch table rooted at `0x4f7868..0x4f78b4`.
-    // Early concrete states that now have source-owned bodies/scaffolds (for example state1,
-    // state2, and state14) are registered separately through RegisterScaffoldState*.
+    // Early concrete states that now have source-owned bodies/scaffolds (including the initial
+    // idle/start state0, plus state1, state2, and state14) are registered separately through
+    // RegisterScaffoldState*.
     // This initializer therefore still only materializes the late
     // `CLTLoginState_State15..State19` tail recovered concretely so far
     // (`0x420640/0x4206e0/0x420850/0x420920/0x4209a0`).
@@ -568,6 +576,8 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // - launcher.exe:0x41e500 = downstream connection initializer call site
     //
     // Current best launcher path:
+    // - this is reached only after owner-owned submit has already handed off from state0 -> state2
+    //   -> state1 on the happy path
     // - copy current `qsAuthServerDNSName` into owner `+0x4c`
     // - read `AuthServerPort` from owner `+0x4c8`
     // - build endpoint at owner `+0x5c`

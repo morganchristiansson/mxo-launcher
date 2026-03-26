@@ -624,6 +624,9 @@ static void DiagnosticApplyLoginControllerConfig() {
     loginController->RegisterScaffoldState17(&states.state17);
     loginController->RegisterScaffoldState18(&states.state18);
     loginController->RegisterScaffoldState19(&states.state19);
+    // Preserve the proven startup convention explicitly before any diagnostic auto-begin logic:
+    // state0 is the initial idle/start helper, and owner-owned `ProcessLoginRequest` performs the
+    // first happy-path handoff into state2 later.
     loginController->InstallInitialState0Scaffold();
 
     const char* characterNameSeed =

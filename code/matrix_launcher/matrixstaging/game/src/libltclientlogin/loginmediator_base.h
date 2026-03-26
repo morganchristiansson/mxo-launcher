@@ -198,8 +198,10 @@ struct ProcessLoginRequestInputSketch {
     // Live input shape confirmed:
     // - `+0x00` = username
     // - `+0x20` = password
-    // Default branch copies this into owner `+0x94`, clears owner `+0xf4`, then moves to
-    // helper/state `2`.
+    // - on the happy path this runs while current helper is still state0
+    // - the owner path copies this into owner `+0x94`, clears owner `+0xf4`, then moves to
+    //   helper/state `2`
+    // So state2 is the first post-submit helper here, not the startup default helper.
     std::array<char, 0x20> inlineString00{};     // input `+0x00 .. +0x1f` = username
     std::array<char, 0x20> inlineString20{};     // input `+0x20 .. +0x3f` = password
     std::array<uint8_t, 16> block40{};           // input `+0x40 .. +0x4f`
