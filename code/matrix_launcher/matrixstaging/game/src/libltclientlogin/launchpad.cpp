@@ -25,6 +25,8 @@ static const char* NonEmptyOrFallback(const char* value, const char* fallback) {
 //   mediator implementation files
 // - keep shared `CLTLoginState_*` gates and the state16 success handoff on the login-state side,
 //   even when nearby strings mention LaunchPad
+// - keep the separate `g_LaunchPadGateState16State18` state16/state18 family and the earlier
+//   startup `station_login` side-effect path out of this vtable file too
 // - key vtable entries now kept here:
 //   - `0x420440` = `LaunchPadClient_OnConnectionOpened`
 //   - `0x4204f0` = `LaunchPadClient_OnSessionClosed`

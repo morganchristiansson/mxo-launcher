@@ -11,7 +11,9 @@ const char* CLTLoginState_State18::DebugName() const {
 // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
 uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     // Stronger current read from disassembly review:
-    // - this is a later launchpad/session helper path, not a direct helper11 writer
+    // - this is the later state18 session-helper path in the alternate
+    //   `g_LaunchPadGateState16State18` family, not the active state2 -> owner+0x680
+    //   bootstrap-child handoff and not a direct helper11 writer
     // - it fetches owner vtable `+0x130` helper `+0x65c`
     // - when conditions permit, it refreshes helper string `+0x18` from owner `+0x94 + 0x60`
     //   (the embedded small-string in the recovered auth/bootstrap source block)

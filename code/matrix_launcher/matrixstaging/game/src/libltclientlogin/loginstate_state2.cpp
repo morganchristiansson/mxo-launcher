@@ -23,9 +23,10 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     // - gate on `0x41b490` / auth connection state `+0x34 == 2`
     // - if not connected yet, switch to helper/state 1 so its slot-3 body starts the auth
     //   transport connection
-    // - if already connected, this state2 body owns the ready-side owner+0x680 child entry:
-    //   static `0x439210` gathers owner-side inputs from `+0x94`, the owner-side getter result,
-    //   and the send target, then forwards that concrete call shape into `0x448050`
+    // - if already connected, this state2 body owns the ready-side handoff into the owner+0x680
+    //   bootstrap child: static `0x439210` gathers owner-side inputs from `+0x94`, the
+    //   owner-side getter result, and the send target, then forwards that concrete call shape
+    //   into `0x448050`
     // - current source mirrors that split explicitly:
     //   `CLTLoginMediator::BeginAuthHandshake()` is only a thin bridge into
     //   `AuthBootstrap680Ops::PrepareAndDispatch(...)`
@@ -56,13 +57,13 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     }
 
     spdlog::info(
-        "ROUTE CHECKPOINT: early-auth state2 ready-side owner+0x680 bootstrap dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
+        "ROUTE CHECKPOINT: early-auth state2 ready-side owner+0x680 bootstrap-child dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode));
     const uint32_t sendResult = mediator->BeginAuthHandshake();
     spdlog::info(
-        "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> BeginAuthHandshake(owner+0x680)=0x{:08x}",
+        "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> BeginAuthHandshake(owner+0x680 child)=0x{:08x}",
         fmt::ptr(upstreamOrArg),
         static_cast<unsigned>(incomingUpstreamPhaseCode),
         fmt::ptr(cachedUpstreamOrArg_),

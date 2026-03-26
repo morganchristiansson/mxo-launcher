@@ -142,7 +142,8 @@ public:
         //   - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection starts auth connect through launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
         // - slot 2 / `0x4f7870` / phase-code `2`
         //   - current best concrete state object: `CLTLoginState_AuthenticatePending` / vtable `0x4b5014`
-        //   - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap is the strongest current earlier credential/bootstrap auth lead
+        //   - launcher.exe:0x439210 is the strongest current earlier loginstate-owned handoff into
+        //     the owner `+0x680` phase-2 auth/bootstrap child
         //   - on the connected branch it reaches launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch, which then branches to:
         //     - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (builds/sends raw auth code 0x06)
         //       -> strongest current `AS_GetPublicKeyRequest` candidate
@@ -680,8 +681,9 @@ public:
     // Current practical startup/auth focus:
     // - state 0  = initial idle/start current helper installed by mediator init
     // - state 1  = auth-connect pending
-    // - state 2  = post-submit auth/bootstrap coordinator, entered from owner
-    //              `ProcessLoginRequest` rather than installed as the startup default helper
+    // - state 2  = post-submit loginstate handoff into the owner `+0x680` phase-2
+    //              auth/bootstrap child, entered from owner `ProcessLoginRequest` rather than
+    //              installed as the startup default helper
     // - state 14 = world-list pending
     // Late Family-A states 15..19 stay non-happy / later-flow scaffolds for now, but keep
     // registration points source-owned so future work can switch to them without reopening the
@@ -909,9 +911,11 @@ public:
     // Tiny auth transport-ready test used by state2 slot 3 before it reaches the bootstrap
     // dispatcher. Current best concrete read: auth connection exists and connection `+0x34 == 2`.
     bool HasReadyAuthConnectionState2() const;
-    // Source-owned branch selector for the later `0x41ecd0` state16/session family.
-    // Keep it default-off so the proven happy path stays on the observed `DAT_004d66ec == 0`
-    // route, but make the alternate transition scaffold explicit for future non-happy work.
+    // Source-owned branch selector for the later `0x41ecd0`
+    // `g_LaunchPadGateState16State18` / state16/state18 family.
+    // Keep it default-off so the proven happy path stays on the observed
+    // `g_LaunchPadGateState16State18 == 0` route, but make the alternate transition scaffold
+    // explicit for future non-happy work.
     void SetProcessLoginRequestAlternateState16BranchScaffold(bool enabled);
     bool ProcessLoginRequestAlternateState16BranchScaffold() const {
         return processLoginRequestAlternateState16BranchScaffold_;
@@ -1411,6 +1415,8 @@ private:
     uint32_t observerRegister170Count_ = 0;     // owner `+0x674` register call count
     uint32_t observerUnregister174Count_ = 0;   // owner `+0x674` unregister call count
 
+    // Source-owned default-off mirror for the alternate
+    // `g_LaunchPadGateState16State18 != 0` state16/state18 family.
     bool processLoginRequestAlternateState16BranchScaffold_ = false;
 
     std::string authServerDnsName_;

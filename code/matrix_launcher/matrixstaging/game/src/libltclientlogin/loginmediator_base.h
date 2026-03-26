@@ -156,8 +156,10 @@ struct AuthBootstrapSelectedSource38Sketch {
     // - owner vtable `+0x150` / `0x41f270` is now also a direct first-string writer for the
     //   same block and copies up to `0x20` bytes into owner `+0x94`
     //
-    // Current best recovered layout from launcher.exe:0x41f0a0 + launcher.exe:0x41ecd0 + launcher.exe:0x41eb80 + launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
-    // plus later owner-path uses like `0x43f300`, `0x41330`, `0x21a50`, and `0x20720`:
+    // Current best recovered layout from launcher.exe:0x41f0a0 + launcher.exe:0x41ecd0
+    // + launcher.exe:0x41eb80 + launcher.exe:0x439210, where state2 owns the handoff into the
+    // owner `+0x680` bootstrap child, plus later owner-path uses like `0x43f300`, `0x41330`,
+    // `0x21a50`, and `0x20720`:
     // - `+0x00 .. +0x1f` = first inline 32-byte NUL-terminated string
     // - `+0x20 .. +0x3f` = second inline 32-byte NUL-terminated string
     // - `+0x40 .. +0x4f` = first copied 16-byte block
@@ -464,7 +466,7 @@ public:
     // +0x134
     virtual SessionCallbackHelper65cSketch* EnsureSessionCallbackHelper65c() = 0;
     // +0x138
-    // virtual void HelperSlot138_State16Dispatch() = 0;
+    // virtual void SwitchToState18IfLaunchPadGateState16State18Set() = 0;
     // +0x13c
     virtual void HelperSlot13c_InvokeSessionHelperVtable4() = 0;
     // +0x140

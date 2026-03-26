@@ -798,7 +798,7 @@ Representative non-zero arg7 result from that same run:
     - live stop there also tightens the input layout:
       - `+0x00` = username
       - `+0x20` = password
-      - observed active branch had `DAT_004d66ec == 0`
+      - observed active branch had `g_LaunchPadGateState16State18 == 0`
   - corrected happy-path rerun from a stable EULA attach now proves the early helper chain more precisely:
     - a second fresh-process rerun with the correct password reproduced the same early chain, so the earlier wrong-password detour does not appear to have contaminated this proved happy-path sequence
     - before submit, owner `+0x10` is `0x004b51e0` = state `0`

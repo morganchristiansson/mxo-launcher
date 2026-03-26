@@ -11,9 +11,10 @@ const char* CLTLoginState_State16::DebugName() const {
 // anchor: launcher.exe:0x00420720 (vtable 0x004b0bb0 slot 3)
 uint32_t CLTLoginState_State16::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     // Current ownership boundary:
-    // - `0x41ecd0` can target state16 only on the alternate `DAT_004d66ec != 0` family
-    // - that family is now kept explicit but default-off so the proven `state0 -> state2 ->
-    //   state1 -> state2 -> state3` happy path remains favored
+    // - `0x41ecd0` can target state16 only on the alternate
+    //   `g_LaunchPadGateState16State18 != 0` family
+    // - that state16/state18 family is now kept explicit but default-off so the proven
+    //   `state0 -> state2 -> state1 -> state2 -> state3` happy path remains favored
     // - keep this placeholder narrow until the non-happy/session branch itself is recovered as a
     //   faithful state-owned body rather than grown ad hoc inside the mediator
     (void)upstreamOrArg;

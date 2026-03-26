@@ -1,9 +1,9 @@
 /**
  * AuthBootstrap680 - launcher-owned phase-2 auth/bootstrap child rooted at mediator owner +0x680.
  *
- * Keep this TU focused on the separate bootstrap child/module that state2 slot 3 enters through
- * `0x439210 -> 0x448050`, plus the later auth-reply shadow fields surfaced back through mediator
- * wrappers.
+ * Keep this TU focused on the separate bootstrap child/module that state2 slot 3 hands off into
+ * through `0x439210 -> 0x448050`, plus the later auth-reply shadow fields surfaced back through
+ * mediator wrappers.
  *
  * Important ownership split:
  * - this file intentionally models the owner `+0x680` bootstrap child as source-owned helper ops
@@ -239,7 +239,7 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
     const bool sendAuthRequestBranch = authRequestReadyA0 != 0u;
 
     spdlog::info(
-        "CLTLoginMediator::BeginAuthHandshake staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={}",
+        "AuthBootstrap680Ops::PrepareAndDispatch staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={}",
         fmt::ptr(callShape.ownerSource94),
         static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
@@ -257,7 +257,7 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
         if (!mediator.lastAuthPublicKeyReply_.valid || !mediator.lastAuthPublicKeyReply_.hasEmbeddedPublicKey) {
             spdlog::warn(
-                "CLTLoginMediator::BeginAuthHandshake expected auth-request branch from owner+0x680 child but no valid cached AS_GetPublicKeyReply is present authRequestReadyA0=0x{:02x}",
+                "AuthBootstrap680Ops::PrepareAndDispatch expected auth-request branch from owner+0x680 child but no valid cached AS_GetPublicKeyReply is present authRequestReadyA0=0x{:02x}",
                 static_cast<unsigned>(authRequestReadyA0));
             return 0u;
         }

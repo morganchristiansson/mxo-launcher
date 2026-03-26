@@ -18,6 +18,8 @@ class CLTLoginMediator;
 //     `LaunchPadClient` ownership
 //   - that success handoff belongs to `CLTLoginState_State16` slot 8 on vtable `0x004b0bb0`
 //     and stays documented on the login-state side
+//   - likewise keep the `g_LaunchPadGateState16State18` state16/state18 family and the earlier
+//     startup `+0x140` `station_login` side effect separate from this status-handler vtable
 //
 // Current high-confidence function anchors in this family:
 // - `0x420440` = `LaunchPadClient_OnConnectionOpened`

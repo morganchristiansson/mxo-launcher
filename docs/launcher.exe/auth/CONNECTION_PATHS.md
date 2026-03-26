@@ -215,6 +215,9 @@ Keep only the auth/connection-path consequence here:
 - the proved early helper sequence still passes through state `2` / `0x439210`
 - that path reaches the separate owner `+0x680` bootstrap child at `0x448050`
 - which then chooses the raw `0x06` vs raw `0x08` send path
+- keep that active state2 -> bootstrap-child handoff separate from the default-off
+  `g_LaunchPadGateState16State18` state16/state18 family and from the earlier startup
+  `0x406470 -> owner vtable +0x140` (`station_login`) side effect
 
 This doc no longer repeats the full child call shape / field layout / `+0xa0/+0xa4/+0xa8/+0xf4`
 family, because that is now canonicalized in the focused startup-object doc above.

@@ -2101,10 +2101,11 @@ void CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4() {
 
 // source-owned shared helper for `CLTLoginState_State18` slot 3 / `0x421a50`
 uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
-    // Current best source-owned mirror of the state18/session helper path:
+    // Current best source-owned mirror of the alternate state18 session-helper path:
     // - ensure owner helper `+0x65c`
     // - refresh helper string `+0x18` from owner `+0x94 + 0x60`
     // - then commit that helper string into owner `+0x664`
+    // - keep this separate from the active state2 -> owner+0x680 bootstrap-child handoff
     SessionCallbackHelper65cSketch* helper = EnsureSessionCallbackHelper65c();
     if (helper == nullptr) {
         return 0u;

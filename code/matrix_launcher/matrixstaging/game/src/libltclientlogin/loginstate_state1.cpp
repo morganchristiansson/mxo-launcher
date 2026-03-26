@@ -49,7 +49,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediato
         // broader event/retry/error surface is still intentionally deferred.
         if (cachedUpstreamPhaseCode == 2u) {
             spdlog::info(
-                "ROUTE CHECKPOINT: early-auth state1 -> state2 auth-bootstrap resume cachedUpstream={} currentStateBeforeRestore={}",
+                "ROUTE CHECKPOINT: early-auth state1 -> state2 phase2-bootstrap-child resume cachedUpstream={} currentStateBeforeRestore={}",
                 fmt::ptr(cachedUpstreamOrArg_),
                 mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         }
@@ -57,14 +57,14 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediato
     }
 
     spdlog::info(
-        "ROUTE CHECKPOINT: early-auth state1 connect-success -> auth bootstrap cachedUpstream={} upstreamPhaseCode={} currentState={} authFlag2c={}",
+        "ROUTE CHECKPOINT: early-auth state1 connect-success -> phase2 bootstrap child cachedUpstream={} upstreamPhaseCode={} currentState={} authFlag2c={}",
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
         static_cast<unsigned>(mediator->AuthConnectionFlag2c()));
     const uint32_t handshakeResult = mediator->BeginAuthHandshake();
     spdlog::info(
-        "CLTLoginState_State1::Slot1_HandlePrimaryGate bridged auth connect-status=0x{:08x} cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} BeginAuthHandshake(owner+0x680)=0x{:08x}",
+        "CLTLoginState_State1::Slot1_HandlePrimaryGate bridged auth connect-status=0x{:08x} cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} BeginAuthHandshake(owner+0x680 child)=0x{:08x}",
         static_cast<unsigned>(workResultCode),
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode),
