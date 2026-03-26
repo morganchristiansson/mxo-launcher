@@ -19,6 +19,7 @@ namespace ltlogin {
 class CLTLoginState;
 class CLTLoginState_AuthenticatePending;
 class CLTLoginState_WorldListPending;
+struct AuthBootstrap680Ops;
 
 // Reimplementation note:
 // This file is intended to mirror the concrete launcher-side login/controller structure
@@ -59,6 +60,13 @@ class CLTLoginState_WorldListPending;
 //     direct auth TCP packet layer just because both live under `libltclientlogin`
 
 class CLTLoginMediator : public ILTLoginMediator {
+    // Source-ownership split note:
+    // - the phase-2 auth/bootstrap child rooted at owner `+0x680` now has its own focused source
+    //   home in `authbootstrap680.cpp`
+    // - keep access narrow by granting that helper ops struct friendship instead of widening the
+    //   mediator surface generically
+    friend struct AuthBootstrap680Ops;
+
 public:
     static constexpr uint32_t kRecoveredWorldSlotCapacity = 100;
 
