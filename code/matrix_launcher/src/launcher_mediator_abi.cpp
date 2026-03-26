@@ -500,6 +500,32 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
         std::memcpy(&input, selectionContext, sizeof(input));
         mediator->PersistSelectionContextForState8(input);
         DiagnosticMirrorSelectionContextIntoLoginController(selectionContext, sizeof(input));
+        // Current bounded client-side proof:
+        // - `ClientShell_OnEngineInitialized` (`0x6216f060`) earlier pushes a direct visible status
+        //   sequence including:
+        //   - `Initializing Client Data Cache`
+        //   - `Initializing Inventory Manager`
+        //   - `Initializing Shortcut Manager`
+        //   - `Initializing Game Object Manager`
+        //   - `Initializing Character Animations`
+        //   - `Initializing Rules Subsystem`
+        //   - `Initializing Animation Tables`
+        //   - `Initializing Chat Manager`
+        //   - `Initializing Abilities`
+        //   - `Initializing FX`
+        //   - `Initializing Metro World`
+        // - `InitClientDLL_BeginLoadingCharacterFlow` then sets visible text `"Loading Character"`
+        //   at `0x62170f2a`
+        // - it then immediately calls arg6 `+0xec` at `0x62170f48`
+        // Practical replacement stance:
+        // - keep exact late text mirrors where we have exact caller-side boundaries (`Loading Character`)
+        // - for the earlier engine-init text family, emit a one-shot retrospective mirror here once
+        //   the path is proven to have passed through `0x6216f060`, without patching client.dll.
+        DiagnosticLogKnownClientEngineInitStatusTextsOnce(
+            "client.dll:ClientShell_OnEngineInitialized retrospective mirror before arg6 +0xec");
+        DiagnosticLogClientLoadingStateText(
+            "Loading Character",
+            "client.dll:InitClientDLL_BeginLoadingCharacterFlow before arg6 +0xec");
     } else {
         mediator->ResetSelectionContext0ecMirror();
     }

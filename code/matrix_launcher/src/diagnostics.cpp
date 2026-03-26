@@ -2,6 +2,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <string>
+
 struct WindowTraceEntry {
     HWND hwnd;
     LONG style;
@@ -17,6 +19,9 @@ static volatile LONG g_WindowTraceRunning = 0;
 static WindowTraceEntry g_WindowTraceEntries[32] = {};
 static int g_WindowTraceEntryCount = 0;
 static int g_LastWindowTraceCount = -1;
+static std::string g_LastClientLoadingStateText;
+static std::string g_LastClientLoadingStateSource;
+static bool g_KnownClientEngineInitStatusTextsLogged = false;
 
 // UNANCHORED: diagnostic-only display-mode snapshot helper.
 static void LogCurrentDisplayMode(const char* prefix) {
@@ -189,4 +194,44 @@ void DiagnosticStopWindowTrace() {
     WaitForSingleObject(g_hWindowTraceThread, 1000);
     CloseHandle(g_hWindowTraceThread);
     g_hWindowTraceThread = NULL;
+}
+
+void DiagnosticLogClientLoadingStateText(const char* text, const char* source) {
+    const std::string nextText = (text && text[0]) ? text : "<empty>";
+    const std::string nextSource = (source && source[0]) ? source : "<unspecified>";
+    if (g_LastClientLoadingStateText == nextText && g_LastClientLoadingStateSource == nextSource) {
+        return;
+    }
+
+    g_LastClientLoadingStateText = nextText;
+    g_LastClientLoadingStateSource = nextSource;
+    spdlog::info(
+        "ClientLoadingState text='{}' source={} (client-visible loading/status text boundary)",
+        nextText,
+        nextSource);
+}
+
+void DiagnosticLogKnownClientEngineInitStatusTextsOnce(const char* source) {
+    if (g_KnownClientEngineInitStatusTextsLogged) {
+        return;
+    }
+    g_KnownClientEngineInitStatusTextsLogged = true;
+
+    static const char* kKnownTexts[] = {
+        "Initializing Client Data Cache",
+        "Initializing Inventory Manager",
+        "Initializing Shortcut Manager",
+        "Initializing Game Object Manager",
+        "Initializing Character Animations",
+        "Initializing Rules Subsystem",
+        "Initializing Animation Tables",
+        "Initializing Chat Manager",
+        "Initializing Abilities",
+        "Initializing FX",
+        "Initializing Metro World",
+    };
+
+    for (const char* text : kKnownTexts) {
+        DiagnosticLogClientLoadingStateText(text, source);
+    }
 }

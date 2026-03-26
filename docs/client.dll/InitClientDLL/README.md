@@ -143,7 +143,8 @@ The zero-init helper at `client.dll:0x6211d3e0` clears this object through offse
 ### New clarification: exact active per-selection cfg readers on the `+0xec` path
 
 Newer static tightening around `client.dll:0x62170e5c..0x62170f07` now closes the exact loader ids and the
-current live stack destinations used by the active `0x62170b00` branch.
+current live stack destinations used by the active `InitClientDLL_BeginLoadingCharacterFlow`
+(`0x62170b00`) branch.
 
 Loader multiplexer:
 - `client.dll:0x621996a0`
@@ -162,9 +163,10 @@ Per-file reader ids:
 - `0x62198320` = selection `cl.cfg`
 - `0x62198400` = selection `cui.cfg`
 - `0x62198390` = selection `mcd.cfg`
-  - loader exists, but it is **not** called on the current `0x62170b00` path
+  - loader exists, but it is **not** called on the current `InitClientDLL_BeginLoadingCharacterFlow`
+    (`0x62170b00`) path
 
-Exact current active `0x62170b00` call sequence on the `+0xec` path:
+Exact current active `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) call sequence on the `+0xec` path:
 - id `4`  -> `pi.cfg`  -> stack object `+0x74`
 - id `5`  -> `ai.cfg`  -> stack object `+0x84`
 - id `6`  -> `cs.cfg`  -> temporary stack slot `+0x94`
@@ -178,7 +180,7 @@ Exact current active `0x62170b00` call sequence on the `+0xec` path:
 
 Practical consequence:
 - the active selection-specific state8-input subset is now narrower than the earlier loose file list
-- for the currently proven `0x62170b00` path, the minimum active subset is:
+- for the currently proven `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) path, the minimum active subset is:
   - `hl.cfg`
   - `an.cfg`
   - `pi.cfg`
@@ -262,7 +264,7 @@ Current best narrow read:
   - the replacement/original low-bit gap is **not** explained by `0x621c9e20` saving from the wrong object instance
 
 Important caution:
-- on the currently proven `0x62170b00` path, `ai.cfg` and `cs.cfg` are loaded through different
+- on the currently proven `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) path, `ai.cfg` and `cs.cfg` are loaded through different
   stack objects (`+0x84` vs `+0x94`)
 - so this is a proven semantic correlation, not proof that both loaders mutate the exact same object instance
 - there is also an important save-order consequence from `PersistSelectionCfgCorpusIfDirty`:
@@ -294,9 +296,11 @@ Important caution:
     - and the later direct/shutdown `0x621966d0` save can therefore naturally persist the original reference pattern `{0,1,7,15,19}`
   - newer bounded-pass tightening on the broader later-save family:
     - static xrefs also show later direct-save candidates through `0x62198490` and `0x62197db0`
-    - and `0x62198490` is callable from `0x621707e0`, `0x62171600`, and `TermClientDLL`
+    - and `0x62198490` is callable from `ClientShell_LoginMediatorObserver_OnEvent (0x621707e0)`,
+      `ClientShell_RunLaterRuntimeTransitionHelper (0x62171600)`, and `TermClientDLL`
     - but on the bounded active original route we observed event sequence `0x10,0x0e,0x11,0x09,0x12,0x17,0x0b,0x18,0x0f` before the later tail
-    - and we did **not** stop on `0x62171600` or `0x62197db0` before entry / before exit
+    - and we did **not** stop on `ClientShell_RunLaterRuntimeTransitionHelper (0x62171600)` or
+      `0x62197db0` before entry / before exit
     - the next later direct-save-family hit after the in-run `0x62198a70 -> 0x621966d0 -> 0x62198970` sequence was instead `0x62198490` with backtrace through `TermClientDLL`
     - so for the currently bounded active route, shutdown remains the strongest concrete later-save explanation rather than a generic abstract later caller list
   - extra first-hit note:
@@ -321,7 +325,7 @@ This matters because:
 - `+0xec` is now better understood as a **selection/config-state handoff**, not just an opaque pointer call,
 - the client uses `+0x38` and `+0x40` while building path strings like `Profiles\%s\` and `Profiles\%s\%s_%X\`,
 - the `+0x40` descriptor builder maps a scratch-shaped arg7-derived request back into descriptor fields at payload `+3` (name pointer) and `+7` (selection id) for that `%s_%X` formatting path,
-- after `+0xec`, the current confirmed path inside `0x62170b00` just jumps to `0x62170f62`, calls `0x6216a1c0`, and then returns success to its caller at `0x620015fd`
+- after `+0xec`, the current confirmed path inside `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) just jumps to `0x62170f62`, calls `0x6216a1c0`, and then returns success to its caller at `0x620015fd`
 - and later crashes that still land at current `arg2 filteredArgv + 2` survive even after the replacement launcher copies that full `0xb4` object into stable mediator-owned storage.
 
 So the current late crash is no longer well-explained by a trivial `+0xec` lifetime bug alone, and the next likely gap is now the enclosing `InitClientDLL` logic **after** this already-confirmed-success helper returns.
@@ -422,6 +426,19 @@ Current stronger validation result:
 - that same block also stores the original masked low-24-bit selection id separately through the nearby `0x629e1c7c` / `0x620011e0` path before the scratch rewrite, which suggests the client expects both a persisted low-24-bit selection id and the later scratch-shaped `+0x40` lookup key
 - newer static work now identifies `0x629e1c7c` as a client-side console-int named `CreateCharacterWorldIndex`, not an anonymous scratch/global slot
 - important ordering correction: the user-visible `"Loading Character"` status text is pushed earlier at `client.dll:0x62170f2a`, immediately before the already-observed `arg6->+0xec` call at `0x62170f48`
+- an earlier direct-string status family also lives inside `client.dll:ClientShell_OnEngineInitialized` (`0x6216f060`), including:
+  - `Initializing Client Data Cache`
+  - `Initializing Inventory Manager`
+  - `Initializing Shortcut Manager`
+  - `Initializing Game Object Manager`
+  - `Initializing Character Animations`
+  - `Initializing Rules Subsystem`
+  - `Initializing Animation Tables`
+  - `Initializing Chat Manager`
+  - `Initializing Abilities`
+  - `Initializing FX`
+  - `Initializing Metro World`
+- replacement-side spdlog now mirrors that earlier engine-init text family retrospectively once the path reaches arg6 `+0xec`, and still mirrors the exact visible `"Loading Character"` text at the wrapper-facing `+0xec` consume point; this keeps the logging launcher-owned and avoids patching client.dll
 - so the visible loading-bar/status phase is consistent with the current `+0xec` evidence, but does **not** yet prove that the later direct `CreateCharacterWorldIndex` consumer at `0x62054cbd` has been reached
 - to avoid missing the next loading-path transition, the diagnostic mediator now also exposes/logs slot `+0x120`
 - a follow-up rerun after adding that slot still did **not** show any `+0x120` traffic before the same late crash (`crash_62`, still `EIP=0x003e5e8a`)
@@ -494,7 +511,7 @@ So the previous `-7` was not a generic mystery code.
 It was a concrete network-shell setup failure reached before arg7/arg8 matter.
 
 ### What arg7/arg8 do *not* explain
-The arg7/arg8-dependent path begins later at `0x620015e2 -> 0x62170b00`.
+The arg7/arg8-dependent path begins later at `0x620015e2 -> InitClientDLL_BeginLoadingCharacterFlow (0x62170b00)`.
 That path is not reached until after the earlier network-shell setup succeeds.
 
 So:

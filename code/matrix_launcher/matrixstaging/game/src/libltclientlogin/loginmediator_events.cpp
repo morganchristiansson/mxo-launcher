@@ -226,10 +226,18 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     // - client-facing `+0x170/+0x174` registration is now source-owned
     // - newer `mcd.cfg` persistence tightening makes one more event concretely valuable here:
     //   original client-side save family `0x62199ed0 -> 0x62198fa0 -> 0x62197830` is reached
-    //   from client event handler `0x621707e0` on event `0x0b` (and sibling `0x16`)
+    //   from client event handler `ClientShell_LoginMediatorObserver_OnEvent` (`0x621707e0`) on
+    //   event `0x0b` (and sibling `0x16`)
+    // - that same event-`0x0b` handler also pushes the visible text `"Waiting for Regionserver"`
     // - active existing-character path posts `0x0b` immediately after the state8 -> helper9 switch
     // - so keep the bridge narrow, but now include `0x0b` alongside the already-proven later
     //   observer-driven `0x18/0x0f` work
+    if (eventId == 0x0bu) {
+        DiagnosticLogClientLoadingStateText(
+            "Waiting for Regionserver",
+            "client.dll:ClientShell_LoginMediatorObserver_OnEvent event 0x0b");
+    }
+
     if (eventId == 0x0bu || eventId == 0x18u || eventId == 0x0fu) {
         const std::vector<void*> observers = registeredObservers;
         for (void* observer : observers) {

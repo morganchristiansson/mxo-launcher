@@ -48,3 +48,5 @@ uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
+void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
+void DiagnosticLogKnownClientEngineInitStatusTextsOnce(const char* source);

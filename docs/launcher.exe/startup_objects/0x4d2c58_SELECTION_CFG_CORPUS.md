@@ -140,7 +140,7 @@ Static proof now closes ten exact corpus pairs end-to-end:
        - but the actual writer tail inside `0x621966d0` switches back to **`ecx = 0x629ea4e8`** before calling `0x621c9e20`
        - the low-byte setters `0x621e0a10`, `0x621e3b50`, and the current isolated `0x621e1a70` callsites also all run with **`ecx = 0x629ea4e8`**
        - so the meaningful saved-slot source is the same live table object, not a separate save-only slot table
-     - important caution from the current `0x62170b00` path:
+     - important caution from the current `InitClientDLL_BeginLoadingCharacterFlow (0x62170b00)` path:
        - `ai.cfg` and `cs.cfg` are loaded through different stack objects there (`+0x84` vs `+0x94`)
        - so the close `+0x6dc/+0x6e0` structural resemblance is real, but it is not proof that both loaders are mutating the same object instance
      - newer save-order consequence from `PersistSelectionCfgCorpusIfDirty`:
@@ -366,7 +366,7 @@ New exact clarification on the old `cs.cfg` size mismatch:
       - `0x62197db0` per-id save helper
     - and `0x62198490` itself is reachable from:
       - `0x621707e0 = ClientShell_LoginMediatorObserver_OnEvent` event-side handler
-      - `0x62171600` later runtime helper
+      - `0x62171600 = ClientShell_RunLaterRuntimeTransitionHelper` later runtime helper
       - `0x6216a2f0` / `TermClientDLL`
     - but a fresh bounded original runtime pass on spawned `matrix.exe` now narrows the **active current-route** behavior further:
       - observed event sequence before entry/later tail was:
@@ -379,12 +379,13 @@ New exact clarification on the old `cs.cfg` size mismatch:
         - `0x0b`
         - `0x18`
         - `0x0f`
-      - on that pass we did **not** stop on `0x62171600` or `0x62197db0` before entering game / before the later exit
+      - on that pass we did **not** stop on `ClientShell_RunLaterRuntimeTransitionHelper (0x62171600)` or `0x62197db0` before entering game / before the later exit
       - the next later direct-save-family hit after the in-run `0x62198a70 -> 0x621966d0 -> 0x62198970` sequence was instead:
         - `0x62198490`
         - with backtrace showing `0x620011aa` / `TermClientDLL`
     - practical consequence:
-      - keep `0x621707e0/0x62171600/0x62197db0` as real static later-save candidates globally
+      - keep `ClientShell_LoginMediatorObserver_OnEvent (0x621707e0)` /
+        `ClientShell_RunLaterRuntimeTransitionHelper (0x62171600)` / `0x62197db0` as real static later-save candidates globally
       - but for the currently bounded active original route, shutdown `TermClientDLL -> 0x62198490 -> 0x621966d0` is still the strongest concrete later-save explanation for the saved `{0,1,7,15,19}` low-bit pattern
   - replacement-side comparison is now concrete enough to close the exact late-save question without reopening broad launcher work:
     - narrow source change in `src/resurrections.cpp` now follows positive `RunClientDLL` with `TermClientDLL`

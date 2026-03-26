@@ -293,7 +293,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0xcc` | sibling state8 section-`0x0b` dword getter; launcher getter now anchored as `0x41f1a0` returning owner dword `+0x145c` | medium |
 | `+0xd0` | sibling state8 section-`0x0b` small-string-like getter; launcher getter now anchored as `0x41f1b0` returning owner `+0x1460` | medium |
 | `+0xd4` | state9 follow-on client path (`0x620065e0`) fetches a 16-byte pointer here, then packages it through `0x62530630`; current best read = same launcher-owned Twofish seed/key family reused by state9 callback/blob work | medium |
-| `+0xd8` | arg7 high-byte / world-selection gate in `0x62170b00` | high |
+| `+0xd8` | arg7 high-byte / world-selection gate in `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) | high |
 | `+0xdc` | maps arg7-derived selection to string/resource in deeper init | medium |
 | `+0xec` | consumes assembled `0xb4` selection/config structure in deeper init | medium |
 | `+0xf4` | later runtime/profile paths treat return value like a broader profile / character-info block; launcher getter is now anchored as `0x41f1c0 = return owner + 0xf1c`, while the real producer is the earlier state8/load-character reply path `0x43f930` that materializes the broader `+0xf1c/+0xf48/+0xf88/+0x13f0` family later consumed by UI + `mcd.cfg` persistence | high |
@@ -328,7 +328,7 @@ Current practical note on `+0x120`:
 - newer static review places one `+0x120` use inside a broader loading-character path (`0x620547c0..0x62054eac`) that also directly reads client-side `CreateCharacterWorldIndex` current value `0x629e1cb0`
 - but the currently visible `"Loading Character"` status text on patched-client runs is already explained earlier by `client.dll:0x62170f2a`, immediately before the already-observed `+0xec` handoff at `0x62170f48`
 - and a follow-up diagnostic rerun with mediator slot `+0x120` instrumented still showed no `+0x120` traffic before the same late `EIP=0x003e5e8a` crash (`crash_62`)
-- newer post-`+0xec` static review also shows that the already-reached `0x62170b00` helper performs no further mediator calls after `+0xec` before returning success through `0x620015fd` / `0x62001634`
+- newer post-`+0xec` static review also shows that the already-reached `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) helper performs no further mediator calls after `+0xec` before returning success through `0x620015fd` / `0x62001634`
 - newer debugger + static review then resolved the old late `arg2` crash family to an early arg6 contract bug in the replacement launcher:
   - client auth-name chain `0x62001325..0x62001362` calls `+0x58`, `+0x60`, `+0x5c`, then does `add esp, 0x14`
   - that proves `+0x60` / `+0x5c` are caller-clean on this path
@@ -601,7 +601,7 @@ Newer patched-client reruns now push the mediator probe one step further than th
 `client.dll:0x62170e2a..0x62170f48` builds a stack object at `[ebp-0xbc]` and passes it to `arg6->+0xec`.
 The constructor at `client.dll:0x6211d3e0` zero-initializes that object through offset `+0xb0`, which fixes the current handoff size at **`0xb4` bytes**.
 
-The same `0x62170b00` family also calls `0x62195ff0` / `0x62195f00`, which format paths like:
+The same `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) family also calls `0x62195ff0` / `0x62195f00`, which format paths like:
 
 - `Profiles\%s\`
 - `Profiles\%s\%s_%X\`
@@ -695,7 +695,7 @@ At this point the best current read is:
   - it returns directly into current `arg2 filteredArgv` base instead
 - so the remaining mismatch is more likely tied to:
   - still-incomplete arg7 low-24-bit / selection-id state,
-  - another launcher-owned client-config expectation inside the same `0x62170b00` / `0x622a39d0` family,
+  - another launcher-owned client-config expectation inside the same `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) / `0x622a39d0` family,
   - or an internal `InitClientDLL` return/unwind corruption that still poisons control flow with the current `arg2` pointer before the launcher regains control.
 
 ## New diagnostic tightening after this pass
