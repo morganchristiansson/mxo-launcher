@@ -17,10 +17,7 @@ static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch g_MediatorState8Sect
 // - `+0x1452` is instead the neighboring `cl.cfg` gate used by arg6 `+0x88`
 static uint32_t __thiscall Mediator_HasState8PersistenceData8c(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const uint32_t ready = mediator && mediator->PostAuthMarginLoadingStateView().section0Flag13f6 ? 1u : 0u;
-    spdlog::info("MediatorStub::HasState8PersistenceData8c(+0x8c) -> {}", ready);
-    return ready;
+    return mxo::ltlogin::ILTLoginMediator::Default->HasState8PersistenceData8c();
 }
 
 // anchor: launcher.exe:0x41f170
@@ -28,8 +25,7 @@ static uint32_t __thiscall Mediator_HasState8PersistenceData8c(MinimalLoginMedia
 // Live original `client.dll:0x62198fa0` copies 0x20 bytes from this pointer into DAT_629ea67c.
 static void* __thiscall Mediator_GetState8PersistenceHeaderBc(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    return mediator ? const_cast<uint32_t*>(mediator->State8PersistenceF1cView().header2c.data()) : nullptr;
+    return const_cast<void*>(mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceHeaderBc());
 }
 
 // anchor: launcher.exe:0x41f180
@@ -37,8 +33,7 @@ static void* __thiscall Mediator_GetState8PersistenceHeaderBc(MinimalLoginMediat
 // Live original `client.dll:0x62198fa0` copies 0x465 bytes from this pointer into DAT_629ea648-backed state.
 static void* __thiscall Mediator_GetState8PersistenceBodyC0(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    return mediator ? const_cast<uint8_t*>(mediator->State8PersistenceF1cView().body6c.data()) : nullptr;
+    return const_cast<void*>(mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceBodyC0());
 }
 
 // anchor: launcher.exe:0x41aec0
@@ -46,19 +41,7 @@ static void* __thiscall Mediator_GetState8PersistenceBodyC0(MinimalLoginMediator
 // Live original `client.dll:0x62198fa0` asks for the optional overflow tail pointer plus out-length.
 static void* __thiscall Mediator_GetState8PersistenceOverflowC4(MinimalLoginMediatorStub* self, uint16_t* outLength) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    if (!mediator) {
-        if (outLength) {
-            *outLength = 0u;
-        }
-        return nullptr;
-    }
-
-    const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
-    if (outLength) {
-        *outLength = ownerState.state8Section0OverflowLength13f4;
-    }
-    return ownerState.state8Section0OverflowLength13f4 ? ownerState.state8Section0OverflowBuffer13f0 : nullptr;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceOverflowC4(outLength);
 }
 
 // anchor: launcher.exe:0x41f190

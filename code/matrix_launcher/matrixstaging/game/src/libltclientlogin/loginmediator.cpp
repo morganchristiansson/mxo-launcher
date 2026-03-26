@@ -319,6 +319,16 @@ static const CLTLoginMediator* ResolveActiveSelectionCfgCorpusOwner(const CLTLog
     return mediator;
 }
 
+static const CLTLoginMediator* ResolveActiveState8PersistenceOwner(const CLTLoginMediator* mediator) {
+    // Keep the wrapper-facing split explicit:
+    // - arg6 `ILTLoginMediator.Default` entrypoints may be invoked on the binder-owned stub object
+    // - the live `mcd.cfg` family still belongs to the active login-controller owner when one exists
+    if (const auto* loginController = DiagnosticAuthGetLoginController()) {
+        return loginController;
+    }
+    return mediator;
+}
+
 static uint32_t LogLiveSelectionCfgCorpusFlag(
     const char* slotLabel,
     const char* corpusLabel,
@@ -913,6 +923,19 @@ uint32_t CLTLoginMediator::HasLiveClCfg88() const {
         view);
 }
 
+uint32_t CLTLoginMediator::HasState8PersistenceData8c() const {
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const uint32_t ready =
+        (ownerState && ownerState->section0Flag13f6 != 0u) ? 1u : 0u;
+    spdlog::info(
+        "CLTLoginMediator::HasState8PersistenceData8c(+0x8c) -> {} [owner={} flag13f6={}]",
+        ready,
+        fmt::ptr(mediator),
+        ownerState ? static_cast<unsigned>(ownerState->section0Flag13f6) : 0u);
+    return ready;
+}
+
 uint32_t CLTLoginMediator::HasLiveCuiCfg90() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1103,6 +1126,55 @@ void* CLTLoginMediator::GetLiveCuiCfgB8(uint32_t* outLength) const {
         "owner+0x1454/0x1458",
         view,
         outLength);
+}
+
+const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const State8PersistenceF1cSnapshot* snapshot =
+        mediator ? &mediator->State8PersistenceF1cView() : nullptr;
+    const void* header = snapshot ? static_cast<const void*>(snapshot->header2c.data()) : nullptr;
+    spdlog::info(
+        "CLTLoginMediator::GetState8PersistenceHeaderBc(+0xbc) -> {} [owner={} first=0x{:08x} bytes=0x{:02x}]",
+        fmt::ptr(header),
+        fmt::ptr(mediator),
+        snapshot ? static_cast<unsigned>(snapshot->header2c[0]) : 0u,
+        snapshot ? static_cast<unsigned>(snapshot->header2c.size() * sizeof(uint32_t)) : 0u);
+    return header;
+}
+
+const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const State8PersistenceF1cSnapshot* snapshot =
+        mediator ? &mediator->State8PersistenceF1cView() : nullptr;
+    const void* body = snapshot ? static_cast<const void*>(snapshot->body6c.data()) : nullptr;
+    const uint32_t bodyWord00 =
+        snapshot ? ReadU32LE(snapshot->body6c.data()) : 0u;
+    spdlog::info(
+        "CLTLoginMediator::GetState8PersistenceBodyC0(+0xc0) -> {} [owner={} body00=0x{:08x} bytes=0x{:04x}]",
+        fmt::ptr(body),
+        fmt::ptr(mediator),
+        bodyWord00,
+        snapshot ? static_cast<unsigned>(snapshot->body6c.size()) : 0u);
+    return body;
+}
+
+void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const uint16_t length = ownerState ? ownerState->state8Section0OverflowLength13f4 : 0u;
+    void* buffer =
+        (ownerState && ownerState->state8Section0OverflowLength13f4 != 0u)
+            ? ownerState->state8Section0OverflowBuffer13f0
+            : nullptr;
+    if (outLength) {
+        *outLength = length;
+    }
+    spdlog::info(
+        "CLTLoginMediator::GetState8PersistenceOverflowC4(+0xc4) -> {} [owner={} length=0x{:04x}]",
+        fmt::ptr(buffer),
+        fmt::ptr(mediator),
+        static_cast<unsigned>(length));
+    return buffer;
 }
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4

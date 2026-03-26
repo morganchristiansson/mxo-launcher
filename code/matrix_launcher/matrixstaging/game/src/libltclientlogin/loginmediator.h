@@ -592,6 +592,9 @@ public:
     // +0x88
     // client.dll:0x62198e50 = `cl.cfg` live-corpus gate; launcher getter returns owner byte `+0x1452`
     uint32_t HasLiveClCfg88() const override;
+    // +0x8c
+    // client.dll:0x62198fa0 = `mcd.cfg` mediator-backed gate; launcher getter returns owner byte `+0x13f6`
+    uint32_t HasState8PersistenceData8c() const override;
     // +0x90
     // client.dll:0x621993d0 = `cui.cfg` live-corpus gate; launcher getter returns owner byte `+0x145a`
     uint32_t HasLiveCuiCfg90() const override;
@@ -625,6 +628,15 @@ public:
     // +0xb8
     // client.dll:0x621993d0 = `cui.cfg` live-corpus getter; launcher getter returns owner `+0x1454`, out-length `+0x1458`
     void* GetLiveCuiCfgB8(uint32_t* outLength) const override;
+    // +0xbc
+    // client.dll:0x62198fa0 = `mcd.cfg` mediator-backed header getter; launcher getter returns owner `+0xf48`
+    const void* GetState8PersistenceHeaderBc() const override;
+    // +0xc0
+    // client.dll:0x62198fa0 = `mcd.cfg` mediator-backed body getter; launcher getter returns owner `+0xf88`
+    const void* GetState8PersistenceBodyC0() const override;
+    // +0xc4
+    // client.dll:0x62198fa0 = `mcd.cfg` overflow-tail getter; launcher getter returns owner `+0x13f0`, out-length `+0x13f4`
+    void* GetState8PersistenceOverflowC4(uint16_t* outLength) const override;
     // +0xd8
     uint32_t GetArg7SelectionUpperBoundExclusive() const override;
     // +0xdc
@@ -1290,6 +1302,7 @@ private:
     State3SelectionContextInputSketch selectionContext0ecCopy_{};
     bool selectionContext0ecCopyValid_ = false;
     uint32_t selection0ecCount_ = 0;
+    // Wrapper-facing contiguous `mcd.cfg` snapshot backing for arg6 `+0xbc/+0xc0/+0xf4`.
     mutable State8PersistenceF1cSnapshot state8PersistenceF1c_{};
     mutable uint32_t profile0f4Count_ = 0;
     // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.

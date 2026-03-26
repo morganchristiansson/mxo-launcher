@@ -362,7 +362,7 @@ public:
     // +0x88
     virtual uint32_t HasLiveClCfg88() const = 0;
     // +0x8c
-    // virtual bool HasState8PersistenceData8c() const = 0;
+    virtual uint32_t HasState8PersistenceData8c() const = 0;
     // +0x90
     virtual uint32_t HasLiveCuiCfg90() const = 0;
     // +0x94
@@ -386,11 +386,11 @@ public:
     // +0xb8
     virtual void* GetLiveCuiCfgB8(uint32_t* outLength) const = 0;
     // +0xbc
-    // virtual bool HasState8Section11Dword145c() const = 0;
+    virtual const void* GetState8PersistenceHeaderBc() const = 0;
     // +0xc0
-    // virtual uint32_t GetState8Section11Dword145c() const = 0;
+    virtual const void* GetState8PersistenceBodyC0() const = 0;
     // +0xc4
-    const char* UnknownSlot50();
+    virtual void* GetState8PersistenceOverflowC4(uint16_t* outLength) const = 0;
     // +0xc8
     void* UnknownSlot51();
     // +0xcc
