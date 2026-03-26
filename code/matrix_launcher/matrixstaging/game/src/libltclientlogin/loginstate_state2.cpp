@@ -23,7 +23,11 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     // - gate on `0x41b490` / auth connection state `+0x34 == 2`
     // - if not connected yet, switch to helper/state 1 so its slot-3 body starts the auth
     //   transport connection
-    // - if already connected, continue into the launcher-owned auth bootstrap dispatcher path
+    // - if already connected, this state2 body owns the ready-side bootstrap entry: static
+    //   `0x439210` gathers the owner/bootstrap inputs and forwards them to `0x448050`
+    // - current source still keeps that deeper ready-side dispatcher bridge behind
+    //   `CLTLoginMediator::BeginAuthHandshake()` while the state-owned body is migrated out of
+    //   mediator code incrementally
     const uint32_t incomingUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
     if (incomingUpstreamPhaseCode != 1u) {
         cachedUpstreamOrArg_ = upstreamOrArg;
@@ -32,9 +36,11 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     if (!mediator->HasReadyAuthConnectionState2()) {
         spdlog::info(
-            "ROUTE CHECKPOINT: early-auth state2 -> state1 auth-connect incomingUpstream={} cachedUpstream={} currentState={}",
+            "ROUTE CHECKPOINT: early-auth state2 -> state1 auth-connect incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={}",
             fmt::ptr(upstreamOrArg),
+            static_cast<unsigned>(incomingUpstreamPhaseCode),
             fmt::ptr(cachedUpstreamOrArg_),
+            static_cast<unsigned>(cachedUpstreamPhaseCode),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         const uint32_t connectResult = mediator->BeginAuthConnectionViaState1Scaffold();
         spdlog::info(
@@ -49,7 +55,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
     }
 
     spdlog::info(
-        "ROUTE CHECKPOINT: early-auth state2 bootstrap dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={}",
+        "ROUTE CHECKPOINT: early-auth state2 ready-side bootstrap dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode));

@@ -1411,9 +1411,19 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     // anchor: launcher.exe:0x41c1f0
     // Writes the state3 selection/config snapshot into owner `+0xcc8/+0xcd0..+0xd7f`, then
     // switches to helper/state `8`.
+    // Fresh happy-path proof tightens the transition boundary too:
+    // - the early route reaches `0x41c1f0` with current helper state3
+    // - so the already-proven upstream chain is `state0 -> ProcessLoginRequest -> state2 ->
+    //   state1 -> state2 -> state3 -> 0x41c1f0`
     selectionContext0ecCopy_ = input;
     selectionContext0ecCopyValid_ = true;
     ++selection0ecCount_;
+    if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 3u) {
+        spdlog::info(
+            "ROUTE CHECKPOINT: early-auth state2 -> state3 -> 0x41c1f0 currentState={} slot=0x{:02x}",
+            currentState_->DebugName(),
+            static_cast<unsigned>(selectionContext0ecCopy_.slotOrSelectionIndex00 & 0xffu));
+    }
     spdlog::info(
         "CLTLoginMediator::PersistSelectionContextForState8 captured selection mirror [count={}] slot=0x{:02x} block04_0=0x{:08x} blockA4_3=0x{:08x}",
         selection0ecCount_,

@@ -342,7 +342,7 @@ bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
 void CLTLoginMediator::SetProcessLoginRequestAlternateState16BranchScaffold(bool enabled) {
     processLoginRequestAlternateState16BranchScaffold_ = enabled;
     spdlog::info(
-        "CLTLoginMediator::SetProcessLoginRequestAlternateState16BranchScaffold enabled={} (default observed happy path keeps this 0 for DAT_004d66ec==0)",
+        "CLTLoginMediator::SetProcessLoginRequestAlternateState16BranchScaffold enabled={} (default-off scaffold for DAT_004d66ec!=0 alternate state16/session family; proven happy path remains DAT_004d66ec==0)",
         enabled ? 1u : 0u);
 }
 
@@ -406,16 +406,27 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         sessionCallbackHelper65c_ ? 1u : 0u);
 
     CLTLoginState* const upstreamState = currentState_;
+    if (stateCode == 0u) {
+        spdlog::info(
+            "ROUTE CHECKPOINT: early-auth ProcessLoginRequest from state0 currentState={} string60Empty={} alternateState16Scaffold={} helper65cPresent={}",
+            upstreamState ? upstreamState->DebugName() : "<null>",
+            string60Empty ? 1u : 0u,
+            processLoginRequestAlternateState16BranchScaffold_ ? 1u : 0u,
+            sessionCallbackHelper65c_ ? 1u : 0u);
+    }
     if (!processLoginRequestAlternateState16BranchScaffold_) {
-        // Active original branch observed under WineDbg had `DAT_004d66ec == 0`, which means:
-        // - while current helper is still the initial idle/start state0, owner code handles submit
-        // - clear owner `+0xf4` (`+0x94 + 0x60`) through the small-string helper
-        // - switch helper state to `2`
-        // - let `0x41b450` immediately enter helper2 slot 3 with the old helper object
-        // This keeps state2 firmly on the post-submit side of the startup chain.
+        // Static + runtime now line up on the default happy path at `0x41ecd0`:
+        // - after copying the input block into owner `+0x94`, the code tests `DAT_004d66ec`
+        // - on `DAT_004d66ec == 0`, it clears owner `+0xf4` (`+0x94 + 0x60`) through
+        //   `0x407dd0`
+        // - then it calls `0x41b450(2)` while the current helper is still state0
+        // - the next state-owned body is therefore `0x439210` on helper/state 2 with upstream
+        //   state0
+        // This is the exact favored happy path and keeps submit ownership on the mediator/owner,
+        // not on state0.
         AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, nullptr, nullptr);
         spdlog::info(
-            "ROUTE CHECKPOINT: early-auth state0/owner-submit -> state2 (initial idle/start helper hands off after owner submit; DAT_004d66ec==0 branch) upstreamState={} clearedOwnerF4=1",
+            "ROUTE CHECKPOINT: early-auth state0 -> state2 via owner ProcessLoginRequest (favored DAT_004d66ec==0 happy path) upstreamState={} clearedOwnerF4=1",
             upstreamState ? upstreamState->DebugName() : "<null>");
         if (scaffoldState2_ != nullptr) {
             const uint32_t state2EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
@@ -436,8 +447,13 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     }
 
     // Default-off source-owned scaffolds for the alternate `DAT_004d66ec != 0` family.
-    // Keep them explicit for future non-happy / session-driven work without perturbing the proven
-    // active existing-character route.
+    // Static `0x41ecd0` now narrows that split more concretely than before:
+    // - if string60 is non-empty and helper65c is absent, switch to state16
+    // - if string60 is non-empty and helper65c is present, switch back to state2
+    // - if string60 is empty, optionally refresh owner `+0xf4` from helper65c `+0x18`, then
+    //   switch to state16
+    // Keep that family explicit but default-off so the proven `DAT_004d66ec == 0` happy path
+    // remains the exact favored route.
     if (!string60Empty) {
         if (sessionCallbackHelper65c_ == nullptr) {
             spdlog::info(
@@ -651,17 +667,19 @@ uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
 
 uint32_t CLTLoginMediator::BeginAuthHandshake() {
     // Address anchors:
-    // - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap
-    // - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch (upstream dispatcher)
+    // - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap / state2 slot 3
+    // - launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch (ready-side dispatcher)
     // - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (raw 0x06 send builder)
     // - launcher.exe:0x4474f0 = AuthBootstrap680_SendAuthRequest (raw 0x08 send builder)
     // - launcher.exe:0x448050 = branch site selecting raw 0x06 vs raw 0x08 path
     //
-    // Transitional note:
-    // - current scaffold still begins with an explicit 0x06 request step
-    // - original helper-state progression is not yet fully rebuilt around 0x448050
-    // The standalone auth probe is the current wire/reference implementation for the
-    // launcher-owned auth loop. Reuse the shared low-level runtime-style auth helpers here
+    // Static `0x439210` now narrows the ready-side ownership better:
+    // - state2 slot 3, not the mediator owner, owns the ready/not-ready split
+    // - on the ready side it gathers owner/bootstrap inputs and forwards them into `0x448050`
+    // - the current source still keeps that dispatcher bridge narrow here while the deeper
+    //   state2-owned bootstrap body is migrated out of mediator code incrementally
+    // The standalone auth probe remains the current wire/reference implementation for the
+    // launcher-owned auth loop, so reuse the shared low-level runtime-style auth helpers here
     // instead of keeping a second launcher-only packet path.
     expectedAuthRequestName_ = kMessageAsGetPublicKeyRequest;
     return SendAuthGetPublicKeyRequest();

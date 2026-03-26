@@ -47,6 +47,12 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediato
         // raw `0x09/0x0b` handling keeps seeing the same state-local continuation (`state8` on the
         // live path). Original `0x4390b0` also posts event `0` on this success side, but that
         // broader event/retry/error surface is still intentionally deferred.
+        if (cachedUpstreamPhaseCode == 2u) {
+            spdlog::info(
+                "ROUTE CHECKPOINT: early-auth state1 -> state2 auth-bootstrap resume cachedUpstream={} currentStateBeforeRestore={}",
+                fmt::ptr(cachedUpstreamOrArg_),
+                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        }
         mediator->SwitchHelperStateScaffold(cachedUpstreamPhaseCode, cachedUpstreamState);
     }
 
