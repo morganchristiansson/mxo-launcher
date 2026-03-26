@@ -100,7 +100,7 @@ $(BUILD_DIR)/matrixstaging/%.o: matrixstaging/%.cpp
 # Target depends on launcher objects and cryptopp (spdlog is order-only prerequisite)
 $(TARGET): $(LAUNCHER_OBJS) | $(SPDLOG_DIR) $(CRYPTOPP_LIB)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ $^ -Wl,--export-all-symbols -lversion -lws2_32 -lcryptopp -Lbuild
+	$(CXX) $(CXXFLAGS) -o $@ $^ -lversion -lws2_32 -lcryptopp -Lbuild
 
 # Download cryptopp and spdlog if they don't exist
 $(CRYPTOPP_DIR):
