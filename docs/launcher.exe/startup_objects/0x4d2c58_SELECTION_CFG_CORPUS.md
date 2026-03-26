@@ -365,7 +365,7 @@ New exact clarification on the old `cs.cfg` size mismatch:
       - `0x62198490 = PersistSelectionCfgCorpusFromEnableFlags`
       - `0x62197db0` per-id save helper
     - and `0x62198490` itself is reachable from:
-      - `0x621707e0` event-side handler
+      - `0x621707e0 = ClientShell_LoginMediatorObserver_OnEvent` event-side handler
       - `0x62171600` later runtime helper
       - `0x6216a2f0` / `TermClientDLL`
     - but a fresh bounded original runtime pass on spawned `matrix.exe` now narrows the **active current-route** behavior further:

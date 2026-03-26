@@ -36,7 +36,7 @@ Current best original chain:
   - `client.dll:0x6216f060`
 
 ### Event-side cfg-save handler
-- `client.dll:0x621707e0`
+- `client.dll:ClientShell_LoginMediatorObserver_OnEvent` (`0x621707e0`)
 - original live pass now proved event sequence reaching it includes:
   - `0x10`
   - `0x0e`

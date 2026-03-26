@@ -128,12 +128,13 @@ New live/runtime proof now tightens the client-facing registration side too:
   - old replacement-side names like `AttachStartupContext(+0x170)` and
     `ConsumeRuntimeDescriptor(+0x178)` were misleading for this late-runtime surface
 - concrete client-side proof now also shows one startup-era `+0x170` caller is already observer-like:
-  - `client.dll:0x62056585` pushes observer object `0x6298a760` into `+0x170`
+  - `client.dll:RsiLayoutsView_ctor` (`0x620557c0`) at `0x62056585` pushes observer object
+    `0x6298a760` into `+0x170`
 - replacement-side runtime progress now tightens the event-`0x18` callback path further too:
   - event-`0x18` observer callback now reaches and consumes arg6 `+0x10c`
   - it also now tolerates an empty arg6 `+0x118` late-entry list scaffold
   - after that callback, the replacement later reaches a second observer registration:
-    - `client.dll:0x62031136`
+    - `client.dll:LoadingAreaCommonLayoutView_ctor` (`0x62030d90`) at `0x62031136`
     - observer object `0x6298a5e8`
 
 Practical consequence:
