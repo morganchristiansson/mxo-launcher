@@ -488,6 +488,40 @@ static int FinishAndReturn(int code) {
     return code;
 }
 
+static bool PatchClientDllMxowrapImportToDbghelp() {
+    // Narrow startup-owned file patch from the current local proof:
+    // `client.dll.patched` only differs here by replacing `mxowrap.dll` with same-length
+    // `dbghelp.dll` at offset `0x978d76`.
+    static constexpr long kClientDllImportNameOffset = 0x978d76L;
+    static constexpr char kImportName[] = "dbghelp.dll";
+
+    FILE* file = std::fopen("client.dll", "r+b");
+    if (!file) {
+        spdlog::info("ERROR: unable to open client.dll for startup import patch");
+        return false;
+    }
+    if (std::fseek(file, kClientDllImportNameOffset, SEEK_SET) != 0) {
+        std::fclose(file);
+        spdlog::info(
+            "ERROR: failed to seek client.dll to startup import patch offset 0x{:x}",
+            static_cast<unsigned>(kClientDllImportNameOffset));
+        return false;
+    }
+    if (std::fwrite(kImportName, 1, sizeof(kImportName) - 1, file) != sizeof(kImportName) - 1) {
+        std::fclose(file);
+        spdlog::info(
+            "ERROR: failed to write client.dll startup import patch at 0x{:x}",
+            static_cast<unsigned>(kClientDllImportNameOffset));
+        return false;
+    }
+    std::fclose(file);
+    spdlog::info(
+        "DIAGNOSTIC: wrote client.dll startup import patch at 0x{:x} -> '{}'",
+        static_cast<unsigned>(kClientDllImportNameOffset),
+        kImportName);
+    return true;
+}
+
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase) {
     spdlog::info("launcher export SetMasterDatabase called: {}", fmt::ptr(pMasterDatabase));
 }
@@ -518,6 +552,9 @@ static bool LoadCresDLL() {
 }
 
 static bool LoadClientDLL() {
+    if (!PatchClientDllMxowrapImportToDbghelp()) {
+        return false;
+    }
     spdlog::info("=== Load client.dll ===");
     g_hClient = LoadLibraryA("client.dll");
     spdlog::info("client.dll handle: {}", fmt::ptr(g_hClient));
