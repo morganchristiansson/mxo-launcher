@@ -9,6 +9,7 @@ Keep auth ownership/flow details here.
 - `README.md`
 - `STATUS.md`
 - `../startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+- `../startup_objects/0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md`
 - `../startup_objects/0x4d6304_network_engine.md`
 
 ## Why this split exists
@@ -207,54 +208,16 @@ So the current post-auth blocker is now narrower than a generic “later world-l
 
 ## Earlier bootstrap/auth send narrowing
 
-Current strongest earlier launcher-owned bootstrap/auth chain:
-- corrected happy-path WineDbg from a stable EULA attach now proves the early helper sequence up to selection-context handoff as:
-  - `state0 -> ProcessLoginRequest -> state2 -> state1 -> state2 -> state3 -> 0x41c1f0`
-- concretely on that same run:
-  - `0x41b450(2)` switches `state0 -> state2`
-  - helper `+0x08 / 0x439210` is entered on state `2` with upstream state `0`
-  - `0x41b450(1)` switches `state2 -> state1`
-  - helper `+0x08 / 0x439090` is entered on state `1` with upstream state `2`
-  - `0x4390b0` later consumes cached upstream state `2`
-  - `0x41b450(2)` switches `state1 -> state2`
-  - `0x439210` is re-entered on state `2` with upstream state `1`
-  - `0x41b450(3)` switches `state2 -> state3`
-- inside that proven sequence, the strongest earlier launcher-owned bootstrap/auth lead remains:
-  - `0x41b450(2)` selects helper `0x4f7870`
-  - helper `+0x08 / 0x439210`
-  - `0x439210` gates on `0x41b490()` and then calls `0x448050`
-  - the now-closed active call shape there is:
-    - `ECX = owner + 0x680`
-    - arg1 = owner `+0x94 + 0x00`
-    - arg2 = owner `+0x94 + 0x20`
-    - arg3 = immediate `1`
-    - arg4 = first dword from the owner-side getter reached through `0x439265`
-    - arg5 = owner `+0x94 + 0x40`
-    - arg6 = owner `+0x94 + 0x50`
-    - arg7 = owner-side send-target result reached through `0x439258`
-    - arg8 = first dword / begin pointer from owner `+0x94 + 0x60`
-  - `0x448050` then concretely writes child:
-    - `+0x04 / +0x10 / +0x1c`
-    - `+0x28 / +0x2c`
-    - `+0x30 .. +0x3f`
-    - `+0x40 .. +0x4f`
-    - `+0x50`
-  - the branch at `0x44811e` is the low-byte test on child `+0xa0` (`mov al,[esi+0xa0] ; test al,al`)
-  - `0x448050` branches into:
-    - `0x447eb0` -> strongest current raw `0x06` / `AS_GetPublicKeyRequest` candidate
-    - `0x4474f0` -> strongest current raw `0x08` / `AS_AuthRequest` candidate
+The detailed earlier bootstrap/auth child chain has now been split out to:
+- `../startup_objects/0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md`
 
-Current best bootstrap anchors:
-- `launcher.exe:0x439210`
-- `launcher.exe:0x448050`
-- `launcher.exe:0x447eb0`
-- `launcher.exe:0x4474f0`
-- later material continuation: `launcher.exe:0x429b0`
+Keep only the auth/connection-path consequence here:
+- the proved early helper sequence still passes through state `2` / `0x439210`
+- that path reaches the separate owner `+0x680` bootstrap child at `0x448050`
+- which then chooses the raw `0x06` vs raw `0x08` send path
 
-The remaining unknown is now narrower than before:
-- what exact helper object lives at bootstrap `+0xa0`
-- what exact send-target object lives at bootstrap `+0x50`
-- and what the original concrete class/name semantics of owner `+0x94` are beyond its recovered auth/bootstrap role
+This doc no longer repeats the full child call shape / field layout / `+0xa0/+0xa4/+0xa8/+0xf4`
+family, because that is now canonicalized in the focused startup-object doc above.
 
 ## Current implementation-side milestone summary
 

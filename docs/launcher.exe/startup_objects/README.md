@@ -19,6 +19,9 @@ This folder documents launcher-owned globals and heap objects that are part of t
 - `0x4d2c58_RESOLUTION_MECHANISM.md`
   - how the launcher resolves and fills the `ILTLoginMediator.Default` pointer slot through registry state
 
+- `0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md`
+  - focused owner `+0x680` phase-2 auth/bootstrap child layout and lifecycle
+
 - `0x4d6304_network_engine.md`
   - heap-allocated launcher object built at startup and passed both to the mediator and to `InitClientDLL`
 

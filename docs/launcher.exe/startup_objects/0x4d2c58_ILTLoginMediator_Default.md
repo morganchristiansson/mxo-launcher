@@ -281,7 +281,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x44` | returns the current character-slot record object used by the later profile/save path; keep this wrapper-facing ABI object split explicit from the owner-side `+0x688[owner+0xcc8]` accessor family, and the replacement now owns the non-null scratch object on `CLTLoginMediator` instead of wrapper globals | high |
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
-| `+0x50` | later runtime distributed-object/RCC path calls this as a nullable pointer getter; `client.dll:0x625c86d0` converts non-null into flag `0x30`, and launcher-side static analysis now narrows it to the auth-reply-copied bootstrap block's `+0xa8` raw-`0x08` public-key worker: `owner +0x680 -> +0xf4 -> +0xa8` when present | high |
+| `+0x50` | later runtime distributed-object/RCC path calls this as a nullable pointer getter; `client.dll:0x625c86d0` converts non-null into flag `0x30`, and launcher-side static analysis now narrows it to `owner +0x680 -> +0xf4 -> +0xa8`; see `0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md` for the full child lifecycle | high |
 | `+0x58` | low-byte crashreporter prompt flag in early init logging/config path; client passes it as `FUN_6236fa40(..., flag)` and launcher stores it to crashreporter `PromptForSecurId` | high |
 | `+0x5c` | crashreporter username string getter on the early init chain; client path proves this single-arg wrapper-facing call shape is **caller-clean** | high |
 | `+0x60` | crashreporter password string getter on the early init chain; client path proves this single-arg wrapper-facing call shape is **caller-clean** | high |
@@ -317,12 +317,12 @@ New late-runtime crash consequence from the current in-game path:
   - convert null/non-null into `0` or `0x30`
 - so a null **function pointer** at arg6 `+0x50`, not merely a null return value, is enough to produce that crash shape
 - this makes arg6 `+0x50` a proven required late-runtime surface on the active in-game path
-- newer launcher-side bootstrap review now tightens the original producer chain behind that getter too:
-  - successful raw-`0x07` handling `0x47f50 = AuthBootstrap680_HandleGetPublicKeyReply` sets bootstrap byte `+0xa0 = 1`
-  - the same `0x47f50 -> 0x47780 = AuthBootstrap680_RebuildReplyPublicKeyWorkers` path ensures lazy `pubkey.dat` state at `+0xa4` and materializes the broader reply-public-key worker family at `+0xa8/+0xac`
-  - later challenge path `0x4429b0` writes the shared `+0x85` material family on the connection-side sibling object, which still matters as corroboration that this material family is reused outside the copied auth-reply block
-  - later auth-reply bootstrap handler `0x448140` validates marker `0x0136` through sibling worker `+0xac` and heap-copies the reply-derived `0x136` block into bootstrap `+0xf4`
-  - only after that does `0x41f370` expose the copied block's `+0xa8` worker and `0x41f3a0` expose its `+0x85` material family
+- the full child lifecycle behind this getter now has its own canonical home:
+  - `0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md`
+- arg6-facing consequence only:
+  - raw `0x07` success eventually prepares raw `0x08`
+  - auth-reply adoption later copies a `0x136` block into child `+0xf4`
+  - only then do `0x41f370` / `0x41f3a0` expose the `+0xa8` worker / `+0x85` material family through arg6
 - the replacement now mirrors that timing more closely by keeping `+0x50` null until successful auth-reply adoption instead of returning a permanent flat null stub
 
 Current practical note on `+0x120`:
@@ -465,18 +465,12 @@ Practical consequences:
    - second half starts from owner `+0xf18`
    - and its tail is materialized through shared `ValueNames` / `FeedbackSize` transform helpers
      fed from mediator `+0xd4 -> owner +0x1c + 0x85`
-5. a second launcher-side getter now also corroborates that `+0x85` family outside the immediate
-   state9 path:
-   - `0x41f3a0` returns `owner + 0x680 -> +0xf4 + 0x85` when present, else static fallback
-     - tighter current read of that `+0xf4` pointer:
-       - original child `+0xf4` = reply-derived copied `0x136` block from `0x448140`
-       - replacement source deliberately keeps only a narrowed shadow of the later exposed
-         `+0x85/+0xa8` suffix family there
-   - companion getter `0x41f3c0` returns the first dword of that same child's `+0xf8`
-     - newer ctor review of `0x41290` now shows `+0xf8` is itself a three-dword small-string object,
-       so the getter returns its begin/data pointer rather than a standalone heap pointer
-   - practical consequence: the `+0x85` field family now looks shared/reusable, not unique to one
-     state9-only object shape
+5. a second launcher-side getter still corroborates that the `+0x85` family is reused outside the
+   immediate state9 path:
+   - `0x41f3a0` exposes `owner + 0x680 -> +0xf4 + 0x85`
+   - `0x41f3c0` exposes the same child's `+0xf8` begin pointer
+   - for the full child `+0xf4/+0xf8` ownership/lifecycle, see:
+     - `0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md`
 6. newer active replacement progress now closes the go/no-go question on live `+0x18c` enough for
    the current state9 path:
    - string anchor `AssemblyTwofish`
@@ -881,3 +875,4 @@ It is much more likely a launcher-resolved `ILTLoginMediator.Default`-style inte
 
 See also:
 - `0x4d2c58_RESOLUTION_MECHANISM.md`
+- `0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md`

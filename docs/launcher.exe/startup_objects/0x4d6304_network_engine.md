@@ -1087,11 +1087,8 @@ Concise retained summary here:
   - `launcher.exe:0x439300 -> 0x41e500`
 - later auth-side sender anchor:
   - `launcher.exe:0x43b830` (`AS_GetWorldListRequest` path)
-- earlier bootstrap/auth chain anchors:
-  - `launcher.exe:0x439210`
-  - `launcher.exe:0x448050`
-  - `launcher.exe:0x447eb0`
-  - `launcher.exe:0x4474f0`
+- the separate phase-2 auth/bootstrap child entered from `0x439210` now has its own canonical doc:
+  - `0x4f78b8_AUTHBOOTSTRAP_CHILD_PLUS680.md`
 - server-config names/defaults and current auth/margin host/port handling are also now documented in `../auth/CONNECTION_PATHS.md`
 
 Important limitation:
