@@ -1180,7 +1180,11 @@ public:
     bool CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const;
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50
     // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
-    // bootstrap `+0xa8` field. Keep that extra level explicit in source too.
+    // child `+0xa8` worker slot.
+    // Current tighter read:
+    // - original child `+0xf4` = reply-derived copied `0x136` block materialized by `0x448140`
+    // - current source keeps only a narrowed shadow of that copied block's exposed `+0x85/+0xa8`
+    //   suffix family
     void* BootstrapRaw08AuxHandle50() const override;
     const char* CharacterNameBufferF1c() { return postAuthMarginLoadingState_.characterNameBufferF1c; }
     const std::array<uint32_t, 8>& CharacterFlagsF48() { return postAuthMarginLoadingState_.characterFlagsF48; }
@@ -1323,6 +1327,13 @@ private:
     // Separate phase-2 auth/bootstrap child rooted at owner `+0x680`.
     // Keep this as a distinct child/module mirror rather than folding its fields back into the
     // mediator body comments or generic mediator helpers.
+    // Current tightened high-value family inside that child:
+    // - `+0xa0` = auth-request-ready byte set by successful raw `0x07` handling and tested by
+    //   `0x448050`
+    // - `+0xa4` = lazy `pubkey.dat`-backed state primed by `0x447260/0x447c10`
+    // - `+0xa8` = raw `0x08` reply-public-key worker used by `0x4474f0`
+    // - `+0xf4` = original reply-derived copied `0x136` block; current source keeps only a
+    //   narrowed shadow of its later exposed `+0x85/+0xa8` suffix family
     AuthBootstrap680ChildSketch authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130

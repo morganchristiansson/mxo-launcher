@@ -26,8 +26,8 @@ namespace {
 // UNANCHORED: source-owned sidecar storage for the owner `+0x680` bootstrap child mirrors that we
 // do not want to inline into `CLTLoginMediator` layout yet.
 struct AuthBootstrap680ChildSidecarState {
-    AuthBootstrapReplyShadowF4Sketch fieldF4Shadow{};
-    uint32_t raw08AuxHandleAvailabilityMarker = 0u;
+    AuthBootstrapReplyCopyShadowF4Sketch authReplyCopyShadowF4{};
+    uint32_t raw08PublicKeyWorkerPresenceMarker = 0u;
 };
 
 static std::unordered_map<const CLTLoginMediator*, std::unique_ptr<AuthBootstrap680ChildSidecarState>>
@@ -204,10 +204,6 @@ static void StageAuthBootstrap680ChildFromPrepareCallShape(
     child.sendTarget50 = callShape.sendTarget50;
 }
 
-static uint8_t AuthBootstrap680BranchLowByteA0(const AuthBootstrap680ChildSketch& child) {
-    return static_cast<uint8_t>(reinterpret_cast<uintptr_t>(child.phase2HelperA0) & 0xffu);
-}
-
 }  // namespace
 
 // UNANCHORED: source-owned sidecar cleanup for the owner `+0x680` bootstrap child mirrors.
@@ -239,20 +235,11 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
     StageAuthBootstrap680ChildFromPrepareCallShape(child, callShape);
     child.currentPublicKeyId9C = mediator.authCurrentPublicKeyId_;
 
-    const bool helperPresent = child.phase2HelperA0 != nullptr;
-    const uint8_t helperA0LowByte = AuthBootstrap680BranchLowByteA0(child);
-    const bool originalLowByteBranchWouldSendRaw08 = helperA0LowByte != 0u;
-    if (helperPresent != originalLowByteBranchWouldSendRaw08) {
-        spdlog::warn(
-            "AuthBootstrap680_PrepareAndDispatch branch-shape mismatch helperA0={} helperA0LowByte=0x{:02x} sourceHelperPresent={} originalLowByteBranchWouldSendRaw08={}",
-            fmt::ptr(child.phase2HelperA0),
-            static_cast<unsigned>(helperA0LowByte),
-            helperPresent ? 1u : 0u,
-            originalLowByteBranchWouldSendRaw08 ? 1u : 0u);
-    }
+    const uint8_t authRequestReadyA0 = child.authRequestReadyA0;
+    const bool sendAuthRequestBranch = authRequestReadyA0 != 0u;
 
     spdlog::info(
-        "CLTLoginMediator::BeginAuthHandshake staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} helperA0={} helperA0LowByte=0x{:02x} branch={}",
+        "CLTLoginMediator::BeginAuthHandshake staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={}",
         fmt::ptr(callShape.ownerSource94),
         static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
@@ -263,16 +250,15 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
         static_cast<unsigned>(child.launcherVersion2C),
         static_cast<unsigned>(child.currentPublicKeyId9C),
         fmt::ptr(child.sendTarget50),
-        fmt::ptr(child.phase2HelperA0),
-        static_cast<unsigned>(helperA0LowByte),
-        helperPresent ? "raw0x08/auth-request" : "raw0x06/get-public-key");
+        static_cast<unsigned>(authRequestReadyA0),
+        sendAuthRequestBranch ? "raw0x08/auth-request" : "raw0x06/get-public-key");
 
-    if (helperPresent) {
+    if (sendAuthRequestBranch) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
         if (!mediator.lastAuthPublicKeyReply_.valid || !mediator.lastAuthPublicKeyReply_.hasEmbeddedPublicKey) {
             spdlog::warn(
-                "CLTLoginMediator::BeginAuthHandshake expected auth-request branch from owner+0x680 child but no valid cached AS_GetPublicKeyReply is present helperA0={}",
-                fmt::ptr(child.phase2HelperA0));
+                "CLTLoginMediator::BeginAuthHandshake expected auth-request branch from owner+0x680 child but no valid cached AS_GetPublicKeyReply is present authRequestReadyA0=0x{:02x}",
+                static_cast<unsigned>(authRequestReadyA0));
             return 0u;
         }
         return SendAuthRequestFromReply(mediator, mediator.lastAuthPublicKeyReply_);
@@ -284,9 +270,10 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator) {
-    const auto* fieldF4 =
-        static_cast<const AuthBootstrapReplyShadowF4Sketch*>(mediator.authBootstrapChild680_.fieldF4);
-    void* value = fieldF4 ? fieldF4->raw08AuxHandleA8 : nullptr;
+    const auto* authReplyCopyShadowF4 =
+        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
+            mediator.authBootstrapChild680_.authReplyCopyShadowF4);
+    void* value = authReplyCopyShadowF4 ? authReplyCopyShadowF4->raw08PublicKeyWorkerA8 : nullptr;
 
     if (!mediator.bootstrapRaw08AuxHandle50Logged_ || mediator.lastBootstrapRaw08AuxHandle50_ != value) {
         spdlog::info(
@@ -302,9 +289,11 @@ void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& med
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
 bool AuthBootstrap680Ops::HasBootstrapRaw08AuxHandle54(const CLTLoginMediator& mediator) {
-    const auto* fieldF4 =
-        static_cast<const AuthBootstrapReplyShadowF4Sketch*>(mediator.authBootstrapChild680_.fieldF4);
-    const bool present = fieldF4 && fieldF4->raw08AuxHandleA8 != nullptr;
+    const auto* authReplyCopyShadowF4 =
+        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
+            mediator.authBootstrapChild680_.authReplyCopyShadowF4);
+    const bool present =
+        authReplyCopyShadowF4 && authReplyCopyShadowF4->raw08PublicKeyWorkerA8 != nullptr;
     spdlog::debug(
         "CLTLoginMediator::HasBootstrapRaw08AuxHandle54(+0x54) -> {}",
         present ? 1u : 0u);
@@ -386,7 +375,7 @@ uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
     mediator.authRequestSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
         spdlog::info(
-            "DIAGNOSTIC: launcher-owned auth built AS_AuthRequest publicKeyId={} loginType={} keySize={} blobLen={} usernameLengthField={} usedReplyPublicKey={} keyConfigMd5Len={} uiConfigMd5Len={} childSendTarget50={} childRaw08AuxHandleA8={} childString04Len={} childString10Len={} childString1CLen={}",
+            "DIAGNOSTIC: launcher-owned auth built AS_AuthRequest publicKeyId={} loginType={} keySize={} blobLen={} usernameLengthField={} usedReplyPublicKey={} keyConfigMd5Len={} uiConfigMd5Len={} childSendTarget50={} childRaw08PublicKeyWorkerA8={} childString04Len={} childString10Len={} childString1CLen={}",
             static_cast<unsigned>(reply.publicKeyId),
             static_cast<unsigned>(requestLayout.loginType),
             static_cast<unsigned>(reply.keySize),
@@ -396,7 +385,7 @@ uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
             static_cast<unsigned>(buildResult.keyConfigMd5Bytes.size()),
             static_cast<unsigned>(buildResult.uiConfigMd5Bytes.size()),
             fmt::ptr(child.sendTarget50),
-            fmt::ptr(child.raw08AuxHandleA8),
+            fmt::ptr(child.raw08PublicKeyWorkerA8),
             static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
             static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
             static_cast<unsigned>(SmallStringMirrorLength(child.string1C)));
@@ -524,12 +513,13 @@ void AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLog
     std::fill(child.challengeMaterial85.begin(), child.challengeMaterial85.end(), 0u);
     child.feedbackTransformLarge94 = nullptr;
     child.feedbackTransformSmall98 = nullptr;
-    child.phase2HelperA0 = nullptr;
-    child.lazyRaw06StateA4 = nullptr;
-    child.raw08AuxHandleA8 = nullptr;
+    child.authRequestReadyA0 = 0u;
+    child.paddingA1ToA3 = {};
+    child.lazyPubkeyDatStateA4 = nullptr;
+    child.raw08PublicKeyWorkerA8 = nullptr;
     child.fieldAC = nullptr;
     child.fieldF0 = nullptr;
-    child.fieldF4 = nullptr;
+    child.authReplyCopyShadowF4 = nullptr;
     ClearSmallStringMirror(child.stringF8);
     child.fieldFC = nullptr;
     child.field100 = nullptr;
@@ -542,19 +532,20 @@ void AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLog
 }
 
 // UNANCHORED: source-owned owner+0x680 update after parsed `AS_GetPublicKeyReply`.
-// Current source uses one sidecar-backed non-zero marker to stand in for the original child
-// `+0xa0/+0xa8/+0xac` helper family so the later ready-side `+0xa0` branch selects raw `0x08`.
+// Current source sets the original `+0xa0` ready byte directly and uses one sidecar-backed non-zero
+// marker as a stand-in for the still-untyped original `+0xa8/+0xac` worker family.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
     CLTLoginMediator& mediator,
     const mxo::auth::GetPublicKeyReply& reply) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     child.currentPublicKeyId9C = reply.publicKeyId;
+    child.authRequestReadyA0 = 1u;
 
     AuthBootstrap680ChildSidecarState& sidecar = MutableAuthBootstrap680ChildSidecar(&mediator);
-    sidecar.raw08AuxHandleAvailabilityMarker = (reply.publicKeyId != 0u) ? reply.publicKeyId : 1u;
-    child.phase2HelperA0 = &sidecar.raw08AuxHandleAvailabilityMarker;
-    child.raw08AuxHandleA8 = &sidecar.raw08AuxHandleAvailabilityMarker;
-    child.fieldAC = &sidecar.raw08AuxHandleAvailabilityMarker;
+    sidecar.raw08PublicKeyWorkerPresenceMarker =
+        (reply.publicKeyId != 0u) ? reply.publicKeyId : 1u;
+    child.raw08PublicKeyWorkerA8 = &sidecar.raw08PublicKeyWorkerPresenceMarker;
+    child.fieldAC = &sidecar.raw08PublicKeyWorkerPresenceMarker;
 }
 
 // UNANCHORED: source-owned owner+0x680 challenge-material update after raw `0x0a` build/send.
@@ -565,36 +556,38 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseSc
         CopyPrefix16(buildResult.decryptedChallengeBytes);
 }
 
-// UNANCHORED: source-owned owner+0x680 auth-reply shadow update for later `+0x50/+0x5c` exposure.
+// UNANCHORED: source-owned owner+0x680 auth-reply copy-shadow update for later `+0x50/+0x5c`
+// exposure. Original child `+0xf4` points at a reply-derived copied `0x136` block; current source
+// keeps only the narrower exposed `+0x85/+0xa8` suffix family shadow there.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
-    child.fieldF4 = nullptr;
+    child.authReplyCopyShadowF4 = nullptr;
 
     AuthBootstrap680ChildSidecarState* sidecar = FindAuthBootstrap680ChildSidecar(&mediator);
     if (sidecar) {
-        sidecar->fieldF4Shadow = {};
+        sidecar->authReplyCopyShadowF4 = {};
     }
 
     if (reply.isErrorReply || !reply.valid || !reply.hasAuthDataMarker ||
-        reply.authDataMarker != 0x0136u || child.raw08AuxHandleA8 == nullptr) {
+        reply.authDataMarker != 0x0136u || child.raw08PublicKeyWorkerA8 == nullptr) {
         return;
     }
 
     AuthBootstrap680ChildSidecarState& materializedSidecar =
         MutableAuthBootstrap680ChildSidecar(&mediator);
-    materializedSidecar.fieldF4Shadow.material85 = child.challengeMaterial85;
-    materializedSidecar.fieldF4Shadow.raw08AuxHandleA8 = child.raw08AuxHandleA8;
-    child.fieldF4 = &materializedSidecar.fieldF4Shadow;
+    materializedSidecar.authReplyCopyShadowF4.material85 = child.challengeMaterial85;
+    materializedSidecar.authReplyCopyShadowF4.raw08PublicKeyWorkerA8 = child.raw08PublicKeyWorkerA8;
+    child.authReplyCopyShadowF4 = &materializedSidecar.authReplyCopyShadowF4;
 
     spdlog::info(
-        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold challengeMaterial85='{}' raw08AuxHandle={} authDataMarker=0x{:04x} childStringF8Begin={} childStringF8Len={}",
+        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold challengeMaterial85='{}' raw08PublicKeyWorker={} authDataMarker=0x{:04x} childStringF8Begin={} childStringF8Len={}",
         BuildHexPreview(
-            materializedSidecar.fieldF4Shadow.material85.data(),
-            materializedSidecar.fieldF4Shadow.material85.size(),
-            materializedSidecar.fieldF4Shadow.material85.size()),
-        fmt::ptr(materializedSidecar.fieldF4Shadow.raw08AuxHandleA8),
+            materializedSidecar.authReplyCopyShadowF4.material85.data(),
+            materializedSidecar.authReplyCopyShadowF4.material85.size(),
+            materializedSidecar.authReplyCopyShadowF4.material85.size()),
+        fmt::ptr(materializedSidecar.authReplyCopyShadowF4.raw08PublicKeyWorkerA8),
         static_cast<unsigned>(reply.authDataMarker),
         fmt::ptr(SmallStringMirrorDataOrEmpty(child.stringF8)),
         static_cast<unsigned>(SmallStringMirrorLength(child.stringF8)));

@@ -21,21 +21,25 @@ struct AuthBootstrap680SmallStringMirror {
     std::string owned;
 };
 
-struct AuthBootstrapReplyShadowF4Sketch {
-    // Bounded source-owned mirror of the validated auth-reply heap block copied into the
-    // phase-2 bootstrap child `+0xf4` by `0x448140`.
+struct AuthBootstrapReplyCopyShadowF4Sketch {
+    // Source-owned shadow of the original reply-derived `0x136` heap block copied into child
+    // `+0xf4` by `0x448140`.
     //
-    // Current strongest anchored fields inside that copied `0x136` block are exactly the two
-    // later owner-vtable exposures we care about on the active runtime path:
+    // Important ownership split:
+    // - original child `+0xf4` points at the full copied block
+    // - current replacement source intentionally narrows that to the later exposed suffix family
+    //   we actually consume on the live runtime path
+    //
+    // Current strongest anchored fields inside that copied block are:
     // - `+0x85 .. +0x94` = shared 16-byte challenge/material family
-    // - `+0xa8`         = raw-`0x08` aux-handle / availability family
+    // - `+0xa8`         = raw-`0x08` public-key worker family
     std::array<uint8_t, 0x85> prefix00{};
     std::array<uint8_t, 16> material85{};
     std::array<uint8_t, 0x13> gap95ToA7{};
-    void* raw08AuxHandleA8 = nullptr;
+    void* raw08PublicKeyWorkerA8 = nullptr;
 };
-static_assert(offsetof(AuthBootstrapReplyShadowF4Sketch, material85) == 0x85);
-static_assert(offsetof(AuthBootstrapReplyShadowF4Sketch, raw08AuxHandleA8) == 0xa8);
+static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, material85) == 0x85);
+static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, raw08PublicKeyWorkerA8) == 0xa8);
 
 struct AuthBootstrap680ChildSketch {
     // Current best source-owned mirror of the separate phase-2 auth/bootstrap child allocated by:
@@ -84,17 +88,18 @@ struct AuthBootstrap680ChildSketch {
     void* feedbackTransformLarge94 = nullptr;    // original child `+0x94`; allocated in `0x4474f0`
     void* feedbackTransformSmall98 = nullptr;    // original child `+0x98`; allocated in `0x4474f0`
     uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
-    void* phase2HelperA0 = nullptr;              // original child `+0xa0`; `0x44811e` does `mov al,[this+0xa0] / test al,al` before selecting raw `0x06` vs raw `0x08`
-    void* lazyRaw06StateA4 = nullptr;            // original child `+0xa4`; lazy raw-`0x06` helper owned by `0x447eb0`
-    void* raw08AuxHandleA8 = nullptr;            // original child `+0xa8`; post-`0x07` availability/worker family used by `0x4474f0`
-    void* fieldAC = nullptr;                     // original child `+0xac`; sibling helper/object family still open
+    uint8_t authRequestReadyA0 = 0;              // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
+    std::array<uint8_t, 3> paddingA1ToA3{};      // original child `+0xa1 .. +0xa3`
+    void* lazyPubkeyDatStateA4 = nullptr;        // original child `+0xa4`; lazy `pubkey.dat`-backed state built by `0x447260/0x447c10` and reused by `0x447eb0/0x447f50`
+    void* raw08PublicKeyWorkerA8 = nullptr;      // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x47780` and consumed by `0x4474f0`
+    void* fieldAC = nullptr;                     // original child `+0xac`; sibling reply-validation/transform family still open
 
     // Original child `+0xb0 .. +0xeb` is still unresolved in current source.
     std::array<uint8_t, 0x3c> opaqueStateB0ToEb{};
 
     uint32_t stateFlagEC = 1;                    // original child `+0xec`; seeded by `0x445500`
     void* fieldF0 = nullptr;                     // original child `+0xf0`
-    void* fieldF4 = nullptr;                     // original child `+0xf4`; points at `AuthBootstrapReplyShadowF4Sketch` when materialized
+    void* authReplyCopyShadowF4 = nullptr;       // original child `+0xf4`; original points at the reply-derived copied `0x136` block, current source keeps a narrowed `AuthBootstrapReplyCopyShadowF4Sketch` shadow there
     AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8`; small-string family whose begin pointer is surfaced by owner vtable `+0x60 / 0x41f3c0`
     void* fieldFC = nullptr;                     // original child `+0xfc`
     void* field100 = nullptr;                    // original child `+0x100`

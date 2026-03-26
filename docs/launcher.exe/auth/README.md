@@ -304,6 +304,11 @@ Newest Ghidra-backed tightening there now includes:
 - the three small-string destinations at bootstrap `+0x04 / +0x10 / +0x1c`
 - the fixed writes to bootstrap `+0x28 / +0x2c / +0x30..+0x4f / +0x50`
 - the ctor-backed tail shape from `0x45500` / `0x41290`
+- a tighter current read of the later `+0xa0/+0xa4/+0xa8/+0xf4` family too:
+  - `+0xa0` = auth-request-ready byte set by successful raw-`0x07` handling `0x47f50 = AuthBootstrap680_HandleGetPublicKeyReply`
+  - `+0xa4` = lazy `pubkey.dat`-backed state primed by `0x447260 = AuthBootstrap680_CreateLazyPubkeyDatState` and `0x447c10 = AuthBootstrap680_InitializeLazyPubkeyDatState`
+  - `+0xa8` = raw-`0x08` reply-public-key worker materialized by `0x47f50 -> 0x47780 = AuthBootstrap680_RebuildReplyPublicKeyWorkers` and consumed by `0x4474f0`
+  - `+0xf4` = original reply-derived copied `0x136` block from `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`; current source keeps only a narrowed shadow of that copied block's exposed `+0x85/+0xa8` suffix family
 
 Keep detailed packet/auth-loop behavior here in `docs/launcher.exe/auth/` and keep the concrete `0x448050` owner-object field recovery in the startup-object doc above.
 
