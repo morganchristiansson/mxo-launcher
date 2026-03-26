@@ -1418,9 +1418,48 @@ const char* CLTLoginMediator::GetSlotRecordHeapStringByIndex(uint8_t slotIndex) 
 }
 
 // anchor: launcher.exe:0x41f310
-void* CLTLoginMediator::GetSessionCallbackHelper65c() const {
+SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() const {
     // Tiny owner-vtable getter used by the later session-callback helper family.
     return sessionCallbackHelper65c_;
+}
+
+// anchor: launcher.exe:0x41f2c0
+RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetRouteDescriptor30() {
+    // Keep the wrapper-facing arg6 `+0x10c` small-string object explicit.
+    // The owner-side route-text resolution still lives in `ResolveMarginRouteDescriptor()`.
+    const char* routeDescriptor = ResolveMarginRouteDescriptor();
+    routeDescriptor30Owned_ = routeDescriptor ? routeDescriptor : "";
+    routeDescriptor30_.begin = routeDescriptor30Owned_.c_str();
+    routeDescriptor30_.current = routeDescriptor30_.begin + routeDescriptor30Owned_.size();
+    routeDescriptor30_.capacity = routeDescriptor30_.current;
+
+    spdlog::info(
+        "CLTLoginMediator::GetRouteDescriptor30(+0x10c) -> begin={} current={} text='{}'",
+        fmt::ptr(routeDescriptor30_.begin),
+        fmt::ptr(routeDescriptor30_.current),
+        routeDescriptor30Owned_.empty() ? "<empty>" : routeDescriptor30Owned_.c_str());
+    return &routeDescriptor30_;
+}
+
+// anchor: launcher.exe:0x41af50
+LateEntryList1470VectorLikeSketch* CLTLoginMediator::GetLateEntryList1470() {
+    // Keep the wrapper-facing arg6 `+0x118` vector-like object explicit instead of leaving this
+    // scratch state in the ABI shell.
+    const LateEntryList1470EntrySketch* begin =
+        lateEntryList1470Entries_.capacity() ? lateEntryList1470Entries_.data() : nullptr;
+    lateEntryList1470_.begin = begin;
+    lateEntryList1470_.current = begin ? (begin + lateEntryList1470Entries_.size()) : nullptr;
+    lateEntryList1470_.capacity = begin ? (begin + lateEntryList1470Entries_.capacity()) : nullptr;
+
+    spdlog::info(
+        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> begin={} current={} capacity={} entryCount={} entryCapacity={}{}",
+        fmt::ptr(lateEntryList1470_.begin),
+        fmt::ptr(lateEntryList1470_.current),
+        fmt::ptr(lateEntryList1470_.capacity),
+        static_cast<unsigned>(lateEntryList1470Entries_.size()),
+        static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
+        lateEntryList1470Entries_.empty() ? " (empty scaffold)" : "");
+    return &lateEntryList1470_;
 }
 
 // anchor: launcher.exe:0x41f320
@@ -1554,11 +1593,21 @@ uint32_t CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     if (helper == nullptr) {
         return 0u;
     }
+    return InvokeSessionCallbackHelper65cVtable4IfPresent();
+}
+
+uint32_t CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent() {
+    SessionCallbackHelper65cSketch* helper = sessionCallbackHelper65c_;
+    if (helper == nullptr) {
+        return 0u;
+    }
 
     if (helper->flag2D != 0) {
         spdlog::info(
-            "DIAGNOSTIC: session helper GameSessionID commit deferred by helper flag2D helperString18='%s'",
-            helper->string18.empty() ? "<empty>" : helper->string18.c_str());
+            "CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent deferred helper={} helperString18='{}' flag2D=0x{:02x}",
+            fmt::ptr(helper),
+            helper->string18.empty() ? "<empty>" : helper->string18.c_str(),
+            static_cast<unsigned>(helper->flag2D));
         return 0u;
     }
 
@@ -1566,10 +1615,22 @@ uint32_t CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     helper->field24 = 0;
 
     spdlog::info(
-        "DIAGNOSTIC: committed helper GameSessionID owner660=0x{:08x} GameSessionID='{}'",
+        "CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent helper={} owner660=0x{:08x} GameSessionID='{}'",
+        fmt::ptr(helper),
         sharedMarginPacketField660_,
         gameSessionId664_.empty() ? "<empty>" : gameSessionId664_);
     return 1u;
+}
+
+// anchor: launcher.exe:0x4202c0
+void CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4() {
+    if (sessionCallbackHelper65c_ == nullptr) {
+        spdlog::debug(
+            "CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4(+0x13c) skipped (no helper)");
+        return;
+    }
+
+    (void)InvokeSessionCallbackHelper65cVtable4IfPresent();
 }
 
 // source-owned shared helper for `CLTLoginState_State18` slot 3 / `0x421a50`

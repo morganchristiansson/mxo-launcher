@@ -289,7 +289,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0xf4` | later runtime/profile paths treat return value like a broader profile / character-info block; launcher getter is now anchored as `0x41f1c0 = return owner + 0xf1c`, while the real producer is the earlier state8/load-character reply path `0x43f930` that materializes the broader `+0xf1c/+0xf48/+0xf88/+0x13f0` family later consumed by UI + `mcd.cfg` persistence | high |
 | `+0x120` | later loading-character path passes a large stack-built state object here before UI teardown / transition work | medium |
 | `+0x124` | wrapper-facing `ProvideStartupTriple`: accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
-| `+0x13c` | `WaitForEvent` loop pump; calls launcher owner helper `+0x65c` vtable `+0x04` when present (`0x4202c0`) | medium |
+| `+0x13c` | `WaitForEvent` loop pump; calls launcher owner helper `+0x65c` vtable `+0x04` when present (`0x4202c0`); replacement wrapper minimization now forwards directly into a `CLTLoginMediator` owner method | medium |
 | `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
 | `+0x170` | registers an observer/listener object into launcher owner `+0x674` (`0x41ddb0`) | high |
 | `+0x174` | unregisters an observer/listener object from launcher owner `+0x674` (`0x41dde0`) | high |
@@ -492,8 +492,15 @@ Later original-launcher runtime + vtable proof materially corrected the old read
   (`0x41ddb0`), not as a generic startup-context adoption slot
 - `+0x174` is now better read as **observer/listener unregistration** (`0x41dde0`)
 - `+0x178` is now better read as **return owner status/result dword `+0x80`** (`0x41f240`)
+- `+0x10c` is now better read as the wrapper-facing small-string-like getter over owner `+0x30`
+  (`0x41f2c0`)
+- `+0x118` is now better read as the wrapper-facing vector-like getter over owner `+0x1470`
+  (`0x41af50`)
 - `+0x13c` is now better read as the `WaitForEvent` loop pump that invokes owner helper `+0x65c`
   vtable `+0x04` when present (`0x4202c0`)
+- replacement wrapper minimization now keeps the ABI-shaped `+0x10c/+0x118` objects and the
+  `+0x13c` action on `CLTLoginMediator`, while `src/launcher_mediator_abi.cpp` only forwards those
+  slots through `g_LoginMediatorVtable`
 - the old scaffold log names `AttachStartupContext`, `AttachRuntimeObject(+0x174)`, and
   `ConsumeRuntimeDescriptor` are historical and misleading for these late-runtime slots
 

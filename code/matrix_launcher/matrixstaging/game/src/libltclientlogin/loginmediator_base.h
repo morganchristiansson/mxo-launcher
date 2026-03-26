@@ -32,11 +32,41 @@ struct SlotRecordState004b5328 {
     uint8_t status0b = 0;
     uint16_t worldId0c = 0;
 };
+struct RouteDescriptor30SmallStringLikeSketch {
+    // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
+    // Wrapper-facing late-runtime object shape returned through arg6 `+0x10c`.
+    // Current client-side evidence only consumes the first two dwords as a small-string
+    // begin/current pair, but keep the third dword explicit because the original getter returns a
+    // full 3-dword string-like object at owner `+0x30`.
+    const char* begin = nullptr;
+    const char* current = nullptr;
+    const char* capacity = nullptr;
+};
+
+struct LateEntryList1470EntrySketch {
+    // anchor: launcher.exe:0x41af50 / owner vtable `+0x118`
+    // Current best late-runtime read is only the fixed 12-byte entry width.
+    // Keep the payload words structural until stronger evidence names them.
+    uint32_t field00 = 0;
+    uint32_t field04 = 0;
+    uint32_t field08 = 0;
+};
+
+struct LateEntryList1470VectorLikeSketch {
+    // anchor: launcher.exe:0x41af50 / owner vtable `+0x118`
+    // Wrapper-facing late-runtime object shape returned through arg6 `+0x118`.
+    // The observer callback reads this as a begin/current/capacity triple over 12-byte entries.
+    const LateEntryList1470EntrySketch* begin = nullptr;
+    const LateEntryList1470EntrySketch* current = nullptr;
+    const LateEntryList1470EntrySketch* capacity = nullptr;
+};
+
 struct SessionCallbackHelper65cSketch {
     // Current best source-owned mirror of the lazy helper at owner `+0x65c`.
     // Concrete chain now in scope:
     // - owner vtable `+0x130` / `0x41f310` returns this helper
     // - owner vtable `+0x134` / `0x420d00` lazy-allocates it through `0x420ca0`
+    // - owner vtable `+0x13c` / `0x4202c0` pumps helper vtable `+0x04` when present
     // - helper `+0x18` is a small-string object
     // - `0x421a50` refreshes that helper string from owner `+0x94 + 0x60`
     // - `0x420e70` then copies helper `+0x18` into owner `+0x664`
@@ -317,13 +347,13 @@ public:
     // +0x108
     // virtual uint8_t GetDescriptorLowNibble1fByIndex(uint32_t index) const = 0;
     // +0x10c
-    // virtual void* GetRouteDescriptor30() const = 0;
+    virtual RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() = 0;
     // +0x110
     void UnknownSlot70();
     // +0x114
     void UnknownSlot71();
     // +0x118
-    // virtual void* GetLateEntryList1470() const = 0;
+    virtual LateEntryList1470VectorLikeSketch* GetLateEntryList1470() = 0;
     // +0x11c
     void UnknownSlot73();
     // +0x120
@@ -337,13 +367,13 @@ public:
     // +0x12c
     virtual void SetState9CallbackObjectTriple84_88_8c(void* callback, void* object, void* object2) = 0;
     // +0x130
-    virtual void* GetSessionCallbackHelper65c() const = 0;
+    virtual SessionCallbackHelper65cSketch* GetSessionCallbackHelper65c() const = 0;
     // +0x134
     virtual SessionCallbackHelper65cSketch* EnsureSessionCallbackHelper65c() = 0;
     // +0x138
     // virtual void HelperSlot138_State16Dispatch() = 0;
     // +0x13c
-    // virtual void HelperSlot13c_InvokeSessionHelperVtable4() = 0;
+    virtual void HelperSlot13c_InvokeSessionHelperVtable4() = 0;
     // +0x140
     // virtual void HelperSlot140_CreateStationLoginSideEffect() = 0;
     // +0x144

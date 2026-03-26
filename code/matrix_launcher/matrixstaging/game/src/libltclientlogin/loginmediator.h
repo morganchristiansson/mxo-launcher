@@ -814,7 +814,15 @@ public:
     const char* ResolveMarginRouteFromCurrentCharacterSlot() const;            // current best anchor: owner vtable +0xe0
     const char* ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const; // current best anchor: owner vtable +0xfc when fed owner `+0x12c`
     const char* ResolveMarginRouteFromWorldId(uint32_t worldId) const;         // provisional fallback helper for world-id keyed route recovery
-    const char* ResolveMarginRouteDescriptor() const;                          // current best anchor: owner vtable +0x10c first-dword fetch
+    const char* ResolveMarginRouteDescriptor() const;                          // current best owner-side route-text resolver used to back arg6 `+0x10c`
+    // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator.Default slot +0x10c
+    // Keep the wrapper-facing small-string object explicit instead of collapsing it into the
+    // owner-side route-text helper family.
+    RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() override;
+    // anchor: launcher.exe:0x41af50 / ILTLoginMediator.Default slot +0x118
+    // Keep the wrapper-facing late-entry vector-like object explicit; the current source-owned
+    // replacement still exposes an empty list scaffold, but the ABI shape now lives on the owner.
+    LateEntryList1470VectorLikeSketch* GetLateEntryList1470() override;
 
     // Post-auth slot/route families recovered around helper10 (`0x4401a0`) and the later
     // state-8 margin dispatcher (`0x439300`).
@@ -836,10 +844,13 @@ public:
     SessionCallbackHelper65cSketch* EnsureSessionCallbackHelper65c();
     // anchor: launcher.exe:0x420e70
     uint32_t CommitSessionCallbackHelperGameSessionId664();
+    uint32_t InvokeSessionCallbackHelper65cVtable4IfPresent();
     // source-owned shared helper used by `CLTLoginState_State18` slot 3 / `0x421a50`
     uint32_t RefreshSessionHelperGameSessionId664FromSourceBlock94();
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
-    void* GetSessionCallbackHelper65c() const;
+    SessionCallbackHelper65cSketch* GetSessionCallbackHelper65c() const override;
+    // anchor: launcher.exe:0x4202c0 / owner vtable +0x13c
+    void HelperSlot13c_InvokeSessionHelperVtable4() override;
     // anchor: launcher.exe:0x41b260 / owner vtable +0xe0
     const char* GetRouteHostPrefixBySlot(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b2a0 / owner vtable +0xe4? / current slot-record payload reader
@@ -1105,9 +1116,16 @@ private:
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
     // Lazily allocated session callback helper whose `+0x18` string can later feed owner `+0x664`.
     SessionCallbackHelper65cSketch sessionCallbackHelper65cState_{};
-    void* sessionCallbackHelper65c_ = nullptr;
+    SessionCallbackHelper65cSketch* sessionCallbackHelper65c_ = nullptr;
     uint32_t sharedMarginPacketField660_ = 0;  // owner `+0x660`
     std::string gameSessionId664_;             // owner `+0x664`
+    // Wrapper-facing late-runtime arg6 object mirrors:
+    // - `+0x10c` = owner `+0x30` small-string-like route descriptor
+    // - `+0x118` = owner `+0x1470` vector-like late-entry list
+    std::string routeDescriptor30Owned_;
+    RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
+    std::vector<LateEntryList1470EntrySketch> lateEntryList1470Entries_{};
+    LateEntryList1470VectorLikeSketch lateEntryList1470_{};
     // Narrow source-owned post-state9 / post-state12 owner collaborators from
     // `0x41f1d0` / `0x41de40` / `0x41c5c0` / `0x41c510`.
     // Strongest current origin: deeper client init owner/arg6 vtable `+0x124`

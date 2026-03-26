@@ -16,6 +16,16 @@ Current active late-login arg6 surface:
 These three slots are the arg6-side inputs that matter most for the current
 `0x439780 -> 0x41de40 -> 0x43c180` path.
 
+Closely related later continuation siblings now live in the post-state9 observer bridge instead of
+this narrower submit surface:
+- `+0x10c`
+- `+0x118`
+- `+0x13c`
+
+See:
+- `../state_machine/POST_STATE9_CONTINUATION.md`
+- `../VTABLES/0x004b01c8.md`
+
 ## Canonical source homes
 
 - ABI shell:

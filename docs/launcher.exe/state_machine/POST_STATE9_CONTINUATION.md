@@ -137,6 +137,11 @@ Practical consequence:
 - the current replacement can source-own a minimal observer list and enough late arg6 getters to
   reach first game entry without claiming the original red-black-tree or late-entry-list container
   implementations are fully reconstructed
+- wrapper minimization for this late arg6 family is now tighter too:
+  - `src/launcher_mediator_abi.cpp` keeps only thin vtable forwarders for `+0x10c/+0x118/+0x13c`
+  - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` now owns the wrapper-facing
+    `+0x10c` small-string-like object, the `+0x118` vector-like scaffold, and the `+0x13c`
+    session-helper pump/logging
 - this is the strongest current implementation lead for stabilizing post-entry fidelity work
 
 ### later `0x0f` bridge now live-confirmed

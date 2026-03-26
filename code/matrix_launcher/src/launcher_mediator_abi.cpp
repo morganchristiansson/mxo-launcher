@@ -52,22 +52,6 @@ static const char g_MediatorEmptyString[] = "";
 
 static constexpr size_t kDiagnosticSelectionContextSize = 0xb4; // from client.dll:6211d3e0 zero-init of the +0xec handoff object
 
-struct DiagnosticSmallStringLike {
-    const char* begin = nullptr;
-    const char* current = nullptr;
-    const char* capacity = nullptr;
-};
-
-struct DiagnosticVectorLike {
-    const void* begin = nullptr;
-    const void* current = nullptr;
-    const void* capacity = nullptr;
-};
-
-static std::string g_MediatorRouteDescriptor10cOwned;
-static DiagnosticSmallStringLike g_MediatorRouteDescriptor10c = {};
-static DiagnosticVectorLike g_MediatorLateEntryList118 = {};
-
 // UNANCHORED: diagnostic masking helper for auth/password log surfaces.
 const char* MaskedSensitiveValue(const char* value) {
     if (!value || !value[0]) return "<empty>";
@@ -620,28 +604,21 @@ static const char* __thiscall Mediator_GetWorldExtra108(MinimalLoginMediatorStub
     return value;
 }
 
+// ILTLoginMediator.Default wrapper minimization:
+// - keep `g_LoginMediatorVtable` in the ABI shell
+// - move wrapper-owned late-runtime state/scratch/logging into `CLTLoginMediator` when the owner
+//   can keep it
+// - keep wrapper-facing ABI object shapes explicit when they are not the same thing as the
+//   higher-level owner-side helper semantics
+
 // anchor: launcher.exe:0x41f2c0
 // vtable: ILTLoginMediator.Default slot +0x10c
 // Current best late-runtime read from the event-0x18 observer callback:
 // - returns owner `+0x30`
 // - client immediately consumes the first two dwords there as a small-string begin/current pair
-static DiagnosticSmallStringLike* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
+static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    const char* routeDescriptor = mediator ? mediator->ResolveMarginRouteDescriptor() : nullptr;
-
-    g_MediatorRouteDescriptor10cOwned = routeDescriptor ? routeDescriptor : std::string();
-    g_MediatorRouteDescriptor10c.begin = g_MediatorRouteDescriptor10cOwned.c_str();
-    g_MediatorRouteDescriptor10c.current =
-        g_MediatorRouteDescriptor10cOwned.c_str() + g_MediatorRouteDescriptor10cOwned.size();
-    g_MediatorRouteDescriptor10c.capacity = g_MediatorRouteDescriptor10c.current;
-
-    spdlog::info(
-        "MediatorStub::GetRouteDescriptor10c(+0x10c) -> begin={} current={} text='{}'",
-        fmt::ptr(g_MediatorRouteDescriptor10c.begin),
-        fmt::ptr(g_MediatorRouteDescriptor10c.current),
-        g_MediatorRouteDescriptor10cOwned.empty() ? "<empty>" : g_MediatorRouteDescriptor10cOwned.c_str());
-    return &g_MediatorRouteDescriptor10c;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetRouteDescriptor30();
 }
 
 // anchor: launcher.exe:0x41af50
@@ -649,14 +626,9 @@ static DiagnosticSmallStringLike* __thiscall Mediator_GetRouteDescriptor10c(Mini
 // Current best late-runtime read from the event-0x18 observer callback:
 // - returns owner `+0x1470`
 // - client reads it as a vector-like begin/current/capacity triple of 12-byte entries
-static DiagnosticVectorLike* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
+static mxo::ltlogin::LateEntryList1470VectorLikeSketch* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
-    spdlog::info(
-        "MediatorStub::GetLateEntryList118(+0x118) -> begin={} current={} capacity={} (empty scaffold)",
-        fmt::ptr(g_MediatorLateEntryList118.begin),
-        g_MediatorLateEntryList118.current,
-        g_MediatorLateEntryList118.capacity);
-    return &g_MediatorLateEntryList118;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetLateEntryList1470();
 }
 
 // UNANCHORED: C helper behind the recovered +0xec ABI wrapper.
@@ -750,8 +722,7 @@ __attribute__((naked)) static void Mediator_FillLoadingCharacterState120() {
 // WaitForEvent uses this repeatedly while blocked on registered observer notifications.
 static void __thiscall Mediator_InvokeSessionCallbackHelper13c(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    (void)mediator;
+    mxo::ltlogin::ILTLoginMediator::Default->HelperSlot13c_InvokeSessionHelperVtable4();
 }
 
 // UNANCHORED: C helper behind the recovered +0x170 observer-registration ABI wrapper.

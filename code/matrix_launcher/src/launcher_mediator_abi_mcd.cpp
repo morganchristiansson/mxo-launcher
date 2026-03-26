@@ -7,7 +7,7 @@ static_assert(
     "State3SelectionContextInputSketch must stay layout-compatible with the recovered arg6 +0xec 0xb4 snapshot");
 
 static std::string g_MediatorState8Section11String1460Owned;
-static DiagnosticSmallStringLike g_MediatorState8Section11String1460 = {};
+static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch g_MediatorState8Section11String1460 = {};
 
 // anchor: launcher.exe:0x41f150
 // vtable: ILTLoginMediator.Default slot +0x8c
@@ -84,7 +84,7 @@ static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediat
 
 // anchor: launcher.exe:0x41f1b0
 // vtable: ILTLoginMediator.Default slot +0xd0
-static DiagnosticSmallStringLike* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
+static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
     (void)self;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const char* beginText = mediator ? mediator->PostAuthMarginLoadingStateView().state8Section11String1460.c_str() : "";
