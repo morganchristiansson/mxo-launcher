@@ -19,9 +19,10 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediato
     // Current focused source-owned tightening:
     // - original `0x4390b0` consumes a type-2 auth connect-status work item and uses its payload
     //   to update owner `+0x80`
+    // - current mediator contract keeps that payload recording at the owner boundary first, then
+    //   re-enters state1 slot 1 so this body can consume `LastAuthConnectStatus()` locally
     // - it also has a broader owner `+0x28/+0x4c/+0x50` retry/error path that we still do not
-    //   model faithfully because the active replacement auth start bypassed the original state1
-    //   entry/return path early on
+    //   model faithfully on the active replacement path
     // - keep the current refactor focused by moving the already-live auth-connect continuation
     //   ownership here while leaving the not-yet-faithful retry iterator explicitly documented
     const uint32_t workResultCode = mediator->LastAuthConnectStatus();

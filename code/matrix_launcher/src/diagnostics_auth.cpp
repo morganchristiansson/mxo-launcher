@@ -796,7 +796,6 @@ const char* DiagnosticAuthCurrentBackground() {
 }
 
 bool DiagnosticCanBeginAuthConnection() {
-
     return g_DiagnosticLoginController != NULL;
 }
 

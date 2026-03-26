@@ -1230,6 +1230,7 @@ private:
     bool SelectMarginEndpointIpv4();
     mxo::liblttcp::CMessageConnection* EnsureAuthConnectionObject();
     mxo::liblttcp::CMessageConnection* EnsureMarginConnectionObject();
+    uint32_t ContinueRecordedAuthConnectStatusScaffold();
 
     // Condensed `0x4f78b8` owner sketch for the active branch:
     // - `+0x10` = current helper/state object

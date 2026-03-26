@@ -1618,21 +1618,23 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
     return result;
 }
 
-uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
-    lastAuthConnectStatus_ = workResultCode;
-    ++authConnectStatusCount_;
-
-    // State-1 ownership note:
-    // - original connect-status handling belongs to `CLTLoginState_State1` slot 1 (`0x4390b0`)
-    // - current replacement still has a non-faithful direct-auth startup path, so keep the old
-    //   mediator-owned success fallback for non-state1 callers
-    // - but if the active helper is already state `1`, hand the continuation back to the concrete
-    //   state object so the owner logic can keep moving out of `loginmediator.cpp`
+uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
+    // Keep the status-recording contract explicit:
+    // - `HandleAuthConnectStatus` must cache the type-2 payload on the mediator first
+    // - state1 slot 1 then consumes that cached payload through `LastAuthConnectStatus()`
+    // - non-state1 callers still use the narrow historical fallback while earlier startup
+    //   ownership remains only partially source-owned
     if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 1u) {
         return currentState_->Slot1_HandlePrimaryGate(this);
     }
 
-    return (workResultCode == kConnectStatusSuccess) ? BeginAuthHandshake() : 0u;
+    return (lastAuthConnectStatus_ == kConnectStatusSuccess) ? BeginAuthHandshake() : 0u;
+}
+
+uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
+    lastAuthConnectStatus_ = workResultCode;
+    ++authConnectStatusCount_;
+    return ContinueRecordedAuthConnectStatusScaffold();
 }
 
 uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
