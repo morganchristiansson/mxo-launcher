@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -36,7 +37,37 @@ struct DiagnosticRawMessageConnectionContext {
     bool peerCloseQueued;
 };
 
-static mxo::ltlogin::CLTLoginMediator* g_DiagnosticLoginController = NULL;
+// Diagnostic-only owner/session wrapper for the launcher-owned login sidecar.
+// Keep controller creation, reset, and auth/margin context lifetime in one place so
+// diagnostics code can query the active controller without directly owning raw new/delete.
+struct DiagnosticLoginControllerSession {
+    ~DiagnosticLoginControllerSession();
+
+    void Reset();
+    void BeginForOwner(void* owner);
+    mxo::ltlogin::CLTLoginMediator* RecreateForEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
+    mxo::ltlogin::CLTLoginMediator* Controller() const;
+    void* CurrentOwner() const;
+    DiagnosticRawMessageConnectionContext* AuthContext() const;
+    DiagnosticRawMessageConnectionContext* MarginContext() const;
+    bool MarkPostAuthMarginBeginAttempted();
+
+    DiagnosticRawMessageConnectionContext* GetOrCreateAuthContext(const char* label);
+    DiagnosticRawMessageConnectionContext* GetOrCreateMarginContext(const char* label);
+
+private:
+    DiagnosticRawMessageConnectionContext* GetOrCreateConnectionContext(
+        DiagnosticRawMessageConnectionContext** slot,
+        const char* label);
+
+    std::unique_ptr<mxo::ltlogin::CLTLoginMediator> controller_;
+    DiagnosticRawMessageConnectionContext* authContext_ = NULL;
+    DiagnosticRawMessageConnectionContext* marginContext_ = NULL;
+    void* currentOwner_ = NULL;
+    bool postAuthMarginBeginAttempted_ = false;
+};
+
+static DiagnosticLoginControllerSession g_DiagnosticLoginControllerSession = {};
 static unsigned char g_LoginControllerState9CallbackSeed85D4[16] = {0};
 static mxo::ltlogin::CLTLoginState_State1 g_DiagnosticLoginStateState1 = {};
 static mxo::ltlogin::CLTLoginState_AuthenticatePending g_DiagnosticLoginStateAuthenticatePending = {};
@@ -50,12 +81,8 @@ static mxo::ltlogin::CLTLoginState_State11 g_DiagnosticLoginStateState11 = {};
 static mxo::ltlogin::CLTLoginState_State12 g_DiagnosticLoginStateState12 = {};
 static mxo::ltlogin::CLTLoginState_State13 g_DiagnosticLoginStateState13 = {};
 static mxo::ltlogin::CLTLoginState_WorldListPending g_DiagnosticLoginStateWorldListPending = {};
-static DiagnosticRawMessageConnectionContext* g_DiagnosticAuthContext = NULL;
-static DiagnosticRawMessageConnectionContext* g_DiagnosticMarginContext = NULL;
-static bool g_DiagnosticPostAuthMarginBeginAttempted = false;
 static void* g_DiagnosticWorkItemVtable[2] = {0};
 static void* g_DiagnosticMessageConnectionContextVtable[5] = {0};
-static void* g_DiagnosticCurrentOwner = NULL;
 
 static char g_LoginControllerAuthDnsName[256] = "auth.lith.thematrixonline.net";
 static uint16_t g_LoginControllerAuthPortHostOrder = 11000;
@@ -70,6 +97,115 @@ static char g_LoginControllerCharacterNameSeed[256] = {};
 static char g_LoginControllerGameSessionIdSeed[256] = {};
 static const char* g_LoginControllerAuthName = "resurrections";
 static const char* g_LoginControllerAuthPassword = "";
+
+static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWorkItemStub* self);
+static uint32_t __thiscall DiagnosticRawMessageConnectionContext_Release(DiagnosticRawMessageConnectionContext* self);
+static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationCompleted(
+    DiagnosticRawMessageConnectionContext* self,
+    DiagnosticQueuedWorkItemStub* workItem);
+
+DiagnosticLoginControllerSession::~DiagnosticLoginControllerSession() {
+    Reset();
+}
+
+void DiagnosticLoginControllerSession::Reset() {
+    if (authContext_) {
+        std::free(authContext_);
+        authContext_ = NULL;
+    }
+    if (marginContext_) {
+        std::free(marginContext_);
+        marginContext_ = NULL;
+    }
+    controller_.reset();
+    currentOwner_ = NULL;
+    postAuthMarginBeginAttempted_ = false;
+}
+
+void DiagnosticLoginControllerSession::BeginForOwner(void* owner) {
+    currentOwner_ = owner;
+    postAuthMarginBeginAttempted_ = false;
+}
+
+mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::RecreateForEngine(
+    mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
+    controller_.reset();
+    if (!engine) {
+        return NULL;
+    }
+
+    controller_ = std::unique_ptr<mxo::ltlogin::CLTLoginMediator>(new mxo::ltlogin::CLTLoginMediator());
+    if (controller_) {
+        controller_->SetNetworkEngine(engine);
+        controller_->InitializeConnectionHelpers();
+    }
+    return controller_.get();
+}
+
+mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::Controller() const {
+    return controller_.get();
+}
+
+void* DiagnosticLoginControllerSession::CurrentOwner() const {
+    return currentOwner_;
+}
+
+DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::AuthContext() const {
+    return authContext_;
+}
+
+DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::MarginContext() const {
+    return marginContext_;
+}
+
+bool DiagnosticLoginControllerSession::MarkPostAuthMarginBeginAttempted() {
+    if (postAuthMarginBeginAttempted_) {
+        return false;
+    }
+
+    postAuthMarginBeginAttempted_ = true;
+    return true;
+}
+
+DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::GetOrCreateAuthContext(const char* label) {
+    return GetOrCreateConnectionContext(&authContext_, label);
+}
+
+DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::GetOrCreateMarginContext(const char* label) {
+    return GetOrCreateConnectionContext(&marginContext_, label);
+}
+
+DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::GetOrCreateConnectionContext(
+    DiagnosticRawMessageConnectionContext** slot,
+    const char* label) {
+    if (!slot) return NULL;
+
+    if (!g_DiagnosticWorkItemVtable[1]) {
+        g_DiagnosticWorkItemVtable[1] = (void*)DiagnosticQueuedWorkItem_Release;
+    }
+    if (!g_DiagnosticMessageConnectionContextVtable[1]) {
+        g_DiagnosticMessageConnectionContextVtable[1] = (void*)DiagnosticRawMessageConnectionContext_Release;
+        g_DiagnosticMessageConnectionContextVtable[4] = (void*)DiagnosticRawMessageConnectionContext_OnOperationCompleted;
+    }
+
+    if (!*slot) {
+        *slot = static_cast<DiagnosticRawMessageConnectionContext*>(std::calloc(1, sizeof(DiagnosticRawMessageConnectionContext)));
+        if (!*slot) {
+            spdlog::info("DIAGNOSTIC: failed to allocate raw message-connection context for '{}'", label ? label : "<null>");
+            return NULL;
+        }
+        (*slot)->vtable = g_DiagnosticMessageConnectionContextVtable;
+        (*slot)->autoReleaseFlag = 0;
+        (*slot)->debugLabel = label;
+        (*slot)->contextKey = *slot;
+    }
+
+    return *slot;
+}
+
+static mxo::ltlogin::CLTLoginMediator* DiagnosticCurrentLoginController() {
+    return g_DiagnosticLoginControllerSession.Controller();
+}
 
 static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWorkItemStub* self) {
     if (self) {
@@ -173,26 +309,27 @@ static bool DiagnosticParseVariableLengthPayload(
 static void DiagnosticRouteConnectStatusToLoginController(
     DiagnosticRawMessageConnectionContext* self,
     DiagnosticQueuedWorkItemStub* workItem) {
-    if (!self || !workItem || !g_DiagnosticLoginController || workItem->header.workType != 2u) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!self || !workItem || !loginController || workItem->header.workType != 2u) {
         return;
     }
 
     uint32_t handled = 0;
     const char* routeLabel = "<unknown>";
-    if (self == g_DiagnosticAuthContext) {
-        handled = g_DiagnosticLoginController->HandleAuthConnectStatus(workItem->workPayload);
+    if (self == g_DiagnosticLoginControllerSession.AuthContext()) {
+        handled = loginController->HandleAuthConnectStatus(workItem->workPayload);
         routeLabel = "auth";
-    } else if (self == g_DiagnosticMarginContext) {
-        handled = g_DiagnosticLoginController->HandleMarginConnectStatus(workItem->workPayload);
+    } else if (self == g_DiagnosticLoginControllerSession.MarginContext()) {
+        handled = loginController->HandleMarginConnectStatus(workItem->workPayload);
         routeLabel = "margin";
     } else {
         return;
     }
 
     const char* incomingReplyAnchor = "";
-    if (self == g_DiagnosticAuthContext) {
+    if (self == g_DiagnosticLoginControllerSession.AuthContext()) {
         incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
-    } else if (self == g_DiagnosticMarginContext) {
+    } else if (self == g_DiagnosticLoginControllerSession.MarginContext()) {
         incomingReplyAnchor = mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply;
     }
 
@@ -239,7 +376,7 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                     (unsigned)bytes.size(),
                     hexPreview);
 
-                if (self == g_DiagnosticAuthContext && bytes.size() >= 2u) {
+                if (self == g_DiagnosticLoginControllerSession.AuthContext() && bytes.size() >= 2u) {
                     const uint8_t* payloadBytes = NULL;
                     size_t payloadSize = 0u;
                     size_t headerBytes = 0u;
@@ -266,17 +403,18 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                         rawCode,
                         DiagnosticAuthRawCodeName(rawCode));
 
-                    if (g_DiagnosticLoginController) {
+                    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+                    if (loginController) {
                         const uint32_t handled =
-                            g_DiagnosticLoginController->HandleAuthPacketBytes(payloadBytes, payloadSize);
+                            loginController->HandleAuthPacketBytes(payloadBytes, payloadSize);
                         spdlog::info(
                             "DIAGNOSTIC: launcher-owned auth packet handler label={} handled={} rawCode=0x{:02x}",
                             self->debugLabel ? self->debugLabel : "<null>",
                             handled,
                             rawCode);
 
-                        if (handled != 0u && rawCode == 0x0b && !g_DiagnosticPostAuthMarginBeginAttempted) {
-                            g_DiagnosticPostAuthMarginBeginAttempted = true;
+                        if (handled != 0u && rawCode == 0x0b &&
+                            g_DiagnosticLoginControllerSession.MarkPostAuthMarginBeginAttempted()) {
                             const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
                             spdlog::info(
                                 "DIAGNOSTIC: post-AS_AuthReply margin auto-begin result = 0x{:08x}",
@@ -288,7 +426,7 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                     continue;
                 }
 
-                if (self == g_DiagnosticMarginContext && bytes.size() >= 2u) {
+                if (self == g_DiagnosticLoginControllerSession.MarginContext() && bytes.size() >= 2u) {
                     const uint8_t* payloadBytes = NULL;
                     size_t payloadSize = 0u;
                     size_t headerBytes = 0u;
@@ -317,9 +455,10 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
                         rawCode,
                         looksLikePlainBootstrapReply ? "plaintext-bootstrap-reply" : "possibly-encrypted-post-bootstrap-payload");
 
-                    if (g_DiagnosticLoginController && payloadBytes && payloadSize != 0u) {
+                    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+                    if (loginController && payloadBytes && payloadSize != 0u) {
                         const uint32_t handled =
-                            g_DiagnosticLoginController->HandleMarginPacketBytes(payloadBytes, payloadSize);
+                            loginController->HandleMarginPacketBytes(payloadBytes, payloadSize);
                         spdlog::info(
                             "DIAGNOSTIC: launcher-owned margin packet handler label={} handled={} outerByte0=0x{:02x} decryptedOpcode=see-CLTLoginMediator-log-when-transportEncrypted=1",
                             self->debugLabel ? self->debugLabel : "<null>",
@@ -337,34 +476,6 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
         return self->sidecarConnection->OnOperationCompleted(reinterpret_cast<void*>(workItem->header.workType));
     }
     return 1;
-}
-
-static DiagnosticRawMessageConnectionContext* DiagnosticGetOrCreateRawConnectionContext(
-    DiagnosticRawMessageConnectionContext** slot,
-    const char* label) {
-    if (!slot) return NULL;
-
-    if (!g_DiagnosticWorkItemVtable[1]) {
-        g_DiagnosticWorkItemVtable[1] = (void*)DiagnosticQueuedWorkItem_Release;
-    }
-    if (!g_DiagnosticMessageConnectionContextVtable[1]) {
-        g_DiagnosticMessageConnectionContextVtable[1] = (void*)DiagnosticRawMessageConnectionContext_Release;
-        g_DiagnosticMessageConnectionContextVtable[4] = (void*)DiagnosticRawMessageConnectionContext_OnOperationCompleted;
-    }
-
-    if (!*slot) {
-        *slot = static_cast<DiagnosticRawMessageConnectionContext*>(std::calloc(1, sizeof(DiagnosticRawMessageConnectionContext)));
-        if (!*slot) {
-            spdlog::info("DIAGNOSTIC: failed to allocate raw message-connection context for '{}'", label ? label : "<null>");
-            return NULL;
-        }
-        (*slot)->vtable = g_DiagnosticMessageConnectionContextVtable;
-        (*slot)->autoReleaseFlag = 0;
-        (*slot)->debugLabel = label;
-        (*slot)->contextKey = *slot;
-    }
-
-    return *slot;
 }
 
 static bool DiagnosticEnqueueConnectionStatusWorkItem(
@@ -406,7 +517,8 @@ static bool DiagnosticEnqueueConnectionStatusWorkItem(
 }
 
 static void DiagnosticApplyLoginControllerConfig() {
-    if (!g_DiagnosticLoginController) return;
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) return;
 
     const uint32_t launcherVersion = 76005u;
     const uint32_t currentPublicKeyId = 0u;
@@ -414,34 +526,34 @@ static void DiagnosticApplyLoginControllerConfig() {
     const std::vector<uint8_t> keyConfigMd5;
     const std::vector<uint8_t> uiConfigMd5;
 
-    g_DiagnosticLoginController->SetAuthServerConfig(
+    loginController->SetAuthServerConfig(
         g_LoginControllerAuthDnsName,
         g_LoginControllerAuthPortHostOrder,
         g_LoginControllerIgnoreHostsFileForAuth);
-    g_DiagnosticLoginController->SetMarginServerConfig(
+    loginController->SetMarginServerConfig(
         g_LoginControllerMarginDnsSuffix,
         g_LoginControllerMarginPortHostOrder,
         g_LoginControllerIgnoreHostsFileForMargin);
-    g_DiagnosticLoginController->SetMarginRouteHostPrefix(g_LoginControllerMarginRouteHostPrefix);
-    g_DiagnosticLoginController->SetExactMarginHostName(g_LoginControllerExactMarginHostName);
-    g_DiagnosticLoginController->SetAuthCredentials(g_LoginControllerAuthName, g_LoginControllerAuthPassword);
-    g_DiagnosticLoginController->SetAuthBootstrapConfig(
+    loginController->SetMarginRouteHostPrefix(g_LoginControllerMarginRouteHostPrefix);
+    loginController->SetExactMarginHostName(g_LoginControllerExactMarginHostName);
+    loginController->SetAuthCredentials(g_LoginControllerAuthName, g_LoginControllerAuthPassword);
+    loginController->SetAuthBootstrapConfig(
         launcherVersion,
         currentPublicKeyId,
         static_cast<uint8_t>(loginType),
         keyConfigMd5,
         uiConfigMd5);
-    g_DiagnosticLoginController->RegisterScaffoldState1(&g_DiagnosticLoginStateState1);
-    g_DiagnosticLoginController->RegisterScaffoldState3(&g_DiagnosticLoginStateState3);
-    g_DiagnosticLoginController->RegisterScaffoldState4(&g_DiagnosticLoginStateState4);
-    g_DiagnosticLoginController->RegisterScaffoldState6(&g_DiagnosticLoginStateState6);
-    g_DiagnosticLoginController->RegisterScaffoldState8(&g_DiagnosticLoginStateState8);
-    g_DiagnosticLoginController->RegisterScaffoldState9(&g_DiagnosticLoginStateState9);
-    g_DiagnosticLoginController->RegisterScaffoldState10(&g_DiagnosticLoginStateState10);
-    g_DiagnosticLoginController->RegisterScaffoldState11(&g_DiagnosticLoginStateState11);
-    g_DiagnosticLoginController->RegisterScaffoldState12(&g_DiagnosticLoginStateState12);
-    g_DiagnosticLoginController->RegisterScaffoldState13(&g_DiagnosticLoginStateState13);
-    g_DiagnosticLoginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
+    loginController->RegisterScaffoldState1(&g_DiagnosticLoginStateState1);
+    loginController->RegisterScaffoldState3(&g_DiagnosticLoginStateState3);
+    loginController->RegisterScaffoldState4(&g_DiagnosticLoginStateState4);
+    loginController->RegisterScaffoldState6(&g_DiagnosticLoginStateState6);
+    loginController->RegisterScaffoldState8(&g_DiagnosticLoginStateState8);
+    loginController->RegisterScaffoldState9(&g_DiagnosticLoginStateState9);
+    loginController->RegisterScaffoldState10(&g_DiagnosticLoginStateState10);
+    loginController->RegisterScaffoldState11(&g_DiagnosticLoginStateState11);
+    loginController->RegisterScaffoldState12(&g_DiagnosticLoginStateState12);
+    loginController->RegisterScaffoldState13(&g_DiagnosticLoginStateState13);
+    loginController->SetCurrentState(&g_DiagnosticLoginStateAuthenticatePending);
 
     const char* characterNameSeed =
         g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : NULL;
@@ -468,7 +580,7 @@ static void DiagnosticApplyLoginControllerConfig() {
             DiagnosticCopyCStringIntoFixed(input.stringB0.data(), input.stringB0.size(), background);
         }
 
-        g_DiagnosticLoginController->ProcessLoginCredentials(input);
+        loginController->ProcessLoginCredentials(input);
         spdlog::info(
             "DiagnosticApplyLoginControllerConfig applied recovered 0x41c3c0 character seed to diagnostic mediator characterName='{}' selectedWorldIndexLow24=0x{:06x} realFirst='{}' realLast='{}' background='{}'",
             characterNameSeed,
@@ -482,7 +594,7 @@ static void DiagnosticApplyLoginControllerConfig() {
     const char* playRequestSessionId =
         g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : NULL;
     if (playRequestSessionId) {
-        launchPad.OnPlayRequestStatus(g_DiagnosticLoginController, /*resultCode=*/0u, playRequestSessionId);
+        launchPad.OnPlayRequestStatus(loginController, /*resultCode=*/0u, playRequestSessionId);
         spdlog::info(
             "DiagnosticApplyLoginControllerConfig routed diagnostic LaunchPadClient::OnPlayRequestStatus GameSessionID='{}'",
             playRequestSessionId);
@@ -492,31 +604,16 @@ static void DiagnosticApplyLoginControllerConfig() {
 }  // namespace
 
 void DiagnosticAuthResetState() {
-    if (g_DiagnosticAuthContext) {
-        std::free(g_DiagnosticAuthContext);
-        g_DiagnosticAuthContext = NULL;
-    }
-    if (g_DiagnosticMarginContext) {
-        std::free(g_DiagnosticMarginContext);
-        g_DiagnosticMarginContext = NULL;
-    }
-    delete g_DiagnosticLoginController;
-    g_DiagnosticLoginController = NULL;
-    g_DiagnosticCurrentOwner = NULL;
-    g_DiagnosticPostAuthMarginBeginAttempted = false;
+    g_DiagnosticLoginControllerSession.Reset();
 }
 
 void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
-    g_DiagnosticCurrentOwner = owner;
-    g_DiagnosticPostAuthMarginBeginAttempted = false;
+    g_DiagnosticLoginControllerSession.BeginForOwner(owner);
     if (!engine) {
         return;
     }
-    delete g_DiagnosticLoginController;
-    g_DiagnosticLoginController = new mxo::ltlogin::CLTLoginMediator();
-    if (g_DiagnosticLoginController) {
-        g_DiagnosticLoginController->SetNetworkEngine(engine);
-        g_DiagnosticLoginController->InitializeConnectionHelpers();
+
+    if (g_DiagnosticLoginControllerSession.RecreateForEngine(engine)) {
         DiagnosticApplyLoginControllerConfig();
         spdlog::info("DIAGNOSTIC: created CLTLoginMediator sidecar for launcher object {}", fmt::ptr(owner));
     }
@@ -529,7 +626,7 @@ void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* auth
 }
 
 mxo::ltlogin::CLTLoginMediator* DiagnosticAuthGetLoginController() {
-    return g_DiagnosticLoginController;
+    return DiagnosticCurrentLoginController();
 }
 
 void DiagnosticAuthPollLiveConnectionTraffic(void* owner) {
@@ -561,12 +658,12 @@ void DiagnosticAuthPollLiveConnectionTraffic(void* owner) {
                 context,
                 /*workType=*/1u,
                 /*workPayload=*/0u,
-                context == g_DiagnosticAuthContext ? "AuthPeerClosed" : "MarginPeerClosed");
+                context == g_DiagnosticLoginControllerSession.AuthContext() ? "AuthPeerClosed" : "MarginPeerClosed");
         }
     };
 
-    tryPoll(g_DiagnosticAuthContext, "AuthReceivePacket");
-    tryPoll(g_DiagnosticMarginContext, "MarginReceivePacket");
+    tryPoll(g_DiagnosticLoginControllerSession.AuthContext(), "AuthReceivePacket");
+    tryPoll(g_DiagnosticLoginControllerSession.MarginContext(), "MarginReceivePacket");
 }
 
 void DiagnosticConfigureLoginControllerNetwork(
@@ -607,7 +704,8 @@ void DiagnosticConfigureLoginControllerNetwork(
 }
 
 void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionContext, uint32_t byteCount) {
-    if (!g_DiagnosticLoginController || !selectionContext) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController || !selectionContext) {
         return;
     }
     if (byteCount < sizeof(mxo::ltlogin::State3SelectionContextInputSketch)) {
@@ -620,7 +718,7 @@ void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionCo
 
     mxo::ltlogin::State3SelectionContextInputSketch input = {};
     std::memcpy(&input, selectionContext, sizeof(input));
-    g_DiagnosticLoginController->PersistSelectionContextForState8(input);
+    loginController->PersistSelectionContextForState8(input);
     spdlog::info(
         "DIAGNOSTIC: mirrored selection context into CLTLoginMediator sidecar slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
         input.slotOrSelectionIndex00 & 0xffu,
@@ -629,11 +727,12 @@ void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionCo
 }
 
 void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, void* object88, void* object8c) {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         return;
     }
 
-    g_DiagnosticLoginController->SetState9CallbackObjectTriple84_88_8c(callback84, object88, object8c);
+    loginController->SetState9CallbackObjectTriple84_88_8c(callback84, object88, object8c);
     spdlog::info(
         "DIAGNOSTIC: mirrored state9 startup triple into CLTLoginMediator sidecar callback84={} object88={} object8c={}",
         fmt::ptr(callback84),
@@ -642,22 +741,24 @@ void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, vo
 }
 
 uint32_t DiagnosticFillState9CallbackBlob18c(void* outBuffer, uint32_t arg2, uint32_t arg3) {
-    if (!g_DiagnosticLoginController || !outBuffer) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController || !outBuffer) {
         return 1u;
     }
-    return g_DiagnosticLoginController->FillState9CallbackBlob18c(
+    return loginController->FillState9CallbackBlob18c(
         static_cast<uint32_t*>(outBuffer),
         arg2,
         arg3);
 }
 
 const void* DiagnosticGetState9CallbackSeedPointer85D4() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         return NULL;
     }
 
     std::array<uint8_t, 16> seed = {};
-    if (!g_DiagnosticLoginController->CopyMarginBootstrapTwofishKeyScaffold(&seed)) {
+    if (!loginController->CopyMarginBootstrapTwofishKeyScaffold(&seed)) {
         return NULL;
     }
 
@@ -689,21 +790,22 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
 }
 
 const char* DiagnosticAuthCurrentCharacterName() {
-    if (g_DiagnosticLoginController) {
-        if (const auto* currentSlotRecord = g_DiagnosticLoginController->GetCurrentSlotRecord()) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (loginController) {
+        if (const auto* currentSlotRecord = loginController->GetCurrentSlotRecord()) {
             if (!currentSlotRecord->heapString14.empty()) {
                 return currentSlotRecord->heapString14.c_str();
             }
         }
-        if (const char* slotZeroName = g_DiagnosticLoginController->LookupSlotRecordHeapStringByIndex(0)) {
+        if (const char* slotZeroName = loginController->LookupSlotRecordHeapStringByIndex(0)) {
             return slotZeroName;
         }
-        if (const char* materializedName = g_DiagnosticLoginController->CharacterNameBufferF1c()) {
+        if (const char* materializedName = loginController->CharacterNameBufferF1c()) {
             if (materializedName[0] != '\0') {
                 return materializedName;
             }
         }
-        const auto& sourceLeadString108 = g_DiagnosticLoginController->SourceLeadString108();
+        const auto& sourceLeadString108 = loginController->SourceLeadString108();
         if (sourceLeadString108[0] != '\0') {
             return sourceLeadString108.data();
         }
@@ -712,26 +814,28 @@ const char* DiagnosticAuthCurrentCharacterName() {
 }
 
 uint32_t DiagnosticAuthCurrentCharacterIdLow() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         return 0u;
     }
-    if (const auto* currentSlotRecord = g_DiagnosticLoginController->GetCurrentSlotRecord()) {
+    if (const auto* currentSlotRecord = loginController->GetCurrentSlotRecord()) {
         return currentSlotRecord->globalCharacterIdLow03;
     }
-    if (const auto* slotZeroRecord = g_DiagnosticLoginController->GetSlotRecordByIndex(0)) {
+    if (const auto* slotZeroRecord = loginController->GetSlotRecordByIndex(0)) {
         return slotZeroRecord->globalCharacterIdLow03;
     }
     return 0u;
 }
 
 uint32_t DiagnosticAuthCurrentCharacterIdHigh() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         return 0u;
     }
-    if (const auto* currentSlotRecord = g_DiagnosticLoginController->GetCurrentSlotRecord()) {
+    if (const auto* currentSlotRecord = loginController->GetCurrentSlotRecord()) {
         return currentSlotRecord->globalCharacterIdHigh07;
     }
-    if (const auto* slotZeroRecord = g_DiagnosticLoginController->GetSlotRecordByIndex(0)) {
+    if (const auto* slotZeroRecord = loginController->GetSlotRecordByIndex(0)) {
         return slotZeroRecord->globalCharacterIdHigh07;
     }
     return 0u;
@@ -742,14 +846,15 @@ static bool IsLikelyMiddleInitialOnly(const char* value) {
 }
 
 const char* DiagnosticAuthCurrentRealFirstName() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         return nullptr;
     }
-    const char* sourceBlock178 = reinterpret_cast<const char*>(g_DiagnosticLoginController->SourceBlock178().data());
+    const char* sourceBlock178 = reinterpret_cast<const char*>(loginController->SourceBlock178().data());
     if (sourceBlock178[0] != '\0') {
         return sourceBlock178;
     }
-    const auto& ownerState = g_DiagnosticLoginController->PostAuthMarginLoadingStateView();
+    const auto& ownerState = loginController->PostAuthMarginLoadingStateView();
     const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
     const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
     const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
@@ -760,14 +865,15 @@ const char* DiagnosticAuthCurrentRealFirstName() {
 }
 
 const char* DiagnosticAuthCurrentRealLastName() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         return nullptr;
     }
-    const char* sourceBlock198 = reinterpret_cast<const char*>(g_DiagnosticLoginController->SourceBlock198().data());
+    const char* sourceBlock198 = reinterpret_cast<const char*>(loginController->SourceBlock198().data());
     if (sourceBlock198[0] != '\0') {
         return sourceBlock198;
     }
-    const auto& ownerState = g_DiagnosticLoginController->PostAuthMarginLoadingStateView();
+    const auto& ownerState = loginController->PostAuthMarginLoadingStateView();
     const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
     const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
     const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
@@ -778,14 +884,15 @@ const char* DiagnosticAuthCurrentRealLastName() {
 }
 
 const char* DiagnosticAuthCurrentBackground() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         return nullptr;
     }
-    const char* sourceBlock1b8 = reinterpret_cast<const char*>(g_DiagnosticLoginController->SourceBlock1b8().data());
+    const char* sourceBlock1b8 = reinterpret_cast<const char*>(loginController->SourceBlock1b8().data());
     if (sourceBlock1b8[0] != '\0') {
         return sourceBlock1b8;
     }
-    const auto& ownerState = g_DiagnosticLoginController->PostAuthMarginLoadingStateView();
+    const auto& ownerState = loginController->PostAuthMarginLoadingStateView();
     const char* section0F8c = ownerState.section0StringF8c[0] ? ownerState.section0StringF8c.data() : nullptr;
     const char* section0Fac = ownerState.section0StringFac[0] ? ownerState.section0StringFac.data() : nullptr;
     const char* section0Fcc = ownerState.section0StringFcc[0] ? ownerState.section0StringFcc.data() : nullptr;
@@ -796,31 +903,34 @@ const char* DiagnosticAuthCurrentBackground() {
 }
 
 bool DiagnosticCanBeginAuthConnection() {
-    return g_DiagnosticLoginController != NULL;
+    return DiagnosticCurrentLoginController() != NULL;
 }
 
 uint32_t DiagnosticBeginAuthConnection() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for auth connection");
         return 0;
     }
 
     DiagnosticRawMessageConnectionContext* context =
-        DiagnosticGetOrCreateRawConnectionContext(&g_DiagnosticAuthContext, "AuthConnection");
+        g_DiagnosticLoginControllerSession.GetOrCreateAuthContext("AuthConnection");
     if (context) {
-        g_DiagnosticLoginController->SetAuthConnectionContextKey(context);
+        loginController->SetAuthConnectionContextKey(context);
     }
 
     const uint32_t result =
-        g_DiagnosticLoginController->BeginAuthConnectionViaState1Scaffold();
+        loginController->BeginAuthConnectionViaState1Scaffold();
     if (context) {
-        context->sidecarConnection = g_DiagnosticLoginController->AuthConnection();
+        context->sidecarConnection = loginController->AuthConnection();
     }
-    DiagnosticAuthBridgeSyncOwnerState(g_DiagnosticCurrentOwner);
 
-    if (result != 0u && context && g_DiagnosticCurrentOwner) {
+    void* currentOwner = g_DiagnosticLoginControllerSession.CurrentOwner();
+    DiagnosticAuthBridgeSyncOwnerState(currentOwner);
+
+    if (result != 0u && context && currentOwner) {
         DiagnosticEnqueueConnectionStatusWorkItem(
-            g_DiagnosticCurrentOwner,
+            currentOwner,
             context,
             /*workType=*/2u,
             /*workPayload=*/0x7000001u,
@@ -834,29 +944,32 @@ uint32_t DiagnosticBeginAuthConnection() {
 }
 
 uint32_t DiagnosticBeginMarginConnection() {
-    if (!g_DiagnosticLoginController) {
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticCurrentLoginController();
+    if (!loginController) {
         spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for margin connection");
         return 0;
     }
 
     DiagnosticRawMessageConnectionContext* context =
-        DiagnosticGetOrCreateRawConnectionContext(&g_DiagnosticMarginContext, "MarginConnection");
+        g_DiagnosticLoginControllerSession.GetOrCreateMarginContext("MarginConnection");
     if (context) {
-        g_DiagnosticLoginController->SetMarginConnectionContextKey(context);
+        loginController->SetMarginConnectionContextKey(context);
     }
 
     const uint32_t result = g_DiagnosticLoginStateState4.Slot3_BeginOrContinue(
-        g_DiagnosticLoginController->CurrentState(),
-        g_DiagnosticLoginController);
-    const std::string marginHost = g_DiagnosticLoginController->ResolvedMarginHostName();
+        loginController->CurrentState(),
+        loginController);
+    const std::string marginHost = loginController->ResolvedMarginHostName();
     if (context) {
-        context->sidecarConnection = g_DiagnosticLoginController->MarginConnection();
+        context->sidecarConnection = loginController->MarginConnection();
     }
-    DiagnosticAuthBridgeSyncOwnerState(g_DiagnosticCurrentOwner);
 
-    if (result != 0u && context && g_DiagnosticCurrentOwner) {
+    void* currentOwner = g_DiagnosticLoginControllerSession.CurrentOwner();
+    DiagnosticAuthBridgeSyncOwnerState(currentOwner);
+
+    if (result != 0u && context && currentOwner) {
         DiagnosticEnqueueConnectionStatusWorkItem(
-            g_DiagnosticCurrentOwner,
+            currentOwner,
             context,
             /*workType=*/2u,
             /*workPayload=*/0x7000001u,
