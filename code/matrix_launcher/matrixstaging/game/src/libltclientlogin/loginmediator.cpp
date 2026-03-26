@@ -1834,7 +1834,7 @@ const char* CLTLoginMediator::GetDescriptorInlineNameByIndex(uint8_t slotIndex) 
 }
 
 // anchor: launcher.exe:0x41b320
-uint8_t CLTLoginMediator::GetDescriptorField18ByIndex(uint8_t slotIndex) const {
+uint8_t CLTLoginMediator::GetDescriptorTypeByIndex(uint8_t slotIndex) const {
     if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
         return 0;
     }
@@ -1842,7 +1842,7 @@ uint8_t CLTLoginMediator::GetDescriptorField18ByIndex(uint8_t slotIndex) const {
 }
 
 // anchor: launcher.exe:0x41b360
-uint8_t CLTLoginMediator::GetDescriptorField19ByIndex(uint8_t slotIndex) const {
+uint8_t CLTLoginMediator::GetDescriptorServerVersionLowByteByIndex(uint8_t slotIndex) const {
     if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
         return 0;
     }
@@ -1850,7 +1850,7 @@ uint8_t CLTLoginMediator::GetDescriptorField19ByIndex(uint8_t slotIndex) const {
 }
 
 // anchor: launcher.exe:0x41b3a0
-uint8_t CLTLoginMediator::GetDescriptorLowNibble1fByIndex(uint8_t slotIndex) const {
+uint8_t CLTLoginMediator::GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const {
     if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
         return 0;
     }
@@ -2249,18 +2249,99 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
     return worldName;
 }
 
-// anchor: launcher.exe:0x40cd10
-// +0xfc
+// anchor: launcher.exe:0x41af30 / launcher.exe:0x40e5b0
+// vtable: ILTLoginMediator.Default slot +0xf8
+uint32_t CLTLoginMediator::GetWorldCount() const {
+    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+    const uint32_t worldCount = useRecoveredDescriptorTable
+        ? static_cast<uint32_t>(worldDescriptorCountD80_)
+        : Arg6GetWorldListCount();
+
+    spdlog::info(
+        "CLTLoginMediator::GetWorldCount(+0xf8) -> {} [source={}]",
+        worldCount,
+        useRecoveredDescriptorTable ? "owner+0xd84" : "arg6-selection-fallback");
+    return worldCount;
+}
+
+// anchor: launcher.exe:0x41b2e0 / launcher.exe:0x40cd10
+// vtable: ILTLoginMediator.Default slot +0xfc
 const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
-    if (index < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(index)) {
-        return Arg6MappedSelectionName();
+    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+
+    const char* worldName = nullptr;
+    const char* source = "arg6-world-list";
+    if (useRecoveredDescriptorTable) {
+        worldName = (index <= 0xffu)
+            ? GetDescriptorInlineNameByIndex(static_cast<uint8_t>(index))
+            : nullptr;
+        source = "owner+0xd84.inlineName+0x03";
+    } else if (index < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(index)) {
+        worldName = Arg6MappedSelectionName();
+        source = "arg6-selection-mapped-name";
+    } else if (index < arg6WorldList_.totalCount_) {
+        worldName = arg6WorldList_.worldNames_[index].c_str();
     }
-    return (index < arg6WorldList_.totalCount_) ? arg6WorldList_.worldNames_[index].c_str() : nullptr;
+
+    spdlog::info(
+        "CLTLoginMediator::GetWorldNameByIndex(+0xfc index=0x{:06x}) -> '{}' [source={}]",
+        static_cast<unsigned>(index & 0x00ffffffu),
+        worldName ? worldName : "<null>",
+        source);
+    return worldName;
+}
+
+// anchor: launcher.exe:0x41b320 / launcher.exe:0x4d3584 +0x100
+// vtable: ILTLoginMediator.Default slot +0x100
+uint8_t CLTLoginMediator::GetWorldTypeByIndex(uint32_t index) const {
+    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+    const uint8_t worldType = useRecoveredDescriptorTable
+        ? ((index <= 0xffu) ? GetDescriptorTypeByIndex(static_cast<uint8_t>(index)) : 0u)
+        : Arg6GetWorldVariantByIndex(index);
+
+    spdlog::info(
+        "CLTLoginMediator::GetWorldTypeByIndex(+0x100 index=0x{:06x}) -> {} [source={}]",
+        static_cast<unsigned>(index & 0x00ffffffu),
+        static_cast<unsigned>(worldType),
+        useRecoveredDescriptorTable ? "owner+0xd84.type+0x18" : "arg6-selection-fallback");
+    return worldType;
+}
+
+// anchor: launcher.exe:0x41b360
+// vtable: ILTLoginMediator.Default slot +0x104
+uint8_t CLTLoginMediator::GetWorldServerVersionLowByteByIndex(uint32_t index) const {
+    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+    const uint8_t serverVersionLowByte = useRecoveredDescriptorTable
+        ? ((index <= 0xffu) ? GetDescriptorServerVersionLowByteByIndex(static_cast<uint8_t>(index)) : 0u)
+        : 0u;
+
+    spdlog::info(
+        "CLTLoginMediator::GetWorldServerVersionLowByteByIndex(+0x104 index=0x{:06x}) -> {} [source={}]",
+        static_cast<unsigned>(index & 0x00ffffffu),
+        static_cast<unsigned>(serverVersionLowByte),
+        useRecoveredDescriptorTable ? "owner+0xd84.serverVersion+0x19.low8" : "no-startup-fallback");
+    return serverVersionLowByte;
+}
+
+// anchor: launcher.exe:0x41b3a0
+// vtable: ILTLoginMediator.Default slot +0x108
+uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const {
+    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+    const uint8_t populationNibble = useRecoveredDescriptorTable
+        ? ((index <= 0xffu) ? GetDescriptorPopulationNibbleByIndex(static_cast<uint8_t>(index)) : 0u)
+        : 0u;
+
+    spdlog::info(
+        "CLTLoginMediator::GetWorldPopulationNibbleByIndex(+0x108 index=0x{:06x}) -> {} [source={}]",
+        static_cast<unsigned>(index & 0x00ffffffu),
+        static_cast<unsigned>(populationNibble),
+        useRecoveredDescriptorTable ? "owner+0xd84.population+0x1f.low4" : "no-startup-fallback");
+    return populationNibble;
 }
 
 // anchor: launcher.exe:0x4d3584 +0x100
 // vtable: launcher.exe:0x4d3584 +0x100
-uint8_t CLTLoginMediator::Arg6GetWorldVariantByIndex(uint32_t index) {
+uint8_t CLTLoginMediator::Arg6GetWorldVariantByIndex(uint32_t index) const {
     if (index < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(index)) {
         return static_cast<uint8_t>(Arg6SelectedWorldType());
     }

@@ -764,9 +764,23 @@ public:
     bool Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const;
     uint32_t Arg6ExpectedSelectionDescriptorScratchRequest() const;
     bool Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
-    // +0xfc
+
+    // Wrapper-facing world-descriptor family (`+0xf8 .. +0x108`).
+    // Keep the wrapper/owner split explicit:
+    // - once the post-auth owner `+0xd84` table exists, these slots read that concrete
+    //   world-descriptor state
+    // - before that table exists, the startup/arg7 path still needs the older arg6-selection
+    //   fallback for `+0xf8/+0xfc/+0x100`
+    // - `+0x104/+0x108` do not have a proved startup-side synthetic answer, so they stay `0`
+    //   until the real descriptor table is present
+    uint32_t GetWorldCount() const override;
     const char* GetWorldNameByIndex(uint32_t index) override;
-    uint8_t Arg6GetWorldVariantByIndex(uint32_t index);
+    uint8_t GetWorldTypeByIndex(uint32_t index) const override;
+    uint8_t GetWorldServerVersionLowByteByIndex(uint32_t index) const override;
+    uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const override;
+
+    // Startup-only arg6 selection/world-list helpers.
+    uint8_t Arg6GetWorldVariantByIndex(uint32_t index) const;
     uint8_t Arg6ValidateWorldSelection(uint8_t variant);
     uint32_t Arg6GetWorldListCount() const;
     uint32_t Arg6GetActiveWorldListCount() const;
@@ -881,11 +895,11 @@ public:
     // anchor: launcher.exe:0x41b2e0 / owner vtable +0xfc
     const char* GetDescriptorInlineNameByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b320 / owner vtable +0x100
-    uint8_t GetDescriptorField18ByIndex(uint8_t slotIndex) const;
+    uint8_t GetDescriptorTypeByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b360 / owner vtable +0x104
-    uint8_t GetDescriptorField19ByIndex(uint8_t slotIndex) const;
+    uint8_t GetDescriptorServerVersionLowByteByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b3a0 / owner vtable +0x108
-    uint8_t GetDescriptorLowNibble1fByIndex(uint8_t slotIndex) const;
+    uint8_t GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const;
 
     // =============================================================================
     // Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)

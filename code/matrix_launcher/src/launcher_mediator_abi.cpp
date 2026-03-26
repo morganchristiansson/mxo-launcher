@@ -85,11 +85,6 @@ static uint32_t DiagnosticMediatorSelectedVariantIndexHigh8() {
     return mediator ? mediator->Arg6SelectedVariantIndexHigh8() : 0u;
 }
 
-static uint32_t DiagnosticMediatorSelectedWorldType() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6SelectedWorldType() : 1u;
-}
-
 static uint32_t DiagnosticMediatorMappedSelectionId() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6MappedSelectionId() : 0u;
@@ -98,11 +93,6 @@ static uint32_t DiagnosticMediatorMappedSelectionId() {
 static const char* DiagnosticMediatorMappedSelectionName() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6MappedSelectionName() : g_MediatorStringC;
-}
-
-static const char* DiagnosticMediatorMappedVariantName() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6MappedVariantName() : DiagnosticMediatorMappedSelectionName();
 }
 
 static const char* DiagnosticMediatorProfileName() {
@@ -483,73 +473,35 @@ static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* se
 // vtable: launcher.exe:0x4d3584 slot +0xf8
 static uint32_t __thiscall Mediator_GetWorldCount(MinimalLoginMediatorStub* self) {
     (void)self;
-    spdlog::info(
-        "MediatorStub::GetWorldCount(+0xf8) -> {}",
-        (unsigned)DiagnosticMediatorWorldUpperBoundExclusive());
-    return DiagnosticMediatorWorldUpperBoundExclusive();
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldCount();
 }
 
 // anchor: launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex
 // vtable: launcher.exe:0x4d3584 slot +0xfc
 static const char* __thiscall Mediator_GetWorldNameByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const char* worldName = DiagnosticMediatorWorldNameForIndex(worldIndex);
-    spdlog::info(
-        "MediatorStub::GetWorldNameByIndex(+0xfc worldIndex=0x{:06x}) -> '{}' (configuredWorld=0x{:06x})",
-        (unsigned)(worldIndex & 0x00ffffffu),
-        worldName ? worldName : "<null>",
-        DiagnosticMediatorSelectedWorldIndexLow24());
-    return worldName;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldNameByIndex(worldIndex);
 }
 
-// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0x100
+// anchor: launcher.exe:0x41b320 / launcher.exe arg7-selection writer at 0x40d763..0x40d810
 // vtable: launcher.exe:0x4d3584 slot +0x100
 static uint32_t __thiscall Mediator_GetWorldTypeByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const uint32_t worldType =
-        (worldIndex < DiagnosticMediatorWorldUpperBoundExclusive() &&
-         DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
-            ? DiagnosticMediatorSelectedWorldType()
-            : 0u;
-    spdlog::info(
-        "MediatorStub::GetWorldTypeByIndex(+0x100 worldIndex=0x{:06x}) -> {} (configuredWorld=0x{:06x} configuredType={})",
-        (unsigned)(worldIndex & 0x00ffffffu),
-        (unsigned)worldType,
-        DiagnosticMediatorSelectedWorldIndexLow24(),
-        (unsigned)DiagnosticMediatorSelectedWorldType());
-    return worldType;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldTypeByIndex(worldIndex);
 }
 
-// anchor: later client/runtime world-descriptor consumers read additional sibling-object fields after +0x100
+// anchor: launcher.exe:0x41b360
 // vtable: launcher.exe:0x4d3584 slot +0x104
-static uint32_t __thiscall Mediator_GetWorldFlag104(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
+static uint32_t __thiscall Mediator_GetWorldServerVersionLowByteByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const uint32_t flagValue =
-        (worldIndex < DiagnosticMediatorWorldUpperBoundExclusive() &&
-         DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
-            ? 0u
-            : 0u;
-    spdlog::info(
-        "MediatorStub::GetWorldFlag104(+0x104 worldIndex=0x{:06x}) -> {}",
-        (unsigned)(worldIndex & 0x00ffffffu),
-        (unsigned)flagValue);
-    return flagValue;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldServerVersionLowByteByIndex(worldIndex);
 }
 
-// anchor: later client/runtime world-descriptor consumers read additional sibling-object fields after +0x100
+// anchor: launcher.exe:0x41b3a0
 // vtable: launcher.exe:0x4d3584 slot +0x108
-static const char* __thiscall Mediator_GetWorldExtra108(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
+static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    const char* value =
-        (worldIndex < DiagnosticMediatorWorldUpperBoundExclusive() &&
-         DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex))
-            ? DiagnosticMediatorMappedVariantName()
-            : NULL;
-    spdlog::info(
-        "MediatorStub::GetWorldExtra108(+0x108 worldIndex=0x{:06x}) -> '{}'",
-        (unsigned)(worldIndex & 0x00ffffffu),
-        value ? value : "<null>");
-    return value;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldPopulationNibbleByIndex(worldIndex);
 }
 
 // ILTLoginMediator.Default wrapper minimization:
@@ -858,8 +810,8 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[62] = (void*)Mediator_GetWorldCount; // +0xf8
     g_LoginMediatorVtable[63] = (void*)Mediator_GetWorldNameByIndex; // +0xfc
     g_LoginMediatorVtable[64] = (void*)Mediator_GetWorldTypeByIndex; // +0x100
-    g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldFlag104; // +0x104
-    g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldExtra108; // +0x108
+    g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldServerVersionLowByteByIndex; // +0x104
+    g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldPopulationNibbleByIndex; // +0x108
     g_LoginMediatorVtable[67] = (void*)Mediator_GetRouteDescriptor10c; // +0x10c
     g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
     g_LoginMediatorVtable[72] = (void*)Mediator_ProcessLoginCredentials120; // +0x120

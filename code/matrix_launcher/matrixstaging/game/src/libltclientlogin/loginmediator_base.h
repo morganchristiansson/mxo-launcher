@@ -343,15 +343,15 @@ public:
     // +0xf4
     virtual const void* GetState8PersistenceF1c() const = 0;
     // +0xf8
-    void UnknownSlot65();
+    virtual uint32_t GetWorldCount() const = 0;
     // +0xfc
     virtual const char* GetWorldNameByIndex(uint32_t index) = 0;
     // +0x100
-    // virtual uint8_t GetDescriptorField18ByIndex(uint32_t index) const = 0;
+    virtual uint8_t GetWorldTypeByIndex(uint32_t index) const = 0;
     // +0x104
-    // virtual uint8_t GetDescriptorField19ByIndex(uint32_t index) const = 0;
+    virtual uint8_t GetWorldServerVersionLowByteByIndex(uint32_t index) const = 0;
     // +0x108
-    // virtual uint8_t GetDescriptorLowNibble1fByIndex(uint32_t index) const = 0;
+    virtual uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const = 0;
     // +0x10c
     virtual RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() = 0;
     // +0x110

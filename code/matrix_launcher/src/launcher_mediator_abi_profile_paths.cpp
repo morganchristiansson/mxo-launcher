@@ -67,24 +67,7 @@ static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* 
     return mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
 }
 
-static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex);
 static void PopulateMediatorCurrentSlotRecordObject();
-
-// UNANCHORED: scaffold selection-resolution helpers layered over the CLTLoginMediator sidecar model.
-static const char* DiagnosticMediatorWorldNameForIndex(uint32_t worldIndex) {
-    if (worldIndex >= DiagnosticMediatorWorldUpperBoundExclusive()) {
-        return NULL;
-    }
-    if (!DiagnosticMediatorWorldIndexMatchesConfiguredSelection(worldIndex)) {
-        return NULL;
-    }
-    return DiagnosticMediatorMappedSelectionName();
-}
-
-static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6WorldIndexMatchesSelection(worldIndex) : false;
-}
 
 static uint32_t DiagnosticMediatorExpectedSelectionDescriptorScratchRequest() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
