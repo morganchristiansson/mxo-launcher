@@ -79,7 +79,7 @@ struct RecoveredLauncherSelectionRecord {
     const char* routeHostPrefix;
     uint32_t worldIndexLow24;
     uint32_t variantIndexHigh8;
-    uint32_t worldType;
+    uint32_t selectionGateByte100;
     uint32_t variantState;
 };
 
@@ -809,12 +809,12 @@ int main(int argc, char* argv[]) {
         g_CLauncherFieldA8 = recoveredSelection->variantIndexHigh8;
         g_CLauncherFieldAC = recoveredSelection->worldIndexLow24;
         spdlog::info(
-            "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} worldType={} variantState={} routePrefix='{}'",
+            "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
             recoveredSelection->worldName,
             g_CLauncherFieldA8,
             g_CLauncherFieldAC,
             BuildPackedArg7Selection(),
-            (unsigned)recoveredSelection->worldType,
+            (unsigned)recoveredSelection->selectionGateByte100,
             (unsigned)recoveredSelection->variantState,
             recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
     } else if (mediatorSelectionName[0] && lstrcmpiA(mediatorSelectionName, "standalone") != 0) {
@@ -828,7 +828,8 @@ int main(int argc, char* argv[]) {
         spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", g_PackedArg7Selection);
     }
 
-    const uint32_t mediatorSelectedWorldType = recoveredSelection ? recoveredSelection->worldType : 1u;
+    const uint32_t mediatorSelectedSelectionGateByte100 =
+        recoveredSelection ? recoveredSelection->selectionGateByte100 : 1u;
     const uint32_t mediatorSelectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
 
     const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionBits();
@@ -880,7 +881,7 @@ int main(int argc, char* argv[]) {
         mediatorSelectionName,
         selectionPackedLow24,
         selectedHighByte,
-        mediatorSelectedWorldType,
+        mediatorSelectedSelectionGateByte100,
         mediatorSelectedVariantState);
     DiagnosticConfigureMediatorProfileName(
         g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);

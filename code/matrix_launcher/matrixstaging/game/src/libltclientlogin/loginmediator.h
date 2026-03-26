@@ -743,7 +743,7 @@ public:
         const char* mappedVariantName,
         uint32_t selectedWorldIndexLow24,
         uint32_t selectedVariantIndexHigh8,
-        uint32_t selectedWorldType,
+        uint32_t selectedSelectionGateByte100,
         uint32_t selectedVariantState);
     void SetArg6ProfileName(const char* profileName);
     void SetArg6AuthName(const char* authName);
@@ -752,7 +752,7 @@ public:
     uint32_t Arg6VariantUpperBoundExclusive() const;
     uint32_t Arg6SelectedWorldIndexLow24() const;
     uint32_t Arg6SelectedVariantIndexHigh8() const;
-    uint32_t Arg6SelectedWorldType() const;
+    uint32_t Arg6SelectedSelectionGateByte100() const;
     uint32_t Arg6SelectedVariantState() const;
     uint32_t Arg6MappedSelectionId() const;
     const char* Arg6MappedSelectionName() const;
@@ -769,18 +769,20 @@ public:
     // Keep the wrapper/owner split explicit:
     // - once the post-auth owner `+0xd84` table exists, these slots read that concrete
     //   world-descriptor state
-    // - before that table exists, the startup/arg7 path still needs the older arg6-selection
-    //   fallback for `+0xf8/+0xfc/+0x100`
+    // - owner `+0x100 / 0x41b320` now reads descriptor byte `+0x17` (Status), but the earlier
+    //   startup/arg7 path still only has a legacy synthetic gate byte for the same wrapper slot,
+    //   so keep `+0x100` named as a wrapper-facing selection-gate byte instead of forcing a
+    //   false owner/wrapper unification
+    // - owner `+0x104 / 0x41b360` reads descriptor byte `+0x18` (Type)
     // - `+0x104/+0x108` do not have a proved startup-side synthetic answer, so they stay `0`
     //   until the real descriptor table is present
     uint32_t GetWorldCount() const override;
     const char* GetWorldNameByIndex(uint32_t index) override;
-    uint8_t GetWorldTypeByIndex(uint32_t index) const override;
-    uint8_t GetWorldServerVersionLowByteByIndex(uint32_t index) const override;
+    uint8_t GetWorldSelectionGateByteByIndex(uint32_t index) const override;
+    uint8_t GetWorldTypeByteByIndex(uint32_t index) const override;
     uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const override;
 
     // Startup-only arg6 selection/world-list helpers.
-    uint8_t Arg6GetWorldVariantByIndex(uint32_t index) const;
     uint8_t Arg6ValidateWorldSelection(uint8_t variant);
     uint32_t Arg6GetWorldListCount() const;
     uint32_t Arg6GetActiveWorldListCount() const;
@@ -895,9 +897,9 @@ public:
     // anchor: launcher.exe:0x41b2e0 / owner vtable +0xfc
     const char* GetDescriptorInlineNameByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b320 / owner vtable +0x100
-    uint8_t GetDescriptorTypeByIndex(uint8_t slotIndex) const;
+    uint8_t GetDescriptorStatusByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b360 / owner vtable +0x104
-    uint8_t GetDescriptorServerVersionLowByteByIndex(uint8_t slotIndex) const;
+    uint8_t GetDescriptorTypeByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b3a0 / owner vtable +0x108
     uint8_t GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const;
 
@@ -1276,7 +1278,7 @@ private:
     // launcher.exe:0x4d3584 +0xc = vtable (ILTLoginMediator)
     // launcher.exe:0x4d3584 +0x10 = ILTLoginMediator_BuildWorldList()
     // launcher.exe:0x4d3584 +0x14 = GetWorldNameByIndex(char*)
-    // launcher.exe:0x4d3584 +0x18 = Arg6GetWorldVariantByIndex(uint)
+    // launcher.exe:0x4d3584 +0x18 = startup-only gate-byte fallback feeding wrapper slot +0x100
     // launcher.exe:0x4d3584 +0x1c = Arg6ValidateWorldSelection(uint -> 0 or 7)
     // launcher.exe:0x4d3584 +0x20 = Arg6GetWorldListCount(uint)
     // launcher.exe:0x4d3584 +0x24 = Arg6GetActiveWorldListCount(uint)
@@ -1286,8 +1288,9 @@ private:
         // launcher.exe:0x4d3584 +0xfc = GetWorldNameByIndex(index) -> char*
         std::array<std::string, 10> worldNames_ = {"Default", "Starter", "Classic", "Advanced", "Extreme"};
 
-        // launcher.exe:0x4d3584 +0x100 = GetWorldVariantByIndex(index) -> uint (1,2,3,5)
-        std::array<uint8_t, 10> worldVariants_ = {1, 2, 3, 5, 1};
+        // launcher.exe:0x4d3584 +0x100 = startup-only synthetic gate byte used before the
+        // recovered owner `+0xd84` descriptor table exists
+        std::array<uint8_t, 10> worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
 
         // launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
         std::array<bool, 10> worldValid_ = {true, true, true, true, true, false, false, false, false, false};
@@ -1307,7 +1310,10 @@ private:
         uint32_t variantUpperBoundExclusive_ = 1;
         uint32_t selectedWorldIndexLow24_ = 0;
         uint32_t selectedVariantIndexHigh8_ = 0;
-        uint32_t selectedWorldType_ = 1;
+        // Startup-only synthetic fallback for wrapper slot `+0x100` before the owner-side
+        // descriptor table exists. Keep the split explicit: this is not yet a proved direct alias
+        // for the later owner descriptor Status/Type bytes.
+        uint32_t selectedSelectionGateByte100_ = 1;
         uint32_t selectedVariantState_ = 0;
         uint32_t mappedSelectionId_ = 0;
         std::string mappedSelectionName_ = "standalone";

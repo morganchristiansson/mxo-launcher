@@ -485,16 +485,16 @@ static const char* __thiscall Mediator_GetWorldNameByIndex(MinimalLoginMediatorS
 
 // anchor: launcher.exe:0x41b320 / launcher.exe arg7-selection writer at 0x40d763..0x40d810
 // vtable: launcher.exe:0x4d3584 slot +0x100
-static uint32_t __thiscall Mediator_GetWorldTypeByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
+static uint32_t __thiscall Mediator_GetWorldSelectionGateByteByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldTypeByIndex(worldIndex);
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldSelectionGateByteByIndex(worldIndex);
 }
 
 // anchor: launcher.exe:0x41b360
 // vtable: launcher.exe:0x4d3584 slot +0x104
-static uint32_t __thiscall Mediator_GetWorldServerVersionLowByteByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
+static uint32_t __thiscall Mediator_GetWorldTypeByteByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldServerVersionLowByteByIndex(worldIndex);
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldTypeByteByIndex(worldIndex);
 }
 
 // anchor: launcher.exe:0x41b3a0
@@ -809,8 +809,8 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[61] = (void*)Mediator_GetState8PersistenceF1c; // +0xf4
     g_LoginMediatorVtable[62] = (void*)Mediator_GetWorldCount; // +0xf8
     g_LoginMediatorVtable[63] = (void*)Mediator_GetWorldNameByIndex; // +0xfc
-    g_LoginMediatorVtable[64] = (void*)Mediator_GetWorldTypeByIndex; // +0x100
-    g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldServerVersionLowByteByIndex; // +0x104
+    g_LoginMediatorVtable[64] = (void*)Mediator_GetWorldSelectionGateByteByIndex; // +0x100
+    g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldTypeByteByIndex; // +0x104
     g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldPopulationNibbleByIndex; // +0x108
     g_LoginMediatorVtable[67] = (void*)Mediator_GetRouteDescriptor10c; // +0x10c
     g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
@@ -926,7 +926,7 @@ void DiagnosticConfigureMediatorSelection(
     const char* mappedVariantName,
     uint32_t selectedWorldIndexLow24,
     uint32_t selectedVariantIndexHigh8,
-    uint32_t selectedWorldType,
+    uint32_t selectedSelectionGateByte100,
     uint32_t selectedVariantState) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     if (!mediator) {
@@ -941,21 +941,21 @@ void DiagnosticConfigureMediatorSelection(
         mappedVariantName,
         selectedWorldIndexLow24,
         selectedVariantIndexHigh8,
-        selectedWorldType,
+        selectedSelectionGateByte100,
         selectedVariantState);
     g_MediatorSelectionPacked.field03 =
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(mediator->Arg6MappedSelectionName()));
     g_MediatorSelectionPacked.field07 = mediator->Arg6MappedSelectionId();
 
     spdlog::info(
-        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive={} variantUpperBoundExclusive={} worldName='{}' variantName='{}' selectedWorldLow24=0x{:06x} selectedVariantHigh8=0x{:02x} selectedWorldType={} selectedVariantState={}",
+        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive={} variantUpperBoundExclusive={} worldName='{}' variantName='{}' selectedWorldLow24=0x{:06x} selectedVariantHigh8=0x{:02x} selectedSelectionGateByte100={} selectedVariantState={}",
         mediator->Arg6WorldUpperBoundExclusive(),
         mediator->Arg6VariantUpperBoundExclusive(),
         mediator->Arg6MappedSelectionName(),
         mediator->Arg6MappedVariantName(),
         mediator->Arg6SelectedWorldIndexLow24(),
         mediator->Arg6SelectedVariantIndexHigh8(),
-        mediator->Arg6SelectedWorldType(),
+        mediator->Arg6SelectedSelectionGateByte100(),
         mediator->Arg6SelectedVariantState());
 }
 
@@ -984,35 +984,35 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     typedef uint32_t (__thiscall *IndexUIntFn)(void*, uint32_t);
     typedef uint32_t (__thiscall *SignedIndexUIntFn)(void*, int32_t);
 
-    NoArgUIntFn allowSpecialTypeFn = (NoArgUIntFn)vtable[21];       // +0x54
+    NoArgUIntFn allowSpecialSelectionGateFn = (NoArgUIntFn)vtable[21]; // +0x54
     IndexStringFn worldNameFn = (IndexStringFn)vtable[63];         // +0xfc
-    IndexUIntFn worldTypeFn = (IndexUIntFn)vtable[64];             // +0x100
+    IndexUIntFn selectionGateByte100Fn = (IndexUIntFn)vtable[64];  // +0x100
     SignedIndexUIntFn variantStateFn = (SignedIndexUIntFn)vtable[57]; // +0xe4
 
     const uint32_t worldIndexLow24 = requestedWorldIndexLow24 & 0x00ffffffu;
     const uint32_t variantIndexHigh8 = requestedVariantIndexHigh8 & 0xffu;
     const char* worldName = worldNameFn(mediatorPtr, worldIndexLow24);
-    const uint32_t worldType = worldTypeFn(mediatorPtr, worldIndexLow24);
+    const uint32_t selectionGateByte100 = selectionGateByte100Fn(mediatorPtr, worldIndexLow24);
 
-    bool typeAccepted = false;
-    if (worldType == 1u) {
-        typeAccepted = true;
-    } else if (worldType == 2u || worldType == 5u) {
-        typeAccepted = allowSpecialTypeFn(mediatorPtr) != 0;
+    bool selectionGateAccepted = false;
+    if (selectionGateByte100 == 1u) {
+        selectionGateAccepted = true;
+    } else if (selectionGateByte100 == 2u || selectionGateByte100 == 5u) {
+        selectionGateAccepted = allowSpecialSelectionGateFn(mediatorPtr) != 0;
     }
 
     const int32_t signedVariantIndex = static_cast<int32_t>(variantIndexHigh8);
     const uint32_t variantState = variantStateFn(mediatorPtr, signedVariantIndex);
     const bool variantAccepted = (variantState == 0u || variantState == 7u);
 
-    if (!worldName || !typeAccepted || !variantAccepted) {
+    if (!worldName || !selectionGateAccepted || !variantAccepted) {
         spdlog::info(
-            "DIAGNOSTIC: launcher selection resolve failed worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} worldName={} worldType={} typeAccepted={} variantState={} variantAccepted={}",
+            "DIAGNOSTIC: launcher selection resolve failed worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} worldName={} selectionGateByte100={} selectionGateAccepted={} variantState={} variantAccepted={}",
             worldIndexLow24,
             variantIndexHigh8,
             worldName ? worldName : "<null>",
-            worldType,
-            typeAccepted ? 1u : 0u,
+            selectionGateByte100,
+            selectionGateAccepted ? 1u : 0u,
             variantState,
             variantAccepted ? 1u : 0u);
         return false;
@@ -1028,11 +1028,11 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     }
 
     spdlog::info(
-        "DIAGNOSTIC: launcher-style selection resolve via mediator worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} -> worldName='{}' worldType={} variantState={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
+        "DIAGNOSTIC: launcher-style selection resolve via mediator worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} -> worldName='{}' selectionGateByte100={} variantState={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
         worldIndexLow24,
         variantIndexHigh8,
         worldName,
-        worldType,
+        selectionGateByte100,
         variantState,
         *outFieldA8,
         *outFieldAC,

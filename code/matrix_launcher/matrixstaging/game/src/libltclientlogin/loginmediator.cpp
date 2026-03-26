@@ -1834,19 +1834,25 @@ const char* CLTLoginMediator::GetDescriptorInlineNameByIndex(uint8_t slotIndex) 
 }
 
 // anchor: launcher.exe:0x41b320
+// Ghidra/disassembly correction:
+// - this owner reader returns descriptor payload byte `+0x17` (Status)
+// - earlier docs/source had an off-by-one stale guess that put Type here
+uint8_t CLTLoginMediator::GetDescriptorStatusByIndex(uint8_t slotIndex) const {
+    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
+        return 0;
+    }
+    return worldDescriptorsD84_[slotIndex].status17;
+}
+
+// anchor: launcher.exe:0x41b360
+// Ghidra/disassembly correction:
+// - this owner reader returns descriptor payload byte `+0x18` (Type)
+// - earlier docs/source had an off-by-one stale guess that put server-version low byte here
 uint8_t CLTLoginMediator::GetDescriptorTypeByIndex(uint8_t slotIndex) const {
     if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
         return 0;
     }
     return worldDescriptorsD84_[slotIndex].type18;
-}
-
-// anchor: launcher.exe:0x41b360
-uint8_t CLTLoginMediator::GetDescriptorServerVersionLowByteByIndex(uint8_t slotIndex) const {
-    if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
-        return 0;
-    }
-    return static_cast<uint8_t>(worldDescriptorsD84_[slotIndex].serverVersion19 & 0xffu);
 }
 
 // anchor: launcher.exe:0x41b3a0
@@ -2018,7 +2024,8 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 //
 // VTABLE METHODS (at offset +0xc from object pointer):
 // +0xfc = GetWorldNameByIndex(index) -> char* world name string
-// +0x100 = GetWorldVariantByIndex(index) -> uint variant state (1,2,3,5)
+// +0x100 = startup-only synthetic selection-gate byte used by the launcher arg7 path before the
+//          recovered owner `+0xd84` descriptor table exists
 // +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
 // +0xf8 = GetWorldListCount() -> uint total count
 // +0xd8 = GetActiveWorldCount() -> uint active count
@@ -2027,7 +2034,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 //
 // ARG7 PACKING FORMAT:
 // g_PackedArg7Selection = (high8bits << 24) | low24bits
-//   high8bits = variant state from vtable[+0x100]
+//   high8bits = variant state from launcher selection data
 //   low24bits = world index from GetItemData low bits
 // =============================================================================
 
@@ -2065,7 +2072,7 @@ void CLTLoginMediator::InitializeArg6DefaultObject() {
     arg6WorldList_.worldNames_ = {
         "Default", "Starter", "Classic", "Advanced", "Extreme"
     };
-    arg6WorldList_.worldVariants_ = {1, 2, 3, 5, 1};
+    arg6WorldList_.worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
     arg6WorldList_.worldValid_ = {true, true, true, true, true, false, false, false, false, false};
     arg6WorldList_.available_ = {true, true, true, true, true, false, false, false, false, false};
     arg6WorldList_.totalCount_ = 5;
@@ -2088,13 +2095,13 @@ void CLTLoginMediator::ConfigureArg6Selection(
     const char* mappedVariantName,
     uint32_t selectedWorldIndexLow24,
     uint32_t selectedVariantIndexHigh8,
-    uint32_t selectedWorldType,
+    uint32_t selectedSelectionGateByte100,
     uint32_t selectedVariantState) {
     arg6Selection_.worldUpperBoundExclusive_ = worldUpperBoundExclusive ? worldUpperBoundExclusive : 1u;
     arg6Selection_.variantUpperBoundExclusive_ = variantUpperBoundExclusive ? variantUpperBoundExclusive : 1u;
     arg6Selection_.selectedWorldIndexLow24_ = selectedWorldIndexLow24 & 0x00ffffffu;
     arg6Selection_.selectedVariantIndexHigh8_ = selectedVariantIndexHigh8 & 0xffu;
-    arg6Selection_.selectedWorldType_ = selectedWorldType;
+    arg6Selection_.selectedSelectionGateByte100_ = selectedSelectionGateByte100;
     arg6Selection_.selectedVariantState_ = selectedVariantState;
     arg6Selection_.mappedSelectionId_ = arg6Selection_.selectedWorldIndexLow24_;
     arg6Selection_.mappedSelectionName_ =
@@ -2131,8 +2138,8 @@ uint32_t CLTLoginMediator::Arg6SelectedVariantIndexHigh8() const {
     return arg6Selection_.selectedVariantIndexHigh8_;
 }
 
-uint32_t CLTLoginMediator::Arg6SelectedWorldType() const {
-    return arg6Selection_.selectedWorldType_;
+uint32_t CLTLoginMediator::Arg6SelectedSelectionGateByte100() const {
+    return arg6Selection_.selectedSelectionGateByte100_;
 }
 
 uint32_t CLTLoginMediator::Arg6SelectedVariantState() const {
@@ -2293,34 +2300,51 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
 
 // anchor: launcher.exe:0x41b320 / launcher.exe:0x4d3584 +0x100
 // vtable: ILTLoginMediator.Default slot +0x100
-uint8_t CLTLoginMediator::GetWorldTypeByIndex(uint32_t index) const {
+// Keep the wrapper/owner split explicit:
+// - once auth-reply world descriptors exist, this slot reads owner descriptor Status byte `+0x17`
+// - before that, startup selection still needs the older synthetic gate byte path
+uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const {
     const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-    const uint8_t worldType = useRecoveredDescriptorTable
-        ? ((index <= 0xffu) ? GetDescriptorTypeByIndex(static_cast<uint8_t>(index)) : 0u)
-        : Arg6GetWorldVariantByIndex(index);
+
+    uint8_t selectionGateByte100 = 0u;
+    const char* source = "no-startup-fallback";
+    if (useRecoveredDescriptorTable) {
+        selectionGateByte100 = (index <= 0xffu)
+            ? GetDescriptorStatusByIndex(static_cast<uint8_t>(index))
+            : 0u;
+        source = "owner+0xd84.status+0x17";
+    } else if (index < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(index)) {
+        selectionGateByte100 = static_cast<uint8_t>(Arg6SelectedSelectionGateByte100());
+        source = "arg6-selection-gate-byte100";
+    } else if (index < arg6WorldList_.totalCount_) {
+        selectionGateByte100 = arg6WorldList_.worldSelectionGateBytes100_[index];
+        source = "arg6-world-list-gate-byte100";
+    }
 
     spdlog::info(
-        "CLTLoginMediator::GetWorldTypeByIndex(+0x100 index=0x{:06x}) -> {} [source={}]",
+        "CLTLoginMediator::GetWorldSelectionGateByteByIndex(+0x100 index=0x{:06x}) -> {} [source={}]",
         static_cast<unsigned>(index & 0x00ffffffu),
-        static_cast<unsigned>(worldType),
-        useRecoveredDescriptorTable ? "owner+0xd84.type+0x18" : "arg6-selection-fallback");
-    return worldType;
+        static_cast<unsigned>(selectionGateByte100),
+        source);
+    return selectionGateByte100;
 }
 
 // anchor: launcher.exe:0x41b360
 // vtable: ILTLoginMediator.Default slot +0x104
-uint8_t CLTLoginMediator::GetWorldServerVersionLowByteByIndex(uint32_t index) const {
+// Corrected off-by-one read from Ghidra/disassembly: this wrapper slot now surfaces owner
+// descriptor Type byte `+0x18`, not server-version low byte.
+uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
     const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-    const uint8_t serverVersionLowByte = useRecoveredDescriptorTable
-        ? ((index <= 0xffu) ? GetDescriptorServerVersionLowByteByIndex(static_cast<uint8_t>(index)) : 0u)
+    const uint8_t worldTypeByte = useRecoveredDescriptorTable
+        ? ((index <= 0xffu) ? GetDescriptorTypeByIndex(static_cast<uint8_t>(index)) : 0u)
         : 0u;
 
     spdlog::info(
-        "CLTLoginMediator::GetWorldServerVersionLowByteByIndex(+0x104 index=0x{:06x}) -> {} [source={}]",
+        "CLTLoginMediator::GetWorldTypeByteByIndex(+0x104 index=0x{:06x}) -> {} [source={}]",
         static_cast<unsigned>(index & 0x00ffffffu),
-        static_cast<unsigned>(serverVersionLowByte),
-        useRecoveredDescriptorTable ? "owner+0xd84.serverVersion+0x19.low8" : "no-startup-fallback");
-    return serverVersionLowByte;
+        static_cast<unsigned>(worldTypeByte),
+        useRecoveredDescriptorTable ? "owner+0xd84.type+0x18" : "no-startup-fallback");
+    return worldTypeByte;
 }
 
 // anchor: launcher.exe:0x41b3a0
@@ -2337,15 +2361,6 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
         static_cast<unsigned>(populationNibble),
         useRecoveredDescriptorTable ? "owner+0xd84.population+0x1f.low4" : "no-startup-fallback");
     return populationNibble;
-}
-
-// anchor: launcher.exe:0x4d3584 +0x100
-// vtable: launcher.exe:0x4d3584 +0x100
-uint8_t CLTLoginMediator::Arg6GetWorldVariantByIndex(uint32_t index) const {
-    if (index < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(index)) {
-        return static_cast<uint8_t>(Arg6SelectedWorldType());
-    }
-    return (index < arg6WorldList_.totalCount_) ? arg6WorldList_.worldVariants_[index] : 0u;
 }
 
 // anchor: launcher.exe:0x4d3584 +0xe4
@@ -2399,7 +2414,8 @@ void CLTLoginMediator::PopulateClientWorldView() {
     // Copy launcher-owned world list into the mediator's client-facing view
     for (uint32_t i = 0; i < kRecoveredWorldSlotCapacity && i < arg6WorldList_.totalCount_; ++i) {
         worldSlots_[i] = const_cast<void*>(reinterpret_cast<const void*>(arg6WorldList_.worldNames_[i].c_str()));
-        worldPayloadSlots_[i] = const_cast<void*>(reinterpret_cast<const void*>(&arg6WorldList_.worldVariants_[i]));
+        worldPayloadSlots_[i] = const_cast<void*>(
+            reinterpret_cast<const void*>(&arg6WorldList_.worldSelectionGateBytes100_[i]));
         arg6WorldList_.worldValid_[i] = true;
         arg6WorldList_.available_[i] = true;
     }

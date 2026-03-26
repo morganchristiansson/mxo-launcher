@@ -347,9 +347,9 @@ public:
     // +0xfc
     virtual const char* GetWorldNameByIndex(uint32_t index) = 0;
     // +0x100
-    virtual uint8_t GetWorldTypeByIndex(uint32_t index) const = 0;
+    virtual uint8_t GetWorldSelectionGateByteByIndex(uint32_t index) const = 0;
     // +0x104
-    virtual uint8_t GetWorldServerVersionLowByteByIndex(uint32_t index) const = 0;
+    virtual uint8_t GetWorldTypeByteByIndex(uint32_t index) const = 0;
     // +0x108
     virtual uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const = 0;
     // +0x10c
