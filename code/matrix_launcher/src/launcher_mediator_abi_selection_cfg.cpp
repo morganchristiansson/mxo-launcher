@@ -62,20 +62,7 @@ static void* LogMediatorResolvedLiveCorpusGetter(
 // - recovered state8 slot-6 producer writes that same owner family from section selector `6`
 static uint32_t __thiscall Mediator_HasLiveCorpus68(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t ready = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferFlag140e != 0u) : 0u;
-    const void* buffer = ownerState ? ownerState->allocatedBuffer1408 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength140c) : 0u;
-    return LogMediatorResolvedLiveCorpusFlag(
-        "HasLiveCorpus68(+0x68)",
-        returnAddress,
-        "hl.cfg / state8 section6",
-        "owner+0x140e/0x1408/0x140c",
-        ready,
-        buffer,
-        length);
+    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveHlCfg68();
 }
 
 // anchor: client.dll:0x62198770 / launcher.exe vtable +0x6c -> 0x41f0d0
@@ -86,20 +73,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus68(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `7`
 static uint32_t __thiscall Mediator_HasLiveCorpus6c(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t ready = ownerState ? static_cast<uint32_t>(ownerState->flag1416 != 0u) : 0u;
-    const void* buffer = ownerState ? ownerState->allocatedBuffer1410 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength1414) : 0u;
-    return LogMediatorResolvedLiveCorpusFlag(
-        "HasLiveCorpus6C(+0x6c)",
-        returnAddress,
-        "an.cfg / state8 section7",
-        "owner+0x1416/0x1410/0x1414",
-        ready,
-        buffer,
-        length);
+    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveAnCfg6c();
 }
 
 // anchor: client.dll:0x62198870 / launcher.exe vtable +0x70
@@ -110,20 +84,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus6c(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `3`
 static uint32_t __thiscall Mediator_HasLiveCorpus70(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t ready = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferFlag141e != 0u) : 0u;
-    const void* buffer = ownerState ? ownerState->allocatedBuffer1418 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength141c) : 0u;
-    return LogMediatorResolvedLiveCorpusFlag(
-        "HasLiveCorpus70(+0x70)",
-        returnAddress,
-        "pi.cfg / state8 section3",
-        "owner+0x141e/0x1418/0x141c",
-        ready,
-        buffer,
-        length);
+    return mxo::ltlogin::ILTLoginMediator::Default->HasLivePiCfg70();
 }
 
 // anchor: client.dll:0x62198970 / launcher.exe vtable +0x74 -> raw bytes 0x41f0f0 = owner byte +0x1426
@@ -136,20 +97,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus70(MinimalLoginMediatorStub* se
 //   `param_1 + 0x6e0 + actionId*8`, making this pair materially closer to the missing Actions-window symptom
 static uint32_t __thiscall Mediator_HasLiveCorpus74(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t ready = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferFlag1426 != 0u) : 0u;
-    const void* buffer = ownerState ? ownerState->allocatedBuffer1420 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength1424) : 0u;
-    return LogMediatorResolvedLiveCorpusFlag(
-        "HasLiveCorpus74(+0x74)",
-        returnAddress,
-        "ai.cfg / state8 section4",
-        "owner+0x1426/0x1420/0x1424",
-        ready,
-        buffer,
-        length);
+    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveAiCfg74();
 }
 
 // anchor: client.dll:0x62198a70 / launcher.exe vtable +0x78 -> raw bytes 0x41f100 = owner byte +0x142e
@@ -321,78 +269,22 @@ static uint32_t __thiscall Mediator_HasLiveCorpus90(MinimalLoginMediatorStub* se
 
 static void* __thiscall Mediator_GetLiveCorpus94(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t flag = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferFlag140e != 0u) : 0u;
-    void* buffer = ownerState ? ownerState->allocatedBuffer1408 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength140c) : 0u;
-    return LogMediatorResolvedLiveCorpusGetter(
-        "GetLiveCorpus94(+0x94)",
-        returnAddress,
-        "hl.cfg / state8 section6",
-        "owner+0x1408/0x140c",
-        flag,
-        buffer,
-        length,
-        outLength);
+    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveHlCfg94(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpus98(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t flag = ownerState ? static_cast<uint32_t>(ownerState->flag1416 != 0u) : 0u;
-    void* buffer = ownerState ? ownerState->allocatedBuffer1410 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength1414) : 0u;
-    return LogMediatorResolvedLiveCorpusGetter(
-        "GetLiveCorpus98(+0x98)",
-        returnAddress,
-        "an.cfg / state8 section7",
-        "owner+0x1410/0x1414",
-        flag,
-        buffer,
-        length,
-        outLength);
+    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveAnCfg98(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpus9c(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t flag = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferFlag141e != 0u) : 0u;
-    void* buffer = ownerState ? ownerState->allocatedBuffer1418 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength141c) : 0u;
-    return LogMediatorResolvedLiveCorpusGetter(
-        "GetLiveCorpus9C(+0x9c)",
-        returnAddress,
-        "pi.cfg / state8 section3",
-        "owner+0x1418/0x141c",
-        flag,
-        buffer,
-        length,
-        outLength);
+    return mxo::ltlogin::ILTLoginMediator::Default->GetLivePiCfg9c(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusA0(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t flag = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferFlag1426 != 0u) : 0u;
-    void* buffer = ownerState ? ownerState->allocatedBuffer1420 : nullptr;
-    const uint32_t length = ownerState ? static_cast<uint32_t>(ownerState->allocatedBufferLength1424) : 0u;
-    return LogMediatorResolvedLiveCorpusGetter(
-        "GetLiveCorpusA0(+0xa0)",
-        returnAddress,
-        "ai.cfg / state8 section4",
-        "owner+0x1420/0x1424",
-        flag,
-        buffer,
-        length,
-        outLength);
+    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveAiCfgA0(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusA4(MinimalLoginMediatorStub* self, uint32_t* outLength) {

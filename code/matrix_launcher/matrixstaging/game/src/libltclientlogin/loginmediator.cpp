@@ -306,6 +306,61 @@ static void** Arg6CurrentSlotRecord44Vtable() {
     return vtable;
 }
 
+struct LiveSelectionCfgCorpusView {
+    uint32_t ready = 0u;
+    void* buffer = nullptr;
+    uint32_t length = 0u;
+};
+
+static const CLTLoginMediator* ResolveActiveSelectionCfgCorpusOwner(const CLTLoginMediator* mediator) {
+    if (const auto* loginController = DiagnosticAuthGetLoginController()) {
+        return loginController;
+    }
+    return mediator;
+}
+
+static uint32_t LogLiveSelectionCfgCorpusFlag(
+    const char* slotLabel,
+    const char* corpusLabel,
+    const char* storageLabel,
+    const LiveSelectionCfgCorpusView& view) {
+    spdlog::info(
+        "{} -> {} [live {} via {} ptr={} length=0x{:04x}]",
+        slotLabel ? slotLabel : "<slot>",
+        static_cast<unsigned>(view.ready),
+        corpusLabel ? corpusLabel : "<corpus>",
+        storageLabel ? storageLabel : "<owner fields>",
+        fmt::ptr(view.buffer),
+        static_cast<unsigned>(view.length));
+    if (view.ready == 0u) {
+        LogMediatorCharacterStateContext(slotLabel, nullptr);
+    }
+    return view.ready;
+}
+
+static void* LogLiveSelectionCfgCorpusGetter(
+    const char* slotLabel,
+    const char* corpusLabel,
+    const char* storageLabel,
+    const LiveSelectionCfgCorpusView& view,
+    uint32_t* outLength) {
+    if (outLength) {
+        *outLength = view.length;
+    }
+    spdlog::info(
+        "{} -> {} [live {} via {} flag={} length=0x{:04x}]",
+        slotLabel ? slotLabel : "<slot>",
+        fmt::ptr(view.buffer),
+        corpusLabel ? corpusLabel : "<corpus>",
+        storageLabel ? storageLabel : "<owner fields>",
+        static_cast<unsigned>(view.ready),
+        static_cast<unsigned>(view.length));
+    if (view.buffer == nullptr || view.length == 0u) {
+        LogMediatorCharacterStateContext(slotLabel, nullptr);
+    }
+    return view.buffer;
+}
+
 }  // namespace
 
 CLTLoginMediator::CLTLoginMediator()
@@ -712,6 +767,138 @@ const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValu
         fmt::ptr(chainedValueToken),
         MaskedSensitiveValue(authPassword));
     return authPassword;
+}
+
+uint32_t CLTLoginMediator::HasLiveHlCfg68() const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag140e != 0u);
+        view.buffer = ownerState->allocatedBuffer1408;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength140c);
+    }
+    return LogLiveSelectionCfgCorpusFlag(
+        "CLTLoginMediator::HasLiveHlCfg68(+0x68)",
+        "hl.cfg / state8 section6",
+        "owner+0x140e/0x1408/0x140c",
+        view);
+}
+
+uint32_t CLTLoginMediator::HasLiveAnCfg6c() const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->flag1416 != 0u);
+        view.buffer = ownerState->allocatedBuffer1410;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1414);
+    }
+    return LogLiveSelectionCfgCorpusFlag(
+        "CLTLoginMediator::HasLiveAnCfg6c(+0x6c)",
+        "an.cfg / state8 section7",
+        "owner+0x1416/0x1410/0x1414",
+        view);
+}
+
+uint32_t CLTLoginMediator::HasLivePiCfg70() const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag141e != 0u);
+        view.buffer = ownerState->allocatedBuffer1418;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength141c);
+    }
+    return LogLiveSelectionCfgCorpusFlag(
+        "CLTLoginMediator::HasLivePiCfg70(+0x70)",
+        "pi.cfg / state8 section3",
+        "owner+0x141e/0x1418/0x141c",
+        view);
+}
+
+uint32_t CLTLoginMediator::HasLiveAiCfg74() const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag1426 != 0u);
+        view.buffer = ownerState->allocatedBuffer1420;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1424);
+    }
+    return LogLiveSelectionCfgCorpusFlag(
+        "CLTLoginMediator::HasLiveAiCfg74(+0x74)",
+        "ai.cfg / state8 section4",
+        "owner+0x1426/0x1420/0x1424",
+        view);
+}
+
+void* CLTLoginMediator::GetLiveHlCfg94(uint32_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag140e != 0u);
+        view.buffer = ownerState->allocatedBuffer1408;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength140c);
+    }
+    return LogLiveSelectionCfgCorpusGetter(
+        "CLTLoginMediator::GetLiveHlCfg94(+0x94)",
+        "hl.cfg / state8 section6",
+        "owner+0x1408/0x140c",
+        view,
+        outLength);
+}
+
+void* CLTLoginMediator::GetLiveAnCfg98(uint32_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->flag1416 != 0u);
+        view.buffer = ownerState->allocatedBuffer1410;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1414);
+    }
+    return LogLiveSelectionCfgCorpusGetter(
+        "CLTLoginMediator::GetLiveAnCfg98(+0x98)",
+        "an.cfg / state8 section7",
+        "owner+0x1410/0x1414",
+        view,
+        outLength);
+}
+
+void* CLTLoginMediator::GetLivePiCfg9c(uint32_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag141e != 0u);
+        view.buffer = ownerState->allocatedBuffer1418;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength141c);
+    }
+    return LogLiveSelectionCfgCorpusGetter(
+        "CLTLoginMediator::GetLivePiCfg9c(+0x9c)",
+        "pi.cfg / state8 section3",
+        "owner+0x1418/0x141c",
+        view,
+        outLength);
+}
+
+void* CLTLoginMediator::GetLiveAiCfgA0(uint32_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag1426 != 0u);
+        view.buffer = ownerState->allocatedBuffer1420;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1424);
+    }
+    return LogLiveSelectionCfgCorpusGetter(
+        "CLTLoginMediator::GetLiveAiCfgA0(+0xa0)",
+        "ai.cfg / state8 section4",
+        "owner+0x1420/0x1424",
+        view,
+        outLength);
 }
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4

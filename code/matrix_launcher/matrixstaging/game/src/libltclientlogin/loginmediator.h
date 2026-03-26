@@ -564,6 +564,22 @@ public:
     const char* GetCrashReporterUsername5c(const void* chainedValueToken) override;
     // +0x60
     const char* GetCrashReporterPassword60(const void* chainedValueToken) override;
+    // +0x68
+    uint32_t HasLiveHlCfg68() const override;
+    // +0x6c
+    uint32_t HasLiveAnCfg6c() const override;
+    // +0x70
+    uint32_t HasLivePiCfg70() const override;
+    // +0x74
+    uint32_t HasLiveAiCfg74() const override;
+    // +0x94
+    void* GetLiveHlCfg94(uint32_t* outLength) const override;
+    // +0x98
+    void* GetLiveAnCfg98(uint32_t* outLength) const override;
+    // +0x9c
+    void* GetLivePiCfg9c(uint32_t* outLength) const override;
+    // +0xa0
+    void* GetLiveAiCfgA0(uint32_t* outLength) const override;
     // +0xd8
     uint32_t GetArg7SelectionUpperBoundExclusive() const override;
     // +0xdc

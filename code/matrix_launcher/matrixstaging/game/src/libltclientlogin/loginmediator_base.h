@@ -344,13 +344,13 @@ public:
     // +0x64
     void UnknownSlot24();
     // +0x68
-    void UnknownSlot25();
+    virtual uint32_t HasLiveHlCfg68() const = 0;
     // +0x6c
-    void UnknownSlot26();
+    virtual uint32_t HasLiveAnCfg6c() const = 0;
     // +0x70
-    void UnknownSlot27();
+    virtual uint32_t HasLivePiCfg70() const = 0;
     // +0x74
-    void UnknownSlot28();
+    virtual uint32_t HasLiveAiCfg74() const = 0;
     // +0x78
     uint8_t UnknownSlot29();
     // +0x7c
@@ -366,13 +366,13 @@ public:
     // +0x90
     uint8_t UnknownSlot35();
     // +0x94
-    // virtual void GetLoginData(char* buffer, size_t* outLength) const = 0;
+    virtual void* GetLiveHlCfg94(uint32_t* outLength) const = 0;
     // +0x98
-    void UnknownSlot37();
+    virtual void* GetLiveAnCfg98(uint32_t* outLength) const = 0;
     // +0x9c
-    void UnknownSlot38();
+    virtual void* GetLivePiCfg9c(uint32_t* outLength) const = 0;
     // +0xa0
-    void UnknownSlot39();
+    virtual void* GetLiveAiCfgA0(uint32_t* outLength) const = 0;
     // +0xa4
     void UnknownSlot40();
     // +0xa8
