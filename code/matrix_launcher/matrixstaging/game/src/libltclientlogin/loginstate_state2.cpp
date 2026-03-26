@@ -1,6 +1,8 @@
 #include "loginstate.h"
 #include "loginmediator.h"
 
+#include <spdlog/spdlog.h>
+
 namespace mxo::ltlogin {
 
 // anchor: launcher.exe vtable 0x004b5014
@@ -10,9 +12,47 @@ const char* CLTLoginState_AuthenticatePending::DebugName() const {
 
 // anchor: launcher.exe:0x00439210 (vtable 0x004b5014 slot 3)
 uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
-    (void)upstreamOrArg;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x00439210");
+    if (!mediator) {
+        return 0u;
+    }
+
+    // Current evidence-backed narrow scaffold for helper/state 2:
+    // - `0x439210` is the strongest current BeginAuthBootstrap entry
+    // - it caches the incoming upstream/helper unless that object's phase/state code is already 1
+    // - on the connected branch it reaches the shared auth bootstrap dispatcher `0x448050`
+    // Current source ownership stays intentionally narrow here:
+    // - preserve the upstream-caching contract needed for future state-2 cleanup
+    // - only execute the already-owned connected bootstrap send side through
+    //   `CLTLoginMediator::BeginAuthHandshake()`
+    // - leave the broader non-connected / retry / helper-switch details explicitly deferred
+    const uint32_t incomingUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
+    if (incomingUpstreamPhaseCode != 1u) {
+        cachedUpstreamOrArg_ = upstreamOrArg;
+    }
+
+    const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    if (mediator->AuthConnectionFlag2c() == 0u) {
+        spdlog::info(
+            "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue blocked on owner+0x2c==0 incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} (connected auth-bootstrap branch only is source-owned here)",
+            fmt::ptr(upstreamOrArg),
+            static_cast<unsigned>(incomingUpstreamPhaseCode),
+            fmt::ptr(cachedUpstreamOrArg_),
+            static_cast<unsigned>(cachedUpstreamPhaseCode),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        return 0u;
+    }
+
+    const uint32_t sendResult = mediator->BeginAuthHandshake();
+    spdlog::info(
+        "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authFlag2c={} -> BeginAuthHandshake=0x{:08x}",
+        fmt::ptr(upstreamOrArg),
+        static_cast<unsigned>(incomingUpstreamPhaseCode),
+        fmt::ptr(cachedUpstreamOrArg_),
+        static_cast<unsigned>(cachedUpstreamPhaseCode),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        static_cast<unsigned>(mediator->AuthConnectionFlag2c()),
+        static_cast<unsigned>(sendResult));
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x0043f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())

@@ -158,6 +158,12 @@ public:
     // anchor: launcher.exe:0x004391e0 (vtable 0x004b5014 slot 10 initializer)
     CLTLoginState_AuthenticatePending() = default;
 
+private:
+    // anchor: launcher.exe:0x00439210 stores the upstream/helper object at `this+4` unless the
+    // incoming helper already reports phase/state code `1` through vtable `+0x18`.
+    void* cachedUpstreamOrArg_ = nullptr;
+
+public:
     // anchor: launcher.exe vtable 0x004b5014
     const char* DebugName() const override;
 
