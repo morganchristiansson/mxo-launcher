@@ -520,7 +520,10 @@ Current active runtime split inside those exact mappings:
 
 Focused replacement source files:
 - `src/launcher_mediator_abi_selection_cfg.cpp`
-  - non-`mcd.cfg` corpus fallback gates/getters `+0x68 .. +0xb8`
+  - non-`mcd.cfg` corpus wrapper surface `+0x68 .. +0xb8`
+  - current cleanup status:
+    - `+0x68/+0x94`, `+0x6c/+0x98`, `+0x70/+0x9c`, `+0x74/+0xa0`, `+0x78/+0xa4`, `+0x7c/+0xa8`, and `+0x80/+0xac`
+      now thin-forward into named `CLTLoginMediator` accessors
 - `src/launcher_mediator_abi_profile_paths.cpp`
   - neighboring profile-path / current-slot / selection-descriptor surface `+0x3c/+0x40/+0x44`
 - `src/launcher_mediator_abi_mcd.cpp`
@@ -529,6 +532,7 @@ Focused replacement source files:
   - real producer-side state8 section materialization
 - `matrixstaging/game/src/libltclientlogin/loginmediator.h`
   - owner-side raw state8/load-character storage layout
+  - named class-owned live-corpus accessors for the migrated `hl/an/pi/ai/cs/bl/il` pairs
 
 Implementation note:
 - the focused ABI files are currently split as separate source-owned implementation files included by

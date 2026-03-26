@@ -833,6 +833,54 @@ uint32_t CLTLoginMediator::HasLiveAiCfg74() const {
         view);
 }
 
+uint32_t CLTLoginMediator::HasLiveCsCfg78() const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag142e != 0u);
+        view.buffer = ownerState->allocatedBuffer1428;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength142c);
+    }
+    return LogLiveSelectionCfgCorpusFlag(
+        "CLTLoginMediator::HasLiveCsCfg78(+0x78)",
+        "cs.cfg / state8 section5",
+        "owner+0x142e/0x1428/0x142c",
+        view);
+}
+
+uint32_t CLTLoginMediator::HasLiveBlCfg7c() const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->flag13fe != 0u);
+        view.buffer = ownerState->allocatedBuffer13f8;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength13fc);
+    }
+    return LogLiveSelectionCfgCorpusFlag(
+        "CLTLoginMediator::HasLiveBlCfg7c(+0x7c)",
+        "bl.cfg / state8 section1",
+        "owner+0x13fe/0x13f8/0x13fc",
+        view);
+}
+
+uint32_t CLTLoginMediator::HasLiveIlCfg80() const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->flag1406 != 0u);
+        view.buffer = ownerState->allocatedBuffer1400;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1404);
+    }
+    return LogLiveSelectionCfgCorpusFlag(
+        "CLTLoginMediator::HasLiveIlCfg80(+0x80)",
+        "il.cfg / state8 section2",
+        "owner+0x1406/0x1400/0x1404",
+        view);
+}
+
 void* CLTLoginMediator::GetLiveHlCfg94(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -897,6 +945,57 @@ void* CLTLoginMediator::GetLiveAiCfgA0(uint32_t* outLength) const {
         "CLTLoginMediator::GetLiveAiCfgA0(+0xa0)",
         "ai.cfg / state8 section4",
         "owner+0x1420/0x1424",
+        view,
+        outLength);
+}
+
+void* CLTLoginMediator::GetLiveCsCfgA4(uint32_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag142e != 0u);
+        view.buffer = ownerState->allocatedBuffer1428;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength142c);
+    }
+    return LogLiveSelectionCfgCorpusGetter(
+        "CLTLoginMediator::GetLiveCsCfgA4(+0xa4)",
+        "cs.cfg / state8 section5",
+        "owner+0x1428/0x142c",
+        view,
+        outLength);
+}
+
+void* CLTLoginMediator::GetLiveBlCfgA8(uint32_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->flag13fe != 0u);
+        view.buffer = ownerState->allocatedBuffer13f8;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength13fc);
+    }
+    return LogLiveSelectionCfgCorpusGetter(
+        "CLTLoginMediator::GetLiveBlCfgA8(+0xa8)",
+        "bl.cfg / state8 section1",
+        "owner+0x13f8/0x13fc",
+        view,
+        outLength);
+}
+
+void* CLTLoginMediator::GetLiveIlCfgAc(uint32_t* outLength) const {
+    const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    LiveSelectionCfgCorpusView view = {};
+    if (ownerState) {
+        view.ready = static_cast<uint32_t>(ownerState->flag1406 != 0u);
+        view.buffer = ownerState->allocatedBuffer1400;
+        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1404);
+    }
+    return LogLiveSelectionCfgCorpusGetter(
+        "CLTLoginMediator::GetLiveIlCfgAc(+0xac)",
+        "il.cfg / state8 section2",
+        "owner+0x1400/0x1404",
         view,
         outLength);
 }

@@ -352,11 +352,11 @@ public:
     // +0x74
     virtual uint32_t HasLiveAiCfg74() const = 0;
     // +0x78
-    uint8_t UnknownSlot29();
+    virtual uint32_t HasLiveCsCfg78() const = 0;
     // +0x7c
-    uint8_t UnknownSlot30();
+    virtual uint32_t HasLiveBlCfg7c() const = 0;
     // +0x80
-    uint8_t UnknownSlot31();
+    virtual uint32_t HasLiveIlCfg80() const = 0;
     // +0x84
     uint8_t UnknownSlot32();
     // +0x88
@@ -374,11 +374,11 @@ public:
     // +0xa0
     virtual void* GetLiveAiCfgA0(uint32_t* outLength) const = 0;
     // +0xa4
-    void UnknownSlot40();
+    virtual void* GetLiveCsCfgA4(uint32_t* outLength) const = 0;
     // +0xa8
-    void UnknownSlot41();
+    virtual void* GetLiveBlCfgA8(uint32_t* outLength) const = 0;
     // +0xac
-    void UnknownSlot42();
+    virtual void* GetLiveIlCfgAc(uint32_t* outLength) const = 0;
     // +0xb0
     void UnknownSlot43();
     // +0xb4

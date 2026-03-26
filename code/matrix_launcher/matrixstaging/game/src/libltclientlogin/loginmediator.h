@@ -565,21 +565,47 @@ public:
     // +0x60
     const char* GetCrashReporterPassword60(const void* chainedValueToken) override;
     // +0x68
+    // client.dll:0x62198670 = `hl.cfg` live-corpus gate; launcher getter returns owner byte `+0x140e
     uint32_t HasLiveHlCfg68() const override;
     // +0x6c
+    // client.dll:0x62198770 = `an.cfg` live-corpus gate; launcher getter returns owner byte `+0x1416`
     uint32_t HasLiveAnCfg6c() const override;
     // +0x70
+    // client.dll:0x62198870 = `pi.cfg` live-corpus gate; launcher getter returns owner byte `+0x141e`
     uint32_t HasLivePiCfg70() const override;
     // +0x74
+    // client.dll:0x62198970 = `ai.cfg` live-corpus gate; launcher getter returns owner byte `+0x1426`
     uint32_t HasLiveAiCfg74() const override;
+    // +0x78
+    // client.dll:0x62198a70 = `cs.cfg` live-corpus gate; launcher getter returns owner byte `+0x142e`
+    uint32_t HasLiveCsCfg78() const override;
+    // +0x7c
+    // client.dll:0x62198b70 = `bl.cfg` live-corpus gate; launcher getter returns owner byte `+0x13fe`
+    uint32_t HasLiveBlCfg7c() const override;
+    // +0x80
+    // client.dll:0x62198c60 = `il.cfg` live-corpus gate; launcher getter returns owner byte `+0x1406`
+    uint32_t HasLiveIlCfg80() const override;
     // +0x94
+    // client.dll:0x62198670 = `hl.cfg` live-corpus getter; launcher getter returns owner `+0x1408`, out-length `+0x140c`
     void* GetLiveHlCfg94(uint32_t* outLength) const override;
     // +0x98
+    // client.dll:0x62198770 = `an.cfg` live-corpus getter; launcher getter returns owner `+0x1410`, out-length `+0x1414`
     void* GetLiveAnCfg98(uint32_t* outLength) const override;
     // +0x9c
+    // client.dll:0x62198870 = `pi.cfg` live-corpus getter; launcher getter returns owner `+0x1418`, out-length `+0x141c`
     void* GetLivePiCfg9c(uint32_t* outLength) const override;
     // +0xa0
+    // client.dll:0x62198970 = `ai.cfg` live-corpus getter; launcher getter returns owner `+0x1420`, out-length `+0x1424`
     void* GetLiveAiCfgA0(uint32_t* outLength) const override;
+    // +0xa4
+    // client.dll:0x62198a70 = `cs.cfg` live-corpus getter; launcher getter returns owner `+0x1428`, out-length `+0x142c`
+    void* GetLiveCsCfgA4(uint32_t* outLength) const override;
+    // +0xa8
+    // client.dll:0x62198b70 = `bl.cfg` live-corpus getter; launcher getter returns owner `+0x13f8`, out-length `+0x13fc`
+    void* GetLiveBlCfgA8(uint32_t* outLength) const override;
+    // +0xac
+    // client.dll:0x62198c60 = `il.cfg` live-corpus getter; launcher getter returns owner `+0x1400`, out-length `+0x1404`
+    void* GetLiveIlCfgAc(uint32_t* outLength) const override;
     // +0xd8
     uint32_t GetArg7SelectionUpperBoundExclusive() const override;
     // +0xdc
