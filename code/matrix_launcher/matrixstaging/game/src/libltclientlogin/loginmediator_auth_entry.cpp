@@ -16,6 +16,7 @@
 #include "loginstate.h"
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cstdlib>
 
 namespace mxo::ltlogin {
@@ -25,6 +26,23 @@ namespace {
 // auth-credential logging helper just for state1/connect-status bringup.
 static const char* MaskedAuthValue(const std::string& value) {
     return value.empty() ? "<empty>" : "<provided>";
+}
+
+static void AssignOwnedSmallStringForAuthEntry(
+    AuthBootstrapSelectedSource38Sketch& dest,
+    const char* begin,
+    const char* current) {
+    dest.string60Owned.clear();
+    dest.string60 = {};
+
+    if (!begin || !current || current <= begin) {
+        return;
+    }
+
+    dest.string60Owned.assign(begin, current);
+    dest.string60.begin = dest.string60Owned.c_str();
+    dest.string60.current = dest.string60.begin + dest.string60Owned.size();
+    dest.string60.capacity = dest.string60.current;
 }
 
 }  // namespace
@@ -218,6 +236,119 @@ const CLTLoginMediator::MarginRouteState& CLTLoginMediator::CurrentMarginRouteSt
     return marginRouteState_;
 }
 
+uint32_t CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold(
+    uint32_t helperStateId,
+    CLTLoginState* state,
+    void* upstreamOrArg,
+    const char* reason) {
+    const CLTLoginState* const oldState = currentState_;
+    SwitchHelperStateScaffold(helperStateId, state);
+    if (state == nullptr) {
+        spdlog::info(
+            "CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold helperState=0x{:02x} reason='{}' oldState={} upstream={} upstreamPhaseCode={} -> skipped (no target state)",
+            static_cast<unsigned>(helperStateId),
+            reason ? reason : "<unspecified>",
+            oldState ? oldState->DebugName() : "<null>",
+            fmt::ptr(upstreamOrArg),
+            static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(upstreamOrArg)));
+        return 0u;
+    }
+
+    const uint32_t result = state->Slot3_BeginOrContinue(upstreamOrArg, this);
+    spdlog::info(
+        "CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold helperState=0x{:02x} reason='{}' oldState={} newState={} upstream={} upstreamPhaseCode={} -> slot3Result=0x{:08x}",
+        static_cast<unsigned>(helperStateId),
+        reason ? reason : "<unspecified>",
+        oldState ? oldState->DebugName() : "<null>",
+        state->DebugName(),
+        fmt::ptr(upstreamOrArg),
+        static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(upstreamOrArg)),
+        static_cast<unsigned>(result));
+    return result;
+}
+
+bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
+    return authConnection_ != nullptr &&
+           authConnection_->State() == mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive;
+}
+
+// anchor: launcher.exe:0x41ecd0
+uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) {
+    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    switch (stateCode) {
+        case 1u:
+        case 2u:
+        case 3u:
+            return 0x12000006u;
+        case 4u:
+        case 6u:
+        case 7u:
+        case 8u:
+        case 9u:
+        case 10u:
+        case 11u:
+            return 0x12000000u;
+        case 12u:
+            return 0x12000007u;
+        default:
+            break;
+    }
+
+    if ((input.inlineString00[0] == '\0' || input.inlineString20[0] == '\0') &&
+        input.string60.current == input.string60.begin) {
+        return 4u;
+    }
+
+    authBootstrapSource38_.inlineString00 = input.inlineString00;
+    authBootstrapSource38_.inlineString20 = input.inlineString20;
+    authBootstrapSource38_.block40 = input.block40;
+    authBootstrapSource38_.block50 = input.block50;
+    authBootstrapSource38_.flag6C = input.flag6C;
+    AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, input.string60.begin, input.string60.current);
+
+    if (currentState_ && currentState_->DispatchPhaseCode() == 2u) {
+        spdlog::info(
+            "DIAGNOSTIC: ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} and remains on helper state 2",
+            authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
+            authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
+            static_cast<unsigned>(authBootstrapSource38_.string60Owned.size()));
+    } else {
+        spdlog::info(
+            "DIAGNOSTIC: ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} (state-switch scaffolding beyond active state-2 branch still partial)",
+            authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
+            authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
+            static_cast<unsigned>(authBootstrapSource38_.string60Owned.size()));
+    }
+
+    // Active original branch observed under WineDbg had `DAT_004d66ec == 0`, which means:
+    // - clear owner `+0xf4` (`+0x94 + 0x60`) through the small-string helper
+    // - switch helper state to `2`
+    // - let `0x41b450` immediately enter helper2 slot 3 with the old helper object
+    // Keep the current source-owned split narrow but now mirror that immediate helper2 re-entry
+    // explicitly through `SwitchHelperStateAndDispatchSlot3Scaffold(...)` because the generic
+    // switch scaffold still does not replay the original old/new helper callbacks globally.
+    AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, nullptr, nullptr);
+    spdlog::info(
+        "DIAGNOSTIC: ProcessLoginRequest mirrored default DAT_004d66ec==0 branch by clearing owner+0xf4 small-string state");
+    if (scaffoldState2_ != nullptr) {
+        CLTLoginState* const upstreamState = currentState_;
+        const uint32_t state2EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
+            2u,
+            scaffoldState2_,
+            upstreamState,
+            "ProcessLoginRequest default DAT_004d66ec==0 branch");
+        spdlog::info(
+            "CLTLoginMediator::ProcessLoginRequest default state2 entry upstreamState={} -> slot3Result=0x{:08x}",
+            upstreamState ? upstreamState->DebugName() : "<null>",
+            static_cast<unsigned>(state2EntryResult));
+    } else {
+        spdlog::info(
+            "CLTLoginMediator::ProcessLoginRequest has no registered state2 scaffold; leaving currentState={} after owner+0xf4 clear",
+            currentState_ ? currentState_->DebugName() : "<null>");
+    }
+    return 0u;
+}
+
 void CLTLoginMediator::InitializeConnectionHelpers() {
     // anchor: launcher.exe:0x43b300
     // Initializes the helper/state dispatch table rooted at `0x4f7868..0x4f78b4`.
@@ -325,8 +456,11 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
     }
 
     CLTLoginState* const upstreamState = currentState_;
-    SwitchHelperStateScaffold(1u, state1);
-    const uint32_t result = state1->Slot3_BeginOrContinue(upstreamState, this);
+    const uint32_t result = SwitchHelperStateAndDispatchSlot3Scaffold(
+        1u,
+        state1,
+        upstreamState,
+        "BeginAuthConnectionViaState1Scaffold");
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold upstreamState={} currentState={} -> result=0x{:08x}",
         upstreamState ? upstreamState->DebugName() : "<null>",

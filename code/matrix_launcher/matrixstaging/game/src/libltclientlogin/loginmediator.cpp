@@ -251,23 +251,6 @@ static void AppendOwnedSectionBytes(void*& buffer, uint16_t& length, const uint8
     length = static_cast<uint16_t>(newLength & 0xffffu);
 }
 
-static void AssignOwnedSmallString(
-    AuthBootstrapSelectedSource38Sketch& dest,
-    const char* begin,
-    const char* current) {
-    dest.string60Owned.clear();
-    dest.string60 = {};
-
-    if (!begin || !current || current <= begin) {
-        return;
-    }
-
-    dest.string60Owned.assign(begin, current);
-    dest.string60.begin = dest.string60Owned.c_str();
-    dest.string60.current = dest.string60Owned.c_str() + dest.string60Owned.size();
-    dest.string60.capacity = dest.string60.current;
-}
-
 static uint32_t __thiscall Arg6CurrentSlotRecord44_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
@@ -1407,71 +1390,6 @@ uint32_t CLTLoginMediator::BeginMarginHandshake() {
 }
 
 // anchor: launcher.exe:0x41ecd0
-uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) {
-    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
-    switch (stateCode) {
-        case 1u:
-        case 2u:
-        case 3u:
-            return 0x12000006u;
-        case 4u:
-        case 6u:
-        case 7u:
-        case 8u:
-        case 9u:
-        case 10u:
-        case 11u:
-            return 0x12000000u;
-        case 12u:
-            return 0x12000007u;
-        default:
-            break;
-    }
-
-    if ((input.inlineString00[0] == '\0' || input.inlineString20[0] == '\0') &&
-        input.string60.current == input.string60.begin) {
-        return 4u;
-    }
-
-    authBootstrapSource38_.inlineString00 = input.inlineString00;
-    authBootstrapSource38_.inlineString20 = input.inlineString20;
-    authBootstrapSource38_.block40 = input.block40;
-    authBootstrapSource38_.block50 = input.block50;
-    authBootstrapSource38_.flag6C = input.flag6C;
-    AssignOwnedSmallString(authBootstrapSource38_, input.string60.begin, input.string60.current);
-
-    if (currentState_ && currentState_->DispatchPhaseCode() == 2u) {
-        spdlog::info(
-            "DIAGNOSTIC: ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} and remains on helper state 2",
-            authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
-            authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
-            static_cast<unsigned>(authBootstrapSource38_.string60Owned.size()));
-    } else {
-        spdlog::info(
-            "DIAGNOSTIC: ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} (state-switch scaffolding beyond active state-2 branch still partial)",
-            authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
-            authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
-            static_cast<unsigned>(authBootstrapSource38_.string60Owned.size()));
-    }
-
-    // Active original branch observed under WineDbg had `DAT_004d66ec == 0`, which means:
-    // - clear owner `+0xf4` (`+0x94 + 0x60`) through the small-string helper
-    // - switch helper state to `2`
-    // With a registered state-2 scaffold present, keep that early concrete helper transition on
-    // the mediator instead of relying on diagnostics-side raw state ownership.
-    AssignOwnedSmallString(authBootstrapSource38_, nullptr, nullptr);
-    spdlog::info(
-        "DIAGNOSTIC: ProcessLoginRequest mirrored default DAT_004d66ec==0 branch by clearing owner+0xf4 small-string state");
-    if (scaffoldState2_ != nullptr) {
-        SwitchHelperStateScaffold(2u, scaffoldState2_);
-    } else {
-        spdlog::info(
-            "CLTLoginMediator::ProcessLoginRequest has no registered state2 scaffold; leaving currentState={} after owner+0xf4 clear",
-            currentState_ ? currentState_->DebugName() : "<null>");
-    }
-    return 0u;
-}
-
 void CLTLoginMediator::ResetSelectionContext0ecMirror() {
     selectionContext0ecCopy_ = {};
     selectionContext0ecCopyValid_ = false;

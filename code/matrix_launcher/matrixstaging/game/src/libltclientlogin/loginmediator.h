@@ -934,6 +934,18 @@ public:
     // - installs the registered state1 scaffold as the active helper
     // - then dispatches state1 slot 3 / `0x439090`
     uint32_t BeginAuthConnectionViaState1Scaffold();
+    // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
+    // `0x41b450` on the early auth path. Keep this narrow instead of changing the generic
+    // switch scaffold until more of the broader helper transition surface is source-owned.
+    uint32_t SwitchHelperStateAndDispatchSlot3Scaffold(
+        uint32_t helperStateId,
+        CLTLoginState* state,
+        void* upstreamOrArg,
+        const char* reason = nullptr);
+    // anchor: launcher.exe:0x41b490
+    // Tiny auth transport-ready test used by state2 slot 3 before it reaches the bootstrap
+    // dispatcher. Current best concrete read: auth connection exists and connection `+0x34 == 2`.
+    bool HasReadyAuthConnectionState2() const;
 
     // Post-connect status handling is still owner/helper-state driven.
     // Current high-value summary:

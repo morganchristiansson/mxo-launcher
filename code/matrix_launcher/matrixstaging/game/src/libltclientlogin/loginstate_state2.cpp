@@ -16,41 +16,40 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
         return 0u;
     }
 
-    // Current evidence-backed narrow scaffold for helper/state 2:
-    // - `0x439210` is the strongest current BeginAuthBootstrap entry
-    // - it caches the incoming upstream/helper unless that object's phase/state code is already 1
-    // - on the connected branch it reaches the shared auth bootstrap dispatcher `0x448050`
-    // Current source ownership stays intentionally narrow here:
-    // - preserve the upstream-caching contract needed for future state-2 cleanup
-    // - only execute the already-owned connected bootstrap send side through
-    //   `CLTLoginMediator::BeginAuthHandshake()`
-    // - leave the broader non-connected / retry / helper-switch details explicitly deferred
+    // Current tighter source-owned mirror of `0x439210`:
+    // - cache the incoming upstream/helper unless that object's phase/state code is already `1`
+    // - gate on `0x41b490` / auth connection state `+0x34 == 2`
+    // - if not connected yet, switch to helper/state 1 so its slot-3 body starts the auth
+    //   transport connection
+    // - if already connected, continue into the launcher-owned auth bootstrap dispatcher path
     const uint32_t incomingUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
     if (incomingUpstreamPhaseCode != 1u) {
         cachedUpstreamOrArg_ = upstreamOrArg;
     }
 
     const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
-    if (mediator->AuthConnectionFlag2c() == 0u) {
+    if (!mediator->HasReadyAuthConnectionState2()) {
+        const uint32_t connectResult = mediator->BeginAuthConnectionViaState1Scaffold();
         spdlog::info(
-            "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue blocked on owner+0x2c==0 incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} (connected auth-bootstrap branch only is source-owned here)",
+            "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue auth transport not ready incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} -> BeginAuthConnectionViaState1Scaffold=0x{:08x}",
             fmt::ptr(upstreamOrArg),
             static_cast<unsigned>(incomingUpstreamPhaseCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
-        return 0u;
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+            static_cast<unsigned>(connectResult));
+        return connectResult;
     }
 
     const uint32_t sendResult = mediator->BeginAuthHandshake();
     spdlog::info(
-        "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authFlag2c={} -> BeginAuthHandshake=0x{:08x}",
+        "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> BeginAuthHandshake=0x{:08x}",
         fmt::ptr(upstreamOrArg),
         static_cast<unsigned>(incomingUpstreamPhaseCode),
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
-        static_cast<unsigned>(mediator->AuthConnectionFlag2c()),
+        mediator->HasReadyAuthConnectionState2() ? 1u : 0u,
         static_cast<unsigned>(sendResult));
     return sendResult;
 }
