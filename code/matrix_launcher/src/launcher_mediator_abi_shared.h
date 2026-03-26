@@ -35,5 +35,4 @@ uint32_t DiagnosticMediatorObserverUnregisterCount();
 const char g_MediatorName[] = "ILTLoginMediator.Default";
 const char* DiagnosticMediatorAuthName();
 const char* DiagnosticMediatorAuthPassword();
-const char* MaskIfMediatorPassword(const char* value);
 const char* MaskedSensitiveValue(const char* value);

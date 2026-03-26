@@ -324,13 +324,23 @@ public:
     // +0x50
     virtual void* BootstrapRaw08AuxHandle50() const = 0;
     // +0x54
-    bool UnknownSlot20();
+    // launcher.exe:0x41f0b0 is a tiny bool wrapper over `+0x50`.
+    virtual bool HasBootstrapRaw08AuxHandle54() const = 0;
     // +0x58
-    uint8_t UnknownSlot21();
+    // Keep the split explicit:
+    // - owner `0x41f390` returns bootstrap child byte `+0x680 + 0x104`
+    // - launcher/client wrapper-facing consumers use that low byte as crashreporter
+    //   `PromptForSecurId`
+    virtual uint8_t GetCrashReporterPromptForSecurId58() const = 0;
     // +0x5c
-    virtual const char* GetString2(const char* value) = 0;
+    // Wrapper-facing launcher/client chains currently consume this as the crashreporter username
+    // getter. Keep the incoming chained token opaque because launcher no-arg and client
+    // caller-clean uses do not prove one stable higher-level arg semantic.
+    virtual const char* GetCrashReporterUsername5c(const void* chainedValueToken) = 0;
     // +0x60
-    virtual const char* GetString1(const char* value) = 0;
+    // Wrapper-facing launcher/client chains currently consume this as the crashreporter password
+    // getter. Keep the incoming chained token opaque for the same reason as `+0x5c`.
+    virtual const char* GetCrashReporterPassword60(const void* chainedValueToken) = 0;
     // +0x64
     void UnknownSlot24();
     // +0x68

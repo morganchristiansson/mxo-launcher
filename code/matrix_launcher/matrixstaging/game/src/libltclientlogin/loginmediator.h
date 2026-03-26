@@ -254,6 +254,8 @@ public:
         void* fieldF8 = nullptr;            // `+0xf8`; companion bootstrap pointer surfaced by mediator `+0x60`, precise role still open
         void* fieldFC = nullptr;            // `+0xfc`
         void* field100 = nullptr;           // `+0x100`
+        uint8_t crashReporterPromptForSecurId104 = 1; // `+0x104`; owner byte returned by mediator `+0x58`; launcher/client wrapper-facing consumers use the low byte as crashreporter `PromptForSecurId`
+        std::array<uint8_t, 3> padding105{}; // `+0x105 .. +0x107`
         uint32_t field108 = 0;              // `+0x108`
         uint32_t field10C = 0;              // `+0x10c`
         uint32_t field110 = 0;              // `+0x110`
@@ -521,6 +523,8 @@ public:
     const void* lastNopatchValue2Ptr_ = nullptr;  // +0x20 / Mediator_SetValue2
     uint32_t lastStatus178_ = 0u;                 // +0x178 / Mediator_GetLastLoginStatus
     uint32_t statusQuery178Count_ = 0u;           // +0x178 / Mediator_GetLastLoginStatus
+    mutable bool bootstrapRaw08AuxHandle50Logged_ = false; // +0x50 change-log state moved from ABI wrapper
+    mutable void* lastBootstrapRaw08AuxHandle50_ = nullptr; // +0x50 last logged value moved from ABI wrapper
 
     // Accessors for migrated state fields (diagnostics only)
     const void* LastNopatchValue1Ptr() const;
@@ -552,10 +556,14 @@ public:
     const char* GetWorldOrSelectionName() const override;
     // +0x4c
     const char* GetProfileOrSessionName() const override;
+    // +0x54
+    bool HasBootstrapRaw08AuxHandle54() const override;
+    // +0x58
+    uint8_t GetCrashReporterPromptForSecurId58() const override;
     // +0x5c
-    const char* GetString2(const char* value) override;
+    const char* GetCrashReporterUsername5c(const void* chainedValueToken) override;
     // +0x60
-    const char* GetString1(const char* value) override;
+    const char* GetCrashReporterPassword60(const void* chainedValueToken) override;
     // +0xd8
     uint32_t GetArg7SelectionUpperBoundExclusive() const override;
     // +0xdc

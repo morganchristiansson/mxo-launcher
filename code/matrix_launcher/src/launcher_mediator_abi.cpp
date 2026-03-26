@@ -203,16 +203,6 @@ void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress
 #include "launcher_mediator_abi_selection_cfg.cpp"
 #include "launcher_mediator_abi_mcd.cpp"
 
-// UNANCHORED: masks reflected password arguments in mediator-chain logs.
-const char* MaskIfMediatorPassword(const char* value) {
-    if (!value) return "<null>";
-    const char* authPassword = DiagnosticMediatorAuthPassword();
-    if (authPassword && authPassword[0] && std::strcmp(value, authPassword) == 0) {
-        return "<provided>";
-    }
-    return value;
-}
-
 // UNANCHORED: generic pointer-word dumper used by mediator diagnostics.
 void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
@@ -328,43 +318,39 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 // vtable: ILTLoginMediator.Default slot +0x50
 static void* __thiscall Mediator_GetBootstrapRaw08AuxHandle50(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* value = mxo::ltlogin::ILTLoginMediator::Default->BootstrapRaw08AuxHandle50();
-
-    static bool loggedOnce = false;
-    static void* lastValue = nullptr;
-    if (!loggedOnce || lastValue != value) {
-        spdlog::info(
-            "MediatorStub::GetBootstrapRaw08AuxHandle(+0x50) -> {}{}",
-            fmt::ptr(value),
-            loggedOnce ? " [changed]" : " [first]");
-        loggedOnce = true;
-        lastValue = value;
-    }
-
-    return value;
+    return mxo::ltlogin::ILTLoginMediator::Default->BootstrapRaw08AuxHandle50();
 }
 
-// anchor: client.dll early auth-name chain at 0x62001325..0x62001362 first calls arg6 +0x58
-// vtable: ILTLoginMediator.Default slot +0x58
-static const char* __thiscall Mediator_GetString0(MinimalLoginMediatorStub* self) {
+// anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
+// vtable: ILTLoginMediator.Default slot +0x54
+static uint32_t __thiscall Mediator_HasBootstrapRaw08AuxHandle54(MinimalLoginMediatorStub* self) {
     (void)self;
-    spdlog::info("MediatorStub::GetString0(+0x58) -> '{}'", g_MediatorStringA);
-    return g_MediatorStringA;
+    return mxo::ltlogin::ILTLoginMediator::Default->HasBootstrapRaw08AuxHandle54() ? 1u : 0u;
+}
+
+// anchor: client.dll:0x62001325..0x62001362 passes the low byte from arg6 +0x58 into
+// `FUN_6236fa40(..., flag)`; launcher.exe:0x409250..0x409254 also stores that low byte into the
+// crashreporter `PromptForSecurId` global.
+// vtable: ILTLoginMediator.Default slot +0x58
+static uint32_t __thiscall Mediator_GetCrashReporterPromptForSecurId58(MinimalLoginMediatorStub* self) {
+    (void)self;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetCrashReporterPromptForSecurId58();
 }
 
 // UNANCHORED: C helper behind the caller-clean +0x60 ABI wrapper.
-extern "C" const char* Mediator_GetString1_Impl(MinimalLoginMediatorStub* self, const char* value) {
+// Keep the chained value opaque here:
+// - client `InitClientDLL` threads the previous return value through this slot
+// - launcher crashreporter seeding calls the same slot with no stack argument on its path
+extern "C" const char* Mediator_GetCrashReporterPassword60_Impl(
+    MinimalLoginMediatorStub* self,
+    const void* chainedValueToken) {
     (void)self;
-    spdlog::info(
-        "MediatorStub::GetString1(+0x60 value='{}') -> {}",
-        value ? value : "<null>",
-        MaskedSensitiveValue(DiagnosticMediatorAuthPassword()));
-    return DiagnosticMediatorAuthPassword();
+    return mxo::ltlogin::ILTLoginMediator::Default->GetCrashReporterPassword60(chainedValueToken);
 }
 
 // anchor: client.dll early auth-name chain proves arg6 +0x60 is caller-clean on this path
 // vtable: ILTLoginMediator.Default slot +0x60
-__attribute__((naked)) static void Mediator_GetString1() {
+__attribute__((naked)) static void Mediator_GetCrashReporterPassword60() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
         "push %%eax\n\t"
@@ -374,23 +360,22 @@ __attribute__((naked)) static void Mediator_GetString1() {
         "add $8, %%esp\n\t"
         "ret\n\t"
         :
-        : "i"(Mediator_GetString1_Impl)
+        : "i"(Mediator_GetCrashReporterPassword60_Impl)
         : "eax");
 }
 
 // UNANCHORED: C helper behind the caller-clean +0x5c ABI wrapper.
-extern "C" const char* Mediator_GetString2_Impl(MinimalLoginMediatorStub* self, const char* value) {
+// Keep the chained value opaque here for the same launcher/client split as `+0x60`.
+extern "C" const char* Mediator_GetCrashReporterUsername5c_Impl(
+    MinimalLoginMediatorStub* self,
+    const void* chainedValueToken) {
     (void)self;
-    spdlog::info(
-        "MediatorStub::GetString2(+0x5c value='{}') -> '{}'",
-        MaskIfMediatorPassword(value),
-        DiagnosticMediatorAuthName());
-    return DiagnosticMediatorAuthName();
+    return mxo::ltlogin::ILTLoginMediator::Default->GetCrashReporterUsername5c(chainedValueToken);
 }
 
 // anchor: client.dll early auth-name chain proves arg6 +0x5c is caller-clean on this path
 // vtable: ILTLoginMediator.Default slot +0x5c
-__attribute__((naked)) static void Mediator_GetString2() {
+__attribute__((naked)) static void Mediator_GetCrashReporterUsername5c() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
         "push %%eax\n\t"
@@ -400,7 +385,7 @@ __attribute__((naked)) static void Mediator_GetString2() {
         "add $8, %%esp\n\t"
         "ret\n\t"
         :
-        : "i"(Mediator_GetString2_Impl)
+        : "i"(Mediator_GetCrashReporterUsername5c_Impl)
         : "eax");
 }
 
@@ -418,13 +403,9 @@ static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub
     return mxo::ltlogin::ILTLoginMediator::Default->MapSelectionName(selectionHighByte);
 }
 
-// anchor: launcher selection resolution checks arg6 +0x54 before accepting world types 2/5
-// vtable: ILTLoginMediator.Default slot +0x54
-static uint32_t __thiscall Mediator_IsLauncherSelectionTypeEnabled(MinimalLoginMediatorStub* self) {
-    (void)self;
-    spdlog::info("MediatorStub::IsLauncherSelectionTypeEnabled(+0x54) -> 1");
-    return 1;
-}
+// launcher.exe arg7-selection resolution still reuses arg6 `+0x54` as a generic bool gate when
+// deciding whether to accept world-type values `2/5`, but the slot body itself is now anchored as
+// the tiny `+0x50` truthiness wrapper at launcher.exe:0x41f0b0.
 
 // anchor: arg7-selection resolution consults the sibling ILTLoginMediator surface through +0xe0
 // vtable: ILTLoginMediator.Default slot +0xe0
@@ -738,10 +719,10 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[18] = (void*)Mediator_GetWorldOrSelectionName; // +0x48
     g_LoginMediatorVtable[19] = (void*)Mediator_GetProfileOrSessionName; // +0x4c
     g_LoginMediatorVtable[20] = (void*)Mediator_GetBootstrapRaw08AuxHandle50; // +0x50
-    g_LoginMediatorVtable[21] = (void*)Mediator_IsLauncherSelectionTypeEnabled; // +0x54
-    g_LoginMediatorVtable[22] = (void*)Mediator_GetString0;      // +0x58
-    g_LoginMediatorVtable[23] = (void*)Mediator_GetString2;      // +0x5c
-    g_LoginMediatorVtable[24] = (void*)Mediator_GetString1;      // +0x60
+    g_LoginMediatorVtable[21] = (void*)Mediator_HasBootstrapRaw08AuxHandle54; // +0x54
+    g_LoginMediatorVtable[22] = (void*)Mediator_GetCrashReporterPromptForSecurId58; // +0x58
+    g_LoginMediatorVtable[23] = (void*)Mediator_GetCrashReporterUsername5c; // +0x5c
+    g_LoginMediatorVtable[24] = (void*)Mediator_GetCrashReporterPassword60; // +0x60
     g_LoginMediatorVtable[26] = (void*)Mediator_HasLiveCorpus68; // +0x68
     g_LoginMediatorVtable[27] = (void*)Mediator_HasLiveCorpus6c; // +0x6c
     g_LoginMediatorVtable[28] = (void*)Mediator_HasLiveCorpus70; // +0x70
@@ -950,7 +931,12 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     typedef uint32_t (__thiscall *IndexUIntFn)(void*, uint32_t);
     typedef uint32_t (__thiscall *SignedIndexUIntFn)(void*, int32_t);
 
-    NoArgUIntFn allowSpecialSelectionGateFn = (NoArgUIntFn)vtable[21]; // +0x54
+    // Keep the semantic split explicit here:
+    // - launcher arg7-selection resolution reuses wrapper slot `+0x54` as a generic bool gate for
+    //   accepting world-type values `2/5`
+    // - the slot body itself is now named from the owner-side evidence: a tiny `+0x50`
+    //   truthiness wrapper over the auth/bootstrap raw08 aux-handle family
+    NoArgUIntFn hasBootstrapRaw08AuxHandle54Fn = (NoArgUIntFn)vtable[21]; // +0x54
     IndexStringFn worldNameFn = (IndexStringFn)vtable[63];         // +0xfc
     IndexUIntFn selectionGateByte100Fn = (IndexUIntFn)vtable[64];  // +0x100
     SignedIndexUIntFn variantStateFn = (SignedIndexUIntFn)vtable[57]; // +0xe4
@@ -964,7 +950,7 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     if (selectionGateByte100 == 1u) {
         selectionGateAccepted = true;
     } else if (selectionGateByte100 == 2u || selectionGateByte100 == 5u) {
-        selectionGateAccepted = allowSpecialSelectionGateFn(mediatorPtr) != 0;
+        selectionGateAccepted = hasBootstrapRaw08AuxHandle54Fn(mediatorPtr) != 0;
     }
 
     const int32_t signedVariantIndex = static_cast<int32_t>(variantIndexHigh8);

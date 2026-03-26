@@ -653,25 +653,65 @@ const char* CLTLoginMediator::GetProfileOrSessionName() const {
 // bootstrap `+0xa8` field. Keep that extra level explicit in source too.
 void* CLTLoginMediator::BootstrapRaw08AuxHandle50() const {
     const auto* fieldF4 = static_cast<const AuthBootstrapReplyShadowF4Sketch*>(authBootstrap680_.fieldF4);
-    return fieldF4 ? fieldF4->raw08AuxHandleA8 : nullptr;
+    void* value = fieldF4 ? fieldF4->raw08AuxHandleA8 : nullptr;
+
+    if (!bootstrapRaw08AuxHandle50Logged_ || lastBootstrapRaw08AuxHandle50_ != value) {
+        spdlog::info(
+            "CLTLoginMediator::BootstrapRaw08AuxHandle50(+0x50) -> {}{}",
+            fmt::ptr(value),
+            bootstrapRaw08AuxHandle50Logged_ ? " [changed]" : " [first]");
+        bootstrapRaw08AuxHandle50Logged_ = true;
+        lastBootstrapRaw08AuxHandle50_ = value;
+    }
+
+    return value;
 }
 
-// +0x5c
-const char* CLTLoginMediator::GetString2(const char* value) {
-    spdlog::info(
-        "MediatorStub::GetString2(+0x5c value='{}') -> '{}'",
-        MaskIfMediatorPassword(value),
-        DiagnosticMediatorAuthName());
-    return DiagnosticMediatorAuthName();
+// anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
+// Tiny bool wrapper over `+0x50`.
+bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
+    const auto* fieldF4 = static_cast<const AuthBootstrapReplyShadowF4Sketch*>(authBootstrap680_.fieldF4);
+    const bool present = fieldF4 && fieldF4->raw08AuxHandleA8 != nullptr;
+    spdlog::debug(
+        "CLTLoginMediator::HasBootstrapRaw08AuxHandle54(+0x54) -> {}",
+        present ? 1u : 0u);
+    return present;
 }
 
-// +0x60
-const char* CLTLoginMediator::GetString1(const char* value) {
+// anchor: launcher.exe:0x41f390 / owner vtable +0x58
+// Keep the split explicit:
+// - owner getter returns bootstrap child byte `+0x680 + 0x104`
+// - launcher/client wrapper-facing consumers use that low byte as crashreporter
+//   `PromptForSecurId`
+uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
+    const uint8_t prompt = authBootstrap680_.crashReporterPromptForSecurId104;
+    spdlog::debug(
+        "CLTLoginMediator::GetCrashReporterPromptForSecurId58(+0x58) -> {}",
+        static_cast<unsigned>(prompt));
+    return prompt;
+}
+
+// Wrapper-facing launcher/client chain note for `+0x5c/+0x60`:
+// - launcher crashreporter seeding calls both slots with no stack argument
+// - client `InitClientDLL` uses caller-clean wrappers and threads the previous return value
+//   through the next call
+// Keep the incoming value opaque here instead of forcing a false `const char*` semantic.
+const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValueToken) {
+    const char* authName = Arg6AuthName();
     spdlog::info(
-        "MediatorStub::GetString1(+0x60 value='{}') -> {}",
-        value ? value : "<null>",
-        MaskedSensitiveValue(DiagnosticMediatorAuthPassword()));
-    return DiagnosticMediatorAuthPassword();
+        "CLTLoginMediator::GetCrashReporterUsername5c(+0x5c chainedValueToken={}) -> '{}'",
+        fmt::ptr(chainedValueToken),
+        NonEmptyTextOrPlaceholder(authName));
+    return authName;
+}
+
+const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
+    const char* authPassword = Arg6AuthPassword();
+    spdlog::info(
+        "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {}",
+        fmt::ptr(chainedValueToken),
+        MaskedSensitiveValue(authPassword));
+    return authPassword;
 }
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4

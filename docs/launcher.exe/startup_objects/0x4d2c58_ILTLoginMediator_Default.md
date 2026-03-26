@@ -191,7 +191,7 @@ From original `launcher.exe` startup/teardown:
 | `+0x0c` | teardown / cleanup path | medium |
 | `+0x1c` | nopatch path passes parsed `"0.1"`-derived value | medium |
 | `+0x24` | nopatch path passes client-version-derived value | medium |
-| `+0x58` | launcher crashreporter/auth seeding path reads a byte-ish flag and stores it to crashreporter prompt state | medium |
+| `+0x58` | launcher crashreporter/auth seeding path reads the low byte later stored as crashreporter `PromptForSecurId` | medium |
 | `+0x5c` | launcher crashreporter/auth seeding path reads the value later used as crashreporter **username** | high |
 | `+0x60` | launcher crashreporter/auth seeding path reads the value later used as crashreporter **password** | high |
 | `+0x164` | teardown conditional check | medium |
@@ -272,9 +272,9 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
 | `+0x50` | later runtime distributed-object/RCC path calls this as a nullable pointer getter; `client.dll:0x625c86d0` converts non-null into flag `0x30`, and launcher-side static analysis currently maps it to `owner +0x680 -> +0xf4 -> +0xa8` when present | high |
-| `+0x58` | string-producing helper in early init logging/config path | medium |
-| `+0x5c` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
-| `+0x60` | chained string-producing helper; early auth-name path shows this single-arg slot is **caller-clean** on the client side | high |
+| `+0x58` | low-byte crashreporter prompt flag in early init logging/config path; client passes it as `FUN_6236fa40(..., flag)` and launcher stores it to crashreporter `PromptForSecurId` | high |
+| `+0x5c` | crashreporter username string getter on the early init chain; client path proves this single-arg wrapper-facing call shape is **caller-clean** | high |
+| `+0x60` | crashreporter password string getter on the early init chain; client path proves this single-arg wrapper-facing call shape is **caller-clean** | high |
 | `+0x8c` | live `mcd.cfg` mediator-backed gate; original `client.dll:0x62198fa0` calls this first and branches to on-disk fallback only when it returns `0`; launcher getter is now anchored as `0x41f150` returning owner byte `+0x1452` | high |
 | `+0xbc` | live `mcd.cfg` mediator-backed header getter; original `client.dll:0x62198fa0` copies `0x20` bytes from here into `DAT_629ea67c`; launcher getter is now anchored as `0x41f170` returning owner `+0xf48` | high |
 | `+0xc0` | live `mcd.cfg` mediator-backed body getter; original `client.dll:0x62198fa0` copies `0x465` bytes from here into its local/global `mcd` body state; launcher getter is now anchored as `0x41f180` returning owner `+0xf88` | high |

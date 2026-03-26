@@ -345,14 +345,14 @@ It is now stronger evidence that `InitClientDLL` itself is unwinding/returning t
 
 A newer static + debugger pass finally narrowed the old corrupted-return-chain bug to a specific early mediator contract mismatch.
 
-Inside `client.dll:0x62001325..0x62001362`, the client does this early auth-name chain:
+Inside `client.dll:0x62001325..0x62001362`, the client does this early crashreporter/auth-default chain:
 
 ```asm
-call [eax+0x58]   ; returns first string
+call [eax+0x58]   ; returns low-byte PromptForSecurId flag
 push eax
-call [edx+0x60]   ; consumes previous string, returns next string
+call [edx+0x60]   ; consumes previous return token, returns password string
 push eax
-call [eax+0x5c]   ; consumes previous string, returns next string
+call [eax+0x5c]   ; consumes previous return token, returns username string
 push eax
 push 0x628689dc
 push 0x628689d4
@@ -361,7 +361,7 @@ add  esp, 0x14
 ```
 
 That final `add esp, 0x14` is the key clue.
-It means the single-stack-argument mediator slots `+0x60` and `+0x5c` are expected to be **caller-clean** on this path.
+It means the single-stack-argument mediator slots `+0x60` and `+0x5c` are expected to be **caller-clean** on this path, while `+0x58` feeds the low-byte flag later stored as crashreporter `PromptForSecurId`.
 
 The scaffold had been exposing both as ordinary `__thiscall` methods, and the generated code in `resurrections.exe` used `ret 4` for both.
 That over-cleaned the stack by 8 bytes before `client.dll:0x62001365`.
