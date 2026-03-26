@@ -165,6 +165,14 @@ struct AuthBootstrapSelectedSource38Sketch {
     // - `+0x60 .. +0x68` = embedded small-string object
     // - `+0x6c` = trailing byte/flag
     //
+    // Newer direct `0x439210 -> 0x448050` call-shape tightening now closes the active use of
+    // this owner block too:
+    // - arg1 = owner `+0x94 + 0x00`
+    // - arg2 = owner `+0x94 + 0x20`
+    // - arg5 = owner `+0x94 + 0x40`
+    // - arg6 = owner `+0x94 + 0x50`
+    // - arg8 = first dword / begin pointer from owner `+0x94 + 0x60`
+    //
     // Newer semantic anchors on individual fields:
     // - `+0x00` first string:
     //   - owner vtable `+0x150` / `0x41f270` writes it directly

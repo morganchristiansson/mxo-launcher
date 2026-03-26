@@ -64,7 +64,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediato
         static_cast<unsigned>(mediator->AuthConnectionFlag2c()));
     const uint32_t handshakeResult = mediator->BeginAuthHandshake();
     spdlog::info(
-        "CLTLoginState_State1::Slot1_HandlePrimaryGate bridged auth connect-status=0x{:08x} cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} BeginAuthHandshake=0x{:08x}",
+        "CLTLoginState_State1::Slot1_HandlePrimaryGate bridged auth connect-status=0x{:08x} cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} BeginAuthHandshake(owner+0x680)=0x{:08x}",
         static_cast<unsigned>(workResultCode),
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode),

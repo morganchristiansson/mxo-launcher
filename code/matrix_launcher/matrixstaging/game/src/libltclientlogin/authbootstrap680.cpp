@@ -129,6 +129,85 @@ static const char* SmallStringMirrorDataOrEmpty(const AuthBootstrap680SmallStrin
     return mirror.begin ? mirror.begin : "";
 }
 
+struct AuthBootstrap680PrepareCallShape {
+    const AuthBootstrapSelectedSource38Sketch* ownerSource94 = nullptr;
+    const char* sourceString00 = nullptr;
+    const char* sourceString20 = nullptr;
+    const char* sourceString60Begin = nullptr;
+    bool usedFallbackString00 = false;
+    bool usedFallbackString20 = false;
+    uint32_t write28 = 1u;
+    uint32_t write2C = 0u;
+    const std::array<uint8_t, 16>* sourceBlock40 = nullptr;
+    const std::array<uint8_t, 16>* sourceBlock50 = nullptr;
+    void* sendTarget50 = nullptr;
+};
+
+static AuthBootstrap680PrepareCallShape BuildAuthBootstrap680PrepareCallShape(
+    const AuthBootstrapSelectedSource38Sketch& ownerSource94,
+    const char* fallbackUsername,
+    const char* fallbackPassword,
+    uint32_t write2C,
+    void* sendTarget50) {
+    AuthBootstrap680PrepareCallShape callShape;
+    callShape.ownerSource94 = &ownerSource94;
+    // Preserve the recovered owner+0x94 -> child copy flow as the primary model, but keep the
+    // current live state8 auto-begin path working when it reaches `0x448050` without an original
+    // ProcessLoginRequest-populated owner+0x94 inline-string pair yet.
+    callShape.sourceString00 = ownerSource94.inlineString00[0] ? ownerSource94.inlineString00.data() : fallbackUsername;
+    callShape.sourceString20 = ownerSource94.inlineString20[0] ? ownerSource94.inlineString20.data() : fallbackPassword;
+    callShape.sourceString60Begin = ownerSource94.string60.begin;
+    callShape.usedFallbackString00 =
+        (ownerSource94.inlineString00[0] == '\0') && fallbackUsername && fallbackUsername[0] != '\0';
+    callShape.usedFallbackString20 =
+        (ownerSource94.inlineString20[0] == '\0') && fallbackPassword && fallbackPassword[0] != '\0';
+    callShape.write28 = 1u;
+    // Current source-owned backing for the first dword returned through the owner-side getter
+    // reached at `0x439265`. That producer object is not typed tightly enough yet, but the live
+    // replacement path already preserves the same launcher-version value here.
+    callShape.write2C = write2C;
+    callShape.sourceBlock40 = &ownerSource94.block40;
+    callShape.sourceBlock50 = &ownerSource94.block50;
+    callShape.sendTarget50 = sendTarget50;
+    return callShape;
+}
+
+static void StageAuthBootstrap680ChildFromPrepareCallShape(
+    AuthBootstrap680ChildSketch& child,
+    const AuthBootstrap680PrepareCallShape& callShape) {
+    AssignSmallStringMirror(
+        child.string04,
+        callShape.sourceString00,
+        callShape.sourceString00 +
+            BoundedCStringLength(
+                callShape.sourceString00,
+                callShape.ownerSource94 ? callShape.ownerSource94->inlineString00.size() : 0u));
+    AssignSmallStringMirror(
+        child.string10,
+        callShape.sourceString20,
+        callShape.sourceString20 +
+            BoundedCStringLength(
+                callShape.sourceString20,
+                callShape.ownerSource94 ? callShape.ownerSource94->inlineString20.size() : 0u));
+    AssignSmallStringMirror(
+        child.string1C,
+        callShape.sourceString60Begin ? callShape.sourceString60Begin : "");
+
+    child.loginType28 = callShape.write28;
+    child.launcherVersion2C = callShape.write2C;
+    if (callShape.sourceBlock40) {
+        child.block30 = *callShape.sourceBlock40;
+    }
+    if (callShape.sourceBlock50) {
+        child.block40 = *callShape.sourceBlock50;
+    }
+    child.sendTarget50 = callShape.sendTarget50;
+}
+
+static uint8_t AuthBootstrap680BranchLowByteA0(const AuthBootstrap680ChildSketch& child) {
+    return static_cast<uint8_t>(reinterpret_cast<uintptr_t>(child.phase2HelperA0) & 0xffu);
+}
+
 }  // namespace
 
 // UNANCHORED: source-owned sidecar cleanup for the owner `+0x680` bootstrap child mirrors.
@@ -137,52 +216,55 @@ void AuthBootstrap680Ops::EraseSidecar(const CLTLoginMediator* mediator) {
 }
 
 // anchor: launcher.exe:0x448050
-uint32_t AuthBootstrap680Ops::PrepareAndDispatchPhase2(CLTLoginMediator& mediator) {
+uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
-
-    AssignSmallStringMirror(
-        child.string04,
-        mediator.authBootstrapSource38_.inlineString00.data(),
-        mediator.authBootstrapSource38_.inlineString00.data() +
-            BoundedCStringLength(
-                mediator.authBootstrapSource38_.inlineString00.data(),
-                mediator.authBootstrapSource38_.inlineString00.size()));
-    AssignSmallStringMirror(
-        child.string10,
-        mediator.authBootstrapSource38_.inlineString20.data(),
-        mediator.authBootstrapSource38_.inlineString20.data() +
-            BoundedCStringLength(
-                mediator.authBootstrapSource38_.inlineString20.data(),
-                mediator.authBootstrapSource38_.inlineString20.size()));
-    AssignSmallStringMirror(
-        child.string1C,
-        mediator.authBootstrapSource38_.string60.begin,
-        mediator.authBootstrapSource38_.string60.current);
-    if (child.string1C.begin == nullptr) {
-        AssignSmallStringMirror(child.string1C, "");
+    if (mediator.authLoginType_ != 1u) {
+        spdlog::warn(
+            "AuthBootstrap680_PrepareAndDispatch current source config loginType={} differs from recovered 0x439210 immediate write28=1; ready-side staging still mirrors the original call shape",
+            static_cast<unsigned>(mediator.authLoginType_));
     }
 
-    child.loginType28 = mediator.authLoginType_;
-    child.launcherVersion2C = mediator.authLauncherVersion_;
-    child.block30 = mediator.authBootstrapSource38_.block40;
-    child.block40 = mediator.authBootstrapSource38_.block50;
+    void* sendTarget50 = mediator.AuthConnection();
+    if (!sendTarget50) {
+        sendTarget50 = mediator.EnsureAuthConnectionObject();
+    }
+
+    const AuthBootstrap680PrepareCallShape callShape = BuildAuthBootstrap680PrepareCallShape(
+        mediator.authBootstrapSource38_,
+        mediator.authUsername_.c_str(),
+        mediator.authPassword_.c_str(),
+        mediator.authLauncherVersion_,
+        sendTarget50);
+
+    StageAuthBootstrap680ChildFromPrepareCallShape(child, callShape);
     child.currentPublicKeyId9C = mediator.authCurrentPublicKeyId_;
-    child.sendTarget50 = mediator.AuthConnection();
-    if (!child.sendTarget50) {
-        child.sendTarget50 = mediator.EnsureAuthConnectionObject();
-    }
 
     const bool helperPresent = child.phase2HelperA0 != nullptr;
+    const uint8_t helperA0LowByte = AuthBootstrap680BranchLowByteA0(child);
+    const bool originalLowByteBranchWouldSendRaw08 = helperA0LowByte != 0u;
+    if (helperPresent != originalLowByteBranchWouldSendRaw08) {
+        spdlog::warn(
+            "AuthBootstrap680_PrepareAndDispatch branch-shape mismatch helperA0={} helperA0LowByte=0x{:02x} sourceHelperPresent={} originalLowByteBranchWouldSendRaw08={}",
+            fmt::ptr(child.phase2HelperA0),
+            static_cast<unsigned>(helperA0LowByte),
+            helperPresent ? 1u : 0u,
+            originalLowByteBranchWouldSendRaw08 ? 1u : 0u);
+    }
+
     spdlog::info(
-        "CLTLoginMediator::BeginAuthHandshake staged owner+0x680 child from owner+0x94 usernameLen={} passwordLen={} string1CLen={} loginType={} launcherVersion={} currentPublicKeyId={} sendTarget50={} helperA0={} branch={}",
+        "CLTLoginMediator::BeginAuthHandshake staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} helperA0={} helperA0LowByte=0x{:02x} branch={}",
+        fmt::ptr(callShape.ownerSource94),
         static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string1C)),
+        callShape.usedFallbackString00 ? 1u : 0u,
+        callShape.usedFallbackString20 ? 1u : 0u,
         static_cast<unsigned>(child.loginType28),
         static_cast<unsigned>(child.launcherVersion2C),
         static_cast<unsigned>(child.currentPublicKeyId9C),
         fmt::ptr(child.sendTarget50),
         fmt::ptr(child.phase2HelperA0),
+        static_cast<unsigned>(helperA0LowByte),
         helperPresent ? "raw0x08/auth-request" : "raw0x06/get-public-key");
 
     if (helperPresent) {
@@ -262,16 +344,18 @@ uint32_t AuthBootstrap680Ops::SendAuthGetPublicKeyRequest(CLTLoginMediator& medi
 uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
     CLTLoginMediator& mediator,
     const mxo::auth::GetPublicKeyReply& reply) {
-    if (mediator.authUsername_.empty()) {
-        spdlog::info("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without a username");
-        return 0;
-    }
     if (!reply.hasEmbeddedPublicKey) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth GetPublicKeyReply has no embedded public key material");
         return 0;
     }
 
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    const char* username = SmallStringMirrorDataOrEmpty(child.string04);
+    if (SmallStringMirrorLength(child.string04) == 0u) {
+        spdlog::info("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without child+0x04 username data");
+        return 0;
+    }
+
     child.currentPublicKeyId9C = reply.publicKeyId;
 
     mxo::auth::AuthBlobLayout blobLayout;
@@ -280,19 +364,19 @@ uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
     mxo::auth::AuthRequestLayout requestLayout;
     requestLayout.publicKeyId = reply.publicKeyId;
     requestLayout.loginType = static_cast<uint8_t>(child.loginType28 & 0xffu);
-    requestLayout.keyConfigMd5 = mediator.authKeyConfigMd5_;
-    requestLayout.uiConfigMd5 = mediator.authUiConfigMd5_;
+    requestLayout.keyConfigMd5.assign(child.block30.begin(), child.block30.end());
+    requestLayout.uiConfigMd5.assign(child.block40.begin(), child.block40.end());
     requestLayout.rsaModulusBytes = reply.modulusBytes;
     requestLayout.rsaExponentBytes.assign(1u, reply.publicExponentByte);
 
     mxo::auth::AuthRequestBuildResult buildResult;
     if (!mxo::auth::BuildAuthRequestPacket(
-            mediator.authUsername_,
+            username,
             blobLayout,
             requestLayout,
             mxo::auth::kFrameModeAuto,
             &buildResult)) {
-        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthRequest");
+        spdlog::info("DIAGNOSTIC: launcher-owned auth failed to build AS_AuthRequest from child+0x04/+0x28/+0x30..+0x4f state");
         return 0;
     }
 
@@ -422,7 +506,9 @@ void AuthBootstrap680Ops::LogParsedAuthReply(
     }
 }
 
-// UNANCHORED: source-owned fixed-field sync for the owner `+0x680` bootstrap child.
+// UNANCHORED: source-owned fixed-field preseed for the owner `+0x680` bootstrap child.
+// The ready-side `0x439210 -> 0x448050` path still rewrites child `+0x28/+0x2c` from its own
+// recovered call shape before raw `0x06` / raw `0x08` dispatch.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(CLTLoginMediator& mediator) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     child.loginType28 = mediator.authLoginType_;
@@ -456,6 +542,8 @@ void AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLog
 }
 
 // UNANCHORED: source-owned owner+0x680 update after parsed `AS_GetPublicKeyReply`.
+// Current source uses one sidecar-backed non-zero marker to stand in for the original child
+// `+0xa0/+0xa8/+0xac` helper family so the later ready-side `+0xa0` branch selects raw `0x08`.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
     CLTLoginMediator& mediator,
     const mxo::auth::GetPublicKeyReply& reply) {

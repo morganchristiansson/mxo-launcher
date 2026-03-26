@@ -55,13 +55,23 @@ struct AuthBootstrap680ChildSketch {
     // - it is not evidence that the original child type was literally named after the mediator
     // - wrapper methods on `CLTLoginMediator` stay thin so callers do not need broad churn
 
+    // Direct `0x439210 -> 0x448050` staging writes now closed concretely enough to keep the
+    // destination mapping inline here:
+    // - child `+0x04` <- owner `+0x94 + 0x00` inline string
+    // - child `+0x10` <- owner `+0x94 + 0x20` inline string
+    // - child `+0x1c` <- owner `+0x94 + 0x60` small-string begin/data pointer (NULL becomes "")
+    // - child `+0x28` <- ready-branch immediate `1`
+    // - child `+0x2c` <- first dword from the owner-side getter reached through `0x439210`
+    // - child `+0x30 .. +0x3f` <- owner `+0x94 + 0x40 .. + 0x4f`
+    // - child `+0x40 .. +0x4f` <- owner `+0x94 + 0x50 .. + 0x5f`
+    // - child `+0x50` <- owner-side send target result returned to `0x439210`
     AuthBootstrap680SmallStringMirror string04;  // original child `+0x04`
     AuthBootstrap680SmallStringMirror string10;  // original child `+0x10`
     AuthBootstrap680SmallStringMirror string1C;  // original child `+0x1c`
-    uint32_t loginType28 = 0;                    // original child `+0x28`; `0x4474f0` uses the low byte as raw `0x08` loginType
+    uint32_t loginType28 = 0;                    // original child `+0x28`; current ready-branch call shape pushes immediate `1`; `0x4474f0` later uses the low byte as raw `0x08` loginType
     uint32_t launcherVersion2C = 0;              // original child `+0x2c`; `0x447eb0` uses it in raw `0x06`
-    std::array<uint8_t, 16> block30{};          // original child `+0x30 .. +0x3f`; copied by `0x448050`
-    std::array<uint8_t, 16> block40{};          // original child `+0x40 .. +0x4f`; copied by `0x448050`
+    std::array<uint8_t, 16> block30{};          // original child `+0x30 .. +0x3f`
+    std::array<uint8_t, 16> block40{};          // original child `+0x40 .. +0x4f`
     void* sendTarget50 = nullptr;                // original child `+0x50`; indirect sender target consumed by `0x447eb0/0x4474f0`
 
     // Original child `+0x54 .. +0x7f` is a concrete helper subobject seeded from ctor `0x445500`
@@ -74,7 +84,7 @@ struct AuthBootstrap680ChildSketch {
     void* feedbackTransformLarge94 = nullptr;    // original child `+0x94`; allocated in `0x4474f0`
     void* feedbackTransformSmall98 = nullptr;    // original child `+0x98`; allocated in `0x4474f0`
     uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
-    void* phase2HelperA0 = nullptr;              // original child `+0xa0`; `0x448050` branches on its low-byte nullness
+    void* phase2HelperA0 = nullptr;              // original child `+0xa0`; `0x44811e` does `mov al,[this+0xa0] / test al,al` before selecting raw `0x06` vs raw `0x08`
     void* lazyRaw06StateA4 = nullptr;            // original child `+0xa4`; lazy raw-`0x06` helper owned by `0x447eb0`
     void* raw08AuxHandleA8 = nullptr;            // original child `+0xa8`; post-`0x07` availability/worker family used by `0x4474f0`
     void* fieldAC = nullptr;                     // original child `+0xac`; sibling helper/object family still open
@@ -100,7 +110,7 @@ struct AuthBootstrap680ChildSketch {
 struct AuthBootstrap680Ops {
     static void EraseSidecar(const CLTLoginMediator* mediator);
 
-    static uint32_t PrepareAndDispatchPhase2(CLTLoginMediator& mediator);
+    static uint32_t PrepareAndDispatch(CLTLoginMediator& mediator);
 
     static void* BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator);
     static bool HasBootstrapRaw08AuxHandle54(const CLTLoginMediator& mediator);

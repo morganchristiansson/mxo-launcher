@@ -928,6 +928,8 @@ public:
     //   branch to prioritize
     // - the earlier auth bootstrap/send lead is still the helper2 / `0x448050` family, not the
     //   later world-list sender
+    // - `BeginAuthHandshake()` stays only as a thin wrapper name; the concrete owner+0x680 child
+    //   prepare/write/branch logic lives in `AuthBootstrap680Ops::PrepareAndDispatch(...)`
     uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
     uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
     uint32_t BeginAuthHandshake();

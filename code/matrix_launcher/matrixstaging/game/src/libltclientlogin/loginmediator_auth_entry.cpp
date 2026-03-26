@@ -666,20 +666,21 @@ uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
 }
 
 // UNANCHORED: thin mediator wrapper over the state2 ready-side `0x439210 -> 0x448050`
-// phase-2 child/module dispatch.
+// owner+0x680 child prepare/dispatch path.
 uint32_t CLTLoginMediator::BeginAuthHandshake() {
     // Address anchors:
     // - launcher.exe:0x439210 = CLTLoginState_AuthenticatePending slot 3 ready/not-ready split
-    // - launcher.exe:0x448050 = phase-2 child dispatcher rooted at owner `+0x680`
+    // - launcher.exe:0x448050 = owner+0x680 child prepare/dispatch body
     // - launcher.exe:0x447eb0 = raw `0x06` builder on that child
     // - launcher.exe:0x4474f0 = raw `0x08` builder on that child
     //
     // Keep the ownership boundary explicit in source:
-    // - state2 owns the decision to enter the child
+    // - state2 owns the ready/not-ready gate and the decision to enter the child
     // - this mediator method is only a thin bridge
-    // - the child/module ops own the copy-from-owner `+0x94`, branch on child `+0xa0`, and send
-    //   selection
-    return AuthBootstrap680Ops::PrepareAndDispatchPhase2(*this);
+    // - `AuthBootstrap680Ops::PrepareAndDispatch(...)` owns the concrete `0x439210` call shape:
+    //   source owner `+0x94`, child destinations `+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50`,
+    //   and the branch keyed off child `+0xa0`
+    return AuthBootstrap680Ops::PrepareAndDispatch(*this);
 }
 
 void CLTLoginMediator::BuildAuthEndpoint() {

@@ -223,6 +223,23 @@ Current strongest earlier launcher-owned bootstrap/auth chain:
   - `0x41b450(2)` selects helper `0x4f7870`
   - helper `+0x08 / 0x439210`
   - `0x439210` gates on `0x41b490()` and then calls `0x448050`
+  - the now-closed active call shape there is:
+    - `ECX = owner + 0x680`
+    - arg1 = owner `+0x94 + 0x00`
+    - arg2 = owner `+0x94 + 0x20`
+    - arg3 = immediate `1`
+    - arg4 = first dword from the owner-side getter reached through `0x439265`
+    - arg5 = owner `+0x94 + 0x40`
+    - arg6 = owner `+0x94 + 0x50`
+    - arg7 = owner-side send-target result reached through `0x439258`
+    - arg8 = first dword / begin pointer from owner `+0x94 + 0x60`
+  - `0x448050` then concretely writes child:
+    - `+0x04 / +0x10 / +0x1c`
+    - `+0x28 / +0x2c`
+    - `+0x30 .. +0x3f`
+    - `+0x40 .. +0x4f`
+    - `+0x50`
+  - the branch at `0x44811e` is the low-byte test on child `+0xa0` (`mov al,[esi+0xa0] ; test al,al`)
   - `0x448050` branches into:
     - `0x447eb0` -> strongest current raw `0x06` / `AS_GetPublicKeyRequest` candidate
     - `0x4474f0` -> strongest current raw `0x08` / `AS_AuthRequest` candidate
