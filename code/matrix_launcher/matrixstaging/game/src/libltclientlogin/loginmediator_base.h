@@ -392,11 +392,11 @@ public:
     // +0xc4
     virtual void* GetState8PersistenceOverflowC4(uint16_t* outLength) const = 0;
     // +0xc8
-    void* UnknownSlot51();
+    virtual uint32_t HasState8Section11Dword145c() const = 0;
     // +0xcc
-    uint8_t UnknownSlot52();
+    virtual uint32_t GetState8Section11Dword145c() const = 0;
     // +0xd0
-    char* UnknownSlot53();
+    virtual RouteDescriptor30SmallStringLikeSketch* GetState8Section11String1460() = 0;
     // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8

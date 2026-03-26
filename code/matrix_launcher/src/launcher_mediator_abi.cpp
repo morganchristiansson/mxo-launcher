@@ -256,8 +256,6 @@ void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
 // UNANCHORED: resets the replacement mediator object and sidecar model to default state.
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
-    g_MediatorState8Section11String1460Owned.clear();
-    g_MediatorState8Section11String1460 = {};
     delete mxo::ltlogin::ILTLoginMediator::Default;
     mxo::ltlogin::ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;

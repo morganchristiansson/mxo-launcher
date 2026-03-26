@@ -1177,6 +1177,53 @@ void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) cons
     return buffer;
 }
 
+uint32_t CLTLoginMediator::HasState8Section11Dword145c() const {
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const uint32_t ready =
+        (ownerState && ownerState->state8Section11Dword145c != 0u) ? 1u : 0u;
+    spdlog::info(
+        "CLTLoginMediator::HasState8Section11Dword145c(+0xc8) -> {} [owner={} value=0x{:08x}]",
+        ready,
+        fmt::ptr(mediator),
+        ownerState ? ownerState->state8Section11Dword145c : 0u);
+    return ready;
+}
+
+uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const uint32_t value = ownerState ? ownerState->state8Section11Dword145c : 0u;
+    spdlog::info(
+        "CLTLoginMediator::GetState8Section11Dword145c(+0xcc) -> 0x{:08x} [owner={}]",
+        value,
+        fmt::ptr(mediator));
+    return value;
+}
+
+RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11String1460() {
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+
+    state8Section11String1460Owned_ = ownerState ? ownerState->state8Section11String1460 : std::string();
+    if (!state8Section11String1460Owned_.empty()) {
+        state8Section11String1460_.begin = state8Section11String1460Owned_.c_str();
+        state8Section11String1460_.current =
+            state8Section11String1460_.begin + state8Section11String1460Owned_.size();
+        state8Section11String1460_.capacity = state8Section11String1460_.current;
+    } else {
+        state8Section11String1460_ = {};
+    }
+
+    spdlog::info(
+        "CLTLoginMediator::GetState8Section11String1460(+0xd0) -> begin={} current={} owner={} text='{}'",
+        fmt::ptr(state8Section11String1460_.begin),
+        fmt::ptr(state8Section11String1460_.current),
+        fmt::ptr(mediator),
+        state8Section11String1460Owned_.empty() ? "<empty>" : state8Section11String1460Owned_.c_str());
+    return &state8Section11String1460_;
+}
+
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4
 // vtable: ILTLoginMediator.Default slot +0xe4
 uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {

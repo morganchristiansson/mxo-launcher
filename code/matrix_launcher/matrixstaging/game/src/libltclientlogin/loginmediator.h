@@ -637,6 +637,15 @@ public:
     // +0xc4
     // client.dll:0x62198fa0 = `mcd.cfg` overflow-tail getter; launcher getter returns owner `+0x13f0`, out-length `+0x13f4`
     void* GetState8PersistenceOverflowC4(uint16_t* outLength) const override;
+    // +0xc8
+    // sibling state8 section-`0x0b` bool getter; launcher getter tests owner dword `+0x145c`
+    uint32_t HasState8Section11Dword145c() const override;
+    // +0xcc
+    // sibling state8 section-`0x0b` dword getter; launcher getter returns owner dword `+0x145c`
+    uint32_t GetState8Section11Dword145c() const override;
+    // +0xd0
+    // sibling state8 section-`0x0b` small-string-like getter; launcher getter returns owner `+0x1460`
+    RouteDescriptor30SmallStringLikeSketch* GetState8Section11String1460() override;
     // +0xd8
     uint32_t GetArg7SelectionUpperBoundExclusive() const override;
     // +0xdc
@@ -1266,6 +1275,7 @@ private:
     // Wrapper-facing arg6 object mirrors:
     // - `+0x40`  = selection-descriptor object for profile-path / arg7-derived selection work
     // - `+0x44`  = current-slot record object for later save/profile work
+    // - `+0xd0`  = owner `+0x1460` small-string-like state8 section-11 view
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list
     Arg6SelectionDescriptor40PackedSketch arg6SelectionDescriptor40Packed_{};
@@ -1274,6 +1284,8 @@ private:
     Arg6CurrentSlotRecord44ObjectSketch arg6CurrentSlotRecord44_{};
     std::string arg6CurrentSlotRecord44NameOwned_;
     bool arg6CurrentSlotRecord44Present_ = false;
+    std::string state8Section11String1460Owned_;
+    RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
     std::string routeDescriptor30Owned_;
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
     std::vector<LateEntryList1470EntrySketch> lateEntryList1470Entries_{};

@@ -6,9 +6,6 @@ static_assert(
     sizeof(mxo::ltlogin::State3SelectionContextInputSketch) == kDiagnosticSelectionContextSize,
     "State3SelectionContextInputSketch must stay layout-compatible with the recovered arg6 +0xec 0xb4 snapshot");
 
-static std::string g_MediatorState8Section11String1460Owned;
-static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch g_MediatorState8Section11String1460 = {};
-
 // anchor: launcher.exe:0x41f150
 // vtable: ILTLoginMediator.Default slot +0x8c
 // Live original `client.dll:0x62198fa0` mcd.cfg family uses this as the mediator-backed/live-data gate.
@@ -48,42 +45,19 @@ static void* __thiscall Mediator_GetState8PersistenceOverflowC4(MinimalLoginMedi
 // vtable: ILTLoginMediator.Default slot +0xc8
 static uint32_t __thiscall Mediator_HasState8Section11DataC8(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const uint32_t ready =
-        mediator && mediator->PostAuthMarginLoadingStateView().state8Section11Dword145c != 0u ? 1u : 0u;
-    spdlog::info("MediatorStub::HasState8Section11DataC8(+0xc8) -> {}", ready);
-    return ready;
+    return mxo::ltlogin::ILTLoginMediator::Default->HasState8Section11Dword145c();
 }
 
 // anchor: launcher.exe:0x41f1a0
 // vtable: ILTLoginMediator.Default slot +0xcc
 static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const uint32_t value = mediator ? mediator->PostAuthMarginLoadingStateView().state8Section11Dword145c : 0u;
-    spdlog::info("MediatorStub::GetState8Section11DwordCc(+0xcc) -> 0x{:08x}", value);
-    return value;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetState8Section11Dword145c();
 }
 
 // anchor: launcher.exe:0x41f1b0
 // vtable: ILTLoginMediator.Default slot +0xd0
 static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    const char* beginText = mediator ? mediator->PostAuthMarginLoadingStateView().state8Section11String1460.c_str() : "";
-    g_MediatorState8Section11String1460Owned = beginText;
-    if (!g_MediatorState8Section11String1460Owned.empty()) {
-        g_MediatorState8Section11String1460.begin = g_MediatorState8Section11String1460Owned.c_str();
-        g_MediatorState8Section11String1460.current =
-            g_MediatorState8Section11String1460.begin + g_MediatorState8Section11String1460Owned.size();
-        g_MediatorState8Section11String1460.capacity = g_MediatorState8Section11String1460.current;
-    } else {
-        g_MediatorState8Section11String1460 = {};
-    }
-    spdlog::info(
-        "MediatorStub::GetState8Section11StringD0(+0xd0) -> begin={} current={} text='{}'",
-        fmt::ptr(g_MediatorState8Section11String1460.begin),
-        fmt::ptr(g_MediatorState8Section11String1460.current),
-        g_MediatorState8Section11String1460Owned.empty() ? "<empty>" : g_MediatorState8Section11String1460Owned.c_str());
-    return &g_MediatorState8Section11String1460;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetState8Section11String1460();
 }

@@ -187,13 +187,17 @@ Producer-side logs:
 Getter-side logs:
 - focused source-owned ABI home now lives under:
   - `src/launcher_mediator_abi_mcd.cpp`
-- broader shell / registration still roots at:
-  - `src/launcher_mediator_abi.cpp`
+  - wrappers there are now thin forwarders for the `mcd.cfg`/section11 family
+- class-owned logging and scratch/state assembly now live under:
+  - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
 - key log anchors:
-  - `MediatorStub::GetState8PersistenceHeaderBc(+0xbc)`
-  - `MediatorStub::GetState8PersistenceBodyC0(+0xc0)`
-  - `MediatorStub::GetState8PersistenceOverflowC4(+0xc4)`
-  - `MediatorStub::GetSelectionContextSnapshot(+0xf4)`
+  - `CLTLoginMediator::GetState8PersistenceHeaderBc(+0xbc)`
+  - `CLTLoginMediator::GetState8PersistenceBodyC0(+0xc0)`
+  - `CLTLoginMediator::GetState8PersistenceOverflowC4(+0xc4)`
+  - `CLTLoginMediator::HasState8Section11Dword145c(+0xc8)`
+  - `CLTLoginMediator::GetState8Section11Dword145c(+0xcc)`
+  - `CLTLoginMediator::GetState8Section11String1460(+0xd0)`
+  - `CLTLoginMediator::GetState8PersistenceF1c(+0xf4)`
 
 Observer/event bridge relevant to entering the save family:
 - `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
