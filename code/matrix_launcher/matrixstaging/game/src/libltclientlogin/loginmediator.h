@@ -858,6 +858,15 @@ public:
     // Keep the wrapper-facing late-entry vector-like object explicit; the current source-owned
     // replacement still exposes an empty list scaffold, but the ABI shape now lives on the owner.
     LateEntryList1470VectorLikeSketch* GetLateEntryList1470() override;
+    // Wrapper-facing arg6 profile-path/current-slot ABI objects.
+    // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
+    // slot-record helpers onto the wrapper-facing `ILTLoginMediator.Default +0x40/+0x44` object
+    // shapes.
+    Arg6SelectionDescriptor40ObjectSketch* GetArg6SelectionDescriptorObject40(
+        uint32_t selectionIndex,
+        void* returnAddress);
+    Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44(
+        void* returnAddress);
 
     // Post-auth slot/route families recovered around helper10 (`0x4401a0`) and the later
     // state-8 margin dispatcher (`0x439300`).
@@ -902,6 +911,10 @@ public:
     uint8_t GetDescriptorTypeByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b3a0 / owner vtable +0x108
     uint8_t GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const;
+
+    // Wrapper-facing arg6 `+0x44` source picker / scratch builder.
+    const SlotRecordState004b5328* ResolveArg6CurrentSlotRecord44Source() const;
+    bool RefreshArg6CurrentSlotRecordObject44();
 
     // =============================================================================
     // Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
@@ -1169,9 +1182,17 @@ private:
     SessionCallbackHelper65cSketch* sessionCallbackHelper65c_ = nullptr;
     uint32_t sharedMarginPacketField660_ = 0;  // owner `+0x660`
     std::string gameSessionId664_;             // owner `+0x664`
-    // Wrapper-facing late-runtime arg6 object mirrors:
+    // Wrapper-facing arg6 object mirrors:
+    // - `+0x40`  = selection-descriptor object for profile-path / arg7-derived selection work
+    // - `+0x44`  = current-slot record object for later save/profile work
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list
+    Arg6SelectionDescriptor40PackedSketch arg6SelectionDescriptor40Packed_{};
+    Arg6SelectionDescriptor40ObjectSketch arg6SelectionDescriptor40_{};
+    Arg6CurrentSlotRecord44PayloadSketch arg6CurrentSlotRecord44Payload_{};
+    Arg6CurrentSlotRecord44ObjectSketch arg6CurrentSlotRecord44_{};
+    std::string arg6CurrentSlotRecord44NameOwned_;
+    bool arg6CurrentSlotRecord44Present_ = false;
     std::string routeDescriptor30Owned_;
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
     std::vector<LateEntryList1470EntrySketch> lateEntryList1470Entries_{};

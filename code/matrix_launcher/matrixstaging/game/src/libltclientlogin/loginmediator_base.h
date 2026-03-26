@@ -32,6 +32,63 @@ struct SlotRecordState004b5328 {
     uint8_t status0b = 0;
     uint16_t worldId0c = 0;
 };
+
+// Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.
+// Keep this split explicit from the owner-side `CLTLoginMediator` helpers documented under
+// `0x004b01c8`:
+// - wrapper `+0x40` returns a selection-descriptor object consumed by client profile-path code
+// - wrapper `+0x44` returns a current-slot record object consumed by later save/profile code
+// Those are not the same thing as the owner-side `+0x40/+0x44` slot-record table accessors.
+struct __attribute__((packed)) Arg6SelectionDescriptor40PackedSketch {
+    uint8_t reserved0;
+    uint8_t reserved1;
+    uint8_t reserved2;
+    uint32_t field03;
+    uint32_t field07;
+};
+
+struct Arg6SelectionDescriptor40ObjectSketch {
+    uint8_t reserved[0x10];
+    Arg6SelectionDescriptor40PackedSketch* packed;
+};
+
+static_assert(offsetof(Arg6SelectionDescriptor40PackedSketch, field03) == 0x03);
+static_assert(offsetof(Arg6SelectionDescriptor40PackedSketch, field07) == 0x07);
+static_assert(offsetof(Arg6SelectionDescriptor40ObjectSketch, packed) == 0x10);
+
+struct __attribute__((packed)) Arg6CurrentSlotRecord44PayloadSketch {
+    uint8_t reserved0;
+    uint8_t reserved1;
+    uint8_t reserved2;
+    uint32_t characterIdLow03;
+    uint32_t characterIdHigh07;
+    uint8_t status0b;
+    uint16_t worldId0c;
+    uint8_t reserved0e;
+    uint8_t reserved0f;
+};
+
+struct Arg6CurrentSlotRecord44ObjectSketch {
+    void** vtable;
+    void* bufferBase04;
+    void* backingObject08;
+    uint8_t flag0c;
+    uint8_t padding0d[3];
+    Arg6CurrentSlotRecord44PayloadSketch* payload10;
+    const char* heapString14;
+    uint16_t heapStringLen18;
+    uint8_t padding1a[2];
+};
+
+static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, characterIdLow03) == 0x03);
+static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, characterIdHigh07) == 0x07);
+static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, status0b) == 0x0b);
+static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, worldId0c) == 0x0c);
+static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
+static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapString14) == 0x14);
+static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapStringLen18) == 0x18);
+static_assert(sizeof(Arg6CurrentSlotRecord44ObjectSketch) == 0x1c);
+
 struct RouteDescriptor30SmallStringLikeSketch {
     // anchor: launcher.exe:0x41f2c0 / owner vtable `+0x10c`
     // Wrapper-facing late-runtime object shape returned through arg6 `+0x10c`.
@@ -251,8 +308,14 @@ public:
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
+    // Keep the split explicit:
+    // - this source interface still uses the owner-side current-slot naming here
+    // - the wrapper-facing `ILTLoginMediator.Default` arg6 `+0x40` selection-descriptor object is
+    //   modeled separately via `Arg6SelectionDescriptor40ObjectSketch`
     virtual const SlotRecordState004b5328* GetCurrentSlotRecord() const = 0;
     // +0x44
+    // Wrapper-facing arg6 `+0x44` is also modeled separately via
+    // `Arg6CurrentSlotRecord44ObjectSketch`; do not force a false unification here.
     void UnknownSlot16();
     // +0x48
     virtual const char* GetWorldOrSelectionName() const = 0;

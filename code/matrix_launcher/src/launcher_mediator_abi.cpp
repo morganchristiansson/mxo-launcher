@@ -70,26 +70,6 @@ static mxo::ltlogin::CLTLoginMediator* DiagnosticGetActiveMediatorForCharacterSt
 }
 
 // UNANCHORED: trivial accessors into the recovered CLTLoginMediator sidecar model.
-static uint32_t DiagnosticMediatorWorldUpperBoundExclusive() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6WorldUpperBoundExclusive() : 1u;
-}
-
-static uint32_t DiagnosticMediatorSelectedWorldIndexLow24() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6SelectedWorldIndexLow24() : 0u;
-}
-
-static uint32_t DiagnosticMediatorSelectedVariantIndexHigh8() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6SelectedVariantIndexHigh8() : 0u;
-}
-
-static uint32_t DiagnosticMediatorMappedSelectionId() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6MappedSelectionId() : 0u;
-}
-
 static const char* DiagnosticMediatorMappedSelectionName() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->Arg6MappedSelectionName() : g_MediatorStringC;
@@ -125,7 +105,7 @@ static const char* NonEmptyOrPlaceholder(const char* value) {
     return (value && value[0]) ? value : "<empty>";
 }
 
-static bool IsProfilePathBuilderCaller(void* returnAddress) {
+bool IsProfilePathBuilderCaller(void* returnAddress) {
     const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
     return address >= 0x62195ff0u && address <= 0x62196121u;
 }
@@ -135,7 +115,7 @@ static bool IsMcdPersistenceCaller(void* returnAddress) {
     return address >= 0x62197830u && address <= 0x621983d0u;
 }
 
-static const char* DescribeMediatorCaller(void* returnAddress) {
+const char* DescribeMediatorCaller(void* returnAddress) {
     const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
     if (address >= 0x62170b00u && address <= 0x62170fbbu) {
         return "client.dll:FUN_62170b00 init/selection family";
@@ -161,7 +141,7 @@ static const char* DescribeMediatorCaller(void* returnAddress) {
     return "client.dll:<unclassified>";
 }
 
-static void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress) {
+void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     if (!mediator) {
         return;
@@ -286,15 +266,10 @@ void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
 // UNANCHORED: resets the replacement mediator object and sidecar model to default state.
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
-    std::memset(&g_MediatorSelectionObject, 0, sizeof(g_MediatorSelectionObject));
-    std::memset(&g_MediatorCurrentSlotRecordObject, 0, sizeof(g_MediatorCurrentSlotRecordObject));
     g_MediatorState8Section11String1460Owned.clear();
     g_MediatorState8Section11String1460 = {};
-    g_MediatorCurrentSlotRecordPayload = {0, 0, 0, 0, 0, 0, 0, 0, 0};
-    g_MediatorCurrentSlotRecordNameOwned.clear();
     delete mxo::ltlogin::ILTLoginMediator::Default;
     mxo::ltlogin::ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
-    g_MediatorSelectionPacked = DiagnosticMediatorSelectionPacked{0, 0, 0, 0u, 0u};
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
 
@@ -748,12 +723,6 @@ static void InitializeMediatorStub() {
     initialized = true;
 
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
-    std::memset(g_MediatorCurrentSlotRecordVtable, 0, sizeof(g_MediatorCurrentSlotRecordVtable));
-    g_MediatorCurrentSlotRecordVtable[0] = (void*)MediatorCurrentSlotRecord_Destroy;
-    g_MediatorCurrentSlotRecordVtable[1] = (void*)MediatorCurrentSlotRecord_TinyGetter;
-    g_MediatorCurrentSlotRecordVtable[2] = (void*)MediatorCurrentSlotRecord_AppendDebugString;
-    g_MediatorCurrentSlotRecordVtable[3] = (void*)MediatorCurrentSlotRecord_ResetPayloadForSourceDescriptor;
-    g_MediatorCurrentSlotRecordVtable[4] = (void*)MediatorCurrentSlotRecord_TinyHelper;
     // Forward to ILTLoginMediator::Default vtable slot 0 (original Mediator_GetName)
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
     g_LoginMediatorVtable[2] = (void*)Mediator_SetNetworkEngine; // +0x08
@@ -764,8 +733,8 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[14] = (void*)Mediator_GetDisplayName;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
-    g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor; // +0x40
-    g_LoginMediatorVtable[17] = (void*)Mediator_GetCurrentSlotRecord44; // +0x44
+    g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor40; // +0x40
+    g_LoginMediatorVtable[17] = (void*)Mediator_GetCurrentSlotRecordObject44; // +0x44
     g_LoginMediatorVtable[18] = (void*)Mediator_GetWorldOrSelectionName; // +0x48
     g_LoginMediatorVtable[19] = (void*)Mediator_GetProfileOrSessionName; // +0x4c
     g_LoginMediatorVtable[20] = (void*)Mediator_GetBootstrapRaw08AuxHandle50; // +0x50
@@ -943,9 +912,6 @@ void DiagnosticConfigureMediatorSelection(
         selectedVariantIndexHigh8,
         selectedSelectionGateByte100,
         selectedVariantState);
-    g_MediatorSelectionPacked.field03 =
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(mediator->Arg6MappedSelectionName()));
-    g_MediatorSelectionPacked.field07 = mediator->Arg6MappedSelectionId();
 
     spdlog::info(
         "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive={} variantUpperBoundExclusive={} worldName='{}' variantName='{}' selectedWorldLow24=0x{:06x} selectedVariantHigh8=0x{:02x} selectedSelectionGateByte100={} selectedVariantState={}",

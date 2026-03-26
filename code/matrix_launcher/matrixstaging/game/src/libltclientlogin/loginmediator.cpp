@@ -271,6 +271,42 @@ static void AssignOwnedSmallString(
     dest.string60.capacity = dest.string60.current;
 }
 
+static uint32_t __thiscall Arg6CurrentSlotRecord44_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
+    (void)self;
+    return 1u;
+}
+
+static uint32_t __thiscall Arg6CurrentSlotRecord44_TinyGetter(Arg6CurrentSlotRecord44ObjectSketch* self) {
+    (void)self;
+    return 0u;
+}
+
+static uint32_t __thiscall Arg6CurrentSlotRecord44_AppendDebugString(Arg6CurrentSlotRecord44ObjectSketch* self) {
+    (void)self;
+    return 1u;
+}
+
+static uint32_t __thiscall Arg6CurrentSlotRecord44_ResetPayloadForSourceDescriptor(Arg6CurrentSlotRecord44ObjectSketch* self) {
+    (void)self;
+    return 1u;
+}
+
+static uint32_t __thiscall Arg6CurrentSlotRecord44_TinyHelper(Arg6CurrentSlotRecord44ObjectSketch* self) {
+    (void)self;
+    return 0u;
+}
+
+static void** Arg6CurrentSlotRecord44Vtable() {
+    static void* vtable[5] = {
+        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_Destroy),
+        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_TinyGetter),
+        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_AppendDebugString),
+        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_ResetPayloadForSourceDescriptor),
+        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_TinyHelper),
+    };
+    return vtable;
+}
+
 }  // namespace
 
 CLTLoginMediator::CLTLoginMediator()
@@ -434,6 +470,148 @@ const char* CLTLoginMediator::GetProfileRootName() const {
         "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}'",
         NonEmptyTextOrPlaceholder(profileRootName));
     return profileRootName;
+}
+
+const SlotRecordState004b5328* CLTLoginMediator::ResolveArg6CurrentSlotRecord44Source() const {
+    const CLTLoginMediator* currentCharacterStateMediator = DiagnosticAuthGetLoginController();
+    if (!currentCharacterStateMediator) {
+        currentCharacterStateMediator = this;
+    }
+
+    const SlotRecordState004b5328* currentSlotRecord =
+        currentCharacterStateMediator->GetCurrentSlotRecord();
+    if (!currentSlotRecord) {
+        currentSlotRecord = currentCharacterStateMediator->GetSlotRecordByIndex(0u);
+    }
+    return currentSlotRecord;
+}
+
+bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
+    arg6CurrentSlotRecord44Payload_ = {};
+    arg6CurrentSlotRecord44_ = {};
+    arg6CurrentSlotRecord44_.vtable = Arg6CurrentSlotRecord44Vtable();
+    arg6CurrentSlotRecord44_.payload10 = &arg6CurrentSlotRecord44Payload_;
+    arg6CurrentSlotRecord44NameOwned_.clear();
+
+    if (const SlotRecordState004b5328* currentSlotRecord = ResolveArg6CurrentSlotRecord44Source()) {
+        arg6CurrentSlotRecord44Payload_.characterIdLow03 = currentSlotRecord->globalCharacterIdLow03;
+        arg6CurrentSlotRecord44Payload_.characterIdHigh07 = currentSlotRecord->globalCharacterIdHigh07;
+        arg6CurrentSlotRecord44Payload_.status0b = currentSlotRecord->status0b;
+        arg6CurrentSlotRecord44Payload_.worldId0c = currentSlotRecord->worldId0c;
+        arg6CurrentSlotRecord44NameOwned_ = currentSlotRecord->heapString14;
+    } else {
+        arg6CurrentSlotRecord44Payload_.characterIdLow03 = DiagnosticAuthCurrentCharacterIdLow();
+        arg6CurrentSlotRecord44Payload_.characterIdHigh07 = DiagnosticAuthCurrentCharacterIdHigh();
+        const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
+        if (authCharacterName && authCharacterName[0]) {
+            arg6CurrentSlotRecord44NameOwned_ = authCharacterName;
+        }
+    }
+
+    if (!arg6CurrentSlotRecord44NameOwned_.empty()) {
+        arg6CurrentSlotRecord44_.heapString14 = arg6CurrentSlotRecord44NameOwned_.c_str();
+        const size_t nameLength = arg6CurrentSlotRecord44NameOwned_.size();
+        arg6CurrentSlotRecord44_.heapStringLen18 =
+            static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
+    }
+
+    arg6CurrentSlotRecord44Present_ =
+        arg6CurrentSlotRecord44_.heapString14 != nullptr ||
+        arg6CurrentSlotRecord44Payload_.characterIdLow03 != 0u ||
+        arg6CurrentSlotRecord44Payload_.characterIdHigh07 != 0u;
+    return arg6CurrentSlotRecord44Present_;
+}
+
+Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
+    uint32_t selectionIndex,
+    void* returnAddress) {
+    const uint32_t low24 = selectionIndex & 0x00ffffffu;
+    const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
+    const uint32_t expectedScratchRequest = Arg6ExpectedSelectionDescriptorScratchRequest();
+    const bool matchedConfiguredRequest = Arg6SelectionDescriptorMatchesRequest(selectionIndex);
+    const char* worldName = matchedConfiguredRequest ? Arg6MappedSelectionName() : nullptr;
+
+    if (!worldName) {
+        spdlog::debug(
+            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
+            static_cast<unsigned>(selectionIndex),
+            static_cast<unsigned>(low24),
+            static_cast<unsigned>(high8),
+            fmt::ptr(returnAddress),
+            DescribeMediatorCaller(returnAddress),
+            static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
+            static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
+            static_cast<unsigned>(expectedScratchRequest),
+            static_cast<unsigned>(Arg6WorldUpperBoundExclusive()));
+        LogMediatorCharacterStateContext("GetArg6SelectionDescriptorObject40(+0x40)", returnAddress);
+        return nullptr;
+    }
+
+    RefreshArg6CurrentSlotRecordObject44();
+
+    const bool profilePathCaller = IsProfilePathBuilderCaller(returnAddress);
+    const char* descriptorShape = "world-shaped";
+    uint32_t field03 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worldName));
+    uint32_t field07 = Arg6MappedSelectionId();
+    if (profilePathCaller) {
+        descriptorShape = "current-slot-id-shaped";
+        field03 = arg6CurrentSlotRecord44Payload_.characterIdLow03;
+        field07 = arg6CurrentSlotRecord44Payload_.characterIdHigh07;
+        if (field03 == 0u && field07 == 0u) {
+            field03 = DiagnosticAuthCurrentCharacterIdLow();
+            field07 = DiagnosticAuthCurrentCharacterIdHigh();
+        }
+    }
+
+    arg6SelectionDescriptor40Packed_ = {};
+    arg6SelectionDescriptor40_ = {};
+    arg6SelectionDescriptor40Packed_.field03 = field03;
+    arg6SelectionDescriptor40Packed_.field07 = field07;
+    arg6SelectionDescriptor40_.packed = &arg6SelectionDescriptor40Packed_;
+
+    const char* matchMode =
+        (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
+        ((low24 == Arg6SelectedWorldIndexLow24()) ? "low24-world-match" : "other-match");
+    spdlog::debug(
+        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> {} (matchMode={} descriptorShape={} mappedName='{}' field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
+        static_cast<unsigned>(selectionIndex),
+        static_cast<unsigned>(low24),
+        static_cast<unsigned>(high8),
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        fmt::ptr(&arg6SelectionDescriptor40_),
+        matchMode,
+        descriptorShape,
+        worldName,
+        static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field03),
+        static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field07),
+        fmt::ptr(reinterpret_cast<const void*>(static_cast<uintptr_t>(arg6SelectionDescriptor40Packed_.field03))),
+        static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
+        static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
+        static_cast<unsigned>(expectedScratchRequest));
+    LogMediatorCharacterStateContext("GetArg6SelectionDescriptorObject40(+0x40)", returnAddress);
+    return &arg6SelectionDescriptor40_;
+}
+
+Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44(
+    void* returnAddress) {
+    const bool hasCurrentSlot = RefreshArg6CurrentSlotRecordObject44();
+    const void* currentSlotRecordPtr = hasCurrentSlot
+        ? static_cast<const void*>(&arg6CurrentSlotRecord44_)
+        : nullptr;
+
+    spdlog::info(
+        "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44 caller={} [{}]) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
+        fmt::ptr(returnAddress),
+        DescribeMediatorCaller(returnAddress),
+        fmt::ptr(currentSlotRecordPtr),
+        arg6CurrentSlotRecord44_.heapString14 ? arg6CurrentSlotRecord44_.heapString14 : "<empty>",
+        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.characterIdLow03),
+        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.characterIdHigh07),
+        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.status0b),
+        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.worldId0c));
+    LogMediatorCharacterStateContext("GetArg6CurrentSlotRecordObject44(+0x44)", returnAddress);
+    return hasCurrentSlot ? &arg6CurrentSlotRecord44_ : nullptr;
 }
 
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
