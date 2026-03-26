@@ -597,6 +597,7 @@ static void DiagnosticApplyLoginControllerConfig() {
         keyConfigMd5,
         uiConfigMd5);
     loginController->RegisterScaffoldState1(&states.state1);
+    loginController->RegisterScaffoldState2(&states.authenticatePending);
     loginController->RegisterScaffoldState3(&states.state3);
     loginController->RegisterScaffoldState4(&states.state4);
     loginController->RegisterScaffoldState6(&states.state6);
@@ -606,7 +607,8 @@ static void DiagnosticApplyLoginControllerConfig() {
     loginController->RegisterScaffoldState11(&states.state11);
     loginController->RegisterScaffoldState12(&states.state12);
     loginController->RegisterScaffoldState13(&states.state13);
-    loginController->SetCurrentState(&states.authenticatePending);
+    loginController->RegisterScaffoldState14(&states.worldListPending);
+    loginController->SetCurrentState(loginController->ScaffoldState2());
 
     const char* characterNameSeed =
         g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : NULL;
@@ -1009,8 +1011,13 @@ uint32_t DiagnosticBeginMarginConnection() {
         loginController->SetMarginConnectionContextKey(context);
     }
 
-    DiagnosticLoginScaffoldStates& states = GetDiagnosticLoginScaffoldStates();
-    const uint32_t result = states.state4.Slot3_BeginOrContinue(
+    mxo::ltlogin::CLTLoginState* state4 = loginController->ScaffoldState4();
+    if (!state4) {
+        spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar missing registered state4 scaffold for margin connection");
+        return 0;
+    }
+
+    const uint32_t result = state4->Slot3_BeginOrContinue(
         loginController->CurrentState(),
         loginController);
     const std::string marginHost = loginController->ResolvedMarginHostName();
@@ -1031,7 +1038,7 @@ uint32_t DiagnosticBeginMarginConnection() {
     }
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State4::Slot3_BeginOrContinue() marginHost='{}' -> 0x{:08x}",
+        "DIAGNOSTIC: CLTLoginMediator::ScaffoldState4()->Slot3_BeginOrContinue() marginHost='{}' -> 0x{:08x}",
         marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
         static_cast<unsigned>(result));
     return result;

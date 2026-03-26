@@ -134,6 +134,7 @@ public:
         //   - current best concrete state object: `CLTLoginState_State1` / vtable `0x4b4fc4`
         //   - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection starts auth connect through launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
         // - slot 2 / `0x4f7870` / phase-code `2`
+        //   - current best concrete state object: `CLTLoginState_AuthenticatePending` / vtable `0x4b5014`
         //   - launcher.exe:0x439210 = CLTLoginMediator_Helper2_BeginAuthBootstrap is the strongest current earlier credential/bootstrap auth lead
         //   - on the connected branch it reaches launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch, which then branches to:
         //     - launcher.exe:0x447eb0 = AuthBootstrap680_SendGetPublicKeyRequest (builds/sends raw auth code 0x06)
@@ -711,7 +712,13 @@ public:
     // Source-owned scaffold registration for concrete CLTLoginState objects that live outside the
     // mediator header. This preserves the original helper-state ownership on the login-state
     // vtables while still letting the mediator switch between the active scaffold states.
+    // Early concrete auth-side states with real current value now use the same mediator-owned
+    // registration/access pattern too:
+    // - state 1  = `CLTLoginState_State1`
+    // - state 2  = `CLTLoginState_AuthenticatePending`
+    // - state 14 = `CLTLoginState_WorldListPending`
     void RegisterScaffoldState1(CLTLoginState* state);
+    void RegisterScaffoldState2(CLTLoginState* state);
     void RegisterScaffoldState3(CLTLoginState* state);
     void RegisterScaffoldState4(CLTLoginState* state);
     void RegisterScaffoldState6(CLTLoginState* state);
@@ -721,6 +728,7 @@ public:
     void RegisterScaffoldState11(CLTLoginState* state);
     void RegisterScaffoldState12(CLTLoginState* state);
     void RegisterScaffoldState13(CLTLoginState* state);
+    void RegisterScaffoldState14(CLTLoginState* state);
     // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
     // Late-login state9 callback-seed getter. Returns the same 16-byte margin bootstrap key
     // family consumed by the callback-blob fill path.
@@ -748,6 +756,7 @@ public:
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
     CLTLoginState* ScaffoldState1() const;
+    CLTLoginState* ScaffoldState2() const;
     CLTLoginState* ScaffoldState3() const;
     CLTLoginState* ScaffoldState4() const;
     CLTLoginState* ScaffoldState6() const;
@@ -757,6 +766,7 @@ public:
     CLTLoginState* ScaffoldState11() const;
     CLTLoginState* ScaffoldState12() const;
     CLTLoginState* ScaffoldState13() const;
+    CLTLoginState* ScaffoldState14() const;
 
     void SetAuthConnectionContextKey(void* contextKey);
     void SetMarginConnectionContextKey(void* contextKey);
@@ -1264,6 +1274,7 @@ private:
     uint16_t lastMarginPacketOpcodeScaffold_ = 0;
     uint32_t lastMarginPacketSizeScaffold_ = 0;
     CLTLoginState* scaffoldState1_;
+    CLTLoginState* scaffoldState2_;
     CLTLoginState* scaffoldState3_;
     CLTLoginState* scaffoldState4_;
     CLTLoginState* scaffoldState6_;
@@ -1273,6 +1284,7 @@ private:
     CLTLoginState* scaffoldState11_;
     CLTLoginState* scaffoldState12_;
     CLTLoginState* scaffoldState13_;
+    CLTLoginState* scaffoldState14_;
 
     mxo::liblttcp::CMessageConnection* authConnection_;
     mxo::liblttcp::CMessageConnection* marginConnection_;

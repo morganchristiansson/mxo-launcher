@@ -377,6 +377,7 @@ CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
       currentState_(nullptr),
       scaffoldState1_(nullptr),
+      scaffoldState2_(nullptr),
       scaffoldState3_(nullptr),
       scaffoldState4_(nullptr),
       scaffoldState6_(nullptr),
@@ -386,6 +387,7 @@ CLTLoginMediator::CLTLoginMediator()
       scaffoldState11_(nullptr),
       scaffoldState12_(nullptr),
       scaffoldState13_(nullptr),
+      scaffoldState14_(nullptr),
       authConnection_(nullptr),
       marginConnection_(nullptr),
       authConnectionOwnedByMediator_(false),
@@ -1335,6 +1337,10 @@ void CLTLoginMediator::RegisterScaffoldState1(CLTLoginState* state) {
     scaffoldState1_ = state;
 }
 
+void CLTLoginMediator::RegisterScaffoldState2(CLTLoginState* state) {
+    scaffoldState2_ = state;
+}
+
 void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
     scaffoldState3_ = state;
 }
@@ -1371,8 +1377,16 @@ void CLTLoginMediator::RegisterScaffoldState13(CLTLoginState* state) {
     scaffoldState13_ = state;
 }
 
+void CLTLoginMediator::RegisterScaffoldState14(CLTLoginState* state) {
+    scaffoldState14_ = state;
+}
+
 CLTLoginState* CLTLoginMediator::ScaffoldState1() const {
     return scaffoldState1_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState2() const {
+    return scaffoldState2_;
 }
 
 CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
@@ -1409,6 +1423,10 @@ CLTLoginState* CLTLoginMediator::ScaffoldState12() const {
 
 CLTLoginState* CLTLoginMediator::ScaffoldState13() const {
     return scaffoldState13_;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState14() const {
+    return scaffoldState14_;
 }
 
 void CLTLoginMediator::SetAuthConnectionContextKey(void* contextKey) {
@@ -1507,8 +1525,10 @@ const CLTLoginMediator::MarginRouteState& CLTLoginMediator::CurrentMarginRouteSt
 void CLTLoginMediator::InitializeConnectionHelpers() {
     // anchor: launcher.exe:0x43b300
     // Initializes the helper/state dispatch table rooted at `0x4f7868..0x4f78b4`.
-    // The active source only keeps the late slot initializers recovered concretely so far
-    // (`0x420640/0x4206e0/0x420850/0x420920/0x4209a0`).
+    // Early concrete states that now have source-owned bodies/scaffolds (for example state1,
+    // state2, and state14) are registered separately through RegisterScaffoldState*.
+    // This initializer therefore still only materializes the late slot tail recovered concretely
+    // so far (`0x420640/0x4206e0/0x420850/0x420920/0x4209a0`).
     InitializeHelperDispatchSlot15();
     InitializeHelperDispatchSlot16();
     InitializeHelperDispatchSlot17();
@@ -1787,13 +1807,21 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     // Active original branch observed under WineDbg had `DAT_004d66ec == 0`, which means:
     // - clear owner `+0xf4` (`+0x94 + 0x60`) through the small-string helper
     // - switch helper state to `2`
-    // Current source scaffold keeps the already-live state-2 side conservative and only mirrors
-    // the owner-state mutation here.
+    // With a registered state-2 scaffold present, keep that early concrete helper transition on
+    // the mediator instead of relying on diagnostics-side raw state ownership.
     AssignOwnedSmallString(authBootstrapSource38_, nullptr, nullptr);
     spdlog::info(
         "DIAGNOSTIC: ProcessLoginRequest mirrored default DAT_004d66ec==0 branch by clearing owner+0xf4 small-string state");
+    if (scaffoldState2_ != nullptr) {
+        SwitchHelperStateScaffold(2u, scaffoldState2_);
+    } else {
+        spdlog::info(
+            "CLTLoginMediator::ProcessLoginRequest has no registered state2 scaffold; leaving currentState={} after owner+0xf4 clear",
+            currentState_ ? currentState_->DebugName() : "<null>");
+    }
     return 0u;
 }
+
 void CLTLoginMediator::ResetSelectionContext0ecMirror() {
     selectionContext0ecCopy_ = {};
     selectionContext0ecCopyValid_ = false;
