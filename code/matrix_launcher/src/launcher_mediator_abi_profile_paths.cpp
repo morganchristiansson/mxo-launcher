@@ -64,10 +64,7 @@ static std::string g_MediatorCurrentSlotRecordNameOwned;
 // vtable: ILTLoginMediator.Default slot +0x38
 static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    const char* profileName = DiagnosticMediatorProfileName();
-    LogMediatorNameGetterDetails("GetProfileRootName(+0x38)", returnAddress, profileName);
-    return profileName;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
 }
 
 static bool DiagnosticMediatorWorldIndexMatchesConfiguredSelection(uint32_t worldIndex);
@@ -263,31 +260,6 @@ static void PopulateMediatorCurrentSlotRecordObject() {
     }
 }
 
-static const char* DiagnosticMediatorCurrentCharacterNameForProfilePath() {
-    PopulateMediatorCurrentSlotRecordObject();
-    if (g_MediatorCurrentSlotRecordObject.heapString14 && g_MediatorCurrentSlotRecordObject.heapString14[0]) {
-        return g_MediatorCurrentSlotRecordObject.heapString14;
-    }
-
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    if (mediator) {
-        const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
-        if (ownerState.characterNameBufferF1c[0]) {
-            return ownerState.characterNameBufferF1c;
-        }
-        if (ownerState.sourceLeadString108[0]) {
-            return ownerState.sourceLeadString108.data();
-        }
-    }
-
-    const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
-    if (authCharacterName && authCharacterName[0]) {
-        return authCharacterName;
-    }
-
-    return DiagnosticMediatorMappedSelectionName();
-}
-
 // anchor: launcher.exe:0x41f300
 // vtable: ILTLoginMediator.Default slot +0x44
 // Current mcd.cfg crash stopper: `client.dll:0x62197560` only gates on non-null here before the
@@ -329,18 +301,12 @@ static void* __thiscall Mediator_GetCurrentSlotRecord44(MinimalLoginMediatorStub
 // vtable: ILTLoginMediator.Default slot +0x48
 static const char* __thiscall Mediator_GetWorldOrSelectionName(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    const char* worldOrSelectionName = DiagnosticMediatorCurrentCharacterNameForProfilePath();
-    LogMediatorNameGetterDetails("GetWorldOrSelectionName(+0x48)", returnAddress, worldOrSelectionName);
-    return worldOrSelectionName;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldOrSelectionName();
 }
 
 // anchor: later client startup path calls arg6 +0x4c immediately after +0x48
 // vtable: ILTLoginMediator.Default slot +0x4c
 static const char* __thiscall Mediator_GetProfileOrSessionName(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* returnAddress = __builtin_return_address(0);
-    const char* profileOrSessionName = DiagnosticMediatorProfileName();
-    LogMediatorNameGetterDetails("GetProfileOrSessionName(+0x4c)", returnAddress, profileOrSessionName);
-    return profileOrSessionName;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetProfileOrSessionName();
 }

@@ -26,6 +26,7 @@
 #include <ws2tcpip.h>
 
 #include "../../../../src/diagnostics.h"
+#include "../../../../src/diagnostics_auth.h"
 #include "loginstate.h"
 #include "launcher_mediator_abi_shared.h"
 #include <spdlog/spdlog.h>
@@ -163,6 +164,10 @@ static bool ResolveAllIpv4Addresses(const char* hostName, std::vector<uint32_t>*
 
 static const char* MaskedAuthValue(const std::string& value) {
     return value.empty() ? "<empty>" : "<provided>";
+}
+
+static const char* NonEmptyTextOrPlaceholder(const char* value) {
+    return (value && value[0]) ? value : "<empty>";
 }
 
 static std::string LowercaseAsciiString(const std::string& value) {
@@ -421,6 +426,59 @@ uint32_t CLTLoginMediator::IsConnected() {
         spdlog::debug("MediatorStub::IsConnected() -> 1 [count={:08x}]", s_IsConnectedCount);
     }
     return 1;
+}
+
+const char* CLTLoginMediator::GetProfileRootName() const {
+    const char* profileRootName = Arg6ProfileName();
+    spdlog::debug(
+        "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}'",
+        NonEmptyTextOrPlaceholder(profileRootName));
+    return profileRootName;
+}
+
+const char* CLTLoginMediator::GetWorldOrSelectionName() const {
+    const SlotRecordState004b5328* slotRecord = GetCurrentSlotRecord();
+    if (!slotRecord) {
+        slotRecord = GetSlotRecordByIndex(0u);
+    }
+
+    const auto& ownerState = PostAuthMarginLoadingStateView();
+    const char* authCharacterName = DiagnosticAuthCurrentCharacterName();
+    const char* worldOrSelectionName = Arg6MappedSelectionName();
+    const char* source = "arg6-selection";
+
+    if (slotRecord && !slotRecord->heapString14.empty()) {
+        worldOrSelectionName = slotRecord->heapString14.c_str();
+        source = "slotRecord+0x14";
+    } else if (ownerState.characterNameBufferF1c[0]) {
+        worldOrSelectionName = ownerState.characterNameBufferF1c;
+        source = "owner+0xf1c";
+    } else if (ownerState.sourceLeadString108[0]) {
+        worldOrSelectionName = ownerState.sourceLeadString108.data();
+        source = "owner+0x108";
+    } else if (authCharacterName && authCharacterName[0]) {
+        worldOrSelectionName = authCharacterName;
+        source = "auth-current-character";
+    }
+
+    spdlog::debug(
+        "CLTLoginMediator::GetWorldOrSelectionName(+0x48) -> '{}' [source={} currentSlot='{}' profile='{}' mappedSelection='{}']",
+        NonEmptyTextOrPlaceholder(worldOrSelectionName),
+        source,
+        (slotRecord && !slotRecord->heapString14.empty())
+            ? slotRecord->heapString14.c_str()
+            : "<empty>",
+        NonEmptyTextOrPlaceholder(Arg6ProfileName()),
+        NonEmptyTextOrPlaceholder(Arg6MappedSelectionName()));
+    return worldOrSelectionName;
+}
+
+const char* CLTLoginMediator::GetProfileOrSessionName() const {
+    const char* profileOrSessionName = Arg6ProfileName();
+    spdlog::debug(
+        "CLTLoginMediator::GetProfileOrSessionName(+0x4c) -> '{}'",
+        NonEmptyTextOrPlaceholder(profileOrSessionName));
+    return profileOrSessionName;
 }
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50

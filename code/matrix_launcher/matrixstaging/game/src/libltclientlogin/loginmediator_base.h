@@ -247,7 +247,7 @@ public:
     // +0x34
     void UnknownSlot12();
     // +0x38
-    void UnknownSlot13();
+    virtual const char* GetProfileRootName() const = 0;
     // +0x3c
     void UnknownSlot14();
     // +0x40
@@ -255,9 +255,9 @@ public:
     // +0x44
     void UnknownSlot16();
     // +0x48
-    void UnknownSlot17();
+    virtual const char* GetWorldOrSelectionName() const = 0;
     // +0x4c
-    void UnknownSlot18();
+    virtual const char* GetProfileOrSessionName() const = 0;
     // +0x50
     virtual void* BootstrapRaw08AuxHandle50() const = 0;
     // +0x54

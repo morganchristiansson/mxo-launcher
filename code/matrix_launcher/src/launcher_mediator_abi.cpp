@@ -230,19 +230,6 @@ static void LogMediatorCharacterStateContext(const char* slotLabel, void* return
         currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->status0b) : 0u);
 }
 
-static void LogMediatorNameGetterDetails(
-    const char* slotLabel,
-    void* returnAddress,
-    const char* returnedText) {
-    spdlog::debug(
-        "MediatorStub::{} caller={} [{}] -> '{}'",
-        slotLabel ? slotLabel : "<slot>",
-        fmt::ptr(returnAddress),
-        DescribeMediatorCaller(returnAddress),
-        NonEmptyOrPlaceholder(returnedText));
-    LogMediatorCharacterStateContext(slotLabel, returnAddress);
-}
-
 // Focused source split for the broader ILTLoginMediator.Default ABI shell:
 // - keep profile-path / current-slot / selection-descriptor work isolated
 // - keep non-mcd selection cfg corpus fallback work isolated

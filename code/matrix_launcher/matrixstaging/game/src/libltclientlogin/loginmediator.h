@@ -542,6 +542,14 @@ public:
     void SetValue2(void* value) override;
     // +0x2c
     uint32_t IsConnected() override;
+    // +0x38
+    // Current best wrapper-facing name from the client `Profiles\%s\...` builder.
+    const char* GetProfileRootName() const override;
+    // +0x48
+    // Current best wrapper-facing name from the later `Profiles\%s\%s_%X\` builder.
+    const char* GetWorldOrSelectionName() const override;
+    // +0x4c
+    const char* GetProfileOrSessionName() const override;
     // +0x5c
     const char* GetString2(const char* value) override;
     // +0x60
