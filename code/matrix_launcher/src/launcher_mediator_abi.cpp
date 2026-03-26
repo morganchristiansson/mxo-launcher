@@ -731,7 +731,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c
     g_LoginMediatorVtable[9] = (void*)Mediator_SetValue2;        // +0x24
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
-    g_LoginMediatorVtable[14] = (void*)Mediator_GetDisplayName;  // +0x38
+    g_LoginMediatorVtable[14] = (void*)Mediator_GetProfileRootName38;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor40; // +0x40
     g_LoginMediatorVtable[17] = (void*)Mediator_GetCurrentSlotRecordObject44; // +0x44

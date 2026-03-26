@@ -9,7 +9,7 @@
 
 // anchor: client.dll profile-root formatting path uses arg6 +0x38 for Profiles\%s\... construction
 // vtable: ILTLoginMediator.Default slot +0x38
-static const char* __thiscall Mediator_GetDisplayName(MinimalLoginMediatorStub* self) {
+static const char* __thiscall Mediator_GetProfileRootName38(MinimalLoginMediatorStub* self) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
 }

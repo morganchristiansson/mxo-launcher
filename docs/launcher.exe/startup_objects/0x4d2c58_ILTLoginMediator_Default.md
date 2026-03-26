@@ -267,8 +267,8 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x2c` | repeated `RunClientDLL` runtime gate before arg5-owned work at `0x62006cb9..0x62006cca` (`IsConnected()` in the current implementation) | high |
 | `+0x38` | returns profile-root string used by client `Profiles\\%s\\...` formatting path | high |
 | `+0x3c` | returns default selection index when the client asks for `0xff` fallback selection | medium |
-| `+0x40` | returns selection-descriptor object for the arg7-derived selection index, including name + low-24-bit id data | medium |
-| `+0x44` | returns the current character-slot record from owner `+0x688[owner+0xcc8]`; the replacement had to source-own a minimal non-null current-slot record here to get past client `0x62197560` on the live `mcd.cfg` save path | high |
+| `+0x40` | returns selection-descriptor object for the arg7-derived selection index, including name + low-24-bit id data; replacement source now keeps this wrapper-facing ABI object explicit and owner-owned on `CLTLoginMediator`, not as ABI-shell globals | medium |
+| `+0x44` | returns the current character-slot record object used by the later profile/save path; keep this wrapper-facing ABI object split explicit from the owner-side `+0x688[owner+0xcc8]` accessor family, and the replacement now owns the non-null scratch object on `CLTLoginMediator` instead of wrapper globals | high |
 | `+0x48` | returns world/selection-style C-string in later real-user startup path | high |
 | `+0x4c` | returns profile/session-style C-string immediately after `+0x48` in later real-user startup path | high |
 | `+0x50` | later runtime distributed-object/RCC path calls this as a nullable pointer getter; `client.dll:0x625c86d0` converts non-null into flag `0x30`, and launcher-side static analysis currently maps it to `owner +0x680 -> +0xf4 -> +0xa8` when present | high |

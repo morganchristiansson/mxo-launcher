@@ -29,7 +29,6 @@
 #include "../../../../src/diagnostics_auth.h"
 #include "loginstate.h"
 #include "launcher_mediator_abi_shared.h"
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -367,17 +366,7 @@ CLTLoginMediator::CLTLoginMediator()
       expectedAuthRequestName_(nullptr),
       expectedMarginRequestName_(nullptr),
       worldSlots_{},
-      worldPayloadSlots_{},
-      lastNopatchValue1Ptr_(nullptr),
-      lastNopatchValue2Ptr_(nullptr),
-      lastStatus178_(0u),
-      statusQuery178Count_(0u),
-      provideStartupTripleNetShell_(nullptr),
-      provideStartupTripleNetMgr_(nullptr),
-      provideStartupTripleDistrObjExecutive_(nullptr),
-      provideStartupTripleCount_(0u),
-      arg6ProcessLoginCredentialsInput120_(nullptr),
-      arg6ProcessLoginCredentialsCount120_(0u) {
+      worldPayloadSlots_{} {
     SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
     InitializeArg6DefaultObject();
