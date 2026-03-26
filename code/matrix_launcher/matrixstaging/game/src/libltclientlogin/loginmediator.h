@@ -735,10 +735,16 @@ public:
     // mediator header. This preserves the original helper-state ownership on the login-state
     // vtables while still letting the mediator switch between the active scaffold states.
     // Early concrete auth-side states with real current value now use the same mediator-owned
-    // registration/access pattern too:
-    // - state 1  = `CLTLoginState_State1`
-    // - state 2  = `CLTLoginState_AuthenticatePending`
-    // - state 14 = `CLTLoginState_WorldListPending`
+    // registration/access pattern too.
+    // Current practical startup/auth focus:
+    // - state 0  = initial current helper installed by mediator init
+    // - state 1  = auth-connect pending
+    // - state 2  = auth/bootstrap coordinator
+    // - state 14 = world-list pending
+    // Late Family-A states 15..19 stay non-happy / later-flow scaffolds for now, but keep
+    // registration points source-owned so future work can switch to them without reopening the
+    // generic mediator ownership split again.
+    void RegisterScaffoldState0(CLTLoginState* state);
     void RegisterScaffoldState1(CLTLoginState* state);
     void RegisterScaffoldState2(CLTLoginState* state);
     void RegisterScaffoldState3(CLTLoginState* state);
@@ -751,6 +757,11 @@ public:
     void RegisterScaffoldState12(CLTLoginState* state);
     void RegisterScaffoldState13(CLTLoginState* state);
     void RegisterScaffoldState14(CLTLoginState* state);
+    void RegisterScaffoldState15(CLTLoginState* state);
+    void RegisterScaffoldState16(CLTLoginState* state);
+    void RegisterScaffoldState17(CLTLoginState* state);
+    void RegisterScaffoldState18(CLTLoginState* state);
+    void RegisterScaffoldState19(CLTLoginState* state);
     // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
     // Late-login state9 callback-seed getter. Returns the same 16-byte margin bootstrap key
     // family consumed by the callback-blob fill path.
@@ -777,6 +788,7 @@ public:
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
+    CLTLoginState* ScaffoldState0() const;
     CLTLoginState* ScaffoldState1() const;
     CLTLoginState* ScaffoldState2() const;
     CLTLoginState* ScaffoldState3() const;
@@ -789,6 +801,13 @@ public:
     CLTLoginState* ScaffoldState12() const;
     CLTLoginState* ScaffoldState13() const;
     CLTLoginState* ScaffoldState14() const;
+    CLTLoginState* ScaffoldState15() const;
+    CLTLoginState* ScaffoldState16() const;
+    CLTLoginState* ScaffoldState17() const;
+    CLTLoginState* ScaffoldState18() const;
+    CLTLoginState* ScaffoldState19() const;
+    // Installs the source-owned initial helper convention (`state0`) after registration.
+    void InstallInitialState0Scaffold();
 
     void SetAuthConnectionContextKey(void* contextKey);
     void SetMarginConnectionContextKey(void* contextKey);
@@ -946,6 +965,13 @@ public:
     // Tiny auth transport-ready test used by state2 slot 3 before it reaches the bootstrap
     // dispatcher. Current best concrete read: auth connection exists and connection `+0x34 == 2`.
     bool HasReadyAuthConnectionState2() const;
+    // Source-owned branch selector for the later `0x41ecd0` state16/session family.
+    // Keep it default-off so the proven happy path stays on the observed `DAT_004d66ec == 0`
+    // route, but make the alternate transition scaffold explicit for future non-happy work.
+    void SetProcessLoginRequestAlternateState16BranchScaffold(bool enabled);
+    bool ProcessLoginRequestAlternateState16BranchScaffold() const {
+        return processLoginRequestAlternateState16BranchScaffold_;
+    }
 
     // Post-connect status handling is still owner/helper-state driven.
     // Current high-value summary:
@@ -1309,6 +1335,7 @@ private:
     uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
     uint16_t lastMarginPacketOpcodeScaffold_ = 0;
     uint32_t lastMarginPacketSizeScaffold_ = 0;
+    CLTLoginState* scaffoldState0_;
     CLTLoginState* scaffoldState1_;
     CLTLoginState* scaffoldState2_;
     CLTLoginState* scaffoldState3_;
@@ -1321,6 +1348,11 @@ private:
     CLTLoginState* scaffoldState12_;
     CLTLoginState* scaffoldState13_;
     CLTLoginState* scaffoldState14_;
+    CLTLoginState* scaffoldState15_;
+    CLTLoginState* scaffoldState16_;
+    CLTLoginState* scaffoldState17_;
+    CLTLoginState* scaffoldState18_;
+    CLTLoginState* scaffoldState19_;
 
     mxo::liblttcp::CMessageConnection* authConnection_;
     mxo::liblttcp::CMessageConnection* marginConnection_;
@@ -1418,6 +1450,8 @@ private:
     void* latestObserver174_ = nullptr;         // owner `+0x674` most recent unregister call
     uint32_t observerRegister170Count_ = 0;     // owner `+0x674` register call count
     uint32_t observerUnregister174Count_ = 0;   // owner `+0x674` unregister call count
+
+    bool processLoginRequestAlternateState16BranchScaffold_ = false;
 
     std::string authServerDnsName_;
     uint16_t authServerPortHostOrder_;

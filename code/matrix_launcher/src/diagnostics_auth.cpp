@@ -69,6 +69,7 @@ private:
 };
 
 struct DiagnosticLoginScaffoldStates {
+    mxo::ltlogin::CLTLoginState_State0 state0 = {};
     mxo::ltlogin::CLTLoginState_State1 state1 = {};
     mxo::ltlogin::CLTLoginState_AuthenticatePending authenticatePending = {};
     mxo::ltlogin::CLTLoginState_State3 state3 = {};
@@ -81,6 +82,11 @@ struct DiagnosticLoginScaffoldStates {
     mxo::ltlogin::CLTLoginState_State12 state12 = {};
     mxo::ltlogin::CLTLoginState_State13 state13 = {};
     mxo::ltlogin::CLTLoginState_WorldListPending worldListPending = {};
+    mxo::ltlogin::CLTLoginState_State15 state15 = {};
+    mxo::ltlogin::CLTLoginState_State16 state16 = {};
+    mxo::ltlogin::CLTLoginState_State17 state17 = {};
+    mxo::ltlogin::CLTLoginState_State18 state18 = {};
+    mxo::ltlogin::CLTLoginState_State19 state19 = {};
 };
 
 static DiagnosticLoginControllerSession g_DiagnosticLoginControllerSession = {};
@@ -600,6 +606,7 @@ static void DiagnosticApplyLoginControllerConfig() {
         static_cast<uint8_t>(loginType),
         keyConfigMd5,
         uiConfigMd5);
+    loginController->RegisterScaffoldState0(&states.state0);
     loginController->RegisterScaffoldState1(&states.state1);
     loginController->RegisterScaffoldState2(&states.authenticatePending);
     loginController->RegisterScaffoldState3(&states.state3);
@@ -612,7 +619,12 @@ static void DiagnosticApplyLoginControllerConfig() {
     loginController->RegisterScaffoldState12(&states.state12);
     loginController->RegisterScaffoldState13(&states.state13);
     loginController->RegisterScaffoldState14(&states.worldListPending);
-    loginController->SetCurrentState(loginController->ScaffoldState2());
+    loginController->RegisterScaffoldState15(&states.state15);
+    loginController->RegisterScaffoldState16(&states.state16);
+    loginController->RegisterScaffoldState17(&states.state17);
+    loginController->RegisterScaffoldState18(&states.state18);
+    loginController->RegisterScaffoldState19(&states.state19);
+    loginController->InstallInitialState0Scaffold();
 
     const char* characterNameSeed =
         g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : NULL;
@@ -862,6 +874,9 @@ uint32_t DiagnosticBeginAuthConnection() {
         loginController->SetAuthConnectionContextKey(context);
     }
 
+    spdlog::info(
+        "ROUTE CHECKPOINT: diagnostics auto-begin auth from currentState={}",
+        loginController->CurrentState() ? loginController->CurrentState()->DebugName() : "<null>");
     const uint32_t result =
         loginController->BeginAuthConnectionViaState1Scaffold();
     if (context) {

@@ -798,9 +798,22 @@ Representative non-zero arg7 result from that same run:
       - `+0x00` = username
       - `+0x20` = password
       - observed active branch had `DAT_004d66ec == 0`
-  - the observed launcher branch then transitions `0 -> 2 -> 3 -> 8`
+  - corrected happy-path rerun from a stable EULA attach now proves the early helper chain more precisely:
+    - a second fresh-process rerun with the correct password reproduced the same early chain, so the earlier wrong-password detour does not appear to have contaminated this proved happy-path sequence
+    - before submit, owner `+0x10` is `0x004b51e0` = state `0`
+    - `0x41b450(2)` switches `state0 -> state2`
+    - `0x439210` (`state2` slot 3) is entered with upstream `state0`
+    - `0x41b450(1)` switches `state2 -> state1`
+    - `0x439090` (`state1` slot 3) is entered with upstream `state2`
+    - `0x4390b0` (`state1` slot 1) later uses cached upstream `state2`
+    - `0x41b450(2)` switches `state1 -> state2`
+    - `0x439210` (`state2` slot 3) is re-entered with upstream `state1`
+    - `0x41b450(3)` switches `state2 -> state3`
   - while current helper vtable is `0x004b5208` (state `3`), the launcher reaches `0x41c1f0`
   - newer live stop now confirms `0x41c1f0` itself is reached on that same branch
+  - a second fresh rerun with the correct password reproduced that same state-`3` arrival at
+    `0x41c1f0`, which makes the earlier wrong-password detour unlikely to have introduced extra
+    backward helper transitions on the proved happy path
   - `0x41c1f0` copies the first dword into owner byte `+0xcc8`, then copies the remaining
     `0xb0` bytes into owner `+0xcd0 .. +0xd7f`, and switches helper state to `8`
 - replacement-launcher follow-up now mirrors that copied arg6 `+0xec` snapshot directly into the

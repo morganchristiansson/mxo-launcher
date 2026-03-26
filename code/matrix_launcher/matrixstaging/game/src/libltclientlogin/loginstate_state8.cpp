@@ -634,6 +634,10 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             }
             mediator->SwitchHelperStateScaffold(9u, nextBase);
         }
+        spdlog::info(
+            "ROUTE CHECKPOINT: late-login state8 complete -> state9 handoffWord=0x{:04x} currentState={}",
+            parsed.handoffWord09,
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
         mediator->PostEventScaffold(0x0bu);
 

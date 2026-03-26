@@ -208,12 +208,24 @@ So the current post-auth blocker is now narrower than a generic “later world-l
 ## Earlier bootstrap/auth send narrowing
 
 Current strongest earlier launcher-owned bootstrap/auth chain:
-- `0x41b450(2)` selects helper `0x4f7870`
-- helper `+0x08 / 0x439210`
-- `0x439210` gates on `0x41b490()` and then calls `0x448050`
-- `0x448050` branches into:
-  - `0x447eb0` -> strongest current raw `0x06` / `AS_GetPublicKeyRequest` candidate
-  - `0x4474f0` -> strongest current raw `0x08` / `AS_AuthRequest` candidate
+- corrected happy-path WineDbg from a stable EULA attach now proves the early helper sequence up to selection-context handoff as:
+  - `state0 -> ProcessLoginRequest -> state2 -> state1 -> state2 -> state3 -> 0x41c1f0`
+- concretely on that same run:
+  - `0x41b450(2)` switches `state0 -> state2`
+  - helper `+0x08 / 0x439210` is entered on state `2` with upstream state `0`
+  - `0x41b450(1)` switches `state2 -> state1`
+  - helper `+0x08 / 0x439090` is entered on state `1` with upstream state `2`
+  - `0x4390b0` later consumes cached upstream state `2`
+  - `0x41b450(2)` switches `state1 -> state2`
+  - `0x439210` is re-entered on state `2` with upstream state `1`
+  - `0x41b450(3)` switches `state2 -> state3`
+- inside that proven sequence, the strongest earlier launcher-owned bootstrap/auth lead remains:
+  - `0x41b450(2)` selects helper `0x4f7870`
+  - helper `+0x08 / 0x439210`
+  - `0x439210` gates on `0x41b490()` and then calls `0x448050`
+  - `0x448050` branches into:
+    - `0x447eb0` -> strongest current raw `0x06` / `AS_GetPublicKeyRequest` candidate
+    - `0x4474f0` -> strongest current raw `0x08` / `AS_AuthRequest` candidate
 
 Current best bootstrap anchors:
 - `launcher.exe:0x439210`

@@ -29,6 +29,11 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
 
     const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     if (!mediator->HasReadyAuthConnectionState2()) {
+        spdlog::info(
+            "ROUTE CHECKPOINT: early-auth state2 -> state1 auth-connect incomingUpstream={} cachedUpstream={} currentState={}",
+            fmt::ptr(upstreamOrArg),
+            fmt::ptr(cachedUpstreamOrArg_),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         const uint32_t connectResult = mediator->BeginAuthConnectionViaState1Scaffold();
         spdlog::info(
             "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue auth transport not ready incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} -> BeginAuthConnectionViaState1Scaffold=0x{:08x}",
@@ -41,6 +46,11 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
         return connectResult;
     }
 
+    spdlog::info(
+        "ROUTE CHECKPOINT: early-auth state2 bootstrap dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={}",
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        fmt::ptr(cachedUpstreamOrArg_),
+        static_cast<unsigned>(cachedUpstreamPhaseCode));
     const uint32_t sendResult = mediator->BeginAuthHandshake();
     spdlog::info(
         "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> BeginAuthHandshake=0x{:08x}",
