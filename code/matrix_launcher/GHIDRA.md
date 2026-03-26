@@ -2,7 +2,7 @@
 
 Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
 
-- **Don't trust decompiler alone**: Verify with disassembly tools when in doubt about calling conventions, stack cleanup, or field semantics
+- Verify with disassembly tools when in doubt about calling conventions, stack cleanup, or field semantics
 - **Cross-reference**: Combine decompilation output with direct disassembly analysis for critical functions
 - **Rename functions**: Sync method names with source code. When log message strings contain method names, use it. Otherwise use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - **Rename variables**: Sync variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
