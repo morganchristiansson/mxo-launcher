@@ -711,6 +711,7 @@ public:
     // Source-owned scaffold registration for concrete CLTLoginState objects that live outside the
     // mediator header. This preserves the original helper-state ownership on the login-state
     // vtables while still letting the mediator switch between the active scaffold states.
+    void RegisterScaffoldState1(CLTLoginState* state);
     void RegisterScaffoldState3(CLTLoginState* state);
     void RegisterScaffoldState4(CLTLoginState* state);
     void RegisterScaffoldState6(CLTLoginState* state);
@@ -746,6 +747,7 @@ public:
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
+    CLTLoginState* ScaffoldState1() const;
     CLTLoginState* ScaffoldState3() const;
     CLTLoginState* ScaffoldState4() const;
     CLTLoginState* ScaffoldState6() const;
@@ -893,6 +895,11 @@ public:
     // Current best method mapping still treats that virtual `+0x1c` as the connection-
     // oriented ensure-connected / engine-Connect wrapper.
     uint32_t BeginAuthConnection();
+    // Narrow mediator-owned auth-entry bridge for the current diagnostics auto-begin path:
+    // - captures the current helper as state1's cached upstream input
+    // - installs the registered state1 scaffold as the active helper
+    // - then dispatches state1 slot 3 / `0x439090`
+    uint32_t BeginAuthConnectionViaState1Scaffold();
 
     // Post-connect status handling is still owner/helper-state driven.
     // Current high-value summary:
@@ -1255,6 +1262,7 @@ private:
     uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
     uint16_t lastMarginPacketOpcodeScaffold_ = 0;
     uint32_t lastMarginPacketSizeScaffold_ = 0;
+    CLTLoginState* scaffoldState1_;
     CLTLoginState* scaffoldState3_;
     CLTLoginState* scaffoldState4_;
     CLTLoginState* scaffoldState6_;

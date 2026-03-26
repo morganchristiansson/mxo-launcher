@@ -376,6 +376,7 @@ static void* LogLiveSelectionCfgCorpusGetter(
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
       currentState_(nullptr),
+      scaffoldState1_(nullptr),
       scaffoldState3_(nullptr),
       scaffoldState4_(nullptr),
       scaffoldState6_(nullptr),
@@ -1330,6 +1331,10 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     return seedPointer;
 }
 
+void CLTLoginMediator::RegisterScaffoldState1(CLTLoginState* state) {
+    scaffoldState1_ = state;
+}
+
 void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
     scaffoldState3_ = state;
 }
@@ -1364,6 +1369,10 @@ void CLTLoginMediator::RegisterScaffoldState12(CLTLoginState* state) {
 
 void CLTLoginMediator::RegisterScaffoldState13(CLTLoginState* state) {
     scaffoldState13_ = state;
+}
+
+CLTLoginState* CLTLoginMediator::ScaffoldState1() const {
+    return scaffoldState1_;
 }
 
 CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
@@ -1587,6 +1596,26 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     connection->SetRemoteHostName(authServerDnsName_.c_str());
     connection->SetRemoteEndpoint(authEndpoint_);
     return connection->EnsureConnected();
+}
+
+uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
+    CLTLoginState* const state1 = scaffoldState1_;
+    if (state1 == nullptr) {
+        spdlog::warn(
+            "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold missing registered state1 scaffold currentState={}",
+            currentState_ ? currentState_->DebugName() : "<null>");
+        return 0u;
+    }
+
+    CLTLoginState* const upstreamState = currentState_;
+    SwitchHelperStateScaffold(1u, state1);
+    const uint32_t result = state1->Slot3_BeginOrContinue(upstreamState, this);
+    spdlog::info(
+        "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold upstreamState={} currentState={} -> result=0x{:08x}",
+        upstreamState ? upstreamState->DebugName() : "<null>",
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(result));
+    return result;
 }
 
 uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
