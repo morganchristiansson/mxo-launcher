@@ -326,7 +326,10 @@ public:
         // - `+0x134 .. +0x177` = appearance/customization ids
         // - `+0x178` = RealFirstName
         // - `+0x198` = RealLastName
-        // - `+0x1b8` = Background
+        // - `+0x1b8` = Background source text
+        //   - client wrapper-facing `+0x120` writer currently copies up to `0x400` bytes there
+        //   - later state11 packet building still uses only the bounded prefix that fits the
+        //     packet builder's own field limits
         // - `+0xf1c ...` = load-character reply materialization area
         std::array<char, 0x20> sourceLeadString108{};    // `+0x108 .. +0x127` = CharacterName
         uint32_t sourceField128 = 0;                     // `+0x128`
@@ -356,7 +359,7 @@ public:
 
         std::array<uint8_t, 0x20> sourceBlock178{};      // `+0x178 .. +0x197` = RealFirstName
         std::array<uint8_t, 0x20> sourceBlock198{};      // `+0x198 .. +0x1b7` = RealLastName
-        std::array<uint8_t, 0x20> sourceBlock1b8{};      // `+0x1b8 .. +0x1d7` = Background
+        std::array<uint8_t, 0x400> sourceBlock1b8{};     // `+0x1b8 ...` = Background source text
 
         // ========================================================================
         // Post-auth HandleLoadCharacterReply outputs (0x440320)
@@ -893,6 +896,16 @@ public:
     // +0x120
     // anchor: launcher.exe:0x41c3c0
     uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) override;
+    // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
+    // Keep the instance-role split explicit in source:
+    // - the wrapper-facing `ILTLoginMediator.Default` mirror should capture the source block even
+    //   when it is not the live owner/controller instance
+    // - the live owner/controller still applies the real `0x41c3c0` state gate and helper-state
+    //   transition to `10`
+    uint32_t CaptureProcessLoginCredentialsArg6Slot120(
+        const void* input120,
+        void* returnAddress,
+        bool applyOwnerSemantics);
 
     // Internal source-owned scaffolds for active CLTLoginState vtable bodies:
     // - owner callback84 secondary-message bridge shared by state8/state9 fallbacks and state12
@@ -972,7 +985,7 @@ public:
     const std::array<uint32_t, 17>& SourceDwords134() const { return postAuthMarginLoadingState_.sourceDwords134; }
     const std::array<uint8_t, 0x20>& SourceBlock178() const { return postAuthMarginLoadingState_.sourceBlock178; }
     const std::array<uint8_t, 0x20>& SourceBlock198() const { return postAuthMarginLoadingState_.sourceBlock198; }
-    const std::array<uint8_t, 0x20>& SourceBlock1b8() const { return postAuthMarginLoadingState_.sourceBlock1b8; }
+    const std::array<uint8_t, 0x400>& SourceBlock1b8() const { return postAuthMarginLoadingState_.sourceBlock1b8; }
 
     // State-owned slot-6 bodies keep class ownership, but mutate this mediator-owned owner-state
     // block through a narrow explicit accessor instead of duplicating the storage elsewhere.
@@ -1032,6 +1045,7 @@ private:
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
     void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
+    void MirrorProcessLoginCredentialsSourceBlock120(const ProcessLoginCredentialsInputSketch& input);
     void AdoptAuthReplyIntoRecoveredMediatorState();
 
     uint32_t SendMarginFramedPacket(
@@ -1139,6 +1153,8 @@ private:
     void* provideStartupTripleNetMgr_ = nullptr;           // +0x124 netMgr
     void* provideStartupTripleDistrObjExecutive_ = nullptr; // +0x124 distrObjExecutive
     uint32_t provideStartupTripleCount_ = 0u;              // +0x124 call count
+    const void* arg6ProcessLoginCredentialsInput120_ = nullptr; // wrapper-facing `+0x120` last raw input pointer
+    uint32_t arg6ProcessLoginCredentialsCount120_ = 0u;         // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).

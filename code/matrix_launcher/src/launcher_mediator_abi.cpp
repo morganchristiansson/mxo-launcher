@@ -44,7 +44,6 @@ static MinimalLoginMediatorStub g_LoginMediatorStub = {};
 static DiagnosticMediatorResolverNode g_DiagnosticMediatorResolver = {};
 static DiagnosticBinderRegistry g_DiagnosticBinderRegistry = {};
 static DiagnosticBinderWrapper g_DiagnosticBinderWrapper = {};
-DiagnosticMediatorRuntimeState g_MediatorRuntimeState = {};
 void* g_LoginMediatorVtable[104] = {0};
 static const char g_MediatorStringA[] = "resurrections";
 static const char g_MediatorStringC[] = "standalone";
@@ -681,27 +680,44 @@ __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
 }
 
 // UNANCHORED: C helper behind the recovered +0x120 ABI wrapper.
-extern "C" void Mediator_FillLoadingCharacterState120_Impl(
+// Evidence-backed slot decision:
+// - client.dll:0x62054d1d builds a larger stack-local input object during the loading-character /
+//   create-character transition
+// - the populated offsets line up with owner `+0x120 / 0x41c3c0`
+// - keep the slot meaning unified as `ProcessLoginCredentials`, but preserve the instance-role
+//   split between the wrapper mirror and the live owner/controller
+extern "C" uint32_t Mediator_ProcessLoginCredentials120_Impl(
     MinimalLoginMediatorStub* self,
-    void* loadingState,
+    void* input120,
     void* returnAddress) {
-    g_MediatorRuntimeState.loadingState120 = loadingState;
-    ++g_MediatorRuntimeState.loading120Count;
+    (void)self;
+
+    uint32_t result = 1u;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    spdlog::info(
-        "MediatorStub::FillLoadingCharacterState(+0x120 out={} self={}) [count={:08x} caller={} copiedFrom0ec={}]}",
-        fmt::ptr(loadingState),
-        fmt::ptr(self),
-        (unsigned)g_MediatorRuntimeState.loading120Count,
-        fmt::ptr(returnAddress),
-        mediator && mediator->SelectionContext0ecCopyValid() ? 1u : 0u);
-    LogPointerWords("FillLoadingCharacterState self", self, 8);
-    LogPointerWords("FillLoadingCharacterState out(before/after stub)", loadingState, 8);
+    mxo::ltlogin::CLTLoginMediator* loginController = DiagnosticAuthGetLoginController();
+
+    if (mediator) {
+        const bool applyOwnerSemantics = (loginController == nullptr || loginController == mediator);
+        result = mediator->CaptureProcessLoginCredentialsArg6Slot120(
+            input120,
+            returnAddress,
+            applyOwnerSemantics);
+    }
+
+    if (loginController && loginController != mediator) {
+        result = loginController->CaptureProcessLoginCredentialsArg6Slot120(
+            input120,
+            returnAddress,
+            true);
+    }
+
+    return result;
 }
 
-// anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes a large state object to arg6 +0x120
+// anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes the
+// post-auth character-data source block to arg6 +0x120
 // vtable: ILTLoginMediator.Default slot +0x120
-__attribute__((naked)) static void Mediator_FillLoadingCharacterState120() {
+__attribute__((naked)) static void Mediator_ProcessLoginCredentials120() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
         "mov 0(%%esp), %%edx\n\t"
@@ -713,7 +729,7 @@ __attribute__((naked)) static void Mediator_FillLoadingCharacterState120() {
         "add $12, %%esp\n\t"
         "ret $4\n\t"
         :
-        : "i"(Mediator_FillLoadingCharacterState120_Impl)
+        : "i"(Mediator_ProcessLoginCredentials120_Impl)
         : "eax", "edx");
 }
 
@@ -830,7 +846,6 @@ static void InitializeMediatorStub() {
     if (initialized) return;
     initialized = true;
 
-    std::memset(&g_MediatorRuntimeState, 0, sizeof(g_MediatorRuntimeState));
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
     std::memset(g_MediatorCurrentSlotRecordVtable, 0, sizeof(g_MediatorCurrentSlotRecordVtable));
     g_MediatorCurrentSlotRecordVtable[0] = (void*)MediatorCurrentSlotRecord_Destroy;
@@ -898,7 +913,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldExtra108; // +0x108
     g_LoginMediatorVtable[67] = (void*)Mediator_GetRouteDescriptor10c; // +0x10c
     g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
-    g_LoginMediatorVtable[72] = (void*)Mediator_FillLoadingCharacterState120; // +0x120
+    g_LoginMediatorVtable[72] = (void*)Mediator_ProcessLoginCredentials120; // +0x120
     g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
     g_LoginMediatorVtable[82] = (void*)Mediator_GetGameSessionId; // +0x148
     g_LoginMediatorVtable[89] = (void*)Mediator_ShouldExportA;   // +0x164

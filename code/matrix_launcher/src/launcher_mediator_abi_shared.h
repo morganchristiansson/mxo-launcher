@@ -18,19 +18,6 @@ struct MinimalLoginMediatorStub {
     unsigned char payload[0x100];
 };
 
-struct DiagnosticMediatorRuntimeState {
-    // Observer state moved to CLTLoginMediator instance:
-    // - firstObserver170, latestObserver170, latestObserver174
-    // - observerRegister170Count, observerUnregister174Count
-    //
-    // +0x124 state moved to CLTLoginMediator instance:
-    // - provideStartupTripleNetShell_, provideStartupTripleNetMgr_, provideStartupTripleDistrObjExecutive_
-    // - provideStartupTripleCount_
-    void* loadingState120;
-    uint32_t loading120Count;
-};
-
-extern DiagnosticMediatorRuntimeState g_MediatorRuntimeState;
 extern void* g_LoginMediatorVtable[104];
 
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel();

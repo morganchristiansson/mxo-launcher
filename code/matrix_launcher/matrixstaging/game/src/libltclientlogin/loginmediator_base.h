@@ -174,25 +174,31 @@ struct State3SelectionContextInputSketch {
 
 struct ProcessLoginCredentialsInputSketch {
     // owner vtable `+0x120` / `0x41c3c0`
-    // Real later branch-specific writer for the post-auth source block, but not the currently
-    // proven default password-submit branch.
+    // Same semantic slot reached from the wrapper-facing arg6 `+0x120` client call at
+    // `client.dll:0x62054d1d`, even though that caller builds a larger stack-local object during
+    // the loading-character/create-character transition.
+    // Current concrete alignment between the client writer and owner reader:
+    // - client initializes `+0x24`, `+0x2c..+0x6f`, `+0x70`, `+0x90`, and `+0xb0`
+    // - owner `0x41c3c0` consumes exactly that subset, then switches helper state to `10`
+    // - owner does not currently read `+0x20` or `+0x28`
     // Current field read:
     // - `+0x00`  -> CharacterName (`owner +0x108`)
     // - `+0x24`  -> selected world-descriptor index / selector (`owner +0x12c`)
     // - `+0x2c .. +0x6f` -> 17 appearance/customization ids (`owner +0x134 .. +0x177`)
     // - `+0x70`  -> RealFirstName (`owner +0x178`)
     // - `+0x90`  -> RealLastName (`owner +0x198`)
-    // - `+0xb0`  -> Background (`owner +0x1b8`)
+    // - `+0xb0`  -> Background (`owner +0x1b8`), with the current client caller copying up to
+    //               `0x400` bytes here before the owner consumes it as a NUL-terminated string
     std::array<char, 0x20> string00{};              // input `+0x00 .. +0x1f` = CharacterName
-    uint32_t field20 = 0;                           // input `+0x20`
-    uint32_t field24 = 0;                           // input `+0x24`
-    uint32_t field28 = 0;                           // input `+0x28`
+    uint32_t field20 = 0;                           // input `+0x20`; currently not read by owner `0x41c3c0`
+    uint32_t field24 = 0;                           // input `+0x24` = selected world-descriptor index / selector
+    uint32_t field28 = 0;                           // input `+0x28`; currently not read by owner `0x41c3c0`
     std::array<uint32_t, 8> dwords2c{};            // input `+0x2c .. +0x4b` = appearance ids 0..7
     std::array<uint32_t, 8> dwords4c{};            // input `+0x4c .. +0x6b` = appearance ids 8..15
     std::array<uint8_t, 4> bytes6c{};              // input `+0x6c .. +0x6f` = trailing appearance id 16
     std::array<char, 0x20> string70{};             // input `+0x70 .. +0x8f` = RealFirstName
     std::array<char, 0x20> string90{};             // input `+0x90 .. +0xaf` = RealLastName
-    std::array<char, 0x20> stringB0{};             // input `+0xb0 .. +0xcf` = Background
+    std::array<char, 0x400> stringB0{};            // input `+0xb0 .. +0x4af` = Background source text
 };
 
 // =============================================================================
@@ -357,6 +363,10 @@ public:
     // +0x11c
     void UnknownSlot73();
     // +0x120
+    // Current best slot decision: keep wrapper-facing arg6 `+0x120` and owner `+0x120`
+    // unified under `ProcessLoginCredentials`.
+    // The client-side wrapper call builds a larger stack-local object, but the populated offsets
+    // line up with the owner-side `0x41c3c0` reader instead of describing a separate slot family.
     virtual uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) = 0;
     // +0x124
     // Wrapper-facing capture of the deeper-init startup triple; owner-side mirroring stays
