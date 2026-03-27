@@ -1,15 +1,19 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 namespace mxo::liblttcp {
 
+class CLTThreadPerClientTCPEngine;
+
 // Reimplementation note:
-// This is still only a starter original-name skeleton.
-// Canonical RE reference remains:
+// This is still a starter original-name skeleton.
+// Canonical RE references remain:
 // - docs/launcher.exe/startup_objects/0x4d6304_network_engine.md
+// - docs/launcher.exe/VTABLES/0x004b8034.md
 
 // State values recovered from original CLTThreadPerClientTCPEngine paths.
 // Only the meanings marked in comments are evidence-backed so far.
@@ -17,8 +21,8 @@ enum class LTTCPEngineConnectionState : uint32_t {
     kUnknown = 0,
     kConnectActive = 1,     // written by Connect success path
     kUdpMonitorActive = 2,  // written by UDPMonitorPort success path
-    kClosing = 4,           // provisional: written by Close path
-    kClosed = 8,            // required by MonitorPort / UDPMonitorPort / Connect prechecks
+    kClosing = 4,           // provisional: written by low-level close path
+    kClosed = 8,            // required by connection-wrapper and engine prechecks
 };
 
 struct LTTCPEndpointKey {
@@ -29,98 +33,124 @@ struct LTTCPEndpointKey {
     uint32_t reserved1 = 0;
 };
 
-// ============================================================
-// VTable 0x004b8018 - CBaseConnection (Abstract Root)
-// This is the abstract base class that serves as the ROOT of the connection hierarchy.
-// Objects are created with this vtable but immediately transition to concrete subclass vtables.
-//
-// Memory Layout:
-//   Offset 0x34: Connection state field (original binary layout)
-// ============================================================
+// Source-owned abstraction over the recovered connection family.
+// Important current limitation:
+// - this C++ base keeps the recovered state/virtual relationships useful to the replacement
+//   launcher, but it is not yet a byte-faithful class-layout reconstruction of the original
+//   `CBaseConnection` / `CLTTCPConnection` hierarchy.
 class CBaseConnection {
  public:
-  // Virtual destructor at slot 0 - cleanup routine for abstract base (16 instructions)
+  // UNANCHORED: source-owned abstract base for the recovered connection family.
   virtual ~CBaseConnection() = default;
 
-  // Pure virtual methods at slots 4-6 define the contract for all derived classes
-  // These are intentionally unimplemented in the abstract base
-  virtual uint32_t OnReceive() = 0;           // slot 4 - pure virtual
-  virtual uint32_t OnOperationCompleted(void*) = 0;  // slot 5 - pure virtual
-  virtual uint32_t SendPacket(const void*, uint32_t, void*) = 0;  // slot 6 - pure virtual
+  // UNANCHORED: source-owned abstraction over the recovered receive entry surface.
+  virtual uint32_t OnReceive(void* callbackContext) = 0;
+  // UNANCHORED: source-owned abstraction over the recovered completion callback surface.
+  virtual uint32_t OnOperationCompleted(void*) = 0;
+  // UNANCHORED: source-owned abstraction over the recovered send callback surface.
+  virtual uint32_t SendPacket(const void*, uint32_t, void*) = 0;
 
-  // Common virtual method at slot 3 - checks state field != kClosed
-  // Original: static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this) + 0x34) & 0xff != 8
+  // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
   virtual bool IsConnected() const;
-  
-  // Getter for state field
-  // Original access: *(uint8_t*)((int)this + 0x34)
+
   LTTCPEngineConnectionState State() const {
     return state_;
   }
 
-  // Constructor to initialize state at offset 0x34
+  // UNANCHORED: source-owned base-field initializer for the recovered state slot.
   CBaseConnection(LTTCPEngineConnectionState initialState = LTTCPEngineConnectionState::kClosed);
 
  protected:
-  // State field at offset 0x34 - matches original binary layout for faithful implementation
   LTTCPEngineConnectionState state_;
 };
 
-// ============================================================
-// VTable 0x004b8034 - CLTTCPConnection (Base Class)
-// Inherits from CBaseConnection and implements the abstract methods.
-// ============================================================
+// Recovered CLTTCPConnection-family wrapper surface.
+// Current high-confidence anchors from launcher.exe vtable `0x004b8034`:
+// - `0x00449ca0` = Close wrapper into engine slot `+0x1c`
+// - `0x00449d40` = OnReceive
+// - `0x00449fd0` = OnClose callback-forwarder
+// - `0x00449cd0` = Connect wrapper that updates endpoint `+0x24` then calls engine slot `+0x18`
+// - `0x00449d20` = SendBuffer wrapper into engine slot `+0x20`
 class CLTTCPConnection : public CBaseConnection {
 public:
+    // UNANCHORED: source-owned convenience ctor for the current replacement-side connection model.
     CLTTCPConnection();
+    // UNANCHORED: source-owned convenience ctor that seeds owner-context state.
     explicit CLTTCPConnection(void* ownerContext);
+    // anchor: launcher.exe:0x44ac40
     ~CLTTCPConnection();
 
+    // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
+    void SetEngine(CLTThreadPerClientTCPEngine* engine);
+    // UNANCHORED: source-owned compatibility accessor over the recovered connection `+0x10` engine field.
+    CLTThreadPerClientTCPEngine* Engine() const;
+
+    // UNANCHORED: source-owned owner-context setter used by the current scaffolds.
     void SetOwnerContext(void* ownerContext);
+    // UNANCHORED: source-owned owner-context accessor used by the current scaffolds.
     void* OwnerContext() const;
 
+    // UNANCHORED: source-owned socket-handle setter used by the current scaffolds.
     void SetSocketHandle(uint32_t socketHandle);
+    // UNANCHORED: source-owned socket-handle accessor used by the current scaffolds.
     uint32_t SocketHandle() const;
 
+    // UNANCHORED: source-owned connection-state setter used by the current scaffolds.
     void SetState(LTTCPEngineConnectionState state);
+    // UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
     LTTCPEngineConnectionState State() const;
 
+    // UNANCHORED: source-owned endpoint setter over the recovered connection `+0x24` copy.
     void SetRemoteEndpoint(const LTTCPEndpointKey& endpoint);
+    // UNANCHORED: source-owned endpoint accessor over the recovered connection `+0x24` copy.
     const LTTCPEndpointKey& RemoteEndpoint() const;
 
+    // UNANCHORED: source-owned hostname setter used by the current resolver scaffold.
     void SetRemoteHostName(const char* hostName);
+    // UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
     const std::string& RemoteHostName() const;
 
+    // UNANCHORED: source-owned nonblocking socket poll helper used by the launcher bridge scaffolds.
     int PollReceiveNonBlocking();
+    // UNANCHORED: source-owned diagnostic accessor over the buffered receive bytes.
     const std::vector<uint8_t>& ReceivedBytes() const;
+    // UNANCHORED: source-owned buffered receive reset helper.
     void ClearReceivedBytes();
+    // UNANCHORED: source-owned buffered receive prefix-consumption helper.
     void ConsumeReceivedBytesPrefix(size_t byteCount);
 
-    // Placeholder reimplementation entry points.
-    // These names follow original launcher/client strings, but behavior is still skeletal.
-    //
-    // original engine users now recovered around them:
-    // - CLTThreadPerClientTCPEngine::Close gates on state 1/2 and then drives shutdown/closesocket cleanup
-    // - CLTThreadPerClientTCPEngine::SendBuffer also gates on state 1/2
-    // - client/launcher queue dispatch later passes work items back through connection/context callbacks
+    // anchor: launcher.exe:0x449ca0
+    // vtable: launcher.exe:0x004b8040
     uint32_t Close(bool graceful);
+
+    // anchor: launcher.exe:0x449cd0
+    // vtable: launcher.exe:0x004b8050
+    uint32_t Connect(const LTTCPEndpointKey& endpoint);
+
+    // anchor: launcher.exe:0x449d20
+    // vtable: launcher.exe:0x004b8054
     uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* completionContext);
 
-    // Name kept intentionally generic for now.
-    // We do not yet have a high-confidence direct original method name mapped onto the
-    // connection-side receive processing entrypoint in this starter skeleton.
-    uint32_t OnReceive();
-    void OnClose();
+    // anchor: launcher.exe:0x449fd0
+    // vtable: launcher.exe:0x004b804c
+    void OnClose(void* callbackContext);
 
-    // ============================================================
-    // FAITHFUL: Helper functions from OnReceive implementation at 0x00449d40
-    // ============================================================
+    // anchor: launcher.exe:0x449d40
+    // vtable: launcher.exe:0x004b8048
+    uint32_t OnReceive(void* callbackContext) override;
 
-    std::uint32_t pollReceive();
-    void pushCompletedOperation(void* thisPtr, int priority, void* connection, char opType);
-    void cleanupConnection();
+    // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
+    uint32_t CloseSocketTransportScaffold(bool graceful);
+    // UNANCHORED: low-level raw-socket send helper used beneath the anchored SendBuffer wrapper.
+    uint32_t SendRawSocketBufferScaffold(const void* buffer, uint32_t byteCount, void* completionContext);
 
- private:
+    // UNANCHORED: source-owned mirror of the `+0x6c` poll helper call shape seen in `0x449d40`.
+    uint32_t pollReceive(void* callbackContext, void** outWorkItem);
+    // UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
+    void pushCompletedOperation(void* workItem, void* context, bool useQueue34);
+
+private:
+    CLTThreadPerClientTCPEngine* engine_;
     void* ownerContext_;
     uint32_t socketHandle_;
     LTTCPEndpointKey remoteEndpoint_;

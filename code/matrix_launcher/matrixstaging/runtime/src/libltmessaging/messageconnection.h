@@ -192,10 +192,12 @@ public:
     explicit CMessageConnection(CLTThreadPerClientTCPEngine* engine);
     ~CMessageConnection();
 
+    // UNANCHORED: source-owned compatibility wrapper over the recovered base-connection `+0x10` engine field.
     void SetEngine(CLTThreadPerClientTCPEngine* engine);
+    // UNANCHORED: source-owned compatibility accessor over the recovered base-connection `+0x10` engine field.
     CLTThreadPerClientTCPEngine* Engine() const;
 
-    // Current recovered wrapper shape around engine slot 6 / Connect.
+    // UNANCHORED: source-owned wrapper over base `CLTTCPConnection::Connect` / engine slot 6.
     // This keeps the connection-object-oriented call site out of diagnostics.cpp.
     uint32_t EnsureConnected();
 

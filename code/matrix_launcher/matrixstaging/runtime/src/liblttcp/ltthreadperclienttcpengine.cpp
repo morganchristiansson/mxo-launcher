@@ -1217,7 +1217,7 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
         return 0;
     }
 
-    const uint32_t result = connection->Close(graceful);
+    const uint32_t result = connection->CloseSocketTransportScaffold(graceful);
     if (result != 0) {
         void* contextKey = connection->OwnerContext() ? connection->OwnerContext() : static_cast<void*>(connection);
         if (WorkerThreadRecord* worker = FindWorker(contextKey)) {
@@ -1245,7 +1245,7 @@ uint32_t CLTThreadPerClientTCPEngine::SendBufferConnectionScaffold(CLTTCPConnect
     if (!connection) {
         return 0;
     }
-    return connection->SendBuffer(buffer, byteCount, completionContext);
+    return connection->SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
 }
 
 // anchor: launcher.exe:0x42fbd0

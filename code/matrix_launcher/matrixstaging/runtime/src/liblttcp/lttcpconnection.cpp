@@ -1,150 +1,169 @@
 #include "lttcpconnection.h"
 
+#include "ltthreadperclienttcpengine.h"
+
 #include <winsock2.h>
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
 
 #include "spdlog/spdlog.h"
 
 namespace mxo::liblttcp {
 
+namespace {
+
+static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
+
+// UNANCHORED: source-owned endpoint-key comparison helper for the current connection wrapper.
+static bool EndpointKeysDiffer(const LTTCPEndpointKey& lhs, const LTTCPEndpointKey& rhs) {
+    return lhs.family != rhs.family ||
+        lhs.portNetworkOrder != rhs.portNetworkOrder ||
+        lhs.ipv4NetworkOrder != rhs.ipv4NetworkOrder ||
+        lhs.reserved0 != rhs.reserved0 ||
+        lhs.reserved1 != rhs.reserved1;
+}
+
+// UNANCHORED: current source-owned callback shim for the `param_1->+0x04(outWorkItem)` step
+// visible at the start of `CLTTCPConnection::OnReceive`.
+static void ConnectionReceiveCallback_PrepareWorkItem(void* callbackContext, void** outWorkItem) {
+    if (!callbackContext || !outWorkItem) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(callbackContext);
+    if (!vtable || !vtable[1]) {
+        return;
+    }
+
+    typedef void (__thiscall *PrepareFn)(void*, void**);
+    PrepareFn fn = reinterpret_cast<PrepareFn>(vtable[1]);
+    fn(callbackContext, outWorkItem);
+}
+
+// UNANCHORED: current source-owned callback shim for the `param_1->+0x08()` step
+// visible at the end of `CLTTCPConnection::OnClose` / `CLTTCPConnection::OnReceive`.
+static void ConnectionReceiveCallback_Finalize(void* callbackContext) {
+    if (!callbackContext) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(callbackContext);
+    if (!vtable || !vtable[2]) {
+        return;
+    }
+
+    typedef void (__thiscall *FinalizeFn)(void*);
+    FinalizeFn fn = reinterpret_cast<FinalizeFn>(vtable[2]);
+    fn(callbackContext);
+}
+
+}  // namespace
+
 // ============================================================
 // VTable 0x004b8034 - CLTTCPConnection (Base Class)
-// 0x004b8034 - Constructor at 0x0044ac40
-// 0x004b8040 - IsConnected at 0x00449ca0
-// 0x004b8048 - OnReceive at 0x00449d40
-// 0x004b804c - OnClose at 0x00449fd0
-// 0x004b8050 - Close at 0x00449cd0
-// 0x004b8054 - Destructor at 0x00449d20
+// High-confidence recovered wrapper entries:
+// - 0x004b8040 -> 0x00449ca0 = Close wrapper into engine slot +0x1c
+// - 0x004b8048 -> 0x00449d40 = OnReceive
+// - 0x004b804c -> 0x00449fd0 = OnClose callback forwarder
+// - 0x004b8050 -> 0x00449cd0 = Connect wrapper into engine slot +0x18
+// - 0x004b8054 -> 0x00449d20 = SendBuffer wrapper into engine slot +0x20
+// ============================================================
 
+// UNANCHORED: source-owned convenience ctor for the current replacement-side connection model.
 CLTTCPConnection::CLTTCPConnection()
     : CBaseConnection(LTTCPEngineConnectionState::kClosed),
+      engine_(nullptr),
       ownerContext_(nullptr),
-      socketHandle_(0xffffffffu),
+      socketHandle_(kInvalidSocketHandle),
       remoteEndpoint_(),
       remoteHostName_(),
       receivedBytes_() {}
 
+// UNANCHORED: source-owned convenience ctor that seeds owner-context state.
 CLTTCPConnection::CLTTCPConnection(void* ownerContext)
     : CBaseConnection(LTTCPEngineConnectionState::kClosed),
+      engine_(nullptr),
       ownerContext_(ownerContext),
-      socketHandle_(0xffffffffu),
+      socketHandle_(kInvalidSocketHandle),
       remoteEndpoint_(),
       remoteHostName_(),
       receivedBytes_() {}
 
-// VTable 0x004b8054 - Destructor at 0x00449d20
+// anchor: launcher.exe:0x44ac40
 CLTTCPConnection::~CLTTCPConnection() = default;
 
-// ============================================================
-// FAITHFUL: VTable 0x004b8040 - IsConnected at 0x00449ca0
-// Implemented in CBaseConnection abstract base (slot 3)
-// Checks state field != kClosed
-// ============================================================
+// UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
 bool CBaseConnection::IsConnected() const {
     return static_cast<uint32_t>(state_) != static_cast<uint32_t>(LTTCPEngineConnectionState::kClosed);
 }
 
-// ============================================================
-// Constructor for CBaseConnection - initializes state at offset 0x34
-// ============================================================
+// UNANCHORED: source-owned base-field initializer for the recovered state slot.
 CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
     : state_(initialState) {}
 
-// ============================================================
-// FAITHFUL: VTable 0x004b804c - OnClose at 0x00449fd0
-// Helper/utility function for close operations (9 instructions)
-// ============================================================
-void CLTTCPConnection::OnClose() {
-    // Placeholder - original is a helper/utility function
+// UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
+void CLTTCPConnection::SetEngine(CLTThreadPerClientTCPEngine* engine) {
+    engine_ = engine;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Placeholder entry point for owner context management
-// ============================================================
+// UNANCHORED: source-owned compatibility accessor over the recovered connection `+0x10` engine field.
+CLTThreadPerClientTCPEngine* CLTTCPConnection::Engine() const {
+    return engine_;
+}
+
+// UNANCHORED: source-owned owner-context setter used by the current scaffolds.
 void CLTTCPConnection::SetOwnerContext(void* ownerContext) {
     ownerContext_ = ownerContext;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Getter for owner context
-// ============================================================
+// UNANCHORED: source-owned owner-context accessor used by the current scaffolds.
 void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Placeholder entry point for socket handle management
-// ============================================================
+// UNANCHORED: source-owned socket-handle setter used by the current scaffolds.
 void CLTTCPConnection::SetSocketHandle(uint32_t socketHandle) {
     socketHandle_ = socketHandle;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Getter for socket handle
-// ============================================================
+// UNANCHORED: source-owned socket-handle accessor used by the current scaffolds.
 uint32_t CLTTCPConnection::SocketHandle() const {
     return socketHandle_;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Placeholder entry point for state management
-// ============================================================
+// UNANCHORED: source-owned connection-state setter used by the current scaffolds.
 void CLTTCPConnection::SetState(LTTCPEngineConnectionState state) {
     state_ = state;
 }
 
-// ============================================================
-// Getter for connection state - delegates to base class
-// ============================================================
+// UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
 LTTCPEngineConnectionState CLTTCPConnection::State() const {
     return CBaseConnection::State();
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Placeholder entry point for remote endpoint management
-// ============================================================
+// UNANCHORED: source-owned endpoint setter over the recovered connection `+0x24` copy.
 void CLTTCPConnection::SetRemoteEndpoint(const LTTCPEndpointKey& endpoint) {
     remoteEndpoint_ = endpoint;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Getter for remote endpoint
-// ============================================================
+// UNANCHORED: source-owned endpoint accessor over the recovered connection `+0x24` copy.
 const LTTCPEndpointKey& CLTTCPConnection::RemoteEndpoint() const {
     return remoteEndpoint_;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Placeholder entry point for remote hostname management
-// ============================================================
+// UNANCHORED: source-owned hostname setter used by the current resolver scaffold.
 void CLTTCPConnection::SetRemoteHostName(const char* hostName) {
     remoteHostName_ = hostName ? hostName : "";
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Getter for remote hostname
-// ============================================================
+// UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
 const std::string& CLTTCPConnection::RemoteHostName() const {
     return remoteHostName_;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Placeholder receive polling entry point
-// ============================================================
+// UNANCHORED: source-owned nonblocking socket poll helper used by the launcher bridge scaffolds.
 int CLTTCPConnection::PollReceiveNonBlocking() {
-    if (socketHandle_ == 0xffffffffu ||
+    if (socketHandle_ == kInvalidSocketHandle ||
         (state_ != LTTCPEngineConnectionState::kConnectActive &&
          state_ != LTTCPEngineConnectionState::kUdpMonitorActive)) {
         return 0;
@@ -177,7 +196,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
                 remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
             state_ = LTTCPEngineConnectionState::kClosed;
             closesocket(socket);
-            socketHandle_ = 0xffffffffu;
+            socketHandle_ = kInvalidSocketHandle;
             return -1;
         }
         if (peekResult == SOCKET_ERROR) {
@@ -192,7 +211,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
                 wsaError);
             state_ = LTTCPEngineConnectionState::kClosed;
             closesocket(socket);
-            socketHandle_ = 0xffffffffu;
+            socketHandle_ = kInvalidSocketHandle;
             return -1;
         }
         available = 1;
@@ -219,7 +238,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
                 remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
             state_ = LTTCPEngineConnectionState::kClosed;
             closesocket(socket);
-            socketHandle_ = 0xffffffffu;
+            socketHandle_ = kInvalidSocketHandle;
             return -1;
         }
 
@@ -234,7 +253,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
             wsaError);
         state_ = LTTCPEngineConnectionState::kClosed;
         closesocket(socket);
-        socketHandle_ = 0xffffffffu;
+        socketHandle_ = kInvalidSocketHandle;
         return -1;
     }
 
@@ -242,28 +261,17 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
     return received;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Getter for received bytes
-// ============================================================
+// UNANCHORED: source-owned diagnostic accessor over the buffered receive bytes.
 const std::vector<uint8_t>& CLTTCPConnection::ReceivedBytes() const {
     return receivedBytes_;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Clear received bytes buffer
-// ============================================================
+// UNANCHORED: source-owned buffered receive reset helper.
 void CLTTCPConnection::ClearReceivedBytes() {
     receivedBytes_.clear();
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Consume a prefix from the buffered receive bytes, preserving any partial tail.
-// This is used by the launcher-side diagnostics receive bridge so split TCP frames do not get
-// dropped between polls.
-// ============================================================
+// UNANCHORED: source-owned buffered receive prefix-consumption helper.
 void CLTTCPConnection::ConsumeReceivedBytesPrefix(size_t byteCount) {
     if (byteCount == 0u) {
         return;
@@ -275,42 +283,96 @@ void CLTTCPConnection::ConsumeReceivedBytesPrefix(size_t byteCount) {
     receivedBytes_.erase(receivedBytes_.begin(), receivedBytes_.begin() + static_cast<std::ptrdiff_t>(byteCount));
 }
 
-// ============================================================
-// FAITHFUL: VTable 0x004b8050 - Close at 0x00449cd0
-// Evidence-backed shape only:
-// - original engine treats states 1/2 as active
-// - Close writes state 4 before shutdown/closesocket cleanup
-// ============================================================
-uint32_t CLTTCPConnection::Close(bool /*graceful*/) {
+// anchor: launcher.exe:0x449ca0
+uint32_t CLTTCPConnection::Close(bool graceful) {
+    if (state_ == LTTCPEngineConnectionState::kClosed) {
+        return 0u;
+    }
+
+    return engine_
+        ? engine_->CloseConnectionScaffold(this, graceful)
+        : CloseSocketTransportScaffold(graceful);
+}
+
+// anchor: launcher.exe:0x449cd0
+uint32_t CLTTCPConnection::Connect(const LTTCPEndpointKey& endpoint) {
+    if (EndpointKeysDiffer(remoteEndpoint_, endpoint)) {
+        (void)Close(false);
+        remoteEndpoint_ = endpoint;
+    }
+
+    return engine_ ? engine_->ConnectConnectionScaffold(this) : 0u;
+}
+
+// anchor: launcher.exe:0x449d20
+uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, void* completionContext) {
+    if (!buffer || byteCount == 0u) {
+        return 0u;
+    }
+
+    return engine_
+        ? engine_->SendBufferConnectionScaffold(this, buffer, byteCount, completionContext)
+        : SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
+}
+
+// anchor: launcher.exe:0x449fd0
+void CLTTCPConnection::OnClose(void* callbackContext) {
+    ConnectionReceiveCallback_Finalize(callbackContext);
+}
+
+// anchor: launcher.exe:0x449d40
+uint32_t CLTTCPConnection::OnReceive(void* callbackContext) {
+    void* workItem = nullptr;
+    ConnectionReceiveCallback_PrepareWorkItem(callbackContext, &workItem);
+
+    uint32_t result = pollReceive(callbackContext, &workItem);
+    while (result == 0u) {
+        pushCompletedOperation(workItem, this, /*useQueue34=*/false);
+        workItem = nullptr;
+        result = pollReceive(nullptr, &workItem);
+    }
+
+    if (static_cast<int32_t>(result) > 0 && result != 0x7000000u) {
+        // Current source scaffolds still do not reconstruct the original `+0x24` endpoint-copy
+        // logging helper family used here before close. Keep the control-flow shape faithful first.
+        (void)Close(false);
+    }
+
+    OnClose(callbackContext);
+    return 1u;
+}
+
+// UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
+uint32_t CLTTCPConnection::CloseSocketTransportScaffold(bool /*graceful*/) {
     if (state_ != LTTCPEngineConnectionState::kConnectActive &&
         state_ != LTTCPEngineConnectionState::kUdpMonitorActive) {
-        return 0;
+        return 0u;
     }
 
     state_ = LTTCPEngineConnectionState::kClosing;
-    if (socketHandle_ != 0xffffffffu) {
+    if (socketHandle_ != kInvalidSocketHandle) {
         closesocket(static_cast<SOCKET>(socketHandle_));
     }
-    socketHandle_ = 0xffffffffu;
-    return 1;
+    socketHandle_ = kInvalidSocketHandle;
+    return 1u;
 }
 
-// ============================================================
-// UNANCHORED: Not based on vtable analysis
-// Placeholder send buffer entry point
-// ============================================================
-uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, void* /*completionContext*/) {
-    if (!buffer || byteCount == 0) {
-        return 0;
+// UNANCHORED: low-level raw-socket send helper used beneath the anchored SendBuffer wrapper.
+uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
+    const void* buffer,
+    uint32_t byteCount,
+    void* /*completionContext*/) {
+    if (!buffer || byteCount == 0u) {
+        return 0u;
     }
 
     if (state_ != LTTCPEngineConnectionState::kConnectActive &&
         state_ != LTTCPEngineConnectionState::kUdpMonitorActive) {
-        return 0;
+        return 0u;
     }
 
-    if (socketHandle_ == 0xffffffffu) {
-        return 0;
+    if (socketHandle_ == kInvalidSocketHandle) {
+        return 0u;
     }
 
     const int sent = send(
@@ -321,89 +383,30 @@ uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, vo
     return (sent == static_cast<int>(byteCount)) ? 1u : 0u;
 }
 
-// ============================================================
-// FAITHFUL: VTable 0x004b8048 - OnReceive at 0x00449d40
-// Original implementation: 225 instructions, 34 complexity, 25 calls
-//
-// Logic flow from Ghidra decompilation:
-// 1. Get receive pointer from queue0C (offset 0x6c) and poll for work
-// 2. Loop polling until non-zero result or error
-// 3. If result is valid (-1 < result && result != 0x7000000):
-//    a. Handle stream corruption (0x700000b) - TLS file + 0x14c
-//    b. Handle unrecoverable errors - TLS file + 0x14e
-// 4. If invalid result, call cleanup vtable offset 0xc and return
-// 5. Call cleanup callback at param_1+8
-// ============================================================
-uint32_t CLTTCPConnection::OnReceive() {
-    // Handle optional cleanup callback at param_1+4
-    if (nullptr != reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(this))) {
-        // Placeholder for cleanup callback - original calls method at param_1+4
+// UNANCHORED: source-owned mirror of the `+0x6c` poll helper call shape seen in `0x449d40`.
+uint32_t CLTTCPConnection::pollReceive(void* callbackContext, void** outWorkItem) {
+    // Current best static read of `0x449d40`:
+    // - this helper call is reached through connection `+0x6c`
+    // - first poll passes `(callbackContext, &workItem)`
+    // - later loop polls pass `(0, &workItem)`
+    // The faithful helper object is not reconstructed yet, so keep this source-owned scaffold
+    // conservative and side-effect-free.
+    (void)callbackContext;
+    if (outWorkItem) {
+        *outWorkItem = nullptr;
     }
-
-    // Poll for receive data
-    std::uint32_t result = pollReceive();
-
-    void* pvVar1 = nullptr;
-
-    // Loop polling until non-zero result
-    while (nullptr == pvVar1 && 0 == result) {
-        // Push completed operation onto queue
-        pushCompletedOperation(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(this) + 0x10), 0, this, '\0');
-
-        result = pollReceive();
-        pvVar1 = nullptr;
-    }
-
-    // If result is valid (not error code, not EOF)
-    if (-1 < static_cast<int>(result) && result != 0x7000000) {
-        // Handle stream corruption error
-        if (result == 0x700000b) {
-            pvVar1 = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(this) + 0x24);
-            Close(false);
-        }
-        else {
-            pvVar1 = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(this) + 0x24);
-            Close(false);
-        }
-
-        // Call cleanup vtable offset 0xc
-        cleanupConnection();
-    }
-
-    // if (param_1 != (int *)0x0) { (**(code **)(*param_1 + 8))(); }
-    // Call cleanup callback at param_1+8
-    if (nullptr != reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(this))) {
-        // Placeholder for cleanup callback - original calls method at param_1+8
-    }
-
-    return 1;
+    return 1u;
 }
 
-// ============================================================
-// Helper: pollReceive - Poll for receive data from socket
-// Original: uVar3 = (**(code **)(*piVar2 + 4))()
-// ============================================================
-std::uint32_t CLTTCPConnection::pollReceive() {
-    // Original polls the receive queue (queue0C) for available work
-    // This interfaces with the engine's receive dispatch mechanism
-
-    return 1;
-}
-
-// ============================================================
-// Helper: pushCompletedOperation - Push operation onto CompletedOpQueue
-// Original: FUN_00436820(...)
-// ============================================================
-void CLTTCPConnection::pushCompletedOperation(void*, int, void*, char) {
-    // Original pushes completed operations onto the engine's CompletedOpQueue
-}
-
-// ============================================================
-// Helper: cleanupConnection - Call cleanup vtable offset 0xc
-// Original: (**(code **)(*(int *)this + 0xc))(0)
-// ============================================================
-void CLTTCPConnection::cleanupConnection() {
-    // Original calls method at vtable offset 0xc (which corresponds to Close method)
+// UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
+void CLTTCPConnection::pushCompletedOperation(void* workItem, void* context, bool useQueue34) {
+    // Current best static read of `0x449d40`:
+    // - queued submission shape is `(engine+0x10, workItem, this, false)` through `0x436820`
+    // - this source file does not yet own the faithful `+0x6c` producer helper that would drive
+    //   the real work-item family into the engine queue
+    (void)workItem;
+    (void)context;
+    (void)useQueue34;
 }
 
 }  // namespace mxo::liblttcp
