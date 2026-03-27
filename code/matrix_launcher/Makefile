@@ -48,6 +48,7 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/authbootstrap680.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_events.o \
+	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_margin_route.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginmediator_state9.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state0.o \

@@ -109,8 +109,9 @@ So current auth-side connection-init model is now tighter than a single fixed-ho
     - if not `-1`, owner vtable `+0xfc(value)`
     - only if non-null does it call `0x41e500`
 - current source ownership consequence:
-  - keep the case split in `loginstate.cpp` / `CLTLoginState_State4::Slot3_BeginOrContinue`
-  - keep only the narrower route-getter / host-resolution / `0x41e500` transport-init helpers in `loginmediator.cpp`
+  - keep the case split in `loginstate_state4.cpp` / `CLTLoginState_State4::Slot3_BeginOrContinue`
+  - keep only the narrower route-getter / host-resolution / `0x41e500` transport-init helpers in
+    `loginmediator_margin_route.cpp`
 
 ### Margin connection-init body
 - `launcher.exe:0x439345 / 0x43936b / 0x43938e / 0x4393bf -> 0x41e500`

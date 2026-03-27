@@ -1045,6 +1045,8 @@ public:
 
     // Post-auth slot/route families recovered around helper10 (`0x4401a0`) and the later
     // state-8 margin dispatcher (`0x439300`).
+    // Source home for the focused route/descriptor/getter cluster:
+    // - `matrixstaging/game/src/libltclientlogin/loginmediator_margin_route.cpp`
     // anchor: launcher.exe:0x41f2e0 / owner vtable +0x30
     const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41f300 / owner vtable +0x40

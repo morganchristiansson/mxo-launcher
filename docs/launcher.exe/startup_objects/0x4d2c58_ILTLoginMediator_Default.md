@@ -21,6 +21,8 @@ Relevant recovered source-file anchors nearby in the same launcher/login area:
 Current replacement-launcher source split:
 - launcher-owned shared mediator/auth/margin state/model lives under:
   - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- focused post-auth slot/route and margin-route init surface now lives under:
+  - `matrixstaging/game/src/libltclientlogin/loginmediator_margin_route.cpp`
 - focused arg6 / startup-selection surface now lives under:
   - `matrixstaging/game/src/libltclientlogin/loginmediator_arg6.cpp`
 - focused late-login/state9 surface now lives under:
