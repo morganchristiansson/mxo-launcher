@@ -6,6 +6,8 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+#include <process.h>
+
 #include <cstring>
 #include <utility>
 
@@ -282,10 +284,18 @@ CLTThread::CLTThread(const char* threadName)
       startPriority_(2),
       suspendDepth_(0),
       running_(false),
-      threadId_(0) {}
+      threadId_(0),
+      threadHandle_(0),
+      stateMutex_() {}
 
 // anchor: launcher.exe:0x452950 / 0x431a80 deleting wrapper
-CLTThread::~CLTThread() = default;
+CLTThread::~CLTThread() {
+    const HANDLE threadHandle = reinterpret_cast<HANDLE>(threadHandle_);
+    if (threadHandle != nullptr) {
+        CloseHandle(threadHandle);
+        threadHandle_ = 0;
+    }
+}
 
 // anchor: launcher.exe:0x4319d0
 const std::string& CLTThread::GetNameString() const {
@@ -294,62 +304,181 @@ const std::string& CLTThread::GetNameString() const {
 
 // anchor: launcher.exe:0x4528d0
 uint32_t CLTThread::Start(int startPriority) {
-    // Scaffold-first note:
-    // - recovered original Start uses _beginthreadex(... CREATE_SUSPENDED ...), priority mapping,
-    //   then ResumeThread
-    // - the current reimplementation only preserves the object/lifecycle surface and state shape
-    //   until the real queue-thread worker path is wired into runtime ownership more faithfully
-    if (running_) {
-        return kStartAlreadyRunning;
+    const auto mapThreadPriority = [](int priority) -> int {
+        switch (priority) {
+            case 0:
+                return THREAD_PRIORITY_BELOW_NORMAL;
+            case 1:
+                return THREAD_PRIORITY_LOWEST;
+            case 3:
+                return THREAD_PRIORITY_ABOVE_NORMAL;
+            case 4:
+                return THREAD_PRIORITY_HIGHEST;
+            default:
+                return THREAD_PRIORITY_NORMAL;
+        }
+    };
+
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    if (threadHandle_ != 0) {
+        const DWORD waitResult = WaitForSingleObject(reinterpret_cast<HANDLE>(threadHandle_), 0);
+        if (waitResult == WAIT_TIMEOUT) {
+            return kStartAlreadyRunning;
+        }
+        CloseHandle(reinterpret_cast<HANDLE>(threadHandle_));
+        threadHandle_ = 0;
+        threadId_ = 0;
+        running_ = false;
+    }
+
+    unsigned threadId = 0;
+    const uintptr_t threadHandle = _beginthreadex(
+        nullptr,
+        0x10000,
+        &CLTThread::ThreadStartAddressScaffold,
+        this,
+        CREATE_SUSPENDED,
+        &threadId);
+    threadHandle_ = threadHandle;
+    if (threadHandle_ == 0) {
+        return kStartFailure;
     }
 
     startPriority_ = startPriority;
+    suspendDepth_ = 0;
     running_ = true;
-    threadId_ = GetCurrentThreadId();
+    threadId_ = static_cast<uint32_t>(threadId);
+
+    if (startPriority != 2) {
+        SetThreadPriority(reinterpret_cast<HANDLE>(threadHandle_), mapThreadPriority(startPriority));
+    }
+
+    const DWORD resumeResult = ResumeThread(reinterpret_cast<HANDLE>(threadHandle_));
+    if (resumeResult == 0xffffffffu) {
+        CloseHandle(reinterpret_cast<HANDLE>(threadHandle_));
+        threadHandle_ = 0;
+        threadId_ = 0;
+        running_ = false;
+        return kStartFailure;
+    }
     return kStartSuccess;
 }
 
 // anchor: launcher.exe:0x4525d0
 bool CLTThread::Resume() {
-    if (!running_) {
+    uintptr_t threadHandle = 0;
+    bool isCurrentThread = false;
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        threadHandle = threadHandle_;
+        if (threadHandle == 0) {
+            return false;
+        }
+
+        isCurrentThread = (threadId_ != 0 && threadId_ == GetCurrentThreadId());
+        if (isCurrentThread) {
+            ++suspendDepth_;
+        }
+    }
+
+    if (isCurrentThread) {
         return false;
     }
 
-    if (IsCurrentThread()) {
-        ++suspendDepth_;
-        return false;
-    }
-    return true;
+    const DWORD resumeResult = ResumeThread(reinterpret_cast<HANDLE>(threadHandle));
+    return resumeResult != 0xffffffffu;
 }
 
 // anchor: launcher.exe:0x452660
 int CLTThread::Stop(bool waitAfterTerminate) {
-    running_ = false;
+    uintptr_t threadHandle = 0;
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        threadHandle = threadHandle_;
+    }
+
+    if (threadHandle == 0) {
+        return 0;
+    }
+
+    if (IsCurrentThread()) {
+        ExitThread(0);
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        const DWORD waitResult = WaitForSingleObject(reinterpret_cast<HANDLE>(threadHandle_), 0);
+        if (waitResult != WAIT_TIMEOUT) {
+            running_ = false;
+            return 0;
+        }
+    }
+
+    (void)TerminateThread(reinterpret_cast<HANDLE>(threadHandle), 0);
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        running_ = false;
+        threadId_ = 0;
+    }
+
     if (waitAfterTerminate) {
-        Wait();
+        (void)Wait();
     }
     return 0;
 }
 
 // anchor: launcher.exe:0x431a60
 bool CLTThread::IsRunning() const {
-    return running_;
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    if (threadHandle_ == 0) {
+        return false;
+    }
+    return WaitForSingleObject(reinterpret_cast<HANDLE>(threadHandle_), 0) == WAIT_TIMEOUT;
 }
 
 // anchor: launcher.exe:0x4526e0
 uint32_t CLTThread::Wait() {
-    return WAIT_OBJECT_0;
+    uintptr_t threadHandle = 0;
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        threadHandle = threadHandle_;
+    }
+
+    if (threadHandle == 0) {
+        return WAIT_FAILED;
+    }
+
+    const DWORD waitResult = WaitForSingleObject(reinterpret_cast<HANDLE>(threadHandle), INFINITE);
+    if (waitResult != WAIT_TIMEOUT) {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        running_ = false;
+    }
+    return waitResult;
 }
 
 // anchor: launcher.exe:0x452620
 void CLTThread::Suspend() {
-    if (suspendDepth_ > 0) {
-        --suspendDepth_;
+    uintptr_t threadHandle = 0;
+    int suspendDepth = 0;
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        threadHandle = threadHandle_;
+        suspendDepth = suspendDepth_;
+        if (suspendDepth_ > 0) {
+            --suspendDepth_;
+        }
     }
+
+    if (threadHandle == 0 || suspendDepth > 0) {
+        return;
+    }
+
+    (void)SuspendThread(reinterpret_cast<HANDLE>(threadHandle));
 }
 
 // anchor: launcher.exe:0x431a40
 bool CLTThread::IsCurrentThread() const {
+    std::lock_guard<std::mutex> lock(stateMutex_);
     return threadId_ != 0 && threadId_ == GetCurrentThreadId();
 }
 
@@ -366,6 +495,36 @@ void CLTThread::LogExit() {
     if (!threadName_.empty()) {
         spdlog::debug("{} exiting.", threadName_);
     }
+}
+
+// UNANCHORED: source-owned wrapper mirroring `_StartAddress_00452800` thread-entry sequencing.
+uint32_t CLTThread::ExecuteThreadMainScaffold() {
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        threadId_ = GetCurrentThreadId();
+        running_ = true;
+    }
+
+    if (!threadName_.empty()) {
+        spdlog::debug("I'm a {}.", threadName_);
+    }
+
+    (void)PreRun();
+    Run();
+    LogExit();
+
+    {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        running_ = false;
+        threadId_ = 0;
+    }
+    return 0;
+}
+
+// UNANCHORED: source-owned `_beginthreadex` entry thunk for ExecuteThreadMainScaffold.
+unsigned __stdcall CLTThread::ThreadStartAddressScaffold(void* parameter) {
+    CLTThread* self = static_cast<CLTThread*>(parameter);
+    return self ? self->ExecuteThreadMainScaffold() : 0u;
 }
 
 // anchor: launcher.exe:0x4365a0

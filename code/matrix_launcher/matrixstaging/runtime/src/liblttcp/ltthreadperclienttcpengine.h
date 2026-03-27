@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -103,12 +104,18 @@ protected:
     virtual void Run();
     // anchor: launcher.exe:0x452770
     virtual void LogExit();
+    // UNANCHORED: source-owned wrapper mirroring `_StartAddress_00452800` thread-entry sequencing.
+    uint32_t ExecuteThreadMainScaffold();
+    // UNANCHORED: source-owned `_beginthreadex` entry thunk for ExecuteThreadMainScaffold.
+    static unsigned __stdcall ThreadStartAddressScaffold(void* parameter);
 
     std::string threadName_;
     int startPriority_;
     int suspendDepth_;
     bool running_;
     uint32_t threadId_;
+    uintptr_t threadHandle_;
+    mutable std::mutex stateMutex_;
 };
 
 // Recovered queue-thread child allocated by engine base ctor helper 0x4365a0.
