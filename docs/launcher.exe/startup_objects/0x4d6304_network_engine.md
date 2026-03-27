@@ -1004,7 +1004,10 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
   - it is a `CVariableLengthPrefixedTCPStreamParser`-family object
   - ctor path: `0x469f50 -> 0x469b20`
   - primary receive call: `0x469bf0 = CVariableLengthPrefixedTCPStreamParser::Parse`
+  - parser slot `+0x10` / `0x469b40` allocates the completed packet object through `0x435db0 -> 0x435090`
+    - i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already seen in queue producer analysis
   - `CLTTCPConnection::OnReceive` (`0x449d40`) therefore feeds received stream fragments into a framing parser there, not an anonymous poll stub
+  - and the parser-emitted object queued by `0x449d40` is now best read as a concrete queue-work item, not only an opaque buffer pointer
 - source lockstep update from the current focused pass:
   - `matrixstaging/runtime/src/liblttcp/lttcpconnection.*` now owns the corrected base-wrapper mapping directly
   - `matrixstaging/runtime/src/libltmessaging/messageconnection.*` no longer keeps a duplicate source-only engine pointer separate from the recovered base `+0x10` field

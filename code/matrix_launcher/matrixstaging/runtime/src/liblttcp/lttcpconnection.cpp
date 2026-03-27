@@ -322,6 +322,11 @@ void CLTTCPConnection::OnClose(void* callbackContext) {
 
 // anchor: launcher.exe:0x449d40
 uint32_t CLTTCPConnection::OnReceive(void* callbackContext) {
+    // Current best read:
+    // - `workItem` is the parser-emitted completed packet/work object yielded through
+    //   connection `+0x6c` (`CVariableLengthPrefixedTCPStreamParser::Parse`)
+    // - current parser-side allocator path now narrows that emitted object to the same
+    //   `0x2c` / vtable-`0x4b3e08` family built by `0x435db0 -> 0x435090`
     void* workItem = nullptr;
     ConnectionReceiveCallback_PrepareWorkItem(callbackContext, &workItem);
 
@@ -389,7 +394,14 @@ uint32_t CLTTCPConnection::pollReceive(void* callbackContext, void** outWorkItem
     // - connection `+0x6c` is now narrowed to a
     //   `CVariableLengthPrefixedTCPStreamParser`-family helper
     // - original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` at `0x469bf0`
-    // - first receive pass reaches it with the current callback/read operation and `&workItem`
+    // - parser vtable slot `+0x10` / `0x469b40` allocates the emitted completed-packet object via
+    //   `0x435db0 -> 0x435090`, i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already
+    //   seen in queue producer xrefs
+    // - first receive pass reaches it with the current callback/read-operation fragment and `&workItem`
+    //   - current best fragment shape from `0x469bf0`:
+    //     - dword `+0x08` = byte count
+    //     - bytes begin at `+0x0c`
+    //     - vtable `+0x04` / `+0x08` = retain/release-style lifetime hooks
     // - later drain passes reach it with `(0, &workItem)` until the parser stops yielding packets
     // The faithful parser/read-operation object family is not reconstructed yet, so keep this
     // source-owned scaffold conservative and side-effect-free.
