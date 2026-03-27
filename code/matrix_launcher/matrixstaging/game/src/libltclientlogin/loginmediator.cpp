@@ -2993,74 +2993,52 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     //   second frame layer
     // Ownership note:
     // - this mediator entry is only the current staging/demux wrapper
-    // - early auth inbound raw `0x07/0x09/0x0b` belongs semantically to:
-    //   - `0x43f300 = CLTLoginState_AuthenticatePending::AuthMessageDispatch`
-    //   - `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
-    // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
+    // - original `0x43f300/0x448140` consume a higher-level incoming auth-message object, not raw
+    //   payload bytes directly
+    // - current source therefore keeps the raw-byte bridge here, but routes the early semantic
+    //   handling into state2 / the owner+0x680 child instead of claiming mediator ownership
+    // - later/narrower selected-slot raw `0x0b` handling still belongs to state10 slot 6
+    //   (`0x4401a0`)
     // - one deliberate current-source exception remains: the replacement's existing-character
     //   state8 branch still bypasses the natural state10/state11 claim/create transition
     if (!packetBytes || packetSize == 0u) {
-        return 0;
+        return 0u;
     }
 
     const uint8_t rawCode = packetBytes[0];
-    switch (rawCode) {
-        case kAuthRawCodeGetPublicKeyReply: {
-            // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
-            mxo::auth::GetPublicKeyReply reply;
-            if (!mxo::auth::ParseGetPublicKeyReplyPayload(packetBytes, packetSize, &reply)) {
-                spdlog::info("DIAGNOSTIC: launcher-owned auth failed to parse AS_GetPublicKeyReply");
-                return 0;
-            }
-
-            lastAuthPublicKeyReply_ = reply;
-            authCurrentPublicKeyId_ = reply.publicKeyId;
-            SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
-            SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(reply);
+    const auto dispatchStagedEarlyAuthViaState2 = [this, packetBytes, packetSize, rawCode]() -> uint32_t {
+        stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+        if (scaffoldState2_ == nullptr) {
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={}",
-                (unsigned)reply.status,
-                (unsigned)reply.currentTime,
-                (unsigned)reply.publicKeyId,
-                (unsigned)reply.keySize,
-                (unsigned)reply.modulusLength,
-                (unsigned)reply.signatureLength,
-                (unsigned)reply.publicExponentByte,
-                reply.hasEmbeddedPublicKey ? 1u : 0u);
-            expectedAuthRequestName_ = kMessageAsAuthRequest;
-            return SendAuthRequestFromReply(reply);
+                "CLTLoginMediator::HandleAuthPacketBytes received early auth rawCode=0x{:02x} with no registered state2/AuthMessageDispatch receiver",
+                static_cast<unsigned>(rawCode));
+            return 0u;
         }
+        return scaffoldState2_->AuthMessageDispatch(nullptr, this);
+    };
 
-        case 0x09: {
-            // Address anchor: launcher.exe:0x439210 = upstream BeginAuthBootstrap call site
-            mxo::auth::AuthChallenge challenge;
-            if (!mxo::auth::ParseAuthChallengePayload(packetBytes, packetSize, &challenge)) {
-                spdlog::info("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthChallenge");
-                return 0;
-            }
+    switch (rawCode) {
+        case kAuthRawCodeGetPublicKeyReply:
+            return dispatchStagedEarlyAuthViaState2();
 
-            lastAuthChallenge_ = challenge;
-            spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
-                challenge.encryptedChallengeBytes.size());
-            expectedAuthRequestName_ = "AS_AuthChallengeResponse";
-            const uint32_t sendResult = SendAuthChallengeResponse(challenge);
+        case 0x09u: {
+            const uint32_t handled = dispatchStagedEarlyAuthViaState2();
             const bool preserveExistingCharacterState8Path =
                 currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u;
-            if (sendResult != 0u && scaffoldState10_ != nullptr && !preserveExistingCharacterState8Path) {
+            if (handled != 0u && scaffoldState10_ != nullptr && !preserveExistingCharacterState8Path) {
                 SwitchHelperStateScaffold(0x0au, scaffoldState10_);
-            } else if (sendResult != 0u && preserveExistingCharacterState8Path) {
+            } else if (handled != 0u && preserveExistingCharacterState8Path) {
                 spdlog::info(
                     "CLTLoginMediator::HandleAuthPacketBytes preserving current state8 through AS_AuthChallengeResponse for the existing-character path instead of forcing helperState=0x0a claim/create flow");
             }
-            return sendResult;
+            return handled;
         }
 
-        case 0x0b: {
+        case 0x0bu: {
             // Address anchors:
             // - launcher.exe:0x41bc20 = later auth opcode read helper
-            // - launcher.exe:0x4401a0 = state10 slot 6 / concrete `AS_AuthReply` handler
-            // - launcher.exe:0x43a330 = auth-reply parse/helper object builder used there
+            // - launcher.exe:0x43f300 = state2 broader inbound auth dispatcher
+            // - launcher.exe:0x4401a0 = state10 slot 6 / later narrower selected-slot auth-reply handler
             stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
             if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u) {
                 spdlog::info(
@@ -3072,11 +3050,15 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
                 }
                 return handled;
             }
-            if (currentState_ != nullptr) {
+            if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 10u) {
                 return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
             }
+            if (scaffoldState2_ != nullptr) {
+                return scaffoldState2_->AuthMessageDispatch(nullptr, this);
+            }
             spdlog::info(
-                "CLTLoginMediator::HandleAuthPacketBytes received AS_AuthReply with no active helper state; no faithful state10 slot6 receiver is available");
+                "CLTLoginMediator::HandleAuthPacketBytes received AS_AuthReply with no faithful state2/state10 receiver available currentState={}",
+                currentState_ ? currentState_->DebugName() : "<null>");
             return 0u;
         }
 
@@ -3089,7 +3071,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             break;
     }
 
-    return 0;
+    return 0u;
 }
 
 uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize) {

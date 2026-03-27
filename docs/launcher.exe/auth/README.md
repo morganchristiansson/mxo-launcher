@@ -89,6 +89,17 @@ Current evidence for that last point:
 - so the safest current architecture is:
   - keep low-level auth packet logic reusable and outside the mediator object itself
   - but keep auth **launcher-owned** and coordinated by the mediator/helper-state layer rather than moving ownership wholesale into `LaunchPadClient` or `client.dll`
+- newer direct `0x43f300 / 0x448140` decompilation also sharpens the current raw-byte-wrapper boundary:
+  - original early inbound auth handling is **not** a raw-payload mediator method
+  - state2 `0x43f300` passes a higher-level incoming auth-message object into child helper `0x448140`
+  - `0x448140` immediately derives the opcode from that object through `0x41bc20`
+  - source consequence:
+    - `CLTLoginMediator::HandleAuthPacketBytes(...)` should stay only a thin staging/demux bridge from the replacement's raw-byte runtime glue
+    - early inbound raw `0x07 / 0x09` and the broader bootstrap-side raw `0x0b` should live closer to:
+      - `matrixstaging/game/src/libltclientlogin/loginstate_state2.cpp`
+      - `matrixstaging/game/src/libltclientlogin/authbootstrap680.cpp`
+    - later narrower selected-slot raw `0x0b` remains separate in state10 / `0x4401a0`
+    - the current explicit state8 existing-character auth bridge remains a replacement-side exception, not proof of original ownership
 
 ## Current working wire sequence
 

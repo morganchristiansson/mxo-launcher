@@ -97,8 +97,8 @@ struct AuthBootstrap680ChildSketch {
     // Original child `+0xb0 .. +0xeb` is still unresolved in current source.
     std::array<uint8_t, 0x3c> opaqueStateB0ToEb{};
 
-    uint32_t stateFlagEC = 1;                    // original child `+0xec`; seeded by `0x445500`
-    void* fieldF0 = nullptr;                     // original child `+0xf0`
+    uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
+    void* fieldF0 = nullptr;                     // original child `+0xf0`; broader raw-`0x0b` parse object family still not source-owned tightly enough
     void* authReplyCopyShadowF4 = nullptr;       // original child `+0xf4`; original points at the reply-derived copied `0x136` block, current source keeps a narrowed `AuthBootstrapReplyCopyShadowF4Sketch` shadow there
     AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8`; small-string family whose begin pointer is surfaced by owner vtable `+0x60 / 0x41f3c0`
     void* fieldFC = nullptr;                     // original child `+0xfc`
@@ -112,10 +112,21 @@ struct AuthBootstrap680ChildSketch {
     uint32_t field118 = 0;                       // original child `+0x118`
 };
 
+enum AuthBootstrap680InboundAuthResult : uint32_t {
+    kAuthBootstrap680InboundUnhandled = 0u,
+    kAuthBootstrap680InboundHandledContinueWaiting = 1u,
+    kAuthBootstrap680InboundAuthReplySuccess = 2u,
+    kAuthBootstrap680InboundAuthReplyError = 3u,
+    kAuthBootstrap680InboundGetPublicKeyReplyError = 4u,
+    kAuthBootstrap680InboundGetPublicKeyWorkerError = 5u,
+    kAuthBootstrap680InboundAuthReplyValidationError = 6u,
+};
+
 struct AuthBootstrap680Ops {
     static void EraseSidecar(const CLTLoginMediator* mediator);
 
     static uint32_t PrepareAndDispatch(CLTLoginMediator& mediator);
+    static uint32_t HandleInboundAuthMessage(CLTLoginMediator& mediator);
 
     static void* BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator);
     static bool HasBootstrapRaw08AuxHandle54(const CLTLoginMediator& mediator);

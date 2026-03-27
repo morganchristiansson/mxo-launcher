@@ -63,9 +63,12 @@ class CLTLoginMediator : public ILTLoginMediator {
     // Source-ownership split note:
     // - the phase-2 auth/bootstrap child rooted at owner `+0x680` now has its own focused source
     //   home in `authbootstrap680.cpp`
+    // - state2 `0x43f300` now also needs narrow access because early inbound auth staging/demux
+    //   is source-owned there instead of in the mediator wrapper
     // - keep access narrow by granting focused friendship instead of widening the mediator
     //   surface generically
     friend struct AuthBootstrap680Ops;
+    friend class CLTLoginState_AuthenticatePending;
     friend class CLTLoginState_State10;
 
 public:
@@ -986,7 +989,10 @@ public:
         const std::vector<uint8_t>& uiConfigMd5);
     // Source-owned wrapper/demux entry used by diagnostics/runtime glue.
     // Important ownership split:
-    // - early auth inbound raw `0x07/0x09/0x0b` belongs semantically to state2
+    // - original `0x43f300/0x448140` consume a higher-level incoming auth-message object, not raw
+    //   payload bytes directly
+    // - current replacement therefore keeps the raw-byte staging bridge here, but early inbound
+    //   raw `0x07/0x09/0x0b` semantics are dispatched into state2
     //   `AuthMessageDispatch` (`0x43f300`) and its owner `+0x680` child helper
     //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
     // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
@@ -1491,6 +1497,10 @@ private:
     mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
     mxo::auth::AuthChallenge lastAuthChallenge_;
     mxo::auth::AuthReply lastAuthReply_;
+    // Keep staged auth bytes mediator-owned for the current raw-byte bridge:
+    // - early inbound auth now demuxes through state2 / owner+0x680 child helpers
+    // - later raw-`0x0b` selected-slot handling still uses state10 slot 6
+    // - loginmediator_state9.cpp callback84 opcode fallback also still consults this storage
     std::vector<uint8_t> stagedIncomingAuthPacketBytes_;
     std::vector<uint8_t> stagedIncomingMarginPacketBytes_;
     // ABI-safety note:

@@ -268,6 +268,112 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
     return SendAuthGetPublicKeyRequest(mediator);
 }
 
+// anchor: launcher.exe:0x448140
+uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediator) {
+    const std::vector<uint8_t>& stagedBytes = mediator.stagedIncomingAuthPacketBytes_;
+    if (stagedBytes.empty()) {
+        return kAuthBootstrap680InboundUnhandled;
+    }
+
+    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    const uint8_t rawCode = stagedBytes[0];
+    switch (rawCode) {
+        case CLTLoginMediator::kAuthRawCodeGetPublicKeyReply: {
+            mxo::auth::GetPublicKeyReply reply;
+            if (!mxo::auth::ParseGetPublicKeyReplyPayload(
+                    stagedBytes.data(),
+                    stagedBytes.size(),
+                    &reply)) {
+                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Ops::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
+            mediator.lastAuthPublicKeyReply_ = reply;
+            child.inboundAuthStatusEc = reply.status;
+            if (reply.status != 0u) {
+                return kAuthBootstrap680InboundGetPublicKeyReplyError;
+            }
+
+            mediator.authCurrentPublicKeyId_ = reply.publicKeyId;
+            mediator.SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
+            mediator.SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(reply);
+            child.timestamp80 = static_cast<uint32_t>(
+                std::time(nullptr) - static_cast<std::time_t>(reply.currentTime));
+
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={}",
+                static_cast<unsigned>(reply.status),
+                static_cast<unsigned>(reply.currentTime),
+                static_cast<unsigned>(reply.publicKeyId),
+                static_cast<unsigned>(reply.keySize),
+                static_cast<unsigned>(reply.modulusLength),
+                static_cast<unsigned>(reply.signatureLength),
+                static_cast<unsigned>(reply.publicExponentByte),
+                reply.hasEmbeddedPublicKey ? 1u : 0u);
+
+            mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
+            return SendAuthRequestFromReply(mediator, reply) != 0u
+                ? kAuthBootstrap680InboundHandledContinueWaiting
+                : kAuthBootstrap680InboundGetPublicKeyWorkerError;
+        }
+
+        case 0x09u: {
+            mxo::auth::AuthChallenge challenge;
+            if (!mxo::auth::ParseAuthChallengePayload(
+                    stagedBytes.data(),
+                    stagedBytes.size(),
+                    &challenge)) {
+                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Ops::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
+            mediator.lastAuthChallenge_ = challenge;
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
+                challenge.encryptedChallengeBytes.size());
+            mediator.expectedAuthRequestName_ = "AS_AuthChallengeResponse";
+            return SendAuthChallengeResponse(mediator, challenge) != 0u
+                ? kAuthBootstrap680InboundHandledContinueWaiting
+                : kAuthBootstrap680InboundUnhandled;
+        }
+
+        case 0x0bu: {
+            mxo::auth::AuthReply reply;
+            if (!mxo::auth::ParseAuthReplyPayload(
+                    stagedBytes.data(),
+                    stagedBytes.size(),
+                    &reply)) {
+                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Ops::HandleInboundAuthMessage failed to parse AS_AuthReply");
+                return kAuthBootstrap680InboundUnhandled;
+            }
+
+            mediator.lastAuthReply_ = reply;
+            mediator.expectedAuthRequestName_ = nullptr;
+            child.inboundAuthStatusEc = reply.isErrorReply ? reply.errorCode : 0u;
+
+            if (reply.isErrorReply) {
+                return kAuthBootstrap680InboundAuthReplyError;
+            }
+
+            // Current source-owned validation is narrower than the original `0x44aec0` path:
+            // keep the marker/worker gate explicit while the full child `+0xac` validation family
+            // is still not typed tightly enough.
+            if (!reply.valid || !reply.hasAuthDataMarker || reply.authDataMarker != 0x0136u ||
+                child.raw08PublicKeyWorkerA8 == nullptr) {
+                return kAuthBootstrap680InboundAuthReplyValidationError;
+            }
+
+            mediator.SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
+            return kAuthBootstrap680InboundAuthReplySuccess;
+        }
+
+        default:
+            break;
+    }
+
+    return kAuthBootstrap680InboundUnhandled;
+}
+
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator) {
     const auto* authReplyCopyShadowF4 =

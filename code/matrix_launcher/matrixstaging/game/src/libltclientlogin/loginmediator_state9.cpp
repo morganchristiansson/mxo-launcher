@@ -99,6 +99,13 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
             opcodeStorage = state9submit::ReadOpcodePrefixVariableWidth(
                 framedPacket.payloadBytes.data(),
                 framedPacket.payloadBytes.size());
+        } else {
+            // Current auth wrapper stages logical payload bytes, not the original higher-level
+            // incoming auth-message object. Keep callback84 opcode derivation tolerant of that
+            // raw-byte bridge instead of assuming a second framing layer is still present here.
+            opcodeStorage = state9submit::ReadOpcodePrefixVariableWidth(
+                stagedIncomingAuthPacketBytes_.data(),
+                stagedIncomingAuthPacketBytes_.size());
         }
     }
 
