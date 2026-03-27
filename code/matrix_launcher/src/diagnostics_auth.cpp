@@ -7,10 +7,7 @@
 #include "loginstate.h"
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <cstdlib>
-#include <cstring>
-#include <vector>
 
 namespace {
 
@@ -49,7 +46,6 @@ struct DiagnosticLoginControllerSession {
     void* CurrentOwner() const;
     DiagnosticRawMessageConnectionContext* AuthContext() const;
     DiagnosticRawMessageConnectionContext* MarginContext() const;
-    bool MarkPostAuthMarginBeginAttempted();
 
     DiagnosticRawMessageConnectionContext* GetOrCreateAuthContext(const char* label);
     DiagnosticRawMessageConnectionContext* GetOrCreateMarginContext(const char* label);
@@ -62,7 +58,6 @@ private:
     DiagnosticRawMessageConnectionContext* authContext_ = NULL;
     DiagnosticRawMessageConnectionContext* marginContext_ = NULL;
     void* currentOwner_ = NULL;
-    bool postAuthMarginBeginAttempted_ = false;
 };
 
 static DiagnosticLoginControllerSession g_DiagnosticLoginControllerSession = {};
@@ -102,12 +97,10 @@ void DiagnosticLoginControllerSession::Reset() {
     }
 
     currentOwner_ = NULL;
-    postAuthMarginBeginAttempted_ = false;
 }
 
 void DiagnosticLoginControllerSession::BeginForOwner(void* owner) {
     currentOwner_ = owner;
-    postAuthMarginBeginAttempted_ = false;
 }
 
 mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::BindInstalledMediatorForEngine(
@@ -141,15 +134,6 @@ DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::AuthCon
 
 DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::MarginContext() const {
     return marginContext_;
-}
-
-bool DiagnosticLoginControllerSession::MarkPostAuthMarginBeginAttempted() {
-    if (postAuthMarginBeginAttempted_) {
-        return false;
-    }
-
-    postAuthMarginBeginAttempted_ = true;
-    return true;
 }
 
 DiagnosticRawMessageConnectionContext* DiagnosticLoginControllerSession::GetOrCreateAuthContext(const char* label) {
@@ -231,10 +215,6 @@ static void* GetDiagnosticLoginControllerOwner() {
     return GetDiagnosticLoginControllerSession().CurrentOwner();
 }
 
-static bool MarkDiagnosticPostAuthMarginBeginAttempted() {
-    return GetDiagnosticLoginControllerSession().MarkPostAuthMarginBeginAttempted();
-}
-
 static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWorkItemStub* self) {
     if (self) {
         spdlog::info("DIAGNOSTIC: releasing queued work item {} type={} payload=0x{:08x} label='{}'",
@@ -254,69 +234,6 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_Release(Diagnos
         (self && self->debugLabel) ? self->debugLabel : "<null>",
         (self && self->autoReleaseFlag) ? 1u : 0u);
     return 1;
-}
-
-static const char* DiagnosticAuthRawCodeName(uint8_t rawCode) {
-    switch (rawCode) {
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyRequest:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetPublicKeyReply:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsGetPublicKeyReply;
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeAuthRequest:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsAuthRequest;
-        case 0x09:
-            return "AS_AuthChallenge";
-        case 0x0a:
-            return "AS_AuthChallengeResponse";
-        case 0x0b:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
-        case mxo::ltlogin::CLTLoginMediator::kAuthRawCodeGetWorldListRequest:
-            return mxo::ltlogin::CLTLoginMediator::kMessageAsGetWorldListRequest;
-        case 0x36:
-            return "AS_GetWorldListReply";
-        default:
-            return "<unknown-auth-code>";
-    }
-}
-
-static bool DiagnosticParseVariableLengthPayload(
-    const std::vector<uint8_t>& bytes,
-    const uint8_t** outPayload,
-    size_t* outPayloadSize,
-    size_t* outHeaderBytes,
-    size_t* outConsumedBytes) {
-    if (outPayload) *outPayload = NULL;
-    if (outPayloadSize) *outPayloadSize = 0u;
-    if (outHeaderBytes) *outHeaderBytes = 0u;
-    if (outConsumedBytes) *outConsumedBytes = 0u;
-    if (bytes.size() < 2u) {
-        return false;
-    }
-
-    uint32_t payloadLength = 0u;
-    size_t headerBytes = 0u;
-    if (bytes[0] & 0x80u) {
-        if (bytes.size() < 3u) {
-            return false;
-        }
-        payloadLength = (static_cast<uint32_t>(bytes[0] & 0x7fu) << 8) |
-                        static_cast<uint32_t>(bytes[1]);
-        headerBytes = 2u;
-    } else {
-        payloadLength = static_cast<uint32_t>(bytes[0]);
-        headerBytes = 1u;
-    }
-
-    const size_t consumedBytes = headerBytes + payloadLength;
-    if (bytes.size() < consumedBytes) {
-        return false;
-    }
-
-    if (outPayload) *outPayload = bytes.data() + headerBytes;
-    if (outPayloadSize) *outPayloadSize = payloadLength;
-    if (outHeaderBytes) *outHeaderBytes = headerBytes;
-    if (outConsumedBytes) *outConsumedBytes = consumedBytes;
-    return true;
 }
 
 static void DiagnosticRouteConnectStatusToLoginController(
@@ -370,120 +287,17 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
             DiagnosticRouteConnectStatusToLoginController(self, workItem);
         }
         if (workItem->header.workType == 3u) {
-            while (true) {
-                const std::vector<uint8_t>& bytes = self->sidecarConnection->ReceivedBytes();
-                if (bytes.empty()) {
-                    break;
-                }
-
-                const size_t preview = (bytes.size() < 16u) ? bytes.size() : 16u;
-                char hexPreview[16 * 3 + 1] = {0};
-                char* out = hexPreview;
-                for (size_t i = 0; i < preview; ++i) {
-                    std::snprintf(out, 4, "%02x ", bytes[i]);
-                    out += 3;
-                }
-                spdlog::info(
-                    "DIAGNOSTIC: received-bytes label={}' total={} preview={}",
-                    self->debugLabel ? self->debugLabel : "<null>",
-                    (unsigned)bytes.size(),
-                    hexPreview);
-
-                if (self == GetDiagnosticAuthContext() && bytes.size() >= 2u) {
-                    const uint8_t* payloadBytes = NULL;
-                    size_t payloadSize = 0u;
-                    size_t headerBytes = 0u;
-                    size_t consumedBytes = 0u;
-                    const bool parsedFrame = DiagnosticParseVariableLengthPayload(
-                        bytes,
-                        &payloadBytes,
-                        &payloadSize,
-                        &headerBytes,
-                        &consumedBytes);
-                    const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
-                    if (!parsedFrame) {
-                        spdlog::info(
-                            "DIAGNOSTIC: auth receive buffering incomplete frame buffered={} preview={}",
-                            bytes.size(),
-                            hexPreview);
-                        break;
-                    }
-
+            mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
+            if (self == GetDiagnosticAuthContext() && loginController) {
+                const uint32_t receiveActions = loginController->HandleAuthConnectionReceiveScaffold();
+                if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
+                    const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
                     spdlog::info(
-                        "DIAGNOSTIC: auth receive framing payloadLength={} headerBytes={} rawCode=0x{:02x} likelyMessage='{}",
-                        payloadSize,
-                        headerBytes,
-                        rawCode,
-                        DiagnosticAuthRawCodeName(rawCode));
-
-                    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-                    if (loginController) {
-                        const uint32_t handled =
-                            loginController->HandleAuthPacketBytes(payloadBytes, payloadSize);
-                        spdlog::info(
-                            "DIAGNOSTIC: launcher-owned auth packet handler label={} handled={} rawCode=0x{:02x}",
-                            self->debugLabel ? self->debugLabel : "<null>",
-                            handled,
-                            rawCode);
-
-                        if (handled != 0u && rawCode == 0x0b &&
-                            MarkDiagnosticPostAuthMarginBeginAttempted()) {
-                            const uint32_t marginConnectResult = DiagnosticBeginMarginConnection();
-                            spdlog::info(
-                                "DIAGNOSTIC: post-AS_AuthReply margin auto-begin result = 0x{:08x}",
-                                marginConnectResult);
-                        }
-                    }
-
-                    self->sidecarConnection->ConsumeReceivedBytesPrefix(consumedBytes);
-                    continue;
+                        "DIAGNOSTIC: post-AS_AuthReply margin auto-begin result = 0x{:08x}",
+                        marginConnectResult);
                 }
-
-                if (self == GetDiagnosticMarginContext() && bytes.size() >= 2u) {
-                    const uint8_t* payloadBytes = NULL;
-                    size_t payloadSize = 0u;
-                    size_t headerBytes = 0u;
-                    size_t consumedBytes = 0u;
-                    const bool parsedFrame = DiagnosticParseVariableLengthPayload(
-                        bytes,
-                        &payloadBytes,
-                        &payloadSize,
-                        &headerBytes,
-                        &consumedBytes);
-                    const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
-                    if (!parsedFrame) {
-                        spdlog::info(
-                            "DIAGNOSTIC: margin receive buffering incomplete frame buffered={} preview={}",
-                            bytes.size(),
-                            hexPreview);
-                        break;
-                    }
-
-                    const bool looksLikePlainBootstrapReply =
-                        rawCode == 0x02u || rawCode == 0x04u || rawCode == 0x07u || rawCode == 0x09u;
-                    spdlog::info(
-                        "DIAGNOSTIC: margin receive framing payloadLength={} headerBytes={} outerByte0=0x{:02x} framingHint={} logicalOpcode=resolved-later-by-mediator-after-optional-decrypt",
-                        payloadSize,
-                        headerBytes,
-                        rawCode,
-                        looksLikePlainBootstrapReply ? "plaintext-bootstrap-reply" : "possibly-encrypted-post-bootstrap-payload");
-
-                    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-                    if (loginController && payloadBytes && payloadSize != 0u) {
-                        const uint32_t handled =
-                            loginController->HandleMarginPacketBytes(payloadBytes, payloadSize);
-                        spdlog::info(
-                            "DIAGNOSTIC: launcher-owned margin packet handler label={} handled={} outerByte0=0x{:02x} decryptedOpcode=see-CLTLoginMediator-log-when-transportEncrypted=1",
-                            self->debugLabel ? self->debugLabel : "<null>",
-                            handled,
-                            rawCode);
-                    }
-
-                    self->sidecarConnection->ConsumeReceivedBytesPrefix(consumedBytes);
-                    continue;
-                }
-
-                break;
+            } else if (self == GetDiagnosticMarginContext() && loginController) {
+                (void)loginController->HandleMarginConnectionReceiveScaffold();
             }
         }
         return self->sidecarConnection->OnOperationCompleted(reinterpret_cast<void*>(workItem->header.workType));

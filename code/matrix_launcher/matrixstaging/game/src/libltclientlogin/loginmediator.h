@@ -1008,6 +1008,10 @@ public:
     // - keep this mediator method only as the current staging/demux wrapper, not as proof that
     //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    // Current receive-side framing bridge still lives on the replacement transport path.
+    // Keep the frame parsing here instead of in diagnostics so post-auth auth-reply semantics and
+    // the one-shot margin auto-begin request stay mediator-owned.
+    uint32_t HandleAuthConnectionReceiveScaffold();
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
@@ -1015,6 +1019,7 @@ public:
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
     uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    uint32_t HandleMarginConnectionReceiveScaffold();
 
     // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6
     // bodies.
@@ -1026,6 +1031,8 @@ public:
     const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
 
     static constexpr uint32_t kConnectStatusSuccess = 0x7000001u;
+    static constexpr uint32_t kReceiveActionNone = 0u;
+    static constexpr uint32_t kReceiveActionBeginMarginAfterAuthReply = 1u << 0;
 
     // launcher.exe owner-vtable surfaces currently recovered from the state4 margin dispatcher.
     // Keep these helpers narrow and structural:
@@ -1531,6 +1538,7 @@ private:
     uint32_t lastMarginConnectStatus_;
     uint32_t authConnectStatusCount_;
     uint32_t marginConnectStatusCount_;
+    bool postAuthMarginAutoBeginAttemptedScaffold_ = false;
     const char* expectedAuthRequestName_;
     const char* expectedMarginRequestName_;
 

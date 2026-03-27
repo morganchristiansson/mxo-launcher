@@ -336,6 +336,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
+    postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
 
@@ -798,6 +799,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
+    postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
     expectedAuthRequestName_ = nullptr;

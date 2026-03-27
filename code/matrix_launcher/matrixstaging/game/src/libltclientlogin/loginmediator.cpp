@@ -163,6 +163,46 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
     return out;
 }
 
+static bool ParseVariableLengthPayloadForReceive(
+    const std::vector<uint8_t>& bytes,
+    const uint8_t** outPayload,
+    size_t* outPayloadSize,
+    size_t* outHeaderBytes,
+    size_t* outConsumedBytes) {
+    if (outPayload) *outPayload = nullptr;
+    if (outPayloadSize) *outPayloadSize = 0u;
+    if (outHeaderBytes) *outHeaderBytes = 0u;
+    if (outConsumedBytes) *outConsumedBytes = 0u;
+    if (bytes.size() < 2u) {
+        return false;
+    }
+
+    uint32_t payloadLength = 0u;
+    size_t headerBytes = 0u;
+    if (bytes[0] & 0x80u) {
+        if (bytes.size() < 3u) {
+            return false;
+        }
+        payloadLength = (static_cast<uint32_t>(bytes[0] & 0x7fu) << 8) |
+                        static_cast<uint32_t>(bytes[1]);
+        headerBytes = 2u;
+    } else {
+        payloadLength = static_cast<uint32_t>(bytes[0]);
+        headerBytes = 1u;
+    }
+
+    const size_t consumedBytes = headerBytes + payloadLength;
+    if (bytes.size() < consumedBytes) {
+        return false;
+    }
+
+    if (outPayload) *outPayload = bytes.data() + headerBytes;
+    if (outPayloadSize) *outPayloadSize = payloadLength;
+    if (outHeaderBytes) *outHeaderBytes = headerBytes;
+    if (outConsumedBytes) *outConsumedBytes = consumedBytes;
+    return true;
+}
+
 static uint32_t ReadU32LE(const uint8_t* p) {
     return static_cast<uint32_t>(p[0]) |
            (static_cast<uint32_t>(p[1]) << 8) |
@@ -2736,10 +2776,74 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         static_cast<unsigned>(postAuthMarginLoadingState_.characterRouteIndexCc8));
 }
 
+uint32_t CLTLoginMediator::HandleAuthConnectionReceiveScaffold() {
+    mxo::liblttcp::CMessageConnection* connection = AuthConnection();
+    if (connection == nullptr) {
+        return kReceiveActionNone;
+    }
+
+    uint32_t actions = kReceiveActionNone;
+    while (true) {
+        const std::vector<uint8_t>& bytes = connection->ReceivedBytes();
+        if (bytes.empty()) {
+            break;
+        }
+
+        spdlog::info(
+            "CLTLoginMediator::HandleAuthConnectionReceiveScaffold bufferedBytes={} preview={}",
+            static_cast<unsigned>(bytes.size()),
+            BuildHexPreview(bytes.data(), bytes.size(), 16u));
+
+        const uint8_t* payloadBytes = nullptr;
+        size_t payloadSize = 0u;
+        size_t headerBytes = 0u;
+        size_t consumedBytes = 0u;
+        const bool parsedFrame = ParseVariableLengthPayloadForReceive(
+            bytes,
+            &payloadBytes,
+            &payloadSize,
+            &headerBytes,
+            &consumedBytes);
+        const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
+        if (!parsedFrame) {
+            spdlog::info(
+                "CLTLoginMediator::HandleAuthConnectionReceiveScaffold incomplete frame bufferedBytes={} preview={}",
+                static_cast<unsigned>(bytes.size()),
+                BuildHexPreview(bytes.data(), bytes.size(), 16u));
+            break;
+        }
+
+        spdlog::info(
+            "CLTLoginMediator::HandleAuthConnectionReceiveScaffold payloadLength={} headerBytes={} rawCode=0x{:02x} likelyMessage='{}'",
+            payloadSize,
+            headerBytes,
+            rawCode,
+            mxo::auth::AuthOpcodeName(rawCode));
+
+        const uint32_t handled = HandleAuthPacketBytes(payloadBytes, payloadSize);
+        spdlog::info(
+            "CLTLoginMediator::HandleAuthConnectionReceiveScaffold handled={} rawCode=0x{:02x}",
+            static_cast<unsigned>(handled),
+            rawCode);
+
+        if (handled != 0u && rawCode == 0x0bu && !postAuthMarginAutoBeginAttemptedScaffold_) {
+            postAuthMarginAutoBeginAttemptedScaffold_ = true;
+            actions |= kReceiveActionBeginMarginAfterAuthReply;
+            spdlog::info(
+                "CLTLoginMediator::HandleAuthConnectionReceiveScaffold requested one-shot post-AS_AuthReply margin auto-begin currentState={}",
+                currentState_ ? currentState_->DebugName() : "<null>");
+        }
+
+        connection->ConsumeReceivedBytesPrefix(consumedBytes);
+    }
+
+    return actions;
+}
+
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
     // Receive-side note:
-    // - the diagnostic auth bridge already strips the variable-length frame header before calling
-    //   this wrapper entry point
+    // - the current replacement receive scaffolds strip the variable-length frame header before
+    //   calling this wrapper entry point
     // - so this function operates on logical auth payload bytes beginning at raw opcode, not on a
     //   second frame layer
     // Ownership note:
@@ -2823,6 +2927,63 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     }
 
     return 0u;
+}
+
+uint32_t CLTLoginMediator::HandleMarginConnectionReceiveScaffold() {
+    mxo::liblttcp::CMessageConnection* connection = MarginConnection();
+    if (connection == nullptr) {
+        return kReceiveActionNone;
+    }
+
+    while (true) {
+        const std::vector<uint8_t>& bytes = connection->ReceivedBytes();
+        if (bytes.empty()) {
+            break;
+        }
+
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginConnectionReceiveScaffold bufferedBytes={} preview={}",
+            static_cast<unsigned>(bytes.size()),
+            BuildHexPreview(bytes.data(), bytes.size(), 16u));
+
+        const uint8_t* payloadBytes = nullptr;
+        size_t payloadSize = 0u;
+        size_t headerBytes = 0u;
+        size_t consumedBytes = 0u;
+        const bool parsedFrame = ParseVariableLengthPayloadForReceive(
+            bytes,
+            &payloadBytes,
+            &payloadSize,
+            &headerBytes,
+            &consumedBytes);
+        const uint8_t rawCode = (parsedFrame && payloadBytes && payloadSize != 0u) ? payloadBytes[0] : 0u;
+        if (!parsedFrame) {
+            spdlog::info(
+                "CLTLoginMediator::HandleMarginConnectionReceiveScaffold incomplete frame bufferedBytes={} preview={}",
+                static_cast<unsigned>(bytes.size()),
+                BuildHexPreview(bytes.data(), bytes.size(), 16u));
+            break;
+        }
+
+        const bool looksLikePlainBootstrapReply =
+            rawCode == 0x02u || rawCode == 0x04u || rawCode == 0x07u || rawCode == 0x09u;
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginConnectionReceiveScaffold payloadLength={} headerBytes={} outerByte0=0x{:02x} framingHint={}",
+            payloadSize,
+            headerBytes,
+            rawCode,
+            looksLikePlainBootstrapReply ? "plaintext-bootstrap-reply" : "possibly-encrypted-post-bootstrap-payload");
+
+        const uint32_t handled = HandleMarginPacketBytes(payloadBytes, payloadSize);
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginConnectionReceiveScaffold handled={} outerByte0=0x{:02x}",
+            static_cast<unsigned>(handled),
+            rawCode);
+
+        connection->ConsumeReceivedBytesPrefix(consumedBytes);
+    }
+
+    return kReceiveActionNone;
 }
 
 uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
