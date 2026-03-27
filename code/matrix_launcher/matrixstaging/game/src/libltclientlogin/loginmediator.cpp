@@ -142,16 +142,6 @@ static const char* NonEmptyTextOrPlaceholder(const char* value) {
     return (value && value[0]) ? value : "<empty>";
 }
 
-static std::string LowercaseAsciiString(const std::string& value) {
-    std::string out = value;
-    for (char& c : out) {
-        if (c >= 'A' && c <= 'Z') {
-            c = static_cast<char>(c - 'A' + 'a');
-        }
-    }
-    return out;
-}
-
 static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t maxPreviewBytes) {
     if (!bytes || byteCount == 0u || maxPreviewBytes == 0u) {
         return "<empty>";
@@ -2937,100 +2927,6 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         outputPath,
         persistedCount,
         static_cast<unsigned>(postAuthMarginLoadingState_.characterRouteIndexCc8));
-}
-
-void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
-    // Address anchors:
-    // - launcher.exe:0x4401a0 / `0x43f300`
-    // Rebuild the owner auth-reply tables now in active scope:
-    // - `+0x688/+0x818/+0xd84` slot/world/route families
-    // - `+0x80/+0xcc8` summary/current-index fields
-    // This still does not reconstruct the separate later post-auth human-name / appearance writer
-    // rooted at owner `+0x108`.
-    worldSlots_.fill(nullptr);
-    worldPayloadSlots_.fill(nullptr);
-    slotRecordValid688_.fill(false);
-    worldDescriptorValidD84_.fill(false);
-    slotRecordCount684_ = 0;
-    worldDescriptorCountD80_ = 0;
-    for (RouteHostStringTripleState& routeString : routeHostStrings818_) {
-        routeString.text.clear();
-    }
-
-    const size_t worldCount = std::min(worldSlots_.size(), lastAuthReply_.worlds.size());
-    for (size_t i = 0; i < worldCount; ++i) {
-        worldSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
-        worldPayloadSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&lastAuthReply_.worlds[i]);
-        SeedRecoveredWorldDescriptorFromAuthReply(static_cast<uint8_t>(i), lastAuthReply_.worlds[i]);
-    }
-    worldDescriptorCountD80_ = static_cast<uint8_t>(worldCount);
-
-    const size_t characterCount = std::min(slotRecords688_.size(), lastAuthReply_.characters.size());
-    for (size_t i = 0; i < characterCount; ++i) {
-        SeedRecoveredCharacterSlotRecordFromAuthReply(static_cast<uint8_t>(i), lastAuthReply_.characters[i]);
-        const SlotRecordState004b5328& slotRecord = slotRecords688_[i];
-        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId0c);
-        if (matchedWorldIndex >= 0) {
-            // Current source-owned tightening for the active state-8 margin path:
-            // preserve the original descriptor-name join, but lowercase the copied text so the
-            // reconstructed `+0x818` family can feed DNS host-prefix use directly (`Reality`
-            // -> `reality`).
-            routeHostStrings818_[i].text =
-                LowercaseAsciiString(worldDescriptorsD84_[static_cast<size_t>(matchedWorldIndex)].inlineNamePlus03);
-        }
-    }
-    slotRecordCount684_ = static_cast<uint8_t>(characterCount);
-
-    // Writeback to owner +0x80 (world list count/status family)
-    postAuthMarginLoadingState_.worldListCountOrStatus80 = static_cast<uint32_t>(lastAuthReply_.worlds.size());
-
-    // Writeback to owner +0xcc8 (current character/route index byte)
-    postAuthMarginLoadingState_.characterRouteIndexCc8 = 0;
-    marginRouteState_.currentCharacterOrRouteIndex = 0;
-
-    if (characterCount != 0) {
-        const SlotRecordState004b5328& currentSlotRecord = slotRecords688_[0];
-        marginRouteState_.pendingWorldId = currentSlotRecord.worldId0c;
-        marginRouteState_.currentWorldId = static_cast<int32_t>(currentSlotRecord.worldId0c);
-    } else if (worldCount != 0) {
-        const mxo::auth::AuthWorldEntry& firstWorld = lastAuthReply_.worlds[0];
-        marginRouteState_.pendingWorldId = firstWorld.worldId;
-        marginRouteState_.currentWorldId = static_cast<int32_t>(firstWorld.worldId);
-    }
-
-    if (const char* routeHostPrefix = LookupRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
-        marginRouteState_.routeHostPrefix = routeHostPrefix;
-    } else {
-        marginRouteState_.routeHostPrefix.clear();
-    }
-
-    SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
-
-    const char* currentDescriptorName = "<empty>";
-    if (characterCount != 0) {
-        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecords688_[0].worldId0c);
-        if (matchedWorldIndex >= 0) {
-            if (const char* name = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex))) {
-                currentDescriptorName = name;
-            }
-        }
-    } else if (worldCount != 0) {
-        if (const char* name = GetDescriptorInlineNameByIndex(0)) {
-            currentDescriptorName = name;
-        }
-    }
-
-    spdlog::info(
-        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount={} characterCount={} currentCharacterOrRouteIndex={} currentSlotWorldId={} routeHostPrefix='{}' slotRecordHeapString='{}' currentWorldDescriptorName='{}'",
-        static_cast<unsigned>(worldCount),
-        static_cast<unsigned>(characterCount),
-        static_cast<unsigned>(marginRouteState_.currentCharacterOrRouteIndex),
-        characterCount == 0 ? 0u : static_cast<unsigned>(slotRecords688_[0].worldId0c),
-        marginRouteState_.routeHostPrefix.empty() ? "<empty>" : marginRouteState_.routeHostPrefix.c_str(),
-        LookupSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
-            ? LookupSlotRecordHeapStringByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8)
-            : "<empty>",
-        currentDescriptorName);
 }
 
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {

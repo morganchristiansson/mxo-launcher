@@ -160,7 +160,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
             mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(mediator->lastAuthReply_);
             mediator->LogParsedAuthReply(mediator->lastAuthReply_);
             if (AuthBootstrap680Ops::ConsumeState2AuthReplySuccessOneTimeGateScaffold(*mediator)) {
-                mediator->AdoptAuthReplyIntoRecoveredMediatorState();
+                CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
                 AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold(
                     *mediator,
                     mediator->lastAuthReply_);

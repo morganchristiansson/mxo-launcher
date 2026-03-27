@@ -4,7 +4,120 @@
 #include "../../../../src/diagnostics.h"
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+
 namespace mxo::ltlogin {
+
+static std::string LowercaseAsciiString(const std::string& value) {
+    std::string out = value;
+    for (char& c : out) {
+        if (c >= 'A' && c <= 'Z') {
+            c = static_cast<char>(c - 'A' + 'a');
+        }
+    }
+    return out;
+}
+
+void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator) {
+    if (!mediator) {
+        return;
+    }
+
+    // Address anchors:
+    // - launcher.exe:0x4401a0 / `0x43f300`
+    // Rebuild the owner auth-reply tables now in active scope:
+    // - `+0x688/+0x818/+0xd84` slot/world/route families
+    // - `+0x80/+0xcc8` summary/current-index fields
+    // This still does not reconstruct the separate later post-auth human-name / appearance writer
+    // rooted at owner `+0x108`.
+    mediator->worldSlots_.fill(nullptr);
+    mediator->worldPayloadSlots_.fill(nullptr);
+    mediator->slotRecordValid688_.fill(false);
+    mediator->worldDescriptorValidD84_.fill(false);
+    mediator->slotRecordCount684_ = 0;
+    mediator->worldDescriptorCountD80_ = 0;
+    for (CLTLoginMediator::RouteHostStringTripleState& routeString : mediator->routeHostStrings818_) {
+        routeString.text.clear();
+    }
+
+    const size_t worldCount = std::min(mediator->worldSlots_.size(), mediator->lastAuthReply_.worlds.size());
+    for (size_t i = 0; i < worldCount; ++i) {
+        mediator->worldSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&mediator->lastAuthReply_.worlds[i]);
+        mediator->worldPayloadSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&mediator->lastAuthReply_.worlds[i]);
+        mediator->SeedRecoveredWorldDescriptorFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.worlds[i]);
+    }
+    mediator->worldDescriptorCountD80_ = static_cast<uint8_t>(worldCount);
+
+    const size_t characterCount = std::min(mediator->slotRecords688_.size(), mediator->lastAuthReply_.characters.size());
+    for (size_t i = 0; i < characterCount; ++i) {
+        mediator->SeedRecoveredCharacterSlotRecordFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.characters[i]);
+        const SlotRecordState004b5328& slotRecord = mediator->slotRecords688_[i];
+        const int matchedWorldIndex = mediator->FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId0c);
+        if (matchedWorldIndex >= 0) {
+            // Current source-owned tightening for the active state-8 margin path:
+            // preserve the original descriptor-name join, but lowercase the copied text so the
+            // reconstructed `+0x818` family can feed DNS host-prefix use directly (`Reality`
+            // -> `reality`).
+            mediator->routeHostStrings818_[i].text = LowercaseAsciiString(
+                mediator->worldDescriptorsD84_[static_cast<size_t>(matchedWorldIndex)].inlineNamePlus03);
+        }
+    }
+    mediator->slotRecordCount684_ = static_cast<uint8_t>(characterCount);
+
+    // Writeback to owner +0x80 (world list count/status family)
+    mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 =
+        static_cast<uint32_t>(mediator->lastAuthReply_.worlds.size());
+
+    // Writeback to owner +0xcc8 (current character/route index byte)
+    mediator->postAuthMarginLoadingState_.characterRouteIndexCc8 = 0;
+    mediator->marginRouteState_.currentCharacterOrRouteIndex = 0;
+
+    if (characterCount != 0) {
+        const SlotRecordState004b5328& currentSlotRecord = mediator->slotRecords688_[0];
+        mediator->marginRouteState_.pendingWorldId = currentSlotRecord.worldId0c;
+        mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(currentSlotRecord.worldId0c);
+    } else if (worldCount != 0) {
+        const mxo::auth::AuthWorldEntry& firstWorld = mediator->lastAuthReply_.worlds[0];
+        mediator->marginRouteState_.pendingWorldId = firstWorld.worldId;
+        mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(firstWorld.worldId);
+    }
+
+    if (const char* routeHostPrefix =
+            mediator->LookupRouteHostPrefixBySlot(mediator->postAuthMarginLoadingState_.characterRouteIndexCc8)) {
+        mediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
+    } else {
+        mediator->marginRouteState_.routeHostPrefix.clear();
+    }
+
+    mediator->SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
+
+    const char* currentDescriptorName = "<empty>";
+    if (characterCount != 0) {
+        const int matchedWorldIndex =
+            mediator->FindRecoveredWorldDescriptorIndexByWorldId(mediator->slotRecords688_[0].worldId0c);
+        if (matchedWorldIndex >= 0) {
+            if (const char* name = mediator->GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex))) {
+                currentDescriptorName = name;
+            }
+        }
+    } else if (worldCount != 0) {
+        if (const char* name = mediator->GetDescriptorInlineNameByIndex(0)) {
+            currentDescriptorName = name;
+        }
+    }
+
+    spdlog::info(
+        "DIAGNOSTIC: adopted AS_AuthReply into recovered mediator state worldCount={} characterCount={} currentCharacterOrRouteIndex={} currentSlotWorldId={} routeHostPrefix='{}' slotRecordHeapString='{}' currentWorldDescriptorName='{}'",
+        static_cast<unsigned>(worldCount),
+        static_cast<unsigned>(characterCount),
+        static_cast<unsigned>(mediator->marginRouteState_.currentCharacterOrRouteIndex),
+        characterCount == 0 ? 0u : static_cast<unsigned>(mediator->slotRecords688_[0].worldId0c),
+        mediator->marginRouteState_.routeHostPrefix.empty() ? "<empty>" : mediator->marginRouteState_.routeHostPrefix.c_str(),
+        mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_.characterRouteIndexCc8)
+            ? mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_.characterRouteIndexCc8)
+            : "<empty>",
+        currentDescriptorName);
+}
 
 // UNANCHORED: source-owned shared raw-0x0b parse/adopt helper used by state10 slot 6 and the
 // current existing-character state8 auth bridge.
@@ -35,7 +148,7 @@ uint32_t CLTLoginState_State10::HandleStagedAuthReplyScaffold(CLTLoginMediator* 
     mediator->SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
     mediator->ResetMarginBootstrapState();
     mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(reply);
-    mediator->AdoptAuthReplyIntoRecoveredMediatorState();
+    AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
     mediator->LogParsedAuthReply(reply);
     mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
     return 1u;
@@ -111,7 +224,8 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // - non-`0x0b` packets are rejected here with owner `+0x80 = 0x12000005`
     // - parsed error replies switch helper state to `3` and post error `0x0b`
     // - parsed success replies switch helper state to `11` and post event `0x14`
-    // - mediator now keeps only the staged auth bytes; the shared parse/adopt helper lives here
+    // - mediator now keeps only the staged auth bytes; the shared parse/adopt plus owner-state
+    //   writeback helpers live here
     if (rawCode != 0x0bu) {
         mediator->WorldListCountOrStatus80() = 0x12000005u;
         spdlog::info(

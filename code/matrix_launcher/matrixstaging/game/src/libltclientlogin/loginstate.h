@@ -392,6 +392,11 @@ public:
     // anchor: launcher.exe:0x004396f0 (vtable 0x004b512c slot 10 initializer)
     CLTLoginState_State10() = default;
 
+    // UNANCHORED: source-owned shared owner-state writeback helper used by the narrower state10
+    // slot-6 auth-reply path (`0x4401a0`) and the broader state2 slot-5 auth-reply success path
+    // (`0x43f300`).
+    static void AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator);
+
     // UNANCHORED: source-owned shared raw-0x0b parse/adopt helper used by state10 slot 6 and the
     // current existing-character state8 auth bridge.
     static uint32_t HandleStagedAuthReplyScaffold(CLTLoginMediator* mediator);

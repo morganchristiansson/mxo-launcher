@@ -996,7 +996,7 @@ public:
     //   `AuthMessageDispatch` (`0x43f300`) and its owner `+0x680` child helper
     //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
     // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
-    //   and the source-owned shared helper kept in `loginstate_state10.cpp`
+    //   and the source-owned shared auth-reply helpers kept in `loginstate_state10.cpp`
     // - keep this mediator method only as the current staging/demux wrapper, not as proof that
     //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
@@ -1011,7 +1011,8 @@ public:
     // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6
     // bodies.
     // Keep the packet/class ownership split explicit:
-    // - state10 slot 6 / `0x4401a0` now owns the source-side staged auth-reply parse/adopt helper
+    // - state10 slot 6 / `0x4401a0` now owns the source-side staged auth-reply helpers,
+    //   including the shared owner-state writeback reused by broader state2 slot 5 / `0x43f300`
     // - state11 slot 6 / `0x440320` owns the load-character reply transition directly
     // - mediator only keeps the staged bytes for those later paths
     const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
@@ -1283,7 +1284,6 @@ private:
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
     void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
     void MirrorProcessLoginCredentialsSourceBlock120(const ProcessLoginCredentialsInputSketch& input);
-    void AdoptAuthReplyIntoRecoveredMediatorState();
     void PersistCharactersIniFromRecoveredAuthStateScaffold() const;
 
     uint32_t SendMarginFramedPacket(
