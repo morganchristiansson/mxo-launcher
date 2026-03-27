@@ -2986,15 +2986,16 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
 }
 
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
-    // Address anchors:
-    // - launcher.exe:0x41bc20 = auth opcode read helper on later incoming path
-    // - launcher.exe:0x4401a0 = strongest current AS_AuthReply handler
-    // - launcher.exe:0x43a330 = concrete auth-reply parse/helper object builder
     // Receive-side note:
     // - the diagnostic auth bridge already strips the variable-length frame header before calling
     //   this mediator entry point
     // - so this function must operate on logical auth payload bytes beginning at raw opcode, not
     //   try to frame-parse them a second time
+    // Ownership note:
+    // - this mediator entry is now just the auth-channel demux/stager
+    // - the later raw-`0x0b` / `AS_AuthReply` body belongs to state10 slot 6 (`0x4401a0`), with
+    //   one deliberate current-source exception for the replacement's existing-character state8
+    //   branch that still bypasses the natural state10/state11 claim/create transition
     if (!packetBytes || packetSize == 0u) {
         return 0;
     }
@@ -3054,19 +3055,16 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
 
         case 0x0b: {
             // Address anchors:
-            // - launcher.exe:0x4401a0 = state10 slot 6 / current best AS_AuthReply handler
-            // - immediate post-success continuation there is not the later helper14
-            //   `AS_GetWorldListRequest` sender at `0x43b830`
-            // - instead it goes through the later state11 path:
-            //   `0x41b450(0x0b)` -> `0x43c020` (raw post-auth margin packet `0x4d`) -> later
-            //   `0x440320` (`MS_LoadCharacterReply`)
+            // - launcher.exe:0x41bc20 = later auth opcode read helper
+            // - launcher.exe:0x4401a0 = state10 slot 6 / concrete `AS_AuthReply` handler
+            // - launcher.exe:0x43a330 = auth-reply parse/helper object builder used there
             stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
             if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u) {
                 spdlog::info(
-                    "CLTLoginMediator::HandleAuthPacketBytes routing AS_AuthReply onto the existing-character state8 path; keeping currentState={} and skipping the later state10/state11 claim/create transition",
+                    "CLTLoginMediator::HandleAuthPacketBytes routing AS_AuthReply onto the existing-character state8 path; keeping currentState={} and skipping the later natural state10/state11 claim/create transition",
                     currentState_->DebugName());
                 const uint32_t handled = HandleStagedAuthReplyPacketScaffold();
-                if (handled != 0u) {
+                if (handled != 0u && !LastAuthReplyIsError()) {
                     expectedMarginRequestName_ = "existing-character state8 raw-0x0f margin packet";
                 }
                 return handled;
@@ -3074,7 +3072,9 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
             if (currentState_ != nullptr) {
                 return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
             }
-            return HandleStagedAuthReplyPacketScaffold();
+            spdlog::info(
+                "CLTLoginMediator::HandleAuthPacketBytes received AS_AuthReply with no active helper state; no faithful state10 slot6 receiver is available");
+            return 0u;
         }
 
         default:
@@ -3176,9 +3176,11 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     return 0u;
 }
 
-// UNANCHORED: staged auth-reply continuation wrapper that still spans owner bootstrap shadow
-// adoption, margin-bootstrap seeding, and broader mediator state writeback around the
-// `0x4401a0` family.
+// UNANCHORED: narrower staged auth-reply parse/adopt helper used by state10 slot 6 (`0x4401a0`)
+// and by the current existing-character state8 auth bridge.
+// Success still performs owner bootstrap adoption + later margin-bootstrap seeding.
+// Error replies are now kept narrow here so the state-owned caller can mirror the original
+// state3/error-`0x0b` branch instead of forcing helper11 continuation.
 uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     if (stagedIncomingAuthPacketBytes_.empty()) {
         return 0u;
@@ -3194,6 +3196,15 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     }
 
     lastAuthReply_ = reply;
+    expectedAuthRequestName_ = nullptr;
+
+    if (reply.isErrorReply) {
+        postAuthMarginLoadingState_.worldListCountOrStatus80 = reply.errorCode;
+        expectedMarginRequestName_ = nullptr;
+        LogParsedAuthReply(reply);
+        return 1u;
+    }
+
     SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
     ResetMarginBootstrapState();
     MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
@@ -3207,9 +3218,16 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     }
     AdoptAuthReplyIntoRecoveredMediatorState();
     LogParsedAuthReply(reply);
-    expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = "CERT_ConnectRequest";
     return 1u;
+}
+
+const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingAuthPacketBytes() const {
+    return stagedIncomingAuthPacketBytes_;
+}
+
+bool CLTLoginMediator::LastAuthReplyIsError() const {
+    return lastAuthReply_.valid && lastAuthReply_.isErrorReply;
 }
 
 const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() const {

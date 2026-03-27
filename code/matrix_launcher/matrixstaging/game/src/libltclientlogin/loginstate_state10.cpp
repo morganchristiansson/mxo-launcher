@@ -68,23 +68,48 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         return 0u;
     }
 
-    // Ownership correction from the vtable docs + Ghidra decompilation:
+    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingAuthPacketBytes();
+    const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
+
+    // Ownership correction from the vtable docs + direct `0x4401a0` review:
     // - `0x4401a0` belongs to `CLTLoginState_State10` slot 6, not to the mediator vtable
-    // - the state entry itself handles raw auth code `0x0b`, performs the owner writeback, then
-    //   switches helper state to `11`
-    // - the mediator keeps only the narrower staged-packet + owner-state helpers
+    // - non-`0x0b` packets are rejected here with owner `+0x80 = 0x12000005`
+    // - parsed error replies switch helper state to `3` and post error `0x0b`
+    // - parsed success replies switch helper state to `11` and post event `0x14`
+    // - mediator keeps only the narrower staged-packet bytes plus parse/adopt helper
+    if (rawCode != 0x0bu) {
+        mediator->WorldListCountOrStatus80() = 0x12000005u;
+        spdlog::info(
+            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected staged auth bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
+            static_cast<unsigned>(stagedBytes.size()),
+            static_cast<unsigned>(rawCode));
+        return 0u;
+    }
+
     const uint32_t handled = mediator->HandleStagedAuthReplyPacketScaffold();
     if (handled == 0u) {
         return 0u;
+    }
+
+    if (mediator->LastAuthReplyIsError()) {
+        if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
+            mediator->SwitchHelperStateScaffold(3u, failureState);
+        }
+        mediator->PostErrorScaffold(0x0bu);
+        spdlog::info(
+            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error AS_AuthReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
+            static_cast<unsigned>(mediator->WorldListCountOrStatus80()));
+        return 1u;
     }
 
     if (CLTLoginState* nextState = mediator->ScaffoldState11()) {
         mediator->SwitchHelperStateScaffold(0x0bu, nextState);
     } else {
         spdlog::warn(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed AS_AuthReply but has no registered helper11 state");
+            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed successful AS_AuthReply but has no registered helper11 state");
     }
-    return handled;
+    mediator->PostEventScaffold(0x14u);
+    return 1u;
 }
 
 // anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)

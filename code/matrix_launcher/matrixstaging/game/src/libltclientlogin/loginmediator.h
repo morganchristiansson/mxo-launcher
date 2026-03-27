@@ -983,6 +983,8 @@ public:
         const std::vector<uint8_t>& keyConfigMd5,
         const std::vector<uint8_t>& uiConfigMd5);
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    const std::vector<uint8_t>& StagedIncomingAuthPacketBytes() const;
+    bool LastAuthReplyIsError() const;
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
@@ -994,9 +996,10 @@ public:
     // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6
     // bodies.
     // Keep the packet/class ownership split explicit:
-    // - state10 slot 6 / `0x4401a0` still uses the mediator's staged auth-reply wrapper
+    // - state10 slot 6 / `0x4401a0` owns the auth-reply transition but still uses a narrower
+    //   mediator-side parse/adopt helper plus staged auth bytes access
     // - state11 slot 6 / `0x440320` now owns the load-character reply transition directly
-    // - mediator only keeps the staged bytes for that later margin path
+    // - mediator only keeps the staged bytes plus the narrower auth owner-writeback helper
     uint32_t HandleStagedAuthReplyPacketScaffold();
     const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
 
