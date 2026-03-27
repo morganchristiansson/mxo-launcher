@@ -349,6 +349,12 @@ public:
         uint32_t workType,
         uint32_t workPayload,
         const char* label);
+    // UNANCHORED: connection-side bridge into the recovered `0x436820` completed-operation enqueue helper.
+    bool EnqueueCompletedOperationFromConnectionScaffold(
+        void* workItem,
+        void* context,
+        bool useQueue34,
+        const char* label = nullptr);
     void PumpLauncherConnectionBridgeFromArg5HelperScaffold();
 
     // anchor: launcher.exe:0x436b10

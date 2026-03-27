@@ -33,6 +33,42 @@ struct LTTCPEndpointKey {
     uint32_t reserved1 = 0;
 };
 
+// Recovered parser input fragment prefix consumed by connection `+0x6c`
+// (`CVariableLengthPrefixedTCPStreamParser::Parse`).
+// Current high-confidence fields from `0x469bf0`:
+// - `+0x08` = byte count
+// - `+0x0c` = first payload byte
+// - vtable `+0x04` / `+0x08` = retain/release-style lifetime hooks
+struct CLTTCPConnection_ReadOperationFragmentScaffold {
+    void** vtable;      // +0x00
+    uint32_t field04;   // +0x04 unknown so far
+    uint32_t byteCount; // +0x08
+    uint8_t bytes0C[1]; // +0x0c variable-length fragment bytes begin here
+};
+
+// Recovered parser-emitted completed-packet work item family built via `0x435db0 -> 0x435090`.
+// Current high-confidence fields from `0x435090`:
+// - size = `0x2c`
+// - `+0x04` = work type `3`
+// - `+0x18` low byte = `1`
+// - vtable = `0x4b3e08`
+struct CLTTCPConnection_ParsedPacketWorkItemScaffold {
+    void** vtable;             // +0x00
+    uint32_t workType;         // +0x04 = 3
+    uint32_t field08;          // +0x08
+    uint32_t field0C;          // +0x0c
+    uint32_t field10;          // +0x10
+    uint32_t field14;          // +0x14
+    uint8_t flag18;            // +0x18 low byte set to 1 by ctor
+    uint8_t unknown19_1b[3];   // +0x19..+0x1b
+    uint32_t field1C;          // +0x1c
+    uint32_t field20;          // +0x20 not explicitly initialized in current ctor read
+    uint32_t field24;          // +0x24
+    uint32_t field28;          // +0x28
+};
+
+static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold) == 0x2c, "parsed packet work item size mismatch");
+
 // Source-owned abstraction over the recovered connection family.
 // Important current limitation:
 // - this C++ base keeps the recovered state/virtual relationships useful to the replacement
@@ -147,9 +183,14 @@ public:
 
     // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
     // Current best original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` (`0x469bf0`).
-    uint32_t pollReceive(void* callbackContext, void** outWorkItem);
+    uint32_t pollReceive(
+        void* callbackContext,
+        CLTTCPConnection_ParsedPacketWorkItemScaffold** outWorkItem);
     // UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
-    void pushCompletedOperation(void* workItem, void* context, bool useQueue34);
+    void pushCompletedOperation(
+        CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+        void* context,
+        bool useQueue34);
 
 private:
     CLTThreadPerClientTCPEngine* engine_;

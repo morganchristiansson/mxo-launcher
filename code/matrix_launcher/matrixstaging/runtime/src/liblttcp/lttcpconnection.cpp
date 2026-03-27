@@ -327,8 +327,12 @@ uint32_t CLTTCPConnection::OnReceive(void* callbackContext) {
     //   connection `+0x6c` (`CVariableLengthPrefixedTCPStreamParser::Parse`)
     // - current parser-side allocator path now narrows that emitted object to the same
     //   `0x2c` / vtable-`0x4b3e08` family built by `0x435db0 -> 0x435090`
-    void* workItem = nullptr;
-    ConnectionReceiveCallback_PrepareWorkItem(callbackContext, &workItem);
+    // - the exact role of the initial callback `+0x04(&slot)` step is still narrower than our
+    //   current source model, so keep treating this local as a conservative shared out-slot
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem = nullptr;
+    ConnectionReceiveCallback_PrepareWorkItem(
+        callbackContext,
+        reinterpret_cast<void**>(&workItem));
 
     uint32_t result = pollReceive(callbackContext, &workItem);
     while (result == 0u) {
@@ -389,7 +393,9 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
 }
 
 // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
-uint32_t CLTTCPConnection::pollReceive(void* callbackContext, void** outWorkItem) {
+uint32_t CLTTCPConnection::pollReceive(
+    void* callbackContext,
+    CLTTCPConnection_ParsedPacketWorkItemScaffold** outWorkItem) {
     // Current best static read of `0x449d40`:
     // - connection `+0x6c` is now narrowed to a
     //   `CVariableLengthPrefixedTCPStreamParser`-family helper
@@ -413,14 +419,23 @@ uint32_t CLTTCPConnection::pollReceive(void* callbackContext, void** outWorkItem
 }
 
 // UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
-void CLTTCPConnection::pushCompletedOperation(void* workItem, void* context, bool useQueue34) {
+void CLTTCPConnection::pushCompletedOperation(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    void* context,
+    bool useQueue34) {
     // Current best static read of `0x449d40`:
     // - queued submission shape is `(engine+0x10, workItem, this, false)` through `0x436820`
-    // - this source file does not yet own the faithful `+0x6c` producer helper that would drive
-    //   the real work-item family into the engine queue
-    (void)workItem;
-    (void)context;
-    (void)useQueue34;
+    // - current source path can now forward that enqueue into the engine-side queue helper when
+    //   the connection already has an attached engine sidecar
+    if (!Engine()) {
+        return;
+    }
+
+    (void)Engine()->EnqueueCompletedOperationFromConnectionScaffold(
+        workItem,
+        context,
+        useQueue34,
+        "CLTTCPConnection::OnReceive");
 }
 
 }  // namespace mxo::liblttcp

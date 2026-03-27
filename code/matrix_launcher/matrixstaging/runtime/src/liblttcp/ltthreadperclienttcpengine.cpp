@@ -1477,6 +1477,20 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemScaffol
         /*queueLockAlreadyHeld=*/false);
 }
 
+// UNANCHORED: connection-side bridge into the recovered `0x436820` completed-operation enqueue helper.
+bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffold(
+    void* workItem,
+    void* context,
+    bool useQueue34,
+    const char* label) {
+    return EnqueueCompletedOperationScaffold(
+        workItem,
+        context,
+        useQueue34,
+        label,
+        /*queueLockAlreadyHeld=*/false);
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,

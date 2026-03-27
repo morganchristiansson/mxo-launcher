@@ -1008,6 +1008,9 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
     - i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already seen in queue producer analysis
   - `CLTTCPConnection::OnReceive` (`0x449d40`) therefore feeds received stream fragments into a framing parser there, not an anonymous poll stub
   - and the parser-emitted object queued by `0x449d40` is now best read as a concrete queue-work item, not only an opaque buffer pointer
+  - source lockstep update from the same focused pass:
+    - `lttcpconnection.h` now carries explicit scaffold types for the parser input fragment prefix and the emitted `0x2c` packet work item
+    - `CLTTCPConnection::pushCompletedOperation(...)` now forwards through an engine-side bridge into the recovered `0x436820` enqueue helper when the sidecar engine is attached
 - source lockstep update from the current focused pass:
   - `matrixstaging/runtime/src/liblttcp/lttcpconnection.*` now owns the corrected base-wrapper mapping directly
   - `matrixstaging/runtime/src/libltmessaging/messageconnection.*` no longer keeps a duplicate source-only engine pointer separate from the recovered base `+0x10` field
