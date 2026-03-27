@@ -23,13 +23,15 @@ static bool EndpointKeysDiffer(const LTTCPEndpointKey& lhs, const LTTCPEndpointK
         lhs.reserved1 != rhs.reserved1;
 }
 
-// UNANCHORED: source-owned retain shim for the read-operation fragment object passed to
-// `CLTTCPConnection::OnReceive`.
-// Current best static read of `0x449d40` is that `param_1` itself is the parser input fragment,
-// and the early `param_1->+0x04` call is a retain/addref-style lifetime step, not a separate
-// callback that writes the work item.
-static void ReadOperationFragment_Retain(CLTTCPConnection_ReadOperationFragmentScaffold* fragment) {
-    if (!fragment) {
+// UNANCHORED: source-owned shim for the early `param_1->+0x04(..., &completedPacketWorkItem)`
+// step at the start of `CLTTCPConnection::OnReceive`.
+// Current best Ghidra read still shows this as a two-argument call that updates the local packet
+// work-item slot, but the exact semantic relationship between that call and the later parser call
+// is still unresolved.
+static void ReadOperationFragment_PrepareCompletedPacketWorkItem(
+    CLTTCPConnection_ReadOperationFragmentScaffold* fragment,
+    CLTTCPConnection_ParsedPacketWorkItemScaffold** outCompletedPacketWorkItem) {
+    if (!fragment || !outCompletedPacketWorkItem) {
         return;
     }
 
@@ -38,9 +40,9 @@ static void ReadOperationFragment_Retain(CLTTCPConnection_ReadOperationFragmentS
         return;
     }
 
-    typedef void (__thiscall *RetainFn)(void*);
-    RetainFn fn = reinterpret_cast<RetainFn>(vtable[1]);
-    fn(fragment);
+    typedef void (__thiscall *PrepareFn)(void*, CLTTCPConnection_ParsedPacketWorkItemScaffold**);
+    PrepareFn fn = reinterpret_cast<PrepareFn>(vtable[1]);
+    fn(fragment, outCompletedPacketWorkItem);
 }
 
 // UNANCHORED: source-owned release shim for the read-operation fragment object passed to
@@ -327,10 +329,11 @@ void CLTTCPConnection::OnClose(void* readOperationFragment) {
 // anchor: launcher.exe:0x449d40
 uint32_t CLTTCPConnection::OnReceive(void* readOperationFragment) {
     // Current best read:
-    // - `readOperationFragment` is itself the parser input fragment object later consumed by
-    //   connection `+0x6c` (`CVariableLengthPrefixedTCPStreamParser::Parse`)
-    // - the early `param_1->+0x04` step now reads best as a retain/addref-style lifetime hook on
-    //   that fragment, not a separate callback that materializes the parser output packet
+    // - `readOperationFragment` participates in the front-end seam before connection `+0x6c`
+    //   parser consumption
+    // - current Ghidra read still shows an early `param_1->+0x04(..., &completedPacketWorkItem)`
+    //   step before the parser call, so the exact relationship between this fragment object and the
+    //   parser entry arguments remains unresolved
     // - `workItem` is the parser-emitted completed packet/work object yielded through
     //   `CVariableLengthPrefixedTCPStreamParser::Parse`
     // - current parser-side allocator path now narrows that emitted object to the same
@@ -338,8 +341,12 @@ uint32_t CLTTCPConnection::OnReceive(void* readOperationFragment) {
     CLTTCPConnection_ReadOperationFragmentScaffold* fragment =
         static_cast<CLTTCPConnection_ReadOperationFragmentScaffold*>(readOperationFragment);
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem = nullptr;
-    ReadOperationFragment_Retain(fragment);
+    ReadOperationFragment_PrepareCompletedPacketWorkItem(fragment, &workItem);
 
+    // Current source keeps the fragment threaded into `pollReceive(...)` because parser `Parse`
+    // itself is now well narrowed as taking an optional read-operation fragment plus the completed
+    // packet out-slot, even though the exact first-call stack shaping in `0x449d40` remains a bit
+    // noisier than the decompiler's current prototype suggests.
     uint32_t result = pollReceive(fragment, &workItem);
     while (result == 0u) {
         pushCompletedOperation(workItem, this, /*useQueue34=*/false);

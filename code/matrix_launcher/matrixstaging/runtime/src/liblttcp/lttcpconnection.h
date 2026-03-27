@@ -46,25 +46,26 @@ struct CLTTCPConnection_ReadOperationFragmentScaffold {
     uint8_t bytes0C[1]; // +0x0c variable-length fragment bytes begin here
 };
 
-// Recovered parser-emitted completed-packet work item family built via `0x435db0 -> 0x435090`.
-// Current high-confidence fields from `0x435090`:
+// Recovered parser-emitted completed-packet work item family built via
+// `CVariableLengthPrefixedTCPStreamParser_AllocatePacketBuffer -> CParsedPacketWorkItem_ctor`.
+// Current high-confidence fields from the helper family around that object:
 // - size = `0x2c`
 // - `+0x04` = work type `3`
 // - `+0x18` low byte = `1`
 // - vtable = `0x4b3e08`
 struct CLTTCPConnection_ParsedPacketWorkItemScaffold {
-    void** vtable;             // +0x00
-    uint32_t workType;         // +0x04 = 3
-    uint32_t field08;          // +0x08
-    uint32_t field0C;          // +0x0c
-    uint32_t field10;          // +0x10
-    uint32_t field14;          // +0x14
-    uint8_t flag18;            // +0x18 low byte set to 1 by ctor
-    uint8_t unknown19_1b[3];   // +0x19..+0x1b
-    uint32_t field1C;          // +0x1c
-    uint32_t field20;          // +0x20 not explicitly initialized in current ctor read
-    uint32_t field24;          // +0x24
-    uint32_t field28;          // +0x28
+    void** vtable;                 // +0x00
+    uint32_t workType;             // +0x04 = 3
+    uint32_t field08;              // +0x08
+    uint32_t field0C;              // +0x0c
+    void* firstFragment10;         // +0x10 first retained fragment (`CParsedPacketWorkItem_BeginFragmentTraversal`)
+    void* fragmentList14;          // +0x14 optional retained fragment-list root (`CParsedPacketWorkItem_AppendFragment`)
+    uint8_t flag18;                // +0x18 low byte set to 1 by ctor
+    uint8_t unknown19_1b[3];       // +0x19..+0x1b
+    uint32_t traversalIndex1C;     // +0x1c traversal/reset state (`CParsedPacketWorkItem_GetNextFragment`)
+    uint32_t field20;              // +0x20 not explicitly initialized in current ctor read
+    uint32_t currentCursor24;      // +0x24 set/get by `CParsedPacketWorkItem_Set/GetCurrentCursor`
+    uint32_t assembledByteCount28; // +0x28 set/get by `CParsedPacketWorkItem_Set/GetAssembledByteCount`
 };
 
 static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold) == 0x2c, "parsed packet work item size mismatch");
