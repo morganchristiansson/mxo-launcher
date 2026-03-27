@@ -28,6 +28,9 @@ namespace {
 struct AuthBootstrap680ChildSidecarState {
     AuthBootstrapReplyCopyShadowF4Sketch authReplyCopyShadowF4{};
     uint32_t raw08PublicKeyWorkerPresenceMarker = 0u;
+    bool state2AuthReplySuccessOneTimeSideEffectsComplete = false;
+    std::vector<uint8_t> opaqueReplyBlob108;
+    std::vector<uint8_t> opaqueReplyBlob10C;
 };
 
 static std::unordered_map<const CLTLoginMediator*, std::unique_ptr<AuthBootstrap680ChildSidecarState>>
@@ -127,6 +130,25 @@ static size_t SmallStringMirrorLength(const AuthBootstrap680SmallStringMirror& m
 
 static const char* SmallStringMirrorDataOrEmpty(const AuthBootstrap680SmallStringMirror& mirror) {
     return mirror.begin ? mirror.begin : "";
+}
+
+static void PointOpaqueBlobPointerAtOwnedBytes(void*& dstPointer, std::vector<uint8_t>& ownedBytes) {
+    dstPointer = ownedBytes.empty() ? nullptr : ownedBytes.data();
+}
+
+static bool HasTrailingSlashSixDigitSuffix(const std::string& text) {
+    const size_t slash = text.find('/');
+    if (slash == std::string::npos || slash + 7u != text.size()) {
+        return false;
+    }
+
+    for (size_t i = slash + 1u; i < text.size(); ++i) {
+        const unsigned char ch = static_cast<unsigned char>(text[i]);
+        if (ch < static_cast<unsigned char>('0') || ch > static_cast<unsigned char>('9')) {
+            return false;
+        }
+    }
+    return true;
 }
 
 struct AuthBootstrap680PrepareCallShape {
@@ -543,7 +565,8 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
     return sendResult;
 }
 
-// UNANCHORED: source-owned parsed-auth logging helper around the `0x4401a0 / 0x43a330` family.
+// UNANCHORED: source-owned parsed-auth logging helper around the
+// `0x4401a0 / State10AuthReplyParseObject_InitFromIncomingPacket` family.
 void AuthBootstrap680Ops::LogParsedAuthReply(
     const CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
@@ -557,10 +580,14 @@ void AuthBootstrap680Ops::LogParsedAuthReply(
     }
 
     spdlog::info(
-        "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply success characterCount={} worldCount={} username='{}' authDataMarker=0x{:04x} signatureLen={} encryptedPrivateExponentLen={}",
+        "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply success characterCount={} worldCount={} username='{}' successHeaderUnknownWord05=0x{:04x} successHeaderUnknownDword07=0x{:08x} unknown2=0x{:08x} unknown3=0x{:08x} authDataMarker=0x{:04x} signatureLen={} encryptedPrivateExponentLen={}",
         reply.characterCount,
         reply.worldCount,
         reply.username.text.empty() ? "<empty>" : reply.username.text,
+        static_cast<unsigned>(reply.successHeaderUnknownWord05),
+        static_cast<unsigned>(reply.successHeaderUnknownDword07),
+        static_cast<unsigned>(reply.unknown2),
+        static_cast<unsigned>(reply.unknown3),
         reply.authDataMarker,
         reply.authSignatureBytes.size(),
         reply.encryptedPrivateExponentLength);
@@ -629,8 +656,8 @@ void AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLog
     ClearSmallStringMirror(child.stringF8);
     child.fieldFC = nullptr;
     child.field100 = nullptr;
-    child.field108 = 0u;
-    child.field10C = 0u;
+    child.opaqueReplyBlob108 = nullptr;
+    child.opaqueReplyBlob10C = nullptr;
     child.field110 = 0u;
     child.field114 = 0u;
     child.field118 = 0u;
@@ -697,6 +724,84 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
         static_cast<unsigned>(reply.authDataMarker),
         fmt::ptr(SmallStringMirrorDataOrEmpty(child.stringF8)),
         static_cast<unsigned>(SmallStringMirrorLength(child.stringF8)));
+}
+
+// UNANCHORED: source-owned narrower mirror of the pre-gate `0x43f300` neighboring helper call
+// `0x441330`, plus the direct child `+0x110` write that occurs immediately before it.
+// Current source keeps only the parts now tight enough to model confidently:
+// - copy owner `+0x94 + 0x20` into child `+0xf8`
+// - set child `+0x104` from the original slash+6-digit SecurID-tail test and strip that tail
+//   from child `+0xf8` when present
+// - mirror child `+0x110` from the parsed success-header dword at payload offset `0x07`
+void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessPregateScaffold(
+    CLTLoginMediator& mediator,
+    const mxo::auth::AuthReply& reply) {
+    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+
+    std::string promptPassword = mediator.authBootstrapSource38_.inlineString20.data();
+    const bool promptForSecurId = HasTrailingSlashSixDigitSuffix(promptPassword);
+    if (promptForSecurId && promptPassword.size() >= 7u) {
+        promptPassword.resize(promptPassword.size() - 7u);
+    }
+    AssignSmallStringMirror(child.stringF8, promptPassword.c_str());
+    child.crashReporterPromptForSecurId104 = promptForSecurId ? 1u : 0u;
+    child.field110 = reply.successHeaderUnknownDword07;
+
+    spdlog::info(
+        "AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessPregateScaffold childStringF8Len={} promptForSecurId={} childField110=0x{:08x}",
+        static_cast<unsigned>(SmallStringMirrorLength(child.stringF8)),
+        static_cast<unsigned>(child.crashReporterPromptForSecurId104),
+        static_cast<unsigned>(child.field110));
+}
+
+// UNANCHORED: source-owned one-time gate mirror for the `DAT_004f79e0` success-side block inside
+// `0x43f300`.
+bool AuthBootstrap680Ops::ConsumeState2AuthReplySuccessOneTimeGateScaffold(CLTLoginMediator& mediator) {
+    AuthBootstrap680ChildSidecarState& sidecar = MutableAuthBootstrap680ChildSidecar(&mediator);
+    if (sidecar.state2AuthReplySuccessOneTimeSideEffectsComplete) {
+        return false;
+    }
+    sidecar.state2AuthReplySuccessOneTimeSideEffectsComplete = true;
+    return true;
+}
+
+// UNANCHORED: source-owned narrower mirror of the gated neighboring `0x43f300` success-side
+// helper subset after the world/character arrays are built.
+// Current source now keeps these gated consequences explicit:
+// - `0x441260 = AuthBootstrap680_StoreField114AndTimestamp118`
+// - owner vtable `+0x150` fed from `0x43d480 = AuthBootstrap680_CopyReplyString54`
+// - `0x441170 = AuthBootstrap680_CopyOpaqueReplyBlobs108_10c`
+// The exact semantics of the two copied blob families are still only provisionally mapped in
+// source to the parsed auth-signature and encrypted-private-exponent byte vectors.
+void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold(
+    CLTLoginMediator& mediator,
+    const mxo::auth::AuthReply& reply) {
+    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    AuthBootstrap680ChildSidecarState& sidecar = MutableAuthBootstrap680ChildSidecar(&mediator);
+
+    child.field114 = reply.unknown3;
+    child.field118 = static_cast<uint32_t>(std::time(nullptr));
+
+    if (!reply.username.text.empty()) {
+        mediator.SetLaunchPadSourceBlock94FirstString(reply.username.text.c_str());
+    }
+
+    sidecar.opaqueReplyBlob108 = reply.authSignatureBytes;
+    sidecar.opaqueReplyBlob10C = reply.encryptedPrivateExponentBytes;
+    PointOpaqueBlobPointerAtOwnedBytes(child.opaqueReplyBlob108, sidecar.opaqueReplyBlob108);
+    PointOpaqueBlobPointerAtOwnedBytes(child.opaqueReplyBlob10C, sidecar.opaqueReplyBlob10C);
+
+    spdlog::info(
+        "AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold childField114=0x{:08x} childField118=0x{:08x} ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={}",
+        static_cast<unsigned>(child.field114),
+        static_cast<unsigned>(child.field118),
+        mediator.authBootstrapSource38_.inlineString00[0] != '\0'
+            ? mediator.authBootstrapSource38_.inlineString00.data()
+            : "<empty>",
+        static_cast<unsigned>(sidecar.opaqueReplyBlob108.size()),
+        static_cast<unsigned>(sidecar.opaqueReplyBlob10C.size()),
+        fmt::ptr(child.opaqueReplyBlob108),
+        fmt::ptr(child.opaqueReplyBlob10C));
 }
 
 }  // namespace mxo::ltlogin

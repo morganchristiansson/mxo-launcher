@@ -262,6 +262,8 @@ struct AuthReply {
     uint32_t errorCode;
     uint32_t zeroDword;
     uint16_t trailingWord;
+    uint16_t successHeaderUnknownWord05;
+    uint32_t successHeaderUnknownDword07;
     uint16_t offsetAuthData;
     uint16_t offsetEncryptedData;
     uint32_t unknown2;
@@ -290,6 +292,8 @@ struct AuthReply {
           errorCode(0),
           zeroDword(0),
           trailingWord(0),
+          successHeaderUnknownWord05(0),
+          successHeaderUnknownDword07(0),
           offsetAuthData(0),
           offsetEncryptedData(0),
           unknown2(0),

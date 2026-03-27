@@ -6,6 +6,9 @@
 namespace mxo::ltlogin {
 namespace {
 
+// UNANCHORED: source-owned registered-state lookup helper used by the current state2 auth-result
+// switch mirror. Original `0x43f300` resolves helper transitions by calling back into the owner
+// instead of using a local phase-code table like this.
 CLTLoginState* LookupRegisteredScaffoldStateByPhaseCode(CLTLoginMediator* mediator, uint32_t phaseCode) {
     if (!mediator) {
         return nullptr;
@@ -150,15 +153,26 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
 
     switch (childResult) {
         case kAuthBootstrap680InboundAuthReplySuccess: {
+            AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessPregateScaffold(
+                *mediator,
+                mediator->lastAuthReply_);
             mediator->ResetMarginBootstrapState();
             mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(mediator->lastAuthReply_);
-            mediator->AdoptAuthReplyIntoRecoveredMediatorState();
             mediator->LogParsedAuthReply(mediator->lastAuthReply_);
+            if (AuthBootstrap680Ops::ConsumeState2AuthReplySuccessOneTimeGateScaffold(*mediator)) {
+                mediator->AdoptAuthReplyIntoRecoveredMediatorState();
+                AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold(
+                    *mediator,
+                    mediator->lastAuthReply_);
+                mediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
+                mediator->PostEventScaffold(6u);
+            }
             mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
 
-            // Current source keeps the broader one-time `PostEvent(6)` / neighboring helper calls
-            // explicit as still incomplete, but mirrors the decisive cached-upstream switch and
-            // later `PostEvent(5)` continuation.
+            // Current source now mirrors the pre-gate `0x441330` subset plus the gated one-time
+            // `0x441260 / 0x41e760 / PostEvent(6) / owner+0x150 / 0x441170` subset.
+            // Remaining uncertainty here is mostly on exact field/blob semantics, not on the
+            // existence of those side effects.
             uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
             if (nextHelperStateId == 0u || nextHelperStateId == 0x10u) {
                 nextHelperStateId = 3u;

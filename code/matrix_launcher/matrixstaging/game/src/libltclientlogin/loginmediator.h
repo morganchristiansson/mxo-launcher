@@ -1284,6 +1284,7 @@ private:
     void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
     void MirrorProcessLoginCredentialsSourceBlock120(const ProcessLoginCredentialsInputSketch& input);
     void AdoptAuthReplyIntoRecoveredMediatorState();
+    void PersistCharactersIniFromRecoveredAuthStateScaffold() const;
 
     uint32_t SendMarginFramedPacket(
         const mxo::auth::FramedPacket& packet,

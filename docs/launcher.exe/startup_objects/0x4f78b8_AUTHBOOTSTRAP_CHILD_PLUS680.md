@@ -176,6 +176,34 @@ That copied block is the important later exposure root:
 - `+0xf4 + 0x85`
 - `+0xf4 + 0xa8`
 
+Important neighboring-success restraint:
+- child `+0xf8` and byte `+0x104` are **not** written by `0x448140` itself
+- those are instead updated later by the surrounding `0x43f300` success branch through helper
+  `0x441330 = AuthBootstrap680_SetPromptPasswordF8AndSecurIdFlag`
+  - copy owner `+0x94 + 0x20` into child `+0xf8`
+  - detect the concrete slash+6-digit SecurID tail shape
+  - set child `+0x104` from that test
+  - strip that trailing `/dddddd` suffix from child `+0xf8` when present
+- the same `0x43f300` neighboring success cluster also refreshes owner `+0x94 + 0x00`
+  through owner vtable `+0x150` from `0x43d480 = AuthBootstrap680_CopyReplyString54`
+- current source now mirrors that narrower subset with the original split kept explicit:
+  - pre-gate `0x441330 = AuthBootstrap680_SetPromptPasswordF8AndSecurIdFlag`
+    - child `+0xf8`
+    - child `+0x104`
+    - child `+0x110` from the parsed success-header dword at payload offset `0x07`
+  - gated once on the surrounding state2 success path
+    - broader owner `+0xd84/+0x688/+0x818` materialization
+    - child `+0x114/+0x118` through `0x441260 = AuthBootstrap680_StoreField114AndTimestamp118`
+    - owner `+0x94 + 0x00`
+    - one-time `PostEvent(6)`
+    - `Profiles/<username>/characters.ini` write from the rebuilt slot/route tables
+    - child `+0x108/+0x10c` through `0x441170 = AuthBootstrap680_CopyOpaqueReplyBlobs108_10c`
+- current strongest replacement-side candidate maps those two opaque copied blob families to:
+  - parsed auth-signature bytes
+  - parsed encrypted-private-exponent bytes
+  but keep that specific blob-to-field pairing provisional until stronger same-object proof lands
+- current remaining uncertainty is mainly the exact meaning of those copied reply fields/blobs, not whether the side effects exist
+
 ## Arg6-facing consequences
 
 The broad arg6 doc should only keep the interface-facing consequence, but the child lifecycle is:

@@ -227,6 +227,8 @@ bool ParseAuthReplyPayload(
         return true;
     }
 
+    reply.successHeaderUnknownWord05 = ReadU16LE(payloadBytes + 5u);
+    reply.successHeaderUnknownDword07 = ReadU32LE(payloadBytes + 7u);
     reply.offsetAuthData = ReadU16LE(payloadBytes + 11u);
     reply.offsetEncryptedData = ReadU16LE(payloadBytes + 13u);
     reply.unknown2 = ReadU32LE(payloadBytes + 15u);

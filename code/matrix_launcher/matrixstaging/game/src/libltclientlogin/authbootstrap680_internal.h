@@ -105,11 +105,11 @@ struct AuthBootstrap680ChildSketch {
     void* field100 = nullptr;                    // original child `+0x100`
     uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; surfaced by owner vtable `+0x58 / 0x41f390`
     std::array<uint8_t, 3> padding105{};         // original child `+0x105 .. +0x107`
-    uint32_t field108 = 0;                       // original child `+0x108`
-    uint32_t field10C = 0;                       // original child `+0x10c`
-    uint32_t field110 = 0;                       // original child `+0x110`
-    uint32_t field114 = 0;                       // original child `+0x114`
-    uint32_t field118 = 0;                       // original child `+0x118`
+    void* opaqueReplyBlob108 = nullptr;          // original child `+0x108`; copied by `0x441170` from one opaque raw-`0x0b` parse-object blob family
+    void* opaqueReplyBlob10C = nullptr;          // original child `+0x10c`; copied by `0x441170` from a second opaque raw-`0x0b` parse-object blob family
+    uint32_t field110 = 0;                       // original child `+0x110`; `0x43f300` writes it from raw-`0x0b` parse inner +0x07 before the one-time success gate
+    uint32_t field114 = 0;                       // original child `+0x114`; `0x441260` writes it from raw-`0x0b` parse inner +0x15 inside the one-time success gate
+    uint32_t field118 = 0;                       // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
 };
 
 enum AuthBootstrap680InboundAuthResult : uint32_t {
@@ -152,6 +152,13 @@ struct AuthBootstrap680Ops {
         CLTLoginMediator& mediator,
         const mxo::auth::AuthChallengeResponseBuildResult& buildResult);
     static void SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
+        CLTLoginMediator& mediator,
+        const mxo::auth::AuthReply& reply);
+    static void SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessPregateScaffold(
+        CLTLoginMediator& mediator,
+        const mxo::auth::AuthReply& reply);
+    static bool ConsumeState2AuthReplySuccessOneTimeGateScaffold(CLTLoginMediator& mediator);
+    static void SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold(
         CLTLoginMediator& mediator,
         const mxo::auth::AuthReply& reply);
 };

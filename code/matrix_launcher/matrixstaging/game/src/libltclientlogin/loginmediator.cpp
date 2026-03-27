@@ -630,11 +630,15 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
 
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
     const char* authPassword = Arg6AuthPassword();
+    const char* bootstrapPassword = authBootstrapChild680_.stringF8.begin;
+    const char* effectivePassword =
+        (bootstrapPassword && bootstrapPassword[0] != '\0') ? bootstrapPassword : authPassword;
     spdlog::info(
-        "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {}",
+        "CLTLoginMediator::GetCrashReporterPassword60(+0x60 chainedValueToken={}) -> {} [source={}]",
         fmt::ptr(chainedValueToken),
-        MaskedSensitiveValue(authPassword));
-    return authPassword;
+        MaskedSensitiveValue(effectivePassword),
+        (bootstrapPassword && bootstrapPassword[0] != '\0') ? "owner+0x680+0xf8" : "arg6-auth-password");
+    return effectivePassword;
 }
 
 uint32_t CLTLoginMediator::HasLiveHlCfg68() const {
@@ -2889,6 +2893,50 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
             postAuthMarginLoadingState_.sourceField12c = static_cast<uint32_t>(matchedWorldIndex);
         }
     }
+}
+
+// anchor: launcher.exe:0x41e760
+void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() const {
+    const char* profileName = authUsername_.empty() ? Arg6AuthName() : authUsername_.c_str();
+    if (!profileName || profileName[0] == '\0') {
+        spdlog::info(
+            "CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold skipped (no auth/profile name available for Profiles/<name>/characters.ini)");
+        return;
+    }
+
+    std::string outputPath = "Profiles/";
+    outputPath += profileName;
+    outputPath += "/characters.ini";
+
+    FILE* file = std::fopen(outputPath.c_str(), "wb");
+    if (!file) {
+        spdlog::info(
+            "CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold could not open '{}' for write",
+            outputPath);
+        return;
+    }
+
+    std::fputs("[Characters]\n", file);
+    uint32_t persistedCount = 0u;
+    for (size_t i = 0; i < slotRecordCount684_ && i < slotRecords688_.size(); ++i) {
+        if (!slotRecordValid688_[i]) {
+            continue;
+        }
+
+        const SlotRecordState004b5328& slotRecord = slotRecords688_[i];
+        const RouteHostStringTripleState& route = routeHostStrings818_[i];
+        const char* characterName = slotRecord.heapString14.empty() ? "" : slotRecord.heapString14.c_str();
+        const char* routeText = route.text.empty() ? "" : route.text.c_str();
+        std::fprintf(file, "Character%u:=%s,%s\n", static_cast<unsigned>(i), characterName, routeText);
+        ++persistedCount;
+    }
+    std::fclose(file);
+
+    spdlog::info(
+        "CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold wrote '{}' characterCount={} currentIndex=0x{:02x}",
+        outputPath,
+        persistedCount,
+        static_cast<unsigned>(postAuthMarginLoadingState_.characterRouteIndexCc8));
 }
 
 void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {

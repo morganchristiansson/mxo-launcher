@@ -42,7 +42,7 @@ narrow auth regression specifically requires it.
     - opcode/text helpers and packet parse helpers
     - current address anchors:
       - `0x4401a0` later auth-reply owner handler
-      - `0x43a330` auth-reply parse helper object
+      - `0x43a330 = State10AuthReplyParseObject_InitFromIncomingPacket`
       - `0x41bc20` opcode read helper
   - `matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp`
     - auth/session-key crypto and outbound packet builders

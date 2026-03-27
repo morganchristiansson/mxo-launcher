@@ -246,7 +246,7 @@ Client-side mirrored surface:
 
 Important implication for the replacement launcher:
 - the current implementation already propagates username strongly enough that downstream crashreporter args can show `morgan`
-- newer implementation cleanup now also wires mediator `+0x60` from explicit auth-password state while preserving the caller-clean wrapper shape and masking password values in logs
+- newer implementation cleanup now keeps the caller-clean wrapper shape but prefers bootstrap child `+0xf8` for mediator `+0x60` once the early auth-success path has populated it; current fallback remains the explicit auth-password state when that child string is still absent
 - the highest-value current reconstruction target became the mediator-backed **password** path corresponding to original launcher `+0x60 -> 0x42ee80 -> 0x4d7424`, not only the already-studied early client `+0x58/+0x60/+0x5c` chain at `0x62001325..0x62001362`
 
 Historical runtime validation with a disposable test credential confirmed that this password path was materially working on the earlier init-success path.
