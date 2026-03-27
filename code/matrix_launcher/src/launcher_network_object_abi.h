@@ -9,3 +9,7 @@ class CLTThreadPerClientTCPEngine;
 // launcher-side surfaces resolve the real engine instead of reinterpreting the arg5 stub pointer as
 // a `CLTThreadPerClientTCPEngine*`.
 mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetLauncherObjectEngine(void* ownerPtr);
+
+// Launcher-object queue/state helpers used by the mediator-owned auth bridge.
+bool DiagnosticLauncherObjectPushQueue0C(void* ownerPtr, uint32_t value0, uint32_t value1);
+void DiagnosticLauncherObjectSyncSidecarState(void* ownerPtr);

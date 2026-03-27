@@ -20,6 +20,25 @@ class CLTLoginState;
 class CLTLoginState_State10;
 class CLTLoginState_AuthenticatePending;
 class CLTLoginState_WorldListPending;
+class CLTLoginMediator;
+
+// Launcher-owned arg5/auth bridge scaffolds now live with the mediator source.
+struct CLTLoginMediatorQueuedWorkItemScaffold {
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader header;
+    uint32_t workPayload;
+    const char* debugLabel;
+};
+
+struct CLTLoginMediatorConnectionContextScaffold {
+    void** vtable;
+    unsigned char autoReleaseFlag;
+    unsigned char padding05[3];
+    mxo::liblttcp::CMessageConnection* sidecarConnection;
+    const char* debugLabel;
+    CLTLoginMediator* mediator;
+    bool isMarginConnection;
+    bool peerCloseQueued;
+};
 
 // Reimplementation note:
 // This file is intended to mirror the concrete launcher-side login/controller structure
@@ -933,6 +952,18 @@ public:
     // - preserves the state4-owned `0x439300` case split instead of open-coding it in diagnostics
     // - dispatches the registered state4 slot 3 against the current helper as upstream input
     uint32_t BeginMarginConnectionViaState4Scaffold();
+    // Launcher-owned arg5/auth bridge migration:
+    // - keep the queued work-item/context scaffolds on `CLTLoginMediator`
+    // - keep arg5 queue pushes in the launcher-object ABI shell
+    // - let diagnostics entrypoints stay thin wrappers instead of owning a second controller
+    void ResetLauncherConnectionBridgeScaffold();
+    void BindLauncherConnectionBridgeScaffold(
+        void* launcherOwner,
+        mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
+    bool CanBeginLauncherAuthConnectionScaffold() const;
+    uint32_t BeginLauncherAuthConnectionScaffold();
+    uint32_t BeginLauncherMarginConnectionScaffold();
+    void PollLauncherConnectionBridgeScaffold();
     // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
     // `0x41b450` on the early auth path. Keep this narrow instead of changing the generic
     // switch scaffold until more of the broader helper transition surface is source-owned.
@@ -1333,6 +1364,15 @@ private:
     mxo::liblttcp::CMessageConnection* EnsureAuthConnectionObject();
     mxo::liblttcp::CMessageConnection* EnsureMarginConnectionObject();
     uint32_t ContinueRecordedAuthConnectStatusScaffold();
+    CLTLoginMediatorConnectionContextScaffold* EnsureLauncherConnectionContextScaffold(
+        CLTLoginMediatorConnectionContextScaffold** slot,
+        const char* label,
+        bool isMarginConnection);
+    bool EnqueueLauncherConnectionStatusWorkItemScaffold(
+        CLTLoginMediatorConnectionContextScaffold* context,
+        uint32_t workType,
+        uint32_t workPayload,
+        const char* label);
 
     // Condensed `0x4f78b8` owner sketch for the active branch:
     // - `+0x10` = current helper/state object
@@ -1390,6 +1430,9 @@ private:
     bool marginConnectionOwnedByMediator_ = false;
     void* authConnectionContextKey_;
     void* marginConnectionContextKey_;
+    void* launcherOwnerConnectionBridgeScaffold_ = nullptr;
+    CLTLoginMediatorConnectionContextScaffold* authConnectionContextScaffold_ = nullptr;
+    CLTLoginMediatorConnectionContextScaffold* marginConnectionContextScaffold_ = nullptr;
 
     ConnectionHelperFamily helpers_;
     MarginRouteState marginRouteState_;

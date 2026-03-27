@@ -31,7 +31,6 @@ COMMON_AUTH_OBJS = \
 LAUNCHER_OBJS = \
 	$(BUILD_DIR)/src/resurrections.o \
 	$(BUILD_DIR)/src/diagnostics.o \
-	$(BUILD_DIR)/src/diagnostics_auth.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/launchercommandline.o \
 	$(BUILD_DIR)/src/launcher_mediator_abi.o \
 	$(BUILD_DIR)/src/launcher_network_object_abi.o \

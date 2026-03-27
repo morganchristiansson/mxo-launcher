@@ -1,6 +1,7 @@
 #include "diagnostics.h"
-#include "diagnostics_auth.h"
+#include "launcher_mediator_abi_shared.h"
 #include "launcher_network_object_abi.h"
+#include "loginmediator.h"
 #include "../matrixstaging/runtime/src/libltmessaging/messageconnection.h"
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
@@ -9,7 +10,7 @@
 #include <cstring>
 #include <spdlog/spdlog.h>
 
-static void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
+static void LogLauncherObjectPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
         spdlog::debug("{}: <null>", label ? label : "PointerWords");
         return;
@@ -200,14 +201,14 @@ static bool DiagnosticEnqueueCompletedOperation(
     return pushed;
 }
 
-// UNANCHORED: auth-side diagnostics bridge into the replacement arg5 queue0C scaffold.
-bool DiagnosticAuthBridgePushQueue0C(void* ownerPtr, uint32_t value0, uint32_t value1) {
+// UNANCHORED: mediator-owned launcher bridge helper into the replacement arg5 queue0C scaffold.
+bool DiagnosticLauncherObjectPushQueue0C(void* ownerPtr, uint32_t value0, uint32_t value1) {
     MinimalLauncherObjectStub* owner = static_cast<MinimalLauncherObjectStub*>(ownerPtr);
-    return DiagnosticEnqueueCompletedOperation(owner, value0, value1, /*useQueue34=*/false, "auth-bridge");
+    return DiagnosticEnqueueCompletedOperation(owner, value0, value1, /*useQueue34=*/false, "launcher-bridge");
 }
 
-// UNANCHORED: auth-side diagnostics bridge for refreshing replacement arg5 sidecar state.
-void DiagnosticAuthBridgeSyncOwnerState(void* ownerPtr) {
+// UNANCHORED: mediator-owned helper for refreshing replacement arg5 sidecar state.
+void DiagnosticLauncherObjectSyncSidecarState(void* ownerPtr) {
     DiagnosticSyncLauncherObjectSidecarState(static_cast<MinimalLauncherObjectStub*>(ownerPtr));
 }
 
@@ -217,7 +218,9 @@ static void DiagnosticClearLttcpBinding(MinimalLauncherObjectStub* owner) {
         return;
     }
 
-    DiagnosticAuthResetState();
+    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+        mediator->ResetLauncherConnectionBridgeScaffold();
+    }
     delete g_DiagnosticLttcpBinding;
     g_DiagnosticLttcpBinding = NULL;
 }
@@ -236,12 +239,16 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
     }
 
     if (g_DiagnosticLttcpBinding->Owner() != owner) {
-        DiagnosticAuthResetState();
+        if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+            mediator->ResetLauncherConnectionBridgeScaffold();
+        }
         if (!g_DiagnosticLttcpBinding->Bind(owner)) {
             spdlog::info("DIAGNOSTIC: failed to bind CLTThreadPerClientTCPEngine sidecar for {}", fmt::ptr(owner));
             return NULL;
         }
-        DiagnosticAuthInitializeForEngine(owner, g_DiagnosticLttcpBinding->Engine());
+        if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+            mediator->BindLauncherConnectionBridgeScaffold(owner, g_DiagnosticLttcpBinding->Engine());
+        }
         spdlog::info("DIAGNOSTIC: created CLTThreadPerClientTCPEngine sidecar for launcher object {}", fmt::ptr(owner));
     }
 
@@ -595,7 +602,7 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
         fmt::ptr(eventHandle),
         (long)result,
         (unsigned)g_LauncherObjectBuildState.subobject5CSlot0CallCount);
-    LogPointerWords("LauncherObject subobject5C self", self, 8);
+    LogLauncherObjectPointerWords("LauncherObject subobject5C self", self, 8);
     return result ? 0u : 1u;
 }
 
@@ -632,7 +639,7 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
         waitResult,
         result,
         g_LauncherObjectBuildState.subobject5CSlot1CallCount);
-    LogPointerWords("LauncherObject subobject5C self", self, 8);
+    LogLauncherObjectPointerWords("LauncherObject subobject5C self", self, 8);
     return result;
 }
 
@@ -645,7 +652,9 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
         EnterCriticalSection(crit);
     }
     MinimalLauncherObjectStub* owner = DiagnosticLauncherObjectFromHelper(self, 0x60);
-    DiagnosticAuthPollLiveConnectionTraffic(owner);
+    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+        mediator->PollLauncherConnectionBridgeScaffold();
+    }
     const uint32_t count = g_LauncherObjectBuildState.subobject60Slot0CallCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
         spdlog::debug(
@@ -653,7 +662,7 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
             fmt::ptr(self),
             fmt::ptr(crit),
             count);
-        LogPointerWords("LauncherObject subobject60 self", self, 4);
+        LogLauncherObjectPointerWords("LauncherObject subobject60 self", self, 4);
         DiagnosticLogLauncherRuntimeQueueState(
             "sub60.enter",
             owner,
@@ -677,7 +686,7 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self) {
             fmt::ptr(self),
             fmt::ptr(crit),
             count);
-        LogPointerWords("LauncherObject subobject60 self", self, 4);
+        LogLauncherObjectPointerWords("LauncherObject subobject60 self", self, 4);
         DiagnosticLogLauncherRuntimeQueueState(
             "sub60.leave",
             DiagnosticLauncherObjectFromHelper(self, 0x60),
@@ -699,7 +708,7 @@ static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self) {
         fmt::ptr(self),
         fmt::ptr(crit),
         g_LauncherObjectBuildState.subobject98Slot0CallCount);
-    LogPointerWords("LauncherObject subobject98 self", self, 4);
+    LogLauncherObjectPointerWords("LauncherObject subobject98 self", self, 4);
     return 0;
 }
 
@@ -716,7 +725,7 @@ static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self) {
         fmt::ptr(self),
         fmt::ptr(crit),
         g_LauncherObjectBuildState.subobject98Slot1CallCount);
-    LogPointerWords("LauncherObject subobject98 self", self, 4);
+    LogLauncherObjectPointerWords("LauncherObject subobject98 self", self, 4);
     return 0;
 }
 
@@ -834,11 +843,11 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
         g_LauncherObjectBuildState.buildGeneration);
     spdlog::info(
         "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x0c/+0x34 faithful queue skeletons initialized +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to faithful placeholders, full primary 13-slot vtable surface now exposed; slot5 models the proven empty-list80 miss path and slot10 matches the original zero-return stub");
-    LogPointerWords("LauncherObject self", object, 8);
-    LogPointerWords("LauncherObject queue0C", &object->queue0C, 8);
-    LogPointerWords("LauncherObject queue34", &object->queue34, 8);
-    LogPointerWords("LauncherObject +0x80 list", object->list80, 4);
-    LogPointerWords("LauncherObject +0x8c list", object->list8C, 4);
+    LogLauncherObjectPointerWords("LauncherObject self", object, 8);
+    LogLauncherObjectPointerWords("LauncherObject queue0C", &object->queue0C, 8);
+    LogLauncherObjectPointerWords("LauncherObject queue34", &object->queue34, 8);
+    LogLauncherObjectPointerWords("LauncherObject +0x80 list", object->list80, 4);
+    LogLauncherObjectPointerWords("LauncherObject +0x8c list", object->list8C, 4);
 
     return object;
 }

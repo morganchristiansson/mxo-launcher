@@ -382,15 +382,80 @@ CLTLoginMediator::CLTLoginMediator()
 }
 
 CLTLoginMediator::~CLTLoginMediator() {
+    ResetLauncherConnectionBridgeScaffold();
+    EraseMarginBootstrapState(this);
+    AuthBootstrap680Ops::EraseSidecar(this);
+}
+
+void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
+    if (authConnectionContextScaffold_) {
+        std::free(authConnectionContextScaffold_);
+        authConnectionContextScaffold_ = nullptr;
+    }
+    if (marginConnectionContextScaffold_) {
+        std::free(marginConnectionContextScaffold_);
+        marginConnectionContextScaffold_ = nullptr;
+    }
+
+    SetCurrentState(nullptr);
+    SetAuthConnectionContextKey(nullptr);
+    SetMarginConnectionContextKey(nullptr);
+    SetNetworkEngine(nullptr);
     UnregisterActiveStateSourceScaffold(this);
+
     if (authConnectionOwnedByMediator_) {
         delete authConnection_;
     }
     if (marginConnectionOwnedByMediator_) {
         delete marginConnection_;
     }
-    EraseMarginBootstrapState(this);
-    AuthBootstrap680Ops::EraseSidecar(this);
+
+    authConnection_ = nullptr;
+    marginConnection_ = nullptr;
+    authConnectionOwnedByMediator_ = false;
+    marginConnectionOwnedByMediator_ = false;
+    launcherOwnerConnectionBridgeScaffold_ = nullptr;
+
+    spdlog::info("CLTLoginMediator::ResetLauncherConnectionBridgeScaffold completed");
+}
+
+void CLTLoginMediator::PollLauncherConnectionBridgeScaffold() {
+    if (!launcherOwnerConnectionBridgeScaffold_) {
+        return;
+    }
+
+    auto tryPoll = [this](CLTLoginMediatorConnectionContextScaffold* context, const char* label) {
+        if (!context || !context->sidecarConnection) {
+            return;
+        }
+
+        const int received = context->sidecarConnection->PollReceiveNonBlocking();
+        if (received > 0) {
+            EnqueueLauncherConnectionStatusWorkItemScaffold(
+                context,
+                /*workType=*/3u,
+                /*workPayload=*/static_cast<uint32_t>(received),
+                label);
+            return;
+        }
+
+        if (received < 0 && !context->peerCloseQueued) {
+            context->peerCloseQueued = true;
+            spdlog::info(
+                "CLTLoginMediator::PollLauncherConnectionBridgeScaffold queued peer-close label='{}' context={} connection={}",
+                (context->debugLabel && context->debugLabel[0]) ? context->debugLabel : "<null>",
+                fmt::ptr(context),
+                fmt::ptr(context->sidecarConnection));
+            EnqueueLauncherConnectionStatusWorkItemScaffold(
+                context,
+                /*workType=*/1u,
+                /*workPayload=*/0u,
+                context->isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed");
+        }
+    };
+
+    tryPoll(authConnectionContextScaffold_, "AuthReceivePacket");
+    tryPoll(marginConnectionContextScaffold_, "MarginReceivePacket");
 }
 
 // +0x00

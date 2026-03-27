@@ -1439,6 +1439,101 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     return true;
 }
 
+void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* authPassword) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        spdlog::info("DIAGNOSTIC: auth credential configure skipped (no installed CLTLoginMediator)");
+        return;
+    }
+
+    mediator->SetAuthCredentials(authName, authPassword);
+}
+
+void DiagnosticConfigureLoginControllerNetwork(
+    const char* authDnsName,
+    uint16_t authPortHostOrder,
+    bool ignoreHostsFileForAuth,
+    const char* marginDnsSuffix,
+    uint16_t marginPortHostOrder,
+    bool ignoreHostsFileForMargin,
+    const char* marginRouteHostPrefix,
+    const char* exactMarginHostName) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        spdlog::info("DIAGNOSTIC: login controller network configure skipped (no installed CLTLoginMediator)");
+        return;
+    }
+
+    mediator->SetAuthServerConfig(
+        authDnsName,
+        authPortHostOrder,
+        ignoreHostsFileForAuth);
+    mediator->SetMarginServerConfig(
+        marginDnsSuffix,
+        marginPortHostOrder,
+        ignoreHostsFileForMargin);
+    mediator->SetMarginRouteHostPrefix(marginRouteHostPrefix);
+    mediator->SetExactMarginHostName(exactMarginHostName);
+    spdlog::info(
+        "DIAGNOSTIC: login controller network configured auth='{}' port={} marginSuffix='{}' marginPort={} marginRoutePrefix='{}' exactMarginHost='{}' ignoreAuthHosts={} ignoreMarginHosts={}",
+        authDnsName && authDnsName[0] ? authDnsName : "<empty>",
+        (unsigned)authPortHostOrder,
+        marginDnsSuffix && marginDnsSuffix[0] ? marginDnsSuffix : "<empty>",
+        (unsigned)marginPortHostOrder,
+        marginRouteHostPrefix && marginRouteHostPrefix[0] ? marginRouteHostPrefix : "<empty>",
+        exactMarginHostName && exactMarginHostName[0] ? exactMarginHostName : "<empty>",
+        ignoreHostsFileForAuth ? 1u : 0u,
+        ignoreHostsFileForMargin ? 1u : 0u);
+}
+
+void DiagnosticConfigureLoginControllerCharacterSeed(
+    const char* characterName,
+    const char* gameSessionId,
+    uint32_t selectedWorldIndexLow24) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        spdlog::info("DIAGNOSTIC: login-controller character seed configure skipped (no installed CLTLoginMediator)");
+        return;
+    }
+
+    const uint32_t normalizedWorldIndex = selectedWorldIndexLow24 & 0x00ffffffu;
+    const uint32_t seedResult =
+        mediator->MirrorCharacterSeedIntoSourceBlock120Scaffold(characterName, normalizedWorldIndex);
+    if (gameSessionId && gameSessionId[0]) {
+        mediator->SetGameSessionId664(gameSessionId);
+    }
+
+    spdlog::info(
+        "DIAGNOSTIC: login-controller character seed configured character='{}' session='{}' selectedWorldIndexLow24=0x{:06x} mirrorResult=0x{:08x} (mirror-only source-block seed; original upstream producer still unresolved)",
+        (characterName && characterName[0]) ? characterName : "<empty>",
+        (gameSessionId && gameSessionId[0]) ? gameSessionId : "<empty>",
+        static_cast<unsigned>(normalizedWorldIndex),
+        static_cast<unsigned>(seedResult));
+}
+
+bool DiagnosticCanBeginAuthConnection() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->CanBeginLauncherAuthConnectionScaffold() : false;
+}
+
+uint32_t DiagnosticBeginAuthConnection() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        spdlog::info("DIAGNOSTIC: installed CLTLoginMediator unavailable for auth connection");
+        return 0u;
+    }
+    return mediator->BeginLauncherAuthConnectionScaffold();
+}
+
+uint32_t DiagnosticBeginMarginConnection() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        spdlog::info("DIAGNOSTIC: installed CLTLoginMediator unavailable for margin connection");
+        return 0u;
+    }
+    return mediator->BeginLauncherMarginConnectionScaffold();
+}
+
 // UNANCHORED: diagnostic profile/session-name configurator for arg6.
 void DiagnosticConfigureMediatorProfileName(const char* profileName) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
