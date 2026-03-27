@@ -31,7 +31,6 @@ namespace mxo::liblttcp {
 // ============================================================
 CMessageConnection::CMessageConnection()
     : CLTTCPConnection(),
-      engine_(nullptr),
       packetNameFamilyScaffold_(CMessageConnectionPacketNameFamilyScaffold::kUnknown),
       packetizedMessagesEnabledScaffold_(false),
       packetAgendaScaffold_() {}
@@ -42,10 +41,11 @@ CMessageConnection::CMessageConnection()
 // ============================================================
 CMessageConnection::CMessageConnection(CLTThreadPerClientTCPEngine* engine)
     : CLTTCPConnection(),
-      engine_(engine),
       packetNameFamilyScaffold_(CMessageConnectionPacketNameFamilyScaffold::kUnknown),
       packetizedMessagesEnabledScaffold_(false),
-      packetAgendaScaffold_() {}
+      packetAgendaScaffold_() {
+    CLTTCPConnection::SetEngine(engine);
+}
 
 // ============================================================
 // FAITHFUL: VTable 0x004aff10 - Destructor at 0x00449d20
@@ -58,7 +58,7 @@ CMessageConnection::~CMessageConnection() = default;
 // Placeholder entry point for engine management
 // ============================================================
 void CMessageConnection::SetEngine(CLTThreadPerClientTCPEngine* engine) {
-    engine_ = engine;
+    CLTTCPConnection::SetEngine(engine);
 }
 
 // ============================================================
@@ -66,7 +66,7 @@ void CMessageConnection::SetEngine(CLTThreadPerClientTCPEngine* engine) {
 // Getter for engine pointer
 // ============================================================
 CLTThreadPerClientTCPEngine* CMessageConnection::Engine() const {
-    return engine_;
+    return CLTTCPConnection::Engine();
 }
 
 void CMessageConnectionMessageScaffold::ResetForPacketBuilderScaffold() {
@@ -228,7 +228,7 @@ bool CMessageConnection::PacketAgendaAllowsEnvelopeScaffold(const CMessageConnec
 }
 
 uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope) {
-    if (!engine_ || !envelope.sharedMessage) {
+    if (!Engine() || !envelope.sharedMessage) {
         return 0u;
     }
 
@@ -259,11 +259,11 @@ uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectio
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return engine_->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), submittedBytes, submittedByteCount, nullptr);
+    return Engine()->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), submittedBytes, submittedByteCount, nullptr);
 }
 
 uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) {
-    if (!engine_ || !envelope.sharedMessage) {
+    if (!Engine() || !envelope.sharedMessage) {
         return 0u;
     }
 
@@ -304,7 +304,7 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
 // Generic fallback handler for unhandled operation codes
 // ============================================================
 uint32_t CMessageConnection::OnOperationCompleted(void* workCode) {
-    if (!engine_) {
+    if (!Engine()) {
         return 0;
     }
 
@@ -320,7 +320,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workCode) {
 // Packet result processing handler
 // ============================================================
 uint32_t CMessageConnection::ProcessPacketResult(const void* packetData, uint32_t byteCount) {
-    if (!engine_ || !packetData) {
+    if (!Engine() || !packetData) {
         return 0;
     }
 
@@ -340,13 +340,13 @@ uint32_t CMessageConnection::ProcessPacketResult(const void* packetData, uint32_
 // - only that lower helper forwards final byte pointer/size into the engine
 // ============================================================
 uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext) {
-    if (!engine_ || !packetData || packetByteCount == 0) {
+    if (!Engine() || !packetData || packetByteCount == 0) {
         return 0;
     }
 
     // Current starter path deliberately routes through the recovered connection-object-based
     // engine surface instead of pretending this is already a faithful packet serializer.
-    return engine_->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), packetData, packetByteCount, completionContext);
+    return Engine()->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), packetData, packetByteCount, completionContext);
 }
 
 // ============================================================
@@ -355,7 +355,7 @@ uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetB
 // Message dispatch result handler
 // ============================================================
 uint32_t CMessageConnection::ProcessDispatchResult(const void* packetData, uint32_t byteCount) {
-    if (!engine_ || !packetData) {
+    if (!Engine() || !packetData) {
         return 0;
     }
 
@@ -369,7 +369,7 @@ uint32_t CMessageConnection::ProcessDispatchResult(const void* packetData, uint3
 // Wrapper for engine Connect method
 // ============================================================
 uint32_t CMessageConnection::EnsureConnected() {
-    if (!engine_) {
+    if (!Engine()) {
         spdlog::debug(
             "CMessageConnection::EnsureConnected failed because engine is null this={} ownerContext={} remoteHost='{}'",
             fmt::ptr(this),
@@ -378,7 +378,7 @@ uint32_t CMessageConnection::EnsureConnected() {
         return 0;
     }
 
-    const uint32_t result = engine_->ConnectConnectionScaffold(static_cast<CLTTCPConnection*>(this));
+    const uint32_t result = CLTTCPConnection::Connect(RemoteEndpoint());
     if (result == 0u) {
         spdlog::debug(
             "CMessageConnection::EnsureConnected connect failed this={} ownerContext={} remoteHost='{}'",

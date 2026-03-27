@@ -1000,6 +1000,10 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
   - endpoint copy at `+0x24`
   - connection state at `+0x34`
   - wait/poll helper at `+0x6c`
+- source lockstep update from the current focused pass:
+  - `matrixstaging/runtime/src/liblttcp/lttcpconnection.*` now owns the corrected base-wrapper mapping directly
+  - `matrixstaging/runtime/src/libltmessaging/messageconnection.*` no longer keeps a duplicate source-only engine pointer separate from the recovered base `+0x10` field
+  - current source `CMessageConnection` wrapper calls now intentionally route through base `CLTTCPConnection` `Connect` / `Close` / `SendBuffer` semantics instead of open-coding a second parallel connection-engine bridge
 
 That newer read also narrows the real engine-call signatures more than the earlier slot-name pass alone:
 - `0x449cd0` does **not** build a raw `(ip, port, context)` call

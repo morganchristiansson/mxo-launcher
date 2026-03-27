@@ -188,8 +188,11 @@ struct CMessageConnectionEnvelopeScaffold {
 
 class CMessageConnection : public CLTTCPConnection {
 public:
+    // anchor: launcher.exe:0x41cf50
     CMessageConnection();
+    // UNANCHORED: source-owned convenience ctor that seeds the recovered base engine field.
     explicit CMessageConnection(CLTThreadPerClientTCPEngine* engine);
+    // anchor: launcher.exe:0x449d20 deleting-wrapper family via CLTTCPConnection base
     ~CMessageConnection();
 
     // UNANCHORED: source-owned compatibility wrapper over the recovered base-connection `+0x10` engine field.
@@ -201,6 +204,7 @@ public:
     // This keeps the connection-object-oriented call site out of diagnostics.cpp.
     uint32_t EnsureConnected();
 
+    // anchor: launcher.exe:0x448cf0
     // string-backed original name: CMessageConnection::SendPacket
     // current best read:
     // - original `0x448cf0` consumes a message/envelope object, not bare payload bytes
@@ -221,11 +225,14 @@ public:
     // So the remaining blocker is no longer best framed as agenda presence alone; the stronger
     // current gap is the richer original message-object content that our scaffold still does not
     // build.
+    // UNANCHORED: source-owned launcher-only bridge for the local envelope builder seam.
     static CMessageConnectionEnvelopeScaffold BuildPacketBuilderEnvelopeScaffold(bool headerless = false);
+    // UNANCHORED: source-owned launcher-only bridge that wraps raw payload bytes in the local envelope scaffold.
     static CMessageConnectionEnvelopeScaffold BuildPayloadEnvelopeScaffold(
         const void* packetData,
         uint32_t packetByteCount,
         bool headerless = false);
+    // UNANCHORED: source-owned launcher-only bridge for the current envelope submit seam.
     uint32_t SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
 
     // anchor: launcher.exe:0x448960
@@ -235,38 +242,42 @@ public:
     void ConfigurePacketNameFamilyScaffold(
         CMessageConnectionPacketNameFamilyScaffold family,
         bool packetizedMessagesEnabled);
+    // UNANCHORED: source-owned accessor for the packet-name family scaffold.
     CMessageConnectionPacketNameFamilyScaffold PacketNameFamilyScaffold() const;
+    // UNANCHORED: source-owned accessor for the packetized-messages enable scaffold byte.
     bool PacketizedMessagesEnabledScaffold() const;
 
     // anchor: launcher.exe:0x448980
     // Narrow source-owned mirror of the lazy packet-agenda object at connection `+0x74`.
     // Current source model keeps only the creation/ownership fact and helper counts explicit.
     void EnsurePacketAgendaScaffold();
+    // UNANCHORED: source-owned accessor for the lazy packet-agenda scaffold pointer.
     const CMessageConnectionPacketAgendaScaffold* PacketAgendaScaffold() const;
 
-    // Pure virtual method required by base class CBaseConnection (slot 5)
-    // ProcessPacketResult at 0x00449a70
+    // anchor: launcher.exe:0x449a70
     uint32_t ProcessPacketResult(const void* packetData, uint32_t byteCount);
 
-   // Override for base class CBaseConnection::OnOperationCompleted(void*) (slot 5)
+    // anchor: launcher.exe:0x448a60
     // string-backed original name: CMessageConnection::OnOperationCompleted
     // current best read:
     // - completion/receive-side bridge back into engine/queue handling
     uint32_t OnOperationCompleted(void* workCode);
 
-    // Placeholder helper to mirror the currently recovered queue producer shape.
+    // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
     void* ContextKey() { return this; }
 
-   // FAITHFUL: VTable 0x004aff1c - ProcessDispatchResult at 0x00449a30
+    // anchor: launcher.exe:0x449a30
     uint32_t ProcessDispatchResult(const void* packetData, uint32_t byteCount);
 
 private:
+    // UNANCHORED: source-owned packet-family name helper for current diagnostics.
     static const char* PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family);
+    // UNANCHORED: source-owned packet-agenda pass/filter scaffold helper.
     bool PacketAgendaAllowsEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) const;
+    // UNANCHORED: source-owned lower submit helper beneath SendPacketEnvelopeScaffold.
     uint32_t SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
 
-    CLTThreadPerClientTCPEngine* engine_;
     CMessageConnectionPacketNameFamilyScaffold packetNameFamilyScaffold_ =
         CMessageConnectionPacketNameFamilyScaffold::kUnknown;
     bool packetizedMessagesEnabledScaffold_ = false;

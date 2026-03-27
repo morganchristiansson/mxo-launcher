@@ -53,6 +53,7 @@ class CBaseConnection {
   // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
   virtual bool IsConnected() const;
 
+  // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
   LTTCPEngineConnectionState State() const {
     return state_;
   }
