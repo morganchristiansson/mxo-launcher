@@ -120,10 +120,10 @@ class CLTThreadPerClientTCPEngine_QueueThread : public CLTThread {
 public:
     // anchor: launcher.exe:0x4365a0
     explicit CLTThreadPerClientTCPEngine_QueueThread(CLTThreadPerClientTCPEngine* owner);
-    // current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
+    // UNANCHORED: current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
     ~CLTThreadPerClientTCPEngine_QueueThread() override;
 
-    // UNANCHORED scaffold accessor for the recovered child +0x38 owner field
+    // UNANCHORED: scaffold accessor for the recovered child +0x38 owner field
     CLTThreadPerClientTCPEngine* Owner() const;
 
 protected:
@@ -147,9 +147,13 @@ public:
     // anchor: launcher.exe:0x431b30 deleting wrapper / +0x40 wakeup helper teardown
     ~CLTThreadPerClientTCPEngine_AcceptThread() override;
 
+    // UNANCHORED: scaffold accessor for recovered child +0x38 owner/context field
     void* OwnerContext() const;
+    // UNANCHORED: scaffold accessor for recovered child +0x3c listening socket field
     uint32_t ListenSocketHandle() const;
+    // UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
     uint32_t WakeupSocketHandle() const;
+    // anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
     void SignalWakeup();
 
 protected:
@@ -176,11 +180,17 @@ public:
     // anchor: launcher.exe:0x431be0 deleting wrapper / +0x40 wakeup helper teardown
     ~CLTThreadPerClientTCPEngine_WorkerThread() override;
 
+    // UNANCHORED: scaffold accessor for recovered child +0x38 context/connection key field
     void* ContextKey() const;
+    // UNANCHORED: scaffold accessor for recovered child +0x3c datagram-mode byte
     bool DatagramMode() const;
+    // UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
     uint32_t WakeupSocketHandle() const;
+    // UNANCHORED: scaffold accessor for recovered child +0x44 exit-request byte
     bool ExitRequested() const;
+    // UNANCHORED: source-owned bridge for the recovered child +0x44 exit-request byte
     void RequestExit();
+    // anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
     void SignalWakeup();
 
 protected:
@@ -237,74 +247,104 @@ public:
     // anchor: launcher.exe:0x40b389..0x40b404 teardown release path; current C++ body remains scaffold-only
     ~CLTThreadPerClientTCPEngine();
 
+    // anchor: launcher.exe:0x4319a0
     int Release(uint32_t flags) override;
+    // anchor: launcher.exe:0x431ce0
     uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) override;
+    // anchor: launcher.exe:0x4325d0
     uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext = nullptr) override;
+    // anchor: launcher.exe:0x436000
     uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ownerContext = nullptr) override;
+    // anchor: launcher.exe:0x42f7c0
     uint32_t Slot4_42F7C0(void* arg1) override;
+    // anchor: launcher.exe:0x431840
     uint32_t UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) override;
+    // anchor: launcher.exe:0x4328a0
     uint32_t Connect(void* contextKey) override;
+    // anchor: launcher.exe:0x42f970
     uint32_t Close(void* contextKey, bool graceful) override;
+    // anchor: launcher.exe:0x42fbd0
     uint32_t SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext = nullptr) override;
+    // anchor: launcher.exe:0x42fd10
     uint32_t Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) override;
+    // anchor: launcher.exe:0x443810
     uint32_t Slot10_443810(void* arg1) override;
+    // anchor: launcher.exe:0x431670
     uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) override;
+    // anchor: launcher.exe:0x4316a0
     uint32_t CleanupConnection(void* contextKey) override;
 
-    // UNANCHORED source-side helpers used by the current connection scaffolding.
+    // UNANCHORED: source-side helper used by the current connection scaffolding.
     uint32_t ConnectResolvedEndpointScaffold(
         uint16_t portHostOrder,
         uint32_t ipv4NetworkOrder,
         void* contextKey,
         void* ownerContext = nullptr);
+    // UNANCHORED: source-side connection-object bridge into ConnectResolvedEndpointScaffold.
     uint32_t ConnectConnectionScaffold(CLTTCPConnection* connection);
+    // UNANCHORED: source-side connection-object bridge into the recovered Close slot family.
     uint32_t CloseConnectionScaffold(CLTTCPConnection* connection, bool graceful);
+    // UNANCHORED: source-side connection-object bridge into the recovered SendBuffer slot family.
     uint32_t SendBufferConnectionScaffold(
         CLTTCPConnection* connection,
         const void* buffer,
         uint32_t byteCount,
         void* completionContext = nullptr);
 
-    // Base queue helpers recovered from:
-    // - 0x436340 = Queue_Init
-    // - 0x436670 / 0x436820 = queue-pair push helpers
-    // Current scaffold uses these helpers as the canonical queue-storage implementation even
-    // while the live arg5 ABI object still owns the runtime-visible queue fields.
+    // anchor: launcher.exe:0x436340
     static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);
+    // anchor: launcher.exe:0x436340
     static bool Queue_Init(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t initialSize);
+    // anchor: launcher.exe:0x436670 / 0x436820
     static bool Queue_PushPair(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t value0, uint32_t value1);
     // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
     static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_Queue* queue);
     // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
     static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_Queue* queue, CLTThreadPerClientTCPEngine_QueuedPair* outPair);
 
-    // UNANCHORED scaffold bridge because the current liblttcp engine lives beside, not inside,
+    // UNANCHORED: scaffold bridge because the current liblttcp engine lives beside, not inside,
     // the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields.
     void AttachExternalQueuePair(
         CLTThreadPerClientTCPEngine_Queue* queue0C,
         CLTThreadPerClientTCPEngine_Queue* queue34);
 
     // anchor: launcher.exe:0x436b10
-    // Current shared consumer-family name recovered from the queue-thread child path.
     void RunCompletedOperationQueue(bool nonBlocking);
 
-    // UNANCHORED scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.
+    // UNANCHORED: scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.
     void RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount);
-    // UNANCHORED scaffold accessor for source-side queue-thread child tracking.
+    // UNANCHORED: scaffold accessor for source-side queue-thread child tracking.
     size_t QueueThreadCount() const;
 
+    // UNANCHORED: starter accessor exposing source-owned monitored-port state.
     const std::vector<AcceptThreadRecord>& MonitoredPorts() const;
+    // UNANCHORED: starter accessor exposing source-owned worker-thread state.
     const std::vector<WorkerThreadRecord>& WorkerThreads() const;
 
+    // UNANCHORED: starter helper keeping connection lookup out of diagnostics.cpp.
     CMessageConnection* FindMessageConnection(void* contextKey);
+    // UNANCHORED: starter helper keeping connection creation out of diagnostics.cpp.
     CMessageConnection* GetOrCreateMessageConnection(void* contextKey);
+    // UNANCHORED: starter helper keeping connection destruction out of diagnostics.cpp.
     bool DropMessageConnection(void* contextKey);
 
 private:
+    // UNANCHORED: starter helper mirroring the recovered endpoint-key shape.
     static LTTCPEndpointKey MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
+    // UNANCHORED: starter helper for the endpoint-keyed +0x80 accept-thread container.
     AcceptThreadRecord* FindMonitoredPort(const LTTCPEndpointKey& key);
+    // UNANCHORED: starter helper for the context-keyed +0x8c worker-thread container.
     WorkerThreadRecord* FindWorker(void* contextKey);
+    // UNANCHORED: source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
+    WorkerThreadRecord* CreateOrReplaceWorkerThreadScaffold(
+        void* contextKey,
+        void* ownerContext,
+        uint32_t socketHandle,
+        LTTCPEngineConnectionState state,
+        bool datagramMode);
+    // UNANCHORED: source-owned teardown helper for recovered AcceptThread-style payloads.
     void StopAcceptThreadScaffold(AcceptThreadRecord* record);
+    // UNANCHORED: source-owned teardown helper for recovered WorkerThread-style payloads.
     void StopWorkerThreadScaffold(WorkerThreadRecord* record);
 
     CLTThreadPerClientTCPEngine_Queue* externalQueue0C_;
@@ -321,25 +361,25 @@ private:
 // recovered liblttcp side.
 class CLTThreadPerClientTCPEngineBinding {
 public:
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     CLTThreadPerClientTCPEngineBinding();
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     ~CLTThreadPerClientTCPEngineBinding();
 
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     bool Bind(void* owner);
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     void Reset();
 
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     void* Owner() const;
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     CLTThreadPerClientTCPEngine* Engine() const;
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     bool HasEngine() const;
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     bool HasMonitoredPorts() const;
-    // UNANCHORED starter binding helper.
+    // UNANCHORED: starter binding helper.
     bool HasWorkerThreads() const;
 
 private:

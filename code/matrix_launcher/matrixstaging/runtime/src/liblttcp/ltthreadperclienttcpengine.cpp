@@ -374,10 +374,10 @@ CLTThreadPerClientTCPEngine_QueueThread::CLTThreadPerClientTCPEngine_QueueThread
     : CLTThread("ILTTCPEngine::QueueThread"),
       owner_(owner) {}
 
-// current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
+// UNANCHORED: current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
 CLTThreadPerClientTCPEngine_QueueThread::~CLTThreadPerClientTCPEngine_QueueThread() = default;
 
-// UNANCHORED scaffold accessor for the recovered child +0x38 owner field
+// UNANCHORED: scaffold accessor for the recovered child +0x38 owner field
 CLTThreadPerClientTCPEngine* CLTThreadPerClientTCPEngine_QueueThread::Owner() const {
     return owner_;
 }
@@ -403,18 +403,22 @@ CLTThreadPerClientTCPEngine_AcceptThread::~CLTThreadPerClientTCPEngine_AcceptThr
     CloseSocketHandle(&wakeupSocketHandle_);
 }
 
+// UNANCHORED: scaffold accessor for recovered child +0x38 owner/context field
 void* CLTThreadPerClientTCPEngine_AcceptThread::OwnerContext() const {
     return ownerContext_;
 }
 
+// UNANCHORED: scaffold accessor for recovered child +0x3c listening socket field
 uint32_t CLTThreadPerClientTCPEngine_AcceptThread::ListenSocketHandle() const {
     return listenSocketHandle_;
 }
 
+// UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
 uint32_t CLTThreadPerClientTCPEngine_AcceptThread::WakeupSocketHandle() const {
     return wakeupSocketHandle_;
 }
 
+// anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
 void CLTThreadPerClientTCPEngine_AcceptThread::SignalWakeup() {
     SignalWakeupSocketHandle(wakeupSocketHandle_);
 }
@@ -440,26 +444,32 @@ CLTThreadPerClientTCPEngine_WorkerThread::~CLTThreadPerClientTCPEngine_WorkerThr
     CloseSocketHandle(&wakeupSocketHandle_);
 }
 
+// UNANCHORED: scaffold accessor for recovered child +0x38 context/connection key field
 void* CLTThreadPerClientTCPEngine_WorkerThread::ContextKey() const {
     return contextKey_;
 }
 
+// UNANCHORED: scaffold accessor for recovered child +0x3c datagram-mode byte
 bool CLTThreadPerClientTCPEngine_WorkerThread::DatagramMode() const {
     return datagramMode_;
 }
 
+// UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
 uint32_t CLTThreadPerClientTCPEngine_WorkerThread::WakeupSocketHandle() const {
     return wakeupSocketHandle_;
 }
 
+// UNANCHORED: scaffold accessor for recovered child +0x44 exit-request byte
 bool CLTThreadPerClientTCPEngine_WorkerThread::ExitRequested() const {
     return exitRequested_;
 }
 
+// UNANCHORED: source-owned bridge for the recovered child +0x44 exit-request byte
 void CLTThreadPerClientTCPEngine_WorkerThread::RequestExit() {
     exitRequested_ = true;
 }
 
+// anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
 void CLTThreadPerClientTCPEngine_WorkerThread::SignalWakeup() {
     SignalWakeupSocketHandle(wakeupSocketHandle_);
 }
@@ -769,37 +779,29 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* 
         return 0;
     }
 
-    (void)record.thread->Start(/*startPriority=*/2);
     monitoredPorts_.push_back(std::move(record));
+    (void)monitoredPorts_.back().thread->Start(/*startPriority=*/2);
     return kResultSuccess;
 }
 
 // anchor: launcher.exe:0x4325d0
 // vtable: launcher.exe:0x004b2768 slot +0x08
 uint32_t CLTThreadPerClientTCPEngine::UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext) {
-    WorkerThreadRecord worker = {};
-    worker.contextKey = contextKey;
-    worker.ownerContext = ownerContext;
-    worker.socketHandle = OpenUdpMonitorSocket(portHostOrder, /*ipv4NetworkOrder=*/0);
-    if (worker.socketHandle == kInvalidSocketHandle) {
+    const uint32_t socketHandle = OpenUdpMonitorSocket(portHostOrder, /*ipv4NetworkOrder=*/0);
+    if (socketHandle == kInvalidSocketHandle) {
         return 0;
     }
 
-    worker.state = LTTCPEngineConnectionState::kUdpMonitorActive;
-    worker.thread = std::make_unique<CLTThreadPerClientTCPEngine_WorkerThread>(
+    WorkerThreadRecord* worker = CreateOrReplaceWorkerThreadScaffold(
         contextKey,
+        ownerContext,
+        socketHandle,
+        LTTCPEngineConnectionState::kUdpMonitorActive,
         /*datagramMode=*/true);
-    if (!worker.thread) {
-        CloseSocketHandle(&worker.socketHandle);
+    if (!worker) {
+        uint32_t socketHandleToClose = socketHandle;
+        CloseSocketHandle(&socketHandleToClose);
         return 0;
-    }
-
-    (void)worker.thread->Start(/*startPriority=*/2);
-    if (WorkerThreadRecord* existing = FindWorker(contextKey)) {
-        StopWorkerThreadScaffold(existing);
-        *existing = std::move(worker);
-    } else {
-        workerThreads_.push_back(std::move(worker));
     }
     return kResultSuccess;
 }
@@ -878,25 +880,16 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
         return 0;
     }
 
-    WorkerThreadRecord worker = {};
-    worker.contextKey = contextKey;
-    worker.ownerContext = ownerContext;
-    worker.socketHandle = static_cast<uint32_t>(sock);
-    worker.state = LTTCPEngineConnectionState::kConnectActive;
-    worker.thread = std::make_unique<CLTThreadPerClientTCPEngine_WorkerThread>(
+    WorkerThreadRecord* worker = CreateOrReplaceWorkerThreadScaffold(
         contextKey,
+        ownerContext,
+        static_cast<uint32_t>(sock),
+        LTTCPEngineConnectionState::kConnectActive,
         /*datagramMode=*/false);
-    if (!worker.thread) {
-        CloseSocketHandle(&worker.socketHandle);
+    if (!worker) {
+        uint32_t socketHandleToClose = static_cast<uint32_t>(sock);
+        CloseSocketHandle(&socketHandleToClose);
         return 0;
-    }
-
-    (void)worker.thread->Start(/*startPriority=*/2);
-    if (WorkerThreadRecord* existing = FindWorker(contextKey)) {
-        StopWorkerThreadScaffold(existing);
-        *existing = std::move(worker);
-    } else {
-        workerThreads_.push_back(std::move(worker));
     }
     return kResultSuccess;
 }
@@ -1213,6 +1206,40 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Fi
     return nullptr;
 }
 
+// UNANCHORED source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
+CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::CreateOrReplaceWorkerThreadScaffold(
+    void* contextKey,
+    void* ownerContext,
+    uint32_t socketHandle,
+    LTTCPEngineConnectionState state,
+    bool datagramMode) {
+    WorkerThreadRecord worker = {};
+    worker.contextKey = contextKey;
+    worker.ownerContext = ownerContext;
+    worker.socketHandle = socketHandle;
+    worker.state = state;
+    worker.thread = std::make_unique<CLTThreadPerClientTCPEngine_WorkerThread>(contextKey, datagramMode);
+    if (!worker.thread) {
+        return nullptr;
+    }
+
+    WorkerThreadRecord* inserted = nullptr;
+    if (WorkerThreadRecord* existing = FindWorker(contextKey)) {
+        StopWorkerThreadScaffold(existing);
+        *existing = std::move(worker);
+        inserted = existing;
+    } else {
+        workerThreads_.push_back(std::move(worker));
+        inserted = workerThreads_.empty() ? nullptr : &workerThreads_.back();
+    }
+
+    if (inserted && inserted->thread) {
+        (void)inserted->thread->Start(/*startPriority=*/2);
+    }
+    return inserted;
+}
+
+// UNANCHORED: source-owned teardown helper for recovered AcceptThread-style payloads.
 void CLTThreadPerClientTCPEngine::StopAcceptThreadScaffold(AcceptThreadRecord* record) {
     if (!record) {
         return;
@@ -1227,6 +1254,7 @@ void CLTThreadPerClientTCPEngine::StopAcceptThreadScaffold(AcceptThreadRecord* r
     CloseSocketHandle(&record->listenSocketHandle);
 }
 
+// UNANCHORED: source-owned teardown helper for recovered WorkerThread-style payloads.
 void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(WorkerThreadRecord* record) {
     if (!record) {
         return;
