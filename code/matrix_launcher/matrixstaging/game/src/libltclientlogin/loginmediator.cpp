@@ -3066,8 +3066,8 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
                 spdlog::info(
                     "CLTLoginMediator::HandleAuthPacketBytes routing AS_AuthReply onto the existing-character state8 path; keeping currentState={} and skipping the later natural state10/state11 claim/create transition",
                     currentState_->DebugName());
-                const uint32_t handled = HandleStagedAuthReplyPacketScaffold();
-                if (handled != 0u && !LastAuthReplyIsError()) {
+                const uint32_t handled = CLTLoginState_State10::HandleStagedAuthReplyScaffold(this);
+                if (handled != 0u && lastAuthReply_.valid && !lastAuthReply_.isErrorReply) {
                     expectedMarginRequestName_ = "existing-character state8 raw-0x0f margin packet";
                 }
                 return handled;
@@ -3179,37 +3179,11 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     return 0u;
 }
 
-// UNANCHORED: narrower staged auth-reply parse/adopt helper used by state10 slot 6 (`0x4401a0`)
-// and by the current existing-character state8 auth bridge.
-// Success still performs owner bootstrap adoption + later margin-bootstrap seeding.
-// Error replies are now kept narrow here so the state-owned caller can mirror the original
-// state3/error-`0x0b` branch instead of forcing helper11 continuation.
-uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
-    if (stagedIncomingAuthPacketBytes_.empty()) {
-        return 0u;
-    }
-
-    mxo::auth::AuthReply reply;
-    if (!mxo::auth::ParseAuthReplyPayload(
-            stagedIncomingAuthPacketBytes_.data(),
-            stagedIncomingAuthPacketBytes_.size(),
-            &reply)) {
-        spdlog::warn("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
-        return 0u;
-    }
-
-    lastAuthReply_ = reply;
-    expectedAuthRequestName_ = nullptr;
-
-    if (reply.isErrorReply) {
-        postAuthMarginLoadingState_.worldListCountOrStatus80 = reply.errorCode;
-        expectedMarginRequestName_ = nullptr;
-        LogParsedAuthReply(reply);
-        return 1u;
-    }
-
-    SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
-    ResetMarginBootstrapState();
+// UNANCHORED: narrower mediator-owned bridge into the auth-reply-derived margin-bootstrap
+// sidecar. State10 owns the broader raw-0x0b parse/adopt body and calls this only for the
+// private-exponent recovery step.
+void CLTLoginMediator::RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(
+    const mxo::auth::AuthReply& reply) {
     MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
     if (!mxo::auth::DecryptAuthReplyPrivateExponent(
             reply,
@@ -3219,18 +3193,6 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
         marginBootstrapState.authReplyPrivateExponentBytes.clear();
         spdlog::info("DIAGNOSTIC: launcher-owned auth could not recover private exponent bytes needed for later margin CERT bootstrap");
     }
-    AdoptAuthReplyIntoRecoveredMediatorState();
-    LogParsedAuthReply(reply);
-    expectedMarginRequestName_ = "CERT_ConnectRequest";
-    return 1u;
-}
-
-const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingAuthPacketBytes() const {
-    return stagedIncomingAuthPacketBytes_;
-}
-
-bool CLTLoginMediator::LastAuthReplyIsError() const {
-    return lastAuthReply_.valid && lastAuthReply_.isErrorReply;
 }
 
 const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() const {

@@ -392,6 +392,10 @@ public:
     // anchor: launcher.exe:0x004396f0 (vtable 0x004b512c slot 10 initializer)
     CLTLoginState_State10() = default;
 
+    // UNANCHORED: source-owned shared raw-0x0b parse/adopt helper used by state10 slot 6 and the
+    // current existing-character state8 auth bridge.
+    static uint32_t HandleStagedAuthReplyScaffold(CLTLoginMediator* mediator);
+
     // anchor: launcher.exe vtable 0x004b512c
     const char* DebugName() const override;
 

@@ -6,6 +6,41 @@
 
 namespace mxo::ltlogin {
 
+// UNANCHORED: source-owned shared raw-0x0b parse/adopt helper used by state10 slot 6 and the
+// current existing-character state8 auth bridge.
+uint32_t CLTLoginState_State10::HandleStagedAuthReplyScaffold(CLTLoginMediator* mediator) {
+    if (!mediator || mediator->stagedIncomingAuthPacketBytes_.empty()) {
+        return 0u;
+    }
+
+    mxo::auth::AuthReply reply;
+    if (!mxo::auth::ParseAuthReplyPayload(
+            mediator->stagedIncomingAuthPacketBytes_.data(),
+            mediator->stagedIncomingAuthPacketBytes_.size(),
+            &reply)) {
+        spdlog::warn("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
+        return 0u;
+    }
+
+    mediator->lastAuthReply_ = reply;
+    mediator->expectedAuthRequestName_ = nullptr;
+
+    if (reply.isErrorReply) {
+        mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 = reply.errorCode;
+        mediator->expectedMarginRequestName_ = nullptr;
+        mediator->LogParsedAuthReply(reply);
+        return 1u;
+    }
+
+    mediator->SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
+    mediator->ResetMarginBootstrapState();
+    mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(reply);
+    mediator->AdoptAuthReplyIntoRecoveredMediatorState();
+    mediator->LogParsedAuthReply(reply);
+    mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
+    return 1u;
+}
+
 // anchor: launcher.exe vtable 0x004b512c
 const char* CLTLoginState_State10::DebugName() const {
     return "CLTLoginState_State10";
@@ -68,7 +103,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         return 0u;
     }
 
-    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingAuthPacketBytes();
+    const std::vector<uint8_t>& stagedBytes = mediator->stagedIncomingAuthPacketBytes_;
     const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
 
     // Ownership correction from the vtable docs + direct `0x4401a0` review:
@@ -76,7 +111,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // - non-`0x0b` packets are rejected here with owner `+0x80 = 0x12000005`
     // - parsed error replies switch helper state to `3` and post error `0x0b`
     // - parsed success replies switch helper state to `11` and post event `0x14`
-    // - mediator keeps only the narrower staged-packet bytes plus parse/adopt helper
+    // - mediator now keeps only the staged auth bytes; the shared parse/adopt helper lives here
     if (rawCode != 0x0bu) {
         mediator->WorldListCountOrStatus80() = 0x12000005u;
         spdlog::info(
@@ -86,12 +121,12 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         return 0u;
     }
 
-    const uint32_t handled = mediator->HandleStagedAuthReplyPacketScaffold();
+    const uint32_t handled = HandleStagedAuthReplyScaffold(mediator);
     if (handled == 0u) {
         return 0u;
     }
 
-    if (mediator->LastAuthReplyIsError()) {
+    if (mediator->lastAuthReply_.valid && mediator->lastAuthReply_.isErrorReply) {
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
             mediator->SwitchHelperStateScaffold(3u, failureState);
         }

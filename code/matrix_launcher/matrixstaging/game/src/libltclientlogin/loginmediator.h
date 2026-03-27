@@ -17,6 +17,7 @@ namespace mxo {
 namespace ltlogin {
 
 class CLTLoginState;
+class CLTLoginState_State10;
 class CLTLoginState_AuthenticatePending;
 class CLTLoginState_WorldListPending;
 
@@ -62,9 +63,10 @@ class CLTLoginMediator : public ILTLoginMediator {
     // Source-ownership split note:
     // - the phase-2 auth/bootstrap child rooted at owner `+0x680` now has its own focused source
     //   home in `authbootstrap680.cpp`
-    // - keep access narrow by granting that helper ops struct friendship instead of widening the
-    //   mediator surface generically
+    // - keep access narrow by granting focused friendship instead of widening the mediator
+    //   surface generically
     friend struct AuthBootstrap680Ops;
+    friend class CLTLoginState_State10;
 
 public:
     static constexpr uint32_t kRecoveredWorldSlotCapacity = 100;
@@ -988,11 +990,10 @@ public:
     //   `AuthMessageDispatch` (`0x43f300`) and its owner `+0x680` child helper
     //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
     // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
+    //   and the source-owned shared helper kept in `loginstate_state10.cpp`
     // - keep this mediator method only as the current staging/demux wrapper, not as proof that
     //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
-    const std::vector<uint8_t>& StagedIncomingAuthPacketBytes() const;
-    bool LastAuthReplyIsError() const;
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
@@ -1004,11 +1005,9 @@ public:
     // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6
     // bodies.
     // Keep the packet/class ownership split explicit:
-    // - state10 slot 6 / `0x4401a0` owns the auth-reply transition but still uses a narrower
-    //   mediator-side parse/adopt helper plus staged auth bytes access
-    // - state11 slot 6 / `0x440320` now owns the load-character reply transition directly
-    // - mediator only keeps the staged bytes plus the narrower auth owner-writeback helper
-    uint32_t HandleStagedAuthReplyPacketScaffold();
+    // - state10 slot 6 / `0x4401a0` now owns the source-side staged auth-reply parse/adopt helper
+    // - state11 slot 6 / `0x440320` owns the load-character reply transition directly
+    // - mediator only keeps the staged bytes for those later paths
     const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
 
     static constexpr uint32_t kConnectStatusSuccess = 0x7000001u;
@@ -1272,6 +1271,7 @@ private:
     void SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
         const mxo::auth::AuthChallengeResponseBuildResult& buildResult);
     void SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mxo::auth::AuthReply& reply);
+    void RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(const mxo::auth::AuthReply& reply);
     void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
