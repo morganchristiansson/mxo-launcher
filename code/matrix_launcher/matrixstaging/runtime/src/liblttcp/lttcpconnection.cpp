@@ -23,38 +23,41 @@ static bool EndpointKeysDiffer(const LTTCPEndpointKey& lhs, const LTTCPEndpointK
         lhs.reserved1 != rhs.reserved1;
 }
 
-// UNANCHORED: current source-owned callback shim for the `param_1->+0x04(outWorkItem)` step
-// visible at the start of `CLTTCPConnection::OnReceive`.
-static void ConnectionReceiveCallback_PrepareWorkItem(void* callbackContext, void** outWorkItem) {
-    if (!callbackContext || !outWorkItem) {
+// UNANCHORED: source-owned retain shim for the read-operation fragment object passed to
+// `CLTTCPConnection::OnReceive`.
+// Current best static read of `0x449d40` is that `param_1` itself is the parser input fragment,
+// and the early `param_1->+0x04` call is a retain/addref-style lifetime step, not a separate
+// callback that writes the work item.
+static void ReadOperationFragment_Retain(CLTTCPConnection_ReadOperationFragmentScaffold* fragment) {
+    if (!fragment) {
         return;
     }
 
-    void** vtable = *reinterpret_cast<void***>(callbackContext);
+    void** vtable = fragment->vtable;
     if (!vtable || !vtable[1]) {
         return;
     }
 
-    typedef void (__thiscall *PrepareFn)(void*, void**);
-    PrepareFn fn = reinterpret_cast<PrepareFn>(vtable[1]);
-    fn(callbackContext, outWorkItem);
+    typedef void (__thiscall *RetainFn)(void*);
+    RetainFn fn = reinterpret_cast<RetainFn>(vtable[1]);
+    fn(fragment);
 }
 
-// UNANCHORED: current source-owned callback shim for the `param_1->+0x08()` step
-// visible at the end of `CLTTCPConnection::OnClose` / `CLTTCPConnection::OnReceive`.
-static void ConnectionReceiveCallback_Finalize(void* callbackContext) {
-    if (!callbackContext) {
+// UNANCHORED: source-owned release shim for the read-operation fragment object passed to
+// `CLTTCPConnection::OnReceive` / `CLTTCPConnection::OnClose`.
+static void ReadOperationFragment_Release(CLTTCPConnection_ReadOperationFragmentScaffold* fragment) {
+    if (!fragment) {
         return;
     }
 
-    void** vtable = *reinterpret_cast<void***>(callbackContext);
+    void** vtable = fragment->vtable;
     if (!vtable || !vtable[2]) {
         return;
     }
 
-    typedef void (__thiscall *FinalizeFn)(void*);
-    FinalizeFn fn = reinterpret_cast<FinalizeFn>(vtable[2]);
-    fn(callbackContext);
+    typedef void (__thiscall *ReleaseFn)(void*);
+    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[2]);
+    fn(fragment);
 }
 
 }  // namespace
@@ -316,25 +319,28 @@ uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, vo
 }
 
 // anchor: launcher.exe:0x449fd0
-void CLTTCPConnection::OnClose(void* callbackContext) {
-    ConnectionReceiveCallback_Finalize(callbackContext);
+void CLTTCPConnection::OnClose(void* readOperationFragment) {
+    ReadOperationFragment_Release(
+        static_cast<CLTTCPConnection_ReadOperationFragmentScaffold*>(readOperationFragment));
 }
 
 // anchor: launcher.exe:0x449d40
-uint32_t CLTTCPConnection::OnReceive(void* callbackContext) {
+uint32_t CLTTCPConnection::OnReceive(void* readOperationFragment) {
     // Current best read:
-    // - `workItem` is the parser-emitted completed packet/work object yielded through
+    // - `readOperationFragment` is itself the parser input fragment object later consumed by
     //   connection `+0x6c` (`CVariableLengthPrefixedTCPStreamParser::Parse`)
+    // - the early `param_1->+0x04` step now reads best as a retain/addref-style lifetime hook on
+    //   that fragment, not a separate callback that materializes the parser output packet
+    // - `workItem` is the parser-emitted completed packet/work object yielded through
+    //   `CVariableLengthPrefixedTCPStreamParser::Parse`
     // - current parser-side allocator path now narrows that emitted object to the same
     //   `0x2c` / vtable-`0x4b3e08` family built by `0x435db0 -> 0x435090`
-    // - the exact role of the initial callback `+0x04(&slot)` step is still narrower than our
-    //   current source model, so keep treating this local as a conservative shared out-slot
+    CLTTCPConnection_ReadOperationFragmentScaffold* fragment =
+        static_cast<CLTTCPConnection_ReadOperationFragmentScaffold*>(readOperationFragment);
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem = nullptr;
-    ConnectionReceiveCallback_PrepareWorkItem(
-        callbackContext,
-        reinterpret_cast<void**>(&workItem));
+    ReadOperationFragment_Retain(fragment);
 
-    uint32_t result = pollReceive(callbackContext, &workItem);
+    uint32_t result = pollReceive(fragment, &workItem);
     while (result == 0u) {
         pushCompletedOperation(workItem, this, /*useQueue34=*/false);
         workItem = nullptr;
@@ -347,7 +353,7 @@ uint32_t CLTTCPConnection::OnReceive(void* callbackContext) {
         (void)Close(false);
     }
 
-    OnClose(callbackContext);
+    OnClose(readOperationFragment);
     return 1u;
 }
 
@@ -394,7 +400,7 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
 
 // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
 uint32_t CLTTCPConnection::pollReceive(
-    void* callbackContext,
+    CLTTCPConnection_ReadOperationFragmentScaffold* readOperationFragment,
     CLTTCPConnection_ParsedPacketWorkItemScaffold** outWorkItem) {
     // Current best static read of `0x449d40`:
     // - connection `+0x6c` is now narrowed to a
@@ -403,7 +409,7 @@ uint32_t CLTTCPConnection::pollReceive(
     // - parser vtable slot `+0x10` / `0x469b40` allocates the emitted completed-packet object via
     //   `0x435db0 -> 0x435090`, i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already
     //   seen in queue producer xrefs
-    // - first receive pass reaches it with the current callback/read-operation fragment and `&workItem`
+    // - first receive pass reaches it with the current read-operation fragment and `&workItem`
     //   - current best fragment shape from `0x469bf0`:
     //     - dword `+0x08` = byte count
     //     - bytes begin at `+0x0c`
@@ -411,7 +417,7 @@ uint32_t CLTTCPConnection::pollReceive(
     // - later drain passes reach it with `(0, &workItem)` until the parser stops yielding packets
     // The faithful parser/read-operation object family is not reconstructed yet, so keep this
     // source-owned scaffold conservative and side-effect-free.
-    (void)callbackContext;
+    (void)readOperationFragment;
     if (outWorkItem) {
         *outWorkItem = nullptr;
     }

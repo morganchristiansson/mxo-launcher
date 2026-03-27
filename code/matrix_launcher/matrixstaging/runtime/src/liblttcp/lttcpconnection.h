@@ -170,11 +170,14 @@ public:
 
     // anchor: launcher.exe:0x449fd0
     // vtable: launcher.exe:0x004b804c
-    void OnClose(void* callbackContext);
+    // Current best read: tiny release/teardown forwarder for the read-operation fragment object.
+    void OnClose(void* readOperationFragment);
 
     // anchor: launcher.exe:0x449d40
     // vtable: launcher.exe:0x004b8048
-    uint32_t OnReceive(void* callbackContext) override;
+    // Current best read: consume one read-operation fragment through the parser at connection `+0x6c`
+    // and enqueue each parser-emitted completed packet work item.
+    uint32_t OnReceive(void* readOperationFragment) override;
 
     // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
     uint32_t CloseSocketTransportScaffold(bool graceful);
@@ -184,7 +187,7 @@ public:
     // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
     // Current best original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` (`0x469bf0`).
     uint32_t pollReceive(
-        void* callbackContext,
+        CLTTCPConnection_ReadOperationFragmentScaffold* readOperationFragment,
         CLTTCPConnection_ParsedPacketWorkItemScaffold** outWorkItem);
     // UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
     void pushCompletedOperation(
