@@ -5,7 +5,6 @@
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 #include "loginmediator.h"
 #include "loginstate.h"
-#include "launchpad.h"
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -69,20 +68,6 @@ private:
 static DiagnosticLoginControllerSession g_DiagnosticLoginControllerSession = {};
 static void* g_DiagnosticWorkItemVtable[2] = {0};
 static void* g_DiagnosticMessageConnectionContextVtable[5] = {0};
-
-static char g_LoginControllerAuthDnsName[256] = "auth.lith.thematrixonline.net";
-static uint16_t g_LoginControllerAuthPortHostOrder = 11000;
-static bool g_LoginControllerIgnoreHostsFileForAuth = false;
-static char g_LoginControllerMarginDnsSuffix[256] = ".lith.thematrixonline.net";
-static uint16_t g_LoginControllerMarginPortHostOrder = 10000;
-static bool g_LoginControllerIgnoreHostsFileForMargin = false;
-static char g_LoginControllerMarginRouteHostPrefix[256] = {};
-static char g_LoginControllerExactMarginHostName[256] = {};
-static uint32_t g_LoginControllerSelectedWorldIndexLow24 = 0;
-static char g_LoginControllerCharacterNameSeed[256] = {};
-static char g_LoginControllerGameSessionIdSeed[256] = {};
-static const char* g_LoginControllerAuthName = "resurrections";
-static const char* g_LoginControllerAuthPassword = "";
 
 static uint32_t __thiscall DiagnosticQueuedWorkItem_Release(DiagnosticQueuedWorkItemStub* self);
 static uint32_t __thiscall DiagnosticRawMessageConnectionContext_Release(DiagnosticRawMessageConnectionContext* self);
@@ -292,21 +277,6 @@ static const char* DiagnosticAuthRawCodeName(uint8_t rawCode) {
         default:
             return "<unknown-auth-code>";
     }
-}
-
-static void DiagnosticCopyCStringIntoFixed(char* dest, size_t destSize, const char* src) {
-    if (!dest || destSize == 0u) {
-        return;
-    }
-
-    std::memset(dest, 0, destSize);
-    if (!src || !src[0]) {
-        return;
-    }
-
-    const size_t copyCount = std::min(destSize - 1u, std::strlen(src));
-    std::memcpy(dest, src, copyCount);
-    dest[copyCount] = '\0';
 }
 
 static bool DiagnosticParseVariableLengthPayload(
@@ -559,82 +529,6 @@ static bool DiagnosticEnqueueConnectionStatusWorkItem(
     return true;
 }
 
-static void DiagnosticApplyLoginControllerConfig() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) return;
-
-    const uint32_t launcherVersion = 76005u;
-    const uint32_t currentPublicKeyId = 0u;
-    const uint8_t loginType = 1u;
-    const std::vector<uint8_t> keyConfigMd5;
-    const std::vector<uint8_t> uiConfigMd5;
-
-    loginController->SetAuthServerConfig(
-        g_LoginControllerAuthDnsName,
-        g_LoginControllerAuthPortHostOrder,
-        g_LoginControllerIgnoreHostsFileForAuth);
-    loginController->SetMarginServerConfig(
-        g_LoginControllerMarginDnsSuffix,
-        g_LoginControllerMarginPortHostOrder,
-        g_LoginControllerIgnoreHostsFileForMargin);
-    loginController->SetMarginRouteHostPrefix(g_LoginControllerMarginRouteHostPrefix);
-    loginController->SetExactMarginHostName(g_LoginControllerExactMarginHostName);
-    loginController->SetAuthCredentials(g_LoginControllerAuthName, g_LoginControllerAuthPassword);
-    loginController->SetAuthBootstrapConfig(
-        launcherVersion,
-        currentPublicKeyId,
-        static_cast<uint8_t>(loginType),
-        keyConfigMd5,
-        uiConfigMd5);
-    loginController->EnsureBuiltinScaffoldStatesRegistered();
-
-    const char* characterNameSeed =
-        g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : NULL;
-    if (characterNameSeed && characterNameSeed[0]) {
-        // Diagnostic bridge only:
-        // - `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the strongest concrete
-        //   writer for the owner source block `+0x108/+0x12c/+0x134..+0x1b8`
-        // - the installed mediator continues to exercise that recovered writer without mutating the live
-        //   launcher mediator outside the targeted wrapper-minimization scope
-        mxo::ltlogin::ProcessLoginCredentialsInputSketch input = {};
-        const auto characterState = loginController->DescribeOwnCharacterStateScaffold();
-        DiagnosticCopyCStringIntoFixed(
-            input.string00.data(),
-            input.string00.size(),
-            characterNameSeed);
-        input.field24 = g_LoginControllerSelectedWorldIndexLow24;
-
-        if (const char* realFirstName = characterState.realFirstName) {
-            DiagnosticCopyCStringIntoFixed(input.string70.data(), input.string70.size(), realFirstName);
-        }
-        if (const char* realLastName = characterState.realLastName) {
-            DiagnosticCopyCStringIntoFixed(input.string90.data(), input.string90.size(), realLastName);
-        }
-        if (const char* background = characterState.background) {
-            DiagnosticCopyCStringIntoFixed(input.stringB0.data(), input.stringB0.size(), background);
-        }
-
-        loginController->ProcessLoginCredentials(input);
-        spdlog::info(
-            "DiagnosticApplyLoginControllerConfig applied recovered 0x41c3c0 character seed to diagnostic mediator characterName='{}' selectedWorldIndexLow24=0x{:06x} realFirst='{}' realLast='{}' background='{}'",
-            characterNameSeed,
-            static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24),
-            input.string70.data(),
-            input.string90.data(),
-            input.stringB0.data());
-    }
-
-    mxo::ltlogin::LaunchPadClient launchPad;
-    const char* playRequestSessionId =
-        g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : NULL;
-    if (playRequestSessionId) {
-        launchPad.OnPlayRequestStatus(loginController, /*resultCode=*/0u, playRequestSessionId);
-        spdlog::info(
-            "DiagnosticApplyLoginControllerConfig routed diagnostic LaunchPadClient::OnPlayRequestStatus GameSessionID='{}'",
-            playRequestSessionId);
-    }
-}
-
 }  // namespace
 
 void DiagnosticAuthResetState() {
@@ -648,15 +542,18 @@ void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerC
     }
 
     if (BindInstalledDiagnosticLoginControllerForEngine(engine)) {
-        DiagnosticApplyLoginControllerConfig();
         spdlog::info("DIAGNOSTIC: bound installed CLTLoginMediator to launcher object {}", fmt::ptr(owner));
     }
 }
 
 void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* authPassword) {
-    g_LoginControllerAuthName = (authName && authName[0]) ? authName : "";
-    g_LoginControllerAuthPassword = (authPassword && authPassword[0]) ? authPassword : "";
-    DiagnosticApplyLoginControllerConfig();
+    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
+    if (!loginController) {
+        spdlog::info("DIAGNOSTIC: auth credential configure skipped (no installed CLTLoginMediator)");
+        return;
+    }
+
+    loginController->SetAuthCredentials(authName, authPassword);
 }
 
 void DiagnosticAuthPollLiveConnectionTraffic(void* owner) {
@@ -705,55 +602,57 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName) {
-    std::strncpy(g_LoginControllerAuthDnsName, authDnsName ? authDnsName : "", sizeof(g_LoginControllerAuthDnsName) - 1);
-    g_LoginControllerAuthDnsName[sizeof(g_LoginControllerAuthDnsName) - 1] = '\0';
-    g_LoginControllerAuthPortHostOrder = authPortHostOrder;
-    g_LoginControllerIgnoreHostsFileForAuth = ignoreHostsFileForAuth;
+    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
+    if (!loginController) {
+        spdlog::info("DIAGNOSTIC: login controller network configure skipped (no installed CLTLoginMediator)");
+        return;
+    }
 
-    std::strncpy(g_LoginControllerMarginDnsSuffix, marginDnsSuffix ? marginDnsSuffix : "", sizeof(g_LoginControllerMarginDnsSuffix) - 1);
-    g_LoginControllerMarginDnsSuffix[sizeof(g_LoginControllerMarginDnsSuffix) - 1] = '\0';
-    g_LoginControllerMarginPortHostOrder = marginPortHostOrder;
-    g_LoginControllerIgnoreHostsFileForMargin = ignoreHostsFileForMargin;
-
-    std::strncpy(g_LoginControllerMarginRouteHostPrefix, marginRouteHostPrefix ? marginRouteHostPrefix : "", sizeof(g_LoginControllerMarginRouteHostPrefix) - 1);
-    g_LoginControllerMarginRouteHostPrefix[sizeof(g_LoginControllerMarginRouteHostPrefix) - 1] = '\0';
-    std::strncpy(g_LoginControllerExactMarginHostName, exactMarginHostName ? exactMarginHostName : "", sizeof(g_LoginControllerExactMarginHostName) - 1);
-    g_LoginControllerExactMarginHostName[sizeof(g_LoginControllerExactMarginHostName) - 1] = '\0';
-
-    DiagnosticApplyLoginControllerConfig();
+    loginController->SetAuthServerConfig(
+        authDnsName,
+        authPortHostOrder,
+        ignoreHostsFileForAuth);
+    loginController->SetMarginServerConfig(
+        marginDnsSuffix,
+        marginPortHostOrder,
+        ignoreHostsFileForMargin);
+    loginController->SetMarginRouteHostPrefix(marginRouteHostPrefix);
+    loginController->SetExactMarginHostName(exactMarginHostName);
     spdlog::info(
         "DIAGNOSTIC: login controller network configured auth='{}' port={} marginSuffix='{}' marginPort={} marginRoutePrefix='{}' exactMarginHost='{}' ignoreAuthHosts={} ignoreMarginHosts={}",
-        g_LoginControllerAuthDnsName,
-        (unsigned)g_LoginControllerAuthPortHostOrder,
-        g_LoginControllerMarginDnsSuffix,
-        (unsigned)g_LoginControllerMarginPortHostOrder,
-        g_LoginControllerMarginRouteHostPrefix[0] ? g_LoginControllerMarginRouteHostPrefix : "<empty>",
-        g_LoginControllerExactMarginHostName[0] ? g_LoginControllerExactMarginHostName : "<empty>",
-        g_LoginControllerIgnoreHostsFileForAuth ? 1u : 0u,
-        g_LoginControllerIgnoreHostsFileForMargin ? 1u : 0u);
+        authDnsName && authDnsName[0] ? authDnsName : "<empty>",
+        (unsigned)authPortHostOrder,
+        marginDnsSuffix && marginDnsSuffix[0] ? marginDnsSuffix : "<empty>",
+        (unsigned)marginPortHostOrder,
+        marginRouteHostPrefix && marginRouteHostPrefix[0] ? marginRouteHostPrefix : "<empty>",
+        exactMarginHostName && exactMarginHostName[0] ? exactMarginHostName : "<empty>",
+        ignoreHostsFileForAuth ? 1u : 0u,
+        ignoreHostsFileForMargin ? 1u : 0u);
 }
 
 void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* characterName,
     const char* gameSessionId,
     uint32_t selectedWorldIndexLow24) {
-    g_LoginControllerSelectedWorldIndexLow24 = selectedWorldIndexLow24 & 0x00ffffffu;
-    std::strncpy(
-        g_LoginControllerCharacterNameSeed,
-        characterName ? characterName : "",
-        sizeof(g_LoginControllerCharacterNameSeed) - 1);
-    g_LoginControllerCharacterNameSeed[sizeof(g_LoginControllerCharacterNameSeed) - 1] = '\0';
-    std::strncpy(
-        g_LoginControllerGameSessionIdSeed,
-        gameSessionId ? gameSessionId : "",
-        sizeof(g_LoginControllerGameSessionIdSeed) - 1);
-    g_LoginControllerGameSessionIdSeed[sizeof(g_LoginControllerGameSessionIdSeed) - 1] = '\0';
-    DiagnosticApplyLoginControllerConfig();
+    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
+    if (!loginController) {
+        spdlog::info("DIAGNOSTIC: login-controller character seed configure skipped (no installed CLTLoginMediator)");
+        return;
+    }
+
+    const uint32_t normalizedWorldIndex = selectedWorldIndexLow24 & 0x00ffffffu;
+    const uint32_t seedResult =
+        loginController->MirrorCharacterSeedIntoSourceBlock120Scaffold(characterName, normalizedWorldIndex);
+    if (gameSessionId && gameSessionId[0]) {
+        loginController->SetGameSessionId664(gameSessionId);
+    }
+
     spdlog::info(
-        "DIAGNOSTIC: login-controller character seed configured character='{}' session='{}' selectedWorldIndexLow24=0x{:06x} (bridge into confirmed 0x41c3c0 / 0x420ef0 writers; original upstream producer still unresolved)",
-        g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : "<empty>",
-        g_LoginControllerGameSessionIdSeed[0] ? g_LoginControllerGameSessionIdSeed : "<empty>",
-        static_cast<unsigned>(g_LoginControllerSelectedWorldIndexLow24));
+        "DIAGNOSTIC: login-controller character seed configured character='{}' session='{}' selectedWorldIndexLow24=0x{:06x} mirrorResult=0x{:08x} (mirror-only source-block seed; original upstream producer still unresolved)",
+        (characterName && characterName[0]) ? characterName : "<empty>",
+        (gameSessionId && gameSessionId[0]) ? gameSessionId : "<empty>",
+        static_cast<unsigned>(normalizedWorldIndex),
+        static_cast<unsigned>(seedResult));
 }
 
 bool DiagnosticCanBeginAuthConnection() {

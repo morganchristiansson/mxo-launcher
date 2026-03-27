@@ -1131,6 +1131,12 @@ public:
     // +0x120
     // anchor: launcher.exe:0x41c3c0
     uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) override;
+    // Narrow mirror-only seed helper for the still-unrecovered upstream producer that eventually
+    // feeds `0x41c3c0`. This builds the same source block family (`+0x108/+0x12c/+0x134..+0x1b8`)
+    // without claiming the original state-3-gated owner dispatch happened.
+    uint32_t MirrorCharacterSeedIntoSourceBlock120Scaffold(
+        const char* characterName,
+        uint32_t selectedWorldIndexLow24);
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
     // Keep the instance-role split explicit in source:
     // - the wrapper-facing `ILTLoginMediator.Default` mirror should capture the source block even

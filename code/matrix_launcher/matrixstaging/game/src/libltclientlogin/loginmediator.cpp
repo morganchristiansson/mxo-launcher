@@ -1446,6 +1446,53 @@ void CLTLoginMediator::MirrorProcessLoginCredentialsSourceBlock120(const Process
     std::copy(input.stringB0.begin(), input.stringB0.end(), postAuthMarginLoadingState_.sourceBlock1b8.begin());
 }
 
+uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
+    const char* characterName,
+    uint32_t selectedWorldIndexLow24) {
+    auto copyCStringIntoFixed = [](auto& dest, const char* src) {
+        std::fill(dest.begin(), dest.end(), 0);
+        if (!src || !src[0]) {
+            return;
+        }
+        const size_t copyCount = std::min(std::char_traits<char>::length(src), dest.size() - 1u);
+        std::memcpy(dest.data(), src, copyCount);
+        dest[copyCount] = '\0';
+    };
+
+    if (!characterName || !characterName[0]) {
+        spdlog::info(
+            "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold skipped (empty characterName)");
+        return 1u;
+    }
+
+    ProcessLoginCredentialsInputSketch input = {};
+    const ActiveCharacterStateViewScaffold characterState = DescribeOwnCharacterStateScaffold();
+    copyCStringIntoFixed(input.string00, characterName);
+    input.field24 = selectedWorldIndexLow24 & 0x00ffffffu;
+    copyCStringIntoFixed(input.string70, characterState.realFirstName);
+    copyCStringIntoFixed(input.string90, characterState.realLastName);
+    copyCStringIntoFixed(input.stringB0, characterState.background);
+
+    MirrorProcessLoginCredentialsSourceBlock120(input);
+    spdlog::info(
+        "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold name='{}' field12c=0x{:08x} realFirst='{}' realLast='{}' background='{}' currentState={} (mirror-only; no 0x41c3c0 state-3 gate claim)",
+        postAuthMarginLoadingState_.sourceLeadString108[0]
+            ? postAuthMarginLoadingState_.sourceLeadString108.data()
+            : "<empty>",
+        static_cast<unsigned>(postAuthMarginLoadingState_.sourceField12c),
+        postAuthMarginLoadingState_.sourceBlock178[0]
+            ? reinterpret_cast<const char*>(postAuthMarginLoadingState_.sourceBlock178.data())
+            : "<empty>",
+        postAuthMarginLoadingState_.sourceBlock198[0]
+            ? reinterpret_cast<const char*>(postAuthMarginLoadingState_.sourceBlock198.data())
+            : "<empty>",
+        postAuthMarginLoadingState_.sourceBlock1b8[0]
+            ? reinterpret_cast<const char*>(postAuthMarginLoadingState_.sourceBlock1b8.data())
+            : "<empty>",
+        currentState_ ? currentState_->DebugName() : "<null>");
+    return 0u;
+}
+
 uint32_t CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(
     const void* input120,
     void* returnAddress,
