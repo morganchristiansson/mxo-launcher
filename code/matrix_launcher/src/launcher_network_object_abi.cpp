@@ -1,40 +1,12 @@
 #include "diagnostics.h"
 #include "launcher_mediator_abi_shared.h"
 #include "launcher_network_object_abi.h"
-#include "loginmediator.h"
-#include "../matrixstaging/runtime/src/libltmessaging/messageconnection.h"
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <spdlog/spdlog.h>
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void LogLauncherObjectPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
-    if (!ptr || !wordCount) {
-        spdlog::debug("{}: <null>", label ? label : "PointerWords");
-        return;
-    }
-
-    const uint32_t* words = static_cast<const uint32_t*>(ptr);
-    spdlog::debug("{} @ {} [+0x00]=0x{:08x} [+0x04]=0x{:08x} [+0x08]=0x{:08x} [+0x0c]=0x{:08x}",
-        label,
-        fmt::ptr(ptr),
-        words[0],
-        (wordCount > 1) ? words[1] : 0,
-        (wordCount > 2) ? words[2] : 0,
-        (wordCount > 3) ? words[3] : 0);
-    if (wordCount > 4) {
-        spdlog::debug("{} @ {} [+0x10]=0x{:08x} [+0x14]=0x{:08x} [+0x18]=0x{:08x} [+0x1c]=0x{:08x}",
-            label,
-            fmt::ptr(ptr),
-            words[4],
-            (wordCount > 5) ? words[5] : 0,
-            (wordCount > 6) ? words[6] : 0,
-            (wordCount > 7) ? words[7] : 0);
-    }
-}
 
 using DiagnosticLauncherQueue = mxo::liblttcp::CLTThreadPerClientTCPEngine_Queue;
 
@@ -79,30 +51,18 @@ struct DiagnosticIntrusiveListHeadSmall {
     unsigned char keyAndPayload[0x8];
 };
 
-struct DiagnosticLauncherObjectBuildState {
-    MinimalLauncherObjectStub* currentObject;
-    uint32_t buildGeneration;
-    uint32_t subobject5CSlot0CallCount;
-    uint32_t subobject5CSlot1CallCount;
-    uint32_t subobject60Slot0CallCount;
-    uint32_t subobject60Slot1CallCount;
-    uint32_t subobject98Slot0CallCount;
-    uint32_t subobject98Slot1CallCount;
-};
-
 static_assert(sizeof(DiagnosticLauncherLockHelper) == 0x1c, "launcher lock helper size mismatch");
 static_assert(sizeof(MinimalLauncherObjectStub) == 0xb4, "launcher object scaffold size must match original allocation");
 static_assert(sizeof(DiagnosticIntrusiveListHead) == 0x24, "list80 scaffold size mismatch");
 static_assert(sizeof(DiagnosticIntrusiveListHeadSmall) == 0x18, "list8C scaffold size mismatch");
 
-static DiagnosticLauncherObjectBuildState g_LauncherObjectBuildState = {};
+static MinimalLauncherObjectStub* g_CurrentLauncherObject = NULL;
+static uint32_t g_LauncherObjectBuildGeneration = 0;
 static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding* g_DiagnosticLttcpBinding = NULL;
-static void* g_LauncherObjectVtable[16] = {0};
-static void* g_LauncherObjectSubVtable5C[8] = {0};
-static void* g_LauncherObjectSubVtable60[8] = {0};
-static void* g_LauncherObjectSubVtable98[8] = {0};
-
-static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count);
+static void* g_LauncherObjectVtable[13] = {0};
+static void* g_LauncherObjectSubVtable5C[2] = {0};
+static void* g_LauncherObjectSubVtable60[2] = {0};
+static void* g_LauncherObjectSubVtable98[2] = {0};
 static void DiagnosticSyncLauncherObjectSidecarState(MinimalLauncherObjectStub* self);
 // UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
 static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEngine(MinimalLauncherObjectStub* owner);
@@ -471,11 +431,6 @@ static CRITICAL_SECTION* DiagnosticLauncherCritFromHelper(void* self) {
     return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
 }
 
-// UNANCHORED: diagnostic log-throttling helper for replacement arg5 runtime polling.
-static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
-    return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
-}
-
 // UNANCHORED: helper-to-owner backpointer used by the current arg5 subobject helper scaffolds.
 static MinimalLauncherObjectStub* DiagnosticLauncherObjectFromHelper(void* helperSelf, size_t helperOffset) {
     return helperSelf
@@ -483,179 +438,82 @@ static MinimalLauncherObjectStub* DiagnosticLauncherObjectFromHelper(void* helpe
         : NULL;
 }
 
-// UNANCHORED: diagnostic queue-state logger for the replacement arg5 runtime poll loop.
-static void DiagnosticLogLauncherRuntimeQueueState(
-    const char* source,
-    MinimalLauncherObjectStub* object,
-    uint32_t count) {
-    if (!object) return;
+// UNANCHORED: shared lock-helper enter for the current arg5 +0x60/+0x98 helper family.
+static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self) {
+    if (CRITICAL_SECTION* crit = DiagnosticLauncherCritFromHelper(self)) {
+        EnterCriticalSection(crit);
+    }
+    return 0u;
+}
 
-    const bool queue0CursorEqual = (object->queue0C.current1 == object->queue0C.current0);
-    const bool queue34CursorEqual = (object->queue34.current1 == object->queue34.current0);
-    const bool queue0SameBlock = (object->queue0C.block0 == object->queue0C.block1);
-    const bool queue34SameBlock = (object->queue34.block0 == object->queue34.block1);
-
-    spdlog::debug(
-        "LauncherObject runtime state[{}] count={}]: self={}, field04={}, field7C={}, q0(current0={}, current1={}, block0={}, block1={}, slotsCurrent={}, slotsLast={}, sameCursor={}, sameBlock={}) q34(current0={}, current1={}, block0={},",
-        source,
-        (unsigned)count,
-        fmt::ptr(object),
-        (unsigned)object->field04,
-        fmt::ptr(object->field08),
-        fmt::ptr(object->field7C),
-        fmt::ptr(object->queue0C.current0),
-        fmt::ptr(object->queue0C.current1),
-        fmt::ptr(object->queue0C.block0),
-        fmt::ptr(object->queue0C.block1),
-        fmt::ptr(object->queue0C.slotsCurrent),
-        fmt::ptr(object->queue0C.slotsLast),
-        queue0CursorEqual ? 1u : 0u,
-        queue0SameBlock ? 1u : 0u,
-        fmt::ptr(object->queue34.current0),
-        fmt::ptr(object->queue34.block1),
-        fmt::ptr(object->queue34.slotsCurrent),
-        fmt::ptr(object->queue34.slotsLast),
-        queue34CursorEqual ? 1u : 0u,
-        queue34SameBlock ? 1u : 0u);
+// UNANCHORED: shared lock-helper leave for the current arg5 +0x60/+0x98 helper family.
+static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
+    if (CRITICAL_SECTION* crit = DiagnosticLauncherCritFromHelper(self)) {
+        LeaveCriticalSection(crit);
+    }
+    return 0u;
 }
 
 // anchor: launcher.exe:0x435f90
 // vtable: launcher.exe:arg5+0x5c helper slot +0x00
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
-    ++g_LauncherObjectBuildState.subobject5CSlot0CallCount;
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
-    BOOL result = eventHandle ? SetEvent(eventHandle) : FALSE;
-    spdlog::info(
-        "LauncherObjectStub::Subobject5C::Slot0(self={} event={} SetEvent={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(eventHandle),
-        (long)result,
-        (unsigned)g_LauncherObjectBuildState.subobject5CSlot0CallCount);
-    LogLauncherObjectPointerWords("LauncherObject subobject5C self", self, 8);
-    return result ? 0u : 1u;
+    return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
 }
 
 // anchor: launcher.exe:0x435fa0
 // vtable: launcher.exe:arg5+0x5c helper slot +0x04
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reason) {
-    ++g_LauncherObjectBuildState.subobject5CSlot1CallCount;
-
     void* helper60 = self ? static_cast<unsigned char*>(self) + 4 : NULL;
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
     if (helper60) {
         LauncherObject_Subobject60_Slot1(helper60);
     }
 
-    DWORD waitResult = eventHandle ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reason)) : WAIT_FAILED;
-    uint32_t result = 1;
+    const DWORD waitResult = eventHandle ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reason)) : WAIT_FAILED;
     if (waitResult == WAIT_OBJECT_0) {
         if (helper60) {
             LauncherObject_Subobject60_Slot0(helper60);
         }
-        result = 0;
-    } else if (waitResult == WAIT_TIMEOUT) {
+        return 0u;
+    }
+    if (waitResult == WAIT_TIMEOUT) {
         if (helper60) {
             LauncherObject_Subobject60_Slot0(helper60);
         }
-        result = 3;
+        return 3u;
     }
-
-    spdlog::info(
-        "LauncherObjectStub::Subobject5C::Slot1(self={} reason={} event={} wait={} result={} [count={}]",
-        fmt::ptr(self),
-        reason,
-        fmt::ptr(eventHandle),
-        waitResult,
-        result,
-        g_LauncherObjectBuildState.subobject5CSlot1CallCount);
-    LogLauncherObjectPointerWords("LauncherObject subobject5C self", self, 8);
-    return result;
+    return 1u;
 }
 
 // anchor: launcher.exe:0x4147b0
-// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60 / arg5+0x98)
+// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
-    ++g_LauncherObjectBuildState.subobject60Slot0CallCount;
-    CRITICAL_SECTION* crit = DiagnosticLauncherCritFromHelper(self);
-    if (crit) {
-        EnterCriticalSection(crit);
+    LauncherObject_LockHelper_Slot0(self);
+    if (MinimalLauncherObjectStub* owner = DiagnosticLauncherObjectFromHelper(self, 0x60)) {
+        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetLauncherObjectEngine(owner)) {
+            engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+        }
     }
-    MinimalLauncherObjectStub* owner = DiagnosticLauncherObjectFromHelper(self, 0x60);
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetLauncherObjectEngine(owner)) {
-        engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
-    }
-    const uint32_t count = g_LauncherObjectBuildState.subobject60Slot0CallCount;
-    if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
-        spdlog::debug(
-            "LauncherObjectStub::Subobject60::Slot0(self={} crit={} EnterCriticalSection) [count={}]",
-            fmt::ptr(self),
-            fmt::ptr(crit),
-            count);
-        LogLauncherObjectPointerWords("LauncherObject subobject60 self", self, 4);
-        DiagnosticLogLauncherRuntimeQueueState(
-            "sub60.enter",
-            owner,
-            count);
-    }
-    return 0;
+    return 0u;
 }
 
 // anchor: launcher.exe:0x4147c0
-// vtable: launcher.exe:0x4add70-family helper slot +0x04 (arg5+0x60 / arg5+0x98)
+// vtable: launcher.exe:0x4add70-family helper slot +0x04 (arg5+0x60)
 static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self) {
-    ++g_LauncherObjectBuildState.subobject60Slot1CallCount;
-    CRITICAL_SECTION* crit = DiagnosticLauncherCritFromHelper(self);
-    if (crit) {
-        LeaveCriticalSection(crit);
-    }
-    const uint32_t count = g_LauncherObjectBuildState.subobject60Slot1CallCount;
-    if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {
-        spdlog::debug(
-            "LauncherObjectStub::Subobject60::Slot1(self={} crit={} LeaveCriticalSection) [count={}]",
-            fmt::ptr(self),
-            fmt::ptr(crit),
-            count);
-        LogLauncherObjectPointerWords("LauncherObject subobject60 self", self, 4);
-        DiagnosticLogLauncherRuntimeQueueState(
-            "sub60.leave",
-            DiagnosticLauncherObjectFromHelper(self, 0x60),
-            count);
-    }
-    return 0;
+    return LauncherObject_LockHelper_Slot1(self);
 }
 
 // anchor: launcher.exe:0x4147b0
 // vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x98)
 static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self) {
-    ++g_LauncherObjectBuildState.subobject98Slot0CallCount;
-    CRITICAL_SECTION* crit = DiagnosticLauncherCritFromHelper(self);
-    if (crit) {
-        EnterCriticalSection(crit);
-    }
-    spdlog::info(
-        "LauncherObjectStub::Subobject98::Slot0(self={} crit={} EnterCriticalSection) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(crit),
-        g_LauncherObjectBuildState.subobject98Slot0CallCount);
-    LogLauncherObjectPointerWords("LauncherObject subobject98 self", self, 4);
-    return 0;
+    return LauncherObject_LockHelper_Slot0(self);
 }
 
 // anchor: launcher.exe:0x4147c0
 // vtable: launcher.exe:0x4add70-family helper slot +0x04 (arg5+0x98)
 static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self) {
-    ++g_LauncherObjectBuildState.subobject98Slot1CallCount;
-    CRITICAL_SECTION* crit = DiagnosticLauncherCritFromHelper(self);
-    if (crit) {
-        LeaveCriticalSection(crit);
-    }
-    spdlog::info(
-        "LauncherObjectStub::Subobject98::Slot1(self={} crit={} LeaveCriticalSection) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(crit),
-        g_LauncherObjectBuildState.subobject98Slot1CallCount);
-    LogLauncherObjectPointerWords("LauncherObject subobject98 self", self, 4);
-    return 0;
+    return LauncherObject_LockHelper_Slot1(self);
 }
 
 // UNANCHORED: seeds the replacement arg5 ABI vtables from recovered launcher.exe addresses.
@@ -664,7 +522,6 @@ static void InitializeLauncherObjectStub() {
     if (initialized) return;
     initialized = true;
 
-    std::memset(&g_LauncherObjectBuildState, 0, sizeof(g_LauncherObjectBuildState));
     std::memset(g_LauncherObjectVtable, 0, sizeof(g_LauncherObjectVtable));
     std::memset(g_LauncherObjectSubVtable5C, 0, sizeof(g_LauncherObjectSubVtable5C));
     std::memset(g_LauncherObjectSubVtable60, 0, sizeof(g_LauncherObjectSubVtable60));
@@ -694,14 +551,14 @@ static void InitializeLauncherObjectStub() {
 static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     InitializeLauncherObjectStub();
 
-    if (g_LauncherObjectBuildState.currentObject) {
+    if (g_CurrentLauncherObject) {
         spdlog::info(
             "DIAGNOSTIC: replacing prior launcher object scaffold generation={} ptr={}",
-            (unsigned)g_LauncherObjectBuildState.buildGeneration,
-            fmt::ptr(g_LauncherObjectBuildState.currentObject));
-        DiagnosticFreeLauncherObjectInternals(g_LauncherObjectBuildState.currentObject);
-        std::free(g_LauncherObjectBuildState.currentObject);
-        g_LauncherObjectBuildState.currentObject = NULL;
+            (unsigned)g_LauncherObjectBuildGeneration,
+            fmt::ptr(g_CurrentLauncherObject));
+        DiagnosticFreeLauncherObjectInternals(g_CurrentLauncherObject);
+        std::free(g_CurrentLauncherObject);
+        g_CurrentLauncherObject = NULL;
     }
 
     MinimalLauncherObjectStub* object =
@@ -762,21 +619,16 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     InitializeDiagnosticIntrusiveListHeadSmall(list8C);
     object->list8C = list8C;
 
-    ++g_LauncherObjectBuildState.buildGeneration;
-    g_LauncherObjectBuildState.currentObject = object;
+    ++g_LauncherObjectBuildGeneration;
+    g_CurrentLauncherObject = object;
 
     spdlog::info(
         "DIAGNOSTIC: built launcher object scaffold like 0x40a380/0x431c30 ptr={} size={} generation={}",
         fmt::ptr(object),
         sizeof(MinimalLauncherObjectStub),
-        g_LauncherObjectBuildState.buildGeneration);
+        g_LauncherObjectBuildGeneration);
     spdlog::info(
-        "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x0c/+0x34 faithful queue skeletons initialized +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to faithful placeholders, full primary 13-slot vtable surface now exposed; slot5 models the proven empty-list80 miss path and slot10 matches the original zero-return stub");
-    LogLauncherObjectPointerWords("LauncherObject self", object, 8);
-    LogLauncherObjectPointerWords("LauncherObject queue0C", &object->queue0C, 8);
-    LogLauncherObjectPointerWords("LauncherObject queue34", &object->queue34, 8);
-    LogLauncherObjectPointerWords("LauncherObject +0x80 list", object->list80, 4);
-    LogLauncherObjectPointerWords("LauncherObject +0x8c list", object->list8C, 4);
+        "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x0c/+0x34 faithful queue skeletons initialized +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to minimal ABI helpers, full primary 13-slot vtable surface exposed");
 
     return object;
 }
