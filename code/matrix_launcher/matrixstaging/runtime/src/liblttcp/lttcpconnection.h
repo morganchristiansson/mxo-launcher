@@ -35,15 +35,27 @@ struct LTTCPEndpointKey {
 
 // Recovered parser input fragment prefix consumed by connection `+0x6c`
 // (`CVariableLengthPrefixedTCPStreamParser::Parse`).
-// Current high-confidence fields from `0x469bf0`:
+// Current best family name comes from `CMessageConnection::OnOperationCompleted` logging
+// ("Unused buffers were attached to CLTTCPReadOperation ...") plus the parser/work-item helpers.
+// This is a refcounted read-buffer fragment object, not a completed-packet work item.
+// High-confidence fields from `0x469bf0`, `0x435e60`, `0x4350c0`, and `0x435510`:
 // - `+0x08` = byte count
 // - `+0x0c` = first payload byte
-// - vtable `+0x04` / `+0x08` = retain/release-style lifetime hooks
-struct CLTTCPConnection_ReadOperationFragmentScaffold {
-    void** vtable;      // +0x00
-    uint32_t field04;   // +0x04 unknown so far
-    uint32_t byteCount; // +0x08
-    uint8_t bytes0C[1]; // +0x0c variable-length fragment bytes begin here
+// - vtable `+0x04` = no-arg AddRef / retain on the fragment object itself
+// - vtable `+0x08` = no-arg Release on the fragment object itself
+struct CLTTCPReadOperationFragmentScaffold;
+
+struct CLTTCPReadOperationFragmentVTable {
+    void* slot00; // original slot 0 exists but its exact ABI is not recovered here yet
+    void (__thiscall *addRef)(CLTTCPReadOperationFragmentScaffold* self);  // +0x04
+    void (__thiscall *release)(CLTTCPReadOperationFragmentScaffold* self); // +0x08
+};
+
+struct CLTTCPReadOperationFragmentScaffold {
+    CLTTCPReadOperationFragmentVTable* vtable; // +0x00
+    uint32_t field04;                          // +0x04 still unresolved
+    uint32_t byteCount;                        // +0x08
+    uint8_t bytes0C[1];                        // +0x0c variable-length fragment bytes begin here
 };
 
 // Recovered parser-emitted completed-packet work item family built via
@@ -81,7 +93,7 @@ class CBaseConnection {
   virtual ~CBaseConnection() = default;
 
   // UNANCHORED: source-owned abstraction over the recovered receive entry surface.
-  virtual uint32_t OnReceive(void* callbackContext) = 0;
+  virtual void OnReceive(void* callbackContext) = 0;
   // UNANCHORED: source-owned abstraction over the recovered completion callback surface.
   virtual uint32_t OnOperationCompleted(void*) = 0;
   // UNANCHORED: source-owned abstraction over the recovered send callback surface.
@@ -171,14 +183,16 @@ public:
 
     // anchor: launcher.exe:0x449fd0
     // vtable: launcher.exe:0x004b804c
-    // Current best read: tiny release/teardown forwarder for the read-operation fragment object.
-    void OnClose(void* readOperationFragment);
+    // Current source-owned wrapper keeps only the confirmed fragment-release behavior of the
+    // original callback. The original `0x449fd0` ABI is wider (`ecx` ignored, `ret 0xc`).
+    void OnClose(CLTTCPReadOperationFragmentScaffold* readOperationFragment);
 
     // anchor: launcher.exe:0x449d40
     // vtable: launcher.exe:0x004b8048
-    // Current best read: consume one read-operation fragment through the parser at connection `+0x6c`
-    // and enqueue each parser-emitted completed packet work item.
-    uint32_t OnReceive(void* readOperationFragment) override;
+    // Current best read: retain one `CLTTCPReadOperation`-family fragment, hand it to the parser at
+    // connection `+0x6c` as `Parse(fragment, &completedPacketWorkItem)`, enqueue each parser-emitted
+    // completed packet work item while parse returns `0`, then release the outer fragment reference.
+    void OnReceive(void* readOperationFragment) override;
 
     // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
     uint32_t CloseSocketTransportScaffold(bool graceful);
@@ -187,8 +201,8 @@ public:
 
     // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
     // Current best original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` (`0x469bf0`).
-    uint32_t pollReceive(
-        CLTTCPConnection_ReadOperationFragmentScaffold* readOperationFragment,
+    uint32_t ParseReadOperationFragmentScaffold(
+        CLTTCPReadOperationFragmentScaffold* readOperationFragment,
         CLTTCPConnection_ParsedPacketWorkItemScaffold** outWorkItem);
     // UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
     void pushCompletedOperation(

@@ -23,43 +23,28 @@ static bool EndpointKeysDiffer(const LTTCPEndpointKey& lhs, const LTTCPEndpointK
         lhs.reserved1 != rhs.reserved1;
 }
 
-// UNANCHORED: source-owned shim for the early `param_1->+0x04(..., &completedPacketWorkItem)`
-// step at the start of `CLTTCPConnection::OnReceive`.
-// Current best Ghidra read still shows this as a two-argument call that updates the local packet
-// work-item slot, but the exact semantic relationship between that call and the later parser call
-// is still unresolved.
-static void ReadOperationFragment_PrepareCompletedPacketWorkItem(
-    CLTTCPConnection_ReadOperationFragmentScaffold* fragment,
-    CLTTCPConnection_ParsedPacketWorkItemScaffold** outCompletedPacketWorkItem) {
-    if (!fragment || !outCompletedPacketWorkItem) {
+// UNANCHORED: source-owned shim for the explicit fragment `+0x04` virtual at the start of
+// `CLTTCPConnection::OnReceive` / `CVariableLengthPrefixedTCPStreamParser::Parse`.
+// Current best static read from the assembly:
+// - this is a no-arg AddRef / retain on the fragment object itself
+// - the apparent stack values around the call belong to the immediately following parser / append
+//   call, not to the fragment virtual
+static void ReadOperationFragment_AddRef(CLTTCPReadOperationFragmentScaffold* fragment) {
+    if (!fragment || !fragment->vtable || !fragment->vtable->addRef) {
         return;
     }
 
-    void** vtable = fragment->vtable;
-    if (!vtable || !vtable[1]) {
-        return;
-    }
-
-    typedef void (__thiscall *PrepareFn)(void*, CLTTCPConnection_ParsedPacketWorkItemScaffold**);
-    PrepareFn fn = reinterpret_cast<PrepareFn>(vtable[1]);
-    fn(fragment, outCompletedPacketWorkItem);
+    fragment->vtable->addRef(fragment);
 }
 
 // UNANCHORED: source-owned release shim for the read-operation fragment object passed to
 // `CLTTCPConnection::OnReceive` / `CLTTCPConnection::OnClose`.
-static void ReadOperationFragment_Release(CLTTCPConnection_ReadOperationFragmentScaffold* fragment) {
-    if (!fragment) {
+static void ReadOperationFragment_Release(CLTTCPReadOperationFragmentScaffold* fragment) {
+    if (!fragment || !fragment->vtable || !fragment->vtable->release) {
         return;
     }
 
-    void** vtable = fragment->vtable;
-    if (!vtable || !vtable[2]) {
-        return;
-    }
-
-    typedef void (__thiscall *ReleaseFn)(void*);
-    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[2]);
-    fn(fragment);
+    fragment->vtable->release(fragment);
 }
 
 }  // namespace
@@ -321,47 +306,42 @@ uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, vo
 }
 
 // anchor: launcher.exe:0x449fd0
-void CLTTCPConnection::OnClose(void* readOperationFragment) {
-    ReadOperationFragment_Release(
-        static_cast<CLTTCPConnection_ReadOperationFragmentScaffold*>(readOperationFragment));
+void CLTTCPConnection::OnClose(CLTTCPReadOperationFragmentScaffold* readOperationFragment) {
+    ReadOperationFragment_Release(readOperationFragment);
 }
 
 // anchor: launcher.exe:0x449d40
-uint32_t CLTTCPConnection::OnReceive(void* readOperationFragment) {
-    // Current best read:
-    // - `readOperationFragment` participates in the front-end seam before connection `+0x6c`
-    //   parser consumption
-    // - current Ghidra read still shows an early `param_1->+0x04(..., &completedPacketWorkItem)`
-    //   step before the parser call, so the exact relationship between this fragment object and the
-    //   parser entry arguments remains unresolved
-    // - `workItem` is the parser-emitted completed packet/work object yielded through
-    //   `CVariableLengthPrefixedTCPStreamParser::Parse`
-    // - current parser-side allocator path now narrows that emitted object to the same
-    //   `0x2c` / vtable-`0x4b3e08` family built by `0x435db0 -> 0x435090`
-    CLTTCPConnection_ReadOperationFragmentScaffold* fragment =
-        static_cast<CLTTCPConnection_ReadOperationFragmentScaffold*>(readOperationFragment);
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem = nullptr;
-    ReadOperationFragment_PrepareCompletedPacketWorkItem(fragment, &workItem);
+void CLTTCPConnection::OnReceive(void* readOperationFragment) {
+    // Current best static read of `0x449d40`:
+    // - the explicit arg is a refcounted `CLTTCPReadOperation`-family buffer fragment
+    // - the early fragment `+0x04` call is a no-arg AddRef / retain on that fragment only
+    //   - the stack values visible around that call belong to the immediately following parser
+    //     call, not to the fragment virtual itself
+    // - connection `+0x6c` is a `CVariableLengthPrefixedTCPStreamParser` family object
+    // - first parser handoff is `Parse(fragment, &completedPacketWorkItem)`
+    // - later drain handoffs are `Parse(nullptr, &completedPacketWorkItem)`
+    // - parser-emitted `completedPacketWorkItem` is the same `0x2c` / vtable-`0x4b3e08`
+    //   work-item family built by `0x435db0 -> 0x435090`
+    // - the final fragment `+0x08` here releases only the outer OnReceive-held fragment reference
+    CLTTCPReadOperationFragmentScaffold* fragment =
+        static_cast<CLTTCPReadOperationFragmentScaffold*>(readOperationFragment);
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* completedPacketWorkItem = nullptr;
 
-    // Current source keeps the fragment threaded into `pollReceive(...)` because parser `Parse`
-    // itself is now well narrowed as taking an optional read-operation fragment plus the completed
-    // packet out-slot, even though the exact first-call stack shaping in `0x449d40` remains a bit
-    // noisier than the decompiler's current prototype suggests.
-    uint32_t result = pollReceive(fragment, &workItem);
-    while (result == 0u) {
-        pushCompletedOperation(workItem, this, /*useQueue34=*/false);
-        workItem = nullptr;
-        result = pollReceive(nullptr, &workItem);
+    ReadOperationFragment_AddRef(fragment);
+    uint32_t parseResult = ParseReadOperationFragmentScaffold(fragment, &completedPacketWorkItem);
+    while (parseResult == 0u) {
+        pushCompletedOperation(completedPacketWorkItem, this, /*useQueue34=*/false);
+        completedPacketWorkItem = nullptr;
+        parseResult = ParseReadOperationFragmentScaffold(nullptr, &completedPacketWorkItem);
     }
 
-    if (static_cast<int32_t>(result) > 0 && result != 0x7000000u) {
+    if (static_cast<int32_t>(parseResult) > 0 && parseResult != 0x7000000u) {
         // Current source scaffolds still do not reconstruct the original `+0x24` endpoint-copy
         // logging helper family used here before close. Keep the control-flow shape faithful first.
         (void)Close(false);
     }
 
-    OnClose(readOperationFragment);
-    return 1u;
+    OnClose(fragment);
 }
 
 // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
@@ -406,22 +386,21 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
 }
 
 // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
-uint32_t CLTTCPConnection::pollReceive(
-    CLTTCPConnection_ReadOperationFragmentScaffold* readOperationFragment,
+uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
+    CLTTCPReadOperationFragmentScaffold* readOperationFragment,
     CLTTCPConnection_ParsedPacketWorkItemScaffold** outWorkItem) {
-    // Current best static read of `0x449d40`:
-    // - connection `+0x6c` is now narrowed to a
-    //   `CVariableLengthPrefixedTCPStreamParser`-family helper
+    // Current best static read of `0x449d40` / `0x469bf0`:
+    // - connection `+0x6c` is a `CVariableLengthPrefixedTCPStreamParser` family object
     // - original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` at `0x469bf0`
-    // - parser vtable slot `+0x10` / `0x469b40` allocates the emitted completed-packet object via
+    // - first receive pass reaches it as `Parse(readOperationFragment, &completedPacketWorkItem)`
+    //   immediately after a no-arg fragment AddRef in `0x449d40`
+    // - later drain passes reach it as `Parse(nullptr, &completedPacketWorkItem)` until the parser
+    //   stops yielding complete packets
+    // - parser slot `+0x10` / `0x469b40` allocates the emitted completed-packet object via
     //   `0x435db0 -> 0x435090`, i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already
     //   seen in queue producer xrefs
-    // - first receive pass reaches it with the current read-operation fragment and `&workItem`
-    //   - current best fragment shape from `0x469bf0`:
-    //     - dword `+0x08` = byte count
-    //     - bytes begin at `+0x0c`
-    //     - vtable `+0x04` / `+0x08` = retain/release-style lifetime hooks
-    // - later drain passes reach it with `(0, &workItem)` until the parser stops yielding packets
+    // - `Parse` itself also uses fragment `+0x04` / `+0x08` as no-arg AddRef / Release hooks while
+    //   transferring retained fragment ownership into the completed work item
     // The faithful parser/read-operation object family is not reconstructed yet, so keep this
     // source-owned scaffold conservative and side-effect-free.
     (void)readOperationFragment;

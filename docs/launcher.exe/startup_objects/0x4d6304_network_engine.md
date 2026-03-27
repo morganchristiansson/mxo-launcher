@@ -890,12 +890,18 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
 - because these branches sit in the same `0x4328a0` socket/connect method, they are now best treated as **TCP connect follow-up / completion-status queue submissions**, not just anonymous queue variants
 
 #### `launcher.exe:0x449d8a`
-- sits inside a loop
-- repeatedly enqueues `(work=[ebp-0x08], context=edi, queueSelect=0)`
-- then polls another object at `[edi+0x6c]` until that helper returns non-zero
-- current best reading is that this is a submit-and-wait style queue0C interaction rather than a one-shot fire-and-forget producer
-- newer static narrowing adds one useful detail:
-  - after the wait loop, this function checks return/status values in the `0x700000x` family (`0x7000000`, `0x700000b`)
+- sits inside the `CLTTCPConnection::OnReceive` loop
+- exact recovered producer shape is now narrower than the older “poll helper” reading:
+  - first pass:
+    - `readOperationFragment->+0x04()`
+    - `parser = [edi+0x6c]`
+    - `parseResult = parser->Parse(readOperationFragment, &completedPacketWorkItem)`
+  - while `parseResult == 0`:
+    - enqueue `(work=completedPacketWorkItem, context=edi, queueSelect=0)` through `0x436820`
+    - call `parser->Parse(0, &completedPacketWorkItem)` to drain more completed packets from the
+      same buffered stream state
+- current best reading is therefore a **parser-drain queue0C producer**, not a one-shot fire-and-forget submission and not an anonymous socket poll stub
+- after that drain loop, this function checks return/status values in the `0x700000x` family (`0x7000000`, `0x700000b`)
   - that makes the coded `0x435050(payload)` queue objects from `0x4329cc` / `0x432dc1` look even more like **network status/result items** rather than generic integers
 
 #### Internal self-calls: `launcher.exe:0x436a0e` and `0x436fa8`
@@ -965,7 +971,7 @@ High-value evidence:
   - engine `+0x1c`
   - engine `+0x20`
   - and the queue producer helper `0x436820`
-- notably, `0x449d40` uses object field `+0x6c` as the wait/poll helper and repeatedly enqueues `(work, self, 0)` through `0x436820`
+- notably, `0x449d40` uses object field `+0x6c` as the framing parser pointer and repeatedly enqueues `(work, self, 0)` through `0x436820` while parser `Parse` keeps returning `0`
 
 Current best virtual-method mapping on that class is now:
 - vtable `+0x10` / `0x4490c0` = likely **`OnOperationCompleted(workItem)`**
@@ -999,22 +1005,28 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
   - engine pointer at `+0x10`
   - endpoint copy at `+0x24`
   - connection state at `+0x34`
-  - wait/poll helper at `+0x6c`
-- newer focused receive-path RE now narrows that `+0x6c` helper materially:
+  - parser pointer at `+0x6c`
+- newer focused receive-path RE now narrows that `+0x6c` parser materially:
   - it is a `CVariableLengthPrefixedTCPStreamParser`-family object
   - ctor path: `0x469f50 -> 0x469b20`
   - primary receive call: `0x469bf0 = CVariableLengthPrefixedTCPStreamParser::Parse`
   - parser slot `+0x10` / `0x469b40` allocates the completed packet object through `0x435db0 -> 0x435090`
     - i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already seen in queue producer analysis
   - `CLTTCPConnection::OnReceive` (`0x449d40`) therefore feeds received stream fragments into a framing parser there, not an anonymous poll stub
-  - and the parser-emitted object queued by `0x449d40` is now best read as a concrete queue-work item, not only an opaque buffer pointer
+  - the parser-emitted object queued by `0x449d40` is now best read as a concrete queue-work item, not only an opaque buffer pointer
   - newer focused pass also narrows the explicit `0x449d40` argument itself:
-    - it is best read as the read-operation fragment object consumed by the parser
-    - early `param_1->+0x04` is now best read as a retain/addref-style hook on that fragment
-    - later `param_1->+0x08` is now best read as the matching release hook
+    - it is best read as a refcounted `CLTTCPReadOperation`-family buffer fragment consumed by the parser
+    - early `param_1->+0x04` is now best read as a **no-arg AddRef only** on that fragment
+      - the stack dwords prepared around that call remain in place for the immediately following
+        `parser->Parse(param_1, &completedPacketWorkItem)` call
+    - later `param_1->+0x08` is now best read as the matching outer-reference Release hook
+    - `Parse` itself also takes and releases its own transient fragment reference while moving any
+      retained fragment ownership into the completed work item
   - source lockstep update from the same focused pass:
-    - `lttcpconnection.h` now carries explicit scaffold types for the parser input fragment prefix and the emitted `0x2c` packet work item
-    - `CLTTCPConnection::OnReceive` / `OnClose` now model retain/parse/release against that read-operation fragment instead of treating it as a generic callback object
+    - `lttcpconnection.h` now carries explicit scaffold types for the `CLTTCPReadOperation`-family
+      parser input fragment and the emitted `0x2c` packet work item
+    - `CLTTCPConnection::OnReceive` / `OnClose` now model the narrower AddRef / Parse / Release seam
+      instead of treating the fragment virtual `+0x04` as a possible materialization helper
     - `CLTTCPConnection::pushCompletedOperation(...)` now forwards through an engine-side bridge into the recovered `0x436820` enqueue helper when the sidecar engine is attached
 - source lockstep update from the current focused pass:
   - `matrixstaging/runtime/src/liblttcp/lttcpconnection.*` now owns the corrected base-wrapper mapping directly
