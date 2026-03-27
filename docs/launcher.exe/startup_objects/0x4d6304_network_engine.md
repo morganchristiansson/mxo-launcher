@@ -1153,10 +1153,14 @@ Build-validated update:
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
 - `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, no longer calls the launcher-network ABI sidecar-sync helper directly, and no longer keeps a launcher-owner pointer just to gate/auth-start this seam
 - `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:
+  - the file is now best read as a **raw arg5 ABI shell** rather than as the real engine implementation
+    - the shell object's first field is the replacement primary arg5 vtable pointer
+    - the rest of the shell only preserves the client-visible object layout (`+0x0c/+0x34/+0x5c/+0x60/+0x7c/+0x80/+0x8c/+0x98`)
+    - real queue/connection/producer behavior continues to move into `liblttcp`
   - primary-slot wrappers no longer manually call the sidecar-state sync helper after those engine mutations
   - helper-side call-count throttling / queue-state debug logging used during earlier bridge bringup has been pruned back out of the ABI shell
   - helper subobject wrappers are now smaller again:
-    - `+0x98` uses shared lock-helper enter/leave bodies
+    - `+0x98` uses shared lock-helper enter/leave bodies directly
     - `+0x60` keeps only the one extra engine-pump side effect on slot `0`
     - the helper-vtable arrays are now sized only for the live 2-slot surfaces instead of oversized diagnostic tables
   - the ABI shell keeps raw arg5 object layout ownership, but less of the bridge-controller logic and less diagnostic scaffolding

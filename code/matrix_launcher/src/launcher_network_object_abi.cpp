@@ -15,7 +15,7 @@ struct DiagnosticLauncherLockHelper {
     CRITICAL_SECTION crit;  // +0x04..+0x1b
 };
 
-struct MinimalLauncherObjectStub {
+struct LauncherObjectAbiShell {
     void** vtable;              // +0x00
     uint32_t field04;           // +0x04 ctor arg in original (0 from 0x40a380)
     void* field08;              // +0x08 pointer array in base ctor (NULL when field04==0)
@@ -52,20 +52,20 @@ struct DiagnosticIntrusiveListHeadSmall {
 };
 
 static_assert(sizeof(DiagnosticLauncherLockHelper) == 0x1c, "launcher lock helper size mismatch");
-static_assert(sizeof(MinimalLauncherObjectStub) == 0xb4, "launcher object scaffold size must match original allocation");
+static_assert(sizeof(LauncherObjectAbiShell) == 0xb4, "launcher object scaffold size must match original allocation");
 static_assert(sizeof(DiagnosticIntrusiveListHead) == 0x24, "list80 scaffold size mismatch");
 static_assert(sizeof(DiagnosticIntrusiveListHeadSmall) == 0x18, "list8C scaffold size mismatch");
 
-static MinimalLauncherObjectStub* g_CurrentLauncherObject = NULL;
+static LauncherObjectAbiShell* g_CurrentLauncherObject = NULL;
 static uint32_t g_LauncherObjectBuildGeneration = 0;
 static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding* g_DiagnosticLttcpBinding = NULL;
 static void* g_LauncherObjectVtable[13] = {0};
 static void* g_LauncherObjectSubVtable5C[2] = {0};
 static void* g_LauncherObjectSubVtable60[2] = {0};
 static void* g_LauncherObjectSubVtable98[2] = {0};
-static void DiagnosticSyncLauncherObjectSidecarState(MinimalLauncherObjectStub* self);
+static void DiagnosticSyncLauncherObjectSidecarState(LauncherObjectAbiShell* self);
 // UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
-static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEngine(MinimalLauncherObjectStub* owner);
+static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEngine(LauncherObjectAbiShell* owner);
 
 static void InitializeDiagnosticIntrusiveListHead(DiagnosticIntrusiveListHead* head) {
     if (!head) return;
@@ -104,11 +104,11 @@ static bool DiagnosticInitializeLauncherQueue(DiagnosticLauncherQueue* queue, ui
 // request owner-visible arg5 state refresh without pulling raw launcher-object layout knowledge
 // back into loginmediator.cpp.
 static void DiagnosticLauncherObjectStateSyncTrampoline(void* ownerPtr) {
-    DiagnosticSyncLauncherObjectSidecarState(static_cast<MinimalLauncherObjectStub*>(ownerPtr));
+    DiagnosticSyncLauncherObjectSidecarState(static_cast<LauncherObjectAbiShell*>(ownerPtr));
 }
 
 // UNANCHORED: replacement arg5 owner/binding cleanup helper.
-static void DiagnosticClearLttcpBinding(MinimalLauncherObjectStub* owner) {
+static void DiagnosticClearLttcpBinding(LauncherObjectAbiShell* owner) {
     if (owner && g_DiagnosticLttcpBinding && g_DiagnosticLttcpBinding->Owner() != owner) {
         return;
     }
@@ -122,7 +122,7 @@ static void DiagnosticClearLttcpBinding(MinimalLauncherObjectStub* owner) {
 
 // UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
 static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEngine(
-    MinimalLauncherObjectStub* owner) {
+    LauncherObjectAbiShell* owner) {
     if (!owner) return NULL;
 
     if (!g_DiagnosticLttcpBinding) {
@@ -152,7 +152,7 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetLauncherObjectEngine(void* ownerPtr) {
-    return DiagnosticGetOrCreateLttcpEngine(static_cast<MinimalLauncherObjectStub*>(ownerPtr));
+    return DiagnosticGetOrCreateLttcpEngine(static_cast<LauncherObjectAbiShell*>(ownerPtr));
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -182,7 +182,7 @@ static void DiagnosticSetListHeadOccupancySmall(DiagnosticIntrusiveListHeadSmall
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-static void DiagnosticSyncLauncherObjectSidecarState(MinimalLauncherObjectStub* self) {
+static void DiagnosticSyncLauncherObjectSidecarState(LauncherObjectAbiShell* self) {
     if (!self) return;
 
     if (g_DiagnosticLttcpBinding && g_DiagnosticLttcpBinding->Owner() == self && g_DiagnosticLttcpBinding->Engine()) {
@@ -208,7 +208,7 @@ static void DiagnosticSyncLauncherObjectSidecarState(MinimalLauncherObjectStub* 
 }
 
 // UNANCHORED: replacement arg5 internal teardown helper.
-static void DiagnosticFreeLauncherObjectInternals(MinimalLauncherObjectStub* self) {
+static void DiagnosticFreeLauncherObjectInternals(LauncherObjectAbiShell* self) {
     if (!self) return;
     DiagnosticClearLttcpBinding(self);
     DiagnosticFreeLauncherQueue(&self->queue0C);
@@ -231,7 +231,7 @@ static void DiagnosticFreeLauncherObjectInternals(MinimalLauncherObjectStub* sel
 
 // anchor: launcher.exe:0x4319a0
 // vtable: launcher.exe:0x004b2768 slot +0x00
-static int __thiscall LauncherObject_Release(MinimalLauncherObjectStub* self, uint32_t flags) {
+static int __thiscall LauncherObject_Release(LauncherObjectAbiShell* self, uint32_t flags) {
     (void)flags;
     DiagnosticFreeLauncherObjectInternals(self);
     return 1;
@@ -240,7 +240,7 @@ static int __thiscall LauncherObject_Release(MinimalLauncherObjectStub* self, ui
 // anchor: launcher.exe:0x431ce0
 // vtable: launcher.exe:0x004b2768 slot +0x04
 static uint32_t __thiscall LauncherObject_MonitorPort(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* port,
     void* ownerContext,
     void* reservedArg3) {
@@ -258,7 +258,7 @@ static uint32_t __thiscall LauncherObject_MonitorPort(
 // anchor: launcher.exe:0x4325d0
 // vtable: launcher.exe:0x004b2768 slot +0x08
 static uint32_t __thiscall LauncherObject_UDPMonitorPort(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* port,
     void* contextKey,
     void* ownerContext) {
@@ -276,7 +276,7 @@ static uint32_t __thiscall LauncherObject_UDPMonitorPort(
 // anchor: launcher.exe:0x436000
 // vtable: launcher.exe:0x004b2768 slot +0x0c
 static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* outBoundPortHostOrder,
     void* contextKey,
     void* ownerContext) {
@@ -295,7 +295,7 @@ static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
 // anchor: launcher.exe:0x42f7c0
 // vtable: launcher.exe:0x004b2768 slot +0x10
 static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* arg1) {
     mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
     return engine ? engine->Slot4_42F7C0(arg1) : 0u;
@@ -304,7 +304,7 @@ static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
 // anchor: launcher.exe:0x431840
 // vtable: launcher.exe:0x004b2768 slot +0x14
 static uint32_t __thiscall LauncherObject_UnmonitorPort(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* port,
     uint32_t* outSocketHandle,
     void* ipv4NetworkOrder) {
@@ -322,7 +322,7 @@ static uint32_t __thiscall LauncherObject_UnmonitorPort(
 // anchor: launcher.exe:0x4328a0
 // vtable: launcher.exe:0x004b2768 slot +0x18
 static uint32_t __thiscall LauncherObject_Connect(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* contextKey) {
     mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
     if (!engine) {
@@ -335,7 +335,7 @@ static uint32_t __thiscall LauncherObject_Connect(
 // anchor: launcher.exe:0x42f970
 // vtable: launcher.exe:0x004b2768 slot +0x1c
 static uint32_t __thiscall LauncherObject_Close(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* contextKey,
     uint32_t graceful) {
     mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
@@ -349,7 +349,7 @@ static uint32_t __thiscall LauncherObject_Close(
 // anchor: launcher.exe:0x42fbd0
 // vtable: launcher.exe:0x004b2768 slot +0x20
 static uint32_t __thiscall LauncherObject_SendBuffer(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* contextKey,
     void* buffer,
     void* byteCount,
@@ -369,7 +369,7 @@ static uint32_t __thiscall LauncherObject_SendBuffer(
 // anchor: launcher.exe:0x42fd10
 // vtable: launcher.exe:0x004b2768 slot +0x24
 static uint32_t __thiscall LauncherObject_Slot9_42FD10(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* arg1,
     void* arg2,
     void* arg3,
@@ -382,29 +382,24 @@ static uint32_t __thiscall LauncherObject_Slot9_42FD10(
 // anchor: launcher.exe:0x443810
 // vtable: launcher.exe:0x004b2768 slot +0x28
 static uint32_t __thiscall LauncherObject_Slot10_443810(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* arg1) {
     mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
     return engine ? engine->Slot10_443810(arg1) : 0u;
 }
 
+// UNANCHORED: shared lock-helper enter for the current arg5 +0x60/+0x98 helper family.
+static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self);
+// UNANCHORED: shared lock-helper leave for the current arg5 +0x60/+0x98 helper family.
+static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self);
 // anchor: launcher.exe:0x4147b0
-// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60 / arg5+0x98)
+// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self);
-// anchor: launcher.exe:0x4147c0
-// vtable: launcher.exe:0x4add70-family helper slot +0x04 (arg5+0x60 / arg5+0x98)
-static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self);
-// anchor: launcher.exe:0x4147b0
-// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x98)
-static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self);
-// anchor: launcher.exe:0x4147c0
-// vtable: launcher.exe:0x4add70-family helper slot +0x04 (arg5+0x98)
-static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self);
 
 // anchor: launcher.exe:0x431670
 // vtable: launcher.exe:0x004b2768 slot +0x2c
 static uint32_t __thiscall LauncherObject_Slot11_431670(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* arg1,
     uint32_t* out0,
     uint32_t* out1) {
@@ -415,14 +410,14 @@ static uint32_t __thiscall LauncherObject_Slot11_431670(
 // anchor: launcher.exe:0x4316a0
 // vtable: launcher.exe:0x004b2768 slot +0x30
 static uint32_t __thiscall LauncherObject_CleanupConnection(
-    MinimalLauncherObjectStub* self,
+    LauncherObjectAbiShell* self,
     void* contextKey) {
-    LauncherObject_Subobject98_Slot0(&self->helper98);
+    LauncherObject_LockHelper_Slot0(&self->helper98);
 
     mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
     const uint32_t result = engine ? engine->CleanupConnection(contextKey) : 0u;
 
-    LauncherObject_Subobject98_Slot1(&self->helper98);
+    LauncherObject_LockHelper_Slot1(&self->helper98);
     return result;
 }
 
@@ -432,9 +427,9 @@ static CRITICAL_SECTION* DiagnosticLauncherCritFromHelper(void* self) {
 }
 
 // UNANCHORED: helper-to-owner backpointer used by the current arg5 subobject helper scaffolds.
-static MinimalLauncherObjectStub* DiagnosticLauncherObjectFromHelper(void* helperSelf, size_t helperOffset) {
+static LauncherObjectAbiShell* DiagnosticLauncherObjectFromHelper(void* helperSelf, size_t helperOffset) {
     return helperSelf
-        ? reinterpret_cast<MinimalLauncherObjectStub*>(static_cast<unsigned char*>(helperSelf) - helperOffset)
+        ? reinterpret_cast<LauncherObjectAbiShell*>(static_cast<unsigned char*>(helperSelf) - helperOffset)
         : NULL;
 }
 
@@ -467,7 +462,7 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
     void* helper60 = self ? static_cast<unsigned char*>(self) + 4 : NULL;
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
     if (helper60) {
-        LauncherObject_Subobject60_Slot1(helper60);
+        LauncherObject_LockHelper_Slot1(helper60);
     }
 
     const DWORD waitResult = eventHandle ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reason)) : WAIT_FAILED;
@@ -490,7 +485,7 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
 // vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     LauncherObject_LockHelper_Slot0(self);
-    if (MinimalLauncherObjectStub* owner = DiagnosticLauncherObjectFromHelper(self, 0x60)) {
+    if (LauncherObjectAbiShell* owner = DiagnosticLauncherObjectFromHelper(self, 0x60)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetLauncherObjectEngine(owner)) {
             engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
         }
@@ -498,23 +493,6 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     return 0u;
 }
 
-// anchor: launcher.exe:0x4147c0
-// vtable: launcher.exe:0x4add70-family helper slot +0x04 (arg5+0x60)
-static uint32_t __thiscall LauncherObject_Subobject60_Slot1(void* self) {
-    return LauncherObject_LockHelper_Slot1(self);
-}
-
-// anchor: launcher.exe:0x4147b0
-// vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x98)
-static uint32_t __thiscall LauncherObject_Subobject98_Slot0(void* self) {
-    return LauncherObject_LockHelper_Slot0(self);
-}
-
-// anchor: launcher.exe:0x4147c0
-// vtable: launcher.exe:0x4add70-family helper slot +0x04 (arg5+0x98)
-static uint32_t __thiscall LauncherObject_Subobject98_Slot1(void* self) {
-    return LauncherObject_LockHelper_Slot1(self);
-}
 
 // UNANCHORED: seeds the replacement arg5 ABI vtables from recovered launcher.exe addresses.
 static void InitializeLauncherObjectStub() {
@@ -542,13 +520,13 @@ static void InitializeLauncherObjectStub() {
     g_LauncherObjectSubVtable5C[0] = (void*)LauncherObject_Subobject5C_Slot0; // base +0x5c helper slot 0x435f90
     g_LauncherObjectSubVtable5C[1] = (void*)LauncherObject_Subobject5C_Slot1; // base +0x5c helper slot 0x435fa0
     g_LauncherObjectSubVtable60[0] = (void*)LauncherObject_Subobject60_Slot0; // base +0x60 helper slot 0x4147b0
-    g_LauncherObjectSubVtable60[1] = (void*)LauncherObject_Subobject60_Slot1; // base +0x60 helper slot 0x4147c0
-    g_LauncherObjectSubVtable98[0] = (void*)LauncherObject_Subobject98_Slot0; // derived +0x98 helper slot
-    g_LauncherObjectSubVtable98[1] = (void*)LauncherObject_Subobject98_Slot1; // derived +0x98 helper slot
+    g_LauncherObjectSubVtable60[1] = (void*)LauncherObject_LockHelper_Slot1;  // base +0x60 helper slot 0x4147c0
+    g_LauncherObjectSubVtable98[0] = (void*)LauncherObject_LockHelper_Slot0;  // derived +0x98 helper slot 0x4147b0
+    g_LauncherObjectSubVtable98[1] = (void*)LauncherObject_LockHelper_Slot1;  // derived +0x98 helper slot 0x4147c0
 }
 
 // UNANCHORED: replacement launcher builder mirroring launcher.exe:0x40a380 -> 0x431c30.
-static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
+static LauncherObjectAbiShell* DiagnosticBuildLauncherObjectLike40A380() {
     InitializeLauncherObjectStub();
 
     if (g_CurrentLauncherObject) {
@@ -561,12 +539,12 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
         g_CurrentLauncherObject = NULL;
     }
 
-    MinimalLauncherObjectStub* object =
-        static_cast<MinimalLauncherObjectStub*>(std::malloc(sizeof(MinimalLauncherObjectStub)));
+    LauncherObjectAbiShell* object =
+        static_cast<LauncherObjectAbiShell*>(std::malloc(sizeof(LauncherObjectAbiShell)));
     if (!object) {
         spdlog::info(
             "DIAGNOSTIC: failed to allocate launcher object scaffold (size=0x{:x})",
-            static_cast<size_t>(sizeof(MinimalLauncherObjectStub)));
+            static_cast<size_t>(sizeof(LauncherObjectAbiShell)));
         return NULL;
     }
 
@@ -625,7 +603,7 @@ static MinimalLauncherObjectStub* DiagnosticBuildLauncherObjectLike40A380() {
     spdlog::info(
         "DIAGNOSTIC: built launcher object scaffold like 0x40a380/0x431c30 ptr={} size={} generation={}",
         fmt::ptr(object),
-        sizeof(MinimalLauncherObjectStub),
+        sizeof(LauncherObjectAbiShell),
         g_LauncherObjectBuildGeneration);
     spdlog::info(
         "DIAGNOSTIC: launcher object scaffold notes: field04=0 field08=NULL +0x0c/+0x34 faithful queue skeletons initialized +0x80/+0x8c intrusive heads allocated +0x5c/+0x60/+0x98 seeded to minimal ABI helpers, full primary 13-slot vtable surface exposed");
@@ -654,7 +632,7 @@ static void DiagnosticRegisterLauncherObjectWithMediator(void* mediatorPtr, void
 
 // UNANCHORED: public replacement-launcher entrypoint that installs the arg5 scaffold.
 void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr) {
-    MinimalLauncherObjectStub* object = DiagnosticBuildLauncherObjectLike40A380();
+    LauncherObjectAbiShell* object = DiagnosticBuildLauncherObjectLike40A380();
     if (outLauncherObjectPtr) {
         *outLauncherObjectPtr = object;
     }
@@ -662,7 +640,7 @@ void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* medi
     spdlog::info(
         "DIAGNOSTIC: using launcher object scaffold for arg5 ptr={} size={}",
         fmt::ptr(object),
-        sizeof(MinimalLauncherObjectStub));
+        sizeof(LauncherObjectAbiShell));
 
     if (object) {
         DiagnosticGetOrCreateLttcpEngine(object);
