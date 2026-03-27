@@ -7,6 +7,7 @@
 #include <ws2tcpip.h>
 
 #include <cstring>
+#include <utility>
 
 namespace mxo::liblttcp {
 
@@ -63,6 +64,126 @@ struct CLTThreadPerClientTCPEngine_QueuePair {
     uint32_t value0;
     uint32_t value1;
 };
+
+static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
+
+// UNANCHORED internal helper used by the current thread-object scaffolds.
+static void CloseSocketHandle(uint32_t* socketHandle) {
+    if (!socketHandle || *socketHandle == kInvalidSocketHandle) {
+        return;
+    }
+
+    closesocket(static_cast<SOCKET>(*socketHandle));
+    *socketHandle = kInvalidSocketHandle;
+}
+
+// anchor: launcher.exe:0x452270 / 0x452300 / 0x452320 helper family shape
+static uint32_t CreateConnectedWakeupSocketHandle() {
+    if (!EnsureWinsockReady()) {
+        return kInvalidSocketHandle;
+    }
+
+    SOCKET wakeupSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (wakeupSocket == INVALID_SOCKET) {
+        return kInvalidSocketHandle;
+    }
+
+    sockaddr_in wakeupAddr = {};
+    wakeupAddr.sin_family = AF_INET;
+    wakeupAddr.sin_port = htons(0);
+    wakeupAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+
+    if (bind(wakeupSocket, reinterpret_cast<const sockaddr*>(&wakeupAddr), sizeof(wakeupAddr)) == SOCKET_ERROR) {
+        closesocket(wakeupSocket);
+        return kInvalidSocketHandle;
+    }
+
+    int wakeupAddrSize = sizeof(wakeupAddr);
+    if (getsockname(wakeupSocket, reinterpret_cast<sockaddr*>(&wakeupAddr), &wakeupAddrSize) == SOCKET_ERROR) {
+        closesocket(wakeupSocket);
+        return kInvalidSocketHandle;
+    }
+
+    if (connect(wakeupSocket, reinterpret_cast<const sockaddr*>(&wakeupAddr), sizeof(wakeupAddr)) == SOCKET_ERROR) {
+        closesocket(wakeupSocket);
+        return kInvalidSocketHandle;
+    }
+
+    return static_cast<uint32_t>(wakeupSocket);
+}
+
+// anchor: launcher.exe:0x452320 helper shape
+static void SignalWakeupSocketHandle(uint32_t socketHandle) {
+    if (socketHandle == kInvalidSocketHandle) {
+        return;
+    }
+
+    (void)send(static_cast<SOCKET>(socketHandle), "", 0, 0);
+}
+
+// UNANCHORED internal helper used by the current MonitorPort scaffold.
+static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
+    if (!EnsureWinsockReady()) {
+        return kInvalidSocketHandle;
+    }
+
+    SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (listenSocket == INVALID_SOCKET) {
+        return kInvalidSocketHandle;
+    }
+
+    sockaddr_in listenAddr = {};
+    listenAddr.sin_family = AF_INET;
+    listenAddr.sin_port = htons(portHostOrder);
+    listenAddr.sin_addr.s_addr = ipv4NetworkOrder;
+
+    if (bind(listenSocket, reinterpret_cast<const sockaddr*>(&listenAddr), sizeof(listenAddr)) == SOCKET_ERROR) {
+        closesocket(listenSocket);
+        return kInvalidSocketHandle;
+    }
+
+    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
+        closesocket(listenSocket);
+        return kInvalidSocketHandle;
+    }
+
+    return static_cast<uint32_t>(listenSocket);
+}
+
+// UNANCHORED internal helper used by the current UDPMonitorPort scaffold.
+static uint32_t OpenUdpMonitorSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
+    if (!EnsureWinsockReady()) {
+        return kInvalidSocketHandle;
+    }
+
+    SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (udpSocket == INVALID_SOCKET) {
+        return kInvalidSocketHandle;
+    }
+
+    BOOL reuseAddr = TRUE;
+    if (setsockopt(
+            udpSocket,
+            SOL_SOCKET,
+            SO_REUSEADDR,
+            reinterpret_cast<const char*>(&reuseAddr),
+            sizeof(reuseAddr)) == SOCKET_ERROR) {
+        closesocket(udpSocket);
+        return kInvalidSocketHandle;
+    }
+
+    sockaddr_in bindAddr = {};
+    bindAddr.sin_family = AF_INET;
+    bindAddr.sin_port = htons(portHostOrder);
+    bindAddr.sin_addr.s_addr = ipv4NetworkOrder;
+
+    if (bind(udpSocket, reinterpret_cast<const sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR) {
+        closesocket(udpSocket);
+        return kInvalidSocketHandle;
+    }
+
+    return static_cast<uint32_t>(udpSocket);
+}
 
 // UNANCHORED internal scaffold helper used by Queue_PushPair growth handling.
 static bool RecenterQueueSlots(
@@ -241,7 +362,11 @@ uint32_t CLTThread::PreRun() {
 void CLTThread::Run() {}
 
 // anchor: launcher.exe:0x452770
-void CLTThread::LogExit() {}
+void CLTThread::LogExit() {
+    if (!threadName_.empty()) {
+        spdlog::debug("{} exiting.", threadName_);
+    }
+}
 
 // anchor: launcher.exe:0x4365a0
 CLTThreadPerClientTCPEngine_QueueThread::CLTThreadPerClientTCPEngine_QueueThread(
@@ -249,7 +374,7 @@ CLTThreadPerClientTCPEngine_QueueThread::CLTThreadPerClientTCPEngine_QueueThread
     : CLTThread("ILTTCPEngine::QueueThread"),
       owner_(owner) {}
 
-// UNANCHORED scaffold dtor; current vtable/dtor mapping still reuses the shared CLTThread deleting dtor
+// current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
 CLTThreadPerClientTCPEngine_QueueThread::~CLTThreadPerClientTCPEngine_QueueThread() = default;
 
 // UNANCHORED scaffold accessor for the recovered child +0x38 owner field
@@ -262,6 +387,87 @@ void CLTThreadPerClientTCPEngine_QueueThread::Run() {
     if (owner_) {
         owner_->RunCompletedOperationQueue(/*nonBlocking=*/false);
     }
+}
+
+// anchor: launcher.exe:0x431ab0
+CLTThreadPerClientTCPEngine_AcceptThread::CLTThreadPerClientTCPEngine_AcceptThread(
+    uint32_t listenSocketHandle,
+    void* ownerContext)
+    : CLTThread("CLTThreadPerClientTCPEngine::AcceptThread"),
+      ownerContext_(ownerContext),
+      listenSocketHandle_(listenSocketHandle),
+      wakeupSocketHandle_(CreateConnectedWakeupSocketHandle()) {}
+
+// anchor: launcher.exe:0x431b30 deleting wrapper / +0x40 wakeup helper teardown
+CLTThreadPerClientTCPEngine_AcceptThread::~CLTThreadPerClientTCPEngine_AcceptThread() {
+    CloseSocketHandle(&wakeupSocketHandle_);
+}
+
+void* CLTThreadPerClientTCPEngine_AcceptThread::OwnerContext() const {
+    return ownerContext_;
+}
+
+uint32_t CLTThreadPerClientTCPEngine_AcceptThread::ListenSocketHandle() const {
+    return listenSocketHandle_;
+}
+
+uint32_t CLTThreadPerClientTCPEngine_AcceptThread::WakeupSocketHandle() const {
+    return wakeupSocketHandle_;
+}
+
+void CLTThreadPerClientTCPEngine_AcceptThread::SignalWakeup() {
+    SignalWakeupSocketHandle(wakeupSocketHandle_);
+}
+
+// anchor: launcher.exe:0x432070
+void CLTThreadPerClientTCPEngine_AcceptThread::Run() {
+    // Current source ownership only models the class/vtable/wakeup surface.
+    // The full accept loop remains a later fidelity target.
+}
+
+// anchor: launcher.exe:0x431b60
+CLTThreadPerClientTCPEngine_WorkerThread::CLTThreadPerClientTCPEngine_WorkerThread(
+    void* contextKey,
+    bool datagramMode)
+    : CLTThread("CLTThreadPerClientTCPEngine::WorkerThread"),
+      contextKey_(contextKey),
+      datagramMode_(datagramMode),
+      wakeupSocketHandle_(CreateConnectedWakeupSocketHandle()),
+      exitRequested_(false) {}
+
+// anchor: launcher.exe:0x431be0 deleting wrapper / +0x40 wakeup helper teardown
+CLTThreadPerClientTCPEngine_WorkerThread::~CLTThreadPerClientTCPEngine_WorkerThread() {
+    CloseSocketHandle(&wakeupSocketHandle_);
+}
+
+void* CLTThreadPerClientTCPEngine_WorkerThread::ContextKey() const {
+    return contextKey_;
+}
+
+bool CLTThreadPerClientTCPEngine_WorkerThread::DatagramMode() const {
+    return datagramMode_;
+}
+
+uint32_t CLTThreadPerClientTCPEngine_WorkerThread::WakeupSocketHandle() const {
+    return wakeupSocketHandle_;
+}
+
+bool CLTThreadPerClientTCPEngine_WorkerThread::ExitRequested() const {
+    return exitRequested_;
+}
+
+void CLTThreadPerClientTCPEngine_WorkerThread::RequestExit() {
+    exitRequested_ = true;
+}
+
+void CLTThreadPerClientTCPEngine_WorkerThread::SignalWakeup() {
+    SignalWakeupSocketHandle(wakeupSocketHandle_);
+}
+
+// anchor: launcher.exe:0x42fe50
+void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
+    // Current source ownership only models the class/vtable/wakeup/exit-request surface.
+    // The full socket worker loop remains a later fidelity target.
 }
 
 // anchor: launcher.exe:0x436340
@@ -501,8 +707,7 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
       queueThreads_(),
       monitoredPorts_(),
       workerThreads_(),
-      messageConnections_(),
-      nextSyntheticSocketHandle_(0x100) {
+      messageConnections_() {
     // Original base ctor 0x4366f0 allocates queue-thread children only when the effective
     // ctor flag/count at +0x04 is non-zero. The current scaffold still enters through a
     // zero-count binder path, so keep the recovered child family in source but default it empty.
@@ -513,6 +718,16 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
 // vtable: launcher.exe:0x004b2768
 // NOTE: starter C++ destructor only models local sidecar cleanup, not the full original dtor body.
 CLTThreadPerClientTCPEngine::~CLTThreadPerClientTCPEngine() {
+    for (AcceptThreadRecord& record : monitoredPorts_) {
+        StopAcceptThreadScaffold(&record);
+    }
+    monitoredPorts_.clear();
+
+    for (WorkerThreadRecord& record : workerThreads_) {
+        StopWorkerThreadScaffold(&record);
+    }
+    workerThreads_.clear();
+
     for (CMessageConnection* connection : messageConnections_) {
         delete connection;
     }
@@ -532,7 +747,8 @@ int CLTThreadPerClientTCPEngine::Release(uint32_t flags) {
 // anchor: launcher.exe:0x431ce0
 // vtable: launcher.exe:0x004b2768 slot +0x04
 uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) {
-    const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, 0);
+    const uint32_t ipv4NetworkOrder = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(reservedArg3));
+    const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
     if (FindMonitoredPort(key)) {
         return kResultAlreadyMonitored;
     }
@@ -540,28 +756,50 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* 
     AcceptThreadRecord record = {};
     record.endpoint = key;
     record.ownerContext = ownerContext;
-    record.listenSocketHandle = nextSyntheticSocketHandle_++;
-    record.shouldRun = true;
-    monitoredPorts_.push_back(record);
-    (void)reservedArg3;
+    record.listenSocketHandle = OpenTcpListenSocket(portHostOrder, ipv4NetworkOrder);
+    if (record.listenSocketHandle == kInvalidSocketHandle) {
+        return 0;
+    }
+
+    record.thread = std::make_unique<CLTThreadPerClientTCPEngine_AcceptThread>(
+        record.listenSocketHandle,
+        ownerContext);
+    if (!record.thread) {
+        CloseSocketHandle(&record.listenSocketHandle);
+        return 0;
+    }
+
+    (void)record.thread->Start(/*startPriority=*/2);
+    monitoredPorts_.push_back(std::move(record));
     return kResultSuccess;
 }
 
 // anchor: launcher.exe:0x4325d0
 // vtable: launcher.exe:0x004b2768 slot +0x08
 uint32_t CLTThreadPerClientTCPEngine::UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext) {
-    (void)portHostOrder;
-
     WorkerThreadRecord worker = {};
     worker.contextKey = contextKey;
     worker.ownerContext = ownerContext;
-    worker.socketHandle = nextSyntheticSocketHandle_++;
-    worker.state = LTTCPEngineConnectionState::kUdpMonitorActive;
+    worker.socketHandle = OpenUdpMonitorSocket(portHostOrder, /*ipv4NetworkOrder=*/0);
+    if (worker.socketHandle == kInvalidSocketHandle) {
+        return 0;
+    }
 
+    worker.state = LTTCPEngineConnectionState::kUdpMonitorActive;
+    worker.thread = std::make_unique<CLTThreadPerClientTCPEngine_WorkerThread>(
+        contextKey,
+        /*datagramMode=*/true);
+    if (!worker.thread) {
+        CloseSocketHandle(&worker.socketHandle);
+        return 0;
+    }
+
+    (void)worker.thread->Start(/*startPriority=*/2);
     if (WorkerThreadRecord* existing = FindWorker(contextKey)) {
-        *existing = worker;
+        StopWorkerThreadScaffold(existing);
+        *existing = std::move(worker);
     } else {
-        workerThreads_.push_back(worker);
+        workerThreads_.push_back(std::move(worker));
     }
     return kResultSuccess;
 }
@@ -574,6 +812,17 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorEphemeralUDPPort(uint16_t* outBound
     const uint32_t result = UDPMonitorPort(/*portHostOrder=*/0, contextKey, ownerContext);
     if (result == kResultSuccess && outBoundPortHostOrder) {
         *outBoundPortHostOrder = 0;
+        if (WorkerThreadRecord* worker = FindWorker(contextKey)) {
+            sockaddr_in boundAddr = {};
+            int boundAddrSize = sizeof(boundAddr);
+            if (worker->socketHandle != kInvalidSocketHandle &&
+                getsockname(
+                    static_cast<SOCKET>(worker->socketHandle),
+                    reinterpret_cast<sockaddr*>(&boundAddr),
+                    &boundAddrSize) == 0) {
+                *outBoundPortHostOrder = ntohs(boundAddr.sin_port);
+            }
+        }
     }
     return result;
 }
@@ -595,6 +844,7 @@ uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint
             if (outSocketHandle) {
                 *outSocketHandle = it->listenSocketHandle;
             }
+            StopAcceptThreadScaffold(&(*it));
             monitoredPorts_.erase(it);
             return 0;
         }
@@ -633,11 +883,20 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
     worker.ownerContext = ownerContext;
     worker.socketHandle = static_cast<uint32_t>(sock);
     worker.state = LTTCPEngineConnectionState::kConnectActive;
+    worker.thread = std::make_unique<CLTThreadPerClientTCPEngine_WorkerThread>(
+        contextKey,
+        /*datagramMode=*/false);
+    if (!worker.thread) {
+        CloseSocketHandle(&worker.socketHandle);
+        return 0;
+    }
 
+    (void)worker.thread->Start(/*startPriority=*/2);
     if (WorkerThreadRecord* existing = FindWorker(contextKey)) {
-        *existing = worker;
+        StopWorkerThreadScaffold(existing);
+        *existing = std::move(worker);
     } else {
-        workerThreads_.push_back(worker);
+        workerThreads_.push_back(std::move(worker));
     }
     return kResultSuccess;
 }
@@ -690,14 +949,27 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
     if (!connection) {
         return 0;
     }
-    return connection->Close(graceful);
+
+    const uint32_t result = connection->Close(graceful);
+    if (result != 0) {
+        void* contextKey = connection->OwnerContext() ? connection->OwnerContext() : static_cast<void*>(connection);
+        if (WorkerThreadRecord* worker = FindWorker(contextKey)) {
+            worker->socketHandle = connection->SocketHandle();
+            worker->state = connection->State();
+            if (worker->thread) {
+                worker->thread->RequestExit();
+                worker->thread->SignalWakeup();
+            }
+        }
+    }
+    return result;
 }
 
 // anchor: launcher.exe:0x42f970
 // vtable: launcher.exe:0x004b2768 slot +0x1c
 uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
     CMessageConnection* connection = GetOrCreateMessageConnection(contextKey);
-    return connection ? connection->Close(graceful) : 0u;
+    return connection ? CloseConnectionScaffold(static_cast<CLTTCPConnection*>(connection), graceful) : 0u;
 }
 
 // UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
@@ -751,11 +1023,12 @@ uint32_t CLTThreadPerClientTCPEngine::Slot11_431670(void* arg1, uint32_t* out0, 
 uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     if (CMessageConnection* connection = FindMessageConnection(contextKey)) {
         connection->SetState(LTTCPEngineConnectionState::kClosed);
-        connection->SetSocketHandle(0xffffffffu);
+        connection->SetSocketHandle(kInvalidSocketHandle);
     }
 
     for (auto it = workerThreads_.begin(); it != workerThreads_.end(); ++it) {
         if (it->contextKey == contextKey) {
+            StopWorkerThreadScaffold(&(*it));
             workerThreads_.erase(it);
             return kResultSuccess;
         }
@@ -938,6 +1211,36 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Fi
         }
     }
     return nullptr;
+}
+
+void CLTThreadPerClientTCPEngine::StopAcceptThreadScaffold(AcceptThreadRecord* record) {
+    if (!record) {
+        return;
+    }
+
+    if (record->thread) {
+        record->thread->SignalWakeup();
+        (void)record->thread->Stop(/*waitAfterTerminate=*/true);
+        record->thread.reset();
+    }
+
+    CloseSocketHandle(&record->listenSocketHandle);
+}
+
+void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(WorkerThreadRecord* record) {
+    if (!record) {
+        return;
+    }
+
+    if (record->thread) {
+        record->thread->RequestExit();
+        record->thread->SignalWakeup();
+        (void)record->thread->Stop(/*waitAfterTerminate=*/true);
+        record->thread.reset();
+    }
+
+    CloseSocketHandle(&record->socketHandle);
+    record->state = LTTCPEngineConnectionState::kClosed;
 }
 
 // UNANCHORED starter binding helper.

@@ -120,7 +120,7 @@ class CLTThreadPerClientTCPEngine_QueueThread : public CLTThread {
 public:
     // anchor: launcher.exe:0x4365a0
     explicit CLTThreadPerClientTCPEngine_QueueThread(CLTThreadPerClientTCPEngine* owner);
-    // UNANCHORED scaffold dtor; current vtable/dtor mapping still reuses the shared CLTThread deleting dtor
+    // current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
     ~CLTThreadPerClientTCPEngine_QueueThread() override;
 
     // UNANCHORED scaffold accessor for the recovered child +0x38 owner field
@@ -132,6 +132,66 @@ protected:
 
 private:
     CLTThreadPerClientTCPEngine* owner_;
+};
+
+// Recovered accept-thread child stored as the +0x80 endpoint-tree payload.
+// Current high-confidence shape from 0x431ab0 / 0x431b30:
+// - inherits generic CLTThread-style base state
+// - stores owner/context-like state at +0x38
+// - stores the listening socket handle at +0x3c
+// - owns a wakeup socket helper at +0x40
+class CLTThreadPerClientTCPEngine_AcceptThread : public CLTThread {
+public:
+    // anchor: launcher.exe:0x431ab0
+    CLTThreadPerClientTCPEngine_AcceptThread(uint32_t listenSocketHandle, void* ownerContext);
+    // anchor: launcher.exe:0x431b30 deleting wrapper / +0x40 wakeup helper teardown
+    ~CLTThreadPerClientTCPEngine_AcceptThread() override;
+
+    void* OwnerContext() const;
+    uint32_t ListenSocketHandle() const;
+    uint32_t WakeupSocketHandle() const;
+    void SignalWakeup();
+
+protected:
+    // anchor: launcher.exe:0x432070
+    void Run() override;
+
+private:
+    void* ownerContext_;
+    uint32_t listenSocketHandle_;
+    uint32_t wakeupSocketHandle_;
+};
+
+// Recovered worker-thread child stored as the +0x8c context-tree payload.
+// Current high-confidence shape from 0x431b60 / 0x431be0:
+// - inherits generic CLTThread-style base state
+// - stores the context/connection key at +0x38
+// - stores a mode byte at +0x3c
+// - owns a wakeup socket helper at +0x40
+// - stores an exit-request flag at +0x44
+class CLTThreadPerClientTCPEngine_WorkerThread : public CLTThread {
+public:
+    // anchor: launcher.exe:0x431b60
+    CLTThreadPerClientTCPEngine_WorkerThread(void* contextKey, bool datagramMode);
+    // anchor: launcher.exe:0x431be0 deleting wrapper / +0x40 wakeup helper teardown
+    ~CLTThreadPerClientTCPEngine_WorkerThread() override;
+
+    void* ContextKey() const;
+    bool DatagramMode() const;
+    uint32_t WakeupSocketHandle() const;
+    bool ExitRequested() const;
+    void RequestExit();
+    void SignalWakeup();
+
+protected:
+    // anchor: launcher.exe:0x42fe50
+    void Run() override;
+
+private:
+    void* contextKey_;
+    bool datagramMode_;
+    uint32_t wakeupSocketHandle_;
+    bool exitRequested_;
 };
 
 // Reimplementation note:
@@ -161,7 +221,7 @@ public:
         LTTCPEndpointKey endpoint;
         void* ownerContext = nullptr;
         uint32_t listenSocketHandle = 0xffffffffu;
-        bool shouldRun = true;
+        std::unique_ptr<CLTThreadPerClientTCPEngine_AcceptThread> thread;
     };
 
     struct WorkerThreadRecord {
@@ -169,6 +229,7 @@ public:
         void* ownerContext = nullptr;
         uint32_t socketHandle = 0xffffffffu;
         LTTCPEngineConnectionState state = LTTCPEngineConnectionState::kClosed;
+        std::unique_ptr<CLTThreadPerClientTCPEngine_WorkerThread> thread;
     };
 
     // anchor: launcher.exe:0x431c30 / base ctor 0x4366f0
@@ -243,6 +304,8 @@ private:
     static LTTCPEndpointKey MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
     AcceptThreadRecord* FindMonitoredPort(const LTTCPEndpointKey& key);
     WorkerThreadRecord* FindWorker(void* contextKey);
+    void StopAcceptThreadScaffold(AcceptThreadRecord* record);
+    void StopWorkerThreadScaffold(WorkerThreadRecord* record);
 
     CLTThreadPerClientTCPEngine_Queue* externalQueue0C_;
     CLTThreadPerClientTCPEngine_Queue* externalQueue34_;
@@ -250,7 +313,6 @@ private:
     std::vector<AcceptThreadRecord> monitoredPorts_;
     std::vector<WorkerThreadRecord> workerThreads_;
     std::vector<CMessageConnection*> messageConnections_;
-    uint32_t nextSyntheticSocketHandle_;
 };
 
 // Starter binding object used by the launcher scaffold while arg5 still enters through
