@@ -373,9 +373,7 @@ void CLTLoginMediator::SetMarginConnectionContextKey(void* contextKey) {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
-    void* launcherOwner,
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
-    launcherOwnerConnectionBridgeScaffold_ = launcherOwner;
     if (!engine) {
         return;
     }
@@ -387,23 +385,21 @@ void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
     EnsureBuiltinScaffoldStatesRegistered();
     RegisterActiveStateSourceScaffold(this);
     spdlog::info(
-        "CLTLoginMediator::BindLauncherConnectionBridgeScaffold owner={} engine={} currentState={}",
-        fmt::ptr(launcherOwnerConnectionBridgeScaffold_),
+        "CLTLoginMediator::BindLauncherConnectionBridgeScaffold engine={} currentState={}",
         fmt::ptr(engine),
         currentState_ ? currentState_->DebugName() : "<null>");
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::CanBeginLauncherAuthConnectionScaffold() const {
-    return launcherOwnerConnectionBridgeScaffold_ != nullptr && engine_ != nullptr;
+    return engine_ != nullptr;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     if (!CanBeginLauncherAuthConnectionScaffold()) {
         spdlog::info(
-            "CLTLoginMediator::BeginLauncherAuthConnectionScaffold skipped owner={} engine={}",
-            fmt::ptr(launcherOwnerConnectionBridgeScaffold_),
+            "CLTLoginMediator::BeginLauncherAuthConnectionScaffold skipped engine={}",
             fmt::ptr(engine_));
         return 0u;
     }
@@ -450,10 +446,9 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
-    if (launcherOwnerConnectionBridgeScaffold_ == nullptr || engine_ == nullptr) {
+    if (engine_ == nullptr) {
         spdlog::info(
-            "CLTLoginMediator::BeginLauncherMarginConnectionScaffold skipped owner={} engine={}",
-            fmt::ptr(launcherOwnerConnectionBridgeScaffold_),
+            "CLTLoginMediator::BeginLauncherMarginConnectionScaffold skipped engine={}",
             fmt::ptr(engine_));
         return 0u;
     }

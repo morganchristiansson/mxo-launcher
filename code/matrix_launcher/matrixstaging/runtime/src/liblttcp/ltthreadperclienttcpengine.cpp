@@ -1773,7 +1773,7 @@ bool CLTThreadPerClientTCPEngineBinding::Bind(void* owner, mxo::ltlogin::CLTLogi
     owner_ = owner;
     engine_ = std::make_unique<CLTThreadPerClientTCPEngine>();
     if (engine_ && mediator) {
-        mediator->BindLauncherConnectionBridgeScaffold(owner_, engine_.get());
+        mediator->BindLauncherConnectionBridgeScaffold(engine_.get());
     }
     return static_cast<bool>(engine_);
 }

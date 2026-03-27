@@ -958,7 +958,6 @@ public:
     // - keep the launcher-object ABI shell thin and arg5-shaped
     void ResetLauncherConnectionBridgeScaffold();
     void BindLauncherConnectionBridgeScaffold(
-        void* launcherOwner,
         mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
     bool CanBeginLauncherAuthConnectionScaffold() const;
     uint32_t BeginLauncherAuthConnectionScaffold();
@@ -1420,7 +1419,6 @@ private:
     bool marginConnectionOwnedByMediator_ = false;
     void* authConnectionContextKey_;
     void* marginConnectionContextKey_;
-    void* launcherOwnerConnectionBridgeScaffold_ = nullptr;
     CLTLoginMediatorConnectionContextScaffold* authConnectionContextScaffold_ = nullptr;
     CLTLoginMediatorConnectionContextScaffold* marginConnectionContextScaffold_ = nullptr;
 

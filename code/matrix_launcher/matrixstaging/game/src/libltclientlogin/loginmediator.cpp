@@ -440,7 +440,6 @@ void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
     marginConnection_ = nullptr;
     authConnectionOwnedByMediator_ = false;
     marginConnectionOwnedByMediator_ = false;
-    launcherOwnerConnectionBridgeScaffold_ = nullptr;
 
     spdlog::info("CLTLoginMediator::ResetLauncherConnectionBridgeScaffold completed");
 }

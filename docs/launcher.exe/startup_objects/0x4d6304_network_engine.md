@@ -1151,7 +1151,7 @@ Build-validated update:
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now drives owner-visible arg5 state refresh after `MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, and `CleanupConnection` sidecar mutations instead of leaving those refresh calls open-coded in the ABI shell wrappers
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` / binding class now own the current mediator bind/reset handshake for the sidecar engine instead of keeping that controller logic in the ABI shell
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
-- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, and no longer calls the launcher-network ABI sidecar-sync helper directly
+- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, no longer calls the launcher-network ABI sidecar-sync helper directly, and no longer keeps a launcher-owner pointer just to gate/auth-start this seam
 - `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:
   - primary-slot wrappers no longer manually call the sidecar-state sync helper after those engine mutations
   - the ABI shell keeps raw arg5 object layout ownership, but less of the bridge-controller logic
