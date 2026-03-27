@@ -10,6 +10,7 @@
 #include "lttcpconnection.h"
 
 namespace mxo::ltlogin {
+class CLTLoginMediator;
 struct CLTLoginMediatorConnectionContextScaffold;
 }
 
@@ -322,9 +323,15 @@ public:
         void* queueLock = nullptr,
         void* queueSignalEvent = nullptr);
 
-    // UNANCHORED: current replacement seam still keeps loginmediator-owned context callbacks,
-    // but the arg5-side nonblocking producer/push path now lives on the engine side instead of
-    // inside loginmediator.cpp or launcher_network_object_abi.cpp.
+    // UNANCHORED: current replacement seam still keeps loginmediator-owned high-level auth/margin
+    // handlers, but the arg5-side queue-context allocation/vtable, nonblocking producer/push path,
+    // and helper-owned pump now live on the engine side instead of inside loginmediator.cpp or
+    // launcher_network_object_abi.cpp.
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* EnsureLauncherConnectionContextScaffold(
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold** slot,
+        mxo::ltlogin::CLTLoginMediator* mediator,
+        const char* label,
+        bool isMarginConnection);
     void AttachLauncherConnectionBridgeContextsScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext,
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext);

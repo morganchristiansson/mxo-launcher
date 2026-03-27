@@ -131,84 +131,6 @@ static BuiltinScaffoldStates& GetBuiltinScaffoldStates() {
     return states;
 }
 
-static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall LauncherConnectionBridgeContext_Release(
-    CLTLoginMediatorConnectionContextScaffold* self) {
-    spdlog::info(
-        "CLTLoginMediator launcher bridge context release self={} label='{}' autoRelease={}",
-        fmt::ptr(self),
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        (self && self->autoReleaseFlag) ? 1u : 0u);
-    return 1u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
-    CLTLoginMediatorConnectionContextScaffold* self,
-    CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
-    spdlog::info(
-        "CLTLoginMediator launcher bridge OnOperationCompleted context={} label='{}' workItem={} type={} payload=0x{:08x}",
-        fmt::ptr(self),
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        fmt::ptr(workItem),
-        workItem ? workItem->header.workType : 0u,
-        workItem ? workItem->workPayload : 0u);
-
-    CLTLoginMediator* mediator = self ? self->mediator : nullptr;
-    if (!self || !workItem || !mediator) {
-        return 1u;
-    }
-
-    if (workItem->header.workType == 2u) {
-        const uint32_t handled = self->isMarginConnection
-            ? mediator->HandleMarginConnectStatus(workItem->workPayload)
-            : mediator->HandleAuthConnectStatus(workItem->workPayload);
-        const char* routeLabel = self->isMarginConnection ? "margin" : "auth";
-        const char* incomingReplyAnchor = self->isMarginConnection
-            ? CLTLoginMediator::kMessageMsLoadCharacterReply
-            : CLTLoginMediator::kMessageAsAuthReply;
-        spdlog::info(
-            "CLTLoginMediator launcher bridge routed {} type-2 connect-status payload=0x{:08x} -> handled={} laterIncomingReplyAnchor='{}'",
-            routeLabel,
-            static_cast<unsigned>(workItem->workPayload),
-            static_cast<unsigned>(handled),
-            (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
-    }
-
-    if (workItem->header.workType == 3u) {
-        if (!self->isMarginConnection) {
-            const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
-            if (receiveActions & CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
-                const uint32_t marginConnectResult =
-                    mediator->BeginLauncherMarginConnectionScaffold();
-                spdlog::info(
-                    "CLTLoginMediator launcher bridge post-AS_AuthReply margin auto-begin result=0x{:08x}",
-                    static_cast<unsigned>(marginConnectResult));
-            }
-        } else {
-            (void)mediator->HandleMarginConnectionReceiveScaffold();
-        }
-    }
-
-    if (self->sidecarConnection) {
-        return self->sidecarConnection->OnOperationCompleted(
-            reinterpret_cast<void*>(workItem->header.workType));
-    }
-    return 1u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void EnsureLauncherConnectionBridgeContextVtableInitialized() {
-    if (!g_LauncherConnectionBridgeContextVtable[1]) {
-        g_LauncherConnectionBridgeContextVtable[1] =
-            reinterpret_cast<void*>(LauncherConnectionBridgeContext_Release);
-        g_LauncherConnectionBridgeContextVtable[4] =
-            reinterpret_cast<void*>(LauncherConnectionBridgeContext_OnOperationCompleted);
-    }
-}
-
 }  // namespace
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -451,35 +373,6 @@ void CLTLoginMediator::SetMarginConnectionContextKey(void* contextKey) {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginMediatorConnectionContextScaffold* CLTLoginMediator::EnsureLauncherConnectionContextScaffold(
-    CLTLoginMediatorConnectionContextScaffold** slot,
-    const char* label,
-    bool isMarginConnection) {
-    if (!slot) {
-        return nullptr;
-    }
-
-    EnsureLauncherConnectionBridgeContextVtableInitialized();
-    if (!*slot) {
-        *slot = static_cast<CLTLoginMediatorConnectionContextScaffold*>(
-            std::calloc(1, sizeof(CLTLoginMediatorConnectionContextScaffold)));
-        if (!*slot) {
-            spdlog::info(
-                "CLTLoginMediator::EnsureLauncherConnectionContextScaffold failed label='{}'",
-                label ? label : "<null>");
-            return nullptr;
-        }
-        (*slot)->vtable = g_LauncherConnectionBridgeContextVtable;
-        (*slot)->autoReleaseFlag = 0;
-    }
-
-    (*slot)->debugLabel = label;
-    (*slot)->mediator = this;
-    (*slot)->isMarginConnection = isMarginConnection;
-    return *slot;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
     void* launcherOwner,
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
@@ -517,8 +410,9 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     }
 
     CLTLoginMediatorConnectionContextScaffold* context =
-        EnsureLauncherConnectionContextScaffold(
+        engine_->EnsureLauncherConnectionContextScaffold(
             &authConnectionContextScaffold_,
+            this,
             "AuthConnection",
             /*isMarginConnection=*/false);
     if (context) {
@@ -566,8 +460,9 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     }
 
     CLTLoginMediatorConnectionContextScaffold* context =
-        EnsureLauncherConnectionContextScaffold(
+        engine_->EnsureLauncherConnectionContextScaffold(
             &marginConnectionContextScaffold_,
+            this,
             "MarginConnection",
             /*isMarginConnection=*/true);
     if (context) {

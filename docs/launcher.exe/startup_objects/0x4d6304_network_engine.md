@@ -1146,8 +1146,13 @@ A later source pass tightened the seam further without yet claiming a fresh runt
 Build-validated update:
 - `src/launcher_network_object_abi.cpp` arg5 helper `+0x60` slot `0` now calls into the liblttcp engine sidecar instead of directly calling a mediator poll helper
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now owns the current narrow nonblocking launcher-bridge pump and the current queue0C enqueue helper used by that seam
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
-- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper as well
+- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, and no longer owns the bridge-context vtable/allocation body
+
+Runtime note:
+- a later user-reported run after this ownership move still launched successfully into game on the active path
+- that is useful practical evidence that the seam cleanup did not regress the current happy path, but it is still not proof of full original producer fidelity by itself
 
 Important limitation:
 - this is still only a **starter ownership cleanup**, not proof that the original launcher's worker-thread producers are fully reconstructed

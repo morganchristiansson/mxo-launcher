@@ -71,6 +71,7 @@ struct CLTThreadPerClientTCPEngine_QueuePair {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_LauncherConnectionBridgeWorkItemVtable[2] = {0};
+static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall LauncherConnectionBridgeWorkItem_Release(
@@ -92,6 +93,82 @@ static void EnsureLauncherConnectionBridgeWorkItemVtableInitialized() {
     if (!g_LauncherConnectionBridgeWorkItemVtable[1]) {
         g_LauncherConnectionBridgeWorkItemVtable[1] =
             reinterpret_cast<void*>(LauncherConnectionBridgeWorkItem_Release);
+    }
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall LauncherConnectionBridgeContext_Release(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* self) {
+    spdlog::info(
+        "CLTThreadPerClientTCPEngine launcher bridge context release self={} label='{}' autoRelease={}",
+        fmt::ptr(self),
+        (self && self->debugLabel) ? self->debugLabel : "<null>",
+        (self && self->autoReleaseFlag) ? 1u : 0u);
+    return 1u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* self,
+    mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
+    spdlog::info(
+        "CLTThreadPerClientTCPEngine launcher bridge OnOperationCompleted context={} label='{}' workItem={} type={} payload=0x{:08x}",
+        fmt::ptr(self),
+        (self && self->debugLabel) ? self->debugLabel : "<null>",
+        fmt::ptr(workItem),
+        workItem ? workItem->header.workType : 0u,
+        workItem ? workItem->workPayload : 0u);
+
+    mxo::ltlogin::CLTLoginMediator* mediator = self ? self->mediator : nullptr;
+    if (!self || !workItem || !mediator) {
+        return 1u;
+    }
+
+    if (workItem->header.workType == 2u) {
+        const uint32_t handled = self->isMarginConnection
+            ? mediator->HandleMarginConnectStatus(workItem->workPayload)
+            : mediator->HandleAuthConnectStatus(workItem->workPayload);
+        const char* routeLabel = self->isMarginConnection ? "margin" : "auth";
+        const char* incomingReplyAnchor = self->isMarginConnection
+            ? mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply
+            : mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine launcher bridge routed {} type-2 connect-status payload=0x{:08x} -> handled={} laterIncomingReplyAnchor='{}'",
+            routeLabel,
+            static_cast<unsigned>(workItem->workPayload),
+            static_cast<unsigned>(handled),
+            (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
+    }
+
+    if (workItem->header.workType == 3u) {
+        if (!self->isMarginConnection) {
+            const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
+            if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
+                const uint32_t marginConnectResult =
+                    mediator->BeginLauncherMarginConnectionScaffold();
+                spdlog::info(
+                    "CLTThreadPerClientTCPEngine launcher bridge post-AS_AuthReply margin auto-begin result=0x{:08x}",
+                    static_cast<unsigned>(marginConnectResult));
+            }
+        } else {
+            (void)mediator->HandleMarginConnectionReceiveScaffold();
+        }
+    }
+
+    if (self->sidecarConnection) {
+        return self->sidecarConnection->OnOperationCompleted(
+            reinterpret_cast<void*>(workItem->header.workType));
+    }
+    return 1u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static void EnsureLauncherConnectionBridgeContextVtableInitialized() {
+    if (!g_LauncherConnectionBridgeContextVtable[1]) {
+        g_LauncherConnectionBridgeContextVtable[1] =
+            reinterpret_cast<void*>(LauncherConnectionBridgeContext_Release);
+        g_LauncherConnectionBridgeContextVtable[4] =
+            reinterpret_cast<void*>(LauncherConnectionBridgeContext_OnOperationCompleted);
     }
 }
 
@@ -1231,6 +1308,36 @@ void CLTThreadPerClientTCPEngine::AttachExternalQueuePair(
     externalQueue34_ = queue34;
     externalQueueLock_ = queueLock;
     externalQueueSignalEvent_ = queueSignalEvent;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* CLTThreadPerClientTCPEngine::EnsureLauncherConnectionContextScaffold(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold** slot,
+    mxo::ltlogin::CLTLoginMediator* mediator,
+    const char* label,
+    bool isMarginConnection) {
+    if (!slot) {
+        return nullptr;
+    }
+
+    EnsureLauncherConnectionBridgeContextVtableInitialized();
+    if (!*slot) {
+        *slot = static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(
+            std::calloc(1, sizeof(mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold)));
+        if (!*slot) {
+            spdlog::info(
+                "CLTThreadPerClientTCPEngine::EnsureLauncherConnectionContextScaffold failed label='{}'",
+                label ? label : "<null>");
+            return nullptr;
+        }
+        (*slot)->vtable = g_LauncherConnectionBridgeContextVtable;
+        (*slot)->autoReleaseFlag = 0;
+    }
+
+    (*slot)->debugLabel = label;
+    (*slot)->mediator = mediator;
+    (*slot)->isMarginConnection = isMarginConnection;
+    return *slot;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
