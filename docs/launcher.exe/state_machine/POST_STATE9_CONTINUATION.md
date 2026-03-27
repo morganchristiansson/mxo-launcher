@@ -26,6 +26,59 @@ Natural original is now live-proven through:
 Representative visible UI at the `0x43c180` boundary:
 - **Waiting for Regionserver**
 
+### Representative minimal EULA attach pass (stable original launcher-spawned `matrix.exe`, `-nopatch`)
+Pass conditions:
+- original launcher-spawned temp `matrix.exe`
+- attached at a stable EULA UI point
+- narrow breakpoint set centered on:
+  - `0x41c1f0`
+  - `0x43bd20`
+  - `0x439780`
+  - `0x41de40`
+  - `0x43c180`
+- then `finish` from `0x43c180` to confirm the success-side helper install
+
+Concrete observed chain from the already-proven state3 wait into later states:
+- `0x41c1f0`
+  - `ECX = 0x004d4e38`
+  - owner `+0x10 = 0x00f9b9d0`
+  - current helper vtable `= 0x004b5208` (state `3`)
+  - input pointer at `ESP+4 = 0x0031fac0`
+  - input first dword `= 0`
+- next direct stop: `0x43bd20`
+  - `ECX = 0x00f9ba70`
+  - current helper vtable `= 0x004b5104` (state `8`)
+  - owner `+0x10` pointed at that same state8 object
+- later direct stop: `0x439780`
+  - `ECX = 0x00f9bad0`
+  - current helper vtable `= 0x004b517c` (state `9`)
+  - helper byte `+4 = 0`
+  - helper word `+6 = 0x2710`
+  - owner `+0x10` pointed at that same state9 object
+- immediate owner submit stop: `0x41de40`
+  - `ECX = 0x004d4e38`
+  - `EAX = 0x2710`
+  - `EDX = 0x004b517c`
+  - owner `+0x10` still pointed at the same state9 object / vtable
+- later reply stop: `0x43c180`
+  - `ECX = 0x00f9bad0`
+  - current helper vtable `= 0x004b517c` (state `9`)
+- `finish` from `0x43c180` then landed at `0x44af4b` with:
+  - owner `+0x10 = 0x00f9baf0`
+  - new helper vtable `= 0x004b5230` (state `12`)
+  - new helper byte `+4 = 1`
+  - owner `+0x80 = 0`
+
+Practical read from that single narrow pass:
+- the happy path really does progress:
+  - state `3` wait -> owner `0x41c1f0`
+  - state `8` at `0x43bd20`
+  - state `9` at `0x439780 / 0x41de40 / 0x43c180`
+  - state `12` immediately after successful return from `0x43c180`
+- keep `0x43f930` as the already-proven state8 reply-stage step on this same happy path; this
+  particular narrow pass was used to tighten the direct state8->state9->state12 handoff shape
+  without broadening the breakpoint set back out again
+
 ### Replacement launcher
 Current active existing-character path is source-owned/live enough to reach:
 - state8 raw `0x0f`

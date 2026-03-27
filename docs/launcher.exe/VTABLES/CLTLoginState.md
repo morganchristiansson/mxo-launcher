@@ -66,8 +66,8 @@ Two important source notes:
 
 For the reviewed/documented set, slot 7 maps cleanly like this:
 
-| VTable | Current class name | Slot 7 entry | Returned id / meaning |
-|---|---|---|---|
+| VTable       | Current class name     | Slot 7 entry | Returned id / meaning |
+|--------------|------------------------|--------------|-----------|
 | `0x004b51e0` | `CLTLoginState_State0` | `0x00437b50` | state `0` |
 | `0x004b4fc4` | `CLTLoginState_State1` | `0x0044e360` | state `1` |
 | `0x004b5014` | `CLTLoginState_AuthenticatePending` | `0x00418150` | state `2` |
