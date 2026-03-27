@@ -173,50 +173,11 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
     return out;
 }
 
-static uint16_t ReadU16LE(const uint8_t* p) {
-    return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
-}
-
 static uint32_t ReadU32LE(const uint8_t* p) {
     return static_cast<uint32_t>(p[0]) |
            (static_cast<uint32_t>(p[1]) << 8) |
            (static_cast<uint32_t>(p[2]) << 16) |
            (static_cast<uint32_t>(p[3]) << 24);
-}
-
-static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src, size_t srcAvailable) {
-    if (!dest || destSize == 0u) {
-        return;
-    }
-
-    std::fill(dest, dest + destSize, '\0');
-    if (!src || srcAvailable == 0u) {
-        return;
-    }
-
-    size_t copyCount = 0u;
-    while (copyCount + 1u < destSize && copyCount < srcAvailable && src[copyCount] != '\0') {
-        dest[copyCount] = static_cast<char>(src[copyCount]);
-        ++copyCount;
-    }
-    dest[copyCount] = '\0';
-}
-
-static void AppendOwnedSectionBytes(void*& buffer, uint16_t& length, const uint8_t* src, uint16_t appendLen) {
-    if (!src || appendLen == 0u) {
-        return;
-    }
-
-    const size_t oldLength = length;
-    const size_t newLength = oldLength + appendLen;
-    void* newBuffer = buffer ? std::realloc(buffer, newLength) : std::malloc(newLength);
-    if (!newBuffer) {
-        return;
-    }
-
-    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, src, appendLen);
-    buffer = newBuffer;
-    length = static_cast<uint16_t>(newLength & 0xffffu);
 }
 
 static uint32_t __thiscall Arg6CurrentSlotRecord44_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
@@ -1427,7 +1388,7 @@ const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8Pe
     state8PersistenceF1c_.field20 = ownerState.characterReplyFieldF3c;
     state8PersistenceF1c_.field24 =
         ownerState.characterReplyFieldF40 ? ownerState.characterReplyFieldF40 : state8PersistenceF1c_.field24;
-    state8PersistenceF1c_.field28 = 0u;
+    state8PersistenceF1c_.field28 = ownerState.characterReplyFieldF44;
     std::copy(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), state8PersistenceF1c_.header2c.begin());
     std::copy(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), state8PersistenceF1c_.secondary4c.begin());
     std::memcpy(state8PersistenceF1c_.body6c.data(), ownerState.state8Section0RawF88.data(), state8PersistenceF1c_.body6c.size());
@@ -1617,210 +1578,6 @@ bool CLTLoginMediator::State10HasReadyConnectionState2() const {
     const mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     return connection != nullptr &&
            connection->State() == mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive;
-}
-
-// anchor: launcher.exe:0x440320
-uint32_t CLTLoginMediator::State11HandleLoadCharacterReplyScaffold(const uint8_t* packetBytes, size_t packetSize) {
-    // Evidence-backed current read:
-    // - validates raw margin code `0x10`
-    // - on first state11/load-character fragment it clears/seeds the owner `+0xf1c` family
-    // - section selector `(byte+0x0d) - 2` drives later per-section writes
-    // - cases `3/4/5/6` append bytes into owned buffers at `+0x1418/+0x1420/+0x1428/+0x1408`
-    // - case `0` fills the `+0xf88/+0x13cc/+0x13d0` family plus three inline strings
-    if (!packetBytes || packetSize < 0x10) {
-        return 0u;
-    }
-    if (packetBytes[0] != 0x10) {
-        return 0u;
-    }
-
-    const uint32_t parsedStatus = ReadU32LE(packetBytes + 1);
-    const uint32_t parsedField05 = ReadU32LE(packetBytes + 5);
-    const uint16_t parsedHandoffWord09 = ReadU16LE(packetBytes + 9);
-    const uint8_t parsedExpectedCount0b = packetBytes[0x0b];
-    const uint8_t parsedSeedCount0c = packetBytes[0x0c];
-    const uint8_t parsedSelectorMinus2 = static_cast<uint8_t>(packetBytes[0x0d] - 2u);
-    const uint16_t sectionOffset0e = ReadU16LE(packetBytes + 0x0e);
-
-    postAuthMarginLoadingState_.worldListCountOrStatus80 = parsedStatus;
-    if (parsedStatus >= 1u) {
-        postAuthMarginLoadingState_.sourceLeadString108[0] = '\0';
-        postAuthMarginLoadingState_.characterRouteIndexCc8 = 0xffu;
-        spdlog::info(
-            "DIAGNOSTIC: state11 load-character scaffold observed non-success status=0x{:08x} handoffWord=0x{:04x} and mirrored failure-side owner clears",
-            static_cast<unsigned>(parsedStatus),
-            static_cast<unsigned>(parsedHandoffWord09));
-        return 0u;
-    }
-
-    uint16_t sectionByteCount = 0u;
-    const uint8_t* sectionData = nullptr;
-    if (sectionOffset0e != 0u && static_cast<size_t>(sectionOffset0e) + 2u <= packetSize) {
-        sectionByteCount = ReadU16LE(packetBytes + sectionOffset0e);
-        const size_t sectionDataOffset = static_cast<size_t>(sectionOffset0e) + 2u;
-        if (sectionDataOffset <= packetSize) {
-            sectionData = packetBytes + sectionDataOffset;
-            const size_t remaining = packetSize - sectionDataOffset;
-            if (sectionByteCount > remaining) {
-                sectionByteCount = static_cast<uint16_t>(remaining);
-            }
-        }
-    }
-
-    const bool firstFragment = (postAuthMarginLoadingState_.characterNameBufferF1c[0] == '\0');
-    bool usedCurrentSlotRecord = false;
-    if (firstFragment) {
-        std::fill(
-            std::begin(postAuthMarginLoadingState_.characterNameBufferF1c),
-            std::end(postAuthMarginLoadingState_.characterNameBufferF1c),
-            '\0');
-        postAuthMarginLoadingState_.characterReplyFieldF3c = parsedField05;
-        postAuthMarginLoadingState_.characterReplyFieldF40 = postAuthMarginLoadingState_.sourceField12c;
-        std::fill(postAuthMarginLoadingState_.characterFlagsF48.begin(), postAuthMarginLoadingState_.characterFlagsF48.end(), 0u);
-        std::fill(postAuthMarginLoadingState_.secondaryCharacterDataF68.begin(), postAuthMarginLoadingState_.secondaryCharacterDataF68.end(), 0u);
-        std::fill(postAuthMarginLoadingState_.characterRecordPointersF88.begin(), postAuthMarginLoadingState_.characterRecordPointersF88.end(), 0u);
-        std::fill(postAuthMarginLoadingState_.section0StringF8c.begin(), postAuthMarginLoadingState_.section0StringF8c.end(), '\0');
-        std::fill(postAuthMarginLoadingState_.section0StringFac.begin(), postAuthMarginLoadingState_.section0StringFac.end(), '\0');
-        std::fill(postAuthMarginLoadingState_.section0StringFcc.begin(), postAuthMarginLoadingState_.section0StringFcc.end(), '\0');
-        postAuthMarginLoadingState_.replySectionData13cc = 0u;
-        postAuthMarginLoadingState_.replySectionData13d0 = 0u;
-        postAuthMarginLoadingState_.section0Flag13f6 = 0u;
-        postAuthMarginLoadingState_.flag13fe = 1u;
-        postAuthMarginLoadingState_.flag1406 = 1u;
-        postAuthMarginLoadingState_.flag1416 = 1u;
-        postAuthMarginLoadingState_.flag1448 = 1u;
-        postAuthMarginLoadingState_.flag1452 = 1u;
-
-        if (postAuthMarginLoadingState_.allocatedBuffer1418) {
-            std::free(postAuthMarginLoadingState_.allocatedBuffer1418);
-            postAuthMarginLoadingState_.allocatedBuffer1418 = nullptr;
-        }
-        if (postAuthMarginLoadingState_.allocatedBuffer1420) {
-            std::free(postAuthMarginLoadingState_.allocatedBuffer1420);
-            postAuthMarginLoadingState_.allocatedBuffer1420 = nullptr;
-        }
-        if (postAuthMarginLoadingState_.allocatedBuffer1428) {
-            std::free(postAuthMarginLoadingState_.allocatedBuffer1428);
-            postAuthMarginLoadingState_.allocatedBuffer1428 = nullptr;
-        }
-        if (postAuthMarginLoadingState_.allocatedBuffer1408) {
-            std::free(postAuthMarginLoadingState_.allocatedBuffer1408);
-            postAuthMarginLoadingState_.allocatedBuffer1408 = nullptr;
-        }
-        postAuthMarginLoadingState_.allocatedBufferLength141c = 0u;
-        postAuthMarginLoadingState_.allocatedBufferLength1424 = 0u;
-        postAuthMarginLoadingState_.allocatedBufferLength142c = 0u;
-        postAuthMarginLoadingState_.allocatedBufferLength140c = 0u;
-        postAuthMarginLoadingState_.allocatedBufferFlag141e = 0u;
-        postAuthMarginLoadingState_.allocatedBufferFlag1426 = 0u;
-        postAuthMarginLoadingState_.allocatedBufferFlag142e = 0u;
-        postAuthMarginLoadingState_.allocatedBufferFlag140e = 0u;
-
-        if (const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord()) {
-            const size_t copyCount = std::min(
-                currentSlotRecord->heapString14.size(),
-                sizeof(postAuthMarginLoadingState_.characterNameBufferF1c) - 1);
-            std::copy_n(
-                currentSlotRecord->heapString14.data(),
-                copyCount,
-                postAuthMarginLoadingState_.characterNameBufferF1c);
-            postAuthMarginLoadingState_.characterNameBufferF1c[copyCount] = '\0';
-            postAuthMarginLoadingState_.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
-            postAuthMarginLoadingState_.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
-            usedCurrentSlotRecord = true;
-        } else {
-            std::copy(
-                postAuthMarginLoadingState_.sourceLeadString108.begin(),
-                postAuthMarginLoadingState_.sourceLeadString108.end(),
-                postAuthMarginLoadingState_.characterNameBufferF1c);
-            postAuthMarginLoadingState_.secondaryCharacterDataF68[0] = postAuthMarginLoadingState_.sourceField12c;
-            postAuthMarginLoadingState_.secondaryCharacterDataF68[1] = 0u;
-        }
-
-        std::copy_n(
-            postAuthMarginLoadingState_.sourceDwords134.begin(),
-            postAuthMarginLoadingState_.characterFlagsF48.size(),
-            postAuthMarginLoadingState_.characterFlagsF48.begin());
-    }
-
-    switch (parsedSelectorMinus2) {
-        case 0u:
-            if (sectionData && sectionByteCount >= 0x44cu) {
-                postAuthMarginLoadingState_.characterRecordPointersF88[0] = ReadU32LE(sectionData + 0x00);
-                postAuthMarginLoadingState_.replySectionData13cc = ReadU32LE(sectionData + 0x444);
-                postAuthMarginLoadingState_.replySectionData13d0 = ReadU32LE(sectionData + 0x448);
-                CopyCStringIntoFixed(
-                    postAuthMarginLoadingState_.section0StringF8c.data(),
-                    postAuthMarginLoadingState_.section0StringF8c.size(),
-                    sectionData + 0x04,
-                    sectionByteCount - 0x04);
-                CopyCStringIntoFixed(
-                    postAuthMarginLoadingState_.section0StringFac.data(),
-                    postAuthMarginLoadingState_.section0StringFac.size(),
-                    sectionData + 0x24,
-                    sectionByteCount > 0x24 ? sectionByteCount - 0x24 : 0u);
-                CopyCStringIntoFixed(
-                    postAuthMarginLoadingState_.section0StringFcc.data(),
-                    postAuthMarginLoadingState_.section0StringFcc.size(),
-                    sectionData + 0x44,
-                    sectionByteCount > 0x44 ? sectionByteCount - 0x44 : 0u);
-                postAuthMarginLoadingState_.section0Flag13f6 = 1u;
-            }
-            break;
-        case 3u:
-            AppendOwnedSectionBytes(
-                postAuthMarginLoadingState_.allocatedBuffer1418,
-                postAuthMarginLoadingState_.allocatedBufferLength141c,
-                sectionData,
-                sectionByteCount);
-            postAuthMarginLoadingState_.allocatedBufferFlag141e = 1u;
-            break;
-        case 4u:
-            AppendOwnedSectionBytes(
-                postAuthMarginLoadingState_.allocatedBuffer1420,
-                postAuthMarginLoadingState_.allocatedBufferLength1424,
-                sectionData,
-                sectionByteCount);
-            postAuthMarginLoadingState_.allocatedBufferFlag1426 = 1u;
-            break;
-        case 5u:
-            AppendOwnedSectionBytes(
-                postAuthMarginLoadingState_.allocatedBuffer1428,
-                postAuthMarginLoadingState_.allocatedBufferLength142c,
-                sectionData,
-                sectionByteCount);
-            postAuthMarginLoadingState_.allocatedBufferFlag142e = 1u;
-            break;
-        case 6u:
-            AppendOwnedSectionBytes(
-                postAuthMarginLoadingState_.allocatedBuffer1408,
-                postAuthMarginLoadingState_.allocatedBufferLength140c,
-                sectionData,
-                sectionByteCount);
-            postAuthMarginLoadingState_.allocatedBufferFlag140e = 1u;
-            break;
-        case 0x0bu:
-            spdlog::info(
-                "DIAGNOSTIC: state11 load-character scaffold observed section 0x0b with byteCount={}; downstream `0x43f8c0` side effect still unresolved",
-                static_cast<unsigned>(sectionByteCount));
-            break;
-        default:
-            break;
-    }
-
-    spdlog::info(
-        "DIAGNOSTIC: state11 load-character scaffold status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} expectedCount={} seedCount={} section={} sectionBytes={} firstFragment={} usedCurrentSlotRecord={} name='{}'",
-        static_cast<unsigned>(parsedStatus),
-        static_cast<unsigned>(parsedField05),
-        static_cast<unsigned>(parsedHandoffWord09),
-        static_cast<unsigned>(parsedExpectedCount0b),
-        static_cast<unsigned>(parsedSeedCount0c),
-        static_cast<unsigned>(parsedSelectorMinus2),
-        static_cast<unsigned>(sectionByteCount),
-        firstFragment ? 1u : 0u,
-        usedCurrentSlotRecord ? 1u : 0u,
-        postAuthMarginLoadingState_.characterNameBufferF1c);
-    return 1u;
 }
 
 // anchor: launcher.exe:0x41f2e0
@@ -3413,10 +3170,10 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     }
 
     spdlog::debug(
-        "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} has no active helper state; using direct state11/post-auth scaffold parser",
+        "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} has no active helper state; no faithful slot6 receiver is available for this post-bootstrap packet",
         static_cast<unsigned>(rawCode),
         static_cast<unsigned>(effectivePacketSize));
-    return HandleStagedMarginLoadCharacterReplyPacketScaffold();
+    return 0u;
 }
 
 // UNANCHORED: staged auth-reply continuation wrapper that still spans owner bootstrap shadow
@@ -3453,17 +3210,6 @@ uint32_t CLTLoginMediator::HandleStagedAuthReplyPacketScaffold() {
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = "CERT_ConnectRequest";
     return 1u;
-}
-
-// UNANCHORED: staged post-auth margin-reply wrapper feeding the current state11/load-character
-// scaffold parser.
-uint32_t CLTLoginMediator::HandleStagedMarginLoadCharacterReplyPacketScaffold() {
-    if (stagedIncomingMarginPacketBytes_.empty()) {
-        return 0u;
-    }
-    return State11HandleLoadCharacterReplyScaffold(
-        stagedIncomingMarginPacketBytes_.data(),
-        stagedIncomingMarginPacketBytes_.size());
 }
 
 const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() const {

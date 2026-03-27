@@ -337,9 +337,12 @@ public:
 
         // Active state8 reply path prefers the current slot record (`+0x688[owner+0xcc8]`) as the
         // first-fragment seed for this name/world block, falling back to the older `+0x108` text.
+        // Later state11 (`0x440320`) is tighter: its first fragment copies owner `+0x108`
+        // directly and does not consult the current-slot record table.
         char characterNameBufferF1c[32] = {0};           // `+0xf1c .. +0xf3b`
         uint32_t characterReplyFieldF3c = 0;             // `+0xf3c`
         uint32_t characterReplyFieldF40 = 0;             // `+0xf40`
+        uint32_t characterReplyFieldF44 = 0x1000;        // `+0xf44`; shared reset helper `0x438a50` seeds this before state8/state11 first-fragment materialization
         std::array<uint32_t, 8> characterFlagsF48{};     // `+0xf48 .. +0xf67`; original getter `0x41f170` / arg6 `+0xbc`
         std::array<uint32_t, 8> secondaryCharacterDataF68{}; // `+0xf68 .. +0xf87` (provisional world/status seed area)
         std::array<uint32_t, 10> characterRecordPointersF88{}; // post-auth/scaffold parsed subview
@@ -407,7 +410,7 @@ public:
         uint8_t flag145a = 0;                            // `+0x145a` bool gate paired with arg6 `+0x90`
         uint32_t state8Section10ChunkBitmap = 0;         // source-owned mirror of the original `DAT_004f79e4` bitmap
 
-        // state8 case `0x0b` / `0x43f8c0` side effect:
+        // state8/state11 case `0x0b` / `0x43f8c0` side effect:
         // - owner `+0x145c` = first dword of the section payload when byteCount > 4
         // - owner `+0x1460` = trailing small-string-like copy of the remaining payload bytes
         // - sibling original getters now anchored too:
@@ -988,13 +991,13 @@ public:
     //   arrive as raw code `0x10` *after* that base-dispatch filter
     uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
 
-    // Narrow owner-side parsers/stagers used by the concrete CLTLoginState slot-6 bodies.
+    // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6
+    // bodies.
     // Keep the packet/class ownership split explicit:
-    // - state10 slot 6 / `0x4401a0` owns the auth-reply transition
-    // - state11 slot 6 / `0x440320` owns the load-character reply transition
-    // - mediator only keeps the staged bytes plus owner-state writeback helpers
+    // - state10 slot 6 / `0x4401a0` still uses the mediator's staged auth-reply wrapper
+    // - state11 slot 6 / `0x440320` now owns the load-character reply transition directly
+    // - mediator only keeps the staged bytes for that later margin path
     uint32_t HandleStagedAuthReplyPacketScaffold();
-    uint32_t HandleStagedMarginLoadCharacterReplyPacketScaffold();
     const std::vector<uint8_t>& StagedIncomingMarginPacketBytes() const;
 
     static constexpr uint32_t kConnectStatusSuccess = 0x7000001u;
@@ -1135,9 +1138,6 @@ public:
         bool clearState10SendGateF14);
     // - state9 slot 6 success side effect / launcher.exe:0x41b420 (owner vtable +0x16c)
     uint32_t HandleState9Opcode11SuccessSideEffect();
-    // - state11 slot 6 / launcher.exe:0x440320
-    uint32_t State11HandleLoadCharacterReplyScaffold(const uint8_t* packetBytes, size_t packetSize);
-
     // anchor: launcher.exe:0x41b4b0
     // State10 slot-3 precheck: owner `+0x1c` must exist and connection state `+0x34 == 2`.
     bool State10HasReadyConnectionState2() const;

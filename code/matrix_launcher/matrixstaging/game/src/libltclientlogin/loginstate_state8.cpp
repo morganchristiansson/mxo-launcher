@@ -114,9 +114,12 @@ static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src
 }
 
 static void ResetState8ReplyOwnerState(PostAuthMarginLoadingState& ownerState) {
+    // anchor: launcher.exe:0x438a50
+    // Shared `+0xf1c` reset helper used by both state8 (`0x43f930`) and state11 (`0x440320`).
     std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
     ownerState.characterReplyFieldF3c = 0u;
     ownerState.characterReplyFieldF40 = 0u;
+    ownerState.characterReplyFieldF44 = 0x1000u;
     std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
     std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
     std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
