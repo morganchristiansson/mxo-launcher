@@ -37,10 +37,10 @@ struct DiagnosticRawMessageConnectionContext {
     bool peerCloseQueued;
 };
 
-// Diagnostic-only owner/session wrapper for the launcher-owned login sidecar.
-// Keep controller creation, reset, auth/margin context lifetime, and the current generic
-// CLTLoginMediator active-state-source registration in one place so diagnostics code can query the
-// active controller without directly owning raw new/delete.
+// Diagnostic owner/session wrapper for the installed launcher-owned `CLTLoginMediator`.
+// Keep reset, auth/margin context lifetime, and active-state-source registration in one place so
+// diagnostics code can drive the real mediator model instead of growing a second controller
+// sidecar beside arg6.
 struct DiagnosticLoginControllerSession {
     ~DiagnosticLoginControllerSession();
 
@@ -115,6 +115,10 @@ static uint32_t __thiscall DiagnosticRawMessageConnectionContext_OnOperationComp
     DiagnosticRawMessageConnectionContext* self,
     DiagnosticQueuedWorkItemStub* workItem);
 
+static mxo::ltlogin::CLTLoginMediator* ResolveInstalledLoginController() {
+    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
+}
+
 DiagnosticLoginControllerSession::~DiagnosticLoginControllerSession() {
     Reset();
 }
@@ -128,7 +132,15 @@ void DiagnosticLoginControllerSession::Reset() {
         std::free(marginContext_);
         marginContext_ = NULL;
     }
-    mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(controller_.get());
+
+    if (mxo::ltlogin::CLTLoginMediator* controller = ResolveInstalledLoginController()) {
+        controller->SetCurrentState(nullptr);
+        controller->SetAuthConnectionContextKey(nullptr);
+        controller->SetMarginConnectionContextKey(nullptr);
+        controller->SetNetworkEngine(nullptr);
+        mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(controller);
+    }
+
     controller_.reset();
     currentOwner_ = NULL;
     postAuthMarginBeginAttempted_ = false;
@@ -141,23 +153,30 @@ void DiagnosticLoginControllerSession::BeginForOwner(void* owner) {
 
 mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::RecreateForEngine(
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
-    mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(controller_.get());
     controller_.reset();
     if (!engine) {
         return NULL;
     }
 
-    controller_ = std::unique_ptr<mxo::ltlogin::CLTLoginMediator>(new mxo::ltlogin::CLTLoginMediator());
-    if (controller_) {
-        controller_->SetNetworkEngine(engine);
-        controller_->InitializeConnectionHelpers();
-        mxo::ltlogin::CLTLoginMediator::RegisterActiveStateSourceScaffold(controller_.get());
+    mxo::ltlogin::CLTLoginMediator* controller = ResolveInstalledLoginController();
+    if (!controller) {
+        return NULL;
     }
-    return controller_.get();
+
+    controller->SetNetworkEngine(engine);
+
+    static bool helpersInitialized = false;
+    if (!helpersInitialized) {
+        controller->InitializeConnectionHelpers();
+        helpersInitialized = true;
+    }
+
+    mxo::ltlogin::CLTLoginMediator::RegisterActiveStateSourceScaffold(controller);
+    return controller;
 }
 
 mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::Controller() const {
-    return controller_.get();
+    return ResolveInstalledLoginController();
 }
 
 void* DiagnosticLoginControllerSession::CurrentOwner() const {
@@ -624,10 +643,13 @@ static void DiagnosticApplyLoginControllerConfig() {
     loginController->RegisterScaffoldState17(&states.state17);
     loginController->RegisterScaffoldState18(&states.state18);
     loginController->RegisterScaffoldState19(&states.state19);
-    // Preserve the proven startup convention explicitly before any diagnostic auto-begin logic:
-    // state0 is the initial idle/start helper, and owner-owned `ProcessLoginRequest` performs the
-    // first happy-path handoff into state2 later.
-    loginController->InstallInitialState0Scaffold();
+    // Preserve the proven startup convention explicitly before any diagnostic auto-begin logic,
+    // but do not clobber a live mediator that has already advanced beyond startup.
+    if (loginController->CurrentState() == nullptr) {
+        // state0 is the initial idle/start helper, and owner-owned `ProcessLoginRequest`
+        // performs the first happy-path handoff into state2 later.
+        loginController->InstallInitialState0Scaffold();
+    }
 
     const char* characterNameSeed =
         g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : NULL;
@@ -635,7 +657,7 @@ static void DiagnosticApplyLoginControllerConfig() {
         // Diagnostic bridge only:
         // - `0x41c3c0 = CLTLoginMediator_ProcessLoginCredentials` is still the strongest concrete
         //   writer for the owner source block `+0x108/+0x12c/+0x134..+0x1b8`
-        // - the sidecar continues to exercise that recovered writer without mutating the live
+        // - the installed mediator continues to exercise that recovered writer without mutating the live
         //   launcher mediator outside the targeted wrapper-minimization scope
         mxo::ltlogin::ProcessLoginCredentialsInputSketch input = {};
         const auto characterState = loginController->DescribeOwnCharacterStateScaffold();
@@ -690,7 +712,7 @@ void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerC
 
     if (RecreateDiagnosticLoginControllerForEngine(engine)) {
         DiagnosticApplyLoginControllerConfig();
-        spdlog::info("DIAGNOSTIC: created CLTLoginMediator sidecar for launcher object {}", fmt::ptr(owner));
+        spdlog::info("DIAGNOSTIC: bound installed CLTLoginMediator to launcher object {}", fmt::ptr(owner));
     }
 }
 
@@ -791,7 +813,7 @@ void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionCo
     std::memcpy(&input, selectionContext, sizeof(input));
     loginController->PersistSelectionContextForState8(input);
     spdlog::info(
-        "DIAGNOSTIC: mirrored selection context into CLTLoginMediator sidecar slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
+        "DIAGNOSTIC: mirrored selection context into installed CLTLoginMediator slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
         input.slotOrSelectionIndex00 & 0xffu,
         input.block04[0],
         input.blockA4[3]);
@@ -805,7 +827,7 @@ void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, vo
 
     loginController->SetState9CallbackObjectTriple84_88_8c(callback84, object88, object8c);
     spdlog::info(
-        "DIAGNOSTIC: mirrored state9 startup triple into CLTLoginMediator sidecar callback84={} object88={} object8c={}",
+        "DIAGNOSTIC: mirrored state9 startup triple into installed CLTLoginMediator callback84={} object88={} object8c={}",
         fmt::ptr(callback84),
         fmt::ptr(object88),
         fmt::ptr(object8c));
@@ -861,13 +883,13 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
 }
 
 bool DiagnosticCanBeginAuthConnection() {
-    return GetDiagnosticLoginController() != NULL;
+    return GetDiagnosticLoginController() != NULL && GetDiagnosticLoginControllerOwner() != NULL;
 }
 
 uint32_t DiagnosticBeginAuthConnection() {
     mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
     if (!loginController) {
-        spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for auth connection");
+        spdlog::info("DIAGNOSTIC: installed CLTLoginMediator unavailable for auth connection");
         return 0;
     }
 
@@ -907,7 +929,7 @@ uint32_t DiagnosticBeginAuthConnection() {
 uint32_t DiagnosticBeginMarginConnection() {
     mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
     if (!loginController) {
-        spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar unavailable for margin connection");
+        spdlog::info("DIAGNOSTIC: installed CLTLoginMediator unavailable for margin connection");
         return 0;
     }
 
@@ -919,7 +941,7 @@ uint32_t DiagnosticBeginMarginConnection() {
 
     mxo::ltlogin::CLTLoginState* state4 = loginController->ScaffoldState4();
     if (!state4) {
-        spdlog::info("DIAGNOSTIC: CLTLoginMediator sidecar missing registered state4 scaffold for margin connection");
+        spdlog::info("DIAGNOSTIC: installed CLTLoginMediator missing registered state4 scaffold for margin connection");
         return 0;
     }
 

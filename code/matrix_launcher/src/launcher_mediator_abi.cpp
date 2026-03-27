@@ -1,5 +1,6 @@
 #include "diagnostics.h"
 #include "launcher_mediator_abi_shared.h"
+#include "launcher_network_object_abi.h"
 #include "loginmediator.h"
 
 #include <array>
@@ -263,8 +264,13 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 // vtable: ILTLoginMediator.Default slot +0x08
 static int __thiscall Mediator_SetNetworkEngine(MinimalLoginMediatorStub* self, void* object) {
     (void)self;
-    mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(
-        static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine*>(object));
+
+    mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetLauncherObjectEngine(object);
+    if (!engine) {
+        engine = static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine*>(object);
+    }
+
+    mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(engine);
     return 1;
 }
 

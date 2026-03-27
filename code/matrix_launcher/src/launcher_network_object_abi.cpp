@@ -1,5 +1,6 @@
 #include "diagnostics.h"
 #include "diagnostics_auth.h"
+#include "launcher_network_object_abi.h"
 #include "../matrixstaging/runtime/src/libltmessaging/messageconnection.h"
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
@@ -257,6 +258,10 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
     }
 
     return g_DiagnosticLttcpBinding->Engine();
+}
+
+mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetLauncherObjectEngine(void* ownerPtr) {
+    return DiagnosticGetOrCreateLttcpEngine(static_cast<MinimalLauncherObjectStub*>(ownerPtr));
 }
 
 static void DiagnosticSetListHeadOccupancy(DiagnosticIntrusiveListHead* head, bool nonEmpty) {
