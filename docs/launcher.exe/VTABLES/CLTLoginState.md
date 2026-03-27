@@ -9,7 +9,7 @@ Why this reading is stronger than older `LaunchPadClient_*` guesses:
 - `CLTLoginMediator_InitializeHelperDispatchTable` allocates/installs these objects.
 - `0x0043f300` contains the string:
   - `CLTLoginState_AuthenticatePending::AuthMessageDispatch()`
-- `0x0043d4d0` contains the string:
+- `0x0043d4d0 = CLTLoginState_WorldListPending_AuthMessageDispatch` contains the string:
   - `CLTLoginState_WorldListPending::AuthMessageDispatch()`
 - both handlers reference `loginstate.cpp` directly.
 - many slot-7 entries are tiny state-id getters.

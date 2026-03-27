@@ -28,6 +28,8 @@ This is supported by the vtable at `0x4b2768`, which is immediately followed in 
 - `launcher.exe:0x4365a0` = `CLTThreadPerClientTCPEngine_QueueThread_ctor`
 - `launcher.exe:0x436fd0` = `CLTBaseThreadPerClientTCPEngine_dtor`
 - `launcher.exe:0x437050` = `CLTBaseThreadPerClientTCPEngine_deleting_dtor`
+- `launcher.exe:0x431310` = `CLTThreadPerClientTCPEngine_dtor`
+- `launcher.exe:0x4319a0` = `CLTThreadPerClientTCPEngine_deleting_dtor`
 
 ### Primary users
 - `0x40a3e9..0x40a3fe`
@@ -555,11 +557,13 @@ Current best read:
 - `+0x80` stores endpoint nodes whose payload at `[node+0x20]` is an **AcceptThread-style worker object**
   - slot `1` / `MonitorPort` allocates a `0x44` object via `0x431ab0`
   - that ctor is string-backed by `CLTThreadPerClientTCPEngine::AcceptThread`
+  - the derived thread-main slot for that object is now named `0x432070 = CLTThreadPerClientTCPEngine_AcceptThread_Run`
   - `MonitorPort` creates `socket(AF_INET, SOCK_STREAM, 0)`, then `bind`, then `listen`
   - on success it stores the new AcceptThread-style payload into the matched/new `+0x80` node at `[node+0x20]`
 - `+0x8c` stores pointer-keyed nodes whose payload at `[node+0x14]` is a **WorkerThread-style worker object**
   - helper `0x431ff0` allocates a `0x48` object via `0x431b60`
   - that ctor is string-backed by `CLTThreadPerClientTCPEngine::WorkerThread`
+  - the derived thread-main slot for that object is now named `0x42fe50 = CLTThreadPerClientTCPEngine_WorkerThread_Run`
   - helper `0x431ff0` then inserts `(contextKey, workerPayload)` into `+0x8c`
   - slot `2` / `UDPMonitorPort` uses that helper after successful UDP socket/bind setup and then marks the returned worker object with `[worker+0x34] = 2`
   - slot `6` / `Connect` uses that helper after successful TCP setup/connect sequencing and then marks the returned worker object with `[worker+0x34] = 1`
