@@ -953,9 +953,9 @@ public:
     // - dispatches the registered state4 slot 3 against the current helper as upstream input
     uint32_t BeginMarginConnectionViaState4Scaffold();
     // Launcher-owned arg5/auth bridge migration:
-    // - keep the queued work-item/context scaffolds on `CLTLoginMediator`
-    // - keep arg5 queue pushes in the launcher-object ABI shell
-    // - let diagnostics entrypoints stay thin wrappers instead of owning a second controller
+    // - keep the queued context callbacks on `CLTLoginMediator`
+    // - let `CLTThreadPerClientTCPEngine` own the current queue push / nonblocking pump seam
+    // - keep the launcher-object ABI shell thin and arg5-shaped
     void ResetLauncherConnectionBridgeScaffold();
     void BindLauncherConnectionBridgeScaffold(
         void* launcherOwner,
@@ -963,7 +963,6 @@ public:
     bool CanBeginLauncherAuthConnectionScaffold() const;
     uint32_t BeginLauncherAuthConnectionScaffold();
     uint32_t BeginLauncherMarginConnectionScaffold();
-    void PollLauncherConnectionBridgeScaffold();
     // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
     // `0x41b450` on the early auth path. Keep this narrow instead of changing the generic
     // switch scaffold until more of the broader helper transition surface is source-owned.
@@ -1368,11 +1367,6 @@ private:
         CLTLoginMediatorConnectionContextScaffold** slot,
         const char* label,
         bool isMarginConnection);
-    bool EnqueueLauncherConnectionStatusWorkItemScaffold(
-        CLTLoginMediatorConnectionContextScaffold* context,
-        uint32_t workType,
-        uint32_t workPayload,
-        const char* label);
 
     // Condensed `0x4f78b8` owner sketch for the active branch:
     // - `+0x10` = current helper/state object

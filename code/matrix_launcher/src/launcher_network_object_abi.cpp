@@ -10,6 +10,7 @@
 #include <cstring>
 #include <spdlog/spdlog.h>
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void LogLauncherObjectPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
     if (!ptr || !wordCount) {
         spdlog::debug("{}: <null>", label ? label : "PointerWords");
@@ -115,6 +116,7 @@ static void InitializeDiagnosticIntrusiveListHead(DiagnosticIntrusiveListHead* h
     head->last = head;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void InitializeDiagnosticIntrusiveListHeadSmall(DiagnosticIntrusiveListHeadSmall* head) {
     if (!head) return;
     std::memset(head, 0, sizeof(*head));
@@ -136,75 +138,6 @@ static bool DiagnosticInitializeLauncherQueue(DiagnosticLauncherQueue* queue, ui
         spdlog::info("DIAGNOSTIC: failed to initialize launcher queue via liblttcp Queue_Init(initialSize={})", initialSize);
     }
     return ok;
-}
-
-// UNANCHORED: launcher-side wrapper that now delegates queue pair pushes to the liblttcp scaffold.
-static bool DiagnosticPushLauncherQueue(
-    DiagnosticLauncherQueue* queue,
-    uint32_t value0,
-    uint32_t value1) {
-    const bool ok = mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_PushPair(queue, value0, value1);
-    if (!ok) {
-        spdlog::info("DIAGNOSTIC: liblttcp Queue_PushPair failed for queue={} value0=0x{:08x} value1=0x{:08x}",
-            fmt::ptr(queue),
-            (unsigned)value0,
-            (unsigned)value1);
-    }
-    return ok;
-}
-
-// UNANCHORED but now intentionally shaped after launcher.exe:0x436820.
-// The current auth-side diagnostics bridge previously pushed straight into queue0C without
-// reproducing the original lock + empty->non-empty signal behavior. Keep the raw queue-storage
-// helper above, but route live owner-visible producer traffic through an owner-aware wrapper.
-static bool DiagnosticEnqueueCompletedOperation(
-    MinimalLauncherObjectStub* owner,
-    uint32_t value0,
-    uint32_t value1,
-    bool useQueue34,
-    const char* label) {
-    if (!owner) {
-        return false;
-    }
-
-    CRITICAL_SECTION* crit = &owner->helper60.crit;
-    if (crit) {
-        EnterCriticalSection(crit);
-    }
-
-    const bool queue0Empty = (owner->queue0C.current1 == owner->queue0C.current0);
-    const bool queue34Empty = (owner->queue34.current1 == owner->queue34.current0);
-    const bool queuePairWasEmpty = queue0Empty && queue34Empty;
-
-    DiagnosticLauncherQueue* targetQueue = useQueue34 ? &owner->queue34 : &owner->queue0C;
-    const bool pushed = DiagnosticPushLauncherQueue(targetQueue, value0, value1);
-
-    if (crit) {
-        LeaveCriticalSection(crit);
-    }
-
-    if (pushed && queuePairWasEmpty && owner->subVtable5C && owner->subVtable5C[0]) {
-        typedef uint32_t (__thiscall *SignalQueueFn)(void*);
-        SignalQueueFn signalQueue = reinterpret_cast<SignalQueueFn>(owner->subVtable5C[0]);
-        (void)signalQueue(&owner->subVtable5C);
-    }
-
-    spdlog::info(
-        "DIAGNOSTIC: enqueue completed-op label={} owner={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} pushed={:08x}",
-        label ? label : "<null>",
-        fmt::ptr(owner),
-        useQueue34 ? "queue34" : "queue0C",
-        (unsigned)value0,
-        (unsigned)value1,
-        queuePairWasEmpty ? 1u : 0u,
-        pushed ? 1u : 0u);
-    return pushed;
-}
-
-// UNANCHORED: mediator-owned launcher bridge helper into the replacement arg5 queue0C scaffold.
-bool DiagnosticLauncherObjectPushQueue0C(void* ownerPtr, uint32_t value0, uint32_t value1) {
-    MinimalLauncherObjectStub* owner = static_cast<MinimalLauncherObjectStub*>(ownerPtr);
-    return DiagnosticEnqueueCompletedOperation(owner, value0, value1, /*useQueue34=*/false, "launcher-bridge");
 }
 
 // UNANCHORED: mediator-owned helper for refreshing replacement arg5 sidecar state.
@@ -255,10 +188,12 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
     return g_DiagnosticLttcpBinding->Engine();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetLauncherObjectEngine(void* ownerPtr) {
     return DiagnosticGetOrCreateLttcpEngine(static_cast<MinimalLauncherObjectStub*>(ownerPtr));
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void DiagnosticSetListHeadOccupancy(DiagnosticIntrusiveListHead* head, bool nonEmpty) {
     if (!head) return;
     if (!nonEmpty) {
@@ -271,6 +206,7 @@ static void DiagnosticSetListHeadOccupancy(DiagnosticIntrusiveListHead* head, bo
     head->last = &head->keyAndPayload[8];
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void DiagnosticSetListHeadOccupancySmall(DiagnosticIntrusiveListHeadSmall* head, bool nonEmpty) {
     if (!head) return;
     if (!nonEmpty) {
@@ -283,13 +219,19 @@ static void DiagnosticSetListHeadOccupancySmall(DiagnosticIntrusiveListHeadSmall
     head->last = &head->keyAndPayload[4];
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void DiagnosticSyncLauncherObjectSidecarState(MinimalLauncherObjectStub* self) {
     if (!self) return;
 
     if (g_DiagnosticLttcpBinding && g_DiagnosticLttcpBinding->Owner() == self && g_DiagnosticLttcpBinding->Engine()) {
         // UNANCHORED scaffold bridge: current liblttcp engine sidecar is separate from the ABI object,
-        // so hand the real launcher-visible queue-field addresses across explicitly.
-        g_DiagnosticLttcpBinding->Engine()->AttachExternalQueuePair(&self->queue0C, &self->queue34);
+        // so hand the real launcher-visible queue-field addresses and paired helper/event surfaces
+        // across explicitly.
+        g_DiagnosticLttcpBinding->Engine()->AttachExternalQueuePair(
+            &self->queue0C,
+            &self->queue34,
+            &self->helper60.crit,
+            self->field7C);
     }
 
     const bool hasMonitoredPorts = g_DiagnosticLttcpBinding && g_DiagnosticLttcpBinding->HasMonitoredPorts();
@@ -539,6 +481,7 @@ static uint32_t __thiscall LauncherObject_CleanupConnection(
     return result;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static CRITICAL_SECTION* DiagnosticLauncherCritFromHelper(void* self) {
     return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
 }
@@ -548,6 +491,7 @@ static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
     return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
 }
 
+// UNANCHORED: helper-to-owner backpointer used by the current arg5 subobject helper scaffolds.
 static MinimalLauncherObjectStub* DiagnosticLauncherObjectFromHelper(void* helperSelf, size_t helperOffset) {
     return helperSelf
         ? reinterpret_cast<MinimalLauncherObjectStub*>(static_cast<unsigned char*>(helperSelf) - helperOffset)
@@ -652,8 +596,8 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
         EnterCriticalSection(crit);
     }
     MinimalLauncherObjectStub* owner = DiagnosticLauncherObjectFromHelper(self, 0x60);
-    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-        mediator->PollLauncherConnectionBridgeScaffold();
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetLauncherObjectEngine(owner)) {
+        engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
     }
     const uint32_t count = g_LauncherObjectBuildState.subobject60Slot0CallCount;
     if (DiagnosticShouldLogRepeatedRuntimeCount(count)) {

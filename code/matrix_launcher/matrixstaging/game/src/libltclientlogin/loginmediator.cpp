@@ -75,14 +75,17 @@ struct MarginBootstrapSessionState {
 static std::unordered_map<const CLTLoginMediator*, MarginBootstrapSessionState>
     g_marginBootstrapStateByMediator;
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static MarginBootstrapSessionState& MutableMarginBootstrapState(const CLTLoginMediator* mediator) {
     return g_marginBootstrapStateByMediator[mediator];
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void EraseMarginBootstrapState(const CLTLoginMediator* mediator) {
     g_marginBootstrapStateByMediator.erase(mediator);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOrder) {
     mxo::liblttcp::LTTCPEndpointKey key = {};
     key.family = 2;  // AF_INET
@@ -91,6 +94,7 @@ static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOr
     return key;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static bool EnsureWinsockReady() {
     static bool initialized = false;
     static bool attempted = false;
@@ -104,6 +108,7 @@ static bool EnsureWinsockReady() {
     return initialized;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static bool ResolveAllIpv4Addresses(const char* hostName, std::vector<uint32_t>* outIpv4NetworkOrderList) {
     if (!hostName || !hostName[0] || !outIpv4NetworkOrderList || !EnsureWinsockReady()) {
         return false;
@@ -138,10 +143,12 @@ static bool ResolveAllIpv4Addresses(const char* hostName, std::vector<uint32_t>*
     return !outIpv4NetworkOrderList->empty();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static const char* NonEmptyTextOrPlaceholder(const char* value) {
     return (value && value[0]) ? value : "<empty>";
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t maxPreviewBytes) {
     if (!bytes || byteCount == 0u || maxPreviewBytes == 0u) {
         return "<empty>";
@@ -163,6 +170,7 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
     return out;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static bool ParseVariableLengthPayloadForReceive(
     const std::vector<uint8_t>& bytes,
     const uint8_t** outPayload,
@@ -203,6 +211,7 @@ static bool ParseVariableLengthPayloadForReceive(
     return true;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t ReadU32LE(const uint8_t* p) {
     return static_cast<uint32_t>(p[0]) |
            (static_cast<uint32_t>(p[1]) << 8) |
@@ -210,31 +219,37 @@ static uint32_t ReadU32LE(const uint8_t* p) {
            (static_cast<uint32_t>(p[3]) << 24);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_TinyGetter(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_AppendDebugString(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_ResetPayloadForSourceDescriptor(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_TinyHelper(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void** Arg6CurrentSlotRecord44Vtable() {
     static void* vtable[5] = {
         reinterpret_cast<void*>(Arg6CurrentSlotRecord44_Destroy),
@@ -252,10 +267,12 @@ struct LiveSelectionCfgCorpusView {
     uint32_t length = 0u;
 };
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static const CLTLoginMediator* ResolveActiveSelectionCfgCorpusOwner(const CLTLoginMediator* mediator) {
     return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static const CLTLoginMediator* ResolveActiveState8PersistenceOwner(const CLTLoginMediator* mediator) {
     // Keep the wrapper-facing split explicit:
     // - arg6 `ILTLoginMediator.Default` entrypoints may be invoked on the binder-owned stub object
@@ -264,6 +281,7 @@ static const CLTLoginMediator* ResolveActiveState8PersistenceOwner(const CLTLogi
     return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t LogLiveSelectionCfgCorpusFlag(
     const char* slotLabel,
     const char* corpusLabel,
@@ -283,6 +301,7 @@ static uint32_t LogLiveSelectionCfgCorpusFlag(
     return view.ready;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void* LogLiveSelectionCfgCorpusGetter(
     const char* slotLabel,
     const char* corpusLabel,
@@ -308,6 +327,7 @@ static void* LogLiveSelectionCfgCorpusGetter(
 
 }  // namespace
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
       currentState_(nullptr),
@@ -381,13 +401,19 @@ CLTLoginMediator::CLTLoginMediator()
     InitializeArg6DefaultObject();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::~CLTLoginMediator() {
     ResetLauncherConnectionBridgeScaffold();
     EraseMarginBootstrapState(this);
     AuthBootstrap680Ops::EraseSidecar(this);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
+    if (engine_) {
+        engine_->AttachLauncherConnectionBridgeContextsScaffold(nullptr, nullptr);
+    }
+
     if (authConnectionContextScaffold_) {
         std::free(authConnectionContextScaffold_);
         authConnectionContextScaffold_ = nullptr;
@@ -419,51 +445,14 @@ void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
     spdlog::info("CLTLoginMediator::ResetLauncherConnectionBridgeScaffold completed");
 }
 
-void CLTLoginMediator::PollLauncherConnectionBridgeScaffold() {
-    if (!launcherOwnerConnectionBridgeScaffold_) {
-        return;
-    }
-
-    auto tryPoll = [this](CLTLoginMediatorConnectionContextScaffold* context, const char* label) {
-        if (!context || !context->sidecarConnection) {
-            return;
-        }
-
-        const int received = context->sidecarConnection->PollReceiveNonBlocking();
-        if (received > 0) {
-            EnqueueLauncherConnectionStatusWorkItemScaffold(
-                context,
-                /*workType=*/3u,
-                /*workPayload=*/static_cast<uint32_t>(received),
-                label);
-            return;
-        }
-
-        if (received < 0 && !context->peerCloseQueued) {
-            context->peerCloseQueued = true;
-            spdlog::info(
-                "CLTLoginMediator::PollLauncherConnectionBridgeScaffold queued peer-close label='{}' context={} connection={}",
-                (context->debugLabel && context->debugLabel[0]) ? context->debugLabel : "<null>",
-                fmt::ptr(context),
-                fmt::ptr(context->sidecarConnection));
-            EnqueueLauncherConnectionStatusWorkItemScaffold(
-                context,
-                /*workType=*/1u,
-                /*workPayload=*/0u,
-                context->isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed");
-        }
-    };
-
-    tryPoll(authConnectionContextScaffold_, "AuthReceivePacket");
-    tryPoll(marginConnectionContextScaffold_, "MarginReceivePacket");
-}
-
 // +0x00
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetName() {
     return g_MediatorName;
 }
 
 // +0x08
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
     engine_ = engine;
     if (authConnection_) {
@@ -483,6 +472,7 @@ void CLTLoginMediator::ClearEngine() {
     spdlog::info("MediatorStub::ClearEngine()");
 }
 // +0x10
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::IsReady() {
     spdlog::info("CLTLoginMediator::IsReady() -> 1");
     return 1;
@@ -528,6 +518,7 @@ uint32_t CLTLoginMediator::IsConnected() {
     return 1;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetProfileRootName() const {
     const char* profileRootName = Arg6ProfileName();
     spdlog::debug(
@@ -536,6 +527,7 @@ const char* CLTLoginMediator::GetProfileRootName() const {
     return profileRootName;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const SlotRecordState004b5328* CLTLoginMediator::ResolveArg6CurrentSlotRecord44Source() const {
     const CLTLoginMediator* currentCharacterStateMediator = ResolveActiveStateSourceScaffold();
 
@@ -547,6 +539,7 @@ const SlotRecordState004b5328* CLTLoginMediator::ResolveArg6CurrentSlotRecord44S
     return currentSlotRecord;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
     arg6CurrentSlotRecord44Payload_ = {};
     arg6CurrentSlotRecord44_ = {};
@@ -583,6 +576,7 @@ bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
     return arg6CurrentSlotRecord44Present_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
     uint32_t selectionIndex) {
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
@@ -632,6 +626,7 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
 }
 
 // +0x44
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44() {
     const bool hasCurrentSlot = RefreshArg6CurrentSlotRecordObject44();
     const void* currentSlotRecordPtr = hasCurrentSlot
@@ -649,6 +644,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
     return hasCurrentSlot ? &arg6CurrentSlotRecord44_ : nullptr;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     const SlotRecordState004b5328* slotRecord = GetCurrentSlotRecord();
     if (!slotRecord) {
@@ -686,6 +682,7 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     return worldOrSelectionName;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetProfileOrSessionName() const {
     const char* profileOrSessionName = Arg6ProfileName();
     spdlog::debug(
@@ -714,6 +711,7 @@ uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
 // - client `InitClientDLL` uses caller-clean wrappers and threads the previous return value
 //   through the next call
 // Keep the incoming value opaque here instead of forcing a false `const char*` semantic.
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValueToken) {
     const char* authName = Arg6AuthName();
     spdlog::info(
@@ -723,6 +721,7 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
     return authName;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
     const char* authPassword = Arg6AuthPassword();
     const char* bootstrapPassword = authBootstrapChild680_.stringF8.begin;
@@ -736,6 +735,7 @@ const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValu
     return effectivePassword;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveHlCfg68() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -752,6 +752,7 @@ uint32_t CLTLoginMediator::HasLiveHlCfg68() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveAnCfg6c() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -768,6 +769,7 @@ uint32_t CLTLoginMediator::HasLiveAnCfg6c() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLivePiCfg70() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -784,6 +786,7 @@ uint32_t CLTLoginMediator::HasLivePiCfg70() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveAiCfg74() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -800,6 +803,7 @@ uint32_t CLTLoginMediator::HasLiveAiCfg74() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveCsCfg78() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -816,6 +820,7 @@ uint32_t CLTLoginMediator::HasLiveCsCfg78() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveBlCfg7c() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -832,6 +837,7 @@ uint32_t CLTLoginMediator::HasLiveBlCfg7c() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveIlCfg80() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -848,6 +854,7 @@ uint32_t CLTLoginMediator::HasLiveIlCfg80() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveRlCfg84() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -864,6 +871,7 @@ uint32_t CLTLoginMediator::HasLiveRlCfg84() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveClCfg88() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -880,6 +888,7 @@ uint32_t CLTLoginMediator::HasLiveClCfg88() const {
         view);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasState8PersistenceData8c() const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -893,6 +902,7 @@ uint32_t CLTLoginMediator::HasState8PersistenceData8c() const {
     return ready;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasLiveCuiCfg90() const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -915,6 +925,7 @@ uint32_t CLTLoginMediator::HasLiveCuiCfg90() const {
     return result;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveHlCfg94(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -932,6 +943,7 @@ void* CLTLoginMediator::GetLiveHlCfg94(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveAnCfg98(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -949,6 +961,7 @@ void* CLTLoginMediator::GetLiveAnCfg98(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLivePiCfg9c(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -966,6 +979,7 @@ void* CLTLoginMediator::GetLivePiCfg9c(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveAiCfgA0(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -983,6 +997,7 @@ void* CLTLoginMediator::GetLiveAiCfgA0(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveCsCfgA4(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1000,6 +1015,7 @@ void* CLTLoginMediator::GetLiveCsCfgA4(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveBlCfgA8(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1017,6 +1033,7 @@ void* CLTLoginMediator::GetLiveBlCfgA8(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveIlCfgAc(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1034,6 +1051,7 @@ void* CLTLoginMediator::GetLiveIlCfgAc(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveRlCfgB0(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1051,6 +1069,7 @@ void* CLTLoginMediator::GetLiveRlCfgB0(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveClCfgB4(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1068,6 +1087,7 @@ void* CLTLoginMediator::GetLiveClCfgB4(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetLiveCuiCfgB8(uint32_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveSelectionCfgCorpusOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1085,6 +1105,7 @@ void* CLTLoginMediator::GetLiveCuiCfgB8(uint32_t* outLength) const {
         outLength);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const State8PersistenceF1cSnapshot* snapshot =
@@ -1099,6 +1120,7 @@ const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
     return header;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const State8PersistenceF1cSnapshot* snapshot =
@@ -1115,6 +1137,7 @@ const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
     return body;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1134,6 +1157,7 @@ void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) cons
     return buffer;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasState8Section11Dword145c() const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1147,6 +1171,7 @@ uint32_t CLTLoginMediator::HasState8Section11Dword145c() const {
     return ready;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1158,6 +1183,7 @@ uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
     return value;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11String1460() {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
@@ -1206,6 +1232,7 @@ uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
 // - launcher `0x40b360` waits for event `1` only when this returns true
 // - tiny slot body uses owner auth-connection state (`+0x18`, `+0x2c`)
 // - keep that explicit instead of conflating it with the margin/state9 `+0x16c` family
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
     if (!authConnection_) {
         spdlog::info(
@@ -1241,23 +1268,28 @@ uint32_t CLTLoginMediator::GetLastLoginStatus() {
 }
 
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
     currentState_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::State6UdpSessionSecretF18() const {
     const auto it = g_marginBootstrapStateByMediator.find(this);
     return (it != g_marginBootstrapStateByMediator.end()) ? it->second.state6UdpSessionSecretF18 : 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
     MutableMarginBootstrapState(this).state6UdpSessionSecretF18 = value;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const {
     if (!outKey) {
         return false;
@@ -1273,6 +1305,7 @@ bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t,
     return true;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     const auto it = g_marginBootstrapStateByMediator.find(this);
     if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
@@ -1287,6 +1320,7 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     return seedPointer;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
     lastMarginConnectStatus_ = workResultCode;
     ++marginConnectStatusCount_;
@@ -1303,6 +1337,7 @@ uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
     return (workResultCode == kConnectStatusSuccess) ? BeginMarginHandshake() : 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginMarginHandshake() {
     // Important ownership split to keep explicit in source:
     // - mediator owns the shared margin-connection transport helper (`0x41e500` family)
@@ -1438,6 +1473,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     return 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8PersistenceF1cView() const {
     auto copyCStringIntoFixed = [](std::array<char, 0x20>& dest, const char* src) {
         std::fill(dest.begin(), dest.end(), '\0');
@@ -1512,6 +1548,7 @@ const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8Pe
     return state8PersistenceF1c_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::GetState8PersistenceF1c() const {
     const State8PersistenceF1cSnapshot& snapshot = State8PersistenceF1cView();
     ++profile0f4Count_;
@@ -1534,6 +1571,7 @@ const void* CLTLoginMediator::GetState8PersistenceF1c() const {
     return &snapshot;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::MirrorProcessLoginCredentialsSourceBlock120(const ProcessLoginCredentialsInputSketch& input) {
     std::copy(input.string00.begin(), input.string00.end(), postAuthMarginLoadingState_.sourceLeadString108.begin());
     postAuthMarginLoadingState_.sourceField12c = input.field24;
@@ -1551,6 +1589,7 @@ void CLTLoginMediator::MirrorProcessLoginCredentialsSourceBlock120(const Process
     std::copy(input.stringB0.begin(), input.stringB0.end(), postAuthMarginLoadingState_.sourceBlock1b8.begin());
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
     const char* characterName,
     uint32_t selectedWorldIndexLow24) {
@@ -1598,6 +1637,7 @@ uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
     return 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(
     const void* input120,
     void* returnAddress,
@@ -1727,18 +1767,22 @@ bool CLTLoginMediator::State10HasReadyConnectionState2() const {
 }
 
 // Accessors for migrated state fields (diagnostics only)
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::LastNopatchValue1Ptr() const {
     return lastNopatchValue1Ptr_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::LastNopatchValue2Ptr() const {
     return lastNopatchValue2Ptr_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::LastStatus178() const {
     return lastStatus178_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::StatusQuery178Count() const {
     return statusQuery178Count_;
 }
@@ -1851,6 +1895,7 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
     return connection->SendPacketEnvelopeScaffold(envelope);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
     if (!packetBytes || packetByteCount == 0u) {
         return 0u;
@@ -1904,6 +1949,7 @@ uint32_t CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     return InvokeSessionCallbackHelper65cVtable4IfPresent();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent() {
     SessionCallbackHelper65cSketch* helper = sessionCallbackHelper65c_;
     if (helper == nullptr) {
@@ -1942,6 +1988,7 @@ void CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4() {
 }
 
 // source-owned shared helper for `CLTLoginState_State18` slot 3 / `0x421a50`
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
     // Current best source-owned mirror of the alternate state18 session-helper path:
     // - ensure owner helper `+0x65c`
@@ -1998,6 +2045,7 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 //     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
 // Address anchor: launcher.exe:0x4d2c58 = ILTLoginMediator_Default object (arg6)
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::WorldSlot(uint32_t index) const {
     // Faithful implementation should call:
     // - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds(index)
@@ -2008,6 +2056,7 @@ void* CLTLoginMediator::WorldSlot(uint32_t index) const {
 }
 
 // Address anchor: launcher.exe:0x4d2c58 = ILTLoginMediator_Default object (arg6)
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::WorldPayloadSlot(uint32_t index) const {
     // Faithful implementation should call:
     // - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName(index)
@@ -2039,6 +2088,7 @@ void CLTLoginMediator::InitializeArg6DefaultObject() {
         arg6Selection_.selectedVariantIndexHigh8_);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::ConfigureArg6Selection(
     uint32_t worldUpperBoundExclusive,
     uint32_t variantUpperBoundExclusive,
@@ -2061,74 +2111,92 @@ void CLTLoginMediator::ConfigureArg6Selection(
         (mappedVariantName && mappedVariantName[0]) ? mappedVariantName : arg6Selection_.mappedSelectionName_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetArg6ProfileName(const char* profileName) {
     arg6Selection_.profileName_ = (profileName && profileName[0]) ? profileName : "resurrections";
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetArg6AuthName(const char* authName) {
     arg6Selection_.authName_ = (authName && authName[0]) ? authName : arg6Selection_.profileName_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetArg6AuthPassword(const char* authPassword) {
     arg6Selection_.authPassword_ = authPassword ? authPassword : "";
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6WorldUpperBoundExclusive() const {
     return arg6Selection_.worldUpperBoundExclusive_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6VariantUpperBoundExclusive() const {
     return arg6Selection_.variantUpperBoundExclusive_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedWorldIndexLow24() const {
     return arg6Selection_.selectedWorldIndexLow24_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedVariantIndexHigh8() const {
     return arg6Selection_.selectedVariantIndexHigh8_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedSelectionGateByte100() const {
     return arg6Selection_.selectedSelectionGateByte100_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedVariantState() const {
     return arg6Selection_.selectedVariantState_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6MappedSelectionId() const {
     return arg6Selection_.mappedSelectionId_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6MappedSelectionName() const {
     return arg6Selection_.mappedSelectionName_.c_str();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6MappedVariantName() const {
     return arg6Selection_.mappedVariantName_.c_str();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6ProfileName() const {
     return arg6Selection_.profileName_.c_str();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6AuthName() const {
     return arg6Selection_.authName_.c_str();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6AuthPassword() const {
     return arg6Selection_.authPassword_.c_str();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::Arg6WorldIndexMatchesSelection(uint32_t worldIndex) const {
     return worldIndex == arg6Selection_.selectedWorldIndexLow24_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const {
     return variantIndex == arg6Selection_.selectedVariantIndexHigh8_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6ExpectedSelectionDescriptorScratchRequest() const {
     const uint32_t variantHigh8 = (arg6Selection_.selectedVariantIndexHigh8_ & 0xffu) << 24;
     const uint32_t preservedMiddle16 = arg6Selection_.selectedWorldIndexLow24_ & 0x00ffff00u;
@@ -2136,6 +2204,7 @@ uint32_t CLTLoginMediator::Arg6ExpectedSelectionDescriptorScratchRequest() const
     return variantHigh8 | preservedMiddle16 | lowByteOverwrittenWithVariant;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const {
     const uint32_t normalizedSelectionIndex = selectionIndex & 0xffffffffu;
     if ((normalizedSelectionIndex & 0x00ffffffu) == arg6Selection_.selectedWorldIndexLow24_) {
@@ -2144,6 +2213,7 @@ bool CLTLoginMediator::Arg6SelectionDescriptorMatchesRequest(uint32_t selectionI
     return normalizedSelectionIndex == Arg6ExpectedSelectionDescriptorScratchRequest();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
     const uint32_t selectionIndex = Arg6SelectedWorldIndexLow24();
     spdlog::debug(
@@ -2152,6 +2222,7 @@ uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
     return selectionIndex;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::GetArg7SelectionUpperBoundExclusive() const {
     const uint32_t upperBoundExclusive = Arg6VariantUpperBoundExclusive();
     spdlog::info(
@@ -2160,6 +2231,7 @@ uint32_t CLTLoginMediator::GetArg7SelectionUpperBoundExclusive() const {
     return upperBoundExclusive;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::MapSelectionName(uint32_t selectionHighByte) const {
     const char* selectionName = nullptr;
     if (selectionHighByte < Arg6VariantUpperBoundExclusive() &&
@@ -2174,6 +2246,7 @@ const char* CLTLoginMediator::MapSelectionName(uint32_t selectionHighByte) const
     return selectionName;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
     ++arg6VariantWorldNameQueryCountE0_;
     if ((arg6VariantWorldNameQueryCountE0_ % 5u) == 0u) {
@@ -2254,6 +2327,7 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
 // Keep the wrapper/owner split explicit:
 // - once auth-reply world descriptors exist, this slot reads owner descriptor Status byte `+0x17`
 // - before that, startup selection still needs the older synthetic gate byte path
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const {
     const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
 
@@ -2357,6 +2431,7 @@ const char* CLTLoginMediator::Arg6GetAvailableWorldName(uint32_t index) {
 // Private helper: Populate client.dll's world list view for InitClientDLL
 // Address anchor: launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject
 // =============================================================================
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::PopulateClientWorldView() {
     // Populate the client's world list view with launcher-provided data
     // This ensures client.dll receives populated world data when InitClientDLL passes arg6
@@ -2374,6 +2449,7 @@ void CLTLoginMediator::PopulateClientWorldView() {
     spdlog::info("launcher-owned PopulateClientWorldView populated {} worlds", kRecoveredWorldSlotCapacity);
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::SendAuthFramedPacket(
     const mxo::auth::FramedPacket& packet,
     const char* stepLabel) {
@@ -2402,6 +2478,7 @@ uint32_t CLTLoginMediator::SendAuthFramedPacket(
     return sendResult;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::SendMarginFramedPacket(
     const mxo::auth::FramedPacket& packet,
     uint8_t plainRawCode,
@@ -2431,6 +2508,7 @@ uint32_t CLTLoginMediator::SendMarginFramedPacket(
     return sendResult;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::ResetMarginBootstrapState() {
     MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
     marginBootstrapState.phase = MarginBootstrapPhase::kIdle;
@@ -2443,6 +2521,7 @@ void CLTLoginMediator::ResetMarginBootstrapState() {
     stagedIncomingMarginPacketBytes_.clear();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
     const uint8_t* payloadBytes,
     size_t payloadSize,
@@ -2841,6 +2920,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         static_cast<unsigned>(postAuthMarginLoadingState_.characterRouteIndexCc8));
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HandleAuthConnectionReceiveScaffold() {
     mxo::liblttcp::CMessageConnection* connection = AuthConnection();
     if (connection == nullptr) {
@@ -2905,6 +2985,7 @@ uint32_t CLTLoginMediator::HandleAuthConnectionReceiveScaffold() {
     return actions;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
     // Receive-side note:
     // - the current replacement receive scaffolds strip the variable-length frame header before
@@ -2994,6 +3075,7 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     return 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HandleMarginConnectionReceiveScaffold() {
     mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     if (connection == nullptr) {
@@ -3051,6 +3133,7 @@ uint32_t CLTLoginMediator::HandleMarginConnectionReceiveScaffold() {
     return kReceiveActionNone;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
     if (!packetBytes || packetSize < 1u) {
         return 0u;
@@ -3154,10 +3237,12 @@ void CLTLoginMediator::RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(
     }
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() const {
     return stagedIncomingMarginPacketBytes_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::RebuildMarginAddressList() {
     const std::string resolvedHostName = ResolvedMarginHostName();
     marginAddressList3c_.resolvedHostName = resolvedHostName;
@@ -3179,6 +3264,7 @@ bool CLTLoginMediator::RebuildMarginAddressList() {
     return true;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::SelectMarginEndpointIpv4() {
     if (marginAddressList3c_.ipv4NetworkOrderList.empty()) {
         return false;
@@ -3192,6 +3278,7 @@ bool CLTLoginMediator::SelectMarginEndpointIpv4() {
     return true;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObject() {
     mxo::liblttcp::CMarginConnection* marginConnection =
         dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_);
@@ -3223,6 +3310,7 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
     return marginConnection_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 // ILTLoginMediator::Default - static member initialization (original: launcher.exe:0x4d2c58)
 ILTLoginMediator* ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
 

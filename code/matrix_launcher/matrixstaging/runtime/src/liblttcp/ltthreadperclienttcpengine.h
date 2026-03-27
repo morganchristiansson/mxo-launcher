@@ -9,6 +9,10 @@
 #include "ilttcpengine.h"
 #include "lttcpconnection.h"
 
+namespace mxo::ltlogin {
+struct CLTLoginMediatorConnectionContextScaffold;
+}
+
 namespace mxo::liblttcp {
 
 class CMessageConnection;
@@ -310,10 +314,26 @@ public:
     static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_Queue* queue, CLTThreadPerClientTCPEngine_QueuedPair* outPair);
 
     // UNANCHORED: scaffold bridge because the current liblttcp engine lives beside, not inside,
-    // the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields.
+    // the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields,
+    // the paired +0x60 lock helper, and the +0x7c queue signal event.
     void AttachExternalQueuePair(
         CLTThreadPerClientTCPEngine_Queue* queue0C,
-        CLTThreadPerClientTCPEngine_Queue* queue34);
+        CLTThreadPerClientTCPEngine_Queue* queue34,
+        void* queueLock = nullptr,
+        void* queueSignalEvent = nullptr);
+
+    // UNANCHORED: current replacement seam still keeps loginmediator-owned context callbacks,
+    // but the arg5-side nonblocking producer/push path now lives on the engine side instead of
+    // inside loginmediator.cpp or launcher_network_object_abi.cpp.
+    void AttachLauncherConnectionBridgeContextsScaffold(
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext,
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext);
+    bool EnqueueLauncherConnectionStatusWorkItemScaffold(
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+        uint32_t workType,
+        uint32_t workPayload,
+        const char* label);
+    void PumpLauncherConnectionBridgeFromArg5HelperScaffold();
 
     // anchor: launcher.exe:0x436b10
     void RunCompletedOperationQueue(bool nonBlocking);
@@ -353,9 +373,33 @@ private:
     void StopAcceptThreadScaffold(AcceptThreadRecord* record);
     // UNANCHORED: source-owned teardown helper for recovered WorkerThread-style payloads.
     void StopWorkerThreadScaffold(WorkerThreadRecord* record);
+    // UNANCHORED: current replacement enqueue helper shaped after 0x436820 but still fed by
+    // synthetic sidecar polling rather than fully recovered worker-thread producers.
+    bool EnqueueCompletedOperationScaffold(
+        void* workItem,
+        void* context,
+        bool useQueue34,
+        const char* label,
+        bool queueLockAlreadyHeld);
+    // UNANCHORED: engine-owned loginmediator work-item builder used by both direct enqueue sites
+    // and the arg5 helper-owned nonblocking pump.
+    bool EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+        uint32_t workType,
+        uint32_t workPayload,
+        const char* label,
+        bool queueLockAlreadyHeld);
+    // UNANCHORED: narrow per-context nonblocking receive pump used by the current arg5 helper seam.
+    void PumpLauncherConnectionContextScaffold(
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+        const char* receiveLabel);
 
     CLTThreadPerClientTCPEngine_Queue* externalQueue0C_;
     CLTThreadPerClientTCPEngine_Queue* externalQueue34_;
+    void* externalQueueLock_;
+    void* externalQueueSignalEvent_;
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authBridgeContextScaffold_;
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginBridgeContextScaffold_;
     std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads_;
     std::vector<AcceptThreadRecord> monitoredPorts_;
     std::vector<WorkerThreadRecord> workerThreads_;

@@ -28,10 +28,12 @@ namespace {
 
 // Keep the early auth-entry split self-contained so loginmediator.cpp no longer needs the
 // auth-credential logging helper just for state1/connect-status bringup.
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static const char* MaskedAuthValue(const std::string& value) {
     return value.empty() ? "<empty>" : "<provided>";
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void AssignOwnedSmallStringForAuthEntry(
     AuthBootstrapSelectedSource38Sketch& dest,
     const char* begin,
@@ -49,6 +51,7 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.capacity = dest.string60.current;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static bool EnsureWinsockReadyForAuthEntry() {
     static bool initialized = false;
     static bool attempted = false;
@@ -62,6 +65,7 @@ static bool EnsureWinsockReadyForAuthEntry() {
     return initialized;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static bool ResolveAllIpv4AddressesForAuthEntry(
     const char* hostName,
     std::vector<uint32_t>* outIpv4NetworkOrderList) {
@@ -121,28 +125,15 @@ struct BuiltinScaffoldStates {
     CLTLoginState_State19 state19 = {};
 };
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static BuiltinScaffoldStates& GetBuiltinScaffoldStates() {
     static BuiltinScaffoldStates states = {};
     return states;
 }
 
-static void* g_LauncherConnectionBridgeWorkItemVtable[2] = {0};
 static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
 
-static uint32_t __thiscall LauncherConnectionBridgeWorkItem_Release(
-    CLTLoginMediatorQueuedWorkItemScaffold* self) {
-    if (self) {
-        spdlog::info(
-            "CLTLoginMediator launcher bridge releasing queued work item {} type={} payload=0x{:08x} label='{}'",
-            fmt::ptr(self),
-            self->header.workType,
-            self->workPayload,
-            self->debugLabel ? self->debugLabel : "<null>");
-        std::free(self);
-    }
-    return 1u;
-}
-
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall LauncherConnectionBridgeContext_Release(
     CLTLoginMediatorConnectionContextScaffold* self) {
     spdlog::info(
@@ -153,6 +144,7 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_Release(
     return 1u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
     CLTLoginMediatorConnectionContextScaffold* self,
     CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
@@ -207,12 +199,8 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
     return 1u;
 }
 
-static void EnsureLauncherConnectionBridgeVtablesInitialized() {
-    if (!g_LauncherConnectionBridgeWorkItemVtable[1]) {
-        g_LauncherConnectionBridgeWorkItemVtable[1] =
-            reinterpret_cast<void*>(LauncherConnectionBridgeWorkItem_Release);
-    }
-
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static void EnsureLauncherConnectionBridgeContextVtableInitialized() {
     if (!g_LauncherConnectionBridgeContextVtable[1]) {
         g_LauncherConnectionBridgeContextVtable[1] =
             reinterpret_cast<void*>(LauncherConnectionBridgeContext_Release);
@@ -223,150 +211,187 @@ static void EnsureLauncherConnectionBridgeVtablesInitialized() {
 
 }  // namespace
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState0(CLTLoginState* state) {
     scaffoldState0_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState1(CLTLoginState* state) {
     scaffoldState1_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState2(CLTLoginState* state) {
     scaffoldState2_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
     scaffoldState3_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState4(CLTLoginState* state) {
     scaffoldState4_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState6(CLTLoginState* state) {
     scaffoldState6_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState8(CLTLoginState* state) {
     scaffoldState8_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState9(CLTLoginState* state) {
     scaffoldState9_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState10(CLTLoginState* state) {
     scaffoldState10_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState11(CLTLoginState* state) {
     scaffoldState11_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState12(CLTLoginState* state) {
     scaffoldState12_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState13(CLTLoginState* state) {
     scaffoldState13_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState14(CLTLoginState* state) {
     scaffoldState14_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState15(CLTLoginState* state) {
     scaffoldState15_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState16(CLTLoginState* state) {
     scaffoldState16_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState17(CLTLoginState* state) {
     scaffoldState17_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState18(CLTLoginState* state) {
     scaffoldState18_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState19(CLTLoginState* state) {
     scaffoldState19_ = state;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState0() const {
     return scaffoldState0_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState1() const {
     return scaffoldState1_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState2() const {
     return scaffoldState2_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
     return scaffoldState3_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState4() const {
     return scaffoldState4_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState6() const {
     return scaffoldState6_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState8() const {
     return scaffoldState8_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState9() const {
     return scaffoldState9_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState10() const {
     return scaffoldState10_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState11() const {
     return scaffoldState11_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState12() const {
     return scaffoldState12_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState13() const {
     return scaffoldState13_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState14() const {
     return scaffoldState14_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState15() const {
     return scaffoldState15_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState16() const {
     return scaffoldState16_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState17() const {
     return scaffoldState17_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState18() const {
     return scaffoldState18_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState19() const {
     return scaffoldState19_;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InstallInitialState0Scaffold() {
     if (scaffoldState0_ == nullptr) {
         spdlog::info(
@@ -386,6 +411,7 @@ void CLTLoginMediator::InstallInitialState0Scaffold() {
         currentState_->DebugName());
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
     auto& states = GetBuiltinScaffoldStates();
 
@@ -414,14 +440,17 @@ void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
     }
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetAuthConnectionContextKey(void* contextKey) {
     authConnectionContextKey_ = contextKey;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetMarginConnectionContextKey(void* contextKey) {
     marginConnectionContextKey_ = contextKey;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediatorConnectionContextScaffold* CLTLoginMediator::EnsureLauncherConnectionContextScaffold(
     CLTLoginMediatorConnectionContextScaffold** slot,
     const char* label,
@@ -430,7 +459,7 @@ CLTLoginMediatorConnectionContextScaffold* CLTLoginMediator::EnsureLauncherConne
         return nullptr;
     }
 
-    EnsureLauncherConnectionBridgeVtablesInitialized();
+    EnsureLauncherConnectionBridgeContextVtableInitialized();
     if (!*slot) {
         *slot = static_cast<CLTLoginMediatorConnectionContextScaffold*>(
             std::calloc(1, sizeof(CLTLoginMediatorConnectionContextScaffold)));
@@ -450,50 +479,7 @@ CLTLoginMediatorConnectionContextScaffold* CLTLoginMediator::EnsureLauncherConne
     return *slot;
 }
 
-bool CLTLoginMediator::EnqueueLauncherConnectionStatusWorkItemScaffold(
-    CLTLoginMediatorConnectionContextScaffold* context,
-    uint32_t workType,
-    uint32_t workPayload,
-    const char* label) {
-    if (!launcherOwnerConnectionBridgeScaffold_ || !context) {
-        return false;
-    }
-
-    EnsureLauncherConnectionBridgeVtablesInitialized();
-    CLTLoginMediatorQueuedWorkItemScaffold* workItem =
-        static_cast<CLTLoginMediatorQueuedWorkItemScaffold*>(
-            std::calloc(1, sizeof(CLTLoginMediatorQueuedWorkItemScaffold)));
-    if (!workItem) {
-        spdlog::info(
-            "CLTLoginMediator::EnqueueLauncherConnectionStatusWorkItemScaffold failed label='{}'",
-            label ? label : "<null>");
-        return false;
-    }
-
-    workItem->header.vtable = g_LauncherConnectionBridgeWorkItemVtable;
-    workItem->header.workType = workType;
-    workItem->workPayload = workPayload;
-    workItem->debugLabel = label;
-
-    const bool pushed = DiagnosticLauncherObjectPushQueue0C(
-        launcherOwnerConnectionBridgeScaffold_,
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
-    if (!pushed) {
-        std::free(workItem);
-        return false;
-    }
-
-    spdlog::info(
-        "CLTLoginMediator launcher bridge queued work label='{}' workItem={} context={} type={} payload=0x{:08x}",
-        label ? label : "<null>",
-        fmt::ptr(workItem),
-        fmt::ptr(context),
-        workType,
-        workPayload);
-    return true;
-}
-
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
     void* launcherOwner,
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
@@ -503,6 +489,9 @@ void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
     }
 
     SetNetworkEngine(engine);
+    engine_->AttachLauncherConnectionBridgeContextsScaffold(
+        authConnectionContextScaffold_,
+        marginConnectionContextScaffold_);
     EnsureBuiltinScaffoldStatesRegistered();
     RegisterActiveStateSourceScaffold(this);
     spdlog::info(
@@ -512,10 +501,12 @@ void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
         currentState_ ? currentState_->DebugName() : "<null>");
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::CanBeginLauncherAuthConnectionScaffold() const {
     return launcherOwnerConnectionBridgeScaffold_ != nullptr && engine_ != nullptr;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     if (!CanBeginLauncherAuthConnectionScaffold()) {
         spdlog::info(
@@ -534,6 +525,9 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         context->peerCloseQueued = false;
         SetAuthConnectionContextKey(context);
     }
+    engine_->AttachLauncherConnectionBridgeContextsScaffold(
+        authConnectionContextScaffold_,
+        marginConnectionContextScaffold_);
 
     spdlog::info(
         "ROUTE CHECKPOINT: launcher bridge auto-begin auth from currentState={}",
@@ -542,10 +536,13 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     if (context) {
         context->sidecarConnection = AuthConnection();
     }
+    engine_->AttachLauncherConnectionBridgeContextsScaffold(
+        authConnectionContextScaffold_,
+        marginConnectionContextScaffold_);
 
     DiagnosticLauncherObjectSyncSidecarState(launcherOwnerConnectionBridgeScaffold_);
     if (result != 0u && context) {
-        EnqueueLauncherConnectionStatusWorkItemScaffold(
+        engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
             context,
             /*workType=*/2u,
             /*workPayload=*/kConnectStatusSuccess,
@@ -558,6 +555,7 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     return result;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     if (launcherOwnerConnectionBridgeScaffold_ == nullptr || engine_ == nullptr) {
         spdlog::info(
@@ -576,16 +574,22 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
         context->peerCloseQueued = false;
         SetMarginConnectionContextKey(context);
     }
+    engine_->AttachLauncherConnectionBridgeContextsScaffold(
+        authConnectionContextScaffold_,
+        marginConnectionContextScaffold_);
 
     const uint32_t result = BeginMarginConnectionViaState4Scaffold();
     const std::string marginHost = ResolvedMarginHostName();
     if (context) {
         context->sidecarConnection = MarginConnection();
     }
+    engine_->AttachLauncherConnectionBridgeContextsScaffold(
+        authConnectionContextScaffold_,
+        marginConnectionContextScaffold_);
 
     DiagnosticLauncherObjectSyncSidecarState(launcherOwnerConnectionBridgeScaffold_);
     if (result != 0u && context) {
-        EnqueueLauncherConnectionStatusWorkItemScaffold(
+        engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
             context,
             /*workType=*/2u,
             /*workPayload=*/kConnectStatusSuccess,
@@ -599,6 +603,7 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     return result;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetAuthCredentials(const char* username, const char* password) {
     authUsername_ = username ? username : "";
     authPassword_ = password ? password : "";
@@ -619,6 +624,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
         MaskedAuthValue(authPassword_));
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetAuthBootstrapConfig(
     uint32_t launcherVersion,
     uint32_t currentPublicKeyId,
@@ -975,6 +981,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     return 0u;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeConnectionHelpers() {
     // anchor: launcher.exe:0x43b300
     // Initializes the helper/state dispatch table rooted at `0x4f7868..0x4f78b4`.
@@ -997,6 +1004,7 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     InitializeHelperDispatchSlot19();
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot15() {
     // Address anchor: launcher.exe:0x420640 = InitializeHelperDispatchSlot15
     // Original: allocates 8 bytes, stores vtable 0x4b0b88 (`CLTLoginState_State15`).
@@ -1007,6 +1015,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot15() {
     }
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot16() {
     // Address anchor: launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16
     // Original: allocates 4 bytes, stores vtable 0x4b0bb0 (`CLTLoginState_State16`).
@@ -1017,6 +1026,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot16() {
     }
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot17() {
     // Address anchor: launcher.exe:0x420850 = InitializeHelperDispatchSlot17
     // Original: allocates 4 bytes, stores vtable 0x4b0bd8 (`CLTLoginState_State17`).
@@ -1027,6 +1037,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot17() {
     }
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot18() {
     // Address anchor: launcher.exe:0x420920 = InitializeHelperDispatchSlot18
     // Original: allocates 8 bytes, stores vtable 0x4b0c00 (`CLTLoginState_State18`).
@@ -1037,6 +1048,7 @@ void CLTLoginMediator::InitializeHelperDispatchSlot18() {
     }
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot19() {
     // Address anchor: launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19
     // Original: allocates 4 bytes, stores vtable 0x4b0c28 (`CLTLoginState_State19`).
@@ -1130,6 +1142,7 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
     return result;
 }
 
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
     CLTLoginState* const state4 = scaffoldState4_;
     if (state4 == nullptr) {

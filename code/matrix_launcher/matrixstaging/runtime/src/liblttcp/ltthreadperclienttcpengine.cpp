@@ -1,6 +1,7 @@
 #include "ltthreadperclienttcpengine.h"
 
 #include "../libltmessaging/messageconnection.h"
+#include "../../../game/src/libltclientlogin/loginmediator.h"
 #include "spdlog/spdlog.h"
 
 #include <winsock2.h>
@@ -8,6 +9,7 @@
 
 #include <process.h>
 
+#include <cstdlib>
 #include <cstring>
 #include <utility>
 
@@ -68,6 +70,30 @@ struct CLTThreadPerClientTCPEngine_QueuePair {
 };
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
+static void* g_LauncherConnectionBridgeWorkItemVtable[2] = {0};
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall LauncherConnectionBridgeWorkItem_Release(
+    mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* self) {
+    if (self) {
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine launcher bridge releasing queued work item {} type={} payload=0x{:08x} label='{}'",
+            fmt::ptr(self),
+            self->header.workType,
+            self->workPayload,
+            self->debugLabel ? self->debugLabel : "<null>");
+        std::free(self);
+    }
+    return 1u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static void EnsureLauncherConnectionBridgeWorkItemVtableInitialized() {
+    if (!g_LauncherConnectionBridgeWorkItemVtable[1]) {
+        g_LauncherConnectionBridgeWorkItemVtable[1] =
+            reinterpret_cast<void*>(LauncherConnectionBridgeWorkItem_Release);
+    }
+}
 
 // UNANCHORED internal helper used by the current thread-object scaffolds.
 static void CloseSocketHandle(uint32_t* socketHandle) {
@@ -870,9 +896,14 @@ static bool QueueContext_ShouldAutoReleaseAfterType1(void* context) {
 // - CreateEventA result at `+0x7c`
 // - derived list heads at `+0x80` (0x24 bytes) and `+0x8c` (0x18 bytes)
 // - derived helper root at `+0x98`
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
     : externalQueue0C_(nullptr),
       externalQueue34_(nullptr),
+      externalQueueLock_(nullptr),
+      externalQueueSignalEvent_(nullptr),
+      authBridgeContextScaffold_(nullptr),
+      marginBridgeContextScaffold_(nullptr),
       queueThreads_(),
       monitoredPorts_(),
       workerThreads_(),
@@ -1189,12 +1220,171 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
 }
 
 // UNANCHORED scaffold bridge because the current liblttcp engine lives beside, not inside,
-// the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields.
+// the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields,
+// the paired +0x60 lock helper, and the +0x7c queue signal event.
 void CLTThreadPerClientTCPEngine::AttachExternalQueuePair(
     CLTThreadPerClientTCPEngine_Queue* queue0C,
-    CLTThreadPerClientTCPEngine_Queue* queue34) {
+    CLTThreadPerClientTCPEngine_Queue* queue34,
+    void* queueLock,
+    void* queueSignalEvent) {
     externalQueue0C_ = queue0C;
     externalQueue34_ = queue34;
+    externalQueueLock_ = queueLock;
+    externalQueueSignalEvent_ = queueSignalEvent;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+void CLTThreadPerClientTCPEngine::AttachLauncherConnectionBridgeContextsScaffold(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext,
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext) {
+    authBridgeContextScaffold_ = authContext;
+    marginBridgeContextScaffold_ = marginContext;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
+    void* workItem,
+    void* context,
+    bool useQueue34,
+    const char* label,
+    bool queueLockAlreadyHeld) {
+    CLTThreadPerClientTCPEngine_Queue* targetQueue = useQueue34 ? externalQueue34_ : externalQueue0C_;
+    if (!targetQueue) {
+        return false;
+    }
+
+    CRITICAL_SECTION* queueLock = static_cast<CRITICAL_SECTION*>(externalQueueLock_);
+    if (queueLock && !queueLockAlreadyHeld) {
+        EnterCriticalSection(queueLock);
+    }
+
+    const bool queuePairWasEmpty = Queue_IsEmpty(externalQueue0C_) && Queue_IsEmpty(externalQueue34_);
+    const bool pushed = Queue_PushPair(
+        targetQueue,
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
+
+    if (queueLock && !queueLockAlreadyHeld) {
+        LeaveCriticalSection(queueLock);
+    }
+
+    if (pushed && queuePairWasEmpty && externalQueueSignalEvent_) {
+        (void)SetEvent(static_cast<HANDLE>(externalQueueSignalEvent_));
+    }
+
+    spdlog::info(
+        "CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold label={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} pushed={:08x} lockHeld={:08x}",
+        label ? label : "<null>",
+        useQueue34 ? "queue34" : "queue0C",
+        static_cast<unsigned>(reinterpret_cast<uintptr_t>(workItem)),
+        fmt::ptr(context),
+        queuePairWasEmpty ? 1u : 0u,
+        pushed ? 1u : 0u,
+        queueLockAlreadyHeld ? 1u : 0u);
+    return pushed;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+    uint32_t workType,
+    uint32_t workPayload,
+    const char* label,
+    bool queueLockAlreadyHeld) {
+    if (!context) {
+        return false;
+    }
+
+    EnsureLauncherConnectionBridgeWorkItemVtableInitialized();
+    mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* workItem =
+        static_cast<mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(
+            std::calloc(1, sizeof(mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold)));
+    if (!workItem) {
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold failed label='{}'",
+            label ? label : "<null>");
+        return false;
+    }
+
+    workItem->header.vtable = g_LauncherConnectionBridgeWorkItemVtable;
+    workItem->header.workType = workType;
+    workItem->workPayload = workPayload;
+    workItem->debugLabel = label;
+
+    const bool pushed = EnqueueCompletedOperationScaffold(
+        workItem,
+        context,
+        /*useQueue34=*/false,
+        label,
+        queueLockAlreadyHeld);
+    if (!pushed) {
+        std::free(workItem);
+        return false;
+    }
+
+    spdlog::info(
+        "CLTThreadPerClientTCPEngine launcher bridge queued work label='{}' workItem={} context={} type={} payload=0x{:08x}",
+        label ? label : "<null>",
+        fmt::ptr(workItem),
+        fmt::ptr(context),
+        workType,
+        workPayload);
+    return true;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemScaffold(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+    uint32_t workType,
+    uint32_t workPayload,
+    const char* label) {
+    return EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+        context,
+        workType,
+        workPayload,
+        label,
+        /*queueLockAlreadyHeld=*/false);
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+    const char* receiveLabel) {
+    if (!context || !context->sidecarConnection) {
+        return;
+    }
+
+    const int received = context->sidecarConnection->PollReceiveNonBlocking();
+    if (received > 0) {
+        (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+            context,
+            /*workType=*/3u,
+            /*workPayload=*/static_cast<uint32_t>(received),
+            receiveLabel,
+            /*queueLockAlreadyHeld=*/true);
+        return;
+    }
+
+    if (received < 0 && !context->peerCloseQueued) {
+        context->peerCloseQueued = true;
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold queued peer-close label='{}' context={} connection={}",
+            (context->debugLabel && context->debugLabel[0]) ? context->debugLabel : "<null>",
+            fmt::ptr(context),
+            fmt::ptr(context->sidecarConnection));
+        (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+            context,
+            /*workType=*/1u,
+            /*workPayload=*/0u,
+            context->isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed",
+            /*queueLockAlreadyHeld=*/true);
+    }
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaffold() {
+    PumpLauncherConnectionContextScaffold(authBridgeContextScaffold_, "AuthReceivePacket");
+    PumpLauncherConnectionContextScaffold(marginBridgeContextScaffold_, "MarginReceivePacket");
 }
 
 // anchor: launcher.exe:0x436b10

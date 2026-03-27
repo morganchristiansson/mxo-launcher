@@ -1107,6 +1107,11 @@ Important limitation:
     - `UDPMonitorPort` now updates an existing worker record for the same context key instead of blindly growing duplicates
     - `CleanupConnection` now also marks the matching `CMessageConnection` sidecar closed before removing the worker record
   - current diagnostic list-head emptiness for arg5 `+0x80` / `+0x8c` is also synchronized from that sidecar engine state so later stub logs track the new class-backed state more directly
+  - newer arg5-helper seam cleanup now also moves the current nonblocking launcher-bridge pump closer to the recovered engine ownership:
+    - `LauncherObject_Subobject60_Slot0(...)` no longer calls a mediator polling helper directly
+    - arg5 helper `+0x60` slot `0` now resolves the sidecar `CLTThreadPerClientTCPEngine` and calls an engine-owned `PumpLauncherConnectionBridgeFromArg5HelperScaffold()` helper
+    - the queue push shaped after original `0x436820` and the synthetic launcher-bridge work-item allocation now also live on the liblttcp engine side rather than in `loginmediator.cpp` or the ABI shell
+    - `CLTLoginMediator` still owns only the queued context callback surface and the narrow auth/margin begin wrappers that seed those contexts into the engine
 - they are therefore now best treated as **partially wired starter structure**, still far from faithful semantics but no longer only dormant future placeholders
 
 New practical rerun result after that partial wiring:
@@ -1133,3 +1138,18 @@ New practical rerun result after that partial wiring:
   - and in particular still no slot-12 traffic has appeared, which remains consistent with the recovered consumer rule that slot `12` is only reached for type-1 work items
 
 So the new class wiring is no longer just dormant cleanup: the auth-side queue0C consumer chain is now observably live on the active runtime path. The next missing progression is later launcher-owned state after successful auth-side queue consumption, not proof that arg5 queue consumption itself is still dead.
+
+## Newer source-ownership update after that rerun
+
+A later source pass tightened the seam further without yet claiming a fresh runtime validation result.
+
+Build-validated update:
+- `src/launcher_network_object_abi.cpp` arg5 helper `+0x60` slot `0` now calls into the liblttcp engine sidecar instead of directly calling a mediator poll helper
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now owns the current narrow nonblocking launcher-bridge pump and the current queue0C enqueue helper used by that seam
+- `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
+- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper as well
+
+Important limitation:
+- this is still only a **starter ownership cleanup**, not proof that the original launcher's worker-thread producers are fully reconstructed
+- the current receive-side producer remains synthetic and sidecar-driven
+- only the ownership boundary moved closer to the recovered arg5 / engine family
