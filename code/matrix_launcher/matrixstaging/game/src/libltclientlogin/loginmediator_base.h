@@ -320,15 +320,9 @@ public:
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
-    // Keep the split explicit:
-    // - this source interface still uses the owner-side current-slot naming here
-    // - the wrapper-facing `ILTLoginMediator.Default` arg6 `+0x40` selection-descriptor object is
-    //   modeled separately via `Arg6SelectionDescriptor40ObjectSketch`
-    virtual const SlotRecordState004b5328* GetCurrentSlotRecord() const = 0;
+    virtual Arg6SelectionDescriptor40ObjectSketch* GetArg6SelectionDescriptorObject40(uint32_t selectionIndex) = 0;
     // +0x44
-    // Wrapper-facing arg6 `+0x44` is also modeled separately via
-    // `Arg6CurrentSlotRecord44ObjectSketch`; do not force a false unification here.
-    void UnknownSlot16();
+    virtual Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() = 0;
     // +0x48
     virtual const char* GetWorldOrSelectionName() const = 0;
     // +0x4c

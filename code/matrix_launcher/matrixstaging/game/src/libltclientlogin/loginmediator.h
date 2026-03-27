@@ -989,10 +989,8 @@ public:
     // slot-record helpers onto the wrapper-facing `ILTLoginMediator.Default +0x40/+0x44` object
     // shapes.
     Arg6SelectionDescriptor40ObjectSketch* GetArg6SelectionDescriptorObject40(
-        uint32_t selectionIndex,
-        void* returnAddress);
-    Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44(
-        void* returnAddress);
+        uint32_t selectionIndex) override;
+    Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() override;
 
     // Post-auth slot/route families recovered around helper10 (`0x4401a0`) and the later
     // state-8 margin dispatcher (`0x439300`).

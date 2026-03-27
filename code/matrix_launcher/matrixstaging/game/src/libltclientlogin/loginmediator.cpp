@@ -528,8 +528,7 @@ bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
 }
 
 Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
-    uint32_t selectionIndex,
-    void* returnAddress) {
+    uint32_t selectionIndex) {
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
     const uint32_t expectedScratchRequest = Arg6ExpectedSelectionDescriptorScratchRequest();
@@ -538,56 +537,34 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
 
     if (!worldName) {
         spdlog::debug(
-            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
+            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
             static_cast<unsigned>(selectionIndex),
             static_cast<unsigned>(low24),
             static_cast<unsigned>(high8),
-            fmt::ptr(returnAddress),
-            DescribeMediatorCaller(returnAddress),
             static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
             static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
             static_cast<unsigned>(expectedScratchRequest),
             static_cast<unsigned>(Arg6WorldUpperBoundExclusive()));
-        LogMediatorCharacterStateContext("GetArg6SelectionDescriptorObject40(+0x40)", returnAddress);
         return nullptr;
-    }
-
-    RefreshArg6CurrentSlotRecordObject44();
-
-    const bool profilePathCaller = IsProfilePathBuilderCaller(returnAddress);
-    const ActiveCharacterStateViewScaffold characterState = DescribeActiveCharacterStateScaffold();
-    const char* descriptorShape = "world-shaped";
-    uint32_t field03 = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worldName));
-    uint32_t field07 = Arg6MappedSelectionId();
-    if (profilePathCaller) {
-        descriptorShape = "current-slot-id-shaped";
-        field03 = arg6CurrentSlotRecord44Payload_.characterIdLow03;
-        field07 = arg6CurrentSlotRecord44Payload_.characterIdHigh07;
-        if (field03 == 0u && field07 == 0u) {
-            field03 = characterState.characterIdLow;
-            field07 = characterState.characterIdHigh;
-        }
     }
 
     arg6SelectionDescriptor40Packed_ = {};
     arg6SelectionDescriptor40_ = {};
-    arg6SelectionDescriptor40Packed_.field03 = field03;
-    arg6SelectionDescriptor40Packed_.field07 = field07;
+    arg6SelectionDescriptor40Packed_.field03 =
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worldName));
+    arg6SelectionDescriptor40Packed_.field07 = Arg6MappedSelectionId();
     arg6SelectionDescriptor40_.packed = &arg6SelectionDescriptor40Packed_;
 
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         ((low24 == Arg6SelectedWorldIndexLow24()) ? "low24-world-match" : "other-match");
     spdlog::debug(
-        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x} caller={} [{}]) -> {} (matchMode={} descriptorShape={} mappedName='{}' field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
+        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} mappedName='{}' field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
         static_cast<unsigned>(selectionIndex),
         static_cast<unsigned>(low24),
         static_cast<unsigned>(high8),
-        fmt::ptr(returnAddress),
-        DescribeMediatorCaller(returnAddress),
         fmt::ptr(&arg6SelectionDescriptor40_),
         matchMode,
-        descriptorShape,
         worldName,
         static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field03),
         static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field07),
@@ -595,28 +572,24 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
         static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
         static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
         static_cast<unsigned>(expectedScratchRequest));
-    LogMediatorCharacterStateContext("GetArg6SelectionDescriptorObject40(+0x40)", returnAddress);
     return &arg6SelectionDescriptor40_;
 }
 
-Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44(
-    void* returnAddress) {
+// +0x44
+Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44() {
     const bool hasCurrentSlot = RefreshArg6CurrentSlotRecordObject44();
     const void* currentSlotRecordPtr = hasCurrentSlot
         ? static_cast<const void*>(&arg6CurrentSlotRecord44_)
         : nullptr;
 
     spdlog::info(
-        "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44 caller={} [{}]) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
-        fmt::ptr(returnAddress),
-        DescribeMediatorCaller(returnAddress),
+        "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
         fmt::ptr(currentSlotRecordPtr),
         arg6CurrentSlotRecord44_.heapString14 ? arg6CurrentSlotRecord44_.heapString14 : "<empty>",
         static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.characterIdLow03),
         static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.characterIdHigh07),
         static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.status0b),
         static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.worldId0c));
-    LogMediatorCharacterStateContext("GetArg6CurrentSlotRecordObject44(+0x44)", returnAddress);
     return hasCurrentSlot ? &arg6CurrentSlotRecord44_ : nullptr;
 }
 

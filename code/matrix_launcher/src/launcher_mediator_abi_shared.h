@@ -26,7 +26,6 @@ const char* DescribeMediatorCaller(void* returnAddress);
 void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress);
 void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount);
 void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount);
-void RegisterMediatorState9AbiSlots();
 
 // Observer state accessors (moved from g_MediatorRuntimeState to CLTLoginMediator):
 uint32_t DiagnosticMediatorObserverRegisterCount();
