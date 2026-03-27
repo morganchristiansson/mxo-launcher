@@ -99,6 +99,32 @@ static bool ResolveAllIpv4AddressesForAuthEntry(
     return !outIpv4NetworkOrderList->empty();
 }
 
+struct BuiltinScaffoldStates {
+    CLTLoginState_State0 state0 = {};
+    CLTLoginState_State1 state1 = {};
+    CLTLoginState_AuthenticatePending authenticatePending = {};
+    CLTLoginState_State3 state3 = {};
+    CLTLoginState_State4 state4 = {};
+    CLTLoginState_State6 state6 = {};
+    CLTLoginState_State8 state8 = {};
+    CLTLoginState_State9 state9 = {};
+    CLTLoginState_State10 state10 = {};
+    CLTLoginState_State11 state11 = {};
+    CLTLoginState_State12 state12 = {};
+    CLTLoginState_State13 state13 = {};
+    CLTLoginState_WorldListPending worldListPending = {};
+    CLTLoginState_State15 state15 = {};
+    CLTLoginState_State16 state16 = {};
+    CLTLoginState_State17 state17 = {};
+    CLTLoginState_State18 state18 = {};
+    CLTLoginState_State19 state19 = {};
+};
+
+static BuiltinScaffoldStates& GetBuiltinScaffoldStates() {
+    static BuiltinScaffoldStates states = {};
+    return states;
+}
+
 }  // namespace
 
 void CLTLoginMediator::RegisterScaffoldState0(CLTLoginState* state) {
@@ -262,6 +288,34 @@ void CLTLoginMediator::InstallInitialState0Scaffold() {
     spdlog::info(
         "ROUTE CHECKPOINT: startup installed initial helper state0 currentState={} role=idle/start anchor=(launcher.exe:0x41b160 -> owner+0x10 = helper0 / 0x4f7868)",
         currentState_->DebugName());
+}
+
+void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
+    auto& states = GetBuiltinScaffoldStates();
+
+    RegisterScaffoldState0(&states.state0);
+    RegisterScaffoldState1(&states.state1);
+    RegisterScaffoldState2(&states.authenticatePending);
+    RegisterScaffoldState3(&states.state3);
+    RegisterScaffoldState4(&states.state4);
+    RegisterScaffoldState6(&states.state6);
+    RegisterScaffoldState8(&states.state8);
+    RegisterScaffoldState9(&states.state9);
+    RegisterScaffoldState10(&states.state10);
+    RegisterScaffoldState11(&states.state11);
+    RegisterScaffoldState12(&states.state12);
+    RegisterScaffoldState13(&states.state13);
+    RegisterScaffoldState14(&states.worldListPending);
+    RegisterScaffoldState15(&states.state15);
+    RegisterScaffoldState16(&states.state16);
+    RegisterScaffoldState17(&states.state17);
+    RegisterScaffoldState18(&states.state18);
+    RegisterScaffoldState19(&states.state19);
+    InitializeConnectionHelpers();
+
+    if (currentState_ == nullptr) {
+        InstallInitialState0Scaffold();
+    }
 }
 
 void CLTLoginMediator::SetAuthConnectionContextKey(void* contextKey) {
@@ -656,6 +710,12 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
     // This initializer therefore still only materializes the late
     // `CLTLoginState_State15..State19` tail recovered concretely so far
     // (`0x420640/0x4206e0/0x420850/0x420920/0x4209a0`).
+    if (helpers_.helper78A4 != nullptr || helpers_.helper78A8 != nullptr ||
+        helpers_.helper78AC != nullptr || helpers_.helper78B0 != nullptr ||
+        helpers_.helper78B4 != nullptr) {
+        return;
+    }
+
     InitializeHelperDispatchSlot15();
     InitializeHelperDispatchSlot16();
     InitializeHelperDispatchSlot17();

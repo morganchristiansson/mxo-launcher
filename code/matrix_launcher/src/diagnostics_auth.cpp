@@ -12,7 +12,6 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
 #include <vector>
 
 namespace {
@@ -46,7 +45,8 @@ struct DiagnosticLoginControllerSession {
 
     void Reset();
     void BeginForOwner(void* owner);
-    mxo::ltlogin::CLTLoginMediator* RecreateForEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
+    mxo::ltlogin::CLTLoginMediator* BindInstalledMediatorForEngine(
+        mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
     mxo::ltlogin::CLTLoginMediator* Controller() const;
     void* CurrentOwner() const;
     DiagnosticRawMessageConnectionContext* AuthContext() const;
@@ -61,36 +61,13 @@ private:
         DiagnosticRawMessageConnectionContext** slot,
         const char* label);
 
-    std::unique_ptr<mxo::ltlogin::CLTLoginMediator> controller_;
     DiagnosticRawMessageConnectionContext* authContext_ = NULL;
     DiagnosticRawMessageConnectionContext* marginContext_ = NULL;
     void* currentOwner_ = NULL;
     bool postAuthMarginBeginAttempted_ = false;
 };
 
-struct DiagnosticLoginScaffoldStates {
-    mxo::ltlogin::CLTLoginState_State0 state0 = {};
-    mxo::ltlogin::CLTLoginState_State1 state1 = {};
-    mxo::ltlogin::CLTLoginState_AuthenticatePending authenticatePending = {};
-    mxo::ltlogin::CLTLoginState_State3 state3 = {};
-    mxo::ltlogin::CLTLoginState_State4 state4 = {};
-    mxo::ltlogin::CLTLoginState_State6 state6 = {};
-    mxo::ltlogin::CLTLoginState_State8 state8 = {};
-    mxo::ltlogin::CLTLoginState_State9 state9 = {};
-    mxo::ltlogin::CLTLoginState_State10 state10 = {};
-    mxo::ltlogin::CLTLoginState_State11 state11 = {};
-    mxo::ltlogin::CLTLoginState_State12 state12 = {};
-    mxo::ltlogin::CLTLoginState_State13 state13 = {};
-    mxo::ltlogin::CLTLoginState_WorldListPending worldListPending = {};
-    mxo::ltlogin::CLTLoginState_State15 state15 = {};
-    mxo::ltlogin::CLTLoginState_State16 state16 = {};
-    mxo::ltlogin::CLTLoginState_State17 state17 = {};
-    mxo::ltlogin::CLTLoginState_State18 state18 = {};
-    mxo::ltlogin::CLTLoginState_State19 state19 = {};
-};
-
 static DiagnosticLoginControllerSession g_DiagnosticLoginControllerSession = {};
-static DiagnosticLoginScaffoldStates g_DiagnosticLoginScaffoldStates = {};
 static unsigned char g_LoginControllerState9CallbackSeed85D4[16] = {0};
 static void* g_DiagnosticWorkItemVtable[2] = {0};
 static void* g_DiagnosticMessageConnectionContextVtable[5] = {0};
@@ -141,7 +118,6 @@ void DiagnosticLoginControllerSession::Reset() {
         mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(controller);
     }
 
-    controller_.reset();
     currentOwner_ = NULL;
     postAuthMarginBeginAttempted_ = false;
 }
@@ -151,9 +127,8 @@ void DiagnosticLoginControllerSession::BeginForOwner(void* owner) {
     postAuthMarginBeginAttempted_ = false;
 }
 
-mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::RecreateForEngine(
+mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::BindInstalledMediatorForEngine(
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
-    controller_.reset();
     if (!engine) {
         return NULL;
     }
@@ -164,13 +139,7 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticLoginControllerSession::RecreateForEng
     }
 
     controller->SetNetworkEngine(engine);
-
-    static bool helpersInitialized = false;
-    if (!helpersInitialized) {
-        controller->InitializeConnectionHelpers();
-        helpersInitialized = true;
-    }
-
+    controller->EnsureBuiltinScaffoldStatesRegistered();
     mxo::ltlogin::CLTLoginMediator::RegisterActiveStateSourceScaffold(controller);
     return controller;
 }
@@ -242,10 +211,6 @@ static DiagnosticLoginControllerSession& GetDiagnosticLoginControllerSession() {
     return g_DiagnosticLoginControllerSession;
 }
 
-static DiagnosticLoginScaffoldStates& GetDiagnosticLoginScaffoldStates() {
-    return g_DiagnosticLoginScaffoldStates;
-}
-
 static mxo::ltlogin::CLTLoginMediator* GetDiagnosticLoginController() {
     return GetDiagnosticLoginControllerSession().Controller();
 }
@@ -258,9 +223,9 @@ static void BeginDiagnosticLoginControllerSession(void* owner) {
     GetDiagnosticLoginControllerSession().BeginForOwner(owner);
 }
 
-static mxo::ltlogin::CLTLoginMediator* RecreateDiagnosticLoginControllerForEngine(
+static mxo::ltlogin::CLTLoginMediator* BindInstalledDiagnosticLoginControllerForEngine(
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
-    return GetDiagnosticLoginControllerSession().RecreateForEngine(engine);
+    return GetDiagnosticLoginControllerSession().BindInstalledMediatorForEngine(engine);
 }
 
 static DiagnosticRawMessageConnectionContext* GetDiagnosticAuthContext() {
@@ -600,8 +565,6 @@ static void DiagnosticApplyLoginControllerConfig() {
     mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
     if (!loginController) return;
 
-    DiagnosticLoginScaffoldStates& states = GetDiagnosticLoginScaffoldStates();
-
     const uint32_t launcherVersion = 76005u;
     const uint32_t currentPublicKeyId = 0u;
     const uint8_t loginType = 1u;
@@ -625,31 +588,7 @@ static void DiagnosticApplyLoginControllerConfig() {
         static_cast<uint8_t>(loginType),
         keyConfigMd5,
         uiConfigMd5);
-    loginController->RegisterScaffoldState0(&states.state0);
-    loginController->RegisterScaffoldState1(&states.state1);
-    loginController->RegisterScaffoldState2(&states.authenticatePending);
-    loginController->RegisterScaffoldState3(&states.state3);
-    loginController->RegisterScaffoldState4(&states.state4);
-    loginController->RegisterScaffoldState6(&states.state6);
-    loginController->RegisterScaffoldState8(&states.state8);
-    loginController->RegisterScaffoldState9(&states.state9);
-    loginController->RegisterScaffoldState10(&states.state10);
-    loginController->RegisterScaffoldState11(&states.state11);
-    loginController->RegisterScaffoldState12(&states.state12);
-    loginController->RegisterScaffoldState13(&states.state13);
-    loginController->RegisterScaffoldState14(&states.worldListPending);
-    loginController->RegisterScaffoldState15(&states.state15);
-    loginController->RegisterScaffoldState16(&states.state16);
-    loginController->RegisterScaffoldState17(&states.state17);
-    loginController->RegisterScaffoldState18(&states.state18);
-    loginController->RegisterScaffoldState19(&states.state19);
-    // Preserve the proven startup convention explicitly before any diagnostic auto-begin logic,
-    // but do not clobber a live mediator that has already advanced beyond startup.
-    if (loginController->CurrentState() == nullptr) {
-        // state0 is the initial idle/start helper, and owner-owned `ProcessLoginRequest`
-        // performs the first happy-path handoff into state2 later.
-        loginController->InstallInitialState0Scaffold();
-    }
+    loginController->EnsureBuiltinScaffoldStatesRegistered();
 
     const char* characterNameSeed =
         g_LoginControllerCharacterNameSeed[0] ? g_LoginControllerCharacterNameSeed : NULL;
@@ -710,7 +649,7 @@ void DiagnosticAuthInitializeForEngine(void* owner, mxo::liblttcp::CLTThreadPerC
         return;
     }
 
-    if (RecreateDiagnosticLoginControllerForEngine(engine)) {
+    if (BindInstalledDiagnosticLoginControllerForEngine(engine)) {
         DiagnosticApplyLoginControllerConfig();
         spdlog::info("DIAGNOSTIC: bound installed CLTLoginMediator to launcher object {}", fmt::ptr(owner));
     }

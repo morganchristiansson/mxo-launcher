@@ -780,6 +780,10 @@ public:
     // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
     // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.
     void InstallInitialState0Scaffold();
+    // Registers the built-in recovered `CLTLoginState_*` family on this mediator and preserves the
+    // startup `state0` install convention when the mediator has not advanced yet. Callers should
+    // prefer this over rebuilding the concrete scaffold-state table from diagnostics code.
+    void EnsureBuiltinScaffoldStatesRegistered();
 
     void SetAuthConnectionContextKey(void* contextKey);
     void SetMarginConnectionContextKey(void* contextKey);
