@@ -85,7 +85,7 @@ Current best interpretation of that split:
 
 Current evidence for that last point:
 - `LaunchPadClient` string-backed handlers are heavily tied to login-request / subscription / play-request result text in `launchpad.cpp`
-- the direct MxO auth wire loop and immediate post-auth continuation now recovered in the launcher path still anchor more naturally to the `CLTLoginMediator` helper chain (`0x41d170`, `0x439210`, `0x448050`, `0x4401a0`, `0x43c020`, `0x440320`, with `0x43b830` as a later auth-side sender) than to the currently reviewed `LaunchPadClient` callbacks
+- the direct MxO auth wire loop and immediate post-auth continuation now recovered in the launcher path still anchor more naturally to the `CLTLoginMediator`-adjacent helper/state chain (`0x41d170`, state2 `0x439210`, owner `+0x680` child `0x448050/0x448140`, state10 `0x4401a0`, state11 `0x43c020`, state11 `0x440320`, with `0x43b830` as a later auth-side sender) than to the currently reviewed `LaunchPadClient` callbacks
 - so the safest current architecture is:
   - keep low-level auth packet logic reusable and outside the mediator object itself
   - but keep auth **launcher-owned** and coordinated by the mediator/helper-state layer rather than moving ownership wholesale into `LaunchPadClient` or `client.dll`

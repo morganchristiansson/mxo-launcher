@@ -2988,14 +2988,17 @@ void CLTLoginMediator::AdoptAuthReplyIntoRecoveredMediatorState() {
 uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
     // Receive-side note:
     // - the diagnostic auth bridge already strips the variable-length frame header before calling
-    //   this mediator entry point
-    // - so this function must operate on logical auth payload bytes beginning at raw opcode, not
-    //   try to frame-parse them a second time
+    //   this wrapper entry point
+    // - so this function operates on logical auth payload bytes beginning at raw opcode, not on a
+    //   second frame layer
     // Ownership note:
-    // - this mediator entry is now just the auth-channel demux/stager
-    // - the later raw-`0x0b` / `AS_AuthReply` body belongs to state10 slot 6 (`0x4401a0`), with
-    //   one deliberate current-source exception for the replacement's existing-character state8
-    //   branch that still bypasses the natural state10/state11 claim/create transition
+    // - this mediator entry is only the current staging/demux wrapper
+    // - early auth inbound raw `0x07/0x09/0x0b` belongs semantically to:
+    //   - `0x43f300 = CLTLoginState_AuthenticatePending::AuthMessageDispatch`
+    //   - `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
+    // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
+    // - one deliberate current-source exception remains: the replacement's existing-character
+    //   state8 branch still bypasses the natural state10/state11 claim/create transition
     if (!packetBytes || packetSize == 0u) {
         return 0;
     }

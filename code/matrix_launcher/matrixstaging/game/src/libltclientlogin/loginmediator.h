@@ -982,6 +982,14 @@ public:
         uint8_t loginType,
         const std::vector<uint8_t>& keyConfigMd5,
         const std::vector<uint8_t>& uiConfigMd5);
+    // Source-owned wrapper/demux entry used by diagnostics/runtime glue.
+    // Important ownership split:
+    // - early auth inbound raw `0x07/0x09/0x0b` belongs semantically to state2
+    //   `AuthMessageDispatch` (`0x43f300`) and its owner `+0x680` child helper
+    //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
+    // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
+    // - keep this mediator method only as the current staging/demux wrapper, not as proof that
+    //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
     const std::vector<uint8_t>& StagedIncomingAuthPacketBytes() const;
     bool LastAuthReplyIsError() const;
