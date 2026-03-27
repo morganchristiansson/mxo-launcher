@@ -13,6 +13,9 @@
 
 #include "loginmediator.h"
 
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
 #include "loginstate.h"
 #include <spdlog/spdlog.h>
 
@@ -43,6 +46,57 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.begin = dest.string60Owned.c_str();
     dest.string60.current = dest.string60.begin + dest.string60Owned.size();
     dest.string60.capacity = dest.string60.current;
+}
+
+static bool EnsureWinsockReadyForAuthEntry() {
+    static bool initialized = false;
+    static bool attempted = false;
+    if (attempted) {
+        return initialized;
+    }
+    attempted = true;
+
+    WSADATA wsaData = {};
+    initialized = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
+    return initialized;
+}
+
+static bool ResolveAllIpv4AddressesForAuthEntry(
+    const char* hostName,
+    std::vector<uint32_t>* outIpv4NetworkOrderList) {
+    if (!hostName || !hostName[0] || !outIpv4NetworkOrderList || !EnsureWinsockReadyForAuthEntry()) {
+        return false;
+    }
+
+    addrinfo hints = {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+
+    addrinfo* results = nullptr;
+    if (getaddrinfo(hostName, nullptr, &hints, &results) != 0 || !results) {
+        return false;
+    }
+
+    outIpv4NetworkOrderList->clear();
+    for (addrinfo* it = results; it; it = it->ai_next) {
+        if (it->ai_family != AF_INET || !it->ai_addr ||
+            it->ai_addrlen < static_cast<int>(sizeof(sockaddr_in))) {
+            continue;
+        }
+
+        const sockaddr_in* addr = reinterpret_cast<const sockaddr_in*>(it->ai_addr);
+        const uint32_t ipv4NetworkOrder = addr->sin_addr.s_addr;
+        if (std::find(
+                outIpv4NetworkOrderList->begin(),
+                outIpv4NetworkOrderList->end(),
+                ipv4NetworkOrder) == outIpv4NetworkOrderList->end()) {
+            outIpv4NetworkOrderList->push_back(ipv4NetworkOrder);
+        }
+    }
+
+    freeaddrinfo(results);
+    return !outIpv4NetworkOrderList->empty();
 }
 
 }  // namespace
@@ -259,13 +313,73 @@ void CLTLoginMediator::SetAuthBootstrapConfig(
         static_cast<unsigned>(authUiConfigMd5_.size()));
 }
 
+// UNANCHORED: source-owned config setter for the auth host/port scaffold feeding owner `+0x4c/+0x5c`.
 void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile) {
     authServerDnsName_ = dnsName ? dnsName : "";
     authServerPortHostOrder_ = portHostOrder;
     ignoreHostsFileForAuth_ = ignoreHostsFile;
+    ResetAuthConnectRetryStateScaffold();
     BuildAuthEndpoint();
 }
 
+// UNANCHORED: source-owned reset for the auth-side owner `+0x28/+0x4c/+0x50/+0x58` retry/iterator mirror.
+void CLTLoginMediator::ResetAuthConnectRetryStateScaffold() {
+    authAddressList4c_.resolvedHostName = authServerDnsName_;
+    authAddressList4c_.ipv4NetworkOrderList.clear();
+    authAddressList4c_.nextIndex = 0;
+    authAddressList4c_.attemptCount28 = 0;
+}
+
+// UNANCHORED: source-owned getter for the mirrored auth connect-attempt counter at owner `+0x28`.
+uint32_t CLTLoginMediator::AuthConnectAttemptCountScaffold() const {
+    return authAddressList4c_.attemptCount28;
+}
+
+// UNANCHORED: source-owned getter for the mirrored auth candidate count derived from owner `+0x4c/+0x50`.
+uint32_t CLTLoginMediator::AuthConnectCandidateCountScaffold() const {
+    return static_cast<uint32_t>(authAddressList4c_.ipv4NetworkOrderList.size());
+}
+
+// UNANCHORED: source-owned predicate matching the `0x4390b0` owner `+0x28` vs `(+0x50 - +0x4c) >> 2` retry gate.
+bool CLTLoginMediator::HasAuthConnectRetryCandidateRemainingScaffold() const {
+    return authAddressList4c_.attemptCount28 < AuthConnectCandidateCountScaffold();
+}
+
+// UNANCHORED: source-owned host-resolution mirror for the auth-side dword IPv4 list rooted at owner `+0x4c`.
+void CLTLoginMediator::RefreshAuthAddressListForCurrentHostScaffold() {
+    const bool hostChanged = (authAddressList4c_.resolvedHostName != authServerDnsName_);
+    if (!hostChanged && !authAddressList4c_.ipv4NetworkOrderList.empty()) {
+        return;
+    }
+
+    authAddressList4c_.resolvedHostName = authServerDnsName_;
+    authAddressList4c_.ipv4NetworkOrderList.clear();
+    authAddressList4c_.nextIndex = 0;
+
+    if (!authServerDnsName_.empty()) {
+        (void)ResolveAllIpv4AddressesForAuthEntry(
+            authServerDnsName_.c_str(),
+            &authAddressList4c_.ipv4NetworkOrderList);
+    }
+}
+
+// UNANCHORED: source-owned iterator step mirroring the `0x440bb0/0x44b090` auth endpoint prep family.
+void CLTLoginMediator::PrepareNextAuthEndpointForConnectAttemptScaffold() {
+    RefreshAuthAddressListForCurrentHostScaffold();
+
+    if (!authAddressList4c_.ipv4NetworkOrderList.empty()) {
+        if (authAddressList4c_.nextIndex >= authAddressList4c_.ipv4NetworkOrderList.size()) {
+            authAddressList4c_.nextIndex = 0;
+        }
+
+        authEndpoint_.ipv4NetworkOrder =
+            authAddressList4c_.ipv4NetworkOrderList[authAddressList4c_.nextIndex++];
+    }
+
+    ++authAddressList4c_.attemptCount28;
+}
+
+// UNANCHORED: source-owned config setter for the margin suffix/port scaffold feeding owner `+0x30/+0x6c`.
 void CLTLoginMediator::SetMarginServerConfig(const char* dnsSuffix, uint16_t portHostOrder, bool ignoreHostsFile) {
     marginServerDnsSuffix_ = dnsSuffix ? dnsSuffix : "";
     marginServerPortHostOrder_ = portHostOrder;
@@ -273,6 +387,7 @@ void CLTLoginMediator::SetMarginServerConfig(const char* dnsSuffix, uint16_t por
     BuildMarginEndpoint();
 }
 
+// UNANCHORED: source-owned route-text resolver for the reconstructed margin-host scaffold.
 std::string CLTLoginMediator::ResolvedMarginHostName() const {
     if (!marginRouteState_.exactMarginHostName.empty()) {
         return marginRouteState_.exactMarginHostName;
@@ -283,26 +398,32 @@ std::string CLTLoginMediator::ResolvedMarginHostName() const {
     return std::string();
 }
 
+// UNANCHORED: source-owned accessor for the auth `CMessageConnection` child mirrored from owner `+0x18`.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::AuthConnection() const {
     return authConnection_;
 }
 
+// UNANCHORED: source-owned accessor for the margin `CMessageConnection` child mirrored from owner `+0x1c`.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::MarginConnection() const {
     return marginConnection_;
 }
 
+// UNANCHORED: source-owned setter for the reconstructed margin route-host prefix.
 void CLTLoginMediator::SetMarginRouteHostPrefix(const char* routeHostPrefix) {
     marginRouteState_.routeHostPrefix = routeHostPrefix ? routeHostPrefix : "";
 }
 
+// UNANCHORED: source-owned setter for the reconstructed exact margin host name.
 void CLTLoginMediator::SetExactMarginHostName(const char* exactMarginHostName) {
     marginRouteState_.exactMarginHostName = exactMarginHostName ? exactMarginHostName : "";
 }
 
+// UNANCHORED: source-owned accessor for the reconstructed margin route-state mirror.
 const CLTLoginMediator::MarginRouteState& CLTLoginMediator::CurrentMarginRouteState() const {
     return marginRouteState_;
 }
 
+// UNANCHORED: source-owned wrapper over `0x41b450` plus explicit new-helper slot-3 dispatch.
 uint32_t CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold(
     uint32_t helperStateId,
     CLTLoginState* state,
@@ -334,11 +455,13 @@ uint32_t CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold(
     return result;
 }
 
+// anchor: launcher.exe:0x41b490
 bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
     return authConnection_ != nullptr &&
            authConnection_->State() == mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive;
 }
 
+// UNANCHORED: source-owned switch for the default-off `g_LaunchPadGateState16State18 != 0` branch scaffold.
 void CLTLoginMediator::SetProcessLoginRequestAlternateState16BranchScaffold(bool enabled) {
     processLoginRequestAlternateState16BranchScaffold_ = enabled;
     spdlog::info(
@@ -590,17 +713,20 @@ void CLTLoginMediator::InitializeHelperDispatchSlot19() {
     }
 }
 
+// anchor: launcher.exe:0x41d170
 uint32_t CLTLoginMediator::BeginAuthConnection() {
     // Address anchors:
     // - launcher.exe:0x41d170 = strongest current BeginAuthConnection implementation
     // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection (upstream)
-    // - launcher.exe:0x41e500 = downstream connection initializer call site
+    // - launcher.exe:0x440bb0 = auth-side dword-list iterator used from owner `+0x4c`
+    // - launcher.exe:0x44b090 = endpoint builder fed by the selected IPv4 + auth port
     //
-    // Current best launcher path:
+    // Current tightened launcher path:
     // - this is reached only after owner-owned submit has already handed off from state0 -> state2
     //   -> state1 on the happy path
-    // - copy current `qsAuthServerDNSName` into owner `+0x4c`
-    // - read `AuthServerPort` from owner `+0x4c8`
+    // - clear owner byte `+0x2c`
+    // - increment owner dword `+0x28`
+    // - pull the next auth IPv4 dword from the iterator rooted at owner `+0x4c`
     // - build endpoint at owner `+0x5c`
     // - allocate auth-side CMessageConnection child
     // - call `connection->+0x1c(owner+0x5c)` (ensure-connected wrapper)
@@ -617,13 +743,27 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();
+    PrepareNextAuthEndpointForConnectAttemptScaffold();
     auto* connection = EnsureAuthConnectionObject();
-    if (!connection) return 0;
+    if (!connection) {
+        return 0u;
+    }
+
     connection->SetRemoteHostName(authServerDnsName_.c_str());
     connection->SetRemoteEndpoint(authEndpoint_);
+
+    spdlog::info(
+        "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> EnsureConnected()",
+        authServerDnsName_.empty() ? "<empty>" : authServerDnsName_.c_str(),
+        static_cast<unsigned>(AuthConnectAttemptCountScaffold()),
+        static_cast<unsigned>(AuthConnectCandidateCountScaffold()),
+        static_cast<unsigned>(authEndpoint_.ipv4NetworkOrder),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(authConnectionFlag2c_));
     return connection->EnsureConnected();
 }
 
+// UNANCHORED: source-owned early-auth bridge that stages state1 then dispatches slot 3.
 uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
     CLTLoginState* const state1 = scaffoldState1_;
     if (state1 == nullptr) {
@@ -633,11 +773,15 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
         return 0u;
     }
 
+    ResetAuthConnectRetryStateScaffold();
+
     CLTLoginState* const upstreamState = currentState_;
     spdlog::info(
-        "ROUTE CHECKPOINT: early-auth entering state1 auth-connect upstreamState={} currentStateBeforeSwitch={}",
+        "ROUTE CHECKPOINT: early-auth entering state1 auth-connect upstreamState={} currentStateBeforeSwitch={} resetAuthRetryState=1 attemptCount28={} candidateCount={}",
         upstreamState ? upstreamState->DebugName() : "<null>",
-        currentState_ ? currentState_->DebugName() : "<null>");
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(AuthConnectAttemptCountScaffold()),
+        static_cast<unsigned>(AuthConnectCandidateCountScaffold()));
     const uint32_t result = SwitchHelperStateAndDispatchSlot3Scaffold(
         1u,
         state1,
@@ -651,6 +795,7 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
     return result;
 }
 
+// UNANCHORED: source-owned status replay bridge that re-enters the active helper after caching type-2 auth connect status.
 uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
     // Keep the status-recording contract explicit:
     // - `HandleAuthConnectStatus` must cache the type-2 payload on the mediator first
@@ -664,6 +809,7 @@ uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
     return (lastAuthConnectStatus_ == kConnectStatusSuccess) ? BeginAuthHandshake() : 0u;
 }
 
+// UNANCHORED: source-owned owner-side cache/update entry for auth type-2 connect-status work.
 uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
     lastAuthConnectStatus_ = workResultCode;
     ++authConnectStatusCount_;
@@ -688,6 +834,7 @@ uint32_t CLTLoginMediator::BeginAuthHandshake() {
     return AuthBootstrap680Ops::PrepareAndDispatch(*this);
 }
 
+// UNANCHORED: source-owned builder for the auth endpoint mirror rooted at owner `+0x5c`.
 void CLTLoginMediator::BuildAuthEndpoint() {
     // Placeholder only.
     // Original launcher currently appears to preserve host text in owner `+0x4c` and then
@@ -699,6 +846,7 @@ void CLTLoginMediator::BuildAuthEndpoint() {
     authEndpoint_.ipv4NetworkOrder = 0;
 }
 
+// UNANCHORED: source-owned builder for the margin endpoint mirror rooted at owner `+0x6c`.
 void CLTLoginMediator::BuildMarginEndpoint() {
     marginEndpoint_ = {};
     marginEndpoint_.family = 2;
@@ -707,6 +855,7 @@ void CLTLoginMediator::BuildMarginEndpoint() {
     marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
 }
 
+// UNANCHORED: source-owned auth-connection child materializer mirroring owner `+0x18` construction.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject() {
     if (engine_ && authConnectionContextKey_) {
         authConnection_ = engine_->GetOrCreateMessageConnection(authConnectionContextKey_);

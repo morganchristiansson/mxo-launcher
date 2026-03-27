@@ -55,19 +55,28 @@ High-value anchors:
 ### Auth connection-init body
 - `launcher.exe:0x43909f -> 0x41d170`
 - `0x41d170`:
+  - clears owner byte `+0x2c`
   - constructs a `CMessageConnection`-family object through `0x4417e0 -> 0x448b40`
   - stores it at owner `+0x18`
-  - builds endpoint data into owner `+0x5c`
+  - consumes the auth-address iterator rooted at owner `+0x4c`
+    - current tighter helper read:
+      - owner `+0x4c` = begin
+      - owner `+0x50` = end
+      - owner `+0x58` = current cursor
+      - helper `0x440bb0` returns the next dword IPv4 and advances the cursor
+  - builds endpoint data into owner `+0x5c` through `0x44b090(selectedIpv4, authPort)`
+  - increments owner dword `+0x28`
   - immediately calls `connection->+0x1c(owner+0x5c)`
 
 Current best method read:
 - that virtual `+0x1c` remains best interpreted as the connection-oriented ensure-connected / engine-`Connect` wrapper
 
-So current auth-side connection-init model is:
-1. copy auth DNS into owner `+0x4c`
-2. read auth port from `0x4f7a50`
+So current auth-side connection-init model is now tighter than a single fixed-host connect:
+1. clear owner byte `+0x2c`
+2. select the next auth IPv4 candidate from the dword list rooted at owner `+0x4c`
 3. build endpoint at owner `+0x5c`
-4. call `CMessageConnection->+0x1c(owner+0x5c)`
+4. increment owner `+0x28`
+5. call `CMessageConnection->+0x1c(owner+0x5c)`
 
 ## Margin-side launcher path
 
@@ -153,6 +162,40 @@ Important nuance:
 - launcher uses recovered auth-side name `qsAuthServerDNSName`
 - client uses direct `AuthServerDNSName`
 - both currently expose `MarginServerDNSSuffix`, not a direct recovered `MarginServerDNSName`
+
+## State1 connect-status gate now tightened
+
+### `launcher.exe:0x4390b0` exact current read
+- if `LaunchPadClient_GetVtableOffset(workItem) != 2`
+  - tail-calls shared slot-1 gate `0x438d80`
+- otherwise
+  - `owner +0x80 = workItem +0x08`
+  - branch on that payload dword:
+    - payload `== 0`
+      - read cached upstream helper state id from `[state1+4]->vtable+0x18`
+      - `0x41b450(stateId)`
+      - new helper slot 3 is immediately re-entered with old-state `state1`
+      - `0x41cfb0(0)`
+    - payload `!= 0`
+      - owner byte `+0x2c = 1`
+      - compare owner `+0x28` against auth candidate count `((+0x50 - +0x4c) >> 2)`
+      - if attempts remain
+        - call state1 slot 3 again with cached upstream `state1+4`
+      - else
+        - zero owner `+0x28`
+        - `0x41b450(0)`
+        - `0x41d090(0)`
+
+### Current replacement/source consequence
+- original control flow is now source-owned narrowly enough in `loginstate_state1.cpp` and the
+  auth-entry scaffolds:
+  - auth address-list mirror
+  - auth attempt counter mirror
+  - retry-vs-reset/error branch
+- live replacement nuance stays explicit:
+  - active replacement auth connect success still arrives as payload `0x07000001`
+  - current source therefore keeps a narrow live-success alias to preserve the proven happy path
+    while reserving the zero-payload switch/event path as the original behavior
 
 ## Later auth-side sender already identified
 

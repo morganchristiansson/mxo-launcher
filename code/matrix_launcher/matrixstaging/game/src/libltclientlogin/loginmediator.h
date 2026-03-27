@@ -205,6 +205,21 @@ public:
         size_t nextIndex = 0;
     };
 
+    struct AuthAddressListState {
+        // Source-owned mirror of the auth-side iterator rooted at owner `+0x4c` plus the nearby
+        // retry/attempt counter at owner `+0x28`.
+        // Current best static read from `0x41d170 / 0x440bb0 / 0x4390b0`:
+        // - owner `+0x4c` = begin pointer for a dword IPv4 list
+        // - owner `+0x50` = end pointer for that list
+        // - owner `+0x58` = current iterator cursor used by `0x440bb0`
+        // - owner `+0x28` increments before each auth connect attempt
+        // - state1 slot1 later compares `+0x28` against `((+0x50 - +0x4c) >> 2)` to decide
+        //   retry-vs-error on the non-zero status side
+        std::string resolvedHostName;
+        std::vector<uint32_t> ipv4NetworkOrderList;
+        size_t nextIndex = 0;
+        uint32_t attemptCount28 = 0;
+    };
 
     struct State9CallbackBlob18cSketch {
         // anchor: launcher.exe:0x41e690 / mediator vtable `+0x18c`
@@ -923,7 +938,13 @@ public:
 
     // Post-connect status handling is still owner/helper-state driven.
     // Current high-value summary:
-    // - successful connect completion arrives as type-2 work `0x7000001`
+    // - active replacement happy path still sees auth connect completion arrive as type-2 work
+    //   `0x7000001`
+    // - newer `0x4390b0` disassembly also proves the original state1 slot-1 body branches on the
+    //   raw status dword as zero-vs-non-zero when deciding helper-switch/event-vs-retry/error
+    // - current source therefore keeps the exact recovered helper-switch/event/error shape while
+    //   still aliasing live replacement `0x7000001` into the success-side bridge so the active
+    //   happy path remains intact until the producer/result semantics are fully source-owned
     // - auth and margin derived connection families fall through wrappers into owner callback /
     //   current-state dispatch rather than being fully handled by optional helper slots alone
     // - active default password-submit continuation is now:
@@ -940,6 +961,10 @@ public:
     uint32_t BeginMarginHandshake();
     uint32_t LastAuthConnectStatus() const { return lastAuthConnectStatus_; }
     uint32_t AuthConnectStatusCount() const { return authConnectStatusCount_; }
+    void ResetAuthConnectRetryStateScaffold();
+    uint32_t AuthConnectAttemptCountScaffold() const;
+    uint32_t AuthConnectCandidateCountScaffold() const;
+    bool HasAuthConnectRetryCandidateRemainingScaffold() const;
 
     void SetAuthCredentials(const char* username, const char* password);
     void SetAuthBootstrapConfig(
@@ -1173,6 +1198,9 @@ public:
 
     // Post-auth load-character reply outputs (0x440320) plus neighboring auth/margin send flags:
     uint32_t& WorldListCountOrStatus80() { return postAuthMarginLoadingState_.worldListCountOrStatus80; }
+    // Caution: original `0x4390b0` writes owner `+0x2c` on its non-zero payload branch, while the
+    // current replacement also reuses this byte as a narrow live auth-ready alias on the active
+    // happy path. Keep the storage stable, but do not overstate the exact original semantic yet.
     uint8_t AuthConnectionFlag2c() const { return authConnectionFlag2c_; }
     uint8_t& AuthConnectionFlag2c() { return authConnectionFlag2c_; }
     uint8_t State10SendGateFlagF14() const { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
@@ -1249,6 +1277,8 @@ private:
     void ResetMarginBootstrapState();
 
     void BuildAuthEndpoint();
+    void RefreshAuthAddressListForCurrentHostScaffold();
+    void PrepareNextAuthEndpointForConnectAttemptScaffold();
     void BuildMarginEndpoint();
     bool RebuildMarginAddressList();
     bool SelectMarginEndpointIpv4();
@@ -1460,6 +1490,10 @@ private:
 
     std::array<void*, kRecoveredWorldSlotCapacity> worldSlots_;
     std::array<void*, kRecoveredWorldSlotCapacity> worldPayloadSlots_;
+
+    // Append-only source-owned mirror of the auth-side owner `+0x28/+0x4c/+0x50/+0x58`
+    // retry/iterator family recovered from `0x41d170 / 0x440bb0 / 0x4390b0`.
+    AuthAddressListState authAddressList4c_{};
 
     // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
     // Faithful implementation of arg6 world list provider for InitClientDLL
