@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-class ILTTCPEngine {
+class CLTBaseThreadPerClientTCPEngine {
 public:
-    ILTTCPEngine() {}
+    CLTBaseThreadPerClientTCPEngine() {}
 };

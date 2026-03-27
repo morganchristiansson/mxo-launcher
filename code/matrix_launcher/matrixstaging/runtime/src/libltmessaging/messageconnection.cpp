@@ -259,7 +259,7 @@ uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectio
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return engine_->SendBuffer(this, submittedBytes, submittedByteCount, nullptr);
+    return engine_->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), submittedBytes, submittedByteCount, nullptr);
 }
 
 uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) {
@@ -346,7 +346,7 @@ uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetB
 
     // Current starter path deliberately routes through the recovered connection-object-based
     // engine surface instead of pretending this is already a faithful packet serializer.
-    return engine_->SendBuffer(this, packetData, packetByteCount, completionContext);
+    return engine_->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), packetData, packetByteCount, completionContext);
 }
 
 // ============================================================
@@ -378,7 +378,7 @@ uint32_t CMessageConnection::EnsureConnected() {
         return 0;
     }
 
-    const uint32_t result = engine_->Connect(this);
+    const uint32_t result = engine_->ConnectConnectionScaffold(static_cast<CLTTCPConnection*>(this));
     if (result == 0u) {
         spdlog::debug(
             "CMessageConnection::EnsureConnected connect failed this={} ownerContext={} remoteHost='{}'",

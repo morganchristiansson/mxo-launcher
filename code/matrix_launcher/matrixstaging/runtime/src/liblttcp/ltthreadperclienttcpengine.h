@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "ilttcpengine.h"
 #include "lttcpconnection.h"
 
 namespace mxo::liblttcp {
@@ -150,7 +151,7 @@ private:
 // - primary vtable 0x4b2768
 // strongest current class string:
 // - CLTThreadPerClientTCPEngine
-class CLTThreadPerClientTCPEngine {
+class CLTThreadPerClientTCPEngine : public ILTTCPEngine {
 public:
     static constexpr uint32_t kResultSuccess = 1;
     static constexpr uint32_t kResultAlreadyMonitored = 0x7000003;
@@ -175,18 +176,33 @@ public:
     // anchor: launcher.exe:0x40b389..0x40b404 teardown release path; current C++ body remains scaffold-only
     ~CLTThreadPerClientTCPEngine();
 
-    uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext);
-    uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext = nullptr);
-    uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ownerContext = nullptr);
-    uint32_t Connect(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, void* contextKey, void* ownerContext = nullptr);
-    uint32_t Connect(CLTTCPConnection* connection);
-    uint32_t ConnectContext(void* contextKey);
-    uint32_t Close(CLTTCPConnection* connection, bool graceful);
-    uint32_t CloseContext(void* contextKey, bool graceful);
-    uint32_t SendBuffer(CLTTCPConnection* connection, const void* buffer, uint32_t byteCount, void* completionContext = nullptr);
-    uint32_t SendPacketContext(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext = nullptr);
-    uint32_t CleanupConnection(void* contextKey);
-    uint32_t UnmonitorPort(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, uint32_t* outSocketHandle);
+    int Release(uint32_t flags) override;
+    uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) override;
+    uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext = nullptr) override;
+    uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ownerContext = nullptr) override;
+    uint32_t Slot4_42F7C0(void* arg1) override;
+    uint32_t UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) override;
+    uint32_t Connect(void* contextKey) override;
+    uint32_t Close(void* contextKey, bool graceful) override;
+    uint32_t SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext = nullptr) override;
+    uint32_t Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) override;
+    uint32_t Slot10_443810(void* arg1) override;
+    uint32_t Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) override;
+    uint32_t CleanupConnection(void* contextKey) override;
+
+    // UNANCHORED source-side helpers used by the current connection scaffolding.
+    uint32_t ConnectResolvedEndpointScaffold(
+        uint16_t portHostOrder,
+        uint32_t ipv4NetworkOrder,
+        void* contextKey,
+        void* ownerContext = nullptr);
+    uint32_t ConnectConnectionScaffold(CLTTCPConnection* connection);
+    uint32_t CloseConnectionScaffold(CLTTCPConnection* connection, bool graceful);
+    uint32_t SendBufferConnectionScaffold(
+        CLTTCPConnection* connection,
+        const void* buffer,
+        uint32_t byteCount,
+        void* completionContext = nullptr);
 
     // Base queue helpers recovered from:
     // - 0x436340 = Queue_Init

@@ -80,18 +80,6 @@ struct DiagnosticIntrusiveListHeadSmall {
 struct DiagnosticLauncherObjectBuildState {
     MinimalLauncherObjectStub* currentObject;
     uint32_t buildGeneration;
-    uint32_t slot1CallCount;
-    uint32_t slot2CallCount;
-    uint32_t slot3CallCount;
-    uint32_t slot4CallCount;
-    uint32_t slot5CallCount;
-    uint32_t slot6CallCount;
-    uint32_t slot7CallCount;
-    uint32_t slot8CallCount;
-    uint32_t slot9CallCount;
-    uint32_t slot10CallCount;
-    uint32_t slot11CallCount;
-    uint32_t slot12CallCount;
     uint32_t subobject5CSlot0CallCount;
     uint32_t subobject5CSlot1CallCount;
     uint32_t subobject60Slot0CallCount;
@@ -333,103 +321,69 @@ static void DiagnosticFreeLauncherObjectInternals(MinimalLauncherObjectStub* sel
 // anchor: launcher.exe:0x4319a0
 // vtable: launcher.exe:0x004b2768 slot +0x00
 static int __thiscall LauncherObject_Release(MinimalLauncherObjectStub* self, uint32_t flags) {
-    spdlog::info("LauncherObjectStub::Release(flags={} self={})", flags, fmt::ptr(self));
+    (void)flags;
     DiagnosticFreeLauncherObjectInternals(self);
     return 1;
 }
 
 // anchor: launcher.exe:0x431ce0
 // vtable: launcher.exe:0x004b2768 slot +0x04
-static uint32_t __thiscall LauncherObject_Slot1_431CE0(
+static uint32_t __thiscall LauncherObject_MonitorPort(
     MinimalLauncherObjectStub* self,
-    void* arg1,
-    void* arg2,
-    void* arg3) {
-    ++g_LauncherObjectBuildState.slot1CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot1_431CE0(self={} arg1={} arg2={} arg3={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(arg2),
-        fmt::ptr(arg3),
-        (unsigned)g_LauncherObjectBuildState.slot1CallCount);
-    LogPointerWords("LauncherObject slot1 self", self, 8);
-
-    uint32_t result = 0;
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
-        result = engine->MonitorPort(
-            /*portHostOrder=*/static_cast<uint16_t>(reinterpret_cast<uintptr_t>(arg1)),
-            /*ownerContext=*/arg2);
-        DiagnosticSyncLauncherObjectSidecarState(self);
+    void* port,
+    void* ownerContext,
+    void* reservedArg3) {
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    if (!engine) {
+        return 0;
     }
 
-    spdlog::info("LauncherObjectStub::Slot1_431CE0 -> sidecar MonitorPort result=0x{:08x}", result);
-    (void)arg3;
+    const uint32_t result = engine->MonitorPort(
+        static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
+        ownerContext,
+        reservedArg3);
+    DiagnosticSyncLauncherObjectSidecarState(self);
     return result;
 }
 
 // anchor: launcher.exe:0x4325d0
 // vtable: launcher.exe:0x004b2768 slot +0x08
-static uint32_t __thiscall LauncherObject_Slot2_4325D0(
+static uint32_t __thiscall LauncherObject_UDPMonitorPort(
     MinimalLauncherObjectStub* self,
-    void* arg1,
-    void* arg2,
-    void* arg3) {
-    ++g_LauncherObjectBuildState.slot2CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot2_4325D0(self={} arg1={} arg2={} arg3={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(arg2),
-        fmt::ptr(arg3),
-        g_LauncherObjectBuildState.slot2CallCount);
-    LogPointerWords("LauncherObject slot2 self", self, 8);
-
-    uint32_t result = 0;
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
-        result = engine->UDPMonitorPort(
-            /*portHostOrder=*/static_cast<uint16_t>(reinterpret_cast<uintptr_t>(arg1)),
-            /*contextKey=*/arg2,
-            /*ownerContext=*/arg3);
-        DiagnosticSyncLauncherObjectSidecarState(self);
+    void* port,
+    void* contextKey,
+    void* ownerContext) {
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    if (!engine) {
+        return 0;
     }
 
-    spdlog::info("LauncherObjectStub::Slot2_4325D0 -> sidecar UDPMonitorPort result=0x{:08x}", result);
+    const uint32_t result = engine->UDPMonitorPort(
+        static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
+        contextKey,
+        ownerContext);
+    DiagnosticSyncLauncherObjectSidecarState(self);
     return result;
 }
 
 // anchor: launcher.exe:0x436000
 // vtable: launcher.exe:0x004b2768 slot +0x0c
-static uint32_t __thiscall LauncherObject_Slot3_436000(
+static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
     MinimalLauncherObjectStub* self,
-    void* arg1,
-    void* arg2,
-    void* arg3) {
-    ++g_LauncherObjectBuildState.slot3CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot3_436000(self={} arg1={} arg2={} arg3={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(arg2),
-        fmt::ptr(arg3),
-        (unsigned)g_LauncherObjectBuildState.slot3CallCount);
-    LogPointerWords("LauncherObject slot3 self", self, 8);
-
-    uint32_t result = 0;
-    uint16_t boundPortHostOrder = 0;
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
-        result = engine->MonitorEphemeralUDPPort(
-            /*outBoundPortHostOrder=*/arg1 ? static_cast<uint16_t*>(arg1) : &boundPortHostOrder,
-            /*contextKey=*/arg2,
-            /*ownerContext=*/arg3);
-        DiagnosticSyncLauncherObjectSidecarState(self);
+    void* outBoundPortHostOrder,
+    void* contextKey,
+    void* ownerContext) {
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    if (!engine) {
+        return 0;
     }
 
-    spdlog::info(
-        "LauncherObjectStub::Slot3_436000 -> sidecar MonitorEphemeralUDPPort result=0x{:08x} boundPort={:08x} context={}",
-        result,
-        (unsigned)(arg1 ? *static_cast<uint16_t*>(arg1) : boundPortHostOrder),
-        fmt::ptr(arg2));
+    uint16_t boundPortHostOrder = 0;
+    const uint32_t result = engine->MonitorEphemeralUDPPort(
+        outBoundPortHostOrder ? static_cast<uint16_t*>(outBoundPortHostOrder) : &boundPortHostOrder,
+        contextKey,
+        ownerContext);
+    DiagnosticSyncLauncherObjectSidecarState(self);
     return result;
 }
 
@@ -438,146 +392,79 @@ static uint32_t __thiscall LauncherObject_Slot3_436000(
 static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
     MinimalLauncherObjectStub* self,
     void* arg1) {
-    ++g_LauncherObjectBuildState.slot4CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot4_42F7C0(self={} arg1={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        (unsigned)g_LauncherObjectBuildState.slot4CallCount);
-    LogPointerWords("LauncherObject slot4 self", self, 8);
-    // Keep slot4 as a logged placeholder for now.
-    // This still needs stronger static naming/semantics before we route it into liblttcp.
-    return 0;
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    return engine ? engine->Slot4_42F7C0(arg1) : 0u;
 }
 
 // anchor: launcher.exe:0x431840
 // vtable: launcher.exe:0x004b2768 slot +0x14
-static uint32_t __thiscall LauncherObject_Slot5_431840(
+static uint32_t __thiscall LauncherObject_UnmonitorPort(
     MinimalLauncherObjectStub* self,
-    void* arg1,
-    uint32_t* out0,
-    void* arg3) {
-    ++g_LauncherObjectBuildState.slot5CallCount;
-    if (out0) *out0 = 0;
-
-    const DiagnosticIntrusiveListHead* list80 =
-        self ? static_cast<const DiagnosticIntrusiveListHead*>(self->list80) : NULL;
-    const bool listLooksEmpty =
-        !self || !list80 || !list80->root || list80->first == list80;
-
-    spdlog::info(
-        "LauncherObjectStub::Slot5_431840(self={} arg1={} out0={} arg3={} root={} first={} last={} empty={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(out0),
-        fmt::ptr(arg3),
-        fmt::ptr(list80 ? list80->root : NULL),
-        fmt::ptr(list80 ? list80->first : NULL),
-        fmt::ptr(list80 ? list80->last : NULL),
-        (unsigned)(listLooksEmpty ? 1u : 0u),
-        (unsigned)g_LauncherObjectBuildState.slot5CallCount);
-    LogPointerWords("LauncherObject slot5 self", self, 8);
-
-    if (listLooksEmpty) {
-        spdlog::info("LauncherObjectStub::Slot5_431840 -> faithful empty-list80 miss path (return 0x7000004, out0=0)");
-        return 0x7000004u;
+    void* port,
+    uint32_t* outSocketHandle,
+    void* ipv4NetworkOrder) {
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    if (!engine) {
+        return 0;
     }
 
-    uint32_t result = 0;
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
-        result = engine->UnmonitorPort(
-            /*portHostOrder=*/static_cast<uint16_t>(reinterpret_cast<uintptr_t>(arg1)),
-            /*ipv4NetworkOrder=*/static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg3)),
-            /*outSocketHandle=*/out0);
-        DiagnosticSyncLauncherObjectSidecarState(self);
-    }
-
-    spdlog::info(
-        "LauncherObjectStub::Slot5_431840 -> sidecar UnmonitorPort result=0x{:08x} outSocketHandle=0x{:08x}",
-        result,
-        (unsigned)(out0 ? *out0 : 0u));
+    const uint32_t result = engine->UnmonitorPort(
+        static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
+        outSocketHandle,
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ipv4NetworkOrder)));
+    DiagnosticSyncLauncherObjectSidecarState(self);
     return result;
 }
 
 // anchor: launcher.exe:0x4328a0
 // vtable: launcher.exe:0x004b2768 slot +0x18
-static uint32_t __thiscall LauncherObject_Slot6_4328A0(
+static uint32_t __thiscall LauncherObject_Connect(
     MinimalLauncherObjectStub* self,
-    void* arg1) {
-    ++g_LauncherObjectBuildState.slot6CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot6_4328A0(self={} arg1={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        (unsigned)g_LauncherObjectBuildState.slot6CallCount);
-    LogPointerWords("LauncherObject slot6 self", self, 8);
-
-    uint32_t result = 0;
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
-        result = engine->ConnectContext(arg1);
-        DiagnosticSyncLauncherObjectSidecarState(self);
+    void* contextKey) {
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    if (!engine) {
+        return 0;
     }
 
-    spdlog::info("LauncherObjectStub::Slot6_4328A0 -> sidecar Connect result=0x{:08x} context={}", result, fmt::ptr(arg1));
+    const uint32_t result = engine->Connect(contextKey);
+    DiagnosticSyncLauncherObjectSidecarState(self);
     return result;
 }
 
 // anchor: launcher.exe:0x42f970
 // vtable: launcher.exe:0x004b2768 slot +0x1c
-static uint32_t __thiscall LauncherObject_Slot7_42F970(
+static uint32_t __thiscall LauncherObject_Close(
     MinimalLauncherObjectStub* self,
-    void* arg1,
-    uint32_t arg2) {
-    ++g_LauncherObjectBuildState.slot7CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot7_42F970(self={} arg1={} arg2=0x{:08x}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        arg2,
-        g_LauncherObjectBuildState.slot7CallCount);
-    LogPointerWords("LauncherObject slot7 self", self, 8);
-
-    uint32_t result = 0;
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
-        result = engine->CloseContext(arg1, /*graceful=*/(arg2 != 0u));
-        DiagnosticSyncLauncherObjectSidecarState(self);
+    void* contextKey,
+    uint32_t graceful) {
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    if (!engine) {
+        return 0;
     }
 
-    spdlog::info("LauncherObjectStub::Slot7_42F970 -> sidecar Close result=0x{:08x} context={}", result, fmt::ptr(arg1));
+    const uint32_t result = engine->Close(contextKey, graceful != 0u);
+    DiagnosticSyncLauncherObjectSidecarState(self);
     return result;
 }
 
 // anchor: launcher.exe:0x42fbd0
 // vtable: launcher.exe:0x004b2768 slot +0x20
-static uint32_t __thiscall LauncherObject_Slot8_42FBD0(
+static uint32_t __thiscall LauncherObject_SendBuffer(
     MinimalLauncherObjectStub* self,
-    void* arg1,
-    void* arg2,
-    void* arg3,
-    void* arg4) {
-    ++g_LauncherObjectBuildState.slot8CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot8_42FBD0(self={} arg1={} arg2={} arg3={} arg4={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(arg2),
-        fmt::ptr(arg3),
-        fmt::ptr(arg4),
-        (unsigned)g_LauncherObjectBuildState.slot8CallCount);
-    LogPointerWords("LauncherObject slot8 self", self, 8);
-
-    uint32_t result = 0;
-    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self)) {
-        result = engine->SendPacketContext(
-            /*contextKey=*/arg1,
-            /*buffer=*/arg2,
-            /*byteCount=*/static_cast<uint32_t>(reinterpret_cast<uintptr_t>(arg3)),
-            /*completionContext=*/arg4);
-        DiagnosticSyncLauncherObjectSidecarState(self);
+    void* contextKey,
+    void* buffer,
+    void* byteCount,
+    void* completionContext) {
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    if (!engine) {
+        return 0;
     }
 
-    spdlog::info("LauncherObjectStub::Slot8_42FBD0 -> sidecar SendPacket/SendBuffer result=0x{:08x} context={}", result, fmt::ptr(arg1));
-    return result;
+    return engine->SendBuffer(
+        contextKey,
+        buffer,
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
+        completionContext);
 }
 
 // anchor: launcher.exe:0x42fd10
@@ -589,18 +476,8 @@ static uint32_t __thiscall LauncherObject_Slot9_42FD10(
     void* arg3,
     void* arg4,
     void* arg5) {
-    ++g_LauncherObjectBuildState.slot9CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot9_42FD10(self={} arg1={} arg2={} arg3={} arg4={} arg5={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(arg2),
-        fmt::ptr(arg3),
-        fmt::ptr(arg4),
-        fmt::ptr(arg5),
-        (unsigned)g_LauncherObjectBuildState.slot9CallCount);
-    LogPointerWords("LauncherObject slot9 self", self, 8);
-    return 0;
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    return engine ? engine->Slot9_42FD10(arg1, arg2, arg3, arg4, arg5) : 0u;
 }
 
 // anchor: launcher.exe:0x443810
@@ -608,14 +485,8 @@ static uint32_t __thiscall LauncherObject_Slot9_42FD10(
 static uint32_t __thiscall LauncherObject_Slot10_443810(
     MinimalLauncherObjectStub* self,
     void* arg1) {
-    ++g_LauncherObjectBuildState.slot10CallCount;
-    spdlog::info(
-        "LauncherObjectStub::Slot10_443810(self={} arg1={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        (unsigned)g_LauncherObjectBuildState.slot10CallCount);
-    LogPointerWords("LauncherObject slot10 self", self, 8);
-    return 0;
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    return engine ? engine->Slot10_443810(arg1) : 0u;
 }
 
 // anchor: launcher.exe:0x4147b0
@@ -638,62 +509,27 @@ static uint32_t __thiscall LauncherObject_Slot11_431670(
     void* arg1,
     uint32_t* out0,
     uint32_t* out1) {
-    ++g_LauncherObjectBuildState.slot11CallCount;
-    if (out0) *out0 = 0;
-    if (out1) *out1 = 0;
-    spdlog::info(
-        "LauncherObjectStub::Slot11_431670(self={} arg1={} out0={} out1={}) [count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(out0),
-        fmt::ptr(out1),
-        g_LauncherObjectBuildState.slot11CallCount);
-    LogPointerWords("LauncherObject slot11 self", self, 8);
-    return 0;
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    return engine ? engine->Slot11_431670(arg1, out0, out1) : 0u;
 }
 
 // anchor: launcher.exe:0x4316a0
 // vtable: launcher.exe:0x004b2768 slot +0x30
-static uint32_t __thiscall LauncherObject_Slot12_4316A0(
+static uint32_t __thiscall LauncherObject_CleanupConnection(
     MinimalLauncherObjectStub* self,
-    void* arg1) {
-    ++g_LauncherObjectBuildState.slot12CallCount;
+    void* contextKey) {
     LauncherObject_Subobject98_Slot0(&self->helper98);
 
-    bool droppedConnection = false;
-    mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
-    const uint32_t cleanupResult = engine ? engine->CleanupConnection(/*contextKey=*/arg1) : 0u;
+    mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
+    const uint32_t result = engine ? engine->CleanupConnection(contextKey) : 0u;
+
     // Keep the connection/context sidecar alive across the later context->+0x10 callback.
     // Original launcher consumer order is slot12(context) first, then context->+0x10(workItem).
     // Dropping the sidecar here would make the current diagnostic context callback less useful.
     DiagnosticSyncLauncherObjectSidecarState(self);
 
-    const DiagnosticIntrusiveListHeadSmall* list8C =
-        self ? static_cast<const DiagnosticIntrusiveListHeadSmall*>(self->list8C) : NULL;
-    const bool listLooksEmpty =
-        !self || !list8C || !list8C->root || list8C->first == list8C;
-
-    spdlog::info(
-        "LauncherObjectStub::Slot12_4316A0(self={} arg1={} root={} first={} last={} empty={} cleanupResult=0x{:08x} droppedConnection={} count={}]",
-        fmt::ptr(self),
-        fmt::ptr(arg1),
-        fmt::ptr(list8C ? list8C->root : NULL),
-        fmt::ptr(list8C ? list8C->first : NULL),
-        fmt::ptr(list8C ? list8C->last : NULL),
-        listLooksEmpty ? 1u : 0u,
-        cleanupResult,
-        droppedConnection ? 1u : 0u,
-        g_LauncherObjectBuildState.slot12CallCount);
-    LogPointerWords("LauncherObject slot12 self", self, 8);
-
-    if (listLooksEmpty) {
-        spdlog::info("LauncherObjectStub::Slot12_4316A0 -> sidecar CleanupConnection now leaves list8C empty");
-    } else {
-        spdlog::info("LauncherObjectStub::Slot12_4316A0 -> sidecar CleanupConnection left list8C non-empty");
-    }
-
     LauncherObject_Subobject98_Slot1(&self->helper98);
-    return cleanupResult;
+    return result;
 }
 
 static CRITICAL_SECTION* DiagnosticLauncherCritFromHelper(void* self) {
@@ -895,19 +731,19 @@ static void InitializeLauncherObjectStub() {
     std::memset(g_LauncherObjectSubVtable5C, 0, sizeof(g_LauncherObjectSubVtable5C));
     std::memset(g_LauncherObjectSubVtable60, 0, sizeof(g_LauncherObjectSubVtable60));
     std::memset(g_LauncherObjectSubVtable98, 0, sizeof(g_LauncherObjectSubVtable98));
-    g_LauncherObjectVtable[0] = (void*)LauncherObject_Release;        // 0x4319a0
-    g_LauncherObjectVtable[1] = (void*)LauncherObject_Slot1_431CE0;   // 0x431ce0
-    g_LauncherObjectVtable[2] = (void*)LauncherObject_Slot2_4325D0;   // 0x4325d0
-    g_LauncherObjectVtable[3] = (void*)LauncherObject_Slot3_436000;   // 0x436000
-    g_LauncherObjectVtable[4] = (void*)LauncherObject_Slot4_42F7C0;   // 0x42f7c0
-    g_LauncherObjectVtable[5] = (void*)LauncherObject_Slot5_431840;   // 0x431840
-    g_LauncherObjectVtable[6] = (void*)LauncherObject_Slot6_4328A0;   // 0x4328a0
-    g_LauncherObjectVtable[7] = (void*)LauncherObject_Slot7_42F970;   // 0x42f970
-    g_LauncherObjectVtable[8] = (void*)LauncherObject_Slot8_42FBD0;   // 0x42fbd0
-    g_LauncherObjectVtable[9] = (void*)LauncherObject_Slot9_42FD10;   // 0x42fd10
-    g_LauncherObjectVtable[10] = (void*)LauncherObject_Slot10_443810; // 0x443810
-    g_LauncherObjectVtable[11] = (void*)LauncherObject_Slot11_431670; // 0x431670
-    g_LauncherObjectVtable[12] = (void*)LauncherObject_Slot12_4316A0; // 0x4316a0
+    g_LauncherObjectVtable[0] = (void*)LauncherObject_Release;                   // 0x4319a0
+    g_LauncherObjectVtable[1] = (void*)LauncherObject_MonitorPort;               // 0x431ce0
+    g_LauncherObjectVtable[2] = (void*)LauncherObject_UDPMonitorPort;            // 0x4325d0
+    g_LauncherObjectVtable[3] = (void*)LauncherObject_MonitorEphemeralUDPPort;   // 0x436000
+    g_LauncherObjectVtable[4] = (void*)LauncherObject_Slot4_42F7C0;              // 0x42f7c0
+    g_LauncherObjectVtable[5] = (void*)LauncherObject_UnmonitorPort;             // 0x431840
+    g_LauncherObjectVtable[6] = (void*)LauncherObject_Connect;                   // 0x4328a0
+    g_LauncherObjectVtable[7] = (void*)LauncherObject_Close;                     // 0x42f970
+    g_LauncherObjectVtable[8] = (void*)LauncherObject_SendBuffer;                // 0x42fbd0
+    g_LauncherObjectVtable[9] = (void*)LauncherObject_Slot9_42FD10;              // 0x42fd10
+    g_LauncherObjectVtable[10] = (void*)LauncherObject_Slot10_443810;            // 0x443810
+    g_LauncherObjectVtable[11] = (void*)LauncherObject_Slot11_431670;            // 0x431670
+    g_LauncherObjectVtable[12] = (void*)LauncherObject_CleanupConnection;        // 0x4316a0
     g_LauncherObjectSubVtable5C[0] = (void*)LauncherObject_Subobject5C_Slot0; // base +0x5c helper slot 0x435f90
     g_LauncherObjectSubVtable5C[1] = (void*)LauncherObject_Subobject5C_Slot1; // base +0x5c helper slot 0x435fa0
     g_LauncherObjectSubVtable60[0] = (void*)LauncherObject_Subobject60_Slot0; // base +0x60 helper slot 0x4147b0

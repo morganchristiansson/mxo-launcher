@@ -519,9 +519,19 @@ CLTThreadPerClientTCPEngine::~CLTThreadPerClientTCPEngine() {
     messageConnections_.clear();
 }
 
+// anchor: launcher.exe:0x4319a0
+// vtable: launcher.exe:0x004b2768 slot +0x00
+int CLTThreadPerClientTCPEngine::Release(uint32_t flags) {
+    // Current sidecar owner still handles the real arg5 object lifetime/teardown.
+    // Keep the primary-slot surface source-owned here so wrappers can forward through
+    // ILTTCPEngine without open-coding placeholder returns.
+    (void)flags;
+    return 1;
+}
+
 // anchor: launcher.exe:0x431ce0
 // vtable: launcher.exe:0x004b2768 slot +0x04
-uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* ownerContext) {
+uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) {
     const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, 0);
     if (FindMonitoredPort(key)) {
         return kResultAlreadyMonitored;
@@ -533,6 +543,7 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* 
     record.listenSocketHandle = nextSyntheticSocketHandle_++;
     record.shouldRun = true;
     monitoredPorts_.push_back(record);
+    (void)reservedArg3;
     return kResultSuccess;
 }
 
@@ -567,9 +578,37 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorEphemeralUDPPort(uint16_t* outBound
     return result;
 }
 
-// UNANCHORED starter overload used by the scaffold.
+// anchor: launcher.exe:0x42f7c0
+// vtable: launcher.exe:0x004b2768 slot +0x10
+uint32_t CLTThreadPerClientTCPEngine::Slot4_42F7C0(void* arg1) {
+    (void)arg1;
+    return 0;
+}
+
+// anchor: launcher.exe:0x431840
+// vtable: launcher.exe:0x004b2768 slot +0x14
+uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) {
+    const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
+    for (auto it = monitoredPorts_.begin(); it != monitoredPorts_.end(); ++it) {
+        if (it->endpoint.portNetworkOrder == key.portNetworkOrder &&
+            it->endpoint.ipv4NetworkOrder == key.ipv4NetworkOrder) {
+            if (outSocketHandle) {
+                *outSocketHandle = it->listenSocketHandle;
+            }
+            monitoredPorts_.erase(it);
+            return 0;
+        }
+    }
+
+    if (outSocketHandle) {
+        *outSocketHandle = 0;
+    }
+    return kResultEndpointNotFound;
+}
+
+// UNANCHORED source-side helper used by the current connection scaffolding.
 // Current original anchor is the lower-level connect family at launcher.exe:0x4328a0.
-uint32_t CLTThreadPerClientTCPEngine::Connect(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, void* contextKey, void* ownerContext) {
+uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, void* contextKey, void* ownerContext) {
     if (!contextKey || !EnsureWinsockReady()) {
         return 0;
     }
@@ -603,9 +642,8 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(uint16_t portHostOrder, uint32_t i
     return kResultSuccess;
 }
 
-// anchor: launcher.exe:0x4328a0
-// vtable: launcher.exe:0x004b2768 slot +0x18
-uint32_t CLTThreadPerClientTCPEngine::Connect(CLTTCPConnection* connection) {
+// UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
+uint32_t CLTThreadPerClientTCPEngine::ConnectConnectionScaffold(CLTTCPConnection* connection) {
     if (!connection) {
         return 0;
     }
@@ -626,7 +664,7 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(CLTTCPConnection* connection) {
     }
 
     void* contextKey = connection->OwnerContext() ? connection->OwnerContext() : static_cast<void*>(connection);
-    const uint32_t result = Connect(
+    const uint32_t result = ConnectResolvedEndpointScaffold(
         portHostOrder,
         ipv4NetworkOrder,
         /*contextKey=*/contextKey,
@@ -640,43 +678,72 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(CLTTCPConnection* connection) {
     return result;
 }
 
-// UNANCHORED starter helper.
-// Collapses current arg5 context-oriented slot-6 bridge behavior into liblttcp.
-uint32_t CLTThreadPerClientTCPEngine::ConnectContext(void* contextKey) {
+// anchor: launcher.exe:0x4328a0
+// vtable: launcher.exe:0x004b2768 slot +0x18
+uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
     CMessageConnection* connection = GetOrCreateMessageConnection(contextKey);
     return connection ? connection->EnsureConnected() : 0u;
 }
 
-// anchor: launcher.exe:0x42f970
-// vtable: launcher.exe:0x004b2768 slot +0x1c
-uint32_t CLTThreadPerClientTCPEngine::Close(CLTTCPConnection* connection, bool graceful) {
+// UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
+uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* connection, bool graceful) {
     if (!connection) {
         return 0;
     }
     return connection->Close(graceful);
 }
 
-// UNANCHORED starter helper.
-// Collapses current arg5 context-oriented slot-7 bridge behavior into liblttcp.
-uint32_t CLTThreadPerClientTCPEngine::CloseContext(void* contextKey, bool graceful) {
+// anchor: launcher.exe:0x42f970
+// vtable: launcher.exe:0x004b2768 slot +0x1c
+uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
     CMessageConnection* connection = GetOrCreateMessageConnection(contextKey);
     return connection ? connection->Close(graceful) : 0u;
 }
 
-// anchor: launcher.exe:0x42fbd0
-// vtable: launcher.exe:0x004b2768 slot +0x20
-uint32_t CLTThreadPerClientTCPEngine::SendBuffer(CLTTCPConnection* connection, const void* buffer, uint32_t byteCount, void* completionContext) {
+// UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
+uint32_t CLTThreadPerClientTCPEngine::SendBufferConnectionScaffold(CLTTCPConnection* connection, const void* buffer, uint32_t byteCount, void* completionContext) {
     if (!connection) {
         return 0;
     }
     return connection->SendBuffer(buffer, byteCount, completionContext);
 }
 
-// UNANCHORED starter helper.
-// Collapses current arg5 context-oriented slot-8 bridge behavior into liblttcp.
-uint32_t CLTThreadPerClientTCPEngine::SendPacketContext(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext) {
+// anchor: launcher.exe:0x42fbd0
+// vtable: launcher.exe:0x004b2768 slot +0x20
+uint32_t CLTThreadPerClientTCPEngine::SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext) {
     CMessageConnection* connection = GetOrCreateMessageConnection(contextKey);
     return connection ? connection->SendPacket(buffer, byteCount, completionContext) : 0u;
+}
+
+// anchor: launcher.exe:0x42fd10
+// vtable: launcher.exe:0x004b2768 slot +0x24
+uint32_t CLTThreadPerClientTCPEngine::Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) {
+    (void)arg1;
+    (void)arg2;
+    (void)arg3;
+    (void)arg4;
+    (void)arg5;
+    return 0;
+}
+
+// anchor: launcher.exe:0x443810
+// vtable: launcher.exe:0x004b2768 slot +0x28
+uint32_t CLTThreadPerClientTCPEngine::Slot10_443810(void* arg1) {
+    (void)arg1;
+    return 0;
+}
+
+// anchor: launcher.exe:0x431670
+// vtable: launcher.exe:0x004b2768 slot +0x2c
+uint32_t CLTThreadPerClientTCPEngine::Slot11_431670(void* arg1, uint32_t* out0, uint32_t* out1) {
+    (void)arg1;
+    if (out0) {
+        *out0 = 0;
+    }
+    if (out1) {
+        *out1 = 0;
+    }
+    return 0;
 }
 
 // anchor: launcher.exe:0x4316a0
@@ -694,27 +761,6 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
         }
     }
     return 0;
-}
-
-// anchor: launcher.exe:0x431840
-// vtable: launcher.exe:0x004b2768 slot +0x14
-uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, uint32_t* outSocketHandle) {
-    const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
-    for (auto it = monitoredPorts_.begin(); it != monitoredPorts_.end(); ++it) {
-        if (it->endpoint.portNetworkOrder == key.portNetworkOrder &&
-            it->endpoint.ipv4NetworkOrder == key.ipv4NetworkOrder) {
-            if (outSocketHandle) {
-                *outSocketHandle = it->listenSocketHandle;
-            }
-            monitoredPorts_.erase(it);
-            return 0;
-        }
-    }
-
-    if (outSocketHandle) {
-        *outSocketHandle = 0;
-    }
-    return kResultEndpointNotFound;
 }
 
 // UNANCHORED scaffold bridge because the current liblttcp engine lives beside, not inside,
