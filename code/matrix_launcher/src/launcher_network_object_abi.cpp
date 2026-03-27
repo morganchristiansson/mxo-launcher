@@ -140,8 +140,10 @@ static bool DiagnosticInitializeLauncherQueue(DiagnosticLauncherQueue* queue, ui
     return ok;
 }
 
-// UNANCHORED: mediator-owned helper for refreshing replacement arg5 sidecar state.
-void DiagnosticLauncherObjectSyncSidecarState(void* ownerPtr) {
+// UNANCHORED: callback trampoline registered on the liblttcp sidecar so engine-owned paths can
+// request owner-visible arg5 state refresh without pulling raw launcher-object layout knowledge
+// back into loginmediator.cpp.
+static void DiagnosticLauncherObjectStateSyncTrampoline(void* ownerPtr) {
     DiagnosticSyncLauncherObjectSidecarState(static_cast<MinimalLauncherObjectStub*>(ownerPtr));
 }
 
@@ -151,8 +153,8 @@ static void DiagnosticClearLttcpBinding(MinimalLauncherObjectStub* owner) {
         return;
     }
 
-    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-        mediator->ResetLauncherConnectionBridgeScaffold();
+    if (g_DiagnosticLttcpBinding) {
+        g_DiagnosticLttcpBinding->Reset(DiagnosticEnsureMediatorModel());
     }
     delete g_DiagnosticLttcpBinding;
     g_DiagnosticLttcpBinding = NULL;
@@ -172,17 +174,17 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetOrCreateLttcpEng
     }
 
     if (g_DiagnosticLttcpBinding->Owner() != owner) {
-        if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-            mediator->ResetLauncherConnectionBridgeScaffold();
-        }
-        if (!g_DiagnosticLttcpBinding->Bind(owner)) {
+        if (!g_DiagnosticLttcpBinding->Bind(owner, DiagnosticEnsureMediatorModel())) {
             spdlog::info("DIAGNOSTIC: failed to bind CLTThreadPerClientTCPEngine sidecar for {}", fmt::ptr(owner));
             return NULL;
         }
-        if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-            mediator->BindLauncherConnectionBridgeScaffold(owner, g_DiagnosticLttcpBinding->Engine());
-        }
         spdlog::info("DIAGNOSTIC: created CLTThreadPerClientTCPEngine sidecar for launcher object {}", fmt::ptr(owner));
+    }
+
+    if (g_DiagnosticLttcpBinding->Engine()) {
+        g_DiagnosticLttcpBinding->Engine()->SetAttachedLauncherObjectStateSyncScaffold(
+            owner,
+            &DiagnosticLauncherObjectStateSyncTrampoline);
     }
 
     return g_DiagnosticLttcpBinding->Engine();
@@ -287,12 +289,10 @@ static uint32_t __thiscall LauncherObject_MonitorPort(
         return 0;
     }
 
-    const uint32_t result = engine->MonitorPort(
+    return engine->MonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         ownerContext,
         reservedArg3);
-    DiagnosticSyncLauncherObjectSidecarState(self);
-    return result;
 }
 
 // anchor: launcher.exe:0x4325d0
@@ -307,12 +307,10 @@ static uint32_t __thiscall LauncherObject_UDPMonitorPort(
         return 0;
     }
 
-    const uint32_t result = engine->UDPMonitorPort(
+    return engine->UDPMonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         contextKey,
         ownerContext);
-    DiagnosticSyncLauncherObjectSidecarState(self);
-    return result;
 }
 
 // anchor: launcher.exe:0x436000
@@ -328,12 +326,10 @@ static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
     }
 
     uint16_t boundPortHostOrder = 0;
-    const uint32_t result = engine->MonitorEphemeralUDPPort(
+    return engine->MonitorEphemeralUDPPort(
         outBoundPortHostOrder ? static_cast<uint16_t*>(outBoundPortHostOrder) : &boundPortHostOrder,
         contextKey,
         ownerContext);
-    DiagnosticSyncLauncherObjectSidecarState(self);
-    return result;
 }
 
 // anchor: launcher.exe:0x42f7c0
@@ -357,12 +353,10 @@ static uint32_t __thiscall LauncherObject_UnmonitorPort(
         return 0;
     }
 
-    const uint32_t result = engine->UnmonitorPort(
+    return engine->UnmonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         outSocketHandle,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ipv4NetworkOrder)));
-    DiagnosticSyncLauncherObjectSidecarState(self);
-    return result;
 }
 
 // anchor: launcher.exe:0x4328a0
@@ -375,9 +369,7 @@ static uint32_t __thiscall LauncherObject_Connect(
         return 0;
     }
 
-    const uint32_t result = engine->Connect(contextKey);
-    DiagnosticSyncLauncherObjectSidecarState(self);
-    return result;
+    return engine->Connect(contextKey);
 }
 
 // anchor: launcher.exe:0x42f970
@@ -391,9 +383,7 @@ static uint32_t __thiscall LauncherObject_Close(
         return 0;
     }
 
-    const uint32_t result = engine->Close(contextKey, graceful != 0u);
-    DiagnosticSyncLauncherObjectSidecarState(self);
-    return result;
+    return engine->Close(contextKey, graceful != 0u);
 }
 
 // anchor: launcher.exe:0x42fbd0
@@ -471,11 +461,6 @@ static uint32_t __thiscall LauncherObject_CleanupConnection(
 
     mxo::liblttcp::ILTTCPEngine* engine = DiagnosticGetOrCreateLttcpEngine(self);
     const uint32_t result = engine ? engine->CleanupConnection(contextKey) : 0u;
-
-    // Keep the connection/context sidecar alive across the later context->+0x10 callback.
-    // Original launcher consumer order is slot12(context) first, then context->+0x10(workItem).
-    // Dropping the sidecar here would make the current diagnostic context callback less useful.
-    DiagnosticSyncLauncherObjectSidecarState(self);
 
     LauncherObject_Subobject98_Slot1(&self->helper98);
     return result;

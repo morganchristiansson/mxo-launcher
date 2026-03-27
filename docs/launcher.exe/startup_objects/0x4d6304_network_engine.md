@@ -1147,8 +1147,14 @@ Build-validated update:
 - `src/launcher_network_object_abi.cpp` arg5 helper `+0x60` slot `0` now calls into the liblttcp engine sidecar instead of directly calling a mediator poll helper
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now owns the current narrow nonblocking launcher-bridge pump and the current queue0C enqueue helper used by that seam
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current attached-owner state-sync callback hook used after engine-side connect work reached through connection wrappers
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now drives owner-visible arg5 state refresh after `MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, and `CleanupConnection` sidecar mutations instead of leaving those refresh calls open-coded in the ABI shell wrappers
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` / binding class now own the current mediator bind/reset handshake for the sidecar engine instead of keeping that controller logic in the ABI shell
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
-- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, and no longer owns the bridge-context vtable/allocation body
+- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, and no longer calls the launcher-network ABI sidecar-sync helper directly
+- `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:
+  - primary-slot wrappers no longer manually call the sidecar-state sync helper after those engine mutations
+  - the ABI shell keeps raw arg5 object layout ownership, but less of the bridge-controller logic
 
 Runtime note:
 - a later user-reported run after this ownership move still launched successfully into game on the active path

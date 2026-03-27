@@ -979,6 +979,8 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
       externalQueue34_(nullptr),
       externalQueueLock_(nullptr),
       externalQueueSignalEvent_(nullptr),
+      attachedLauncherObjectOwnerScaffold_(nullptr),
+      attachedLauncherObjectStateSyncScaffold_(nullptr),
       authBridgeContextScaffold_(nullptr),
       marginBridgeContextScaffold_(nullptr),
       queueThreads_(),
@@ -1048,6 +1050,7 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* 
 
     monitoredPorts_.push_back(std::move(record));
     (void)monitoredPorts_.back().thread->Start(/*startPriority=*/2);
+    SyncAttachedLauncherObjectStateScaffold();
     return kResultSuccess;
 }
 
@@ -1070,6 +1073,7 @@ uint32_t CLTThreadPerClientTCPEngine::UDPMonitorPort(uint16_t portHostOrder, voi
         CloseSocketHandle(&socketHandleToClose);
         return 0;
     }
+    SyncAttachedLauncherObjectStateScaffold();
     return kResultSuccess;
 }
 
@@ -1115,6 +1119,7 @@ uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint
             }
             StopAcceptThreadScaffold(&(*it));
             monitoredPorts_.erase(it);
+            SyncAttachedLauncherObjectStateScaffold();
             return 0;
         }
     }
@@ -1158,6 +1163,7 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
         CloseSocketHandle(&socketHandleToClose);
         return 0;
     }
+    SyncAttachedLauncherObjectStateScaffold();
     return kResultSuccess;
 }
 
@@ -1193,6 +1199,7 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectConnectionScaffold(CLTTCPConnection
         if (WorkerThreadRecord* worker = FindWorker(contextKey)) {
             connection->SetSocketHandle(worker->socketHandle);
         }
+        SyncAttachedLauncherObjectStateScaffold();
     }
     return result;
 }
@@ -1221,6 +1228,7 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
                 worker->thread->SignalWakeup();
             }
         }
+        SyncAttachedLauncherObjectStateScaffold();
     }
     return result;
 }
@@ -1290,6 +1298,7 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
         if (it->contextKey == contextKey) {
             StopWorkerThreadScaffold(&(*it));
             workerThreads_.erase(it);
+            SyncAttachedLauncherObjectStateScaffold();
             return kResultSuccess;
         }
     }
@@ -1308,6 +1317,21 @@ void CLTThreadPerClientTCPEngine::AttachExternalQueuePair(
     externalQueue34_ = queue34;
     externalQueueLock_ = queueLock;
     externalQueueSignalEvent_ = queueSignalEvent;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+void CLTThreadPerClientTCPEngine::SetAttachedLauncherObjectStateSyncScaffold(
+    void* owner,
+    void (*syncFn)(void*)) {
+    attachedLauncherObjectOwnerScaffold_ = owner;
+    attachedLauncherObjectStateSyncScaffold_ = syncFn;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+void CLTThreadPerClientTCPEngine::SyncAttachedLauncherObjectStateScaffold() {
+    if (attachedLauncherObjectStateSyncScaffold_) {
+        attachedLauncherObjectStateSyncScaffold_(attachedLauncherObjectOwnerScaffold_);
+    }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1737,18 +1761,28 @@ CLTThreadPerClientTCPEngineBinding::CLTThreadPerClientTCPEngineBinding()
 CLTThreadPerClientTCPEngineBinding::~CLTThreadPerClientTCPEngineBinding() = default;
 
 // UNANCHORED starter binding helper.
-bool CLTThreadPerClientTCPEngineBinding::Bind(void* owner) {
+bool CLTThreadPerClientTCPEngineBinding::Bind(void* owner, mxo::ltlogin::CLTLoginMediator* mediator) {
     if (owner_ == owner && engine_) {
         return true;
     }
 
+    if (engine_ && mediator) {
+        mediator->ResetLauncherConnectionBridgeScaffold();
+    }
+
     owner_ = owner;
     engine_ = std::make_unique<CLTThreadPerClientTCPEngine>();
+    if (engine_ && mediator) {
+        mediator->BindLauncherConnectionBridgeScaffold(owner_, engine_.get());
+    }
     return static_cast<bool>(engine_);
 }
 
 // UNANCHORED starter binding helper.
-void CLTThreadPerClientTCPEngineBinding::Reset() {
+void CLTThreadPerClientTCPEngineBinding::Reset(mxo::ltlogin::CLTLoginMediator* mediator) {
+    if (engine_ && mediator) {
+        mediator->ResetLauncherConnectionBridgeScaffold();
+    }
     engine_.reset();
     owner_ = nullptr;
 }

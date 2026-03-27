@@ -322,6 +322,15 @@ public:
         CLTThreadPerClientTCPEngine_Queue* queue34,
         void* queueLock = nullptr,
         void* queueSignalEvent = nullptr);
+    // UNANCHORED: current sidecar still needs an ABI-shell callback to refresh owner-visible
+    // arg5 list-head/queue attachment state after engine-side changes reached through connection
+    // wrappers instead of direct arg5 primary-vtable calls.
+    void SetAttachedLauncherObjectStateSyncScaffold(
+        void* owner,
+        void (*syncFn)(void*) = nullptr);
+    // UNANCHORED: current auth/margin begin wrappers still call this after engine-side connect work
+    // so the raw arg5 object shell can mirror sidecar-owned state changes.
+    void SyncAttachedLauncherObjectStateScaffold();
 
     // UNANCHORED: current replacement seam still keeps loginmediator-owned high-level auth/margin
     // handlers, but the arg5-side queue-context allocation/vtable, nonblocking producer/push path,
@@ -405,6 +414,8 @@ private:
     CLTThreadPerClientTCPEngine_Queue* externalQueue34_;
     void* externalQueueLock_;
     void* externalQueueSignalEvent_;
+    void* attachedLauncherObjectOwnerScaffold_;
+    void (*attachedLauncherObjectStateSyncScaffold_)(void*);
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authBridgeContextScaffold_;
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginBridgeContextScaffold_;
     std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads_;
@@ -425,9 +436,9 @@ public:
     ~CLTThreadPerClientTCPEngineBinding();
 
     // UNANCHORED: starter binding helper.
-    bool Bind(void* owner);
+    bool Bind(void* owner, mxo::ltlogin::CLTLoginMediator* mediator = nullptr);
     // UNANCHORED: starter binding helper.
-    void Reset();
+    void Reset(mxo::ltlogin::CLTLoginMediator* mediator = nullptr);
 
     // UNANCHORED: starter binding helper.
     void* Owner() const;

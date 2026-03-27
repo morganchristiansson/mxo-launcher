@@ -10,5 +10,3 @@ class CLTThreadPerClientTCPEngine;
 // a `CLTThreadPerClientTCPEngine*`.
 mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetLauncherObjectEngine(void* ownerPtr);
 
-// UNANCHORED: launcher-object queue/state helper still used by the narrow mediator-owned bind/start path.
-void DiagnosticLauncherObjectSyncSidecarState(void* ownerPtr);

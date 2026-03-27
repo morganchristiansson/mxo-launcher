@@ -16,7 +16,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-#include "launcher_network_object_abi.h"
 #include "loginstate.h"
 #include <spdlog/spdlog.h>
 
@@ -434,7 +433,7 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         authConnectionContextScaffold_,
         marginConnectionContextScaffold_);
 
-    DiagnosticLauncherObjectSyncSidecarState(launcherOwnerConnectionBridgeScaffold_);
+    engine_->SyncAttachedLauncherObjectStateScaffold();
     if (result != 0u && context) {
         engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
             context,
@@ -482,7 +481,7 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
         authConnectionContextScaffold_,
         marginConnectionContextScaffold_);
 
-    DiagnosticLauncherObjectSyncSidecarState(launcherOwnerConnectionBridgeScaffold_);
+    engine_->SyncAttachedLauncherObjectStateScaffold();
     if (result != 0u && context) {
         engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
             context,
