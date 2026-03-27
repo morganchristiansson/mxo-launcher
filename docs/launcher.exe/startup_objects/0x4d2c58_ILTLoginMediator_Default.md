@@ -815,8 +815,17 @@ Representative non-zero arg7 result from that same run:
   - a second fresh rerun with the correct password reproduced that same state-`3` arrival at
     `0x41c1f0`, which makes the earlier wrong-password detour unlikely to have introduced extra
     backward helper transitions on the proved happy path
-  - `0x41c1f0` copies the first dword into owner byte `+0xcc8`, then copies the remaining
-    `0xb0` bytes into owner `+0xcd0 .. +0xd7f`, and switches helper state to `8`
+  - no extra early helper-switch hits were observed during that narrow state-`3` wait period
+    before `0x41c1f0`
+  - practical current read therefore stays narrow:
+    - state `3` is the waiting helper identity on this branch
+    - the owner-side methods keep selection-context ownership
+    - `0x41c390` is the sibling byte setter that checks current state code `> 2`, stores owner
+      `+0xcc8`, then switches helper state to `7`
+    - `0x41c1f0` is the full snapshot writer that checks current state code `> 2`, copies the
+      first dword into owner byte `+0xcc8`, copies the remaining `0xb0` bytes into owner
+      `+0xcd0 .. +0xd7f`, and switches helper state to `8`
+  - that is stronger evidence for a state3 wait phase than for any state3-local slot-3 body
 - replacement-launcher follow-up now mirrors that copied arg6 `+0xec` snapshot directly into the
   source-owned `CLTLoginMediator::PersistSelectionContextForState8(...)` model path instead of
   leaving the recovered `0xb4` object only as ABI-side diagnostic storage

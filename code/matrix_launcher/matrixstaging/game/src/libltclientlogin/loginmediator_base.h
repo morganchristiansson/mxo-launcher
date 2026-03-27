@@ -225,8 +225,12 @@ struct ProcessLoginRequestInputSketch {
 // in the canonical docs.
 struct State3SelectionContextInputSketch {
     // owner vtable `+0xec` / `0x41c1f0`
-    // Active password-submit branch persists this `0xb4` selection/config snapshot and then
-    // switches from state `3` to state `8`.
+    // Active password-submit branch reaches this while the current helper is still state `3`.
+    // Keep the ownership split explicit:
+    // - state3 is the waiting helper on that branch
+    // - the owner-side mediator method consumes this `0xb4` selection/config snapshot and then
+    //   switches to state `8`
+    // - do not model this as a state3-local slot-3 body
     uint32_t slotOrSelectionIndex00 = 0;            // input `+0x00`, must be `< 100`
     std::array<uint32_t, 4> block04{};             // input `+0x04 .. +0x13`
     std::array<uint32_t, 4> block14{};             // input `+0x14 .. +0x23`

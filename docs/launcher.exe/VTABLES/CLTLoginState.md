@@ -149,7 +149,7 @@ Do not mass-rename the source classes yet; several are still behavior-backed rat
 | Current class | Suggested alias | Confidence | Why |
 |---|---|---:|---|
 | `CLTLoginState_State1` | `CLTLoginState_AuthConnectPending` | high | slot 3 is `CLTLoginMediator_Helper1_StartAuthConnection` |
-| `CLTLoginState_State3` | `CLTLoginState_SelectionContextPending` | medium | live original path reaches state `3`, then owner writers `0x41c390/0x41c1f0` consume selection-context input and switch to states `7/8` |
+| `CLTLoginState_State3` | `CLTLoginState_SelectionContextPending` | medium | live original path reaches state `3`, then waits there while owner writers `0x41c390/0x41c1f0` consume selection-context input and switch to states `7/8`; current evidence still does not support a state3-local slot-3 body |
 | `CLTLoginState_State7` | `CLTLoginState_MarginRouteProbePending` | low-medium | sends a smaller current-selection/current-character margin packet and expects reply opcode `0x0e` |
 | `CLTLoginState_State8` | `CLTLoginState_MarginLoadCharacterPending` | medium | sends a large structured margin packet, handles chunked opcode `0x10`, then advances to state `9` |
 | `CLTLoginState_State9` | `CLTLoginState_LoadCharacterFollowupPending` | low-medium | consumes the post-`0x10` follow-up path, handles opcode `0x11`, and advances to state `0x0c` |

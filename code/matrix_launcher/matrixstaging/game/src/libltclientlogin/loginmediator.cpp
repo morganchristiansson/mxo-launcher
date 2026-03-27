@@ -1322,18 +1322,22 @@ void CLTLoginMediator::ResetSelectionContext0ecMirror() {
 // anchor: launcher.exe:0x41c1f0
 uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) {
     // anchor: launcher.exe:0x41c1f0
-    // Writes the state3 selection/config snapshot into owner `+0xcc8/+0xcd0..+0xd7f`, then
-    // switches to helper/state `8`.
+    // Owner-side state3-wait advance:
+    // - the early route reaches this while current helper `+0x10` is still state3
+    // - this method, not a state3-local slot-3 body, copies the `0xb4` selection/config snapshot
+    //   into owner `+0xcc8/+0xcd0..+0xd7f`
+    // - then it switches to helper/state `8`
     // Fresh happy-path proof tightens the transition boundary too:
-    // - the early route reaches `0x41c1f0` with current helper state3
-    // - so the already-proven upstream chain is `state0 -> ProcessLoginRequest -> state2 ->
-    //   state1 -> state2 -> state3 -> 0x41c1f0`
+    // - the already-proven upstream chain is
+    //   `state0 -> ProcessLoginRequest -> state2 -> state1 -> state2 -> state3(wait) -> 0x41c1f0`
+    // - no additional early helper-switch hits were observed in the narrow state3 wait window
+    //   before the live `0x41c1f0` stop
     selectionContext0ecCopy_ = input;
     selectionContext0ecCopyValid_ = true;
     ++selection0ecCount_;
     if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 3u) {
         spdlog::info(
-            "ROUTE CHECKPOINT: early-auth state2 -> state3 -> 0x41c1f0 currentState={} slot=0x{:02x}",
+            "ROUTE CHECKPOINT: early-auth state2 -> state3(wait) -> owner+0xec/0x41c1f0 currentState={} slot=0x{:02x}",
             currentState_->DebugName(),
             static_cast<unsigned>(selectionContext0ecCopy_.slotOrSelectionIndex00 & 0xffu));
     }
@@ -1366,7 +1370,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     }
 
     spdlog::info(
-        "CLTLoginMediator::PersistSelectionContextForState8 mirrored state3->8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} currentState={}",
+        "CLTLoginMediator::PersistSelectionContextForState8 mirrored owner-advanced state3(wait)->state8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} currentState={}",
         state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8,
         state8SelectionContextSnapshotState_.blockCd0[0],
         state8SelectionContextSnapshotState_.blockD70[3],
@@ -1534,6 +1538,8 @@ uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentials
     // - same semantic slot on the wrapper and owner sides
     // - wrapper caller builds a larger stack object, but the offsets initialized there line up
     //   with the owner-side reader instead of describing a separate slot family
+    // - like the neighboring `0x41c390/0x41c1f0` pair, this remains an owner-side method gated by
+    //   current state code `3`; do not treat that gate as proof of a state3-local slot body
     const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
     switch (stateCode) {
         case 0u:

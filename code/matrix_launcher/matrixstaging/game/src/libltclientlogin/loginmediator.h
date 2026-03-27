@@ -250,7 +250,10 @@ public:
     };
 
     struct State8SelectionContextSnapshotState {
-        // owner writeback area filled by `0x41c1f0` on the active state `3 -> 8` branch.
+        // owner writeback area filled by `0x41c1f0` on the active state `3(wait) -> 8` branch.
+        // Keep the boundary explicit:
+        // - state3 is just the current waiting helper at that stop
+        // - the owner-side mediator method owns this writeback and helper advance
         // This is the persisted selection/config snapshot, not the later post-auth appearance/name block.
         uint8_t slotOrSelectionIndexCc8 = 0;           // `+0xcc8`
         std::array<uint8_t, 7> paddingCc9{};           // `+0xcc9 .. +0xccf`
@@ -947,8 +950,11 @@ public:
     //   happy path remains intact until the producer/result semantics are fully source-owned
     // - auth and margin derived connection families fall through wrappers into owner callback /
     //   current-state dispatch rather than being fully handled by optional helper slots alone
-    // - active default password-submit continuation is now:
-    //   `0x41ecd0 -> 0x41c1f0 -> 0x439300 -> 0x43bd20 / 0x43f930`
+    // - active default password-submit continuation is now tighter:
+    //   `0x41ecd0 -> state2 -> state1 -> state2 -> state3(wait) -> 0x41c1f0(owner advance)
+    //    -> 0x439300 -> 0x43bd20 / 0x43f930`
+    // - state3 remains the waiting helper there; do not invent a state3-local slot-3 body to
+    //   explain the `0x41c1f0` transition
     // - state11 remains a later real branch after auth-reply handling, not the first active
     //   branch to prioritize
     // - the earlier auth bootstrap/send lead is still the helper2 / `0x448050` family, not the
@@ -1082,6 +1088,7 @@ public:
 
     // +0xec
     // anchor: launcher.exe:0x41c1f0
+    // Owner-side state3-wait advance: persists the selection/config snapshot and switches to state8.
     uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) override;
     const State8PersistenceF1cSnapshot& State8PersistenceF1cView() const;
     const void* GetState8PersistenceF1c() const override;
@@ -1169,7 +1176,7 @@ public:
     // and load character reply handling logic.
     // =============================================================================
 
-    // State-3 -> state-8 selection/config snapshot block (`0x41c1f0`):
+    // State-3(wait) -> state-8 owner-side selection/config snapshot block (`0x41c1f0`):
     uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8; }
     const std::array<uint32_t, 4>& SelectionContextBlockCd0() const { return state8SelectionContextSnapshotState_.blockCd0; }
     const std::array<uint32_t, 4>& SelectionContextBlockCe0() const { return state8SelectionContextSnapshotState_.blockCe0; }
@@ -1410,6 +1417,7 @@ private:
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
+    // This is filled by the owner-side advance out of state3-wait, not by a state3-local body.
     State8SelectionContextSnapshotState state8SelectionContextSnapshotState_;
     // +0xec / +0xf4 wrapper-owned mirrors now live on the mediator instance instead of in the
     // launcher ABI shell.

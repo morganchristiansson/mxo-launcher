@@ -190,10 +190,22 @@ public:
 // anchor: launcher.exe vtable 0x004b5208
 // docs: ../../docs/launcher.exe/VTABLES/0x004b5208.md
 // Provisional better-name suggestion: `CLTLoginState_SelectionContextPending`
+// Current practical role on the proven happy path:
+// - state2 switches into state3
+// - state3 then waits as the current helper while owner-side mediator methods
+//   `0x41c390/0x41c1f0` consume selection-context input and advance into states `7/8`
+// - no extra early helper-switch hits were observed between that `state2 -> state3` switch and the
+//   live `0x41c1f0` stop
+// So keep state3 as the waiting/helper-id leaf here rather than inventing a state3-local slot-3
+// body.
 class CLTLoginState_State3 : public CLTLoginState_AbstractFinalLeafBase {
 public:
     // anchor: launcher.exe:0x00439d80 (vtable 0x004b5208 slot 10 shared initializer)
     CLTLoginState_State3() = default;
+
+    // Intentionally no Slot3 override here:
+    // the current practical advance out of state3 belongs to the owner-side mediator methods
+    // `0x41c390/0x41c1f0`, while vtable slot 3 still resolves to the shared tiny stub.
 
     // anchor: launcher.exe vtable 0x004b5208
     const char* DebugName() const override;
