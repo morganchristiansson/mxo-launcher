@@ -1154,6 +1154,7 @@ Build-validated update:
 - `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, no longer calls the launcher-network ABI sidecar-sync helper directly, and no longer keeps a launcher-owner pointer just to gate/auth-start this seam
 - `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:
   - the file is now best read as a **raw arg5 ABI shell** rather than as the real engine implementation
+    - current source names that shell explicitly as `LauncherObjectAbiShell`
     - the shell object's first field is the replacement primary arg5 vtable pointer
     - the rest of the shell only preserves the client-visible object layout (`+0x0c/+0x34/+0x5c/+0x60/+0x7c/+0x80/+0x8c/+0x98`)
     - real queue/connection/producer behavior continues to move into `liblttcp`
