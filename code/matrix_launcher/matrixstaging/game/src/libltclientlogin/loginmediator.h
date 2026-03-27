@@ -929,6 +929,10 @@ public:
     // - installs the registered state1 scaffold as the active helper
     // - then dispatches state1 slot 3 / `0x439090`
     uint32_t BeginAuthConnectionViaState1Scaffold();
+    // Narrow mediator-owned margin-entry bridge for the current diagnostics auto-begin path:
+    // - preserves the state4-owned `0x439300` case split instead of open-coding it in diagnostics
+    // - dispatches the registered state4 slot 3 against the current helper as upstream input
+    uint32_t BeginMarginConnectionViaState4Scaffold();
     // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
     // `0x41b450` on the early auth path. Keep this narrow instead of changing the generic
     // switch scaffold until more of the broader helper transition surface is source-owned.

@@ -9,7 +9,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <array>
 #include <cstdlib>
 #include <cstring>
 #include <vector>
@@ -68,7 +67,6 @@ private:
 };
 
 static DiagnosticLoginControllerSession g_DiagnosticLoginControllerSession = {};
-static unsigned char g_LoginControllerState9CallbackSeed85D4[16] = {0};
 static void* g_DiagnosticWorkItemVtable[2] = {0};
 static void* g_DiagnosticMessageConnectionContextVtable[5] = {0};
 
@@ -735,69 +733,6 @@ void DiagnosticConfigureLoginControllerNetwork(
         g_LoginControllerIgnoreHostsFileForMargin ? 1u : 0u);
 }
 
-void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionContext, uint32_t byteCount) {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController || !selectionContext) {
-        return;
-    }
-    if (byteCount < sizeof(mxo::ltlogin::State3SelectionContextInputSketch)) {
-        spdlog::info(
-            "DIAGNOSTIC: selection context mirror into login controller skipped byteCount=0x{:x} required=0x{:x}",
-            byteCount,
-            sizeof(mxo::ltlogin::State3SelectionContextInputSketch));
-        return;
-    }
-
-    mxo::ltlogin::State3SelectionContextInputSketch input = {};
-    std::memcpy(&input, selectionContext, sizeof(input));
-    loginController->PersistSelectionContextForState8(input);
-    spdlog::info(
-        "DIAGNOSTIC: mirrored selection context into installed CLTLoginMediator slot=0x{:02x} firstBlock04=0x{:08x} lastBlockA4=0x{:08x}",
-        input.slotOrSelectionIndex00 & 0xffu,
-        input.block04[0],
-        input.blockA4[3]);
-}
-
-void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, void* object88, void* object8c) {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) {
-        return;
-    }
-
-    loginController->SetState9CallbackObjectTriple84_88_8c(callback84, object88, object8c);
-    spdlog::info(
-        "DIAGNOSTIC: mirrored state9 startup triple into installed CLTLoginMediator callback84={} object88={} object8c={}",
-        fmt::ptr(callback84),
-        fmt::ptr(object88),
-        fmt::ptr(object8c));
-}
-
-uint32_t DiagnosticFillState9CallbackBlob18c(void* outBuffer, uint32_t arg2, uint32_t arg3) {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController || !outBuffer) {
-        return 1u;
-    }
-    return loginController->FillState9CallbackBlob18c(
-        static_cast<uint32_t*>(outBuffer),
-        arg2,
-        arg3);
-}
-
-const void* DiagnosticGetState9CallbackSeedPointer85D4() {
-    mxo::ltlogin::CLTLoginMediator* loginController = GetDiagnosticLoginController();
-    if (!loginController) {
-        return NULL;
-    }
-
-    std::array<uint8_t, 16> seed = {};
-    if (!loginController->CopyMarginBootstrapTwofishKeyScaffold(&seed)) {
-        return NULL;
-    }
-
-    std::memcpy(g_LoginControllerState9CallbackSeed85D4, seed.data(), sizeof(g_LoginControllerState9CallbackSeed85D4));
-    return g_LoginControllerState9CallbackSeed85D4;
-}
-
 void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* characterName,
     const char* gameSessionId,
@@ -878,15 +813,7 @@ uint32_t DiagnosticBeginMarginConnection() {
         loginController->SetMarginConnectionContextKey(context);
     }
 
-    mxo::ltlogin::CLTLoginState* state4 = loginController->ScaffoldState4();
-    if (!state4) {
-        spdlog::info("DIAGNOSTIC: installed CLTLoginMediator missing registered state4 scaffold for margin connection");
-        return 0;
-    }
-
-    const uint32_t result = state4->Slot3_BeginOrContinue(
-        loginController->CurrentState(),
-        loginController);
+    const uint32_t result = loginController->BeginMarginConnectionViaState4Scaffold();
     const std::string marginHost = loginController->ResolvedMarginHostName();
     if (context) {
         context->sidecarConnection = loginController->MarginConnection();

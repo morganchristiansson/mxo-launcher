@@ -855,6 +855,27 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
     return result;
 }
 
+uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
+    CLTLoginState* const state4 = scaffoldState4_;
+    if (state4 == nullptr) {
+        spdlog::warn(
+            "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold missing registered state4 scaffold currentState={}",
+            currentState_ ? currentState_->DebugName() : "<null>");
+        return 0u;
+    }
+
+    CLTLoginState* const upstreamState = currentState_;
+    const uint32_t result = state4->Slot3_BeginOrContinue(upstreamState, this);
+    const std::string marginHost = ResolvedMarginHostName();
+    spdlog::info(
+        "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold upstreamState={} currentState={} marginHost='{}' -> result=0x{:08x}",
+        upstreamState ? upstreamState->DebugName() : "<null>",
+        currentState_ ? currentState_->DebugName() : "<null>",
+        marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
+        static_cast<unsigned>(result));
+    return result;
+}
+
 // UNANCHORED: source-owned status replay bridge that re-enters the active helper after caching type-2 auth connect status.
 uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
     // Keep the status-recording contract explicit:

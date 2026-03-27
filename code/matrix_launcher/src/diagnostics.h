@@ -40,10 +40,6 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* characterName,
     const char* gameSessionId,
     uint32_t selectedWorldIndexLow24);
-void DiagnosticMirrorSelectionContextIntoLoginController(const void* selectionContext, uint32_t byteCount);
-void DiagnosticMirrorState9StartupTripleIntoLoginController(void* callback84, void* object88, void* object8c);
-uint32_t DiagnosticFillState9CallbackBlob18c(void* outBuffer, uint32_t arg2, uint32_t arg3);
-const void* DiagnosticGetState9CallbackSeedPointer85D4();
 bool DiagnosticCanBeginAuthConnection();
 uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();

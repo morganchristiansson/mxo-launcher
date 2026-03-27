@@ -3,7 +3,6 @@
 #include "loginmediator_state9_submit_scaffold.h"
 #include "loginstate.h"
 #include "../../../runtime/src/libltcrypto/auth_internal.h"
-#include "../../../../src/diagnostics.h"
 #include <spdlog/spdlog.h>
 
 #include <array>
@@ -31,14 +30,11 @@ void CLTLoginMediator::ProvideStartupTriple(void* netShell, void* netMgr, void* 
     provideStartupTripleDistrObjExecutive_ = distrObjExecutive;
     ++provideStartupTripleCount_;
 
-    // Keep the wrapper-facing capture and the live diagnostic controller in sync:
-    // - this object owns the wrapper-facing +0x124 triple state
-    // - the active late-login submit path still reads the separate diagnostic controller instance
+    // Keep the wrapper-facing capture and the owner-side submit mirror unified on the mediator.
     SetState9CallbackObjectTriple84_88_8c(netShell, netMgr, distrObjExecutive);
-    DiagnosticMirrorState9StartupTripleIntoLoginController(netShell, netMgr, distrObjExecutive);
 
     spdlog::info(
-        "CLTLoginMediator::ProvideStartupTriple(+0x124 wrapper-facing netShell={} netMgr={} distrObjExecutive={} [count={}] ownerMirror=+0x84/+0x88/+0x8c + diagnosticControllerMirror)",
+        "CLTLoginMediator::ProvideStartupTriple(+0x124 wrapper-facing netShell={} netMgr={} distrObjExecutive={} [count={}] ownerMirror=+0x84/+0x88/+0x8c)",
         fmt::ptr(provideStartupTripleNetShell_),
         fmt::ptr(provideStartupTripleNetMgr_),
         fmt::ptr(provideStartupTripleDistrObjExecutive_),

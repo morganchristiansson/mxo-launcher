@@ -3,7 +3,6 @@
 #include "launcher_network_object_abi.h"
 #include "loginmediator.h"
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -714,7 +713,7 @@ static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator
 // - practical current read is the same launcher-owned Twofish key/seed family reused by `+0x18c`
 static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalLoginMediatorStub* self) {
     (void)self;
-    return DiagnosticGetState9CallbackSeedPointer85D4();
+    return mxo::ltlogin::ILTLoginMediator::Default->GetState9CallbackSeedPointer85D4();
 }
 
 // anchor: client.dll:0x62170b00 gates arg7 high-byte selection flow through arg6 +0xd8
@@ -826,7 +825,6 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
         mxo::ltlogin::State3SelectionContextInputSketch input = {};
         std::memcpy(&input, selectionContext, sizeof(input));
         mediator->PersistSelectionContextForState8(input);
-        DiagnosticMirrorSelectionContextIntoLoginController(selectionContext, sizeof(input));
         // Current bounded client-side proof:
         // - `ClientShell_OnEngineInitialized` (`0x6216f060`) earlier pushes a direct visible status
         //   sequence including:
@@ -1091,7 +1089,16 @@ extern "C" uint32_t Mediator_FillState9CallbackBlob18c_Impl(
     void* returnAddress) {
     (void)self;
     (void)returnAddress;
-    return DiagnosticFillState9CallbackBlob18c(outBuffer, arg2, arg3);
+
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator || !outBuffer) {
+        return 1u;
+    }
+
+    return mediator->FillState9CallbackBlob18c(
+        static_cast<uint32_t*>(outBuffer),
+        arg2,
+        arg3);
 }
 
 // anchor: launcher.exe:0x41e690 / arg6 vtable +0x18c
