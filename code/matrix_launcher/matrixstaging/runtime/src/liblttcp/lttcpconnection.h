@@ -145,7 +145,8 @@ public:
     // UNANCHORED: low-level raw-socket send helper used beneath the anchored SendBuffer wrapper.
     uint32_t SendRawSocketBufferScaffold(const void* buffer, uint32_t byteCount, void* completionContext);
 
-    // UNANCHORED: source-owned mirror of the `+0x6c` poll helper call shape seen in `0x449d40`.
+    // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
+    // Current best original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` (`0x469bf0`).
     uint32_t pollReceive(void* callbackContext, void** outWorkItem);
     // UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
     void pushCompletedOperation(void* workItem, void* context, bool useQueue34);

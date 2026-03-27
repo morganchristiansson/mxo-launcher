@@ -383,14 +383,16 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
     return (sent == static_cast<int>(byteCount)) ? 1u : 0u;
 }
 
-// UNANCHORED: source-owned mirror of the `+0x6c` poll helper call shape seen in `0x449d40`.
+// UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
 uint32_t CLTTCPConnection::pollReceive(void* callbackContext, void** outWorkItem) {
     // Current best static read of `0x449d40`:
-    // - this helper call is reached through connection `+0x6c`
-    // - first poll passes `(callbackContext, &workItem)`
-    // - later loop polls pass `(0, &workItem)`
-    // The faithful helper object is not reconstructed yet, so keep this source-owned scaffold
-    // conservative and side-effect-free.
+    // - connection `+0x6c` is now narrowed to a
+    //   `CVariableLengthPrefixedTCPStreamParser`-family helper
+    // - original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` at `0x469bf0`
+    // - first receive pass reaches it with the current callback/read operation and `&workItem`
+    // - later drain passes reach it with `(0, &workItem)` until the parser stops yielding packets
+    // The faithful parser/read-operation object family is not reconstructed yet, so keep this
+    // source-owned scaffold conservative and side-effect-free.
     (void)callbackContext;
     if (outWorkItem) {
         *outWorkItem = nullptr;

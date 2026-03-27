@@ -188,11 +188,11 @@ struct CMessageConnectionEnvelopeScaffold {
 
 class CMessageConnection : public CLTTCPConnection {
 public:
-    // anchor: launcher.exe:0x41cf50
+    // UNANCHORED: source-owned convenience ctor for the current auth/message connection scaffold.
     CMessageConnection();
     // UNANCHORED: source-owned convenience ctor that seeds the recovered base engine field.
     explicit CMessageConnection(CLTThreadPerClientTCPEngine* engine);
-    // anchor: launcher.exe:0x449d20 deleting-wrapper family via CLTTCPConnection base
+    // UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
     ~CMessageConnection();
 
     // UNANCHORED: source-owned compatibility wrapper over the recovered base-connection `+0x10` engine field.
@@ -254,20 +254,21 @@ public:
     // UNANCHORED: source-owned accessor for the lazy packet-agenda scaffold pointer.
     const CMessageConnectionPacketAgendaScaffold* PacketAgendaScaffold() const;
 
-    // anchor: launcher.exe:0x449a70
+    // UNANCHORED: source-owned packet-result helper surface; the currently known `0x449a70` anchor belongs to a later derived leaf.
     uint32_t ProcessPacketResult(const void* packetData, uint32_t byteCount);
 
-    // anchor: launcher.exe:0x448a60
+    // anchor: launcher.exe:0x4490c0
     // string-backed original name: CMessageConnection::OnOperationCompleted
     // current best read:
-    // - completion/receive-side bridge back into engine/queue handling
+    // - main completion/receive-side bridge back into engine/queue handling
+    // - generic fallback logger on this path is helper `0x448a60`
     uint32_t OnOperationCompleted(void* workCode);
 
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
     void* ContextKey() { return this; }
 
-    // anchor: launcher.exe:0x449a30
+    // UNANCHORED: source-owned dispatch-result helper surface; the currently known `0x449a30` anchor belongs to a later derived leaf.
     uint32_t ProcessDispatchResult(const void* packetData, uint32_t byteCount);
 
 private:

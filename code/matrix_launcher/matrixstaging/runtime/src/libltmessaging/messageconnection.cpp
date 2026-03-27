@@ -11,23 +11,22 @@
 namespace mxo::liblttcp {
 
 // ============================================================
-// VTable 0x004afef0 - CMessageConnection (Intermediate Base)
+// Message-connection family notes
 // ============================================================
-// 0x004afef0 - CMessageConnection::CMessageConnection at 0x0041cf50
-// 0x004afefc - CLTTCPConnection::CLTTCPConnection at 0x00449ca0
-// 0x004aff00 - CMessageConnection::ProcessPacketResult at 0x00449a70
-// 0x004aff04 - CLTTCPConnection::OnReceive at 0x00449d40
-// 0x004aff08 - CLTTCPConnection::OnClose at 0x00449fd0
-// 0x004aff0c - CLTTCPConnection::Close at 0x00449cd0
-// 0x004aff10 - CLTTCPConnection::~CLTTCPConnection at 0x00449d20
-// 0x004aff14 - FinalizeCallback at 0x0041cf30
-// 0x004aff18 - CMessageConnection::SendPacket at 0x00448cf0
-// 0x004aff1c - CMessageConnection::ProcessDispatchResult at 0x00449a30
-// 0x004aff34 - CMarginConnection::~CMarginConnection at 0x0041ce80
+// Current corrected split:
+// - base/auth-side `CMessageConnection` family surface is centered on vtable `0x004b7928`
+//   including:
+//   - `0x4490c0` = `CMessageConnection::OnOperationCompleted`
+//   - `0x448cf0` = `CMessageConnection::SendPacket`
+//   - inherited base connection wrappers from `CLTTCPConnection`
+// - later leaf-family vtables such as `0x004afef0` add narrower result/dispatch helpers including:
+//   - `0x449a70`
+//   - `0x449a30`
+// So this source file currently holds both the base scaffolds and some later leaf-oriented helper
+// names, but the two should not be conflated.
 
 // ============================================================
-// FAITHFUL: VTable 0x004afef0 - Constructor at 0x0041cf50
-// Type A initialization - sets vtable, calls cleanup via FUN_00441400
+// UNANCHORED: source-owned convenience ctor for the current auth/message connection scaffold.
 // ============================================================
 CMessageConnection::CMessageConnection()
     : CLTTCPConnection(),
@@ -48,8 +47,7 @@ CMessageConnection::CMessageConnection(CLTThreadPerClientTCPEngine* engine)
 }
 
 // ============================================================
-// FAITHFUL: VTable 0x004aff10 - Destructor at 0x00449d20
-// Inherits from CLTTCPConnection
+// UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
 // ============================================================
 CMessageConnection::~CMessageConnection() = default;
 
@@ -299,25 +297,34 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
     return SubmitEnvelopeBytesScaffold(envelope);
 }
 
+// anchor: launcher.exe:0x448a60
+// UNANCHORED: source-owned narrow fallback helper for the generic unhandled-operation log branch
+// reached from the much larger `CMessageConnection::OnOperationCompleted` family.
+static void CMessageConnection_LogUnhandledOperationScaffold(void* workCode) {
+    spdlog::debug(
+        "CMessageConnection_LogUnhandledOperationScaffold workCode={}",
+        fmt::ptr(workCode));
+}
+
 // ============================================================
-// FAITHFUL: VTable 0x004aff1c - CMessageConnection::OnOperationCompleted at 0x00448a60
-// Generic fallback handler for unhandled operation codes
+// anchor: launcher.exe:0x4490c0
+// string-backed original name: CMessageConnection::OnOperationCompleted
+// Current source body remains a narrow scaffold:
+// - original `0x4490c0` is the large completion/packet-dispatch bridge
+// - helper `0x448a60` is only the generic unhandled-operation logger used on one fallback branch
 // ============================================================
 uint32_t CMessageConnection::OnOperationCompleted(void* workCode) {
     if (!Engine()) {
         return 0;
     }
 
-    // FAITHFUL: Original launcher.exe FUN_00448a60 is string-backed only as a generic
-    // "Got unhandled op of type %d with status %s" logger when the auth helper returns 0.
-    (void)workCode;
+    CMessageConnection_LogUnhandledOperationScaffold(workCode);
     return 1;
 }
 
 // ============================================================
-// FAITHFUL: ProcessPacketResult at 0x00449a70
-// 42 instructions, 8 complexity, 5 calls
-// Packet result processing handler
+// UNANCHORED: source-owned packet-result helper surface.
+// Current known `0x449a70` anchor belongs to a later derived leaf rather than this base scaffold.
 // ============================================================
 uint32_t CMessageConnection::ProcessPacketResult(const void* packetData, uint32_t byteCount) {
     if (!Engine() || !packetData) {
@@ -350,9 +357,8 @@ uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetB
 }
 
 // ============================================================
-// FAITHFUL: VTable 0x004aff1c - CMessageConnection::ProcessDispatchResult at 0x00449a30
-// 23 instructions, 2 complexity, 2 calls
-// Message dispatch result handler
+// UNANCHORED: source-owned dispatch-result helper surface.
+// Current known `0x449a30` anchor belongs to a later derived leaf rather than this base scaffold.
 // ============================================================
 uint32_t CMessageConnection::ProcessDispatchResult(const void* packetData, uint32_t byteCount) {
     if (!Engine() || !packetData) {

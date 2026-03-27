@@ -1000,6 +1000,11 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
   - endpoint copy at `+0x24`
   - connection state at `+0x34`
   - wait/poll helper at `+0x6c`
+- newer focused receive-path RE now narrows that `+0x6c` helper materially:
+  - it is a `CVariableLengthPrefixedTCPStreamParser`-family object
+  - ctor path: `0x469f50 -> 0x469b20`
+  - primary receive call: `0x469bf0 = CVariableLengthPrefixedTCPStreamParser::Parse`
+  - `CLTTCPConnection::OnReceive` (`0x449d40`) therefore feeds received stream fragments into a framing parser there, not an anonymous poll stub
 - source lockstep update from the current focused pass:
   - `matrixstaging/runtime/src/liblttcp/lttcpconnection.*` now owns the corrected base-wrapper mapping directly
   - `matrixstaging/runtime/src/libltmessaging/messageconnection.*` no longer keeps a duplicate source-only engine pointer separate from the recovered base `+0x10` field
