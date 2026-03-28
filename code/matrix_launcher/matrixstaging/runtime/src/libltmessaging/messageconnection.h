@@ -440,9 +440,11 @@ protected:
     // Current bounded margin-side correction:
     // - after base `0x4490c0` finishes the parsed-packet copy, the margin leaf can now re-enter
     //   the nearer base-dispatch/current-helper-slot6 path directly from the connection callback
-    // - one consumed `0x442d00` branch is now pulled one step closer too:
-    //   decoded code `4` mirrors the narrower `0x441850` side effect locally before the existing
-    //   launcher-owned bootstrap continuation
+    // - consumed `0x442d00` branches are now pulled one step closer too:
+    //   - decoded code `2` can now re-enter the launcher-owned bootstrap continuation directly at
+    //     the connection/leaf seam
+    //   - decoded code `4` mirrors the narrower `0x441850` side effect locally before that same
+    //     continuation
     // - current source still does not materialize the full original message-ref object, so this
     //   remains a staged-payload mirror of that later destination rather than a byte-faithful
     //   `0x44af20`

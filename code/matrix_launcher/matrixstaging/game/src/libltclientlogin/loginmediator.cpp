@@ -1275,7 +1275,7 @@ uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
 
 // UNANCHORED: source-owned staging wrapper for the remaining margin-side receive branches.
 // Current narrowed role:
-// - consumed decoded-code-4 handling can now be taken earlier at the connection/leaf seam
+// - consumed decoded-code-2/4 handling can now be taken earlier at the connection/leaf seam
 // - this helper stays the broader fallback/remaining consumer for other margin receive paths
 uint32_t CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
     const uint8_t* packetBytes,
@@ -3085,6 +3085,27 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     }
 
     return 0u;
+}
+
+// anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441a30 / 0x4429b0
+uint32_t CLTLoginMediator::HandleMarginConsumedCode2AtConnectionSeamScaffold(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    bool transportEncrypted) {
+    if (!packetBytes || packetSize == 0u) {
+        return 0u;
+    }
+
+    stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+    const uint32_t handled = ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
+    spdlog::info(
+        "CLTLoginMediator::HandleMarginConsumedCode2AtConnectionSeamScaffold rawCode=0x{:02x} transportEncrypted={} packetSize={} currentState={} handled={}",
+        static_cast<unsigned>(packetBytes[0]),
+        transportEncrypted ? 1u : 0u,
+        static_cast<unsigned>(packetSize),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        handled);
+    return handled;
 }
 
 // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441bc0 / 0x441850

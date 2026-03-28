@@ -668,8 +668,8 @@ public:
         void* workItem = nullptr);
     // UNANCHORED: source-owned staging wrapper for the narrowed margin-side
     // `0x4490c0 -> 0x44af20 -> 0x442d00 -> 0x41f260` post-copy receive seam.
-    // Current scope is now narrower on one consumed branch too:
-    // - decoded code `4` can be handled earlier at the connection/leaf seam
+    // Current scope is now narrower on consumed branches too:
+    // - decoded code `2` and decoded code `4` can be handled earlier at the connection/leaf seam
     // - this helper remains the fallback/remaining consumer for the other margin receive paths
     uint32_t StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
         const uint8_t* packetBytes,
@@ -1074,12 +1074,19 @@ public:
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
-    // - code `4` and code `5` now each have one bounded nearer source-owned step at the
-    //   connection/leaf seam before any later fallback path
+    // - code `2`, code `4`, and code `5` now each have one bounded nearer source-owned step at
+    //   the connection/leaf seam before any later fallback path
     // - only other codes survive into owner `+0x184` / current helper slot 6
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
     uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441a30 / 0x4429b0
+    // Narrow source-owned mirror of one consumed decoded-code-2 branch moved closer to the
+    // connection/leaf dispatch seam.
+    uint32_t HandleMarginConsumedCode2AtConnectionSeamScaffold(
+        const uint8_t* packetBytes,
+        size_t packetSize,
+        bool transportEncrypted);
     // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441bc0 / 0x441850
     // Narrow source-owned mirror of one consumed decoded-code-4 branch moved closer to the
     // connection/leaf dispatch seam.

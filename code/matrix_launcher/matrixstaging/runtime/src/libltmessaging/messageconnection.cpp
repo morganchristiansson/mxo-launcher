@@ -1107,6 +1107,28 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
         &usedHeaderlessLocatorDecode,
         &hadValidMessageCode);
 
+    if (hadValidMessageCode && decodedMessageCode == 2u) {
+        const uint32_t handledCode2 =
+            mediator->HandleMarginConsumedCode2AtConnectionSeamScaffold(
+                payloadBytes.data(),
+                payloadBytes.size(),
+                /*transportEncrypted=*/false);
+        spdlog::info(
+            "CMarginConnection::DispatchCopiedParsedPacketTailScaffold source-owned local code2 branch decodedMessageCode={} rawCode=0x{:02x} headerless={} locatorDecoded={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+            static_cast<unsigned>(decodedMessageCode),
+            static_cast<unsigned>(payloadBytes[0]),
+            headerless ? 1u : 0u,
+            usedHeaderlessLocatorDecode ? 1u : 0u,
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            fmt::ptr(mediator->CurrentState()),
+            handledCode2,
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        if (handledCode2 != 0u) {
+            return handledCode2;
+        }
+    }
+
     if (hadValidMessageCode && decodedMessageCode == 4u) {
         const uint32_t handledCode4 =
             mediator->HandleMarginConsumedCode4AtConnectionSeamScaffold(
