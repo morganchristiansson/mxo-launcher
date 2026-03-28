@@ -1440,8 +1440,18 @@ private:
     LoginObserverTreeNode674* ObserverTreeEnd674() const;
     LoginObserverTreeNode674* ObserverTreeSuccessor674(LoginObserverTreeNode674* node) const;
     LoginObserverTreeNode674* FindObserverNode674(void* observer) const;
+    void EqualRangeObserver674(
+        void* observer,
+        LoginObserverTreeNode674** outLowerBound,
+        LoginObserverTreeNode674** outUpperBound) const;
+    uint32_t CountObserverRange674(
+        LoginObserverTreeNode674* first,
+        LoginObserverTreeNode674* last) const;
     bool InsertObserverNode674(void* observer);
     bool EraseObserverNode674(void* observer);
+    void EraseObserverRange674(
+        LoginObserverTreeNode674* first,
+        LoginObserverTreeNode674* last);
 
     uint32_t SendMarginFramedPacket(
         const mxo::auth::FramedPacket& packet,

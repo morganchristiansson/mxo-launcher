@@ -303,8 +303,8 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x124` | wrapper-facing `ProvideStartupTriple`: accepts `INetShell/INetMgr/ILTDistrObjExecutive` triple in deeper init | medium |
 | `+0x13c` | `WaitForEvent` loop pump; calls launcher owner helper `+0x65c` vtable `+0x04` when present (`0x4202c0`); replacement wrapper minimization now forwards directly into a `CLTLoginMediator` owner method | medium |
 | `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
-| `+0x170` | registers an observer/listener object into launcher owner `+0x674` (`0x41ddb0`) | high |
-| `+0x174` | unregisters an observer/listener object from launcher owner `+0x674` (`0x41dde0`) | high |
+| `+0x170` | registers an observer/listener object into launcher owner `+0x674` (`0x41ddb0`); current best container home is `0x4f78b8_OBSERVER_TREE_PLUS674.md` | high |
+| `+0x174` | unregisters an observer/listener object from launcher owner `+0x674` (`0x41dde0`); current best container home is `0x4f78b8_OBSERVER_TREE_PLUS674.md` | high |
 | `+0x178` | returns launcher owner status/result dword `+0x80` (`0x41f240`); client observer error handlers consult this after `PostError`, so state8 `MS_LoadCharacterReply` failures can carry the raw server status (for example `0x0b000025`) into the normal popup path | high |
 | `+0x18c` | later callback84-side writer queried indirectly through `ClientNetShell +0x38`; fills client scratch buffer later surfaced as pair `(&0x629e0284, 0x20)`; active replacement now source-owns the state9-gated blob fill closely enough to run it live | high |
 

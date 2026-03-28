@@ -151,8 +151,15 @@ Current best read:
 
 Current source stance:
 - event history and the narrow helper9 bridge are source-owned
-- a minimal arg6/observer registration bridge is now source-owned too
-- the original listener tree container itself is still unresolved
+- arg6/observer registration is now source-owned through a std::_Tree-like owner `+0x674`
+  scaffold instead of the older flat vector bridge
+- source now uses that same tree shape for general in-order event/error walks again, not just for
+  a hand-picked subset of events
+- the container/traversal shape is documented closely enough for those walks, but
+  balancing/color bits and original node-pool recycling are still only partial
+
+Canonical tree/container home:
+- `../startup_objects/0x4f78b8_OBSERVER_TREE_PLUS674.md`
 
 Source home:
 - `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
@@ -192,8 +199,9 @@ New live/runtime proof now tightens the client-facing registration side too:
 
 Practical consequence:
 - the client-visible observer registration bridge is no longer speculative
-- the current replacement can source-own a minimal observer list and enough late arg6 getters to
-  reach first game entry without claiming the original red-black-tree or late-entry-list container
+- the current replacement can now source-own a std::_Tree-like observer container at owner `+0x674`
+  closely enough to match the original in-order event/error walks without flattening it into a
+  vector, while still not claiming balancing/color bits or late-entry-list container
   implementations are fully reconstructed
 - wrapper minimization for this late arg6 family is now tighter too:
   - `src/launcher_mediator_abi.cpp` keeps only thin vtable forwarders for `+0x10c/+0x118/+0x13c`

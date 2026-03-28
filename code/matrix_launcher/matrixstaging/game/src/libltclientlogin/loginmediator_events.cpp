@@ -184,6 +184,57 @@ LoginObserverTreeNode674* CLTLoginMediator::FindObserverNode674(void* observer) 
     return nullptr;
 }
 
+// UNANCHORED: source-owned equal-range helper mirroring the `0x419510` owner `+0x674`
+// search-pair builder.
+void CLTLoginMediator::EqualRangeObserver674(
+    void* observer,
+    LoginObserverTreeNode674** outLowerBound,
+    LoginObserverTreeNode674** outUpperBound) const {
+    LoginObserverTreeNode674* lowerBound = const_cast<LoginObserverTreeNode674*>(&observerTreeHeader674_);
+    LoginObserverTreeNode674* upperBound = const_cast<LoginObserverTreeNode674*>(&observerTreeHeader674_);
+    LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
+    const uintptr_t targetKey = ObserverTreeKey(observer);
+
+    while (current != nullptr) {
+        if (targetKey < ObserverTreeKey(current->observer10)) {
+            upperBound = current;
+            current = current->left08;
+        } else {
+            current = current->right0c;
+        }
+    }
+
+    current = observerTreeHeader674_.parent04;
+    while (current != nullptr) {
+        if (ObserverTreeKey(current->observer10) < targetKey) {
+            current = current->right0c;
+        } else {
+            lowerBound = current;
+            current = current->left08;
+        }
+    }
+
+    if (outLowerBound) {
+        *outLowerBound = lowerBound;
+    }
+    if (outUpperBound) {
+        *outUpperBound = upperBound;
+    }
+}
+
+// UNANCHORED: source-owned iterator-distance helper mirroring the `0x41baa0` owner `+0x674`
+// range-count walk.
+uint32_t CLTLoginMediator::CountObserverRange674(
+    LoginObserverTreeNode674* first,
+    LoginObserverTreeNode674* last) const {
+    uint32_t count = 0u;
+    while (first != last) {
+        first = ObserverTreeSuccessor674(first);
+        ++count;
+    }
+    return count;
+}
+
 // UNANCHORED: source-owned insert helper for the recovered owner `+0x674` observer tree.
 bool CLTLoginMediator::InsertObserverNode674(void* observer) {
     LoginObserverTreeNode674* parent = &observerTreeHeader674_;
@@ -235,7 +286,7 @@ bool CLTLoginMediator::InsertObserverNode674(void* observer) {
     return true;
 }
 
-// UNANCHORED: source-owned erase helper for the recovered owner `+0x674` observer tree.
+// UNANCHORED: source-owned erase-one helper for the recovered owner `+0x674` observer tree.
 bool CLTLoginMediator::EraseObserverNode674(void* observer) {
     LoginObserverTreeNode674* node = FindObserverNode674(observer);
     if (node == nullptr) {
@@ -291,6 +342,25 @@ bool CLTLoginMediator::EraseObserverNode674(void* observer) {
     return true;
 }
 
+// UNANCHORED: source-owned erase-range helper mirroring the `0x41d430` owner `+0x674`
+// erase walk, including its full-range clear special case.
+void CLTLoginMediator::EraseObserverRange674(
+    LoginObserverTreeNode674* first,
+    LoginObserverTreeNode674* last) {
+    if (first == ObserverTreeBegin674() && last == ObserverTreeEnd674()) {
+        if (observerTree674_.count04 != 0u) {
+            ClearObserverTree674();
+        }
+        return;
+    }
+
+    while (first != last) {
+        LoginObserverTreeNode674* const next = ObserverTreeSuccessor674(first);
+        EraseObserverNode674(first->observer10);
+        first = next;
+    }
+}
+
 void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
     // anchor: launcher.exe:0x41b450
     // Tightened recovered shape from the current Ghidra pass plus direct vtable reads:
@@ -342,30 +412,35 @@ bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
         return false;
     }
 
+    latestObserver170_ = observer;
+    ++observerRegister170Count_;
+
     const bool inserted = InsertObserverNode674(observer);
+    const bool returnValue = !inserted;
     if (!inserted) {
         spdlog::info(
-            "CLTLoginMediator::RegisterLoginObserver observer={} already registered treeCount={} header={} root={} leftmost={} rightmost={}",
+            "CLTLoginMediator::RegisterLoginObserver observer={} already registered treeCount={} header={} root={} leftmost={} rightmost={} returnValue={} (0x41ddb0 returns !insertedFlag from the helper result pair)",
             fmt::ptr(observer),
             static_cast<unsigned>(observerTree674_.count04),
             fmt::ptr(observerTree674_.header00),
             fmt::ptr(observerTreeHeader674_.parent04),
             fmt::ptr(observerTreeHeader674_.left08),
-            fmt::ptr(observerTreeHeader674_.right0c));
-        return false;
+            fmt::ptr(observerTreeHeader674_.right0c),
+            returnValue ? 1u : 0u);
+        return returnValue;
     }
 
-    latestObserver170_ = observer;
-    ++observerRegister170Count_;
     spdlog::info(
-        "CLTLoginMediator::RegisterLoginObserver observer={} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 bridge active)",
+        "CLTLoginMediator::RegisterLoginObserver observer={} treeCount={} header={} root={} leftmost={} rightmost={} inserted={} returnValue={} (source-owned std::_Tree-like owner+0x674 bridge active)",
         fmt::ptr(observer),
         static_cast<unsigned>(observerTree674_.count04),
         fmt::ptr(observerTree674_.header00),
         fmt::ptr(observerTreeHeader674_.parent04),
         fmt::ptr(observerTreeHeader674_.left08),
-        fmt::ptr(observerTreeHeader674_.right0c));
-    return true;
+        fmt::ptr(observerTreeHeader674_.right0c),
+        inserted ? 1u : 0u,
+        returnValue ? 1u : 0u);
+    return returnValue;
 }
 
 bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
@@ -376,30 +451,27 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
         return false;
     }
 
-    const bool erased = EraseObserverNode674(observer);
-    if (!erased) {
-        spdlog::info(
-            "CLTLoginMediator::UnregisterLoginObserver observer={} not found treeCount={} header={} root={} leftmost={} rightmost={}",
-            fmt::ptr(observer),
-            static_cast<unsigned>(observerTree674_.count04),
-            fmt::ptr(observerTree674_.header00),
-            fmt::ptr(observerTreeHeader674_.parent04),
-            fmt::ptr(observerTreeHeader674_.left08),
-            fmt::ptr(observerTreeHeader674_.right0c));
-        return false;
-    }
-
     latestObserver174_ = observer;
     ++observerUnregister174Count_;
+
+    LoginObserverTreeNode674* lowerBound = nullptr;
+    LoginObserverTreeNode674* upperBound = nullptr;
+    EqualRangeObserver674(observer, &lowerBound, &upperBound);
+    const uint32_t rangeCount = CountObserverRange674(lowerBound, upperBound);
+    EraseObserverRange674(lowerBound, upperBound);
+    const bool returnValue = (rangeCount == 0u);
+
     spdlog::info(
-        "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} treeCount={} header={} root={} leftmost={} rightmost={}",
+        "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} rangeCount={} treeCount={} header={} root={} leftmost={} rightmost={} returnValue={} (0x41dde0 mirrors equal_range + distance + erase_range and returns rangeCount==0)",
         fmt::ptr(observer),
+        static_cast<unsigned>(rangeCount),
         static_cast<unsigned>(observerTree674_.count04),
         fmt::ptr(observerTree674_.header00),
         fmt::ptr(observerTreeHeader674_.parent04),
         fmt::ptr(observerTreeHeader674_.left08),
-        fmt::ptr(observerTreeHeader674_.right0c));
-    return true;
+        fmt::ptr(observerTreeHeader674_.right0c),
+        returnValue ? 1u : 0u);
+    return returnValue;
 }
 
 void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
@@ -423,9 +495,9 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     //   - static `CLTEvilBlockingLoginObserver::WaitForEvent` callers currently prove waits for
     //     events `1`, `8`, and `0x0f`, but not for `0x18`
     // - practical scaffold consequence:
-    //   keep explicit event-history logging here and bridge arg6 `+0x170/+0x174` observer
-    //   registration into a minimal source-owned listener list, without pretending the original
-    //   red-black-tree container at owner `+0x674` is fully reconstructed.
+    //   keep explicit event-history logging here and source-own a std::_Tree-like owner `+0x674`
+    //   observer container/traversal shape, while still leaving balancing/color bits and the
+    //   original node-pool recycling helpers only partially reconstructed.
     lastPostedEventScaffold_ = eventId;
     if (recentPostedEventCountScaffold_ < recentPostedEventsScaffold_.size()) {
         recentPostedEventsScaffold_[recentPostedEventCountScaffold_++] = eventId;
@@ -457,43 +529,38 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
         (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu),
         recentEventsPreview.c_str());
 
-    // Current implementation keeps observer dispatch deliberately narrow and evidence-backed:
-    // - client-facing `+0x170/+0x174` registration is now source-owned
-    // - newer `mcd.cfg` persistence tightening makes one more event concretely valuable here:
-    //   original client-side save family `0x62199ed0 -> 0x62198fa0 -> 0x62197830` is reached
-    //   from client event handler `ClientShell_LoginMediatorObserver_OnEvent` (`0x621707e0`) on
-    //   event `0x0b` (and sibling `0x16`)
-    // - that same event-`0x0b` handler also pushes the visible text `"Waiting for Regionserver"`
-    // - active existing-character path posts `0x0b` immediately after the state8 -> helper9 switch
-    // - so keep the bridge narrow, but now include `0x0b` alongside the already-proven later
-    //   observer-driven `0x18/0x0f` work
+    // Observer dispatch note:
+    // - `0x41cfb0` itself walks the owner `+0x674` tree for whatever event number it is given;
+    //   it is not specialized only to `0x0b/0x18/0x0f`
+    // - now that the std::_Tree-like owner `+0x674` scaffold is source-owned enough, event
+    //   dispatch here follows that broader original behavior again
+    // - only event-specific extra side effects stay narrow, e.g. the diagnostic text mirror below
+    //   for the now-proved `0x0b` / "Waiting for Regionserver" path
     if (eventId == 0x0bu) {
         DiagnosticLogClientLoadingStateText(
             "Waiting for Regionserver",
             "client.dll:ClientShell_LoginMediatorObserver_OnEvent event 0x0b");
     }
 
-    if (eventId == 0x0bu || eventId == 0x18u || eventId == 0x0fu) {
-        LoginObserverTreeNode674* node = ObserverTreeBegin674();
-        const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
-        while (node != end) {
-            void* const observer = node->observer10;
-            spdlog::info(
-                "CLTLoginMediator::PostEventScaffold dispatching observerNode={} observer={} event=0x{:02x}",
-                fmt::ptr(node),
-                fmt::ptr(observer),
-                static_cast<unsigned>(eventId & 0xffu));
-            DispatchLoginObserverEvent(observer, eventId);
-            node = ObserverTreeSuccessor674(node);
-        }
+    LoginObserverTreeNode674* node = ObserverTreeBegin674();
+    const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
+    while (node != end) {
+        void* const observer = node->observer10;
+        spdlog::info(
+            "CLTLoginMediator::PostEventScaffold dispatching observerNode={} observer={} event=0x{:02x}",
+            fmt::ptr(node),
+            fmt::ptr(observer),
+            static_cast<unsigned>(eventId & 0xffu));
+        DispatchLoginObserverEvent(observer, eventId);
+        node = ObserverTreeSuccessor674(node);
     }
 
     // Narrow source-owned continuation bridge for the now-live state8 -> helper9/state9 path:
     // - natural original switches to helper9, then posts event `0x0b`, and helper9 slot 3
     //   (`0x439780`) is immediately part of the same active progression family
-    // - the full owner `+0x674` listener tree behind `0x41cfb0` is still unresolved
-    // - keep this bridge narrow to the already-proven helper9 handoff instead of claiming a
-    //   general event-listener reconstruction
+    // - the owner `+0x674` container/traversal shape is now source-owned enough to walk here,
+    //   but this helper9 continuation bridge is still intentionally narrower than claiming the
+    //   whole later observer/UI runtime is fully understood
     if (eventId == 0x0bu && currentState_ != nullptr && currentState_->DispatchPhaseCode() == 9u) {
         const uint32_t continueResult = currentState_->Slot3_BeginOrContinue(currentState_, this);
         spdlog::info(
