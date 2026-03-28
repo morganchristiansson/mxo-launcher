@@ -351,7 +351,7 @@ For live original-launcher work:
 ## See also
 
 - `README.md`
-- `startup_objects/README.md`
-- `../client.dll/InitClientDLL/README.md`
-- `../client.dll/InitClientDLL/CRASH_EIP_003E2B82.md`
-- `../client.dll/InitClientDLL/RET_BYPASS_HACK.md`
+- `../../docs/launcher.exe/startup_objects/README.md`
+- `../../docs/launcher.exe/client_dll_loading/LOADING_SEQUENCE.md`
+- `../../docs/client.dll/InitClientDLL/README.md`
+- `../../docs/client.dll/README.md`
