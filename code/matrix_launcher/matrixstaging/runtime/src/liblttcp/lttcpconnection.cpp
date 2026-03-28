@@ -448,7 +448,10 @@ void CLTTCPConnection::OnReceive(void* readOperationFragment) {
         (void)Close(false);
     }
 
-    OnClose(fragment);
+    // `0x449d40` ends with a direct `readOperationFragment->Release()` on the outer OnReceive-held
+    // temp ref. Keep that narrower than routing the final release back through the wider
+    // `OnClose(fragment, opaqueArg08, opaqueArg0c)` callback wrapper.
+    CLTTCPReadOperationFragment_ReleaseScaffold(fragment);
 }
 
 // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.

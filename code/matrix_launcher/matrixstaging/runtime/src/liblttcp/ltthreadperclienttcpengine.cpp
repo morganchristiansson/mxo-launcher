@@ -1730,7 +1730,15 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
     //       teardown still keys off the owning connection context rather than the bridge pointer
     //   - later context callback always receives the original work-item pointer
     //   - optional context release remains type-1-only and uses the pre-callback byte-at-+4 test
+    //   - newer bounded correction: queue selection/pop now happens while the attached arg5 queue
+    //     lock is held, and the blocking empty-queue path releases that lock before waiting on the
+    //     attached signal event, mirroring the recovered `+0x60` / `+0x5c` choreography more closely
+    CRITICAL_SECTION* queueLock = static_cast<CRITICAL_SECTION*>(externalQueueLock_);
     while (true) {
+        if (queueLock) {
+            EnterCriticalSection(queueLock);
+        }
+
         CLTThreadPerClientTCPEngine_Queue* selectedQueue = nullptr;
         if (!Queue_IsEmpty(externalQueue34_)) {
             selectedQueue = externalQueue34_;
@@ -1739,15 +1747,17 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
         }
 
         if (!selectedQueue) {
+            if (queueLock) {
+                LeaveCriticalSection(queueLock);
+            }
             if (nonBlocking) {
                 return;
             }
 
             // Bounded fidelity step from the shared `0x436b10` / `0x62531c10` queue-consumer family:
             // when both queues are empty, original code routes through arg5 helper `+0x5c` for the
-            // wait path rather than immediately returning. Current sidecar consumer does not model
-            // the exact helper lock choreography yet, but it can safely mirror the recovered event
-            // wait role through the attached arg5 queue-signal handle.
+            // wait path instead of immediately returning. The exact helper call surface remains
+            // source-owned, but the lock release -> wait -> re-enter loop shape is now closer.
             if (!externalQueueSignalEvent_) {
                 return;
             }
@@ -1762,7 +1772,11 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
         }
 
         CLTThreadPerClientTCPEngine_QueuedPair pair = {};
-        if (!Queue_TryPopPair(selectedQueue, &pair)) {
+        const bool popped = Queue_TryPopPair(selectedQueue, &pair);
+        if (queueLock) {
+            LeaveCriticalSection(queueLock);
+        }
+        if (!popped) {
             return;
         }
 
@@ -1770,8 +1784,14 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
         void* context = reinterpret_cast<void*>(static_cast<uintptr_t>(pair.value1));
         if (!workItem) {
             // Current best read: a null work item is the shutdown-style queue sentinel.
-            // Original 0x436f56..0x436fa8 cascades shutdown by enqueueing one more null queue0C item.
-            Queue_PushPair(externalQueue0C_, 0u, 0u);
+            // Original `0x436f56..0x436fa8` cascades shutdown via the normal enqueue helper path,
+            // not by open-coding another raw queue write.
+            (void)EnqueueCompletedOperationScaffold(
+                nullptr,
+                nullptr,
+                /*useQueue34=*/false,
+                "RunCompletedOperationQueueShutdownCascade",
+                /*queueLockAlreadyHeld=*/false);
             return;
         }
 
