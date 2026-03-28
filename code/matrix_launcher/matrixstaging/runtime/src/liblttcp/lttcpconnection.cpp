@@ -324,6 +324,12 @@ void CLTTCPConnection::OnReceive(void* readOperationFragment) {
     //   - the stack values visible around that call belong to the immediately following parser
     //     call, not to the fragment virtual itself
     // - connection `+0x6c` is a `CVariableLengthPrefixedTCPStreamParser` family object
+    //   - current recovered source-side parser prefix now includes:
+    //     - `+0x04` retained current-cursor fragment
+    //     - `+0x08` next unread buffered byte pointer
+    //     - `+0x0c` unread buffered byte count
+    //     - `+0x10` provisional advanced-byte-count state
+    //     - `+0x14` current parser-owned work item
     // - first parser handoff is `Parse(fragment, &completedPacketWorkItem)`
     // - later drain handoffs are `Parse(nullptr, &completedPacketWorkItem)`
     // - parser-emitted `completedPacketWorkItem` is the same `0x2c` / vtable-`0x4b3e08`
@@ -403,6 +409,12 @@ uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
     // Current best static read of `0x449d40` / `0x469bf0`:
     // - connection `+0x6c` is a `CVariableLengthPrefixedTCPStreamParser` family object
     // - original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` at `0x469bf0`
+    // - current recovered parser prefix at connection `+0x6c` is:
+    //   - `+0x04` retained fragment currently containing parser cursor `+0x08`
+    //   - `+0x08` next unread buffered byte pointer
+    //   - `+0x0c` total unread buffered byte count across retained fragments
+    //   - `+0x10` provisional byte-count accumulator advanced by `0x472660`
+    //   - `+0x14` current parser-owned `CParsedPacketWorkItem`
     // - first receive pass reaches it as `Parse(readOperationFragment, &completedPacketWorkItem)`
     //   immediately after a no-arg fragment AddRef in `0x449d40`
     // - later drain passes reach it as `Parse(nullptr, &completedPacketWorkItem)` until the parser

@@ -1046,6 +1046,12 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
       - traversal-only state at `+0x18/+0x1c/+0x20`
       - `+0x24` as a cursor pointer
       - `+0x28` as assembled packet-body byte count
+    - source there now also carries a recovered parser-prefix scaffold for connection `+0x6c` with:
+      - `+0x04` current-cursor fragment reference
+      - `+0x08` next unread buffered byte pointer
+      - `+0x0c` unread buffered byte count across retained fragments
+      - `+0x10` provisional cursor-advance byte-count state
+      - `+0x14` current parser-owned work item
     - `CLTTCPConnection::OnReceive` / `OnClose` now model the narrower AddRef / Parse / Release seam
       instead of treating the fragment virtual `+0x04` as a possible materialization helper
     - source comments now also record the wider original `OnClose` callback ABI proven by the UDP
