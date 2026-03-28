@@ -391,6 +391,13 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
             break;
         }
 
+        // `0x42fe50` keeps two worker-side refs on the TCP path around the OnReceive callback:
+        // - one outer worker-thread ref taken immediately after allocation/setup
+        // - one delivery temp ref taken just before the vtable `+0x14` callback
+        // Then the success path drops only the delivery temp after `OnReceive` returns.
+        // Restoring that second worker-side ref is what makes the parser-side
+        // `0x435e60` trailing `Release(param_1)` viable again on the live path.
+        CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
         std::memcpy(
             readOperationFragment->bytes0C,
             receivedBytes_.data() + consumedBytes,

@@ -218,9 +218,10 @@ public:
     // anchor: launcher.exe:0x42fe50 TCP receive subpath
     // Narrow source-owned mirror of the worker-thread receive delivery shape:
     // - receive into a `CLTTCPReadOperation`-family fragment
+    // - take one worker-owned outer ref immediately after allocation/setup
     // - set fragment byte count
-    // - call `OnReceive(readOperationFragment)`
-    // - release the worker-held outer fragment reference
+    // - take one more delivery-temp ref just before `OnReceive(readOperationFragment)`
+    // - release only that delivery-temp ref after the callback returns
     int PollReceiveAndDeliverReadOperationFragmentsScaffold();
 
     // anchor: launcher.exe:0x449ca0

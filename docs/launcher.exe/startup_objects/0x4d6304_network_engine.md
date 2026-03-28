@@ -1052,12 +1052,19 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
       - `+0x04 =` interlocked refcount
       - `+0x08 =` received byte count
       - `+0x0c =` first payload byte
-    - early `param_1->+0x04` is now best read as a **no-arg AddRef only** on that fragment
+    - worker-thread TCP receive subpath actually takes **two** refs before the callback:
+      - one worker-owned outer ref immediately after allocation/setup
+      - one delivery-temp ref immediately before the vtable `+0x14` / `OnReceive` call
+    - early `param_1->+0x04` inside `0x449d40` is now best read as another **no-arg AddRef only**
+      on that fragment
       - the stack dwords prepared around that call remain in place for the immediately following
         `parser->Parse(param_1, &completedPacketWorkItem)` call
-    - later `param_1->+0x08` is now best read as the matching outer-reference Release hook
-    - `Parse` itself also takes and releases its own transient fragment reference while moving any
+    - later `param_1->+0x08` inside `0x449d40` is now best read as the matching outer-reference
+      Release hook
+    - `Parse` itself also takes/releases its own transient fragment reference while moving any
       retained fragment ownership into the completed work item
+    - `0x435e60 = CParsedPacketWorkItem_AppendFragment` then consumes one caller-held temp itself
+      with trailing `Release(param_1)`
   - source lockstep update from the same focused pass:
     - `lttcpconnection.h` now carries explicit scaffold types for the `CLTTCPReadOperation`-family
       parser input fragment and the emitted `0x2c` packet work item
