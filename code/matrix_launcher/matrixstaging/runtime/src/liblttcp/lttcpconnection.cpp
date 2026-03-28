@@ -39,6 +39,9 @@ static void ReadOperationFragment_AddRef(CLTTCPReadOperationFragmentScaffold* fr
 
 // UNANCHORED: source-owned release shim for the read-operation fragment object passed to
 // `CLTTCPConnection::OnReceive` / `CLTTCPConnection::OnClose`.
+// Current best static read of the concrete `CLTTCPReadOperation` family:
+// - decrements interlocked refcount at `+0x04`
+// - zero-count path dispatches vtable `+0x0c`, which then reaches the deleting-dtor-style slot `+0x00`
 static void ReadOperationFragment_Release(CLTTCPReadOperationFragmentScaffold* fragment) {
     if (!fragment || !fragment->vtable || !fragment->vtable->release) {
         return;
@@ -306,7 +309,10 @@ uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, vo
 }
 
 // anchor: launcher.exe:0x449fd0
-void CLTTCPConnection::OnClose(CLTTCPReadOperationFragmentScaffold* readOperationFragment) {
+void CLTTCPConnection::OnClose(
+    CLTTCPReadOperationFragmentScaffold* readOperationFragment,
+    void* /*opaqueArg08*/,
+    void* /*opaqueArg0c*/) {
     ReadOperationFragment_Release(readOperationFragment);
 }
 

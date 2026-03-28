@@ -36,24 +36,33 @@ struct LTTCPEndpointKey {
 // Recovered parser input fragment prefix consumed by connection `+0x6c`
 // (`CVariableLengthPrefixedTCPStreamParser::Parse`).
 // Current best family name comes from `CMessageConnection::OnOperationCompleted` logging
-// ("Unused buffers were attached to CLTTCPReadOperation ...") plus the parser/work-item helpers.
+// ("Unused buffers were attached to CLTTCPReadOperation ...") plus the worker-thread receive path.
 // This is a refcounted read-buffer fragment object, not a completed-packet work item.
-// High-confidence fields from `0x469bf0`, `0x435e60`, `0x4350c0`, and `0x435510`:
+// High-confidence fields from `0x42fe50`, `0x42f850`, `0x42f860`, `0x42f880`, `0x42f890`,
+// `0x452350`, `0x469bf0`, `0x435e60`, `0x4350c0`, and `0x435510`:
+// - worker-thread receive path installs vtable `0x004b2300` and allocates `0x100c` bytes for this family
+// - `+0x04` = interlocked refcount
 // - `+0x08` = byte count
 // - `+0x0c` = first payload byte
+// - vtable `+0x00` = deleting-dtor-style entry (`this, deleteFlag`)
 // - vtable `+0x04` = no-arg AddRef / retain on the fragment object itself
 // - vtable `+0x08` = no-arg Release on the fragment object itself
+// - vtable `+0x10` = reset refcount to zero
+// - vtable `+0x14` = set refcount from pointed-to value
 struct CLTTCPReadOperationFragmentScaffold;
 
 struct CLTTCPReadOperationFragmentVTable {
-    void* slot00; // original slot 0 exists but its exact ABI is not recovered here yet
-    void (__thiscall *addRef)(CLTTCPReadOperationFragmentScaffold* self);  // +0x04
-    void (__thiscall *release)(CLTTCPReadOperationFragmentScaffold* self); // +0x08
+    void* (__thiscall *deletingDtor)(CLTTCPReadOperationFragmentScaffold* self, uint8_t deleteFlag); // +0x00
+    void (__thiscall *addRef)(CLTTCPReadOperationFragmentScaffold* self);                             // +0x04
+    void (__thiscall *release)(CLTTCPReadOperationFragmentScaffold* self);                            // +0x08
+    void (__thiscall *deleteIfNonNull)(CLTTCPReadOperationFragmentScaffold* self);                    // +0x0c
+    void (__thiscall *resetRefCount)(CLTTCPReadOperationFragmentScaffold* self);                      // +0x10
+    void (__thiscall *setRefCountFromPtr)(CLTTCPReadOperationFragmentScaffold* self, const long* value); // +0x14
 };
 
 struct CLTTCPReadOperationFragmentScaffold {
     CLTTCPReadOperationFragmentVTable* vtable; // +0x00
-    uint32_t field04;                          // +0x04 still unresolved
+    volatile long referenceCount;              // +0x04 interlocked by AddRef / Release
     uint32_t byteCount;                        // +0x08
     uint8_t bytes0C[1];                        // +0x0c variable-length fragment bytes begin here
 };
@@ -183,9 +192,17 @@ public:
 
     // anchor: launcher.exe:0x449fd0
     // vtable: launcher.exe:0x004b804c
-    // Current source-owned wrapper keeps only the confirmed fragment-release behavior of the
-    // original callback. The original `0x449fd0` ABI is wider (`ecx` ignored, `ret 0xc`).
-    void OnClose(CLTTCPReadOperationFragmentScaffold* readOperationFragment);
+    // Current best original ABI is wider than the source-owned wrapper logic:
+    // - `ecx` is ignored
+    // - function returns with `ret 0xc`
+    // - current concrete caller shape from `0x42fe50` prepares:
+    //   `(readOperationFragment, peerAddressBlob16Ptr, 0x004b2118)`
+    // Current recovered semantic effect is still only:
+    // - if `readOperationFragment != nullptr`, call `readOperationFragment->+0x08()`
+    void OnClose(
+        CLTTCPReadOperationFragmentScaffold* readOperationFragment,
+        void* opaqueArg08 = nullptr,
+        void* opaqueArg0c = nullptr);
 
     // anchor: launcher.exe:0x449d40
     // vtable: launcher.exe:0x004b8048

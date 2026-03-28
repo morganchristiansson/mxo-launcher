@@ -1016,6 +1016,12 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
   - the parser-emitted object queued by `0x449d40` is now best read as a concrete queue-work item, not only an opaque buffer pointer
   - newer focused pass also narrows the explicit `0x449d40` argument itself:
     - it is best read as a refcounted `CLTTCPReadOperation`-family buffer fragment consumed by the parser
+    - worker-thread receive producer now gives that object a much tighter concrete shape:
+      - allocation size `0x100c`
+      - vtable `0x004b2300`
+      - `+0x04 =` interlocked refcount
+      - `+0x08 =` received byte count
+      - `+0x0c =` first payload byte
     - early `param_1->+0x04` is now best read as a **no-arg AddRef only** on that fragment
       - the stack dwords prepared around that call remain in place for the immediately following
         `parser->Parse(param_1, &completedPacketWorkItem)` call
@@ -1027,6 +1033,11 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
       parser input fragment and the emitted `0x2c` packet work item
     - `CLTTCPConnection::OnReceive` / `OnClose` now model the narrower AddRef / Parse / Release seam
       instead of treating the fragment virtual `+0x04` as a possible materialization helper
+    - source comments now also record the wider original `OnClose` callback ABI proven by the UDP
+      worker-thread caller:
+      - `ret 0xc`
+      - current concrete caller shape = `(readOperationFragment, peerAddressBlob16Ptr, 0x004b2118)`
+      - recovered semantic effect still only releases the fragment
     - `CLTTCPConnection::pushCompletedOperation(...)` now forwards through an engine-side bridge into the recovered `0x436820` enqueue helper when the sidecar engine is attached
 - source lockstep update from the current focused pass:
   - `matrixstaging/runtime/src/liblttcp/lttcpconnection.*` now owns the corrected base-wrapper mapping directly
