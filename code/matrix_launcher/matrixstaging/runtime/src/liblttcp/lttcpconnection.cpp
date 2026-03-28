@@ -471,7 +471,19 @@ uint32_t CLTTCPConnection::CloseSocketTransportScaffold(bool /*graceful*/) {
 
     state_ = LTTCPEngineConnectionState::kClosing;
     if (socketHandle_ != kInvalidSocketHandle) {
-        closesocket(static_cast<SOCKET>(socketHandle_));
+        const SOCKET socket = static_cast<SOCKET>(socketHandle_);
+        const int shutdownResult = shutdown(socket, SD_BOTH);
+        if (shutdownResult == SOCKET_ERROR) {
+            const int wsaError = WSAGetLastError();
+            if (wsaError != WSAENOTCONN) {
+                spdlog::debug(
+                    "CLTTCPConnection::CloseSocketTransportScaffold shutdown failed socket=0x{:08x} remoteHost='{}' wsaError={}",
+                    socketHandle_,
+                    remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+                    wsaError);
+            }
+        }
+        closesocket(socket);
     }
     socketHandle_ = kInvalidSocketHandle;
     return 1u;

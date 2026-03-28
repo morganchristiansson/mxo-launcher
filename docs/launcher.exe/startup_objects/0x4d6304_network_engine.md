@@ -137,6 +137,9 @@ New queue-thread clarification from the current focused pass:
     - newer bounded correction: `CleanupConnection` now always runs the owner-state sync tail at
       function exit, even on miss/no-worker paths, as the bounded source stand-in for the later
       always-run `0x44ab60(arg)` side effect recovered from original slot `12`
+    - newer bounded correction: worker-teardown now makes the intermediate closing state explicit
+      before the later wakeup/stop/remove steps instead of jumping straight from active to closed
+      only at the tail
     - newer bounded correction: cross-block dequeue no longer immediately frees the exhausted head
       `0x80` queue block; source now caches it for later `Queue_PushPair` growth reuse, which is a
       closer source-owned mirror of the original block recycling / free-list behavior

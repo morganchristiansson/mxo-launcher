@@ -1990,6 +1990,12 @@ void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(WorkerThreadRecord* r
         return;
     }
 
+    // Bounded fidelity step from slot-12 / worker-teardown RE:
+    // - original cleanup first marks the worker payload as exit-requested before the later wakeup /
+    //   stop / removal steps
+    // - keep that intermediate transport state explicit in source too instead of jumping straight
+    //   from active to closed only at the very end
+    record->state = LTTCPEngineConnectionState::kClosing;
     if (record->thread) {
         record->thread->RequestExit();
         record->thread->SignalWakeup();
