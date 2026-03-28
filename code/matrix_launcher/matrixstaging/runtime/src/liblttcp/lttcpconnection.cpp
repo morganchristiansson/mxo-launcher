@@ -16,6 +16,7 @@ namespace {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_ParsedPacketWorkItemVtable[2] = {nullptr, nullptr};
+static void* g_BaseConnectionQueueContextVtable[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
 static CLTTCPReadOperationFragmentVTable g_ReadOperationFragmentSourceVtable = {};
 
 // UNANCHORED: source-owned endpoint-key comparison helper for the current connection wrapper.
@@ -52,6 +53,28 @@ static void ReadOperationFragment_Release(CLTTCPReadOperationFragmentScaffold* f
     }
 
     fragment->vtable->release(fragment);
+}
+
+// UNANCHORED: source-owned queue-context release bridge for current non-byte-faithful C++ objects.
+static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
+    CBaseConnection_QueueContextScaffold* /*self*/) {
+    return 1u;
+}
+
+// UNANCHORED: source-owned queue-context completion bridge for current non-byte-faithful C++ objects.
+static uint32_t __thiscall BaseConnectionQueueContext_OnOperationCompletedScaffold(
+    CBaseConnection_QueueContextScaffold* self,
+    void* workItem) {
+    return (self && self->owner) ? self->owner->OnOperationCompleted(workItem) : 0u;
+}
+
+static void EnsureBaseConnectionQueueContextVtableInitialized() {
+    if (!g_BaseConnectionQueueContextVtable[1]) {
+        g_BaseConnectionQueueContextVtable[1] =
+            reinterpret_cast<void*>(BaseConnectionQueueContext_ReleaseScaffold);
+        g_BaseConnectionQueueContextVtable[4] =
+            reinterpret_cast<void*>(BaseConnectionQueueContext_OnOperationCompletedScaffold);
+    }
 }
 
 // anchor: launcher.exe:0x42fd50 / vtable 0x004b2300 +0x00
@@ -664,7 +687,13 @@ bool CBaseConnection::IsConnected() const {
 
 // UNANCHORED: source-owned narrow mirror of the `0x44a9f0` base-ctor state write.
 CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
-    : state_(initialState) {}
+    : state_(initialState),
+      queueContextScaffold_() {
+    EnsureBaseConnectionQueueContextVtableInitialized();
+    queueContextScaffold_.vtable = g_BaseConnectionQueueContextVtable;
+    queueContextScaffold_.autoReleaseFlag = 0u;
+    queueContextScaffold_.owner = this;
+}
 
 // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
 void CLTTCPConnection::SetEngine(CLTThreadPerClientTCPEngine* engine) {
@@ -1185,7 +1214,7 @@ void CLTTCPConnection::EnqueueCompletedPacketWorkItemScaffold(
 
     Engine()->EnqueueCompletedOperationFromConnectionScaffold(
         workItem,
-        this,
+        static_cast<CLTTCPConnection*>(this),
         "CLTTCPConnection::OnReceive");
 }
 

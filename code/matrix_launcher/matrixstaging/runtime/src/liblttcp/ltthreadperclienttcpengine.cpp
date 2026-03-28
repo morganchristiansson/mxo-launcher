@@ -1498,7 +1498,7 @@ void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffol
     //   transferred to the queue/consumer boundary when this helper is entered
     (void)EnqueueCompletedOperationScaffold(
         workItem,
-        connection,
+        connection ? connection->QueueContextScaffold() : nullptr,
         /*useQueue34=*/false,
         label,
         /*queueLockAlreadyHeld=*/false);
@@ -1512,8 +1512,7 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
         return;
     }
 
-    const int received =
-        context->sidecarConnection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
+    const int received = context->sidecarConnection->PollReceiveNonBlocking();
     if (received > 0) {
         (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
             context,

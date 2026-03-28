@@ -128,6 +128,18 @@ struct CVariableLengthPrefixedTCPStreamParserScaffold {
     CLTTCPConnection_ParsedPacketWorkItemScaffold* currentPacketWorkItem14; // +0x14 parser-owned current work item (assembly state before emit; fresh replacement after emit)
 };
 
+class CBaseConnection;
+
+// Source-owned queue-context bridge compensating for the current non-byte-faithful C++ vtable
+// layout of `CBaseConnection` / `CLTTCPConnection` while queue consumers still dispatch through
+// original-style slot `+0x10` (`vtable[4]`).
+struct CBaseConnection_QueueContextScaffold {
+    void** vtable;           // +0x00
+    uint8_t autoReleaseFlag; // +0x04
+    uint8_t padding05[3];    // +0x05..+0x07
+    CBaseConnection* owner;  // +0x08
+};
+
 static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, currentCursorFragment04) == 0x04, "parser current fragment offset mismatch");
 static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, currentCursor08) == 0x08, "parser current cursor offset mismatch");
 static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, unreadBufferedByteCount0C) == 0x0c, "parser unread byte count offset mismatch");
@@ -154,6 +166,10 @@ class CBaseConnection {
   // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
   virtual bool IsConnected() const;
 
+  // UNANCHORED: source-owned queue-context bridge accessor used where queue consumers still expect
+  // original-style context vtable slot `+0x10`.
+  void* QueueContextScaffold() { return &queueContextScaffold_; }
+
   // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
   LTTCPEngineConnectionState State() const {
     return state_;
@@ -166,6 +182,7 @@ class CBaseConnection {
 
  protected:
   LTTCPEngineConnectionState state_;
+  CBaseConnection_QueueContextScaffold queueContextScaffold_;
 };
 
 // Recovered CLTTCPConnection-family wrapper surface.
