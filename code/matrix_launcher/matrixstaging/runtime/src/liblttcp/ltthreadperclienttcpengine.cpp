@@ -1347,8 +1347,11 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
 
     const uint32_t result = connection->CloseSocketTransportScaffold(graceful);
     if (result != 0) {
-        void* contextKey = connection->OwnerContext() ? connection->OwnerContext() : static_cast<void*>(connection);
-        if (WorkerThreadRecord* worker = FindWorker(contextKey)) {
+        WorkerThreadRecord* worker = FindWorker(connection);
+        if (!worker && connection->OwnerContext()) {
+            worker = FindWorker(connection->OwnerContext());
+        }
+        if (worker) {
             worker->socketHandle = connection->SocketHandle();
             worker->state = connection->State();
             if (worker->thread) {
@@ -1465,6 +1468,13 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     }
 
     const bool droppedGenericConnection = DropMessageConnection(cleanupContextKey);
+    if (!touchedConnectionState && !droppedGenericConnection) {
+        spdlog::debug(
+            "CLTThreadPerClientTCPEngine::CleanupConnection couldn't find socket/context key={} normalizedKey={} owner={} ",
+            fmt::ptr(contextKey),
+            fmt::ptr(cleanupContextKey),
+            fmt::ptr(queuedConnectionOwner));
+    }
     SyncAttachedLauncherObjectStateScaffold();
     return (touchedConnectionState || droppedGenericConnection) ? kResultSuccess : 0u;
 }
@@ -1955,9 +1965,16 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
 bool CLTThreadPerClientTCPEngine::DropMessageConnection(void* contextKey) {
+    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
+    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
     for (auto it = messageConnections_.begin(); it != messageConnections_.end(); ++it) {
         CMessageConnection* connection = *it;
-        if (connection && connection->OwnerContext() == contextKey) {
+        if (connection &&
+            (connection == contextKey ||
+             connection == resolvedContextKey ||
+             connection == queueContextOwner ||
+             connection->OwnerContext() == contextKey ||
+             connection->OwnerContext() == resolvedContextKey)) {
             delete connection;
             messageConnections_.erase(it);
             return true;
@@ -2032,6 +2049,18 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Cr
         inserted = workerThreads_.empty() ? nullptr : &workerThreads_.back();
     }
 
+    if (inserted) {
+        if (CMessageConnection* connection =
+                FindMessageConnection(inserted->contextKey ? inserted->contextKey : inserted->ownerContext)) {
+            connection->SetEngine(this);
+            if (connection->OwnerContext() == nullptr && inserted->ownerContext) {
+                connection->SetOwnerContext(inserted->ownerContext);
+            }
+            connection->SetSocketHandle(inserted->socketHandle);
+            connection->SetState(inserted->state);
+        }
+    }
+
     if (inserted && inserted->thread) {
         (void)inserted->thread->Start(/*startPriority=*/2);
     }
@@ -2064,6 +2093,12 @@ void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(WorkerThreadRecord* r
     //   stop / removal steps
     // - keep that intermediate transport state explicit in source too instead of jumping straight
     //   from active to closed only at the very end
+    if (CMessageConnection* connection =
+            FindMessageConnection(record->contextKey ? record->contextKey : record->ownerContext)) {
+        connection->SetState(LTTCPEngineConnectionState::kClosing);
+        connection->SetSocketHandle(record->socketHandle);
+    }
+
     record->state = LTTCPEngineConnectionState::kClosing;
     if (record->thread) {
         record->thread->RequestExit();
@@ -2074,6 +2109,11 @@ void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(WorkerThreadRecord* r
 
     CloseSocketHandle(&record->socketHandle);
     record->state = LTTCPEngineConnectionState::kClosed;
+    if (CMessageConnection* connection =
+            FindMessageConnection(record->contextKey ? record->contextKey : record->ownerContext)) {
+        connection->SetSocketHandle(kInvalidSocketHandle);
+        connection->SetState(LTTCPEngineConnectionState::kClosed);
+    }
 }
 
 // UNANCHORED starter binding helper.

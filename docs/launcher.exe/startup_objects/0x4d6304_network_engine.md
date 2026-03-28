@@ -1251,6 +1251,9 @@ Important limitation:
   - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered unique-key intent:
     - `UDPMonitorPort` now updates an existing worker record for the same context key instead of blindly growing duplicates
     - `CleanupConnection` now also marks the matching `CMessageConnection` sidecar closed before removing the worker record
+    - worker teardown now also mirrors that state/socket transition back onto the matched connection-family object before and after the stop path
+    - generic fallback `CMessageConnection` entries are now dropped during slot-12-style cleanup instead of lingering after the worker-side owner goes away
+    - current miss path now logs the nearer recovered `CleanupConnection: Couldn't find socket ...` outcome instead of only returning `0`
   - current diagnostic list-head emptiness for arg5 `+0x80` / `+0x8c` is also synchronized from that sidecar engine state so later stub logs track the new class-backed state more directly
   - newer arg5-helper seam cleanup now also moves the current nonblocking launcher-bridge pump closer to the recovered engine ownership:
     - `LauncherObject_Subobject60_Slot0(...)` no longer calls a mediator polling helper directly
