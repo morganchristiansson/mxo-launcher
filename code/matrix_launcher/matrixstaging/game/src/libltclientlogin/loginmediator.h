@@ -668,6 +668,9 @@ public:
         void* workItem = nullptr);
     // UNANCHORED: source-owned staging wrapper for the narrowed margin-side
     // `0x4490c0 -> 0x44af20 -> 0x442d00 -> 0x41f260` post-copy receive seam.
+    // Current scope is now narrower on one consumed branch too:
+    // - decoded code `4` can be handled earlier at the connection/leaf seam
+    // - this helper remains the fallback/remaining consumer for the other margin receive paths
     uint32_t StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
         const uint8_t* packetBytes,
         size_t packetSize,
@@ -1075,6 +1078,13 @@ public:
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
     uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441bc0 / 0x441850
+    // Narrow source-owned mirror of one consumed decoded-code-4 branch moved closer to the
+    // connection/leaf dispatch seam.
+    uint32_t HandleMarginConsumedCode4AtConnectionSeamScaffold(
+        const uint8_t* packetBytes,
+        size_t packetSize,
+        bool transportEncrypted);
     // Current margin receive handling is now split like auth:
     // - handled copied packets can already re-enter the nearer connection/leaf path
     //   `0x44af20 -> 0x442d00 -> 0x41f260`

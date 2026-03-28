@@ -402,6 +402,13 @@ public:
     // field; no separate `CMarginConnection` engine slot is evidenced.
     CLTThreadPerClientTCPEngine* MarginEngine() const;
 
+    // anchor: launcher.exe:0x441850
+    // Narrow source-owned mirror of the consumed decoded-code-4 side effect that sets connection
+    // byte `+0x84` when the inner status dword is zero.
+    void SetMessageCode4SuccessFlag84Scaffold(bool value);
+    // UNANCHORED: source-owned diagnostic accessor for the same narrowed `+0x84` mirror.
+    bool MessageCode4SuccessFlag84Scaffold() const;
+
     // anchor: launcher.exe:0x44af60
     // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
     // Current best original order:
@@ -423,12 +430,19 @@ protected:
     // Current bounded margin-side correction:
     // - after base `0x4490c0` finishes the parsed-packet copy, the margin leaf can now re-enter
     //   the nearer base-dispatch/current-helper-slot6 path directly from the connection callback
-    // - current source still does not materialize the original message-ref object, so this remains
-    //   a staged-payload mirror of that later destination rather than a byte-faithful `0x44af20`
+    // - one consumed `0x442d00` branch is now pulled one step closer too:
+    //   decoded code `4` mirrors the narrower `0x441850` side effect locally before the existing
+    //   launcher-owned bootstrap continuation
+    // - current source still does not materialize the full original message-ref object, so this
+    //   remains a staged-payload mirror of that later destination rather than a byte-faithful
+    //   `0x44af20`
     uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
         const std::vector<uint8_t>& payloadBytes,
         bool headerless) override;
+
+private:
+    bool messageCode4SuccessFlag84Scaffold_ = false;
 };
 
 }  // namespace mxo::liblttcp

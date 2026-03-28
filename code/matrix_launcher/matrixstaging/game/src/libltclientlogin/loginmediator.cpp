@@ -1273,6 +1273,10 @@ uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
     return handled;
 }
 
+// UNANCHORED: source-owned staging wrapper for the remaining margin-side receive branches.
+// Current narrowed role:
+// - consumed decoded-code-4 handling can now be taken earlier at the connection/leaf seam
+// - this helper stays the broader fallback/remaining consumer for other margin receive paths
 uint32_t CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
     const uint8_t* packetBytes,
     size_t packetSize,
@@ -3065,6 +3069,35 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     }
 
     return 0u;
+}
+
+// anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441bc0 / 0x441850
+uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    bool transportEncrypted) {
+    if (!packetBytes || packetSize < 5u) {
+        return 0u;
+    }
+
+    stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+    const uint32_t status = ReadU32LE(packetBytes + 1u);
+    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
+    if (marginConnection != nullptr) {
+        marginConnection->SetMessageCode4SuccessFlag84Scaffold(status == 0u);
+    }
+
+    spdlog::info(
+        "CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold rawCode=0x{:02x} status=0x{:08x} transportEncrypted={} connectionByte84={} currentState={}",
+        static_cast<unsigned>(packetBytes[0]),
+        status,
+        transportEncrypted ? 1u : 0u,
+        (marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84Scaffold()) ? 1u : 0u,
+        currentState_ ? currentState_->DebugName() : "<null>");
+
+    // Keep the current launcher-owned bootstrap send/build continuation unchanged after mirroring
+    // the narrower connection-side consumed-code-4 side effect.
+    return ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
