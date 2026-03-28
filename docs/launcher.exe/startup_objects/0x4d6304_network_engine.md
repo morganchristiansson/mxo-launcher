@@ -1243,9 +1243,12 @@ Important limitation:
   - newer bounded creation correction then normalizes queue-context bridge inputs back to the owning
     connection/context key before creating any generic sidecar entry, which avoids inventing a
     second synthetic connection record keyed only by the bridge object
-  - newer bounded slot-6 correction now makes that normalization explicit on `Connect(...)` too:
+  - newer bounded slot-6 correction now makes that normalization explicit on `Connect(...)` and
+    the lower resolved-endpoint helper too:
     - prefer an already-live auth/margin or engine-tracked connection-family object first
     - only then create a generic sidecar fallback on the normalized owning key
+    - worker insertion on the connect path now also stores the normalized owning key and mirrors the
+      resulting socket/state back onto the matched connection-family object immediately
   - sidecar owner/engine binding state is now also kept by `CLTThreadPerClientTCPEngineBinding` on the liblttcp side rather than by diagnostics-local owner/engine globals
   - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
   - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered unique-key intent:

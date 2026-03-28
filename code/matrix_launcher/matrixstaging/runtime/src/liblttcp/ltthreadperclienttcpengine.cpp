@@ -99,6 +99,16 @@ static bool IsSyntheticReceiveDrainWorkType(uint32_t workType) {
     return workType == CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain;
 }
 
+// UNANCHORED: source-owned helper for the current connection/worker key normalization seams.
+static void* ResolveEngineContextKeyScaffold(void* contextKey) {
+    return CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+}
+
+// UNANCHORED: source-owned helper for the current queue-context bridge lookup seams.
+static CBaseConnection* ResolveEngineQueueContextOwnerScaffold(void* contextKey) {
+    return CBaseConnection_FromQueueContextScaffold(contextKey);
+}
+
 static const char* LauncherBridgeWorkTypeName(uint32_t workType) {
     switch (workType) {
         case CLTThreadPerClientTCPEngine::kWorkTypeClose:
@@ -1240,7 +1250,9 @@ uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint
 // UNANCHORED source-side helper used by the current connection scaffolding.
 // Current original anchor is the lower-level connect family at launcher.exe:0x4328a0.
 uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, void* contextKey, void* ownerContext) {
-    if (!contextKey || !EnsureWinsockReady()) {
+    void* normalizedContextKey = ResolveEngineContextKeyScaffold(contextKey);
+    void* normalizedOwnerContext = ResolveEngineContextKeyScaffold(ownerContext ? ownerContext : contextKey);
+    if (!normalizedContextKey || !EnsureWinsockReady()) {
         return 0;
     }
 
@@ -1260,8 +1272,8 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
     }
 
     WorkerThreadRecord* worker = CreateOrReplaceWorkerThreadScaffold(
-        contextKey,
-        ownerContext,
+        normalizedContextKey,
+        normalizedOwnerContext,
         static_cast<uint32_t>(sock),
         LTTCPEngineConnectionState::kConnectActive,
         /*datagramMode=*/false);
@@ -1470,7 +1482,7 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     const bool droppedGenericConnection = DropMessageConnection(cleanupContextKey);
     if (!touchedConnectionState && !droppedGenericConnection) {
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine::CleanupConnection couldn't find socket/context key={} normalizedKey={} owner={} ",
+            "CLTThreadPerClientTCPEngine::CleanupConnection couldn't find socket/context key={} normalizedKey={} owner={}",
             fmt::ptr(contextKey),
             fmt::ptr(cleanupContextKey),
             fmt::ptr(queuedConnectionOwner));
@@ -1902,8 +1914,8 @@ const std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>& CLTThreadPer
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
 CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* contextKey) {
-    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
-    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
+    void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
     auto matchesConnectionKey =
         [contextKey, resolvedContextKey, queueContextOwner](CMessageConnection* connection) -> bool {
         if (!connection) {
@@ -1945,7 +1957,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
         return existing;
     }
 
-    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
     if (resolvedContextKey != contextKey) {
         if (CMessageConnection* existing = FindMessageConnection(resolvedContextKey)) {
             return existing;
@@ -1965,8 +1977,8 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
 bool CLTThreadPerClientTCPEngine::DropMessageConnection(void* contextKey) {
-    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
-    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
+    void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
     for (auto it = messageConnections_.begin(); it != messageConnections_.end(); ++it) {
         CMessageConnection* connection = *it;
         if (connection &&
@@ -2008,8 +2020,8 @@ CLTThreadPerClientTCPEngine::AcceptThreadRecord* CLTThreadPerClientTCPEngine::Fi
 // UNANCHORED starter helper.
 // No direct launcher.exe helper body is assigned yet.
 CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::FindWorker(void* contextKey) {
-    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
-    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
+    void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
     for (auto& record : workerThreads_) {
         if (record.contextKey == contextKey ||
             record.contextKey == resolvedContextKey ||
@@ -2029,18 +2041,27 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Cr
     uint32_t socketHandle,
     LTTCPEngineConnectionState state,
     bool datagramMode) {
+    void* normalizedContextKey = ResolveEngineContextKeyScaffold(contextKey);
+    void* normalizedOwnerContext = ResolveEngineContextKeyScaffold(ownerContext ? ownerContext : contextKey);
+    if (!normalizedContextKey) {
+        normalizedContextKey = contextKey;
+    }
+    if (!normalizedOwnerContext) {
+        normalizedOwnerContext = normalizedContextKey;
+    }
+
     WorkerThreadRecord worker = {};
-    worker.contextKey = contextKey;
-    worker.ownerContext = ownerContext;
+    worker.contextKey = normalizedContextKey;
+    worker.ownerContext = normalizedOwnerContext;
     worker.socketHandle = socketHandle;
     worker.state = state;
-    worker.thread = std::make_unique<CLTThreadPerClientTCPEngine_WorkerThread>(contextKey, datagramMode);
+    worker.thread = std::make_unique<CLTThreadPerClientTCPEngine_WorkerThread>(normalizedContextKey, datagramMode);
     if (!worker.thread) {
         return nullptr;
     }
 
     WorkerThreadRecord* inserted = nullptr;
-    if (WorkerThreadRecord* existing = FindWorker(contextKey)) {
+    if (WorkerThreadRecord* existing = FindWorker(normalizedContextKey)) {
         StopWorkerThreadScaffold(existing);
         *existing = std::move(worker);
         inserted = existing;
