@@ -41,7 +41,10 @@ namespace mxo::liblttcp {
 //   - string-backed receive/completion/error handling lives on this path
 // - newer startup-side narrowing now also shows important **derived** leaf families on top of this
 //   base object:
-//   - later leaf vtable `0x4afef0` (current best read: `CBasicMarginConnection`)
+//   - later leaf vtable `0x4afef0`
+//     - older notes called this `CBasicMarginConnection`
+//     - current focused startup read instead proves it is the auth-side startup leaf reached from
+//       `0x41d170` and wrapped by `0x449a70`
 //   - later leaf vtable `0x4aff38` (`CMarginConnection`)
 //   - those families wrap base completion through `0x449a70` / `0x44af60`
 //   - later leaf `0x449a70` is now narrowed one step further:
@@ -273,6 +276,8 @@ public:
     // string-backed original name: CMessageConnection::OnOperationCompleted
     // current best read:
     // - main completion/receive-side bridge back into engine/queue handling
+    // - work type `2` first tries optional completion helper `+0x7c`; on the launcher startup path
+    //   that then falls through into the leaf owner-callback wrapper
     // - work type `3` copies packet-body bytes out of the retained-fragment-backed
     //   `CParsedPacketWorkItem` via `+0x24/+0x28` before later dispatch/agenda handling
     // - generic fallback logger on this path is helper `0x448a60`
@@ -316,6 +321,32 @@ private:
     std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
     bool lastReceivedPacketHeaderlessScaffold_ = false;
     std::vector<CMessageConnectionReceivedPacketScaffold> pendingReceivedPacketsScaffold_;
+};
+
+// ============================================================
+// CAuthStartupConnection class declaration
+// ============================================================
+// Source-owned leaf mirror of the auth-side startup child built at `0x41d170` and assigned
+// vtable `0x004afef0` before the initial `connection->+0x1c(owner+0x5c)` call.
+// Keep the class name conservative in source for now:
+// - the surrounding canonical docs still carry older naming on `0x004afef0`
+// - but current static RE is strong that this is the auth-side leaf completion wrapper reached
+//   through `0x449a70`, not just a generic base `CMessageConnection`
+class CAuthStartupConnection : public CMessageConnection {
+public:
+    // anchor: launcher.exe:0x41cf50
+    CAuthStartupConnection();
+    // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
+    explicit CAuthStartupConnection(CLTThreadPerClientTCPEngine* authEngine);
+    ~CAuthStartupConnection();
+
+    // anchor: launcher.exe:0x449a70
+    // Current best original order:
+    // - call base `0x4490c0`
+    // - if base returns 0, call owner `+0x17c(this, workItem)`
+    // - if that also returns 0, fall through to `0x448a60`
+    // - if work type == 1, tears down through the connection object
+    uint32_t OnOperationCompleted(void* workItem) override;
 };
 
 // ============================================================

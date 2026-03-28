@@ -1488,10 +1488,13 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     workItem->debugLabel = label;
 
     void* queuedContext = context;
-    if (IsSyntheticReceiveDrainWorkType(workType) && context->sidecarConnection) {
+    if ((IsSyntheticReceiveDrainWorkType(workType) ||
+         workType == kWorkTypeConnectionStatus) &&
+        context->sidecarConnection) {
         // Current bounded fidelity step:
-        // - original queue consumer dispatches into the connection-family callback path
-        // - the synthetic receive-drain proxy is still source-owned, but it now reaches that
+        // - original queue consumer dispatches type-2/type-3-adjacent work into the
+        //   connection-family callback path with `context == connection`
+        // - the source-owned receive-drain proxy is still synthetic, but it now reaches that
         //   nearer connection callback surface first instead of jumping straight to the
         //   mediator-owned bridge context callback
         queuedContext = context->sidecarConnection->QueueContextScaffold();

@@ -363,6 +363,40 @@ static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
     return 1u;
 }
 
+static uint32_t CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
+    CMessageConnection* self,
+    uint32_t workPayload,
+    bool isMarginConnection,
+    const char* ownerSlotLabel) {
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        CMessageConnection_LoginMediatorContextScaffold(self);
+    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    if (!self || !context || !mediator) {
+        spdlog::debug(
+            "CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold missing mediator context this={} ownerContext={} payload=0x{:08x} ownerSlot={} expectedMargin={}",
+            fmt::ptr(self),
+            fmt::ptr(self ? self->OwnerContext() : nullptr),
+            workPayload,
+            ownerSlotLabel ? ownerSlotLabel : "<null>",
+            isMarginConnection ? 1u : 0u);
+        return 0u;
+    }
+
+    const uint32_t handled = isMarginConnection
+        ? mediator->HandleMarginConnectStatus(workPayload)
+        : mediator->HandleAuthConnectStatus(workPayload);
+    spdlog::info(
+        "CMessageConnection::OnOperationCompleted routed type-2 connect-status through owner fallback payload=0x{:08x} this={} ownerContext={} ownerSlot={} isMargin={} handled={} remoteHost='{}'",
+        workPayload,
+        fmt::ptr(self),
+        fmt::ptr(self->OwnerContext()),
+        ownerSlotLabel ? ownerSlotLabel : "<null>",
+        isMarginConnection ? 1u : 0u,
+        handled,
+        self->RemoteHostName().empty() ? std::string("<empty>") : self->RemoteHostName());
+    return handled;
+}
+
 // anchor: launcher.exe:0x4490c0 first dispatch on `workItem+0x04`
 // Source-owned decomposition of the initial work-type test inside
 // `CMessageConnection::OnOperationCompleted`.
@@ -521,6 +555,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
             this,
             syntheticWorkItem ? syntheticWorkItem->workPayload : 0u);
     }
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+        // Current best startup-path read from `0x4490c0` + wrapper callers `0x449a70/0x44af60`:
+        // - base type-2 handling first tries optional completion helper `+0x7c`
+        // - on the auth/margin startup path those helpers are null
+        // - control therefore falls through into the leaf owner-callback wrapper
+        return 0u;
+    }
     if (workType != CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket) {
         CMessageConnection_LogUnhandledOperationScaffold(workItem);
         return 1u;
@@ -656,6 +697,56 @@ uint32_t CMessageConnection::EnsureConnected() {
 }
 
 // ============================================================
+// VTable 0x004afef0 - auth-side startup leaf wrapper
+// ============================================================
+// Current best anchored role from `0x41d170`:
+// - auth startup allocates `0xa8`
+// - runs shared connection ctor setup
+// - overwrites vtable to `0x004afef0`
+// - stores owner at `+0xa4`
+// - configures packet-name callback `0x41ce00`
+// - then immediately calls `connection->+0x1c(owner+0x5c)`
+// Current source keeps the class name conservative until wider naming cleanup is done.
+CAuthStartupConnection::CAuthStartupConnection()
+    : CMessageConnection() {}
+
+CAuthStartupConnection::CAuthStartupConnection(CLTThreadPerClientTCPEngine* authEngine)
+    : CMessageConnection(authEngine) {}
+
+CAuthStartupConnection::~CAuthStartupConnection() = default;
+
+// anchor: launcher.exe:0x449a70
+uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
+    if (!workItem) {
+        return 0u;
+    }
+
+    const uint32_t baseResult = CMessageConnection::OnOperationCompleted(workItem);
+    if (baseResult != 0u) {
+        return 1u;
+    }
+
+    const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+        const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* statusWorkItem =
+            static_cast<const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
+        return CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
+            this,
+            statusWorkItem ? statusWorkItem->workPayload : 0u,
+            /*isMarginConnection=*/false,
+            "+0x17c");
+    }
+
+    spdlog::debug(
+        "CAuthStartupConnection::OnOperationCompleted unresolved owner+0x17c fallback workItem={} this={} ownerContext={} remoteHost='{}'",
+        fmt::ptr(workItem),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return 0u;
+}
+
+// ============================================================
 // VTable 0x004aff38 - CMarginConnection
 // ============================================================
 // Later leaf on top of:
@@ -698,6 +789,17 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
     const uint32_t baseResult = CMessageConnection::OnOperationCompleted(workItem);
     if (baseResult != 0u) {
         return 1u;
+    }
+
+    const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+        const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* statusWorkItem =
+            static_cast<const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
+        return CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
+            this,
+            statusWorkItem ? statusWorkItem->workPayload : 0u,
+            /*isMarginConnection=*/true,
+            "+0x188");
     }
 
     spdlog::debug(

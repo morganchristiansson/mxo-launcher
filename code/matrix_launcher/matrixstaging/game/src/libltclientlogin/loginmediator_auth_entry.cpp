@@ -1115,24 +1115,36 @@ void CLTLoginMediator::BuildMarginEndpoint() {
 
 // UNANCHORED: source-owned auth-connection child materializer mirroring owner `+0x18` construction.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject() {
-    if (engine_ && authConnectionContextKey_) {
-        authConnection_ = engine_->GetOrCreateMessageConnection(authConnectionContextKey_);
-        authConnectionOwnedByMediator_ = false;
-    } else if (!authConnection_) {
-        authConnection_ = new mxo::liblttcp::CMessageConnection(engine_);
+    mxo::liblttcp::CAuthStartupConnection* authConnection =
+        dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
+    if (!authConnection) {
+        if (authConnectionOwnedByMediator_) {
+            delete authConnection_;
+        }
+        authConnection = new mxo::liblttcp::CAuthStartupConnection(engine_);
+        if (!authConnection) {
+            authConnection_ = nullptr;
+            authConnectionOwnedByMediator_ = false;
+            return nullptr;
+        }
+
+        authConnection_ = authConnection;
         authConnectionOwnedByMediator_ = true;
     }
 
-    if (authConnection_) {
-        // anchor: launcher.exe:0x448960 via `0x41d170`
-        // Auth connection startup config writes `+0x78 = 1` and `+0x70 = FUN_0041ce00`.
-        // Current source scaffold keeps the packet-name family / packetized-mode side of that
-        // connection metadata explicit even though the callback body itself is still only used as
-        // evidence for naming, not as a live function pointer.
-        authConnection_->ConfigurePacketNameFamilyScaffold(
-            mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kAuth,
-            /*packetizedMessagesEnabled=*/true);
+    authConnection->SetEngine(engine_);
+    if (authConnectionContextKey_) {
+        authConnection->SetOwnerContext(authConnectionContextKey_);
     }
+
+    // anchor: launcher.exe:0x41d170 / vtable `0x004afef0`
+    // Current bounded source correction:
+    // - auth startup no longer materializes only a base `CMessageConnection` here
+    // - source now keeps the auth-side leaf completion wrapper explicit so type-2 status and the
+    //   later receive-drain proxy can re-enter through the nearer connection callback surface
+    authConnection->ConfigurePacketNameFamilyScaffold(
+        mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kAuth,
+        /*packetizedMessagesEnabled=*/true);
     return authConnection_;
 }
 

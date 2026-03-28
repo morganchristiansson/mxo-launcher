@@ -437,9 +437,10 @@ private:
     //   because original type `3` is already consumed by the parsed-packet queue items emitted from
     //   `CLTTCPConnection::OnReceive`
     // Current bounded destination correction:
-    // - synthetic receive-drain items now prefer the connection-family queue context when one is
-    //   available, so queue dispatch lands on `CMessageConnection::OnOperationCompleted` before any
-    //   later mediator-owned drain handling
+    // - type-2 connection-status items and synthetic receive-drain items now prefer the
+    //   connection-family queue context when one is available
+    // - that lets queue dispatch land on the nearer `CMessageConnection`/leaf callback path before
+    //   any later mediator-owned handling
     bool EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         uint32_t workType,
