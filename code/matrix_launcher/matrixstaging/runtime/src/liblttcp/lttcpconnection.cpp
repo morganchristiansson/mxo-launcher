@@ -137,6 +137,13 @@ static void EnsureParsedPacketWorkItemVtableInitialized() {
     }
 }
 
+// Recovered original source-file anchor for the parser helper family reflected below:
+// - `\matrixstaging\runtime\src\libltmessaging\variablelengthprefixedtcpstreamparser.cpp`
+// Current source still keeps the parser helper scaffolds beside `CLTTCPConnection` because the
+// parser object is not yet split into its own source-owned runtime type. Direct one-to-one parser
+// helper mirrors should still carry launcher.exe anchors even while this temporary file placement
+// remains.
+
 // UNANCHORED: source-owned allocator for the recovered `0x2c` parsed-packet work-item family.
 static CLTTCPConnection_ParsedPacketWorkItemScaffold* AllocateParsedPacketWorkItemScaffold() {
     EnsureParsedPacketWorkItemVtableInitialized();
@@ -240,6 +247,19 @@ static CLTTCPReadOperationFragmentScaffold* ParsedPacketWorkItem_GetTailFragment
         return workItem->firstRetainedFragment10;
     }
     return tailNode->retainedFragment08;
+}
+
+// anchor: launcher.exe:0x4355c0
+// Narrow source-owned helper matching the temp-ref return shape used by
+// `CVariableLengthPrefixedTCPStreamParser_ResetAfterPacket`.
+static CLTTCPReadOperationFragmentScaffold* ParsedPacketWorkItem_GetTailFragmentTempRefScaffold(
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
+    CLTTCPReadOperationFragmentScaffold* tailFragment =
+        ParsedPacketWorkItem_GetTailFragmentScaffold(workItem);
+    if (tailFragment) {
+        ReadOperationFragment_AddRef(tailFragment);
+    }
+    return tailFragment;
 }
 
 // UNANCHORED: source-owned allocator guard for parser `+0x14` current work-item state.
@@ -375,8 +395,9 @@ static bool Parser_PeekBufferedByteAtOffsetScaffold(
     return false;
 }
 
-// UNANCHORED: source-owned cursor-advance helper mirroring the active `0x472660` receive path.
-// Current source models the nonzero advance-flag xrefs used by `0x469bf0`.
+// anchor: launcher.exe:0x472660
+// Narrow source-owned mirror of the active nonzero-flag cursor-advance path used by current
+// `0x469bf0` xrefs.
 static bool Parser_AdvanceBufferedCursorScaffold(
     CVariableLengthPrefixedTCPStreamParserScaffold* parser,
     uint32_t byteCountToConsume) {
@@ -444,7 +465,8 @@ static bool Parser_AdvanceBufferedCursorScaffold(
     return true;
 }
 
-// UNANCHORED: source-owned narrow reset helper mirroring the `0x469bf0 -> 0x4725c0` emit handoff.
+// anchor: launcher.exe:0x4725c0
+// Narrow source-owned mirror of the post-emit reset helper reached from parser virtual `+0x0c`.
 static void Parser_ResetAfterPacketScaffold(
     CVariableLengthPrefixedTCPStreamParserScaffold* parser) {
     if (!parser) {
@@ -462,16 +484,26 @@ static void Parser_ResetAfterPacketScaffold(
         return;
     }
 
-    CLTTCPReadOperationFragmentScaffold* tailFragment =
-        ParsedPacketWorkItem_GetTailFragmentScaffold(emittedWorkItem);
-    if (!tailFragment) {
-        return;
+    CLTTCPReadOperationFragmentScaffold* tailFragmentTempRef =
+        ParsedPacketWorkItem_GetTailFragmentTempRefScaffold(emittedWorkItem);
+    if (tailFragmentTempRef != parser->currentCursorFragment04) {
+        Parser_AssignCurrentCursorFragmentScaffold(parser, tailFragmentTempRef);
+    }
+    ReadOperationFragment_Release(tailFragmentTempRef);
+
+    CLTTCPReadOperationFragmentScaffold* parserCurrentCursorFragment =
+        parser->currentCursorFragment04;
+    if (parserCurrentCursorFragment) {
+        ReadOperationFragment_AddRef(parserCurrentCursorFragment);
+        const bool appended = ParsedPacketWorkItem_AppendFragmentScaffold(
+            replacementWorkItem,
+            parserCurrentCursorFragment);
+        ReadOperationFragment_Release(parserCurrentCursorFragment);
+        if (!appended) {
+            return;
+        }
     }
 
-    Parser_AssignCurrentCursorFragmentScaffold(parser, tailFragment);
-    if (!ParsedPacketWorkItem_AppendFragmentScaffold(replacementWorkItem, tailFragment)) {
-        return;
-    }
     replacementWorkItem->currentCursor24 = parser->currentCursor08;
 }
 
@@ -878,7 +910,8 @@ uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
     //     used by `0x469bf0`
     //   - queueable parsed-packet work-item emits even when the framed packet body crosses the
     //     retained-fragment boundary inside the current parser work item
-    //   - post-emit reset/carry-over of the current tail fragment for later drain loops
+    //   - post-emit reset/carry-over now also follows the narrower `0x4725c0` temp-ref ordering
+    //     around tail-fragment handoff into the replacement work item
     // - the remaining local gap is now narrower:
     //   - exact temp AddRef/Release ordering inside `0x472660`
     //   - the dormant zero-flag branch shape in that helper, which is not used by current parse xrefs

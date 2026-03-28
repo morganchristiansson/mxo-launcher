@@ -6,6 +6,12 @@
 // - `\matrixstaging\runtime\src\libltcrypto\auth_crypto.h`
 // Compatibility wrapper retained at:
 // - `src/auth/auth_crypto.h`
+// Important current split:
+// - the receive-side `CVariableLengthPrefixedTCPStreamParser` runtime mirror used by
+//   `CLTTCPConnection::OnReceive` still lives beside the connection scaffold in
+//   `matrixstaging/runtime/src/liblttcp/lttcpconnection.cpp`
+// - keep that temporary placement explicit until the parser object itself is split into a dedicated
+//   source-owned runtime type; do not silently duplicate the runtime parser logic in two places
 //
 // Address anchors:
 // - exact original helper function VA for this framing code: [not yet isolated]
