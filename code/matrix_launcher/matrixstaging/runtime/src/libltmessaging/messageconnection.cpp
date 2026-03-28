@@ -169,12 +169,19 @@ bool CMessageConnection::PacketizedMessagesEnabledScaffold() const {
 }
 
 void CMessageConnection::ConfigurePacketAgendaScaffold(const void* agendaConfiguration) {
-    (void)agendaConfiguration;
     if (!packetAgendaScaffold_) {
         packetAgendaScaffold_ = std::make_unique<CMessageConnectionPacketAgendaScaffold>();
     }
     if (packetAgendaScaffold_) {
         packetAgendaScaffold_->created = true;
+        // anchor: launcher.exe:0x448980 -> 0x469740
+        // Current best known original builder path (`0x41470 -> 0x44da00`) installs both a read
+        // helper and a write helper on the agenda configuration object before `0x448980` forwards
+        // it into the agenda at connection `+0x74`.
+        // Source still accepts a typeless pointer here, so keep the modeled helper presence
+        // conservative: null => no helpers known, non-null => one read + one write helper known.
+        packetAgendaScaffold_->configuredReadHelperCount = (agendaConfiguration != nullptr) ? 1u : 0u;
+        packetAgendaScaffold_->configuredWriteHelperCount = (agendaConfiguration != nullptr) ? 1u : 0u;
     }
 }
 
@@ -227,7 +234,8 @@ bool CMessageConnection::PacketAgendaAllowsEnvelopeScaffold(const CMessageConnec
     // - `0x448980` lazy-creates the `+0x74` agenda object
     // - `0x469950` runs the send-side write-helper chain and may return a replaced or null packet
     // Current source model still keeps the active path pass-through, but it now preserves whether
-    // we have even modeled the presence of that agenda object on the connection.
+    // we have even modeled the presence of that agenda object on the connection and whether a
+    // write helper was ever configured there.
     (void)envelope;
     return true;
 }
@@ -761,6 +769,47 @@ static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
     }
 }
 
+// anchor: launcher.exe:0x4489d0
+// Source-owned shared_ptr-based mirror of the receive/message-ref swap helper used after
+// `0x469930` returns a read-side packet-agenda result.
+static void CMessageConnection_AssignReceivedMessageRefScaffold(
+    CMessageConnectionReceivedMessageRefScaffold* destination,
+    const CMessageConnectionReceivedMessageRefScaffold& source) {
+    if (!destination) {
+        return;
+    }
+    *destination = source;
+}
+
+// anchor: launcher.exe:0x469930
+// Source-owned mirror of the read-side packet-agenda handoff just before leaf dispatch.
+// Current bounded source model:
+// - if no read helper is configured, keep the input message-ref unchanged
+// - if a read helper is configured, preserve the original handoff/swap shape but still pass the
+//   same message-ref through until helper transformation/discard behavior is recovered
+static bool CMessageConnection_ApplyReceivePacketAgendaScaffold(
+    const CMessageConnectionPacketAgendaScaffold* agenda,
+    const CMessageConnectionReceivedMessageRefScaffold& inputMessageRef,
+    CMessageConnectionReceivedMessageRefScaffold* outputMessageRef,
+    bool* outAgendaTouched) {
+    if (outAgendaTouched) {
+        *outAgendaTouched = false;
+    }
+    if (!outputMessageRef) {
+        return false;
+    }
+
+    CMessageConnection_AssignReceivedMessageRefScaffold(outputMessageRef, inputMessageRef);
+    if (!agenda || agenda->configuredReadHelperCount == 0u) {
+        return true;
+    }
+
+    if (outAgendaTouched) {
+        *outAgendaTouched = true;
+    }
+    return true;
+}
+
 }  // namespace
 
 uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
@@ -784,6 +833,8 @@ uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
 //   - copied packet spans are appended into that inner storage before later code reads
 //   - headerless packets now keep the original locator-id validity gate on that object before leaf dispatch
 // - current bounded leaf correction:
+//   - if connection `+0x74` is present, source now also preserves the nearer
+//     `0x469930 -> 0x4489d0` read-agenda handoff shape as a pass-through swap before dispatch
 //   - auth leaf `0x449a30 -> owner+0x180 / 0x41f250` can now re-enter current-helper slot 5
 //     through a local message-ref/base-filter step instead of jumping straight from copied bytes
 //   - margin leaf `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260` can now re-enter the nearer
@@ -886,9 +937,45 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
+    CMessageConnectionReceivedMessageRefScaffold agendaMessageRef = {};
+    const CMessageConnectionReceivedMessageRefScaffold* messageRefForDispatch = &copiedMessageRef;
+    bool agendaTouched = false;
+    if (const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
+        agenda && agenda->created) {
+        if (!CMessageConnection_ApplyReceivePacketAgendaScaffold(
+                agenda,
+                copiedMessageRef,
+                &agendaMessageRef,
+                &agendaTouched)) {
+            spdlog::info(
+                "CMessageConnection::OnOperationCompleted discarded receive/message-ref through packet-agenda read handoff payloadBytes={} headerless={} this={} ownerContext={} remoteHost='{}'",
+                static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
+                lastReceivedPacketHeaderlessScaffold_ ? 1u : 0u,
+                fmt::ptr(this),
+                fmt::ptr(OwnerContext()),
+                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+            return 1u;
+        }
+        if (agendaTouched) {
+            messageRefForDispatch = &agendaMessageRef;
+            if (const std::vector<uint8_t>* agendaPayloadBytes =
+                    CMessageConnection_MessagePayloadBytesScaffold(*messageRefForDispatch)) {
+                lastReceivedPacketBodyBytesScaffold_ = *agendaPayloadBytes;
+            }
+            lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
+            spdlog::debug(
+                "CMessageConnection::OnOperationCompleted preserved source-owned packet-agenda read handoff as pass-through payloadBytes={} configuredReadHelpers={} this={} ownerContext={} remoteHost='{}'",
+                static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
+                static_cast<unsigned>(agenda->configuredReadHelperCount),
+                fmt::ptr(this),
+                fmt::ptr(OwnerContext()),
+                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        }
+    }
+
     const uint32_t postCopyDispatchHandled = DispatchCopiedParsedPacketTailScaffold(
         workItem,
-        copiedMessageRef);
+        *messageRefForDispatch);
     if (postCopyDispatchHandled != 0u) {
         spdlog::info(
             "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} and dispatched it on the post-copy leaf path this={} ownerContext={} remoteHost='{}'",

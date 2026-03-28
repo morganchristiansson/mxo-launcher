@@ -190,7 +190,10 @@ struct CMessageConnectionPacketAgendaScaffold {
     // Current best narrowed shape from `0x448980 -> 0x469b10 -> 0x469850 -> 0x469740`:
     // - object is lazy-created, not constructor-owned
     // - object has distinct read/write helper sides
-    // - send path `0x448cf0` consults the write side and may replace/discard the envelope
+    // - receive path `0x4490c0` consults the read side through `0x469930` and then swaps the
+    //   returned message-ref through `0x4489d0` before leaf dispatch
+    // - send path `0x448cf0` consults the write side through `0x469950` and may replace/discard
+    //   the outgoing envelope
     bool created = false;
     uint32_t configuredReadHelperCount = 0;
     uint32_t configuredWriteHelperCount = 0;
@@ -304,11 +307,13 @@ public:
     // - generic fallback logger on this path is helper `0x448a60`
     // Current source gap kept explicit:
     // - source now owns the copied-packet staging subset and two later leaf post-copy destinations:
-    //   - auth: local message-ref/base-filter step -> `0x449a30 -> owner+0x180 / 0x41f250`
-    //   - margin: `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
-    // - later original refcounted message-object / agenda work from this same callback is still
-    //   missing, so the launcher bridge keeps one extra synthetic receive-drain proxy item for the
-    //   remaining unconsumed paths
+    //   - auth: optional `connection+0x74 -> 0x469930 -> 0x4489d0` pass-through handoff,
+    //     then local message-ref/base-filter step -> `0x449a30 -> owner+0x180 / 0x41f250`
+    //   - margin: optional `connection+0x74 -> 0x469930 -> 0x4489d0` pass-through handoff,
+    //     then `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
+    // - later original agenda helper transformation/discard behavior from this same callback is
+    //   still incomplete, so the launcher bridge keeps one extra synthetic receive-drain proxy item
+    //   for the remaining unconsumed paths
     uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
