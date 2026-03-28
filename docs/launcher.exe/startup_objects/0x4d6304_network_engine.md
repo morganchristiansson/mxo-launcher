@@ -1010,10 +1010,20 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
   - it is a `CVariableLengthPrefixedTCPStreamParser`-family object
   - ctor path: `0x469f50 -> 0x469b20`
   - primary receive call: `0x469bf0 = CVariableLengthPrefixedTCPStreamParser::Parse`
-  - parser slot `+0x10` / `0x469b40` allocates the completed packet object through `0x435db0 -> 0x435090`
+  - parser slot `+0x10` / `0x469b40` allocates the parser's current `CParsedPacketWorkItem` through
+    `0x435db0 = CParsedPacketWorkItem_Allocate -> 0x435090 = CParsedPacketWorkItem_ctor`
     - i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already seen in queue producer analysis
+  - that `0x4b3e08` object family is now best read as **both**:
+    - parser-owned assembly state while bytes are still being accumulated, and
+    - the emitted completed packet object when `Parse(...)` returns `0`
+  - the concrete phase boundary is now static-RE-backed:
+    - `Parse` appends retained read fragments into parser current work item `+0x14`
+    - after prefix decode it stores packet-body byte count at work-item `+0x28`
+    - just before emit it stores work-item `+0x24 = parser+0x08`
+    - `ResetAfterPacket` then allocates a fresh replacement work item and, if unread bytes remain,
+      carries the old tail fragment plus the new cursor into that replacement object
   - `CLTTCPConnection::OnReceive` (`0x449d40`) therefore feeds received stream fragments into a framing parser there, not an anonymous poll stub
-  - the parser-emitted object queued by `0x449d40` is now best read as a concrete queue-work item, not only an opaque buffer pointer
+  - the parser-emitted object queued by `0x449d40` is now best read as a fragment-backed parsed-packet work item with retained-fragment, cursor, and assembled-byte-count state, not only an opaque buffer pointer
   - newer focused pass also narrows the explicit `0x449d40` argument itself:
     - it is best read as a refcounted `CLTTCPReadOperation`-family buffer fragment consumed by the parser
     - worker-thread receive producer now gives that object a much tighter concrete shape:
@@ -1031,6 +1041,11 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
   - source lockstep update from the same focused pass:
     - `lttcpconnection.h` now carries explicit scaffold types for the `CLTTCPReadOperation`-family
       parser input fragment and the emitted `0x2c` packet work item
+    - the parsed-packet scaffold there now also records the currently proven parser-owned fields:
+      - retained fragment count / first retained fragment / additional-fragment list owner
+      - traversal-only state at `+0x18/+0x1c/+0x20`
+      - `+0x24` as a cursor pointer
+      - `+0x28` as assembled packet-body byte count
     - `CLTTCPConnection::OnReceive` / `OnClose` now model the narrower AddRef / Parse / Release seam
       instead of treating the fragment virtual `+0x04` as a possible materialization helper
     - source comments now also record the wider original `OnClose` callback ABI proven by the UDP

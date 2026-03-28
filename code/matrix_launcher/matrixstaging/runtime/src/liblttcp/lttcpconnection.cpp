@@ -327,7 +327,12 @@ void CLTTCPConnection::OnReceive(void* readOperationFragment) {
     // - first parser handoff is `Parse(fragment, &completedPacketWorkItem)`
     // - later drain handoffs are `Parse(nullptr, &completedPacketWorkItem)`
     // - parser-emitted `completedPacketWorkItem` is the same `0x2c` / vtable-`0x4b3e08`
-    //   work-item family built by `0x435db0 -> 0x435090`
+    //   `CParsedPacketWorkItem` family built by `0x435db0 -> 0x435090`
+    // - that object family is both:
+    //   - the parser-owned assembly state while bytes are still buffered, and
+    //   - the completed packet object once `Parse(...)` returns `0`
+    // - after each successful emit, `ResetAfterPacket` allocates a fresh replacement work item and
+    //   may carry the tail fragment / cursor forward when unread stream bytes remain buffered
     // - the final fragment `+0x08` here releases only the outer OnReceive-held fragment reference
     CLTTCPReadOperationFragmentScaffold* fragment =
         static_cast<CLTTCPReadOperationFragmentScaffold*>(readOperationFragment);
@@ -402,9 +407,14 @@ uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
     //   immediately after a no-arg fragment AddRef in `0x449d40`
     // - later drain passes reach it as `Parse(nullptr, &completedPacketWorkItem)` until the parser
     //   stops yielding complete packets
-    // - parser slot `+0x10` / `0x469b40` allocates the emitted completed-packet object via
+    // - parser slot `+0x10` / `0x469b40` allocates the current `CParsedPacketWorkItem` object via
     //   `0x435db0 -> 0x435090`, i.e. the same `0x2c` / vtable-`0x4b3e08` work-item family already
     //   seen in queue producer xrefs
+    // - that current work item starts as parser-owned assembly state and becomes the emitted
+    //   completed packet object when `Parse(...)` returns `0`
+    // - `0x4725c0` / `ResetAfterPacket` then allocates a fresh replacement object and, when unread
+    //   bytes remain in the old tail fragment, carries that tail fragment plus the new cursor into
+    //   the replacement work item
     // - `Parse` itself also uses fragment `+0x04` / `+0x08` as no-arg AddRef / Release hooks while
     //   transferring retained fragment ownership into the completed work item
     // The faithful parser/read-operation object family is not reconstructed yet, so keep this
