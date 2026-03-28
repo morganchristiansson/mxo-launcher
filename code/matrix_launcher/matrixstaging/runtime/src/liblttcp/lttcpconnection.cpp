@@ -345,9 +345,12 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
                 "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv returned EOF socket=0x{:08x} remoteHost='{}'",
                 socketHandle_,
                 remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
-            state_ = LTTCPEngineConnectionState::kClosed;
-            closesocket(socket);
-            socketHandle_ = kInvalidSocketHandle;
+            // Bounded fidelity step:
+            // - the later queue/type-1 cleanup path is what ultimately settles the connection into
+            //   the fully closed state
+            // - keep this earlier terminal-recv transition on the lower close helper so source now
+            //   uses the same intermediate `kClosing` transport state as the anchored close wrapper
+            (void)CloseSocketTransportScaffold(/*graceful=*/false);
             return -1;
         }
 
@@ -360,9 +363,7 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
             socketHandle_,
             remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             wsaError);
-        state_ = LTTCPEngineConnectionState::kClosed;
-        closesocket(socket);
-        socketHandle_ = kInvalidSocketHandle;
+        (void)CloseSocketTransportScaffold(/*graceful=*/false);
         return -1;
     }
 

@@ -132,6 +132,8 @@ New queue-thread clarification from the current focused pass:
       it on the next loop iteration
     - newer bounded correction: the shutdown-sentinel cascade now re-enters the normal enqueue
       helper path instead of open-coding a raw `Queue_PushPair(0,0)` write
+    - newer bounded correction: source now also keeps the recovered `0x4816f0(workItem)`-style
+      type read explicit at dequeue time before the later slot-12/context callback branch
     - newer bounded correction: cross-block dequeue no longer immediately frees the exhausted head
       `0x80` queue block; source now caches it for later `Queue_PushPair` growth reuse, which is a
       closer source-owned mirror of the original block recycling / free-list behavior

@@ -1800,6 +1800,14 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
         const bool shouldAutoReleaseContext =
             context && isType1 && QueueContext_ShouldAutoReleaseAfterType1(context);
 
+        spdlog::debug(
+            "CLTThreadPerClientTCPEngine::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
+            (selectedQueue == externalQueue34_) ? "queue34" : "queue0C",
+            fmt::ptr(workItem),
+            workType,
+            fmt::ptr(context),
+            shouldAutoReleaseContext ? 1u : 0u);
+
         if (context && isType1) {
             CleanupConnection(context);
         }
