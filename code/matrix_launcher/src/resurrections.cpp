@@ -12,6 +12,7 @@
 #include <winver.h>
 #include <cstdio>
 #include <cstdint>
+#include <cstddef>
 #include <cstring>
 #include <cstdarg>
 #include <cstdlib>
@@ -49,24 +50,41 @@ using InitClientDLLFunc = int (*)(
 
 using RunClientDLLFunc = int (*)();
 using TermClientDLLFunc = int (*)();
+using ErrorClientDLLFunc = const char* (*)();
+
+class CLauncher {
+public:
+    // anchor: launcher.exe:0x4097f0
+    // This replacement class intentionally does not derive from MFC yet.
+    // It only preserves the currently useful recovered field tail and startup helpers.
+    uint8_t m_RecoveredBaseToA3[0xa4] = {};
+    uint32_t m_FieldA4 = 0;          // original: [this+0xa4]
+    uint32_t m_FieldA8 = 0xffffffff; // original: [this+0xa8], high 8 bits feed InitClientDLL arg7
+    uint32_t m_FieldAC = 0;          // original: [this+0xac], low 24 bits feed InitClientDLL arg7
+    uint8_t m_FieldB0 = 0;           // original: [this+0xb0]
+
+    uint32_t BuildPackedArg7Selection() const;
+    bool RunClientDllLifecycle() const;
+};
+
+static_assert(offsetof(CLauncher, m_FieldA4) == 0xa4, "CLauncher +0xa4 drifted");
+static_assert(offsetof(CLauncher, m_FieldA8) == 0xa8, "CLauncher +0xa8 drifted");
+static_assert(offsetof(CLauncher, m_FieldAC) == 0xac, "CLauncher +0xac drifted");
+static_assert(offsetof(CLauncher, m_FieldB0) == 0xb0, "CLauncher +0xb0 drifted");
 
 static HMODULE g_hCres = NULL;
 static HMODULE g_hClient = NULL;
-static InitClientDLLFunc g_InitClientDLL = NULL;
-static RunClientDLLFunc g_RunClientDLL = NULL;
-static TermClientDLLFunc g_TermClientDLL = NULL;
 
 // Launcher-owned command-line preprocessing now lives in a dedicated recovered model.
 static mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 
 // Launcher-owned startup/auth state outside the command-line parser.
-static void* g_pLauncherObject6304 = NULL;       // original: [0x4d6304]
-static void* g_pILTLoginMediatorDefault = NULL;  // original: [0x4d2c58]
+static CLauncher g_Launcher;                     // original global object: [0x4d3368]
+static void* g_pLauncherObject6304 = NULL;      // original: [0x4d6304]
+static void* g_pILTLoginMediatorDefault = NULL; // original: [0x4d2c58]
 static void* g_pILTLoginMediatorSelection3584 = NULL; // original sibling slot: [0x4d3584]
-static uint32_t g_CLauncherFieldA8 = 0;          // original: [CLauncher+0xa8], high 8 bits used
-static uint32_t g_CLauncherFieldAC = 0;          // original: [CLauncher+0xac], low 24 bits used
-static uint32_t g_PackedArg7Selection = 0;       // packed from [this+0xa8]/[this+0xac]
-static uint32_t g_FlagByte = 0;                  // original: [0x4d2c69]
+static uint32_t g_PackedArg7Selection = 0;      // packed from [CLauncher+0xa8]/[CLauncher+0xac]
+static uint32_t g_FlagByte = 0;                 // original: [0x4d2c69]
 static char g_LastWorldName[256] = {0};         // original registry value: Last_WorldName
 
 static const char* kLauncherRegistryKeyPath = "Software\\Monolith Productions\\The Matrix Online\\";
@@ -118,6 +136,7 @@ static const char* DiagnosticExceptionClassification(DWORD exceptionCode);
 static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTERS* exceptionInfo);
 static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo);
+static void LogKnownStartupState();
 
 template <typename T>
 static T ResolveProc(HMODULE module, const char* name) {
@@ -481,9 +500,22 @@ static void DiagnosticShutdownPreclientEnvironment() {
     g_PreclientEnvironment.readyPointer48 = NULL;
 }
 
+static void UnloadClientLibraries() {
+    // anchor: launcher.exe:0x40a760 / 0x40a7a0
+    if (g_hClient) {
+        FreeLibrary(g_hClient);
+        g_hClient = NULL;
+    }
+    if (g_hCres) {
+        FreeLibrary(g_hCres);
+        g_hCres = NULL;
+    }
+}
+
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
     DiagnosticShutdownPreclientEnvironment();
+    UnloadClientLibraries();
     g_LauncherCommandLine.Reset();
     return code;
 }
@@ -561,18 +593,102 @@ static bool LoadClientDLL() {
     return g_hClient != NULL;
 }
 
-static bool ResolveClientExports() {
-    spdlog::info("=== Resolve client exports ===");
+static void LogClientLifecycleFailure(const char* phase, ErrorClientDLLFunc errorClientDLL) {
+    const char* clientError = nullptr;
+    if (errorClientDLL) {
+        clientError = errorClientDLL();
+    }
 
-    g_InitClientDLL = ResolveProc<InitClientDLLFunc>(g_hClient, "InitClientDLL");
-    g_RunClientDLL = ResolveProc<RunClientDLLFunc>(g_hClient, "RunClientDLL");
-    g_TermClientDLL = ResolveProc<TermClientDLLFunc>(g_hClient, "TermClientDLL");
+    spdlog::error("{} failed{}{}",
+        phase ? phase : "Client DLL lifecycle phase",
+        clientError ? ": " : "",
+        clientError ? clientError : "");
+}
 
-    spdlog::info("InitClientDLL : {}", fmt::ptr(g_InitClientDLL));
-    spdlog::info("RunClientDLL  : {}", fmt::ptr(g_RunClientDLL));
-    spdlog::info("TermClientDLL : {}", fmt::ptr(g_TermClientDLL));
+uint32_t CLauncher::BuildPackedArg7Selection() const {
+    return (m_FieldAC & 0x00ffffffu) | ((m_FieldA8 & 0xffu) << 24);
+}
 
-    return g_InitClientDLL && g_RunClientDLL && g_TermClientDLL;
+bool CLauncher::RunClientDllLifecycle() const {
+    // anchor: launcher.exe:0x40a4d0
+    spdlog::info("=== Launcher_RunClientDllLifecycle (0x40a4d0-shaped) ===");
+
+    if (!g_hClient) {
+        spdlog::error("client.dll is not loaded before lifecycle dispatch");
+        return false;
+    }
+
+    const InitClientDLLFunc initClientDLL = ResolveProc<InitClientDLLFunc>(g_hClient, "InitClientDLL");
+    const RunClientDLLFunc runClientDLL = ResolveProc<RunClientDLLFunc>(g_hClient, "RunClientDLL");
+    const TermClientDLLFunc termClientDLL = ResolveProc<TermClientDLLFunc>(g_hClient, "TermClientDLL");
+    const ErrorClientDLLFunc errorClientDLL = ResolveProc<ErrorClientDLLFunc>(g_hClient, "ErrorClientDLL");
+
+    spdlog::info("InitClientDLL  : {}", fmt::ptr(initClientDLL));
+    spdlog::info("RunClientDLL   : {}", fmt::ptr(runClientDLL));
+    spdlog::info("TermClientDLL  : {}", fmt::ptr(termClientDLL));
+    spdlog::info("ErrorClientDLL : {}", fmt::ptr(errorClientDLL));
+
+    if (!initClientDLL || !runClientDLL || !termClientDLL || !errorClientDLL) {
+        spdlog::error("launcher.exe:0x40a4d0 requires InitClientDLL/RunClientDLL/TermClientDLL/ErrorClientDLL exports");
+        return false;
+    }
+
+    const bool allowInitWithCurrentStartupScaffold =
+        g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
+    if (!allowInitWithCurrentStartupScaffold) {
+        spdlog::error("Refusing to call InitClientDLL with incomplete launcher state.");
+        return false;
+    }
+
+    LogKnownStartupState();
+    spdlog::info("");
+
+    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
+    g_PackedArg7Selection = packedArg7Selection;
+
+    spdlog::info("=== Calling InitClientDLL with current launcher startup scaffold ===");
+    const int initResult = initClientDLL(
+        g_LauncherCommandLine.FilteredArgCount(),
+        g_LauncherCommandLine.FilteredArgv(),
+        g_hClient,
+        g_hCres,
+        g_pLauncherObject6304,
+        g_pILTLoginMediatorDefault,
+        packedArg7Selection,
+        g_FlagByte);
+    spdlog::info("InitClientDLL returned: {}", initResult);
+    if (initResult <= 0) {
+        LogClientLifecycleFailure("InitClientDLL", errorClientDLL);
+        return false;
+    }
+
+    // The original 0x40a4d0 helper goes straight from a successful InitClientDLL into RunClientDLL.
+    // The replacement launcher keeps this narrow recovered auth handoff in between because the active
+    // launcher-owned runtime path still depends on it.
+    if (DiagnosticCanBeginAuthConnection()) {
+        const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
+        spdlog::info("DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x}", (unsigned)authConnectResult);
+    }
+
+    spdlog::info("=== Calling RunClientDLL on the active launcher path ===");
+    const int runResult = runClientDLL();
+    spdlog::info("RunClientDLL returned: {}", runResult);
+    if (runResult <= 0) {
+        LogClientLifecycleFailure("RunClientDLL", errorClientDLL);
+        return false;
+    }
+
+    // Keep the current narrow faithful sequencing: positive RunClientDLL success continues into
+    // TermClientDLL so the real client owns its normal shutdown persistence path.
+    spdlog::info("=== Calling TermClientDLL on the active launcher path ===");
+    const int termResult = termClientDLL();
+    spdlog::info("TermClientDLL returned: {}", termResult);
+    if (termResult <= 0) {
+        spdlog::error("TermClientDLL failed.");
+        return false;
+    }
+
+    return true;
 }
 
 static bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
@@ -703,11 +819,6 @@ static const RecoveredLauncherSelectionRecord* FindRecoveredLauncherSelectionRec
     return NULL;
 }
 
-static uint32_t BuildPackedArg7Selection() {
-    return (g_CLauncherFieldAC & 0x00ffffffu) | ((g_CLauncherFieldA8 & 0xffu) << 24);
-}
-
-
 static void LogArgvContentsAsBytes(const char* label, char** argv, uint32_t count) {
     if (!argv || count == 0) return;
     spdlog::info("{} pointer array @ {}:", label, fmt::ptr(argv));
@@ -740,8 +851,8 @@ static void LogKnownStartupState() {
     spdlog::info("arg4 hCresDll                = {}", fmt::ptr(g_hCres));
     spdlog::info("arg5 launcherNetworkObject   = {}", fmt::ptr(g_pLauncherObject6304));
     spdlog::info("arg6 ILTLoginMediatorDefault = {}", fmt::ptr(g_pILTLoginMediatorDefault));
-    spdlog::info("CLauncher+0xa8 placeholder   = 0x{:08x}", g_CLauncherFieldA8);
-    spdlog::info("CLauncher+0xac placeholder   = 0x{:08x}", g_CLauncherFieldAC);
+    spdlog::info("CLauncher+0xa8 placeholder   = 0x{:08x}", g_Launcher.m_FieldA8);
+    spdlog::info("CLauncher+0xac placeholder   = 0x{:08x}", g_Launcher.m_FieldAC);
     spdlog::info("Last_WorldName               = {}", g_LastWorldName[0] ? g_LastWorldName : "<unavailable>");
     spdlog::info("arg7 packedArg7Selection     = 0x{:08x}", g_PackedArg7Selection);
     spdlog::info("arg8 flagByte                = 0x{:08x}", g_FlagByte);
@@ -887,14 +998,14 @@ int main(int argc, char* argv[]) {
     if (recoveredSelection) {
         std::strncpy(mediatorSelectionName, recoveredSelection->worldName, sizeof(mediatorSelectionName) - 1);
         mediatorSelectionName[sizeof(mediatorSelectionName) - 1] = '\0';
-        g_CLauncherFieldA8 = recoveredSelection->variantIndexHigh8;
-        g_CLauncherFieldAC = recoveredSelection->worldIndexLow24;
+        g_Launcher.m_FieldA8 = recoveredSelection->variantIndexHigh8;
+        g_Launcher.m_FieldAC = recoveredSelection->worldIndexLow24;
         spdlog::info(
             "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
             recoveredSelection->worldName,
-            g_CLauncherFieldA8,
-            g_CLauncherFieldAC,
-            BuildPackedArg7Selection(),
+            g_Launcher.m_FieldA8,
+            g_Launcher.m_FieldAC,
+            g_Launcher.BuildPackedArg7Selection(),
             (unsigned)recoveredSelection->selectionGateByte100,
             (unsigned)recoveredSelection->variantState,
             recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
@@ -904,8 +1015,8 @@ int main(int argc, char* argv[]) {
             mediatorSelectionName);
     }
 
-    g_PackedArg7Selection = BuildPackedArg7Selection();
-    if ((g_CLauncherFieldA8 | g_CLauncherFieldAC) != 0) {
+    g_PackedArg7Selection = g_Launcher.BuildPackedArg7Selection();
+    if ((g_Launcher.m_FieldA8 | g_Launcher.m_FieldAC) != 0) {
         spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", g_PackedArg7Selection);
     }
 
@@ -989,20 +1100,20 @@ int main(int argc, char* argv[]) {
             "DIAGNOSTIC: reusing current ILTLoginMediator.Default object as sibling 0x4d3584 selection slot ({})",
             fmt::ptr(g_pILTLoginMediatorSelection3584));
 
-        uint32_t resolvedA8 = g_CLauncherFieldA8;
-        uint32_t resolvedAC = g_CLauncherFieldAC;
+        uint32_t resolvedA8 = g_Launcher.m_FieldA8;
+        uint32_t resolvedAC = g_Launcher.m_FieldAC;
         char resolvedWorldName[sizeof(g_LastWorldName)] = {0};
         if (DiagnosticResolveLauncherSelectionFromMediator(
                 g_pILTLoginMediatorSelection3584,
-                g_CLauncherFieldAC,
-                g_CLauncherFieldA8,
+                g_Launcher.m_FieldAC,
+                g_Launcher.m_FieldA8,
                 &resolvedA8,
                 &resolvedAC,
                 resolvedWorldName,
                 sizeof(resolvedWorldName))) {
-            g_CLauncherFieldA8 = resolvedA8;
-            g_CLauncherFieldAC = resolvedAC;
-            g_PackedArg7Selection = BuildPackedArg7Selection();
+            g_Launcher.m_FieldA8 = resolvedA8;
+            g_Launcher.m_FieldAC = resolvedAC;
+            g_PackedArg7Selection = g_Launcher.BuildPackedArg7Selection();
             if (resolvedWorldName[0]) {
                 std::strncpy(g_LastWorldName, resolvedWorldName, sizeof(g_LastWorldName) - 1);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
@@ -1010,8 +1121,8 @@ int main(int argc, char* argv[]) {
             }
             spdlog::info(
                 "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
-                g_CLauncherFieldA8,
-                g_CLauncherFieldAC,
+                g_Launcher.m_FieldA8,
+                g_Launcher.m_FieldAC,
                 g_PackedArg7Selection,
                 g_LastWorldName[0] ? g_LastWorldName : mediatorSelectionName);
         }
@@ -1090,85 +1201,7 @@ int main(int argc, char* argv[]) {
         return FinishAndReturn(1);
     }
 
-    if (!ResolveClientExports()) {
-        spdlog::info("ERROR: missing required client exports");
-        return FinishAndReturn(1);
-    }
-
-    LogKnownStartupState();
-    spdlog::info("");
-
-    const bool allowInitWithCurrentStartupScaffold =
-        g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
-
-    if (!allowInitWithCurrentStartupScaffold) {
-        spdlog::error("Refusing to call InitClientDLL with incomplete launcher state.");
-        return FinishAndReturn(2);
-    }
-
-    spdlog::info("=== Calling InitClientDLL with current active startup scaffold ===");
-    spdlog::info("DIAGNOSTIC: proceeding because the current launcher path now provides arg5 build/register, binder-backed arg6, and sibling-slot arg7 rebuild");
-
-    if (g_pILTLoginMediatorDefault) {
-        spdlog::info("arg6 mediator object prepared for InitClientDLL: {}", fmt::ptr(g_pILTLoginMediatorDefault));
-    } else {
-        spdlog::info("WARNING: arg6 mediator object is NULL");
-    }
-
-    int initResult = g_InitClientDLL(
-        g_LauncherCommandLine.FilteredArgCount(),
-        g_LauncherCommandLine.FilteredArgv(),
-        g_hClient,
-        g_hCres,
-        g_pLauncherObject6304,
-        g_pILTLoginMediatorDefault,
-        g_PackedArg7Selection,
-        g_FlagByte);
-
-    spdlog::info("InitClientDLL returned: {}", initResult);
-
-    // Original client code returns 1 on the observed success path and 0 / negative values on failure paths.
-    // Do not treat non-zero generically as failure here.
-    const bool initSucceeded = (initResult > 0);
-    if (!initSucceeded) {
-        spdlog::info("InitClientDLL failed.");
-        return FinishAndReturn(1);
-    }
-
-    // Address anchors for the original launcher-owned auth start handoff:
-    // - launcher.exe:0x4207c0 = `CLTLoginState_State16` slot 8 success handoff
-    // - launcher.exe:0x439090 = `CLTLoginState_State1` slot 3 / StartAuthConnection
-    // - launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
-    if (DiagnosticCanBeginAuthConnection()) {
-        const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
-        spdlog::info("DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x}", (unsigned)authConnectResult);
-    }
-
-    spdlog::info("=== Calling RunClientDLL on the active launcher path ===");
-    const int runResult = g_RunClientDLL();
-    spdlog::info("RunClientDLL returned: {}", runResult);
-
-    const bool runSucceeded = (runResult > 0);
-    if (!runSucceeded) {
-        spdlog::info("RunClientDLL failed.");
-        return FinishAndReturn(1);
-    }
-
-    // Narrow selection-cfg corpus follow-up:
-    // - original launcher tests `RunClientDLL` for positive success, then continues into
-    //   `TermClientDLL`
-    // - bounded original runtime proof now shows shutdown-side `TermClientDLL -> 0x62198490 ->
-    //   0x621966d0` as the strongest concrete later direct-save path for the saved `cs.cfg`
-    //   low-bit pattern on the active route
-    // - keep this intentionally narrow: just preserve the original positive-success contract and
-    //   let the real client run its own shutdown persistence path
-    spdlog::info("=== Calling TermClientDLL on the active launcher path ===");
-    const int termResult = g_TermClientDLL();
-    spdlog::info("TermClientDLL returned: {}", termResult);
-
-    const bool termSucceeded = (termResult > 0);
-    if (!termSucceeded) {
-        spdlog::info("TermClientDLL failed.");
+    if (!g_Launcher.RunClientDllLifecycle()) {
         return FinishAndReturn(1);
     }
 
