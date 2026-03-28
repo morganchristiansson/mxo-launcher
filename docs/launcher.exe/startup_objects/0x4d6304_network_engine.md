@@ -140,6 +140,11 @@ New queue-thread clarification from the current focused pass:
     - newer bounded correction: `CleanupConnection` now always runs the owner-state sync tail at
       function exit, even on miss/no-worker paths, as the bounded source stand-in for the later
       always-run `0x44ab60(arg)` side effect recovered from original slot `12`
+    - newer bounded correction: slot-12 cleanup now also drops any generic engine-owned fallback
+      `CMessageConnection` entry for that context key after worker teardown or on later miss/tail
+      cleanup, which keeps source closer to the original pointer-keyed unique-owner model
+    - newer bounded correction: worker lookup itself now also recognizes queue-context bridge /
+      owning-connection forms instead of only the raw stored key
     - newer bounded correction: worker-teardown now makes the intermediate closing state explicit
       before the later wakeup/stop/remove steps instead of jumping straight from active to closed
       only at the tail

@@ -1458,13 +1458,15 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
         if (it->contextKey == cleanupContextKey) {
             StopWorkerThreadScaffold(&(*it));
             workerThreads_.erase(it);
+            (void)DropMessageConnection(cleanupContextKey);
             SyncAttachedLauncherObjectStateScaffold();
             return kResultSuccess;
         }
     }
 
+    const bool droppedGenericConnection = DropMessageConnection(cleanupContextKey);
     SyncAttachedLauncherObjectStateScaffold();
-    return touchedConnectionState ? kResultSuccess : 0u;
+    return (touchedConnectionState || droppedGenericConnection) ? kResultSuccess : 0u;
 }
 
 // UNANCHORED scaffold bridge because the current liblttcp engine lives beside, not inside,
@@ -1989,8 +1991,14 @@ CLTThreadPerClientTCPEngine::AcceptThreadRecord* CLTThreadPerClientTCPEngine::Fi
 // UNANCHORED starter helper.
 // No direct launcher.exe helper body is assigned yet.
 CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::FindWorker(void* contextKey) {
+    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
+    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
     for (auto& record : workerThreads_) {
-        if (record.contextKey == contextKey) {
+        if (record.contextKey == contextKey ||
+            record.contextKey == resolvedContextKey ||
+            record.contextKey == queueContextOwner ||
+            record.ownerContext == contextKey ||
+            record.ownerContext == resolvedContextKey) {
             return &record;
         }
     }

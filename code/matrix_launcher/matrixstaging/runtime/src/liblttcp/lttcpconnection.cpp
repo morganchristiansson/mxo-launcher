@@ -493,7 +493,14 @@ uint32_t CLTTCPConnection::CloseSocketTransportScaffold(bool /*graceful*/) {
                     wsaError);
             }
         }
-        closesocket(socket);
+        const int closeResult = closesocket(socket);
+        if (closeResult == SOCKET_ERROR) {
+            spdlog::debug(
+                "CLTTCPConnection::CloseSocketTransportScaffold closesocket failed socket=0x{:08x} remoteHost='{}' wsaError={}",
+                socketHandle_,
+                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+                WSAGetLastError());
+        }
     }
     socketHandle_ = kInvalidSocketHandle;
     return 1u;
@@ -510,10 +517,21 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
 
     if (state_ != LTTCPEngineConnectionState::kConnectActive &&
         state_ != LTTCPEngineConnectionState::kUdpMonitorActive) {
+        spdlog::debug(
+            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because state={} socket=0x{:08x} remoteHost='{}' byteCount={}",
+            static_cast<uint32_t>(state_),
+            socketHandle_,
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+            byteCount);
         return 0u;
     }
 
     if (socketHandle_ == kInvalidSocketHandle) {
+        spdlog::debug(
+            "CLTTCPConnection::SendRawSocketBufferScaffold rejected send because socket is invalid state={} remoteHost='{}' byteCount={}",
+            static_cast<uint32_t>(state_),
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+            byteCount);
         return 0u;
     }
 
