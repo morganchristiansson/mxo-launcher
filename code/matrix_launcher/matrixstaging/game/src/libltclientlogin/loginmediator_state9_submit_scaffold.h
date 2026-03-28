@@ -98,7 +98,11 @@ inline bool TryCallback84FillPair(void* callback84, uint32_t* outLow, uint32_t* 
     //   - blob `+0x10..+0x1f` via an in-place 16-byte FeedbackSize transform
     // - the transform contract is now tighter too:
     //   - `0x41e690` seeds blob `+0x10` from owner `+0xf18`
-    //   - `0x41df60` constructs a small FeedbackSize adapter around source `owner +0x1c + 0x85`
+    //   - `0x41e690` then calls mediator `+0xd4`
+    //   - `0x41b4f0` is the tiny live-pointer getter `owner +0x1c + 0x85`
+    //   - replacement still keeps the older launcher-owned bootstrap sidecar as explicit
+    //     fallback glue on that slot when the live connection mirror is absent at runtime
+    //   - `0x41df60` constructs a small FeedbackSize adapter around that source
     //   - `0x44b190` dispatches that adapter's configure call
     //   - `0x44b570` then transforms one 16-byte block in place
     //   - newer runtime+string proof now closes the active one-block algorithm enough to test/live-own:

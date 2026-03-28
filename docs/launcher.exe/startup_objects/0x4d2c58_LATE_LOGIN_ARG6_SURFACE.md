@@ -83,8 +83,20 @@ Client-side consequence:
 
 Current best read:
 - `+0xd4` returns the 16-byte source pointer consumed on the client side with size `0x10`
-- this surface corroborates that the state9 callback/blob tail is fed from the same broader
-  launcher-owned margin/bootstrap crypto material, not a state9-only ad hoc buffer
+- direct assembly now tightens that slot to the live connection field, not a fallback chooser:
+  - `0x41b4f0 = mov eax,[ecx+0x1c] ; add eax,0x85 ; ret`
+  - so the original slot is just `owner +0x1c + 0x85`
+- `0x41e690` then calls `+0xd4` and passes that returned pointer straight into
+  `0x41df60 / 0x44b190` for the state9 tail transform; no alternate launcher-side seed branch is
+  visible in that body
+- `0x442d00` code-5 handling writes the consumed 16-byte payload tail back into connection
+  `+0x85 .. +0x94`, which matches that later `+0xd4` consumption
+- practical replacement consequence:
+  - live connection `+0x85 .. +0x94` is now the real preferred/original source on the active path
+  - the older launcher-owned bootstrap-sidecar key is not part of the original `0x41b4f0` body
+  - bounded replacement smoke on `2026-03-28` still hit a direct client `+0xd4` caller before the
+    live connection mirror was present, so the current replacement keeps that sidecar as explicit
+    fallback/diagnostic glue on `+0xd4` until the writeback timing gap is closed
 
 ## Active path status
 

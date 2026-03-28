@@ -1356,22 +1356,18 @@ bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t,
     }
     outKey->fill(0u);
 
-    if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
-        if (marginConnection->CopyMessageCode5SeedBytes85Scaffold(outKey)) {
-            return true;
-        }
-    }
-
     const auto it = g_marginBootstrapStateByMediator.find(this);
     if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
         return false;
     }
 
     std::copy_n(it->second.marginTwofishKeyBytes.begin(), 16u, outKey->begin());
+    spdlog::info(
+        "CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold using launcher-owned bootstrap-sidecar fallback copy because live +0xd4 / connection+0x85 seed is unavailable");
     return true;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41b4f0
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
         if (const uint8_t* seedPointer = marginConnection->MessageCode5SeedBytes85PointerScaffold()) {
@@ -1384,16 +1380,19 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     }
 
     const auto it = g_marginBootstrapStateByMediator.find(this);
-    if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
-        spdlog::info("CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> <null> (missing 16-byte margin Twofish key)");
-        return nullptr;
+    if (it != g_marginBootstrapStateByMediator.end() && it->second.marginTwofishKeyBytes.size() == 16u) {
+        const void* seedPointer = it->second.marginTwofishKeyBytes.data();
+        spdlog::info(
+            "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=bootstrap-sidecar-fallback marginConnection={} original+0xd4=owner+0x1c+0x85]",
+            fmt::ptr(seedPointer),
+            fmt::ptr(marginConnection_));
+        return seedPointer;
     }
 
-    const void* seedPointer = it->second.marginTwofishKeyBytes.data();
     spdlog::info(
-        "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {}",
-        fmt::ptr(seedPointer));
-    return seedPointer;
+        "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> <null> [marginConnection={} expectedLiveSource=owner+0x1c+0x85]",
+        fmt::ptr(marginConnection_));
+    return nullptr;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

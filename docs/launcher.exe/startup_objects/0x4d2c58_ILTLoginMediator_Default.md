@@ -422,7 +422,15 @@ Current best read of `0x41e690`:
 - then materializes the trailing 16-byte half of the blob in place from a current
   margin-connection-side source:
   - mediator vtable `+0xd4` = `0x41b4f0 = CLTLoginMediator_GetMarginConnectionField85D4`
-  - that tiny getter returns `owner + 0x1c + 0x85`
+  - direct assembly there is only:
+    - `mov eax,[ecx+0x1c]`
+    - `add eax,0x85`
+    - `ret`
+  - so original `+0xd4` is just the live pointer `owner + 0x1c + 0x85`, not a fallback chooser
+  - `0x41e690` calls that slot and passes the returned pointer straight into the transform-helper
+    constructor path; no alternate seed branch is visible in the bounded launcher body
+  - `0x442d00` code-5 handling writes the consumed 16-byte payload tail back into connection
+    `+0x85 .. +0x94`, which matches that later `+0xd4` read
   - `0x41df60 = FeedbackSizeTransformAdapter_ConstructSmall` builds a small
     `FeedbackSize` transform adapter around that source
   - `0x44b190 = FeedbackSizeTransformAdapter_InvokeConfigure40` dispatches the adapter's
@@ -467,6 +475,10 @@ Practical consequences:
    - second half starts from owner `+0xf18`
    - and its tail is materialized through shared `ValueNames` / `FeedbackSize` transform helpers
      fed from mediator `+0xd4 -> owner +0x1c + 0x85`
+   - on the replacement path, that means live connection `+0x85 .. +0x94` is the real preferred
+     source; the older launcher-owned bootstrap-sidecar key is kept only as explicit
+     fallback/diagnostic glue when direct client `+0xd4` callers still arrive before that live
+     mirror has been populated
 5. a second launcher-side getter still corroborates that the `+0x85` family is reused outside the
    immediate state9 path:
    - `0x41f3a0` exposes `owner + 0x680 -> +0xf4 + 0x85`

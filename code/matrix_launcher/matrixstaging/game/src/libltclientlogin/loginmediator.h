@@ -255,7 +255,10 @@ public:
         // - `+0x08/+0x0c` = caller args (`900, 0` on the client callback84 path)
         // - `+0x10..+0x1f` = 16-byte transform region
         //   - seeded from owner `+0xf18`
-        //   - source material rooted at mediator `+0xd4 -> owner +0x1c + 0x85`
+        //   - source material resolved through mediator `+0xd4`
+        //   - original `+0xd4` body is the tiny live-pointer read `owner +0x1c + 0x85`
+        //   - replacement still keeps the older launcher-owned bootstrap sidecar as explicit
+        //     fallback glue on that slot when the live connection mirror is absent at runtime
         //   - transformed in place through `0x41df60 / 0x44b190 / 0x44b570`
         // Current source-owned provenance answer for owner `+0xf18`:
         // - zero-init at `0x41ee60`
@@ -784,8 +787,10 @@ public:
     void RegisterScaffoldState18(CLTLoginState* state);
     void RegisterScaffoldState19(CLTLoginState* state);
     // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
-    // Late-login state9 callback-seed getter. Returns the same 16-byte margin bootstrap key
-    // family consumed by the callback-blob fill path.
+    // Late-login state9 callback-seed getter. Original body is the tiny live-pointer read
+    // `owner +0x1c + 0x85`; current replacement still keeps an explicit launcher-owned
+    // bootstrap-sidecar fallback on this slot until the live connection mirror is present at every
+    // active caller timing.
     const void* GetState9CallbackSeedPointer85D4() const override;
     // anchor: launcher.exe:0x41f1d0
     // Focused late-login source home:
@@ -1353,9 +1358,8 @@ public:
     }
     uint32_t State6UdpSessionSecretF18() const;
     void SetState6UdpSessionSecretF18(uint32_t value);
-    // Current bounded source order now prefers the nearer connection-side `+0x85 .. +0x94`
-    // mirror when the consumed code-5 margin branch has populated it; otherwise it falls back to
-    // the older launcher-owned bootstrap sidecar key.
+    // Current source keeps this helper only as launcher-owned bootstrap-sidecar fallback glue.
+    // The original state9 seed provenance itself is mediator `+0xd4 -> owner +0x1c + 0x85`.
     bool CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const;
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50
     // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
