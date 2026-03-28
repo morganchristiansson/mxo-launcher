@@ -109,25 +109,12 @@ struct CLTTCPConnection_ParsedPacketWorkItemScaffold {
 
 static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold) == 0x2c, "parsed packet work item size mismatch");
 
-// Recovered prefix of the parser object stored at connection `+0x6c`.
-// Current focused field recovery from `0x469bf0`, `0x4725c0`, and `0x472660`:
-// - `+0x04` = retained fragment currently containing parser cursor `+0x08`
-// - `+0x08` = next unread buffered byte pointer
-// - `+0x0c` = total unread buffered byte count across retained fragments
-// - `+0x10` = provisional byte-count state incremented by
-//   `CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursor` and zeroed by
-//   `CVariableLengthPrefixedTCPStreamParser_ResetAfterPacket`
-// - `+0x14` = current parser-owned `CParsedPacketWorkItem`
-// This is a recovered prefix only; do not treat it as a full final object-layout claim yet.
-struct CVariableLengthPrefixedTCPStreamParserScaffold {
-    void** vtable; // +0x00
-    CLTTCPReadOperationFragmentScaffold* currentCursorFragment04; // +0x04 retained fragment currently containing `currentCursor08`
-    uint8_t* currentCursor08; // +0x08 next unread buffered byte
-    uint32_t unreadBufferedByteCount0C; // +0x0c unread buffered bytes across retained fragments
-    uint32_t advancedBufferedByteCount10; // +0x10 provisional: incremented by cursor-advance helper, zeroed by ResetAfterPacket
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* currentPacketWorkItem14; // +0x14 parser-owned current work item (assembly state before emit; fresh replacement after emit)
-};
-
+// High-confidence original parser object at connection `+0x6c`:
+// - vtable `0x004baf84`
+// - concrete class `CVariableLengthPrefixedTCPStreamParser`
+// - implementation owned by
+//   `matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp`
+class CVariableLengthPrefixedTCPStreamParser;
 class CBaseConnection;
 
 // Source-owned queue-context bridge compensating for the current non-byte-faithful C++ vtable
@@ -139,12 +126,6 @@ struct CBaseConnection_QueueContextScaffold {
     uint8_t padding05[3];    // +0x05..+0x07
     CBaseConnection* owner;  // +0x08
 };
-
-static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, currentCursorFragment04) == 0x04, "parser current fragment offset mismatch");
-static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, currentCursor08) == 0x08, "parser current cursor offset mismatch");
-static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, unreadBufferedByteCount0C) == 0x0c, "parser unread byte count offset mismatch");
-static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, advancedBufferedByteCount10) == 0x10, "parser advanced-byte count offset mismatch");
-static_assert(offsetof(CVariableLengthPrefixedTCPStreamParserScaffold, currentPacketWorkItem14) == 0x14, "parser current work-item offset mismatch");
 
 // Source-owned abstraction over the recovered connection family.
 // Important current limitation:
@@ -282,11 +263,6 @@ public:
     // UNANCHORED: low-level raw-socket send helper used beneath the anchored SendBuffer wrapper.
     uint32_t SendRawSocketBufferScaffold(const void* buffer, uint32_t byteCount, void* completionContext);
 
-    // UNANCHORED: source-owned mirror of the connection `+0x6c` parser call shape seen in `0x449d40`.
-    // Current best original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` (`0x469bf0`).
-    uint32_t ParseReadOperationFragmentScaffold(
-        CLTTCPReadOperationFragmentScaffold* readOperationFragment,
-        CLTTCPConnection_ParsedPacketWorkItemScaffold** outCompletedPacketWorkItem);
     // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
     // Current best original read:
     // - argument order after engine `this` is `(workItem, connection, useQueue34)`
@@ -309,8 +285,9 @@ private:
     LTTCPEndpointKey remoteEndpoint_;
     std::string remoteHostName_;
     std::vector<uint8_t> receivedBytes_;
-    // UNANCHORED: source-owned mirror of the recovered connection `+0x6c` parser prefix.
-    CVariableLengthPrefixedTCPStreamParserScaffold parserScaffold_;
+    // High-confidence original seam: `CLTTCPConnection_ctor` stores a concrete
+    // `CVariableLengthPrefixedTCPStreamParser` object pointer at connection `+0x6c`.
+    CVariableLengthPrefixedTCPStreamParser* parser06c_;
 };
 
 }  // namespace mxo::liblttcp
