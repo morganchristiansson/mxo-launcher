@@ -174,6 +174,9 @@ void CMessageConnection::ConfigurePacketAgendaScaffold(const void* agendaConfigu
     }
     if (packetAgendaScaffold_) {
         packetAgendaScaffold_->created = true;
+        packetAgendaScaffold_->hasEmbeddedDefaultReadPassThroughHelper0c = true;
+        packetAgendaScaffold_->hasReadOutputSlot08 = false;
+        packetAgendaScaffold_->hasWriteOutputSlot24 = false;
         // anchor: launcher.exe:0x448980 -> 0x469740
         // Current best known original builder path (`0x41470 -> 0x44da00`) installs both a read
         // helper and a write helper on the agenda configuration object before `0x448980` forwards
@@ -233,7 +236,7 @@ CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPayloadEnvelopeScaff
 bool CMessageConnection::ApplySendPacketAgendaScaffold(
     const CMessageConnectionEnvelopeScaffold& inputEnvelope,
     CMessageConnectionEnvelopeScaffold* outputEnvelope,
-    bool* outAgendaTouched) const {
+    bool* outAgendaTouched) {
     if (outAgendaTouched) {
         *outAgendaTouched = false;
     }
@@ -244,9 +247,10 @@ bool CMessageConnection::ApplySendPacketAgendaScaffold(
     // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
     // Current bounded source model preserves the nearer `0x469950` handoff shape:
     // - no agenda / no active write helper (`+0x44 == 0`) => keep the original envelope
-    // - active write helper => preserve the handoff/swap seam, but still pass the same envelope
-    //   through until helper-side replacement/discard behavior is recovered
-    const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
+    // - active write helper => return the agenda write-output slot at `+0x24`
+    // Current source still lacks helper-side transformation/discard, so on the active helper path
+    // it seeds that output slot with the input envelope as a bounded pass-through fallback.
+    CMessageConnectionPacketAgendaScaffold* agenda = packetAgendaScaffold_.get();
     if (!agenda || !agenda->created) {
         return true;
     }
@@ -254,10 +258,15 @@ bool CMessageConnection::ApplySendPacketAgendaScaffold(
         return true;
     }
 
+    agenda->writeOutputSlot24 = inputEnvelope;
+    agenda->hasWriteOutputSlot24 = (agenda->writeOutputSlot24.sharedMessage != nullptr);
+    if (outputEnvelope && agenda->hasWriteOutputSlot24) {
+        *outputEnvelope = agenda->writeOutputSlot24;
+    }
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
-    return true;
+    return agenda->hasWriteOutputSlot24;
 }
 
 // anchor: launcher.exe:0x448a00
@@ -323,7 +332,7 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
     const uint8_t rawOpcode = (opcodeIndex < framedBytesFrom0a.size()) ? framedBytesFrom0a[opcodeIndex] : 0u;
     const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
     spdlog::info(
-        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(agendaEnvelope.headerless10),
         static_cast<unsigned>(rawOpcode),
         static_cast<unsigned>(agendaEnvelope.sharedMessage->reservedBytes08),
@@ -336,6 +345,7 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         agenda ? static_cast<unsigned>(agenda->configuredReadHelperCount) : 0u,
         agenda ? static_cast<unsigned>(agenda->configuredWriteHelperCount) : 0u,
         agendaTouched ? 1u : 0u,
+        (agenda && agenda->hasWriteOutputSlot24) ? 1u : 0u,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -805,15 +815,29 @@ static void CMessageConnection_AssignReceivedMessageRefScaffold(
     *destination = source;
 }
 
+// anchor: launcher.exe:0x469980 / embedded helper vtable `0x004baf48 +0x0c`
+// Source-owned mirror of the default read helper's concrete effect:
+// store the incoming message-ref into the agenda read-output slot at `+0x08`.
+static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
+    CMessageConnectionPacketAgendaScaffold* agenda,
+    const CMessageConnectionReceivedMessageRefScaffold& inputMessageRef) {
+    if (!agenda || !agenda->hasEmbeddedDefaultReadPassThroughHelper0c) {
+        return false;
+    }
+    agenda->readOutputSlot08 = inputMessageRef;
+    agenda->hasReadOutputSlot08 = true;
+    return true;
+}
+
 // anchor: launcher.exe:0x469930
 // Source-owned mirror of the read-side packet-agenda handoff just before leaf dispatch.
 // Current bounded source model:
-// - a created agenda always has the embedded default read pass-through helper at `+0x0c`, so the
-//   handoff is still touched even when no caller-installed read helper is present
+// - a created agenda always has the embedded default read pass-through helper at `+0x0c`
+// - source now owns that helper's concrete agenda `+0x08` output-slot effect
 // - caller-installed read helpers are still modeled as pass-through-only until helper-side
 //   transformation/discard behavior is recovered
 static bool CMessageConnection_ApplyReceivePacketAgendaScaffold(
-    const CMessageConnectionPacketAgendaScaffold* agenda,
+    CMessageConnectionPacketAgendaScaffold* agenda,
     const CMessageConnectionReceivedMessageRefScaffold& inputMessageRef,
     CMessageConnectionReceivedMessageRefScaffold* outputMessageRef,
     bool* outAgendaTouched) {
@@ -832,7 +856,15 @@ static bool CMessageConnection_ApplyReceivePacketAgendaScaffold(
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
-    return true;
+    if (!CMessageConnection_DefaultAgendaReadPassThroughScaffold(agenda, inputMessageRef)) {
+        return false;
+    }
+
+    if (agenda->hasReadOutputSlot08) {
+        CMessageConnection_AssignReceivedMessageRefScaffold(outputMessageRef, agenda->readOutputSlot08);
+        return true;
+    }
+    return false;
 }
 
 }  // namespace
@@ -965,7 +997,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     CMessageConnectionReceivedMessageRefScaffold agendaMessageRef = {};
     const CMessageConnectionReceivedMessageRefScaffold* messageRefForDispatch = &copiedMessageRef;
     bool agendaTouched = false;
-    if (const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
+    if (CMessageConnectionPacketAgendaScaffold* agenda = packetAgendaScaffold_.get();
         agenda && agenda->created) {
         if (!CMessageConnection_ApplyReceivePacketAgendaScaffold(
                 agenda,
@@ -989,9 +1021,10 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
             }
             lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
             spdlog::debug(
-                "CMessageConnection::OnOperationCompleted preserved source-owned packet-agenda read handoff as pass-through payloadBytes={} configuredReadHelpers={} this={} ownerContext={} remoteHost='{}'",
+                "CMessageConnection::OnOperationCompleted preserved source-owned packet-agenda read handoff via agenda+0x08 output slot payloadBytes={} configuredReadHelpers={} hasDefaultReadHelper={} this={} ownerContext={} remoteHost='{}'",
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
                 static_cast<unsigned>(agenda->configuredReadHelperCount),
+                agenda->hasEmbeddedDefaultReadPassThroughHelper0c ? 1u : 0u,
                 fmt::ptr(this),
                 fmt::ptr(OwnerContext()),
                 RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());

@@ -184,25 +184,6 @@ enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
     kMargin = 2,
 };
 
-struct CMessageConnectionPacketAgendaScaffold {
-    // Source-owned mirror of the lazy packet-processing agenda object rooted at original
-    // connection `+0x74`.
-    // Current best narrowed shape from `0x448980 -> 0x469b10 -> 0x469850 -> 0x469740`:
-    // - object is lazy-created, not constructor-owned
-    // - object has distinct read/write helper sides
-    // - read side always has an embedded default pass-through helper at agenda `+0x0c`
-    // - receive path `0x4490c0` consults the read side through `0x469930` and then swaps the
-    //   returned message-ref through `0x4489d0` before leaf dispatch
-    // - send path `0x448cf0` consults the write side through `0x469950` and may replace/discard
-    //   the outgoing envelope when an active write helper exists at agenda `+0x44`
-    bool created = false;
-    // Current source meaning of these counts:
-    // - they track the known caller-installed helper pair forwarded through `0x469740`
-    // - they do not count the embedded default read pass-through helper at agenda `+0x0c`
-    uint32_t configuredReadHelperCount = 0;
-    uint32_t configuredWriteHelperCount = 0;
-};
-
 struct CMessageConnectionEnvelopeScaffold {
     // Source-owned bridge for the original local envelope family forwarded by `0x41af70`
     // through `0x41cf30` into `0x448cf0`.
@@ -211,6 +192,32 @@ struct CMessageConnectionEnvelopeScaffold {
     // - original envelope `+0x10` = headerless/send-mode flag consumed by `0x448cf0`
     std::shared_ptr<CMessageConnectionMessageScaffold> sharedMessage;
     uint8_t headerless10 = 0;
+};
+
+struct CMessageConnectionPacketAgendaScaffold {
+    // Source-owned mirror of the lazy packet-processing agenda object rooted at original
+    // connection `+0x74`.
+    // Current best narrowed shape from `0x448980 -> 0x469b10 -> 0x469850 -> 0x469740`:
+    // - object is lazy-created, not constructor-owned
+    // - object has distinct read/write helper sides
+    // - read side always has an embedded default pass-through helper at agenda `+0x0c`
+    // - receive path `0x4490c0` consults the read side through `0x469930`, which returns agenda
+    //   read-output slot `+0x08`, and then swaps that message-ref through `0x4489d0` before leaf
+    //   dispatch
+    // - send path `0x448cf0` consults the write side through `0x469950`, which returns agenda
+    //   write-output slot `+0x24`, and may replace/discard the outgoing envelope when an active
+    //   write helper exists at agenda `+0x44`
+    bool created = false;
+    bool hasEmbeddedDefaultReadPassThroughHelper0c = false;
+    // Current source meaning of these counts:
+    // - they track the known caller-installed helper pair forwarded through `0x469740`
+    // - they do not count the embedded default read pass-through helper at agenda `+0x0c`
+    uint32_t configuredReadHelperCount = 0;
+    uint32_t configuredWriteHelperCount = 0;
+    bool hasReadOutputSlot08 = false;
+    CMessageConnectionReceivedMessageRefScaffold readOutputSlot08;
+    bool hasWriteOutputSlot24 = false;
+    CMessageConnectionEnvelopeScaffold writeOutputSlot24;
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
@@ -369,7 +376,7 @@ private:
     bool ApplySendPacketAgendaScaffold(
         const CMessageConnectionEnvelopeScaffold& inputEnvelope,
         CMessageConnectionEnvelopeScaffold* outputEnvelope,
-        bool* outAgendaTouched) const;
+        bool* outAgendaTouched);
     // UNANCHORED: source-owned lower submit helper beneath SendPacketEnvelopeScaffold.
     // Current best original helper is `0x448a00`.
     uint32_t SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
