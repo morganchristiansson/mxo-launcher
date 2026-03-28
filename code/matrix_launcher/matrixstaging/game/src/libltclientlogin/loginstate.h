@@ -44,7 +44,7 @@ public:
     virtual uint32_t Slot1_HandlePrimaryGate(CLTLoginMediator* mediator);
 
     // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
-    virtual uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator);
+    virtual uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator);
 
     // anchor: launcher.exe:0x00441790 (shared slot 3 no-op stub on multiple vtables)
     virtual uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator);
@@ -232,7 +232,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004393f0 (vtable 0x004b503c slot 2)
-    uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) override;
+    uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) override;
 
     // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
@@ -251,11 +251,16 @@ public:
     // anchor: launcher.exe:0x004394f0 (vtable 0x004b5064 slot 10 initializer)
     CLTLoginState_State5() = default;
 
+private:
+    // anchor: launcher.exe:0x00439520 stores a cached upstream/helper pointer at `this+4`.
+    void* cachedUpstreamOrArg_ = nullptr;
+
+public:
     // anchor: launcher.exe vtable 0x004b5064
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439590 (vtable 0x004b5064 slot 2)
-    uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) override;
+    uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) override;
 
     // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
@@ -474,7 +479,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439680 (vtable 0x004b50dc slot 2)
-    uint32_t Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) override;
+    uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) override;
 
     // anchor: launcher.exe:0x0043bb90 (vtable 0x004b50dc slot 3)
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;

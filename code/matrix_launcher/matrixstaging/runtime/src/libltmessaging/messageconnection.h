@@ -431,6 +431,18 @@ protected:
 // ============================================================
 // CMarginConnection class declaration
 // ============================================================
+struct CMarginConnectionLocalCompletionWorkItemScaffold {
+    // anchor: launcher.exe:0x434ce0 -> 0x464870 / 0x4444e0
+    // Minimal local stack work-item shape recovered for the `0x441850` continuation:
+    // - `+0x00` = vtable pointer (type-specific local completion object)
+    // - `+0x04` = work-item type / LaunchPadClient_GetVtableOffset() result
+    // - `+0x08` = status / payload dword read back through `0x434d00`
+    CLTThreadPerClientTCPEngine_WorkItemHeader header{};
+    uint32_t workPayload = 0u;
+};
+
+static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
+
 class CMarginConnection : public CMessageConnection {
 public:
     // UNANCHORED: source-owned narrow leaf ctor over the `0x41cf80 -> 0x448b40` family.
@@ -454,6 +466,10 @@ public:
     void SetMessageCode4SuccessFlag84Scaffold(bool value);
     // UNANCHORED: source-owned diagnostic accessor for the same narrowed `+0x84` mirror.
     bool MessageCode4SuccessFlag84Scaffold() const;
+    // anchor: launcher.exe:0x441850
+    // Source-owned local type-`0x0b` continuation scaffold routed back through connection vtable
+    // `+0x10` / `OnOperationCompleted(workItem)`.
+    uint32_t DispatchMessageCode4LocalCompletionWorkItemScaffold(uint32_t workPayloadStatus);
     // anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
     // Narrow source-owned mirror of the consumed decoded-code-5 16-byte writeback.
     void SetMessageCode5SeedBytes85Scaffold(const std::array<uint8_t, 16>& value);

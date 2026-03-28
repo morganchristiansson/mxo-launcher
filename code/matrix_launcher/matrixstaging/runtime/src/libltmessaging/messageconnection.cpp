@@ -1277,6 +1277,18 @@ CLTThreadPerClientTCPEngine* CMarginConnection::MarginEngine() const {
     return CMessageConnection::Engine();
 }
 
+namespace {
+
+static void** CMarginConnection_LocalCompletionWorkItemVtableScaffold() {
+    // anchor: launcher.exe:0x464870 / data `0x004baa00`
+    // The current source does not need the concrete local dtor body from that vtable family, but
+    // keep a stable non-null vtable pointer in the recovered 12-byte stack work-item shape.
+    static void* vtable[1] = {nullptr};
+    return vtable;
+}
+
+}  // namespace
+
 // anchor: launcher.exe:0x441850
 void CMarginConnection::SetMessageCode4SuccessFlag84Scaffold(bool value) {
     messageCode4SuccessFlag84Scaffold_ = value;
@@ -1284,6 +1296,30 @@ void CMarginConnection::SetMessageCode4SuccessFlag84Scaffold(bool value) {
 
 bool CMarginConnection::MessageCode4SuccessFlag84Scaffold() const {
     return messageCode4SuccessFlag84Scaffold_;
+}
+
+// anchor: launcher.exe:0x441850
+uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItemScaffold(uint32_t workPayloadStatus) {
+    CMarginConnectionLocalCompletionWorkItemScaffold workItem = {};
+    workItem.header.vtable = CMarginConnection_LocalCompletionWorkItemVtableScaffold();
+    workItem.header.workType = 0x0bu;
+    workItem.workPayload = workPayloadStatus;
+
+    CMessageConnection* selfAsMessageConnection = this;
+    const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&workItem);
+    spdlog::info(
+        "CMarginConnection::DispatchMessageCode4LocalCompletionWorkItemScaffold synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
+        workPayloadStatus,
+        handled,
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        fmt::ptr(CMessageConnection_LoginMediatorContextScaffold(this)
+                     ? CMessageConnection_LoginMediatorContextScaffold(this)->mediator
+                           ? CMessageConnection_LoginMediatorContextScaffold(this)->mediator->CurrentState()
+                           : nullptr
+                     : nullptr),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return handled;
 }
 
 // anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
@@ -1472,9 +1508,21 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
             "+0x188");
     }
 
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        CMessageConnection_LoginMediatorContextScaffold(this);
+    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    if (context && mediator && context->isMarginConnection) {
+        const uint32_t handled =
+            mediator->HandleMarginConnectionCompletionFallbackScaffold(this, workItem);
+        if (handled != 0u) {
+            return 1u;
+        }
+    }
+
     spdlog::debug(
-        "CMarginConnection::OnOperationCompleted unresolved owner+0x188 fallback workItem={} this={} ownerContext={} remoteHost='{}'",
+        "CMarginConnection::OnOperationCompleted unresolved owner+0x188 fallback workItem={} workType=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         fmt::ptr(workItem),
+        static_cast<unsigned>(workType),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());

@@ -53,6 +53,8 @@ static CLTLoginState* LookupRegisteredScaffoldStateById(CLTLoginMediator* mediat
             return mediator->ScaffoldState3();
         case 4u:
             return mediator->ScaffoldState4();
+        case 5u:
+            return mediator->ScaffoldState5();
         case 6u:
             return mediator->ScaffoldState6();
         case 8u:

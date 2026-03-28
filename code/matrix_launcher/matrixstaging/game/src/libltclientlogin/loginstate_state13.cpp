@@ -9,7 +9,8 @@ const char* CLTLoginState_State13::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00439680 (vtable 0x004b50dc slot 2)
-uint32_t CLTLoginState_State13::Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State13::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) {
+    (void)workItem;
     (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x00439680");
 }

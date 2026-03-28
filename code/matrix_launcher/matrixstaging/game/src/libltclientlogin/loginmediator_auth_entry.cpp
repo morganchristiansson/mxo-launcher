@@ -109,6 +109,7 @@ struct BuiltinScaffoldStates {
     CLTLoginState_AuthenticatePending authenticatePending = {};
     CLTLoginState_State3 state3 = {};
     CLTLoginState_State4 state4 = {};
+    CLTLoginState_State5 state5 = {};
     CLTLoginState_State6 state6 = {};
     CLTLoginState_State8 state8 = {};
     CLTLoginState_State9 state9 = {};
@@ -155,6 +156,11 @@ void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState4(CLTLoginState* state) {
     scaffoldState4_ = state;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+void CLTLoginMediator::RegisterScaffoldState5(CLTLoginState* state) {
+    scaffoldState5_ = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -245,6 +251,11 @@ CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState4() const {
     return scaffoldState4_;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+CLTLoginState* CLTLoginMediator::ScaffoldState5() const {
+    return scaffoldState5_;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -341,6 +352,7 @@ void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
     RegisterScaffoldState2(&states.authenticatePending);
     RegisterScaffoldState3(&states.state3);
     RegisterScaffoldState4(&states.state4);
+    RegisterScaffoldState5(&states.state5);
     RegisterScaffoldState6(&states.state6);
     RegisterScaffoldState8(&states.state8);
     RegisterScaffoldState9(&states.state9);

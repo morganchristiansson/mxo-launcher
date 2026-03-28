@@ -41,10 +41,51 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(CLTLoginMediator* mediator) {
     return 1;
 }
 
+namespace {
+
+static uint32_t LoginStateWorkItemTypeScaffold(const void* workItem) {
+    if (!workItem) {
+        return 0u;
+    }
+
+    const auto* header =
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    return header->workType;
+}
+
+}  // namespace
+
 // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
-uint32_t CLTLoginState::Slot2_HandleSecondaryGate(CLTLoginMediator* mediator) {
-    (void)mediator;
-    return 1;
+uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) {
+    if (!workItem || !mediator) {
+        return 0u;
+    }
+
+    const uint32_t workType = LoginStateWorkItemTypeScaffold(workItem);
+    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        return 0u;
+    }
+
+    if (mediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold()) {
+        mediator->PostEventScaffold(0x0fu);
+        spdlog::info(
+            "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed armed owner+0x2d -> event=0x0f currentState={}",
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        return 1u;
+    }
+
+    if (mediator->GetLastLoginStatus() == 0u) {
+        mediator->WorldListCountOrStatus80() = 1u;
+    }
+    if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
+        mediator->SwitchHelperStateScaffold(3u, failureState);
+    }
+    mediator->PostErrorScaffold(7u);
+    spdlog::info(
+        "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed unarmed owner+0x2d -> owner+0x80=0x{:08x} currentState={}",
+        static_cast<unsigned>(mediator->WorldListCountOrStatus80()),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+    return 1u;
 }
 
 // anchor: launcher.exe:0x00441790 (shared slot 3 no-op stub on multiple vtables)

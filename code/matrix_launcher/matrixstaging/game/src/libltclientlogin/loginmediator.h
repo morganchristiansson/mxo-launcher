@@ -659,6 +659,10 @@ public:
     // - tail-jumps to helper vtable `+0x10`
     // - current best read is helper slot 5 / `AuthMessageDispatch`
     uint32_t DispatchCurrentHelperAuthMessageScaffold(void* workItem);
+    // anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
+    // Narrow source-owned mirror of the margin completion-fallback re-entry used from
+    // `CMarginConnection::OnOperationCompleted` when base `0x4490c0` leaves work unconsumed.
+    uint32_t DispatchCurrentHelperSecondaryGateScaffold(void* workItem);
     // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
     // `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
     // Current scope is only the surviving owner-slot-5 dispatch after that new leaf-local step.
@@ -675,6 +679,10 @@ public:
         const uint8_t* packetBytes,
         size_t packetSize,
         void* workItem = nullptr);
+    // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
+    uint32_t HandleMarginConnectionCompletionFallbackScaffold(
+        mxo::liblttcp::CMessageConnection* connection,
+        void* workItem);
 
     struct ActiveCharacterStateViewScaffold {
         const char* characterName = nullptr;
@@ -761,6 +769,7 @@ public:
     void RegisterScaffoldState2(CLTLoginState* state);
     void RegisterScaffoldState3(CLTLoginState* state);
     void RegisterScaffoldState4(CLTLoginState* state);
+    void RegisterScaffoldState5(CLTLoginState* state);
     void RegisterScaffoldState6(CLTLoginState* state);
     void RegisterScaffoldState8(CLTLoginState* state);
     void RegisterScaffoldState9(CLTLoginState* state);
@@ -805,6 +814,7 @@ public:
     CLTLoginState* ScaffoldState2() const;
     CLTLoginState* ScaffoldState3() const;
     CLTLoginState* ScaffoldState4() const;
+    CLTLoginState* ScaffoldState5() const;
     CLTLoginState* ScaffoldState6() const;
     CLTLoginState* ScaffoldState8() const;
     CLTLoginState* ScaffoldState9() const;
@@ -1090,6 +1100,11 @@ public:
     // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441bc0 / 0x441850
     // Narrow source-owned mirror of one consumed decoded-code-4 branch moved closer to the
     // connection/leaf dispatch seam.
+    // Current bounded split:
+    // - source now mirrors the local `0x441850` type-`0x0b` work-item re-entry through
+    //   connection vtable `+0x10`
+    // - the older launcher-owned bootstrap continuation remains only as the fallback that keeps the
+    //   current working path alive while later slot-2 resumption is still incomplete
     uint32_t HandleMarginConsumedCode4AtConnectionSeamScaffold(
         const uint8_t* packetBytes,
         size_t packetSize,
@@ -1332,6 +1347,10 @@ public:
     uint8_t& AuthConnectionFlag2c() { return authConnectionFlag2c_; }
     uint8_t State10SendGateFlagF14() const { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
     uint8_t& State10SendGateFlagF14() { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
+    bool MarginConnectionCloseWaitEvent0fGateArmedScaffold() const { return marginConnectionFlag2d_ != 0u; }
+    void SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(bool armed) {
+        marginConnectionFlag2d_ = armed ? 1u : 0u;
+    }
     uint32_t State6UdpSessionSecretF18() const;
     void SetState6UdpSessionSecretF18(uint32_t value);
     // Current bounded source order now prefers the nearer connection-side `+0x85 .. +0x94`
@@ -1453,6 +1472,7 @@ private:
     CLTLoginState* scaffoldState2_;
     CLTLoginState* scaffoldState3_;
     CLTLoginState* scaffoldState4_;
+    CLTLoginState* scaffoldState5_;
     CLTLoginState* scaffoldState6_;
     CLTLoginState* scaffoldState8_;
     CLTLoginState* scaffoldState9_;

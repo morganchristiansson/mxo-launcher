@@ -295,6 +295,7 @@ CLTLoginMediator::CLTLoginMediator()
       scaffoldState2_(nullptr),
       scaffoldState3_(nullptr),
       scaffoldState4_(nullptr),
+      scaffoldState5_(nullptr),
       scaffoldState6_(nullptr),
       scaffoldState8_(nullptr),
       scaffoldState9_(nullptr),
@@ -1248,6 +1249,18 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessageScaffold(void* workIt
     return currentState_->AuthMessageDispatch(workItem, this);
 }
 
+// anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
+uint32_t CLTLoginMediator::DispatchCurrentHelperSecondaryGateScaffold(void* workItem) {
+    if (!currentState_) {
+        spdlog::info(
+            "CLTLoginMediator::DispatchCurrentHelperSecondaryGateScaffold skipped because currentState is null workItem={}",
+            fmt::ptr(workItem));
+        return 0u;
+    }
+
+    return currentState_->Slot2_HandleSecondaryGate(workItem, this);
+}
+
 // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
 // `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
 // Current role is narrower than the earlier raw-byte bridge:
@@ -1294,6 +1307,34 @@ uint32_t CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffol
         static_cast<unsigned>(packetSize),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(handled));
+    return handled;
+}
+
+// anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
+uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold(
+    mxo::liblttcp::CMessageConnection* connection,
+    void* workItem) {
+    if (!connection || !workItem || connection != marginConnection_) {
+        return 0u;
+    }
+
+    const auto* workHeader =
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    const uint32_t workType = workHeader ? workHeader->workType : 0u;
+    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        marginConnection_ = nullptr;
+        marginConnectionContextKey_ = nullptr;
+    }
+
+    const uint32_t handled = DispatchCurrentHelperSecondaryGateScaffold(workItem);
+    spdlog::info(
+        "CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerMarginConnection={} ownerContextKey={}",
+        static_cast<unsigned>(workType),
+        fmt::ptr(connection),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(handled),
+        fmt::ptr(marginConnection_),
+        fmt::ptr(marginConnectionContextKey_));
     return handled;
 }
 
@@ -3124,17 +3165,28 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
         marginConnection->SetMessageCode4SuccessFlag84Scaffold(status == 0u);
     }
 
+    uint32_t localWorkItemHandled = 0u;
+    if (marginConnection != nullptr) {
+        localWorkItemHandled =
+            marginConnection->DispatchMessageCode4LocalCompletionWorkItemScaffold(status);
+    }
+
     spdlog::info(
-        "CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold rawCode=0x{:02x} status=0x{:08x} transportEncrypted={} connectionByte84={} currentState={}",
+        "CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold rawCode=0x{:02x} status=0x{:08x} transportEncrypted={} connectionByte84={} localType0x0bHandled={} currentState={}",
         static_cast<unsigned>(packetBytes[0]),
         status,
         transportEncrypted ? 1u : 0u,
         (marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84Scaffold()) ? 1u : 0u,
+        static_cast<unsigned>(localWorkItemHandled),
         currentState_ ? currentState_->DebugName() : "<null>");
 
-    // Keep the current launcher-owned bootstrap send/build continuation unchanged after mirroring
-    // the narrower connection-side consumed-code-4 side effect.
-    return ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
+    // Current source now mirrors the nearer `0x441850` local type-0x0b work-item re-entry before
+    // falling back to the existing launcher-owned bootstrap send/build continuation. Keep that
+    // fallback for the current working path until the later state5/state6 resumption behind the
+    // completion-fallback slot-2 chain is source-owned enough to replace it.
+    const uint32_t bootstrapHandled =
+        ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
+    return (bootstrapHandled != 0u) ? bootstrapHandled : localWorkItemHandled;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
