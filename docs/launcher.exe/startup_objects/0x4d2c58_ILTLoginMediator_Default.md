@@ -475,10 +475,11 @@ Practical consequences:
    - second half starts from owner `+0xf18`
    - and its tail is materialized through shared `ValueNames` / `FeedbackSize` transform helpers
      fed from mediator `+0xd4 -> owner +0x1c + 0x85`
+   - replacement `+0x18c` now mirrors that by sourcing the seed through `+0xd4` alone instead of
+     keeping an extra local fallback chain in the blob builder
    - on the replacement path, that means live connection `+0x85 .. +0x94` is the real preferred
-     source; the older launcher-owned bootstrap-sidecar key is kept only as explicit
-     fallback/diagnostic glue when direct client `+0xd4` callers still arrive before that live
-     mirror has been populated
+     source; after the earlier live-mirror timing fix, repeated active-path runs now stay stable
+     with fallback pruned back out of `+0xd4` too
 5. a second launcher-side getter still corroborates that the `+0x85` family is reused outside the
    immediate state9 path:
    - `0x41f3a0` exposes `owner + 0x680 -> +0xf4 + 0x85`

@@ -187,28 +187,16 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords
     std::memcpy(transformInput.data(), &ownerF18, sizeof(ownerF18));
 
     std::array<uint8_t, 16> marginTwofishKey{};
-    const uint8_t* liveSeedPointer85D4 = nullptr;
-    if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection())) {
-        liveSeedPointer85D4 = marginConnection->MessageCode5SeedBytes85PointerScaffold();
-    }
-
-    const char* seedSource = "connection+0x85";
-    if (liveSeedPointer85D4 != nullptr) {
-        std::memcpy(marginTwofishKey.data(), liveSeedPointer85D4, marginTwofishKey.size());
-    } else if (const uint8_t* state9SeedPointer85D4 =
-                   static_cast<const uint8_t*>(GetState9CallbackSeedPointer85D4());
-               state9SeedPointer85D4 != nullptr) {
-        std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
-        seedSource = "bootstrap-sidecar-fallback-via+0xd4";
-    } else if (CopyMarginBootstrapTwofishKeyScaffold(&marginTwofishKey)) {
-        seedSource = "bootstrap-sidecar-fallback";
-    } else {
+    const uint8_t* state9SeedPointer85D4 =
+        static_cast<const uint8_t*>(GetState9CallbackSeedPointer85D4());
+    if (state9SeedPointer85D4 == nullptr) {
         std::memset(outDwords + 4, 0, 16u);
         spdlog::info(
-            "CLTLoginMediator::FillState9CallbackBlob18cScaffold missing 16-byte state9 seed; zeroed blob tail ownerF18=0x{:08x}",
+            "CLTLoginMediator::FillState9CallbackBlob18cScaffold missing 16-byte state9 seed from mediator+0xd4; zeroed blob tail ownerF18=0x{:08x}",
             static_cast<unsigned>(ownerF18));
         return 1u;
     }
+    std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
 
     std::vector<uint8_t> ciphertext;
     if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
@@ -226,13 +214,12 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords
 
     std::memcpy(outDwords + 4, ciphertext.data(), 16u);
     spdlog::info(
-        "CLTLoginMediator::FillState9CallbackBlob18cScaffold built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource={} tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
+        "CLTLoginMediator::FillState9CallbackBlob18cScaffold built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource=mediator+0xd4 tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
         static_cast<unsigned>(outDwords[0]),
         static_cast<unsigned>(outDwords[1]),
         static_cast<unsigned>(outDwords[2]),
         static_cast<unsigned>(outDwords[3]),
         static_cast<unsigned>(ownerF18),
-        seedSource,
         static_cast<unsigned>(outDwords[4]),
         static_cast<unsigned>(outDwords[5]),
         static_cast<unsigned>(outDwords[6]),

@@ -1349,24 +1349,6 @@ void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
     MutableMarginBootstrapState(this).state6UdpSessionSecretF18 = value;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const {
-    if (!outKey) {
-        return false;
-    }
-    outKey->fill(0u);
-
-    const auto it = g_marginBootstrapStateByMediator.find(this);
-    if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
-        return false;
-    }
-
-    std::copy_n(it->second.marginTwofishKeyBytes.begin(), 16u, outKey->begin());
-    spdlog::info(
-        "CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold using launcher-owned bootstrap-sidecar fallback copy because live +0xd4 / connection+0x85 seed is unavailable");
-    return true;
-}
-
 // anchor: launcher.exe:0x41b4f0
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
@@ -1377,16 +1359,11 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
                 fmt::ptr(marginConnection));
             return seedPointer;
         }
-    }
 
-    const auto it = g_marginBootstrapStateByMediator.find(this);
-    if (it != g_marginBootstrapStateByMediator.end() && it->second.marginTwofishKeyBytes.size() == 16u) {
-        const void* seedPointer = it->second.marginTwofishKeyBytes.data();
         spdlog::info(
-            "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=bootstrap-sidecar-fallback marginConnection={} original+0xd4=owner+0x1c+0x85]",
-            fmt::ptr(seedPointer),
-            fmt::ptr(marginConnection_));
-        return seedPointer;
+            "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> <null> [expectedLiveSource=connection+0x85 mirror connection={}]",
+            fmt::ptr(marginConnection));
+        return nullptr;
     }
 
     spdlog::info(

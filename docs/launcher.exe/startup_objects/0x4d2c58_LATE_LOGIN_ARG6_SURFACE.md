@@ -89,6 +89,8 @@ Current best read:
 - `0x41e690` then calls `+0xd4` and passes that returned pointer straight into
   `0x41df60 / 0x44b190` for the state9 tail transform; no alternate launcher-side seed branch is
   visible in that body
+- replacement `+0x18c` now mirrors that tighter call shape too: it sources the seed through
+  mediator `+0xd4` alone instead of keeping an extra local fallback chain in the blob builder
 - `0x442d00` code-5 handling writes the consumed 16-byte payload tail back into connection
   `+0x85 .. +0x94`, which matches that later `+0xd4` consumption
 - practical replacement consequence:
@@ -96,12 +98,12 @@ Current best read:
   - the older launcher-owned bootstrap-sidecar key is not part of the original `0x41b4f0` body
   - bounded replacement smoke on `2026-03-28` initially still hit a direct client `+0xd4` caller
     before the live connection mirror was present
-  - current replacement now narrows that timing gap by mirroring the already-recovered
+  - current replacement narrows that timing gap by mirroring the already-recovered
     CERT_Challenge Twofish key into the live margin connection `+0x85 .. +0x94` as soon as the
     launcher-owned bootstrap parse recovers it, because the active replacement path has not yet
     naturally hit the decoded code-5 writeback seam early enough
-  - keep the sidecar only as explicit fallback/diagnostic glue until runtime proves that earlier
-    live mirror is now always present
+  - repeated successful active-path runs now show only live `connection+0x85` reads, so fallback
+    has been pruned back out of `+0xd4` itself
 
 ## Active path status
 

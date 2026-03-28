@@ -257,8 +257,8 @@ public:
         //   - seeded from owner `+0xf18`
         //   - source material resolved through mediator `+0xd4`
         //   - original `+0xd4` body is the tiny live-pointer read `owner +0x1c + 0x85`
-        //   - replacement still keeps the older launcher-owned bootstrap sidecar as explicit
-        //     fallback glue on that slot when the live connection mirror is absent at runtime
+        //   - active replacement now mirrors the recovered challenge key into that live field early
+        //     enough that the state9 path no longer keeps a separate fallback on this slot
         //   - transformed in place through `0x41df60 / 0x44b190 / 0x44b570`
         // Current source-owned provenance answer for owner `+0xf18`:
         // - zero-init at `0x41ee60`
@@ -1358,9 +1358,6 @@ public:
     }
     uint32_t State6UdpSessionSecretF18() const;
     void SetState6UdpSessionSecretF18(uint32_t value);
-    // Current source keeps this helper only as launcher-owned bootstrap-sidecar fallback glue.
-    // The original state9 seed provenance itself is mediator `+0xd4 -> owner +0x1c + 0x85`.
-    bool CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const;
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50
     // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
     // child `+0xa8` worker slot.
