@@ -102,8 +102,9 @@ Current best read:
     CERT_Challenge Twofish key into the live margin connection `+0x85 .. +0x94` as soon as the
     launcher-owned bootstrap parse recovers it, because the active replacement path has not yet
     naturally hit the decoded code-5 writeback seam early enough
-  - repeated successful active-path runs now show only live `connection+0x85` reads, so fallback
-    has been pruned back out of `+0xd4` itself
+  - repeated successful active-path runs now usually show only live `connection+0x85` reads, but
+    keep fallback behind `+0xd4` until runtime remains stable enough to prune it without risking
+    game entry
 
 ## Active path status
 

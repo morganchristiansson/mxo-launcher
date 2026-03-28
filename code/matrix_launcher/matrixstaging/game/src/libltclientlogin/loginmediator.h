@@ -257,8 +257,9 @@ public:
         //   - seeded from owner `+0xf18`
         //   - source material resolved through mediator `+0xd4`
         //   - original `+0xd4` body is the tiny live-pointer read `owner +0x1c + 0x85`
-        //   - active replacement now mirrors the recovered challenge key into that live field early
-        //     enough that the state9 path no longer keeps a separate fallback on this slot
+        //   - active replacement mirrors the recovered challenge key into that live field early
+        //   - keep the older launcher-owned bootstrap sidecar as bounded fallback on `+0xd4`
+        //     until runtime evidence is stable enough to prune it without risking game entry
         //   - transformed in place through `0x41df60 / 0x44b190 / 0x44b570`
         // Current source-owned provenance answer for owner `+0xf18`:
         // - zero-init at `0x41ee60`

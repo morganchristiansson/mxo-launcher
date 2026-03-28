@@ -1359,11 +1359,16 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
                 fmt::ptr(marginConnection));
             return seedPointer;
         }
+    }
 
+    const auto it = g_marginBootstrapStateByMediator.find(this);
+    if (it != g_marginBootstrapStateByMediator.end() && it->second.marginTwofishKeyBytes.size() == 16u) {
+        const void* seedPointer = it->second.marginTwofishKeyBytes.data();
         spdlog::info(
-            "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> <null> [expectedLiveSource=connection+0x85 mirror connection={}]",
-            fmt::ptr(marginConnection));
-        return nullptr;
+            "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=bootstrap-sidecar-fallback marginConnection={} original+0xd4=owner+0x1c+0x85]",
+            fmt::ptr(seedPointer),
+            fmt::ptr(marginConnection_));
+        return seedPointer;
     }
 
     spdlog::info(
