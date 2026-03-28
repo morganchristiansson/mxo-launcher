@@ -317,18 +317,220 @@ static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
         fmt::ptr(workItem));
 }
 
-// anchor: launcher.exe:0x4490c0
-// string-backed original name: CMessageConnection::OnOperationCompleted
-// Current source body remains a narrow scaffold:
-// - original `0x4490c0` is the large completion/packet-dispatch bridge
-// - helper `0x448a60` is only the generic unhandled-operation logger used on one fallback branch
-uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
-    if (!Engine()) {
-        return 0;
+// anchor: launcher.exe:0x4490c0 first dispatch on `workItem+0x04`
+// Source-owned decomposition of the initial work-type test inside
+// `CMessageConnection::OnOperationCompleted`.
+static uint32_t CMessageConnection_WorkItemTypeScaffold(const void* workItem) {
+    if (!workItem) {
+        return 0u;
     }
 
-    CMessageConnection_LogUnhandledOperationScaffold(workItem);
-    return 1;
+    const CLTThreadPerClientTCPEngine_WorkItemHeader* header =
+        static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    return header->workType;
+}
+
+// anchor: launcher.exe:0x4490c0 type-3 first-fragment copy setup
+// Source-owned decomposition of the narrowed type-3 packet-copy path, which begins from the
+// first retained fragment returned by the `CParsedPacketWorkItem` traversal state.
+static const CLTTCPReadOperationFragmentScaffold* CMessageConnection_FirstRetainedFragmentScaffold(
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
+    return (workItem && workItem->retainedFragmentCount0C != 0u)
+        ? workItem->firstRetainedFragment10
+        : nullptr;
+}
+
+// anchor: launcher.exe:0x4490c0 type-3 later-fragment copy loop
+// Source-owned decomposition of the later-fragment walk performed after the first copy span.
+static const CLTTCPReadOperationFragmentScaffold* CMessageConnection_NextRetainedFragmentScaffold(
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    const CLTTCPReadOperationFragmentScaffold* fragment) {
+    if (!workItem || !fragment || workItem->retainedFragmentCount0C == 0u) {
+        return nullptr;
+    }
+
+    if (fragment == workItem->firstRetainedFragment10) {
+        if (!workItem->retainedFragmentListOwner14 ||
+            !workItem->retainedFragmentListOwner14->sentinel) {
+            return nullptr;
+        }
+
+        const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* firstNode =
+            workItem->retainedFragmentListOwner14->sentinel->next;
+        return (firstNode && firstNode != workItem->retainedFragmentListOwner14->sentinel)
+            ? firstNode->retainedFragment08
+            : nullptr;
+    }
+
+    if (!workItem->retainedFragmentListOwner14 ||
+        !workItem->retainedFragmentListOwner14->sentinel) {
+        return nullptr;
+    }
+
+    const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* sentinel =
+        workItem->retainedFragmentListOwner14->sentinel;
+    for (const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* node = sentinel->next;
+         node && node != sentinel;
+         node = node->next) {
+        if (node->retainedFragment08 != fragment) {
+            continue;
+        }
+
+        const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* nextNode = node->next;
+        return (nextNode && nextNode != sentinel) ? nextNode->retainedFragment08 : nullptr;
+    }
+    return nullptr;
+}
+
+// anchor: launcher.exe:0x4490c0 type-3 parsed-packet body copy path
+// Source-owned decomposition of the packet-body extraction that copies from
+// `CParsedPacketWorkItem.currentCursor24` / `assembledByteCount28` into the later message object.
+static bool CMessageConnection_CopyParsedPacketPayloadBytesScaffold(
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    std::vector<uint8_t>* outPayloadBytes,
+    bool* outHadUnusedBuffers) {
+    if (outPayloadBytes) {
+        outPayloadBytes->clear();
+    }
+    if (outHadUnusedBuffers) {
+        *outHadUnusedBuffers = false;
+    }
+    if (!workItem || !outPayloadBytes) {
+        return false;
+    }
+
+    const uint32_t packetBodyByteCount = workItem->assembledByteCount28;
+    if (packetBodyByteCount == 0u) {
+        return true;
+    }
+
+    const CLTTCPReadOperationFragmentScaffold* currentFragment =
+        CMessageConnection_FirstRetainedFragmentScaffold(workItem);
+    if (!currentFragment || !workItem->currentCursor24) {
+        return false;
+    }
+
+    const uint8_t* fragmentBegin = currentFragment->bytes0C;
+    const uint8_t* fragmentEnd = fragmentBegin + currentFragment->byteCount;
+    const uint8_t* currentCursor = workItem->currentCursor24;
+    if (currentCursor < fragmentBegin || currentCursor > fragmentEnd) {
+        return false;
+    }
+
+    outPayloadBytes->reserve(packetBodyByteCount);
+    const uint32_t firstCopyByteCount = std::min<uint32_t>(
+        packetBodyByteCount,
+        static_cast<uint32_t>(fragmentEnd - currentCursor));
+    outPayloadBytes->insert(
+        outPayloadBytes->end(),
+        currentCursor,
+        currentCursor + firstCopyByteCount);
+
+    uint32_t remainingPacketBodyByteCount = packetBodyByteCount - firstCopyByteCount;
+    currentFragment = CMessageConnection_NextRetainedFragmentScaffold(workItem, currentFragment);
+    while (currentFragment) {
+        if (remainingPacketBodyByteCount == 0u) {
+            if (outHadUnusedBuffers) {
+                *outHadUnusedBuffers = true;
+            }
+            break;
+        }
+
+        const uint32_t copyByteCount =
+            std::min<uint32_t>(remainingPacketBodyByteCount, currentFragment->byteCount);
+        outPayloadBytes->insert(
+            outPayloadBytes->end(),
+            currentFragment->bytes0C,
+            currentFragment->bytes0C + copyByteCount);
+        remainingPacketBodyByteCount -= copyByteCount;
+        currentFragment = CMessageConnection_NextRetainedFragmentScaffold(workItem, currentFragment);
+    }
+
+    return remainingPacketBodyByteCount == 0u;
+}
+
+// anchor: launcher.exe:0x4490c0
+// string-backed original name: CMessageConnection::OnOperationCompleted
+// Current source body now mirrors the smallest static-RE-backed live subset of the type-3 path:
+// - dispatch on `workItem+0x04`
+// - on type `3`, copy packet-body bytes from the retained-fragment-backed parsed-packet work item
+//   via `currentCursor24` / `assembledByteCount28`
+// - preserve the original oversized-packet close branch before later dispatch/agenda work
+// - later message dispatch / packet-agenda / owner callback handling remains a separate next step
+uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
+    if (!Engine() || !workItem) {
+        return 0u;
+    }
+
+    const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
+    if (workType != 3u) {
+        CMessageConnection_LogUnhandledOperationScaffold(workItem);
+        return 1u;
+    }
+
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* parsedPacketWorkItem =
+        static_cast<const CLTTCPConnection_ParsedPacketWorkItemScaffold*>(workItem);
+    if (parsedPacketWorkItem->assembledByteCount28 > 0x1000u) {
+        spdlog::info(
+            "CMessageConnection::OnOperationCompleted received illegally large packet payloadBytes={} this={} ownerContext={} remoteHost='{}' -> closing",
+            static_cast<unsigned>(parsedPacketWorkItem->assembledByteCount28),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        (void)Close(false);
+        lastReceivedPacketBodyBytesScaffold_.clear();
+        lastReceivedPacketHeaderlessScaffold_ = !packetizedMessagesEnabledScaffold_;
+        return 1u;
+    }
+
+    bool hadUnusedBuffers = false;
+    std::vector<uint8_t> copiedPayloadBytes;
+    const bool copied = CMessageConnection_CopyParsedPacketPayloadBytesScaffold(
+        parsedPacketWorkItem,
+        &copiedPayloadBytes,
+        &hadUnusedBuffers);
+    if (!copied) {
+        spdlog::info(
+            "CMessageConnection::OnOperationCompleted unresolved parsed-packet copy this={} ownerContext={} payloadBytes={} retainedFragmentCount={} currentCursor={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            static_cast<unsigned>(parsedPacketWorkItem->assembledByteCount28),
+            static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
+            fmt::ptr(parsedPacketWorkItem->currentCursor24),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        CMessageConnection_LogUnhandledOperationScaffold(workItem);
+        return 1u;
+    }
+
+    if (hadUnusedBuffers) {
+        spdlog::info(
+            "CMessageConnection::OnOperationCompleted unused retained buffers remained after packet copy this={} ownerContext={} payloadBytes={} retainedFragmentCount={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            static_cast<unsigned>(parsedPacketWorkItem->assembledByteCount28),
+            static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    }
+
+    lastReceivedPacketBodyBytesScaffold_.swap(copiedPayloadBytes);
+    lastReceivedPacketHeaderlessScaffold_ = !packetizedMessagesEnabledScaffold_;
+    spdlog::info(
+        "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
+        lastReceivedPacketHeaderlessScaffold_ ? 1u : 0u,
+        static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return 1u;
+}
+
+const std::vector<uint8_t>& CMessageConnection::LastReceivedPacketBodyBytesScaffold() const {
+    return lastReceivedPacketBodyBytesScaffold_;
+}
+
+bool CMessageConnection::LastReceivedPacketHeaderlessScaffold() const {
+    return lastReceivedPacketHeaderlessScaffold_;
 }
 
 // UNANCHORED: source-owned raw-byte compatibility override beneath the original envelope-based

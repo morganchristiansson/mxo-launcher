@@ -268,8 +268,17 @@ public:
     // string-backed original name: CMessageConnection::OnOperationCompleted
     // current best read:
     // - main completion/receive-side bridge back into engine/queue handling
+    // - work type `3` copies packet-body bytes out of the retained-fragment-backed
+    //   `CParsedPacketWorkItem` via `+0x24/+0x28` before later dispatch/agenda handling
     // - generic fallback logger on this path is helper `0x448a60`
     uint32_t OnOperationCompleted(void* workItem);
+
+    // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
+    // narrowed `0x4490c0` type-3 path.
+    const std::vector<uint8_t>& LastReceivedPacketBodyBytesScaffold() const;
+    // UNANCHORED: source-owned accessor exposing the current headerless/packetized split narrowed
+    // from the `0x4490c0` message-ref flag write.
+    bool LastReceivedPacketHeaderlessScaffold() const;
 
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
@@ -290,6 +299,8 @@ private:
     uintptr_t packetNameCallbackScaffold_ = 0;
     bool packetizedMessagesEnabledScaffold_ = false;
     std::unique_ptr<CMessageConnectionPacketAgendaScaffold> packetAgendaScaffold_;
+    std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
+    bool lastReceivedPacketHeaderlessScaffold_ = false;
 };
 
 // ============================================================
