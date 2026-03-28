@@ -123,6 +123,10 @@ New queue-thread clarification from the current focused pass:
       bridge instead of the original connection-family object, slot-12-style cleanup now unwraps
       that bridge back to the owning connection's logical context key before worker/message-table
       teardown
+    - newer bounded correction: the blocking `RunCompletedOperationQueue(false)` path no longer
+      returns immediately on empty queues; when an attached arg5 queue-signal event exists it now
+      waits on that event and re-enters the dequeue loop, matching the recovered `+0x5c`
+      wait-helper role more closely even though the exact helper lock choreography is still source-owned
   - that source consumer is still explicitly scaffold-first and should not yet be treated as a faithful final replacement for original `0x436b10`
 
 ## New clarification: arg5 contains helper subobjects the client can call directly

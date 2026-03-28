@@ -380,6 +380,11 @@ public:
     void PumpLauncherConnectionBridgeFromArg5HelperScaffold();
 
     // anchor: launcher.exe:0x436b10
+    // Current bounded source mirror:
+    // - nonBlocking=true still models the client-side poll form (`0x62531c10(1)`)
+    // - nonBlocking=false now also waits on the attached arg5 queue-signal event when both queues
+    //   are empty, matching the recovered `+0x5c` wait-helper role more closely than the older
+    //   immediate-return scaffold
     void RunCompletedOperationQueue(bool nonBlocking);
 
     // UNANCHORED: scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.

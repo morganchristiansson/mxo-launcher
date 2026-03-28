@@ -1674,7 +1674,22 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
             if (nonBlocking) {
                 return;
             }
-            // The faithful blocking wait path still belongs to the launcher-owned helper/event surface.
+
+            // Bounded fidelity step from the shared `0x436b10` / `0x62531c10` queue-consumer family:
+            // when both queues are empty, original code routes through arg5 helper `+0x5c` for the
+            // wait path rather than immediately returning. Current sidecar consumer does not model
+            // the exact helper lock choreography yet, but it can safely mirror the recovered event
+            // wait role through the attached arg5 queue-signal handle.
+            if (!externalQueueSignalEvent_) {
+                return;
+            }
+
+            const DWORD waitResult = WaitForSingleObject(
+                static_cast<HANDLE>(externalQueueSignalEvent_),
+                INFINITE);
+            if (waitResult == WAIT_OBJECT_0 || waitResult == WAIT_TIMEOUT) {
+                continue;
+            }
             return;
         }
 
