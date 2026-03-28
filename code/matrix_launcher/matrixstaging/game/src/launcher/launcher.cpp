@@ -20,23 +20,23 @@ public:
     // anchor: launcher.exe:0x40b430
     bool InitInstance();
 
-    // anchor: launcher.exe:0x409950
-    bool ParseCommandLineStage(int argc, char** argv);
+    // anchor: launcher.exe:0x409950 / 0x4173d0
+    bool ParseCommandLineStage() const;
 
     // anchor: launcher.exe:0x40a780
-    bool LoadCresDLL();
+    bool LoadCresDLL() const;
 
     // anchor: launcher.exe:0x40a420
-    bool LoadClientDLL();
+    bool LoadClientDLL() const;
 
     // anchor: launcher.exe:0x40a4d0
-    bool RunClientDllLifecycle();
+    bool RunClientDllLifecycle() const;
 
     // anchor: launcher.exe:0x40a760
-    void UnloadClientDLL();
+    void UnloadClientDLL() const;
 
     // anchor: launcher.exe:0x40a7a0
-    void UnloadCresDLL();
+    void UnloadCresDLL() const;
 
     // anchor: launcher.exe:0x40a55c / 0x40b430
     uint32_t BuildPackedArg7Selection() const;
@@ -64,31 +64,31 @@ bool CLauncher::InitInstance() {
     return false;
 }
 
-bool CLauncher::ParseCommandLineStage(int /*argc*/, char** /*argv*/) {
+bool CLauncher::ParseCommandLineStage() const {
     // UNANCHORED: live behavior still owned by src/resurrections.cpp.
     return false;
 }
 
-bool CLauncher::LoadCresDLL() {
+bool CLauncher::LoadCresDLL() const {
     // UNANCHORED: live behavior still owned by src/resurrections.cpp.
     return false;
 }
 
-bool CLauncher::LoadClientDLL() {
+bool CLauncher::LoadClientDLL() const {
     // UNANCHORED: live behavior still owned by src/resurrections.cpp.
     return false;
 }
 
-bool CLauncher::RunClientDllLifecycle() {
+bool CLauncher::RunClientDllLifecycle() const {
     // UNANCHORED: live behavior still owned by src/resurrections.cpp.
     return false;
 }
 
-void CLauncher::UnloadClientDLL() {
+void CLauncher::UnloadClientDLL() const {
     // UNANCHORED: live behavior still owned by src/resurrections.cpp.
 }
 
-void CLauncher::UnloadCresDLL() {
+void CLauncher::UnloadCresDLL() const {
     // UNANCHORED: live behavior still owned by src/resurrections.cpp.
 }
 

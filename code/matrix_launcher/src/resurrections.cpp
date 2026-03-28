@@ -63,6 +63,24 @@ public:
     uint32_t m_FieldAC = 0;          // original: [this+0xac], low 24 bits feed InitClientDLL arg7
     uint8_t m_FieldB0 = 0;           // original: [this+0xb0]
 
+    // anchor: launcher.exe:0x40b430
+    bool InitInstance();
+
+    // anchor: launcher.exe:0x409950 / 0x4173d0
+    bool ParseCommandLineStage() const;
+
+    // anchor: launcher.exe:0x40a780
+    bool LoadCresDLL() const;
+
+    // anchor: launcher.exe:0x40a420
+    bool LoadClientDLL() const;
+
+    // anchor: launcher.exe:0x40a760
+    void UnloadClientDLL() const;
+
+    // anchor: launcher.exe:0x40a7a0
+    void UnloadCresDLL() const;
+
     uint32_t BuildPackedArg7Selection() const;
     bool RunClientDllLifecycle() const;
 };
@@ -74,6 +92,8 @@ static_assert(offsetof(CLauncher, m_FieldB0) == 0xb0, "CLauncher +0xb0 drifted")
 
 static HMODULE g_hCres = NULL;
 static HMODULE g_hClient = NULL;
+static int g_CrtArgc = 0;
+static char** g_CrtArgv = NULL;
 
 // Launcher-owned command-line preprocessing now lives in a dedicated recovered model.
 static mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
@@ -501,15 +521,8 @@ static void DiagnosticShutdownPreclientEnvironment() {
 }
 
 static void UnloadClientLibraries() {
-    // anchor: launcher.exe:0x40a760 / 0x40a7a0
-    if (g_hClient) {
-        FreeLibrary(g_hClient);
-        g_hClient = NULL;
-    }
-    if (g_hCres) {
-        FreeLibrary(g_hCres);
-        g_hCres = NULL;
-    }
+    g_Launcher.UnloadClientDLL();
+    g_Launcher.UnloadCresDLL();
 }
 
 static int FinishAndReturn(int code) {
@@ -576,14 +589,14 @@ static bool PreloadDependencies() {
     return true;
 }
 
-static bool LoadCresDLL() {
+bool CLauncher::LoadCresDLL() const {
     spdlog::info("=== Load cres.dll ===");
     g_hCres = LoadLibraryA("cres.dll");
     spdlog::info("cres.dll handle: {}", fmt::ptr(g_hCres));
     return g_hCres != NULL;
 }
 
-static bool LoadClientDLL() {
+bool CLauncher::LoadClientDLL() const {
     if (!PatchClientDllMxowrapImportToDbghelp()) {
         return false;
     }
@@ -591,6 +604,20 @@ static bool LoadClientDLL() {
     g_hClient = LoadLibraryA("client.dll");
     spdlog::info("client.dll handle: {}", fmt::ptr(g_hClient));
     return g_hClient != NULL;
+}
+
+void CLauncher::UnloadClientDLL() const {
+    if (g_hClient) {
+        FreeLibrary(g_hClient);
+        g_hClient = NULL;
+    }
+}
+
+void CLauncher::UnloadCresDLL() const {
+    if (g_hCres) {
+        FreeLibrary(g_hCres);
+        g_hCres = NULL;
+    }
 }
 
 static void LogClientLifecycleFailure(const char* phase, ErrorClientDLLFunc errorClientDLL) {
@@ -868,13 +895,13 @@ static void LogKnownStartupState() {
 // - so the faithful target is not "bypass launcher preprocessing and feed raw argv straight into
 //   CConsoleVar_ParseCommandLineAndConfig"; it is "reimplement 0x409950 faithfully, then call the
 //   runtime console parser on its filtered argv output"
-static bool ConfigureFilteredArgv(int argc, char* argv[]) {
+bool CLauncher::ParseCommandLineStage() const {
     spdlog::info("=== Launcher argv preprocessing ===");
     spdlog::info(
         "DIAGNOSTIC: launcher.exe uses ParseCommandLine(0x409950) followed by "
         "CConsoleVar_ParseCommandLineAndConfig(0x4173d0)");
 
-    if (!g_LauncherCommandLine.ParseCommandLine(argc, argv)) {
+    if (!g_LauncherCommandLine.ParseCommandLine(g_CrtArgc, g_CrtArgv)) {
         spdlog::error("ERROR: launcher ParseCommandLine scaffold failed");
         return false;
     }
@@ -949,22 +976,11 @@ static void InitializeLogging() {
     }
 }
 
-int main(int argc, char* argv[]) {
-    InitializeLogging();
-    AddVectoredExceptionHandler(1, DiagnosticVectoredExceptionHandler);
-    SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
-
-    spdlog::info("Matrix Online launcher reimplementation scaffold");
-    spdlog::info("===============================================");
-    spdlog::info("Mode: original startup order, no client-memory injection");
-    spdlog::info("Default branch target: nopatch path");
-    spdlog::info("DIAGNOSTIC: spdlog debug file = resurrections_spdlog.log");
-    spdlog::info("");
-
+bool CLauncher::InitInstance() {
     spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
     spdlog::info("NOTE: launcher-owned nopatch setup, arg5, arg6, arg7, and arg8 remain incomplete.");
-    if (!ConfigureFilteredArgv(argc, argv)) {
-        return FinishAndReturn(1);
+    if (!ParseCommandLineStage()) {
+        return false;
     }
     spdlog::info("");
 
@@ -998,14 +1014,14 @@ int main(int argc, char* argv[]) {
     if (recoveredSelection) {
         std::strncpy(mediatorSelectionName, recoveredSelection->worldName, sizeof(mediatorSelectionName) - 1);
         mediatorSelectionName[sizeof(mediatorSelectionName) - 1] = '\0';
-        g_Launcher.m_FieldA8 = recoveredSelection->variantIndexHigh8;
-        g_Launcher.m_FieldAC = recoveredSelection->worldIndexLow24;
+        m_FieldA8 = recoveredSelection->variantIndexHigh8;
+        m_FieldAC = recoveredSelection->worldIndexLow24;
         spdlog::info(
             "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
             recoveredSelection->worldName,
-            g_Launcher.m_FieldA8,
-            g_Launcher.m_FieldAC,
-            g_Launcher.BuildPackedArg7Selection(),
+            m_FieldA8,
+            m_FieldAC,
+            BuildPackedArg7Selection(),
             (unsigned)recoveredSelection->selectionGateByte100,
             (unsigned)recoveredSelection->variantState,
             recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
@@ -1015,8 +1031,8 @@ int main(int argc, char* argv[]) {
             mediatorSelectionName);
     }
 
-    g_PackedArg7Selection = g_Launcher.BuildPackedArg7Selection();
-    if ((g_Launcher.m_FieldA8 | g_Launcher.m_FieldAC) != 0) {
+    g_PackedArg7Selection = BuildPackedArg7Selection();
+    if ((m_FieldA8 | m_FieldAC) != 0) {
         spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", g_PackedArg7Selection);
     }
 
@@ -1049,7 +1065,7 @@ int main(int argc, char* argv[]) {
 
     if (!PreloadDependencies()) {
         spdlog::info("ERROR: preload failed");
-        return FinishAndReturn(1);
+        return false;
     }
 
     DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
@@ -1100,20 +1116,20 @@ int main(int argc, char* argv[]) {
             "DIAGNOSTIC: reusing current ILTLoginMediator.Default object as sibling 0x4d3584 selection slot ({})",
             fmt::ptr(g_pILTLoginMediatorSelection3584));
 
-        uint32_t resolvedA8 = g_Launcher.m_FieldA8;
-        uint32_t resolvedAC = g_Launcher.m_FieldAC;
+        uint32_t resolvedA8 = m_FieldA8;
+        uint32_t resolvedAC = m_FieldAC;
         char resolvedWorldName[sizeof(g_LastWorldName)] = {0};
         if (DiagnosticResolveLauncherSelectionFromMediator(
                 g_pILTLoginMediatorSelection3584,
-                g_Launcher.m_FieldAC,
-                g_Launcher.m_FieldA8,
+                m_FieldAC,
+                m_FieldA8,
                 &resolvedA8,
                 &resolvedAC,
                 resolvedWorldName,
                 sizeof(resolvedWorldName))) {
-            g_Launcher.m_FieldA8 = resolvedA8;
-            g_Launcher.m_FieldAC = resolvedAC;
-            g_PackedArg7Selection = g_Launcher.BuildPackedArg7Selection();
+            m_FieldA8 = resolvedA8;
+            m_FieldAC = resolvedAC;
+            g_PackedArg7Selection = BuildPackedArg7Selection();
             if (resolvedWorldName[0]) {
                 std::strncpy(g_LastWorldName, resolvedWorldName, sizeof(g_LastWorldName) - 1);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
@@ -1121,8 +1137,8 @@ int main(int argc, char* argv[]) {
             }
             spdlog::info(
                 "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
-                g_Launcher.m_FieldA8,
-                g_Launcher.m_FieldAC,
+                m_FieldA8,
+                m_FieldAC,
                 g_PackedArg7Selection,
                 g_LastWorldName[0] ? g_LastWorldName : mediatorSelectionName);
         }
@@ -1193,17 +1209,31 @@ int main(int argc, char* argv[]) {
 
     if (!LoadCresDLL()) {
         spdlog::info("ERROR: failed to load cres.dll");
-        return FinishAndReturn(1);
+        return false;
     }
 
     if (!LoadClientDLL()) {
         spdlog::info("ERROR: failed to load client.dll");
-        return FinishAndReturn(1);
+        return false;
     }
 
-    if (!g_Launcher.RunClientDllLifecycle()) {
-        return FinishAndReturn(1);
-    }
+    return RunClientDllLifecycle();
+}
 
-    return FinishAndReturn(0);
+int main(int argc, char* argv[]) {
+    InitializeLogging();
+    AddVectoredExceptionHandler(1, DiagnosticVectoredExceptionHandler);
+    SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
+
+    g_CrtArgc = argc;
+    g_CrtArgv = argv;
+
+    spdlog::info("Matrix Online launcher reimplementation scaffold");
+    spdlog::info("===============================================");
+    spdlog::info("Mode: original startup order, no client-memory injection");
+    spdlog::info("Default branch target: nopatch path");
+    spdlog::info("DIAGNOSTIC: spdlog debug file = resurrections_spdlog.log");
+    spdlog::info("");
+
+    return FinishAndReturn(g_Launcher.InitInstance() ? 0 : 1);
 }
