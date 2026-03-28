@@ -234,8 +234,6 @@ public:
     // UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
     const std::string& RemoteHostName() const;
 
-    // UNANCHORED: source-owned nonblocking socket poll helper used by the launcher bridge scaffolds.
-    int PollReceiveNonBlocking();
     // anchor: launcher.exe:0x42fe50 TCP receive subpath
     // Narrow source-owned mirror of the worker-thread receive delivery shape:
     // - receive into a `CLTTCPReadOperation`-family fragment
@@ -243,12 +241,6 @@ public:
     // - call `OnReceive(readOperationFragment)`
     // - release the worker-held outer fragment reference
     int PollReceiveAndDeliverReadOperationFragmentsScaffold();
-    // UNANCHORED: source-owned diagnostic accessor over the buffered receive bytes.
-    const std::vector<uint8_t>& ReceivedBytes() const;
-    // UNANCHORED: source-owned buffered receive reset helper.
-    void ClearReceivedBytes();
-    // UNANCHORED: source-owned buffered receive prefix-consumption helper.
-    void ConsumeReceivedBytesPrefix(size_t byteCount);
 
     // anchor: launcher.exe:0x449ca0
     // vtable: launcher.exe:0x004b8040
@@ -304,6 +296,13 @@ public:
     void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 
 private:
+    // UNANCHORED: internal socket-read helper that fills the connection-owned buffered-byte staging
+    // used by the faithful `0x42fe50 -> 0x449d40 -> 0x469bf0` receive seam.
+    int ReceiveBufferedSocketBytesNonBlockingScaffold();
+    // UNANCHORED: internal buffered-byte prefix-consumption helper used after staged fragment
+    // delivery drains bytes out of the connection-owned socket-read staging.
+    void ConsumeBufferedSocketBytesPrefixScaffold(size_t byteCount);
+
     CLTThreadPerClientTCPEngine* engine_;
     void* ownerContext_;
     uint32_t socketHandle_;

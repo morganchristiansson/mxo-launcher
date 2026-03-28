@@ -264,12 +264,8 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 static int __thiscall Mediator_SetNetworkEngine(MinimalLoginMediatorStub* self, void* object) {
     (void)self;
 
-    mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetLauncherObjectEngine(object);
-    if (!engine) {
-        engine = static_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine*>(object);
-    }
-
-    mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(engine);
+    mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(
+        DiagnosticGetLauncherObjectEngine(object));
     return 1;
 }
 

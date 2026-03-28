@@ -817,8 +817,9 @@ const std::string& CLTTCPConnection::RemoteHostName() const {
     return remoteHostName_;
 }
 
-// UNANCHORED: source-owned nonblocking socket poll helper used by the launcher bridge scaffolds.
-int CLTTCPConnection::PollReceiveNonBlocking() {
+// UNANCHORED: internal socket-read helper that fills the connection-owned buffered-byte staging
+// used by the faithful `0x42fe50 -> 0x449d40 -> 0x469bf0` receive seam.
+int CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold() {
     if (socketHandle_ == kInvalidSocketHandle ||
         (state_ != LTTCPEngineConnectionState::kConnectActive &&
          state_ != LTTCPEngineConnectionState::kUdpMonitorActive)) {
@@ -847,7 +848,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
         const int peekResult = recv(socket, &probeByte, 1, MSG_PEEK);
         if (peekResult == 0) {
             spdlog::info(
-                "CLTTCPConnection::PollReceiveNonBlocking peer closed socket=0x{:08x} remoteHost='{}'",
+                "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold peer closed socket=0x{:08x} remoteHost='{}'",
                 socketHandle_,
                 remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
             state_ = LTTCPEngineConnectionState::kClosed;
@@ -861,7 +862,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
                 return 0;
             }
             spdlog::warn(
-                "CLTTCPConnection::PollReceiveNonBlocking recv(MSG_PEEK) failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+                "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold recv(MSG_PEEK) failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
                 socketHandle_,
                 remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
                 wsaError);
@@ -889,7 +890,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
         receivedBytes_.resize(oldSize);
         if (received == 0) {
             spdlog::info(
-                "CLTTCPConnection::PollReceiveNonBlocking recv returned EOF socket=0x{:08x} remoteHost='{}'",
+                "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold recv returned EOF socket=0x{:08x} remoteHost='{}'",
                 socketHandle_,
                 remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
             state_ = LTTCPEngineConnectionState::kClosed;
@@ -903,7 +904,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
             return 0;
         }
         spdlog::warn(
-            "CLTTCPConnection::PollReceiveNonBlocking recv failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+            "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold recv failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
             socketHandle_,
             remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             wsaError);
@@ -919,7 +920,7 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
 
 // anchor: launcher.exe:0x42fe50 TCP receive subpath
 int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
-    const int received = PollReceiveNonBlocking();
+    const int received = ReceiveBufferedSocketBytesNonBlockingScaffold();
     if (received <= 0) {
         return received;
     }
@@ -952,23 +953,14 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     }
 
     if (consumedBytes != 0u) {
-        ConsumeReceivedBytesPrefix(consumedBytes);
+        ConsumeBufferedSocketBytesPrefixScaffold(consumedBytes);
     }
     return received;
 }
 
-// UNANCHORED: source-owned diagnostic accessor over the buffered receive bytes.
-const std::vector<uint8_t>& CLTTCPConnection::ReceivedBytes() const {
-    return receivedBytes_;
-}
-
-// UNANCHORED: source-owned buffered receive reset helper.
-void CLTTCPConnection::ClearReceivedBytes() {
-    receivedBytes_.clear();
-}
-
-// UNANCHORED: source-owned buffered receive prefix-consumption helper.
-void CLTTCPConnection::ConsumeReceivedBytesPrefix(size_t byteCount) {
+// UNANCHORED: internal buffered-byte prefix-consumption helper used after staged fragment
+// delivery drains bytes out of the connection-owned socket-read staging.
+void CLTTCPConnection::ConsumeBufferedSocketBytesPrefixScaffold(size_t byteCount) {
     if (byteCount == 0u) {
         return;
     }

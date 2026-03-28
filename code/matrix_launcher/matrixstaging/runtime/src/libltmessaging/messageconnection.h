@@ -214,7 +214,7 @@ public:
     // This keeps the connection-object-oriented call site out of diagnostics.cpp.
     uint32_t EnsureConnected();
 
-    // UNANCHORED: source-owned raw-byte compatibility override beneath the original
+    // UNANCHORED: source-owned payload-span submit wrapper beneath the original
     // `CMessageConnection::SendPacket` envelope family.
     // Current best original `0x448cf0` consumes a message/envelope object, performs packet-agenda
     // filtering, then reaches lower submit helper `0x448a00`.

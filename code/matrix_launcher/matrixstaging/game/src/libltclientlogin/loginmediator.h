@@ -1024,12 +1024,12 @@ public:
         uint8_t loginType,
         const std::vector<uint8_t>& keyConfigMd5,
         const std::vector<uint8_t>& uiConfigMd5);
-    // Source-owned wrapper/demux entry used by diagnostics/runtime glue.
+    // Source-owned wrapper/demux entry used by the current staged-payload handoff.
     // Important ownership split:
     // - original `0x43f300/0x448140` consume a higher-level incoming auth-message object, not raw
     //   payload bytes directly
-    // - current replacement therefore keeps the raw-byte staging bridge here, but early inbound
-    //   raw `0x07/0x09/0x0b` semantics are dispatched into state2
+    // - current replacement therefore keeps only the staged-payload handoff here, while early
+    //   inbound raw `0x07/0x09/0x0b` semantics are dispatched into state2
     //   `AuthMessageDispatch` (`0x43f300`) and its owner `+0x680` child helper
     //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
     // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
@@ -1037,9 +1037,9 @@ public:
     // - keep this mediator method only as the current staging/demux wrapper, not as proof that
     //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
-    // Current receive-side framing bridge still lives on the replacement transport path.
-    // Keep the frame parsing here instead of in diagnostics so post-auth auth-reply semantics and
-    // the one-shot margin auto-begin request stay mediator-owned.
+    // Current receive handling drains parsed packets from the faithful transport/parser seam.
+    // Keep the post-auth auth-reply semantics and the one-shot margin auto-begin request here so
+    // they stay mediator-owned.
     uint32_t HandleAuthConnectionReceiveScaffold();
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
@@ -1552,7 +1552,7 @@ private:
     mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
     mxo::auth::AuthChallenge lastAuthChallenge_;
     mxo::auth::AuthReply lastAuthReply_;
-    // Keep staged auth bytes mediator-owned for the current raw-byte bridge:
+    // Keep staged auth bytes mediator-owned for the current staged-payload handoff:
     // - early inbound auth now demuxes through state2 / owner+0x680 child helpers
     // - later raw-`0x0b` selected-slot handling still uses state10 slot 6
     // - loginmediator_state9.cpp callback84 opcode fallback also still consults this storage

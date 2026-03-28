@@ -564,7 +564,7 @@ bool CMessageConnection::TakeNextReceivedPacketScaffold(
     return true;
 }
 
-// UNANCHORED: source-owned raw-byte compatibility override beneath the original envelope-based
+// UNANCHORED: source-owned payload-span submit wrapper beneath the original envelope-based
 // `CMessageConnection::SendPacket` family at `0x448cf0 -> 0x448a00`.
 uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext) {
     if (!Engine() || !packetData || packetByteCount == 0) {
