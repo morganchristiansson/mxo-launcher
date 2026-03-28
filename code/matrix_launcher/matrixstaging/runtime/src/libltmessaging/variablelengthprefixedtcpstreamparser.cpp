@@ -214,10 +214,16 @@ static bool CParsedPacketWorkItem_EnsureAdditionalFragmentListScaffold(
 }
 
 // anchor: launcher.exe:0x435e60
-// Current source keeps the pre-existing live ownership balance here while the full original
-// fragment-refcount reconciliation across `0x42fe50 -> 0x449d40 -> 0x469bf0 -> 0x435e60`
-// remains open. Static helper body `0x435e60` is narrower than that source-owned end-to-end seam,
-// so do not overclaim exact lifetime parity yet.
+// Static body `0x435e60` now proves one narrower point than the old source comment did:
+// - the original helper ends with `if (param_1 != 0) param_1->Release();`
+// - so original callers may hand it a temporary retained fragment reference and let the helper
+//   consume that temporary on return
+// Current source still intentionally does *not* restore that trailing release here on the live
+// path. The full cross-caller reconciliation across
+// `0x42fe50 -> 0x449d40 -> 0x469bf0 -> 0x435e60` remains open, and an earlier attempt to tighten
+// this helper body globally caused the known fragment-teardown crash after successful
+// parse/enqueue/copy. Keep the surviving live retain balance here until that broader chain is
+// fully proven.
 static bool CParsedPacketWorkItem_AppendFragmentScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
     CLTTCPReadOperationFragmentScaffold* fragment) {
@@ -312,12 +318,18 @@ static bool CParsedPacketWorkItem_RebaseFirstFragmentToScaffold(
 
     CParsedPacketWorkItem_ResetFragmentStateScaffold(workItem);
     for (size_t index = 0; index < retainedFragmentsToKeep.size(); ++index) {
-        if (!CParsedPacketWorkItem_AppendFragmentScaffold(workItem, retainedFragmentsToKeep[index])) {
+        CLTTCPReadOperationFragmentScaffold* retainedFragmentTempRef = retainedFragmentsToKeep[index];
+        if (!CParsedPacketWorkItem_AppendFragmentScaffold(workItem, retainedFragmentTempRef)) {
+            CLTTCPReadOperationFragment_ReleaseScaffold(retainedFragmentTempRef);
             for (size_t remaining = index + 1; remaining < retainedFragmentsToKeep.size(); ++remaining) {
                 CLTTCPReadOperationFragment_ReleaseScaffold(retainedFragmentsToKeep[remaining]);
             }
             return false;
         }
+
+        // These vector-held retains are source-owned rebase temporaries, not the original
+        // `0x435e60` trailing `Release(param_1)` behavior.
+        CLTTCPReadOperationFragment_ReleaseScaffold(retainedFragmentTempRef);
     }
     return true;
 }
@@ -366,8 +378,15 @@ static bool CVariableLengthPrefixedTCPStreamParser_NormalizeCursorFragmentScaffo
 }
 
 // anchor: launcher.exe:0x472660
-// Current source mirrors the active low-byte-nonzero path used by `0x469bf0` and now expresses
-// the original traversal / exact-boundary split in terms of the recovered work-item helper family.
+// Current source mirrors the active launcher.exe callers from `0x469bf0`, which all pass
+// low-byte-nonzero `cursorAdvanceFlags == 1`.
+//
+// The helper body itself also contains a low-byte-zero branch:
+// - `test cl, cl` / `setz dl` feeds the exact-boundary math
+// - but `ghidra_get_xrefs_to(0x472660)` currently shows only the three `0x469bf0` callers, and
+//   each of those pushes `1`
+// So the zero-flag shape below stays only a conservative structural translation of the recovered
+// arithmetic/traversal split, not a separately proven launcher.exe-active behavior.
 static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold(
     CVariableLengthPrefixedTCPStreamParser* parser,
     uint32_t byteCountToConsume,
@@ -691,10 +710,17 @@ void CVariableLengthPrefixedTCPStreamParser::ResetAfterPacket() {
 
     CLTTCPReadOperationFragmentScaffold* parserCurrentCursorFragment = currentCursorFragment04;
     if (parserCurrentCursorFragment) {
+        // `0x4725c0` explicitly takes one transient ref on parser `+0x04` immediately before
+        // `0x435e60`. Original `0x435e60` then consumes that temp with its trailing
+        // `Release(param_1)`. The live source helper still keeps its own source-owned no-trailing-
+        // release body, so drop the carry-over temp explicitly here instead of broadening that
+        // tighter-but-still-risky helper correction back onto the active parse path.
         CLTTCPReadOperationFragment_AddRefScaffold(parserCurrentCursorFragment);
-        if (!CParsedPacketWorkItem_AppendFragmentScaffold(
-                replacementWorkItem,
-                parserCurrentCursorFragment)) {
+        const bool appended = CParsedPacketWorkItem_AppendFragmentScaffold(
+            replacementWorkItem,
+            parserCurrentCursorFragment);
+        CLTTCPReadOperationFragment_ReleaseScaffold(parserCurrentCursorFragment);
+        if (!appended) {
             return;
         }
     }
@@ -722,6 +748,10 @@ uint32_t CVariableLengthPrefixedTCPStreamParser::Parse(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* currentWorkItem = currentPacketWorkItem14;
     CLTTCPReadOperationFragmentScaffold* inputFragment = readOperationFragment;
     if (readOperationFragment && readOperationFragment->byteCount != 0u) {
+        // `0x469bf0` takes a transient fragment ref immediately before `0x435e60`.
+        // Original `0x435e60` consumes one caller-held temp on return, but the live source helper
+        // still intentionally keeps its source-owned no-trailing-release behavior on this active
+        // Parse path until the full worker->OnReceive->Parse->queue-consumer chain is proven safe.
         CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
         const bool appended =
             CParsedPacketWorkItem_AppendFragmentScaffold(currentWorkItem, readOperationFragment);
