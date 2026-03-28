@@ -1343,7 +1343,12 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
 // anchor: launcher.exe:0x42f970
 // vtable: launcher.exe:0x004b2768 slot +0x1c
 uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
-    CMessageConnection* connection = GetOrCreateMessageConnection(contextKey);
+    // Bounded fidelity step:
+    // - slot 7 is the connection-object-based close path, not a helper that first materializes a
+    //   brand-new sidecar connection on demand
+    // - keep slot 6 / Connect as the creation/ensure-connected seam, but require slot 7 callers to
+    //   resolve an already-existing connection entry
+    CMessageConnection* connection = FindMessageConnection(contextKey);
     return connection ? CloseConnectionScaffold(static_cast<CLTTCPConnection*>(connection), graceful) : 0u;
 }
 
@@ -1358,7 +1363,11 @@ uint32_t CLTThreadPerClientTCPEngine::SendBufferConnectionScaffold(CLTTCPConnect
 // anchor: launcher.exe:0x42fbd0
 // vtable: launcher.exe:0x004b2768 slot +0x20
 uint32_t CLTThreadPerClientTCPEngine::SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext) {
-    CMessageConnection* connection = GetOrCreateMessageConnection(contextKey);
+    // Bounded fidelity step:
+    // - slot 8 is the connection-object-based send path
+    // - do not implicitly create a fresh sidecar connection here; require the existing connection
+    //   entry established earlier on the connect path
+    CMessageConnection* connection = FindMessageConnection(contextKey);
     return connection ? connection->SendPacket(buffer, byteCount, completionContext) : 0u;
 }
 
