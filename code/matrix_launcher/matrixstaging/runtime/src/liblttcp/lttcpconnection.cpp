@@ -332,6 +332,8 @@ void CLTTCPConnection::OnReceive(void* readOperationFragment) {
     //     - `+0x14` current parser-owned work item
     // - first parser handoff is `Parse(fragment, &completedPacketWorkItem)`
     // - later drain handoffs are `Parse(nullptr, &completedPacketWorkItem)`
+    // - successful emits then hand off exactly `(engine+0x10, completedPacketWorkItem, this, false)`
+    //   through `0x436820`; this path does not use queue34 and does not branch on enqueue success
     // - parser-emitted `completedPacketWorkItem` is the same `0x2c` / vtable-`0x4b3e08`
     //   `CParsedPacketWorkItem` family built by `0x435db0 -> 0x435090`
     // - that object family is both:
@@ -347,7 +349,7 @@ void CLTTCPConnection::OnReceive(void* readOperationFragment) {
     ReadOperationFragment_AddRef(fragment);
     uint32_t parseResult = ParseReadOperationFragmentScaffold(fragment, &completedPacketWorkItem);
     while (parseResult == 0u) {
-        pushCompletedOperation(completedPacketWorkItem, this, /*useQueue34=*/false);
+        pushCompletedOperation(completedPacketWorkItem);
         completedPacketWorkItem = nullptr;
         parseResult = ParseReadOperationFragmentScaffold(nullptr, &completedPacketWorkItem);
     }
@@ -424,6 +426,10 @@ uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
     //   seen in queue producer xrefs
     // - that current work item starts as parser-owned assembly state and becomes the emitted
     //   completed packet object when `Parse(...)` returns `0`
+    // - current best static read of `0x469bf0` also narrows the emit contract further:
+    //   - `Parse(...) == 0` writes `*outWorkItem = parser+0x14` before `ResetAfterPacket`
+    //   - no evidence currently supports an intentional `Parse(...) == 0` / `*outWorkItem == nullptr`
+    //     result on this receive path; null work items belong to later lifecycle/shutdown producers
     // - `0x4725c0` / `ResetAfterPacket` then allocates a fresh replacement object and, when unread
     //   bytes remain in the old tail fragment, carries that tail fragment plus the new cursor into
     //   the replacement work item
@@ -438,23 +444,21 @@ uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
     return 1u;
 }
 
-// UNANCHORED: source-owned mirror of the queue-enqueue helper call shape seen in `0x449d40`.
-void CLTTCPConnection::pushCompletedOperation(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
-    void* context,
-    bool useQueue34) {
-    // Current best static read of `0x449d40`:
-    // - queued submission shape is `(engine+0x10, workItem, this, false)` through `0x436820`
-    // - current source path can now forward that enqueue into the engine-side queue helper when
-    //   the connection already has an attached engine sidecar
+// UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
+void CLTTCPConnection::pushCompletedOperation(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
+    // Current best static read of `0x449d40` / `0x469bf0`:
+    // - the queue handoff is exactly `(engine+0x10, completedPacketWorkItem, this, false)`
+    // - this receive path therefore always targets queue0C through `0x436820`
+    // - original caller-side lifetime does not depend on enqueue success because `0x436820`
+    //   returns `void`; once we reach this seam the completed parsed-packet work item is
+    //   queue-owned / consumer-owned rather than connection-owned
     if (!Engine()) {
         return;
     }
 
-    (void)Engine()->EnqueueCompletedOperationFromConnectionScaffold(
+    Engine()->EnqueueCompletedOperationFromConnectionScaffold(
         workItem,
-        context,
-        useQueue34,
+        this,
         "CLTTCPConnection::OnReceive");
 }
 

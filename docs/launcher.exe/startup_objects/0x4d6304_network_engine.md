@@ -758,13 +758,20 @@ A newer throttled runtime log on the same active path now shows that state stayi
 
 A newer original-launcher static pass now also identifies the corresponding producer side more concretely.
 Original enqueue helper `launcher.exe:0x436820`:
+- exact public argument order after engine `this` is:
+  - `workItem`
+  - `context`
+  - `queueSelect`
 - acquires arg5 helper `+0x60`
 - snapshots whether both queues were empty before enqueue
-- calls `0x436670(argA, argB, queueSelect)` to push an **8-byte pair** into one of the two queues
+- calls `0x436670(workItem, context, queueSelect)` to push an **8-byte pair** into one of the two queues
+  - `0x436670` itself is also `void`
+  - so this producer family does **not** surface enqueue-success feedback back to its callers
 - `queueSelect = 0` uses queue0C
 - `queueSelect != 0` uses queue34
 - releases arg5 helper `+0x60`
 - and if both queues were previously empty, signals arg5 helper `+0x5c` slot `0`
+- the signal decision is therefore keyed to the pre-push queue-pair emptiness snapshot, not to any caller-visible push-success result
 
 Representative original xrefs to that producer helper now identified statically include:
 - `launcher.exe:0x4302d5`
@@ -898,9 +905,22 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
     - `parseResult = parser->Parse(readOperationFragment, &completedPacketWorkItem)`
   - while `parseResult == 0`:
     - enqueue `(work=completedPacketWorkItem, context=edi, queueSelect=0)` through `0x436820`
+      - the machine-code call sequence is `push 0 ; push edi ; push edx ; call 0x436820`
+      - i.e. exact enqueue argument order after engine `this` is `(workItem, connection, queueSelect)`
     - call `parser->Parse(0, &completedPacketWorkItem)` to drain more completed packets from the
       same buffered stream state
 - current best reading is therefore a **parser-drain queue0C producer**, not a one-shot fire-and-forget submission and not an anonymous socket poll stub
+- newer parser read from `0x469bf0` also tightens lifetime / nullability on this path:
+  - on the success case `Parse(...) == 0`, the parser writes `*outCompletedPacketWorkItem = parser+0x14`
+    before `ResetAfterPacket` allocates the next assembly object
+  - so current RE does **not** support an intentional `parseResult == 0` / `completedPacketWorkItem == NULL`
+    result on this receive path
+  - the queue consumer's `workItem == NULL` shutdown sentinel still exists, but current evidence ties
+    that to later lifecycle / teardown producers such as:
+    - `0x436a0e`
+    - `0x436fa8`
+    - `0x4309ef`
+    - allocation-failure fallbacks in `0x432d86..0x432dd7`
 - after that drain loop, this function checks return/status values in the `0x700000x` family (`0x7000000`, `0x700000b`)
   - that makes the coded `0x435050(payload)` queue objects from `0x4329cc` / `0x432dc1` look even more like **network status/result items** rather than generic integers
 
@@ -1059,7 +1079,12 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
       - `ret 0xc`
       - current concrete caller shape = `(readOperationFragment, peerAddressBlob16Ptr, 0x004b2118)`
       - recovered semantic effect still only releases the fragment
-    - `CLTTCPConnection::pushCompletedOperation(...)` now forwards through an engine-side bridge into the recovered `0x436820` enqueue helper when the sidecar engine is attached
+    - `CLTTCPConnection::pushCompletedOperation(...)` is now best read as the exact receive-side handoff
+      `(completedPacketWorkItem, this, false)` into engine helper `0x436820`, not as a generic
+      raw-pointer convenience wrapper
+    - because original `0x436820` is `void`, current source ownership notes now also treat that seam
+      as an unconditional transfer into the queue/consumer boundary rather than as a caller-visible
+      success/failure API
 - source lockstep update from the current focused pass:
   - `matrixstaging/runtime/src/liblttcp/lttcpconnection.*` now owns the corrected base-wrapper mapping directly
   - `matrixstaging/runtime/src/libltmessaging/messageconnection.*` no longer keeps a duplicate source-only engine pointer separate from the recovered base `+0x10` field
@@ -1190,6 +1215,8 @@ New practical rerun result after that partial wiring:
     - locking through the arg5 `+0x60` critical-section helper surface
     - checking the combined queue-pair empty state before enqueue
     - signaling arg5 `+0x5c` on empty -> non-empty transition
+    - and no longer treating enqueue as a caller-visible success/failure API on the connection-owned
+      parsed-packet path, which matches the original `void` helper shape more closely
 - concrete deliberate-run evidence now includes consumed queue0C items for:
   - `AuthConnectStatus` (type `2`)
   - repeated `AuthReceivePacket` items (type `3`)

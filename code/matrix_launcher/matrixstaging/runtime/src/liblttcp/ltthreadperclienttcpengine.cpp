@@ -817,26 +817,26 @@ bool CLTThreadPerClientTCPEngine::Queue_Init(
     return true;
 }
 
-// anchor: launcher.exe:0x436670 / 0x436820 producer-family push path
-bool CLTThreadPerClientTCPEngine::Queue_PushPair(
+// anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
+void CLTThreadPerClientTCPEngine::Queue_PushPair(
     CLTThreadPerClientTCPEngine_Queue* queue,
     uint32_t value0,
     uint32_t value1) {
     if (!queue || !queue->current1) {
-        return false;
+        return;
     }
 
     uint8_t* lastPairInBlock = queue->end1 ? (static_cast<uint8_t*>(queue->end1) - 8) : nullptr;
     if (static_cast<void*>(queue->current1) == static_cast<void*>(lastPairInBlock)) {
         CLTThreadPerClientTCPEngine_QueuePair pair = {value0, value1};
-        return GrowQueue(queue, &pair);
+        (void)GrowQueue(queue, &pair);
+        return;
     }
 
     uint32_t* current1 = static_cast<uint32_t*>(queue->current1);
     current1[0] = value0;
     current1[1] = value1;
     queue->current1 = current1 + 2;
-    return true;
 }
 
 // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
@@ -1379,6 +1379,13 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
     bool useQueue34,
     const char* label,
     bool queueLockAlreadyHeld) {
+    // Current best read of original `0x436820` / `0x436670`:
+    // - `0x436820` itself returns `void`
+    // - lock/order is:
+    //   enter helper `+0x60` -> snapshot combined queue-pair emptiness -> push pair -> leave lock
+    //   -> signal helper `+0x5c` only on pre-push empty -> non-empty transition
+    // - no push-success result is surfaced back to callers; caller-side ownership/lifetime does not
+    //   branch on queue-growth success/failure once this path is entered
     CLTThreadPerClientTCPEngine_Queue* targetQueue = useQueue34 ? externalQueue34_ : externalQueue0C_;
     if (!targetQueue) {
         return false;
@@ -1390,7 +1397,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
     }
 
     const bool queuePairWasEmpty = Queue_IsEmpty(externalQueue0C_) && Queue_IsEmpty(externalQueue34_);
-    const bool pushed = Queue_PushPair(
+    Queue_PushPair(
         targetQueue,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(workItem)),
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
@@ -1399,20 +1406,19 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
         LeaveCriticalSection(queueLock);
     }
 
-    if (pushed && queuePairWasEmpty && externalQueueSignalEvent_) {
+    if (queuePairWasEmpty && externalQueueSignalEvent_) {
         (void)SetEvent(static_cast<HANDLE>(externalQueueSignalEvent_));
     }
 
     spdlog::info(
-        "CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold label={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} pushed={:08x} lockHeld={:08x}",
+        "CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold label={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} lockHeld={:08x}",
         label ? label : "<null>",
         useQueue34 ? "queue34" : "queue0C",
         static_cast<unsigned>(reinterpret_cast<uintptr_t>(workItem)),
         fmt::ptr(context),
         queuePairWasEmpty ? 1u : 0u,
-        pushed ? 1u : 0u,
         queueLockAlreadyHeld ? 1u : 0u);
-    return pushed;
+    return true;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1442,13 +1448,13 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     workItem->workPayload = workPayload;
     workItem->debugLabel = label;
 
-    const bool pushed = EnqueueCompletedOperationScaffold(
+    const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
         context,
         /*useQueue34=*/false,
         label,
         queueLockAlreadyHeld);
-    if (!pushed) {
+    if (!queued) {
         std::free(workItem);
         return false;
     }
@@ -1477,16 +1483,22 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemScaffol
         /*queueLockAlreadyHeld=*/false);
 }
 
-// UNANCHORED: connection-side bridge into the recovered `0x436820` completed-operation enqueue helper.
-bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffold(
-    void* workItem,
-    void* context,
-    bool useQueue34,
+// UNANCHORED: connection-owned bridge for the recovered `0x449d8a -> 0x436820` handoff.
+void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffold(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPConnection* connection,
     const char* label) {
-    return EnqueueCompletedOperationScaffold(
+    // Current best original read for this receive path:
+    // - `CLTTCPConnection::OnReceive` always calls `0x436820(engine+0x10, workItem, self, false)`
+    // - queue selection is therefore fixed to queue0C here
+    // - current parser read does not support an intentional `Parse(...) == 0` / `workItem == NULL`
+    //   emit on this path; null work items belong to later lifecycle/shutdown producers instead
+    // - original caller does not test a success result or reclaim `workItem`; ownership is already
+    //   transferred to the queue/consumer boundary when this helper is entered
+    (void)EnqueueCompletedOperationScaffold(
         workItem,
-        context,
-        useQueue34,
+        connection,
+        /*useQueue34=*/false,
         label,
         /*queueLockAlreadyHeld=*/false);
 }

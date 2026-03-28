@@ -307,8 +307,10 @@ public:
     static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);
     // anchor: launcher.exe:0x436340
     static bool Queue_Init(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t initialSize);
-    // anchor: launcher.exe:0x436670 / 0x436820
-    static bool Queue_PushPair(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t value0, uint32_t value1);
+    // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
+    // Original helper returns `void`; once the caller reaches this push path it does not receive
+    // enqueue-success feedback.
+    static void Queue_PushPair(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t value0, uint32_t value1);
     // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
     static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_Queue* queue);
     // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
@@ -349,11 +351,16 @@ public:
         uint32_t workType,
         uint32_t workPayload,
         const char* label);
-    // UNANCHORED: connection-side bridge into the recovered `0x436820` completed-operation enqueue helper.
-    bool EnqueueCompletedOperationFromConnectionScaffold(
-        void* workItem,
-        void* context,
-        bool useQueue34,
+    // UNANCHORED: connection-owned bridge for the recovered `0x449d8a -> 0x436820` handoff.
+    // Current best original read for this specific receive path:
+    // - argument order after engine `this` is `(workItem, connection, useQueue34)`
+    // - `CLTTCPConnection::OnReceive` always reaches it as `(completedPacketWorkItem, self, false)`
+    //   i.e. queue0C on the currently understood receive path
+    // - ownership of `workItem` transfers to the queue/consumer here; original `0x436820` returns
+    //   `void`, so caller-side lifetime does not depend on enqueue success/failure
+    void EnqueueCompletedOperationFromConnectionScaffold(
+        CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+        CLTTCPConnection* connection,
         const char* label = nullptr);
     void PumpLauncherConnectionBridgeFromArg5HelperScaffold();
 
@@ -395,8 +402,12 @@ private:
     void StopAcceptThreadScaffold(AcceptThreadRecord* record);
     // UNANCHORED: source-owned teardown helper for recovered WorkerThread-style payloads.
     void StopWorkerThreadScaffold(WorkerThreadRecord* record);
-    // UNANCHORED: current replacement enqueue helper shaped after 0x436820 but still fed by
-    // synthetic sidecar polling rather than fully recovered worker-thread producers.
+    // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape
+    // while still returning `false` to synthetic callers when no attached target queue exists.
+    // Unlike original `0x436820`, this source-owned helper exposes queue availability to the
+    // synthetic launcher-bridge allocation path; once a target queue exists, it follows the
+    // original enter-lock -> empty-snapshot -> push -> leave-lock -> signal ordering and does not
+    // surface a push-success result.
     bool EnqueueCompletedOperationScaffold(
         void* workItem,
         void* context,
