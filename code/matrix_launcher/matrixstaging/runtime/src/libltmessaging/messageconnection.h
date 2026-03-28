@@ -130,14 +130,18 @@ namespace mxo::liblttcp {
 // - keep the names stable, but treat the exact live method signatures as still provisional
 
 struct CMessageConnectionMessageScaffold {
-    // Source-owned bridge for the original shared message object consumed by
-    // `0x448cf0 -> 0x448a00`.
-    // Current best narrowed fields that materially affect the final byte submit:
+    // Source-owned bridge for the original inner message-storage object:
+    // - send path: the envelope/shared-message family eventually submitted by `0x448cf0 -> 0x448a00`
+    // - receive path: the object stored at outer message-ref `+0x0c` after `0x455cd0 -> 0x455c60`
+    // Current best narrowed fields that materially affect the current send/receive seams:
     // - original inner object `+0x08` participates in payload-cap checks (`0xffc`)
     // - original inner object `+0x0a/+0x0b` hold the framed payload length/header bytes
     // - original payload bytes begin at `+0x0c`
     // - builder helpers such as `0x43acf0` grow the payload through shared-object vtable `+0x18`
     //   (`0x4557b0`) before later copy helpers write bytes into the newly reserved tail
+    // - receive-side `0x4490c0` now also uses the same inner-object shape more directly:
+    //   copied parsed-packet spans are appended into this storage before `0x41bc20/0x41bbb0`
+    //   style opcode reads and later leaf dispatch
     // - crucial newer live-original correction:
     //   an earlier `0x448a00` capture with submitted bytes beginning `01 03 00 36 ...` and
     //   length `0x13b` was later proven to return to `0x441f9f`, i.e. a different send family,
@@ -160,6 +164,18 @@ struct CMessageConnectionMessageScaffold {
     uint8_t* PayloadBaseScaffold();
     const uint8_t* PayloadBaseScaffold() const;
     std::vector<uint8_t> BuildFramedBytesFrom0aScaffold() const;
+};
+
+struct CMessageConnectionReceivedMessageRefScaffold {
+    // Source-owned mirror of the outer receive/message-ref object created by `0x455cd0/0x455c60`
+    // and consumed by later helpers such as `0x41bc20` / `0x41bbb0`.
+    // Current best narrowed material fields:
+    // - original outer `+0x0c` = inner message-storage object
+    // - original outer `+0x10` = headerless/non-headerless flag written by `0x4490c0`
+    // - original outer `+0x14` = extra context dword passed as the second `0x455cd0` argument
+    std::shared_ptr<CMessageConnectionMessageScaffold> messageStorage0c;
+    uint8_t headerless10 = 0;
+    uint32_t messageContext14 = 0;
 };
 
 enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
@@ -280,10 +296,11 @@ public:
     // - work type `2` first tries optional completion helper `+0x7c`; on the launcher startup path
     //   that then falls through into the leaf owner-callback wrapper
     // - work type `3` copies packet-body bytes out of the retained-fragment-backed
-    //   `CParsedPacketWorkItem` via `+0x24/+0x28` before later dispatch/agenda handling
+    //   `CParsedPacketWorkItem` via `+0x24/+0x28` into a local receive/message-ref scaffold
+    //   built on the same outer-ref/inner-storage split used by `0x455cd0/0x455c60`
     // - source now also mirrors one narrower original post-copy step there:
-    //   - build a local message-ref-shaped view over the copied bytes
-    //   - keep the original headerless locator-id validity gate before leaf dispatch
+    //   - keep the original headerless locator-id validity gate on that receive/message-ref
+    //   - read message codes through the nearer `0x41bc20/0x41bbb0`-style object path before leaf dispatch
     // - generic fallback logger on this path is helper `0x448a60`
     // Current source gap kept explicit:
     // - source now owns the copied-packet staging subset and two later leaf post-copy destinations:
@@ -315,14 +332,15 @@ protected:
     // Source-owned post-copy dispatch seam beneath the narrowed type-3 receive path.
     // Current bounded use:
     // - base `0x4490c0` now still owns the copied-packet extraction
+    // - leaf families now receive a nearer outer-ref/inner-storage scaffold instead of a naked
+    //   byte vector, matching the real `0x455cd0 -> 0x41bc20/0x41bbb0` seam more closely
     // - leaf families can optionally source-own one later dispatch destination without pretending
     //   the full original message-object / agenda tail is already reconstructed
     // - returning non-zero means the leaf consumed this copied packet without needing the pending
     //   copied-packet queue / later synthetic receive-drain proxy
     virtual uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
-        const std::vector<uint8_t>& payloadBytes,
-        bool headerless);
+        const CMessageConnectionReceivedMessageRefScaffold& messageRef);
 
 private:
     // UNANCHORED: source-owned packet-family name helper for current diagnostics.
@@ -372,15 +390,15 @@ public:
 protected:
     // anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
     // Current bounded auth-side correction:
-    // - after base `0x4490c0` finishes the parsed-packet copy, the auth leaf now first builds a
-    //   local message-ref-shaped view and runs the narrow `0x442d00` consumed-code filter
+    // - after base `0x4490c0` finishes the parsed-packet copy, the auth leaf now receives the
+    //   nearer local receive/message-ref scaffold and runs the narrow `0x442d00` consumed-code
+    //   filter through the same `0x41bc20/0x41bbb0`-style object read path
     // - only the surviving auth path then re-enters the current helper's slot-5
     //   `AuthMessageDispatch` path through owner `+0x180`
     // - source still does not materialize the full original refcounted message object / agenda tail
     uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
-        const std::vector<uint8_t>& payloadBytes,
-        bool headerless) override;
+        const CMessageConnectionReceivedMessageRefScaffold& messageRef) override;
 };
 
 // ============================================================
@@ -412,8 +430,6 @@ public:
     // anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
     // Narrow source-owned mirror of the consumed decoded-code-5 16-byte writeback.
     void SetMessageCode5SeedBytes85Scaffold(const std::array<uint8_t, 16>& value);
-    // UNANCHORED: source-owned accessor returning whether that narrower code-5 writeback exists.
-    bool HasMessageCode5SeedBytes85Scaffold() const;
     // UNANCHORED: source-owned copy-out accessor for the same narrowed code-5 writeback.
     bool CopyMessageCode5SeedBytes85Scaffold(std::array<uint8_t, 16>* outValue) const;
     // UNANCHORED: source-owned raw-pointer accessor for the same narrowed code-5 writeback.
@@ -445,13 +461,12 @@ protected:
     //     the connection/leaf seam
     //   - decoded code `4` mirrors the narrower `0x441850` side effect locally before that same
     //     continuation
-    // - current source still does not materialize the full original message-ref object, so this
-    //   remains a staged-payload mirror of that later destination rather than a byte-faithful
-    //   `0x44af20`
+    // - current source still does not materialize the full original message-ref object / agenda
+    //   tail, but this seam now receives the nearer local outer-ref/inner-storage scaffold instead
+    //   of a naked payload vector before mirroring `0x44af20`
     uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
-        const std::vector<uint8_t>& payloadBytes,
-        bool headerless) override;
+        const CMessageConnectionReceivedMessageRefScaffold& messageRef) override;
 
 private:
     bool messageCode4SuccessFlag84Scaffold_ = false;
