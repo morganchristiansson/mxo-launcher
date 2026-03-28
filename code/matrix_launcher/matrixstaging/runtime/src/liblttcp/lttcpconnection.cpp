@@ -5,6 +5,8 @@
 #include <winsock2.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 
 #include "spdlog/spdlog.h"
 
@@ -13,6 +15,7 @@ namespace mxo::liblttcp {
 namespace {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
+static void* g_ParsedPacketWorkItemVtable[2] = {nullptr, nullptr};
 
 // UNANCHORED: source-owned endpoint-key comparison helper for the current connection wrapper.
 static bool EndpointKeysDiffer(const LTTCPEndpointKey& lhs, const LTTCPEndpointKey& rhs) {
@@ -50,6 +53,265 @@ static void ReadOperationFragment_Release(CLTTCPReadOperationFragmentScaffold* f
     fragment->vtable->release(fragment);
 }
 
+// UNANCHORED: source-owned payload-base helper for the recovered read-operation fragment family.
+static uint8_t* ReadOperationFragment_PayloadBegin(CLTTCPReadOperationFragmentScaffold* fragment) {
+    return fragment ? fragment->bytes0C : nullptr;
+}
+
+// UNANCHORED: source-owned payload-end helper for the recovered read-operation fragment family.
+static const uint8_t* ReadOperationFragment_PayloadEnd(
+    const CLTTCPReadOperationFragmentScaffold* fragment) {
+    return fragment ? (fragment->bytes0C + fragment->byteCount) : nullptr;
+}
+
+// UNANCHORED: source-owned remaining-byte helper for the recovered read-operation fragment family.
+static uint32_t ReadOperationFragment_BytesRemainingFromCursor(
+    const CLTTCPReadOperationFragmentScaffold* fragment,
+    const uint8_t* cursor) {
+    if (!fragment || !cursor) {
+        return 0u;
+    }
+
+    const uint8_t* begin = fragment->bytes0C;
+    const uint8_t* end = ReadOperationFragment_PayloadEnd(fragment);
+    if (cursor < begin || cursor > end) {
+        return 0u;
+    }
+
+    return static_cast<uint32_t>(end - cursor);
+}
+
+// UNANCHORED: source-owned parser current-fragment ref helper mirroring parser `+0x04` ownership.
+static void Parser_AssignCurrentCursorFragmentScaffold(
+    CVariableLengthPrefixedTCPStreamParserScaffold* parser,
+    CLTTCPReadOperationFragmentScaffold* fragment) {
+    if (!parser || parser->currentCursorFragment04 == fragment) {
+        return;
+    }
+
+    ReadOperationFragment_Release(parser->currentCursorFragment04);
+    parser->currentCursorFragment04 = fragment;
+    if (fragment) {
+        ReadOperationFragment_AddRef(fragment);
+    }
+}
+
+// UNANCHORED: source-owned release helper for the parsed-packet work-item scaffold.
+static uint32_t __thiscall ParsedPacketWorkItem_ReleaseScaffold(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* self) {
+    if (!self) {
+        return 1u;
+    }
+
+    if (self->firstRetainedFragment10) {
+        ReadOperationFragment_Release(self->firstRetainedFragment10);
+        self->firstRetainedFragment10 = nullptr;
+    }
+
+    if (self->retainedFragmentListOwner14) {
+        CParsedPacketWorkItem_RetainedFragmentNodeScaffold* sentinel =
+            self->retainedFragmentListOwner14->sentinel;
+        if (sentinel) {
+            CParsedPacketWorkItem_RetainedFragmentNodeScaffold* node = sentinel->next;
+            while (node && node != sentinel) {
+                CParsedPacketWorkItem_RetainedFragmentNodeScaffold* next = node->next;
+                ReadOperationFragment_Release(node->retainedFragment08);
+                std::free(node);
+                node = next;
+            }
+            std::free(sentinel);
+        }
+        std::free(self->retainedFragmentListOwner14);
+        self->retainedFragmentListOwner14 = nullptr;
+    }
+
+    std::free(self);
+    return 1u;
+}
+
+// UNANCHORED: source-owned vtable init helper for queued parsed-packet work items.
+static void EnsureParsedPacketWorkItemVtableInitialized() {
+    if (!g_ParsedPacketWorkItemVtable[1]) {
+        g_ParsedPacketWorkItemVtable[1] =
+            reinterpret_cast<void*>(ParsedPacketWorkItem_ReleaseScaffold);
+    }
+}
+
+// UNANCHORED: source-owned allocator for the recovered `0x2c` parsed-packet work-item family.
+static CLTTCPConnection_ParsedPacketWorkItemScaffold* AllocateParsedPacketWorkItemScaffold() {
+    EnsureParsedPacketWorkItemVtableInitialized();
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem =
+        static_cast<CLTTCPConnection_ParsedPacketWorkItemScaffold*>(
+            std::calloc(1, sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold)));
+    if (!workItem) {
+        return nullptr;
+    }
+
+    workItem->vtable = g_ParsedPacketWorkItemVtable;
+    workItem->workType = 3u;
+    workItem->directFragmentTraversalPhase18 = 1u;
+    return workItem;
+}
+
+// UNANCHORED: source-owned list-owner allocator for additional retained fragments.
+static bool ParsedPacketWorkItem_EnsureAdditionalFragmentListScaffold(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
+    if (!workItem) {
+        return false;
+    }
+    if (workItem->retainedFragmentListOwner14 && workItem->retainedFragmentListOwner14->sentinel) {
+        return true;
+    }
+
+    CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold* owner =
+        static_cast<CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold*>(
+            std::calloc(1, sizeof(CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold)));
+    CParsedPacketWorkItem_RetainedFragmentNodeScaffold* sentinel =
+        static_cast<CParsedPacketWorkItem_RetainedFragmentNodeScaffold*>(
+            std::calloc(1, sizeof(CParsedPacketWorkItem_RetainedFragmentNodeScaffold)));
+    if (!owner || !sentinel) {
+        std::free(sentinel);
+        std::free(owner);
+        return false;
+    }
+
+    sentinel->next = sentinel;
+    sentinel->prev = sentinel;
+    owner->sentinel = sentinel;
+    workItem->retainedFragmentListOwner14 = owner;
+    return true;
+}
+
+// UNANCHORED: source-owned retained-fragment append helper for the recovered parsed-packet family.
+static bool ParsedPacketWorkItem_AppendFragmentScaffold(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationFragmentScaffold* fragment) {
+    if (!workItem || !fragment) {
+        return false;
+    }
+
+    if (workItem->retainedFragmentCount0C == 0u) {
+        if (workItem->firstRetainedFragment10 != fragment) {
+            ReadOperationFragment_Release(workItem->firstRetainedFragment10);
+            workItem->firstRetainedFragment10 = fragment;
+            ReadOperationFragment_AddRef(fragment);
+        }
+        workItem->retainedFragmentCount0C = 1u;
+        return true;
+    }
+
+    if (!ParsedPacketWorkItem_EnsureAdditionalFragmentListScaffold(workItem)) {
+        return false;
+    }
+
+    CParsedPacketWorkItem_RetainedFragmentNodeScaffold* node =
+        static_cast<CParsedPacketWorkItem_RetainedFragmentNodeScaffold*>(
+            std::calloc(1, sizeof(CParsedPacketWorkItem_RetainedFragmentNodeScaffold)));
+    if (!node) {
+        return false;
+    }
+
+    CParsedPacketWorkItem_RetainedFragmentNodeScaffold* sentinel =
+        workItem->retainedFragmentListOwner14->sentinel;
+    node->retainedFragment08 = fragment;
+    ReadOperationFragment_AddRef(fragment);
+    node->next = sentinel;
+    node->prev = sentinel->prev;
+    sentinel->prev->next = node;
+    sentinel->prev = node;
+    ++workItem->retainedFragmentCount0C;
+    return true;
+}
+
+// UNANCHORED: source-owned tail-fragment helper for the recovered parsed-packet family.
+static CLTTCPReadOperationFragmentScaffold* ParsedPacketWorkItem_GetTailFragmentScaffold(
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
+    if (!workItem || workItem->retainedFragmentCount0C == 0u) {
+        return nullptr;
+    }
+    if (workItem->retainedFragmentCount0C == 1u || !workItem->retainedFragmentListOwner14 ||
+        !workItem->retainedFragmentListOwner14->sentinel) {
+        return workItem->firstRetainedFragment10;
+    }
+
+    CParsedPacketWorkItem_RetainedFragmentNodeScaffold* tailNode =
+        workItem->retainedFragmentListOwner14->sentinel->prev;
+    if (!tailNode || tailNode == workItem->retainedFragmentListOwner14->sentinel) {
+        return workItem->firstRetainedFragment10;
+    }
+    return tailNode->retainedFragment08;
+}
+
+// UNANCHORED: source-owned allocator guard for parser `+0x14` current work-item state.
+static bool Parser_EnsureCurrentWorkItemScaffold(
+    CVariableLengthPrefixedTCPStreamParserScaffold* parser) {
+    if (!parser) {
+        return false;
+    }
+    if (parser->currentPacketWorkItem14) {
+        return true;
+    }
+
+    parser->currentPacketWorkItem14 = AllocateParsedPacketWorkItemScaffold();
+    return parser->currentPacketWorkItem14 != nullptr;
+}
+
+// UNANCHORED: source-owned single-fragment byte-consume helper over the recovered parser prefix.
+static bool Parser_ConsumeBytesWithinCurrentFragmentScaffold(
+    CVariableLengthPrefixedTCPStreamParserScaffold* parser,
+    uint32_t byteCount) {
+    if (!parser || byteCount == 0u) {
+        return true;
+    }
+
+    const uint32_t remainingInCurrentFragment =
+        ReadOperationFragment_BytesRemainingFromCursor(
+            parser->currentCursorFragment04,
+            parser->currentCursor08);
+    if (remainingInCurrentFragment < byteCount || parser->unreadBufferedByteCount0C < byteCount) {
+        return false;
+    }
+
+    parser->currentCursor08 += byteCount;
+    parser->unreadBufferedByteCount0C -= byteCount;
+    parser->advancedBufferedByteCount10 += byteCount;
+    if (parser->unreadBufferedByteCount0C == 0u) {
+        parser->currentCursor08 = nullptr;
+    }
+    return true;
+}
+
+// UNANCHORED: source-owned narrow reset helper mirroring the `0x469bf0 -> 0x4725c0` emit handoff.
+static void Parser_ResetAfterPacketScaffold(
+    CVariableLengthPrefixedTCPStreamParserScaffold* parser) {
+    if (!parser) {
+        return;
+    }
+
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* emittedWorkItem = parser->currentPacketWorkItem14;
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* replacementWorkItem =
+        AllocateParsedPacketWorkItemScaffold();
+    parser->currentPacketWorkItem14 = replacementWorkItem;
+    Parser_AssignCurrentCursorFragmentScaffold(parser, nullptr);
+    parser->advancedBufferedByteCount10 = 0u;
+
+    if (parser->unreadBufferedByteCount0C == 0u || !replacementWorkItem || !emittedWorkItem) {
+        return;
+    }
+
+    CLTTCPReadOperationFragmentScaffold* tailFragment =
+        ParsedPacketWorkItem_GetTailFragmentScaffold(emittedWorkItem);
+    if (!tailFragment) {
+        return;
+    }
+
+    Parser_AssignCurrentCursorFragmentScaffold(parser, tailFragment);
+    if (!ParsedPacketWorkItem_AppendFragmentScaffold(replacementWorkItem, tailFragment)) {
+        return;
+    }
+    replacementWorkItem->currentCursor24 = parser->currentCursor08;
+}
+
 }  // namespace
 
 // ============================================================
@@ -70,7 +332,10 @@ CLTTCPConnection::CLTTCPConnection()
       socketHandle_(kInvalidSocketHandle),
       remoteEndpoint_(),
       remoteHostName_(),
-      receivedBytes_() {}
+      receivedBytes_(),
+      parserScaffold_() {
+    parserScaffold_.currentPacketWorkItem14 = AllocateParsedPacketWorkItemScaffold();
+}
 
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family that also seeds the
 // replacement-side owner-context scaffold.
@@ -81,10 +346,17 @@ CLTTCPConnection::CLTTCPConnection(void* ownerContext)
       socketHandle_(kInvalidSocketHandle),
       remoteEndpoint_(),
       remoteHostName_(),
-      receivedBytes_() {}
+      receivedBytes_(),
+      parserScaffold_() {
+    parserScaffold_.currentPacketWorkItem14 = AllocateParsedPacketWorkItemScaffold();
+}
 
 // anchor: launcher.exe:0x44ac40
-CLTTCPConnection::~CLTTCPConnection() = default;
+CLTTCPConnection::~CLTTCPConnection() {
+    Parser_AssignCurrentCursorFragmentScaffold(&parserScaffold_, nullptr);
+    (void)ParsedPacketWorkItem_ReleaseScaffold(parserScaffold_.currentPacketWorkItem14);
+    parserScaffold_.currentPacketWorkItem14 = nullptr;
+}
 
 // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
 bool CBaseConnection::IsConnected() const {
@@ -436,15 +708,139 @@ uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
     // - `0x4725c0` / `ResetAfterPacket` then allocates a fresh replacement object and, when unread
     //   bytes remain in the old tail fragment, carries that tail fragment plus the new cursor into
     //   the replacement work item
-    // - `Parse` itself also uses fragment `+0x04` / `+0x08` as no-arg AddRef / Release hooks while
-    //   transferring retained fragment ownership into the completed work item
-    // The faithful parser/read-operation object family is not reconstructed yet, so keep this
-    // source-owned scaffold conservative and side-effect-free.
-    (void)readOperationFragment;
+    // - current source now implements the smallest evidence-backed live subset of that contract:
+    //   - fragment retain/append into parser-owned work-item state
+    //   - 1-byte / 2-byte prefix decode with original `0`, `0x7000000`, `0x700000b` returns
+    //   - queueable parsed-packet work-item emits when the whole framed packet remains inside the
+    //     current cursor fragment
+    //   - post-emit reset/carry-over of the current tail fragment for same-fragment drain loops
+    // - the remaining local gap is explicit: cross-fragment cursor advance/body assembly still
+    //   needs the original `0x472660` traversal behavior across retained fragments
     if (outCompletedPacketWorkItem) {
         *outCompletedPacketWorkItem = nullptr;
     }
-    return 1u;
+
+    if (!Parser_EnsureCurrentWorkItemScaffold(&parserScaffold_)) {
+        return 1u;
+    }
+
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* currentWorkItem =
+        parserScaffold_.currentPacketWorkItem14;
+    if (readOperationFragment && readOperationFragment->byteCount != 0u) {
+        ReadOperationFragment_AddRef(readOperationFragment);
+        const bool appended =
+            ParsedPacketWorkItem_AppendFragmentScaffold(currentWorkItem, readOperationFragment);
+        if (parserScaffold_.currentCursorFragment04 == nullptr) {
+            Parser_AssignCurrentCursorFragmentScaffold(&parserScaffold_, readOperationFragment);
+        }
+        if (parserScaffold_.unreadBufferedByteCount0C == 0u) {
+            parserScaffold_.currentCursor08 = ReadOperationFragment_PayloadBegin(readOperationFragment);
+        }
+        parserScaffold_.unreadBufferedByteCount0C += readOperationFragment->byteCount;
+        ReadOperationFragment_Release(readOperationFragment);
+        if (!appended) {
+            return 1u;
+        }
+    }
+
+    if (parserScaffold_.unreadBufferedByteCount0C == 0u) {
+        return 0x7000000u;
+    }
+
+    const uint32_t remainingInCurrentFragment =
+        ReadOperationFragment_BytesRemainingFromCursor(
+            parserScaffold_.currentCursorFragment04,
+            parserScaffold_.currentCursor08);
+    if (!parserScaffold_.currentCursorFragment04 || !parserScaffold_.currentCursor08 ||
+        remainingInCurrentFragment == 0u) {
+        spdlog::debug(
+            "CLTTCPConnection::ParseReadOperationFragmentScaffold unresolved cross-fragment cursor this={} unreadBuffered=0x{:08x} assembledByteCount=0x{:08x} retainedFragmentCount={} currentCursor={} currentFragment={}",
+            fmt::ptr(this),
+            static_cast<unsigned>(parserScaffold_.unreadBufferedByteCount0C),
+            currentWorkItem ? static_cast<unsigned>(currentWorkItem->assembledByteCount28) : 0u,
+            currentWorkItem ? static_cast<unsigned>(currentWorkItem->retainedFragmentCount0C) : 0u,
+            fmt::ptr(parserScaffold_.currentCursor08),
+            fmt::ptr(parserScaffold_.currentCursorFragment04));
+        return 0x7000000u;
+    }
+
+    uint32_t packetBodyByteCount = currentWorkItem->assembledByteCount28;
+    if (packetBodyByteCount == 0u) {
+        if (parserScaffold_.unreadBufferedByteCount0C < 2u) {
+            return 0x7000000u;
+        }
+
+        uint32_t prefixByteCount = 1u;
+        const uint8_t firstPrefixByte = *parserScaffold_.currentCursor08;
+        packetBodyByteCount = static_cast<uint32_t>(firstPrefixByte);
+        if ((firstPrefixByte & 0x80u) != 0u) {
+            if (remainingInCurrentFragment < 2u) {
+                spdlog::debug(
+                    "CLTTCPConnection::ParseReadOperationFragmentScaffold unresolved cross-fragment 2-byte prefix this={} unreadBuffered=0x{:08x} retainedFragmentCount={}",
+                    fmt::ptr(this),
+                    static_cast<unsigned>(parserScaffold_.unreadBufferedByteCount0C),
+                    static_cast<unsigned>(currentWorkItem->retainedFragmentCount0C));
+                return 0x7000000u;
+            }
+
+            packetBodyByteCount =
+                (static_cast<uint32_t>(firstPrefixByte & 0x7fu) << 8u) |
+                static_cast<uint32_t>(parserScaffold_.currentCursor08[1]);
+            if (packetBodyByteCount < 0x80u) {
+                return 0x700000bu;
+            }
+            prefixByteCount = 2u;
+        }
+
+        if (packetBodyByteCount > 0x1000u) {
+            return 0x700000bu;
+        }
+
+        if (remainingInCurrentFragment == prefixByteCount &&
+            parserScaffold_.unreadBufferedByteCount0C > prefixByteCount) {
+            spdlog::debug(
+                "CLTTCPConnection::ParseReadOperationFragmentScaffold unresolved prefix-to-body fragment boundary this={} unreadBuffered=0x{:08x} packetBodyByteCount=0x{:08x} retainedFragmentCount={}",
+                fmt::ptr(this),
+                static_cast<unsigned>(parserScaffold_.unreadBufferedByteCount0C),
+                static_cast<unsigned>(packetBodyByteCount),
+                static_cast<unsigned>(currentWorkItem->retainedFragmentCount0C));
+            return 0x7000000u;
+        }
+
+        currentWorkItem->assembledByteCount28 = packetBodyByteCount;
+        if (!Parser_ConsumeBytesWithinCurrentFragmentScaffold(&parserScaffold_, prefixByteCount)) {
+            return 0x7000000u;
+        }
+    }
+
+    const uint32_t remainingPacketBytesInCurrentFragment =
+        ReadOperationFragment_BytesRemainingFromCursor(
+            parserScaffold_.currentCursorFragment04,
+            parserScaffold_.currentCursor08);
+    if (packetBodyByteCount <= parserScaffold_.unreadBufferedByteCount0C &&
+        packetBodyByteCount <= remainingPacketBytesInCurrentFragment) {
+        currentWorkItem->currentCursor24 = parserScaffold_.currentCursor08;
+        if (!Parser_ConsumeBytesWithinCurrentFragmentScaffold(
+                &parserScaffold_, packetBodyByteCount)) {
+            return 0x7000000u;
+        }
+        if (outCompletedPacketWorkItem) {
+            *outCompletedPacketWorkItem = currentWorkItem;
+        }
+        Parser_ResetAfterPacketScaffold(&parserScaffold_);
+        return 0u;
+    }
+
+    if (packetBodyByteCount <= parserScaffold_.unreadBufferedByteCount0C &&
+        packetBodyByteCount > remainingPacketBytesInCurrentFragment) {
+        spdlog::debug(
+            "CLTTCPConnection::ParseReadOperationFragmentScaffold unresolved cross-fragment packet body this={} unreadBuffered=0x{:08x} packetBodyByteCount=0x{:08x} retainedFragmentCount={}",
+            fmt::ptr(this),
+            static_cast<unsigned>(parserScaffold_.unreadBufferedByteCount0C),
+            static_cast<unsigned>(packetBodyByteCount),
+            static_cast<unsigned>(currentWorkItem->retainedFragmentCount0C));
+    }
+    return 0x7000000u;
 }
 
 // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.

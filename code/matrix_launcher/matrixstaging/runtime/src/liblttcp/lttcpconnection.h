@@ -286,6 +286,8 @@ private:
     LTTCPEndpointKey remoteEndpoint_;
     std::string remoteHostName_;
     std::vector<uint8_t> receivedBytes_;
+    // UNANCHORED: source-owned mirror of the recovered connection `+0x6c` parser prefix.
+    CVariableLengthPrefixedTCPStreamParserScaffold parserScaffold_;
 };
 
 }  // namespace mxo::liblttcp
