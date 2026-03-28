@@ -1314,8 +1314,29 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectConnectionScaffold(CLTTCPConnection
 // anchor: launcher.exe:0x4328a0
 // vtable: launcher.exe:0x004b2768 slot +0x18
 uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
-    CMessageConnection* connection = GetOrCreateMessageConnection(contextKey);
-    return connection ? connection->EnsureConnected() : 0u;
+    // Bounded fidelity step:
+    // - slot 6 is the connection-object-based ensure-connected path
+    // - normalize queue-context bridge inputs back to the owning connection/context key before any
+    //   generic fallback creation
+    // - prefer already-live connection-family objects first, especially the auth/margin bridge
+    //   sidecars that are already driving the active path
+    void* normalizedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    CMessageConnection* connection = FindMessageConnection(contextKey);
+    if (!connection && normalizedContextKey != contextKey) {
+        connection = FindMessageConnection(normalizedContextKey);
+    }
+    if (!connection) {
+        connection = GetOrCreateMessageConnection(normalizedContextKey);
+    }
+    if (!connection) {
+        return 0u;
+    }
+
+    connection->SetEngine(this);
+    if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
+        connection->SetOwnerContext(normalizedContextKey);
+    }
+    return connection->EnsureConnected();
 }
 
 // UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
@@ -1831,12 +1852,12 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
 
         if (context) {
             QueueContext_OnOperationCompleted(context, workItem);
-            if (shouldAutoReleaseContext) {
-                QueueContext_Release(context);
-            }
         }
 
         QueueWorkItem_Release(workItem);
+        if (shouldAutoReleaseContext) {
+            QueueContext_Release(context);
+        }
     }
 }
 

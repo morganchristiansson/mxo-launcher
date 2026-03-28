@@ -134,6 +134,9 @@ New queue-thread clarification from the current focused pass:
       helper path instead of open-coding a raw `Queue_PushPair(0,0)` write
     - newer bounded correction: source now also keeps the recovered `0x4816f0(workItem)`-style
       type read explicit at dequeue time before the later slot-12/context callback branch
+    - newer bounded correction: after the context callback returns, source now releases the work
+      item before any conditional type-1 context auto-release, which is a closer fit for the
+      recovered "later releases both objects as needed" continuation than the older reverse order
     - newer bounded correction: `CleanupConnection` now always runs the owner-state sync tail at
       function exit, even on miss/no-worker paths, as the bounded source stand-in for the later
       always-run `0x44ab60(arg)` side effect recovered from original slot `12`
@@ -1235,6 +1238,9 @@ Important limitation:
   - newer bounded creation correction then normalizes queue-context bridge inputs back to the owning
     connection/context key before creating any generic sidecar entry, which avoids inventing a
     second synthetic connection record keyed only by the bridge object
+  - newer bounded slot-6 correction now makes that normalization explicit on `Connect(...)` too:
+    - prefer an already-live auth/margin or engine-tracked connection-family object first
+    - only then create a generic sidecar fallback on the normalized owning key
   - sidecar owner/engine binding state is now also kept by `CLTThreadPerClientTCPEngineBinding` on the liblttcp side rather than by diagnostics-local owner/engine globals
   - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
   - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered unique-key intent:

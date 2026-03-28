@@ -523,12 +523,16 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
         static_cast<int>(byteCount),
         0);
     if (sent == SOCKET_ERROR) {
+        const int wsaError = WSAGetLastError();
         spdlog::debug(
             "CLTTCPConnection::SendRawSocketBufferScaffold send failed socket=0x{:08x} remoteHost='{}' byteCount={} wsaError={}",
             socketHandle_,
             remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             byteCount,
-            WSAGetLastError());
+            wsaError);
+        if (wsaError != WSAEWOULDBLOCK) {
+            (void)CloseSocketTransportScaffold(/*graceful=*/false);
+        }
         return 0u;
     }
     if (sent != static_cast<int>(byteCount)) {
