@@ -302,9 +302,11 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     // - we also keep the two worker-side refs proved on the TCP success path:
     //   - one outer worker-owned ref immediately after allocation/setup
     //   - one delivery-temp ref immediately before `OnReceive`
-    // The original same-poll recv-drain loop remains a separate follow-up; the live launcher
-    // bridge currently still advances one successful recv iteration per pump so game entry stays
-    // stable while the larger worker-thread fidelity work remains isolated.
+    // This helper still intentionally models one successful recv/OnReceive iteration per call so
+    // the faithful fragment-delivery seam stays isolated in one place.
+    // Current bridge pacing may re-enter this helper multiple times within one arg5 helper poll,
+    // but the original `0x42fe50` same-poll recv-drain loop is still not reconstructed here inside
+    // `CLTTCPConnection` itself.
     CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
     const int received = recv(
         socket,

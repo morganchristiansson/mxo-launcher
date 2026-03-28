@@ -1512,35 +1512,48 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
         return;
     }
 
-    // Keep the launcher bridge on the faithful original-shaped fragment-delivery receive seam.
-    // Local source scaffolding now repairs the parser-owned work-item invariant needed by
-    // `CMessageConnection::OnOperationCompleted`, so this path stays aligned with
-    // `0x42fe50 -> 0x449d40 -> 0x469bf0`.
-    const int received =
-        context->sidecarConnection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
-    if (received > 0) {
-        (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-            context,
-            /*workType=*/3u,
-            /*workPayload=*/static_cast<uint32_t>(received),
-            receiveLabel,
-            /*queueLockAlreadyHeld=*/true);
-        return;
-    }
+    // Keep the connection seam itself on the faithful one-fragment
+    // `0x42fe50 -> 0x449d40 -> 0x469bf0` receive handoff, but let the launcher bridge re-enter
+    // that helper repeatedly within one arg5 helper poll.
+    //
+    // Why this is currently bounded here instead of inside `CLTTCPConnection`:
+    // - a previous full same-poll recv-drain restoration on the bridge path regressed live runs
+    //   into a later "Loading Character" stall
+    // - the remaining source-owned pacing seam is now narrower: the bridge still needs synthetic
+    //   `AuthReceivePacket` / `MarginReceivePacket` work items, and those notifications line up
+    //   better with the original worker-thread cadence when they are emitted once per successful
+    //   recv fragment / `OnReceive` iteration rather than once per whole helper poll
+    // - later peer-close notification still queues after any successful fragment notifications from
+    //   the same helper poll, matching the original `0x42fe50` ordering more closely than the old
+    //   once-per-pump synthetic receive path
+    while (true) {
+        const int received =
+            context->sidecarConnection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
+        if (received > 0) {
+            (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+                context,
+                /*workType=*/3u,
+                /*workPayload=*/static_cast<uint32_t>(received),
+                receiveLabel,
+                /*queueLockAlreadyHeld=*/true);
+            continue;
+        }
 
-    if (received < 0 && !context->peerCloseQueued) {
-        context->peerCloseQueued = true;
-        spdlog::info(
-            "CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold queued peer-close label='{}' context={} connection={}",
-            (context->debugLabel && context->debugLabel[0]) ? context->debugLabel : "<null>",
-            fmt::ptr(context),
-            fmt::ptr(context->sidecarConnection));
-        (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-            context,
-            /*workType=*/1u,
-            /*workPayload=*/0u,
-            context->isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed",
-            /*queueLockAlreadyHeld=*/true);
+        if (received < 0 && !context->peerCloseQueued) {
+            context->peerCloseQueued = true;
+            spdlog::info(
+                "CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold queued peer-close label='{}' context={} connection={}",
+                (context->debugLabel && context->debugLabel[0]) ? context->debugLabel : "<null>",
+                fmt::ptr(context),
+                fmt::ptr(context->sidecarConnection));
+            (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+                context,
+                /*workType=*/1u,
+                /*workPayload=*/0u,
+                context->isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed",
+                /*queueLockAlreadyHeld=*/true);
+        }
+        return;
     }
 }
 

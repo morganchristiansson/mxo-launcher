@@ -222,7 +222,10 @@ public:
     // - set fragment byte count
     // - take one more delivery-temp ref just before `OnReceive(readOperationFragment)`
     // - release only that delivery-temp ref after the callback returns
-    // The original same-poll recv-drain loop remains a later bounded fidelity target.
+    // This helper still models one successful recv/OnReceive iteration per call.
+    // Current source may re-enter it repeatedly from the launcher bridge within one arg5 helper
+    // poll, but the original `0x42fe50` same-poll recv-drain loop is still not reconstructed here
+    // inside `CLTTCPConnection` itself.
     int PollReceiveAndDeliverReadOperationFragmentsScaffold();
 
     // anchor: launcher.exe:0x449ca0

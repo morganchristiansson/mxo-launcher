@@ -423,6 +423,12 @@ private:
         const char* label,
         bool queueLockAlreadyHeld);
     // UNANCHORED: narrow per-context nonblocking receive pump used by the current arg5 helper seam.
+    // Current source-owned pacing split:
+    // - `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` stays the narrow
+    //   one-fragment recv->fragment->OnReceive seam
+    // - this bridge pump may re-enter that helper repeatedly within one arg5 helper poll so the
+    //   current source-owned synthetic `AuthReceivePacket` / `MarginReceivePacket` notifications can
+    //   stay aligned once per successful recv fragment instead of once per whole pump
     void PumpLauncherConnectionContextScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         const char* receiveLabel);
