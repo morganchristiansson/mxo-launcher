@@ -18,7 +18,7 @@ This object is useful because it bridges internal mediator/login events into a s
 | Slot | Offset | Entry Address | Current symbol | Notes |
 |---|---:|---:|---|---|
 | 1 | `+0x00` | `0x0041b8e0` | `CLTLoginObserver_PassThrough_OnLoginEvent` | logs event number + current server result, then forwards callback with errorFlag `0` |
-| 2 | `+0x04` | `0x0041b990` | `CLTLoginObserver_PassThrough_OnLoginError` | logs error number, samples current server result, then forwards callback with errorFlag `1` |
+| 2 | `+0x04` | `0x0041b990` | `CLTLoginObserver_PassThrough_OnLoginError` | logs error number, samples current server result through mediator `+0x178` / owner `+0x80`, then forwards callback with errorFlag `1` |
 
 ## Notes
 

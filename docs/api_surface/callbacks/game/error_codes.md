@@ -23,7 +23,7 @@ This document catalogs all error and event codes used in the login system, extra
 | `LTLO_ALREADYLOGGEDIN` | 7 (0x7) | Client already logged in |
 | `LTLO_DECRYPTIONFAILURE` | 8 (0x8) | Decryption failed |
 | `LTLO_CHARACTERNOTREADY` | 9 (0x9) | Character not ready |
-| (missing) | 10 (0xa) | *Reserved/undefined* |
+| (unnamed) | 10 (0xa) | launcher `0x43f930` / state8 `MS_LoadCharacterReply` failure posts `OnLoginError(10)` after latching the real raw server status into mediator owner `+0x80`; observers then query mediator `+0x178` to recover the detailed code (for example `0x0b000025`) |
 | `LTLO_CERTVERIFYFAILED` | 11 (0xb) | Certificate verification failed |
 | `LTLO_CLIENTHASHFAILED` | 12 (0xc) | Client hash verification failed |
 | `LTLO_VERSIONREADFAILED` | 13 (0xd) | Version read failed |

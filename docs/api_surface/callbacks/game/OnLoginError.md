@@ -159,6 +159,26 @@ No return value. Error processing is fire-and-forget.
 └───────────────┘  └────────────────────┘
 ```
 
+### Important launcher-side detail: error number vs detailed status
+
+Static RE now makes one important split explicit on the post-auth margin path:
+
+- `launcher.exe:0x43f930` (`MS_LoadCharacterReply` / raw `0x10`) handles the failure in the
+  active state8 path
+- on `status >= 1`, it first writes the raw server result dword into mediator owner `+0x80`
+- it then switches back to state `3` and calls `CLTLoginMediator::PostError(10)`
+- `launcher.exe:0x41d090` (`PostError`) walks the owner `+0x674` observer tree and calls each
+  observer's `OnLoginError(errorNumber)`
+- both concrete observer implementations then query mediator slot `+0x178`
+  (`launcher.exe:0x41f240`), which is just a tiny getter returning owner `+0x80`
+
+Practical consequence:
+
+- the `errorNumber` delivered to `OnLoginError` can be a generic wrapper like `10`
+- the real server-side detail is carried separately in mediator `+0x178` / owner `+0x80`
+- for the stale-session / unclean-shutdown case, that detailed status can be
+  `0x0b000025` from `MS_LoadCharacterReply`
+
 ---
 
 ## Assembly Analysis

@@ -624,7 +624,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         }
         mediator->PostErrorScaffold(10u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would switch helper state to 3 and post error=10 currentState={}",
+            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would latch owner+0x80 to that raw server code, switch helper state to 3, and post generic OnLoginError error=10 currentState={}",
             parsed.status,
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
         return 1u;
