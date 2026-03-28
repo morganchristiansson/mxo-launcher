@@ -1326,27 +1326,15 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectConnectionScaffold(CLTTCPConnection
 // anchor: launcher.exe:0x4328a0
 // vtable: launcher.exe:0x004b2768 slot +0x18
 uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
-    // Bounded fidelity step:
-    // - slot 6 is the connection-object-based ensure-connected path
-    // - normalize queue-context bridge inputs back to the owning connection/context key before any
-    //   generic fallback creation
-    // - prefer already-live connection-family objects first, especially the auth/margin bridge
-    //   sidecars that are already driving the active path
-    void* normalizedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
-    CMessageConnection* connection = FindMessageConnection(contextKey);
-    if (!connection && normalizedContextKey != contextKey) {
-        connection = FindMessageConnection(normalizedContextKey);
-    }
+    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(
+        contextKey,
+        /*allowCreateFallback=*/true);
     if (!connection) {
-        connection = GetOrCreateMessageConnection(normalizedContextKey);
-    }
-    if (!connection) {
+        spdlog::debug(
+            "CLTThreadPerClientTCPEngine::Connect couldn't resolve connection context={} normalizedContext={}",
+            fmt::ptr(contextKey),
+            fmt::ptr(ResolveEngineContextKeyScaffold(contextKey)));
         return 0u;
-    }
-
-    connection->SetEngine(this);
-    if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
-        connection->SetOwnerContext(normalizedContextKey);
     }
     return connection->EnsureConnected();
 }
@@ -1366,6 +1354,7 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
         if (worker) {
             worker->socketHandle = connection->SocketHandle();
             worker->state = connection->State();
+            SyncConnectionFromWorkerRecordScaffold(worker);
             if (worker->thread) {
                 worker->thread->RequestExit();
                 worker->thread->SignalWakeup();
@@ -1379,13 +1368,17 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
 // anchor: launcher.exe:0x42f970
 // vtable: launcher.exe:0x004b2768 slot +0x1c
 uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
-    // Bounded fidelity step:
-    // - slot 7 is the connection-object-based close path, not a helper that first materializes a
-    //   brand-new sidecar connection on demand
-    // - keep slot 6 / Connect as the creation/ensure-connected seam, but require slot 7 callers to
-    //   resolve an already-existing connection entry
-    CMessageConnection* connection = FindMessageConnection(contextKey);
-    return connection ? CloseConnectionScaffold(static_cast<CLTTCPConnection*>(connection), graceful) : 0u;
+    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(
+        contextKey,
+        /*allowCreateFallback=*/false);
+    if (!connection) {
+        spdlog::debug(
+            "CLTThreadPerClientTCPEngine::Close couldn't resolve existing connection context={} normalizedContext={}",
+            fmt::ptr(contextKey),
+            fmt::ptr(ResolveEngineContextKeyScaffold(contextKey)));
+        return 0u;
+    }
+    return CloseConnectionScaffold(static_cast<CLTTCPConnection*>(connection), graceful);
 }
 
 // UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
@@ -1399,12 +1392,18 @@ uint32_t CLTThreadPerClientTCPEngine::SendBufferConnectionScaffold(CLTTCPConnect
 // anchor: launcher.exe:0x42fbd0
 // vtable: launcher.exe:0x004b2768 slot +0x20
 uint32_t CLTThreadPerClientTCPEngine::SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext) {
-    // Bounded fidelity step:
-    // - slot 8 is the connection-object-based send path
-    // - do not implicitly create a fresh sidecar connection here; require the existing connection
-    //   entry established earlier on the connect path
-    CMessageConnection* connection = FindMessageConnection(contextKey);
-    return connection ? connection->SendPacket(buffer, byteCount, completionContext) : 0u;
+    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(
+        contextKey,
+        /*allowCreateFallback=*/false);
+    if (!connection) {
+        spdlog::debug(
+            "CLTThreadPerClientTCPEngine::SendBuffer couldn't resolve existing connection context={} normalizedContext={} byteCount={}",
+            fmt::ptr(contextKey),
+            fmt::ptr(ResolveEngineContextKeyScaffold(contextKey)),
+            byteCount);
+        return 0u;
+    }
+    return connection->SendPacket(buffer, byteCount, completionContext);
 }
 
 // anchor: launcher.exe:0x42fd10
@@ -1779,22 +1778,13 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaf
 
 // anchor: launcher.exe:0x436b10
 void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
-    // Current scaffold note:
-    // - the recovered queue-thread child now calls into this source-level entrypoint
-    // - the real queue fields still live on the launcher ABI object, so this source method reaches
-    //   them through AttachExternalQueuePair(...)
-    // - current source model now mirrors more of the original consumer loop shape:
-    //   - repeatedly poll queue34 first, otherwise queue0C
-    //   - in non-blocking mode, return only once both queues are empty
-    //   - null work item means shutdown-style sentinel and cascades one more null queue0C item
-    //   - slot12/CleanupConnection only runs for type-1 work
-    //     - current source now also unwraps the queue-context bridge there so worker/message-table
-    //       teardown still keys off the owning connection context rather than the bridge pointer
-    //   - later context callback always receives the original work-item pointer
-    //   - optional context release remains type-1-only and uses the pre-callback byte-at-+4 test
-    //   - newer bounded correction: queue selection/pop now happens while the attached arg5 queue
-    //     lock is held, and the blocking empty-queue path releases that lock before waiting on the
-    //     attached signal event, mirroring the recovered `+0x60` / `+0x5c` choreography more closely
+    // Current bounded mirror of the shared launcher/client consumer family:
+    // - prefer queue34, else queue0C
+    // - nonBlocking=true matches the client poll form; false waits on the attached signal event
+    // - null work item is the shutdown sentinel and cascades via the normal enqueue helper
+    // - type-1 work runs slot-12-style cleanup before the later context callback
+    // - callback runs before work-item release; conditional type-1 context auto-release stays last
+    // - queue selection/pop happens under the attached arg5 lock
     CRITICAL_SECTION* queueLock = static_cast<CRITICAL_SECTION*>(externalQueueLock_);
     while (true) {
         if (queueLock) {
@@ -2034,6 +2024,53 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Fi
     return nullptr;
 }
 
+CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotScaffold(
+    void* contextKey,
+    bool allowCreateFallback) {
+    if (!contextKey) {
+        return nullptr;
+    }
+
+    void* normalizedContextKey = ResolveEngineContextKeyScaffold(contextKey);
+    CMessageConnection* connection = FindMessageConnection(contextKey);
+    if (!connection && normalizedContextKey != contextKey) {
+        connection = FindMessageConnection(normalizedContextKey);
+    }
+    if (!connection && allowCreateFallback) {
+        connection = GetOrCreateMessageConnection(normalizedContextKey);
+    }
+    if (!connection) {
+        return nullptr;
+    }
+
+    connection->SetEngine(this);
+    if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
+        connection->SetOwnerContext(normalizedContextKey);
+    }
+    return connection;
+}
+
+void CLTThreadPerClientTCPEngine::SyncConnectionFromWorkerRecordScaffold(
+    const WorkerThreadRecord* record) {
+    if (!record) {
+        return;
+    }
+
+    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(
+        record->contextKey ? record->contextKey : record->ownerContext,
+        /*allowCreateFallback=*/false);
+    if (!connection) {
+        return;
+    }
+
+    connection->SetEngine(this);
+    if (connection->OwnerContext() == nullptr && record->ownerContext) {
+        connection->SetOwnerContext(record->ownerContext);
+    }
+    connection->SetSocketHandle(record->socketHandle);
+    connection->SetState(record->state);
+}
+
 // UNANCHORED source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
 CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::CreateOrReplaceWorkerThreadScaffold(
     void* contextKey,
@@ -2071,15 +2108,7 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Cr
     }
 
     if (inserted) {
-        if (CMessageConnection* connection =
-                FindMessageConnection(inserted->contextKey ? inserted->contextKey : inserted->ownerContext)) {
-            connection->SetEngine(this);
-            if (connection->OwnerContext() == nullptr && inserted->ownerContext) {
-                connection->SetOwnerContext(inserted->ownerContext);
-            }
-            connection->SetSocketHandle(inserted->socketHandle);
-            connection->SetState(inserted->state);
-        }
+        SyncConnectionFromWorkerRecordScaffold(inserted);
     }
 
     if (inserted && inserted->thread) {
@@ -2114,13 +2143,8 @@ void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(WorkerThreadRecord* r
     //   stop / removal steps
     // - keep that intermediate transport state explicit in source too instead of jumping straight
     //   from active to closed only at the very end
-    if (CMessageConnection* connection =
-            FindMessageConnection(record->contextKey ? record->contextKey : record->ownerContext)) {
-        connection->SetState(LTTCPEngineConnectionState::kClosing);
-        connection->SetSocketHandle(record->socketHandle);
-    }
-
     record->state = LTTCPEngineConnectionState::kClosing;
+    SyncConnectionFromWorkerRecordScaffold(record);
     if (record->thread) {
         record->thread->RequestExit();
         record->thread->SignalWakeup();
@@ -2130,11 +2154,7 @@ void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(WorkerThreadRecord* r
 
     CloseSocketHandle(&record->socketHandle);
     record->state = LTTCPEngineConnectionState::kClosed;
-    if (CMessageConnection* connection =
-            FindMessageConnection(record->contextKey ? record->contextKey : record->ownerContext)) {
-        connection->SetSocketHandle(kInvalidSocketHandle);
-        connection->SetState(LTTCPEngineConnectionState::kClosed);
-    }
+    SyncConnectionFromWorkerRecordScaffold(record);
 }
 
 // UNANCHORED starter binding helper.

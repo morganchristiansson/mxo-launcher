@@ -411,6 +411,10 @@ private:
     AcceptThreadRecord* FindMonitoredPort(const LTTCPEndpointKey& key);
     // UNANCHORED: starter helper for the context-keyed +0x8c worker-thread container.
     WorkerThreadRecord* FindWorker(void* contextKey);
+    // UNANCHORED: shared engine-slot connection resolver.
+    CMessageConnection* ResolveConnectionForEngineSlotScaffold(void* contextKey, bool allowCreateFallback);
+    // UNANCHORED: shared worker->connection state/socket sync helper.
+    void SyncConnectionFromWorkerRecordScaffold(const WorkerThreadRecord* record);
     // UNANCHORED: source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
     WorkerThreadRecord* CreateOrReplaceWorkerThreadScaffold(
         void* contextKey,

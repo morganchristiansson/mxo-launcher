@@ -1249,6 +1249,9 @@ Important limitation:
     - only then create a generic sidecar fallback on the normalized owning key
     - worker insertion on the connect path now also stores the normalized owning key and mirrors the
       resulting socket/state back onto the matched connection-family object immediately
+  - newer source pruning there also collapsed repeated queue-context normalization into shared local
+    engine helpers and moved repeated worker->connection state/socket mirroring behind one helper
+    instead of open-coding that logic at each call site
   - sidecar owner/engine binding state is now also kept by `CLTThreadPerClientTCPEngineBinding` on the liblttcp side rather than by diagnostics-local owner/engine globals
   - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
   - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered unique-key intent:
