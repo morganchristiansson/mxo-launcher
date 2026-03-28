@@ -94,9 +94,14 @@ Current best read:
 - practical replacement consequence:
   - live connection `+0x85 .. +0x94` is now the real preferred/original source on the active path
   - the older launcher-owned bootstrap-sidecar key is not part of the original `0x41b4f0` body
-  - bounded replacement smoke on `2026-03-28` still hit a direct client `+0xd4` caller before the
-    live connection mirror was present, so the current replacement keeps that sidecar as explicit
-    fallback/diagnostic glue on `+0xd4` until the writeback timing gap is closed
+  - bounded replacement smoke on `2026-03-28` initially still hit a direct client `+0xd4` caller
+    before the live connection mirror was present
+  - current replacement now narrows that timing gap by mirroring the already-recovered
+    CERT_Challenge Twofish key into the live margin connection `+0x85 .. +0x94` as soon as the
+    launcher-owned bootstrap parse recovers it, because the active replacement path has not yet
+    naturally hit the decoded code-5 writeback seam early enough
+  - keep the sidecar only as explicit fallback/diagnostic glue until runtime proves that earlier
+    live mirror is now always present
 
 ## Active path status
 

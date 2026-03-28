@@ -2631,6 +2631,26 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             marginBootstrapState.marginTwofishKeyBytes = challenge.twofishKeyBytes;
             marginBootstrapState.certChallengeBytes = challenge.challengeBytes;
 
+            // Current active-path timing gap:
+            // - original later state9 seed reads want live `+0xd4 -> owner+0x1c+0x85`
+            // - the replacement's launcher-owned bootstrap parse currently learns the same 16-byte
+            //   key here before the narrowed post-copy margin leaf ever sees a decoded code-5 writeback
+            // Keep the nearer live connection mirror populated from that earlier recovery point so
+            // direct client `+0xd4` callers stop depending on the launcher-owned sidecar on the
+            // active path.
+            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
+                marginConnection != nullptr && marginBootstrapState.marginTwofishKeyBytes.size() == 16u) {
+                std::array<uint8_t, 16> liveSeedBytes85 = {};
+                std::copy_n(
+                    marginBootstrapState.marginTwofishKeyBytes.begin(),
+                    liveSeedBytes85.size(),
+                    liveSeedBytes85.begin());
+                marginConnection->SetMessageCode5SeedBytes85Scaffold(liveSeedBytes85);
+                spdlog::info(
+                    "DIAGNOSTIC: mirrored launcher-owned CERT_Challenge Twofish key into live margin connection +0x85..+0x94 early because the active replacement path has not yet naturally hit the decoded code-5 writeback seam connection={}",
+                    fmt::ptr(marginConnection));
+            }
+
             mxo::auth::FramedPacket response;
             if (!mxo::auth::BuildMarginCertChallengeResponsePacket(
                     marginBootstrapState.certChallengeBytes,
