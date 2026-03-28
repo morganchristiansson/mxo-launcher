@@ -1059,6 +1059,29 @@ bool CMarginConnection::MessageCode4SuccessFlag84Scaffold() const {
     return messageCode4SuccessFlag84Scaffold_;
 }
 
+// anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
+void CMarginConnection::SetMessageCode5SeedBytes85Scaffold(const std::array<uint8_t, 16>& value) {
+    messageCode5SeedBytes85Scaffold_ = value;
+    hasMessageCode5SeedBytes85Scaffold_ = true;
+}
+
+bool CMarginConnection::HasMessageCode5SeedBytes85Scaffold() const {
+    return hasMessageCode5SeedBytes85Scaffold_;
+}
+
+bool CMarginConnection::CopyMessageCode5SeedBytes85Scaffold(std::array<uint8_t, 16>* outValue) const {
+    if (!outValue || !hasMessageCode5SeedBytes85Scaffold_) {
+        return false;
+    }
+
+    *outValue = messageCode5SeedBytes85Scaffold_;
+    return true;
+}
+
+const uint8_t* CMarginConnection::MessageCode5SeedBytes85PointerScaffold() const {
+    return hasMessageCode5SeedBytes85Scaffold_ ? messageCode5SeedBytes85Scaffold_.data() : nullptr;
+}
+
 // anchor: launcher.exe:0x44af20 -> 0x442d00 -> owner vtable `+0x184` / `0x41f260`
 uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
     void* workItem,
@@ -1105,6 +1128,28 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
         if (handledCode4 != 0u) {
             return handledCode4;
         }
+    }
+
+    if (hadValidMessageCode && decodedMessageCode == 5u && payloadBytes.size() >= 17u) {
+        std::array<uint8_t, 16> seedBytes85 = {};
+        std::copy_n(payloadBytes.data() + 1u, seedBytes85.size(), seedBytes85.begin());
+        SetMessageCode5SeedBytes85Scaffold(seedBytes85);
+        spdlog::info(
+            "CMarginConnection::DispatchCopiedParsedPacketTailScaffold source-owned local code5 branch decodedMessageCode={} rawCode=0x{:02x} headerless={} locatorDecoded={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
+            static_cast<unsigned>(decodedMessageCode),
+            static_cast<unsigned>(payloadBytes[0]),
+            headerless ? 1u : 0u,
+            usedHeaderlessLocatorDecode ? 1u : 0u,
+            static_cast<unsigned>(
+                static_cast<uint32_t>(seedBytes85[0]) |
+                (static_cast<uint32_t>(seedBytes85[1]) << 8u) |
+                (static_cast<uint32_t>(seedBytes85[2]) << 16u) |
+                (static_cast<uint32_t>(seedBytes85[3]) << 24u)),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            fmt::ptr(mediator->CurrentState()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        return 1u;
     }
 
     const uint8_t rawCode = payloadBytes[0];

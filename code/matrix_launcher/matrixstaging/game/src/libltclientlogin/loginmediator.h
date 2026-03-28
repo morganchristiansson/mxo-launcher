@@ -1074,6 +1074,8 @@ public:
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
+    // - code `4` and code `5` now each have one bounded nearer source-owned step at the
+    //   connection/leaf seam before any later fallback path
     // - only other codes survive into owner `+0x184` / current helper slot 6
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
@@ -1325,6 +1327,9 @@ public:
     uint8_t& State10SendGateFlagF14() { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
     uint32_t State6UdpSessionSecretF18() const;
     void SetState6UdpSessionSecretF18(uint32_t value);
+    // Current bounded source order now prefers the nearer connection-side `+0x85 .. +0x94`
+    // mirror when the consumed code-5 margin branch has populated it; otherwise it falls back to
+    // the older launcher-owned bootstrap sidecar key.
     bool CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t, 16>* outKey) const;
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50
     // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct

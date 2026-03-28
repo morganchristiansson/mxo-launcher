@@ -1315,6 +1315,12 @@ bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t,
     }
     outKey->fill(0u);
 
+    if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
+        if (marginConnection->CopyMessageCode5SeedBytes85Scaffold(outKey)) {
+            return true;
+        }
+    }
+
     const auto it = g_marginBootstrapStateByMediator.find(this);
     if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
         return false;
@@ -1326,6 +1332,16 @@ bool CLTLoginMediator::CopyMarginBootstrapTwofishKeyScaffold(std::array<uint8_t,
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
+    if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
+        if (const uint8_t* seedPointer = marginConnection->MessageCode5SeedBytes85PointerScaffold()) {
+            spdlog::info(
+                "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=connection+0x85 mirror connection={}]",
+                fmt::ptr(seedPointer),
+                fmt::ptr(marginConnection));
+            return seedPointer;
+        }
+    }
+
     const auto it = g_marginBootstrapStateByMediator.find(this);
     if (it == g_marginBootstrapStateByMediator.end() || it->second.marginTwofishKeyBytes.size() != 16u) {
         spdlog::info("CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> <null> (missing 16-byte margin Twofish key)");

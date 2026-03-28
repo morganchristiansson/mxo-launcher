@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -408,6 +409,15 @@ public:
     void SetMessageCode4SuccessFlag84Scaffold(bool value);
     // UNANCHORED: source-owned diagnostic accessor for the same narrowed `+0x84` mirror.
     bool MessageCode4SuccessFlag84Scaffold() const;
+    // anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
+    // Narrow source-owned mirror of the consumed decoded-code-5 16-byte writeback.
+    void SetMessageCode5SeedBytes85Scaffold(const std::array<uint8_t, 16>& value);
+    // UNANCHORED: source-owned accessor returning whether that narrower code-5 writeback exists.
+    bool HasMessageCode5SeedBytes85Scaffold() const;
+    // UNANCHORED: source-owned copy-out accessor for the same narrowed code-5 writeback.
+    bool CopyMessageCode5SeedBytes85Scaffold(std::array<uint8_t, 16>* outValue) const;
+    // UNANCHORED: source-owned raw-pointer accessor for the same narrowed code-5 writeback.
+    const uint8_t* MessageCode5SeedBytes85PointerScaffold() const;
 
     // anchor: launcher.exe:0x44af60
     // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
@@ -443,6 +453,8 @@ protected:
 
 private:
     bool messageCode4SuccessFlag84Scaffold_ = false;
+    bool hasMessageCode5SeedBytes85Scaffold_ = false;
+    std::array<uint8_t, 16> messageCode5SeedBytes85Scaffold_{};
 };
 
 }  // namespace mxo::liblttcp
