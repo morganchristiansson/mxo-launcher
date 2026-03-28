@@ -2,7 +2,7 @@
 
 #include "../libltmessaging/messageconnection.h"
 #include "../../../game/src/libltclientlogin/loginmediator.h"
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -64,6 +64,18 @@ static bool ResolveIpv4Address(const char* hostName, uint32_t* outIpv4NetworkOrd
     return ok;
 }
 
+// Per-logger SPDLOG_LEVEL overrides only apply on call sites that explicitly fetch a named logger.
+// Keep the receive hot-path seam narrow by only routing labels with registered logger names through
+// spdlog::get(...); all other bridge labels fall back to the default logger.
+static spdlog::logger* LoggerForBridgeLabel(const char* label) {
+    if (label && label[0]) {
+        if (std::shared_ptr<spdlog::logger> logger = spdlog::get(label)) {
+            return logger.get();
+        }
+    }
+    return spdlog::default_logger_raw();
+}
+
 struct CLTThreadPerClientTCPEngine_QueuePair {
     uint32_t value0;
     uint32_t value1;
@@ -77,7 +89,7 @@ static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
 static uint32_t __thiscall LauncherConnectionBridgeWorkItem_Release(
     mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* self) {
     if (self) {
-        spdlog::info(
+        LoggerForBridgeLabel(self->debugLabel)->info(
             "CLTThreadPerClientTCPEngine launcher bridge releasing queued work item {} type={} payload=0x{:08x} label='{}'",
             fmt::ptr(self),
             self->header.workType,
@@ -99,7 +111,7 @@ static void EnsureLauncherConnectionBridgeWorkItemVtableInitialized() {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall LauncherConnectionBridgeContext_Release(
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* self) {
-    spdlog::info(
+    LoggerForBridgeLabel(self ? self->debugLabel : nullptr)->info(
         "CLTThreadPerClientTCPEngine launcher bridge context release self={} label='{}' autoRelease={}",
         fmt::ptr(self),
         (self && self->debugLabel) ? self->debugLabel : "<null>",
@@ -111,7 +123,7 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_Release(
 static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* self,
     mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
-    spdlog::info(
+    LoggerForBridgeLabel(workItem && workItem->debugLabel ? workItem->debugLabel : (self ? self->debugLabel : nullptr))->info(
         "CLTThreadPerClientTCPEngine launcher bridge OnOperationCompleted context={} label='{}' workItem={} type={} payload=0x{:08x}",
         fmt::ptr(self),
         (self && self->debugLabel) ? self->debugLabel : "<null>",
@@ -1411,7 +1423,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
         (void)SetEvent(static_cast<HANDLE>(externalQueueSignalEvent_));
     }
 
-    spdlog::info(
+    LoggerForBridgeLabel(label)->info(
         "CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold label={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} lockHeld={:08x}",
         label ? label : "<null>",
         useQueue34 ? "queue34" : "queue0C",
@@ -1438,7 +1450,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         static_cast<mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(
             std::calloc(1, sizeof(mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold)));
     if (!workItem) {
-        spdlog::info(
+        LoggerForBridgeLabel(label)->info(
             "CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold failed label='{}'",
             label ? label : "<null>");
         return false;
@@ -1460,7 +1472,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         return false;
     }
 
-    spdlog::info(
+    LoggerForBridgeLabel(label)->info(
         "CLTThreadPerClientTCPEngine launcher bridge queued work label='{}' workItem={} context={} type={} payload=0x{:08x}",
         label ? label : "<null>",
         fmt::ptr(workItem),

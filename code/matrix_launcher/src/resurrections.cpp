@@ -16,18 +16,15 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
+#include <memory>
 #include <string>
 #include <sys/stat.h>
 
 #include <spdlog/spdlog.h>
-#include "spdlog/sinks/basic_file_sink.h"
+#include <spdlog/cfg/env.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include "diagnostics.h"
 #include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
-
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/basic_file_sink.h>
-// Initialize spdlog logger at startup that writes to resurrections.log (plain text, no colors)
-auto g_SpdlogLogger = spdlog::basic_logger_mt("resurrections", "resurrections.log", true);
 
 // Include the login mediator header for world list builder access
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
@@ -791,14 +788,58 @@ static bool ConfigureFilteredArgv(int argc, char* argv[]) {
     return true;
 }
 
-int main(int argc, char* argv[]) {
+static std::shared_ptr<spdlog::logger> RegisterSharedSinkLogger(
+    const std::shared_ptr<spdlog::logger>& baseLogger,
+    const char* loggerName) {
+    if (!baseLogger || !loggerName || !loggerName[0]) {
+        return nullptr;
+    }
+
+    std::shared_ptr<spdlog::logger> existingLogger = spdlog::get(loggerName);
+    if (existingLogger) {
+        return existingLogger;
+    }
+
+    std::shared_ptr<spdlog::logger> logger = std::make_shared<spdlog::logger>(
+        loggerName,
+        baseLogger->sinks().begin(),
+        baseLogger->sinks().end());
+    spdlog::register_logger(logger);
+    return logger;
+}
+
+static void InitializeLogging() {
     try {
-        auto logger = spdlog::basic_logger_mt("resurrections", "resurrections.log", true);
+        std::shared_ptr<spdlog::logger> logger =
+            spdlog::basic_logger_mt("resurrections", "resurrections.log", true);
         spdlog::set_default_logger(logger);
-        spdlog::set_level(spdlog::level::debug);
+
+        // Per-logger SPDLOG_LEVEL overrides only affect call sites that explicitly log through
+        // these named loggers instead of bare spdlog::info/debug/... helpers.
+        std::shared_ptr<spdlog::logger> authReceiveLogger =
+            RegisterSharedSinkLogger(logger, "AuthReceivePacket");
+        std::shared_ptr<spdlog::logger> marginReceiveLogger =
+            RegisterSharedSinkLogger(logger, "MarginReceivePacket");
+
+        // Default fallback levels when SPDLOG_LEVEL does not override them:
+        // - resurrections stays at debug
+        // - the hot receive-path loggers stay quieter at warn unless explicitly raised
+        logger->set_level(spdlog::level::debug);
+        if (authReceiveLogger) {
+            authReceiveLogger->set_level(spdlog::level::warn);
+        }
+        if (marginReceiveLogger) {
+            marginReceiveLogger->set_level(spdlog::level::warn);
+        }
+
+        spdlog::cfg::load_env_levels();
         spdlog::flush_on(spdlog::level::debug);
     } catch (const spdlog::spdlog_ex&) {
     }
+}
+
+int main(int argc, char* argv[]) {
+    InitializeLogging();
     AddVectoredExceptionHandler(1, DiagnosticVectoredExceptionHandler);
     SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
 
