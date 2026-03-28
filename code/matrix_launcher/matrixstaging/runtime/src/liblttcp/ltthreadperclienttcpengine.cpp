@@ -1869,10 +1869,24 @@ const std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>& CLTThreadPer
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
 CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* contextKey) {
+    auto matchesConnectionKey = [contextKey](CMessageConnection* connection) -> bool {
+        if (!connection) {
+            return false;
+        }
+        return connection == contextKey || connection->OwnerContext() == contextKey;
+    };
+
     for (CMessageConnection* connection : messageConnections_) {
-        if (connection && connection->OwnerContext() == contextKey) {
+        if (matchesConnectionKey(connection)) {
             return connection;
         }
+    }
+
+    if (authBridgeContextScaffold_ && matchesConnectionKey(authBridgeContextScaffold_->sidecarConnection)) {
+        return authBridgeContextScaffold_->sidecarConnection;
+    }
+    if (marginBridgeContextScaffold_ && matchesConnectionKey(marginBridgeContextScaffold_->sidecarConnection)) {
+        return marginBridgeContextScaffold_->sidecarConnection;
     }
     return nullptr;
 }

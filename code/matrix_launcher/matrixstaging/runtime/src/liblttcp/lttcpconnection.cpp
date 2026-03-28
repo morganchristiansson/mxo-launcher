@@ -512,7 +512,25 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
         static_cast<const char*>(buffer),
         static_cast<int>(byteCount),
         0);
-    return (sent == static_cast<int>(byteCount)) ? 1u : 0u;
+    if (sent == SOCKET_ERROR) {
+        spdlog::debug(
+            "CLTTCPConnection::SendRawSocketBufferScaffold send failed socket=0x{:08x} remoteHost='{}' byteCount={} wsaError={}",
+            socketHandle_,
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+            byteCount,
+            WSAGetLastError());
+        return 0u;
+    }
+    if (sent != static_cast<int>(byteCount)) {
+        spdlog::debug(
+            "CLTTCPConnection::SendRawSocketBufferScaffold short send socket=0x{:08x} remoteHost='{}' requested={} sent={}",
+            socketHandle_,
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+            byteCount,
+            sent);
+        return 0u;
+    }
+    return 1u;
 }
 
 // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.

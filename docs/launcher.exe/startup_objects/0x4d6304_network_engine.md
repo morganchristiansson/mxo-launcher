@@ -1227,6 +1227,10 @@ Important limitation:
   - that ABI layer now incrementally delegates slot `1` / `MonitorPort`, slot `2` / `UDPMonitorPort`, slot `3` / `MonitorEphemeralUDPPort`, slot `5` / `UnmonitorPort`, slot `6` / `Connect`, slot `7` / `Close`, slot `8` / `SendBuffer`, and slot `12` / `CleanupConnection` into the recovered `liblttcp` / `libltmessaging` classes through a sidecar engine/connection binding
   - `Connect`, `Close`, and `SendBuffer` are now routed through liblttcp-side context wrappers (`ConnectContext()` / `CloseContext()` / `SendPacketContext()`) instead of keeping those connection-oriented paths entirely inside `diagnostics.cpp`
   - newer bounded fidelity correction there now keeps slot `6` / `Connect` as the sidecar creation / ensure-connected seam, while slot `7` / `Close` and slot `8` / `SendBuffer` require an already-existing sidecar connection instead of implicitly materializing a new one on demand
+  - newer bounded lookup correction also lets the engine resolve those connection-oriented slots by either:
+    - the direct connection object pointer, or
+    - the connection's stored owner/context key
+    and it now also searches the live auth/margin bridge-tracked sidecar connections before falling back to source-created generic entries
   - sidecar owner/engine binding state is now also kept by `CLTThreadPerClientTCPEngineBinding` on the liblttcp side rather than by diagnostics-local owner/engine globals
   - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
   - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered unique-key intent:
