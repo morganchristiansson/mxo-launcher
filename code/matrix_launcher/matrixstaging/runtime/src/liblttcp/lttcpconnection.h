@@ -116,6 +116,16 @@ static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold) == 0x2c, "pa
 class CVariableLengthPrefixedTCPStreamParser;
 class CBaseConnection;
 
+// UNANCHORED: source-owned helper that recognizes the current queue-context bridge object and
+// returns its owning `CBaseConnection` when present.
+CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext);
+// UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
+// Original queue consumers dequeue a real connection-family object as `context`; current source may
+// instead carry the queue-context bridge object that dispatches back into `vtable[4]`.
+// This helper narrows that gap by resolving the cleanup/search key back to the owning connection's
+// logical context key when the bridge object is what was actually queued.
+void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext);
+
 // Source-owned queue-context bridge compensating for the current non-byte-faithful C++ vtable
 // layout of `CBaseConnection` / `CLTTCPConnection` while queue consumers still dispatch through
 // original-style slot `+0x10` (`vtable[4]`).

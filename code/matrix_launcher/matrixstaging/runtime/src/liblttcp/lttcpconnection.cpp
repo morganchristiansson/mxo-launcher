@@ -226,6 +226,31 @@ void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
 }
 
+// UNANCHORED: source-owned helper that recognizes the current queue-context bridge object and
+// returns its owning `CBaseConnection` when present.
+CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext) {
+    CBaseConnection_QueueContextScaffold* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
+    if (!queueContext || queueContext->vtable != g_BaseConnectionQueueContextVtable) {
+        return nullptr;
+    }
+    return queueContext->owner;
+}
+
+// UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
+void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext) {
+    CBaseConnection* owner = CBaseConnection_FromQueueContextScaffold(maybeQueueContext);
+    if (!owner) {
+        return maybeQueueContext;
+    }
+
+    if (CLTTCPConnection* tcpConnection = dynamic_cast<CLTTCPConnection*>(owner)) {
+        return tcpConnection->OwnerContext() ? tcpConnection->OwnerContext()
+                                             : static_cast<void*>(tcpConnection);
+    }
+    return owner;
+}
+
 // UNANCHORED: source-owned socket-handle setter used by the current scaffolds.
 void CLTTCPConnection::SetSocketHandle(uint32_t socketHandle) {
     socketHandle_ = socketHandle;

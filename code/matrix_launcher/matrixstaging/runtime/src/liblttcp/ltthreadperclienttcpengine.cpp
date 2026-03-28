@@ -1328,13 +1328,30 @@ uint32_t CLTThreadPerClientTCPEngine::Slot11_431670(void* arg1, uint32_t* out0, 
 // anchor: launcher.exe:0x4316a0
 // vtable: launcher.exe:0x004b2768 slot +0x30
 uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
-    if (CMessageConnection* connection = FindMessageConnection(contextKey)) {
+    // Current bounded fidelity correction:
+    // - original queue consumers dequeue a real connection-family object as `context` before
+    //   calling arg5 slot 12 / CleanupConnection
+    // - current source often queues the explicit `CBaseConnection_QueueContextScaffold` bridge
+    //   instead so later callback dispatch can still land on `vtable[4]`
+    // - slot-12-style worker lookup/teardown therefore has to unwrap that bridge back to the
+    //   owning connection's logical context key instead of searching worker/message tables with
+    //   the bridge pointer itself
+    CBaseConnection* queuedConnectionOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
+    void* cleanupContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+
+    if (CLTTCPConnection* queuedTcpConnection =
+            dynamic_cast<CLTTCPConnection*>(queuedConnectionOwner)) {
+        queuedTcpConnection->SetState(LTTCPEngineConnectionState::kClosed);
+        queuedTcpConnection->SetSocketHandle(kInvalidSocketHandle);
+    }
+
+    if (CMessageConnection* connection = FindMessageConnection(cleanupContextKey)) {
         connection->SetState(LTTCPEngineConnectionState::kClosed);
         connection->SetSocketHandle(kInvalidSocketHandle);
     }
 
     for (auto it = workerThreads_.begin(); it != workerThreads_.end(); ++it) {
-        if (it->contextKey == contextKey) {
+        if (it->contextKey == cleanupContextKey) {
             StopWorkerThreadScaffold(&(*it));
             workerThreads_.erase(it);
             SyncAttachedLauncherObjectStateScaffold();
@@ -1641,6 +1658,8 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
     //   - in non-blocking mode, return only once both queues are empty
     //   - null work item means shutdown-style sentinel and cascades one more null queue0C item
     //   - slot12/CleanupConnection only runs for type-1 work
+    //     - current source now also unwraps the queue-context bridge there so worker/message-table
+    //       teardown still keys off the owning connection context rather than the bridge pointer
     //   - later context callback always receives the original work-item pointer
     //   - optional context release remains type-1-only and uses the pre-callback byte-at-+4 test
     while (true) {

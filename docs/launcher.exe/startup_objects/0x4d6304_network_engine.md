@@ -119,6 +119,10 @@ New queue-thread clarification from the current focused pass:
     - prefer queue34 when non-empty, else queue0C
     - null work item means shutdown-style sentinel
     - cleanup/slot-12-style connection teardown logically precedes later context callback
+    - newer bounded correction: when source queued the explicit `CBaseConnection_QueueContextScaffold`
+      bridge instead of the original connection-family object, slot-12-style cleanup now unwraps
+      that bridge back to the owning connection's logical context key before worker/message-table
+      teardown
   - that source consumer is still explicitly scaffold-first and should not yet be treated as a faithful final replacement for original `0x436b10`
 
 ## New clarification: arg5 contains helper subobjects the client can call directly
