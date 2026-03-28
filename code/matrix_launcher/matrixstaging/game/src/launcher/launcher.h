@@ -6,6 +6,7 @@
 namespace mxo {
 namespace launcher {
 
+// UNANCHORED: recovered replacement grouping for launcher.exe:0x40b430 startup-state handoff.
 struct RecoveredLauncherStartupContext {
     char mediatorSelectionName[64];
     const void* recoveredSelection;
@@ -15,9 +16,10 @@ struct RecoveredLauncherStartupContext {
     uint32_t nopatchClientVersionValue;
 };
 
+// anchor: launcher.exe:0x004abfe0
+// anchor: launcher.exe:0x4097f0
 class CLauncher {
 public:
-    // anchor: launcher.exe:0x4097f0
     // Original binary shape:
     // - derives from MFC CWinApp
     // - installs vtable 0x004abfe0
@@ -46,13 +48,13 @@ public:
     // anchor: launcher.exe:0x40a7a0
     void UnloadCresDLL() const;
 
-    // Recovered grouping inside launcher.exe:0x40b430
+    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
     bool BuildStartupContextFromRecoveredSelection(RecoveredLauncherStartupContext* startupContext);
 
-    // Recovered grouping inside launcher.exe:0x40b430
+    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
     bool PrepareInitClientStateFromStartupContext(const RecoveredLauncherStartupContext& startupContext);
 
-    // Recovered grouping inside launcher.exe:0x40b430
+    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
     void LogInitInstanceFaithfulnessGaps() const;
 
     // anchor: launcher.exe:0x40a55c / 0x40b430

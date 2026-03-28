@@ -26,22 +26,20 @@ using RunClientDLLFunc = int (*)();
 using TermClientDLLFunc = int (*)();
 using ErrorClientDLLFunc = const char* (*)();
 
-extern HMODULE g_hCres;
-extern HMODULE g_hClient;
-extern int g_CrtArgc;
-extern char** g_CrtArgv;
-extern mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
-extern void* g_pLauncherObject6304;
-extern void* g_pILTLoginMediatorDefault;
-extern void* g_pILTLoginMediatorSelection3584;
-extern uint32_t g_PackedArg7Selection;
-extern uint32_t g_FlagByte;
-extern char g_LastWorldName[256];
+HMODULE g_hCres = NULL;
+HMODULE g_hClient = NULL;
+int g_CrtArgc = 0;
+char** g_CrtArgv = NULL;
+mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
+mxo::launcher::CLauncher g_Launcher;
+void* g_pLauncherObject6304 = NULL;
+void* g_pILTLoginMediatorDefault = NULL;
+void* g_pILTLoginMediatorSelection3584 = NULL;
+uint32_t g_PackedArg7Selection = 0;
+uint32_t g_FlagByte = 0;
+char g_LastWorldName[256] = {0};
 
-extern bool PatchClientDllMxowrapImportToDbghelp();
-extern bool PreloadDependencies();
 extern bool DiagnosticInitializePreclientEnvironmentLike402EC0();
-extern void RunOptionsCfgAutodetectStepIfNeeded();
 extern bool IsRecoveredPreclientEnvironmentActive();
 
 namespace {
@@ -120,6 +118,24 @@ void LogLauncherPreprocessingState() {
     if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
         spdlog::info("launcher autodetect exitCode = {}", (unsigned long)g_LauncherCommandLine.AutodetectExitCode());
     }
+}
+
+bool PreloadDependencies() {
+    const char* dlls[] = {
+        "MFC71.dll",
+        "MSVCR71.dll",
+        "dbghelp.dll",
+        "r3d9.dll",
+        "binkw32.dll",
+        NULL
+    };
+
+    for (int i = 0; dlls[i]; ++i) {
+        HMODULE h = LoadLibraryA(dlls[i]);
+        spdlog::info("preload {:12s} : {} ({})", dlls[i], h ? "OK" : "FAIL", fmt::ptr(h));
+        if (!h) return false;
+    }
+    return true;
 }
 
 bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
@@ -294,10 +310,12 @@ void LogClientLifecycleFailure(const char* phase, ErrorClientDLLFunc errorClient
 namespace mxo {
 namespace launcher {
 
+// anchor: launcher.exe:0x40a55c / 0x40b430
 uint32_t CLauncher::BuildPackedArg7Selection() const {
     return (m_FieldAC & 0x00ffffffu) | ((m_FieldA8 & 0xffu) << 24);
 }
 
+// anchor: launcher.exe:0x409950 / 0x4173d0
 bool CLauncher::ParseCommandLineStage() const {
     spdlog::info("=== Launcher argv preprocessing ===");
     spdlog::info(
@@ -327,6 +345,7 @@ bool CLauncher::ParseCommandLineStage() const {
     return true;
 }
 
+// anchor: launcher.exe:0x40a780
 bool CLauncher::LoadCresDLL() const {
     spdlog::info("=== Load cres.dll ===");
     g_hCres = LoadLibraryA("cres.dll");
@@ -334,16 +353,15 @@ bool CLauncher::LoadCresDLL() const {
     return g_hCres != NULL;
 }
 
+// anchor: launcher.exe:0x40a420
 bool CLauncher::LoadClientDLL() const {
-    if (!PatchClientDllMxowrapImportToDbghelp()) {
-        return false;
-    }
     spdlog::info("=== Load client.dll ===");
     g_hClient = LoadLibraryA("client.dll");
     spdlog::info("client.dll handle: {}", fmt::ptr(g_hClient));
     return g_hClient != NULL;
 }
 
+// anchor: launcher.exe:0x40a760
 void CLauncher::UnloadClientDLL() const {
     if (g_hClient) {
         FreeLibrary(g_hClient);
@@ -351,6 +369,7 @@ void CLauncher::UnloadClientDLL() const {
     }
 }
 
+// anchor: launcher.exe:0x40a7a0
 void CLauncher::UnloadCresDLL() const {
     if (g_hCres) {
         FreeLibrary(g_hCres);
@@ -358,6 +377,7 @@ void CLauncher::UnloadCresDLL() const {
     }
 }
 
+// UNANCHORED: recovered grouping inside launcher.exe:0x40b430 before arg6/arg7 preparation.
 bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStartupContext* startupContext) {
     if (!startupContext) {
         return false;
@@ -438,6 +458,7 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     return true;
 }
 
+// UNANCHORED: recovered grouping inside launcher.exe:0x40b430 that prepares arg5/arg6/arg7-owned state.
 bool CLauncher::PrepareInitClientStateFromStartupContext(const RecoveredLauncherStartupContext& startupContext) {
     if (!PreloadDependencies()) {
         spdlog::info("ERROR: preload failed");
@@ -543,11 +564,16 @@ bool CLauncher::PrepareInitClientStateFromStartupContext(const RecoveredLauncher
         spdlog::info("WARNING: pre-client environment scaffold failed to initialize");
     }
 
-    RunOptionsCfgAutodetectStepIfNeeded();
+    // Static RE currently proves the autodetect/options.cfg gate is set during ParseCommandLine
+    // (launcher.exe:0x409f34) and later consumed by the InitInstance dialog path
+    // (launcher.exe:0x40b75a -> 0x401520 / DoModal). The old child-process launcher step was
+    // replacement-only scaffolding and is intentionally omitted here until the real original
+    // dialog/config behavior is recovered.
     DiagnosticStartWindowTrace();
     return true;
 }
 
+// UNANCHORED: replacement-only summary logger for current gaps within launcher.exe:0x40b430.
 void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     spdlog::info("=== Original-path gaps still missing ===");
     spdlog::info("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
@@ -566,6 +592,7 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     spdlog::info("");
 }
 
+// anchor: launcher.exe:0x40a4d0
 bool CLauncher::RunClientDllLifecycle() const {
     spdlog::info("=== Launcher_RunClientDllLifecycle (0x40a4d0-shaped) ===");
 
@@ -642,6 +669,7 @@ bool CLauncher::RunClientDllLifecycle() const {
     return true;
 }
 
+// anchor: launcher.exe:0x40b430
 bool CLauncher::InitInstance() {
     spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
     spdlog::info("NOTE: launcher-owned nopatch setup, arg5, arg6, arg7, and arg8 remain incomplete.");

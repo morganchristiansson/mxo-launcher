@@ -41,22 +41,22 @@ namespace ltlogin {
 
 using mxo::launcher::CLauncher;
 
-HMODULE g_hCres = NULL;
-HMODULE g_hClient = NULL;
-int g_CrtArgc = 0;
-char** g_CrtArgv = NULL;
+extern HMODULE g_hCres;
+extern HMODULE g_hClient;
+extern int g_CrtArgc;
+extern char** g_CrtArgv;
 
 // Launcher-owned command-line preprocessing now lives in a dedicated recovered model.
-mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
+extern mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 
 // Launcher-owned startup/auth state outside the command-line parser.
-CLauncher g_Launcher;                            // original global object: [0x4d3368]
-void* g_pLauncherObject6304 = NULL;             // original: [0x4d6304]
-void* g_pILTLoginMediatorDefault = NULL;        // original: [0x4d2c58]
-void* g_pILTLoginMediatorSelection3584 = NULL;  // original sibling slot: [0x4d3584]
-uint32_t g_PackedArg7Selection = 0;             // packed from [CLauncher+0xa8]/[CLauncher+0xac]
-uint32_t g_FlagByte = 0;                        // original: [0x4d2c69]
-char g_LastWorldName[256] = {0};                // original registry value: Last_WorldName
+extern CLauncher g_Launcher;                    // original global object: [0x4d3368]
+extern void* g_pLauncherObject6304;            // original: [0x4d6304]
+extern void* g_pILTLoginMediatorDefault;       // original: [0x4d2c58]
+extern void* g_pILTLoginMediatorSelection3584; // original sibling slot: [0x4d3584]
+extern uint32_t g_PackedArg7Selection;         // packed from [CLauncher+0xa8]/[CLauncher+0xac]
+extern uint32_t g_FlagByte;                    // original: [0x4d2c69]
+extern char g_LastWorldName[256];              // original registry value: Last_WorldName
 
 struct DiagnosticPreclientEnvironmentState {
     HANDLE threadHandle;
@@ -88,17 +88,6 @@ static const char* DiagnosticExceptionClassification(DWORD exceptionCode);
 static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTERS* exceptionInfo);
 static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo);
-
-template <typename T>
-static T ResolveProc(HMODULE module, const char* name) {
-    FARPROC proc = GetProcAddress(module, name);
-    T typed = nullptr;
-    static_assert(sizeof(typed) == sizeof(proc), "function pointer size mismatch");
-    std::memcpy(&typed, &proc, sizeof(typed));
-    return typed;
-}
-
-
 
 static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
     const uint32_t* words = static_cast<const uint32_t*>(base);
@@ -241,72 +230,6 @@ static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* except
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
-void RunOptionsCfgAutodetectStepIfNeeded() {
-    if (!g_LauncherCommandLine.LauncherGlobal4D2C64()) return;
-
-    STARTUPINFOA startupInfo = {};
-    startupInfo.cb = sizeof(startupInfo);
-    PROCESS_INFORMATION processInfo = {};
-    char commandLine[] = "autodetect_settings.exe setopts hide";
-
-    spdlog::info("=== Original-style options.cfg autodetect step ===");
-    spdlog::info("DIAGNOSTIC: launching '{}' with currentDir='.'", commandLine);
-
-    if (!CreateProcessA(
-            NULL,
-            commandLine,
-            NULL,
-            NULL,
-            FALSE,
-            0,
-            NULL,
-            ".",
-            &startupInfo,
-            &processInfo)) {
-        spdlog::info(
-            "WARNING: CreateProcessA for autodetect_settings.exe failed ({}); continuing original-path scaffold without that side effect",
-            GetLastError());
-        return;
-    }
-
-    DWORD waitResult = WaitForSingleObject(processInfo.hProcess, 60000);
-    spdlog::info("DIAGNOSTIC: autodetect wait result = {}", waitResult);
-
-    if (waitResult == WAIT_OBJECT_0) {
-        DWORD exitCode = 0;
-        if (GetExitCodeProcess(processInfo.hProcess, &exitCode)) {
-            g_LauncherCommandLine.SetAutodetectExitCode(exitCode);
-            spdlog::info(
-                "DIAGNOSTIC: autodetect exit code = {} (0x{:08x})",
-                static_cast<unsigned long>(exitCode),
-                static_cast<unsigned long>(exitCode));
-        } else {
-            spdlog::info("WARNING: GetExitCodeProcess for autodetect_settings.exe failed ({})", GetLastError());
-        }
-    } else if (waitResult == WAIT_TIMEOUT) {
-        spdlog::info("WARNING: autodetect_settings.exe did not finish within 60000 ms");
-    } else {
-        spdlog::info("WARNING: WaitForSingleObject for autodetect_settings.exe failed ({})", GetLastError());
-    }
-
-    if (processInfo.hThread) CloseHandle(processInfo.hThread);
-    if (processInfo.hProcess) CloseHandle(processInfo.hProcess);
-
-    struct _stat optionsStat = {};
-    if (_stat("options.cfg", &optionsStat) == 0) {
-        spdlog::info("DIAGNOSTIC: autodetect produced options.cfg size={} bytes", optionsStat.st_size);
-    } else {
-        spdlog::info("DIAGNOSTIC: options.cfg not present after autodetect child returned");
-    }
-
-    if (DeleteFileA("options.cfg")) {
-        spdlog::info("DIAGNOSTIC: deleted temporary options.cfg after autodetect step");
-    } else {
-        DWORD deleteError = GetLastError();
-        spdlog::info("DIAGNOSTIC: DeleteFileA('options.cfg') failed ({})", (unsigned long)deleteError);
-    }
-}
-
 static DWORD WINAPI DiagnosticPreclientThreadProc(LPVOID) {
     MSG msg = {};
     PeekMessageA(&msg, NULL, 0, 0, PM_NOREMOVE);
@@ -415,9 +338,7 @@ static int FinishAndReturn(int code) {
 }
 
 bool PatchClientDllMxowrapImportToDbghelp() {
-    // Narrow startup-owned file patch from the current local proof:
-    // `client.dll.patched` only differs here by replacing `mxowrap.dll` with same-length
-    // `dbghelp.dll` at offset `0x978d76`.
+    // UNANCHORED: replacement-only startup patch, not part of faithful launcher.exe behavior.
     static constexpr long kClientDllImportNameOffset = 0x978d76L;
     static constexpr char kImportName[] = "dbghelp.dll";
 
@@ -450,24 +371,6 @@ bool PatchClientDllMxowrapImportToDbghelp() {
 
 extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase) {
     spdlog::info("launcher export SetMasterDatabase called: {}", fmt::ptr(pMasterDatabase));
-}
-
-bool PreloadDependencies() {
-    const char* dlls[] = {
-        "MFC71.dll",
-        "MSVCR71.dll",
-        "dbghelp.dll",
-        "r3d9.dll",
-        "binkw32.dll",
-        NULL
-    };
-
-    for (int i = 0; dlls[i]; ++i) {
-        HMODULE h = LoadLibraryA(dlls[i]);
-        spdlog::info("preload {:12s} : {} ({})", dlls[i], h ? "OK" : "FAIL", fmt::ptr(h));
-        if (!h) return false;
-    }
-    return true;
 }
 
 static std::shared_ptr<spdlog::logger> RegisterSharedSinkLogger(
@@ -528,12 +431,12 @@ int main(int argc, char* argv[]) {
     g_CrtArgc = argc;
     g_CrtArgv = argv;
 
-    spdlog::info("Matrix Online launcher reimplementation scaffold");
-    spdlog::info("===============================================");
     spdlog::info("Mode: original startup order, no client-memory injection");
     spdlog::info("Default branch target: nopatch path");
-    spdlog::info("DIAGNOSTIC: spdlog debug file = resurrections_spdlog.log");
-    spdlog::info("");
+
+    if (!PatchClientDllMxowrapImportToDbghelp()) {
+        return FinishAndReturn(1);
+    }
 
     return FinishAndReturn(g_Launcher.InitInstance() ? 0 : 1);
 }

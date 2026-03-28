@@ -62,12 +62,13 @@ bool CLauncherCommandLine::ParseCommandLine(int argc, char** argv) {
 
     ProbeOptionsCfgAutodetectGate();
 
-    // Abort early with error if -user, -pwd AND -char args are not provided
-    bool hasUser = (authUsername_[0] != '\0');
-    bool hasPwd = (authPassword_[0] != '\0');
-    bool hasChar = (launcherCharacter_[0] != '\0');
+    // UNANCHORED: current replacement launcher has no faithful UI/login prompt path yet,
+    // so keep a hard fail here until that interface exists.
+    const bool hasUser = (authUsername_[0] != '\0');
+    const bool hasPwd = (authPassword_[0] != '\0');
+    const bool hasChar = (launcherCharacter_[0] != '\0');
     if (!hasUser || !hasPwd || !hasChar) {
-        spdlog::error("ERROR: launcher requires -user, -pwd AND -char arguments");
+        spdlog::error("ERROR: launcher currently requires -user, -pwd AND -char arguments");
         return false;
     }
 
