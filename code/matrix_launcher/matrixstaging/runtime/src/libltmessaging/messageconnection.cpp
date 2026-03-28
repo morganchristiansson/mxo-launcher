@@ -529,6 +529,16 @@ static bool CMessageConnection_CopyParsedPacketPayloadBytesScaffold(
     return remainingPacketBodyByteCount == 0u;
 }
 
+uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
+    void* workItem,
+    const std::vector<uint8_t>& payloadBytes,
+    bool headerless) {
+    (void)workItem;
+    (void)payloadBytes;
+    (void)headerless;
+    return 0u;
+}
+
 // anchor: launcher.exe:0x4490c0
 // string-backed original name: CMessageConnection::OnOperationCompleted
 // Current source body now mirrors the smallest static-RE-backed live subset of the type-3 path:
@@ -536,12 +546,13 @@ static bool CMessageConnection_CopyParsedPacketPayloadBytesScaffold(
 // - on type `3`, copy packet-body bytes from the retained-fragment-backed parsed-packet work item
 //   via `currentCursor24` / `assembledByteCount28`
 // - preserve the original oversized-packet close branch before later dispatch/agenda work
-// - later message dispatch / packet-agenda / owner callback handling remains a separate next step
-//   in source; that is why the launcher bridge still needs a second synthetic receive-drain proxy
-//   after the original parsed-packet type-3 queue callback has already run
-// - current bounded correction: that synthetic proxy now re-enters through the
-//   CMessageConnection-family callback itself instead of going straight from the queue to the
-//   mediator-owned drain helper
+// - current bounded post-copy correction:
+//   - base `0x4490c0` now offers a leaf post-copy dispatch seam
+//   - auth leaf `0x449a30 -> owner+0x180 / 0x41f250` can now re-enter current-helper slot 5
+//     directly from this callback on the handled auth path
+// - remaining message-object / agenda / margin-leaf dispatch work is still incomplete, so the
+//   launcher bridge still keeps the later synthetic receive-drain proxy for the paths that are not
+//   yet consumed here
 uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
@@ -613,6 +624,23 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
 
     lastReceivedPacketBodyBytesScaffold_.swap(copiedPayloadBytes);
     lastReceivedPacketHeaderlessScaffold_ = !packetizedMessagesEnabledScaffold_;
+
+    const uint32_t postCopyDispatchHandled = DispatchCopiedParsedPacketTailScaffold(
+        workItem,
+        lastReceivedPacketBodyBytesScaffold_,
+        lastReceivedPacketHeaderlessScaffold_);
+    if (postCopyDispatchHandled != 0u) {
+        spdlog::info(
+            "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} and dispatched it on the post-copy leaf path this={} ownerContext={} remoteHost='{}'",
+            static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
+            lastReceivedPacketHeaderlessScaffold_ ? 1u : 0u,
+            static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        return 1u;
+    }
+
     pendingReceivedPacketsScaffold_.push_back(
         CMessageConnectionReceivedPacketScaffold{
             lastReceivedPacketBodyBytesScaffold_,
@@ -714,6 +742,38 @@ CAuthStartupConnection::CAuthStartupConnection(CLTThreadPerClientTCPEngine* auth
     : CMessageConnection(authEngine) {}
 
 CAuthStartupConnection::~CAuthStartupConnection() = default;
+
+// anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
+uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
+    void* workItem,
+    const std::vector<uint8_t>& payloadBytes,
+    bool headerless) {
+    (void)workItem;
+
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        CMessageConnection_LoginMediatorContextScaffold(this);
+    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    if (!context || !mediator || context->isMarginConnection || payloadBytes.empty()) {
+        return 0u;
+    }
+
+    const uint8_t rawCode = payloadBytes[0];
+    const uint32_t handled = mediator->StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
+        payloadBytes.data(),
+        payloadBytes.size(),
+        /*workItem=*/nullptr);
+    spdlog::info(
+        "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} payloadBytes={} headerless={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+        static_cast<unsigned>(rawCode),
+        static_cast<unsigned>(payloadBytes.size()),
+        headerless ? 1u : 0u,
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        fmt::ptr(mediator->CurrentState()),
+        handled,
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return handled;
+}
 
 // anchor: launcher.exe:0x449a70
 uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {

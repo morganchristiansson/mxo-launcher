@@ -1236,6 +1236,40 @@ CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
 }
 
+// anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
+uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessageScaffold(void* workItem) {
+    if (!currentState_) {
+        spdlog::info(
+            "CLTLoginMediator::DispatchCurrentHelperAuthMessageScaffold skipped because currentState is null workItem={}",
+            fmt::ptr(workItem));
+        return 0u;
+    }
+
+    return currentState_->AuthMessageDispatch(workItem, this);
+}
+
+// UNANCHORED: source-owned staging wrapper for the narrowed auth-side
+// `0x4490c0 -> 0x449a30 -> owner+0x180` post-copy receive seam.
+uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    void* workItem) {
+    if (!packetBytes || packetSize == 0u) {
+        return 0u;
+    }
+
+    stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+    const uint8_t rawCode = stagedIncomingAuthPacketBytes_[0];
+    const uint32_t handled = DispatchCurrentHelperAuthMessageScaffold(workItem);
+    spdlog::info(
+        "CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={}",
+        static_cast<unsigned>(rawCode),
+        static_cast<unsigned>(packetSize),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(handled));
+    return handled;
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::State6UdpSessionSecretF18() const {
     const auto it = g_marginBootstrapStateByMediator.find(this);

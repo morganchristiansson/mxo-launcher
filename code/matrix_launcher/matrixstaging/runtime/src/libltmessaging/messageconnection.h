@@ -282,8 +282,9 @@ public:
     //   `CParsedPacketWorkItem` via `+0x24/+0x28` before later dispatch/agenda handling
     // - generic fallback logger on this path is helper `0x448a60`
     // Current source gap kept explicit:
-    // - source currently stops after the copied-packet staging subset
-    // - later original message-object / dispatch / owner-callback work from this same callback is
+    // - source now owns the copied-packet staging subset and one later auth-leaf post-copy
+    //   destination (`0x449a30 -> owner+0x180 / 0x41f250`)
+    // - later original message-object / agenda / margin-dispatch work from this same callback is
     //   still missing, so the launcher bridge keeps one extra synthetic receive-drain proxy item
     uint32_t OnOperationCompleted(void* workItem);
 
@@ -302,6 +303,20 @@ public:
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
     void* ContextKey() { return this; }
+
+protected:
+    // anchor: launcher.exe:0x4490c0 -> vtable `+0x2c`
+    // Source-owned post-copy dispatch seam beneath the narrowed type-3 receive path.
+    // Current bounded use:
+    // - base `0x4490c0` now still owns the copied-packet extraction
+    // - leaf families can optionally source-own one later dispatch destination without pretending
+    //   the full original message-object / agenda tail is already reconstructed
+    // - returning non-zero means the leaf consumed this copied packet without needing the pending
+    //   copied-packet queue / later synthetic receive-drain proxy
+    virtual uint32_t DispatchCopiedParsedPacketTailScaffold(
+        void* workItem,
+        const std::vector<uint8_t>& payloadBytes,
+        bool headerless);
 
 private:
     // UNANCHORED: source-owned packet-family name helper for current diagnostics.
@@ -347,6 +362,18 @@ public:
     // - if that also returns 0, fall through to `0x448a60`
     // - if work type == 1, tears down through the connection object
     uint32_t OnOperationCompleted(void* workItem) override;
+
+protected:
+    // anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
+    // Current bounded auth-side correction:
+    // - after base `0x4490c0` finishes the parsed-packet copy, the auth leaf can now re-enter the
+    //   current helper's slot-5 `AuthMessageDispatch` path directly from the connection callback
+    // - this is only a narrowed destination recovery; source still does not materialize the
+    //   original message-ref object passed through `0x449a30`
+    uint32_t DispatchCopiedParsedPacketTailScaffold(
+        void* workItem,
+        const std::vector<uint8_t>& payloadBytes,
+        bool headerless) override;
 };
 
 // ============================================================

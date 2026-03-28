@@ -653,6 +653,19 @@ public:
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
 
+    // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
+    // Tiny auth-side receive wrapper:
+    // - loads current helper from owner `+0x10`
+    // - tail-jumps to helper vtable `+0x10`
+    // - current best read is helper slot 5 / `AuthMessageDispatch`
+    uint32_t DispatchCurrentHelperAuthMessageScaffold(void* workItem);
+    // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
+    // `0x4490c0 -> 0x449a30 -> owner+0x180` post-copy receive seam.
+    uint32_t StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
+        const uint8_t* packetBytes,
+        size_t packetSize,
+        void* workItem = nullptr);
+
     struct ActiveCharacterStateViewScaffold {
         const char* characterName = nullptr;
         uint32_t characterIdLow = 0;
@@ -1038,12 +1051,13 @@ public:
     //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
     // Current receive handling drains parsed packets from the faithful transport/parser seam.
-    // Current entry shape is still one bounded source-owned step later than original:
+    // Current entry shape is still one bounded source-owned step later than original, but one
+    // auth-side destination is now tighter than before:
     // - original type-3 parsed-packet queue work already reaches `CMessageConnection::OnOperationCompleted`
-    // - source then queues one more synthetic receive-drain proxy so the copied packet bytes can be
-    //   drained here until the later original message-object / dispatch tail is reconstructed
-    // - newer bounded correction now routes that proxy back through the connection-family queue
-    //   callback path first; this mediator method remains only the later source-owned drain target
+    // - handled auth copied packets can now continue one step later through
+    //   `0x449a30 -> owner+0x180 / 0x41f250 -> current helper slot5`
+    // - this mediator method remains the later source-owned drain target for the packets/branches
+    //   that still are not consumed on that nearer connection-side path
     // Keep the post-auth auth-reply semantics and the one-shot margin auto-begin request here so
     // they stay mediator-owned.
     uint32_t HandleAuthConnectionReceiveScaffold();
