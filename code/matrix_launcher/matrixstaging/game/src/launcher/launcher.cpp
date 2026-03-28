@@ -12,6 +12,7 @@
 #include <spdlog/cfg/env.h>
 #include "autodetectdialog.h"
 #include "../../../../src/diagnostics.h"
+#include "../../../../src/launcher_network_object_abi.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
 
 using InitClientDLLFunc = int (*)(
@@ -570,7 +571,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
         }
     }
 
-    DiagnosticInstallLauncherObjectStub(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
+    LauncherInstallNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
 
     const char authServerDnsName[] = "auth.lith.thematrixonline.net";
     const uint16_t authServerPort = 11000;
@@ -633,7 +634,7 @@ bool CLauncher::RunAutodetectDialogWithoutGui() const {
 void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     spdlog::info("=== Original-path gaps still missing ===");
     spdlog::info("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
-    spdlog::info("arg5 status: current launcher object scaffold materialized 0x4d6304-style object (not yet faithful ctor/internal state)");
+    spdlog::info("arg5 status: current launcher-owned 0x4d6304 ABI shell now mirrors the original create/register/pass shape, but internal ctor state is still incomplete");
     spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
     if (g_pILTLoginMediatorSelection3584) {
         spdlog::info("arg7 status: sibling 0x4d3584-style ILTLoginMediator selection slot currently reuses the active mediator object and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
@@ -731,13 +732,13 @@ bool CLauncher::RunClientDllLifecycle() const {
 bool CLauncher::InitInstance() {
     spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
     spdlog::info("NOTE: this replacement intentionally supports only the effective nopatch branch; patch/update support remains out of scope even while startup behavior is kept close to launcher.exe.");
-    spdlog::info("NOTE: launcher-owned arg5, arg6, arg7, and arg8 remain incomplete.");
+    spdlog::info("NOTE: launcher-owned arg5 now enters through a dedicated 0x4d6304 ABI shell, but arg5/arg6/arg7/arg8 fidelity is still incomplete.");
     if (!ParseCommandLineStage()) {
         return false;
     }
     spdlog::info("");
 
-    spdlog::info("DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher object scaffold + InitClientDLL/RunClientDLL + launcher-owned auth begin");
+    spdlog::info("DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher-owned arg5 ABI shell + InitClientDLL/RunClientDLL + launcher-owned auth begin");
 
     RecoveredLauncherStartupContext startupContext = {};
 

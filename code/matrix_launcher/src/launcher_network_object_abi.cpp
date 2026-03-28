@@ -52,9 +52,9 @@ struct LauncherObjectListHead18 {
 };
 
 static_assert(sizeof(LauncherObjectLockHelper) == 0x1c, "launcher lock helper size mismatch");
-static_assert(sizeof(LauncherObjectAbiShell) == 0xb4, "launcher object scaffold size must match original allocation");
-static_assert(sizeof(LauncherObjectListHead24) == 0x24, "list80 scaffold size mismatch");
-static_assert(sizeof(LauncherObjectListHead18) == 0x18, "list8C scaffold size mismatch");
+static_assert(sizeof(LauncherObjectAbiShell) == 0xb4, "launcher object ABI shell size must match original allocation");
+static_assert(sizeof(LauncherObjectListHead24) == 0x24, "list80 ABI head size mismatch");
+static_assert(sizeof(LauncherObjectListHead18) == 0x18, "list8C ABI head size mismatch");
 
 static LauncherObjectAbiShell* g_CurrentLauncherObject = NULL;
 static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding* g_LauncherObjectEngineBinding = NULL;
@@ -141,7 +141,7 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-mxo::liblttcp::CLTThreadPerClientTCPEngine* DiagnosticGetLauncherObjectEngine(void* ownerPtr) {
+mxo::liblttcp::CLTThreadPerClientTCPEngine* LauncherNetworkEngineFromAbiShell(void* ownerPtr) {
     return GetOrCreateLauncherObjectEngineSidecar(static_cast<LauncherObjectAbiShell*>(ownerPtr));
 }
 
@@ -405,7 +405,7 @@ static CRITICAL_SECTION* LauncherObjectCritFromHelper(void* self) {
     return self ? reinterpret_cast<CRITICAL_SECTION*>(static_cast<unsigned char*>(self) + 4) : NULL;
 }
 
-// UNANCHORED: helper-to-owner backpointer used by the current arg5 subobject helper scaffolds.
+// UNANCHORED: helper-to-owner backpointer used by the current arg5 embedded helper surfaces.
 static LauncherObjectAbiShell* LauncherObjectShellFromHelper(void* helperSelf, size_t helperOffset) {
     return helperSelf
         ? reinterpret_cast<LauncherObjectAbiShell*>(static_cast<unsigned char*>(helperSelf) - helperOffset)
@@ -465,7 +465,7 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     LauncherObject_LockHelper_Slot0(self);
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
-        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = DiagnosticGetLauncherObjectEngine(owner)) {
+        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
             engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
         }
     }
@@ -474,7 +474,7 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
 
 
 // UNANCHORED: seeds the replacement arg5 ABI vtables from recovered launcher.exe addresses.
-static void InitializeLauncherObjectStub() {
+static void InitializeLauncherObjectAbiVtables() {
     static bool initialized = false;
     if (initialized) return;
     initialized = true;
@@ -505,8 +505,8 @@ static void InitializeLauncherObjectStub() {
 }
 
 // UNANCHORED: replacement launcher builder mirroring launcher.exe:0x40a380 -> 0x431c30.
-static LauncherObjectAbiShell* BuildLauncherObjectAbiShellLike40A380() {
-    InitializeLauncherObjectStub();
+static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
+    InitializeLauncherObjectAbiVtables();
 
     if (g_CurrentLauncherObject) {
         FreeLauncherObjectAbiShellInternals(g_CurrentLauncherObject);
@@ -578,7 +578,7 @@ static LauncherObjectAbiShell* BuildLauncherObjectAbiShellLike40A380() {
 }
 
 // UNANCHORED: replacement helper that mirrors the mediator +0x08 handoff used after launcher.exe:0x40a380.
-static void RegisterLauncherObjectWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
+static void RegisterLauncherNetworkEngineWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
     if (!launcherObjectPtr || !mediatorPtr) return;
 
     void** vtable = *(void***)mediatorPtr;
@@ -591,20 +591,15 @@ static void RegisterLauncherObjectWithMediator(void* mediatorPtr, void* launcher
     (void)fn(mediatorPtr, launcherObjectPtr);
 }
 
-// UNANCHORED: public replacement-launcher entrypoint that installs the arg5 scaffold.
-void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr) {
-    LauncherObjectAbiShell* object = BuildLauncherObjectAbiShellLike40A380();
+// UNANCHORED: public replacement-launcher entrypoint that installs the arg5 ABI shell.
+void LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr) {
+    LauncherObjectAbiShell* object = CreateLauncherNetworkEngineAbiShellLike40A380();
     if (outLauncherObjectPtr) {
         *outLauncherObjectPtr = object;
     }
 
-    if (object) {
-        GetOrCreateLauncherObjectEngineSidecar(object);
-        SyncLauncherObjectShellState(object);
-    }
-
     if (mediatorPtr && object) {
-        RegisterLauncherObjectWithMediator(mediatorPtr, object);
+        RegisterLauncherNetworkEngineWithMediator(mediatorPtr, object);
     }
 }
 

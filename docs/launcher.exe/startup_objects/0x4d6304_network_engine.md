@@ -1347,3 +1347,14 @@ Important limitation:
 - this is still only a **starter ownership cleanup**, not proof that the original launcher's worker-thread producers are fully reconstructed
 - the current receive-side producer remains synthetic and sidecar-driven
 - only the ownership boundary moved closer to the recovered arg5 / engine family
+
+Newer source-ownership cleanup on the launcher entry side:
+- launcher-facing arg5 entrypoints no longer hang off `src/diagnostics.h`
+  - current source now exposes them through `src/launcher_network_object_abi.h` as launcher-owned ABI helpers instead
+- `matrixstaging/game/src/launcher/launcher.cpp` now calls that dedicated arg5 ABI helper directly when materializing `g_pLauncherObject6304`
+- the install helper itself is now slightly closer to original `0x40a380` ordering too:
+  - build raw `0xb4` ABI shell
+  - store/pass it to the launcher
+  - immediately hand it to arg6 / mediator registration
+  - and let the liblttcp sidecar bind lazily from that mediator handoff or the first later arg5 use
+- so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned creation / registration boundary

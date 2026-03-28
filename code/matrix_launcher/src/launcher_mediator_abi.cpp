@@ -265,7 +265,7 @@ static int __thiscall Mediator_SetNetworkEngine(MinimalLoginMediatorStub* self, 
     (void)self;
 
     mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(
-        DiagnosticGetLauncherObjectEngine(object));
+        LauncherNetworkEngineFromAbiShell(object));
     return 1;
 }
 

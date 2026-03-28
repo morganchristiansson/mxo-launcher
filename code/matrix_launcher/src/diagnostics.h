@@ -26,7 +26,6 @@ void DiagnosticConfigureMediatorAuthName(const char* authName);
 void DiagnosticConfigureMediatorAuthPassword(const char* authPassword);
 void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* authPassword);
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr, uint32_t parsedNoPatchValue, uint32_t clientVersionValue);
-void DiagnosticInstallLauncherObjectStub(void** outLauncherObjectPtr, void* mediatorPtr);
 void DiagnosticConfigureLoginControllerNetwork(
     const char* authDnsName,
     uint16_t authPortHostOrder,
