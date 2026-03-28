@@ -305,7 +305,7 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 | `+0x148` | accepts a runtime object/descriptor in later runtime setup paths | low |
 | `+0x170` | registers an observer/listener object into launcher owner `+0x674` (`0x41ddb0`) | high |
 | `+0x174` | unregisters an observer/listener object from launcher owner `+0x674` (`0x41dde0`) | high |
-| `+0x178` | returns launcher owner status/result dword `+0x80` (`0x41f240`) | high |
+| `+0x178` | returns launcher owner status/result dword `+0x80` (`0x41f240`); client observer error handlers consult this after `PostError`, so state8 `MS_LoadCharacterReply` failures can carry the raw server status (for example `0x0b000025`) into the normal popup path | high |
 | `+0x18c` | later callback84-side writer queried indirectly through `ClientNetShell +0x38`; fills client scratch buffer later surfaced as pair `(&0x629e0284, 0x20)`; active replacement now source-owns the state9-gated blob fill closely enough to run it live | high |
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.

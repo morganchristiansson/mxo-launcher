@@ -38,6 +38,7 @@ static std::string BuildRecentEventHistoryPreview(const std::array<uint32_t, 8>&
 }
 
 using LoginObserverOnEventFn = void(__thiscall*)(void*, uint32_t);
+using LoginObserverOnErrorFn = void(__thiscall*)(void*, uint32_t);
 
 static std::vector<void*> g_registeredLoginObservers;
 
@@ -49,12 +50,21 @@ static const std::vector<void*>& RegisteredLoginObservers() {
     return g_registeredLoginObservers;
 }
 
-static bool LooksLikeLoginObserverEventVtable(void* observer) {
+static void** GetLoginObserverVtable(void* observer) {
     if (!observer) {
-        return false;
+        return nullptr;
     }
-    void** vtable = *reinterpret_cast<void***>(observer);
+    return *reinterpret_cast<void***>(observer);
+}
+
+static bool LooksLikeLoginObserverEventVtable(void* observer) {
+    void** vtable = GetLoginObserverVtable(observer);
     return vtable != nullptr && vtable[0] != nullptr;
+}
+
+static bool LooksLikeLoginObserverErrorVtable(void* observer) {
+    void** vtable = GetLoginObserverVtable(observer);
+    return vtable != nullptr && vtable[1] != nullptr;
 }
 
 static void DispatchLoginObserverEvent(void* observer, uint32_t eventId) {
@@ -62,9 +72,19 @@ static void DispatchLoginObserverEvent(void* observer, uint32_t eventId) {
         return;
     }
 
-    void** vtable = *reinterpret_cast<void***>(observer);
+    void** vtable = GetLoginObserverVtable(observer);
     const auto fn = reinterpret_cast<LoginObserverOnEventFn>(vtable[0]);
     fn(observer, eventId);
+}
+
+static void DispatchLoginObserverError(void* observer, uint32_t errorId) {
+    if (!LooksLikeLoginObserverErrorVtable(observer)) {
+        return;
+    }
+
+    void** vtable = GetLoginObserverVtable(observer);
+    const auto fn = reinterpret_cast<LoginObserverOnErrorFn>(vtable[1]);
+    fn(observer, errorId);
 }
 
 }  // namespace
@@ -270,17 +290,31 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
 
 void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
     // anchor: launcher.exe:0x41d090
-    // The original walks the owner `+0x674` listener tree here and calls each observer's second
-    // vtable slot (`+0x04` / current best read: OnLoginError).
-    // Current replacement keeps this late observer bridge narrower than events for now: error-side
-    // fanout stays logged but not yet dispatched until the active event-`0x18` continuation proves
-    // which registered observers are safe to call on the replacement path.
+    // Static Ghidra/decompilation for the original body is now concrete enough to mirror here:
+    // - log `CLTLoginMediator::PostError(): Error# %d`
+    // - walk the owner `+0x674` listener tree
+    // - call each observer's second vtable slot (`+0x04` / OnLoginError)
+    // This matters for the state8 failure path because `0x43f930` first writes the raw server
+    // result dword to owner `+0x80`, then posts error `10`; client observer-side error handling
+    // queries mediator slot `+0x178` to read back that status and choose the visible popup.
     lastPostedErrorScaffold_ = errorId;
+    const std::vector<void*>& registeredObservers = RegisteredLoginObservers();
     spdlog::info(
-        "{} Error# {} registeredObservers={} (late observer bridge not yet enabled for errors)",
+        "{} Error# {} status80=0x{:08x} registeredObservers={} (source-owned owner+0x674 error-listener walk active)",
         kLogPrefixPostError,
         static_cast<unsigned>(errorId),
-        static_cast<unsigned>(RegisteredLoginObservers().size()));
+        static_cast<unsigned>(WorldListCountOrStatus80()),
+        static_cast<unsigned>(registeredObservers.size()));
+
+    const std::vector<void*> observers = registeredObservers;
+    for (void* observer : observers) {
+        spdlog::info(
+            "CLTLoginMediator::PostErrorScaffold dispatching observer={} error=0x{:02x} status80=0x{:08x}",
+            fmt::ptr(observer),
+            static_cast<unsigned>(errorId & 0xffu),
+            static_cast<unsigned>(WorldListCountOrStatus80()));
+        DispatchLoginObserverError(observer, errorId);
+    }
 }
 
 }  // namespace mxo::ltlogin

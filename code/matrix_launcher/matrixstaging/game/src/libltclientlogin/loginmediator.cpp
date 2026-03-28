@@ -1220,9 +1220,15 @@ uint32_t CLTLoginMediator::GetLastLoginStatus() {
     const uint32_t status = this->WorldListCountOrStatus80();
     this->lastStatus178_ = status;
     ++this->statusQuery178Count_;
-    spdlog::debug("CLTLoginMediator::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
-        status,
-        this->statusQuery178Count_);
+    if (status != 0u) {
+        spdlog::info("CLTLoginMediator::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
+            status,
+            this->statusQuery178Count_);
+    } else {
+        spdlog::debug("CLTLoginMediator::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
+            status,
+            this->statusQuery178Count_);
+    }
     return status;
 }
 
@@ -3286,6 +3292,23 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     // Exact receive-side boundary now mirrored in source:
     // - decoded codes 2 / 4 / 5 are consumed by base margin dispatch
     // - only other decoded codes survive into owner +0x184 / current helper slot 6
+    if ((rawCode == 0x10u || rawCode == 0x11u) && effectivePacketSize >= 5u) {
+        const uint32_t leadingStatusDword =
+            static_cast<uint32_t>(effectivePacketBytes[1]) |
+            (static_cast<uint32_t>(effectivePacketBytes[2]) << 8) |
+            (static_cast<uint32_t>(effectivePacketBytes[3]) << 16) |
+            (static_cast<uint32_t>(effectivePacketBytes[4]) << 24);
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginPacketBytes observed post-bootstrap rawCode=0x{:02x} statusDword=0x{:08x} packetSize={} encrypted={} receiveCount={} filteredBeforeSlot6={} currentState={}",
+            static_cast<unsigned>(rawCode),
+            static_cast<unsigned>(leadingStatusDword),
+            static_cast<unsigned>(effectivePacketSize),
+            transportEncrypted ? 1u : 0u,
+            static_cast<unsigned>(marginPacketReceiveCountScaffold_),
+            static_cast<unsigned>(marginPacketFilteredBeforeSlot6CountScaffold_),
+            currentState_ ? currentState_->DebugName() : "<null>");
+    }
+
     if (rawCode == 2u || rawCode == 4u || rawCode == 5u) {
         ++marginPacketFilteredBeforeSlot6CountScaffold_;
         spdlog::debug(

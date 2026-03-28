@@ -577,9 +577,16 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     // - only other decoded message codes fall through owner `+0x184 -> 0x41f260` and land here
     // - practical consequence: the raw state8 reply opcode `0x10` belongs on that fallback path,
     //   not on the base code-4 wrapper branch
+    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
     const ParsedState11LoadCharacterReplyScaffold parsed =
-        ParseState11LoadCharacterReplyScaffold(mediator->StagedIncomingMarginPacketBytes());
+        ParseState11LoadCharacterReplyScaffold(stagedBytes);
     if (!parsed.valid) {
+        if (!stagedBytes.empty() && stagedBytes[0] == 0x10u) {
+            spdlog::info(
+                "CLTLoginState_State8::Slot6_HandleSecondaryMessage saw raw opcode 0x10 but parse rejected stagedBytes={} currentState={} (expected >= 0x10-byte MS_LoadCharacterReply layout)",
+                static_cast<unsigned>(stagedBytes.size()),
+                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        }
         const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
             spdlog::info(
@@ -593,6 +600,18 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             fallbackResult);
         return 0u;
     }
+
+    spdlog::info(
+        "CLTLoginState_State8::Slot6_HandleSecondaryMessage parsed MS_LoadCharacterReply status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} expectedSections={} seedExpected={} sectionSelector={} sectionOffset=0x{:04x} sectionBytes={} currentState={}",
+        static_cast<unsigned>(parsed.status),
+        static_cast<unsigned>(parsed.field05),
+        static_cast<unsigned>(parsed.handoffWord09),
+        static_cast<unsigned>(parsed.expectedSectionCount0b),
+        parsed.shouldSeedExpectedSectionCount ? 1u : 0u,
+        static_cast<unsigned>(parsed.sectionSelectorMinus2),
+        static_cast<unsigned>(parsed.sectionOffset0e),
+        static_cast<unsigned>(parsed.sectionByteCount),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
 
     auto& ownerState = mediator->MutablePostAuthMarginLoadingState();
     ownerState.worldListCountOrStatus80 = parsed.status;
