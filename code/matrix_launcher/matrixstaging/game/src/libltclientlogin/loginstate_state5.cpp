@@ -103,13 +103,17 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         }
     }
 
+    const auto* authReplyCopyShadowF4 =
+        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
+            mediator ? mediator->AuthBootstrapReplyCopyShadowF4Scaffold() : nullptr);
     spdlog::info(
-        "CLTLoginState_State5::Slot3_BeginOrContinue cachedUpstream={} incomingUpstream={} incomingUpstreamPhaseCode={} mediator={} currentState={} (bounded source model still leaves the broader 0x41b500 / event-0x10 send branch unresolved)",
+        "CLTLoginState_State5::Slot3_BeginOrContinue cachedUpstream={} incomingUpstream={} incomingUpstreamPhaseCode={} mediator={} currentState={} authReplyCopyShadowF4={} (kept non-sending: 0x41b500 -> 0x41ce80/+0x98 -> 0x41f30 helper chain remains source-owned but dormant until the full 0x136 block is validated)",
         fmt::ptr(cachedUpstreamOrArg_),
         fmt::ptr(upstreamOrArg),
         static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(upstreamOrArg)),
         fmt::ptr(mediator),
-        mediator && mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator && mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        fmt::ptr(authReplyCopyShadowF4));
     return 1u;
 }
 

@@ -228,11 +228,23 @@ Practical consequence for the replacement launcher:
 
 Current replacement source keeps this split explicitly:
 - original child `+0xf4` = full reply-derived copied `0x136` block
-- source-owned mirror = narrowed shadow of the later exposed `+0x85/+0xa8` suffix family only
+- source-owned mirror now preserves that **full structural width** too, but still only names a
+  narrower subset confidently:
+  - `+0x85 .. +0x94`
+  - `+0xa8`
+- the remaining bytes stay structural/opaque rather than semantically over-named
 
 That is deliberate.
 It keeps the runtime path working without over-claiming that the entire copied block is already
 fully typed in source.
+
+Current bounded follow-up consequence:
+- this wider structural mirror is now enough to source-own the neighboring state5 helper chain
+  shape behind:
+  - `0x41ce80` copy into margin connection `+0x98`
+  - `0x41f30` raw-type-`1` prefix plus stored `0x136` block send
+- but that chain remains dormant on the working path until the full copied block is validated more
+  strongly; the current launcher-owned bootstrap continuation still preserves the known-good route
 
 ## Reimplementation guidance
 

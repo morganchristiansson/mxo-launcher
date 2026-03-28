@@ -1390,6 +1390,7 @@ public:
     uint32_t& ReplySectionData13cc() { return postAuthMarginLoadingState_.replySectionData13cc; }
     uint32_t& ReplySectionData13d0() { return postAuthMarginLoadingState_.replySectionData13d0; }
     uint8_t& CharacterRouteIndexCc8() { return postAuthMarginLoadingState_.characterRouteIndexCc8; }
+    const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
 
 private:
     uint32_t SendAuthFramedPacket(const mxo::auth::FramedPacket& packet, const char* stepLabel);

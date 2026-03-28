@@ -21,14 +21,16 @@ struct AuthBootstrap680SmallStringMirror {
     std::string owned;
 };
 
-struct AuthBootstrapReplyCopyShadowF4Sketch {
+struct __attribute__((packed)) AuthBootstrapReplyCopyShadowF4Sketch {
     // Source-owned shadow of the original reply-derived `0x136` heap block copied into child
     // `+0xf4` by `0x448140`.
     //
     // Important ownership split:
     // - original child `+0xf4` points at the full copied block
-    // - current replacement source intentionally narrows that to the later exposed suffix family
-    //   we actually consume on the live runtime path
+    // - replacement source still only *understands* a narrower suffix family with confidence
+    // - but later margin state5/state6 follow-up work now benefits from preserving the full block
+    //   width structurally so the old `0x41ce80 -> 0x41f30` copy/send path can be modeled without
+    //   pretending every byte is already semantically named
     //
     // Current strongest anchored fields inside that copied block are:
     // - `+0x85 .. +0x94` = shared 16-byte challenge/material family
@@ -37,9 +39,11 @@ struct AuthBootstrapReplyCopyShadowF4Sketch {
     std::array<uint8_t, 16> material85{};
     std::array<uint8_t, 0x13> gap95ToA7{};
     void* raw08PublicKeyWorkerA8 = nullptr;
+    std::array<uint8_t, 0x8a> tailAcTo135{};
 };
 static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, material85) == 0x85);
 static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, raw08PublicKeyWorkerA8) == 0xa8);
+static_assert(sizeof(AuthBootstrapReplyCopyShadowF4Sketch) == 0x136);
 
 struct AuthBootstrap680ChildSketch {
     // Current best source-owned mirror of the separate phase-2 auth/bootstrap child allocated by:

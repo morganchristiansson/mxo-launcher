@@ -470,6 +470,14 @@ public:
     // Source-owned local type-`0x0b` continuation scaffold routed back through connection vtable
     // `+0x10` / `OnOperationCompleted(workItem)`.
     uint32_t DispatchMessageCode4LocalCompletionWorkItemScaffold(uint32_t workPayloadStatus);
+    // anchor: launcher.exe:0x41ce80 -> connection `+0x98`
+    // Source-owned mirror of the margin connection helper that stores a copied `0x136` auth-reply
+    // shadow block for the later state5/state6 raw type-1 send path.
+    bool StoreBootstrapReplyCopy98Scaffold(const void* bytes, size_t byteCount);
+    // anchor: launcher.exe:0x41f30
+    // Source-owned mirror of the later raw type-1 send that prefixes `[0x01][u16 0]` and then
+    // appends the stored `+0x98` `0x136` block through connection vtable `+0x24`.
+    uint32_t SendStoredBootstrapReplyCopy98Scaffold();
     // anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
     // Narrow source-owned mirror of the consumed decoded-code-5 16-byte writeback.
     void SetMessageCode5SeedBytes85Scaffold(const std::array<uint8_t, 16>& value);
@@ -513,6 +521,8 @@ protected:
 
 private:
     bool messageCode4SuccessFlag84Scaffold_ = false;
+    bool hasBootstrapReplyCopy98Scaffold_ = false;
+    std::array<uint8_t, 0x136> bootstrapReplyCopy98Scaffold_{};
     bool hasMessageCode5SeedBytes85Scaffold_ = false;
     std::array<uint8_t, 16> messageCode5SeedBytes85Scaffold_{};
 };

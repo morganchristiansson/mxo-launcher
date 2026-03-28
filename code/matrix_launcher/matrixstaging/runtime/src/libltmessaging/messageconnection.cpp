@@ -1322,6 +1322,63 @@ uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItemScaffold(
     return handled;
 }
 
+// anchor: launcher.exe:0x41ce80 -> connection `+0x98`
+bool CMarginConnection::StoreBootstrapReplyCopy98Scaffold(const void* bytes, size_t byteCount) {
+    if (!bytes || byteCount != bootstrapReplyCopy98Scaffold_.size()) {
+        return false;
+    }
+
+    std::copy_n(
+        static_cast<const uint8_t*>(bytes),
+        bootstrapReplyCopy98Scaffold_.size(),
+        bootstrapReplyCopy98Scaffold_.begin());
+    hasBootstrapReplyCopy98Scaffold_ = true;
+    spdlog::info(
+        "CMarginConnection::StoreBootstrapReplyCopy98Scaffold stored reply-copy block bytes=0x{:03x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(bootstrapReplyCopy98Scaffold_.size()),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return true;
+}
+
+// anchor: launcher.exe:0x41f30
+uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold() {
+    if (!hasBootstrapReplyCopy98Scaffold_) {
+        return 0u;
+    }
+
+    CMessageConnectionEnvelopeScaffold envelope = CMessageConnection::BuildPacketBuilderEnvelopeScaffold(false);
+    if (!envelope.sharedMessage) {
+        return 0u;
+    }
+
+    envelope.sharedMessage->ResetPayloadByteCountScaffold(
+        static_cast<uint16_t>(3u + bootstrapReplyCopy98Scaffold_.size()));
+    uint8_t* payloadBytes = envelope.sharedMessage->PayloadBaseScaffold();
+    if (!payloadBytes) {
+        return 0u;
+    }
+
+    payloadBytes[0] = 0x01u;
+    payloadBytes[1] = 0u;
+    payloadBytes[2] = 0u;
+    std::copy(
+        bootstrapReplyCopy98Scaffold_.begin(),
+        bootstrapReplyCopy98Scaffold_.end(),
+        payloadBytes + 3u);
+
+    const uint32_t sendResult = SendPacketEnvelopeScaffold(envelope);
+    spdlog::info(
+        "CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold sent rawType1PrefixPlusReplyCopy payloadBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(3u + bootstrapReplyCopy98Scaffold_.size()),
+        static_cast<unsigned>(sendResult),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return sendResult;
+}
+
 // anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
 void CMarginConnection::SetMessageCode5SeedBytes85Scaffold(const std::array<uint8_t, 16>& value) {
     messageCode5SeedBytes85Scaffold_ = value;

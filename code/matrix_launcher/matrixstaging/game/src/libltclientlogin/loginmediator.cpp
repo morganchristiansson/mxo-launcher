@@ -2872,6 +2872,10 @@ void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mx
     AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(*this, reply);
 }
 
+const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
+    return authBootstrapChild680_.authReplyCopyShadowF4;
+}
+
 // UNANCHORED: source-owned table mirror fed from parsed auth reply worlds
 void CLTLoginMediator::SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world) {
     if (worldIndex >= worldDescriptorsD84_.size()) {
