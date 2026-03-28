@@ -190,11 +190,15 @@ struct CMessageConnectionPacketAgendaScaffold {
     // Current best narrowed shape from `0x448980 -> 0x469b10 -> 0x469850 -> 0x469740`:
     // - object is lazy-created, not constructor-owned
     // - object has distinct read/write helper sides
+    // - read side always has an embedded default pass-through helper at agenda `+0x0c`
     // - receive path `0x4490c0` consults the read side through `0x469930` and then swaps the
     //   returned message-ref through `0x4489d0` before leaf dispatch
     // - send path `0x448cf0` consults the write side through `0x469950` and may replace/discard
-    //   the outgoing envelope
+    //   the outgoing envelope when an active write helper exists at agenda `+0x44`
     bool created = false;
+    // Current source meaning of these counts:
+    // - they track the known caller-installed helper pair forwarded through `0x469740`
+    // - they do not count the embedded default read pass-through helper at agenda `+0x0c`
     uint32_t configuredReadHelperCount = 0;
     uint32_t configuredWriteHelperCount = 0;
 };
@@ -264,6 +268,10 @@ public:
     // anchor: launcher.exe:0x448cf0
     // Narrow source-owned mirror of the envelope-based `CMessageConnection::SendPacket` family.
     // Original input is a local envelope / shared-message object, not a bare byte span.
+    // Current bounded send-side tightening also preserves the nearer packet-agenda write seam:
+    // - if connection `+0x74` exists, `0x448cf0` consults `0x469950` before submit
+    // - source now keeps that handoff shape explicit even though helper-side replacement/discard is
+    //   still pass-through-only in source
     uint32_t SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
 
     // anchor: launcher.exe:0x448960
@@ -353,8 +361,15 @@ private:
     // UNANCHORED: source-owned helper that maps the diagnostic family enum onto the currently known
     // original callback bodies stored at connection `+0x70`.
     static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamilyScaffold family);
-    // UNANCHORED: source-owned packet-agenda pass/filter scaffold helper.
-    bool PacketAgendaAllowsEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) const;
+    // UNANCHORED: source-owned send-side packet-agenda handoff helper.
+    // Current bounded model preserves the nearer `0x469950` shape:
+    // - no active write helper => keep the original envelope
+    // - active write helper => preserve the handoff/swap seam but currently pass the same envelope
+    //   through until helper-side transformation/discard is recovered
+    bool ApplySendPacketAgendaScaffold(
+        const CMessageConnectionEnvelopeScaffold& inputEnvelope,
+        CMessageConnectionEnvelopeScaffold* outputEnvelope,
+        bool* outAgendaTouched) const;
     // UNANCHORED: source-owned lower submit helper beneath SendPacketEnvelopeScaffold.
     // Current best original helper is `0x448a00`.
     uint32_t SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope);

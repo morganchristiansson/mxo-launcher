@@ -178,8 +178,10 @@ void CMessageConnection::ConfigurePacketAgendaScaffold(const void* agendaConfigu
         // Current best known original builder path (`0x41470 -> 0x44da00`) installs both a read
         // helper and a write helper on the agenda configuration object before `0x448980` forwards
         // it into the agenda at connection `+0x74`.
-        // Source still accepts a typeless pointer here, so keep the modeled helper presence
-        // conservative: null => no helpers known, non-null => one read + one write helper known.
+        // Source still accepts a typeless pointer here, so keep the modeled caller-installed helper
+        // presence conservative: null => no extra helpers known, non-null => one read + one write
+        // helper known. The embedded default read pass-through helper is treated as part of agenda
+        // creation itself and is not counted here.
         packetAgendaScaffold_->configuredReadHelperCount = (agendaConfiguration != nullptr) ? 1u : 0u;
         packetAgendaScaffold_->configuredWriteHelperCount = (agendaConfiguration != nullptr) ? 1u : 0u;
     }
@@ -228,15 +230,33 @@ CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPayloadEnvelopeScaff
     return envelope;
 }
 
-bool CMessageConnection::PacketAgendaAllowsEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) const {
+bool CMessageConnection::ApplySendPacketAgendaScaffold(
+    const CMessageConnectionEnvelopeScaffold& inputEnvelope,
+    CMessageConnectionEnvelopeScaffold* outputEnvelope,
+    bool* outAgendaTouched) const {
+    if (outAgendaTouched) {
+        *outAgendaTouched = false;
+    }
+    if (outputEnvelope) {
+        *outputEnvelope = inputEnvelope;
+    }
+
     // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
-    // Newer tightening now makes that connection-side metadata explicit too:
-    // - `0x448980` lazy-creates the `+0x74` agenda object
-    // - `0x469950` runs the send-side write-helper chain and may return a replaced or null packet
-    // Current source model still keeps the active path pass-through, but it now preserves whether
-    // we have even modeled the presence of that agenda object on the connection and whether a
-    // write helper was ever configured there.
-    (void)envelope;
+    // Current bounded source model preserves the nearer `0x469950` handoff shape:
+    // - no agenda / no active write helper (`+0x44 == 0`) => keep the original envelope
+    // - active write helper => preserve the handoff/swap seam, but still pass the same envelope
+    //   through until helper-side replacement/discard behavior is recovered
+    const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
+    if (!agenda || !agenda->created) {
+        return true;
+    }
+    if (agenda->configuredWriteHelperCount == 0u) {
+        return true;
+    }
+
+    if (outAgendaTouched) {
+        *outAgendaTouched = true;
+    }
     return true;
 }
 
@@ -285,26 +305,29 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         return 0u;
     }
 
-    if (!PacketAgendaAllowsEnvelopeScaffold(envelope)) {
+    CMessageConnectionEnvelopeScaffold agendaEnvelope = {};
+    bool agendaTouched = false;
+    if (!ApplySendPacketAgendaScaffold(envelope, &agendaEnvelope, &agendaTouched) ||
+        !agendaEnvelope.sharedMessage) {
         spdlog::info(
-            "CMessageConnection::SendPacketEnvelopeScaffold discarded packet because packet-agenda reconstruction is still missing this={} ownerContext={} remoteHost='{}'",
+            "CMessageConnection::SendPacketEnvelopeScaffold discarded packet at packet-agenda write handoff this={} ownerContext={} remoteHost='{}'",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
         return 0u;
     }
 
-    const std::vector<uint8_t> framedBytesFrom0a = envelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
+    const std::vector<uint8_t> framedBytesFrom0a = agendaEnvelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
     const size_t submitOffset = (framedBytesFrom0a.empty() || ((framedBytesFrom0a[0] >> 7) != 0u)) ? 0u : 1u;
     const size_t opcodeIndex = submitOffset + ((submitOffset == 0u) ? 2u : 1u);
     const uint8_t rawOpcode = (opcodeIndex < framedBytesFrom0a.size()) ? framedBytesFrom0a[opcodeIndex] : 0u;
     const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
     spdlog::info(
-        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(envelope.headerless10),
+        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(agendaEnvelope.headerless10),
         static_cast<unsigned>(rawOpcode),
-        static_cast<unsigned>(envelope.sharedMessage->reservedBytes08),
-        static_cast<unsigned>(envelope.sharedMessage->PayloadByteCountScaffold()),
+        static_cast<unsigned>(agendaEnvelope.sharedMessage->reservedBytes08),
+        static_cast<unsigned>(agendaEnvelope.sharedMessage->PayloadByteCountScaffold()),
         static_cast<unsigned>(framedBytesFrom0a.size()),
         static_cast<uint32_t>(packetNameCallbackScaffold_),
         PacketNameFamilyToString(PacketNameFamilyScaffold()),
@@ -312,10 +335,11 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         (agenda && agenda->created) ? 1u : 0u,
         agenda ? static_cast<unsigned>(agenda->configuredReadHelperCount) : 0u,
         agenda ? static_cast<unsigned>(agenda->configuredWriteHelperCount) : 0u,
+        agendaTouched ? 1u : 0u,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return SubmitEnvelopeBytesScaffold(envelope);
+    return SubmitEnvelopeBytesScaffold(agendaEnvelope);
 }
 
 // anchor: launcher.exe:0x448a60
@@ -784,9 +808,10 @@ static void CMessageConnection_AssignReceivedMessageRefScaffold(
 // anchor: launcher.exe:0x469930
 // Source-owned mirror of the read-side packet-agenda handoff just before leaf dispatch.
 // Current bounded source model:
-// - if no read helper is configured, keep the input message-ref unchanged
-// - if a read helper is configured, preserve the original handoff/swap shape but still pass the
-//   same message-ref through until helper transformation/discard behavior is recovered
+// - a created agenda always has the embedded default read pass-through helper at `+0x0c`, so the
+//   handoff is still touched even when no caller-installed read helper is present
+// - caller-installed read helpers are still modeled as pass-through-only until helper-side
+//   transformation/discard behavior is recovered
 static bool CMessageConnection_ApplyReceivePacketAgendaScaffold(
     const CMessageConnectionPacketAgendaScaffold* agenda,
     const CMessageConnectionReceivedMessageRefScaffold& inputMessageRef,
@@ -800,7 +825,7 @@ static bool CMessageConnection_ApplyReceivePacketAgendaScaffold(
     }
 
     CMessageConnection_AssignReceivedMessageRefScaffold(outputMessageRef, inputMessageRef);
-    if (!agenda || agenda->configuredReadHelperCount == 0u) {
+    if (!agenda || !agenda->created) {
         return true;
     }
 
