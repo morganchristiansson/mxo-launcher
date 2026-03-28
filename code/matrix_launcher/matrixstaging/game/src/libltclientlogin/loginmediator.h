@@ -513,8 +513,6 @@ public:
     // ============================================================================
     const void* lastNopatchValue1Ptr_ = nullptr;  // +0x1c / Mediator_SetValue1
     const void* lastNopatchValue2Ptr_ = nullptr;  // +0x20 / Mediator_SetValue2
-    uint32_t lastStatus178_ = 0u;                 // +0x178 / Mediator_GetLastLoginStatus
-    uint32_t statusQuery178Count_ = 0u;           // +0x178 / Mediator_GetLastLoginStatus
     mutable bool bootstrapRaw08AuxHandle50Logged_ = false; // +0x50 change-log state moved from ABI wrapper
     mutable void* lastBootstrapRaw08AuxHandle50_ = nullptr; // +0x50 last logged value moved from ABI wrapper
     mutable bool liveCuiCfgAbsentNoteLogged90_ = false;     // +0x90 one-shot caveat log moved from ABI wrapper
@@ -522,8 +520,6 @@ public:
     // Accessors for migrated state fields (diagnostics only)
     const void* LastNopatchValue1Ptr() const;
     const void* LastNopatchValue2Ptr() const;
-    uint32_t LastStatus178() const;
-    uint32_t StatusQuery178Count() const;
 
     // +0x00
     const char* GetName() override;

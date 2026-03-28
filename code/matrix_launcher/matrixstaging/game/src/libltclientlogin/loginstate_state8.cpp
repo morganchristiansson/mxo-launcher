@@ -616,9 +616,6 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     auto& ownerState = mediator->MutablePostAuthMarginLoadingState();
     ownerState.worldListCountOrStatus80 = parsed.status;
     if (parsed.status >= 1u) {
-        replySectionsSeen_ = 0;
-        replySectionsExpected_ = 0;
-        ownerState.state8Section10ChunkBitmap = 0u;
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
             mediator->SwitchHelperStateScaffold(3u, failureState);
         }

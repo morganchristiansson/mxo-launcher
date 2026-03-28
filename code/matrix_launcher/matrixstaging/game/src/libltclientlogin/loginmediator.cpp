@@ -1217,19 +1217,9 @@ bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
 // anchor: launcher.exe:0x41f240
 // vtable: ILTLoginMediator.Default slot +0x178
 uint32_t CLTLoginMediator::GetLastLoginStatus() {
-    const uint32_t status = this->WorldListCountOrStatus80();
-    this->lastStatus178_ = status;
-    ++this->statusQuery178Count_;
-    if (status != 0u) {
-        spdlog::info("CLTLoginMediator::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
-            status,
-            this->statusQuery178Count_);
-    } else {
-        spdlog::debug("CLTLoginMediator::GetLastLoginStatus(+0x178) -> 0x{:08x} [count={}]",
-            status,
-            this->statusQuery178Count_);
-    }
-    return status;
+    // Keep this wrapper-facing slot as close as practical to the original tiny getter
+    // `0x41f240: mov eax, [ecx+0x80] ; ret`.
+    return this->WorldListCountOrStatus80();
 }
 
 
@@ -1838,16 +1828,6 @@ const void* CLTLoginMediator::LastNopatchValue1Ptr() const {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const void* CLTLoginMediator::LastNopatchValue2Ptr() const {
     return lastNopatchValue2Ptr_;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::LastStatus178() const {
-    return lastStatus178_;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::StatusQuery178Count() const {
-    return statusQuery178Count_;
 }
 
 // anchor: launcher.exe:0x41f310
