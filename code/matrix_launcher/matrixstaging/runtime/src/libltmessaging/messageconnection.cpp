@@ -550,9 +550,10 @@ uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
 //   - base `0x4490c0` now offers a leaf post-copy dispatch seam
 //   - auth leaf `0x449a30 -> owner+0x180 / 0x41f250` can now re-enter current-helper slot 5
 //     directly from this callback on the handled auth path
-// - remaining message-object / agenda / margin-leaf dispatch work is still incomplete, so the
-//   launcher bridge still keeps the later synthetic receive-drain proxy for the paths that are not
-//   yet consumed here
+//   - margin leaf `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260` can now re-enter the nearer
+//     base-dispatch/current-helper-slot6 path directly from this callback on the handled margin path
+// - remaining message-object / agenda work is still incomplete, so the launcher bridge still keeps
+//   the later synthetic receive-drain proxy for the paths that are not yet consumed here
 uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
@@ -837,6 +838,38 @@ CLTThreadPerClientTCPEngine* CMarginConnection::MarginEngine() const {
     return CMessageConnection::Engine();
 }
 
+// anchor: launcher.exe:0x44af20 -> 0x442d00 -> owner vtable `+0x184` / `0x41f260`
+uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
+    void* workItem,
+    const std::vector<uint8_t>& payloadBytes,
+    bool headerless) {
+    (void)workItem;
+
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        CMessageConnection_LoginMediatorContextScaffold(this);
+    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    if (!context || !mediator || !context->isMarginConnection || payloadBytes.empty()) {
+        return 0u;
+    }
+
+    const uint8_t rawCode = payloadBytes[0];
+    const uint32_t handled = mediator->StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
+        payloadBytes.data(),
+        payloadBytes.size(),
+        /*workItem=*/nullptr);
+    spdlog::info(
+        "CMarginConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} payloadBytes={} headerless={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+        static_cast<unsigned>(rawCode),
+        static_cast<unsigned>(payloadBytes.size()),
+        headerless ? 1u : 0u,
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        fmt::ptr(mediator->CurrentState()),
+        handled,
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return handled;
+}
+
 // anchor: launcher.exe:0x44af60
 // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
 // Current source body keeps only the proven base-first order explicit; the owner `+0x188` fallback
@@ -873,8 +906,11 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
 
 // anchor: launcher.exe:0x44af20
 // Later leaf dispatch override on top of the unmodeled `CBaseMarginConnection` dispatch family.
-// Current source body keeps the one-argument message-ref shape explicit and leaves the base / owner
-// fallback chain unimplemented.
+// Current source note:
+// - the staged-payload equivalent of this later destination is now owned one step earlier through
+//   `DispatchCopiedParsedPacketTailScaffold(...)`
+// - this literal one-argument message-ref form still remains unmodeled until source reconstructs
+//   the original message object created inside `0x4490c0`
 uint32_t CMarginConnection::DispatchMessage(void* messageRef) {
     if (!messageRef) {
         return 0u;

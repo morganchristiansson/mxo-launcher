@@ -1576,10 +1576,13 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
     // - the extra `AuthReceivePacket` / `MarginReceivePacket` submission below is therefore only a
     //   source-owned receive-drain proxy for the later original `0x4490c0` dispatch tail that
     //   source still does not execute on that same callback
-    // - newer bounded auth-side correction now source-owns one later destination from that tail:
-    //   handled auth copied packets can re-enter `0x449a30 -> owner+0x180 / 0x41f250`
-    //   directly from the connection callback, so the later auth synthetic receive-drain item is
-    //   increasingly a fallback/no-op path rather than the primary live consumer
+    // - newer bounded leaf-side corrections now source-own two later destinations from that tail:
+    //   - handled auth copied packets can re-enter
+    //     `0x449a30 -> owner+0x180 / 0x41f250`
+    //   - handled margin copied packets can re-enter
+    //     `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
+    // - so the later synthetic receive-drain item is increasingly a fallback/no-op path rather
+    //   than the primary live consumer on those handled branches
     // - current source queue order on one helper poll is therefore:
     //   - `OnReceive` first queues all parsed-packet work items emitted from the current fragment
     //   - then this helper queues one synthetic receive-drain proxy for that same fragment

@@ -665,6 +665,12 @@ public:
         const uint8_t* packetBytes,
         size_t packetSize,
         void* workItem = nullptr);
+    // UNANCHORED: source-owned staging wrapper for the narrowed margin-side
+    // `0x4490c0 -> 0x44af20 -> 0x442d00 -> 0x41f260` post-copy receive seam.
+    uint32_t StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
+        const uint8_t* packetBytes,
+        size_t packetSize,
+        void* workItem = nullptr);
 
     struct ActiveCharacterStateViewScaffold {
         const char* characterName = nullptr;
@@ -1068,6 +1074,11 @@ public:
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
     uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    // Current margin receive handling is now split like auth:
+    // - handled copied packets can already re-enter the nearer connection/leaf path
+    //   `0x44af20 -> 0x442d00 -> 0x41f260`
+    // - this drain helper remains the later fallback consumer for packets/branches not yet handled
+    //   there directly
     uint32_t HandleMarginConnectionReceiveScaffold();
 
     // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6

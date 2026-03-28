@@ -282,10 +282,12 @@ public:
     //   `CParsedPacketWorkItem` via `+0x24/+0x28` before later dispatch/agenda handling
     // - generic fallback logger on this path is helper `0x448a60`
     // Current source gap kept explicit:
-    // - source now owns the copied-packet staging subset and one later auth-leaf post-copy
-    //   destination (`0x449a30 -> owner+0x180 / 0x41f250`)
-    // - later original message-object / agenda / margin-dispatch work from this same callback is
-    //   still missing, so the launcher bridge keeps one extra synthetic receive-drain proxy item
+    // - source now owns the copied-packet staging subset and two later leaf post-copy destinations:
+    //   - auth: `0x449a30 -> owner+0x180 / 0x41f250`
+    //   - margin: `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
+    // - later original message-object / agenda work from this same callback is still missing, so
+    //   the launcher bridge keeps one extra synthetic receive-drain proxy item for the remaining
+    //   unconsumed paths
     uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
@@ -411,6 +413,18 @@ public:
     // - call `CBaseMarginConnection::DispatchMessage(this, messageRef)` (`0x442d00`)
     // - if that returns 0, call owner `+0x184(messageRef)`
     uint32_t DispatchMessage(void* messageRef);
+
+protected:
+    // anchor: launcher.exe:0x44af20 -> 0x442d00 -> owner vtable `+0x184` / `0x41f260`
+    // Current bounded margin-side correction:
+    // - after base `0x4490c0` finishes the parsed-packet copy, the margin leaf can now re-enter
+    //   the nearer base-dispatch/current-helper-slot6 path directly from the connection callback
+    // - current source still does not materialize the original message-ref object, so this remains
+    //   a staged-payload mirror of that later destination rather than a byte-faithful `0x44af20`
+    uint32_t DispatchCopiedParsedPacketTailScaffold(
+        void* workItem,
+        const std::vector<uint8_t>& payloadBytes,
+        bool headerless) override;
 };
 
 }  // namespace mxo::liblttcp

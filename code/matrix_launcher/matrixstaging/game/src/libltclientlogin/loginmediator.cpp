@@ -1270,6 +1270,26 @@ uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
     return handled;
 }
 
+uint32_t CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    void* workItem) {
+    (void)workItem;
+    if (!packetBytes || packetSize == 0u) {
+        return 0u;
+    }
+
+    const uint8_t rawCode = packetBytes[0];
+    const uint32_t handled = HandleMarginPacketBytes(packetBytes, packetSize);
+    spdlog::info(
+        "CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={}",
+        static_cast<unsigned>(rawCode),
+        static_cast<unsigned>(packetSize),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(handled));
+    return handled;
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::State6UdpSessionSecretF18() const {
     const auto it = g_marginBootstrapStateByMediator.find(this);
