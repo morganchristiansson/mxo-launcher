@@ -452,6 +452,68 @@ static CLTTCPReadOperationFragmentScaffold* ParsedPacketWorkItem_GetNextFragment
     return nullptr;
 }
 
+// UNANCHORED: source-owned rebase helper for the parser-owned work item after prefix consumption.
+// Static RE of `0x4490c0` now confirms the consumer begins from
+// `CParsedPacketWorkItem_BeginFragmentTraversal -> firstRetainedFragment10`, so when prefix consume
+// advances the parser cursor into a later retained fragment we must also drop the fully consumed
+// leading fragments from the current work item rather than teaching the consumer to search for a
+// later cursor fragment.
+static bool ParsedPacketWorkItem_RebaseFirstFragmentToScaffold(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationFragmentScaffold* firstFragmentToKeep) {
+    if (!workItem || !firstFragmentToKeep || workItem->retainedFragmentCount0C == 0u ||
+        workItem->firstRetainedFragment10 == firstFragmentToKeep) {
+        return true;
+    }
+
+    std::vector<CLTTCPReadOperationFragmentScaffold*> keptFragments;
+    for (CLTTCPReadOperationFragmentScaffold* fragment = firstFragmentToKeep;
+         fragment != nullptr;
+         fragment = ParsedPacketWorkItem_GetNextFragmentAfterScaffold(workItem, fragment)) {
+        ReadOperationFragment_AddRef(fragment);
+        keptFragments.push_back(fragment);
+    }
+    if (keptFragments.empty()) {
+        return false;
+    }
+
+    if (workItem->firstRetainedFragment10) {
+        ReadOperationFragment_Release(workItem->firstRetainedFragment10);
+        workItem->firstRetainedFragment10 = nullptr;
+    }
+
+    if (workItem->retainedFragmentListOwner14) {
+        CParsedPacketWorkItem_RetainedFragmentNodeScaffold* sentinel =
+            workItem->retainedFragmentListOwner14->sentinel;
+        if (sentinel) {
+            CParsedPacketWorkItem_RetainedFragmentNodeScaffold* node = sentinel->next;
+            while (node && node != sentinel) {
+                CParsedPacketWorkItem_RetainedFragmentNodeScaffold* next = node->next;
+                ReadOperationFragment_Release(node->retainedFragment08);
+                std::free(node);
+                node = next;
+            }
+            std::free(sentinel);
+        }
+        std::free(workItem->retainedFragmentListOwner14);
+        workItem->retainedFragmentListOwner14 = nullptr;
+    }
+
+    workItem->retainedFragmentCount0C = 0u;
+    workItem->directFragmentTraversalPhase18 = 1u;
+    workItem->fragmentTraversalIndex1C = 0u;
+    workItem->fragmentTraversalNode20 = nullptr;
+
+    for (CLTTCPReadOperationFragmentScaffold* fragment : keptFragments) {
+        const bool appended = ParsedPacketWorkItem_AppendFragmentScaffold(workItem, fragment);
+        ReadOperationFragment_Release(fragment);
+        if (!appended) {
+            return false;
+        }
+    }
+    return true;
+}
+
 // UNANCHORED: source-owned cursor normalization helper for the recovered parser prefix.
 static bool Parser_NormalizeCursorFragmentScaffold(
     CVariableLengthPrefixedTCPStreamParserScaffold* parser) {
@@ -1171,6 +1233,18 @@ uint32_t CLTTCPConnection::ParseReadOperationFragmentScaffold(
                 static_cast<unsigned>(packetBodyByteCount),
                 static_cast<unsigned>(currentWorkItem->retainedFragmentCount0C));
             return 0x7000000u;
+        }
+        if (parserScaffold_.currentCursorFragment04 &&
+            !ParsedPacketWorkItem_RebaseFirstFragmentToScaffold(
+                currentWorkItem,
+                parserScaffold_.currentCursorFragment04)) {
+            spdlog::debug(
+                "CLTTCPConnection::ParseReadOperationFragmentScaffold failed to rebase current work-item first fragment after prefix consume this={} retainedFragmentCount={} currentCursorFragment={} currentCursor={}",
+                fmt::ptr(this),
+                static_cast<unsigned>(currentWorkItem->retainedFragmentCount0C),
+                fmt::ptr(parserScaffold_.currentCursorFragment04),
+                fmt::ptr(parserScaffold_.currentCursor08));
+            return 1u;
         }
     }
 

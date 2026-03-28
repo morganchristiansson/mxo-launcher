@@ -1512,7 +1512,12 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
         return;
     }
 
-    const int received = context->sidecarConnection->PollReceiveNonBlocking();
+    // Keep the launcher bridge on the original-shaped fragment-delivery receive seam.
+    // Local source scaffolding now repairs the parser-owned work-item invariant needed by
+    // `CMessageConnection::OnOperationCompleted`, so this path can stay closer to `0x42fe50`
+    // instead of falling back to the older raw-buffer bridge.
+    const int received =
+        context->sidecarConnection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
     if (received > 0) {
         (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
             context,
