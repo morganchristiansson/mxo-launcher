@@ -1055,6 +1055,11 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
     - worker-thread TCP receive subpath actually takes **two** refs before the callback:
       - one worker-owned outer ref immediately after allocation/setup
       - one delivery-temp ref immediately before the vtable `+0x14` / `OnReceive` call
+    - source now also mirrors one more concrete worker-side detail there:
+      - recv lands directly into fragment `+0x0c` instead of first copying through a
+        connection-owned staging vector
+    - the original same-poll recv-drain loop is still a separate follow-up target on the launcher
+      bridge path
     - early `param_1->+0x04` inside `0x449d40` is now best read as another **no-arg AddRef only**
       on that fragment
       - the stack dwords prepared around that call remain in place for the immediately following

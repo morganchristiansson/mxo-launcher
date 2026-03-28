@@ -297,11 +297,14 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     }
 
     // Current bounded fidelity step from `0x42fe50`:
-    // - recv now lands directly into the `CLTTCPReadOperation` fragment payload instead of first
+    // - recv lands directly into the `CLTTCPReadOperation` fragment payload instead of first
     //   copying through a connection-owned staging vector
     // - we also keep the two worker-side refs proved on the TCP success path:
     //   - one outer worker-owned ref immediately after allocation/setup
     //   - one delivery-temp ref immediately before `OnReceive`
+    // The original same-poll recv-drain loop remains a separate follow-up; the live launcher
+    // bridge currently still advances one successful recv iteration per pump so game entry stays
+    // stable while the larger worker-thread fidelity work remains isolated.
     CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
     const int received = recv(
         socket,
