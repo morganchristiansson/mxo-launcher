@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
-#include <cstring>
 
 #include "spdlog/spdlog.h"
 
@@ -173,7 +172,6 @@ CLTTCPConnection::CLTTCPConnection()
       socketHandle_(kInvalidSocketHandle),
       remoteEndpoint_(),
       remoteHostName_(),
-      receivedBytes_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family that also seeds the
@@ -185,7 +183,6 @@ CLTTCPConnection::CLTTCPConnection(void* ownerContext)
       socketHandle_(kInvalidSocketHandle),
       remoteEndpoint_(),
       remoteHostName_(),
-      receivedBytes_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
 // anchor: launcher.exe:0x44ac40
@@ -269,9 +266,8 @@ const std::string& CLTTCPConnection::RemoteHostName() const {
     return remoteHostName_;
 }
 
-// UNANCHORED: internal socket-read helper that fills the connection-owned buffered-byte staging
-// used by the faithful `0x42fe50 -> 0x449d40 -> 0x469bf0` receive seam.
-int CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold() {
+// anchor: launcher.exe:0x42fe50 TCP receive subpath
+int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     if (socketHandle_ == kInvalidSocketHandle ||
         (state_ != LTTCPEngineConnectionState::kConnectActive &&
          state_ != LTTCPEngineConnectionState::kUdpMonitorActive)) {
@@ -290,59 +286,33 @@ int CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold() {
         return 0;
     }
 
-    u_long available = 0;
-    if (ioctlsocket(socket, FIONREAD, &available) != 0) {
+    CLTTCPReadOperationFragmentScaffold* readOperationFragment =
+        AllocateReadOperationFragmentSourceScaffold();
+    if (!readOperationFragment) {
+        spdlog::warn(
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold failed fragment allocation this={} remoteHost='{}'",
+            fmt::ptr(this),
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
         return 0;
     }
 
-    if (available == 0) {
-        char probeByte = 0;
-        const int peekResult = recv(socket, &probeByte, 1, MSG_PEEK);
-        if (peekResult == 0) {
-            spdlog::info(
-                "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold peer closed socket=0x{:08x} remoteHost='{}'",
-                socketHandle_,
-                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
-            state_ = LTTCPEngineConnectionState::kClosed;
-            closesocket(socket);
-            socketHandle_ = kInvalidSocketHandle;
-            return -1;
-        }
-        if (peekResult == SOCKET_ERROR) {
-            const int wsaError = WSAGetLastError();
-            if (wsaError == WSAEWOULDBLOCK) {
-                return 0;
-            }
-            spdlog::warn(
-                "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold recv(MSG_PEEK) failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
-                socketHandle_,
-                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
-                wsaError);
-            state_ = LTTCPEngineConnectionState::kClosed;
-            closesocket(socket);
-            socketHandle_ = kInvalidSocketHandle;
-            return -1;
-        }
-        available = 1;
-    }
-
-    const int toRead = static_cast<int>(std::min<u_long>(available, 4096));
-    if (toRead <= 0) {
-        return 0;
-    }
-
-    const size_t oldSize = receivedBytes_.size();
-    receivedBytes_.resize(oldSize + static_cast<size_t>(toRead));
+    // Current bounded fidelity step from `0x42fe50`:
+    // - recv now lands directly into the `CLTTCPReadOperation` fragment payload instead of first
+    //   copying through a connection-owned staging vector
+    // - we also keep the two worker-side refs proved on the TCP success path:
+    //   - one outer worker-owned ref immediately after allocation/setup
+    //   - one delivery-temp ref immediately before `OnReceive`
+    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
     const int received = recv(
         socket,
-        reinterpret_cast<char*>(receivedBytes_.data() + oldSize),
-        toRead,
+        reinterpret_cast<char*>(readOperationFragment->bytes0C),
+        0x1000,
         0);
     if (received <= 0) {
-        receivedBytes_.resize(oldSize);
+        CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
         if (received == 0) {
             spdlog::info(
-                "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold recv returned EOF socket=0x{:08x} remoteHost='{}'",
+                "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv returned EOF socket=0x{:08x} remoteHost='{}'",
                 socketHandle_,
                 remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
             state_ = LTTCPEngineConnectionState::kClosed;
@@ -356,7 +326,7 @@ int CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold() {
             return 0;
         }
         spdlog::warn(
-            "CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold recv failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
             socketHandle_,
             remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             wsaError);
@@ -366,68 +336,13 @@ int CLTTCPConnection::ReceiveBufferedSocketBytesNonBlockingScaffold() {
         return -1;
     }
 
-    receivedBytes_.resize(oldSize + static_cast<size_t>(received));
+    ReadOperationFragmentSource_SetByteCountScaffold(
+        readOperationFragment,
+        static_cast<uint32_t>(received));
+    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
+    OnReceive(readOperationFragment);
+    CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
     return received;
-}
-
-// anchor: launcher.exe:0x42fe50 TCP receive subpath
-int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
-    const int received = ReceiveBufferedSocketBytesNonBlockingScaffold();
-    if (received <= 0) {
-        return received;
-    }
-
-    size_t consumedBytes = 0u;
-    while (consumedBytes < receivedBytes_.size()) {
-        const size_t chunkByteCount = std::min<size_t>(receivedBytes_.size() - consumedBytes, 0x1000u);
-        CLTTCPReadOperationFragmentScaffold* readOperationFragment =
-            AllocateReadOperationFragmentSourceScaffold();
-        if (!readOperationFragment) {
-            spdlog::warn(
-                "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold failed fragment allocation this={} bufferedBytes={} remoteHost='{}'",
-                fmt::ptr(this),
-                static_cast<unsigned>(receivedBytes_.size() - consumedBytes),
-                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
-            break;
-        }
-
-        // `0x42fe50` keeps two worker-side refs on the TCP path around the OnReceive callback:
-        // - one outer worker-thread ref taken immediately after allocation/setup
-        // - one delivery temp ref taken just before the vtable `+0x14` callback
-        // Then the success path drops only the delivery temp after `OnReceive` returns.
-        // Restoring that second worker-side ref is what makes the parser-side
-        // `0x435e60` trailing `Release(param_1)` viable again on the live path.
-        CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
-        std::memcpy(
-            readOperationFragment->bytes0C,
-            receivedBytes_.data() + consumedBytes,
-            chunkByteCount);
-        ReadOperationFragmentSource_SetByteCountScaffold(
-            readOperationFragment,
-            static_cast<uint32_t>(chunkByteCount));
-        CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
-        OnReceive(readOperationFragment);
-        CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
-        consumedBytes += chunkByteCount;
-    }
-
-    if (consumedBytes != 0u) {
-        ConsumeBufferedSocketBytesPrefixScaffold(consumedBytes);
-    }
-    return received;
-}
-
-// UNANCHORED: internal buffered-byte prefix-consumption helper used after staged fragment
-// delivery drains bytes out of the connection-owned socket-read staging.
-void CLTTCPConnection::ConsumeBufferedSocketBytesPrefixScaffold(size_t byteCount) {
-    if (byteCount == 0u) {
-        return;
-    }
-    if (byteCount >= receivedBytes_.size()) {
-        receivedBytes_.clear();
-        return;
-    }
-    receivedBytes_.erase(receivedBytes_.begin(), receivedBytes_.begin() + static_cast<std::ptrdiff_t>(byteCount));
 }
 
 // anchor: launcher.exe:0x449ca0

@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <vector>
 
 namespace mxo::liblttcp {
 
@@ -273,19 +272,11 @@ public:
     void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 
 private:
-    // UNANCHORED: internal socket-read helper that fills the connection-owned buffered-byte staging
-    // used by the faithful `0x42fe50 -> 0x449d40 -> 0x469bf0` receive seam.
-    int ReceiveBufferedSocketBytesNonBlockingScaffold();
-    // UNANCHORED: internal buffered-byte prefix-consumption helper used after staged fragment
-    // delivery drains bytes out of the connection-owned socket-read staging.
-    void ConsumeBufferedSocketBytesPrefixScaffold(size_t byteCount);
-
     CLTThreadPerClientTCPEngine* engine_;
     void* ownerContext_;
     uint32_t socketHandle_;
     LTTCPEndpointKey remoteEndpoint_;
     std::string remoteHostName_;
-    std::vector<uint8_t> receivedBytes_;
     // High-confidence original seam: `CLTTCPConnection_ctor` stores a concrete
     // `CVariableLengthPrefixedTCPStreamParser` object pointer at connection `+0x6c`.
     CVariableLengthPrefixedTCPStreamParser* parser06c_;
