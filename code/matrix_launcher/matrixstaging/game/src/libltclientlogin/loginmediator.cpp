@@ -356,6 +356,7 @@ CLTLoginMediator::CLTLoginMediator()
       expectedMarginRequestName_(nullptr),
       worldSlots_{},
       worldPayloadSlots_{} {
+    InitializeObserverTree674();
     SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
     InitializeArg6DefaultObject();
@@ -364,6 +365,7 @@ CLTLoginMediator::CLTLoginMediator()
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::~CLTLoginMediator() {
     ResetLauncherConnectionBridgeScaffold();
+    ClearObserverTree674();
     EraseMarginBootstrapState(this);
     AuthBootstrap680Ops::EraseSidecar(this);
 }

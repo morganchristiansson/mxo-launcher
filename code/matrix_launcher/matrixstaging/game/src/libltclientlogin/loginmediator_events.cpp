@@ -6,8 +6,8 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
-#include <vector>
 
 namespace mxo::ltlogin {
 namespace {
@@ -40,14 +40,28 @@ static std::string BuildRecentEventHistoryPreview(const std::array<uint32_t, 8>&
 using LoginObserverOnEventFn = void(__thiscall*)(void*, uint32_t);
 using LoginObserverOnErrorFn = void(__thiscall*)(void*, uint32_t);
 
-static std::vector<void*> g_registeredLoginObservers;
-
-static std::vector<void*>& MutableRegisteredLoginObservers() {
-    return g_registeredLoginObservers;
+static uintptr_t ObserverTreeKey(void* observer) {
+    return reinterpret_cast<uintptr_t>(observer);
 }
 
-static const std::vector<void*>& RegisteredLoginObservers() {
-    return g_registeredLoginObservers;
+static LoginObserverTreeNode674* ObserverTreeMinimum(LoginObserverTreeNode674* node) {
+    if (!node) {
+        return nullptr;
+    }
+    while (node->left08 != nullptr) {
+        node = node->left08;
+    }
+    return node;
+}
+
+static LoginObserverTreeNode674* ObserverTreeMaximum(LoginObserverTreeNode674* node) {
+    if (!node) {
+        return nullptr;
+    }
+    while (node->right0c != nullptr) {
+        node = node->right0c;
+    }
+    return node;
 }
 
 static void** GetLoginObserverVtable(void* observer) {
@@ -88,6 +102,194 @@ static void DispatchLoginObserverError(void* observer, uint32_t errorId) {
 }
 
 }  // namespace
+
+// UNANCHORED: source-owned std::_Tree-like initialization for the recovered owner `+0x674`
+// observer container scaffold.
+void CLTLoginMediator::InitializeObserverTree674() {
+    observerTree674_.header00 = &observerTreeHeader674_;
+    observerTree674_.count04 = 0u;
+    observerTreeHeader674_.reserved00 = nullptr;
+    observerTreeHeader674_.parent04 = nullptr;
+    observerTreeHeader674_.left08 = &observerTreeHeader674_;
+    observerTreeHeader674_.right0c = &observerTreeHeader674_;
+    observerTreeHeader674_.observer10 = nullptr;
+    latestObserver170_ = nullptr;
+    latestObserver174_ = nullptr;
+    observerRegister170Count_ = 0u;
+    observerUnregister174Count_ = 0u;
+}
+
+// UNANCHORED: source-owned tree cleanup for the recovered owner `+0x674` observer container.
+void CLTLoginMediator::ClearObserverTree674() {
+    LoginObserverTreeNode674* node = ObserverTreeBegin674();
+    const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
+    while (node != end) {
+        LoginObserverTreeNode674* const next = ObserverTreeSuccessor674(node);
+        std::free(node);
+        node = next;
+    }
+    InitializeObserverTree674();
+}
+
+// UNANCHORED: source-owned `begin()` helper over the recovered owner `+0x674` observer tree.
+LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeBegin674() const {
+    if (observerTree674_.header00 == nullptr || observerTree674_.count04 == 0u) {
+        return observerTree674_.header00;
+    }
+    return observerTreeHeader674_.left08;
+}
+
+// UNANCHORED: source-owned `end()`/header helper over the recovered owner `+0x674` observer tree.
+LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeEnd674() const {
+    return observerTree674_.header00;
+}
+
+// UNANCHORED: source-owned in-order successor helper mirroring the `0x41cfb0/0x41d090`
+// owner `+0x674` traversal shape.
+LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeSuccessor674(LoginObserverTreeNode674* node) const {
+    LoginObserverTreeNode674* const header = ObserverTreeEnd674();
+    if (node == nullptr || header == nullptr) {
+        return header;
+    }
+
+    if (node->right0c != nullptr) {
+        return ObserverTreeMinimum(node->right0c);
+    }
+
+    LoginObserverTreeNode674* parent = node->parent04;
+    while (parent != nullptr && node == parent->right0c) {
+        node = parent;
+        parent = parent->parent04;
+    }
+    if (node->right0c != parent) {
+        node = parent;
+    }
+    return node ? node : header;
+}
+
+// UNANCHORED: source-owned keyed lookup over the recovered owner `+0x674` observer tree.
+LoginObserverTreeNode674* CLTLoginMediator::FindObserverNode674(void* observer) const {
+    LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
+    const uintptr_t targetKey = ObserverTreeKey(observer);
+    while (current != nullptr) {
+        const uintptr_t currentKey = ObserverTreeKey(current->observer10);
+        if (targetKey < currentKey) {
+            current = current->left08;
+        } else if (currentKey < targetKey) {
+            current = current->right0c;
+        } else {
+            return current;
+        }
+    }
+    return nullptr;
+}
+
+// UNANCHORED: source-owned insert helper for the recovered owner `+0x674` observer tree.
+bool CLTLoginMediator::InsertObserverNode674(void* observer) {
+    LoginObserverTreeNode674* parent = &observerTreeHeader674_;
+    LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
+    const uintptr_t targetKey = ObserverTreeKey(observer);
+    bool insertLeft = true;
+
+    while (current != nullptr) {
+        parent = current;
+        const uintptr_t currentKey = ObserverTreeKey(current->observer10);
+        if (targetKey < currentKey) {
+            insertLeft = true;
+            current = current->left08;
+        } else if (currentKey < targetKey) {
+            insertLeft = false;
+            current = current->right0c;
+        } else {
+            return false;
+        }
+    }
+
+    auto* node = static_cast<LoginObserverTreeNode674*>(std::malloc(sizeof(LoginObserverTreeNode674)));
+    if (!node) {
+        return false;
+    }
+    node->reserved00 = nullptr;
+    node->parent04 = parent;
+    node->left08 = nullptr;
+    node->right0c = nullptr;
+    node->observer10 = observer;
+
+    if (observerTreeHeader674_.parent04 == nullptr) {
+        observerTreeHeader674_.parent04 = node;
+        observerTreeHeader674_.left08 = node;
+        observerTreeHeader674_.right0c = node;
+    } else if (insertLeft) {
+        parent->left08 = node;
+        if (observerTreeHeader674_.left08 == parent) {
+            observerTreeHeader674_.left08 = node;
+        }
+    } else {
+        parent->right0c = node;
+        if (observerTreeHeader674_.right0c == parent) {
+            observerTreeHeader674_.right0c = node;
+        }
+    }
+
+    ++observerTree674_.count04;
+    return true;
+}
+
+// UNANCHORED: source-owned erase helper for the recovered owner `+0x674` observer tree.
+bool CLTLoginMediator::EraseObserverNode674(void* observer) {
+    LoginObserverTreeNode674* node = FindObserverNode674(observer);
+    if (node == nullptr) {
+        return false;
+    }
+
+    auto transplant = [this](LoginObserverTreeNode674* oldNode, LoginObserverTreeNode674* replacement) {
+        LoginObserverTreeNode674* const header = &observerTreeHeader674_;
+        if (oldNode->parent04 == header) {
+            header->parent04 = replacement;
+        } else if (oldNode == oldNode->parent04->left08) {
+            oldNode->parent04->left08 = replacement;
+        } else {
+            oldNode->parent04->right0c = replacement;
+        }
+        if (replacement != nullptr) {
+            replacement->parent04 = oldNode->parent04;
+        }
+    };
+
+    if (node->left08 == nullptr) {
+        transplant(node, node->right0c);
+    } else if (node->right0c == nullptr) {
+        transplant(node, node->left08);
+    } else {
+        LoginObserverTreeNode674* successor = ObserverTreeMinimum(node->right0c);
+        if (successor->parent04 != node) {
+            transplant(successor, successor->right0c);
+            successor->right0c = node->right0c;
+            if (successor->right0c != nullptr) {
+                successor->right0c->parent04 = successor;
+            }
+        }
+        transplant(node, successor);
+        successor->left08 = node->left08;
+        if (successor->left08 != nullptr) {
+            successor->left08->parent04 = successor;
+        }
+    }
+
+    std::free(node);
+    --observerTree674_.count04;
+
+    if (observerTree674_.count04 == 0u) {
+        observerTreeHeader674_.parent04 = nullptr;
+        observerTreeHeader674_.left08 = &observerTreeHeader674_;
+        observerTreeHeader674_.right0c = &observerTreeHeader674_;
+    } else {
+        observerTreeHeader674_.left08 = ObserverTreeMinimum(observerTreeHeader674_.parent04);
+        observerTreeHeader674_.right0c = ObserverTreeMaximum(observerTreeHeader674_.parent04);
+    }
+
+    return true;
+}
 
 void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
     // anchor: launcher.exe:0x41b450
@@ -140,24 +342,29 @@ bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
         return false;
     }
 
-    std::vector<void*>& observers = MutableRegisteredLoginObservers();
-    const auto it = std::find(
-        observers.begin(),
-        observers.end(),
-        observer);
-    if (it != observers.end()) {
+    const bool inserted = InsertObserverNode674(observer);
+    if (!inserted) {
         spdlog::info(
-            "CLTLoginMediator::RegisterLoginObserver observer={} already registered count={}",
+            "CLTLoginMediator::RegisterLoginObserver observer={} already registered treeCount={} header={} root={} leftmost={} rightmost={}",
             fmt::ptr(observer),
-            static_cast<unsigned>(observers.size()));
+            static_cast<unsigned>(observerTree674_.count04),
+            fmt::ptr(observerTree674_.header00),
+            fmt::ptr(observerTreeHeader674_.parent04),
+            fmt::ptr(observerTreeHeader674_.left08),
+            fmt::ptr(observerTreeHeader674_.right0c));
         return false;
     }
 
-    observers.push_back(observer);
+    latestObserver170_ = observer;
+    ++observerRegister170Count_;
     spdlog::info(
-        "CLTLoginMediator::RegisterLoginObserver observer={} count={} (minimal source-owned bridge for owner+0x674 listener registration)",
+        "CLTLoginMediator::RegisterLoginObserver observer={} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 bridge active)",
         fmt::ptr(observer),
-        static_cast<unsigned>(observers.size()));
+        static_cast<unsigned>(observerTree674_.count04),
+        fmt::ptr(observerTree674_.header00),
+        fmt::ptr(observerTreeHeader674_.parent04),
+        fmt::ptr(observerTreeHeader674_.left08),
+        fmt::ptr(observerTreeHeader674_.right0c));
     return true;
 }
 
@@ -169,24 +376,29 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
         return false;
     }
 
-    std::vector<void*>& observers = MutableRegisteredLoginObservers();
-    const auto it = std::find(
-        observers.begin(),
-        observers.end(),
-        observer);
-    if (it == observers.end()) {
+    const bool erased = EraseObserverNode674(observer);
+    if (!erased) {
         spdlog::info(
-            "CLTLoginMediator::UnregisterLoginObserver observer={} not found count={}",
+            "CLTLoginMediator::UnregisterLoginObserver observer={} not found treeCount={} header={} root={} leftmost={} rightmost={}",
             fmt::ptr(observer),
-            static_cast<unsigned>(observers.size()));
+            static_cast<unsigned>(observerTree674_.count04),
+            fmt::ptr(observerTree674_.header00),
+            fmt::ptr(observerTreeHeader674_.parent04),
+            fmt::ptr(observerTreeHeader674_.left08),
+            fmt::ptr(observerTreeHeader674_.right0c));
         return false;
     }
 
-    observers.erase(it);
+    latestObserver174_ = observer;
+    ++observerUnregister174Count_;
     spdlog::info(
-        "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} count={}",
+        "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} treeCount={} header={} root={} leftmost={} rightmost={}",
         fmt::ptr(observer),
-        static_cast<unsigned>(observers.size()));
+        static_cast<unsigned>(observerTree674_.count04),
+        fmt::ptr(observerTree674_.header00),
+        fmt::ptr(observerTreeHeader674_.parent04),
+        fmt::ptr(observerTreeHeader674_.left08),
+        fmt::ptr(observerTreeHeader674_.right0c));
     return true;
 }
 
@@ -226,15 +438,18 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     }
     const std::string recentEventsPreview =
         BuildRecentEventHistoryPreview(recentPostedEventsScaffold_, recentPostedEventCountScaffold_);
-    const std::vector<void*>& registeredObservers = RegisteredLoginObservers();
     spdlog::info(
-        "{} Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={} registeredObservers={} (minimal owner+0x674 observer bridge active; full tree container still not scaffolded)",
+        "{} Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 observer walk active)",
         kLogPrefixPostEvent,
         static_cast<unsigned>(eventId),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(lastSwitchedHelperStateScaffold_ & 0xffu),
         recentEventsPreview,
-        static_cast<unsigned>(registeredObservers.size()));
+        static_cast<unsigned>(observerTree674_.count04),
+        fmt::ptr(observerTree674_.header00),
+        fmt::ptr(observerTreeHeader674_.parent04),
+        fmt::ptr(observerTreeHeader674_.left08),
+        fmt::ptr(observerTreeHeader674_.right0c));
     spdlog::info(
         "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={}",
         (unsigned)eventId,
@@ -259,13 +474,17 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     }
 
     if (eventId == 0x0bu || eventId == 0x18u || eventId == 0x0fu) {
-        const std::vector<void*> observers = registeredObservers;
-        for (void* observer : observers) {
+        LoginObserverTreeNode674* node = ObserverTreeBegin674();
+        const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
+        while (node != end) {
+            void* const observer = node->observer10;
             spdlog::info(
-                "CLTLoginMediator::PostEventScaffold dispatching observer={} event=0x{:02x}",
+                "CLTLoginMediator::PostEventScaffold dispatching observerNode={} observer={} event=0x{:02x}",
+                fmt::ptr(node),
                 fmt::ptr(observer),
                 static_cast<unsigned>(eventId & 0xffu));
             DispatchLoginObserverEvent(observer, eventId);
+            node = ObserverTreeSuccessor674(node);
         }
     }
 
@@ -298,22 +517,29 @@ void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
     // result dword to owner `+0x80`, then posts error `10`; client observer-side error handling
     // queries mediator slot `+0x178` to read back that status and choose the visible popup.
     lastPostedErrorScaffold_ = errorId;
-    const std::vector<void*>& registeredObservers = RegisteredLoginObservers();
     spdlog::info(
-        "{} Error# {} status80=0x{:08x} registeredObservers={} (source-owned owner+0x674 error-listener walk active)",
+        "{} Error# {} status80=0x{:08x} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 error walk active)",
         kLogPrefixPostError,
         static_cast<unsigned>(errorId),
         static_cast<unsigned>(WorldListCountOrStatus80()),
-        static_cast<unsigned>(registeredObservers.size()));
+        static_cast<unsigned>(observerTree674_.count04),
+        fmt::ptr(observerTree674_.header00),
+        fmt::ptr(observerTreeHeader674_.parent04),
+        fmt::ptr(observerTreeHeader674_.left08),
+        fmt::ptr(observerTreeHeader674_.right0c));
 
-    const std::vector<void*> observers = registeredObservers;
-    for (void* observer : observers) {
+    LoginObserverTreeNode674* node = ObserverTreeBegin674();
+    const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
+    while (node != end) {
+        void* const observer = node->observer10;
         spdlog::info(
-            "CLTLoginMediator::PostErrorScaffold dispatching observer={} error=0x{:02x} status80=0x{:08x}",
+            "CLTLoginMediator::PostErrorScaffold dispatching observerNode={} observer={} error=0x{:02x} status80=0x{:08x}",
+            fmt::ptr(node),
             fmt::ptr(observer),
             static_cast<unsigned>(errorId & 0xffu),
             static_cast<unsigned>(WorldListCountOrStatus80()));
         DispatchLoginObserverError(observer, errorId);
+        node = ObserverTreeSuccessor674(node);
     }
 }
 

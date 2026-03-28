@@ -40,6 +40,26 @@ struct CLTLoginMediatorConnectionContextScaffold {
     bool peerCloseQueued;
 };
 
+// owner `+0x674` listener tree sketch tightened from `0x41ddb0 / 0x41dde0 / 0x41cfb0 / 0x41d090`:
+// - container object is an 8-byte pair `{ headerPtr, count }`
+// - header node is std::_Tree-like and self-referential when empty
+//   - `header + 0x04` = root
+//   - `header + 0x08` = leftmost/begin
+//   - `header + 0x0c` = rightmost
+// - concrete nodes compare/store the observer pointer at `+0x10`
+struct LoginObserverTreeNode674 {
+    void* reserved00 = nullptr;                    // current meaning unresolved in this bounded pass
+    LoginObserverTreeNode674* parent04 = nullptr;
+    LoginObserverTreeNode674* left08 = nullptr;
+    LoginObserverTreeNode674* right0c = nullptr;
+    void* observer10 = nullptr;
+};
+
+struct LoginObserverTree674 {
+    LoginObserverTreeNode674* header00 = nullptr;
+    uint32_t count04 = 0;
+};
+
 // Reimplementation note:
 // This file is intended to mirror the concrete launcher-side login/controller structure
 // now being recovered around global `0x4f78b8`.
@@ -730,7 +750,11 @@ public:
     // Observer count getters for wrapper diagnostics (moved from g_MediatorRuntimeState):
     uint32_t ObserverRegisterCount() const { return observerRegister170Count_; }
     uint32_t ObserverUnregisterCount() const { return observerUnregister174Count_; }
-    void* FirstObserver() const { return firstObserver170_; }
+    void* FirstObserver() const {
+        return (observerTree674_.count04 != 0u && observerTreeHeader674_.left08 != nullptr)
+            ? observerTreeHeader674_.left08->observer10
+            : nullptr;
+    }
     void* LatestObserver() const { return latestObserver170_; }
     uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }
     uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
@@ -1410,6 +1434,15 @@ private:
     void MirrorProcessLoginCredentialsSourceBlock120(const ProcessLoginCredentialsInputSketch& input);
     void PersistCharactersIniFromRecoveredAuthStateScaffold() const;
 
+    void InitializeObserverTree674();
+    void ClearObserverTree674();
+    LoginObserverTreeNode674* ObserverTreeBegin674() const;
+    LoginObserverTreeNode674* ObserverTreeEnd674() const;
+    LoginObserverTreeNode674* ObserverTreeSuccessor674(LoginObserverTreeNode674* node) const;
+    LoginObserverTreeNode674* FindObserverNode674(void* observer) const;
+    bool InsertObserverNode674(void* observer);
+    bool EraseObserverNode674(void* observer);
+
     uint32_t SendMarginFramedPacket(
         const mxo::auth::FramedPacket& packet,
         uint8_t plainRawCode,
@@ -1587,14 +1620,16 @@ private:
     uint8_t worldDescriptorCountD80_ = 0;
 
     // Observer/listener state for late-login arg6 +0x170/+0x174 bridge:
-    // - +0x170 (RegisterLoginObserver) inserts into owner `+0x674` listener tree
-    // - +0x174 (UnregisterLoginObserver) removes from the same tree
-    // These fields mirror launcher.exe runtime state for diagnostic logging.
-    void* firstObserver170_ = nullptr;          // owner `+0x674` first registered observer
-    void* latestObserver170_ = nullptr;         // owner `+0x674` most recent register call
-    void* latestObserver174_ = nullptr;         // owner `+0x674` most recent unregister call
-    uint32_t observerRegister170Count_ = 0;     // owner `+0x674` register call count
-    uint32_t observerUnregister174Count_ = 0;   // owner `+0x674` unregister call count
+    // - +0x170 (RegisterLoginObserver) inserts into owner `+0x674`
+    // - +0x174 (UnregisterLoginObserver) removes from owner `+0x674`
+    // Keep the container shape explicit instead of flattening it into a vector because the
+    // original `0x41cfb0 / 0x41d090` traversals are std::_Tree-like in-order walks over this data.
+    LoginObserverTree674 observerTree674_{};
+    LoginObserverTreeNode674 observerTreeHeader674_{};
+    void* latestObserver170_ = nullptr;         // most recent register call observer
+    void* latestObserver174_ = nullptr;         // most recent unregister call observer
+    uint32_t observerRegister170Count_ = 0;     // register call count
+    uint32_t observerUnregister174Count_ = 0;   // unregister call count
 
     // Source-owned default-off mirror for the alternate
     // `g_LaunchPadGateState16State18 != 0` state16/state18 family.
