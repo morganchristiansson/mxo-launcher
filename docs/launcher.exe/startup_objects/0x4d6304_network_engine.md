@@ -1231,7 +1231,12 @@ New practical rerun result after that partial wiring:
       parsed-packet path, which matches the original `void` helper shape more closely
 - concrete deliberate-run evidence now includes consumed queue0C items for:
   - `AuthConnectStatus` (type `2`)
-  - repeated `AuthReceivePacket` items (type `3`)
+  - repeated `AuthReceivePacket` items
+    - earlier logs showed these as type `3`
+    - newer static RE now rejects that as too optimistic
+    - original type `3` is already the parsed-packet work item queued by `CLTTCPConnection::OnReceive`
+    - the extra `AuthReceivePacket` item is better read as a later synthetic receive-drain proxy for
+      the unimplemented tail of `CMessageConnection::OnOperationCompleted`
 - that same run reaches launcher-owned auth progression through:
   - `AS_GetPublicKeyReply`
   - `AS_AuthChallenge`
@@ -1250,7 +1255,13 @@ Build-validated update:
 - `src/launcher_network_object_abi.cpp` arg5 helper `+0x60` slot `0` now calls into the liblttcp engine sidecar instead of directly calling a mediator poll helper
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now owns the current narrow nonblocking launcher-bridge pump and the current queue0C enqueue helper used by that seam
   - newer bounded pacing correction there keeps `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` as the one-fragment recv seam, but lets the bridge re-enter it within one arg5 helper poll
-  - source-owned synthetic `AuthReceivePacket` / `MarginReceivePacket` notifications therefore remain explicit and are now paced once per successful recv fragment rather than once per whole helper poll
+  - source-owned `AuthReceivePacket` / `MarginReceivePacket` notifications therefore remain explicit and are now paced once per successful recv fragment rather than once per whole helper poll
+  - newer static RE also narrows their role more strictly:
+    - they are not another original type-3 family
+    - original type `3` already comes from the parsed-packet work items queued by `CLTTCPConnection::OnReceive`
+    - the extra notification is only a source-owned receive-drain proxy for the later original
+      `CMessageConnection::OnOperationCompleted` tail that source still does not execute there yet
+    - source now reflects that with a distinct synthetic work type instead of reusing original type `3`
   - this narrower bridge-level batching is the current compromise because the earlier fuller same-poll recv-drain restoration regressed live runs into the later `Loading Character` stall
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current attached-owner state-sync callback hook used after engine-side connect work reached through connection wrappers

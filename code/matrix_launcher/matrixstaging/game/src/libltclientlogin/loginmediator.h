@@ -1038,6 +1038,10 @@ public:
     //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
     // Current receive handling drains parsed packets from the faithful transport/parser seam.
+    // Current entry shape is still one bounded source-owned step later than original:
+    // - original type-3 parsed-packet queue work already reaches `CMessageConnection::OnOperationCompleted`
+    // - source then queues one more synthetic receive-drain proxy so the copied packet bytes can be
+    //   drained here until the later original message-object / dispatch tail is reconstructed
     // Keep the post-auth auth-reply semantics and the one-shot margin auto-begin request here so
     // they stay mediator-owned.
     uint32_t HandleAuthConnectionReceiveScaffold();

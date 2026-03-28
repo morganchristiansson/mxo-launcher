@@ -239,6 +239,21 @@ public:
     static constexpr uint32_t kResultAlreadyMonitored = 0x7000003;
     static constexpr uint32_t kResultEndpointNotFound = 0x7000004;
 
+    // Current best queue work-type split from `0x4490c0`, `0x436d31..0x436ee7`, and the current
+    // launcher bridge:
+    // - `1` = original close / cleanup family that reaches arg5 slot 12 before context callback
+    // - `2` = original connect/status family
+    // - `3` = original parsed-packet work item emitted by `CLTTCPConnection::OnReceive`
+    // - `0x10000003` = source-owned receive-drain proxy only
+    //   - this is intentionally *not* another original type-3 work item
+    //   - it exists because source currently stages the copied parsed packet inside
+    //     `CMessageConnection::OnOperationCompleted`, but does not yet reimplement the later
+    //     original message-object / dispatch / owner-callback tail reached from that same callback
+    static constexpr uint32_t kWorkTypeClose = 1u;
+    static constexpr uint32_t kWorkTypeConnectionStatus = 2u;
+    static constexpr uint32_t kWorkTypeParsedPacket = 3u;
+    static constexpr uint32_t kWorkTypeSyntheticReceiveDrain = 0x10000003u;
+
     struct AcceptThreadRecord {
         LTTCPEndpointKey endpoint;
         void* ownerContext = nullptr;
@@ -414,8 +429,13 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: engine-owned loginmediator work-item builder used by both direct enqueue sites
+    // UNANCHORED: engine-owned launcher-bridge work-item builder used by both direct enqueue sites
     // and the arg5 helper-owned nonblocking pump.
+    // Current work-type split:
+    // - original connection-status items still use type `2`
+    // - source-owned receive-drain proxies use `kWorkTypeSyntheticReceiveDrain`
+    //   because original type `3` is already consumed by the parsed-packet queue items emitted from
+    //   `CLTTCPConnection::OnReceive`
     bool EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         uint32_t workType,
@@ -427,8 +447,10 @@ private:
     // - `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` stays the narrow
     //   one-fragment recv->fragment->OnReceive seam
     // - this bridge pump may re-enter that helper repeatedly within one arg5 helper poll so the
-    //   current source-owned synthetic `AuthReceivePacket` / `MarginReceivePacket` notifications can
+    //   current source-owned `AuthReceivePacket` / `MarginReceivePacket` receive-drain proxies can
     //   stay aligned once per successful recv fragment instead of once per whole pump
+    // - those proxies are intentionally not queued as original type `3`; original parsed-packet
+    //   type `3` work is already in queue0C before this helper enqueues the later drain proxy
     void PumpLauncherConnectionContextScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         const char* receiveLabel);

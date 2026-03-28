@@ -532,11 +532,14 @@ Current best reading remains:
       - `queued connection-status work item label='AuthConnectStatus' ... type=2 payload=0x07000001`
       - `raw message-connection context OnOperationCompleted ... type=2 payload=0x07000001`
       - `routed auth type-2 connect-status payload=0x07000001 into CLTLoginMediator scaffold -> handled=1 nextOutboundRequest='AS_GetPublicKeyRequest' laterIncomingReplyAnchor='AS_AuthReply'`
-    - later type-3 receive items:
-      - `AuthReceivePacket ... type=3 payload=0x00000198`
-      - `AuthReceivePacket ... type=3 payload=0x00000012`
-      - `AuthReceivePacket ... type=3 payload=0x00000219`
-  - those type-3 receives now drive a concrete launcher-owned auth progression on the current `RunClientDLL` path:
+    - later synthetic receive-drain items:
+      - older logs showed:
+        - `AuthReceivePacket ... type=3 payload=0x00000198`
+        - `AuthReceivePacket ... type=3 payload=0x00000012`
+        - `AuthReceivePacket ... type=3 payload=0x00000219`
+      - newer static RE now narrows that as a source-owned receive-drain proxy, not as a second
+        original type-3 family
+  - those synthetic receive-drain callbacks now drive a concrete launcher-owned auth progression on the current `RunClientDLL` path:
     - `AS_GetPublicKeyReply`
     - `AS_AuthRequest`
     - `AS_AuthChallenge`
@@ -554,7 +557,7 @@ Current best reading remains:
     - arg5 helper `+0x60` slot `1`
   - still no arg5 slot `12` traffic has appeared on this auth-success path, which remains consistent with the recovered consumer rule that slot `12` only matters for type-1 work items
 - current best blocker reading therefore shifts one step past the old “empty queue0C” diagnosis:
-  - the auth-side arg5 queue consumer chain is now demonstrably alive for type-2 / type-3 work items on deliberate `RunClientDLL`
+  - the auth-side arg5 queue consumer chain is now demonstrably alive for type-2 work items plus the later synthetic receive-drain proxy items on deliberate `RunClientDLL`
   - the next missing state is later launcher-owned progression **after** successful `AS_AuthReply`, not proof that the arg5 queue consumer itself is still dead
 - newer original-launcher helper follow-up now makes that post-auth gap more concrete:
   - `launcher.exe:0x4401a0` (`CLTLoginMediator_Helper10_HandleAuthReply`) performs the auth-reply writeback

@@ -433,7 +433,7 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     if (result != 0u && context) {
         engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
             context,
-            /*workType=*/2u,
+            /*workType=*/mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
             /*workPayload=*/kConnectStatusSuccess,
             "AuthConnectStatus");
     }
@@ -480,7 +480,7 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     if (result != 0u && context) {
         engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
             context,
-            /*workType=*/2u,
+            /*workType=*/mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
             /*workPayload=*/kConnectStatusSuccess,
             "MarginConnectStatus");
     }

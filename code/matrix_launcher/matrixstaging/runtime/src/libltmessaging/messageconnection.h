@@ -276,6 +276,10 @@ public:
     // - work type `3` copies packet-body bytes out of the retained-fragment-backed
     //   `CParsedPacketWorkItem` via `+0x24/+0x28` before later dispatch/agenda handling
     // - generic fallback logger on this path is helper `0x448a60`
+    // Current source gap kept explicit:
+    // - source currently stops after the copied-packet staging subset
+    // - later original message-object / dispatch / owner-callback work from this same callback is
+    //   still missing, so the launcher bridge keeps one extra synthetic receive-drain proxy item
     uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the

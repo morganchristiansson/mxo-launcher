@@ -85,14 +85,34 @@ static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_LauncherConnectionBridgeWorkItemVtable[2] = {0};
 static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
 
+static bool IsSyntheticReceiveDrainWorkType(uint32_t workType) {
+    return workType == CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain;
+}
+
+static const char* LauncherBridgeWorkTypeName(uint32_t workType) {
+    switch (workType) {
+        case CLTThreadPerClientTCPEngine::kWorkTypeClose:
+            return "Close";
+        case CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus:
+            return "ConnectionStatus";
+        case CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket:
+            return "ParsedPacket";
+        case CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain:
+            return "SyntheticReceiveDrain";
+        default:
+            return "Unknown";
+    }
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall LauncherConnectionBridgeWorkItem_Release(
     mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* self) {
     if (self) {
         LoggerForBridgeLabel(self->debugLabel)->info(
-            "CLTThreadPerClientTCPEngine launcher bridge releasing queued work item {} type={} payload=0x{:08x} label='{}'",
+            "CLTThreadPerClientTCPEngine launcher bridge releasing queued work item {} type=0x{:08x} ({}) payload=0x{:08x} label='{}'",
             fmt::ptr(self),
             self->header.workType,
+            LauncherBridgeWorkTypeName(self->header.workType),
             self->workPayload,
             self->debugLabel ? self->debugLabel : "<null>");
         std::free(self);
@@ -124,11 +144,12 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* self,
     mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
     LoggerForBridgeLabel(workItem && workItem->debugLabel ? workItem->debugLabel : (self ? self->debugLabel : nullptr))->info(
-        "CLTThreadPerClientTCPEngine launcher bridge OnOperationCompleted context={} label='{}' workItem={} type={} payload=0x{:08x}",
+        "CLTThreadPerClientTCPEngine launcher bridge OnOperationCompleted context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x}",
         fmt::ptr(self),
         (self && self->debugLabel) ? self->debugLabel : "<null>",
         fmt::ptr(workItem),
         workItem ? workItem->header.workType : 0u,
+        LauncherBridgeWorkTypeName(workItem ? workItem->header.workType : 0u),
         workItem ? workItem->workPayload : 0u);
 
     mxo::ltlogin::CLTLoginMediator* mediator = self ? self->mediator : nullptr;
@@ -136,7 +157,7 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
         return 1u;
     }
 
-    if (workItem->header.workType == 2u) {
+    if (workItem->header.workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
         const uint32_t handled = self->isMarginConnection
             ? mediator->HandleMarginConnectStatus(workItem->workPayload)
             : mediator->HandleAuthConnectStatus(workItem->workPayload);
@@ -152,14 +173,22 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
             (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
     }
 
-    if (workItem->header.workType == 3u) {
+    if (IsSyntheticReceiveDrainWorkType(workItem->header.workType)) {
+        // Current best static-RE read:
+        // - original queue type `3` is already the parsed-packet work item queued by
+        //   `CLTTCPConnection::OnReceive -> 0x436820`
+        // - original `CMessageConnection::OnOperationCompleted(0x4490c0)` then continues on that
+        //   same callback into later message-object / dispatch / owner-callback work
+        // - current source stops earlier after copying packet bytes into connection-owned staged
+        //   receive storage, so this extra queue item is only a source-owned proxy for that later
+        //   original tail and must not pretend to be a second original type-3 family
         if (!self->isMarginConnection) {
             const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
             if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
                 const uint32_t marginConnectResult =
                     mediator->BeginLauncherMarginConnectionScaffold();
                 spdlog::info(
-                    "CLTThreadPerClientTCPEngine launcher bridge post-AS_AuthReply margin auto-begin result=0x{:08x}",
+                    "CLTThreadPerClientTCPEngine launcher bridge synthetic receive-drain post-AS_AuthReply margin auto-begin result=0x{:08x}",
                     static_cast<unsigned>(marginConnectResult));
             }
         } else {
@@ -1473,11 +1502,12 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     }
 
     LoggerForBridgeLabel(label)->info(
-        "CLTThreadPerClientTCPEngine launcher bridge queued work label='{}' workItem={} context={} type={} payload=0x{:08x}",
+        "CLTThreadPerClientTCPEngine launcher bridge queued work label='{}' workItem={} context={} type=0x{:08x} ({}) payload=0x{:08x}",
         label ? label : "<null>",
         fmt::ptr(workItem),
         fmt::ptr(context),
         workType,
+        LauncherBridgeWorkTypeName(workType),
         workPayload);
     return true;
 }
@@ -1531,10 +1561,18 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
     // Why this is currently bounded here instead of inside `CLTTCPConnection`:
     // - a previous full same-poll recv-drain restoration on the bridge path regressed live runs
     //   into a later "Loading Character" stall
-    // - the remaining source-owned pacing seam is now narrower: the bridge still needs synthetic
-    //   `AuthReceivePacket` / `MarginReceivePacket` work items, and those notifications line up
-    //   better with the original worker-thread cadence when they are emitted once per successful
-    //   recv fragment / `OnReceive` iteration rather than once per whole helper poll
+    // - original queue type `3` already belongs to the parsed-packet work items that
+    //   `CLTTCPConnection::OnReceive` enqueues before control returns here
+    // - the extra `AuthReceivePacket` / `MarginReceivePacket` submission below is therefore only a
+    //   source-owned receive-drain proxy for the later original `0x4490c0` dispatch tail that
+    //   source still does not execute on that same callback
+    // - current source queue order on one helper poll is therefore:
+    //   - `OnReceive` first queues all parsed-packet work items emitted from the current fragment
+    //   - then this helper queues one synthetic receive-drain proxy for that same fragment
+    //   - if a later recv in the same poll returns peer-close/error, the type-1 close item queues
+    //     after those successful-fragment submissions
+    // - that proxy lines up better with the original worker-thread cadence when it is emitted once
+    //   per successful recv fragment / `OnReceive` iteration rather than once per whole helper poll
     // - later peer-close notification still queues after any successful fragment notifications from
     //   the same helper poll, matching the original `0x42fe50` ordering more closely than the old
     //   once-per-pump synthetic receive path
@@ -1544,7 +1582,7 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
         if (received > 0) {
             (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
                 context,
-                /*workType=*/3u,
+                /*workType=*/kWorkTypeSyntheticReceiveDrain,
                 /*workPayload=*/static_cast<uint32_t>(received),
                 receiveLabel,
                 /*queueLockAlreadyHeld=*/true);
@@ -1560,7 +1598,7 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
                 fmt::ptr(context->sidecarConnection));
             (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
                 context,
-                /*workType=*/1u,
+                /*workType=*/kWorkTypeClose,
                 /*workPayload=*/0u,
                 context->isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed",
                 /*queueLockAlreadyHeld=*/true);
@@ -1619,7 +1657,7 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
         }
 
         const uint32_t workType = QueueWorkItem_GetType(workItem);
-        const bool isType1 = (workType == 1u);
+        const bool isType1 = (workType == kWorkTypeClose);
         const bool shouldAutoReleaseContext =
             context && isType1 && QueueContext_ShouldAutoReleaseAfterType1(context);
 

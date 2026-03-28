@@ -458,6 +458,8 @@ static bool CMessageConnection_CopyParsedPacketPayloadBytesScaffold(
 //   via `currentCursor24` / `assembledByteCount28`
 // - preserve the original oversized-packet close branch before later dispatch/agenda work
 // - later message dispatch / packet-agenda / owner callback handling remains a separate next step
+//   in source; that is why the launcher bridge still needs a second synthetic receive-drain proxy
+//   after the original parsed-packet type-3 queue callback has already run
 uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
