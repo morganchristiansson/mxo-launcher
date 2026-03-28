@@ -39,12 +39,12 @@ namespace mxo::liblttcp {
 // - base vtable +0x10 / 0x4490c0 -> likely OnOperationCompleted(workItem)
 //   - processes work item types via [workItem+0x04]
 //   - string-backed receive/completion/error handling lives on this path
-// - newer startup-side narrowing now also shows important **derived** auth/margin families
-//   on top of this base object:
-//   - auth-side derived connection vtable `0x4afef0`
-//   - margin-side derived connection vtable `0x4aff38`
+// - newer startup-side narrowing now also shows important **derived** leaf families on top of this
+//   base object:
+//   - later leaf vtable `0x4afef0` (current best read: `CBasicMarginConnection`)
+//   - later leaf vtable `0x4aff38` (`CMarginConnection`)
 //   - those families wrap base completion through `0x449a70` / `0x44af60`
-//   - auth-side `0x449a70` is now narrowed one step further:
+//   - later leaf `0x449a70` is now narrowed one step further:
 //     - after base `0x4490c0` returns 0, it calls owner `[self+0xa4]->+0x17c`
 //     - that owner surface is now resolved as thunk `0x41f260`, which forwards to the
 //       owner's current helper/state object at `owner+0x10`, then jumps to helper vtable `+0x14`
@@ -58,7 +58,7 @@ namespace mxo::liblttcp {
 //     - if the current helper `+0x14` target returns 0, `0x449a70` falls through to
 //       `0x448a60`, which is string-backed only as a generic
 //       `Got unhandled op of type %d with status %s` logger
-//   - important nuance: that auth-side owner/helper/fallback chain is therefore a later
+//   - important nuance: that owner/helper/fallback chain is therefore a later derived-leaf
 //     incoming packet/owner-handling anchor, not direct proof of the first outbound request
 //     after connect
 // - connection fields `+0x7c` / `+0x80` are no longer just anonymous mystery pointers:
@@ -92,33 +92,33 @@ namespace mxo::liblttcp {
 //   - current best engine mapping there is slot-7 / Close
 //
 // ============================================================
-// VTable 0x004afef0 - CMessageConnection (Intermediate Base)
+// VTable 0x004afef0 - CBasicMarginConnection
 // ============================================================
-// 0x004afef0 - FUN_0041cf50
-// 0x004afefc - CLTTCPConnection::CLTTCPConnection at 0x00449ca0
-// 0x004aff00 - FUN_00449a70
-// 0x004aff04 - CLTTCPConnection::OnReceive at 0x00449d40
-// 0x004aff08 - CLTTCPConnection::OnClose at 0x00449fd0
-// 0x004aff0c - CLTTCPConnection::Close at 0x00449cd0
-// 0x004aff10 - CLTTCPConnection::~CLTTCPConnection at 0x00449d20
-// 0x004aff14 - FUN_0041cf30
-// 0x004aff18 - SendPacket at 0x00448cf0
-// 0x004aff1c - FUN_00449a30
-// 0x004aff34 - FUN_0041ce80
+// Later leaf on top of the shared message-connection surface:
+// CLTTCPConnection (0x004b8034)
+// └── CMessageConnection-family base surface (`0x448b40`, `0x448cf0`, `0x4490c0`)
+//     └── CBaseMarginConnection (0x004b64a8)
+//         └── CBasicMarginConnection (0x004afef0)
+// Key leaf-only rows now relevant here:
+// - 0x004afef0 = 0x0041cf50 ctor / leaf init
+// - 0x004aff00 = 0x00449a70 leaf `OnOperationCompleted` override
+// - 0x004aff1c = 0x00449a30 leaf `DispatchMessage` override
+// - 0x004aff34 = 0x0041ce80 deleting-dtor / cleanup family
+// The source file does not yet model `CBasicMarginConnection` as its own class, so do not treat
+// those leaf rows as base `CMessageConnection` methods.
 
 // ============================================================
-// VTable 0x004aff38 - CMarginConnection (Type D)
+// VTable 0x004aff38 - CMarginConnection
 // ============================================================
-// Inheritance Chain:
-// CLTTCPConnection (0x004b8034) [Base]
-// └── CMessageConnection (0x004afef0) [Intermediate Base]
-//     └── Type A (0x004b64a8) [Base for Type D]
-//         └── CMarginConnection (Type D) [0x004aff38] - Leaf
-// ============================================================
-// 0x004aff38 - FUN_0041cf80 (Type D initialization)
-// 0x004aff48 - FUN_0044af60 (Advanced message routing)
-// 0x004aff64 - FUN_0044af20 (Message dispatcher)
-// Inherits: CLTTCPConnection methods + CMessageConnection::SendPacket
+// Later leaf on top of:
+// CLTTCPConnection (0x004b8034)
+// └── CMessageConnection-family base surface
+//     └── CBaseMarginConnection (0x004b64a8)
+//         └── CMarginConnection (0x004aff38)
+// Key leaf-only rows:
+// - 0x004aff38 = 0x0041cf80 ctor / leaf init
+// - 0x004aff48 = 0x0044af60 `OnOperationCompleted` override
+// - 0x004aff64 = 0x0044af20 `DispatchMessage` override
 
 // Important current limitation for this starter skeleton:
 // - the recovered original engine entry on this path is more connection-object-oriented
@@ -188,30 +188,31 @@ struct CMessageConnectionEnvelopeScaffold {
 
 class CMessageConnection : public CLTTCPConnection {
 public:
-    // UNANCHORED: source-owned convenience ctor for the current auth/message connection scaffold.
+    // UNANCHORED: source-owned narrow subset of `0x448b40` with a null engine and without the
+    // optional `+0x7c/+0x80` completion-helper allocation path.
     CMessageConnection();
-    // UNANCHORED: source-owned convenience ctor that seeds the recovered base engine field.
+    // UNANCHORED: source-owned narrow subset of `0x448b40(engine, createCompletionHelpers)`.
+    // Current source body only seeds the recovered base `+0x10` engine field and does not model
+    // the original parser allocation or optional completion-helper ownership.
     explicit CMessageConnection(CLTThreadPerClientTCPEngine* engine);
     // UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
     ~CMessageConnection();
 
-    // UNANCHORED: source-owned compatibility wrapper over the recovered base-connection `+0x10` engine field.
+    // UNANCHORED: source-owned compatibility pass-through over the recovered base-connection
+    // `+0x10` engine field; no separate leaf-owned engine slot is evidenced here.
     void SetEngine(CLTThreadPerClientTCPEngine* engine);
-    // UNANCHORED: source-owned compatibility accessor over the recovered base-connection `+0x10` engine field.
+    // UNANCHORED: source-owned compatibility accessor over the recovered base-connection `+0x10`
+    // engine field; no separate leaf-owned engine slot is evidenced here.
     CLTThreadPerClientTCPEngine* Engine() const;
 
     // UNANCHORED: source-owned wrapper over base `CLTTCPConnection::Connect` / engine slot 6.
     // This keeps the connection-object-oriented call site out of diagnostics.cpp.
     uint32_t EnsureConnected();
 
-    // anchor: launcher.exe:0x448cf0
-    // string-backed original name: CMessageConnection::SendPacket
-    // current best read:
-    // - original `0x448cf0` consumes a message/envelope object, not bare payload bytes
-    // - it runs packet-agenda filtering first, then reaches a lower submit helper that forwards
-    //   final byte pointer/size through engine slot 8 / SendBuffer using `this` as the
-    //   connection object
-    // - the raw-byte overload remains as the older narrow bridge used by auth-side scaffold sends
+    // UNANCHORED: source-owned raw-byte compatibility override beneath the original
+    // `CMessageConnection::SendPacket` envelope family.
+    // Current best original `0x448cf0` consumes a message/envelope object, performs packet-agenda
+    // filtering, then reaches lower submit helper `0x448a00`.
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
 
     // Source-owned launcher-only bridge for the narrowed state8/state10/state11 send-authenticity
@@ -232,55 +233,61 @@ public:
         const void* packetData,
         uint32_t packetByteCount,
         bool headerless = false);
-    // UNANCHORED: source-owned launcher-only bridge for the current envelope submit seam.
+    // anchor: launcher.exe:0x448cf0
+    // Narrow source-owned mirror of the envelope-based `CMessageConnection::SendPacket` family.
+    // Original input is a local envelope / shared-message object, not a bare byte span.
     uint32_t SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
 
     // anchor: launcher.exe:0x448960
-    // Narrow source-owned mirror of the per-connection packet-name callback configuration:
+    // Narrow source-owned wrapper over the per-connection packet-name callback configuration:
     // - original writes connection `+0x78 = enabled`
     // - when enabled, original writes connection `+0x70 = callback`
+    // Current source API still accepts a family enum, but immediately maps that family to the
+    // currently known callback bodies (`0x41ce00` auth, `0x41ce40` margin).
     void ConfigurePacketNameFamilyScaffold(
         CMessageConnectionPacketNameFamilyScaffold family,
         bool packetizedMessagesEnabled);
-    // UNANCHORED: source-owned accessor for the packet-name family scaffold.
+    // UNANCHORED: source-owned diagnostic family view derived from the callback-address scaffold.
     CMessageConnectionPacketNameFamilyScaffold PacketNameFamilyScaffold() const;
     // UNANCHORED: source-owned accessor for the packetized-messages enable scaffold byte.
     bool PacketizedMessagesEnabledScaffold() const;
 
     // anchor: launcher.exe:0x448980
-    // Narrow source-owned mirror of the lazy packet-agenda object at connection `+0x74`.
-    // Current source model keeps only the creation/ownership fact and helper counts explicit.
-    void EnsurePacketAgendaScaffold();
+    // Narrow source-owned mirror of the lazy packet-agenda install/configure helper at
+    // connection `+0x74`.
+    // Current best read of the original helper:
+    // - lazily allocate the `+0x74` agenda object on first use
+    // - always forward the caller-supplied agenda/config pointer into the helper family rooted at
+    //   `0x469740`
+    // Current source model keeps only the lazy creation/ownership fact explicit.
+    void ConfigurePacketAgendaScaffold(const void* agendaConfiguration = nullptr);
     // UNANCHORED: source-owned accessor for the lazy packet-agenda scaffold pointer.
     const CMessageConnectionPacketAgendaScaffold* PacketAgendaScaffold() const;
-
-    // UNANCHORED: source-owned packet-result helper surface; the currently known `0x449a70` anchor belongs to a later derived leaf.
-    uint32_t ProcessPacketResult(const void* packetData, uint32_t byteCount);
 
     // anchor: launcher.exe:0x4490c0
     // string-backed original name: CMessageConnection::OnOperationCompleted
     // current best read:
     // - main completion/receive-side bridge back into engine/queue handling
     // - generic fallback logger on this path is helper `0x448a60`
-    uint32_t OnOperationCompleted(void* workCode);
+    uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
     void* ContextKey() { return this; }
 
-    // UNANCHORED: source-owned dispatch-result helper surface; the currently known `0x449a30` anchor belongs to a later derived leaf.
-    uint32_t ProcessDispatchResult(const void* packetData, uint32_t byteCount);
-
 private:
     // UNANCHORED: source-owned packet-family name helper for current diagnostics.
     static const char* PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family);
+    // UNANCHORED: source-owned helper that maps the diagnostic family enum onto the currently known
+    // original callback bodies stored at connection `+0x70`.
+    static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamilyScaffold family);
     // UNANCHORED: source-owned packet-agenda pass/filter scaffold helper.
     bool PacketAgendaAllowsEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) const;
     // UNANCHORED: source-owned lower submit helper beneath SendPacketEnvelopeScaffold.
+    // Current best original helper is `0x448a00`.
     uint32_t SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
 
-    CMessageConnectionPacketNameFamilyScaffold packetNameFamilyScaffold_ =
-        CMessageConnectionPacketNameFamilyScaffold::kUnknown;
+    uintptr_t packetNameCallbackScaffold_ = 0;
     bool packetizedMessagesEnabledScaffold_ = false;
     std::unique_ptr<CMessageConnectionPacketAgendaScaffold> packetAgendaScaffold_;
 };
@@ -290,65 +297,36 @@ private:
 // ============================================================
 class CMarginConnection : public CMessageConnection {
 public:
-    // ============================================================
-    // FAITHFUL: VTable 0x004aff38 - Constructor at 0x0041cf80
-    // Type D initialization - sets vtable pointer, calls FUN_00441820 cleanup
-    // ============================================================
+    // UNANCHORED: source-owned narrow leaf ctor over the `0x41cf80 -> 0x448b40` family.
     CMarginConnection();
-
-    // ============================================================
-    // UNANCHORED: Not based on vtable analysis
-    // Constructor with margin engine parameter
-    // ============================================================
+    // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
     explicit CMarginConnection(CLTThreadPerClientTCPEngine* marginEngine);
-
-    // ============================================================
-    // FAITHFUL: VTable 0x004aff38 - Destructor at 0x00449d20
-    // Inherits from CLTTCPConnection (via CMessageConnection)
-    // Note: Cleanup calls FUN_00441820 which sets vtable to Type A's vtable
-    // ============================================================
+    // UNANCHORED: source-owned default destructor; the original family uses `0x41ce80` cleanup
+    // after restoring the shared base-margin vtable.
     ~CMarginConnection();
 
-    // ============================================================
-    // UNANCHORED: Not based on vtable analysis
-    // Placeholder entry point for margin engine management
-    // ============================================================
+    // UNANCHORED: source-owned compatibility pass-through over the recovered base `+0x10` engine
+    // field; no separate `CMarginConnection` engine slot is evidenced.
     void SetMarginEngine(CLTThreadPerClientTCPEngine* marginEngine);
-
-    // ============================================================
-    // UNANCHORED: Not based on vtable analysis
-    // Getter for margin engine pointer
-    // ============================================================
+    // UNANCHORED: source-owned compatibility accessor over the recovered base `+0x10` engine
+    // field; no separate `CMarginConnection` engine slot is evidenced.
     CLTThreadPerClientTCPEngine* MarginEngine() const;
 
-    // ============================================================
-    // FAITHFUL: VTable 0x004aff48 - FUN_0044af60 at 0x0044af60
-    // 42 instructions, 7 complexity, 5 calls
-    // Advanced message routing with fallback handlers for robustness
-    // ============================================================
-    uint32_t RouteMessage(const void* packetData, uint32_t byteCount);
+    // anchor: launcher.exe:0x44af60
+    // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
+    // Current best original order:
+    // - call base `0x4490c0`
+    // - if base returns 0, call owner `+0x188(this, workItem)`
+    // - if that also returns 0, fall through to `0x448a60`
+    // - if work type == 1, clear owner byte `+0xf14` then tear down through the connection object
+    uint32_t OnOperationCompleted(void* workItem) override;
 
-    // ============================================================
-    // FAITHFUL: VTable 0x004aff64 - FUN_0044af20 at 0x0044af20
-    // 23 instructions, 2 complexity, 2 calls
-    // Message dispatcher - calls dispatch router FUN_00442d00
-    // ============================================================
-    uint32_t DispatchMessage(const void* packetData, uint32_t byteCount);
-
-    // ============================================================
-    // UNANCHORED: Not based on vtable analysis
-    // CERT protocol handler placeholder
-    // ============================================================
-    uint32_t HandleCERTMessage(const void* packetData, uint32_t byteCount);
-
-    // ============================================================
-    // UNANCHORED: Not based on vtable analysis
-    // MS protocol handler placeholder
-    // ============================================================
-    uint32_t HandleMSMessage(const void* packetData, uint32_t byteCount);
-
-private:
-    CLTThreadPerClientTCPEngine* marginEngine_;
+    // anchor: launcher.exe:0x44af20
+    // Later leaf dispatch override on top of the unmodeled `CBaseMarginConnection` dispatch family.
+    // Current best original order:
+    // - call `CBaseMarginConnection::DispatchMessage(this, messageRef)` (`0x442d00`)
+    // - if that returns 0, call owner `+0x184(messageRef)`
+    uint32_t DispatchMessage(void* messageRef);
 };
 
 }  // namespace mxo::liblttcp

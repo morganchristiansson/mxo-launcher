@@ -1079,7 +1079,7 @@ Newer ctor/vtable-backed clarification now makes that class family more concrete
       - `ret 0xc`
       - current concrete caller shape = `(readOperationFragment, peerAddressBlob16Ptr, 0x004b2118)`
       - recovered semantic effect still only releases the fragment
-    - `CLTTCPConnection::pushCompletedOperation(...)` is now best read as the exact receive-side handoff
+    - `CLTTCPConnection::EnqueueCompletedPacketWorkItemScaffold(...)` is now best read as the exact receive-side handoff
       `(completedPacketWorkItem, this, false)` into engine helper `0x436820`, not as a generic
       raw-pointer convenience wrapper
     - because original `0x436820` is `void`, current source ownership notes now also treat that seam

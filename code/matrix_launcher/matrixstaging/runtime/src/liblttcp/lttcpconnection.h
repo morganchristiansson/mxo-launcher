@@ -147,7 +147,7 @@ class CBaseConnection {
   // UNANCHORED: source-owned abstraction over the recovered receive entry surface.
   virtual void OnReceive(void* callbackContext) = 0;
   // UNANCHORED: source-owned abstraction over the recovered completion callback surface.
-  virtual uint32_t OnOperationCompleted(void*) = 0;
+  virtual uint32_t OnOperationCompleted(void* workItem) = 0;
   // UNANCHORED: source-owned abstraction over the recovered send callback surface.
   virtual uint32_t SendPacket(const void*, uint32_t, void*) = 0;
 
@@ -159,7 +159,9 @@ class CBaseConnection {
     return state_;
   }
 
-  // UNANCHORED: source-owned base-field initializer for the recovered state slot.
+  // UNANCHORED: source-owned narrow mirror of the `0x44a9f0` base-ctor state write.
+  // The original base ctor initializes much more of the eventual full object than this reduced
+  // source-side base class owns.
   CBaseConnection(LTTCPEngineConnectionState initialState = LTTCPEngineConnectionState::kClosed);
 
  protected:
@@ -175,9 +177,12 @@ class CBaseConnection {
 // - `0x00449d20` = SendBuffer wrapper into engine slot `+0x20`
 class CLTTCPConnection : public CBaseConnection {
 public:
-    // UNANCHORED: source-owned convenience ctor for the current replacement-side connection model.
+    // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family.
+    // Current source ctor seeds only the replacement-side fields we model explicitly and does not
+    // reconstruct the original parser-argument construction path.
     CLTTCPConnection();
-    // UNANCHORED: source-owned convenience ctor that seeds owner-context state.
+    // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family that also seeds the
+    // replacement-side owner-context scaffold.
     explicit CLTTCPConnection(void* ownerContext);
     // anchor: launcher.exe:0x44ac40
     ~CLTTCPConnection();
@@ -265,14 +270,14 @@ public:
     // Current best original callee is `CVariableLengthPrefixedTCPStreamParser::Parse` (`0x469bf0`).
     uint32_t ParseReadOperationFragmentScaffold(
         CLTTCPReadOperationFragmentScaffold* readOperationFragment,
-        CLTTCPConnection_ParsedPacketWorkItemScaffold** outWorkItem);
+        CLTTCPConnection_ParsedPacketWorkItemScaffold** outCompletedPacketWorkItem);
     // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
     // Current best original read:
     // - argument order after engine `this` is `(workItem, connection, useQueue34)`
     // - this `OnReceive` path always uses `(completedPacketWorkItem, this, false)`
     // - ownership transfers to the engine queue here; caller-side lifetime does not branch on an
     //   enqueue success result because original `0x436820` returns `void`
-    void pushCompletedOperation(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
+    void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 
 private:
     CLTThreadPerClientTCPEngine* engine_;

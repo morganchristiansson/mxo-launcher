@@ -127,7 +127,7 @@ That report already shows source-file anchors such as:
 - `ltipaddresslist.cpp` -> `CLTIPAddressList_Reinit`
 - `lttcpconnection.cpp` -> `CLTIPSocket_StaticAllocateSocket`, `CLTTCPConnection_OnReceive`
 - `ltthreadperclienttcpengine.cpp` -> `CLTThreadPerClientTCPEngine__Close`, `CLTThreadPerClientTCPEngine__SendBuffer`, `CLTThreadPerClientTCPEngine__MonitorPort`, `CLTThreadPerClientTCPEngine__CleanupConnection`, `CLTThreadPerClientTCPEngine__Connect`, `CLTThreadPerClientTCPEngine__UDPMonitorPort`, `CLTThreadPerClientTCPEngine_dtor`, `CLTThreadPerClientTCPEngine_AcceptThread_Run`, `CLTThreadPerClientTCPEngine_WorkerThread_Run`
-- `messageconnection.cpp` -> `CMessageConnection_LogUnhandledOperation`, `CMessageConnection_OnOperationCompleted`, `CMessageConnection_SendPacketEnvelope`
+- `messageconnection.cpp` -> `CMessageConnection_LogUnhandledOperation`, `CMessageConnection_OnOperationCompleted`, `CMessageConnection_SendPacket`
 - `sessionkeyencryption.cpp` -> `CPacketDecryptor_DecryptPacket`
 - `variablelengthprefixedtcpstreamparser.cpp` -> `CVariableLengthPrefixedTCPStreamParser_Parse`
 - `filters.cpp` -> `StreamTransformationFilter_ctor`, `StreamTransformationFilter_LastPut`
