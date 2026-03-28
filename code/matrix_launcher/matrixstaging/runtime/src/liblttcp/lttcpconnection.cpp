@@ -445,7 +445,14 @@ void CLTTCPConnection::OnReceive(void* readOperationFragment) {
 
     if (static_cast<int32_t>(parseResult) > 0 && parseResult != 0x7000000u) {
         // Current source scaffolds still do not reconstruct the original `+0x24` endpoint-copy
-        // logging helper family used here before close. Keep the control-flow shape faithful first.
+        // logging helper family used here before close. Keep the control-flow shape faithful first,
+        // but preserve the recovered "log then close" structure on terminal parser errors.
+        spdlog::info(
+            "CLTTCPConnection::OnReceive terminal parser result=0x{:08x} this={} ownerContext={} remoteHost='{}' -> closing",
+            parseResult,
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
         (void)Close(false);
     }
 

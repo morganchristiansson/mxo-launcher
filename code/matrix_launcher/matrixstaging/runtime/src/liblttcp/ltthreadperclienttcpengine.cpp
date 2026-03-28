@@ -1404,18 +1404,24 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     // - slot-12-style worker lookup/teardown therefore has to unwrap that bridge back to the
     //   owning connection's logical context key instead of searching worker/message tables with
     //   the bridge pointer itself
+    // - original `0x4316a0` also calls a later helper (`0x44ab60`) on both hit and miss paths
+    //   before releasing its helper lock; current source uses the owner-state sync hook as the
+    //   bounded stand-in for that always-run tail side effect
     CBaseConnection* queuedConnectionOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
     void* cleanupContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    bool touchedConnectionState = false;
 
     if (CLTTCPConnection* queuedTcpConnection =
             dynamic_cast<CLTTCPConnection*>(queuedConnectionOwner)) {
         queuedTcpConnection->SetState(LTTCPEngineConnectionState::kClosed);
         queuedTcpConnection->SetSocketHandle(kInvalidSocketHandle);
+        touchedConnectionState = true;
     }
 
     if (CMessageConnection* connection = FindMessageConnection(cleanupContextKey)) {
         connection->SetState(LTTCPEngineConnectionState::kClosed);
         connection->SetSocketHandle(kInvalidSocketHandle);
+        touchedConnectionState = true;
     }
 
     for (auto it = workerThreads_.begin(); it != workerThreads_.end(); ++it) {
@@ -1426,7 +1432,9 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
             return kResultSuccess;
         }
     }
-    return 0;
+
+    SyncAttachedLauncherObjectStateScaffold();
+    return touchedConnectionState ? kResultSuccess : 0u;
 }
 
 // UNANCHORED scaffold bridge because the current liblttcp engine lives beside, not inside,
