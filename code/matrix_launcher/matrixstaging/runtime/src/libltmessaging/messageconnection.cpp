@@ -529,6 +529,167 @@ static bool CMessageConnection_CopyParsedPacketPayloadBytesScaffold(
     return remainingPacketBodyByteCount == 0u;
 }
 
+namespace {
+
+constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
+    0x11u,
+    0x04u,
+    0x10u,
+    0x0bu,
+    0x10u,
+    0x11u,
+    0x10u,
+};
+
+struct CMessageConnectionCopiedMessageRefScaffold {
+    std::vector<uint8_t> messageBytesFrom0c;
+    bool headerless04 = false;
+};
+
+static CMessageConnectionCopiedMessageRefScaffold CMessageConnection_BuildCopiedMessageRefScaffold(
+    const std::vector<uint8_t>& payloadBytes,
+    bool headerless) {
+    CMessageConnectionCopiedMessageRefScaffold messageRef = {};
+    messageRef.messageBytesFrom0c = payloadBytes;
+    messageRef.headerless04 = headerless;
+    return messageRef;
+}
+
+static bool CMessageConnection_ResolveHeaderlessMessageCodePointerScaffold(
+    const CMessageConnectionCopiedMessageRefScaffold& messageRef,
+    const uint8_t** outMessageCodePointer,
+    uint8_t* outTargetLocatorType,
+    uint8_t* outSenderLocatorType) {
+    if (outMessageCodePointer) {
+        *outMessageCodePointer = nullptr;
+    }
+    if (outTargetLocatorType) {
+        *outTargetLocatorType = 0u;
+    }
+    if (outSenderLocatorType) {
+        *outSenderLocatorType = 0u;
+    }
+    if (messageRef.messageBytesFrom0c.size() < 2u) {
+        return false;
+    }
+
+    const uint8_t locatorByte0d = messageRef.messageBytesFrom0c[1];
+    const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
+    const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
+    if (outTargetLocatorType) {
+        *outTargetLocatorType = targetLocatorType;
+    }
+    if (outSenderLocatorType) {
+        *outSenderLocatorType = senderLocatorType;
+    }
+
+    if (targetLocatorType == 0u || targetLocatorType > 6u ||
+        senderLocatorType == 0u || senderLocatorType > 6u) {
+        return false;
+    }
+
+    const size_t payloadOffset =
+        0x12u +
+        static_cast<size_t>(kMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
+        static_cast<size_t>(kMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
+    if (payloadOffset >= messageRef.messageBytesFrom0c.size()) {
+        return false;
+    }
+
+    if (outMessageCodePointer) {
+        *outMessageCodePointer = messageRef.messageBytesFrom0c.data() + payloadOffset;
+    }
+    return true;
+}
+
+static bool CMessageConnection_DecodeMessageCodeScaffold(
+    const CMessageConnectionCopiedMessageRefScaffold& messageRef,
+    uint16_t* outMessageCode,
+    bool* outUsedHeaderlessLocatorDecode) {
+    if (outMessageCode) {
+        *outMessageCode = 0u;
+    }
+    if (outUsedHeaderlessLocatorDecode) {
+        *outUsedHeaderlessLocatorDecode = false;
+    }
+    if (messageRef.messageBytesFrom0c.empty()) {
+        return false;
+    }
+
+    const uint8_t* messageCodePointer = messageRef.messageBytesFrom0c.data();
+    if (messageRef.headerless04) {
+        if (outUsedHeaderlessLocatorDecode) {
+            *outUsedHeaderlessLocatorDecode = true;
+        }
+        if (!CMessageConnection_ResolveHeaderlessMessageCodePointerScaffold(
+                messageRef,
+                &messageCodePointer,
+                /*outTargetLocatorType=*/nullptr,
+                /*outSenderLocatorType=*/nullptr)) {
+            return false;
+        }
+    }
+
+    const size_t messageCodeOffset =
+        static_cast<size_t>(messageCodePointer - messageRef.messageBytesFrom0c.data());
+    const uint8_t firstByte = *messageCodePointer;
+    uint16_t messageCode = firstByte;
+    if ((firstByte & 0x80u) != 0u) {
+        if (messageCodeOffset + 1u >= messageRef.messageBytesFrom0c.size()) {
+            return false;
+        }
+        messageCode = static_cast<uint16_t>(
+            ((static_cast<uint16_t>(firstByte) << 8) |
+             static_cast<uint16_t>(messageRef.messageBytesFrom0c[messageCodeOffset + 1u])) &
+            0x7fffu);
+    }
+
+    if (outMessageCode) {
+        *outMessageCode = messageCode;
+    }
+    return true;
+}
+
+static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
+    const CMessageConnectionCopiedMessageRefScaffold& messageRef,
+    uint16_t* outDecodedMessageCode,
+    bool* outUsedHeaderlessLocatorDecode,
+    bool* outHadValidMessageCode) {
+    if (outHadValidMessageCode) {
+        *outHadValidMessageCode = false;
+    }
+
+    uint16_t decodedMessageCode = 0u;
+    bool usedHeaderlessLocatorDecode = false;
+    const bool hadValidMessageCode = CMessageConnection_DecodeMessageCodeScaffold(
+        messageRef,
+        &decodedMessageCode,
+        &usedHeaderlessLocatorDecode);
+    if (outDecodedMessageCode) {
+        *outDecodedMessageCode = decodedMessageCode;
+    }
+    if (outUsedHeaderlessLocatorDecode) {
+        *outUsedHeaderlessLocatorDecode = usedHeaderlessLocatorDecode;
+    }
+    if (outHadValidMessageCode) {
+        *outHadValidMessageCode = hadValidMessageCode;
+    }
+    if (!hadValidMessageCode) {
+        return 0u;
+    }
+
+    switch (decodedMessageCode) {
+        case 2u:
+        case 4u:
+        case 5u:
+            return 1u;
+        default:
+            return 0u;
+    }
+}
+
+}  // namespace
+
 uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
     void* workItem,
     const std::vector<uint8_t>& payloadBytes,
@@ -546,10 +707,12 @@ uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
 // - on type `3`, copy packet-body bytes from the retained-fragment-backed parsed-packet work item
 //   via `currentCursor24` / `assembledByteCount28`
 // - preserve the original oversized-packet close branch before later dispatch/agenda work
-// - current bounded post-copy correction:
-//   - base `0x4490c0` now offers a leaf post-copy dispatch seam
+// - newer bounded base-step correction at the post-copy seam:
+//   - source now also materializes a local message-ref-shaped view over those copied bytes
+//   - headerless packets now keep the original locator-id validity gate before leaf dispatch
+// - current bounded leaf correction:
 //   - auth leaf `0x449a30 -> owner+0x180 / 0x41f250` can now re-enter current-helper slot 5
-//     directly from this callback on the handled auth path
+//     through a local message-ref/base-filter step instead of jumping straight from copied bytes
 //   - margin leaf `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260` can now re-enter the nearer
 //     base-dispatch/current-helper-slot6 path directly from this callback on the handled margin path
 // - remaining message-object / agenda work is still incomplete, so the launcher bridge still keeps
@@ -625,6 +788,30 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
 
     lastReceivedPacketBodyBytesScaffold_.swap(copiedPayloadBytes);
     lastReceivedPacketHeaderlessScaffold_ = !packetizedMessagesEnabledScaffold_;
+
+    const CMessageConnectionCopiedMessageRefScaffold copiedMessageRef =
+        CMessageConnection_BuildCopiedMessageRefScaffold(
+            lastReceivedPacketBodyBytesScaffold_,
+            lastReceivedPacketHeaderlessScaffold_);
+    if (lastReceivedPacketHeaderlessScaffold_) {
+        uint8_t targetLocatorType = 0u;
+        uint8_t senderLocatorType = 0u;
+        if (!CMessageConnection_ResolveHeaderlessMessageCodePointerScaffold(
+                copiedMessageRef,
+                /*outMessageCodePointer=*/nullptr,
+                &targetLocatorType,
+                &senderLocatorType)) {
+            spdlog::info(
+                "CMessageConnection::OnOperationCompleted discarded copied headerless packet because locator ids were invalid payloadBytes={} targetLocatorType={} senderLocatorType={} this={} ownerContext={} remoteHost='{}'",
+                static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
+                static_cast<unsigned>(targetLocatorType),
+                static_cast<unsigned>(senderLocatorType),
+                fmt::ptr(this),
+                fmt::ptr(OwnerContext()),
+                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+            return 1u;
+        }
+    }
 
     const uint32_t postCopyDispatchHandled = DispatchCopiedParsedPacketTailScaffold(
         workItem,
@@ -758,16 +945,41 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
         return 0u;
     }
 
-    const uint8_t rawCode = payloadBytes[0];
+    const CMessageConnectionCopiedMessageRefScaffold copiedMessageRef =
+        CMessageConnection_BuildCopiedMessageRefScaffold(payloadBytes, headerless);
+    uint16_t decodedMessageCode = 0u;
+    bool usedHeaderlessLocatorDecode = false;
+    bool hadValidMessageCode = false;
+    const uint32_t baseFilterHandled = CBaseMarginConnection_DispatchMessageFilterScaffold(
+        copiedMessageRef,
+        &decodedMessageCode,
+        &usedHeaderlessLocatorDecode,
+        &hadValidMessageCode);
+    if (baseFilterHandled != 0u) {
+        spdlog::info(
+            "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold source-owned local 0x449a30/0x442d00 filter consumed decodedMessageCode={} rawCode=0x{:02x} headerless={} locatorDecoded={} this={} ownerContext={} remoteHost='{}'",
+            static_cast<unsigned>(decodedMessageCode),
+            static_cast<unsigned>(payloadBytes[0]),
+            headerless ? 1u : 0u,
+            usedHeaderlessLocatorDecode ? 1u : 0u,
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        return 1u;
+    }
+
     const uint32_t handled = mediator->StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
         payloadBytes.data(),
         payloadBytes.size(),
         /*workItem=*/nullptr);
     spdlog::info(
-        "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} payloadBytes={} headerless={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
-        static_cast<unsigned>(rawCode),
-        static_cast<unsigned>(payloadBytes.size()),
+        "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+        static_cast<unsigned>(payloadBytes[0]),
+        static_cast<unsigned>(decodedMessageCode),
+        hadValidMessageCode ? 1u : 0u,
         headerless ? 1u : 0u,
+        usedHeaderlessLocatorDecode ? 1u : 0u,
+        static_cast<unsigned>(payloadBytes.size()),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         fmt::ptr(mediator->CurrentState()),

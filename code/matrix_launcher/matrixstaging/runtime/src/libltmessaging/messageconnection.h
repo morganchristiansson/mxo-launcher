@@ -280,14 +280,17 @@ public:
     //   that then falls through into the leaf owner-callback wrapper
     // - work type `3` copies packet-body bytes out of the retained-fragment-backed
     //   `CParsedPacketWorkItem` via `+0x24/+0x28` before later dispatch/agenda handling
+    // - source now also mirrors one narrower original post-copy step there:
+    //   - build a local message-ref-shaped view over the copied bytes
+    //   - keep the original headerless locator-id validity gate before leaf dispatch
     // - generic fallback logger on this path is helper `0x448a60`
     // Current source gap kept explicit:
     // - source now owns the copied-packet staging subset and two later leaf post-copy destinations:
-    //   - auth: `0x449a30 -> owner+0x180 / 0x41f250`
+    //   - auth: local message-ref/base-filter step -> `0x449a30 -> owner+0x180 / 0x41f250`
     //   - margin: `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
-    // - later original message-object / agenda work from this same callback is still missing, so
-    //   the launcher bridge keeps one extra synthetic receive-drain proxy item for the remaining
-    //   unconsumed paths
+    // - later original refcounted message-object / agenda work from this same callback is still
+    //   missing, so the launcher bridge keeps one extra synthetic receive-drain proxy item for the
+    //   remaining unconsumed paths
     uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
@@ -368,10 +371,11 @@ public:
 protected:
     // anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
     // Current bounded auth-side correction:
-    // - after base `0x4490c0` finishes the parsed-packet copy, the auth leaf can now re-enter the
-    //   current helper's slot-5 `AuthMessageDispatch` path directly from the connection callback
-    // - this is only a narrowed destination recovery; source still does not materialize the
-    //   original message-ref object passed through `0x449a30`
+    // - after base `0x4490c0` finishes the parsed-packet copy, the auth leaf now first builds a
+    //   local message-ref-shaped view and runs the narrow `0x442d00` consumed-code filter
+    // - only the surviving auth path then re-enters the current helper's slot-5
+    //   `AuthMessageDispatch` path through owner `+0x180`
+    // - source still does not materialize the full original refcounted message object / agenda tail
     uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
         const std::vector<uint8_t>& payloadBytes,

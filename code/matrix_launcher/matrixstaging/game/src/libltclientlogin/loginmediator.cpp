@@ -1249,7 +1249,10 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessageScaffold(void* workIt
 }
 
 // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
-// `0x4490c0 -> 0x449a30 -> owner+0x180` post-copy receive seam.
+// `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
+// Current role is narrower than the earlier raw-byte bridge:
+// - the auth leaf now source-owns the local message-ref-shaped pre-owner step
+// - this mediator helper is therefore only the surviving owner-slot-5 consumer on that branch
 uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
     const uint8_t* packetBytes,
     size_t packetSize,

@@ -660,7 +660,8 @@ public:
     // - current best read is helper slot 5 / `AuthMessageDispatch`
     uint32_t DispatchCurrentHelperAuthMessageScaffold(void* workItem);
     // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
-    // `0x4490c0 -> 0x449a30 -> owner+0x180` post-copy receive seam.
+    // `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
+    // Current scope is only the surviving owner-slot-5 dispatch after that new leaf-local step.
     uint32_t StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
         const uint8_t* packetBytes,
         size_t packetSize,
