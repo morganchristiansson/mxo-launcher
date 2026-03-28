@@ -1869,24 +1869,34 @@ const std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>& CLTThreadPer
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
 CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* contextKey) {
-    auto matchesConnectionKey = [contextKey](CMessageConnection* connection) -> bool {
+    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
+    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    auto matchesConnectionKey =
+        [contextKey, resolvedContextKey, queueContextOwner](CMessageConnection* connection) -> bool {
         if (!connection) {
             return false;
         }
-        return connection == contextKey || connection->OwnerContext() == contextKey;
+        return connection == contextKey ||
+            connection == resolvedContextKey ||
+            connection == queueContextOwner ||
+            connection->OwnerContext() == contextKey ||
+            connection->OwnerContext() == resolvedContextKey;
     };
 
-    for (CMessageConnection* connection : messageConnections_) {
-        if (matchesConnectionKey(connection)) {
-            return connection;
-        }
-    }
-
+    // Prefer the live auth/margin bridge-tracked sidecar connections before falling back to
+    // engine-owned generic entries. That keeps slot 6/7/8 lookup closer to the real
+    // connection-family objects already driving the active path.
     if (authBridgeContextScaffold_ && matchesConnectionKey(authBridgeContextScaffold_->sidecarConnection)) {
         return authBridgeContextScaffold_->sidecarConnection;
     }
     if (marginBridgeContextScaffold_ && matchesConnectionKey(marginBridgeContextScaffold_->sidecarConnection)) {
         return marginBridgeContextScaffold_->sidecarConnection;
+    }
+
+    for (CMessageConnection* connection : messageConnections_) {
+        if (matchesConnectionKey(connection)) {
+            return connection;
+        }
     }
     return nullptr;
 }
@@ -1902,12 +1912,19 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
         return existing;
     }
 
+    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
+    if (resolvedContextKey != contextKey) {
+        if (CMessageConnection* existing = FindMessageConnection(resolvedContextKey)) {
+            return existing;
+        }
+    }
+
     CMessageConnection* connection = new CMessageConnection(this);
     if (!connection) {
         return nullptr;
     }
 
-    connection->SetOwnerContext(contextKey);
+    connection->SetOwnerContext(resolvedContextKey);
     messageConnections_.push_back(connection);
     return connection;
 }

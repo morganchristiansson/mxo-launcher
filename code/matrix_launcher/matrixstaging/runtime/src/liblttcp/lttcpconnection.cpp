@@ -307,7 +307,17 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
     timeout.tv_sec = 0;
     timeout.tv_usec = 0;
     const int ready = select(0, &readSet, nullptr, nullptr, &timeout);
-    if (ready <= 0 || !FD_ISSET(socket, &readSet)) {
+    if (ready == SOCKET_ERROR) {
+        const int wsaError = WSAGetLastError();
+        spdlog::debug(
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold select failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
+            socketHandle_,
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
+            wsaError);
+        (void)CloseSocketTransportScaffold(/*graceful=*/false);
+        return -1;
+    }
+    if (ready == 0 || !FD_ISSET(socket, &readSet)) {
         return 0;
     }
 
