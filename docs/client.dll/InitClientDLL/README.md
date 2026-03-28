@@ -111,7 +111,7 @@ What is currently supported with high confidence:
 - that branch constructs a dialog/helper object with `0x401520`, enters `DoModal`, and later destroys the object with `0x4012e0`
 - the actual helper-process launch is later in dialog `OnInitDialog` at `0x401640`, which starts `_beginthread(0x401590)`
 - thread start `0x401590` launches `autodetect_settings.exe setopts hide`, waits up to 60 seconds, records result bytes, and calls `0x4013c0` to populate launcher UI text such as `Default Settings:`, `Detail:`, `Memory:`, and `Continue`
-- `options.cfg` cleanup is handled by dialog close helper `0x401300`, not by `0x4012e0`
+- `options.cfg` early-close cleanup is handled by dialog close helper `0x401300`, not by `0x4012e0`; that cleanup is conditional on the worker still being active / the dialog not yet being in its ready-to-continue state
 - this preprocessing occurs before the `client.dll` startup handoff
 
 What is **not** yet proven:

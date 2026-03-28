@@ -122,8 +122,9 @@ The strongest current model is:
 2. opens an autodetect dialog through `0x401520` / `DoModal`,
 3. the dialog's `OnInitDialog` path asynchronously launches `autodetect_settings.exe setopts hide`,
 4. launcher-owned dialog code consumes the resulting exit-code bytes and updates the UI,
-5. dialog close helper `0x401300` cleans up `options.cfg`,
-6. and only then does startup continue toward `cres.dll` / `client.dll` loading.
+5. if the dialog closes while the worker is still active / not-yet-ready, close helper `0x401300` terminates that worker and deletes `options.cfg`,
+6. otherwise the temporary config can remain in place for later startup consumption,
+7. and only then does startup continue toward `cres.dll` / `client.dll` loading.
 
 This is currently better supported than any claim that the launcher literally injects `+Windowed 1` into forwarded argv.
 

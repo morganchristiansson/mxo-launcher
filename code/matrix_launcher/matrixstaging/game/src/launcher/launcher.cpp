@@ -10,6 +10,7 @@
 
 #include <spdlog/spdlog.h>
 #include <spdlog/cfg/env.h>
+#include "autodetectdialog.h"
 #include "../../../../src/diagnostics.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
 
@@ -108,7 +109,7 @@ void LogLauncherPreprocessingState() {
         g_LauncherCommandLine.SwitchSkipLaunch() ? 1 : 0,
         g_LauncherCommandLine.SwitchLPTest() ? "1" : "0");
     spdlog::info(
-        "launcher globals    = 4c8b1c:{} 4c8b1d:{} 4d2c64:{} 4d2c65:{} 4d2c66:{} 4d2c6a:{} forced-default-nopatch:{}",
+        "launcher globals    = 4c8b1c:{} 4c8b1d:{} 4d2c64:{} 4d2c65:{} 4d2c66:{} 4d2c6a:{} replacement-default-nopatch:{}",
         g_LauncherCommandLine.LauncherGlobal4C8B1C() ? 1 : 0,
         g_LauncherCommandLine.LauncherGlobal4C8B1D() ? 1 : 0,
         g_LauncherCommandLine.LauncherGlobal4D2C64() ? 1 : 0,
@@ -333,6 +334,17 @@ bool CLauncher::ParseCommandLineStage() const {
         return false;
     }
 
+    // UNANCHORED: the original launcher could continue into launcher-owned UI paths when these
+    // auth parameters were absent. The replacement has no faithful prompt/login UI yet, so keep a
+    // launcher-stage hard fail instead of pretending 0x409950 itself enforced it.
+    const bool hasUser = (g_LauncherCommandLine.AuthUsername()[0] != '\0');
+    const bool hasPwd = (g_LauncherCommandLine.AuthPassword()[0] != '\0');
+    const bool hasChar = (g_LauncherCommandLine.LauncherCharacter()[0] != '\0');
+    if (!hasUser || !hasPwd || !hasChar) {
+        spdlog::error("ERROR: replacement launcher currently requires -user, -pwd AND -char arguments");
+        return false;
+    }
+
     if (!g_LauncherCommandLine.SwitchNoPatch()) {
         g_LauncherCommandLine.ApplyReplacementDefaultNoPatchPolicy();
         spdlog::info(
@@ -342,8 +354,8 @@ bool CLauncher::ParseCommandLineStage() const {
 
     if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
         spdlog::info(
-            "UNANCHORED: parser preserved launcher.exe:0x409f34 autodetect gate, but the 0x40b75a "
-            "dialog/config consumption path is still not reimplemented");
+            "UNANCHORED: parser preserved launcher.exe:0x409f34 autodetect gate and the replacement "
+            "now executes a no-GUI wrapper for the later 0x40b75a dialog/helper path");
     }
 
     LogLauncherPreprocessingState();
@@ -578,16 +590,21 @@ bool CLauncher::PrepareInitClientStateFromStartupContext(const RecoveredLauncher
         spdlog::info("WARNING: pre-client environment scaffold failed to initialize");
     }
 
-    // Static RE currently proves the autodetect/options.cfg gate is set during ParseCommandLine
-    // (launcher.exe:0x409f34) and later consumed by the InitInstance dialog path
-    // (launcher.exe:0x40b75a -> 0x401520 ctor -> DoModal -> 0x401640 OnInitDialog ->
-    // _beginthread(0x401590) -> CreateProcessA("autodetect_settings.exe setopts hide")).
-    // That launcher-owned dialog path is intentionally omitted here until the real original
-    // dialog/config behavior is recovered. If we ever add a temporary console-silencing wrapper
-    // for the helper process, keep it clearly marked replacement-only because the original GUI
-    // launcher had no console for the helper to spam.
     DiagnosticStartWindowTrace();
+    if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
+        if (!RunAutodetectDialogWithoutGui()) {
+            spdlog::error("ERROR: autodetect dialog/helper path failed");
+            return false;
+        }
+    }
     return true;
+}
+
+// UNANCHORED: no-GUI wrapper for launcher.exe:0x40b75a -> 0x401520 -> DoModal -> 0x401640 -> 0x401590.
+bool CLauncher::RunAutodetectDialogWithoutGui() const {
+    spdlog::info("=== Running autodetect dialog path without GUI ===");
+    CAutodetectDialog autodetectDialog;
+    return autodetectDialog.RunWithoutGui();
 }
 
 // UNANCHORED: replacement-only summary logger for current gaps within launcher.exe:0x40b430.
@@ -606,6 +623,7 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     } else {
         spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
+    spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
     spdlog::info("");
 }
 
@@ -689,7 +707,8 @@ bool CLauncher::RunClientDllLifecycle() const {
 // anchor: launcher.exe:0x40b430
 bool CLauncher::InitInstance() {
     spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
-    spdlog::info("NOTE: launcher-owned nopatch setup, arg5, arg6, arg7, and arg8 remain incomplete.");
+    spdlog::info("NOTE: this replacement intentionally supports only the effective nopatch branch; patch/update support remains out of scope even while startup behavior is kept close to launcher.exe.");
+    spdlog::info("NOTE: launcher-owned arg5, arg6, arg7, and arg8 remain incomplete.");
     if (!ParseCommandLineStage()) {
         return false;
     }

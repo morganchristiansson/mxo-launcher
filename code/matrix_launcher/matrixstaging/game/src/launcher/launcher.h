@@ -57,6 +57,9 @@ public:
     // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
     void LogInitInstanceFaithfulnessGaps() const;
 
+    // UNANCHORED: no-GUI wrapper for the original 0x40b75a autodetect dialog consumption path.
+    bool RunAutodetectDialogWithoutGui() const;
+
     // anchor: launcher.exe:0x40a55c / 0x40b430
     uint32_t BuildPackedArg7Selection() const;
 
