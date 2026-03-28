@@ -1237,6 +1237,9 @@ New practical rerun result after that partial wiring:
     - original type `3` is already the parsed-packet work item queued by `CLTTCPConnection::OnReceive`
     - the extra `AuthReceivePacket` item is better read as a later synthetic receive-drain proxy for
       the unimplemented tail of `CMessageConnection::OnOperationCompleted`
+    - newer bounded source correction now also routes that proxy back through the
+      `CMessageConnection` queue callback path first, instead of sending it straight to the
+      mediator bridge context on the normal path
 - that same run reaches launcher-owned auth progression through:
   - `AS_GetPublicKeyReply`
   - `AS_AuthChallenge`

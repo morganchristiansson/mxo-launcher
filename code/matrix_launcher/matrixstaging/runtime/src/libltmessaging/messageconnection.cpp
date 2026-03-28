@@ -1,5 +1,6 @@
 #include "messageconnection.h"
 
+#include "../../../game/src/libltclientlogin/loginmediator.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -318,6 +319,50 @@ static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
         fmt::ptr(workItem));
 }
 
+static mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*
+CMessageConnection_LoginMediatorContextScaffold(CMessageConnection* self) {
+    return self
+        ? static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(self->OwnerContext())
+        : nullptr;
+}
+
+static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
+    CMessageConnection* self,
+    uint32_t workPayload) {
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        CMessageConnection_LoginMediatorContextScaffold(self);
+    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    if (!self || !context || !mediator) {
+        spdlog::debug(
+            "CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold missing mediator context this={} ownerContext={} payload=0x{:08x}",
+            fmt::ptr(self),
+            fmt::ptr(self ? self->OwnerContext() : nullptr),
+            workPayload);
+        return 0u;
+    }
+
+    if (!context->isMarginConnection) {
+        const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
+        if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
+            const uint32_t marginConnectResult = mediator->BeginLauncherMarginConnectionScaffold();
+            spdlog::info(
+                "CMessageConnection::OnOperationCompleted synthetic receive-drain post-AS_AuthReply margin auto-begin result=0x{:08x}",
+                static_cast<unsigned>(marginConnectResult));
+        }
+    } else {
+        (void)mediator->HandleMarginConnectionReceiveScaffold();
+    }
+
+    spdlog::info(
+        "CMessageConnection::OnOperationCompleted handled synthetic receive-drain proxy payload=0x{:08x} this={} ownerContext={} isMargin={} remoteHost='{}'",
+        workPayload,
+        fmt::ptr(self),
+        fmt::ptr(self->OwnerContext()),
+        context->isMarginConnection ? 1u : 0u,
+        self->RemoteHostName().empty() ? std::string("<empty>") : self->RemoteHostName());
+    return 1u;
+}
+
 // anchor: launcher.exe:0x4490c0 first dispatch on `workItem+0x04`
 // Source-owned decomposition of the initial work-type test inside
 // `CMessageConnection::OnOperationCompleted`.
@@ -460,13 +505,23 @@ static bool CMessageConnection_CopyParsedPacketPayloadBytesScaffold(
 // - later message dispatch / packet-agenda / owner callback handling remains a separate next step
 //   in source; that is why the launcher bridge still needs a second synthetic receive-drain proxy
 //   after the original parsed-packet type-3 queue callback has already run
+// - current bounded correction: that synthetic proxy now re-enters through the
+//   CMessageConnection-family callback itself instead of going straight from the queue to the
+//   mediator-owned drain helper
 uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
     }
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
-    if (workType != 3u) {
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain) {
+        const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* syntheticWorkItem =
+            static_cast<const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
+        return CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
+            this,
+            syntheticWorkItem ? syntheticWorkItem->workPayload : 0u);
+    }
+    if (workType != CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket) {
         CMessageConnection_LogUnhandledOperationScaffold(workItem);
         return 1u;
     }

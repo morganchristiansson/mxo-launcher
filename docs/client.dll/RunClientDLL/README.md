@@ -558,6 +558,9 @@ Current best reading remains:
   - still no arg5 slot `12` traffic has appeared on this auth-success path, which remains consistent with the recovered consumer rule that slot `12` only matters for type-1 work items
 - current best blocker reading therefore shifts one step past the old “empty queue0C” diagnosis:
   - the auth-side arg5 queue consumer chain is now demonstrably alive for type-2 work items plus the later synthetic receive-drain proxy items on deliberate `RunClientDLL`
+  - newer bounded source correction also moves that proxy one step closer to the original anchored
+    destination by routing it back through the connection-family queue callback path before the
+    remaining source-owned mediator drain step
   - the next missing state is later launcher-owned progression **after** successful `AS_AuthReply`, not proof that the arg5 queue consumer itself is still dead
 - newer original-launcher helper follow-up now makes that post-auth gap more concrete:
   - `launcher.exe:0x4401a0` (`CLTLoginMediator_Helper10_HandleAuthReply`) performs the auth-reply writeback

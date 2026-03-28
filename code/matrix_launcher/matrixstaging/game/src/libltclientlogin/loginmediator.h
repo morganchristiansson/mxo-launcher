@@ -1042,6 +1042,8 @@ public:
     // - original type-3 parsed-packet queue work already reaches `CMessageConnection::OnOperationCompleted`
     // - source then queues one more synthetic receive-drain proxy so the copied packet bytes can be
     //   drained here until the later original message-object / dispatch tail is reconstructed
+    // - newer bounded correction now routes that proxy back through the connection-family queue
+    //   callback path first; this mediator method remains only the later source-owned drain target
     // Keep the post-auth auth-reply semantics and the one-shot margin auto-begin request here so
     // they stay mediator-owned.
     uint32_t HandleAuthConnectionReceiveScaffold();

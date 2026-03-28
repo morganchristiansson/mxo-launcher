@@ -174,14 +174,11 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
     }
 
     if (IsSyntheticReceiveDrainWorkType(workItem->header.workType)) {
-        // Current best static-RE read:
-        // - original queue type `3` is already the parsed-packet work item queued by
-        //   `CLTTCPConnection::OnReceive -> 0x436820`
-        // - original `CMessageConnection::OnOperationCompleted(0x4490c0)` then continues on that
-        //   same callback into later message-object / dispatch / owner-callback work
-        // - current source stops earlier after copying packet bytes into connection-owned staged
-        //   receive storage, so this extra queue item is only a source-owned proxy for that later
-        //   original tail and must not pretend to be a second original type-3 family
+        // Fallback only:
+        // - the bounded receive-entry correction now normally queues this synthetic proxy with the
+        //   connection-family queue context so it re-enters through `CMessageConnection`
+        // - keep the older mediator-context handling here as a defensive fallback until that seam is
+        //   fully retired
         if (!self->isMarginConnection) {
             const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
             if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
@@ -1490,9 +1487,19 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     workItem->workPayload = workPayload;
     workItem->debugLabel = label;
 
+    void* queuedContext = context;
+    if (IsSyntheticReceiveDrainWorkType(workType) && context->sidecarConnection) {
+        // Current bounded fidelity step:
+        // - original queue consumer dispatches into the connection-family callback path
+        // - the synthetic receive-drain proxy is still source-owned, but it now reaches that
+        //   nearer connection callback surface first instead of jumping straight to the
+        //   mediator-owned bridge context callback
+        queuedContext = context->sidecarConnection->QueueContextScaffold();
+    }
+
     const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
-        context,
+        queuedContext,
         /*useQueue34=*/false,
         label,
         queueLockAlreadyHeld);
@@ -1505,7 +1512,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         "CLTThreadPerClientTCPEngine launcher bridge queued work label='{}' workItem={} context={} type=0x{:08x} ({}) payload=0x{:08x}",
         label ? label : "<null>",
         fmt::ptr(workItem),
-        fmt::ptr(context),
+        fmt::ptr(queuedContext),
         workType,
         LauncherBridgeWorkTypeName(workType),
         workPayload);

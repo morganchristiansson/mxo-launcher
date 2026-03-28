@@ -436,6 +436,10 @@ private:
     // - source-owned receive-drain proxies use `kWorkTypeSyntheticReceiveDrain`
     //   because original type `3` is already consumed by the parsed-packet queue items emitted from
     //   `CLTTCPConnection::OnReceive`
+    // Current bounded destination correction:
+    // - synthetic receive-drain items now prefer the connection-family queue context when one is
+    //   available, so queue dispatch lands on `CMessageConnection::OnOperationCompleted` before any
+    //   later mediator-owned drain handling
     bool EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         uint32_t workType,
@@ -451,6 +455,8 @@ private:
     //   stay aligned once per successful recv fragment instead of once per whole pump
     // - those proxies are intentionally not queued as original type `3`; original parsed-packet
     //   type `3` work is already in queue0C before this helper enqueues the later drain proxy
+    // - when the sidecar connection is present, that later drain proxy now targets the
+    //   connection-family queue callback path first rather than the mediator bridge context
     void PumpLauncherConnectionContextScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         const char* receiveLabel);
