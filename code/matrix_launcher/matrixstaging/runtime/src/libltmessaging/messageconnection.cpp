@@ -3,6 +3,7 @@
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
+#include <utility>
 
 #ifdef DispatchMessage
 #undef DispatchMessage
@@ -514,11 +515,16 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
 
     lastReceivedPacketBodyBytesScaffold_.swap(copiedPayloadBytes);
     lastReceivedPacketHeaderlessScaffold_ = !packetizedMessagesEnabledScaffold_;
+    pendingReceivedPacketsScaffold_.push_back(
+        CMessageConnectionReceivedPacketScaffold{
+            lastReceivedPacketBodyBytesScaffold_,
+            lastReceivedPacketHeaderlessScaffold_});
     spdlog::info(
-        "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} pendingCopiedPackets={} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
         lastReceivedPacketHeaderlessScaffold_ ? 1u : 0u,
         static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
+        static_cast<unsigned>(pendingReceivedPacketsScaffold_.size()),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -531,6 +537,31 @@ const std::vector<uint8_t>& CMessageConnection::LastReceivedPacketBodyBytesScaff
 
 bool CMessageConnection::LastReceivedPacketHeaderlessScaffold() const {
     return lastReceivedPacketHeaderlessScaffold_;
+}
+
+bool CMessageConnection::TakeNextReceivedPacketScaffold(
+    std::vector<uint8_t>* outPayloadBytes,
+    bool* outHeaderless) {
+    if (outPayloadBytes) {
+        outPayloadBytes->clear();
+    }
+    if (outHeaderless) {
+        *outHeaderless = false;
+    }
+    if (pendingReceivedPacketsScaffold_.empty()) {
+        return false;
+    }
+
+    CMessageConnectionReceivedPacketScaffold pendingPacket =
+        std::move(pendingReceivedPacketsScaffold_.front());
+    pendingReceivedPacketsScaffold_.erase(pendingReceivedPacketsScaffold_.begin());
+    if (outPayloadBytes) {
+        *outPayloadBytes = std::move(pendingPacket.payloadBytes);
+    }
+    if (outHeaderless) {
+        *outHeaderless = pendingPacket.headerless;
+    }
+    return true;
 }
 
 // UNANCHORED: source-owned raw-byte compatibility override beneath the original envelope-based

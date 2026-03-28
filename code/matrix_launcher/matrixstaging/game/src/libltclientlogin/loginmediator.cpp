@@ -2927,6 +2927,36 @@ uint32_t CLTLoginMediator::HandleAuthConnectionReceiveScaffold() {
     }
 
     uint32_t actions = kReceiveActionNone;
+    std::vector<uint8_t> queuedPacketBodyBytes;
+    bool queuedPacketHeaderless = false;
+    while (connection->TakeNextReceivedPacketScaffold(
+        &queuedPacketBodyBytes,
+        &queuedPacketHeaderless)) {
+        const uint8_t rawCode = queuedPacketBodyBytes.empty() ? 0u : queuedPacketBodyBytes[0];
+        spdlog::info(
+            "CLTLoginMediator::HandleAuthConnectionReceiveScaffold queuedParsedPacket payloadBytes={} headerless={} rawCode=0x{:02x} likelyMessage='{}'",
+            static_cast<unsigned>(queuedPacketBodyBytes.size()),
+            queuedPacketHeaderless ? 1u : 0u,
+            static_cast<unsigned>(rawCode),
+            mxo::auth::AuthOpcodeName(rawCode));
+
+        const uint32_t handled = HandleAuthPacketBytes(
+            queuedPacketBodyBytes.empty() ? nullptr : queuedPacketBodyBytes.data(),
+            queuedPacketBodyBytes.size());
+        spdlog::info(
+            "CLTLoginMediator::HandleAuthConnectionReceiveScaffold handledQueuedPacket={} rawCode=0x{:02x}",
+            static_cast<unsigned>(handled),
+            static_cast<unsigned>(rawCode));
+
+        if (handled != 0u && rawCode == 0x0bu && !postAuthMarginAutoBeginAttemptedScaffold_) {
+            postAuthMarginAutoBeginAttemptedScaffold_ = true;
+            actions |= kReceiveActionBeginMarginAfterAuthReply;
+            spdlog::info(
+                "CLTLoginMediator::HandleAuthConnectionReceiveScaffold requested one-shot post-AS_AuthReply margin auto-begin currentState={}",
+                currentState_ ? currentState_->DebugName() : "<null>");
+        }
+    }
+
     while (true) {
         const std::vector<uint8_t>& bytes = connection->ReceivedBytes();
         if (bytes.empty()) {
@@ -3079,6 +3109,30 @@ uint32_t CLTLoginMediator::HandleMarginConnectionReceiveScaffold() {
     mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     if (connection == nullptr) {
         return kReceiveActionNone;
+    }
+
+    std::vector<uint8_t> queuedPacketBodyBytes;
+    bool queuedPacketHeaderless = false;
+    while (connection->TakeNextReceivedPacketScaffold(
+        &queuedPacketBodyBytes,
+        &queuedPacketHeaderless)) {
+        const uint8_t rawCode = queuedPacketBodyBytes.empty() ? 0u : queuedPacketBodyBytes[0];
+        const bool looksLikePlainBootstrapReply =
+            rawCode == 0x02u || rawCode == 0x04u || rawCode == 0x07u || rawCode == 0x09u;
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginConnectionReceiveScaffold queuedParsedPacket payloadBytes={} headerless={} outerByte0=0x{:02x} framingHint={}",
+            static_cast<unsigned>(queuedPacketBodyBytes.size()),
+            queuedPacketHeaderless ? 1u : 0u,
+            static_cast<unsigned>(rawCode),
+            looksLikePlainBootstrapReply ? "plaintext-bootstrap-reply" : "possibly-encrypted-post-bootstrap-payload");
+
+        const uint32_t handled = HandleMarginPacketBytes(
+            queuedPacketBodyBytes.empty() ? nullptr : queuedPacketBodyBytes.data(),
+            queuedPacketBodyBytes.size());
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginConnectionReceiveScaffold handledQueuedPacket={} outerByte0=0x{:02x}",
+            static_cast<unsigned>(handled),
+            static_cast<unsigned>(rawCode));
     }
 
     while (true) {

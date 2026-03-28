@@ -186,6 +186,11 @@ struct CMessageConnectionEnvelopeScaffold {
     uint8_t headerless10 = 0;
 };
 
+struct CMessageConnectionReceivedPacketScaffold {
+    std::vector<uint8_t> payloadBytes;
+    bool headerless = false;
+};
+
 class CMessageConnection : public CLTTCPConnection {
 public:
     // UNANCHORED: source-owned narrow subset of `0x448b40` with a null engine and without the
@@ -279,6 +284,11 @@ public:
     // UNANCHORED: source-owned accessor exposing the current headerless/packetized split narrowed
     // from the `0x4490c0` message-ref flag write.
     bool LastReceivedPacketHeaderlessScaffold() const;
+    // UNANCHORED: source-owned queue-drain helper exposing copied parsed-packet bodies from the
+    // narrowed `0x4490c0` type-3 path.
+    bool TakeNextReceivedPacketScaffold(
+        std::vector<uint8_t>* outPayloadBytes,
+        bool* outHeaderless = nullptr);
 
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
@@ -301,6 +311,7 @@ private:
     std::unique_ptr<CMessageConnectionPacketAgendaScaffold> packetAgendaScaffold_;
     std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
     bool lastReceivedPacketHeaderlessScaffold_ = false;
+    std::vector<CMessageConnectionReceivedPacketScaffold> pendingReceivedPacketsScaffold_;
 };
 
 // ============================================================

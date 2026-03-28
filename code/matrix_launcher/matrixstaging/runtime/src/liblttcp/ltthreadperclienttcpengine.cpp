@@ -155,10 +155,6 @@ static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
         }
     }
 
-    if (self->sidecarConnection) {
-        return self->sidecarConnection->OnOperationCompleted(
-            reinterpret_cast<void*>(workItem->header.workType));
-    }
     return 1u;
 }
 
@@ -738,8 +734,13 @@ void CLTThreadPerClientTCPEngine_WorkerThread::SignalWakeup() {
 
 // anchor: launcher.exe:0x42fe50
 void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
-    // Current source ownership only models the class/vtable/wakeup/exit-request surface.
-    // The full socket worker loop remains a later fidelity target.
+    // Current source ownership still does not reimplement the full original select/connect/send/
+    // recv/wakeup loop here.
+    // Narrow update:
+    // - the active TCP receive fragment-production subpath from this function is now mirrored through
+    //   `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` on the launcher
+    //   bridge path
+    // - the remaining broader worker-thread loop fidelity still belongs here later
 }
 
 // anchor: launcher.exe:0x436340
@@ -1511,7 +1512,8 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
         return;
     }
 
-    const int received = context->sidecarConnection->PollReceiveNonBlocking();
+    const int received =
+        context->sidecarConnection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
     if (received > 0) {
         (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
             context,

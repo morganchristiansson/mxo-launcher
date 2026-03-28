@@ -16,6 +16,7 @@ namespace {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_ParsedPacketWorkItemVtable[2] = {nullptr, nullptr};
+static CLTTCPReadOperationFragmentVTable g_ReadOperationFragmentSourceVtable = {};
 
 // UNANCHORED: source-owned endpoint-key comparison helper for the current connection wrapper.
 static bool EndpointKeysDiffer(const LTTCPEndpointKey& lhs, const LTTCPEndpointKey& rhs) {
@@ -51,6 +52,109 @@ static void ReadOperationFragment_Release(CLTTCPReadOperationFragmentScaffold* f
     }
 
     fragment->vtable->release(fragment);
+}
+
+// anchor: launcher.exe:0x42fd50 / vtable 0x004b2300 +0x00
+static void* __thiscall ReadOperationFragmentSource_DeletingDtorScaffold(
+    CLTTCPReadOperationFragmentScaffold* self,
+    uint8_t deleteFlag) {
+    if (self && (deleteFlag & 1u) != 0u) {
+        std::free(self);
+    }
+    return nullptr;
+}
+
+// anchor: launcher.exe:0x42f850 / vtable 0x004b2300 +0x04
+static void __thiscall ReadOperationFragmentSource_AddRefScaffold(
+    CLTTCPReadOperationFragmentScaffold* self) {
+    if (!self) {
+        return;
+    }
+    (void)InterlockedIncrement(reinterpret_cast<volatile LONG*>(&self->referenceCount));
+}
+
+// anchor: launcher.exe:0x42f860 / vtable 0x004b2300 +0x08
+static void __thiscall ReadOperationFragmentSource_ReleaseScaffold(
+    CLTTCPReadOperationFragmentScaffold* self) {
+    if (!self) {
+        return;
+    }
+
+    const LONG remaining =
+        InterlockedDecrement(reinterpret_cast<volatile LONG*>(&self->referenceCount));
+    if (remaining == 0 && self->vtable && self->vtable->deleteIfNonNull) {
+        self->vtable->deleteIfNonNull(self);
+    }
+}
+
+// anchor: launcher.exe:0x004199b0 / vtable 0x004b2300 +0x0c
+static void __thiscall ReadOperationFragmentSource_DeleteIfNonNullScaffold(
+    CLTTCPReadOperationFragmentScaffold* self) {
+    if (!self || !self->vtable || !self->vtable->deletingDtor) {
+        return;
+    }
+
+    (void)self->vtable->deletingDtor(self, 1u);
+}
+
+// anchor: launcher.exe:0x42f880 / vtable 0x004b2300 +0x10
+static void __thiscall ReadOperationFragmentSource_ResetRefCountScaffold(
+    CLTTCPReadOperationFragmentScaffold* self) {
+    if (!self) {
+        return;
+    }
+    (void)InterlockedExchange(reinterpret_cast<volatile LONG*>(&self->referenceCount), 0);
+}
+
+// anchor: launcher.exe:0x42f890 / vtable 0x004b2300 +0x14
+static void __thiscall ReadOperationFragmentSource_SetRefCountFromPtrScaffold(
+    CLTTCPReadOperationFragmentScaffold* self,
+    const long* value) {
+    if (!self || !value) {
+        return;
+    }
+    (void)InterlockedExchange(
+        reinterpret_cast<volatile LONG*>(&self->referenceCount),
+        static_cast<LONG>(*value));
+}
+
+// anchor: launcher.exe:0x42fe50 TCP receive-path `CLTTCPReadOperation` allocation/setup
+static CLTTCPReadOperationFragmentScaffold* AllocateReadOperationFragmentSourceScaffold() {
+    constexpr size_t kPayloadCapacity = 0x1000u;
+    constexpr size_t kAllocationSize = offsetof(CLTTCPReadOperationFragmentScaffold, bytes0C) + kPayloadCapacity;
+    if (!g_ReadOperationFragmentSourceVtable.addRef) {
+        g_ReadOperationFragmentSourceVtable.deletingDtor =
+            &ReadOperationFragmentSource_DeletingDtorScaffold;
+        g_ReadOperationFragmentSourceVtable.addRef = &ReadOperationFragmentSource_AddRefScaffold;
+        g_ReadOperationFragmentSourceVtable.release = &ReadOperationFragmentSource_ReleaseScaffold;
+        g_ReadOperationFragmentSourceVtable.deleteIfNonNull =
+            &ReadOperationFragmentSource_DeleteIfNonNullScaffold;
+        g_ReadOperationFragmentSourceVtable.resetRefCount =
+            &ReadOperationFragmentSource_ResetRefCountScaffold;
+        g_ReadOperationFragmentSourceVtable.setRefCountFromPtr =
+            &ReadOperationFragmentSource_SetRefCountFromPtrScaffold;
+    }
+
+    CLTTCPReadOperationFragmentScaffold* fragment =
+        static_cast<CLTTCPReadOperationFragmentScaffold*>(std::calloc(1, kAllocationSize));
+    if (!fragment) {
+        return nullptr;
+    }
+
+    fragment->vtable = &g_ReadOperationFragmentSourceVtable;
+    fragment->referenceCount = 0;
+    fragment->byteCount = 0u;
+    return fragment;
+}
+
+// anchor: launcher.exe:0x452350
+static void ReadOperationFragmentSource_SetByteCountScaffold(
+    CLTTCPReadOperationFragmentScaffold* fragment,
+    uint32_t byteCount) {
+    if (!fragment) {
+        return;
+    }
+    fragment->byteCount = std::min<uint32_t>(byteCount, 0x1000u);
 }
 
 // UNANCHORED: source-owned payload-base helper for the recovered read-operation fragment family.
@@ -719,6 +823,46 @@ int CLTTCPConnection::PollReceiveNonBlocking() {
     }
 
     receivedBytes_.resize(oldSize + static_cast<size_t>(received));
+    return received;
+}
+
+// anchor: launcher.exe:0x42fe50 TCP receive subpath
+int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
+    const int received = PollReceiveNonBlocking();
+    if (received <= 0) {
+        return received;
+    }
+
+    size_t consumedBytes = 0u;
+    while (consumedBytes < receivedBytes_.size()) {
+        const size_t chunkByteCount = std::min<size_t>(receivedBytes_.size() - consumedBytes, 0x1000u);
+        CLTTCPReadOperationFragmentScaffold* readOperationFragment =
+            AllocateReadOperationFragmentSourceScaffold();
+        if (!readOperationFragment) {
+            spdlog::warn(
+                "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold failed fragment allocation this={} bufferedBytes={} remoteHost='{}'",
+                fmt::ptr(this),
+                static_cast<unsigned>(receivedBytes_.size() - consumedBytes),
+                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+            break;
+        }
+
+        std::memcpy(
+            readOperationFragment->bytes0C,
+            receivedBytes_.data() + consumedBytes,
+            chunkByteCount);
+        ReadOperationFragmentSource_SetByteCountScaffold(
+            readOperationFragment,
+            static_cast<uint32_t>(chunkByteCount));
+        ReadOperationFragment_AddRef(readOperationFragment);
+        OnReceive(readOperationFragment);
+        ReadOperationFragment_Release(readOperationFragment);
+        consumedBytes += chunkByteCount;
+    }
+
+    if (consumedBytes != 0u) {
+        ConsumeReceivedBytesPrefix(consumedBytes);
+    }
     return received;
 }
 

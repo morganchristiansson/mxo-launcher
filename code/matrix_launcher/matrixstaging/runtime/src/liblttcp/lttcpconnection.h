@@ -219,6 +219,13 @@ public:
 
     // UNANCHORED: source-owned nonblocking socket poll helper used by the launcher bridge scaffolds.
     int PollReceiveNonBlocking();
+    // anchor: launcher.exe:0x42fe50 TCP receive subpath
+    // Narrow source-owned mirror of the worker-thread receive delivery shape:
+    // - receive into a `CLTTCPReadOperation`-family fragment
+    // - set fragment byte count
+    // - call `OnReceive(readOperationFragment)`
+    // - release the worker-held outer fragment reference
+    int PollReceiveAndDeliverReadOperationFragmentsScaffold();
     // UNANCHORED: source-owned diagnostic accessor over the buffered receive bytes.
     const std::vector<uint8_t>& ReceivedBytes() const;
     // UNANCHORED: source-owned buffered receive reset helper.
