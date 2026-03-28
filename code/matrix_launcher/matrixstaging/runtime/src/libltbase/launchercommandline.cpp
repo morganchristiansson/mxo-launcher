@@ -9,8 +9,6 @@
 #include <ctime>
 #include <sys/stat.h>
 
-#include <spdlog/spdlog.h>
-
 namespace mxo {
 namespace libltbase {
 
@@ -61,21 +59,11 @@ bool CLauncherCommandLine::ParseCommandLine(int argc, char** argv) {
     }
 
     ProbeOptionsCfgAutodetectGate();
-
-    // UNANCHORED: current replacement launcher has no faithful UI/login prompt path yet,
-    // so keep a hard fail here until that interface exists.
-    const bool hasUser = (authUsername_[0] != '\0');
-    const bool hasPwd = (authPassword_[0] != '\0');
-    const bool hasChar = (launcherCharacter_[0] != '\0');
-    if (!hasUser || !hasPwd || !hasChar) {
-        spdlog::error("ERROR: launcher currently requires -user, -pwd AND -char arguments");
-        return false;
-    }
-
     return true;
 }
 
-// UNANCHORED: replacement-side wrapper for the original CWinApp_InitInstance call to
+// anchor: launcher.exe:0x40b59a -> 0x4173d0
+// Replacement wrapper for the original InitInstance call to
 // CConsoleVar_ParseCommandLineAndConfig(filteredArgCount, filteredArgv, 0).
 bool CLauncherCommandLine::ParseRuntimeConsoleVariables() {
     runtimeConsoleErrors_.lines.clear();
@@ -83,14 +71,13 @@ bool CLauncherCommandLine::ParseRuntimeConsoleVariables() {
 }
 
 // UNANCHORED: deliberate replacement-launcher policy, not original ParseCommandLine behavior.
-void CLauncherCommandLine::ForceDefaultNoPatchBranch() {
-    if (switchNoPatch_) {
+void CLauncherCommandLine::ApplyReplacementDefaultNoPatchPolicy() {
+    if (switchNoPatch_ || forcedDefaultNoPatchBranch_) {
         return;
     }
 
-    switchNoPatch_ = true;
+    forcedDefaultNoPatchBranch_ = true;
     launcherGlobal4C8B1D_ = false;
-    RebuildNoPatchVersionState();
 }
 
 void CLauncherCommandLine::Reset() {
@@ -116,7 +103,7 @@ void CLauncherCommandLine::Reset() {
     launcherGlobal4C8B1C_ = true;
     launcherGlobal4C8B1D_ = true;
     launcherGlobal4D2C64_ = false;
-    autodetectExitCode_ = 0;
+    forcedDefaultNoPatchBranch_ = false;
 
     noPatchLauncherVersionBits_ = FloatBitsFromCString("0.1");
     noPatchClientVersionBits_ = noPatchLauncherVersionBits_;
@@ -198,12 +185,8 @@ bool CLauncherCommandLine::LauncherGlobal4D2C64() const {
     return launcherGlobal4D2C64_;
 }
 
-std::uint32_t CLauncherCommandLine::AutodetectExitCode() const {
-    return autodetectExitCode_;
-}
-
-void CLauncherCommandLine::SetAutodetectExitCode(std::uint32_t exitCode) {
-    autodetectExitCode_ = exitCode;
+bool CLauncherCommandLine::ReplacementDefaultNoPatchPolicyActive() const {
+    return forcedDefaultNoPatchBranch_;
 }
 
 std::uint32_t CLauncherCommandLine::NoPatchLauncherVersionBits() const {
@@ -388,6 +371,7 @@ bool CLauncherCommandLine::ConsumeValueSwitch(PendingValueTarget target, const c
     }
 }
 
+// anchor: launcher.exe:0x409f34..0x409fc4
 void CLauncherCommandLine::ProbeOptionsCfgAutodetectGate() {
     launcherGlobal4D2C64_ = false;
 
@@ -408,6 +392,7 @@ void CLauncherCommandLine::ProbeOptionsCfgAutodetectGate() {
     const std::time_t currentTime = std::time(nullptr);
     std::tm* currentUtc = std::gmtime(&currentTime);
     if (!currentUtc) {
+        launcherGlobal4D2C64_ = true;
         return;
     }
     if (IsTmBeforeAutodetectCutoff(currentUtc)) {
@@ -417,8 +402,9 @@ void CLauncherCommandLine::ProbeOptionsCfgAutodetectGate() {
     launcherGlobal4D2C64_ = true;
 }
 
-// anchor: launcher.exe:0x409a73..0x409b46
-// The original -nopatch branch seeds mediator version values from launcher.exe/client.dll version info.
+// anchor: launcher.exe:0x409a73..0x409c42
+// The original explicit -nopatch branch seeds mediator version values from launcher.exe/client.dll
+// version info after first applying the fallback string "0.1" to both mediator slots.
 void CLauncherCommandLine::RebuildNoPatchVersionState() {
     noPatchLauncherVersionBits_ = FloatBitsFromCString("0.1");
     noPatchClientVersionBits_ = noPatchLauncherVersionBits_;

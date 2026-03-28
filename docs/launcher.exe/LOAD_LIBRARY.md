@@ -373,7 +373,7 @@ The `p_dlls/` folder serves as:
 **FreeLibrary vs DeleteFile**:
 - Launcher.exe uses `FreeLibrary` to **unload** DLLs from memory at exit
 - Launcher.exe does **NOT** call `DeleteFileA` on deployed DLLs
-- The only `DeleteFileA` call found deletes `options.cfg` (a temporary config file)
+- The only currently confirmed `DeleteFileA` cleanup path for the temp config is dialog helper `0x401300`, which deletes `options.cfg`
 
 **Cleanup Functions Found**:
 
@@ -381,7 +381,8 @@ The `p_dlls/` folder serves as:
 |----------|---------|--------|
 | `fcn.0040a760` | Unload client.dll | `FreeLibrary(0x4d2c50)` - module handle |
 | `fcn.0040a7a0` | Unload secondary module | `FreeLibrary(0x4d2c4c)` |
-| `fcn.004012e0` | Delete temp config | `DeleteFileA("options.cfg")` |
+| `fcn.00401300` | Autodetect dialog close helper | `DeleteFileA("options.cfg")` when the autodetect worker thread is still active / tracked |
+| `fcn.004012e0` | Autodetect dialog destructor | vtable reset + `CDialog::~CDialog` |
 
 **Assembly Evidence**:
 ```assembly
@@ -449,7 +450,7 @@ Game Exit
     │
     ├── fcn.0040a760: FreeLibrary(client.dll)
     │
-    ├── fcn.004012e0: DeleteFileA("options.cfg")
+    ├── fcn.00401300: autodetect dialog close helper may DeleteFileA("options.cfg")
     │
     └── Process terminates
     

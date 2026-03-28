@@ -97,7 +97,7 @@ void LogLauncherPreprocessingState() {
     spdlog::info("launcher character  = {}", MaskedArgValue(g_LauncherCommandLine.LauncherCharacter()));
     spdlog::info("launcher session    = {}", MaskedArgValue(g_LauncherCommandLine.LauncherSession()));
     spdlog::info(
-        "launcher flags      = clone:{} silent:{} nopatch:{} recover:{} deletechar:{} justpatch:{} noeula:{} skiplaunch:{} lptest:{}",
+        "launcher flags      = clone:{} silent:{} explicit-nopatch:{} recover:{} deletechar:{} justpatch:{} noeula:{} skiplaunch:{} lptest:{}",
         g_LauncherCommandLine.SwitchClone() ? 1 : 0,
         g_LauncherCommandLine.SwitchSilent() ? 1 : 0,
         g_LauncherCommandLine.SwitchNoPatch() ? 1 : 0,
@@ -108,16 +108,14 @@ void LogLauncherPreprocessingState() {
         g_LauncherCommandLine.SwitchSkipLaunch() ? 1 : 0,
         g_LauncherCommandLine.SwitchLPTest() ? "1" : "0");
     spdlog::info(
-        "launcher globals    = 4c8b1c:{} 4c8b1d:{} 4d2c64:{} 4d2c65:{} 4d2c66:{} 4d2c6a:{}",
+        "launcher globals    = 4c8b1c:{} 4c8b1d:{} 4d2c64:{} 4d2c65:{} 4d2c66:{} 4d2c6a:{} forced-default-nopatch:{}",
         g_LauncherCommandLine.LauncherGlobal4C8B1C() ? 1 : 0,
         g_LauncherCommandLine.LauncherGlobal4C8B1D() ? 1 : 0,
         g_LauncherCommandLine.LauncherGlobal4D2C64() ? 1 : 0,
         g_LauncherCommandLine.SwitchRecover() ? 1 : 0,
         g_LauncherCommandLine.SwitchJustPatch() ? 1 : 0,
-        g_LauncherCommandLine.SwitchClone() ? 1 : 0);
-    if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
-        spdlog::info("launcher autodetect exitCode = {}", (unsigned long)g_LauncherCommandLine.AutodetectExitCode());
-    }
+        g_LauncherCommandLine.SwitchClone() ? 1 : 0,
+        g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive() ? 1 : 0);
 }
 
 bool PreloadDependencies() {
@@ -336,8 +334,16 @@ bool CLauncher::ParseCommandLineStage() const {
     }
 
     if (!g_LauncherCommandLine.SwitchNoPatch()) {
-        g_LauncherCommandLine.ForceDefaultNoPatchBranch();
-        spdlog::info("DIAGNOSTIC: forcing default nopatch branch semantics in replacement launcher");
+        g_LauncherCommandLine.ApplyReplacementDefaultNoPatchPolicy();
+        spdlog::info(
+            "UNANCHORED: replacement launcher forces the effective nopatch branch after the faithful "
+            "0x409950 -> 0x4173d0 parse/config stages");
+    }
+
+    if (g_LauncherCommandLine.LauncherGlobal4D2C64()) {
+        spdlog::info(
+            "UNANCHORED: parser preserved launcher.exe:0x409f34 autodetect gate, but the 0x40b75a "
+            "dialog/config consumption path is still not reimplemented");
     }
 
     LogLauncherPreprocessingState();
@@ -436,8 +442,12 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
 
     if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
         spdlog::info(
-            "DIAGNOSTIC: rebuilt nopatch launcher-version float from launcher.exe version info = '{}' (0x{:08x})",
+            "DIAGNOSTIC: explicit -nopatch rebuilt launcher-version float from launcher.exe version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchLauncherVersionString(),
+            startupContext->nopatchLauncherVersionValue);
+    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
+        spdlog::info(
+            "UNANCHORED: replacement default nopatch policy is using fallback launcher-version float 0.1 (0x{:08x})",
             startupContext->nopatchLauncherVersionValue);
     } else {
         spdlog::info(
@@ -446,8 +456,12 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     }
     if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
         spdlog::info(
-            "DIAGNOSTIC: rebuilt nopatch client-version float from client.dll version info = '{}' (0x{:08x})",
+            "DIAGNOSTIC: explicit -nopatch rebuilt client-version float from client.dll version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchClientVersionString(),
+            startupContext->nopatchClientVersionValue);
+    } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
+        spdlog::info(
+            "UNANCHORED: replacement default nopatch policy is using fallback client-version float 0.1 (0x{:08x})",
             startupContext->nopatchClientVersionValue);
     } else {
         spdlog::info(
@@ -566,9 +580,12 @@ bool CLauncher::PrepareInitClientStateFromStartupContext(const RecoveredLauncher
 
     // Static RE currently proves the autodetect/options.cfg gate is set during ParseCommandLine
     // (launcher.exe:0x409f34) and later consumed by the InitInstance dialog path
-    // (launcher.exe:0x40b75a -> 0x401520 / DoModal). The old child-process launcher step was
-    // replacement-only scaffolding and is intentionally omitted here until the real original
-    // dialog/config behavior is recovered.
+    // (launcher.exe:0x40b75a -> 0x401520 ctor -> DoModal -> 0x401640 OnInitDialog ->
+    // _beginthread(0x401590) -> CreateProcessA("autodetect_settings.exe setopts hide")).
+    // That launcher-owned dialog path is intentionally omitted here until the real original
+    // dialog/config behavior is recovered. If we ever add a temporary console-silencing wrapper
+    // for the helper process, keep it clearly marked replacement-only because the original GUI
+    // launcher had no console for the helper to spam.
     DiagnosticStartWindowTrace();
     return true;
 }

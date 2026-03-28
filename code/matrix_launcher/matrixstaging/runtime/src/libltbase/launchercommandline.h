@@ -19,13 +19,15 @@ public:
     // anchor: launcher.exe:0x409950
     bool ParseCommandLine(int argc, char** argv);
 
-    // UNANCHORED: faithful CWinApp_InitInstance second-stage wrapper around
+    // anchor: launcher.exe:0x40b59a -> 0x4173d0
+    // Replacement wrapper for the original InitInstance call shape:
     // CConsoleVar_ParseCommandLineAndConfig(filteredArgCount, filteredArgv, 0)
     bool ParseRuntimeConsoleVariables();
 
-    // UNANCHORED: diagnostic policy to preserve the current replacement-launcher
-    // nopatch path without pretending that the original parser forced it.
-    void ForceDefaultNoPatchBranch();
+    // UNANCHORED: replacement-only runtime policy that keeps the current launcher on the
+    // nopatch branch after the faithful 0x409950 parse stage. This must not mutate
+    // whether the original -nopatch switch was actually present on the command line.
+    void ApplyReplacementDefaultNoPatchPolicy();
 
     void Reset();
 
@@ -50,9 +52,7 @@ public:
     bool LauncherGlobal4C8B1C() const;
     bool LauncherGlobal4C8B1D() const;
     bool LauncherGlobal4D2C64() const;
-
-    std::uint32_t AutodetectExitCode() const;
-    void SetAutodetectExitCode(std::uint32_t exitCode);
+    bool ReplacementDefaultNoPatchPolicyActive() const;
 
     std::uint32_t NoPatchLauncherVersionBits() const;
     std::uint32_t NoPatchClientVersionBits() const;
@@ -99,19 +99,19 @@ private:
     char launcherSession_[256] = {};
 
     bool switchClone_ = false;
-    bool switchSilent_ = false;
-    bool switchNoPatch_ = false;
+    bool switchSilent_ = false;     // observed -silent presence; 0x409950 shows no extra state write here
+    bool switchNoPatch_ = false;    // observed explicit -nopatch presence from 0x409950
     bool switchRecover_ = false;
-    bool switchDeleteChar_ = false;
+    bool switchDeleteChar_ = false; // observed -deletechar presence; 0x409950 shows no extra state write here
     bool switchJustPatch_ = false;
     bool switchNoEula_ = false;
-    bool switchSkipLaunch_ = false;
-    bool switchLPTest_ = false;
+    bool switchSkipLaunch_ = false; // observed -skiplaunch presence; 0x409950 shows no extra state write here
+    bool switchLPTest_ = false;     // observed -lptest presence; 0x409950 shows no extra state write here
 
     bool launcherGlobal4C8B1C_ = true;
     bool launcherGlobal4C8B1D_ = true;
     bool launcherGlobal4D2C64_ = false;
-    std::uint32_t autodetectExitCode_ = 0;
+    bool forcedDefaultNoPatchBranch_ = false;
 
     std::uint32_t noPatchLauncherVersionBits_ = 0;
     std::uint32_t noPatchClientVersionBits_ = 0;

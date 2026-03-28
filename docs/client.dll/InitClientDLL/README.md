@@ -108,9 +108,10 @@ What is currently supported with high confidence:
 - `options.cfg` is consulted during the launcher-side preprocessing path
 - that probe can set launcher-global flag `0x4d2c64`
 - startup later checks `0x4d2c64` at `0x40b75a` and runs an extra launcher-side branch before client loading continues
-- that branch constructs a helper object and calls `0x401520`
-- `0x401520` launches `autodetect_settings.exe setopts hide`, waits up to 60 seconds, records result bytes, and calls `0x4013c0` to populate launcher UI text such as `Default Settings:`, `Detail:`, `Memory:`, and `Continue`
-- `options.cfg` is deleted later by `0x4012e0`
+- that branch constructs a dialog/helper object with `0x401520`, enters `DoModal`, and later destroys the object with `0x4012e0`
+- the actual helper-process launch is later in dialog `OnInitDialog` at `0x401640`, which starts `_beginthread(0x401590)`
+- thread start `0x401590` launches `autodetect_settings.exe setopts hide`, waits up to 60 seconds, records result bytes, and calls `0x4013c0` to populate launcher UI text such as `Default Settings:`, `Detail:`, `Memory:`, and `Continue`
+- `options.cfg` cleanup is handled by dialog close helper `0x401300`, not by `0x4012e0`
 - this preprocessing occurs before the `client.dll` startup handoff
 
 What is **not** yet proven:

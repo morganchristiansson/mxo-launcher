@@ -102,33 +102,28 @@ Static tracing now shows this relationship:
 - `0x409950` performs `_stat("options.cfg")` and time/date checks
 - if the probe path decides the temporary config is relevant, it sets launcher flag `0x4d2c64 = 1`
 - later startup at `0x40b75a` reads `0x4d2c64`
-- if set, startup constructs a helper object on the stack and calls `0x401520`
-- after that helper returns, startup destroys the helper object and calls `0x4012e0`
-- `0x4012e0` is the known `DeleteFileA("options.cfg")` cleanup path
+- if set, startup constructs a stack dialog object with `0x401520`, calls `DoModal`, then destroys it with `0x4012e0`
+- the actual helper-process launch is not in the ctor: it happens later in dialog `OnInitDialog` at `0x401640`
+- `0x401640` starts `_beginthread(0x401590)`
+- thread start `0x401590` brings the launcher window to the top, calls `CreateProcessA("autodetect_settings.exe setopts hide")`, waits up to `0xea60` milliseconds (60 seconds), records the child exit code through `GetExitCodeProcess`, and calls `0x4013c0`
+- `0x4013c0` populates UI strings like `Default Settings:`, `Detail:`, `Memory:`, and `Continue` using `Low` / `Medium` / `High` text derived from the recorded result bytes
+- cleanup of the temporary file is in dialog close helper `0x401300`, which calls `DeleteFileA("options.cfg")` when the background thread is still active / tracked
 
 `0x401520` itself is now much better understood:
 
 - it constructs an MFC-style dialog/helper object
-- it brings the launcher window to the top
-- it launches:
-  - `autodetect_settings.exe setopts hide`
-- it waits up to `0xea60` milliseconds (60 seconds)
-- on success, it records the child process exit code through `GetExitCodeProcess`
-- it then calls `0x4013c0`, which populates UI strings like:
-  - `Default Settings:`
-  - `Detail:`
-  - `Memory:`
-  - `Continue`
-  using `Low` / `Medium` / `High` text derived from the recorded result bytes
+- it does **not** directly launch `autodetect_settings.exe`
+- the launch instead occurs during the modal dialog path reached after `DoModal`
 
 So `options.cfg` is part of a real launcher-owned preprocessing branch before the client-loading sequence continues.
 The strongest current model is:
 
 1. `launcher.exe` notices relevant temporary config state,
-2. launches `autodetect_settings.exe setopts hide`,
-3. consumes the resulting settings/result state through launcher-owned code,
-4. cleans up `options.cfg`,
-5. and only then continues toward `cres.dll` / `client.dll` loading.
+2. opens an autodetect dialog through `0x401520` / `DoModal`,
+3. the dialog's `OnInitDialog` path asynchronously launches `autodetect_settings.exe setopts hide`,
+4. launcher-owned dialog code consumes the resulting exit-code bytes and updates the UI,
+5. dialog close helper `0x401300` cleans up `options.cfg`,
+6. and only then does startup continue toward `cres.dll` / `client.dll` loading.
 
 This is currently better supported than any claim that the launcher literally injects `+Windowed 1` into forwarded argv.
 
