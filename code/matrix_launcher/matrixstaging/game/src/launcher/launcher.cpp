@@ -395,13 +395,20 @@ void CLauncher::UnloadCresDLL() const {
     }
 }
 
-// UNANCHORED: recovered grouping inside launcher.exe:0x40b430 before arg6/arg7 preparation.
+// UNANCHORED: replacement-only synthesis inside launcher.exe:0x40b430 before the later
+// 0x40b739..0x40b7af continuation corridor. This groups state that the replacement must recover
+// in order to feed arg5/arg6/arg7 on the active nopatch path, without claiming a real original
+// helper boundary.
 bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStartupContext* startupContext) {
     if (!startupContext) {
         return false;
     }
 
     std::memset(startupContext, 0, sizeof(*startupContext));
+
+    // Replacement-only stand-in for launcher-owned world-selection state that must already exist
+    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. No separate 0x40b430 helper is
+    // claimed here; this only groups the current recovery work.
     LoadLastWorldNameFromRegistry(g_LastWorldName, sizeof(g_LastWorldName));
 
     if (g_LastWorldName[0]) {
@@ -449,6 +456,10 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
 
     startupContext->mediatorSelectedSelectionGateByte100 = recoveredSelection ? recoveredSelection->selectionGateByte100 : 1u;
     startupContext->mediatorSelectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
+
+    // Replacement-only nopatch bookkeeping used by the recovered mediator scaffold later in the
+    // active 0x40b430 path. This is intentionally documented as a grouped source convenience, not
+    // as a proven original subroutine boundary.
     startupContext->nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionBits();
     startupContext->nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionBits();
 
@@ -484,8 +495,11 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     return true;
 }
 
-// UNANCHORED: recovered grouping inside launcher.exe:0x40b430 that prepares arg5/arg6/arg7-owned state.
-bool CLauncher::PrepareInitClientStateFromStartupContext(const RecoveredLauncherStartupContext& startupContext) {
+// UNANCHORED: replacement-only synthesis that feeds the later 0x40b739..0x40b7af corridor by
+// materializing current arg5/arg6/arg7 scaffolds. This is more honest than treating the entire
+// pre-client stretch as one faux method, but it still does not claim an exact original boundary.
+bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
+    const RecoveredLauncherStartupContext& startupContext) {
     if (!PreloadDependencies()) {
         spdlog::info("ERROR: preload failed");
         return false;
@@ -586,6 +600,14 @@ bool CLauncher::PrepareInitClientStateFromStartupContext(const RecoveredLauncher
         marginRoutePrefix,
         exactMarginHostName);
 
+    return true;
+}
+
+// UNANCHORED: recovered continuation for the original 0x40b74d..0x40b790 corridor after the
+// 0x40a380 success gate. The current source maps the 0x402ec0-style pre-client bringup and the
+// optional 0x40b75a autodetect dialog path here, while leaving the later 0x40b790 _access /
+// 0x41ab10 file gate explicitly unmodeled.
+bool CLauncher::RunRecoveredPreClientBringupStage() const {
     if (!DiagnosticInitializePreclientEnvironmentLike402EC0()) {
         spdlog::info("WARNING: pre-client environment scaffold failed to initialize");
     }
@@ -624,6 +646,7 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
         spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
     spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
+    spdlog::info("file/access gate status: original 0x40b790..0x40b7af _access(DAT_004d4cbc,0) / 0x41ab10(0) side path is still not modeled on the replacement path");
     spdlog::info("");
 }
 
@@ -717,12 +740,27 @@ bool CLauncher::InitInstance() {
     spdlog::info("DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher object scaffold + InitClientDLL/RunClientDLL + launcher-owned auth begin");
 
     RecoveredLauncherStartupContext startupContext = {};
+
+    // UNANCHORED within 0x40b430: replacement-only synthesis that seeds launcher-owned selection
+    // and nopatch state before the later pre-client continuation corridor.
     if (!BuildStartupContextFromRecoveredSelection(&startupContext)) {
         return false;
     }
-    if (!PrepareInitClientStateFromStartupContext(startupContext)) {
+
+    // UNANCHORED within 0x40b430: replacement-only arg5/arg6/arg7 scaffold materialization that
+    // feeds the later anchored 0x40a4d0 InitClientDLL call shape.
+    if (!MaterializeRecoveredInitClientStateFromStartupContext(startupContext)) {
         return false;
     }
+
+    // Original corridor in 0x40b430:
+    // - 0x40b74d..0x40b752: 0x402ec0 pre-client thread/message bringup gate
+    // - 0x40b75a..0x40b790: optional autodetect dialog path when 0x4d2c64 is set
+    // - 0x40b790..0x40b7af: file/access gate remains explicitly unmodeled here
+    if (!RunRecoveredPreClientBringupStage()) {
+        return false;
+    }
+
     LogInitInstanceFaithfulnessGaps();
 
     if (!LoadCresDLL()) {

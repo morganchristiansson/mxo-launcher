@@ -6,7 +6,9 @@
 namespace mxo {
 namespace launcher {
 
-// UNANCHORED: recovered replacement grouping for launcher.exe:0x40b430 startup-state handoff.
+// UNANCHORED: replacement-only handoff object for the current launcher.exe:0x40b430 recovery.
+// It deliberately groups state synthesized by the replacement rather than claiming an original
+// standalone struct or helper boundary in the binary.
 struct RecoveredLauncherStartupContext {
     char mediatorSelectionName[64];
     const void* recoveredSelection;
@@ -48,11 +50,19 @@ public:
     // anchor: launcher.exe:0x40a7a0
     void UnloadCresDLL() const;
 
-    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
+    // UNANCHORED: replacement-only synthesis inside launcher.exe:0x40b430 that seeds the
+    // launcher-owned selection / nopatch inputs consumed later by the active nopatch path.
     bool BuildStartupContextFromRecoveredSelection(RecoveredLauncherStartupContext* startupContext);
 
-    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
-    bool PrepareInitClientStateFromStartupContext(const RecoveredLauncherStartupContext& startupContext);
+    // UNANCHORED: replacement-only synthesis that materializes arg5/arg6/arg7-owned InitClientDLL
+    // state before the later 0x40b739..0x40b7af pre-client continuation corridor.
+    bool MaterializeRecoveredInitClientStateFromStartupContext(
+        const RecoveredLauncherStartupContext& startupContext);
+
+    // UNANCHORED: recovered continuation for the 0x40b74d..0x40b790 pre-client corridor
+    // (0x402ec0 gate + optional 0x40b75a autodetect path). This is not claimed as a separate
+    // original method boundary.
+    bool RunRecoveredPreClientBringupStage() const;
 
     // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
     void LogInitInstanceFaithfulnessGaps() const;
