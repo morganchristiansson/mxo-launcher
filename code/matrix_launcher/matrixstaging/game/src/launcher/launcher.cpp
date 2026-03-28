@@ -8,6 +8,8 @@
 namespace mxo {
 namespace launcher {
 
+struct RecoveredLauncherStartupContext;
+
 class CLauncher {
 public:
     // anchor: launcher.exe:0x4097f0
@@ -38,6 +40,15 @@ public:
     // anchor: launcher.exe:0x40a7a0
     void UnloadCresDLL() const;
 
+    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
+    bool BuildRecoveredStartupContext(RecoveredLauncherStartupContext* startupContext);
+
+    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
+    bool PrepareRecoveredInitClientState(const RecoveredLauncherStartupContext& startupContext);
+
+    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
+    void LogOriginalPathGapSummary() const;
+
     // anchor: launcher.exe:0x40a55c / 0x40b430
     uint32_t BuildPackedArg7Selection() const;
 
@@ -48,6 +59,15 @@ public:
     uint32_t m_FieldA8 = 0xffffffff; // original: [this+0xa8]
     uint32_t m_FieldAC = 0;          // original: [this+0xac]
     uint8_t m_FieldB0 = 0;           // original: [this+0xb0]
+};
+
+struct RecoveredLauncherStartupContext {
+    char mediatorSelectionName[64];
+    const void* recoveredSelection;
+    uint32_t mediatorSelectedSelectionGateByte100;
+    uint32_t mediatorSelectedVariantState;
+    uint32_t nopatchLauncherVersionValue;
+    uint32_t nopatchClientVersionValue;
 };
 
 static_assert(offsetof(CLauncher, m_FieldA4) == 0xa4, "CLauncher +0xa4 drifted");
@@ -89,6 +109,20 @@ void CLauncher::UnloadClientDLL() const {
 }
 
 void CLauncher::UnloadCresDLL() const {
+    // UNANCHORED: live behavior still owned by src/resurrections.cpp.
+}
+
+bool CLauncher::BuildRecoveredStartupContext(RecoveredLauncherStartupContext* /*startupContext*/) {
+    // UNANCHORED: live behavior still owned by src/resurrections.cpp.
+    return false;
+}
+
+bool CLauncher::PrepareRecoveredInitClientState(const RecoveredLauncherStartupContext& /*startupContext*/) {
+    // UNANCHORED: live behavior still owned by src/resurrections.cpp.
+    return false;
+}
+
+void CLauncher::LogOriginalPathGapSummary() const {
     // UNANCHORED: live behavior still owned by src/resurrections.cpp.
 }
 
