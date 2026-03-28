@@ -11,7 +11,9 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 
 namespace mxo::liblttcp {
 
@@ -84,6 +86,14 @@ struct CLTThreadPerClientTCPEngine_QueuePair {
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_LauncherConnectionBridgeWorkItemVtable[2] = {0};
 static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
+
+// UNANCHORED: source-owned narrow mirror of the original queue block free-list behavior.
+// Static RE already shows that the consumer path recycles exhausted blocks instead of treating the
+// transition as a simple free-and-forget step. Current source keeps that narrower behavior in a
+// side cache keyed by the queue object while the exact original in-object free-list plumbing is
+// still unrecovered.
+static std::unordered_map<CLTThreadPerClientTCPEngine_Queue*, std::vector<uint32_t*>>
+    g_QueueRecycledBlocks;
 
 static bool IsSyntheticReceiveDrainWorkType(uint32_t workType) {
     return workType == CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain;
@@ -214,6 +224,54 @@ static void CloseSocketHandle(uint32_t* socketHandle) {
 
     closesocket(static_cast<SOCKET>(*socketHandle));
     *socketHandle = kInvalidSocketHandle;
+}
+
+// UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
+static void QueueRecycleBlockScaffold(
+    CLTThreadPerClientTCPEngine_Queue* queue,
+    uint32_t* block) {
+    if (!queue || !block) {
+        return;
+    }
+    g_QueueRecycledBlocks[queue].push_back(block);
+}
+
+// UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
+static uint32_t* QueueTakeRecycledBlockScaffold(
+    CLTThreadPerClientTCPEngine_Queue* queue) {
+    if (!queue) {
+        return nullptr;
+    }
+
+    auto it = g_QueueRecycledBlocks.find(queue);
+    if (it == g_QueueRecycledBlocks.end() || it->second.empty()) {
+        return nullptr;
+    }
+
+    uint32_t* block = it->second.back();
+    it->second.pop_back();
+    if (it->second.empty()) {
+        g_QueueRecycledBlocks.erase(it);
+    }
+    return block;
+}
+
+// UNANCHORED: source-owned helper for the narrowed queue block recycling seam.
+static void QueueFreeRecycledBlocksScaffold(
+    CLTThreadPerClientTCPEngine_Queue* queue) {
+    if (!queue) {
+        return;
+    }
+
+    auto it = g_QueueRecycledBlocks.find(queue);
+    if (it == g_QueueRecycledBlocks.end()) {
+        return;
+    }
+
+    for (uint32_t* block : it->second) {
+        std::free(block);
+    }
+    g_QueueRecycledBlocks.erase(it);
 }
 
 // anchor: launcher.exe:0x452270 / 0x452300 / 0x452320 helper family shape
@@ -393,9 +451,14 @@ static bool GrowQueue(
         slotsLast = static_cast<uint32_t**>(queue->slotsLast);
     }
 
-    uint32_t* newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
+    uint32_t* newBlock = QueueTakeRecycledBlockScaffold(queue);
     if (!newBlock) {
-        return false;
+        newBlock = static_cast<uint32_t*>(std::calloc(1, 0x80));
+        if (!newBlock) {
+            return false;
+        }
+    } else {
+        std::memset(newBlock, 0, 0x80);
     }
 
     slotsLast[1] = newBlock;
@@ -802,6 +865,7 @@ void CLTThreadPerClientTCPEngine::Queue_Free(CLTThreadPerClientTCPEngine_Queue* 
         std::free(slotsBase);
     }
 
+    QueueFreeRecycledBlocksScaffold(queue);
     std::memset(queue, 0, sizeof(*queue));
 }
 
@@ -901,15 +965,19 @@ bool CLTThreadPerClientTCPEngine::Queue_TryPopPair(
         uint32_t** slotsCurrent = static_cast<uint32_t**>(queue->slotsCurrent);
         uint32_t** slotsLast = static_cast<uint32_t**>(queue->slotsLast);
         if (!slotsCurrent || slotsCurrent >= slotsLast) {
-            // The recovered original uses a block free-list here before advancing to the next block.
-            // Current scaffold keeps the same observable cursor transition shape but falls back to a
-            // simple in-place advance if no next block is available.
+            // No later block is active; the queue just becomes empty within the current block.
+            // The recovered free-list behavior matters on the cross-block path below, not here.
             queue->current0 = current0 + 2;
             return true;
         }
 
         if (oldBlock) {
-            std::free(oldBlock);
+            // Current bounded fidelity step:
+            // - original `0x436d31..0x436ee7` uses block recycling / free-list behavior when the
+            //   dequeue cursor leaves a full `0x80` block
+            // - current source now mirrors that more closely by caching the exhausted head block for
+            //   later `Queue_PushPair` growth reuse instead of freeing it immediately
+            QueueRecycleBlockScaffold(queue, oldBlock);
         }
         ++slotsCurrent;
         queue->slotsCurrent = slotsCurrent;

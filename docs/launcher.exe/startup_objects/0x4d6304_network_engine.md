@@ -127,6 +127,9 @@ New queue-thread clarification from the current focused pass:
       returns immediately on empty queues; when an attached arg5 queue-signal event exists it now
       waits on that event and re-enters the dequeue loop, matching the recovered `+0x5c`
       wait-helper role more closely even though the exact helper lock choreography is still source-owned
+    - newer bounded correction: cross-block dequeue no longer immediately frees the exhausted head
+      `0x80` queue block; source now caches it for later `Queue_PushPair` growth reuse, which is a
+      closer source-owned mirror of the original block recycling / free-list behavior
   - that source consumer is still explicitly scaffold-first and should not yet be treated as a faithful final replacement for original `0x436b10`
 
 ## New clarification: arg5 contains helper subobjects the client can call directly
