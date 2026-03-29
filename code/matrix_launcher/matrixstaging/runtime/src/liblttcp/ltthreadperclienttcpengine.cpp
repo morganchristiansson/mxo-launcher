@@ -189,6 +189,27 @@ static CLTThreadPerClientTCPEngine_ContextPayloadBacking& EnsureEngineContextPay
     return g_CLTThreadPerClientTCPEngineContextPayloadBackings[self];
 }
 
+static mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*
+ResolveLauncherBridgeContextForConnectionScaffold(
+    const CLTThreadPerClientTCPEngine* engine,
+    const CMessageConnection* connection) {
+    if (!engine || !connection) {
+        return nullptr;
+    }
+
+    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(engine);
+    if (!side) {
+        return nullptr;
+    }
+    if (side->authBridgeContext && side->authBridgeContext->sidecarConnection == connection) {
+        return side->authBridgeContext;
+    }
+    if (side->marginBridgeContext && side->marginBridgeContext->sidecarConnection == connection) {
+        return side->marginBridgeContext;
+    }
+    return nullptr;
+}
+
 template <typename Head>
 static std::_Rb_tree_node_base* TreeHeaderBase(Head* head) {
     return reinterpret_cast<std::_Rb_tree_node_base*>(head);
@@ -833,6 +854,15 @@ static void SignalWakeupSocketHandle(uint32_t socketHandle) {
     (void)send(static_cast<SOCKET>(socketHandle), "", 0, 0);
 }
 
+static void DrainWakeupSocketHandleScaffold(uint32_t socketHandle) {
+    if (socketHandle == kInvalidSocketHandle) {
+        return;
+    }
+
+    char dummy[1] = {};
+    (void)recv(static_cast<SOCKET>(socketHandle), dummy, sizeof(dummy), 0);
+}
+
 // anchor: launcher.exe:0x449b40 helper shape
 static uint32_t CreateSocketHandleWithOriginalSetupScaffold(
     int socketType,
@@ -1395,13 +1425,127 @@ void CLTThreadPerClientTCPEngine_WorkerThread::SignalWakeup() {
 
 // anchor: launcher.exe:0x42fe50
 void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
-    // Current source ownership still does not reimplement the full original select/connect/send/
-    // recv/wakeup loop here.
-    // Narrow update:
-    // - the active TCP receive fragment-production subpath from this function is now mirrored through
-    //   `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` on the launcher
-    //   bridge path
-    // - the remaining broader worker-thread loop fidelity still belongs here later
+    CMessageConnection* connection = static_cast<CMessageConnection*>(contextKey_);
+    if (!connection) {
+        return;
+    }
+
+    CLTThreadPerClientTCPEngine* engine = connection->Engine();
+    if (!engine) {
+        return;
+    }
+
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* launcherContext =
+        ResolveLauncherBridgeContextForConnectionScaffold(engine, connection);
+    const char* connectStatusLabel =
+        (launcherContext && launcherContext->isMarginConnection) ? "MarginConnectStatus"
+                                                                 : "AuthConnectStatus";
+    bool completionQueued = false;
+
+    while (!exitRequested_) {
+        const uint32_t socketHandle = connection->SocketHandle();
+        if (socketHandle == kInvalidSocketHandle) {
+            break;
+        }
+
+        fd_set readSet;
+        fd_set writeSet;
+        fd_set exceptSet;
+        FD_ZERO(&readSet);
+        FD_ZERO(&writeSet);
+        FD_ZERO(&exceptSet);
+
+        const SOCKET socket = static_cast<SOCKET>(socketHandle);
+        const SOCKET wakeupSocket = static_cast<SOCKET>(wakeupSocketHandle_);
+        FD_SET(wakeupSocket, &readSet);
+        FD_SET(socket, &exceptSet);
+
+        if (!completionQueued && !datagramMode_) {
+            FD_SET(socket, &writeSet);
+        } else {
+            FD_SET(socket, &readSet);
+        }
+
+        timeval timeout = {};
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 100000;
+        const int readyCount = select(
+            static_cast<int>((socket > wakeupSocket ? socket : wakeupSocket) + 1),
+            &readSet,
+            &writeSet,
+            &exceptSet,
+            &timeout);
+        if (readyCount == SOCKET_ERROR) {
+            break;
+        }
+
+        if (FD_ISSET(wakeupSocket, &readSet)) {
+            DrainWakeupSocketHandleScaffold(wakeupSocketHandle_);
+            if (exitRequested_) {
+                break;
+            }
+        }
+
+        if (FD_ISSET(socket, &exceptSet)) {
+            int soError = 0;
+            int soErrorSize = sizeof(soError);
+            (void)getsockopt(
+                socket,
+                SOL_SOCKET,
+                SO_ERROR,
+                reinterpret_cast<char*>(&soError),
+                &soErrorSize);
+            (void)connection->CloseSocketTransportScaffold(/*graceful=*/false);
+            if (!completionQueued && launcherContext) {
+                (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
+                    launcherContext,
+                    CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
+                    static_cast<uint32_t>(soError != 0 ? soError : 1u),
+                    connectStatusLabel);
+            }
+            break;
+        }
+
+        if (!completionQueued && !datagramMode_ && FD_ISSET(socket, &writeSet)) {
+            int soError = 0;
+            int soErrorSize = sizeof(soError);
+            if (getsockopt(
+                    socket,
+                    SOL_SOCKET,
+                    SO_ERROR,
+                    reinterpret_cast<char*>(&soError),
+                    &soErrorSize) == 0 &&
+                soError == 0) {
+                if (launcherContext) {
+                    (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
+                        launcherContext,
+                        CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
+                        0u,
+                        connectStatusLabel);
+                }
+                completionQueued = true;
+                continue;
+            }
+
+            (void)connection->CloseSocketTransportScaffold(/*graceful=*/false);
+            if (launcherContext) {
+                (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
+                    launcherContext,
+                    CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
+                    static_cast<uint32_t>(soError != 0 ? soError : 1u),
+                    connectStatusLabel);
+            }
+            break;
+        }
+
+        if (FD_ISSET(socket, &readSet)) {
+            const int receiveResult =
+                connection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
+            if (receiveResult < 0) {
+                break;
+            }
+        }
+    }
 }
 
 // anchor: launcher.exe:0x436340

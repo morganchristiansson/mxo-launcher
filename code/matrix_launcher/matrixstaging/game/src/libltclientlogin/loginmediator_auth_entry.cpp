@@ -370,6 +370,7 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     if (context) {
         context->peerCloseQueued = false;
         SetAuthConnectionContextKey(context);
+        context->sidecarConnection = EnsureAuthConnectionObject();
     }
     engine_->AttachLauncherConnectionBridgeContextsScaffold(
         authConnectionContextScaffold_,
@@ -387,13 +388,6 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         marginConnectionContextScaffold_);
 
     engine_->SyncAttachedLauncherObjectStateScaffold();
-    if (result != 0u && context) {
-        engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
-            context,
-            /*workType=*/mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-            /*workPayload=*/kConnectStatusSuccess,
-            "AuthConnectStatus");
-    }
 
     spdlog::info(
         "CLTLoginMediator::BeginLauncherAuthConnectionScaffold -> 0x{:08x}",
@@ -419,6 +413,7 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     if (context) {
         context->peerCloseQueued = false;
         SetMarginConnectionContextKey(context);
+        context->sidecarConnection = EnsureMarginConnectionObject();
     }
     engine_->AttachLauncherConnectionBridgeContextsScaffold(
         authConnectionContextScaffold_,
@@ -434,13 +429,6 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
         marginConnectionContextScaffold_);
 
     engine_->SyncAttachedLauncherObjectStateScaffold();
-    if (result != 0u && context) {
-        engine_->EnqueueLauncherConnectionStatusWorkItemScaffold(
-            context,
-            /*workType=*/mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-            /*workPayload=*/kConnectStatusSuccess,
-            "MarginConnectStatus");
-    }
 
     spdlog::info(
         "CLTLoginMediator::BeginLauncherMarginConnectionScaffold marginHost='{}' -> 0x{:08x}",

@@ -1022,6 +1022,13 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
       - `connect(...) == 0`
       - `connect(...) == SOCKET_ERROR` with `WSAGetLastError() == 0x2733` / `WSAEWOULDBLOCK`
   - successful connect then creates/inserts a `WorkerThread` payload into arg5 `+0x8c` and marks it with `[worker+0x34] = 1`
+  - the later connect-status item should therefore be treated as an **async completion from the
+    worker/connect loop**, not as a mediator-side immediate success alias
+  - current source now also moved closer to that read:
+    - connect no longer fabricates an immediate launcher-bridge success work item from the mediator
+      begin wrapper
+    - the worker-thread slot `0x42fe50` now owns a narrow source-side connect-completion poll that
+      waits for socket writability / `SO_ERROR == 0` and then queues type-2 status `0`
   - so `0x4329cc` is now best read as part of a **TCP connect / connect-status / worker-start** producer path
 
 #### `launcher.exe:0x432d86`, `0x432dc1`, and `0x432dd7`
@@ -1444,11 +1451,13 @@ Build-validated update:
   - the ABI shell keeps raw arg5 object layout ownership, but less of the bridge-controller logic and less diagnostic scaffolding
 
 Runtime note:
-- a later user-reported run after this ownership move still launched successfully into game on the active path
-- that is useful practical evidence that the seam cleanup did not regress the current happy path, but it is still not proof of full original producer fidelity by itself
+- newer runs after the current fidelity passes have regressed before entering game
+- current evidence points at remaining worker/connect/send fidelity gaps rather than a launcher-main
+  startup-order failure
 
 Important limitation:
 - this is still only a **starter ownership cleanup**, not proof that the original launcher's worker-thread producers are fully reconstructed
+- current source now has a narrow source-owned connect-completion loop in worker-thread slot `0x42fe50`, but broader original send/select/wakeup behavior there is still incomplete
 - the current receive-side producer remains synthetic and sidecar-driven
 - only the ownership boundary moved closer to the recovered arg5 / engine family
 
