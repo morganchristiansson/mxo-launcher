@@ -476,13 +476,19 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //   the base type-4/MS wrapper path can synthesize a local type-`0x0b` completion object and
     //   fall into mediator fallback `0x41afc0`, which re-enters helper slot 2 instead of slot 6
     if (!mediator->State10HasReadyConnectionState2()) {
-        if (CLTLoginState* fallbackState = mediator->ScaffoldState4()) {
-            mediator->SwitchHelperStateScaffold(4u, fallbackState);
-        }
+        CLTLoginState* fallbackState = mediator->ScaffoldState4();
+        const uint32_t fallbackResult = fallbackState
+            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+                  4u,
+                  fallbackState,
+                  this,
+                  "State8 slot3 owner+0x1c state!=2 -> helper4 margin-connect continuation")
+            : 0u;
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4 currentState={}",
+            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x} currentState={}",
+            static_cast<unsigned>(fallbackResult),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
-        return 0u;
+        return fallbackResult;
     }
     if (mediator->State10SendGateFlagF14() == 0) {
         if (CLTLoginState* fallbackState = mediator->ScaffoldState6()) {

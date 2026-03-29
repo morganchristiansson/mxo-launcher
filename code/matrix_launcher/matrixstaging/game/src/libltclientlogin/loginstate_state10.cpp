@@ -181,9 +181,18 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
     // - send through `0x41af70`
     // - post event `0x13`
     if (!mediator->State10HasReadyConnectionState2()) {
+        CLTLoginState* fallbackState = mediator->ScaffoldState4();
+        const uint32_t fallbackResult = fallbackState
+            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+                  4u,
+                  fallbackState,
+                  this,
+                  "State10 slot3 owner+0x1c state!=2 -> helper4 margin-connect continuation")
+            : 0u;
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; original would switch helper state to 4");
-        return 0u;
+            "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
+            static_cast<unsigned>(fallbackResult));
+        return fallbackResult;
     }
     if (mediator->State10SendGateFlagF14() == 0) {
         spdlog::info(
