@@ -81,18 +81,35 @@ static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
 static std::unordered_map<CLTThreadPerClientTCPEngine_Queue*, std::vector<uint32_t*>>
     g_QueueRecycledBlocks;
 
+// GHIDRA layout audit anchors:
+// - derived ctor `launcher.exe:0x431c30`
+// - base ctor `launcher.exe:0x4366f0`
+// - derived dtor `launcher.exe:0x431310`
+// - worker insert helper `launcher.exe:0x431ff0`
+// Current best read:
+// - the real `0xb4` engine object is already fully accounted for by the recovered in-object fields
+//   at `+0x04/+0x08/+0x0c/+0x34/+0x5c/+0x60/+0x7c/+0x80/+0x84/+0x8c/+0x90/+0x98`
+// - so none of the members below should be mistaken for hidden original class fields
+// - recovered runtime payload families are tracked separately from this bridge-only side state:
+//   - queue-thread pointer array backing -> real object `+0x08`
+//   - accept-thread payload backing -> real object `+0x80/+0x84`
+//   - worker-thread payload backing -> real object `+0x8c/+0x90`
+// - only launcher-shell attachment and auth/margin bridge contexts remain here as true
+//   source-only baggage
 struct CLTThreadPerClientTCPEngine_SideState {
     CLTThreadPerClientTCPEngine_LauncherAbiAttachment attachedLauncherAbiSurface = {};
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authBridgeContext = nullptr;
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginBridgeContext = nullptr;
-    std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads;
-    std::vector<CLTThreadPerClientTCPEngine::AcceptThreadRecord> monitoredPorts;
-    std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord> workerThreads;
-    std::vector<CMessageConnection*> messageConnections;
 };
 
 static std::unordered_map<CLTThreadPerClientTCPEngine*, std::unique_ptr<CLTThreadPerClientTCPEngine_SideState>>
     g_CLTThreadPerClientTCPEngineSideStates;
+static std::unordered_map<CLTThreadPerClientTCPEngine*, std::vector<CLTThreadPerClientTCPEngine::AcceptThreadRecord>>
+    g_CLTThreadPerClientTCPEngineEndpointPayloadBackings;
+static std::unordered_map<CLTThreadPerClientTCPEngine*, std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>>
+    g_CLTThreadPerClientTCPEngineContextPayloadBackings;
+static std::unordered_map<CLTThreadPerClientTCPEngine*, std::vector<std::unique_ptr<CMessageConnection>>>
+    g_CLTThreadPerClientTCPEngineFallbackMessageConnections;
 
 static CLTThreadPerClientTCPEngine_SideState* FindEngineSideState(
     const CLTThreadPerClientTCPEngine* self) {
@@ -114,8 +131,56 @@ static CLTThreadPerClientTCPEngine_SideState& EnsureEngineSideState(
     return *slot;
 }
 
-static void EraseEngineSideState(CLTThreadPerClientTCPEngine* self) {
+static std::vector<CLTThreadPerClientTCPEngine::AcceptThreadRecord>* FindEngineEndpointPayloadBacking(
+    const CLTThreadPerClientTCPEngine* self) {
+    if (!self) {
+        return nullptr;
+    }
+    auto it = g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.find(
+        const_cast<CLTThreadPerClientTCPEngine*>(self));
+    return (it != g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.end()) ? &it->second : nullptr;
+}
+
+static std::vector<CLTThreadPerClientTCPEngine::AcceptThreadRecord>& EnsureEngineEndpointPayloadBacking(
+    CLTThreadPerClientTCPEngine* self) {
+    return g_CLTThreadPerClientTCPEngineEndpointPayloadBackings[self];
+}
+
+static std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>* FindEngineContextPayloadBacking(
+    const CLTThreadPerClientTCPEngine* self) {
+    if (!self) {
+        return nullptr;
+    }
+    auto it = g_CLTThreadPerClientTCPEngineContextPayloadBackings.find(
+        const_cast<CLTThreadPerClientTCPEngine*>(self));
+    return (it != g_CLTThreadPerClientTCPEngineContextPayloadBackings.end()) ? &it->second : nullptr;
+}
+
+static std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>& EnsureEngineContextPayloadBacking(
+    CLTThreadPerClientTCPEngine* self) {
+    return g_CLTThreadPerClientTCPEngineContextPayloadBackings[self];
+}
+
+static std::vector<std::unique_ptr<CMessageConnection>>* FindEngineFallbackMessageConnections(
+    const CLTThreadPerClientTCPEngine* self) {
+    if (!self) {
+        return nullptr;
+    }
+    auto it = g_CLTThreadPerClientTCPEngineFallbackMessageConnections.find(
+        const_cast<CLTThreadPerClientTCPEngine*>(self));
+    return (it != g_CLTThreadPerClientTCPEngineFallbackMessageConnections.end()) ? &it->second : nullptr;
+}
+
+static std::vector<std::unique_ptr<CMessageConnection>>& EnsureEngineFallbackMessageConnections(
+    CLTThreadPerClientTCPEngine* self) {
+    return g_CLTThreadPerClientTCPEngineFallbackMessageConnections[self];
+}
+
+static void EraseEngineScaffoldBackings(CLTThreadPerClientTCPEngine* self) {
     g_CLTThreadPerClientTCPEngineSideStates.erase(self);
+    g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.erase(self);
+    g_CLTThreadPerClientTCPEngineContextPayloadBackings.erase(self);
+    g_CLTThreadPerClientTCPEngineFallbackMessageConnections.erase(self);
 }
 
 static bool IsSyntheticReceiveDrainWorkType(uint32_t workType) {
@@ -1211,8 +1276,9 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
     // anchor: launcher.exe:0x4366f0
     // Faithfulness restructuring:
     // - keep the real recovered arg5 fields on the object body itself
-    // - move non-original source-owned baggage (attachment maps, vectors, bridge contexts) into
-    //   external side-state keyed by `this`
+    // - keep only launcher-shell attachment + auth/margin bridge baggage in side-state
+    // - keep recovered payload families (`+0x08`, `+0x80/+0x84`, `+0x8c/+0x90`) in dedicated
+    //   source backings keyed by `this`, not as pretend hidden object fields
     (void)EnsureEngineSideState(this);
 
     ownedQueueLockHelper60Scaffold_.vtable = nullptr;
@@ -1250,23 +1316,27 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
 // NOTE: starter C++ destructor only models local sidecar cleanup, not the full original dtor body.
 CLTThreadPerClientTCPEngine::~CLTThreadPerClientTCPEngine() {
     DetachLauncherAbiSurfaceScaffold();
+    RebuildQueueThreadsForCtorCount(/*queueThreadCount=*/0);
 
-    if (CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this)) {
-        for (AcceptThreadRecord& record : side->monitoredPorts) {
+    if (std::vector<AcceptThreadRecord>* endpointPayloads =
+            FindEngineEndpointPayloadBacking(this)) {
+        for (AcceptThreadRecord& record : *endpointPayloads) {
             StopAcceptThreadScaffold(&record);
         }
-        side->monitoredPorts.clear();
+        endpointPayloads->clear();
+    }
 
-        for (WorkerThreadRecord& record : side->workerThreads) {
+    if (std::vector<WorkerThreadRecord>* contextPayloads =
+            FindEngineContextPayloadBacking(this)) {
+        for (WorkerThreadRecord& record : *contextPayloads) {
             StopWorkerThreadScaffold(&record);
         }
-        side->workerThreads.clear();
+        contextPayloads->clear();
+    }
 
-        for (CMessageConnection* connection : side->messageConnections) {
-            delete connection;
-        }
-        side->messageConnections.clear();
-        side->queueThreads.clear();
+    if (std::vector<std::unique_ptr<CMessageConnection>>* fallbackConnections =
+            FindEngineFallbackMessageConnections(this)) {
+        fallbackConnections->clear();
     }
 
     Queue_Free(&ownedQueue0CScaffold_);
@@ -1286,7 +1356,7 @@ CLTThreadPerClientTCPEngine::~CLTThreadPerClientTCPEngine() {
         ownedContextTreeHead8CScaffold_ = nullptr;
     }
 
-    EraseEngineSideState(this);
+    EraseEngineScaffoldBackings(this);
 }
 
 // anchor: launcher.exe:0x4319a0
@@ -1324,9 +1394,9 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* 
         return 0;
     }
 
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    side.monitoredPorts.push_back(std::move(record));
-    (void)side.monitoredPorts.back().thread->Start(/*startPriority=*/2);
+    std::vector<AcceptThreadRecord>& endpointPayloads = EnsureEngineEndpointPayloadBacking(this);
+    endpointPayloads.push_back(std::move(record));
+    (void)endpointPayloads.back().thread->Start(/*startPriority=*/2);
     SyncAttachedLauncherObjectStateScaffold();
     return kResultSuccess;
 }
@@ -1388,15 +1458,15 @@ uint32_t CLTThreadPerClientTCPEngine::Slot4_42F7C0(void* arg1) {
 // vtable: launcher.exe:0x004b2768 slot +0x14
 uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) {
     const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    for (auto it = side.monitoredPorts.begin(); it != side.monitoredPorts.end(); ++it) {
+    std::vector<AcceptThreadRecord>& endpointPayloads = EnsureEngineEndpointPayloadBacking(this);
+    for (auto it = endpointPayloads.begin(); it != endpointPayloads.end(); ++it) {
         if (it->endpoint.portNetworkOrder == key.portNetworkOrder &&
             it->endpoint.ipv4NetworkOrder == key.ipv4NetworkOrder) {
             if (outSocketHandle) {
                 *outSocketHandle = it->listenSocketHandle;
             }
             StopAcceptThreadScaffold(&(*it));
-            side.monitoredPorts.erase(it);
+            endpointPayloads.erase(it);
             SyncAttachedLauncherObjectStateScaffold();
             return 0;
         }
@@ -1632,11 +1702,11 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
         touchedConnectionState = true;
     }
 
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    for (auto it = side.workerThreads.begin(); it != side.workerThreads.end(); ++it) {
+    std::vector<WorkerThreadRecord>& contextPayloads = EnsureEngineContextPayloadBacking(this);
+    for (auto it = contextPayloads.begin(); it != contextPayloads.end(); ++it) {
         if (it->contextKey == cleanupContextKey) {
             StopWorkerThreadScaffold(&(*it));
-            side.workerThreads.erase(it);
+            contextPayloads.erase(it);
             (void)DropMessageConnection(cleanupContextKey);
             result = kResultSuccess;
             goto cleanup_tail;
@@ -1697,9 +1767,14 @@ void CLTThreadPerClientTCPEngine::DetachLauncherAbiSurfaceScaffold() {
 }
 
 void CLTThreadPerClientTCPEngine::RefreshOwnedLauncherMirrorStateScaffold() {
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    ownedEndpointCount84Scaffold_ = static_cast<uint32_t>(side.monitoredPorts.size());
-    ownedContextCount90Scaffold_ = static_cast<uint32_t>(side.workerThreads.size());
+    const std::vector<AcceptThreadRecord>* endpointPayloads = FindEngineEndpointPayloadBacking(this);
+    const std::vector<WorkerThreadRecord>* contextPayloads = FindEngineContextPayloadBacking(this);
+    ownedEndpointCount84Scaffold_ = endpointPayloads
+        ? static_cast<uint32_t>(endpointPayloads->size())
+        : 0u;
+    ownedContextCount90Scaffold_ = contextPayloads
+        ? static_cast<uint32_t>(contextPayloads->size())
+        : 0u;
     SetEndpointTreeHead24OccupancyScaffold(
         ownedEndpointTreeHead80Scaffold_,
         ownedEndpointCount84Scaffold_ != 0u);
@@ -2200,34 +2275,72 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
 
 // UNANCHORED scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.
 void CLTThreadPerClientTCPEngine::RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount) {
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    side.queueThreads.clear();
-    side.queueThreads.reserve(queueThreadCount);
-    for (uint32_t i = 0; i < queueThreadCount; ++i) {
-        side.queueThreads.push_back(std::make_unique<CLTThreadPerClientTCPEngine_QueueThread>(this));
+    CLTThreadPerClientTCPEngine_QueueThread** queueThreadArray =
+        static_cast<CLTThreadPerClientTCPEngine_QueueThread**>(queueThreadArrayField08Scaffold_);
+    const uint32_t existingQueueThreadCount = ctorFlagsField04Scaffold_;
+    if (existingQueueThreadCount != 0u) {
+        (void)EnqueueCompletedOperationScaffold(
+            nullptr,
+            nullptr,
+            /*useQueue34=*/false,
+            "RebuildQueueThreadsForCtorCountShutdown",
+            /*queueLockAlreadyHeld=*/false);
     }
+    for (uint32_t i = 0; i < existingQueueThreadCount; ++i) {
+        CLTThreadPerClientTCPEngine_QueueThread* thread = queueThreadArray ? queueThreadArray[i] : nullptr;
+        if (!thread) {
+            continue;
+        }
+        (void)thread->Wait();
+        delete thread;
+    }
+    if (queueThreadArray) {
+        std::free(queueThreadArray);
+    }
+
+    queueThreadArrayField08Scaffold_ = nullptr;
+    ctorFlagsField04Scaffold_ = 0u;
+    if (queueThreadCount == 0u) {
+        SyncAttachedLauncherObjectStateScaffold();
+        return;
+    }
+
+    queueThreadArray = static_cast<CLTThreadPerClientTCPEngine_QueueThread**>(
+        std::calloc(queueThreadCount, sizeof(CLTThreadPerClientTCPEngine_QueueThread*)));
+    if (!queueThreadArray) {
+        SyncAttachedLauncherObjectStateScaffold();
+        return;
+    }
+
+    for (uint32_t i = 0; i < queueThreadCount; ++i) {
+        queueThreadArray[i] = new CLTThreadPerClientTCPEngine_QueueThread(this);
+        (void)queueThreadArray[i]->Start(/*startPriority=*/2);
+    }
+
+    queueThreadArrayField08Scaffold_ = queueThreadArray;
+    ctorFlagsField04Scaffold_ = queueThreadCount;
+    SyncAttachedLauncherObjectStateScaffold();
 }
 
 // UNANCHORED scaffold accessor for source-side queue-thread child tracking.
 size_t CLTThreadPerClientTCPEngine::QueueThreadCount() const {
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return side ? side->queueThreads.size() : 0u;
+    return static_cast<size_t>(ctorFlagsField04Scaffold_);
 }
 
 // UNANCHORED starter accessor.
-// Exposes scaffold state; no direct launcher.exe function anchor is assigned yet.
+// Exposes the source backing for the recovered `+0x80/+0x84` endpoint-tree payload family.
 const std::vector<CLTThreadPerClientTCPEngine::AcceptThreadRecord>& CLTThreadPerClientTCPEngine::MonitoredPorts() const {
     static const std::vector<AcceptThreadRecord> kEmpty;
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return side ? side->monitoredPorts : kEmpty;
+    const std::vector<AcceptThreadRecord>* endpointPayloads = FindEngineEndpointPayloadBacking(this);
+    return endpointPayloads ? *endpointPayloads : kEmpty;
 }
 
 // UNANCHORED starter accessor.
-// Exposes scaffold state; no direct launcher.exe function anchor is assigned yet.
+// Exposes the source backing for the recovered `+0x8c/+0x90` context-tree payload family.
 const std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>& CLTThreadPerClientTCPEngine::WorkerThreads() const {
     static const std::vector<WorkerThreadRecord> kEmpty;
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return side ? side->workerThreads : kEmpty;
+    const std::vector<WorkerThreadRecord>* contextPayloads = FindEngineContextPayloadBacking(this);
+    return contextPayloads ? *contextPayloads : kEmpty;
 }
 
 // UNANCHORED starter helper.
@@ -2250,7 +2363,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* con
     CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
 
     // Prefer the live auth/margin bridge-tracked sidecar connections before falling back to
-    // engine-owned generic entries. That keeps slot 6/7/8 lookup closer to the real
+    // source-owned generic entries. That keeps slot 6/7/8 lookup closer to the real
     // connection-family objects already driving the active path.
     if (side.authBridgeContext && matchesConnectionKey(side.authBridgeContext->sidecarConnection)) {
         return side.authBridgeContext->sidecarConnection;
@@ -2259,9 +2372,12 @@ CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* con
         return side.marginBridgeContext->sidecarConnection;
     }
 
-    for (CMessageConnection* connection : side.messageConnections) {
-        if (matchesConnectionKey(connection)) {
-            return connection;
+    if (std::vector<std::unique_ptr<CMessageConnection>>* fallbackConnections =
+            FindEngineFallbackMessageConnections(this)) {
+        for (const std::unique_ptr<CMessageConnection>& connection : *fallbackConnections) {
+            if (matchesConnectionKey(connection.get())) {
+                return connection.get();
+            }
         }
     }
     return nullptr;
@@ -2285,13 +2401,16 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
         }
     }
 
-    CMessageConnection* connection = new CMessageConnection(this);
+    std::vector<std::unique_ptr<CMessageConnection>>& fallbackConnections =
+        EnsureEngineFallbackMessageConnections(this);
+    fallbackConnections.push_back(std::make_unique<CMessageConnection>(this));
+    CMessageConnection* connection = fallbackConnections.back().get();
     if (!connection) {
+        fallbackConnections.pop_back();
         return nullptr;
     }
 
     connection->SetOwnerContext(resolvedContextKey);
-    EnsureEngineSideState(this).messageConnections.push_back(connection);
     return connection;
 }
 
@@ -2300,17 +2419,21 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
 bool CLTThreadPerClientTCPEngine::DropMessageConnection(void* contextKey) {
     CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
     void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    for (auto it = side.messageConnections.begin(); it != side.messageConnections.end(); ++it) {
-        CMessageConnection* connection = *it;
+    std::vector<std::unique_ptr<CMessageConnection>>* fallbackConnections =
+        FindEngineFallbackMessageConnections(this);
+    if (!fallbackConnections) {
+        return false;
+    }
+
+    for (auto it = fallbackConnections->begin(); it != fallbackConnections->end(); ++it) {
+        CMessageConnection* connection = it->get();
         if (connection &&
             (connection == contextKey ||
              connection == resolvedContextKey ||
              connection == queueContextOwner ||
              connection->OwnerContext() == contextKey ||
              connection->OwnerContext() == resolvedContextKey)) {
-            delete connection;
-            side.messageConnections.erase(it);
+            fallbackConnections->erase(it);
             return true;
         }
     }
@@ -2330,8 +2453,8 @@ LTTCPEndpointKey CLTThreadPerClientTCPEngine::MakeEndpointKey(uint16_t portHostO
 // UNANCHORED starter helper.
 // No direct launcher.exe helper body is assigned yet.
 CLTThreadPerClientTCPEngine::AcceptThreadRecord* CLTThreadPerClientTCPEngine::FindMonitoredPort(const LTTCPEndpointKey& key) {
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    for (auto& record : side.monitoredPorts) {
+    std::vector<AcceptThreadRecord>& endpointPayloads = EnsureEngineEndpointPayloadBacking(this);
+    for (auto& record : endpointPayloads) {
         if (record.endpoint.portNetworkOrder == key.portNetworkOrder &&
             record.endpoint.ipv4NetworkOrder == key.ipv4NetworkOrder) {
             return &record;
@@ -2345,8 +2468,8 @@ CLTThreadPerClientTCPEngine::AcceptThreadRecord* CLTThreadPerClientTCPEngine::Fi
 CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::FindWorker(void* contextKey) {
     CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
     void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    for (auto& record : side.workerThreads) {
+    std::vector<WorkerThreadRecord>& contextPayloads = EnsureEngineContextPayloadBacking(this);
+    for (auto& record : contextPayloads) {
         if (record.contextKey == contextKey ||
             record.contextKey == resolvedContextKey ||
             record.contextKey == queueContextOwner ||
@@ -2431,15 +2554,15 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Cr
         return nullptr;
     }
 
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    std::vector<WorkerThreadRecord>& contextPayloads = EnsureEngineContextPayloadBacking(this);
     WorkerThreadRecord* inserted = nullptr;
     if (WorkerThreadRecord* existing = FindWorker(normalizedContextKey)) {
         StopWorkerThreadScaffold(existing);
         *existing = std::move(worker);
         inserted = existing;
     } else {
-        side.workerThreads.push_back(std::move(worker));
-        inserted = side.workerThreads.empty() ? nullptr : &side.workerThreads.back();
+        contextPayloads.push_back(std::move(worker));
+        inserted = contextPayloads.empty() ? nullptr : &contextPayloads.back();
     }
 
     if (inserted) {

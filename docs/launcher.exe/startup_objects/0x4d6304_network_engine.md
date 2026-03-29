@@ -101,6 +101,21 @@ Base ctor `0x4366f0` / `CLTBaseThreadPerClientTCPEngine_ctor` itself:
 - allocates an array at `+0x08` when the effective queue-thread count is non-zero
 - constructs per-entry helper objects of size `0x3c` through `0x4365a0` / `CLTThreadPerClientTCPEngine_QueueThread_ctor`
 
+New side-state audit from the current constructor / destructor / worker-insert pass (`0x431c30`,
+`0x4366f0`, `0x431310`, `0x431ff0`):
+- the original `0xb4` object body is already fully spoken for by the recovered fields above plus:
+  - endpoint tree / count at `+0x80/+0x84`
+  - context tree / count at `+0x8c/+0x90`
+  - cleanup lock helper at `+0x98`
+- so the current source-side `CLTThreadPerClientTCPEngine_SideState` members are **not** evidence
+  for hidden launcher fields
+- current best mapping is:
+  - side `queueThreads` = temporary ownership stand-in for the real `+0x08` queue-thread pointer array
+  - side `monitoredPorts` = temporary ownership stand-in for the real `+0x80/+0x84` endpoint-keyed tree payloads
+  - side `workerThreads` = temporary ownership stand-in for the real `+0x8c/+0x90` context-keyed tree payloads
+  - side `attachedLauncherAbiSurface`, `authBridgeContext`, `marginBridgeContext`, and `messageConnections`
+    = source-only bridge baggage, not original `launcher.exe` class members
+
 New queue-thread clarification from the current focused pass:
 - these `0x3c` children are not anonymous queue blobs
 - `0x4365a0` first builds a shared generic thread base through `0x4319e0` / `CLTThread_ctor`
