@@ -87,11 +87,11 @@ all: $(TARGET)
 
 CXXFLAGS = -Wall -Wextra -O0 -g -fno-omit-frame-pointer -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -Imatrixstaging/game/src/libltclientlogin -Imatrixstaging/runtime/src/liblttcp -Isrc/liblttcp -Isrc
 
-# MinGW-only experimental arg5 mode:
-# - keep wrapper-table mode as the default / fallback
-# - enable with: make MXO_EXPERIMENT_MINGW_NATIVE_ARG5_VPTR=1
-ifeq ($(MXO_EXPERIMENT_MINGW_NATIVE_ARG5_VPTR),1)
-CXXFLAGS += -DMXO_EXPERIMENT_MINGW_NATIVE_ARG5_VPTR
+# MinGW arg5 native-vptr mode:
+# - enabled by default on __MINGW32__ builds
+# - opt out with: make MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR=1
+ifeq ($(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR),1)
+CXXFLAGS += -DMXO_DISABLE_MINGW_NATIVE_ARG5_VPTR
 endif
 
 CXXFLAGS += -MMD -MP

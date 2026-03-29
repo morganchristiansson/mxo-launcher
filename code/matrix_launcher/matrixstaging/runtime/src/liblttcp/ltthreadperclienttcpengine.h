@@ -1,12 +1,14 @@
 #pragma once
 
+#include <winsock2.h>
+#include <windows.h>
+
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
-
-struct _RTL_CRITICAL_SECTION;
 
 #include "ilttcpengine.h"
 #include "lttcpconnection.h"
@@ -71,14 +73,13 @@ struct CLTThreadPerClientTCPEngine_WaitHelperScaffold {
 };
 
 // Recovered launcher-visible lock-helper family at +0x60 / +0x98.
-// Source-owned surrogate note:
+// Faithfulness update:
 // - original embeds a `CRITICAL_SECTION` immediately after the vtable root
-// - the current target-class surrogate stores an opaque pointer to heap-backed
-//   `CRITICAL_SECTION` storage instead, because this class is still not the raw MSVC launcher ABI
-//   object itself
+// - keep that inline shape on the native class too so the class body can converge on the original
+//   `0xb4` arg5 layout instead of carrying heap-backed helper storage baggage
 struct CLTThreadPerClientTCPEngine_LockHelperScaffold {
     void** vtable;
-    void* criticalSectionStorage;
+    CRITICAL_SECTION crit;
 };
 
 // Recovered allocated sentinel/tree head shape reached from arg5 +0x80.
@@ -118,38 +119,8 @@ struct CLTThreadPerClientTCPEngine_LauncherAbiAttachment {
     uint32_t* field90ContextCount = nullptr;
 };
 
-// MinGW-native primary-vptr experiment note:
-// - this reports the current GCC-emitted live address-point plus the concrete native-object field
-//   offsets reached by that vptr's `this`
-// - launcher arg5 shell compatibility requires more than matching slot count / cleanup shape
-// - the launcher-side experiment gate uses this to decide whether installing the real native vptr
-//   into the launcher-owned arg5 shell is even layout-plausible
-struct CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo {
-    size_t objectSize = 0;
-    size_t waitHelperSize = 0;
-    size_t lockHelperSize = 0;
-    size_t attachmentSize = 0;
-    size_t offsetField04 = 0;
-    size_t offsetField08 = 0;
-    size_t offsetQueue0C = 0;
-    size_t offsetQueue34 = 0;
-    size_t offsetWaitHelper5C = 0;
-    size_t offsetQueueLockHelper60 = 0;
-    size_t offsetQueueSignalEvent7C = 0;
-    size_t offsetEndpointTreeHead80 = 0;
-    size_t offsetEndpointCount84 = 0;
-    size_t offsetReserved88 = 0;
-    size_t offsetContextTreeHead8C = 0;
-    size_t offsetContextCount90 = 0;
-    size_t offsetReserved94 = 0;
-    size_t offsetCleanupLockHelper98 = 0;
-    size_t offsetAttachment = 0;
-    void* livePrimaryVptrAddressPoint = nullptr;
-    uintptr_t rawPrimaryVtableBaseGuess = 0;
-    intptr_t offsetToTop = 0;
-    void* typeinfo = nullptr;
-};
-
+static_assert(sizeof(CLTThreadPerClientTCPEngine_WaitHelperScaffold) == 0x04, "wait helper size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_LockHelperScaffold) == 0x1c, "lock helper size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_EndpointTreeHead24) == 0x24, "endpoint head size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_ContextTreeHead18) == 0x18, "context head size mismatch");
 
@@ -335,6 +306,22 @@ public:
     static constexpr uint32_t kResultAlreadyMonitored = 0x7000003;
     static constexpr uint32_t kResultEndpointNotFound = 0x7000004;
 
+    // Recovered launcher arg5 body offsets derived from the real class layout.
+    static constexpr size_t OffsetField04();
+    static constexpr size_t OffsetField08();
+    static constexpr size_t OffsetQueue0C();
+    static constexpr size_t OffsetQueue34();
+    static constexpr size_t OffsetWaitHelper5C();
+    static constexpr size_t OffsetQueueLockHelper60();
+    static constexpr size_t OffsetQueueSignalEvent7C();
+    static constexpr size_t OffsetEndpointTreeHead80();
+    static constexpr size_t OffsetEndpointCount84();
+    static constexpr size_t OffsetReserved88();
+    static constexpr size_t OffsetContextTreeHead8C();
+    static constexpr size_t OffsetContextCount90();
+    static constexpr size_t OffsetReserved94();
+    static constexpr size_t OffsetCleanupLockHelper98();
+
     // Current best queue work-type split from `0x4490c0`, `0x436d31..0x436ee7`, and the current
     // launcher bridge:
     // - `1` = original close / cleanup family that reaches arg5 slot 12 before context callback
@@ -418,13 +405,6 @@ public:
     static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);
     // anchor: launcher.exe:0x436340
     static bool Queue_Init(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t initialSize);
-    // UNANCHORED: compile-time / runtime probe for the MinGW native-vptr arg5 experiment.
-    static CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo
-    CollectNativePrimaryVptrExperimentInfoScaffold();
-    // UNANCHORED: conservative gate for installing the real GCC address-point directly into the
-    // launcher-owned arg5 shell. False means stay on the wrapper-table path.
-    static bool IsLauncherArg5PrimaryLayoutCompatibleForNativeVptrExperimentScaffold(
-        CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo* outInfo = nullptr);
     // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
     // Original helper returns `void`; once the caller reaches this push path it does not receive
     // enqueue-success feedback.
@@ -592,8 +572,8 @@ private:
     void* ActiveQueueLockScaffold() const;
     void* ActiveQueueSignalEventScaffold() const;
     void* ActiveCleanupLockScaffold() const;
-    static bool InitializeHeapBackedCriticalSectionScaffold(void** outCritStorage);
-    static void DeleteHeapBackedCriticalSectionScaffold(void** critStorage);
+    static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_LockHelperScaffold* helper);
+    static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_LockHelperScaffold* helper);
     static void InitializeEndpointTreeHead24Scaffold(CLTThreadPerClientTCPEngine_EndpointTreeHead24* head);
     static void InitializeContextTreeHead18Scaffold(CLTThreadPerClientTCPEngine_ContextTreeHead18* head);
     static void SetEndpointTreeHead24OccupancyScaffold(
@@ -609,7 +589,7 @@ private:
     CLTThreadPerClientTCPEngine_Queue ownedQueue34Scaffold_;
     CLTThreadPerClientTCPEngine_WaitHelperScaffold ownedWaitHelper5CScaffold_;
     CLTThreadPerClientTCPEngine_LockHelperScaffold ownedQueueLockHelper60Scaffold_;
-    void* ownedQueueSignalEvent7CScaffold_;
+    HANDLE ownedQueueSignalEvent7CScaffold_;
     CLTThreadPerClientTCPEngine_EndpointTreeHead24* ownedEndpointTreeHead80Scaffold_;
     uint32_t ownedEndpointCount84Scaffold_;
     uint32_t reserved88Scaffold_;
@@ -617,14 +597,42 @@ private:
     uint32_t ownedContextCount90Scaffold_;
     uint32_t reserved94Scaffold_;
     CLTThreadPerClientTCPEngine_LockHelperScaffold ownedCleanupLockHelper98Scaffold_;
-    CLTThreadPerClientTCPEngine_LauncherAbiAttachment attachedLauncherAbiSurfaceScaffold_;
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authBridgeContextScaffold_;
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginBridgeContextScaffold_;
-    std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads_;
-    std::vector<AcceptThreadRecord> monitoredPorts_;
-    std::vector<WorkerThreadRecord> workerThreads_;
-    std::vector<CMessageConnection*> messageConnections_;
 };
+
+struct CLTThreadPerClientTCPEngine_LayoutMirror {
+    void** vtable;
+    uint32_t field04;
+    void* field08;
+    CLTThreadPerClientTCPEngine_Queue queue0C;
+    CLTThreadPerClientTCPEngine_Queue queue34;
+    CLTThreadPerClientTCPEngine_WaitHelperScaffold waitHelper5C;
+    CLTThreadPerClientTCPEngine_LockHelperScaffold queueLockHelper60;
+    HANDLE queueSignalEvent7C;
+    CLTThreadPerClientTCPEngine_EndpointTreeHead24* endpointTreeHead80;
+    uint32_t endpointCount84;
+    uint32_t reserved88;
+    CLTThreadPerClientTCPEngine_ContextTreeHead18* contextTreeHead8C;
+    uint32_t contextCount90;
+    uint32_t reserved94;
+    CLTThreadPerClientTCPEngine_LockHelperScaffold cleanupLockHelper98;
+};
+
+static_assert(sizeof(CLTThreadPerClientTCPEngine_LayoutMirror) == 0xb4, "layout mirror size mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, field04) == 0x04, "field04 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, field08) == 0x08, "field08 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queue0C) == 0x0c, "queue0C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queue34) == 0x34, "queue34 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, waitHelper5C) == 0x5c, "waitHelper5C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queueLockHelper60) == 0x60, "queueLockHelper60 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queueSignalEvent7C) == 0x7c, "queueSignalEvent7C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, endpointTreeHead80) == 0x80, "endpointTreeHead80 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, endpointCount84) == 0x84, "endpointCount84 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, reserved88) == 0x88, "reserved88 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, contextTreeHead8C) == 0x8c, "contextTreeHead8C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, contextCount90) == 0x90, "contextCount90 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, reserved94) == 0x94, "reserved94 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, cleanupLockHelper98) == 0x98, "cleanupLockHelper98 offset mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine) == sizeof(CLTThreadPerClientTCPEngine_LayoutMirror), "CLTThreadPerClientTCPEngine size must match launcher arg5");
 
 // Starter binding object used by the launcher scaffold while arg5 still enters through
 // the dedicated launcher-network ABI layer in src/launcher_network_object_abi.cpp.

@@ -95,6 +95,43 @@ static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
 static std::unordered_map<CLTThreadPerClientTCPEngine_Queue*, std::vector<uint32_t*>>
     g_QueueRecycledBlocks;
 
+struct CLTThreadPerClientTCPEngine_SideState {
+    CLTThreadPerClientTCPEngine_LauncherAbiAttachment attachedLauncherAbiSurface = {};
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authBridgeContext = nullptr;
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginBridgeContext = nullptr;
+    std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads;
+    std::vector<CLTThreadPerClientTCPEngine::AcceptThreadRecord> monitoredPorts;
+    std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord> workerThreads;
+    std::vector<CMessageConnection*> messageConnections;
+};
+
+static std::unordered_map<CLTThreadPerClientTCPEngine*, std::unique_ptr<CLTThreadPerClientTCPEngine_SideState>>
+    g_CLTThreadPerClientTCPEngineSideStates;
+
+static CLTThreadPerClientTCPEngine_SideState* FindEngineSideState(
+    const CLTThreadPerClientTCPEngine* self) {
+    if (!self) {
+        return nullptr;
+    }
+    auto it = g_CLTThreadPerClientTCPEngineSideStates.find(
+        const_cast<CLTThreadPerClientTCPEngine*>(self));
+    return (it != g_CLTThreadPerClientTCPEngineSideStates.end()) ? it->second.get() : nullptr;
+}
+
+static CLTThreadPerClientTCPEngine_SideState& EnsureEngineSideState(
+    CLTThreadPerClientTCPEngine* self) {
+    std::unique_ptr<CLTThreadPerClientTCPEngine_SideState>& slot =
+        g_CLTThreadPerClientTCPEngineSideStates[self];
+    if (!slot) {
+        slot = std::make_unique<CLTThreadPerClientTCPEngine_SideState>();
+    }
+    return *slot;
+}
+
+static void EraseEngineSideState(CLTThreadPerClientTCPEngine* self) {
+    g_CLTThreadPerClientTCPEngineSideStates.erase(self);
+}
+
 static bool IsSyntheticReceiveDrainWorkType(uint32_t workType) {
     return workType == CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain;
 }
@@ -284,8 +321,8 @@ static void QueueFreeRecycledBlocksScaffold(
     g_QueueRecycledBlocks.erase(it);
 }
 
-static _RTL_CRITICAL_SECTION* CriticalSectionFromOpaqueStorage(void* storage) {
-    return static_cast<_RTL_CRITICAL_SECTION*>(storage);
+static CRITICAL_SECTION* CriticalSectionFromOpaqueStorage(void* storage) {
+    return static_cast<CRITICAL_SECTION*>(storage);
 }
 
 // anchor: launcher.exe:0x452270 / 0x452300 / 0x452320 helper family shape
@@ -934,85 +971,6 @@ bool CLTThreadPerClientTCPEngine::Queue_Init(
     return true;
 }
 
-CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo
-CLTThreadPerClientTCPEngine::CollectNativePrimaryVptrExperimentInfoScaffold() {
-    CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo info = {};
-    CLTThreadPerClientTCPEngine probe;
-
-    const auto memberOffset = [&probe](const auto& member) -> size_t {
-        return static_cast<size_t>(
-            reinterpret_cast<const unsigned char*>(&member) -
-            reinterpret_cast<const unsigned char*>(&probe));
-    };
-
-    info.objectSize = sizeof(CLTThreadPerClientTCPEngine);
-    info.waitHelperSize = sizeof(CLTThreadPerClientTCPEngine_WaitHelperScaffold);
-    info.lockHelperSize = sizeof(CLTThreadPerClientTCPEngine_LockHelperScaffold);
-    info.attachmentSize = sizeof(CLTThreadPerClientTCPEngine_LauncherAbiAttachment);
-    info.offsetField04 = memberOffset(probe.ctorFlagsField04Scaffold_);
-    info.offsetField08 = memberOffset(probe.queueThreadArrayField08Scaffold_);
-    info.offsetQueue0C = memberOffset(probe.ownedQueue0CScaffold_);
-    info.offsetQueue34 = memberOffset(probe.ownedQueue34Scaffold_);
-    info.offsetWaitHelper5C = memberOffset(probe.ownedWaitHelper5CScaffold_);
-    info.offsetQueueLockHelper60 = memberOffset(probe.ownedQueueLockHelper60Scaffold_);
-    info.offsetQueueSignalEvent7C = memberOffset(probe.ownedQueueSignalEvent7CScaffold_);
-    info.offsetEndpointTreeHead80 = memberOffset(probe.ownedEndpointTreeHead80Scaffold_);
-    info.offsetEndpointCount84 = memberOffset(probe.ownedEndpointCount84Scaffold_);
-    info.offsetReserved88 = memberOffset(probe.reserved88Scaffold_);
-    info.offsetContextTreeHead8C = memberOffset(probe.ownedContextTreeHead8CScaffold_);
-    info.offsetContextCount90 = memberOffset(probe.ownedContextCount90Scaffold_);
-    info.offsetReserved94 = memberOffset(probe.reserved94Scaffold_);
-    info.offsetCleanupLockHelper98 = memberOffset(probe.ownedCleanupLockHelper98Scaffold_);
-    info.offsetAttachment = memberOffset(probe.attachedLauncherAbiSurfaceScaffold_);
-
-    info.livePrimaryVptrAddressPoint = *reinterpret_cast<void* const*>(&probe);
-    if (info.livePrimaryVptrAddressPoint) {
-        const uintptr_t* vtableWords =
-            reinterpret_cast<const uintptr_t*>(info.livePrimaryVptrAddressPoint);
-        info.rawPrimaryVtableBaseGuess =
-            reinterpret_cast<uintptr_t>(info.livePrimaryVptrAddressPoint) - 8u;
-        info.offsetToTop = static_cast<intptr_t>(vtableWords[-2]);
-        info.typeinfo = reinterpret_cast<void*>(vtableWords[-1]);
-    }
-
-    return info;
-}
-
-bool CLTThreadPerClientTCPEngine::IsLauncherArg5PrimaryLayoutCompatibleForNativeVptrExperimentScaffold(
-    CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo* outInfo) {
-    const CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo info =
-        CollectNativePrimaryVptrExperimentInfoScaffold();
-    if (outInfo) {
-        *outInfo = info;
-    }
-
-    // Conservative gate for the direct-native-vptr experiment:
-    // - launcher arg5 shell is still the original-sized 0xb4 object
-    // - the native class must not only expose a live GCC address-point, it must also keep the
-    //   shell-visible field/subobject offsets compatible enough for native methods to read `this`
-    //   safely
-    // - current required landmarks are the concrete shell offsets consumed by original/client code
-    //   or by any native method that would run directly after the vptr swap
-    return info.livePrimaryVptrAddressPoint != nullptr &&
-        info.objectSize == 0xb4u &&
-        info.waitHelperSize == 0x04u &&
-        info.lockHelperSize == 0x1cu &&
-        info.offsetField04 == 0x04u &&
-        info.offsetField08 == 0x08u &&
-        info.offsetQueue0C == 0x0cu &&
-        info.offsetQueue34 == 0x34u &&
-        info.offsetWaitHelper5C == 0x5cu &&
-        info.offsetQueueLockHelper60 == 0x60u &&
-        info.offsetQueueSignalEvent7C == 0x7cu &&
-        info.offsetEndpointTreeHead80 == 0x80u &&
-        info.offsetEndpointCount84 == 0x84u &&
-        info.offsetReserved88 == 0x88u &&
-        info.offsetContextTreeHead8C == 0x8cu &&
-        info.offsetContextCount90 == 0x90u &&
-        info.offsetReserved94 == 0x94u &&
-        info.offsetCleanupLockHelper98 == 0x98u;
-}
-
 // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
 void CLTThreadPerClientTCPEngine::Queue_PushPair(
     CLTThreadPerClientTCPEngine_Queue* queue,
@@ -1174,31 +1132,23 @@ static bool QueueContext_ShouldAutoReleaseAfterType1(void* context) {
 // - derived list heads at `+0x80` (0x24 bytes) and `+0x8c` (0x18 bytes)
 // - derived helper root at `+0x98`
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTThreadPerClientTCPEngine::InitializeHeapBackedCriticalSectionScaffold(void** outCritStorage) {
-    if (!outCritStorage) {
-        return false;
-    }
-
-    _RTL_CRITICAL_SECTION* crit =
-        static_cast<_RTL_CRITICAL_SECTION*>(std::malloc(sizeof(CRITICAL_SECTION)));
-    if (!crit) {
-        return false;
-    }
-
-    InitializeCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(crit));
-    *outCritStorage = crit;
-    return true;
-}
-
-void CLTThreadPerClientTCPEngine::DeleteHeapBackedCriticalSectionScaffold(void** critStorage) {
-    if (!critStorage || !*critStorage) {
+void CLTThreadPerClientTCPEngine::InitializeLockHelperScaffold(
+    CLTThreadPerClientTCPEngine_LockHelperScaffold* helper) {
+    if (!helper) {
         return;
     }
 
-    _RTL_CRITICAL_SECTION* crit = CriticalSectionFromOpaqueStorage(*critStorage);
-    DeleteCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(crit));
-    std::free(crit);
-    *critStorage = nullptr;
+    std::memset(&helper->crit, 0, sizeof(helper->crit));
+    InitializeCriticalSection(&helper->crit);
+}
+
+void CLTThreadPerClientTCPEngine::DeleteLockHelperScaffold(
+    CLTThreadPerClientTCPEngine_LockHelperScaffold* helper) {
+    if (!helper) {
+        return;
+    }
+
+    DeleteCriticalSection(&helper->crit);
 }
 
 void CLTThreadPerClientTCPEngine::InitializeEndpointTreeHead24Scaffold(
@@ -1263,35 +1213,29 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
       ownedQueue0CScaffold_(),
       ownedQueue34Scaffold_(),
       ownedWaitHelper5CScaffold_{nullptr},
-      ownedQueueLockHelper60Scaffold_{nullptr, nullptr},
-      ownedQueueSignalEvent7CScaffold_(nullptr),
+      ownedQueueLockHelper60Scaffold_(),
+      ownedQueueSignalEvent7CScaffold_(NULL),
       ownedEndpointTreeHead80Scaffold_(nullptr),
       ownedEndpointCount84Scaffold_(0),
       reserved88Scaffold_(0),
       ownedContextTreeHead8CScaffold_(nullptr),
       ownedContextCount90Scaffold_(0),
       reserved94Scaffold_(0),
-      ownedCleanupLockHelper98Scaffold_{nullptr, nullptr},
-      attachedLauncherAbiSurfaceScaffold_(),
-      authBridgeContextScaffold_(nullptr),
-      marginBridgeContextScaffold_(nullptr),
-      queueThreads_(),
-      monitoredPorts_(),
-      workerThreads_(),
-      messageConnections_() {
+      ownedCleanupLockHelper98Scaffold_() {
     // anchor: launcher.exe:0x4366f0
-    // Source-owned ownership move from the arg5 ABI shell:
-    // - the target class now owns fallback/live surrogates for the recovered ctor-visible queue
-    //   pair, helper families, event handle, and sentinel-headed container surfaces
-    // - the wrapper still supplies the raw shell addresses consumed directly by original code, but
-    //   that shell now mirrors this class state instead of remaining the only owner of it
+    // Faithfulness restructuring:
+    // - keep the real recovered arg5 fields on the object body itself
+    // - move non-original source-owned baggage (attachment maps, vectors, bridge contexts) into
+    //   external side-state keyed by `this`
+    (void)EnsureEngineSideState(this);
+
+    ownedQueueLockHelper60Scaffold_.vtable = nullptr;
+    ownedCleanupLockHelper98Scaffold_.vtable = nullptr;
     Queue_Init(&ownedQueue0CScaffold_, 0);
     Queue_Init(&ownedQueue34Scaffold_, 0);
     ownedQueueSignalEvent7CScaffold_ = CreateEventA(NULL, FALSE, FALSE, NULL);
-    (void)InitializeHeapBackedCriticalSectionScaffold(
-        &ownedQueueLockHelper60Scaffold_.criticalSectionStorage);
-    (void)InitializeHeapBackedCriticalSectionScaffold(
-        &ownedCleanupLockHelper98Scaffold_.criticalSectionStorage);
+    InitializeLockHelperScaffold(&ownedQueueLockHelper60Scaffold_);
+    InitializeLockHelperScaffold(&ownedCleanupLockHelper98Scaffold_);
 
     ownedEndpointTreeHead80Scaffold_ =
         static_cast<CLTThreadPerClientTCPEngine_EndpointTreeHead24*>(
@@ -1321,28 +1265,31 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
 CLTThreadPerClientTCPEngine::~CLTThreadPerClientTCPEngine() {
     DetachLauncherAbiSurfaceScaffold();
 
-    for (AcceptThreadRecord& record : monitoredPorts_) {
-        StopAcceptThreadScaffold(&record);
-    }
-    monitoredPorts_.clear();
+    if (CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this)) {
+        for (AcceptThreadRecord& record : side->monitoredPorts) {
+            StopAcceptThreadScaffold(&record);
+        }
+        side->monitoredPorts.clear();
 
-    for (WorkerThreadRecord& record : workerThreads_) {
-        StopWorkerThreadScaffold(&record);
-    }
-    workerThreads_.clear();
+        for (WorkerThreadRecord& record : side->workerThreads) {
+            StopWorkerThreadScaffold(&record);
+        }
+        side->workerThreads.clear();
 
-    for (CMessageConnection* connection : messageConnections_) {
-        delete connection;
+        for (CMessageConnection* connection : side->messageConnections) {
+            delete connection;
+        }
+        side->messageConnections.clear();
+        side->queueThreads.clear();
     }
-    messageConnections_.clear();
 
     Queue_Free(&ownedQueue0CScaffold_);
     Queue_Free(&ownedQueue34Scaffold_);
-    DeleteHeapBackedCriticalSectionScaffold(&ownedQueueLockHelper60Scaffold_.criticalSectionStorage);
-    DeleteHeapBackedCriticalSectionScaffold(&ownedCleanupLockHelper98Scaffold_.criticalSectionStorage);
+    DeleteLockHelperScaffold(&ownedQueueLockHelper60Scaffold_);
+    DeleteLockHelperScaffold(&ownedCleanupLockHelper98Scaffold_);
     if (ownedQueueSignalEvent7CScaffold_) {
-        CloseHandle(static_cast<HANDLE>(ownedQueueSignalEvent7CScaffold_));
-        ownedQueueSignalEvent7CScaffold_ = nullptr;
+        CloseHandle(ownedQueueSignalEvent7CScaffold_);
+        ownedQueueSignalEvent7CScaffold_ = NULL;
     }
     if (ownedEndpointTreeHead80Scaffold_) {
         std::free(ownedEndpointTreeHead80Scaffold_);
@@ -1352,6 +1299,8 @@ CLTThreadPerClientTCPEngine::~CLTThreadPerClientTCPEngine() {
         std::free(ownedContextTreeHead8CScaffold_);
         ownedContextTreeHead8CScaffold_ = nullptr;
     }
+
+    EraseEngineSideState(this);
 }
 
 // anchor: launcher.exe:0x4319a0
@@ -1389,8 +1338,9 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* 
         return 0;
     }
 
-    monitoredPorts_.push_back(std::move(record));
-    (void)monitoredPorts_.back().thread->Start(/*startPriority=*/2);
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    side.monitoredPorts.push_back(std::move(record));
+    (void)side.monitoredPorts.back().thread->Start(/*startPriority=*/2);
     SyncAttachedLauncherObjectStateScaffold();
     return kResultSuccess;
 }
@@ -1452,14 +1402,15 @@ uint32_t CLTThreadPerClientTCPEngine::Slot4_42F7C0(void* arg1) {
 // vtable: launcher.exe:0x004b2768 slot +0x14
 uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) {
     const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
-    for (auto it = monitoredPorts_.begin(); it != monitoredPorts_.end(); ++it) {
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    for (auto it = side.monitoredPorts.begin(); it != side.monitoredPorts.end(); ++it) {
         if (it->endpoint.portNetworkOrder == key.portNetworkOrder &&
             it->endpoint.ipv4NetworkOrder == key.ipv4NetworkOrder) {
             if (outSocketHandle) {
                 *outSocketHandle = it->listenSocketHandle;
             }
             StopAcceptThreadScaffold(&(*it));
-            monitoredPorts_.erase(it);
+            side.monitoredPorts.erase(it);
             SyncAttachedLauncherObjectStateScaffold();
             return 0;
         }
@@ -1695,10 +1646,11 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
         touchedConnectionState = true;
     }
 
-    for (auto it = workerThreads_.begin(); it != workerThreads_.end(); ++it) {
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    for (auto it = side.workerThreads.begin(); it != side.workerThreads.end(); ++it) {
         if (it->contextKey == cleanupContextKey) {
             StopWorkerThreadScaffold(&(*it));
-            workerThreads_.erase(it);
+            side.workerThreads.erase(it);
             (void)DropMessageConnection(cleanupContextKey);
             result = kResultSuccess;
             goto cleanup_tail;
@@ -1726,36 +1678,42 @@ cleanup_tail:
 // UNANCHORED: launcher ABI-shell attachment/mirror entrypoint.
 void CLTThreadPerClientTCPEngine::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_LauncherAbiAttachment& attachment) {
-    attachedLauncherAbiSurfaceScaffold_ = attachment;
+    EnsureEngineSideState(this).attachedLauncherAbiSurface = attachment;
     SyncAttachedLauncherObjectStateScaffold();
 }
 
 // UNANCHORED: launcher ABI-shell detach/reset helper.
 void CLTThreadPerClientTCPEngine::DetachLauncherAbiSurfaceScaffold() {
-    if (attachedLauncherAbiSurfaceScaffold_.field04CtorFlags) {
-        *attachedLauncherAbiSurfaceScaffold_.field04CtorFlags = 0u;
+    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    if (!side) {
+        return;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.field08QueueThreadArray) {
-        *attachedLauncherAbiSurfaceScaffold_.field08QueueThreadArray = nullptr;
+
+    if (side->attachedLauncherAbiSurface.field04CtorFlags) {
+        *side->attachedLauncherAbiSurface.field04CtorFlags = 0u;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.list80EndpointTreeHead) {
-        *attachedLauncherAbiSurfaceScaffold_.list80EndpointTreeHead = nullptr;
+    if (side->attachedLauncherAbiSurface.field08QueueThreadArray) {
+        *side->attachedLauncherAbiSurface.field08QueueThreadArray = nullptr;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.field84EndpointCount) {
-        *attachedLauncherAbiSurfaceScaffold_.field84EndpointCount = 0u;
+    if (side->attachedLauncherAbiSurface.list80EndpointTreeHead) {
+        *side->attachedLauncherAbiSurface.list80EndpointTreeHead = nullptr;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.list8CContextTreeHead) {
-        *attachedLauncherAbiSurfaceScaffold_.list8CContextTreeHead = nullptr;
+    if (side->attachedLauncherAbiSurface.field84EndpointCount) {
+        *side->attachedLauncherAbiSurface.field84EndpointCount = 0u;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.field90ContextCount) {
-        *attachedLauncherAbiSurfaceScaffold_.field90ContextCount = 0u;
+    if (side->attachedLauncherAbiSurface.list8CContextTreeHead) {
+        *side->attachedLauncherAbiSurface.list8CContextTreeHead = nullptr;
     }
-    attachedLauncherAbiSurfaceScaffold_ = {};
+    if (side->attachedLauncherAbiSurface.field90ContextCount) {
+        *side->attachedLauncherAbiSurface.field90ContextCount = 0u;
+    }
+    side->attachedLauncherAbiSurface = {};
 }
 
 void CLTThreadPerClientTCPEngine::RefreshOwnedLauncherMirrorStateScaffold() {
-    ownedEndpointCount84Scaffold_ = static_cast<uint32_t>(monitoredPorts_.size());
-    ownedContextCount90Scaffold_ = static_cast<uint32_t>(workerThreads_.size());
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    ownedEndpointCount84Scaffold_ = static_cast<uint32_t>(side.monitoredPorts.size());
+    ownedContextCount90Scaffold_ = static_cast<uint32_t>(side.workerThreads.size());
     SetEndpointTreeHead24OccupancyScaffold(
         ownedEndpointTreeHead80Scaffold_,
         ownedEndpointCount84Scaffold_ != 0u);
@@ -1767,66 +1725,74 @@ void CLTThreadPerClientTCPEngine::RefreshOwnedLauncherMirrorStateScaffold() {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::SyncAttachedLauncherObjectStateScaffold() {
     RefreshOwnedLauncherMirrorStateScaffold();
-    if (attachedLauncherAbiSurfaceScaffold_.field04CtorFlags) {
-        *attachedLauncherAbiSurfaceScaffold_.field04CtorFlags = ctorFlagsField04Scaffold_;
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    if (side.attachedLauncherAbiSurface.field04CtorFlags) {
+        *side.attachedLauncherAbiSurface.field04CtorFlags = ctorFlagsField04Scaffold_;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.field08QueueThreadArray) {
-        *attachedLauncherAbiSurfaceScaffold_.field08QueueThreadArray = queueThreadArrayField08Scaffold_;
+    if (side.attachedLauncherAbiSurface.field08QueueThreadArray) {
+        *side.attachedLauncherAbiSurface.field08QueueThreadArray = queueThreadArrayField08Scaffold_;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.list80EndpointTreeHead) {
-        *attachedLauncherAbiSurfaceScaffold_.list80EndpointTreeHead = ownedEndpointTreeHead80Scaffold_;
+    if (side.attachedLauncherAbiSurface.list80EndpointTreeHead) {
+        *side.attachedLauncherAbiSurface.list80EndpointTreeHead = ownedEndpointTreeHead80Scaffold_;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.field84EndpointCount) {
-        *attachedLauncherAbiSurfaceScaffold_.field84EndpointCount = ownedEndpointCount84Scaffold_;
+    if (side.attachedLauncherAbiSurface.field84EndpointCount) {
+        *side.attachedLauncherAbiSurface.field84EndpointCount = ownedEndpointCount84Scaffold_;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.list8CContextTreeHead) {
-        *attachedLauncherAbiSurfaceScaffold_.list8CContextTreeHead = ownedContextTreeHead8CScaffold_;
+    if (side.attachedLauncherAbiSurface.list8CContextTreeHead) {
+        *side.attachedLauncherAbiSurface.list8CContextTreeHead = ownedContextTreeHead8CScaffold_;
     }
-    if (attachedLauncherAbiSurfaceScaffold_.field90ContextCount) {
-        *attachedLauncherAbiSurfaceScaffold_.field90ContextCount = ownedContextCount90Scaffold_;
+    if (side.attachedLauncherAbiSurface.field90ContextCount) {
+        *side.attachedLauncherAbiSurface.field90ContextCount = ownedContextCount90Scaffold_;
     }
 }
 
 CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue0CScaffold() {
-    return attachedLauncherAbiSurfaceScaffold_.queue0C
-        ? attachedLauncherAbiSurfaceScaffold_.queue0C
+    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return (side && side->attachedLauncherAbiSurface.queue0C)
+        ? side->attachedLauncherAbiSurface.queue0C
         : &ownedQueue0CScaffold_;
 }
 
 CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue34Scaffold() {
-    return attachedLauncherAbiSurfaceScaffold_.queue34
-        ? attachedLauncherAbiSurfaceScaffold_.queue34
+    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return (side && side->attachedLauncherAbiSurface.queue34)
+        ? side->attachedLauncherAbiSurface.queue34
         : &ownedQueue34Scaffold_;
 }
 
 const CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue0CScaffold() const {
-    return attachedLauncherAbiSurfaceScaffold_.queue0C
-        ? attachedLauncherAbiSurfaceScaffold_.queue0C
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return (side && side->attachedLauncherAbiSurface.queue0C)
+        ? side->attachedLauncherAbiSurface.queue0C
         : &ownedQueue0CScaffold_;
 }
 
 const CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue34Scaffold() const {
-    return attachedLauncherAbiSurfaceScaffold_.queue34
-        ? attachedLauncherAbiSurfaceScaffold_.queue34
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return (side && side->attachedLauncherAbiSurface.queue34)
+        ? side->attachedLauncherAbiSurface.queue34
         : &ownedQueue34Scaffold_;
 }
 
 void* CLTThreadPerClientTCPEngine::ActiveQueueLockScaffold() const {
-    return attachedLauncherAbiSurfaceScaffold_.queueLock
-        ? attachedLauncherAbiSurfaceScaffold_.queueLock
-        : ownedQueueLockHelper60Scaffold_.criticalSectionStorage;
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return (side && side->attachedLauncherAbiSurface.queueLock)
+        ? side->attachedLauncherAbiSurface.queueLock
+        : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60Scaffold_.crit);
 }
 
 void* CLTThreadPerClientTCPEngine::ActiveQueueSignalEventScaffold() const {
-    return attachedLauncherAbiSurfaceScaffold_.queueSignalEvent
-        ? attachedLauncherAbiSurfaceScaffold_.queueSignalEvent
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return (side && side->attachedLauncherAbiSurface.queueSignalEvent)
+        ? side->attachedLauncherAbiSurface.queueSignalEvent
         : ownedQueueSignalEvent7CScaffold_;
 }
 
 void* CLTThreadPerClientTCPEngine::ActiveCleanupLockScaffold() const {
-    return attachedLauncherAbiSurfaceScaffold_.cleanupLock
-        ? attachedLauncherAbiSurfaceScaffold_.cleanupLock
-        : ownedCleanupLockHelper98Scaffold_.criticalSectionStorage;
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return (side && side->attachedLauncherAbiSurface.cleanupLock)
+        ? side->attachedLauncherAbiSurface.cleanupLock
+        : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98Scaffold_.crit);
 }
 
 uint32_t CLTThreadPerClientTCPEngine::SignalQueueEventHelperScaffold() {
@@ -1852,9 +1818,9 @@ uint32_t CLTThreadPerClientTCPEngine::WaitQueueEventHelperScaffold(int reasonMil
 }
 
 uint32_t CLTThreadPerClientTCPEngine::EnterQueueLockHelperScaffold(bool pumpLauncherBridge) {
-    if (_RTL_CRITICAL_SECTION* crit =
+    if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
-        EnterCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(crit));
+        EnterCriticalSection(crit);
     }
     if (pumpLauncherBridge) {
         PumpLauncherConnectionBridgeFromArg5HelperScaffold();
@@ -1863,25 +1829,25 @@ uint32_t CLTThreadPerClientTCPEngine::EnterQueueLockHelperScaffold(bool pumpLaun
 }
 
 uint32_t CLTThreadPerClientTCPEngine::LeaveQueueLockHelperScaffold() {
-    if (_RTL_CRITICAL_SECTION* crit =
+    if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
-        LeaveCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(crit));
+        LeaveCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine::EnterCleanupLockHelperScaffold() {
-    if (_RTL_CRITICAL_SECTION* crit =
+    if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
-        EnterCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(crit));
+        EnterCriticalSection(crit);
     }
     return 0u;
 }
 
 uint32_t CLTThreadPerClientTCPEngine::LeaveCleanupLockHelperScaffold() {
-    if (_RTL_CRITICAL_SECTION* crit =
+    if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
-        LeaveCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(crit));
+        LeaveCriticalSection(crit);
     }
     return 0u;
 }
@@ -1920,8 +1886,9 @@ mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* CLTThreadPerClientTCPEn
 void CLTThreadPerClientTCPEngine::AttachLauncherConnectionBridgeContextsScaffold(
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext,
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext) {
-    authBridgeContextScaffold_ = authContext;
-    marginBridgeContextScaffold_ = marginContext;
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    side.authBridgeContext = authContext;
+    side.marginBridgeContext = marginContext;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1943,10 +1910,10 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
         return false;
     }
 
-    _RTL_CRITICAL_SECTION* queueLock =
+    CRITICAL_SECTION* queueLock =
         CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold());
     if (queueLock && !queueLockAlreadyHeld) {
-        EnterCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(queueLock));
+        EnterCriticalSection(queueLock);
     }
 
     const bool queuePairWasEmpty =
@@ -1957,7 +1924,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(context)));
 
     if (queueLock && !queueLockAlreadyHeld) {
-        LeaveCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(queueLock));
+        LeaveCriticalSection(queueLock);
     }
 
     if (queuePairWasEmpty) {
@@ -2141,8 +2108,9 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaffold() {
-    PumpLauncherConnectionContextScaffold(authBridgeContextScaffold_, "AuthReceivePacket");
-    PumpLauncherConnectionContextScaffold(marginBridgeContextScaffold_, "MarginReceivePacket");
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    PumpLauncherConnectionContextScaffold(side.authBridgeContext, "AuthReceivePacket");
+    PumpLauncherConnectionContextScaffold(side.marginBridgeContext, "MarginReceivePacket");
 }
 
 // anchor: launcher.exe:0x436b10
@@ -2154,11 +2122,11 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
     // - type-1 work runs slot-12-style cleanup before the later context callback
     // - callback runs before work-item release; conditional type-1 context auto-release stays last
     // - queue selection/pop happens under the attached arg5 lock
-    _RTL_CRITICAL_SECTION* queueLock =
+    CRITICAL_SECTION* queueLock =
         CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold());
     while (true) {
         if (queueLock) {
-            EnterCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(queueLock));
+            EnterCriticalSection(queueLock);
         }
 
         CLTThreadPerClientTCPEngine_Queue* selectedQueue = nullptr;
@@ -2170,7 +2138,7 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
 
         if (!selectedQueue) {
             if (queueLock) {
-                LeaveCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(queueLock));
+                LeaveCriticalSection(queueLock);
             }
             if (nonBlocking) {
                 return;
@@ -2195,7 +2163,7 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
         CLTThreadPerClientTCPEngine_QueuedPair pair = {};
         const bool popped = Queue_TryPopPair(selectedQueue, &pair);
         if (queueLock) {
-            LeaveCriticalSection(reinterpret_cast<CRITICAL_SECTION*>(queueLock));
+            LeaveCriticalSection(queueLock);
         }
         if (!popped) {
             return;
@@ -2246,28 +2214,34 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
 
 // UNANCHORED scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.
 void CLTThreadPerClientTCPEngine::RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount) {
-    queueThreads_.clear();
-    queueThreads_.reserve(queueThreadCount);
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    side.queueThreads.clear();
+    side.queueThreads.reserve(queueThreadCount);
     for (uint32_t i = 0; i < queueThreadCount; ++i) {
-        queueThreads_.push_back(std::make_unique<CLTThreadPerClientTCPEngine_QueueThread>(this));
+        side.queueThreads.push_back(std::make_unique<CLTThreadPerClientTCPEngine_QueueThread>(this));
     }
 }
 
 // UNANCHORED scaffold accessor for source-side queue-thread child tracking.
 size_t CLTThreadPerClientTCPEngine::QueueThreadCount() const {
-    return queueThreads_.size();
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return side ? side->queueThreads.size() : 0u;
 }
 
 // UNANCHORED starter accessor.
 // Exposes scaffold state; no direct launcher.exe function anchor is assigned yet.
 const std::vector<CLTThreadPerClientTCPEngine::AcceptThreadRecord>& CLTThreadPerClientTCPEngine::MonitoredPorts() const {
-    return monitoredPorts_;
+    static const std::vector<AcceptThreadRecord> kEmpty;
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return side ? side->monitoredPorts : kEmpty;
 }
 
 // UNANCHORED starter accessor.
 // Exposes scaffold state; no direct launcher.exe function anchor is assigned yet.
 const std::vector<CLTThreadPerClientTCPEngine::WorkerThreadRecord>& CLTThreadPerClientTCPEngine::WorkerThreads() const {
-    return workerThreads_;
+    static const std::vector<WorkerThreadRecord> kEmpty;
+    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
+    return side ? side->workerThreads : kEmpty;
 }
 
 // UNANCHORED starter helper.
@@ -2287,17 +2261,19 @@ CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* con
             connection->OwnerContext() == resolvedContextKey;
     };
 
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+
     // Prefer the live auth/margin bridge-tracked sidecar connections before falling back to
     // engine-owned generic entries. That keeps slot 6/7/8 lookup closer to the real
     // connection-family objects already driving the active path.
-    if (authBridgeContextScaffold_ && matchesConnectionKey(authBridgeContextScaffold_->sidecarConnection)) {
-        return authBridgeContextScaffold_->sidecarConnection;
+    if (side.authBridgeContext && matchesConnectionKey(side.authBridgeContext->sidecarConnection)) {
+        return side.authBridgeContext->sidecarConnection;
     }
-    if (marginBridgeContextScaffold_ && matchesConnectionKey(marginBridgeContextScaffold_->sidecarConnection)) {
-        return marginBridgeContextScaffold_->sidecarConnection;
+    if (side.marginBridgeContext && matchesConnectionKey(side.marginBridgeContext->sidecarConnection)) {
+        return side.marginBridgeContext->sidecarConnection;
     }
 
-    for (CMessageConnection* connection : messageConnections_) {
+    for (CMessageConnection* connection : side.messageConnections) {
         if (matchesConnectionKey(connection)) {
             return connection;
         }
@@ -2329,7 +2305,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
     }
 
     connection->SetOwnerContext(resolvedContextKey);
-    messageConnections_.push_back(connection);
+    EnsureEngineSideState(this).messageConnections.push_back(connection);
     return connection;
 }
 
@@ -2338,7 +2314,8 @@ CMessageConnection* CLTThreadPerClientTCPEngine::GetOrCreateMessageConnection(vo
 bool CLTThreadPerClientTCPEngine::DropMessageConnection(void* contextKey) {
     CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
     void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
-    for (auto it = messageConnections_.begin(); it != messageConnections_.end(); ++it) {
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    for (auto it = side.messageConnections.begin(); it != side.messageConnections.end(); ++it) {
         CMessageConnection* connection = *it;
         if (connection &&
             (connection == contextKey ||
@@ -2347,7 +2324,7 @@ bool CLTThreadPerClientTCPEngine::DropMessageConnection(void* contextKey) {
              connection->OwnerContext() == contextKey ||
              connection->OwnerContext() == resolvedContextKey)) {
             delete connection;
-            messageConnections_.erase(it);
+            side.messageConnections.erase(it);
             return true;
         }
     }
@@ -2367,7 +2344,8 @@ LTTCPEndpointKey CLTThreadPerClientTCPEngine::MakeEndpointKey(uint16_t portHostO
 // UNANCHORED starter helper.
 // No direct launcher.exe helper body is assigned yet.
 CLTThreadPerClientTCPEngine::AcceptThreadRecord* CLTThreadPerClientTCPEngine::FindMonitoredPort(const LTTCPEndpointKey& key) {
-    for (auto& record : monitoredPorts_) {
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    for (auto& record : side.monitoredPorts) {
         if (record.endpoint.portNetworkOrder == key.portNetworkOrder &&
             record.endpoint.ipv4NetworkOrder == key.ipv4NetworkOrder) {
             return &record;
@@ -2381,7 +2359,8 @@ CLTThreadPerClientTCPEngine::AcceptThreadRecord* CLTThreadPerClientTCPEngine::Fi
 CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::FindWorker(void* contextKey) {
     CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
     void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
-    for (auto& record : workerThreads_) {
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
+    for (auto& record : side.workerThreads) {
         if (record.contextKey == contextKey ||
             record.contextKey == resolvedContextKey ||
             record.contextKey == queueContextOwner ||
@@ -2466,14 +2445,15 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Cr
         return nullptr;
     }
 
+    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
     WorkerThreadRecord* inserted = nullptr;
     if (WorkerThreadRecord* existing = FindWorker(normalizedContextKey)) {
         StopWorkerThreadScaffold(existing);
         *existing = std::move(worker);
         inserted = existing;
     } else {
-        workerThreads_.push_back(std::move(worker));
-        inserted = workerThreads_.empty() ? nullptr : &workerThreads_.back();
+        side.workerThreads.push_back(std::move(worker));
+        inserted = side.workerThreads.empty() ? nullptr : &side.workerThreads.back();
     }
 
     if (inserted) {

@@ -1,7 +1,8 @@
-#include "launcher_mediator_abi_shared.h"
 #include "launcher_network_object_abi.h"
+#include "launcher_mediator_abi_shared.h"
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -43,13 +44,11 @@ enum class LauncherObjectPrimaryDispatchMode {
     kMinGWNativeVptr,
 };
 
-struct LauncherObjectPrimaryDispatchConfig {
-    LauncherObjectPrimaryDispatchMode requestedMode;
-    LauncherObjectPrimaryDispatchMode effectiveMode;
-    bool nativeExperimentRequested;
-    bool nativeLayoutCompatible;
-    mxo::liblttcp::CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo nativeInfo;
-};
+#if defined(__MINGW32__) && !defined(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR)
+#define MXO_USE_MINGW_NATIVE_ARG5_VPTR 1
+#else
+#define MXO_USE_MINGW_NATIVE_ARG5_VPTR 0
+#endif
 
 static const char* LauncherObjectPrimaryDispatchModeName(LauncherObjectPrimaryDispatchMode mode) {
     switch (mode) {
@@ -61,28 +60,24 @@ static const char* LauncherObjectPrimaryDispatchModeName(LauncherObjectPrimaryDi
     return "unknown";
 }
 
-static const LauncherObjectPrimaryDispatchConfig& LauncherObjectPrimaryDispatchConfigForBuild() {
-    static const LauncherObjectPrimaryDispatchConfig kConfig = []() {
-        LauncherObjectPrimaryDispatchConfig config = {};
-        config.requestedMode = LauncherObjectPrimaryDispatchMode::kWrapperTable;
-        config.effectiveMode = LauncherObjectPrimaryDispatchMode::kWrapperTable;
-        config.nativeExperimentRequested = false;
-        config.nativeLayoutCompatible = false;
-
-#if defined(__MINGW32__) && defined(MXO_EXPERIMENT_MINGW_NATIVE_ARG5_VPTR)
-        config.requestedMode = LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr;
-        config.nativeExperimentRequested = true;
-        config.nativeLayoutCompatible =
-            mxo::liblttcp::CLTThreadPerClientTCPEngine::
-                IsLauncherArg5PrimaryLayoutCompatibleForNativeVptrExperimentScaffold(
-                    &config.nativeInfo);
-        config.effectiveMode = config.nativeLayoutCompatible
-            ? LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr
-            : LauncherObjectPrimaryDispatchMode::kWrapperTable;
+static LauncherObjectPrimaryDispatchMode LauncherObjectPrimaryDispatchModeForBuild() {
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    return LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr;
+#else
+    return LauncherObjectPrimaryDispatchMode::kWrapperTable;
 #endif
-        return config;
+}
+
+static void** LauncherObjectNativePrimaryAddressPointForBuild() {
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    static void** const kNativeAddressPoint = []() -> void** {
+        mxo::liblttcp::CLTThreadPerClientTCPEngine probe;
+        return *reinterpret_cast<void***>(&probe);
     }();
-    return kConfig;
+    return kNativeAddressPoint;
+#else
+    return nullptr;
+#endif
 }
 
 static void LogLauncherObjectPrimaryDispatchConfigOnce() {
@@ -92,53 +87,60 @@ static void LogLauncherObjectPrimaryDispatchConfigOnce() {
     }
     logged = true;
 
-    const LauncherObjectPrimaryDispatchConfig& config = LauncherObjectPrimaryDispatchConfigForBuild();
+    const LauncherObjectPrimaryDispatchMode mode = LauncherObjectPrimaryDispatchModeForBuild();
     spdlog::info(
-        "launcher arg5 primary dispatch requested={} effective={} mingwNativeRequested={} nativeLayoutCompatible={}",
-        LauncherObjectPrimaryDispatchModeName(config.requestedMode),
-        LauncherObjectPrimaryDispatchModeName(config.effectiveMode),
-        config.nativeExperimentRequested ? 1 : 0,
-        config.nativeLayoutCompatible ? 1 : 0);
+        "launcher arg5 primary dispatch active={} mingwNativeDefault={} optOutDefined={}",
+        LauncherObjectPrimaryDispatchModeName(mode),
+#if defined(__MINGW32__)
+        1,
+#else
+        0,
+#endif
+#if defined(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR)
+        1
+#else
+        0
+#endif
+    );
 
-#if defined(__MINGW32__) && defined(MXO_EXPERIMENT_MINGW_NATIVE_ARG5_VPTR)
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    void** const nativeAddressPoint = LauncherObjectNativePrimaryAddressPointForBuild();
+    const uintptr_t* const vtableWords = reinterpret_cast<const uintptr_t*>(nativeAddressPoint);
     spdlog::info(
-        "launcher arg5 native-vptr probe liveVptr={} rawBaseGuess={} offsetToTop=0x{:08x} typeinfo={} nativeSize=0x{:x} shellSize=0x{:x}",
-        fmt::ptr(config.nativeInfo.livePrimaryVptrAddressPoint),
-        fmt::ptr(reinterpret_cast<void*>(config.nativeInfo.rawPrimaryVtableBaseGuess)),
-        static_cast<uint32_t>(config.nativeInfo.offsetToTop),
-        fmt::ptr(config.nativeInfo.typeinfo),
-        config.nativeInfo.objectSize,
+        "launcher arg5 native-vptr addressPoint={} rawBaseGuess={} offsetToTop=0x{:08x} typeinfo={} nativeSize=0x{:x} shellSize=0x{:x}",
+        fmt::ptr(nativeAddressPoint),
+        fmt::ptr(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(nativeAddressPoint) - 8u)),
+        static_cast<uint32_t>(vtableWords[-2]),
+        fmt::ptr(reinterpret_cast<void*>(vtableWords[-1])),
+        sizeof(mxo::liblttcp::CLTThreadPerClientTCPEngine),
         sizeof(LauncherObjectAbiShell));
     spdlog::info(
-        "launcher arg5 native-vptr layout offsets field04=0x{:x} field08=0x{:x} queue0C=0x{:x} queue34=0x{:x} wait5C=0x{:x} lock60=0x{:x} event=0x{:x} list80=0x{:x} count84=0x{:x} list8C=0x{:x} count90=0x{:x} cleanup98=0x{:x} lockHelperSize=0x{:x}",
-        config.nativeInfo.offsetField04,
-        config.nativeInfo.offsetField08,
-        config.nativeInfo.offsetQueue0C,
-        config.nativeInfo.offsetQueue34,
-        config.nativeInfo.offsetWaitHelper5C,
-        config.nativeInfo.offsetQueueLockHelper60,
-        config.nativeInfo.offsetQueueSignalEvent7C,
-        config.nativeInfo.offsetEndpointTreeHead80,
-        config.nativeInfo.offsetEndpointCount84,
-        config.nativeInfo.offsetContextTreeHead8C,
-        config.nativeInfo.offsetContextCount90,
-        config.nativeInfo.offsetCleanupLockHelper98,
-        config.nativeInfo.lockHelperSize);
-    if (!config.nativeLayoutCompatible) {
-        spdlog::warn(
-            "launcher arg5 MinGW native-vptr experiment blocked: native object still diverges from the 0xb4 shell (event/list/cleanup offsets and embedded +0x60/+0x98 lock-helper shape do not match)"
-        );
-    }
+        "launcher arg5 native-vptr compile-time layout field04=0x{:x} field08=0x{:x} queue0C=0x{:x} queue34=0x{:x} wait5C=0x{:x} lock60=0x{:x} event=0x{:x} list80=0x{:x} count84=0x{:x} list8C=0x{:x} count90=0x{:x} cleanup98=0x{:x} lockHelperSize=0x{:x}",
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, field04),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, field08),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, queue0C),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, queue34),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, waitHelper5C),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, queueLockHelper60),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, queueSignalEvent7C),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, endpointTreeHead80),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, endpointCount84),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, contextTreeHead8C),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, contextCount90),
+        offsetof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LayoutMirror, cleanupLockHelper98),
+        sizeof(mxo::liblttcp::CLTThreadPerClientTCPEngine_LockHelperScaffold));
+    spdlog::info(
+        "launcher arg5 native-vptr note: live shell keeps wrapper-owned helper vtables at +0x5c/+0x60/+0x98 for direct helper dispatch"
+    );
 #endif
 }
 
 static void** LauncherObjectSelectedPrimaryVtable() {
-    const LauncherObjectPrimaryDispatchConfig& config = LauncherObjectPrimaryDispatchConfigForBuild();
-    if (config.effectiveMode == LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr &&
-        config.nativeInfo.livePrimaryVptrAddressPoint) {
-        return static_cast<void**>(config.nativeInfo.livePrimaryVptrAddressPoint);
-    }
+#if MXO_USE_MINGW_NATIVE_ARG5_VPTR
+    return LauncherObjectNativePrimaryAddressPointForBuild();
+#else
     return nullptr;
+#endif
 }
 
 // UNANCHORED: launcher-owned accessor for the single current arg5 sidecar binding.
@@ -786,17 +788,16 @@ static void ClearLauncherNetworkEngineFromMediator(void* mediatorPtr) {
 void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, const char* phase) {
     LogLauncherObjectPrimaryDispatchConfigOnce();
 
-    const LauncherObjectPrimaryDispatchConfig& config = LauncherObjectPrimaryDispatchConfigForBuild();
+    const LauncherObjectPrimaryDispatchMode mode = LauncherObjectPrimaryDispatchModeForBuild();
     void* storedVptr = launcherObjectPtr ? *reinterpret_cast<void**>(launcherObjectPtr) : nullptr;
     const bool vptrMatchesNativeAddressPoint =
-        storedVptr != nullptr && storedVptr == config.nativeInfo.livePrimaryVptrAddressPoint;
+        storedVptr != nullptr && storedVptr == LauncherObjectNativePrimaryAddressPointForBuild();
     spdlog::info(
-        "launcher arg5 dispatch state phase='{}' object={} storedVptr={} requested={} effective={} nativeAddressPointMatch={}",
+        "launcher arg5 dispatch state phase='{}' object={} storedVptr={} active={} nativeAddressPointMatch={}",
         (phase && phase[0]) ? phase : "<unspecified>",
         fmt::ptr(launcherObjectPtr),
         fmt::ptr(storedVptr),
-        LauncherObjectPrimaryDispatchModeName(config.requestedMode),
-        LauncherObjectPrimaryDispatchModeName(config.effectiveMode),
+        LauncherObjectPrimaryDispatchModeName(mode),
         vptrMatchesNativeAddressPoint ? 1 : 0);
 }
 
@@ -839,10 +840,9 @@ void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediat
     LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(*launcherObjectPtr);
     LauncherLogNetworkEngineAbiShellDispatchState(object, "pre-release");
 
-    const LauncherObjectPrimaryDispatchConfig& config = LauncherObjectPrimaryDispatchConfigForBuild();
-    if (config.effectiveMode == LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr) {
+    if (LauncherObjectPrimaryDispatchModeForBuild() == LauncherObjectPrimaryDispatchMode::kMinGWNativeVptr) {
         spdlog::info(
-            "launcher arg5 native-vptr experiment using manual shell release for {} instead of object->vtable[0]",
+            "launcher arg5 native-vptr mode using manual shell release for {} instead of object->vtable[0]",
             fmt::ptr(object));
         LauncherObject_Release(object, 1u);
     } else {

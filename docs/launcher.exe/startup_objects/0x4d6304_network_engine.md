@@ -1514,6 +1514,66 @@ That is the important regression check for this pass:
 - more arg5 structure moved into the target class
 - and the working path still launched
 
+## 2026-03-29 layout-restructuring follow-up for the MinGW native-vptr experiment
+
+A follow-up restructuring pass pulled `mxo::liblttcp::CLTThreadPerClientTCPEngine` back toward the
+recovered original arg5 body instead of leaving later source-owned baggage inside the class.
+
+What changed:
+- non-original source bookkeeping moved out of the class body into external side-state keyed by
+  `this`
+  - launcher-ABI attachment map
+  - bridge contexts
+  - queue-thread vector
+  - monitored-port / worker-thread / message-connection vectors
+- the native class body itself now again carries the recovered top-level arg5 fields at the
+  original offsets
+- helper roots at `+0x60` and `+0x98` now again embed inline `CRITICAL_SECTION` storage, matching
+  the original `0x1c` helper shape instead of the older heap-backed `0x8` surrogate
+- `ltthreadperclienttcpengine.h` now statically enforces:
+  - `sizeof(CLTThreadPerClientTCPEngine) == 0xb4`
+  - recovered field positions through the `0xb4` top-level layout via a compile-time layout mirror
+
+Observed result from the latest default MinGW run log (`~/MxO_7.6005/resurrections.log`):
+- `active=mingw-native-vptr`
+- native size now matches shell size:
+  - `nativeSize=0xb4`
+  - `shellSize=0xb4`
+- top-level offsets now match the launcher shell completely:
+  - `field04=0x4`
+  - `field08=0x8`
+  - `queue0C=0xc`
+  - `queue34=0x34`
+  - `wait5C=0x5c`
+  - `lock60=0x60`
+  - `event=0x7c`
+  - `list80=0x80`
+  - `count84=0x84`
+  - `list8C=0x8c`
+  - `count90=0x90`
+  - `cleanup98=0x98`
+  - `lockHelperSize=0x1c`
+- the live shell now stores the native GCC address-point directly:
+  - `storedVptr=0x6ae4b4`
+  - `nativeAddressPointMatch=1`
+- the live shell still keeps the wrapper-owned helper tables at those embedded addresses, so direct
+  helper dispatch remains valid while only the primary vptr changed
+
+So the blocker moved one step further and the experiment now crossed it:
+- **no longer** the big top-level `0xf0` vs `0xb4` body mismatch from the earlier pass
+- **no longer** blocked from installing the native primary address-point on the live shell
+- the embedded helper dispatch surface remains wrapper-owned, which is acceptable for this narrow
+  primary-dispatch change
+
+Current conclusion:
+- the restructuring pass was the right faithful move
+- the MinGW native-vptr primary-dispatch path is now the default on MinGW builds
+- there is an explicit compile-time opt-out for rollback:
+  - `make MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR=1`
+- user validation confirmed the default MinGW-native-vptr build still **launched into game
+  successfully**
+- non-MinGW / opt-out builds still preserve the wrapper-table path
+
 ## ABI boundary note
 
 The broader ABI-boundary / wrapper-reduction investigation for arg5 was moved out of this per-object doc because the lessons also apply to other launcher-owned objects.
