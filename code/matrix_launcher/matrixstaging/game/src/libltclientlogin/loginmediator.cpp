@@ -430,6 +430,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 // +0x0c
 // anchor launcher.exe:0x0041f060
 void CLTLoginMediator::ClearEngine() {
+    SetNetworkEngine(nullptr);
     spdlog::info("MediatorStub::ClearEngine()");
 }
 // +0x10

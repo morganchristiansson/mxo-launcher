@@ -332,6 +332,7 @@ static void UnloadClientLibraries() {
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
     DiagnosticShutdownPreclientEnvironment();
+    g_Launcher.CleanupRecoveredInitClientState();
     UnloadClientLibraries();
     g_LauncherCommandLine.Reset();
     return code;

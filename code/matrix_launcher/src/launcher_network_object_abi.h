@@ -13,3 +13,6 @@ mxo::liblttcp::CLTThreadPerClientTCPEngine* LauncherNetworkEngineFromAbiShell(vo
 // UNANCHORED: launcher-owned replacement for the original 0x40a380 allocation/registration path.
 void LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr);
 
+// UNANCHORED: launcher-owned replacement for the original 0x40b389..0x40b404 release/clear path.
+void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediatorPtr);
+

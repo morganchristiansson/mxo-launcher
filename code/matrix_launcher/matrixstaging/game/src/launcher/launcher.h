@@ -75,6 +75,9 @@ public:
 
     // anchor: launcher.exe:0x40a4d0
     bool RunClientDllLifecycle() const;
+
+    // UNANCHORED: replacement cleanup wrapper for the current launcher-owned arg5/arg6 state.
+    void CleanupRecoveredInitClientState() const;
 };
 
 static_assert(offsetof(CLauncher, m_FieldA4) == 0xa4, "CLauncher +0xa4 drifted");

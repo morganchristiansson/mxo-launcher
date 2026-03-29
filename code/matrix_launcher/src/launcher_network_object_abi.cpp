@@ -56,13 +56,13 @@ static_assert(sizeof(LauncherObjectAbiShell) == 0xb4, "launcher object ABI shell
 static_assert(sizeof(LauncherObjectListHead24) == 0x24, "list80 ABI head size mismatch");
 static_assert(sizeof(LauncherObjectListHead18) == 0x18, "list8C ABI head size mismatch");
 
-static LauncherObjectAbiShell* g_CurrentLauncherObject = NULL;
-static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding* g_LauncherObjectEngineBinding = NULL;
 static void* g_LauncherObjectVtable[13] = {0};
 static void* g_LauncherObjectSubVtable5C[2] = {0};
 static void* g_LauncherObjectSubVtable60[2] = {0};
 static void* g_LauncherObjectSubVtable98[2] = {0};
 static void SyncLauncherObjectShellState(LauncherObjectAbiShell* self);
+// UNANCHORED: launcher-owned accessor for the single current arg5 sidecar binding.
+static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& LauncherObjectEngineBinding();
 // UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
 static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner);
 
@@ -93,17 +93,20 @@ static void SyncLauncherObjectShellStateTrampoline(void* ownerPtr) {
     SyncLauncherObjectShellState(static_cast<LauncherObjectAbiShell*>(ownerPtr));
 }
 
+// UNANCHORED: launcher-owned accessor for the single current arg5 sidecar binding.
+static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& LauncherObjectEngineBinding() {
+    static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding binding;
+    return binding;
+}
+
 // UNANCHORED: replacement arg5 owner/binding cleanup helper.
 static void ResetLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner) {
-    if (owner && g_LauncherObjectEngineBinding && g_LauncherObjectEngineBinding->Owner() != owner) {
+    mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& binding = LauncherObjectEngineBinding();
+    if (owner && binding.Owner() != owner) {
         return;
     }
 
-    if (g_LauncherObjectEngineBinding) {
-        g_LauncherObjectEngineBinding->Reset(DiagnosticEnsureMediatorModel());
-    }
-    delete g_LauncherObjectEngineBinding;
-    g_LauncherObjectEngineBinding = NULL;
+    binding.Reset(DiagnosticEnsureMediatorModel());
 }
 
 // UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
@@ -111,33 +114,26 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
     LauncherObjectAbiShell* owner) {
     if (!owner) return NULL;
 
-    if (!g_LauncherObjectEngineBinding) {
-        g_LauncherObjectEngineBinding = new mxo::liblttcp::CLTThreadPerClientTCPEngineBinding();
-        if (!g_LauncherObjectEngineBinding) {
-            spdlog::warn("launcher arg5 ABI shell failed to allocate CLTThreadPerClientTCPEngine binding for {}", fmt::ptr(owner));
-            return NULL;
-        }
-    }
-
-    if (g_LauncherObjectEngineBinding->Owner() != owner) {
-        if (!g_LauncherObjectEngineBinding->Bind(owner, DiagnosticEnsureMediatorModel())) {
+    mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& binding = LauncherObjectEngineBinding();
+    if (binding.Owner() != owner) {
+        if (!binding.Bind(owner, DiagnosticEnsureMediatorModel())) {
             spdlog::warn("launcher arg5 ABI shell failed to bind CLTThreadPerClientTCPEngine sidecar for {}", fmt::ptr(owner));
             return NULL;
         }
     }
 
-    if (g_LauncherObjectEngineBinding->Engine()) {
-        g_LauncherObjectEngineBinding->Engine()->AttachExternalQueuePair(
+    if (binding.Engine()) {
+        binding.Engine()->AttachExternalQueuePair(
             &owner->queue0C,
             &owner->queue34,
             &owner->helper60.crit,
             owner->field7C);
-        g_LauncherObjectEngineBinding->Engine()->SetAttachedLauncherObjectStateSyncScaffold(
+        binding.Engine()->SetAttachedLauncherObjectStateSyncScaffold(
             owner,
             &SyncLauncherObjectShellStateTrampoline);
     }
 
-    return g_LauncherObjectEngineBinding->Engine();
+    return binding.Engine();
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -175,8 +171,9 @@ static void SetLauncherObjectListHead18Occupancy(LauncherObjectListHead18* head,
 static void SyncLauncherObjectShellState(LauncherObjectAbiShell* self) {
     if (!self) return;
 
-    const bool hasMonitoredPorts = g_LauncherObjectEngineBinding && g_LauncherObjectEngineBinding->HasMonitoredPorts();
-    const bool hasWorkerThreads = g_LauncherObjectEngineBinding && g_LauncherObjectEngineBinding->HasWorkerThreads();
+    mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& binding = LauncherObjectEngineBinding();
+    const bool hasMonitoredPorts = binding.HasMonitoredPorts();
+    const bool hasWorkerThreads = binding.HasWorkerThreads();
 
     SetLauncherObjectListHead24Occupancy(
         static_cast<LauncherObjectListHead24*>(self->list80),
@@ -213,6 +210,7 @@ static void FreeLauncherObjectAbiShellInternals(LauncherObjectAbiShell* self) {
 static int __thiscall LauncherObject_Release(LauncherObjectAbiShell* self, uint32_t flags) {
     (void)flags;
     FreeLauncherObjectAbiShellInternals(self);
+    std::free(self);
     return 1;
 }
 
@@ -508,12 +506,6 @@ static void InitializeLauncherObjectAbiVtables() {
 static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
     InitializeLauncherObjectAbiVtables();
 
-    if (g_CurrentLauncherObject) {
-        FreeLauncherObjectAbiShellInternals(g_CurrentLauncherObject);
-        std::free(g_CurrentLauncherObject);
-        g_CurrentLauncherObject = NULL;
-    }
-
     LauncherObjectAbiShell* object =
         static_cast<LauncherObjectAbiShell*>(std::malloc(sizeof(LauncherObjectAbiShell)));
     if (!object) {
@@ -572,34 +564,77 @@ static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
     }
     InitializeLauncherObjectListHead18(list8C);
     object->list8C = list8C;
-
-    g_CurrentLauncherObject = object;
     return object;
 }
 
 // UNANCHORED: replacement helper that mirrors the mediator +0x08 handoff used after launcher.exe:0x40a380.
-static void RegisterLauncherNetworkEngineWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
-    if (!launcherObjectPtr || !mediatorPtr) return;
+static int RegisterLauncherNetworkEngineWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
+    if (!launcherObjectPtr || !mediatorPtr) return 0;
 
     void** vtable = *(void***)mediatorPtr;
     if (!vtable || !vtable[2]) {
-        return;
+        return 0;
     }
 
     typedef int (__thiscall *RegisterEngineFn)(void*, void*);
     RegisterEngineFn fn = (RegisterEngineFn)vtable[2];
-    (void)fn(mediatorPtr, launcherObjectPtr);
+    return fn(mediatorPtr, launcherObjectPtr);
+}
+
+// UNANCHORED: replacement helper that mirrors the mediator +0x0c clear handoff used during
+// launcher.exe cleanup after the arg5 release.
+static void ClearLauncherNetworkEngineFromMediator(void* mediatorPtr) {
+    if (!mediatorPtr) return;
+
+    void** vtable = *(void***)mediatorPtr;
+    if (!vtable || !vtable[3]) {
+        return;
+    }
+
+    typedef void (__thiscall *ClearEngineFn)(void*);
+    ClearEngineFn fn = (ClearEngineFn)vtable[3];
+    fn(mediatorPtr);
 }
 
 // UNANCHORED: public replacement-launcher entrypoint that installs the arg5 ABI shell.
 void LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr) {
+    if (outLauncherObjectPtr && *outLauncherObjectPtr) {
+        LauncherReleaseNetworkEngineAbiShell(outLauncherObjectPtr, mediatorPtr);
+    }
+    if (outLauncherObjectPtr) {
+        *outLauncherObjectPtr = NULL;
+    }
+
     LauncherObjectAbiShell* object = CreateLauncherNetworkEngineAbiShellLike40A380();
     if (outLauncherObjectPtr) {
         *outLauncherObjectPtr = object;
     }
 
     if (mediatorPtr && object) {
-        RegisterLauncherNetworkEngineWithMediator(mediatorPtr, object);
+        const int registerResult = RegisterLauncherNetworkEngineWithMediator(mediatorPtr, object);
+        if (registerResult < 1) {
+            spdlog::warn(
+                "launcher arg5 ABI shell mediator registration returned {} for {}",
+                registerResult,
+                fmt::ptr(object));
+        }
     }
+}
+
+// UNANCHORED: public replacement-launcher entrypoint that releases the arg5 ABI shell.
+void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediatorPtr) {
+    if (!launcherObjectPtr || !*launcherObjectPtr) {
+        return;
+    }
+
+    LauncherObjectAbiShell* object = static_cast<LauncherObjectAbiShell*>(*launcherObjectPtr);
+    typedef int (__thiscall *ReleaseFn)(LauncherObjectAbiShell*, uint32_t);
+    ReleaseFn release = object->vtable ? reinterpret_cast<ReleaseFn>(object->vtable[0]) : nullptr;
+    if (release) {
+        release(object, 1u);
+    }
+    *launcherObjectPtr = NULL;
+
+    ClearLauncherNetworkEngineFromMediator(mediatorPtr);
 }
 

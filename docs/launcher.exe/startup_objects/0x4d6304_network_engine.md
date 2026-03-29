@@ -1357,4 +1357,11 @@ Newer source-ownership cleanup on the launcher entry side:
   - store/pass it to the launcher
   - immediately hand it to arg6 / mediator registration
   - and let the liblttcp sidecar bind lazily from that mediator handoff or the first later arg5 use
-- so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned creation / registration boundary
+- a follow-up cleanup pass also tightened the teardown side toward original `0x40b389..0x40b404`:
+  - launcher-owned shutdown now explicitly releases arg5 through primary slot `0` with flag `1`
+  - clears the launcher-side arg5 pointer
+  - and then calls the mediator clear slot `+0x0c`
+- the launcher ABI shell no longer keeps a separate `g_CurrentLauncherObject` owner-global just to make repeated installs safe
+  - reinstall now releases any prior caller-owned arg5 object through the same public release helper
+- the sidecar binding itself is now a single launcher-owned static binding object instead of a separately heap-allocated binding pointer
+- so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned create/register and release/clear boundaries

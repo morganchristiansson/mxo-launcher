@@ -634,7 +634,7 @@ bool CLauncher::RunAutodetectDialogWithoutGui() const {
 void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     spdlog::info("=== Original-path gaps still missing ===");
     spdlog::info("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
-    spdlog::info("arg5 status: current launcher-owned 0x4d6304 ABI shell now mirrors the original create/register/pass shape, but internal ctor state is still incomplete");
+    spdlog::info("arg5 status: current launcher-owned 0x4d6304 ABI shell now mirrors the original create/register/pass and release/clear shape, but internal ctor state is still incomplete");
     spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
     if (g_pILTLoginMediatorSelection3584) {
         spdlog::info("arg7 status: sibling 0x4d3584-style ILTLoginMediator selection slot currently reuses the active mediator object and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
@@ -649,6 +649,13 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
     spdlog::info("file/access gate status: original 0x40b790..0x40b7af _access(DAT_004d4cbc,0) / 0x41ab10(0) side path is still not modeled on the replacement path");
     spdlog::info("");
+}
+
+// anchor: launcher.exe:0x40a4d0
+void CLauncher::CleanupRecoveredInitClientState() const {
+    if (g_pLauncherObject6304) {
+        LauncherReleaseNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
+    }
 }
 
 // anchor: launcher.exe:0x40a4d0
