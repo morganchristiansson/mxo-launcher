@@ -339,7 +339,7 @@ static uint32_t __thiscall LauncherObject_Slot4_42F7C0(
 static uint32_t __thiscall LauncherObject_UnmonitorPort(
     LauncherObjectAbiShell* self,
     void* port,
-    uint32_t* outSocketHandle,
+    void** outOwnerContext,
     void* ipv4NetworkOrder) {
     mxo::liblttcp::ILTTCPEngine* engine = GetOrCreateLauncherObjectEngineSidecar(self);
     if (!engine) {
@@ -348,7 +348,7 @@ static uint32_t __thiscall LauncherObject_UnmonitorPort(
 
     return engine->UnmonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
-        outSocketHandle,
+        outOwnerContext,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ipv4NetworkOrder)));
 }
 

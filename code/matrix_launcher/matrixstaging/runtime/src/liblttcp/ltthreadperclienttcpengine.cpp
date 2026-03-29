@@ -103,35 +103,39 @@ struct CLTThreadPerClientTCPEngine_SideState {
 };
 
 static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
-static_assert(sizeof(std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>) == 0x14, "endpoint tree value size mismatch");
+using CLTThreadPerClientTCPEngine_EndpointTreeNode =
+    std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine_AcceptThread*>>;
+using CLTThreadPerClientTCPEngine_ContextTreeNode =
+    std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>>;
+static_assert(sizeof(std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine_AcceptThread*>) == 0x14, "endpoint tree value size mismatch");
 static_assert(sizeof(std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>) == 0x8, "context tree value size mismatch");
-static_assert(sizeof(std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>) == 0x24, "endpoint tree node size mismatch");
-static_assert(sizeof(std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>>) == 0x18, "context tree node size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_EndpointTreeNode) == 0x24, "endpoint tree node size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_ContextTreeNode) == 0x18, "context tree node size mismatch");
 
 struct CLTThreadPerClientTCPEngine_EndpointPayloadEntry {
-    CLTThreadPerClientTCPEngine::AcceptThreadRecord record = {};
-    std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>> node = {};
+    std::unique_ptr<CLTThreadPerClientTCPEngine_AcceptThread> payload;
+    CLTThreadPerClientTCPEngine_EndpointTreeNode node = {};
 };
 
 struct CLTThreadPerClientTCPEngine_ContextPayloadEntry {
     CLTThreadPerClientTCPEngine::WorkerThreadRecord record = {};
-    std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>> node = {};
+    CLTThreadPerClientTCPEngine_ContextTreeNode node = {};
 };
 
-struct CLTThreadPerClientTCPEngine_EndpointTreeBacking {
-    std::unordered_map<std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>*, std::unique_ptr<CLTThreadPerClientTCPEngine_EndpointPayloadEntry>> entries;
+struct CLTThreadPerClientTCPEngine_EndpointPayloadBacking {
+    std::unordered_map<CLTThreadPerClientTCPEngine_EndpointTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_EndpointPayloadEntry>> entries;
 };
 
-struct CLTThreadPerClientTCPEngine_ContextTreeBacking {
-    std::unordered_map<std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>>*, std::unique_ptr<CLTThreadPerClientTCPEngine_ContextPayloadEntry>> entries;
+struct CLTThreadPerClientTCPEngine_ContextPayloadBacking {
+    std::unordered_map<CLTThreadPerClientTCPEngine_ContextTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_ContextPayloadEntry>> entries;
 };
 
 static std::unordered_map<CLTThreadPerClientTCPEngine*, std::unique_ptr<CLTThreadPerClientTCPEngine_SideState>>
     g_CLTThreadPerClientTCPEngineSideStates;
-static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_EndpointTreeBacking>
-    g_CLTThreadPerClientTCPEngineEndpointTreeBackings;
-static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_ContextTreeBacking>
-    g_CLTThreadPerClientTCPEngineContextTreeBackings;
+static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_EndpointPayloadBacking>
+    g_CLTThreadPerClientTCPEngineEndpointPayloadBackings;
+static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_ContextPayloadBacking>
+    g_CLTThreadPerClientTCPEngineContextPayloadBackings;
 
 static CLTThreadPerClientTCPEngine_SideState* FindEngineSideState(
     const CLTThreadPerClientTCPEngine* self) {
@@ -153,34 +157,34 @@ static CLTThreadPerClientTCPEngine_SideState& EnsureEngineSideState(
     return *slot;
 }
 
-static CLTThreadPerClientTCPEngine_EndpointTreeBacking* FindEngineEndpointTreeBacking(
+static CLTThreadPerClientTCPEngine_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
     const CLTThreadPerClientTCPEngine* self) {
     if (!self) {
         return nullptr;
     }
-    auto it = g_CLTThreadPerClientTCPEngineEndpointTreeBackings.find(
+    auto it = g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.find(
         const_cast<CLTThreadPerClientTCPEngine*>(self));
-    return (it != g_CLTThreadPerClientTCPEngineEndpointTreeBackings.end()) ? &it->second : nullptr;
+    return (it != g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.end()) ? &it->second : nullptr;
 }
 
-static CLTThreadPerClientTCPEngine_EndpointTreeBacking& EnsureEngineEndpointTreeBacking(
+static CLTThreadPerClientTCPEngine_EndpointPayloadBacking& EnsureEngineEndpointPayloadBacking(
     CLTThreadPerClientTCPEngine* self) {
-    return g_CLTThreadPerClientTCPEngineEndpointTreeBackings[self];
+    return g_CLTThreadPerClientTCPEngineEndpointPayloadBackings[self];
 }
 
-static CLTThreadPerClientTCPEngine_ContextTreeBacking* FindEngineContextTreeBacking(
+static CLTThreadPerClientTCPEngine_ContextPayloadBacking* FindEngineContextPayloadBacking(
     const CLTThreadPerClientTCPEngine* self) {
     if (!self) {
         return nullptr;
     }
-    auto it = g_CLTThreadPerClientTCPEngineContextTreeBackings.find(
+    auto it = g_CLTThreadPerClientTCPEngineContextPayloadBackings.find(
         const_cast<CLTThreadPerClientTCPEngine*>(self));
-    return (it != g_CLTThreadPerClientTCPEngineContextTreeBackings.end()) ? &it->second : nullptr;
+    return (it != g_CLTThreadPerClientTCPEngineContextPayloadBackings.end()) ? &it->second : nullptr;
 }
 
-static CLTThreadPerClientTCPEngine_ContextTreeBacking& EnsureEngineContextTreeBacking(
+static CLTThreadPerClientTCPEngine_ContextPayloadBacking& EnsureEngineContextPayloadBacking(
     CLTThreadPerClientTCPEngine* self) {
-    return g_CLTThreadPerClientTCPEngineContextTreeBackings[self];
+    return g_CLTThreadPerClientTCPEngineContextPayloadBackings[self];
 }
 
 template <typename Head>
@@ -315,58 +319,132 @@ static bool LauncherTreeEraseOwnedNode(Backing* backing, Head* head, Node* node)
 }
 
 // anchor: launcher.exe:0x42fdb0
-static std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>* EndpointTreeFindNode(
+static CLTThreadPerClientTCPEngine_EndpointTreeNode* EndpointTreeFindNode(
     const CLTThreadPerClientTCPEngine_EndpointTreeHead24* head,
     const LTTCPEndpointKey& key) {
-    return LauncherTreeFindNode<
-        std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>>(
+    return LauncherTreeFindNode<CLTThreadPerClientTCPEngine_EndpointTreeNode>(
         head,
         key,
         CompareEndpointTreeKeys);
 }
 
-// anchor: launcher.exe:0x42fe10
-static std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>>* ContextTreeFindNode(
-    const CLTThreadPerClientTCPEngine_ContextTreeHead18* head,
-    uint32_t key) {
-    return LauncherTreeFindNode<
-        std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>>>(
-        head,
-        key,
-        CompareContextTreeKeys);
+static CLTThreadPerClientTCPEngine_EndpointPayloadEntry* FindEngineEndpointPayloadEntry(
+    CLTThreadPerClientTCPEngine* self,
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* node) {
+    if (!node) {
+        return nullptr;
+    }
+
+    CLTThreadPerClientTCPEngine_EndpointPayloadBacking* backing =
+        FindEngineEndpointPayloadBacking(self);
+    if (!backing) {
+        return nullptr;
+    }
+
+    auto it = backing->entries.find(node);
+    return (it != backing->entries.end()) ? it->second.get() : nullptr;
 }
 
 // anchor family: launcher.exe:0x4318f0 / 0x431240
 // Static-RE note:
-// - launcher.exe keeps a wrapper layer above `_Rb_tree_insert_and_rebalance`
-// - `0x4318f0` performs the unique-insert search / duplicate decision
-// - `0x431240` performs node allocation/linking before delegating to the shared rebalance helper
-// - current source keeps one combined helper here because it still has to own source-side payload
-//   storage/backing lifetime in addition to the original wrapper-family search semantics
-static CLTThreadPerClientTCPEngine::AcceptThreadRecord* EndpointTreeInsertUniqueRecord(
+// - launcher.exe inserts an endpoint node first, with `[node+0x20]` still null
+// - later `0x431ce0` fills that payload slot with the direct `AcceptThread` object pointer on the
+//   success path, or erases the node again on bind/listen failure via `0x431200`
+static CLTThreadPerClientTCPEngine_EndpointTreeNode* EndpointTreeInsertUniqueNode(
     CLTThreadPerClientTCPEngine* self,
     CLTThreadPerClientTCPEngine_EndpointTreeHead24* head,
-    CLTThreadPerClientTCPEngine::AcceptThreadRecord&& record) {
+    const LTTCPEndpointKey& key,
+    bool* outInserted) {
+    if (outInserted) {
+        *outInserted = false;
+    }
     if (!self || !head) {
         return nullptr;
     }
 
-    CLTThreadPerClientTCPEngine_EndpointTreeBacking& backing = EnsureEngineEndpointTreeBacking(self);
+    CLTThreadPerClientTCPEngine_EndpointPayloadBacking& backing =
+        EnsureEngineEndpointPayloadBacking(self);
     auto entry = std::make_unique<CLTThreadPerClientTCPEngine_EndpointPayloadEntry>();
     if (!entry) {
         return nullptr;
     }
-    entry->record = std::move(record);
-    const LTTCPEndpointKey key = entry->record.endpoint;
-    CLTThreadPerClientTCPEngine::AcceptThreadRecord* payload = &entry->record;
-    return LauncherTreeInsertUniqueOwnedNode<
-        std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>>(
-        backing,
+
+    entry->node._M_valptr()->first = key;
+    entry->node._M_valptr()->second = nullptr;
+
+    std::_Rb_tree_node_base* header = TreeHeaderBase(head);
+    std::_Rb_tree_node_base* parent = header;
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* current =
+        TreeRootNode<CLTThreadPerClientTCPEngine_EndpointTreeNode>(head);
+    bool insertLeft = true;
+    while (current) {
+        parent = current;
+        const int cmp = CompareEndpointTreeKeys(
+            entry->node._M_valptr()->first,
+            current->_M_valptr()->first);
+        if (cmp == 0) {
+            return current;
+        }
+        insertLeft = (cmp < 0);
+        current = insertLeft
+            ? static_cast<CLTThreadPerClientTCPEngine_EndpointTreeNode*>(current->_M_left)
+            : static_cast<CLTThreadPerClientTCPEngine_EndpointTreeNode*>(current->_M_right);
+    }
+
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* insertedNode = &entry->node;
+    insertedNode->_M_parent = nullptr;
+    insertedNode->_M_left = nullptr;
+    insertedNode->_M_right = nullptr;
+    insertedNode->_M_color = std::_S_red;
+
+    std::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
+    backing.entries.emplace(insertedNode, std::move(entry));
+    if (outInserted) {
+        *outInserted = true;
+    }
+    return insertedNode;
+}
+
+static bool EndpointTreeAttachPayload(
+    CLTThreadPerClientTCPEngine* self,
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* node,
+    std::unique_ptr<CLTThreadPerClientTCPEngine_AcceptThread> payload) {
+    if (!payload) {
+        return false;
+    }
+
+    CLTThreadPerClientTCPEngine_EndpointPayloadEntry* entry =
+        FindEngineEndpointPayloadEntry(self, node);
+    if (!entry) {
+        return false;
+    }
+
+    node->_M_valptr()->second = payload.get();
+    entry->payload = std::move(payload);
+    return true;
+}
+
+static std::unique_ptr<CLTThreadPerClientTCPEngine_AcceptThread> EndpointTreeDetachPayload(
+    CLTThreadPerClientTCPEngine* self,
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* node) {
+    CLTThreadPerClientTCPEngine_EndpointPayloadEntry* entry =
+        FindEngineEndpointPayloadEntry(self, node);
+    if (!entry) {
+        return nullptr;
+    }
+
+    node->_M_valptr()->second = nullptr;
+    return std::move(entry->payload);
+}
+
+// anchor: launcher.exe:0x42fe10
+static CLTThreadPerClientTCPEngine_ContextTreeNode* ContextTreeFindNode(
+    const CLTThreadPerClientTCPEngine_ContextTreeHead18* head,
+    uint32_t key) {
+    return LauncherTreeFindNode<CLTThreadPerClientTCPEngine_ContextTreeNode>(
         head,
-        std::move(entry),
         key,
-        payload,
-        CompareEndpointTreeKeys);
+        CompareContextTreeKeys);
 }
 
 // anchor family: launcher.exe:0x4196b0 / 0x420ba0
@@ -384,7 +462,7 @@ static CLTThreadPerClientTCPEngine::WorkerThreadRecord* ContextTreeInsertUniqueR
         return nullptr;
     }
 
-    CLTThreadPerClientTCPEngine_ContextTreeBacking& backing = EnsureEngineContextTreeBacking(self);
+    CLTThreadPerClientTCPEngine_ContextPayloadBacking& backing = EnsureEngineContextPayloadBacking(self);
     auto entry = std::make_unique<CLTThreadPerClientTCPEngine_ContextPayloadEntry>();
     if (!entry) {
         return nullptr;
@@ -392,8 +470,7 @@ static CLTThreadPerClientTCPEngine::WorkerThreadRecord* ContextTreeInsertUniqueR
     entry->record = std::move(record);
     const uint32_t key = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(entry->record.contextKey));
     CLTThreadPerClientTCPEngine::WorkerThreadRecord* payload = &entry->record;
-    return LauncherTreeInsertUniqueOwnedNode<
-        std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>>>(
+    return LauncherTreeInsertUniqueOwnedNode<CLTThreadPerClientTCPEngine_ContextTreeNode>(
         backing,
         head,
         std::move(entry),
@@ -409,9 +486,9 @@ static CLTThreadPerClientTCPEngine::WorkerThreadRecord* ContextTreeInsertUniqueR
 static bool EndpointTreeEraseNode(
     CLTThreadPerClientTCPEngine* self,
     CLTThreadPerClientTCPEngine_EndpointTreeHead24* head,
-    std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>* node) {
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* node) {
     return LauncherTreeEraseOwnedNode(
-        FindEngineEndpointTreeBacking(self),
+        FindEngineEndpointPayloadBacking(self),
         head,
         node);
 }
@@ -423,17 +500,17 @@ static bool EndpointTreeEraseNode(
 static bool ContextTreeEraseNode(
     CLTThreadPerClientTCPEngine* self,
     CLTThreadPerClientTCPEngine_ContextTreeHead18* head,
-    std::_Rb_tree_node<std::pair<uint32_t, CLTThreadPerClientTCPEngine::WorkerThreadRecord*>>* node) {
+    CLTThreadPerClientTCPEngine_ContextTreeNode* node) {
     return LauncherTreeEraseOwnedNode(
-        FindEngineContextTreeBacking(self),
+        FindEngineContextPayloadBacking(self),
         head,
         node);
 }
 
 static void EraseEngineBackings(CLTThreadPerClientTCPEngine* self) {
     g_CLTThreadPerClientTCPEngineSideStates.erase(self);
-    g_CLTThreadPerClientTCPEngineEndpointTreeBackings.erase(self);
-    g_CLTThreadPerClientTCPEngineContextTreeBackings.erase(self);
+    g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.erase(self);
+    g_CLTThreadPerClientTCPEngineContextPayloadBackings.erase(self);
 }
 
 static bool IsSyntheticReceiveDrainWorkType(uint32_t workType) {
@@ -1132,6 +1209,11 @@ uint32_t CLTThreadPerClientTCPEngine_AcceptThread::WakeupSocketHandle() const {
     return wakeupSocketHandle_;
 }
 
+// UNANCHORED: source-owned bridge for the original external closesocket([payload+0x3c]) seam.
+void CLTThreadPerClientTCPEngine_AcceptThread::CloseListenSocketScaffold() {
+    CloseSocketHandle(&listenSocketHandle_);
+}
+
 // anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
 void CLTThreadPerClientTCPEngine_AcceptThread::SignalWakeup() {
     SignalWakeupSocketHandle(wakeupSocketHandle_);
@@ -1543,16 +1625,16 @@ CLTThreadPerClientTCPEngine::~CLTThreadPerClientTCPEngine() {
     DetachLauncherAbiSurfaceScaffold();
     RebuildQueueThreadsForCtorCount(/*queueThreadCount=*/0);
 
-    if (CLTThreadPerClientTCPEngine_EndpointTreeBacking* endpointBacking =
-            FindEngineEndpointTreeBacking(this)) {
+    if (CLTThreadPerClientTCPEngine_EndpointPayloadBacking* endpointBacking =
+            FindEngineEndpointPayloadBacking(this)) {
         for (auto& it : endpointBacking->entries) {
-            StopAcceptThreadScaffold(&it.second->record);
+            StopAcceptThreadScaffold(it.second->payload.get());
         }
         endpointBacking->entries.clear();
     }
 
-    if (CLTThreadPerClientTCPEngine_ContextTreeBacking* contextBacking =
-            FindEngineContextTreeBacking(this)) {
+    if (CLTThreadPerClientTCPEngine_ContextPayloadBacking* contextBacking =
+            FindEngineContextPayloadBacking(this)) {
         for (auto& it : contextBacking->entries) {
             StopWorkerThreadScaffold(&it.second->record);
         }
@@ -1592,39 +1674,53 @@ int CLTThreadPerClientTCPEngine::Release(uint32_t flags) {
 // anchor: launcher.exe:0x431ce0
 // vtable: launcher.exe:0x004b2768 slot +0x04
 uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) {
+    if (!ownerContext) {
+        return 4u;
+    }
+
     const uint32_t ipv4NetworkOrder = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(reservedArg3));
     const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
-    if (FindMonitoredPort(key)) {
+    bool inserted = false;
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* node = EndpointTreeInsertUniqueNode(
+        this,
+        ownedEndpointTreeHead80_,
+        key,
+        &inserted);
+    if (!node) {
+        return 1u;
+    }
+    if (!inserted) {
         return kResultAlreadyMonitored;
     }
 
-    AcceptThreadRecord record = {};
-    record.endpoint = key;
-    record.ownerContext = ownerContext;
-    record.listenSocketHandle = OpenTcpListenSocket(portHostOrder, ipv4NetworkOrder);
-    if (record.listenSocketHandle == kInvalidSocketHandle) {
-        return 0;
+    const uint32_t listenSocketHandle = OpenTcpListenSocket(portHostOrder, ipv4NetworkOrder);
+    if (listenSocketHandle == kInvalidSocketHandle) {
+        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        return 1u;
     }
 
-    record.thread = std::make_unique<CLTThreadPerClientTCPEngine_AcceptThread>(
-        record.listenSocketHandle,
-        ownerContext);
-    if (!record.thread) {
-        CloseSocketHandle(&record.listenSocketHandle);
-        return 0;
+    std::unique_ptr<CLTThreadPerClientTCPEngine_AcceptThread> acceptThread =
+        std::make_unique<CLTThreadPerClientTCPEngine_AcceptThread>(
+            listenSocketHandle,
+            ownerContext);
+    if (!acceptThread) {
+        uint32_t socketHandleToClose = listenSocketHandle;
+        CloseSocketHandle(&socketHandleToClose);
+        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        return 1u;
+    }
+    if (!EndpointTreeAttachPayload(this, node, std::move(acceptThread))) {
+        uint32_t socketHandleToClose = listenSocketHandle;
+        CloseSocketHandle(&socketHandleToClose);
+        (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+        return 1u;
     }
 
-    AcceptThreadRecord* inserted = EndpointTreeInsertUniqueRecord(
-        this,
-        ownedEndpointTreeHead80_,
-        std::move(record));
-    if (!inserted) {
-        return 0;
+    if (CLTThreadPerClientTCPEngine_AcceptThread* payload = node->_M_valptr()->second) {
+        (void)payload->Start(/*startPriority=*/2);
     }
-
-    (void)inserted->thread->Start(/*startPriority=*/2);
     SyncAttachedLauncherObjectStateScaffold();
-    return kResultSuccess;
+    return 0u;
 }
 
 // anchor: launcher.exe:0x4325d0
@@ -1632,7 +1728,7 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorPort(uint16_t portHostOrder, void* 
 uint32_t CLTThreadPerClientTCPEngine::UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext) {
     const uint32_t socketHandle = OpenUdpMonitorSocket(portHostOrder, /*ipv4NetworkOrder=*/0);
     if (socketHandle == kInvalidSocketHandle) {
-        return 0;
+        return 1u;
     }
 
     WorkerThreadRecord* worker = CreateOrReplaceWorkerThreadScaffold(
@@ -1644,10 +1740,10 @@ uint32_t CLTThreadPerClientTCPEngine::UDPMonitorPort(uint16_t portHostOrder, voi
     if (!worker) {
         uint32_t socketHandleToClose = socketHandle;
         CloseSocketHandle(&socketHandleToClose);
-        return 0;
+        return 1u;
     }
     SyncAttachedLauncherObjectStateScaffold();
-    return kResultSuccess;
+    return 0u;
 }
 
 // anchor: launcher.exe:0x436000
@@ -1656,7 +1752,7 @@ uint32_t CLTThreadPerClientTCPEngine::MonitorEphemeralUDPPort(uint16_t* outBound
     // Current best static read: thin helper around slot 2 / UDPMonitorPort(port=0, ...)
     // followed by getsockname/ntohs to report the chosen local port.
     const uint32_t result = UDPMonitorPort(/*portHostOrder=*/0, contextKey, ownerContext);
-    if (result == kResultSuccess && outBoundPortHostOrder) {
+    if (result == 0u && outBoundPortHostOrder) {
         *outBoundPortHostOrder = 0;
         if (WorkerThreadRecord* worker = FindWorker(contextKey)) {
             sockaddr_in boundAddr = {};
@@ -1682,24 +1778,28 @@ uint32_t CLTThreadPerClientTCPEngine::Slot4_42F7C0(void* arg1) {
 
 // anchor: launcher.exe:0x431840
 // vtable: launcher.exe:0x004b2768 slot +0x14
-uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) {
+uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, void** outOwnerContext, uint32_t ipv4NetworkOrder) {
     const LTTCPEndpointKey key = MakeEndpointKey(portHostOrder, ipv4NetworkOrder);
-    std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>* node =
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* node =
         EndpointTreeFindNode(ownedEndpointTreeHead80_, key);
     if (!node || !(node)->_M_valptr()->second) {
-        if (outSocketHandle) {
-            *outSocketHandle = 0;
+        if (outOwnerContext) {
+            *outOwnerContext = nullptr;
         }
         return kResultEndpointNotFound;
     }
 
-    if (outSocketHandle) {
-        *outSocketHandle = (node)->_M_valptr()->second->listenSocketHandle;
+    std::unique_ptr<CLTThreadPerClientTCPEngine_AcceptThread> acceptThread =
+        EndpointTreeDetachPayload(this, node);
+    if (outOwnerContext) {
+        *outOwnerContext = acceptThread ? acceptThread->OwnerContext() : nullptr;
     }
-    StopAcceptThreadScaffold((node)->_M_valptr()->second);
+
     (void)EndpointTreeEraseNode(this, ownedEndpointTreeHead80_, node);
+    StopAcceptThreadScaffold(acceptThread.get());
+    acceptThread.reset();
     SyncAttachedLauncherObjectStateScaffold();
-    return 0;
+    return 0u;
 }
 
 // UNANCHORED source-side helper used by the current connection scaffolding.
@@ -1986,8 +2086,8 @@ void CLTThreadPerClientTCPEngine::DetachLauncherAbiSurfaceScaffold() {
 }
 
 void CLTThreadPerClientTCPEngine::RefreshOwnedLauncherMirrorStateScaffold() {
-    CLTThreadPerClientTCPEngine_EndpointTreeBacking* endpointBacking = FindEngineEndpointTreeBacking(this);
-    CLTThreadPerClientTCPEngine_ContextTreeBacking* contextBacking = FindEngineContextTreeBacking(this);
+    CLTThreadPerClientTCPEngine_EndpointPayloadBacking* endpointBacking = FindEngineEndpointPayloadBacking(this);
+    CLTThreadPerClientTCPEngine_ContextPayloadBacking* contextBacking = FindEngineContextPayloadBacking(this);
     ownedEndpointCount84_ = endpointBacking
         ? static_cast<uint32_t>(endpointBacking->entries.size())
         : 0u;
@@ -2596,11 +2696,10 @@ LTTCPEndpointKey CLTThreadPerClientTCPEngine::MakeEndpointKey(uint16_t portHostO
 }
 
 // anchor: launcher.exe:0x42fdb0
-// Current source still returns the higher-level payload record rather than the raw tree node.
-CLTThreadPerClientTCPEngine::AcceptThreadRecord* CLTThreadPerClientTCPEngine::FindMonitoredPort(const LTTCPEndpointKey& key) {
-    std::_Rb_tree_node<std::pair<LTTCPEndpointKey, CLTThreadPerClientTCPEngine::AcceptThreadRecord*>>* node =
+CLTThreadPerClientTCPEngine_AcceptThread* CLTThreadPerClientTCPEngine::FindMonitoredPort(const LTTCPEndpointKey& key) {
+    CLTThreadPerClientTCPEngine_EndpointTreeNode* node =
         EndpointTreeFindNode(ownedEndpointTreeHead80_, key);
-    return node ? (node)->_M_valptr()->second : nullptr;
+    return node ? node->_M_valptr()->second : nullptr;
 }
 
 // anchor: launcher.exe:0x42fe10
@@ -2629,7 +2728,7 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Fi
         return record;
     }
 
-    if (CLTThreadPerClientTCPEngine_ContextTreeBacking* backing = FindEngineContextTreeBacking(this)) {
+    if (CLTThreadPerClientTCPEngine_ContextPayloadBacking* backing = FindEngineContextPayloadBacking(this)) {
         for (auto& it : backing->entries) {
             WorkerThreadRecord* record = (&it.second->node)->_M_valptr()->second;
             if (record &&
@@ -2736,19 +2835,17 @@ CLTThreadPerClientTCPEngine::WorkerThreadRecord* CLTThreadPerClientTCPEngine::Cr
     return inserted;
 }
 
-// UNANCHORED: source-owned teardown helper for recovered AcceptThread-style payloads.
-void CLTThreadPerClientTCPEngine::StopAcceptThreadScaffold(AcceptThreadRecord* record) {
-    if (!record) {
+// UNANCHORED: source-owned teardown helper for the direct `AcceptThread` payload stored at
+// `[endpointNode+0x20]`.
+void CLTThreadPerClientTCPEngine::StopAcceptThreadScaffold(
+    CLTThreadPerClientTCPEngine_AcceptThread* acceptThread) {
+    if (!acceptThread) {
         return;
     }
 
-    if (record->thread) {
-        record->thread->SignalWakeup();
-        (void)record->thread->Stop(/*waitAfterTerminate=*/true);
-        record->thread.reset();
-    }
-
-    CloseSocketHandle(&record->listenSocketHandle);
+    acceptThread->SignalWakeup();
+    (void)acceptThread->Stop(/*waitAfterTerminate=*/true);
+    acceptThread->CloseListenSocketScaffold();
 }
 
 // UNANCHORED: source-owned teardown helper for recovered WorkerThread-style payloads.

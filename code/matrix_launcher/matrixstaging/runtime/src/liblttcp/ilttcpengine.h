@@ -32,7 +32,7 @@ public:
     // +0x10
     virtual uint32_t Slot4_42F7C0(void* arg1) = 0;
     // +0x14
-    virtual uint32_t UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) = 0;
+    virtual uint32_t UnmonitorPort(uint16_t portHostOrder, void** outOwnerContext, uint32_t ipv4NetworkOrder) = 0;
     // +0x18
     virtual uint32_t Connect(void* contextKey) = 0;
     // +0x1c

@@ -119,6 +119,10 @@ New side-state audit from the current constructor / destructor / worker-insert p
       with the same recovered `0x24` node size / layout expected by the
       `0x4318f0 / 0x42fdb0 / 0x4154d0` family and keeps launcher-visible head `+0x80`
       `root/first/last` pointers live instead of only toggling a fake occupancy marker
+      - current tighter source correction there also stops pretending `[node+0x20]` is a
+        higher-level wrapper record: it now mirrors launcher.exe more closely as the direct
+        `AcceptThread` object pointer, with source-owned backing only retaining ownership of that
+        object outside the raw tree node
     - context backing now uses direct MinGW `_Rb_tree_node<std::pair<key,payload*>>` node types
       with the same recovered `0x18` node size / layout expected by the
       `0x4196b0 / 0x42fe10 / 0x4154d0` family and keeps launcher-visible head `+0x8c`
@@ -670,7 +674,10 @@ Current best read:
   - that ctor is string-backed by `CLTThreadPerClientTCPEngine::AcceptThread`
   - the derived thread-main slot for that object is now named `0x432070 = CLTThreadPerClientTCPEngine_AcceptThread_Run`
   - `MonitorPort` creates `socket(AF_INET, SOCK_STREAM, 0)`, then `bind`, then `listen`
-  - on success it stores the new AcceptThread-style payload into the matched/new `+0x80` node at `[node+0x20]`
+  - more exact insert sequencing from `0x4318f0 / 0x431240 / 0x431200`:
+    - it first inserts the endpoint-keyed node with `[node+0x20] = 0`
+    - on success it then stores the new AcceptThread-style payload into `[node+0x20]`
+    - bind/listen failure erases that just-inserted node again
 - `+0x8c` stores pointer-keyed nodes whose payload at `[node+0x14]` is a **WorkerThread-style worker object**
   - helper `0x431ff0` allocates a `0x48` object via `0x431b60`
   - that ctor is string-backed by `CLTThreadPerClientTCPEngine::WorkerThread`
@@ -694,6 +701,8 @@ Recovered behavior:
   - decrements the container count
   - loads payload object from `[node+0x20]`
   - writes `[payload+0x38]` to the caller out-pointer
+    - current best read of that out-value is the `AcceptThread` owner/context field, **not** the
+      listening socket handle
   - calls cleanup helpers on the payload state including:
     - `0x452320` on `payload+0x40`
     - payload virtual `+0x14`

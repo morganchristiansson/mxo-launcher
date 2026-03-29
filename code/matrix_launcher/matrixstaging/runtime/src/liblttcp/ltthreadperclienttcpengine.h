@@ -232,6 +232,8 @@ public:
     uint32_t ListenSocketHandle() const;
     // UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
     uint32_t WakeupSocketHandle() const;
+    // UNANCHORED: source-owned bridge for the original external closesocket([payload+0x3c]) seam.
+    void CloseListenSocketScaffold();
     // anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
     void SignalWakeup();
 
@@ -302,6 +304,11 @@ private:
 // - CLTThreadPerClientTCPEngine
 class CLTThreadPerClientTCPEngine : public ILTTCPEngine {
 public:
+    // Source note:
+    // - original slot return conventions are not uniform
+    // - e.g. `MonitorPort`, `UDPMonitorPort`, and `UnmonitorPort` use `0` on success in the
+    //   current static read, while some source-owned helper paths still use `1` as the local
+    //   success sentinel
     static constexpr uint32_t kResultSuccess = 1;
     static constexpr uint32_t kResultAlreadyMonitored = 0x7000003;
     static constexpr uint32_t kResultEndpointNotFound = 0x7000004;
@@ -337,13 +344,9 @@ public:
     static constexpr uint32_t kWorkTypeParsedPacket = 3u;
     static constexpr uint32_t kWorkTypeSyntheticReceiveDrain = 0x10000003u;
 
-    struct AcceptThreadRecord {
-        LTTCPEndpointKey endpoint;
-        void* ownerContext = nullptr;
-        uint32_t listenSocketHandle = 0xffffffffu;
-        std::unique_ptr<CLTThreadPerClientTCPEngine_AcceptThread> thread;
-    };
-
+    // Current best static read of the `+0x80` tree family:
+    // - node payload `[node+0x20]` is the `AcceptThread` object itself
+    // - there is no extra launcher-side wrapper record around that payload
     struct WorkerThreadRecord {
         void* contextKey = nullptr;
         void* ownerContext = nullptr;
@@ -368,7 +371,7 @@ public:
     // anchor: launcher.exe:0x42f7c0
     uint32_t Slot4_42F7C0(void* arg1) override;
     // anchor: launcher.exe:0x431840
-    uint32_t UnmonitorPort(uint16_t portHostOrder, uint32_t* outSocketHandle, uint32_t ipv4NetworkOrder) override;
+    uint32_t UnmonitorPort(uint16_t portHostOrder, void** outOwnerContext, uint32_t ipv4NetworkOrder) override;
     // anchor: launcher.exe:0x4328a0
     uint32_t Connect(void* contextKey) override;
     // anchor: launcher.exe:0x42f970
@@ -495,7 +498,7 @@ private:
     // UNANCHORED: starter helper mirroring the recovered endpoint-key shape.
     static LTTCPEndpointKey MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
     // anchor: launcher.exe:0x42fdb0 search shape over the endpoint-keyed `+0x80` tree family.
-    AcceptThreadRecord* FindMonitoredPort(const LTTCPEndpointKey& key);
+    CLTThreadPerClientTCPEngine_AcceptThread* FindMonitoredPort(const LTTCPEndpointKey& key);
     // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
     WorkerThreadRecord* FindWorker(void* contextKey);
     // Source-owned shared engine-slot connection resolver.
@@ -511,8 +514,9 @@ private:
         uint32_t socketHandle,
         LTTCPEngineConnectionState state,
         bool datagramMode);
-    // UNANCHORED: source-owned teardown helper for recovered AcceptThread-style payloads.
-    void StopAcceptThreadScaffold(AcceptThreadRecord* record);
+    // UNANCHORED: source-owned teardown helper for the direct `AcceptThread` payload stored at
+    // `[endpointNode+0x20]`.
+    void StopAcceptThreadScaffold(CLTThreadPerClientTCPEngine_AcceptThread* acceptThread);
     // UNANCHORED: source-owned teardown helper for recovered WorkerThread-style payloads.
     void StopWorkerThreadScaffold(WorkerThreadRecord* record);
     // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape
