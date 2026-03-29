@@ -29,8 +29,16 @@ For the current codebase, `LauncherObjectPrimaryVtable` should **not** be remove
 
 Best current answer is a constrained hybrid:
 - keep the launcher-owned `0xb4` arg5 ABI shell as the top-level boundary
-- keep launcher-owned embedded helper subobjects at `+0x5c`, `+0x60`, and `+0x98`
-- maybe thin a few low-risk primary slots into shell-to-sidecar trampolines later
+- keep the shell because original code still consumes raw embedded object addresses at:
+  - `+0x0c` / `+0x34`
+  - `+0x5c`
+  - `+0x60`
+  - `+0x98`
+- but do **not** treat every one of those surfaces as permanently shell-owned implementation logic
+- move recovered field/helper/container semantics into `mxo::liblttcp::CLTThreadPerClientTCPEngine`
+  where source ownership is conceptually engine-owned
+- let the shell become mostly a raw-address / vtable / lifetime boundary that attaches those live
+  shell addresses to the fuller target-class implementation
 - do **not** replace the whole shell with the native C++ `CLTThreadPerClientTCPEngine` object
 - do **not** blindly assign the native GCC vtable as arg5
 
@@ -150,12 +158,24 @@ So the current blocker is **not** just â€œMinGW always emits the wrong cleanup.â
 
 For arg5, the bigger blockers are:
 - shell `this` vs sidecar `this`
-- launcher-owned embedded helper subobjects
-- launcher-owned cleanup responsibility
+- raw embedded helper-object address identity seen by original code
+- launcher-owned top-level cleanup / allocator responsibility
 - client-visible field layout
 
-That means a future **thin shell-to-sidecar thunk** may be fine for some individual slots.
-It does **not** mean the whole shell can disappear.
+The latest focused pass narrows one important point though:
+- the shell no longer needs to be the only place that knows how those helper/container surfaces
+  behave
+- `CLTThreadPerClientTCPEngine` now owns first-class source-level surrogates for:
+  - fallback queue pair state
+  - helper-family semantics for `+0x5c`, `+0x60`, `+0x98`
+  - fallback event / lock state
+  - sentinel-head / count mirror state for `+0x80` / `+0x8c`
+- and the shell now attaches its live raw addresses to that class instead of open-coding as much of
+  the behavior itself
+
+That means a future **thin shell-to-sidecar thunk** may be fine for more individual slots than
+before.
+It still does **not** mean the whole shell can disappear.
 
 ## 0x4d6304 slot reduction summary
 
@@ -167,13 +187,30 @@ It does **not** mean the whole shell can disappear.
 
 ### Slots that should stay wrapper-owned
 - slot `0` / deleting dtor
+  - shell still owns top-level `malloc(0xb4)` lifetime and mediator clear/release ordering
+
+### Slots now reduced to thin shell -> class thunks after the arg5 ownership pass
+- slot `1` / `MonitorPort`
+- slot `2` / `UDPMonitorPort`
+- slot `3` / `MonitorEphemeralUDPPort`
+- slot `4` / `0x42f7c0`
+- slot `5` / `UnmonitorPort`
+- slot `6` / `Connect`
+- slot `7` / `Close`
+- slot `8` / `SendBuffer`
+- slot `9` / `0x42fd10`
+- slot `10` / `0x443810`
+- slot `11` / `0x431670`
 - slot `12` / `CleanupConnection`
+  - important change: slot `12` lock/helper behavior now lives in the target class; the wrapper no
+    longer acquires/releases arg5 `+0x98` itself
 
 ### Current conclusion
 
 For arg5 / `0x4d6304`:
 - keep the launcher-owned ABI shell
-- keep the launcher-owned helper subobjects and layout contract
+- keep the shell's layout contract and raw embedded-address identity
+- but prefer target-class ownership for recovered engine semantics behind that shell
 - if we reduce indirection later, reduce **individual slot bodies**, not the top-level shell object
 
 ## Related canonical docs

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+struct _RTL_CRITICAL_SECTION;
+
 #include "ilttcpengine.h"
 #include "lttcpconnection.h"
 
@@ -56,6 +58,68 @@ struct CLTThreadPerClientTCPEngine_WorkItemHeader {
     void** vtable;
     uint32_t workType;
 };
+
+// Recovered launcher-visible arg5 helper root at +0x5c.
+// Current source note:
+// - original shell still has to materialize this helper root in-place for client-visible `ecx`
+//   identity
+// - the target class now also owns a first-class surrogate for the helper family so wrapper code
+//   can delegate helper semantics/mechanical mirror state into liblttcp instead of keeping all
+//   arg5-only state bookkeeping in `src/launcher_network_object_abi.cpp`
+struct CLTThreadPerClientTCPEngine_WaitHelperScaffold {
+    void** vtable;
+};
+
+// Recovered launcher-visible lock-helper family at +0x60 / +0x98.
+// Source-owned surrogate note:
+// - original embeds a `CRITICAL_SECTION` immediately after the vtable root
+// - the current target-class surrogate stores an opaque pointer to heap-backed
+//   `CRITICAL_SECTION` storage instead, because this class is still not the raw MSVC launcher ABI
+//   object itself
+struct CLTThreadPerClientTCPEngine_LockHelperScaffold {
+    void** vtable;
+    void* criticalSectionStorage;
+};
+
+// Recovered allocated sentinel/tree head shape reached from arg5 +0x80.
+struct CLTThreadPerClientTCPEngine_EndpointTreeHead24 {
+    unsigned char colorOrFlag;
+    unsigned char padding[3];
+    void* root;
+    void* first;
+    void* last;
+    unsigned char keyAndPayload[0x14];
+};
+
+// Recovered allocated sentinel/tree head shape reached from arg5 +0x8c.
+struct CLTThreadPerClientTCPEngine_ContextTreeHead18 {
+    unsigned char colorOrFlag;
+    unsigned char padding[3];
+    void* root;
+    void* first;
+    void* last;
+    unsigned char keyAndPayload[0x8];
+};
+
+// Launcher-visible shell attachment map used by the current wrapper boundary.
+// This intentionally keeps the raw arg5 shell outside liblttcp while letting the target class own
+// more of the constructor/runtime-visible state that the shell mirrors.
+struct CLTThreadPerClientTCPEngine_LauncherAbiAttachment {
+    uint32_t* field04CtorFlags = nullptr;
+    void** field08QueueThreadArray = nullptr;
+    CLTThreadPerClientTCPEngine_Queue* queue0C = nullptr;
+    CLTThreadPerClientTCPEngine_Queue* queue34 = nullptr;
+    void* queueLock = nullptr;
+    void* queueSignalEvent = nullptr;
+    void* cleanupLock = nullptr;
+    void** list80EndpointTreeHead = nullptr;
+    uint32_t* field84EndpointCount = nullptr;
+    void** list8CContextTreeHead = nullptr;
+    uint32_t* field90ContextCount = nullptr;
+};
+
+static_assert(sizeof(CLTThreadPerClientTCPEngine_EndpointTreeHead24) == 0x24, "endpoint head size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_ContextTreeHead18) == 0x18, "context head size mismatch");
 
 // Recovered generic thread-base surface shared by several launcher worker objects.
 // Current original anchors:
@@ -218,7 +282,7 @@ private:
 
 // Reimplementation note:
 // This file intentionally mirrors recovered original launcher.exe naming.
-// Keep the names stable even where behavior is still placeholder-only.
+// Keep the names stable even where behavior is still scaffold-first or only partially recovered.
 // Canonical RE reference remains:
 // - docs/launcher.exe/startup_objects/0x4d6304_network_engine.md
 // Recovered source-file anchor:
@@ -331,23 +395,32 @@ public:
     // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
     static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_Queue* queue, CLTThreadPerClientTCPEngine_QueuedPair* outPair);
 
-    // UNANCHORED: scaffold bridge because the current liblttcp engine lives beside, not inside,
-    // the launcher ABI object that still owns the runtime-visible +0x0c / +0x34 queue fields,
-    // the paired +0x60 lock helper, and the +0x7c queue signal event.
-    void AttachExternalQueuePair(
-        CLTThreadPerClientTCPEngine_Queue* queue0C,
-        CLTThreadPerClientTCPEngine_Queue* queue34,
-        void* queueLock = nullptr,
-        void* queueSignalEvent = nullptr);
-    // UNANCHORED: current sidecar still needs an ABI-shell callback to refresh owner-visible
-    // arg5 list-head/queue attachment state after engine-side changes reached through connection
-    // wrappers instead of direct arg5 primary-vtable calls.
-    void SetAttachedLauncherObjectStateSyncScaffold(
-        void* owner,
-        void (*syncFn)(void*) = nullptr);
-    // UNANCHORED: current auth/margin begin wrappers still call this after engine-side connect work
-    // so the raw arg5 object shell can mirror sidecar-owned state changes.
+    // UNANCHORED: scaffold bridge because the current liblttcp engine still lives beside the raw
+    // launcher ABI shell.
+    //
+    // Ownership note after the current arg5 structural pass:
+    // - the target class now owns first-class source-level surrogates for the recovered ctor/
+    //   helper/container state
+    // - the wrapper still provides the raw embedded shell addresses consumed by original code
+    // - this attachment map tells the class which live shell surfaces should override the owned
+    //   fallback queue/event/lock state while also exposing which count/head fields on the shell
+    //   should mirror class-owned state directly
+    void AttachLauncherAbiSurfaceScaffold(
+        const CLTThreadPerClientTCPEngine_LauncherAbiAttachment& attachment);
+    // UNANCHORED: explicit detach/reset helper for the launcher ABI bridge.
+    void DetachLauncherAbiSurfaceScaffold();
+    // UNANCHORED: current auth/margin begin wrappers and launcher ABI helper thunks still call this
+    // so the raw arg5 object shell can mirror class-owned state changes.
     void SyncAttachedLauncherObjectStateScaffold();
+
+    // UNANCHORED: helper-family bodies now source-own the recovered +0x5c/+0x60/+0x98 semantics
+    // on the target class side; launcher ABI wrappers only route raw helper entrypoints here.
+    uint32_t SignalQueueEventHelperScaffold();
+    uint32_t WaitQueueEventHelperScaffold(int reasonMilliseconds);
+    uint32_t EnterQueueLockHelperScaffold(bool pumpLauncherBridge = false);
+    uint32_t LeaveQueueLockHelperScaffold();
+    uint32_t EnterCleanupLockHelperScaffold();
+    uint32_t LeaveCleanupLockHelperScaffold();
 
     // UNANCHORED: current replacement seam still keeps loginmediator-owned high-level auth/margin
     // handlers, but the arg5-side queue-context allocation/vtable, nonblocking producer/push path,
@@ -470,13 +543,42 @@ private:
     void PumpLauncherConnectionContextScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         const char* receiveLabel);
+    // UNANCHORED: launcher-visible mirror refresh for the recovered +0x80/+0x8c sentinel heads and
+    // count dwords.
+    void RefreshOwnedLauncherMirrorStateScaffold();
+    CLTThreadPerClientTCPEngine_Queue* ActiveQueue0CScaffold();
+    CLTThreadPerClientTCPEngine_Queue* ActiveQueue34Scaffold();
+    const CLTThreadPerClientTCPEngine_Queue* ActiveQueue0CScaffold() const;
+    const CLTThreadPerClientTCPEngine_Queue* ActiveQueue34Scaffold() const;
+    void* ActiveQueueLockScaffold() const;
+    void* ActiveQueueSignalEventScaffold() const;
+    void* ActiveCleanupLockScaffold() const;
+    static bool InitializeHeapBackedCriticalSectionScaffold(void** outCritStorage);
+    static void DeleteHeapBackedCriticalSectionScaffold(void** critStorage);
+    static void InitializeEndpointTreeHead24Scaffold(CLTThreadPerClientTCPEngine_EndpointTreeHead24* head);
+    static void InitializeContextTreeHead18Scaffold(CLTThreadPerClientTCPEngine_ContextTreeHead18* head);
+    static void SetEndpointTreeHead24OccupancyScaffold(
+        CLTThreadPerClientTCPEngine_EndpointTreeHead24* head,
+        bool nonEmpty);
+    static void SetContextTreeHead18OccupancyScaffold(
+        CLTThreadPerClientTCPEngine_ContextTreeHead18* head,
+        bool nonEmpty);
 
-    CLTThreadPerClientTCPEngine_Queue* externalQueue0C_;
-    CLTThreadPerClientTCPEngine_Queue* externalQueue34_;
-    void* externalQueueLock_;
-    void* externalQueueSignalEvent_;
-    void* attachedLauncherObjectOwnerScaffold_;
-    void (*attachedLauncherObjectStateSyncScaffold_)(void*);
+    uint32_t ctorFlagsField04Scaffold_;
+    void* queueThreadArrayField08Scaffold_;
+    CLTThreadPerClientTCPEngine_Queue ownedQueue0CScaffold_;
+    CLTThreadPerClientTCPEngine_Queue ownedQueue34Scaffold_;
+    CLTThreadPerClientTCPEngine_WaitHelperScaffold ownedWaitHelper5CScaffold_;
+    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedQueueLockHelper60Scaffold_;
+    void* ownedQueueSignalEvent7CScaffold_;
+    CLTThreadPerClientTCPEngine_EndpointTreeHead24* ownedEndpointTreeHead80Scaffold_;
+    uint32_t ownedEndpointCount84Scaffold_;
+    uint32_t reserved88Scaffold_;
+    CLTThreadPerClientTCPEngine_ContextTreeHead18* ownedContextTreeHead8CScaffold_;
+    uint32_t ownedContextCount90Scaffold_;
+    uint32_t reserved94Scaffold_;
+    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedCleanupLockHelper98Scaffold_;
+    CLTThreadPerClientTCPEngine_LauncherAbiAttachment attachedLauncherAbiSurfaceScaffold_;
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authBridgeContextScaffold_;
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginBridgeContextScaffold_;
     std::vector<std::unique_ptr<CLTThreadPerClientTCPEngine_QueueThread>> queueThreads_;

@@ -124,7 +124,10 @@ New queue-thread clarification from the current focused pass:
   - launcher ABI glue now delegates queue init/push/free to those liblttcp helpers rather than carrying a fully separate duplicate queue implementation
 - newer lockstep source cleanup also added an explicit sidecar bridge for the recovered ownership mismatch in the current implementation:
   - the runtime-visible queue fields still live on the launcher ABI object (`+0x0c` / `+0x34`)
-  - but the liblttcp engine sidecar now exposes `AttachExternalQueuePair(queue0C, queue34)` so source-level `RunCompletedOperationQueue(bool)` can at least model the current best consumer ordering against the real launcher-visible queue storage
+  - the current class-side attachment model now reaches those live shell queues through one explicit ABI-surface attachment map rather than a queue-only sidecar hook
+  - source-level `RunCompletedOperationQueue(bool)` can therefore model the current best consumer ordering against either:
+    - the live launcher-visible queue storage when attached, or
+    - the class-owned fallback queue surrogates when not attached
   - current source-level consumer skeleton now preserves these highest-confidence rules only:
     - prefer queue34 when non-empty, else queue0C
     - null work item means shutdown-style sentinel
@@ -1330,7 +1333,7 @@ Build-validated update:
     - source now reflects that with a distinct synthetic work type instead of reusing original type `3`
   - this narrower bridge-level batching is the current compromise because the earlier fuller same-poll recv-drain restoration regressed live runs into the later `Loading Character` stall
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
-- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current attached-owner state-sync callback hook used after engine-side connect work reached through connection wrappers
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-ABI surface attachment / mirror rules used after engine-side connect work reached through connection wrappers
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now drives owner-visible arg5 state refresh after `MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, and `CleanupConnection` sidecar mutations instead of leaving those refresh calls open-coded in the ABI shell wrappers
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` / binding class now own the current mediator bind/reset handshake for the sidecar engine instead of keeping that controller logic in the ABI shell
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
@@ -1385,6 +1388,131 @@ Newer source-ownership cleanup on the launcher entry side:
 - the old mutable runtime vtable seeding step is gone too
   - arg5 primary and helper vtable tables are now compile-time static tables instead
 - so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned create/register and release/clear boundaries
+
+## Newer arg5 ownership pass: structural mismatch reduction between shell and target class
+
+A later focused pass revisited the structural mismatch between:
+- original launcher-visible arg5 object at `0x4d6304`
+- `src/launcher_network_object_abi.cpp`
+- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.*`
+
+The main result is **not** “remove the wrapper.”
+The result is a narrower, more mechanical wrapper because more of the recovered object-facing state
+now lives in `CLTThreadPerClientTCPEngine` itself.
+
+### Constructor / helper evidence kept in scope
+
+This pass stayed anchored to the same original facts:
+- builder: `launcher.exe:0x40a380`
+- derived ctor: `launcher.exe:0x431c30`
+- base ctor: `launcher.exe:0x4366f0`
+- helper enter/leave family: `launcher.exe:0x4147b0` / `0x4147c0`
+- wait helper: `launcher.exe:0x435f90` / `0x435fa0`
+- primary slot `12`: `launcher.exe:0x4316a0`
+
+Static ctor evidence still says the shell boundary must remain because original code consumes raw
+embedded addresses for:
+- queue pair at `+0x0c` / `+0x34`
+- wait helper at `+0x5c`
+- lock helpers at `+0x60` / `+0x98`
+
+But this pass also confirmed that those surfaces do **not** all need to remain wrapper-owned in the
+source-level implementation.
+
+### Per-offset ownership matrix after the pass
+
+| Offset | Original meaning | Before this pass | After this pass | Current status |
+|---|---|---|---|---|
+| `+0x0c` | queue0C object from `0x436610 -> 0x436340` | shell-owned live queue storage; class consumed through an explicit launcher-ABI attachment seam | class now owns a first-class fallback queue surrogate and chooses active queue storage through `AttachLauncherAbiSurfaceScaffold(...)`; live launcher ABI path still uses shell queue storage | **shared**: shell keeps raw storage, class owns queue semantics / fallback model |
+| `+0x34` | queue34 object from `0x436610 -> 0x436340` | same as `+0x0c` | same as `+0x0c` | **shared** |
+| `+0x5c` | wait/event helper root | shell-owned helper body (`SetEvent` / wait / reacquire) | helper body now lives on `CLTThreadPerClientTCPEngine::{SignalQueueEventHelperScaffold, WaitQueueEventHelperScaffold}`; shell helper thunk only routes raw embedded calls there | **raw address shell-owned; semantics class-owned** |
+| `+0x60` | helper root + `CRITICAL_SECTION` for queue lock | shell-owned enter/leave plus pump side effect | target class now owns queue-lock helper semantics and fallback lock surrogate; shell slot `0` now routes to `EnterQueueLockHelperScaffold(true)` and slot `1` to `LeaveQueueLockHelperScaffold()` | **raw address shell-owned; semantics class-owned** |
+| `+0x7c` | queue signal event from `CreateEventA` | shell-owned event and helper usage | target class now owns fallback event state and helper semantics; live launcher ABI path still uses the shell event handle through attached surface mapping | **shared** |
+| `+0x80` | endpoint-keyed sentinel/tree head pointer | shell allocated and shell synchronized empty/non-empty shape | target class now owns the sentinel-head object and count mirror; attachment updates shell `+0x80/+0x84` to point at class-owned head/count state | **class-owned data mirrored through shell** |
+| `+0x8c` | context-keyed sentinel/tree head pointer | shell allocated and shell synchronized empty/non-empty shape | target class now owns the sentinel-head object and count mirror; attachment updates shell `+0x8c/+0x90` to point at class-owned head/count state | **class-owned data mirrored through shell** |
+| `+0x98` | cleanup lock helper root + `CRITICAL_SECTION` | shell-owned enter/leave; shell wrapper also locked slot `12` manually | cleanup helper semantics now live in `EnterCleanupLockHelperScaffold()` / `LeaveCleanupLockHelperScaffold()` and `CleanupConnection()` now acquires/releases that lock internally | **raw address shell-owned; semantics class-owned** |
+
+### What moved into `CLTThreadPerClientTCPEngine`
+
+`matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h` and `.cpp` now carry explicit
+source-owned surrogates for the missing object-facing surfaces:
+- fallback queue pair fields matching the recovered `+0x0c` / `+0x34` queue shape
+- explicit helper-family surrogate structs for:
+  - wait helper `+0x5c`
+  - lock helper `+0x60`
+  - lock helper `+0x98`
+- fallback event state for `+0x7c`
+- explicit sentinel-head structs for:
+  - endpoint-tree head `+0x80`
+  - context-tree head `+0x8c`
+- mirrored count state for:
+  - `+0x84`
+  - `+0x90`
+- a new launcher-ABI attachment map so the class can use live shell queue/lock/event addresses when
+  present, while still owning the conceptual engine-side state model
+
+That means the target class is now the canonical owner of:
+- helper semantics
+- fallback queue/event/lock state
+- sentinel-head occupancy/count mirror state
+- and the shell-to-class attachment rules for the current arg5 boundary
+
+### What became thinner in `src/launcher_network_object_abi.cpp`
+
+The wrapper is still required, but it is now more mechanical.
+
+Main reductions in the shell:
+- the old shell-side state-sync callback path is gone from this seam
+- the shell no longer open-codes `+0x80` / `+0x8c` occupancy synchronization
+- the shell no longer open-codes helper semantics as the primary implementation
+  - `+0x5c` now routes to class-owned wait/event helpers
+  - `+0x60` now routes to class-owned queue-lock helper bodies
+  - `+0x98` now routes to class-owned cleanup-lock helper bodies
+- primary slot `12` wrapper no longer acquires/releases arg5 `+0x98` itself before calling into the
+  class
+- the binder now attaches the raw shell surfaces into the class with one explicit attachment struct
+  instead of separately pushing queue/event/sync callback pieces
+- once attached, the shell's original constructor-allocated list heads are replaced by class-owned
+  sentinel-head objects and the transient shell allocations are freed
+
+### Current slot-ownership read after the pass
+
+Primary slots `0..12` now classify as:
+- **shell-owned**
+  - slot `0` / deleting dtor
+    - top-level `malloc(0xb4)` lifetime and release order still belong to the launcher shell
+- **thin shell -> class thunks**
+  - slots `1,2,3,4,5,6,7,8,9,10,11,12`
+- **candidate for later direct-vtable experiment**
+  - slots `4,9,10,11`
+  - slot `12` is now a better later candidate than before because the helper lock behavior moved
+    into the target class, but the top-level shell boundary is still required today
+
+### What still remains shell-only
+
+These surfaces still intentionally stay on the wrapper side:
+- raw `0xb4` object size/layout consumed by original code
+- compile-time replacement primary/helper vtable tables used by original callers
+- top-level allocate/register/release/clear boundary around:
+  - `0x40a380`
+  - mediator `+0x08`
+  - mediator `+0x0c`
+  - slot `0` deleting-dtor release path
+- live embedded helper/object address identity for original code using:
+  - `ecx = arg5 + 0x5c`
+  - `ecx = arg5 + 0x60`
+  - `ecx = arg5 + 0x98`
+
+### Runtime note
+
+Local harness `make -j6 run` still returned a non-zero Wine/process code on one observed run after
+this pass, but user validation for the same code state reported that the launcher **entered game
+successfully** on the active path.
+
+That is the important regression check for this pass:
+- the wrapper became thinner
+- more arg5 structure moved into the target class
+- and the working path still launched
 
 ## ABI boundary note
 

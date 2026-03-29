@@ -8,6 +8,9 @@
 #include <spdlog/spdlog.h>
 
 using LauncherObjectQueue = mxo::liblttcp::CLTThreadPerClientTCPEngine_Queue;
+using LauncherObjectListHead24 = mxo::liblttcp::CLTThreadPerClientTCPEngine_EndpointTreeHead24;
+using LauncherObjectListHead18 = mxo::liblttcp::CLTThreadPerClientTCPEngine_ContextTreeHead18;
+using LauncherObjectAbiAttachment = mxo::liblttcp::CLTThreadPerClientTCPEngine_LauncherAbiAttachment;
 
 struct LauncherObjectLockHelper {
     void** vtable;          // +0x00
@@ -32,30 +35,9 @@ struct LauncherObjectAbiShell {
     LauncherObjectLockHelper helper98; // +0x98..+0xb3 derived helper root + CRITICAL_SECTION
 };
 
-struct LauncherObjectListHead24 {
-    unsigned char colorOrFlag;  // +0x00 RB-tree/list sentinel byte
-    unsigned char padding[3];
-    void* root;                 // +0x04 root node pointer (NULL in ctor)
-    void* first;                // +0x08 first/list-next sentinel link (self in ctor)
-    void* last;                 // +0x0c last/list-prev sentinel link (self in ctor)
-    unsigned char keyAndPayload[0x14];
-};
-
-struct LauncherObjectListHead18 {
-    unsigned char colorOrFlag;  // +0x00 RB-tree/list sentinel byte
-    unsigned char padding[3];
-    void* root;                 // +0x04 root node pointer (NULL in ctor)
-    void* first;                // +0x08 first/list-next sentinel link (self in ctor)
-    void* last;                 // +0x0c last/list-prev sentinel link (self in ctor)
-    unsigned char keyAndPayload[0x8];
-};
-
 static_assert(sizeof(LauncherObjectLockHelper) == 0x1c, "launcher lock helper size mismatch");
 static_assert(sizeof(LauncherObjectAbiShell) == 0xb4, "launcher object ABI shell size must match original allocation");
-static_assert(sizeof(LauncherObjectListHead24) == 0x24, "list80 ABI head size mismatch");
-static_assert(sizeof(LauncherObjectListHead18) == 0x18, "list8C ABI head size mismatch");
 
-static void SyncLauncherObjectShellState(LauncherObjectAbiShell* self);
 // UNANCHORED: launcher-owned accessor for the single current arg5 sidecar binding.
 static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& LauncherObjectEngineBinding();
 // UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
@@ -80,14 +62,6 @@ static void InitializeLauncherObjectListHead18(LauncherObjectListHead18* head) {
     head->last = head;
 }
 
-
-// UNANCHORED: callback trampoline registered on the liblttcp sidecar so engine-owned paths can
-// request owner-visible arg5 state refresh without pulling raw launcher-object layout knowledge
-// back into loginmediator.cpp.
-static void SyncLauncherObjectShellStateTrampoline(void* ownerPtr) {
-    SyncLauncherObjectShellState(static_cast<LauncherObjectAbiShell*>(ownerPtr));
-}
-
 // UNANCHORED: launcher-owned accessor for the single current arg5 sidecar binding.
 static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& LauncherObjectEngineBinding() {
     static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding binding;
@@ -101,6 +75,9 @@ static void ResetLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner) {
         return;
     }
 
+    if (binding.Engine()) {
+        binding.Engine()->DetachLauncherAbiSurfaceScaffold();
+    }
     binding.Reset(DiagnosticEnsureMediatorModel());
 }
 
@@ -118,14 +95,29 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
     }
 
     if (binding.Engine()) {
-        binding.Engine()->AttachExternalQueuePair(
-            &owner->queue0C,
-            &owner->queue34,
-            &owner->helper60.crit,
-            owner->field7C);
-        binding.Engine()->SetAttachedLauncherObjectStateSyncScaffold(
-            owner,
-            &SyncLauncherObjectShellStateTrampoline);
+        void* priorList80 = owner->list80;
+        void* priorList8C = owner->list8C;
+
+        LauncherObjectAbiAttachment attachment = {};
+        attachment.field04CtorFlags = &owner->field04;
+        attachment.field08QueueThreadArray = &owner->field08;
+        attachment.queue0C = &owner->queue0C;
+        attachment.queue34 = &owner->queue34;
+        attachment.queueLock = &owner->helper60.crit;
+        attachment.queueSignalEvent = owner->field7C;
+        attachment.cleanupLock = &owner->helper98.crit;
+        attachment.list80EndpointTreeHead = &owner->list80;
+        attachment.field84EndpointCount = &owner->field84;
+        attachment.list8CContextTreeHead = &owner->list8C;
+        attachment.field90ContextCount = &owner->field90;
+        binding.Engine()->AttachLauncherAbiSurfaceScaffold(attachment);
+
+        if (priorList80 && priorList80 != owner->list80) {
+            std::free(priorList80);
+        }
+        if (priorList8C && priorList8C != owner->list8C) {
+            std::free(priorList8C);
+        }
     }
 
     return binding.Engine();
@@ -134,48 +126,6 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CLTThreadPerClientTCPEngine* LauncherNetworkEngineFromAbiShell(void* ownerPtr) {
     return GetOrCreateLauncherObjectEngineSidecar(static_cast<LauncherObjectAbiShell*>(ownerPtr));
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void SetLauncherObjectListHead24Occupancy(LauncherObjectListHead24* head, bool nonEmpty) {
-    if (!head) return;
-    if (!nonEmpty) {
-        InitializeLauncherObjectListHead24(head);
-        return;
-    }
-
-    head->root = &head->keyAndPayload[0];
-    head->first = &head->keyAndPayload[4];
-    head->last = &head->keyAndPayload[8];
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void SetLauncherObjectListHead18Occupancy(LauncherObjectListHead18* head, bool nonEmpty) {
-    if (!head) return;
-    if (!nonEmpty) {
-        InitializeLauncherObjectListHead18(head);
-        return;
-    }
-
-    head->root = &head->keyAndPayload[0];
-    head->first = &head->keyAndPayload[0];
-    head->last = &head->keyAndPayload[4];
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void SyncLauncherObjectShellState(LauncherObjectAbiShell* self) {
-    if (!self) return;
-
-    mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& binding = LauncherObjectEngineBinding();
-    const bool hasMonitoredPorts = binding.HasMonitoredPorts();
-    const bool hasWorkerThreads = binding.HasWorkerThreads();
-
-    SetLauncherObjectListHead24Occupancy(
-        static_cast<LauncherObjectListHead24*>(self->list80),
-        hasMonitoredPorts);
-    SetLauncherObjectListHead18Occupancy(
-        static_cast<LauncherObjectListHead18*>(self->list8C),
-        hasWorkerThreads);
 }
 
 // UNANCHORED: replacement arg5 internal teardown helper.
@@ -390,13 +340,8 @@ static uint32_t __thiscall LauncherObject_Slot11_431670(
 static uint32_t __thiscall LauncherObject_CleanupConnection(
     LauncherObjectAbiShell* self,
     void* contextKey) {
-    LauncherObject_LockHelper_Slot0(&self->helper98);
-
     mxo::liblttcp::ILTTCPEngine* engine = GetOrCreateLauncherObjectEngineSidecar(self);
-    const uint32_t result = engine ? engine->CleanupConnection(contextKey) : 0u;
-
-    LauncherObject_LockHelper_Slot1(&self->helper98);
-    return result;
+    return engine ? engine->CleanupConnection(contextKey) : 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -411,8 +356,41 @@ static LauncherObjectAbiShell* LauncherObjectShellFromHelper(void* helperSelf, s
         : NULL;
 }
 
+static LauncherObjectAbiShell* LauncherObjectShellFromLockHelper(void* helperSelf, size_t* outHelperOffset) {
+    if (!helperSelf) {
+        return NULL;
+    }
+
+    LauncherObjectAbiShell* owner60 = LauncherObjectShellFromHelper(helperSelf, 0x60);
+    if (owner60 && (&owner60->helper60 == helperSelf)) {
+        if (outHelperOffset) {
+            *outHelperOffset = 0x60;
+        }
+        return owner60;
+    }
+
+    LauncherObjectAbiShell* owner98 = LauncherObjectShellFromHelper(helperSelf, 0x98);
+    if (owner98 && (&owner98->helper98 == helperSelf)) {
+        if (outHelperOffset) {
+            *outHelperOffset = 0x98;
+        }
+        return owner98;
+    }
+
+    return NULL;
+}
+
 // UNANCHORED: shared lock-helper enter for the current arg5 +0x60/+0x98 helper family.
 static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self) {
+    size_t helperOffset = 0;
+    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromLockHelper(self, &helperOffset)) {
+        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
+            return (helperOffset == 0x98)
+                ? engine->EnterCleanupLockHelperScaffold()
+                : engine->EnterQueueLockHelperScaffold(/*pumpLauncherBridge=*/false);
+        }
+    }
+
     if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
         EnterCriticalSection(crit);
     }
@@ -421,6 +399,15 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self) {
 
 // UNANCHORED: shared lock-helper leave for the current arg5 +0x60/+0x98 helper family.
 static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
+    size_t helperOffset = 0;
+    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromLockHelper(self, &helperOffset)) {
+        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
+            return (helperOffset == 0x98)
+                ? engine->LeaveCleanupLockHelperScaffold()
+                : engine->LeaveQueueLockHelperScaffold();
+        }
+    }
+
     if (CRITICAL_SECTION* crit = LauncherObjectCritFromHelper(self)) {
         LeaveCriticalSection(crit);
     }
@@ -430,6 +417,12 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
 // anchor: launcher.exe:0x435f90
 // vtable: launcher.exe:arg5+0x5c helper slot +0x00
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
+    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x5c)) {
+        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
+            return engine->SignalQueueEventHelperScaffold();
+        }
+    }
+
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
     return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
 }
@@ -437,6 +430,12 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
 // anchor: launcher.exe:0x435fa0
 // vtable: launcher.exe:arg5+0x5c helper slot +0x04
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reason) {
+    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x5c)) {
+        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
+            return engine->WaitQueueEventHelperScaffold(reason);
+        }
+    }
+
     void* helper60 = self ? static_cast<unsigned char*>(self) + 4 : NULL;
     HANDLE eventHandle = self ? *reinterpret_cast<HANDLE*>(static_cast<unsigned char*>(self) + 0x20) : NULL;
     if (helper60) {
@@ -462,6 +461,12 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
 // anchor: launcher.exe:0x4147b0
 // vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
+    if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
+        if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
+            return engine->EnterQueueLockHelperScaffold(/*pumpLauncherBridge=*/true);
+        }
+    }
+
     LauncherObject_LockHelper_Slot0(self);
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
