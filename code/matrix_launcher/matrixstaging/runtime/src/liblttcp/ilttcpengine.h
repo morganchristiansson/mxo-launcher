@@ -26,9 +26,9 @@ public:
     // +0x04
     virtual uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) = 0;
     // +0x08
-    virtual uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext) = 0;
+    virtual uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder) = 0;
     // +0x0c
-    virtual uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ownerContext) = 0;
+    virtual uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder) = 0;
     // +0x10
     virtual uint32_t Slot4_42F7C0(void* arg1) = 0;
     // +0x14

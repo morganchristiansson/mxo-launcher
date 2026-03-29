@@ -217,6 +217,9 @@ private:
 // Current high-confidence shape from 0x431ab0 / 0x431b30:
 // - inherits generic CLTThread-style base state
 // - stores owner/context-like state at +0x38
+//   - current best evidence: `0x431840` writes `[payload+0x38]` to the caller out-pointer on the
+//     endpoint-removal path, so this still reads best as the owner/context pointer rather than the
+//     listening socket handle
 // - stores the listening socket handle at +0x3c
 // - owns a wakeup socket helper at +0x40
 class CLTThreadPerClientTCPEngine_AcceptThread : public CLTThread {
@@ -344,16 +347,10 @@ public:
     static constexpr uint32_t kWorkTypeParsedPacket = 3u;
     static constexpr uint32_t kWorkTypeSyntheticReceiveDrain = 0x10000003u;
 
-    // Current best static read of the `+0x80` tree family:
-    // - node payload `[node+0x20]` is the `AcceptThread` object itself
-    // - there is no extra launcher-side wrapper record around that payload
-    struct WorkerThreadRecord {
-        void* contextKey = nullptr;
-        void* ownerContext = nullptr;
-        uint32_t socketHandle = 0xffffffffu;
-        LTTCPEngineConnectionState state = LTTCPEngineConnectionState::kClosed;
-        std::unique_ptr<CLTThreadPerClientTCPEngine_WorkerThread> thread;
-    };
+    // Current best static read of the `+0x80` / `+0x8c` tree families:
+    // - endpoint node payload `[node+0x20]` is the direct `AcceptThread` object
+    // - context node payload `[node+0x14]` is the direct `WorkerThread` object
+    // - there is no extra launcher-side wrapper record around either payload family
 
     // anchor: launcher.exe:0x431c30 / base ctor 0x4366f0
     CLTThreadPerClientTCPEngine();
@@ -365,9 +362,9 @@ public:
     // anchor: launcher.exe:0x431ce0
     uint32_t MonitorPort(uint16_t portHostOrder, void* ownerContext, void* reservedArg3) override;
     // anchor: launcher.exe:0x4325d0
-    uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ownerContext = nullptr) override;
+    uint32_t UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder = nullptr) override;
     // anchor: launcher.exe:0x436000
-    uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ownerContext = nullptr) override;
+    uint32_t MonitorEphemeralUDPPort(uint16_t* outBoundPortHostOrder, void* contextKey, void* ipv4NetworkOrder = nullptr) override;
     // anchor: launcher.exe:0x42f7c0
     uint32_t Slot4_42F7C0(void* arg1) override;
     // anchor: launcher.exe:0x431840
@@ -392,7 +389,7 @@ public:
         uint16_t portHostOrder,
         uint32_t ipv4NetworkOrder,
         void* contextKey,
-        void* ownerContext = nullptr);
+        void* unusedArg3 = nullptr);
     // UNANCHORED: source-side connection-object bridge into ConnectResolvedEndpointScaffold.
     uint32_t ConnectConnectionScaffold(CLTTCPConnection* connection);
     // UNANCHORED: source-side connection-object bridge into the recovered Close slot family.
@@ -500,25 +497,22 @@ private:
     // anchor: launcher.exe:0x42fdb0 search shape over the endpoint-keyed `+0x80` tree family.
     CLTThreadPerClientTCPEngine_AcceptThread* FindMonitoredPort(const LTTCPEndpointKey& key);
     // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
-    WorkerThreadRecord* FindWorker(void* contextKey);
+    CLTThreadPerClientTCPEngine_WorkerThread* FindWorker(void* contextKey);
     // Source-owned shared engine-slot connection resolver.
     // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection`
     // objects when original caller/object evidence is missing.
     CMessageConnection* ResolveConnectionForEngineSlotScaffold(void* contextKey);
-    // UNANCHORED: shared worker->connection state/socket sync helper.
-    void SyncConnectionFromWorkerRecordScaffold(const WorkerThreadRecord* record);
     // UNANCHORED: source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
-    WorkerThreadRecord* CreateOrReplaceWorkerThreadScaffold(
-        void* contextKey,
-        void* ownerContext,
-        uint32_t socketHandle,
-        LTTCPEngineConnectionState state,
-        bool datagramMode);
+    CLTThreadPerClientTCPEngine_WorkerThread* CreateAndInsertWorkerThreadScaffold(
+        CMessageConnection* connection,
+        bool datagramMode,
+        bool startThread = false);
     // UNANCHORED: source-owned teardown helper for the direct `AcceptThread` payload stored at
     // `[endpointNode+0x20]`.
     void StopAcceptThreadScaffold(CLTThreadPerClientTCPEngine_AcceptThread* acceptThread);
-    // UNANCHORED: source-owned teardown helper for recovered WorkerThread-style payloads.
-    void StopWorkerThreadScaffold(WorkerThreadRecord* record);
+    // UNANCHORED: source-owned teardown helper for the direct `WorkerThread` payload stored at
+    // `[contextNode+0x14]`.
+    void StopWorkerThreadScaffold(CLTThreadPerClientTCPEngine_WorkerThread* workerThread);
     // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape
     // while still returning `false` to synthetic callers when no attached target queue exists.
     // Unlike original `0x436820`, this source-owned helper exposes queue availability to the

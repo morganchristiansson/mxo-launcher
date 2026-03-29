@@ -122,8 +122,8 @@ CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContex
 // UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
 // Original queue consumers dequeue a real connection-family object as `context`; current source may
 // instead carry the queue-context bridge object that dispatches back into `vtable[4]`.
-// This helper narrows that gap by resolving the cleanup/search key back to the owning connection's
-// logical context key when the bridge object is what was actually queued.
+// This helper narrows that gap by resolving the cleanup/search key back to the owning connection
+// object when the bridge object is what was actually queued.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext);
 
 // Source-owned queue-context bridge compensating for the current non-byte-faithful C++ vtable

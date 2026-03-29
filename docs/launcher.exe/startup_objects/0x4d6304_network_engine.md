@@ -127,6 +127,10 @@ New side-state audit from the current constructor / destructor / worker-insert p
       with the same recovered `0x18` node size / layout expected by the
       `0x4196b0 / 0x42fe10 / 0x4154d0` family and keeps launcher-visible head `+0x8c`
       `root/first/last` pointers live instead of only toggling a fake occupancy marker
+      - current tighter source correction there also stops pretending `[node+0x14]` is a
+        higher-level wrapper record: it now mirrors launcher.exe more closely as the direct
+        `WorkerThread` object pointer, with source-owned backing only retaining ownership of that
+        object outside the raw tree node
   - side `attachedLauncherAbiSurface`, `authBridgeContext`, and `marginBridgeContext`
     = source-only bridge baggage, not original `launcher.exe` class members
   - earlier generic fallback engine-owned `CMessageConnection` allocation has now been retired from
@@ -204,8 +208,7 @@ New queue-thread clarification from the current focused pass:
     - cleanup/slot-12-style connection teardown logically precedes later context callback
     - newer bounded correction: when source queued the explicit `CBaseConnection_QueueContextScaffold`
       bridge instead of the original connection-family object, slot-12-style cleanup now unwraps
-      that bridge back to the owning connection's logical context key before worker/message-table
-      teardown
+      that bridge back to the owning connection object before worker/message-table teardown
     - newer bounded correction: the blocking `RunCompletedOperationQueue(false)` path no longer
       returns immediately on empty queues; when an attached arg5 queue-signal event exists it now
       waits on that event and re-enters the dequeue loop, matching the recovered `+0x5c`
@@ -558,10 +561,14 @@ Newer string-backed naming now tightens several of those slots substantially:
   - proven by in-function log strings:
     - `CLTThreadPerClientTCPEngine::UDPMonitorPort: Successfully monitored ...`
     - `... Failed to monitor port ...`
+  - current best argument read:
+    - arg1 = port
+    - arg2 = connection object pointer
+    - arg3 = IPv4 bind address / network-order `sin_addr.s_addr`
 - slot 3 / `0x436000` = **provisional UDP-monitor helper / local-port query wrapper**
   - no direct surviving string name recovered yet
   - current static behavior:
-    - calls slot `2` / `UDPMonitorPort` with `port = 0`
+    - calls slot `2` / `UDPMonitorPort` with `port = 0`, forwarding the same connection pointer and IPv4 bind-address arg
     - and on one branch then queries `getsockname` / `ntohs` to hand a bound local port back to the caller
   - this is still lower confidence than the string-backed names above, but it is no longer just an anonymous opaque callback
 - slot 6 / `0x4328a0` = **`Connect`**
@@ -682,9 +689,10 @@ Current best read:
   - helper `0x431ff0` allocates a `0x48` object via `0x431b60`
   - that ctor is string-backed by `CLTThreadPerClientTCPEngine::WorkerThread`
   - the derived thread-main slot for that object is now named `0x42fe50 = CLTThreadPerClientTCPEngine_WorkerThread_Run`
-  - helper `0x431ff0` then inserts `(contextKey, workerPayload)` into `+0x8c`
-  - slot `2` / `UDPMonitorPort` uses that helper after successful UDP socket/bind setup and then marks the returned worker object with `[worker+0x34] = 2`
-  - slot `6` / `Connect` uses that helper after successful TCP setup/connect sequencing and then marks the returned worker object with `[worker+0x34] = 1`
+  - helper `0x431ff0` stores that new worker pointer back through the connection object at `[connection+0x08]`
+  - helper `0x431ff0` then inserts `(connection, workerPayload)` into `+0x8c` under helper `+0x98` lock
+  - slot `2` / `UDPMonitorPort` uses that helper after successful UDP socket/bind setup, then marks the connection object state with `[connection+0x34] = 2`, and starts the returned worker with priority `2`
+  - slot `6` / `Connect` uses that helper after successful TCP setup/connect sequencing, then marks the connection object state with `[connection+0x34] = 1`, and starts the returned worker with priority `3`
 
 ### New clarification: slot `5` is an endpoint-removal / handle-extraction path
 
@@ -1237,8 +1245,9 @@ Current best reading from that combination:
 - that object is no longer just a passive owner token:
   - it appears to be an active bridge back into engine `Connect` / `Close` / `SendBuffer` paths
 - and the pointer-keyed `+0x8c` container now looks more concrete too:
-  - helper `0x431ff0` inserts nodes there using the raw connection/context pointer as key and a `WorkerThread`-style payload as value
-  - both `UDPMonitorPort` and `Connect` then store that returned worker back through the connection-side object before marking worker state `2` / `1`
+  - helper `0x431ff0` inserts nodes there using the raw connection pointer as key and a `WorkerThread`-style payload as value
+  - that same helper also writes the new worker pointer back through the connection-side object at `[connection+0x08]`
+  - `UDPMonitorPort` and `Connect` then mark the connection object state `2` / `1` and start the worker with priorities `2` / `3`
 - that also helps explain why the engine methods are hard to find through direct global `0x4d6304` xrefs alone:
   - meaningful calls are likely mediated through these connection objects after they capture the engine pointer, not only through raw global-engine direct calls
 
@@ -1342,10 +1351,10 @@ Important limitation:
     instead of open-coding that logic at each call site
   - sidecar owner/engine binding state is now also kept by `CLTThreadPerClientTCPEngineBinding` on the liblttcp side rather than by diagnostics-local owner/engine globals
   - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
-  - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered unique-key intent:
-    - `UDPMonitorPort` now updates an existing worker record for the same context key instead of blindly growing duplicates
-    - `CleanupConnection` now also marks the matching `CMessageConnection` sidecar closed before removing the worker record
-    - worker teardown now also mirrors that state/socket transition back onto the matched connection-family object before and after the stop path
+  - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered direct-payload read:
+    - source now keys `+0x8c` by the resolved `CMessageConnection` object pointer rather than by a synthetic normalized owner key
+    - source now stores direct `WorkerThread` payloads in that tree instead of an extra wrapper record
+    - `CleanupConnection` now also marks the matching `CMessageConnection` sidecar closed before removing the worker payload
     - generic fallback `CMessageConnection` entries are now dropped during slot-12-style cleanup instead of lingering after the worker-side owner goes away
     - current miss path now logs the nearer recovered `CleanupConnection: Couldn't find socket ...` outcome instead of only returning `0`
   - current diagnostic list-head emptiness for arg5 `+0x80` / `+0x8c` is also synchronized from that sidecar engine state so later stub logs track the new class-backed state more directly

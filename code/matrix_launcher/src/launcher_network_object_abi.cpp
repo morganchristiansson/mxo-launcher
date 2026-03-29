@@ -294,7 +294,7 @@ static uint32_t __thiscall LauncherObject_UDPMonitorPort(
     LauncherObjectAbiShell* self,
     void* port,
     void* contextKey,
-    void* ownerContext) {
+    void* ipv4NetworkOrder) {
     mxo::liblttcp::ILTTCPEngine* engine = GetOrCreateLauncherObjectEngineSidecar(self);
     if (!engine) {
         return 0;
@@ -303,7 +303,7 @@ static uint32_t __thiscall LauncherObject_UDPMonitorPort(
     return engine->UDPMonitorPort(
         static_cast<uint16_t>(reinterpret_cast<uintptr_t>(port)),
         contextKey,
-        ownerContext);
+        ipv4NetworkOrder);
 }
 
 // anchor: launcher.exe:0x436000
@@ -312,7 +312,7 @@ static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
     LauncherObjectAbiShell* self,
     void* outBoundPortHostOrder,
     void* contextKey,
-    void* ownerContext) {
+    void* ipv4NetworkOrder) {
     mxo::liblttcp::ILTTCPEngine* engine = GetOrCreateLauncherObjectEngineSidecar(self);
     if (!engine) {
         return 0;
@@ -322,7 +322,7 @@ static uint32_t __thiscall LauncherObject_MonitorEphemeralUDPPort(
     return engine->MonitorEphemeralUDPPort(
         outBoundPortHostOrder ? static_cast<uint16_t*>(outBoundPortHostOrder) : &boundPortHostOrder,
         contextKey,
-        ownerContext);
+        ipv4NetworkOrder);
 }
 
 // anchor: launcher.exe:0x42f7c0
