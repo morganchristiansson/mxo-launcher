@@ -3320,6 +3320,27 @@ bool CLTLoginMediator::SelectMarginEndpointIpv4() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObject() {
+    if (marginConnectionContextKey_ == nullptr && engine_ != nullptr) {
+        // Bounded source-owned bridge correction:
+        // - original `0x41e500` is reached directly from state4 and does not pass through the
+        //   outer `BeginLauncherMarginConnectionScaffold()` helper
+        // - current replacement therefore has to materialize the queue/context bridge here too,
+        //   not only at the outer wrapper
+        CLTLoginMediatorConnectionContextScaffold* context =
+            engine_->EnsureLauncherConnectionContextScaffold(
+                &marginConnectionContextScaffold_,
+                this,
+                "MarginConnection",
+                /*isMarginConnection=*/true);
+        if (context) {
+            context->peerCloseQueued = false;
+            SetMarginConnectionContextKey(context);
+            engine_->AttachLauncherConnectionBridgeContextsScaffold(
+                authConnectionContextScaffold_,
+                marginConnectionContextScaffold_);
+        }
+    }
+
     mxo::liblttcp::CMarginConnection* marginConnection =
         dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_);
     if (!marginConnection) {
@@ -3346,6 +3367,14 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
         /*packetizedMessagesEnabled=*/true);
     if (marginConnectionContextKey_) {
         marginConnection->SetOwnerContext(marginConnectionContextKey_);
+    }
+    if (marginConnectionContextScaffold_ != nullptr) {
+        marginConnectionContextScaffold_->sidecarConnection = marginConnection;
+    }
+    if (engine_ != nullptr) {
+        engine_->AttachLauncherConnectionBridgeContextsScaffold(
+            authConnectionContextScaffold_,
+            marginConnectionContextScaffold_);
     }
     return marginConnection_;
 }

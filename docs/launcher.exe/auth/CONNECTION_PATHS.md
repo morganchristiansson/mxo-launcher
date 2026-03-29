@@ -266,6 +266,61 @@ Keep only the auth/connection-path consequence here:
 This doc no longer repeats the full child call shape / field layout / `+0xa0/+0xa4/+0xa8/+0xf4`
 family, because that is now canonicalized in the focused startup-object doc above.
 
+## Existing-character margin-connect continuation (`2026-03-30` WineDbg, original launcher)
+
+Repeated narrow original-launcher attach passes on the patch-notes/Continue path now confirm the real
+post-connect continuation on the active existing-character branch more concretely.
+
+Observed stop order:
+- initial state8 send attempt:
+  - `0x43bd20`
+  - then `0x41b4b0` with owner `+0x1c == 0`
+  - so this first state8 slot-3 entry is the pre-connect gate that falls back to helper/state `4`
+- margin connect completion fallback:
+  - `0x41afc0`
+  - current helper object vtable = `0x4b503c` / state4
+  - owner `+0x1c` was non-null and connection state `+0x34 == 2`
+- state4 connect-status handler:
+  - `0x4393f0`
+  - cached upstream object at `state4+4` was the state8 object (`0x4b5104`)
+  - work-item type was `2`, payload/status dword was `0`
+- immediate continuation after that zero-status state4 slot-2 success:
+  - `0x43bd20` again
+  - caller chain now concretely included `0x4394c0 -> 0x41aff6`
+  - so this branch really does re-enter state8 slot 3 after the successful margin connect
+- but the next step is **not** a direct stable state8 send:
+  - from that post-connect state8 entry the run reached `0x43b8f0`
+  - later original call chain proved: `0x43bd59 -> 0x43b8f0`
+- first state6 pass then falls into the state5 family:
+  - the run reached `0x439520`
+  - caller chain proved: `0x43b959 -> 0x439520`
+  - the same pass then hit `0x41b500` and `0x41ce80`
+- later code-4 local completion re-entered state5 slot 2:
+  - `0x441850 -> 0x41afc0 -> 0x439590`
+  - current helper at that fallback stop was state5 (`0x4b5064`)
+- state5 slot 2 then re-entered state6:
+  - later call chain proved: `0x4395de -> 0x43b8f0`
+- only after that later state6 work did the run reach state6 slot 6 and restore state8:
+  - `0x440780`
+  - later `0x440ae5 -> 0x43bd20`
+  - at that restored state8 stop owner byte `+0xf14 == 1`
+  - owner dword `+0xf18` was already non-zero
+
+Current runtime consequence:
+- the original continuation on this branch is **not** just
+  `state4 slot2 -> state8 -> state6`
+- but it is also **not** a simple “state5 instead of state6” replacement
+- current best runtime-backed order is:
+  - `state8(slot3 pre-connect gate)`
+  - `-> state4 slot2 success`
+  - `-> state8 slot3`
+  - `-> state6 slot3`
+  - `-> state5 slot3`
+  - `-> state5 slot2`
+  - `-> state6 slot3`
+  - `-> state6 slot6`
+  - `-> state8 slot3`
+
 ## Current implementation-side milestone summary
 
 Current implementation/runtime milestones already achieved:

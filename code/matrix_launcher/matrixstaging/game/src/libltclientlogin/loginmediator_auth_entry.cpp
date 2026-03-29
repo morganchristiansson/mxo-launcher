@@ -551,7 +551,11 @@ void CLTLoginMediator::SetMarginServerConfig(const char* dnsSuffix, uint16_t por
     marginServerDnsSuffix_ = dnsSuffix ? dnsSuffix : "";
     marginServerPortHostOrder_ = portHostOrder;
     ignoreHostsFileForMargin_ = ignoreHostsFile;
+    marginSelectedIpv4_7c_ = 0u;
     BuildMarginEndpoint();
+    if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
+        BuildMarginEndpoint();
+    }
 }
 
 // UNANCHORED: source-owned route-text resolver for the reconstructed margin-host scaffold.
@@ -578,11 +582,19 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::MarginConnection() const {
 // UNANCHORED: source-owned setter for the reconstructed margin route-host prefix.
 void CLTLoginMediator::SetMarginRouteHostPrefix(const char* routeHostPrefix) {
     marginRouteState_.routeHostPrefix = routeHostPrefix ? routeHostPrefix : "";
+    marginSelectedIpv4_7c_ = 0u;
+    if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
+        BuildMarginEndpoint();
+    }
 }
 
 // UNANCHORED: source-owned setter for the reconstructed exact margin host name.
 void CLTLoginMediator::SetExactMarginHostName(const char* exactMarginHostName) {
     marginRouteState_.exactMarginHostName = exactMarginHostName ? exactMarginHostName : "";
+    marginSelectedIpv4_7c_ = 0u;
+    if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
+        BuildMarginEndpoint();
+    }
 }
 
 // UNANCHORED: source-owned accessor for the reconstructed margin route-state mirror.
@@ -986,7 +998,11 @@ uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
     }
 
     CLTLoginState* const upstreamState = currentState_;
-    const uint32_t result = state4->Slot3_BeginOrContinue(upstreamState, this);
+    const uint32_t result = SwitchHelperStateAndDispatchSlot3Scaffold(
+        4u,
+        state4,
+        upstreamState,
+        "BeginMarginConnectionViaState4Scaffold");
     const std::string marginHost = ResolvedMarginHostName();
     spdlog::info(
         "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold upstreamState={} currentState={} marginHost='{}' -> result=0x{:08x}",

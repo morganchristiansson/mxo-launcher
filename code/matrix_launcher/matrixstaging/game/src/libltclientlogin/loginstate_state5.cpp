@@ -79,18 +79,23 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
 
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     CLTLoginState* nextState = LookupRegisteredScaffoldStateById(mediator, nextHelperStateId);
-    if (nextState != nullptr) {
-        mediator->SwitchHelperStateScaffold(nextHelperStateId, nextState);
-    }
+    const uint32_t switchDispatchResult = nextState != nullptr
+        ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+              nextHelperStateId,
+              nextState,
+              this,
+              "State5 slot2 local type0x0b -> restore cached upstream and re-enter new helper slot3")
+        : 0u;
 
     spdlog::info(
-        "CLTLoginState_State5::Slot2_HandleSecondaryGate handled local type0x0b status=0x{:08x} cachedUpstream={} nextHelperState=0x{:02x} resolvedNextState={} owner+0x2d={} currentState={}",
+        "CLTLoginState_State5::Slot2_HandleSecondaryGate handled local type0x0b status=0x{:08x} cachedUpstream={} nextHelperState=0x{:02x} resolvedNextState={} owner+0x2d={} currentState={} switchDispatchResult=0x{:08x}",
         static_cast<unsigned>(status),
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(nextHelperStateId),
         nextState ? nextState->DebugName() : "<null>",
         mediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold() ? 1u : 0u,
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        static_cast<unsigned>(switchDispatchResult));
     return 1u;
 }
 
@@ -102,19 +107,52 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             cachedUpstreamOrArg_ = upstreamOrArg;
         }
     }
+    if (!mediator) {
+        return 0u;
+    }
 
     const auto* authReplyCopyShadowF4 =
         static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
-            mediator ? mediator->AuthBootstrapReplyCopyShadowF4Scaffold() : nullptr);
+            mediator->AuthBootstrapReplyCopyShadowF4Scaffold());
+    const bool helper680Ready = (authReplyCopyShadowF4 == nullptr);
+    if (helper680Ready) {
+        CLTLoginState* nextState = mediator->ScaffoldState2();
+        const uint32_t switchDispatchResult = nextState
+            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+                  2u,
+                  nextState,
+                  this,
+                  "State5 slot3 helper680-ready -> helper2 continuation")
+            : 0u;
+        spdlog::info(
+            "CLTLoginState_State5::Slot3_BeginOrContinue helper680Ready=1 cachedUpstream={} incomingUpstream={} currentState={} -> helper2 switchDispatchResult=0x{:08x}",
+            fmt::ptr(cachedUpstreamOrArg_),
+            fmt::ptr(upstreamOrArg),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+            static_cast<unsigned>(switchDispatchResult));
+        return switchDispatchResult;
+    }
+
+    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(mediator->MarginConnection());
+    const bool storedReplyCopy =
+        marginConnection != nullptr &&
+        marginConnection->StoreBootstrapReplyCopy98Scaffold(
+            authReplyCopyShadowF4,
+            sizeof(*authReplyCopyShadowF4));
+    const uint32_t sendResult =
+        (marginConnection != nullptr && storedReplyCopy)
+            ? marginConnection->SendStoredBootstrapReplyCopy98Scaffold()
+            : 0u;
+    mediator->PostEventScaffold(0x10u);
     spdlog::info(
-        "CLTLoginState_State5::Slot3_BeginOrContinue cachedUpstream={} incomingUpstream={} incomingUpstreamPhaseCode={} mediator={} currentState={} authReplyCopyShadowF4={} (kept non-sending: 0x41b500 -> 0x41ce80/+0x98 -> 0x41f30 helper chain remains source-owned but dormant until the full 0x136 block is validated)",
+        "CLTLoginState_State5::Slot3_BeginOrContinue helper680Ready=0 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} storedReplyCopy={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
         fmt::ptr(cachedUpstreamOrArg_),
         fmt::ptr(upstreamOrArg),
-        static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(upstreamOrArg)),
-        fmt::ptr(mediator),
-        mediator && mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
-        fmt::ptr(authReplyCopyShadowF4));
-    return 1u;
+        fmt::ptr(authReplyCopyShadowF4),
+        storedReplyCopy ? 1u : 0u,
+        static_cast<unsigned>(sendResult),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)

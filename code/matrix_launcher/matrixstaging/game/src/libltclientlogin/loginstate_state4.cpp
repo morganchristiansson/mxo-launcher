@@ -1,17 +1,65 @@
 #include "loginstate.h"
 #include "loginmediator.h"
 
-namespace mxo::ltlogin {
+#include <spdlog/spdlog.h>
 
-static uint32_t BeginMarginConnectionIfResolved(
+namespace mxo::ltlogin {
+namespace {
+
+static uint32_t LoginState4WorkItemTypeScaffold(const void* workItem) {
+    if (!workItem) {
+        return 0u;
+    }
+
+    const auto* header =
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    return header->workType;
+}
+
+static uint32_t LoginState4WorkItemPayloadScaffold(const void* workItem) {
+    if (!workItem) {
+        return 0u;
+    }
+
+    const auto* payload = static_cast<const uint32_t*>(workItem);
+    return payload[2];
+}
+
+static CLTLoginState* LookupRegisteredScaffoldStateById(CLTLoginMediator* mediator, uint32_t stateId) {
+    if (!mediator) {
+        return nullptr;
+    }
+
+    switch (stateId) {
+        case 0u: return mediator->ScaffoldState0();
+        case 1u: return mediator->ScaffoldState1();
+        case 2u: return mediator->ScaffoldState2();
+        case 3u: return mediator->ScaffoldState3();
+        case 4u: return mediator->ScaffoldState4();
+        case 5u: return mediator->ScaffoldState5();
+        case 6u: return mediator->ScaffoldState6();
+        case 8u: return mediator->ScaffoldState8();
+        case 9u: return mediator->ScaffoldState9();
+        case 10u: return mediator->ScaffoldState10();
+        case 11u: return mediator->ScaffoldState11();
+        case 12u: return mediator->ScaffoldState12();
+        case 13u: return mediator->ScaffoldState13();
+        default:
+            return nullptr;
+    }
+}
+
+static uint32_t BeginMarginConnectionForState4Case(
     CLTLoginMediator* mediator,
     const char* routeHostText,
     uint8_t cachedRouteSelector) {
-    if (!mediator || !routeHostText || routeHostText[0] == '\0') {
+    if (!mediator) {
         return 0u;
     }
     return mediator->BeginMarginConnectionScaffold(routeHostText, cachedRouteSelector);
 }
+
+}  // namespace
 
 // anchor: launcher.exe vtable 0x004b503c
 const char* CLTLoginState_State4::DebugName() const {
@@ -20,9 +68,68 @@ const char* CLTLoginState_State4::DebugName() const {
 
 // anchor: launcher.exe:0x004393f0 (vtable 0x004b503c slot 2)
 uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) {
-    (void)workItem;
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x004393f0");
+    if (!workItem || !mediator) {
+        return 0u;
+    }
+
+    if (LoginState4WorkItemTypeScaffold(workItem) !=
+        mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+        return CLTLoginState::Slot2_HandleSecondaryGate(workItem, mediator);
+    }
+
+    const uint32_t status = LoginState4WorkItemPayloadScaffold(workItem);
+    mediator->WorldListCountOrStatus80() = status;
+
+    if (status != 0u) {
+        mediator->SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(true);
+        if (mediator->MarginConnectAttemptCountScaffold() < mediator->MarginConnectCandidateCountScaffold()) {
+            const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_, mediator);
+            spdlog::info(
+                "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3 result=0x{:08x}",
+                static_cast<unsigned>(status),
+                fmt::ptr(cachedUpstreamOrArg_),
+                static_cast<unsigned>(mediator->MarginConnectAttemptCountScaffold()),
+                static_cast<unsigned>(mediator->MarginConnectCandidateCountScaffold()),
+                static_cast<unsigned>(retryResult));
+            return 1u;
+        }
+
+        const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+        mediator->ResetMarginConnectAttemptCountScaffold();
+        if (nextHelperStateId != 13u) {
+            if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
+                mediator->SwitchHelperStateScaffold(3u, failureState);
+            }
+        }
+        mediator->PostErrorScaffold(6u);
+        spdlog::info(
+            "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostError(0x06)",
+            static_cast<unsigned>(status),
+            fmt::ptr(cachedUpstreamOrArg_),
+            static_cast<unsigned>(nextHelperStateId),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        return 1u;
+    }
+
+    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    cachedUpstreamOrArg_ = nullptr;
+    mediator->MutableMarginRouteState().currentWorldId = -1;
+    CLTLoginState* nextState = LookupRegisteredScaffoldStateById(mediator, nextHelperStateId);
+    const uint32_t switchDispatchResult = nextState
+        ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+              nextHelperStateId,
+              nextState,
+              this,
+              "State4 slot2 zero-status success -> restore cached upstream and re-enter new helper slot3")
+        : 0u;
+    mediator->PostEventScaffold(0x0eu);
+    spdlog::info(
+        "CLTLoginState_State4::Slot2_HandleSecondaryGate status=0x{:08x} cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",
+        static_cast<unsigned>(status),
+        static_cast<unsigned>(nextHelperStateId),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        static_cast<unsigned>(switchDispatchResult));
+    return 1u;
 }
 
 // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
@@ -45,7 +152,7 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     switch (upstreamPhaseCode) {
         case 6:
-            return BeginMarginConnectionIfResolved(
+            return BeginMarginConnectionForState4Case(
                 mediator,
                 mediator->ResolveMarginRouteDescriptor(),
                 0u);
@@ -53,13 +160,18 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         case 7:
         case 8:
         case 13:
-            return BeginMarginConnectionIfResolved(
+            // Exact `0x439300 -> 0x41e500` consequence to preserve:
+            // - this branch forwards owner byte `+0xcc8` as arg2
+            // - `0x41e500` only refreshes route/address state on `arg2 == 0`
+            // - so on the live state8/state13 continuation path the returned route-text pointer is
+            //   forwarded even when current source still has no populated route-string table entry
+            return BeginMarginConnectionForState4Case(
                 mediator,
                 mediator->ResolveMarginRouteFromCurrentCharacterSlot(),
-                mediator->CharacterRouteIndexCc8());
+                mediator->CurrentCharacterRouteIndexCc8Scaffold());
 
         case 10:
-            return BeginMarginConnectionIfResolved(
+            return BeginMarginConnectionForState4Case(
                 mediator,
                 mediator->ResolveMarginRouteFromDescriptorIndex(mediator->SourceField12c()),
                 static_cast<uint8_t>(mediator->SourceField12c() & 0xffu));
@@ -73,9 +185,14 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             if (field104Value == -1) {
                 return 0u;
             }
-            return BeginMarginConnectionIfResolved(
+            const char* const routeHostText =
+                mediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value));
+            if (routeHostText == nullptr) {
+                return 0u;
+            }
+            return BeginMarginConnectionForState4Case(
                 mediator,
-                mediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value)),
+                routeHostText,
                 0u);
         }
     }

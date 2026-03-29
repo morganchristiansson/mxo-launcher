@@ -93,9 +93,56 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             cachedUpstreamOrArg_ = upstreamOrArg;
         }
     }
+    if (!mediator) {
+        return 0u;
+    }
 
-    (void)mediator;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043b8f0");
+    if (!mediator->State10HasReadyConnectionState2()) {
+        CLTLoginState* fallbackState = mediator->ScaffoldState4();
+        const uint32_t fallbackResult = fallbackState
+            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+                  4u,
+                  fallbackState,
+                  this,
+                  "State6 slot3 owner+0x1c state!=2 -> helper4 margin-connect continuation")
+            : 0u;
+        spdlog::info(
+            "CLTLoginState_State6::Slot3_BeginOrContinue blocked on owner+0x1c state!=2 -> helper4 result=0x{:08x} currentState={}",
+            static_cast<unsigned>(fallbackResult),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        return fallbackResult;
+    }
+
+    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(mediator->MarginConnection());
+    const bool marginConnectionReady84 =
+        marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84Scaffold();
+    if (!marginConnectionReady84) {
+        CLTLoginState* fallbackState = mediator->ScaffoldState5();
+        const uint32_t fallbackResult = fallbackState
+            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+                  5u,
+                  fallbackState,
+                  this,
+                  "State6 slot3 owner+0x1c+0x84==0 -> helper5 continuation")
+            : 0u;
+        spdlog::info(
+            "CLTLoginState_State6::Slot3_BeginOrContinue blocked on margin connection +0x84==0 -> helper5 result=0x{:08x} currentState={}",
+            static_cast<unsigned>(fallbackResult),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        return fallbackResult;
+    }
+
+    // Narrow currently validated send-side mirror from `0x43b8f0`:
+    // - copied payload fields now resolved to owner getter pairs `+0x20/+0x28`
+    //   (`owner+0x08` / `owner+0x0c` via tiny getters), fixed constants, GOB file GUID,
+    //   and owner current helper phase byte at payload `+0x22`
+    // - the exact packet-builder body remains a later fidelity target once the state5/state6
+    //   continuation is stable on the active path
+    mediator->PostEventScaffold(0x11u);
+    spdlog::info(
+        "CLTLoginState_State6::Slot3_BeginOrContinue passed owner+0x1c state==2 and margin connection +0x84 gate; packet builder/send still bounded, posted event=0x11 currentState={}",
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+    return 1u;
 }
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
@@ -178,8 +225,16 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
 
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     if (CLTLoginState* nextState = LookupRegisteredScaffoldStateById(mediator, nextHelperStateId)) {
-        mediator->SwitchHelperStateScaffold(nextHelperStateId, nextState);
+        const uint32_t switchDispatchResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+            nextHelperStateId,
+            nextState,
+            this,
+            "State6 slot6 opcode-0x09 success -> restore cached upstream and re-enter new helper slot3");
         mediator->PostEventScaffold(0x12u);
+        spdlog::info(
+            "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success re-entered helperState=0x{:02x} via 0x41b450 semantics switchDispatchResult=0x{:08x}",
+            static_cast<unsigned>(nextHelperStateId),
+            static_cast<unsigned>(switchDispatchResult));
     } else {
         spdlog::info(
             "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} but could not resolve nextHelperState={} from cachedUpstream={}; preserving currentState={}",

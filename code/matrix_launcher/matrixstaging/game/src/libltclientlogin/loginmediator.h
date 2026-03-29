@@ -870,6 +870,10 @@ public:
     void SetMarginRouteHostPrefix(const char* routeHostPrefix);
     void SetExactMarginHostName(const char* exactMarginHostName);
     const MarginRouteState& CurrentMarginRouteState() const;
+    MarginRouteState& MutableMarginRouteState() { return marginRouteState_; }
+    uint32_t MarginConnectAttemptCountScaffold() const { return marginBeginCount24_; }
+    uint32_t MarginConnectCandidateCountScaffold() const { return static_cast<uint32_t>(marginAddressList3c_.Count()); }
+    void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
     // launcher.exe:0x43b300
     // Current best read:
@@ -1327,6 +1331,13 @@ public:
 
     // State-3(wait) -> state-8 owner-side selection/config snapshot block (`0x41c1f0`):
     uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8; }
+    // Source-owned bridge over the still-duplicated `+0xcc8` mirrors.
+    // Current best recovered split:
+    // - pre-auth / existing-character state8 path still uses the earlier selection-context snapshot
+    // - post-AS_AuthReply state10/state11 path uses the later adopted post-auth mirror
+    // So callers that want original owner `+0xcc8` behavior should prefer this selector helper
+    // over reading one backing field directly.
+    uint8_t CurrentCharacterRouteIndexCc8Scaffold() const;
     const std::array<uint32_t, 4>& SelectionContextBlockCd0() const { return state8SelectionContextSnapshotState_.blockCd0; }
     const std::array<uint32_t, 4>& SelectionContextBlockCe0() const { return state8SelectionContextSnapshotState_.blockCe0; }
     const std::array<uint32_t, 4>& SelectionContextBlockCf0() const { return state8SelectionContextSnapshotState_.blockCf0; }

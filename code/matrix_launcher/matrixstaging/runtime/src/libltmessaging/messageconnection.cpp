@@ -1554,20 +1554,51 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
         return 1u;
     }
 
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        CMessageConnection_LoginMediatorContextScaffold(this);
+    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
         const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* statusWorkItem =
             static_cast<const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
+        const uint32_t workPayload = statusWorkItem ? statusWorkItem->workPayload : 0u;
+
+        // Bounded fidelity correction for the active state4 existing-character margin path:
+        // - original margin type-2 completion re-enters the current helper slot-2 chain
+        // - state4 slot-2 then restores the cached upstream helper and lets that continuation
+        //   progress through `0x41b450` semantics
+        // - the active sender gates also require owner `+0x1c` state `== 2`, so keep the
+        //   connect-status success promotion immediately before that slot-2 re-entry
+        if (workPayload == 0u && State() == LTTCPEngineConnectionState::kConnectActive) {
+            SetState(LTTCPEngineConnectionState::kUdpMonitorActive);
+            spdlog::info(
+                "CMarginConnection::OnOperationCompleted promoted margin connection to ready state=2 on type-2 zero-status completion this={} ownerContext={} remoteHost='{}'",
+                fmt::ptr(this),
+                fmt::ptr(OwnerContext()),
+                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        }
+
+        if (context && mediator && context->isMarginConnection) {
+            const uint32_t handled = mediator->DispatchCurrentHelperSecondaryGateScaffold(workItem);
+            spdlog::info(
+                "CMarginConnection::OnOperationCompleted routed type-2 connect-status through current helper slot2 payload=0x{:08x} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+                workPayload,
+                fmt::ptr(this),
+                fmt::ptr(OwnerContext()),
+                fmt::ptr(mediator->CurrentState()),
+                handled,
+                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+            return handled;
+        }
+
         return CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
             this,
-            statusWorkItem ? statusWorkItem->workPayload : 0u,
+            workPayload,
             /*isMarginConnection=*/true,
             "+0x188");
     }
 
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-        CMessageConnection_LoginMediatorContextScaffold(this);
-    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
     if (context && mediator && context->isMarginConnection) {
         const uint32_t handled =
             mediator->HandleMarginConnectionCompletionFallbackScaffold(this, workItem);

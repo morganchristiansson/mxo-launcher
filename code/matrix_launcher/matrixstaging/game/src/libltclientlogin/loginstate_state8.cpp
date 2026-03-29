@@ -491,13 +491,19 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         return fallbackResult;
     }
     if (mediator->State10SendGateFlagF14() == 0) {
-        if (CLTLoginState* fallbackState = mediator->ScaffoldState6()) {
-            mediator->SwitchHelperStateScaffold(6u, fallbackState);
-        }
+        CLTLoginState* fallbackState = mediator->ScaffoldState6();
+        const uint32_t fallbackResult = fallbackState
+            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+                  6u,
+                  fallbackState,
+                  this,
+                  "State8 slot3 owner+0xf14==0 -> helper6 margin-bootstrap continuation")
+            : 0u;
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0xf14==0; original would switch helper state to 6 currentState={}",
+            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x} currentState={}",
+            static_cast<unsigned>(fallbackResult),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
-        return 0u;
+        return fallbackResult;
     }
 
     replySectionsSeen_ = 0;

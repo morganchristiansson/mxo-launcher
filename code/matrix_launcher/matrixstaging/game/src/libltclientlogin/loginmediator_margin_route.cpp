@@ -4,6 +4,22 @@
 
 namespace mxo::ltlogin {
 
+uint8_t CLTLoginMediator::CurrentCharacterRouteIndexCc8Scaffold() const {
+    // The current source still carries two bounded mirrors for original owner byte `+0xcc8`:
+    // - `state8SelectionContextSnapshotState_` for the earlier state3(wait)->state8 path
+    // - `postAuthMarginLoadingState_` for the later post-AS_AuthReply path
+    // Fidelity correction:
+    // - startup defaults already populate world/variant-selection tables before auth reply
+    // - so world/descriptor count alone is not a safe discriminator here
+    // - on the live existing-character path, state4/state6/state8 margin work before
+    //   `AS_AuthReply` still needs the earlier selection-context snapshot index (slot `0x05` in the
+    //   current log family), not the later post-auth mirror defaulting to `0`
+    if ((!lastAuthReply_.valid || lastAuthReply_.isErrorReply) && selectionContext0ecCopyValid_) {
+        return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8;
+    }
+    return postAuthMarginLoadingState_.characterRouteIndexCc8;
+}
+
 const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {
     // Address anchors:
     // - launcher.exe:0x439300 case `7/8/0xd`
@@ -11,8 +27,16 @@ const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const
     // - owner vtable `+0xe0`
     //
     // Current best source-owned mirror returns the reconstructed route-host string triple's first
-    // string for the current slot/index.
-    return LookupRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8);
+    // string for the current owner `+0xcc8` slot/index.
+    if (const char* routeHost = LookupRouteHostPrefixBySlot(CurrentCharacterRouteIndexCc8Scaffold())) {
+        return routeHost;
+    }
+
+    // Current bounded bridge for the still-unrecovered earlier producer of owner
+    // `+0x30/+0x3c/+0x6c` on the existing-character path:
+    // when the per-slot route table is not populated yet, reuse the launcher-selected route host
+    // prefix already mirrored on the owner.
+    return marginRouteState_.routeHostPrefix.empty() ? nullptr : marginRouteState_.routeHostPrefix.c_str();
 }
 
 const char* CLTLoginMediator::ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const {
@@ -60,7 +84,7 @@ const char* CLTLoginMediator::ResolveMarginRouteDescriptor() const {
     // - then uses the first dword of that object as the string argument into `0x41e500`
     // - current scaffold keeps this narrow by preferring the already mirrored current-slot
     //   route-host string and only falling back to older diagnostic route text when needed
-    if (const char* currentSlotRouteHost = LookupRouteHostPrefixBySlot(postAuthMarginLoadingState_.characterRouteIndexCc8)) {
+    if (const char* currentSlotRouteHost = LookupRouteHostPrefixBySlot(CurrentCharacterRouteIndexCc8Scaffold())) {
         return currentSlotRouteHost;
     }
     return marginRouteState_.routeHostPrefix.empty() ? nullptr : marginRouteState_.routeHostPrefix.c_str();
@@ -79,7 +103,37 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     // - increment owner dword `+0x24`
     // - clear owner `+0x7c`
     // - call `connection->+0x1c(owner+0x6c)`
+    // Current bounded bridge correction:
+    // - the active existing-character state8 -> state4 path reaches here directly, not through the
+    //   outer `BeginLauncherMarginConnectionScaffold()` wrapper
+    // - so this helper itself must ensure the launcher bridge context/sidecar connection is
+    //   present before `EnsureConnected()` re-enters the engine connect slot with the connection
+    //   object as context key
+    if (engine_ != nullptr) {
+        CLTLoginMediatorConnectionContextScaffold* context =
+            engine_->EnsureLauncherConnectionContextScaffold(
+                &marginConnectionContextScaffold_,
+                this,
+                "MarginConnection",
+                /*isMarginConnection=*/true);
+        if (context) {
+            context->peerCloseQueued = false;
+            SetMarginConnectionContextKey(context);
+        }
+        engine_->AttachLauncherConnectionBridgeContextsScaffold(
+            authConnectionContextScaffold_,
+            marginConnectionContextScaffold_);
+    }
+
     mxo::liblttcp::CMessageConnection* connection = EnsureMarginConnectionObject();
+    if (marginConnectionContextScaffold_ != nullptr) {
+        marginConnectionContextScaffold_->sidecarConnection = connection;
+    }
+    if (engine_ != nullptr) {
+        engine_->AttachLauncherConnectionBridgeContextsScaffold(
+            authConnectionContextScaffold_,
+            marginConnectionContextScaffold_);
+    }
     if (!connection) {
         spdlog::warn("CLTLoginMediator::BeginMarginConnectionScaffold failed to allocate margin connection");
         return 0u;
@@ -87,11 +141,22 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 
     marginConnectionFlag2d_ = 0;
 
-    const bool shouldRefreshRouteState = (cachedRouteSelector == 0u) ||
-                                         (marginAddressList3c_.Empty()) ||
-                                         (marginEndpoint_.ipv4NetworkOrder == 0u);
-    if (shouldRefreshRouteState) {
-        if (routeHostText && routeHostText[0] != '\0') {
+    const bool shouldRefreshRouteState = (cachedRouteSelector == 0u);
+    const bool needsBoundedNonZeroSelectorMaterialization =
+        (cachedRouteSelector != 0u) && (marginEndpoint_.ipv4NetworkOrder == 0u);
+    if (shouldRefreshRouteState || needsBoundedNonZeroSelectorMaterialization) {
+        if (!routeHostText || routeHostText[0] == '\0') {
+            spdlog::debug(
+                "CLTLoginMediator::BeginMarginConnectionScaffold selector=0x{:02x} requires routeHostText but received <empty>",
+                cachedRouteSelector);
+            return 0u;
+        }
+
+        // `0x41e500` only refreshes owner `+0x30/+0x3c/+0x6c` on the exact `arg2 == 0` path.
+        // The extra `selector != 0 && endpoint still zero` branch below is a bounded source-owned
+        // stand-in for the still-unrecovered earlier producer that should already have
+        // materialized owner `+0x6c` before the non-zero-selector state4/state8 path reaches here.
+        if (shouldRefreshRouteState || marginRouteState_.routeHostPrefix.empty()) {
             marginRouteState_.routeHostPrefix = routeHostText;
         }
 
@@ -159,7 +224,7 @@ const SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t sl
 
 // anchor: launcher.exe:0x41f300
 const SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
-    return GetSlotRecordByIndex(postAuthMarginLoadingState_.characterRouteIndexCc8);
+    return GetSlotRecordByIndex(CurrentCharacterRouteIndexCc8Scaffold());
 }
 
 // anchor: launcher.exe:0x41b220

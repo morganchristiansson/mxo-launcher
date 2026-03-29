@@ -2086,6 +2086,14 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
 
     CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
     if (!connection || connection->State() != LTTCPEngineConnectionState::kClosed) {
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold rejected connect context={} connection={} state={} remoteHost='{}' port={} ip=0x{:08x}",
+            fmt::ptr(contextKey),
+            fmt::ptr(connection),
+            connection ? static_cast<unsigned>(connection->State()) : 0xffffffffu,
+            (connection && !connection->RemoteHostName().empty()) ? connection->RemoteHostName() : std::string("<empty>"),
+            static_cast<unsigned>(portHostOrder),
+            static_cast<unsigned>(ipv4NetworkOrder));
         return 0u;
     }
 
@@ -2094,6 +2102,13 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
         IPPROTO_TCP,
         /*flags=*/0u);
     if (socketHandle == kInvalidSocketHandle) {
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold socket allocation failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
+            fmt::ptr(connection),
+            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+            static_cast<unsigned>(portHostOrder),
+            static_cast<unsigned>(ipv4NetworkOrder),
+            WSAGetLastError());
         return 0u;
     }
 
@@ -2104,7 +2119,15 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
     bindAddr.sin_port = htons(0);
     bindAddr.sin_addr.s_addr = 0;
     if (bind(sock, reinterpret_cast<const sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR) {
+        const int wsaError = WSAGetLastError();
         closesocket(sock);
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold bind failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
+            fmt::ptr(connection),
+            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+            static_cast<unsigned>(portHostOrder),
+            static_cast<unsigned>(ipv4NetworkOrder),
+            wsaError);
         return 0u;
     }
 
@@ -2120,6 +2143,13 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
             uint32_t socketHandleToClose = static_cast<uint32_t>(sock);
             CloseSocketHandle(&socketHandleToClose);
             connection->SetSocketHandle(kInvalidSocketHandle);
+            spdlog::info(
+                "CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold connect failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
+                fmt::ptr(connection),
+                connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+                static_cast<unsigned>(portHostOrder),
+                static_cast<unsigned>(ipv4NetworkOrder),
+                wsaError);
             return 0u;
         }
     }
@@ -2132,11 +2162,26 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
         uint32_t socketHandleToClose = static_cast<uint32_t>(sock);
         CloseSocketHandle(&socketHandleToClose);
         connection->SetSocketHandle(kInvalidSocketHandle);
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold worker creation failed connection={} remoteHost='{}' port={} ip=0x{:08x}",
+            fmt::ptr(connection),
+            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+            static_cast<unsigned>(portHostOrder),
+            static_cast<unsigned>(ipv4NetworkOrder));
         return 0u;
     }
 
     connection->SetState(LTTCPEngineConnectionState::kConnectActive);
     (void)worker->Start(/*startPriority=*/3);
+    spdlog::info(
+        "CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold started worker connection={} worker={} remoteHost='{}' port={} ip=0x{:08x} state={} ownerContext={}",
+        fmt::ptr(connection),
+        fmt::ptr(worker),
+        connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+        static_cast<unsigned>(portHostOrder),
+        static_cast<unsigned>(ipv4NetworkOrder),
+        static_cast<unsigned>(connection->State()),
+        fmt::ptr(connection->OwnerContext()));
     SyncAttachedLauncherObjectStateScaffold();
     return kResultSuccess;
 }
