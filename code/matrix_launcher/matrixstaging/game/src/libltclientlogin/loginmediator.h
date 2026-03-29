@@ -8,6 +8,7 @@
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
 #include "../../../runtime/src/libltmessaging/messageconnection.h"
+#include "../../../runtime/src/liblttcp/ltipaddresslist.h"
 #include "../../../runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 #include "loginmediator_base.h"
@@ -238,32 +239,6 @@ public:
         std::string exactMarginHostName;
     };
 
-    struct MarginAddressListState {
-        // Source-owned mirror of the `0x41e500` host-resolution family rooted at owner `+0x3c`.
-        // Current best decompile-backed read:
-        // - owner `+0x30` stores the current route/prefix string
-        // - owner `+0x3c` owns the resolved IPv4 list object rebuilt through `0x440d80`
-        // - owner `+0x7c` holds the transient selected IPv4 used to build `+0x6c`
-        std::string resolvedHostName;
-        std::vector<uint32_t> ipv4NetworkOrderList;
-        size_t nextIndex = 0;
-    };
-
-    struct AuthAddressListState {
-        // Source-owned mirror of the auth-side iterator rooted at owner `+0x4c` plus the nearby
-        // retry/attempt counter at owner `+0x28`.
-        // Current best static read from `0x41d170 / 0x440bb0 / 0x4390b0`:
-        // - owner `+0x4c` = begin pointer for a dword IPv4 list
-        // - owner `+0x50` = end pointer for that list
-        // - owner `+0x58` = current iterator cursor used by `0x440bb0`
-        // - owner `+0x28` increments before each auth connect attempt
-        // - state1 slot1 later compares `+0x28` against `((+0x50 - +0x4c) >> 2)` to decide
-        //   retry-vs-error on the non-zero status side
-        std::string resolvedHostName;
-        std::vector<uint32_t> ipv4NetworkOrderList;
-        size_t nextIndex = 0;
-        uint32_t attemptCount28 = 0;
-    };
 
     struct State9CallbackBlob18cSketch {
         // anchor: launcher.exe:0x41e690 / mediator vtable `+0x18c`
@@ -1552,7 +1527,17 @@ private:
 
     ConnectionHelperFamily helpers_;
     MarginRouteState marginRouteState_;
-    MarginAddressListState marginAddressList3c_{};
+    // Original non-virtual `CLTIPAddressList` helper rooted at owner `+0x3c`.
+    // Recovered original in-object layout:
+    // - `+0x3c` = begin pointer
+    // - `+0x40` = end pointer
+    // - `+0x44` = capacity pointer
+    // - `+0x48` = current iterator pointer
+    // Companion source-owned state kept adjacent to the object only where launcher RE proves it is
+    // outside the helper itself:
+    // - current resolved host string used for source-side route-change detection
+    mxo::liblttcp::CLTIPAddressList marginAddressList3c_{};
+    std::string marginAddressListResolvedHostName3c_;
     // owner `+0x24/+0x2c/+0x2d/+0x7c` connection-routing/teardown family:
     // - `+0x24` = margin begin-count from `0x41e500`
     // - `+0x2c` = shared slot1 / event-`1` gate armed by vtable `+0x164 / 0x41b3f0`
@@ -1706,9 +1691,18 @@ private:
     std::array<void*, kRecoveredWorldSlotCapacity> worldSlots_;
     std::array<void*, kRecoveredWorldSlotCapacity> worldPayloadSlots_;
 
-    // Append-only source-owned mirror of the auth-side owner `+0x28/+0x4c/+0x50/+0x58`
-    // retry/iterator family recovered from `0x41d170 / 0x440bb0 / 0x4390b0`.
-    AuthAddressListState authAddressList4c_{};
+    // Original non-virtual `CLTIPAddressList` helper rooted at owner `+0x4c`.
+    // Recovered original in-object layout:
+    // - `+0x4c` = begin pointer
+    // - `+0x50` = end pointer
+    // - `+0x54` = capacity pointer
+    // - `+0x58` = current iterator pointer
+    // Nearby owner-side state that is not part of the helper object itself remains explicit:
+    // - owner `+0x28` = auth connect attempt count / retry gate state
+    // - source-side resolved-host cache is kept separately for rebuild-change detection
+    mxo::liblttcp::CLTIPAddressList authAddressList4c_{};
+    std::string authAddressListResolvedHostName4c_;
+    uint32_t authConnectAttemptCount28_ = 0;
 
     // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
     // Faithful implementation of arg6 world list provider for InitClientDLL

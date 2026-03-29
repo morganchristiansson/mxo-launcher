@@ -13,13 +13,10 @@
 
 #include "loginmediator.h"
 
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include "loginstate.h"
+#include "../../../runtime/src/liblttcp/ltipaddresslist.h"
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <cstdlib>
 
 namespace mxo::ltlogin {
@@ -50,58 +47,6 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.capacity = dest.string60.current;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static bool EnsureWinsockReadyForAuthEntry() {
-    static bool initialized = false;
-    static bool attempted = false;
-    if (attempted) {
-        return initialized;
-    }
-    attempted = true;
-
-    WSADATA wsaData = {};
-    initialized = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
-    return initialized;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static bool ResolveAllIpv4AddressesForAuthEntry(
-    const char* hostName,
-    std::vector<uint32_t>* outIpv4NetworkOrderList) {
-    if (!hostName || !hostName[0] || !outIpv4NetworkOrderList || !EnsureWinsockReadyForAuthEntry()) {
-        return false;
-    }
-
-    addrinfo hints = {};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-
-    addrinfo* results = nullptr;
-    if (getaddrinfo(hostName, nullptr, &hints, &results) != 0 || !results) {
-        return false;
-    }
-
-    outIpv4NetworkOrderList->clear();
-    for (addrinfo* it = results; it; it = it->ai_next) {
-        if (it->ai_family != AF_INET || !it->ai_addr ||
-            it->ai_addrlen < static_cast<int>(sizeof(sockaddr_in))) {
-            continue;
-        }
-
-        const sockaddr_in* addr = reinterpret_cast<const sockaddr_in*>(it->ai_addr);
-        const uint32_t ipv4NetworkOrder = addr->sin_addr.s_addr;
-        if (std::find(
-                outIpv4NetworkOrderList->begin(),
-                outIpv4NetworkOrderList->end(),
-                ipv4NetworkOrder) == outIpv4NetworkOrderList->end()) {
-            outIpv4NetworkOrderList->push_back(ipv4NetworkOrder);
-        }
-    }
-
-    freeaddrinfo(results);
-    return !outIpv4NetworkOrderList->empty();
-}
 
 struct BuiltinScaffoldStates {
     CLTLoginState_State0 state0 = {};
@@ -557,61 +502,60 @@ void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHos
     BuildAuthEndpoint();
 }
 
-// UNANCHORED: source-owned reset for the auth-side owner `+0x28/+0x4c/+0x50/+0x58` retry/iterator mirror.
+// UNANCHORED: source-owned reset for the auth-side owner `+0x28/+0x4c/+0x50/+0x58` retry/iterator family.
 void CLTLoginMediator::ResetAuthConnectRetryStateScaffold() {
-    authAddressList4c_.resolvedHostName = authServerDnsName_;
-    authAddressList4c_.ipv4NetworkOrderList.clear();
-    authAddressList4c_.nextIndex = 0;
-    authAddressList4c_.attemptCount28 = 0;
+    authAddressListResolvedHostName4c_ = authServerDnsName_;
+    authAddressList4c_.Reset();
+    authConnectAttemptCount28_ = 0;
 }
 
 // UNANCHORED: source-owned getter for the mirrored auth connect-attempt counter at owner `+0x28`.
 uint32_t CLTLoginMediator::AuthConnectAttemptCountScaffold() const {
-    return authAddressList4c_.attemptCount28;
+    return authConnectAttemptCount28_;
 }
 
 // UNANCHORED: source-owned getter for the mirrored auth candidate count derived from owner `+0x4c/+0x50`.
 uint32_t CLTLoginMediator::AuthConnectCandidateCountScaffold() const {
-    return static_cast<uint32_t>(authAddressList4c_.ipv4NetworkOrderList.size());
+    return static_cast<uint32_t>(authAddressList4c_.Count());
 }
 
 // UNANCHORED: source-owned predicate matching the `0x4390b0` owner `+0x28` vs `(+0x50 - +0x4c) >> 2` retry gate.
 bool CLTLoginMediator::HasAuthConnectRetryCandidateRemainingScaffold() const {
-    return authAddressList4c_.attemptCount28 < AuthConnectCandidateCountScaffold();
+    return authConnectAttemptCount28_ < AuthConnectCandidateCountScaffold();
 }
 
 // UNANCHORED: source-owned host-resolution mirror for the auth-side dword IPv4 list rooted at owner `+0x4c`.
 void CLTLoginMediator::RefreshAuthAddressListForCurrentHostScaffold() {
-    const bool hostChanged = (authAddressList4c_.resolvedHostName != authServerDnsName_);
-    if (!hostChanged && !authAddressList4c_.ipv4NetworkOrderList.empty()) {
+    const bool hostChanged = (authAddressListResolvedHostName4c_ != authServerDnsName_);
+    if (!hostChanged && !authAddressList4c_.Empty()) {
         return;
     }
 
-    authAddressList4c_.resolvedHostName = authServerDnsName_;
-    authAddressList4c_.ipv4NetworkOrderList.clear();
-    authAddressList4c_.nextIndex = 0;
+    authAddressListResolvedHostName4c_ = authServerDnsName_;
 
-    if (!authServerDnsName_.empty()) {
-        (void)ResolveAllIpv4AddressesForAuthEntry(
-            authServerDnsName_.c_str(),
-            &authAddressList4c_.ipv4NetworkOrderList);
+    if (authServerDnsName_.empty()) {
+        authAddressList4c_.Reset();
+        return;
     }
+
+    uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
+    if (ignoreHostsFileForAuth_) {
+        flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
+    }
+
+    (void)authAddressList4c_.Reinit(authServerDnsName_.c_str(), flags);
 }
 
 // UNANCHORED: source-owned iterator step mirroring the `0x440bb0/0x44b090` auth endpoint prep family.
 void CLTLoginMediator::PrepareNextAuthEndpointForConnectAttemptScaffold() {
     RefreshAuthAddressListForCurrentHostScaffold();
 
-    if (!authAddressList4c_.ipv4NetworkOrderList.empty()) {
-        if (authAddressList4c_.nextIndex >= authAddressList4c_.ipv4NetworkOrderList.size()) {
-            authAddressList4c_.nextIndex = 0;
-        }
-
-        authEndpoint_.ipv4NetworkOrder =
-            authAddressList4c_.ipv4NetworkOrderList[authAddressList4c_.nextIndex++];
+    const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
+    if (nextIpv4 != 0u) {
+        authEndpoint_.ipv4NetworkOrder = nextIpv4;
     }
 
-    ++authAddressList4c_.attemptCount28;
+    ++authConnectAttemptCount28_;
 }
 
 // UNANCHORED: source-owned config setter for the margin suffix/port scaffold feeding owner `+0x30/+0x6c`.

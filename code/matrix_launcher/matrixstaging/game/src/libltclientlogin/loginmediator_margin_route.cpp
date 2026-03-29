@@ -88,7 +88,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     marginConnectionFlag2d_ = 0;
 
     const bool shouldRefreshRouteState = (cachedRouteSelector == 0u) ||
-                                         (marginAddressList3c_.ipv4NetworkOrderList.empty()) ||
+                                         (marginAddressList3c_.Empty()) ||
                                          (marginEndpoint_.ipv4NetworkOrder == 0u);
     if (shouldRefreshRouteState) {
         if (routeHostText && routeHostText[0] != '\0') {
@@ -101,8 +101,8 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
             return 0u;
         }
 
-        const bool routeChanged = (marginAddressList3c_.resolvedHostName != marginHost);
-        if (routeChanged || marginAddressList3c_.ipv4NetworkOrderList.empty()) {
+        const bool routeChanged = (marginAddressListResolvedHostName3c_ != marginHost);
+        if (routeChanged || marginAddressList3c_.Empty()) {
             if (!RebuildMarginAddressList()) {
                 return 0u;
             }

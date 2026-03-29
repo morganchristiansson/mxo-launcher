@@ -23,10 +23,10 @@ void CLTLoginMediator::InitializeHelperDispatchSlot15() {
 
 ## Example usage
 
-### Decompile one or multiple function
+### Decompile one function by address, or multiple functions by name
 ```
 mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
-mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "0x400000 0x410000 0x420000", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "CLTSocketLayer_Init,CLTBaseThreadPerClientTCPEngine_ctor", "program": "launcher.exe"}' })
 ```
 
 ### Disassemble a function
@@ -36,8 +36,9 @@ mcp({ tool: "ghidra_disassemble_function", args: '{"address": "0x43b300", "progr
 
 ### Get function callers/callees
 ```
-mcp({ tool: "ghidra_get_function_callers", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
-mcp({ tool: "ghidra_get_function_callees", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+# Note: these tools currently expect a function name, not an address.
+mcp({ tool: "ghidra_get_function_callers", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_get_function_callees", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
 ```
 
 ### Get xrefs from/to an address
@@ -48,12 +49,16 @@ mcp({ tool: "ghidra_get_xrefs_to", args: '{"address": "0x43b300", "program": "la
 
 ### Rename a function
 ```
-mcp({ tool: "ghidra_rename_function", args: '{"name": "CLTLoginMediator_InitializeHelperDispatchTable", "address": "0x43b300", "program": "launcher.exe"}' })
+# Rename by address:
+mcp({ tool: "ghidra_rename_function_by_address", args: '{"function_address": "0x43b300", "new_name": "CLTLoginMediator_InitializeHelperDispatchTable", "program": "launcher.exe"}' })
+
+# Or rename by old/new function name:
+mcp({ tool: "ghidra_rename_function", args: '{"oldName": "FUN_0043b300", "newName": "CLTLoginMediator_InitializeHelperDispatchTable", "program": "launcher.exe"}' })
 ```
 
 ### Rename variables in a function
 ```
-mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "variables": {"puVar1": "ptr", "DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}}}' })
+mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "variable_renames": {"puVar1": "ptr", "DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}, "program": "launcher.exe"}' })
 ```
 
 ### Read memory at an address

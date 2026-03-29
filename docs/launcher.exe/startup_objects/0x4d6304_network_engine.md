@@ -97,6 +97,7 @@ Base ctor `0x4366f0` / `CLTBaseThreadPerClientTCPEngine_ctor` itself:
 - initializes a subobject at `+0x5c`
 - initializes another helper subobject rooted at `+0x60`
 - creates the event stored at `+0x7c`
+- calls `0x452e00` / `CLTSocketLayer::Init` before queue-thread allocation, so process-wide Winsock bootstrap is part of the engine ctor path rather than an unrelated later side effect
 - allocates an array at `+0x08` when the effective queue-thread count is non-zero
 - constructs per-entry helper objects of size `0x3c` through `0x4365a0` / `CLTThreadPerClientTCPEngine_QueueThread_ctor`
 

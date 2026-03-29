@@ -28,12 +28,11 @@
 
 #include "loginmediator.h"
 
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include "loginstate.h"
 #include "launcher_mediator_abi_shared.h"
 #include "authbootstrap680_internal.h"
+#include "../../../runtime/src/liblttcp/ltipaddresslist.h"
+#include "../../../runtime/src/libltnet/sys/pc/pcsocket.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -94,54 +93,6 @@ static mxo::liblttcp::LTTCPEndpointKey BuildLoopbackEndpoint(uint16_t portHostOr
     return key;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static bool EnsureWinsockReady() {
-    static bool initialized = false;
-    static bool attempted = false;
-    if (attempted) {
-        return initialized;
-    }
-    attempted = true;
-
-    WSADATA wsaData = {};
-    initialized = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
-    return initialized;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static bool ResolveAllIpv4Addresses(const char* hostName, std::vector<uint32_t>* outIpv4NetworkOrderList) {
-    if (!hostName || !hostName[0] || !outIpv4NetworkOrderList || !EnsureWinsockReady()) {
-        return false;
-    }
-
-    addrinfo hints = {};
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-
-    addrinfo* results = nullptr;
-    if (getaddrinfo(hostName, nullptr, &hints, &results) != 0 || !results) {
-        return false;
-    }
-
-    outIpv4NetworkOrderList->clear();
-    for (addrinfo* it = results; it; it = it->ai_next) {
-        if (it->ai_family != AF_INET || !it->ai_addr ||
-            it->ai_addrlen < static_cast<int>(sizeof(sockaddr_in))) {
-            continue;
-        }
-
-        const sockaddr_in* addr = reinterpret_cast<const sockaddr_in*>(it->ai_addr);
-        const uint32_t ipv4NetworkOrder = addr->sin_addr.s_addr;
-        if (std::find(outIpv4NetworkOrderList->begin(), outIpv4NetworkOrderList->end(), ipv4NetworkOrder) ==
-            outIpv4NetworkOrderList->end()) {
-            outIpv4NetworkOrderList->push_back(ipv4NetworkOrder);
-        }
-    }
-
-    freeaddrinfo(results);
-    return !outIpv4NetworkOrderList->empty();
-}
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 static const char* NonEmptyTextOrPlaceholder(const char* value) {
@@ -3337,19 +3288,24 @@ const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::RebuildMarginAddressList() {
     const std::string resolvedHostName = ResolvedMarginHostName();
-    marginAddressList3c_.resolvedHostName = resolvedHostName;
-    marginAddressList3c_.ipv4NetworkOrderList.clear();
-    marginAddressList3c_.nextIndex = 0;
+    marginAddressListResolvedHostName3c_ = resolvedHostName;
 
     if (resolvedHostName.empty()) {
+        marginAddressList3c_.Reset();
         spdlog::debug("CLTLoginMediator::BeginMarginConnectionScaffold unresolved margin host");
         return false;
     }
 
-    if (!ResolveAllIpv4Addresses(resolvedHostName.c_str(), &marginAddressList3c_.ipv4NetworkOrderList)) {
+    uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
+    if (ignoreHostsFileForMargin_) {
+        flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
+    }
+
+    if (!marginAddressList3c_.Reinit(resolvedHostName.c_str(), flags)) {
         spdlog::warn(
-            "CLTLoginMediator::BeginMarginConnectionScaffold failed to resolve margin host '{}'",
-            resolvedHostName);
+            "CLTLoginMediator::BeginMarginConnectionScaffold failed to resolve margin host '{}' flags=0x{:02x}",
+            resolvedHostName,
+            flags);
         return false;
     }
 
@@ -3358,16 +3314,8 @@ bool CLTLoginMediator::RebuildMarginAddressList() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::SelectMarginEndpointIpv4() {
-    if (marginAddressList3c_.ipv4NetworkOrderList.empty()) {
-        return false;
-    }
-
-    if (marginAddressList3c_.nextIndex >= marginAddressList3c_.ipv4NetworkOrderList.size()) {
-        marginAddressList3c_.nextIndex = 0;
-    }
-
-    marginSelectedIpv4_7c_ = marginAddressList3c_.ipv4NetworkOrderList[marginAddressList3c_.nextIndex++];
-    return true;
+    marginSelectedIpv4_7c_ = marginAddressList3c_.GetNextAddress(/*wrap=*/true);
+    return marginSelectedIpv4_7c_ != 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

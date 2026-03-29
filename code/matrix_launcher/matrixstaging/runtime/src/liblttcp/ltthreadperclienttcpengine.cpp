@@ -1,6 +1,7 @@
 #include "ltthreadperclienttcpengine.h"
 
 #include "../libltmessaging/messageconnection.h"
+#include "../libltnet/sys/pc/pcsocket.h"
 #include "../../../game/src/libltclientlogin/loginmediator.h"
 #include <spdlog/spdlog.h>
 
@@ -21,23 +22,8 @@ namespace {
 
 // UNANCHORED helper used by the starter scaffold.
 // No direct launcher.exe function anchor is assigned yet.
-static bool EnsureWinsockReady() {
-    static bool initialized = false;
-    static bool attempted = false;
-    if (attempted) {
-        return initialized;
-    }
-    attempted = true;
-
-    WSADATA wsaData = {};
-    initialized = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
-    return initialized;
-}
-
-// UNANCHORED helper used by the starter scaffold.
-// No direct launcher.exe function anchor is assigned yet.
 static bool ResolveIpv4Address(const char* hostName, uint32_t* outIpv4NetworkOrder) {
-    if (!hostName || !hostName[0] || !outIpv4NetworkOrder || !EnsureWinsockReady()) {
+    if (!hostName || !hostName[0] || !outIpv4NetworkOrder || !mxo::libltnet::CLTSocketLayer::Init()) {
         return false;
     }
 
@@ -327,7 +313,7 @@ static CRITICAL_SECTION* CriticalSectionFromOpaqueStorage(void* storage) {
 
 // anchor: launcher.exe:0x452270 / 0x452300 / 0x452320 helper family shape
 static uint32_t CreateConnectedWakeupSocketHandle() {
-    if (!EnsureWinsockReady()) {
+    if (!mxo::libltnet::CLTSocketLayer::Init()) {
         return kInvalidSocketHandle;
     }
 
@@ -371,7 +357,7 @@ static void SignalWakeupSocketHandle(uint32_t socketHandle) {
 
 // UNANCHORED internal helper used by the current MonitorPort scaffold.
 static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    if (!EnsureWinsockReady()) {
+    if (!mxo::libltnet::CLTSocketLayer::Init()) {
         return kInvalidSocketHandle;
     }
 
@@ -400,7 +386,7 @@ static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4Network
 
 // UNANCHORED internal helper used by the current UDPMonitorPort scaffold.
 static uint32_t OpenUdpMonitorSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    if (!EnsureWinsockReady()) {
+    if (!mxo::libltnet::CLTSocketLayer::Init()) {
         return kInvalidSocketHandle;
     }
 
@@ -1427,7 +1413,7 @@ uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, uint
 uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t portHostOrder, uint32_t ipv4NetworkOrder, void* contextKey, void* ownerContext) {
     void* normalizedContextKey = ResolveEngineContextKeyScaffold(contextKey);
     void* normalizedOwnerContext = ResolveEngineContextKeyScaffold(ownerContext ? ownerContext : contextKey);
-    if (!normalizedContextKey || !EnsureWinsockReady()) {
+    if (!normalizedContextKey || !mxo::libltnet::CLTSocketLayer::Init()) {
         return 0;
     }
 
