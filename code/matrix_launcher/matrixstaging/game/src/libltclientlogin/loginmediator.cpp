@@ -428,7 +428,8 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 }
 
 // +0x0c
-// anchor launcher.exe:0x0041f060
+// UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
+// nopatch launcher-version setter instead.
 void CLTLoginMediator::ClearEngine() {
     SetNetworkEngine(nullptr);
     spdlog::info("MediatorStub::ClearEngine()");

@@ -568,15 +568,21 @@ uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
     return sendResult;
 }
 
-// UNANCHORED: source-owned current raw `0x0a` builder/send bridge; exact original send VA is not
-// yet isolated even though the surrounding challenge/material continuation is anchored later.
+// anchor: launcher.exe:0x44831c..0x448467 (raw `0x09` inbound case building/sending raw `0x0a`)
 uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthChallenge& challenge) {
-    if (mediator.authPassword_.empty()) {
+    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    const char* password = SmallStringMirrorDataOrEmpty(child.string10);
+    const char* soePassword = SmallStringMirrorDataOrEmpty(child.string1C);
+    if (SmallStringMirrorLength(child.string10) == 0u) {
         spdlog::error(
-            "launcher-owned auth received AS_AuthChallenge but has no password to send in AS_AuthChallengeResponse");
+            "launcher-owned auth received AS_AuthChallenge but child+0x10 password data is empty");
         return 0;
+    }
+    if (SmallStringMirrorLength(child.string1C) == 0u) {
+        spdlog::warn(
+            "launcher-owned auth raw0x0a using empty child+0x1c secondary password/station field while preserving the recovered 0x44831c field mapping");
     }
     if (mediator.lastAuthRequestBuildResult_.twofishKeyBytes.size() != 16u) {
         spdlog::error("launcher-owned auth missing Twofish key from AS_AuthRequest build result");
@@ -588,8 +594,8 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
     if (!mxo::auth::BuildAuthChallengeResponsePacket(
             challenge.encryptedChallengeBytes,
             mediator.lastAuthRequestBuildResult_.twofishKeyBytes,
-            mediator.authPassword_,
-            mediator.authPassword_,
+            password,
+            soePassword,
             layout,
             mxo::auth::kFrameModeAuto,
             &buildResult)) {
@@ -597,10 +603,9 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
         return 0;
     }
 
-    // UNANCHORED: exact original raw `0x0a` send builder VA is still open, but keeping the send
-    // tail child-scoped is more faithful than routing this through a mediator-wide helper. The
-    // neighboring anchored raw `0x06` / `0x08` builders both send through child `+0x50`.
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    // Current source still uses a recovered packet-builder helper rather than reconstructing the
+    // exact original temporary object family rooted at `0x44831c`, but the field mapping and the
+    // child+0x50 direct-send tail now follow the static launcher.exe case closely.
     if (!child.sendTarget50) {
         spdlog::warn(
             "AuthBootstrap680 raw0x0a challenge-response missing child+0x50 send target; refusing less-faithful fallback path");
@@ -628,11 +633,13 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
     if (sendResult != 0u) {
         SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(mediator, buildResult);
         spdlog::info(
-            "DIAGNOSTIC: launcher-owned auth built AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={}",
+            "DIAGNOSTIC: launcher-owned auth built AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} childString10Len={} childString1CLen={}",
             (unsigned)buildResult.passwordLengthField,
             (unsigned)buildResult.soePasswordLengthField,
             (unsigned)buildResult.plaintextBytes.size(),
-            (unsigned)buildResult.ciphertextBytes.size());
+            (unsigned)buildResult.ciphertextBytes.size(),
+            static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
+            static_cast<unsigned>(SmallStringMirrorLength(child.string1C)));
     }
     return sendResult;
 }

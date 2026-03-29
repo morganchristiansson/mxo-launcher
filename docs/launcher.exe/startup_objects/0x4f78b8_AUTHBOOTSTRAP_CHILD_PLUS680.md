@@ -156,6 +156,14 @@ The same broader bootstrap area also uses the shared `+0x85 .. +0x94` material f
 
 Current strongest direct child-side anchor:
 - `0x448140` case `0x09`
+- narrowed send/build subrange now visible inside that case:
+  - `0x44831c .. 0x448467`
+  - current field mapping there is:
+    - child `+0x10` -> first password string fed into the raw `0x0a` builder
+    - child `+0x1c` -> second password/station string fed into the same builder
+    - child `+0x54` -> 16-byte challenge-material family read for the build
+    - child `+0x98` -> helper used during the encrypted reply-body build step
+    - child `+0x50` -> direct send target through vtable slot `+0x24`
 
 Neighboring corroboration:
 - `0x4429b0`
