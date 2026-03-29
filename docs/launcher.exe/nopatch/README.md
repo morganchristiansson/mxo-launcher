@@ -41,6 +41,14 @@ In the original launcher, the nopatch branch:
 3. parses the string `"0.1"`,
 4. invokes methods on the launcher-owned object at `0x4d2c58`.
 
+Important parser clarification from `0x417440`:
+- this is **not** an IEEE-float parser
+- it packs the major version into the high word and the post-dot decimal digits into the low word
+- current on-disk corpus values recovered through the same shaping are:
+  - `launcher.exe` -> `7.6004`
+  - `client.dll` -> `7.6005`
+- the launcher-side `7.6004` value also matches the current `vlck.ltb` corpus
+
 So even in nopatch mode, launcher object `0x4d2c58` is actively configured before the client startup path.
 
 ## Reimplementation guidance

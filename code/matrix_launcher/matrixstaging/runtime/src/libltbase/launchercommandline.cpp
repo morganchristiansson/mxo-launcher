@@ -105,8 +105,8 @@ void CLauncherCommandLine::Reset() {
     launcherGlobal4D2C64_ = false;
     forcedDefaultNoPatchBranch_ = false;
 
-    noPatchLauncherVersionBits_ = FloatBitsFromCString("0.1");
-    noPatchClientVersionBits_ = noPatchLauncherVersionBits_;
+    noPatchLauncherVersionValue_ = ParseOriginalVersionDword("0.1");
+    noPatchClientVersionValue_ = noPatchLauncherVersionValue_;
     std::memset(noPatchLauncherVersionString_, 0, sizeof(noPatchLauncherVersionString_));
     std::memset(noPatchClientVersionString_, 0, sizeof(noPatchClientVersionString_));
 
@@ -189,12 +189,12 @@ bool CLauncherCommandLine::ReplacementDefaultNoPatchPolicyActive() const {
     return forcedDefaultNoPatchBranch_;
 }
 
-std::uint32_t CLauncherCommandLine::NoPatchLauncherVersionBits() const {
-    return noPatchLauncherVersionBits_;
+std::uint32_t CLauncherCommandLine::NoPatchLauncherVersionValue() const {
+    return noPatchLauncherVersionValue_;
 }
 
-std::uint32_t CLauncherCommandLine::NoPatchClientVersionBits() const {
-    return noPatchClientVersionBits_;
+std::uint32_t CLauncherCommandLine::NoPatchClientVersionValue() const {
+    return noPatchClientVersionValue_;
 }
 
 const char* CLauncherCommandLine::NoPatchLauncherVersionString() const {
@@ -241,11 +241,50 @@ bool CLauncherCommandLine::CopyIntoFixedBuffer(
     return true;
 }
 
-std::uint32_t CLauncherCommandLine::FloatBitsFromCString(const char* value) {
-    const float parsedValue = value ? std::strtof(value, nullptr) : 0.0f;
-    std::uint32_t bits = 0;
-    std::memcpy(&bits, &parsedValue, sizeof(bits));
-    return bits;
+// anchor: launcher.exe:0x417440
+std::uint32_t CLauncherCommandLine::ParseOriginalVersionDword(const char* value) {
+    if (!value) {
+        return 0u;
+    }
+
+    std::uint32_t major = 0u;
+    std::size_t index = 0u;
+    while (value[index] != '\0' && value[index] != '.') {
+        const unsigned char ch = static_cast<unsigned char>(value[index]);
+        if (ch < static_cast<unsigned char>('0') || ch > static_cast<unsigned char>('9')) {
+            return 0u;
+        }
+        major = major * 10u + static_cast<std::uint32_t>(ch - static_cast<unsigned char>('0'));
+        ++index;
+    }
+
+    if (major > 0xffu) {
+        return 0u;
+    }
+    if (value[index] == '\0') {
+        return major << 16u;
+    }
+    if (value[index] != '.') {
+        return 0u;
+    }
+
+    ++index;
+    std::uint32_t packedLowWord = 0u;
+    std::uint32_t multiplier = 1u;
+    while (value[index] != '\0') {
+        const unsigned char ch = static_cast<unsigned char>(value[index]);
+        if (ch < static_cast<unsigned char>('0') || ch > static_cast<unsigned char>('9')) {
+            return 0u;
+        }
+        packedLowWord += static_cast<std::uint32_t>(ch - static_cast<unsigned char>('0')) * multiplier;
+        multiplier *= 10u;
+        ++index;
+    }
+
+    if (packedLowWord > 9999u) {
+        return 0u;
+    }
+    return (major << 16u) + packedLowWord;
 }
 
 void CLauncherCommandLine::FreeFilteredArgvOwned() {
@@ -404,31 +443,33 @@ void CLauncherCommandLine::ProbeOptionsCfgAutodetectGate() {
 
 // anchor: launcher.exe:0x409a73..0x409c42
 // The original explicit -nopatch branch seeds mediator version values from launcher.exe/client.dll
-// version info after first applying the fallback string "0.1" to both mediator slots.
+// version info after first applying the fallback string "0.1" to both mediator slots. The
+// parser at `0x417440` does **not** produce IEEE float bits; it packs `major` into the high word
+// and the post-dot decimal digits into the low word in reverse-order decimal form.
 void CLauncherCommandLine::RebuildNoPatchVersionState() {
-    noPatchLauncherVersionBits_ = FloatBitsFromCString("0.1");
-    noPatchClientVersionBits_ = noPatchLauncherVersionBits_;
+    noPatchLauncherVersionValue_ = ParseOriginalVersionDword("0.1");
+    noPatchClientVersionValue_ = noPatchLauncherVersionValue_;
     std::memset(noPatchLauncherVersionString_, 0, sizeof(noPatchLauncherVersionString_));
     std::memset(noPatchClientVersionString_, 0, sizeof(noPatchClientVersionString_));
 
-    TryBuildOriginalVersionFloatString(
+    TryBuildOriginalVersionStringAndValue(
         "launcher.exe",
         noPatchLauncherVersionString_,
         sizeof(noPatchLauncherVersionString_),
-        &noPatchLauncherVersionBits_);
-    TryBuildOriginalVersionFloatString(
+        &noPatchLauncherVersionValue_);
+    TryBuildOriginalVersionStringAndValue(
         "client.dll",
         noPatchClientVersionString_,
         sizeof(noPatchClientVersionString_),
-        &noPatchClientVersionBits_);
+        &noPatchClientVersionValue_);
 }
 
-bool CLauncherCommandLine::TryBuildOriginalVersionFloatString(
+bool CLauncherCommandLine::TryBuildOriginalVersionStringAndValue(
     const char* modulePath,
     char* out,
     std::uint32_t outSize,
-    std::uint32_t* outBits) const {
-    if (!modulePath || !out || outSize < 8 || !outBits) {
+    std::uint32_t* outValue) const {
+    if (!modulePath || !out || outSize < 8 || !outValue) {
         return false;
     }
 
@@ -474,8 +515,8 @@ bool CLauncherCommandLine::TryBuildOriginalVersionFloatString(
             static_cast<unsigned>(minor),
             static_cast<unsigned>(build),
             static_cast<unsigned>(revision));
-        *outBits = FloatBitsFromCString(out);
-        ok = true;
+        *outValue = ParseOriginalVersionDword(out);
+        ok = (*outValue != 0u);
     } while (false);
 
     std::free(versionInfo);

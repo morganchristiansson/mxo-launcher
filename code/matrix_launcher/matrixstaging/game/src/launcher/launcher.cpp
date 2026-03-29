@@ -462,35 +462,35 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     // Replacement-only nopatch bookkeeping used by the recovered mediator scaffold later in the
     // active 0x40b430 path. This is intentionally documented as a grouped source convenience, not
     // as a proven original subroutine boundary.
-    startupContext->nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionBits();
-    startupContext->nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionBits();
+    startupContext->nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
+    startupContext->nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
 
     if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
         spdlog::info(
-            "DIAGNOSTIC: explicit -nopatch rebuilt launcher-version float from launcher.exe version info = '{}' (0x{:08x})",
+            "DIAGNOSTIC: explicit -nopatch rebuilt packed launcher-version dword from launcher.exe version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchLauncherVersionString(),
             startupContext->nopatchLauncherVersionValue);
     } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
         spdlog::info(
-            "UNANCHORED: replacement default nopatch policy is using fallback launcher-version float 0.1 (0x{:08x})",
+            "UNANCHORED: replacement default nopatch policy is using fallback packed launcher-version dword 0.1 (0x{:08x})",
             startupContext->nopatchLauncherVersionValue);
     } else {
         spdlog::info(
-            "DIAGNOSTIC: nopatch launcher-version float is using fallback 0.1 (0x{:08x})",
+            "DIAGNOSTIC: nopatch launcher-version dword is using fallback 0.1 (0x{:08x})",
             startupContext->nopatchLauncherVersionValue);
     }
     if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
         spdlog::info(
-            "DIAGNOSTIC: explicit -nopatch rebuilt client-version float from client.dll version info = '{}' (0x{:08x})",
+            "DIAGNOSTIC: explicit -nopatch rebuilt packed client-version dword from client.dll version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchClientVersionString(),
             startupContext->nopatchClientVersionValue);
     } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
         spdlog::info(
-            "UNANCHORED: replacement default nopatch policy is using fallback client-version float 0.1 (0x{:08x})",
+            "UNANCHORED: replacement default nopatch policy is using fallback packed client-version dword 0.1 (0x{:08x})",
             startupContext->nopatchClientVersionValue);
     } else {
         spdlog::info(
-            "DIAGNOSTIC: nopatch client-version float is using fallback 0.1 (0x{:08x})",
+            "DIAGNOSTIC: nopatch client-version dword is using fallback 0.1 (0x{:08x})",
             startupContext->nopatchClientVersionValue);
     }
 

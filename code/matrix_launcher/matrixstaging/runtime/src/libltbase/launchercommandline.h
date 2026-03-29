@@ -54,8 +54,8 @@ public:
     bool LauncherGlobal4D2C64() const;
     bool ReplacementDefaultNoPatchPolicyActive() const;
 
-    std::uint32_t NoPatchLauncherVersionBits() const;
-    std::uint32_t NoPatchClientVersionBits() const;
+    std::uint32_t NoPatchLauncherVersionValue() const;
+    std::uint32_t NoPatchClientVersionValue() const;
     const char* NoPatchLauncherVersionString() const;
     const char* NoPatchClientVersionString() const;
 
@@ -73,7 +73,7 @@ private:
 
     static char* DuplicateArgString(const char* value);
     static bool CopyIntoFixedBuffer(char* destination, std::uint32_t destinationSize, const char* value);
-    static std::uint32_t FloatBitsFromCString(const char* value);
+    static std::uint32_t ParseOriginalVersionDword(const char* value);
 
     void FreeFilteredArgvOwned();
     bool AppendFilteredArg(const char* value);
@@ -82,11 +82,11 @@ private:
     bool ConsumeValueSwitch(PendingValueTarget target, const char* value);
     void ProbeOptionsCfgAutodetectGate();
     void RebuildNoPatchVersionState();
-    bool TryBuildOriginalVersionFloatString(
+    bool TryBuildOriginalVersionStringAndValue(
         const char* modulePath,
         char* out,
         std::uint32_t outSize,
-        std::uint32_t* outBits) const;
+        std::uint32_t* outValue) const;
     static bool IsTmBeforeAutodetectCutoff(const std::tm* value);
 
     std::uint32_t filteredArgCount_ = 0;
@@ -113,8 +113,8 @@ private:
     bool launcherGlobal4D2C64_ = false;
     bool forcedDefaultNoPatchBranch_ = false;
 
-    std::uint32_t noPatchLauncherVersionBits_ = 0;
-    std::uint32_t noPatchClientVersionBits_ = 0;
+    std::uint32_t noPatchLauncherVersionValue_ = 0;
+    std::uint32_t noPatchClientVersionValue_ = 0;
     char noPatchLauncherVersionString_[32] = {};
     char noPatchClientVersionString_[32] = {};
 

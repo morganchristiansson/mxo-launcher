@@ -184,9 +184,9 @@ static AuthBootstrap680PrepareCallShape BuildAuthBootstrap680PrepareCallShape(
     callShape.usedFallbackString20 =
         (ownerSource94.inlineString20[0] == '\0') && fallbackPassword && fallbackPassword[0] != '\0';
     callShape.write28 = 1u;
-    // Current source-owned backing for the first dword returned through the owner-side getter
-    // reached at `0x439265`. That producer object is not typed tightly enough yet, but the live
-    // replacement path already preserves the same launcher-version value here.
+    // `0x439265` is now concrete enough to keep explicit: state2 calls the tiny owner getter at
+    // vtable `+0x20` / `0x41f070`, which returns owner `+0x08`; the paired setter is
+    // vtable `+0x1c` / `0x41f060` from the nopatch version-config path.
     callShape.write2C = write2C;
     callShape.sourceBlock40 = &ownerSource94.block40;
     callShape.sourceBlock50 = &ownerSource94.block50;
@@ -247,11 +247,17 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
         sendTarget50 = mediator.EnsureAuthConnectionObject();
     }
 
+    const uint32_t* recoveredLauncherVersionPtr = mediator.GetNoPatchLauncherVersionValuePtr08();
+    const uint32_t recoveredLauncherVersion =
+        (recoveredLauncherVersionPtr && *recoveredLauncherVersionPtr != 0u)
+            ? *recoveredLauncherVersionPtr
+            : mediator.authLauncherVersion_;
+
     const AuthBootstrap680PrepareCallShape callShape = BuildAuthBootstrap680PrepareCallShape(
         mediator.authBootstrapSource38_,
         mediator.authUsername_.c_str(),
         mediator.authPassword_.c_str(),
-        mediator.authLauncherVersion_,
+        recoveredLauncherVersion,
         sendTarget50);
 
     StageAuthBootstrap680ChildFromPrepareCallShape(child, callShape);
@@ -634,7 +640,10 @@ void AuthBootstrap680Ops::LogParsedAuthReply(
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(CLTLoginMediator& mediator) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     child.loginType28 = mediator.authLoginType_;
-    child.launcherVersion2C = mediator.authLauncherVersion_;
+    const uint32_t* launcherVersionPtr = mediator.GetNoPatchLauncherVersionValuePtr08();
+    child.launcherVersion2C = (launcherVersionPtr && *launcherVersionPtr != 0u)
+        ? *launcherVersionPtr
+        : mediator.authLauncherVersion_;
     child.currentPublicKeyId9C = mediator.authCurrentPublicKeyId_;
 }
 

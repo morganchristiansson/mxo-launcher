@@ -531,8 +531,12 @@ public:
     // Migrated state fields (formerly in g_MediatorRuntimeState)
     // These fields are now instance-owned instead of global runtime state.
     // ============================================================================
-    const void* lastNopatchValue1Ptr_ = nullptr;  // +0x1c / Mediator_SetValue1
-    const void* lastNopatchValue2Ptr_ = nullptr;  // +0x20 / Mediator_SetValue2
+    // Source-owned mirrors of the original owner dwords reached through the tiny setter/getter
+    // family around `0x41f060/0x41f070` and `0x41f080/0x41f090`.
+    uint32_t nopatchLauncherVersionValue08_ = 0;  // original owner `+0x08`
+    uint32_t nopatchClientVersionValue0c_ = 0;    // original owner `+0x0c`
+    const void* lastNopatchValue1Ptr_ = nullptr;  // latest caller-supplied source pointer for `+0x1c`
+    const void* lastNopatchValue2Ptr_ = nullptr;  // latest caller-supplied source pointer for `+0x24`
     mutable bool bootstrapRaw08AuxHandle50Logged_ = false; // +0x50 change-log state moved from ABI wrapper
     mutable void* lastBootstrapRaw08AuxHandle50_ = nullptr; // +0x50 last logged value moved from ABI wrapper
     mutable bool liveCuiCfgAbsentNoteLogged90_ = false;     // +0x90 one-shot caveat log moved from ABI wrapper
@@ -540,6 +544,15 @@ public:
     // Accessors for migrated state fields (diagnostics only)
     const void* LastNopatchValue1Ptr() const;
     const void* LastNopatchValue2Ptr() const;
+
+    // anchor: launcher.exe:0x41f070
+    // Tiny owner getter reached from state2 `0x439210` through owner vtable `+0x20`.
+    // Exact original body returns `owner + 0x08`; callers then dereference that dword.
+    const uint32_t* GetNoPatchLauncherVersionValuePtr08() const;
+
+    // anchor: launcher.exe:0x41f090
+    // Tiny owner getter paired with `0x41f080`; exact original body returns `owner + 0x0c`.
+    const uint32_t* GetNoPatchClientVersionValuePtr0c() const;
 
     // +0x00
     const char* GetName() override;

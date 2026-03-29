@@ -69,7 +69,7 @@ So `+0xa0` is a **byte readiness flag**, not a helper pointer.
 | Offset | Current best read | Strongest anchors |
 |---:|---|---|
 | `+0x28` | raw `0x08` loginType low byte | `0x4474f0` |
-| `+0x2c` | current auth public-key id / request dword used by raw `0x06` | `0x447eb0`, `0x447780` |
+| `+0x2c` | launcher-version dword used by raw `0x06`; state2 `0x439210` feeds it from owner getter vtable `+0x20` / `0x41f070` returning owner `+0x08`, with paired nopatch setter vtable `+0x1c` / `0x41f060` | `0x439210`, `0x447eb0` |
 | `+0x54` | child-owned helper/transform subobject | `0x445500`, `VTABLES/0x004b695c.md` |
 | `+0x80` | time-delta/cache dword later consumed during auth-reply validation | `0x448140`, `0x44aec0` |
 | `+0x85 .. +0x94` | 16-byte challenge/material family | `0x448140`, neighboring corroboration `0x4429b0 / 0x41470` |
@@ -109,9 +109,9 @@ Current best read:
   - `0x447c10 = AuthBootstrap680_InitializeLazyPubkeyDatState`
 - builds and sends the raw `0x06` packet
 - packet uses:
-  - child `+0x2c`
-  - child `+0x9c`
-  - child `+0x50`
+  - child `+0x2c` = launcher-version dword
+  - child `+0x9c` = current public-key id dword
+  - child `+0x50` = send target
 
 So `+0xa4` is no longer best described as generic lazy state; it is specifically the lazy
 `pubkey.dat`-backed state family used on the get-public-key path.

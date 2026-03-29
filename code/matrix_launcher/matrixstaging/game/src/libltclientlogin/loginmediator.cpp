@@ -441,27 +441,29 @@ uint32_t CLTLoginMediator::IsReady() {
 }
 
 // +0x1c
-// anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
-// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+// anchor: launcher.exe:0x41f060
+// anchor: launcher.exe:0x409a73..0x409b5f explicit nopatch path
+// vtable: ILTLoginMediator.Default slot +0x1c
 void CLTLoginMediator::SetValue1(void* value) {
-    if (!this->lastNopatchValue1Ptr_) {
-        this->lastNopatchValue1Ptr_ = value;
-    } else {
-        this->lastNopatchValue2Ptr_ = value;
-    }
-    spdlog::debug("CLTLoginMediator::SetValue1({})", value);
+    lastNopatchValue1Ptr_ = value;
+    nopatchLauncherVersionValue08_ = value ? *static_cast<const uint32_t*>(value) : 0u;
+    spdlog::debug(
+        "CLTLoginMediator::SetValue1({}) -> owner+0x08=0x{:08x}",
+        value,
+        static_cast<unsigned>(nopatchLauncherVersionValue08_));
 }
 
-// +0x20
-// anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
-// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+// +0x24
+// anchor: launcher.exe:0x41f080
+// anchor: launcher.exe:0x409a98..0x409c2d explicit nopatch path
+// vtable: ILTLoginMediator.Default slot +0x24
 void CLTLoginMediator::SetValue2(void* value) {
-    if (!this->lastNopatchValue1Ptr_) {
-        this->lastNopatchValue1Ptr_ = value;
-    } else {
-        this->lastNopatchValue2Ptr_ = value;
-    }
-    spdlog::debug("CLTLoginMediator::SetValue2({})", value);
+    lastNopatchValue2Ptr_ = value;
+    nopatchClientVersionValue0c_ = value ? *static_cast<const uint32_t*>(value) : 0u;
+    spdlog::debug(
+        "CLTLoginMediator::SetValue2({}) -> owner+0x0c=0x{:08x}",
+        value,
+        static_cast<unsigned>(nopatchClientVersionValue0c_));
 }
 
 // UNANCHORED: shared diagnostic log-throttling helper.
@@ -1833,6 +1835,16 @@ const void* CLTLoginMediator::LastNopatchValue2Ptr() const {
     return lastNopatchValue2Ptr_;
 }
 
+// anchor: launcher.exe:0x41f070
+const uint32_t* CLTLoginMediator::GetNoPatchLauncherVersionValuePtr08() const {
+    return &nopatchLauncherVersionValue08_;
+}
+
+// anchor: launcher.exe:0x41f090
+const uint32_t* CLTLoginMediator::GetNoPatchClientVersionValuePtr0c() const {
+    return &nopatchClientVersionValue0c_;
+}
+
 // anchor: launcher.exe:0x41f310
 SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() const {
     // Tiny owner-vtable getter used by the later session-callback helper family.
@@ -2692,14 +2704,21 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 return bytes;
             };
 
-            uint32_t clientDllVersion = authLauncherVersion_;
+            const uint32_t* launcherVersionPtr = GetNoPatchLauncherVersionValuePtr08();
+            const uint32_t* clientVersionPtr = GetNoPatchClientVersionValuePtr0c();
+            uint32_t launcherVersion = (launcherVersionPtr && *launcherVersionPtr != 0u)
+                ? *launcherVersionPtr
+                : authLauncherVersion_;
+            uint32_t clientDllVersion = (clientVersionPtr && *clientVersionPtr != 0u)
+                ? *clientVersionPtr
+                : launcherVersion;
             if (!lastAuthReply_.worlds.empty() && lastAuthReply_.worlds[0].clientVersion != 0u) {
                 clientDllVersion = lastAuthReply_.worlds[0].clientVersion;
             }
 
             mxo::auth::FramedPacket response;
             if (!mxo::auth::BuildMarginConnectRequestPacket(
-                    authLauncherVersion_,
+                    launcherVersion,
                     clientDllVersion,
                     pickWeirdSequence(),
                     marginBootstrapState.marginTwofishKeyBytes,

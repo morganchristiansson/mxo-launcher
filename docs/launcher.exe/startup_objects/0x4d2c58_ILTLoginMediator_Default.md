@@ -210,9 +210,14 @@ New teardown-slot clarification:
     even though the same tiny body is also the owner-side state9 opcode-`0x11` success helper
 
 Current implementation note:
-- the replacement launcher now still uses parsed `"0.1"` for `+0x1c`,
-- and it now rebuilds the `+0x24` value from the on-disk `client.dll` version resource using the same `%d.%d%d%d%d`-style float-string shaping recovered from the original nopatch path,
-- instead of using the older identical `0.1` placeholder for both slots.
+- the replacement launcher now uses the original packed-version parser shape from `0x417440`
+  rather than treating these as IEEE float bits,
+- it still applies parsed `"0.1"` as the fallback seed for both slots,
+- and it rebuilds the slot values from the on-disk PE version resources with the same
+  `%d.%d%d%d%d`-style string shaping recovered from the original nopatch path:
+  - `launcher.exe` -> `7.6004`
+  - `client.dll` -> `7.6005`
+- that launcher-side `7.6004` result also matches the current `vlck.ltb` corpus value.
 
 ### New crashreporter/auth-default seeding clarification
 
