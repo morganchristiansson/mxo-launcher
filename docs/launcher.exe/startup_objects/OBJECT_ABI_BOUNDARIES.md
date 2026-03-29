@@ -52,10 +52,11 @@ Current evidence:
 - launcher-visible arg5 shell size: `0xb4`
   - `src/launcher_network_object_abi.cpp`
   - `LauncherObjectAbiShell`
-- current native sidecar size: `0x54`
+- current native sidecar size: `0xf0`
   - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h`
   - `mxo::liblttcp::CLTThreadPerClientTCPEngine`
-  - confirmed in this pass via GCC class-layout dump
+  - confirmed by the new MinGW runtime probe that constructs a real native object and reads its
+    live first-word vptr / field offsets
 
 That size difference is explained by **data/layout mismatch**, not by missing vtable entries.
 
@@ -176,6 +177,66 @@ The latest focused pass narrows one important point though:
 That means a future **thin shell-to-sidecar thunk** may be fine for more individual slots than
 before.
 It still does **not** mean the whole shell can disappear.
+
+## 2026-03-29 MinGW native-vptr experiment result
+
+A narrow compile-time experiment now exists behind:
+- `MXO_EXPERIMENT_MINGW_NATIVE_ARG5_VPTR`
+- enabled from the build with:
+  - `make MXO_EXPERIMENT_MINGW_NATIVE_ARG5_VPTR=1`
+
+Important implementation constraints preserved in this pass:
+- `InitClientDLL` still receives the **base object pointer**
+- the old wrapper-table path remains the stable fallback and the non-MinGW path
+- the build logs the requested mode, effective mode, stored shell vptr, and the live GCC native
+  address-point probe
+
+The experiment intentionally does **not** force native-vptr dispatch unless the native object layout
+is close enough to the launcher shell.
+The current MinGW runtime probe now constructs a real
+`mxo::liblttcp::CLTThreadPerClientTCPEngine`, reads its live first-word vptr, and records the field
+offsets the native methods would interpret as `this`.
+
+Observed result from `~/MxO_7.6005/resurrections.log` on the experiment-enabled build:
+- `requested=mingw-native-vptr`
+- `effective=wrapper-table`
+- `mingwNativeRequested=1`
+- `nativeLayoutCompatible=0`
+- live native vptr/address-point: `0x6ad4f4`
+- raw-vtable-base guess: `0x6ad4ec`
+- `offsetToTop=0`
+- native object size: `0xf0`
+- launcher shell size: `0xb4`
+- native field offsets only match through the early queue/helper start:
+  - `field04=0x4`
+  - `field08=0x8`
+  - `queue0C=0xc`
+  - `queue34=0x34`
+  - `wait5C=0x5c`
+  - `lock60=0x60`
+- but later shell-visible offsets diverge immediately after that:
+  - native event field at `0x68` vs shell `+0x7c`
+  - native endpoint-head pointer at `0x6c` vs shell `+0x80`
+  - native endpoint count at `0x70` vs shell `+0x84`
+  - native context-head pointer at `0x78` vs shell `+0x8c`
+  - native context count at `0x7c` vs shell `+0x90`
+  - native cleanup helper at `0x84` vs shell `+0x98`
+  - native lock-helper size `0x8` vs shell embedded helper size `0x1c`
+
+Conclusion from this pass:
+- the MinGW build now has a **real, reversible native-vptr experiment switch**
+- but the guard correctly refuses to install the native GCC address-point today because the object
+  body/layout is still not close enough after `+0x60`
+- so the current tested success case with the experiment enabled is:
+  - **requested native-vptr path falls back to wrapper-table mode**
+  - **the launcher still entered game successfully on that fallback path**
+
+This is a useful negative result, not a dead end:
+- it proves the build/run rollback path works cleanly
+- it confirms the `+8` issue belongs to the GCC vptr/address-point, not the object pointer passed
+  to `InitClientDLL`
+- and it narrows the real blocker to remaining body/layout divergence rather than only vtable slot
+  count or stack cleanup shape
 
 ## 0x4d6304 slot reduction summary
 

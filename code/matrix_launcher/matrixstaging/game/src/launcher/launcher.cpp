@@ -289,6 +289,7 @@ void LogKnownStartupState(const mxo::launcher::CLauncher& launcher) {
     spdlog::info("arg3 hClientDll              = {}", fmt::ptr(g_hClient));
     spdlog::info("arg4 hCresDll                = {}", fmt::ptr(g_hCres));
     spdlog::info("arg5 launcherNetworkObject   = {}", fmt::ptr(g_pLauncherObject6304));
+    LauncherLogNetworkEngineAbiShellDispatchState(g_pLauncherObject6304, "InitClientDLL-args");
     spdlog::info("arg6 ILTLoginMediatorDefault = {}", fmt::ptr(g_pILTLoginMediatorDefault));
     spdlog::info("CLauncher+0xa8 placeholder   = 0x{:08x}", launcher.m_FieldA8);
     spdlog::info("CLauncher+0xac placeholder   = 0x{:08x}", launcher.m_FieldAC);

@@ -16,3 +16,6 @@ void LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* med
 // UNANCHORED: launcher-owned replacement for the original 0x40b389..0x40b404 release/clear path.
 void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediatorPtr);
 
+// UNANCHORED: launcher-owned diagnostic log for the active arg5 primary-dispatch mode / vptr.
+void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, const char* phase);
+

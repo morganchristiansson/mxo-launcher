@@ -118,6 +118,38 @@ struct CLTThreadPerClientTCPEngine_LauncherAbiAttachment {
     uint32_t* field90ContextCount = nullptr;
 };
 
+// MinGW-native primary-vptr experiment note:
+// - this reports the current GCC-emitted live address-point plus the concrete native-object field
+//   offsets reached by that vptr's `this`
+// - launcher arg5 shell compatibility requires more than matching slot count / cleanup shape
+// - the launcher-side experiment gate uses this to decide whether installing the real native vptr
+//   into the launcher-owned arg5 shell is even layout-plausible
+struct CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo {
+    size_t objectSize = 0;
+    size_t waitHelperSize = 0;
+    size_t lockHelperSize = 0;
+    size_t attachmentSize = 0;
+    size_t offsetField04 = 0;
+    size_t offsetField08 = 0;
+    size_t offsetQueue0C = 0;
+    size_t offsetQueue34 = 0;
+    size_t offsetWaitHelper5C = 0;
+    size_t offsetQueueLockHelper60 = 0;
+    size_t offsetQueueSignalEvent7C = 0;
+    size_t offsetEndpointTreeHead80 = 0;
+    size_t offsetEndpointCount84 = 0;
+    size_t offsetReserved88 = 0;
+    size_t offsetContextTreeHead8C = 0;
+    size_t offsetContextCount90 = 0;
+    size_t offsetReserved94 = 0;
+    size_t offsetCleanupLockHelper98 = 0;
+    size_t offsetAttachment = 0;
+    void* livePrimaryVptrAddressPoint = nullptr;
+    uintptr_t rawPrimaryVtableBaseGuess = 0;
+    intptr_t offsetToTop = 0;
+    void* typeinfo = nullptr;
+};
+
 static_assert(sizeof(CLTThreadPerClientTCPEngine_EndpointTreeHead24) == 0x24, "endpoint head size mismatch");
 static_assert(sizeof(CLTThreadPerClientTCPEngine_ContextTreeHead18) == 0x18, "context head size mismatch");
 
@@ -386,6 +418,13 @@ public:
     static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);
     // anchor: launcher.exe:0x436340
     static bool Queue_Init(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t initialSize);
+    // UNANCHORED: compile-time / runtime probe for the MinGW native-vptr arg5 experiment.
+    static CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo
+    CollectNativePrimaryVptrExperimentInfoScaffold();
+    // UNANCHORED: conservative gate for installing the real GCC address-point directly into the
+    // launcher-owned arg5 shell. False means stay on the wrapper-table path.
+    static bool IsLauncherArg5PrimaryLayoutCompatibleForNativeVptrExperimentScaffold(
+        CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo* outInfo = nullptr);
     // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
     // Original helper returns `void`; once the caller reaches this push path it does not receive
     // enqueue-success feedback.

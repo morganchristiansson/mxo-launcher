@@ -934,6 +934,85 @@ bool CLTThreadPerClientTCPEngine::Queue_Init(
     return true;
 }
 
+CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo
+CLTThreadPerClientTCPEngine::CollectNativePrimaryVptrExperimentInfoScaffold() {
+    CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo info = {};
+    CLTThreadPerClientTCPEngine probe;
+
+    const auto memberOffset = [&probe](const auto& member) -> size_t {
+        return static_cast<size_t>(
+            reinterpret_cast<const unsigned char*>(&member) -
+            reinterpret_cast<const unsigned char*>(&probe));
+    };
+
+    info.objectSize = sizeof(CLTThreadPerClientTCPEngine);
+    info.waitHelperSize = sizeof(CLTThreadPerClientTCPEngine_WaitHelperScaffold);
+    info.lockHelperSize = sizeof(CLTThreadPerClientTCPEngine_LockHelperScaffold);
+    info.attachmentSize = sizeof(CLTThreadPerClientTCPEngine_LauncherAbiAttachment);
+    info.offsetField04 = memberOffset(probe.ctorFlagsField04Scaffold_);
+    info.offsetField08 = memberOffset(probe.queueThreadArrayField08Scaffold_);
+    info.offsetQueue0C = memberOffset(probe.ownedQueue0CScaffold_);
+    info.offsetQueue34 = memberOffset(probe.ownedQueue34Scaffold_);
+    info.offsetWaitHelper5C = memberOffset(probe.ownedWaitHelper5CScaffold_);
+    info.offsetQueueLockHelper60 = memberOffset(probe.ownedQueueLockHelper60Scaffold_);
+    info.offsetQueueSignalEvent7C = memberOffset(probe.ownedQueueSignalEvent7CScaffold_);
+    info.offsetEndpointTreeHead80 = memberOffset(probe.ownedEndpointTreeHead80Scaffold_);
+    info.offsetEndpointCount84 = memberOffset(probe.ownedEndpointCount84Scaffold_);
+    info.offsetReserved88 = memberOffset(probe.reserved88Scaffold_);
+    info.offsetContextTreeHead8C = memberOffset(probe.ownedContextTreeHead8CScaffold_);
+    info.offsetContextCount90 = memberOffset(probe.ownedContextCount90Scaffold_);
+    info.offsetReserved94 = memberOffset(probe.reserved94Scaffold_);
+    info.offsetCleanupLockHelper98 = memberOffset(probe.ownedCleanupLockHelper98Scaffold_);
+    info.offsetAttachment = memberOffset(probe.attachedLauncherAbiSurfaceScaffold_);
+
+    info.livePrimaryVptrAddressPoint = *reinterpret_cast<void* const*>(&probe);
+    if (info.livePrimaryVptrAddressPoint) {
+        const uintptr_t* vtableWords =
+            reinterpret_cast<const uintptr_t*>(info.livePrimaryVptrAddressPoint);
+        info.rawPrimaryVtableBaseGuess =
+            reinterpret_cast<uintptr_t>(info.livePrimaryVptrAddressPoint) - 8u;
+        info.offsetToTop = static_cast<intptr_t>(vtableWords[-2]);
+        info.typeinfo = reinterpret_cast<void*>(vtableWords[-1]);
+    }
+
+    return info;
+}
+
+bool CLTThreadPerClientTCPEngine::IsLauncherArg5PrimaryLayoutCompatibleForNativeVptrExperimentScaffold(
+    CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo* outInfo) {
+    const CLTThreadPerClientTCPEngine_NativePrimaryVptrExperimentInfo info =
+        CollectNativePrimaryVptrExperimentInfoScaffold();
+    if (outInfo) {
+        *outInfo = info;
+    }
+
+    // Conservative gate for the direct-native-vptr experiment:
+    // - launcher arg5 shell is still the original-sized 0xb4 object
+    // - the native class must not only expose a live GCC address-point, it must also keep the
+    //   shell-visible field/subobject offsets compatible enough for native methods to read `this`
+    //   safely
+    // - current required landmarks are the concrete shell offsets consumed by original/client code
+    //   or by any native method that would run directly after the vptr swap
+    return info.livePrimaryVptrAddressPoint != nullptr &&
+        info.objectSize == 0xb4u &&
+        info.waitHelperSize == 0x04u &&
+        info.lockHelperSize == 0x1cu &&
+        info.offsetField04 == 0x04u &&
+        info.offsetField08 == 0x08u &&
+        info.offsetQueue0C == 0x0cu &&
+        info.offsetQueue34 == 0x34u &&
+        info.offsetWaitHelper5C == 0x5cu &&
+        info.offsetQueueLockHelper60 == 0x60u &&
+        info.offsetQueueSignalEvent7C == 0x7cu &&
+        info.offsetEndpointTreeHead80 == 0x80u &&
+        info.offsetEndpointCount84 == 0x84u &&
+        info.offsetReserved88 == 0x88u &&
+        info.offsetContextTreeHead8C == 0x8cu &&
+        info.offsetContextCount90 == 0x90u &&
+        info.offsetReserved94 == 0x94u &&
+        info.offsetCleanupLockHelper98 == 0x98u;
+}
+
 // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
 void CLTThreadPerClientTCPEngine::Queue_PushPair(
     CLTThreadPerClientTCPEngine_Queue* queue,
