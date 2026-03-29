@@ -1,4 +1,3 @@
-#include "diagnostics.h"
 #include "launcher_mediator_abi_shared.h"
 #include "launcher_network_object_abi.h"
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
@@ -16,21 +15,21 @@ struct LauncherObjectLockHelper {
 };
 
 struct LauncherObjectAbiShell {
-    void** vtable;              // +0x00
-    uint32_t field04;           // +0x04 ctor arg in original (0 from 0x40a380)
-    void* field08;              // +0x08 pointer array in base ctor (NULL when field04==0)
+    void** vtable;               // +0x00 derived primary vtable after 0x431c30 completes
+    uint32_t field04;            // +0x04 ctor arg / queue-thread count seed from 0x4366f0
+    void* field08;               // +0x08 queue-thread pointer array (NULL on the current ctorFlags=0 path)
     LauncherObjectQueue queue0C; // +0x0c..+0x33 base queue state from 0x436610/0x436340
     LauncherObjectQueue queue34; // +0x34..+0x5b second base queue from 0x436610/0x436340
-    void** subVtable5C;         // +0x5c base wait/event helper vtable
-    LauncherObjectLockHelper helper60; // +0x60..+0x7b vtable + CRITICAL_SECTION from 0x4add70/0x4147b0/0x4147c0
-    HANDLE field7C;             // +0x7c CreateEventA(NULL,0,0,0)
-    void* list80;               // +0x80 allocated 0x24 list head
-    uint32_t field84;           // +0x84 zeroed in derived ctor
-    uint32_t field88;           // +0x88 left generic for now
-    void* list8C;               // +0x8c allocated 0x18 list head
-    uint32_t field90;           // +0x90 zeroed in derived ctor
-    uint32_t field94;           // +0x94 left generic for now
-    LauncherObjectLockHelper helper98; // +0x98..+0xb3 derived lock helper root + CRITICAL_SECTION
+    void** subVtable5C;          // +0x5c base wait/event helper vtable (`0x4b3e20` final ctor state)
+    LauncherObjectLockHelper helper60; // +0x60..+0x7b helper vtable + CRITICAL_SECTION
+    HANDLE field7C;              // +0x7c CreateEventA(NULL,0,0,0)
+    void* list80;                // +0x80 allocated 0x24 endpoint-tree sentinel head
+    uint32_t field84;            // +0x84 zeroed in derived ctor
+    uint32_t reserved88;         // +0x88 remains zero on the current ctorFlags=0 path
+    void* list8C;                // +0x8c allocated 0x18 context-tree sentinel head
+    uint32_t field90;            // +0x90 zeroed in derived ctor
+    uint32_t reserved94;         // +0x94 remains zero on the current ctorFlags=0 path
+    LauncherObjectLockHelper helper98; // +0x98..+0xb3 derived helper root + CRITICAL_SECTION
 };
 
 struct LauncherObjectListHead24 {
@@ -56,10 +55,6 @@ static_assert(sizeof(LauncherObjectAbiShell) == 0xb4, "launcher object ABI shell
 static_assert(sizeof(LauncherObjectListHead24) == 0x24, "list80 ABI head size mismatch");
 static_assert(sizeof(LauncherObjectListHead18) == 0x18, "list8C ABI head size mismatch");
 
-static void* g_LauncherObjectVtable[13] = {0};
-static void* g_LauncherObjectSubVtable5C[2] = {0};
-static void* g_LauncherObjectSubVtable60[2] = {0};
-static void* g_LauncherObjectSubVtable98[2] = {0};
 static void SyncLauncherObjectShellState(LauncherObjectAbiShell* self);
 // UNANCHORED: launcher-owned accessor for the single current arg5 sidecar binding.
 static mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& LauncherObjectEngineBinding();
@@ -193,8 +188,14 @@ static void FreeLauncherObjectAbiShellInternals(LauncherObjectAbiShell* self) {
         CloseHandle(self->field7C);
         self->field7C = NULL;
     }
-    DeleteCriticalSection(&self->helper60.crit);
-    DeleteCriticalSection(&self->helper98.crit);
+    if (self->helper60.vtable) {
+        DeleteCriticalSection(&self->helper60.crit);
+        self->helper60.vtable = NULL;
+    }
+    if (self->helper98.vtable) {
+        DeleteCriticalSection(&self->helper98.crit);
+        self->helper98.vtable = NULL;
+    }
     if (self->list80) {
         std::free(self->list80);
         self->list80 = NULL;
@@ -471,41 +472,113 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
 }
 
 
-// UNANCHORED: seeds the replacement arg5 ABI vtables from recovered launcher.exe addresses.
-static void InitializeLauncherObjectAbiVtables() {
-    static bool initialized = false;
-    if (initialized) return;
-    initialized = true;
+// UNANCHORED: compile-time launcher arg5 primary vtable table replacing the old mutable seed step.
+static void** LauncherObjectPrimaryVtable() {
+    static void* const kPrimaryVtable[13] = {
+        (void*)LauncherObject_Release,                 // 0x4319a0
+        (void*)LauncherObject_MonitorPort,             // 0x431ce0
+        (void*)LauncherObject_UDPMonitorPort,          // 0x4325d0
+        (void*)LauncherObject_MonitorEphemeralUDPPort, // 0x436000
+        (void*)LauncherObject_Slot4_42F7C0,            // 0x42f7c0
+        (void*)LauncherObject_UnmonitorPort,           // 0x431840
+        (void*)LauncherObject_Connect,                 // 0x4328a0
+        (void*)LauncherObject_Close,                   // 0x42f970
+        (void*)LauncherObject_SendBuffer,              // 0x42fbd0
+        (void*)LauncherObject_Slot9_42FD10,            // 0x42fd10
+        (void*)LauncherObject_Slot10_443810,          // 0x443810
+        (void*)LauncherObject_Slot11_431670,          // 0x431670
+        (void*)LauncherObject_CleanupConnection,      // 0x4316a0
+    };
+    return const_cast<void**>(kPrimaryVtable);
+}
 
-    std::memset(g_LauncherObjectVtable, 0, sizeof(g_LauncherObjectVtable));
-    std::memset(g_LauncherObjectSubVtable5C, 0, sizeof(g_LauncherObjectSubVtable5C));
-    std::memset(g_LauncherObjectSubVtable60, 0, sizeof(g_LauncherObjectSubVtable60));
-    std::memset(g_LauncherObjectSubVtable98, 0, sizeof(g_LauncherObjectSubVtable98));
-    g_LauncherObjectVtable[0] = (void*)LauncherObject_Release;                   // 0x4319a0
-    g_LauncherObjectVtable[1] = (void*)LauncherObject_MonitorPort;               // 0x431ce0
-    g_LauncherObjectVtable[2] = (void*)LauncherObject_UDPMonitorPort;            // 0x4325d0
-    g_LauncherObjectVtable[3] = (void*)LauncherObject_MonitorEphemeralUDPPort;   // 0x436000
-    g_LauncherObjectVtable[4] = (void*)LauncherObject_Slot4_42F7C0;              // 0x42f7c0
-    g_LauncherObjectVtable[5] = (void*)LauncherObject_UnmonitorPort;             // 0x431840
-    g_LauncherObjectVtable[6] = (void*)LauncherObject_Connect;                   // 0x4328a0
-    g_LauncherObjectVtable[7] = (void*)LauncherObject_Close;                     // 0x42f970
-    g_LauncherObjectVtable[8] = (void*)LauncherObject_SendBuffer;                // 0x42fbd0
-    g_LauncherObjectVtable[9] = (void*)LauncherObject_Slot9_42FD10;              // 0x42fd10
-    g_LauncherObjectVtable[10] = (void*)LauncherObject_Slot10_443810;            // 0x443810
-    g_LauncherObjectVtable[11] = (void*)LauncherObject_Slot11_431670;            // 0x431670
-    g_LauncherObjectVtable[12] = (void*)LauncherObject_CleanupConnection;        // 0x4316a0
-    g_LauncherObjectSubVtable5C[0] = (void*)LauncherObject_Subobject5C_Slot0; // base +0x5c helper slot 0x435f90
-    g_LauncherObjectSubVtable5C[1] = (void*)LauncherObject_Subobject5C_Slot1; // base +0x5c helper slot 0x435fa0
-    g_LauncherObjectSubVtable60[0] = (void*)LauncherObject_Subobject60_Slot0; // base +0x60 helper slot 0x4147b0
-    g_LauncherObjectSubVtable60[1] = (void*)LauncherObject_LockHelper_Slot1;  // base +0x60 helper slot 0x4147c0
-    g_LauncherObjectSubVtable98[0] = (void*)LauncherObject_LockHelper_Slot0;  // derived +0x98 helper slot 0x4147b0
-    g_LauncherObjectSubVtable98[1] = (void*)LauncherObject_LockHelper_Slot1;  // derived +0x98 helper slot 0x4147c0
+// UNANCHORED: compile-time launcher arg5 helper table for the final `+0x5c` ctor state.
+static void** LauncherObjectSubVtable5C() {
+    static void* const kSubVtable5C[2] = {
+        (void*)LauncherObject_Subobject5C_Slot0, // 0x435f90
+        (void*)LauncherObject_Subobject5C_Slot1, // 0x435fa0
+    };
+    return const_cast<void**>(kSubVtable5C);
+}
+
+// UNANCHORED: compile-time launcher arg5 helper table for the final `+0x60` ctor state.
+static void** LauncherObjectSubVtable60() {
+    static void* const kSubVtable60[2] = {
+        (void*)LauncherObject_Subobject60_Slot0, // 0x4147b0
+        (void*)LauncherObject_LockHelper_Slot1,  // 0x4147c0
+    };
+    return const_cast<void**>(kSubVtable60);
+}
+
+// UNANCHORED: compile-time launcher arg5 helper table for the final `+0x98` ctor state.
+static void** LauncherObjectSubVtable98() {
+    static void* const kSubVtable98[2] = {
+        (void*)LauncherObject_LockHelper_Slot0, // 0x4147b0
+        (void*)LauncherObject_LockHelper_Slot1, // 0x4147c0
+    };
+    return const_cast<void**>(kSubVtable98);
+}
+
+// UNANCHORED: bounded source mirror of base ctor `0x4366f0` for the current ctorFlags=0 path.
+static bool InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(LauncherObjectAbiShell* object) {
+    if (!object) {
+        return false;
+    }
+
+    object->field04 = 0; // 0x40a380 passes ctor arg 0 into 0x431c30 -> 0x4366f0.
+    object->field08 = NULL;
+    object->subVtable5C = LauncherObjectSubVtable5C();
+    object->helper60.vtable = LauncherObjectSubVtable60();
+    InitializeCriticalSection(&object->helper60.crit);
+    object->field7C = CreateEventA(NULL, FALSE, FALSE, NULL);
+    if (!object->field7C) {
+        spdlog::warn("launcher arg5 ABI shell failed to create +0x7c event ({})", (unsigned long)GetLastError());
+        return false;
+    }
+
+    if (!mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_Init(&object->queue0C, 0) ||
+        !mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_Init(&object->queue34, 0)) {
+        return false;
+    }
+
+    return true;
+}
+
+// UNANCHORED: bounded source mirror of derived ctor `0x431c30` after the base ctor completes.
+static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(LauncherObjectAbiShell* object) {
+    if (!object) {
+        return false;
+    }
+
+    object->vtable = LauncherObjectPrimaryVtable();
+
+    LauncherObjectListHead24* list80 =
+        static_cast<LauncherObjectListHead24*>(std::malloc(sizeof(LauncherObjectListHead24)));
+    if (!list80) {
+        spdlog::warn("launcher arg5 ABI shell failed to allocate +0x80 list head");
+        return false;
+    }
+    InitializeLauncherObjectListHead24(list80);
+    object->list80 = list80;
+    object->field84 = 0;
+
+    LauncherObjectListHead18* list8C =
+        static_cast<LauncherObjectListHead18*>(std::malloc(sizeof(LauncherObjectListHead18)));
+    if (!list8C) {
+        spdlog::warn("launcher arg5 ABI shell failed to allocate +0x8c list head");
+        return false;
+    }
+    InitializeLauncherObjectListHead18(list8C);
+    object->list8C = list8C;
+    object->field90 = 0;
+
+    object->helper98.vtable = LauncherObjectSubVtable98();
+    InitializeCriticalSection(&object->helper98.crit);
+    return true;
 }
 
 // UNANCHORED: replacement launcher builder mirroring launcher.exe:0x40a380 -> 0x431c30.
 static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
-    InitializeLauncherObjectAbiVtables();
-
     LauncherObjectAbiShell* object =
         static_cast<LauncherObjectAbiShell*>(std::malloc(sizeof(LauncherObjectAbiShell)));
     if (!object) {
@@ -516,54 +589,13 @@ static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
     }
 
     std::memset(object, 0, sizeof(*object));
-    object->vtable = g_LauncherObjectVtable;
-    object->field04 = 0; // 0x40a380 passes ctor arg 0
-    object->field08 = NULL;
-    object->subVtable5C = g_LauncherObjectSubVtable5C;
-    object->helper60.vtable = g_LauncherObjectSubVtable60;
-    InitializeCriticalSection(&object->helper60.crit);
-    object->field7C = CreateEventA(NULL, FALSE, FALSE, NULL);
-    object->field84 = 0;
-    object->field88 = 0;
-    object->field90 = 0;
-    object->field94 = 0;
-    object->helper98.vtable = g_LauncherObjectSubVtable98;
-    InitializeCriticalSection(&object->helper98.crit);
-    if (!object->field7C) {
-        spdlog::warn("launcher arg5 ABI shell failed to create +0x7c event ({})", (unsigned long)GetLastError());
-        FreeLauncherObjectAbiShellInternals(object);
-        std::free(object);
-        return NULL;
-    }
-    if (!mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_Init(&object->queue0C, 0) ||
-        !mxo::liblttcp::CLTThreadPerClientTCPEngine::Queue_Init(&object->queue34, 0)) {
+    if (!InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(object) ||
+        !InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(object)) {
         FreeLauncherObjectAbiShellInternals(object);
         std::free(object);
         return NULL;
     }
 
-    LauncherObjectListHead24* list80 =
-        static_cast<LauncherObjectListHead24*>(std::malloc(sizeof(LauncherObjectListHead24)));
-    if (!list80) {
-        spdlog::warn("launcher arg5 ABI shell failed to allocate +0x80 list head");
-        FreeLauncherObjectAbiShellInternals(object);
-        std::free(object);
-        return NULL;
-    }
-    InitializeLauncherObjectListHead24(list80);
-    object->list80 = list80;
-
-    LauncherObjectListHead18* list8C =
-        static_cast<LauncherObjectListHead18*>(std::malloc(sizeof(LauncherObjectListHead18)));
-    if (!list8C) {
-        spdlog::warn("launcher arg5 ABI shell failed to allocate +0x8c list head");
-        object->list80 = list80;
-        FreeLauncherObjectAbiShellInternals(object);
-        std::free(object);
-        return NULL;
-    }
-    InitializeLauncherObjectListHead18(list8C);
-    object->list8C = list8C;
     return object;
 }
 

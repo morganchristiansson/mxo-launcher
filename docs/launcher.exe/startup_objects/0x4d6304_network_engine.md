@@ -1364,4 +1364,9 @@ Newer source-ownership cleanup on the launcher entry side:
 - the launcher ABI shell no longer keeps a separate `g_CurrentLauncherObject` owner-global just to make repeated installs safe
   - reinstall now releases any prior caller-owned arg5 object through the same public release helper
 - the sidecar binding itself is now a single launcher-owned static binding object instead of a separately heap-allocated binding pointer
+- a newer ctor-shape cleanup also now splits the ABI-shell initialization by the same recovered constructor boundary:
+  - base-style init after `0x4366f0`
+  - then derived-style init after `0x431c30`
+- the old mutable runtime vtable seeding step is gone too
+  - arg5 primary and helper vtable tables are now compile-time static tables instead
 - so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned create/register and release/clear boundaries
