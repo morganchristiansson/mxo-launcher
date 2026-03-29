@@ -523,8 +523,8 @@ static void** LauncherObjectSubVtable98() {
 // Important faithfulness note from current static RE:
 // - original `0x40a380` allocates with `malloc(0xb4)` and does NOT zero the full object first
 // - recovered ctors currently do not write `+0x88` or `+0x94`
-// - current source still zero-fills the shell before these ctor-shaped writes for stability on the
-//   active path, so those two dwords remain source-owned zeroes rather than original indeterminate bytes
+// - current source now seeds only cleanup-sensitive / currently-read fields before ctor-shaped init,
+//   and leaves any stronger meaning for `+0x88/+0x94` deliberately unresolved
 static bool InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(LauncherObjectAbiShell* object) {
     if (!object) {
         return false;
@@ -566,7 +566,6 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
     InitializeLauncherObjectListHead24(list80);
     object->list80 = list80;
     object->field84 = 0;
-    object->reserved88 = 0;
 
     LauncherObjectListHead18* list8C =
         static_cast<LauncherObjectListHead18*>(std::malloc(sizeof(LauncherObjectListHead18)));
@@ -577,7 +576,6 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
     InitializeLauncherObjectListHead18(list8C);
     object->list8C = list8C;
     object->field90 = 0;
-    object->reserved94 = 0;
 
     object->helper98.vtable = LauncherObjectSubVtable98();
     InitializeCriticalSection(&object->helper98.crit);

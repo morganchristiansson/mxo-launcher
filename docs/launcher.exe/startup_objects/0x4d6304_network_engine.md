@@ -1380,7 +1380,8 @@ Newer source-ownership cleanup on the launcher entry side:
 - a follow-up bounded cleanup also reduced source dependence on whole-object zeroing:
   - source no longer `memset`s the entire `0xb4` shell before ctor-shaped init
   - instead it seeds only the fields that partial cleanup or the current ctor-shaped steps may read before full initialization
-  - `+0x88/+0x94` therefore remain explicit source-owned stability values rather than accidentally inherited from a blanket whole-object zero-fill step
+  - the older source-only explicit ctor writes to `+0x88/+0x94` have now also been pruned back out again
+  - so those dwords remain only pre-init stability values in source, not fake derived-ctor side effects
 - the old mutable runtime vtable seeding step is gone too
   - arg5 primary and helper vtable tables are now compile-time static tables instead
 - so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned create/register and release/clear boundaries
