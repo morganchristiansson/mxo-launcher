@@ -473,6 +473,15 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
 
 
 // UNANCHORED: compile-time launcher arg5 primary vtable table replacing the old mutable seed step.
+// 2026-03-28 ABI-boundary note:
+// - do not replace this wholesale with the native GCC C++ vtable from
+//   `mxo::liblttcp::CLTThreadPerClientTCPEngine`
+// - the launcher-visible arg5 object is still the `0xb4` shell carrying client-consumed fields and
+//   embedded helper subobjects at `+0x5c/+0x60/+0x98`
+// - the current native sidecar object is smaller and uses a separate GNU C++ object/vptr model
+// - only per-slot thinning via explicit shell->sidecar trampolines is a plausible future reduction
+// Canonical doc:
+// - ../../docs/launcher.exe/startup_objects/0x4d6304_network_engine.md
 static void** LauncherObjectPrimaryVtable() {
     static void* const kPrimaryVtable[13] = {
         (void*)LauncherObject_Release,                 // 0x4319a0

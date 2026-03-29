@@ -1385,3 +1385,15 @@ Newer source-ownership cleanup on the launcher entry side:
 - the old mutable runtime vtable seeding step is gone too
   - arg5 primary and helper vtable tables are now compile-time static tables instead
 - so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned create/register and release/clear boundaries
+
+## ABI boundary note
+
+The broader ABI-boundary / wrapper-reduction investigation for arg5 was moved out of this per-object doc because the lessons also apply to other launcher-owned objects.
+
+See:
+- `./OBJECT_ABI_BOUNDARIES.md`
+
+Current short takeaway for `0x4d6304` specifically:
+- keep the launcher-owned arg5 shell as the top-level object boundary
+- do not replace it wholesale with the native C++ `CLTThreadPerClientTCPEngine` object
+- if reduction is pursued later, reduce individual slot bodies, not the shell layout contract
