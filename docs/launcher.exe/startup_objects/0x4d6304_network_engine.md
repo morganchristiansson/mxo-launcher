@@ -109,12 +109,62 @@ New side-state audit from the current constructor / destructor / worker-insert p
   - cleanup lock helper at `+0x98`
 - so the current source-side `CLTThreadPerClientTCPEngine_SideState` members are **not** evidence
   for hidden launcher fields
-- current best mapping is:
-  - side `queueThreads` = temporary ownership stand-in for the real `+0x08` queue-thread pointer array
-  - side `monitoredPorts` = temporary ownership stand-in for the real `+0x80/+0x84` endpoint-keyed tree payloads
-  - side `workerThreads` = temporary ownership stand-in for the real `+0x8c/+0x90` context-keyed tree payloads
-  - side `attachedLauncherAbiSurface`, `authBridgeContext`, `marginBridgeContext`, and `messageConnections`
+- current best mapping is now tighter in source too:
+  - real object `+0x04/+0x08` now directly own the queue-thread count / pointer-array backing in the
+    class instead of hiding that family in side-state
+  - recovered endpoint-keyed and context-keyed payload families are now kept in dedicated
+    source-owned tree backings keyed by engine identity, not inside
+    `CLTThreadPerClientTCPEngine_SideState` and not as pretend hidden launcher fields
+    - endpoint backing now uses direct MinGW `_Rb_tree_node<std::pair<key,payload*>>` node types
+      with the same recovered `0x24` node size / layout expected by the
+      `0x4318f0 / 0x42fdb0 / 0x4154d0` family and keeps launcher-visible head `+0x80`
+      `root/first/last` pointers live instead of only toggling a fake occupancy marker
+    - context backing now uses direct MinGW `_Rb_tree_node<std::pair<key,payload*>>` node types
+      with the same recovered `0x18` node size / layout expected by the
+      `0x4196b0 / 0x42fe10 / 0x4154d0` family and keeps launcher-visible head `+0x8c`
+      `root/first/last` pointers live instead of only toggling a fake occupancy marker
+  - side `attachedLauncherAbiSurface`, `authBridgeContext`, and `marginBridgeContext`
     = source-only bridge baggage, not original `launcher.exe` class members
+  - earlier generic fallback engine-owned `CMessageConnection` allocation has now been retired from
+    the active slot-resolution path because current RE does not support it as original engine state
+  - dead source-only accessors kept only for compile compatibility (`MonitoredPorts()`,
+    `WorkerThreads()`, `HasMonitoredPorts()`, `HasWorkerThreads()`, and the older fallback-message
+    connection stubs) have now been pruned instead of being left behind as fake compatibility API
+
+New shared-tree clarification from the current helper-xref pass:
+- the tree helper family used by arg5 `+0x80/+0x8c` is **not** unique to
+  `CLTThreadPerClientTCPEngine`
+- current shared helper anchors include:
+  - predecessor / search-side helper: `0x4151b0`
+  - rotations: `0x415200`, `0x415250`
+  - insert rebalance: `0x4152a0`
+  - erase / rebalance: `0x4154d0`
+- current helper shape is also strongly reminiscent of the old SGI / STL red-black-tree helper
+  family rather than an engine-unique custom container:
+  - `0x4151b0` has the same header-special-case pattern as `_Rb_tree_decrement`
+  - `0x415200/0x415250` are left/right rotations
+  - `0x4152a0` is insert rebalance
+  - `0x4154d0` is erase rebalance / unlink
+- non-engine xrefs now show the same generic family is also reused by other launcher containers,
+  including:
+  - console-variable registry string trees through `0x415fc0` / `0x4162c0`
+  - other integer-keyed trees through `0x415f20`, `0x4568a0`, `0x47e8e0`, and related helpers
+- so the current best naming direction is a **shared launcher tree helper family** rather than an
+  engine-specific tree implementation
+- current source now routes the arg5 tree family directly through MinGW libstdc++
+  `<bits/stl_tree.h>`, using the recovered launcher node/head layouts as the concrete `_Rb_tree`
+  objects while still treating launcher.exe itself as source of truth
+- the intended donor/reference is `/usr/lib/gcc/i686-w64-mingw32/13-win32/include/c++/bits/stl_tree.h`
+  (the local `13-posix` copy is identical on this machine)
+- current arg5 tree users now call the low-level `_Rb_tree` helpers directly
+  (`_Rb_tree_insert_and_rebalance`, `_Rb_tree_rebalance_for_erase`) and keep
+  engine-specific search/insert decisions local
+- the currently recovered endpoint-key compare helper (`0x44b040`) orders by
+  `portNetworkOrder`, then `ipv4NetworkOrder`; the wider copied endpoint-key payload still carries
+  `family/reserved` fields, but those are not currently evidenced as tree-ordering fields
+- once that direct insert/erase path was in place, the older local header relink/sync helpers were
+  pruned too; current source now relies on upstream `_Rb_tree` header maintenance for non-empty
+  trees instead of resynchronizing `root/first/last` by hand after each change
 
 New queue-thread clarification from the current focused pass:
 - these `0x3c` children are not anonymous queue blobs

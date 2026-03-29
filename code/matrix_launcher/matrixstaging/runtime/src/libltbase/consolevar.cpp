@@ -4,11 +4,15 @@
 
 #include "consolevar.h"
 
+#include <bits/stl_tree.h>
+
 #include <cctype>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <unordered_map>
 
 namespace mxo {
 namespace libltbase {
@@ -26,23 +30,198 @@ ConsoleRuntimeGlobals& RuntimeGlobals() {
     return globals;
 }
 
-std::vector<CConsoleVar*>& RegisteredConsoleVars() {
-    static std::vector<CConsoleVar*> vars;
-    return vars;
+// Console-variable registry tree wrappers above the shared SGI/libstdc++ `_Rb_tree` core.
+// Current best static-RE anchors:
+// - `0x4157b0` = `CConsoleVarRegistryTree_Find`
+// - `0x415c40` = `CConsoleVarRegistryTree_InsertNode`
+// - `0x415fc0` = `CConsoleVarRegistryTree_InsertUniqueHint`
+// - `0x4161f0` = `CConsoleVarRegistryTree_ctor`
+// - `0x456a90` = `CConsoleVarRegistryTree_EraseNode`
+// Current source direction:
+// - use direct `_Rb_tree` insert/erase mechanics
+// - keep only the case-insensitive (`_stricmp`) registry-wrapper logic and source-owned node
+//   ownership here
+using ConsoleVarRegistryNode = std::_Rb_tree_node<std::pair<const char*, CConsoleVar*>>;
+
+struct ConsoleVarRegistryTreeHead18 {
+    unsigned char colorOrFlag;
+    unsigned char padding[3];
+    void* root;
+    void* first;
+    void* last;
+    unsigned char keyAndPayload[0x8];
+};
+
+struct ConsoleVarRegistryTreeObject0C {
+    ConsoleVarRegistryTreeHead18* header = nullptr;
+    std::uint32_t nodeCount = 0;
+    std::uint32_t reserved08 = 0;
+};
+
+static_assert(sizeof(ConsoleVarRegistryTreeHead18) == 0x18, "console registry head size mismatch");
+static_assert(sizeof(ConsoleVarRegistryTreeObject0C) == 0x0c, "console registry tree object size mismatch");
+static_assert(sizeof(ConsoleVarRegistryNode) == 0x18, "console registry node size mismatch");
+
+static ConsoleVarRegistryTreeObject0C* g_CConsoleVarRegistryTree = nullptr;
+
+struct ConsoleRegistryFreeDeleter {
+    void operator()(void* memory) const {
+        std::free(memory);
+    }
+};
+
+static std::unique_ptr<ConsoleVarRegistryTreeObject0C>& ConsoleVarRegistryTreeStorage() {
+    static std::unique_ptr<ConsoleVarRegistryTreeObject0C> storage;
+    return storage;
 }
 
-CConsoleVar* FindRegisteredConsoleVar(const char* name) {
-    if (!name || !name[0]) {
+static std::unique_ptr<ConsoleVarRegistryTreeHead18, ConsoleRegistryFreeDeleter>& ConsoleVarRegistryHeadStorage() {
+    static std::unique_ptr<ConsoleVarRegistryTreeHead18, ConsoleRegistryFreeDeleter> storage(nullptr);
+    return storage;
+}
+
+static std::unordered_map<ConsoleVarRegistryNode*, std::unique_ptr<ConsoleVarRegistryNode>>&
+ConsoleVarRegistryNodeStorage() {
+    static std::unordered_map<ConsoleVarRegistryNode*, std::unique_ptr<ConsoleVarRegistryNode>> nodes;
+    return nodes;
+}
+
+template <typename Head>
+static std::_Rb_tree_node_base* ConsoleRegistryHeaderBase(Head* head) {
+    return reinterpret_cast<std::_Rb_tree_node_base*>(head);
+}
+
+template <typename Head>
+static const std::_Rb_tree_node_base* ConsoleRegistryHeaderBase(const Head* head) {
+    return reinterpret_cast<const std::_Rb_tree_node_base*>(head);
+}
+
+static void InitializeConsoleVarRegistryTreeHead18(ConsoleVarRegistryTreeHead18* head) {
+    std::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(head);
+    if (!header) {
+        return;
+    }
+
+    std::memset(head, 0, sizeof(*head));
+    header->_M_color = std::_S_red;
+    header->_M_parent = nullptr;
+    header->_M_left = header;
+    header->_M_right = header;
+}
+
+static int CompareConsoleVarRegistryKeys(const char* lhs, const char* rhs) {
+    return _stricmp(lhs ? lhs : "", rhs ? rhs : "");
+}
+
+static ConsoleVarRegistryTreeObject0C* EnsureConsoleVarRegistryTree() {
+    if (g_CConsoleVarRegistryTree) {
+        return g_CConsoleVarRegistryTree;
+    }
+
+    auto tree = std::make_unique<ConsoleVarRegistryTreeObject0C>();
+    if (!tree) {
         return nullptr;
     }
 
-    for (CConsoleVar* var : RegisteredConsoleVars()) {
-        if (var && std::strcmp(var->Name(), name) == 0) {
-            return var;
+    std::unique_ptr<ConsoleVarRegistryTreeHead18, ConsoleRegistryFreeDeleter> header(
+        static_cast<ConsoleVarRegistryTreeHead18*>(std::malloc(sizeof(ConsoleVarRegistryTreeHead18))));
+    if (!header) {
+        return nullptr;
+    }
+    InitializeConsoleVarRegistryTreeHead18(header.get());
+    tree->header = header.get();
+
+    g_CConsoleVarRegistryTree = tree.get();
+    ConsoleVarRegistryHeadStorage() = std::move(header);
+    ConsoleVarRegistryTreeStorage() = std::move(tree);
+    return g_CConsoleVarRegistryTree;
+}
+
+static ConsoleVarRegistryNode* ConsoleVarRegistryFindNode(const char* name) {
+    if (!name || !name[0] || !g_CConsoleVarRegistryTree || !g_CConsoleVarRegistryTree->header) {
+        return nullptr;
+    }
+
+    const ConsoleVarRegistryNode* candidate = nullptr;
+    const std::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(g_CConsoleVarRegistryTree->header);
+    const ConsoleVarRegistryNode* node =
+        (header && header->_M_parent) ? static_cast<const ConsoleVarRegistryNode*>(header->_M_parent) : nullptr;
+    while (node) {
+        if (CompareConsoleVarRegistryKeys(node->_M_valptr()->first, name) >= 0) {
+            candidate = node;
+            node = static_cast<const ConsoleVarRegistryNode*>(node->_M_left);
+        } else {
+            node = static_cast<const ConsoleVarRegistryNode*>(node->_M_right);
         }
     }
 
-    return nullptr;
+    return (candidate && CompareConsoleVarRegistryKeys(candidate->_M_valptr()->first, name) == 0)
+        ? const_cast<ConsoleVarRegistryNode*>(candidate)
+        : nullptr;
+}
+
+static CConsoleVar* FindRegisteredConsoleVar(const char* name) {
+    ConsoleVarRegistryNode* node = ConsoleVarRegistryFindNode(name);
+    return node ? node->_M_valptr()->second : nullptr;
+}
+
+static bool ConsoleVarRegistryInsert(CConsoleVar* var) {
+    if (!var || !var->Name()[0]) {
+        return false;
+    }
+
+    ConsoleVarRegistryTreeObject0C* tree = EnsureConsoleVarRegistryTree();
+    if (!tree || !tree->header) {
+        return false;
+    }
+
+    auto node = std::make_unique<ConsoleVarRegistryNode>();
+    if (!node) {
+        return false;
+    }
+    node->_M_valptr()->first = var->Name();
+    node->_M_valptr()->second = var;
+
+    std::_Rb_tree_node_base* header = ConsoleRegistryHeaderBase(tree->header);
+    std::_Rb_tree_node_base* parent = header;
+    ConsoleVarRegistryNode* current =
+        (header && header->_M_parent) ? static_cast<ConsoleVarRegistryNode*>(header->_M_parent) : nullptr;
+    bool insertLeft = true;
+    while (current) {
+        parent = current;
+        const int cmp = CompareConsoleVarRegistryKeys(node->_M_valptr()->first, current->_M_valptr()->first);
+        if (cmp == 0) {
+            return false;
+        }
+        insertLeft = (cmp < 0);
+        current = insertLeft ? static_cast<ConsoleVarRegistryNode*>(current->_M_left)
+                             : static_cast<ConsoleVarRegistryNode*>(current->_M_right);
+    }
+
+    node->_M_parent = nullptr;
+    node->_M_left = nullptr;
+    node->_M_right = nullptr;
+    node->_M_color = std::_S_red;
+
+    ConsoleVarRegistryNode* insertedNode = node.get();
+    std::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
+    ++tree->nodeCount;
+    ConsoleVarRegistryNodeStorage().emplace(insertedNode, std::move(node));
+    return true;
+}
+
+static bool ConsoleVarRegistryEraseByName(const char* name) {
+    ConsoleVarRegistryNode* node = ConsoleVarRegistryFindNode(name);
+    if (!node || !g_CConsoleVarRegistryTree || !g_CConsoleVarRegistryTree->header) {
+        return false;
+    }
+
+    (void)std::_Rb_tree_rebalance_for_erase(node, *ConsoleRegistryHeaderBase(g_CConsoleVarRegistryTree->header));
+    ConsoleVarRegistryNodeStorage().erase(node);
+    if (g_CConsoleVarRegistryTree->nodeCount > 0) {
+        --g_CConsoleVarRegistryTree->nodeCount;
+    }
+    return true;
 }
 
 void CloseIncludeFiles(ConsoleConfigParseState& state) {
@@ -141,23 +320,36 @@ void CConsoleVar::RegisterSelf() {
         return;
     }
 
-    for (CConsoleVar* existing : RegisteredConsoleVars()) {
+    if (CConsoleVar* existing = FindRegisteredConsoleVar(name_.c_str())) {
+        // Current best read from `0x4162c0`:
+        // - registry insertion is unique-by-name
+        // - duplicate registration attempts do not replace the existing entry
+        // - the duplicate path constructs the message
+        //     `A console variable named "..." already exists!`
+        //   but current static RE does not yet show a surviving user-visible sink before the
+        //   wrapper still reaches `CConsoleVarRegistryTree_InsertUniqueHint`
+        // - keep current source behavior as a silent no-op on duplicates until stronger evidence
+        //   appears for an assert/log side effect that must be mirrored
         if (existing == this) {
             return;
         }
+        return;
     }
 
-    RegisteredConsoleVars().push_back(this);
+    (void)ConsoleVarRegistryInsert(this);
 }
 
 void CConsoleVar::UnregisterSelf() {
-    std::vector<CConsoleVar*>& vars = RegisteredConsoleVars();
-    for (std::size_t i = 0; i < vars.size(); ++i) {
-        if (vars[i] == this) {
-            vars.erase(vars.begin() + static_cast<std::ptrdiff_t>(i));
-            return;
-        }
+    if (name_.empty()) {
+        return;
     }
+
+    ConsoleVarRegistryNode* node = ConsoleVarRegistryFindNode(name_.c_str());
+    if (!node || node->_M_valptr()->second != this) {
+        return;
+    }
+
+    (void)ConsoleVarRegistryEraseByName(name_.c_str());
 }
 
 // anchor: launcher.exe:0x4164b0

@@ -479,32 +479,29 @@ public:
     //   immediate-return scaffold
     void RunCompletedOperationQueue(bool nonBlocking);
 
-    // UNANCHORED: scaffold helper used to mirror the recovered 0x4366f0 child-allocation shape in source.
+    // anchor family: launcher.exe:0x4366f0 / 0x436920
+    // Current source helper owns the real `+0x04/+0x08` queue-thread array/count fields directly
+    // and mirrors the constructor/stop-thread family without pretending to be one exact body.
     void RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount);
-    // UNANCHORED: scaffold accessor for source-side queue-thread child tracking.
+    // Recovered field-backed accessor over real object `+0x04`.
     size_t QueueThreadCount() const;
 
-    // UNANCHORED: starter accessor exposing source-owned monitored-port state.
-    const std::vector<AcceptThreadRecord>& MonitoredPorts() const;
-    // UNANCHORED: starter accessor exposing source-owned worker-thread state.
-    const std::vector<WorkerThreadRecord>& WorkerThreads() const;
-
-    // UNANCHORED: starter helper keeping connection lookup out of diagnostics.cpp.
+    // Source-owned connection resolver. Current faithful preference order is:
+    // - real bridge-tracked auth/margin connection objects
+    // - no generic engine-owned synthetic fallback allocation
     CMessageConnection* FindMessageConnection(void* contextKey);
-    // UNANCHORED: starter helper keeping connection creation out of diagnostics.cpp.
-    CMessageConnection* GetOrCreateMessageConnection(void* contextKey);
-    // UNANCHORED: starter helper keeping connection destruction out of diagnostics.cpp.
-    bool DropMessageConnection(void* contextKey);
 
 private:
     // UNANCHORED: starter helper mirroring the recovered endpoint-key shape.
     static LTTCPEndpointKey MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
-    // UNANCHORED: starter helper for the endpoint-keyed +0x80 accept-thread container.
+    // anchor: launcher.exe:0x42fdb0 search shape over the endpoint-keyed `+0x80` tree family.
     AcceptThreadRecord* FindMonitoredPort(const LTTCPEndpointKey& key);
-    // UNANCHORED: starter helper for the context-keyed +0x8c worker-thread container.
+    // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
     WorkerThreadRecord* FindWorker(void* contextKey);
-    // UNANCHORED: shared engine-slot connection resolver.
-    CMessageConnection* ResolveConnectionForEngineSlotScaffold(void* contextKey, bool allowCreateFallback);
+    // Source-owned shared engine-slot connection resolver.
+    // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection`
+    // objects when original caller/object evidence is missing.
+    CMessageConnection* ResolveConnectionForEngineSlotScaffold(void* contextKey);
     // UNANCHORED: shared worker->connection state/socket sync helper.
     void SyncConnectionFromWorkerRecordScaffold(const WorkerThreadRecord* record);
     // UNANCHORED: source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
@@ -574,29 +571,23 @@ private:
     void* ActiveCleanupLockScaffold() const;
     static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_LockHelperScaffold* helper);
     static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_LockHelperScaffold* helper);
-    static void InitializeEndpointTreeHead24Scaffold(CLTThreadPerClientTCPEngine_EndpointTreeHead24* head);
-    static void InitializeContextTreeHead18Scaffold(CLTThreadPerClientTCPEngine_ContextTreeHead18* head);
-    static void SetEndpointTreeHead24OccupancyScaffold(
-        CLTThreadPerClientTCPEngine_EndpointTreeHead24* head,
-        bool nonEmpty);
-    static void SetContextTreeHead18OccupancyScaffold(
-        CLTThreadPerClientTCPEngine_ContextTreeHead18* head,
-        bool nonEmpty);
+    static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_EndpointTreeHead24* head);
+    static void InitializeContextTreeHead18(CLTThreadPerClientTCPEngine_ContextTreeHead18* head);
 
-    uint32_t ctorFlagsField04Scaffold_;
-    void* queueThreadArrayField08Scaffold_;
-    CLTThreadPerClientTCPEngine_Queue ownedQueue0CScaffold_;
-    CLTThreadPerClientTCPEngine_Queue ownedQueue34Scaffold_;
-    CLTThreadPerClientTCPEngine_WaitHelperScaffold ownedWaitHelper5CScaffold_;
-    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedQueueLockHelper60Scaffold_;
-    HANDLE ownedQueueSignalEvent7CScaffold_;
-    CLTThreadPerClientTCPEngine_EndpointTreeHead24* ownedEndpointTreeHead80Scaffold_;
-    uint32_t ownedEndpointCount84Scaffold_;
-    uint32_t reserved88Scaffold_;
-    CLTThreadPerClientTCPEngine_ContextTreeHead18* ownedContextTreeHead8CScaffold_;
-    uint32_t ownedContextCount90Scaffold_;
-    uint32_t reserved94Scaffold_;
-    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedCleanupLockHelper98Scaffold_;
+    uint32_t ctorFlagsField04_;
+    void* queueThreadArrayField08_;
+    CLTThreadPerClientTCPEngine_Queue ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_Queue ownedQueue34_;
+    CLTThreadPerClientTCPEngine_WaitHelperScaffold ownedWaitHelper5C_;
+    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedQueueLockHelper60_;
+    HANDLE ownedQueueSignalEvent7C_;
+    CLTThreadPerClientTCPEngine_EndpointTreeHead24* ownedEndpointTreeHead80_;
+    uint32_t ownedEndpointCount84_;
+    uint32_t reserved88_;
+    CLTThreadPerClientTCPEngine_ContextTreeHead18* ownedContextTreeHead8C_;
+    uint32_t ownedContextCount90_;
+    uint32_t reserved94_;
+    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedCleanupLockHelper98_;
 };
 
 struct CLTThreadPerClientTCPEngine_LayoutMirror {
@@ -656,10 +647,6 @@ public:
     CLTThreadPerClientTCPEngine* Engine() const;
     // UNANCHORED: starter binding helper.
     bool HasEngine() const;
-    // UNANCHORED: starter binding helper.
-    bool HasMonitoredPorts() const;
-    // UNANCHORED: starter binding helper.
-    bool HasWorkerThreads() const;
 
 private:
     void* owner_;
