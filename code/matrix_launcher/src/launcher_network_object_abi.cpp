@@ -584,6 +584,31 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
     return true;
 }
 
+// UNANCHORED: bounded source pre-ctor initialization for safe partial cleanup on the current
+// malloc-backed create path. Unlike the older whole-object memset, this only seeds the fields that
+// current source cleanup or the current ctor-shaped steps may read before full initialization.
+static void InitializeLauncherNetworkEngineAbiShellPreCtorState(LauncherObjectAbiShell* object) {
+    if (!object) {
+        return;
+    }
+
+    object->vtable = NULL;
+    object->field04 = 0;
+    object->field08 = NULL;
+    std::memset(&object->queue0C, 0, sizeof(object->queue0C));
+    std::memset(&object->queue34, 0, sizeof(object->queue34));
+    object->subVtable5C = NULL;
+    object->helper60.vtable = NULL;
+    object->field7C = NULL;
+    object->list80 = NULL;
+    object->field84 = 0;
+    object->reserved88 = 0;
+    object->list8C = NULL;
+    object->field90 = 0;
+    object->reserved94 = 0;
+    object->helper98.vtable = NULL;
+}
+
 // UNANCHORED: replacement launcher builder mirroring launcher.exe:0x40a380 -> 0x431c30.
 static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
     LauncherObjectAbiShell* object =
@@ -597,8 +622,9 @@ static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
 
     // Current bounded stability choice:
     // - original `0x40a380` reaches `malloc(0xb4)` and then ctor writes only known fields
-    // - source still zero-fills the shell first so the active path does not depend on allocator garbage
-    std::memset(object, 0, sizeof(*object));
+    // - source no longer zero-fills the entire shell up front
+    // - instead it seeds only the fields that partial cleanup / current ctor-shaped init may read
+    InitializeLauncherNetworkEngineAbiShellPreCtorState(object);
     if (!InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(object) ||
         !InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(object)) {
         FreeLauncherObjectAbiShellInternals(object);

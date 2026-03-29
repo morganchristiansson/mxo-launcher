@@ -78,6 +78,13 @@ Ctor `0x431c30` / `CLTThreadPerClientTCPEngine_ctor`:
 - current focused static pass still does **not** show ctor writes to `+0x88` or `+0x94`
   - so those two dwords remain lower-confidence / reserved in source naming for now
   - important faithfulness caveat: original `0x40a380` uses `malloc(0xb4)` rather than a zeroing allocator, so absent later evidence those bytes are best treated as **indeterminate on the original path**, not as proven zeros
+- newer targeted consumption search also failed to show convincing arg5-object reads of those offsets on the currently known launcher/client engine paths
+  - launcher engine-range scan around the `CLTThreadPerClientTCPEngine` family only surfaced unrelated virtual-call offsets in the `0x437470..0x437e80` helper cluster, not concrete `this+0x88/0x94` data reads on the arg5 engine object itself
+  - client-side direct arg5 holders / users currently read as:
+    - `InitClientDLL` stores arg5 in `0x62b073e4`
+    - `0x62006c30` checks that global and drives `0x62532130`
+    - `0x62531c10` then consumes arg5 fields at `+0x0c/+0x34/+0x5c/+0x60`
+  - current focused pass therefore still has **no** positive evidence that client runtime consumption depends on arg5 `+0x88` or `+0x94`
 
 Base ctor `0x4366f0` / `CLTBaseThreadPerClientTCPEngine_ctor` itself:
 
@@ -1370,7 +1377,10 @@ Newer source-ownership cleanup on the launcher entry side:
 - a newer ctor-shape cleanup also now splits the ABI-shell initialization by the same recovered constructor boundary:
   - base-style init after `0x4366f0`
   - then derived-style init after `0x431c30`
-  - current source still zero-fills the shell before those ctor-shaped writes for active-path stability, so unwritten dwords such as `+0x88/+0x94` remain source-owned zeroes rather than faithful original indeterminate bytes
+- a follow-up bounded cleanup also reduced source dependence on whole-object zeroing:
+  - source no longer `memset`s the entire `0xb4` shell before ctor-shaped init
+  - instead it seeds only the fields that partial cleanup or the current ctor-shaped steps may read before full initialization
+  - `+0x88/+0x94` therefore remain explicit source-owned stability values rather than accidentally inherited from a blanket whole-object zero-fill step
 - the old mutable runtime vtable seeding step is gone too
   - arg5 primary and helper vtable tables are now compile-time static tables instead
 - so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned create/register and release/clear boundaries
