@@ -323,7 +323,7 @@ bool CLauncher::ParseCommandLineStage() const {
         "CConsoleVar_ParseCommandLineAndConfig(0x4173d0)");
 
     if (!g_LauncherCommandLine.ParseCommandLine(g_CrtArgc, g_CrtArgv)) {
-        spdlog::error("ERROR: launcher ParseCommandLine scaffold failed");
+        spdlog::error("ERROR: launcher ParseCommandLine stage failed");
         return false;
     }
 
@@ -497,7 +497,7 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
 }
 
 // UNANCHORED: replacement-only synthesis that feeds the later 0x40b739..0x40b7af corridor by
-// materializing current arg5/arg6/arg7 scaffolds. This is more honest than treating the entire
+// materializing current arg5/arg6/arg7 startup state. This is more honest than treating the entire
 // pre-client stretch as one faux method, but it still does not claim an exact original boundary.
 bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
     const RecoveredLauncherStartupContext& startupContext) {
@@ -610,7 +610,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 // 0x41ab10 file gate explicitly unmodeled.
 bool CLauncher::RunRecoveredPreClientBringupStage() const {
     if (!DiagnosticInitializePreclientEnvironmentLike402EC0()) {
-        spdlog::info("WARNING: pre-client environment scaffold failed to initialize");
+        spdlog::info("WARNING: pre-client environment bringup failed to initialize");
     }
 
     DiagnosticStartWindowTrace();
@@ -682,9 +682,9 @@ bool CLauncher::RunClientDllLifecycle() const {
         return false;
     }
 
-    const bool allowInitWithCurrentStartupScaffold =
+    const bool allowInitWithCurrentStartupState =
         g_pILTLoginMediatorDefault && g_pLauncherObject6304 && g_pILTLoginMediatorSelection3584;
-    if (!allowInitWithCurrentStartupScaffold) {
+    if (!allowInitWithCurrentStartupState) {
         spdlog::error("Refusing to call InitClientDLL with incomplete launcher state.");
         return false;
     }
@@ -695,7 +695,7 @@ bool CLauncher::RunClientDllLifecycle() const {
     const uint32_t packedArg7Selection = BuildPackedArg7Selection();
     g_PackedArg7Selection = packedArg7Selection;
 
-    spdlog::info("=== Calling InitClientDLL with current launcher startup scaffold ===");
+    spdlog::info("=== Calling InitClientDLL with current launcher startup state ===");
     const int initResult = initClientDLL(
         g_LauncherCommandLine.FilteredArgCount(),
         g_LauncherCommandLine.FilteredArgv(),
@@ -755,8 +755,8 @@ bool CLauncher::InitInstance() {
         return false;
     }
 
-    // UNANCHORED within 0x40b430: replacement-only arg5/arg6/arg7 scaffold materialization that
-    // feeds the later anchored 0x40a4d0 InitClientDLL call shape.
+    // UNANCHORED within 0x40b430: replacement-only arg5/arg6/arg7 startup-state materialization
+    // that feeds the later anchored 0x40a4d0 InitClientDLL call shape.
     if (!MaterializeRecoveredInitClientStateFromStartupContext(startupContext)) {
         return false;
     }

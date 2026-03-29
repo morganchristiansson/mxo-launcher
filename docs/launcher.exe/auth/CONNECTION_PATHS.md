@@ -291,6 +291,10 @@ Current limitation summary:
 - the remaining post-auth blocker has moved forward:
   - helper11/state11 send is now live
   - later incoming margin `0x10` / `MS_LoadCharacterReply` handling (`0x440320`) is still not yet live
+- newer practical rerun note after the arg5 ctor/ABI-shell cleanup pass:
+  - one active-path run stalled at visible `Loading Character`
+  - a second retry then entered game successfully
+  - so current late-runtime behavior is still intermittent around the post-state11 / load-character continuation rather than a fully stable deterministic handoff
 
 ## Practical boundary
 

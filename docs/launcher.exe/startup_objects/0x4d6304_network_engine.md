@@ -75,6 +75,9 @@ Ctor `0x431c30` / `CLTThreadPerClientTCPEngine_ctor`:
   - `+0x8c` = `0x18`-byte sentinel-headed context map object
   - `+0x98` = derived helper root
   - `+0x9c` = `CRITICAL_SECTION` storage paired with that helper root
+- current focused static pass still does **not** show ctor writes to `+0x88` or `+0x94`
+  - so those two dwords remain lower-confidence / reserved in source naming for now
+  - important faithfulness caveat: original `0x40a380` uses `malloc(0xb4)` rather than a zeroing allocator, so absent later evidence those bytes are best treated as **indeterminate on the original path**, not as proven zeros
 
 Base ctor `0x4366f0` / `CLTBaseThreadPerClientTCPEngine_ctor` itself:
 
@@ -1367,6 +1370,7 @@ Newer source-ownership cleanup on the launcher entry side:
 - a newer ctor-shape cleanup also now splits the ABI-shell initialization by the same recovered constructor boundary:
   - base-style init after `0x4366f0`
   - then derived-style init after `0x431c30`
+  - current source still zero-fills the shell before those ctor-shaped writes for active-path stability, so unwritten dwords such as `+0x88/+0x94` remain source-owned zeroes rather than faithful original indeterminate bytes
 - the old mutable runtime vtable seeding step is gone too
   - arg5 primary and helper vtable tables are now compile-time static tables instead
 - so the current arg5 path is still not a fully faithful ctor/runtime reproduction, but it is less diagnostics-owned and a little closer to the original launcher-owned create/register and release/clear boundaries

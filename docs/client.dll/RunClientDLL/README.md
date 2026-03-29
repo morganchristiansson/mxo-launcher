@@ -590,6 +590,10 @@ What matters here for `RunClientDLL` is narrower:
 - auth therefore remains launcher-owned in practice as well as in static analysis
 - newer live-runtime validation now also shows the post-`AS_AuthReply` State4/`0x41e500` margin begin succeeding on the active runtime path, with helper11/state11 slot 3 (`0x43c020`) becoming live and sending the raw `0x4d` packet there
 - the next auth-side/runtime question therefore shifts one step forward again: what launcher-owned state or incoming margin traffic is still missing so later helper11/state11 slot 6 (`0x440320` / `MS_LoadCharacterReply`) becomes live on that same active runtime path
+- newer practical rerun note after the arg5 ctor/ABI-shell cleanup pass:
+  - one active-path run stalled at visible `Loading Character`
+  - a second retry then entered game successfully
+  - so the current post-auth / post-state11 boundary should be treated as **intermittent later-runtime fidelity**, not as a clean deterministic startup failure
 
 Important restraint:
 - this is now the active launcher runtime path rather than a separately gated runtime experiment

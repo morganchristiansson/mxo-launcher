@@ -25,10 +25,10 @@ struct LauncherObjectAbiShell {
     HANDLE field7C;              // +0x7c CreateEventA(NULL,0,0,0)
     void* list80;                // +0x80 allocated 0x24 endpoint-tree sentinel head
     uint32_t field84;            // +0x84 zeroed in derived ctor
-    uint32_t reserved88;         // +0x88 remains zero on the current ctorFlags=0 path
+    uint32_t reserved88;         // +0x88 no ctor write recovered yet; current source zero-fills it
     void* list8C;                // +0x8c allocated 0x18 context-tree sentinel head
     uint32_t field90;            // +0x90 zeroed in derived ctor
-    uint32_t reserved94;         // +0x94 remains zero on the current ctorFlags=0 path
+    uint32_t reserved94;         // +0x94 no ctor write recovered yet; current source zero-fills it
     LauncherObjectLockHelper helper98; // +0x98..+0xb3 derived helper root + CRITICAL_SECTION
 };
 
@@ -520,6 +520,11 @@ static void** LauncherObjectSubVtable98() {
 }
 
 // UNANCHORED: bounded source mirror of base ctor `0x4366f0` for the current ctorFlags=0 path.
+// Important faithfulness note from current static RE:
+// - original `0x40a380` allocates with `malloc(0xb4)` and does NOT zero the full object first
+// - recovered ctors currently do not write `+0x88` or `+0x94`
+// - current source still zero-fills the shell before these ctor-shaped writes for stability on the
+//   active path, so those two dwords remain source-owned zeroes rather than original indeterminate bytes
 static bool InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(LauncherObjectAbiShell* object) {
     if (!object) {
         return false;
@@ -561,6 +566,7 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
     InitializeLauncherObjectListHead24(list80);
     object->list80 = list80;
     object->field84 = 0;
+    object->reserved88 = 0;
 
     LauncherObjectListHead18* list8C =
         static_cast<LauncherObjectListHead18*>(std::malloc(sizeof(LauncherObjectListHead18)));
@@ -571,6 +577,7 @@ static bool InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(Launche
     InitializeLauncherObjectListHead18(list8C);
     object->list8C = list8C;
     object->field90 = 0;
+    object->reserved94 = 0;
 
     object->helper98.vtable = LauncherObjectSubVtable98();
     InitializeCriticalSection(&object->helper98.crit);
@@ -588,6 +595,9 @@ static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
         return NULL;
     }
 
+    // Current bounded stability choice:
+    // - original `0x40a380` reaches `malloc(0xb4)` and then ctor writes only known fields
+    // - source still zero-fills the shell first so the active path does not depend on allocator garbage
     std::memset(object, 0, sizeof(*object));
     if (!InitializeLauncherNetworkEngineAbiShellBaseCtorLike4366F0(object) ||
         !InitializeLauncherNetworkEngineAbiShellDerivedCtorLike431C30(object)) {
