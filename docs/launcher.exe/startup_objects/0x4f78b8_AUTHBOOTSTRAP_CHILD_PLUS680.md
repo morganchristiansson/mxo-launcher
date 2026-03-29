@@ -112,6 +112,7 @@ Current best read:
   - child `+0x2c` = launcher-version dword
   - child `+0x9c` = current public-key id dword
   - child `+0x50` = send target
+- send step itself is a direct virtual call through child `+0x50` slot `+0x24`
 
 So `+0xa4` is no longer best described as generic lazy state; it is specifically the lazy
 `pubkey.dat`-backed state family used on the get-public-key path.
@@ -139,6 +140,7 @@ Current best read:
   - child `+0x9c` as public-key id
   - child `+0x30 .. +0x4f` as two fixed 16-byte blocks
   - child `+0x50` as the send target
+- send step itself is again the direct virtual call through child `+0x50` slot `+0x24`
 - the same path also allocates/rebuilds helper objects at:
   - child `+0x94`
   - child `+0x98`

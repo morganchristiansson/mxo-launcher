@@ -457,8 +457,28 @@ uint32_t AuthBootstrap680Ops::SendAuthGetPublicKeyRequest(CLTLoginMediator& medi
         return 0;
     }
 
-    const uint32_t sendResult =
-        mediator.SendAuthFramedPacket(packet, CLTLoginMediator::kMessageAsGetPublicKeyRequest);
+    if (!child.sendTarget50) {
+        spdlog::warn(
+            "AuthBootstrap680_SendGetPublicKeyRequest missing child+0x50 send target; recovered 0x447eb0 tail expects direct virtual send through that field");
+        return 0u;
+    }
+
+    auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(child.sendTarget50);
+    const uint8_t rawCode = packet.payloadBytes.empty() ? 0u : packet.payloadBytes[0];
+    const uint32_t sendResult = sendTarget->SendPacket(
+        packet.bytes.data(),
+        static_cast<uint32_t>(packet.bytes.size()),
+        nullptr);
+    spdlog::info(
+        "DIAGNOSTIC: launcher-owned auth send via 0x447eb0 child+0x50->vtable+0x24 step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} sendTarget50={} -> sendResult=0x{:08x}",
+        CLTLoginMediator::kMessageAsGetPublicKeyRequest,
+        rawCode,
+        mxo::auth::AuthOpcodeName(rawCode),
+        packet.headerBytes.size(),
+        packet.payloadBytes.size(),
+        packet.bytes.size(),
+        fmt::ptr(child.sendTarget50),
+        static_cast<unsigned>(sendResult));
     mediator.authGetPublicKeyRequestSent_ = (sendResult != 0u);
     return sendResult;
 }
@@ -504,8 +524,29 @@ uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
     }
 
     mediator.lastAuthRequestBuildResult_ = buildResult;
-    const uint32_t sendResult =
-        mediator.SendAuthFramedPacket(buildResult.packet, CLTLoginMediator::kMessageAsAuthRequest);
+    if (!child.sendTarget50) {
+        spdlog::warn(
+            "AuthBootstrap680_SendAuthRequest missing child+0x50 send target; recovered 0x4474f0 tail expects direct virtual send through that field");
+        return 0u;
+    }
+
+    auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(child.sendTarget50);
+    const uint8_t rawCode =
+        buildResult.packet.payloadBytes.empty() ? 0u : buildResult.packet.payloadBytes[0];
+    const uint32_t sendResult = sendTarget->SendPacket(
+        buildResult.packet.bytes.data(),
+        static_cast<uint32_t>(buildResult.packet.bytes.size()),
+        nullptr);
+    spdlog::info(
+        "DIAGNOSTIC: launcher-owned auth send via 0x4474f0 child+0x50->vtable+0x24 step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} sendTarget50={} -> sendResult=0x{:08x}",
+        CLTLoginMediator::kMessageAsAuthRequest,
+        rawCode,
+        mxo::auth::AuthOpcodeName(rawCode),
+        buildResult.packet.headerBytes.size(),
+        buildResult.packet.payloadBytes.size(),
+        buildResult.packet.bytes.size(),
+        fmt::ptr(child.sendTarget50),
+        static_cast<unsigned>(sendResult));
     mediator.authRequestSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
         spdlog::info(
@@ -556,8 +597,33 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
         return 0;
     }
 
-    const uint32_t sendResult =
-        mediator.SendAuthFramedPacket(buildResult.packet, "AS_AuthChallengeResponse");
+    // UNANCHORED: exact original raw `0x0a` send builder VA is still open, but keeping the send
+    // tail child-scoped is more faithful than routing this through a mediator-wide helper. The
+    // neighboring anchored raw `0x06` / `0x08` builders both send through child `+0x50`.
+    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    if (!child.sendTarget50) {
+        spdlog::warn(
+            "AuthBootstrap680 raw0x0a challenge-response missing child+0x50 send target; refusing less-faithful fallback path");
+        return 0u;
+    }
+
+    auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(child.sendTarget50);
+    const uint8_t rawCode =
+        buildResult.packet.payloadBytes.empty() ? 0u : buildResult.packet.payloadBytes[0];
+    const uint32_t sendResult = sendTarget->SendPacket(
+        buildResult.packet.bytes.data(),
+        static_cast<uint32_t>(buildResult.packet.bytes.size()),
+        nullptr);
+    spdlog::info(
+        "DIAGNOSTIC: launcher-owned auth send via child+0x50 step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} sendTarget50={} -> sendResult=0x{:08x}",
+        "AS_AuthChallengeResponse",
+        rawCode,
+        mxo::auth::AuthOpcodeName(rawCode),
+        buildResult.packet.headerBytes.size(),
+        buildResult.packet.payloadBytes.size(),
+        buildResult.packet.bytes.size(),
+        fmt::ptr(child.sendTarget50),
+        static_cast<unsigned>(sendResult));
     mediator.authChallengeResponseSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
         SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(mediator, buildResult);

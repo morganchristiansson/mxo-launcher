@@ -1428,7 +1428,6 @@ public:
     const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
 
 private:
-    uint32_t SendAuthFramedPacket(const mxo::auth::FramedPacket& packet, const char* stepLabel);
     uint32_t SendAuthGetPublicKeyRequest();
     uint32_t SendAuthRequestFromReply(const mxo::auth::GetPublicKeyReply& reply);
     uint32_t SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge);

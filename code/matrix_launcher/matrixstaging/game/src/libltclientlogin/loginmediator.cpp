@@ -2508,35 +2508,6 @@ void CLTLoginMediator::PopulateClientWorldView() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::SendAuthFramedPacket(
-    const mxo::auth::FramedPacket& packet,
-    const char* stepLabel) {
-    mxo::liblttcp::CMessageConnection* connection = AuthConnection();
-    if (!connection) {
-        connection = EnsureAuthConnectionObject();
-    }
-    if (!connection || packet.bytes.empty()) {
-        return 0;
-    }
-
-    const uint8_t rawCode = packet.payloadBytes.empty() ? 0u : packet.payloadBytes[0];
-    const uint32_t sendResult = connection->SendPacket(
-        packet.bytes.data(),
-        static_cast<uint32_t>(packet.bytes.size()),
-        nullptr);
-    spdlog::info(
-        "DIAGNOSTIC: launcher-owned auth send step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} -> sendResult=0x{:08x}",
-        (stepLabel && stepLabel[0]) ? stepLabel : "<unnamed>",
-        rawCode,
-        mxo::auth::AuthOpcodeName(rawCode),
-        packet.headerBytes.size(),
-        packet.payloadBytes.size(),
-        packet.bytes.size(),
-        (unsigned)sendResult);
-    return sendResult;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::SendMarginFramedPacket(
     const mxo::auth::FramedPacket& packet,
     uint8_t plainRawCode,
