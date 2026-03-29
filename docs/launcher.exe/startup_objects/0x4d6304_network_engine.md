@@ -565,6 +565,7 @@ Newer string-backed naming now tightens several of those slots substantially:
     - arg1 = port
     - arg2 = connection object pointer
     - arg3 = IPv4 bind address / network-order `sin_addr.s_addr`
+    - i.e. this arg3 is not currently evidenced as a generic owner-context pointer
 - slot 3 / `0x436000` = **provisional UDP-monitor helper / local-port query wrapper**
   - no direct surviving string name recovered yet
   - current static behavior:
@@ -1013,7 +1014,13 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
   - enclosing method is original arg5 slot `6` / `Connect`
   - `0x4328a0` creates a socket through helper `0x449b40(1, 6, 0)`
   - `0x449b40` wraps `WS2_32!socket(AF_INET, type, protocol)` and option setup
+    - current decompile now makes that helper more concrete:
+      - disables Nagle for TCP stream sockets unless caller opts out
+      - sets non-blocking mode unless caller opts out
   - later in the same `0x4328a0` method the launcher calls `WS2_32!connect`
+    - current decompile also shows the connect-success branch covers both:
+      - `connect(...) == 0`
+      - `connect(...) == SOCKET_ERROR` with `WSAGetLastError() == 0x2733` / `WSAEWOULDBLOCK`
   - successful connect then creates/inserts a `WorkerThread` payload into arg5 `+0x8c` and marks it with `[worker+0x34] = 1`
   - so `0x4329cc` is now best read as part of a **TCP connect / connect-status / worker-start** producer path
 

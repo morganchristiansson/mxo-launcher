@@ -74,6 +74,8 @@ struct CLTThreadPerClientTCPEngine_QueuePair {
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_LauncherConnectionBridgeWorkItemVtable[2] = {0};
 static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
+static constexpr uint8_t kSocketFactoryFlagSkipDisableNagle = 0x01u;
+static constexpr uint8_t kSocketFactoryFlagKeepBlocking = 0x02u;
 
 // UNANCHORED: source-owned narrow mirror of the original queue block free-list behavior.
 // Static RE already shows that the consumer path recycles exhausted blocks instead of treating the
@@ -831,16 +833,55 @@ static void SignalWakeupSocketHandle(uint32_t socketHandle) {
     (void)send(static_cast<SOCKET>(socketHandle), "", 0, 0);
 }
 
-// UNANCHORED internal helper used by the current MonitorPort scaffold.
-static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
+// anchor: launcher.exe:0x449b40 helper shape
+static uint32_t CreateSocketHandleWithOriginalSetupScaffold(
+    int socketType,
+    int protocol,
+    uint8_t flags) {
     if (!mxo::libltnet::CLTSocketLayer::Init()) {
         return kInvalidSocketHandle;
     }
 
-    SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (listenSocket == INVALID_SOCKET) {
+    SOCKET socketHandle = socket(AF_INET, socketType, protocol);
+    if (socketHandle == INVALID_SOCKET) {
         return kInvalidSocketHandle;
     }
+
+    if (protocol == IPPROTO_TCP && (flags & kSocketFactoryFlagSkipDisableNagle) == 0u) {
+        BOOL noDelay = TRUE;
+        if (setsockopt(
+                socketHandle,
+                IPPROTO_TCP,
+                TCP_NODELAY,
+                reinterpret_cast<const char*>(&noDelay),
+                sizeof(noDelay)) == SOCKET_ERROR) {
+            closesocket(socketHandle);
+            return kInvalidSocketHandle;
+        }
+    }
+
+    if ((flags & kSocketFactoryFlagKeepBlocking) == 0u) {
+        u_long nonBlocking = 1;
+        if (ioctlsocket(socketHandle, FIONBIO, &nonBlocking) == SOCKET_ERROR) {
+            closesocket(socketHandle);
+            return kInvalidSocketHandle;
+        }
+    }
+
+    return static_cast<uint32_t>(socketHandle);
+}
+
+// UNANCHORED internal helper used by the current MonitorPort scaffold.
+static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
+    const uint32_t listenSocketHandle = CreateSocketHandleWithOriginalSetupScaffold(
+        SOCK_STREAM,
+        IPPROTO_TCP,
+        /*flags=*/0u);
+    if (listenSocketHandle == kInvalidSocketHandle) {
+        return kInvalidSocketHandle;
+    }
+
+    SOCKET listenSocket = static_cast<SOCKET>(listenSocketHandle);
 
     sockaddr_in listenAddr = {};
     listenAddr.sin_family = AF_INET;
@@ -862,14 +903,15 @@ static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4Network
 
 // UNANCHORED internal helper used by the current UDPMonitorPort scaffold.
 static uint32_t OpenUdpMonitorSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    if (!mxo::libltnet::CLTSocketLayer::Init()) {
+    const uint32_t udpSocketHandle = CreateSocketHandleWithOriginalSetupScaffold(
+        SOCK_DGRAM,
+        IPPROTO_UDP,
+        /*flags=*/0u);
+    if (udpSocketHandle == kInvalidSocketHandle) {
         return kInvalidSocketHandle;
     }
 
-    SOCKET udpSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (udpSocket == INVALID_SOCKET) {
-        return kInvalidSocketHandle;
-    }
+    SOCKET udpSocket = static_cast<SOCKET>(udpSocketHandle);
 
     BOOL reuseAddr = TRUE;
     if (setsockopt(
@@ -1899,15 +1941,19 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
     (void)unusedArg3;
 
     CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
-    if (!connection || connection->State() != LTTCPEngineConnectionState::kClosed ||
-        !mxo::libltnet::CLTSocketLayer::Init()) {
+    if (!connection || connection->State() != LTTCPEngineConnectionState::kClosed) {
         return 0u;
     }
 
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (sock == INVALID_SOCKET) {
+    const uint32_t socketHandle = CreateSocketHandleWithOriginalSetupScaffold(
+        SOCK_STREAM,
+        IPPROTO_TCP,
+        /*flags=*/0u);
+    if (socketHandle == kInvalidSocketHandle) {
         return 0u;
     }
+
+    SOCKET sock = static_cast<SOCKET>(socketHandle);
 
     sockaddr_in bindAddr = {};
     bindAddr.sin_family = AF_INET;
@@ -1925,10 +1971,13 @@ uint32_t CLTThreadPerClientTCPEngine::ConnectResolvedEndpointScaffold(uint16_t p
 
     connection->SetSocketHandle(static_cast<uint32_t>(sock));
     if (connect(sock, reinterpret_cast<const sockaddr*>(&remoteAddr), sizeof(remoteAddr)) == SOCKET_ERROR) {
-        uint32_t socketHandleToClose = static_cast<uint32_t>(sock);
-        CloseSocketHandle(&socketHandleToClose);
-        connection->SetSocketHandle(kInvalidSocketHandle);
-        return 0u;
+        const int wsaError = WSAGetLastError();
+        if (wsaError != WSAEWOULDBLOCK) {
+            uint32_t socketHandleToClose = static_cast<uint32_t>(sock);
+            CloseSocketHandle(&socketHandleToClose);
+            connection->SetSocketHandle(kInvalidSocketHandle);
+            return 0u;
+        }
     }
 
     CLTThreadPerClientTCPEngine_WorkerThread* worker = CreateAndInsertWorkerThreadScaffold(
