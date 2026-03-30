@@ -242,6 +242,72 @@ void CMessageConnectionReceivedMessageRefScaffold::ResetForPacketBuilderScaffold
     messageStorage0c = &ownedMessageStorageScaffold24;
 }
 
+void CStreamPacketEncryptionHelperBaseScaffold::ForwardToNextHelper(
+    void* opaqueMessageRef) {
+    if (nextHelper04) {
+        nextHelper04->HandleOpaqueMessageRef(opaqueMessageRef);
+    }
+}
+
+void CStreamPacketEncryptionModuleReadHelperScaffold::HandleOpaqueMessageRef(
+    void* opaqueMessageRef) {
+    ForwardToNextHelper(opaqueMessageRef);
+}
+
+void CStreamPacketEncryptionModuleReadHelperScaffold::ResetForOwner(
+    CStreamPacketEncryptionModuleScaffold* owner) {
+    nextHelper04 = nullptr;
+    owner08 = owner;
+    collectionControl0c = 0u;
+    collectionBegin10 = nullptr;
+    collectionEnd14 = nullptr;
+}
+
+void CStreamPacketEncryptionModuleWriteHelperScaffold::HandleOpaqueMessageRef(
+    void* opaqueMessageRef) {
+    ForwardToNextHelper(opaqueMessageRef);
+}
+
+void CStreamPacketEncryptionModuleWriteHelperScaffold::ResetForOwner(
+    CStreamPacketEncryptionModuleScaffold* owner) {
+    nextHelper04 = nullptr;
+    owner08 = owner;
+    embeddedTransformAdapter0c = nullptr;
+    embeddedTransformAdapterMeta10 = nullptr;
+}
+
+void CStreamPacketEncryptionAgendaHelperScaffold::HandleOpaqueMessageRef(
+    void* opaqueMessageRef) {
+    if (outputSlotAddress10) {
+        *outputSlotAddress10 = opaqueMessageRef;
+    }
+}
+
+void CStreamPacketEncryptionAgendaHelperScaffold::ResetForAgenda(
+    const char* helperLabel,
+    void** outputSlotAddress,
+    CStreamPacketEncryptionHelperBaseScaffold** downstreamHelperSlot) {
+    nextHelper04 = nullptr;
+    field04 = 0u;
+    field08 = 0u;
+    helperLabel0c = helperLabel;
+    outputSlotAddress10 = outputSlotAddress;
+    downstreamHelperSlot14 = downstreamHelperSlot;
+}
+
+void CStreamPacketEncryptionModuleScaffold::ResetForMarginConnectionSeed(
+    const std::array<uint8_t, 16>& seedBytes85) {
+    readHelper04 = nullptr;
+    writeHelper08 = nullptr;
+    nextConfiguredModule0c = nullptr;
+    configuredAgendaIdentity10 = nullptr;
+    ownedReadHelperScaffold14.ResetForOwner(this);
+    ownedWriteHelperScaffold2c.ResetForOwner(this);
+    readHelper04 = &ownedReadHelperScaffold14;
+    writeHelper08 = &ownedWriteHelperScaffold2c;
+    associatedSeedBytes40 = seedBytes85;
+}
+
 const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family) {
     switch (family) {
         case CMessageConnectionPacketNameFamilyScaffold::kAuth:
@@ -287,28 +353,64 @@ bool CMessageConnection::PacketizedMessagesEnabledScaffold() const {
     return packetizedMessagesEnabledScaffold_;
 }
 
-void CMessageConnection::ConfigurePacketAgendaScaffold(const void* agendaConfiguration) {
+void CMessageConnection::ConfigurePacketAgendaScaffold(
+    CStreamPacketEncryptionModuleScaffold* streamPacketEncryptionModule) {
     if (!packetAgendaScaffold_) {
         packetAgendaScaffold_ = std::make_unique<CMessageConnectionPacketAgendaScaffold>();
     }
-    if (packetAgendaScaffold_) {
-        packetAgendaScaffold_->created = true;
-        packetAgendaScaffold_->hasEmbeddedDefaultReadPassThroughHelper0c = true;
-        packetAgendaScaffold_->hasReadOutputSlot08 = false;
-        packetAgendaScaffold_->readOutputSlot08 = nullptr;
-        packetAgendaScaffold_->hasWriteOutputSlot24 = false;
-        packetAgendaScaffold_->writeOutputSlot24 = nullptr;
-        // anchor: launcher.exe:0x448980 -> 0x469740
-        // Current best known original builder path (`0x41470 -> 0x44da00`) installs both a read
-        // helper and a write helper on the agenda configuration object before `0x448980` forwards
-        // it into the agenda at connection `+0x74`.
-        // Source still accepts a typeless pointer here, so keep the modeled caller-installed helper
-        // presence conservative: null => no extra helpers known, non-null => one read + one write
-        // helper known. The embedded default read pass-through helper is treated as part of agenda
-        // creation itself and is not counted here.
-        packetAgendaScaffold_->configuredReadHelperCount = (agendaConfiguration != nullptr) ? 1u : 0u;
-        packetAgendaScaffold_->configuredWriteHelperCount = (agendaConfiguration != nullptr) ? 1u : 0u;
+    if (!packetAgendaScaffold_) {
+        return;
     }
+
+    CMessageConnectionPacketAgendaScaffold& agenda = *packetAgendaScaffold_;
+    agenda.configuredModuleList04 = nullptr;
+    agenda.readOutputSlot08 = nullptr;
+    agenda.embeddedReadHelper0c.ResetForAgenda(
+        "Agenda read helper",
+        reinterpret_cast<void**>(&agenda.readOutputSlot08),
+        &agenda.writeHelperChainHead44);
+    agenda.writeOutputSlot24 = nullptr;
+    agenda.embeddedWriteHelper28.ResetForAgenda(
+        "Agenda write helper",
+        reinterpret_cast<void**>(&agenda.writeOutputSlot24),
+        nullptr);
+    agenda.readHelperChainHead40 = &agenda.embeddedReadHelper0c;
+    agenda.writeHelperChainHead44 = nullptr;
+    agenda.writeHelperChainTail48 = nullptr;
+    agenda.configuredModuleCount4c = 0u;
+    agenda.reserved4e = 0u;
+    agenda.created = true;
+    agenda.configuredStreamPacketEncryptionModule = streamPacketEncryptionModule;
+
+    // anchor: launcher.exe:0x448980 -> 0x469740
+    // Current tighter install read from `0x469740`:
+    // - agenda starts with embedded/default read helper at `+0x0c`
+    // - module `+0x04` becomes the read-chain head and links onward to that embedded helper
+    // - module `+0x08` becomes the write-chain head/tail and links onward to the embedded write
+    //   helper at `+0x28`
+    // - module `+0x0c/+0x10` are also updated as agenda-owned bookkeeping
+    if (!streamPacketEncryptionModule) {
+        return;
+    }
+
+    streamPacketEncryptionModule->nextConfiguredModule0c = agenda.configuredModuleList04;
+    streamPacketEncryptionModule->configuredAgendaIdentity10 = &agenda;
+    agenda.configuredModuleList04 = streamPacketEncryptionModule;
+
+    if (streamPacketEncryptionModule->readHelper04) {
+        streamPacketEncryptionModule->readHelper04->nextHelper04 =
+            agenda.readHelperChainHead40;
+        agenda.readHelperChainHead40 = streamPacketEncryptionModule->readHelper04;
+    }
+
+    if (streamPacketEncryptionModule->writeHelper08) {
+        streamPacketEncryptionModule->writeHelper08->nextHelper04 =
+            &agenda.embeddedWriteHelper28;
+        agenda.writeHelperChainHead44 = streamPacketEncryptionModule->writeHelper08;
+        agenda.writeHelperChainTail48 = streamPacketEncryptionModule->writeHelper08;
+    }
+
+    agenda.configuredModuleCount4c = 1u;
 }
 
 const CMessageConnectionPacketAgendaScaffold* CMessageConnection::PacketAgendaScaffold() const {
@@ -383,25 +485,26 @@ CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgendaS
     // Current bounded source model preserves the nearer `0x469950` handoff shape:
     // - no agenda / no active write helper (`+0x44 == 0`) => keep the original message-ref pointer
     // - active write helper => return the agenda write-output slot at `+0x24`
-    // Current source still lacks helper-side transformation/discard, so on the active helper path
-    // it seeds that output slot with the same input pointer as a bounded pass-through fallback.
+    // Current source still lacks helper-side transformation/discard, so the concrete helper
+    // implementations currently forward the same pointer through the virtual chain and let the
+    // embedded agenda helper populate output slot `+0x24`.
     CMessageConnectionPacketAgendaScaffold* agenda = packetAgendaScaffold_.get();
     if (!agenda || !agenda->created) {
         return &inputMessageRef;
     }
 
-    agenda->hasWriteOutputSlot24 = false;
     agenda->writeOutputSlot24 = nullptr;
-    if (agenda->configuredWriteHelperCount == 0u) {
+    if (agenda->writeHelperChainHead44 == nullptr) {
         return &inputMessageRef;
     }
 
-    agenda->writeOutputSlot24 = &inputMessageRef;
-    agenda->hasWriteOutputSlot24 = (agenda->writeOutputSlot24 != nullptr);
+    agenda->writeHelperChainHead44->HandleOpaqueMessageRef(&inputMessageRef);
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
-    return agenda->hasWriteOutputSlot24 ? agenda->writeOutputSlot24 : nullptr;
+    return agenda->writeOutputSlot24
+        ? agenda->writeOutputSlot24
+        : &inputMessageRef;
 }
 
 // anchor: launcher.exe:0x448a00
@@ -473,7 +576,7 @@ uint32_t CMessageConnection::SendPacketMessageRefScaffold(
         static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
     const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
     spdlog::info(
-        "CMessageConnection::SendPacketMessageRefScaffold sendMode10={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::SendPacketMessageRefScaffold sendMode10={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaModuleCount={} agendaHasReadHead={} agendaHasWriteHead={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(messageRefForSubmit->headerless10),
         static_cast<unsigned>(rawOpcode),
         static_cast<unsigned>(messageStorage.reservedBytes08),
@@ -483,10 +586,11 @@ uint32_t CMessageConnection::SendPacketMessageRefScaffold(
         PacketNameFamilyToString(PacketNameFamilyScaffold()),
         packetizedMessagesEnabledScaffold_ ? 1u : 0u,
         (agenda && agenda->created) ? 1u : 0u,
-        agenda ? static_cast<unsigned>(agenda->configuredReadHelperCount) : 0u,
-        agenda ? static_cast<unsigned>(agenda->configuredWriteHelperCount) : 0u,
+        agenda ? static_cast<unsigned>(agenda->configuredModuleCount4c) : 0u,
+        (agenda && agenda->readHelperChainHead40 != nullptr) ? 1u : 0u,
+        (agenda && agenda->writeHelperChainHead44 != nullptr) ? 1u : 0u,
         agendaTouched ? 1u : 0u,
-        (agenda && agenda->hasWriteOutputSlot24) ? 1u : 0u,
+        (agenda && agenda->writeOutputSlot24 != nullptr) ? 1u : 0u,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -939,17 +1043,19 @@ static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
 }
 
 // anchor: launcher.exe:0x469980 / embedded helper vtable `0x004baf48 +0x0c`
-// Source-owned mirror of the default read helper's concrete effect:
+// Source-owned mirror of the currently modeled read-side agenda effect:
 // store the incoming message-ref into the agenda read-output slot at `+0x08`.
+// With the internal-only family now modeled as full virtual C++ classes, source routes this
+// through the helper-chain head directly. The concrete helper implementations remain conservative:
+// module read helper forwards to the embedded agenda helper, which then stores the output slot.
 static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
     CMessageConnectionPacketAgendaScaffold* agenda,
     CMessageConnectionReceivedMessageRefScaffold* inputMessageRef) {
-    if (!agenda || !agenda->hasEmbeddedDefaultReadPassThroughHelper0c) {
+    if (!agenda || agenda->readHelperChainHead40 == nullptr) {
         return false;
     }
-    agenda->readOutputSlot08 = inputMessageRef;
-    agenda->hasReadOutputSlot08 = (inputMessageRef != nullptr);
-    return agenda->hasReadOutputSlot08;
+    agenda->readHelperChainHead40->HandleOpaqueMessageRef(inputMessageRef);
+    return agenda->readOutputSlot08 != nullptr;
 }
 
 // anchor: launcher.exe:0x469930
@@ -975,7 +1081,6 @@ static CMessageConnectionReceivedMessageRefScaffold* CMessageConnection_ApplyRec
         return inputMessageRef;
     }
 
-    agenda->hasReadOutputSlot08 = false;
     agenda->readOutputSlot08 = nullptr;
     if (outAgendaTouched) {
         *outAgendaTouched = true;
@@ -984,7 +1089,7 @@ static CMessageConnectionReceivedMessageRefScaffold* CMessageConnection_ApplyRec
         return nullptr;
     }
 
-    return agenda->hasReadOutputSlot08 ? agenda->readOutputSlot08 : nullptr;
+    return agenda->readOutputSlot08;
 }
 
 }  // namespace
@@ -1165,10 +1270,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
             }
             lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
             spdlog::debug(
-                "CMessageConnection::OnOperationCompleted preserved raw packet-agenda read handoff via agenda+0x08 message-ref pointer payloadBytes={} configuredReadHelpers={} hasDefaultReadHelper={} this={} ownerContext={} remoteHost='{}'",
+                "CMessageConnection::OnOperationCompleted preserved raw packet-agenda read handoff via agenda+0x08 message-ref pointer payloadBytes={} agendaModuleCount={} readHeadIsEmbedded={} this={} ownerContext={} remoteHost='{}'",
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
-                static_cast<unsigned>(agenda->configuredReadHelperCount),
-                agenda->hasEmbeddedDefaultReadPassThroughHelper0c ? 1u : 0u,
+                static_cast<unsigned>(agenda->configuredModuleCount4c),
+                (agenda->readHelperChainHead40 ==
+                 static_cast<const CStreamPacketEncryptionHelperBaseScaffold*>(&agenda->embeddedReadHelper0c))
+                    ? 1u
+                    : 0u,
                 fmt::ptr(this),
                 fmt::ptr(OwnerContext()),
                 RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -1440,16 +1548,16 @@ static void** CMarginConnection_LocalCompletionWorkItemVtableScaffold() {
 }  // namespace
 
 // anchor: launcher.exe:0x441850
-void CMarginConnection::SetMessageCode4SuccessFlag84Scaffold(bool value) {
-    messageCode4SuccessFlag84Scaffold_ = value;
+void CMarginConnection::SetMessageCode4SuccessFlag84(bool value) {
+    messageCode4SuccessFlag84_ = value;
 }
 
-bool CMarginConnection::MessageCode4SuccessFlag84Scaffold() const {
-    return messageCode4SuccessFlag84Scaffold_;
+bool CMarginConnection::MessageCode4SuccessFlag84() const {
+    return messageCode4SuccessFlag84_;
 }
 
 // anchor: launcher.exe:0x441850
-uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItemScaffold(uint32_t workPayloadStatus) {
+uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint32_t workPayloadStatus) {
     CMarginConnectionLocalCompletionWorkItemScaffold workItem = {};
     workItem.header.vtable = CMarginConnection_LocalCompletionWorkItemVtableScaffold();
     workItem.header.workType = 0x0bu;
@@ -1458,7 +1566,7 @@ uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItemScaffold(
     CMessageConnection* selfAsMessageConnection = this;
     const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&workItem);
     spdlog::info(
-        "CMarginConnection::DispatchMessageCode4LocalCompletionWorkItemScaffold synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
+        "CMarginConnection::DispatchMessageCode4LocalCompletionWorkItem synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
         workPayloadStatus,
         handled,
         fmt::ptr(this),
@@ -1473,19 +1581,19 @@ uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItemScaffold(
 }
 
 // anchor: launcher.exe:0x41ce80 -> connection `+0x98`
-bool CMarginConnection::StoreBootstrapReplyCopy98Scaffold(const void* bytes, size_t byteCount) {
-    if (!bytes || byteCount != bootstrapReplyCopy98Scaffold_.size()) {
+bool CMarginConnection::StoreBootstrapReplyCopy98(const void* bytes, size_t byteCount) {
+    if (!bytes || byteCount != bootstrapReplyCopy98_.size()) {
         return false;
     }
 
     std::copy_n(
         static_cast<const uint8_t*>(bytes),
-        bootstrapReplyCopy98Scaffold_.size(),
-        bootstrapReplyCopy98Scaffold_.begin());
-    hasBootstrapReplyCopy98Scaffold_ = true;
+        bootstrapReplyCopy98_.size(),
+        bootstrapReplyCopy98_.begin());
+    hasBootstrapReplyCopy98_ = true;
     spdlog::info(
-        "CMarginConnection::StoreBootstrapReplyCopy98Scaffold stored reply-copy block bytes=0x{:03x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(bootstrapReplyCopy98Scaffold_.size()),
+        "CMarginConnection::StoreBootstrapReplyCopy98 stored reply-copy block bytes=0x{:03x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(bootstrapReplyCopy98_.size()),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -1493,7 +1601,7 @@ bool CMarginConnection::StoreBootstrapReplyCopy98Scaffold(const void* bytes, siz
 }
 
 // anchor: launcher.exe:0x443340 -> connection `+0xa0`
-bool CMarginConnection::StoreBootstrapPrepStateA0Scaffold(
+bool CMarginConnection::StoreBootstrapPrepStateA0(
     const void* blockB0,
     const void* blockC4,
     const void* blockD8,
@@ -1503,25 +1611,25 @@ bool CMarginConnection::StoreBootstrapPrepStateA0Scaffold(
         return false;
     }
 
-    if (!bootstrapPrepStateA0Scaffold_) {
-        bootstrapPrepStateA0Scaffold_ = std::make_unique<CMarginConnectionBootstrapPrepStateA0Scaffold>();
+    if (!bootstrapPrepStateA0_) {
+        bootstrapPrepStateA0_ = std::make_unique<CMarginConnectionBootstrapPrepStateA0Scaffold>();
     }
-    if (!bootstrapPrepStateA0Scaffold_) {
+    if (!bootstrapPrepStateA0_) {
         return false;
     }
 
     std::copy_n(
         static_cast<const uint8_t*>(blockB0),
         kExpectedBlockByteCount,
-        bootstrapPrepStateA0Scaffold_->blockB0.begin());
+        bootstrapPrepStateA0_->blockB0.begin());
     std::copy_n(
         static_cast<const uint8_t*>(blockC4),
         kExpectedBlockByteCount,
-        bootstrapPrepStateA0Scaffold_->blockC4.begin());
+        bootstrapPrepStateA0_->blockC4.begin());
     std::copy_n(
         static_cast<const uint8_t*>(blockD8),
         kExpectedBlockByteCount,
-        bootstrapPrepStateA0Scaffold_->blockD8.begin());
+        bootstrapPrepStateA0_->blockD8.begin());
 
     const auto readFirstDword = [](const std::array<uint8_t, 0x14>& bytes) -> uint32_t {
         return static_cast<uint32_t>(bytes[0]) |
@@ -1531,11 +1639,11 @@ bool CMarginConnection::StoreBootstrapPrepStateA0Scaffold(
     };
 
     spdlog::info(
-        "CMarginConnection::StoreBootstrapPrepStateA0Scaffold staged owner+0x680 child blocks +0xb0/+0xc4/+0xd8 into connection-side +0xa0 mirror blockBytes=0x{:02x} firstDwordB0=0x{:08x} firstDwordC4=0x{:08x} firstDwordD8=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CMarginConnection::StoreBootstrapPrepStateA0 staged owner+0x680 child blocks +0xb0/+0xc4/+0xd8 into connection-side +0xa0 mirror blockBytes=0x{:02x} firstDwordB0=0x{:08x} firstDwordC4=0x{:08x} firstDwordD8=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(kExpectedBlockByteCount),
-        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0Scaffold_->blockB0)),
-        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0Scaffold_->blockC4)),
-        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0Scaffold_->blockD8)),
+        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0_->blockB0)),
+        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0_->blockC4)),
+        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0_->blockD8)),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -1543,8 +1651,8 @@ bool CMarginConnection::StoreBootstrapPrepStateA0Scaffold(
 }
 
 // anchor: launcher.exe:0x41f30
-uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold() {
-    if (!hasBootstrapReplyCopy98Scaffold_) {
+uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98() {
+    if (!hasBootstrapReplyCopy98_) {
         return 0u;
     }
 
@@ -1579,13 +1687,13 @@ uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold() {
     payloadBytes[3] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
     payloadBytes[4] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
     std::copy(
-        bootstrapReplyCopy98Scaffold_.begin(),
-        bootstrapReplyCopy98Scaffold_.end(),
+        bootstrapReplyCopy98_.begin(),
+        bootstrapReplyCopy98_.end(),
         payloadBytes + kLeadingType1PrefixByteCount + kNestedReplyCopyLengthFieldByteCount);
 
     const uint32_t sendResult = SendPacketMessageRefScaffold(messageRef);
     spdlog::info(
-        "CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold sent rawType1PrefixPlusLengthPrefixedReplyCopy payloadBytes=0x{:03x} nestedReplyCopyBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CMarginConnection::SendStoredBootstrapReplyCopy98 sent rawType1PrefixPlusLengthPrefixedReplyCopy payloadBytes=0x{:03x} nestedReplyCopyBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(kTotalPayloadByteCount),
         static_cast<unsigned>(kReplyCopyByteCount),
         static_cast<unsigned>(sendResult),
@@ -1595,23 +1703,57 @@ uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold() {
     return sendResult;
 }
 
-// anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
-void CMarginConnection::SetMessageCode5SeedBytes85Scaffold(const std::array<uint8_t, 16>& value) {
-    messageCode5SeedBytes85Scaffold_ = value;
-    hasMessageCode5SeedBytes85Scaffold_ = true;
+// anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
+void CMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85() {
+    if (!hasMessageCode5SeedBytes85_) {
+        return;
+    }
+
+    if (!streamPacketEncryptionModule9c_) {
+        streamPacketEncryptionModule9c_ =
+            std::make_unique<CStreamPacketEncryptionModuleScaffold>();
+    }
+    if (!streamPacketEncryptionModule9c_) {
+        ConfigurePacketAgendaScaffold(nullptr);
+        return;
+    }
+
+    streamPacketEncryptionModule9c_->ResetForMarginConnectionSeed(
+        messageCode5SeedBytes85_);
+    ConfigurePacketAgendaScaffold(streamPacketEncryptionModule9c_.get());
+
+    spdlog::info(
+        "CMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85 synced connection+0x9c module from seed85_94 module={} agenda={} firstDword=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        fmt::ptr(streamPacketEncryptionModule9c_.get()),
+        fmt::ptr(PacketAgendaScaffold()),
+        static_cast<unsigned>(
+            static_cast<uint32_t>(messageCode5SeedBytes85_[0]) |
+            (static_cast<uint32_t>(messageCode5SeedBytes85_[1]) << 8u) |
+            (static_cast<uint32_t>(messageCode5SeedBytes85_[2]) << 16u) |
+            (static_cast<uint32_t>(messageCode5SeedBytes85_[3]) << 24u)),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
 }
 
-bool CMarginConnection::CopyMessageCode5SeedBytes85Scaffold(std::array<uint8_t, 16>* outValue) const {
-    if (!outValue || !hasMessageCode5SeedBytes85Scaffold_) {
+// anchor: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
+void CMarginConnection::SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value) {
+    messageCode5SeedBytes85_ = value;
+    hasMessageCode5SeedBytes85_ = true;
+    EnsureStreamPacketEncryptionModuleFromSeed85();
+}
+
+bool CMarginConnection::CopyMessageCode5SeedBytes85(std::array<uint8_t, 16>* outValue) const {
+    if (!outValue || !hasMessageCode5SeedBytes85_) {
         return false;
     }
 
-    *outValue = messageCode5SeedBytes85Scaffold_;
+    *outValue = messageCode5SeedBytes85_;
     return true;
 }
 
-const uint8_t* CMarginConnection::MessageCode5SeedBytes85PointerScaffold() const {
-    return hasMessageCode5SeedBytes85Scaffold_ ? messageCode5SeedBytes85Scaffold_.data() : nullptr;
+const uint8_t* CMarginConnection::MessageCode5SeedBytes85Pointer() const {
+    return hasMessageCode5SeedBytes85_ ? messageCode5SeedBytes85_.data() : nullptr;
 }
 
 // anchor: launcher.exe:0x44af20 -> 0x442d00 -> owner vtable `+0x184` / `0x41f260`
@@ -1714,7 +1856,7 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
             decodedMessageCode,
             handledCode4,
             "connectionByte84",
-            MessageCode4SuccessFlag84Scaffold() ? 1u : 0u);
+            MessageCode4SuccessFlag84() ? 1u : 0u);
         if (handledCode4 != 0u) {
             return handledCode4;
         }
@@ -1723,7 +1865,7 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
     if (hadValidMessageCode && decodedMessageCode == 5u && payloadByteCount >= 17u) {
         std::array<uint8_t, 16> seedBytes85 = {};
         std::copy_n(payloadBytes + 1u, seedBytes85.size(), seedBytes85.begin());
-        SetMessageCode5SeedBytes85Scaffold(seedBytes85);
+        SetMessageCode5SeedBytes85(seedBytes85);
         spdlog::info(
             "CMarginConnection::DispatchCopiedParsedPacketTailScaffold source-owned local code5 branch rawCode=0x{:02x} headerless={} locatorDecoded={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
             static_cast<unsigned>(rawCode),

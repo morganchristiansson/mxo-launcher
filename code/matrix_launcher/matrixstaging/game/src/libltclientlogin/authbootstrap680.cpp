@@ -893,9 +893,9 @@ bool AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold(
 
     const uint8_t* prepBase = child.opaqueStateB0ToEb.data();
     const bool storedReplyCopy =
-        marginConnection.StoreBootstrapReplyCopy98Scaffold(copyShadow, sizeof(*copyShadow));
+        marginConnection.StoreBootstrapReplyCopy98(copyShadow, sizeof(*copyShadow));
     const bool storedPrepState =
-        marginConnection.StoreBootstrapPrepStateA0Scaffold(
+        marginConnection.StoreBootstrapPrepStateA0(
             prepBase,
             prepBase + kBootstrapPrepBlockByteCount,
             prepBase + (kBootstrapPrepBlockByteCount * 2u),

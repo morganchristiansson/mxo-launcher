@@ -171,8 +171,12 @@ Neighboring corroboration:
 
 Current best combined read:
 - the `+0x85` family is real and reused
-- but the `0x4429b0 / 0x41470` path is best treated as a **neighboring/sibling object** path,
-  not as proof that every `+0x85/+0x9c` write there belongs to this exact child type
+- but the `0x4429b0 / 0x41470` path is now tightened further as a **neighboring margin-connection
+  object** path:
+  - `0x4429b0` is reached from `CBaseMarginConnection::DispatchMessage` consumed code-2 handling
+  - `0x41470` lazily builds/refeshes connection `+0x9c = CStreamPacketEncryptionModule`
+- so that path is still not proof that every `+0x85/+0x9c` write there belongs to this exact child
+  type
 
 ### 6. Raw `0x0b` / auth-reply adoption (`0x448140`)
 

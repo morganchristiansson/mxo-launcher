@@ -501,11 +501,15 @@ Current best reading remains:
           - builds/sends raw auth code `0x08`
           - strongest current **`AS_AuthRequest`** candidate
           - also emits a later auxiliary raw `0x1b` packet on that same indirect path
-      - newer bootstrap-object follow-up now also tightens what those fields mean later:
-        - `0x429b0` uses bootstrap helper pointer `+0xa0 -> +0x1c` on a later incoming path
-        - it writes 16-byte challenge-derived material to bootstrap `+0x85 .. +0x94`
-        - then `0x41470` derives/caches a dword-ish token at bootstrap `+0x9c`
-        - that same `+0x9c` value is then used by both raw `0x06` and raw `0x08` send builders
+      - newer follow-up on the neighboring consumed margin code-2 path now tightens those fields
+        differently:
+        - `0x429b0` is reached from `CBaseMarginConnection::DispatchMessage`
+        - it uses margin-connection helper pointer `+0xa0 -> +0x1c` on that later incoming path
+        - it writes 16-byte challenge-derived material to margin connection `+0x85 .. +0x94`
+        - then `0x41470 = CBaseMarginConnection_EnsureStreamPacketEncryptionModule` lazily builds or
+          refreshes connection `+0x9c = CStreamPacketEncryptionModule`
+        - that `+0x9c` value is therefore packet-agenda module state on the margin connection, not
+          the earlier auth raw `0x06/0x08` send-builder state
       - important channel-specific correction from the same pass still holds:
         - margin-side wrapper traffic must be read through the separate margin table
         - for example, raw code `0x06` on `0x41af70` maps to **`MS_GetClientIPRequest`**, not auth-side `AS_GetPublicKeyRequest`

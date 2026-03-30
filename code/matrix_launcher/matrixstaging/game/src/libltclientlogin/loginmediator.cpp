@@ -1387,7 +1387,7 @@ void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
 // anchor: launcher.exe:0x41b4f0
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
-        if (const uint8_t* seedPointer = marginConnection->MessageCode5SeedBytes85PointerScaffold()) {
+        if (const uint8_t* seedPointer = marginConnection->MessageCode5SeedBytes85Pointer()) {
             spdlog::info(
                 "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=connection+0x85 mirror connection={}]",
                 fmt::ptr(seedPointer),
@@ -2650,6 +2650,10 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             // Keep the nearer live connection mirror populated from that earlier recovery point so
             // direct client `+0xd4` callers stop depending on the launcher-owned sidecar on the
             // active path.
+            // Current tighter source consequence from the new `0x4429b0 -> 0x441470` pass:
+            // - writing that live `+0x85..+0x94` mirror on the margin connection now also triggers
+            //   the lazy local `+0x9c = CStreamPacketEncryptionModule` scaffold install/refresh,
+            //   matching the newly recovered agenda-module ownership point more closely.
             if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
                 marginConnection != nullptr && marginBootstrapState.marginTwofishKeyBytes.size() == 16u) {
                 std::array<uint8_t, 16> liveSeedBytes85 = {};
@@ -2657,7 +2661,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     marginBootstrapState.marginTwofishKeyBytes.begin(),
                     liveSeedBytes85.size(),
                     liveSeedBytes85.begin());
-                marginConnection->SetMessageCode5SeedBytes85Scaffold(liveSeedBytes85);
+                marginConnection->SetMessageCode5SeedBytes85(liveSeedBytes85);
                 spdlog::info(
                     "DIAGNOSTIC: mirrored launcher-owned CERT_Challenge Twofish key into live margin connection +0x85..+0x94 early because the active replacement path has not yet naturally hit the decoded code-5 writeback seam connection={}",
                     fmt::ptr(marginConnection));
@@ -3249,13 +3253,13 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
     const uint32_t status = ReadU32LE(packetBytes + 1u);
     auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
     if (marginConnection != nullptr) {
-        marginConnection->SetMessageCode4SuccessFlag84Scaffold(status == 0u);
+        marginConnection->SetMessageCode4SuccessFlag84(status == 0u);
     }
 
     uint32_t localWorkItemHandled = 0u;
     if (marginConnection != nullptr) {
         localWorkItemHandled =
-            marginConnection->DispatchMessageCode4LocalCompletionWorkItemScaffold(status);
+            marginConnection->DispatchMessageCode4LocalCompletionWorkItem(status);
     }
 
     spdlog::info(
@@ -3263,7 +3267,7 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
         static_cast<unsigned>(packetBytes[0]),
         status,
         transportEncrypted ? 1u : 0u,
-        (marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84Scaffold()) ? 1u : 0u,
+        (marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84()) ? 1u : 0u,
         static_cast<unsigned>(localWorkItemHandled),
         currentState_ ? currentState_->DebugName() : "<null>");
 

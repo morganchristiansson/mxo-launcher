@@ -117,7 +117,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
     auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(mediator->MarginConnection());
     const bool marginConnectionReady84 =
-        marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84Scaffold();
+        marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84();
     if (!marginConnectionReady84) {
         CLTLoginState* fallbackState = mediator->ScaffoldState5();
         const uint32_t fallbackResult = fallbackState

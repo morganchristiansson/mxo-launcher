@@ -148,7 +148,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         mediator->PrepareState5MarginConnectionCopySendScaffold(marginConnection);
     const uint32_t sendResult =
         (marginConnection != nullptr && preparedCopySendState)
-            ? marginConnection->SendStoredBootstrapReplyCopy98Scaffold()
+            ? marginConnection->SendStoredBootstrapReplyCopy98()
             : 0u;
     mediator->PostEventScaffold(0x10u);
     spdlog::info(
