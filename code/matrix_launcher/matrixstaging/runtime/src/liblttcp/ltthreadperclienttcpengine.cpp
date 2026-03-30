@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -95,14 +96,10 @@ static std::unordered_map<CLTThreadPerClientTCPEngine_Queue*, std::vector<uint32
 // Current best read:
 // - the real `0xb4` engine object is already fully accounted for by the recovered in-object fields
 //   at `+0x04/+0x08/+0x0c/+0x34/+0x5c/+0x60/+0x7c/+0x80/+0x84/+0x8c/+0x90/+0x98`
-// - so none of the members below should be mistaken for hidden original class fields
-// - recovered runtime payload families are tracked separately from bridge-only side state using
-//   node shapes that match the launcher tree families rather than source vectors
-struct CLTThreadPerClientTCPEngine_SideState {
-    CLTThreadPerClientTCPEngine_LauncherAbiAttachment attachedLauncherAbiSurface = {};
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authBridgeContext = nullptr;
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginBridgeContext = nullptr;
-};
+// - so none of the source-owned maps below should be mistaken for hidden original class fields
+// - recovered runtime payload families are tracked separately from source-only launcher bridge
+//   baggage using node shapes that match the launcher tree families rather than source vectors
+using CLTThreadPerClientTCPEngine_ConnectionRegistry = std::unordered_set<CMessageConnection*>;
 
 static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
 using CLTThreadPerClientTCPEngine_EndpointTreeNode =
@@ -132,31 +129,52 @@ struct CLTThreadPerClientTCPEngine_ContextPayloadBacking {
     std::unordered_map<CLTThreadPerClientTCPEngine_ContextTreeNode*, std::unique_ptr<CLTThreadPerClientTCPEngine_ContextPayloadEntry>> entries;
 };
 
-static std::unordered_map<CLTThreadPerClientTCPEngine*, std::unique_ptr<CLTThreadPerClientTCPEngine_SideState>>
-    g_CLTThreadPerClientTCPEngineSideStates;
+static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_LauncherAbiAttachment>
+    g_CLTThreadPerClientTCPEngineLauncherAbiAttachments;
+// Static RE anchors proving the original engine family is keyed by direct connection objects:
+// - `0x4325d0` / `0x4328a0` pass the direct connection object to `0x431ff0`
+// - `0x431ff0` stores `[connection+0x08] = workerThread` and inserts key=`connection` into `+0x8c`
+// - `0x4316a0` later searches `+0x8c` with that same raw connection pointer
+// - `0x449d40` enqueues completed operations with `context = connection`
+// - `0x436b10` consumes that queued `context` directly and calls slot 12 on type-1 items
+// Current source therefore tracks known live connections generically by direct connection identity
+// rather than by auth/margin-specific bridge maps.
+static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_ConnectionRegistry>
+    g_CLTThreadPerClientTCPEngineKnownConnections;
 static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_EndpointPayloadBacking>
     g_CLTThreadPerClientTCPEngineEndpointPayloadBackings;
 static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_ContextPayloadBacking>
     g_CLTThreadPerClientTCPEngineContextPayloadBackings;
 
-static CLTThreadPerClientTCPEngine_SideState* FindEngineSideState(
+static CLTThreadPerClientTCPEngine_LauncherAbiAttachment* FindEngineLauncherAbiAttachment(
     const CLTThreadPerClientTCPEngine* self) {
     if (!self) {
         return nullptr;
     }
-    auto it = g_CLTThreadPerClientTCPEngineSideStates.find(
+    auto it = g_CLTThreadPerClientTCPEngineLauncherAbiAttachments.find(
         const_cast<CLTThreadPerClientTCPEngine*>(self));
-    return (it != g_CLTThreadPerClientTCPEngineSideStates.end()) ? it->second.get() : nullptr;
+    return (it != g_CLTThreadPerClientTCPEngineLauncherAbiAttachments.end()) ? &it->second
+                                                                          : nullptr;
 }
 
-static CLTThreadPerClientTCPEngine_SideState& EnsureEngineSideState(
+static CLTThreadPerClientTCPEngine_LauncherAbiAttachment& EnsureEngineLauncherAbiAttachment(
     CLTThreadPerClientTCPEngine* self) {
-    std::unique_ptr<CLTThreadPerClientTCPEngine_SideState>& slot =
-        g_CLTThreadPerClientTCPEngineSideStates[self];
-    if (!slot) {
-        slot = std::make_unique<CLTThreadPerClientTCPEngine_SideState>();
+    return g_CLTThreadPerClientTCPEngineLauncherAbiAttachments[self];
+}
+
+static CLTThreadPerClientTCPEngine_ConnectionRegistry* FindEngineConnectionRegistry(
+    const CLTThreadPerClientTCPEngine* self) {
+    if (!self) {
+        return nullptr;
     }
-    return *slot;
+    auto it = g_CLTThreadPerClientTCPEngineKnownConnections.find(
+        const_cast<CLTThreadPerClientTCPEngine*>(self));
+    return (it != g_CLTThreadPerClientTCPEngineKnownConnections.end()) ? &it->second : nullptr;
+}
+
+static CLTThreadPerClientTCPEngine_ConnectionRegistry& EnsureEngineConnectionRegistry(
+    CLTThreadPerClientTCPEngine* self) {
+    return g_CLTThreadPerClientTCPEngineKnownConnections[self];
 }
 
 static CLTThreadPerClientTCPEngine_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
@@ -189,25 +207,28 @@ static CLTThreadPerClientTCPEngine_ContextPayloadBacking& EnsureEngineContextPay
     return g_CLTThreadPerClientTCPEngineContextPayloadBackings[self];
 }
 
+static bool IsLauncherBridgeContextScaffold(
+    const mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context) {
+    return context != nullptr && context->vtable == g_LauncherConnectionBridgeContextVtable;
+}
+
+// Static-RE note for the current bridge seam:
+// - original `0x4325d0/0x4328a0 -> 0x431ff0` and `0x449d40 -> 0x436820` paths are connection-keyed
+// - keep the source-owned mediator bridge context attached to the direct connection object's
+//   owner/context pointer instead of mirroring auth/margin-specific maps on the engine
 static mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*
 ResolveLauncherBridgeContextForConnectionScaffold(
-    const CLTThreadPerClientTCPEngine* engine,
     const CMessageConnection* connection) {
-    if (!engine || !connection) {
+    if (!connection) {
         return nullptr;
     }
 
-    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(engine);
-    if (!side) {
-        return nullptr;
-    }
-    if (side->authBridgeContext && side->authBridgeContext->sidecarConnection == connection) {
-        return side->authBridgeContext;
-    }
-    if (side->marginBridgeContext && side->marginBridgeContext->sidecarConnection == connection) {
-        return side->marginBridgeContext;
-    }
-    return nullptr;
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(
+            connection->OwnerContext());
+    return (IsLauncherBridgeContextScaffold(context) && context->sidecarConnection == connection)
+        ? context
+        : nullptr;
 }
 
 template <typename Head>
@@ -609,7 +630,8 @@ static bool ContextTreeEraseNode(
 }
 
 static void EraseEngineBackings(CLTThreadPerClientTCPEngine* self) {
-    g_CLTThreadPerClientTCPEngineSideStates.erase(self);
+    g_CLTThreadPerClientTCPEngineLauncherAbiAttachments.erase(self);
+    g_CLTThreadPerClientTCPEngineKnownConnections.erase(self);
     g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.erase(self);
     g_CLTThreadPerClientTCPEngineContextPayloadBackings.erase(self);
 }
@@ -1436,7 +1458,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
     }
 
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* launcherContext =
-        ResolveLauncherBridgeContextForConnectionScaffold(engine, connection);
+        ResolveLauncherBridgeContextForConnectionScaffold(connection);
     const char* connectStatusLabel =
         (launcherContext && launcherContext->isMarginConnection) ? "MarginConnectStatus"
                                                                  : "AuthConnectStatus";
@@ -1850,11 +1872,12 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
     // anchor: launcher.exe:0x4366f0
     // Faithfulness restructuring:
     // - keep the real recovered arg5 fields on the object body itself
-    // - keep only launcher-shell attachment + auth/margin bridge baggage in side-state
+    // - keep only source-only launcher-shell attachment + generic direct-connection bookkeeping in
+    //   discrete engine-keyed maps instead of a synthetic per-engine side-state record
+    // - keep launcher bridge contexts on the connection owner/context pointers rather than in
+    //   auth/margin-specific engine maps
     // - keep recovered payload families (`+0x08`, `+0x80/+0x84`, `+0x8c/+0x90`) in dedicated
     //   source backings keyed by `this`, not as pretend hidden object fields
-    (void)EnsureEngineSideState(this);
-
     ownedQueueLockHelper60_.vtable = nullptr;
     ownedCleanupLockHelper98_.vtable = nullptr;
     Queue_Init(&ownedQueue0C_, 0);
@@ -2382,36 +2405,38 @@ cleanup_tail:
 // UNANCHORED: launcher ABI-shell attachment/mirror entrypoint.
 void CLTThreadPerClientTCPEngine::AttachLauncherAbiSurfaceScaffold(
     const CLTThreadPerClientTCPEngine_LauncherAbiAttachment& attachment) {
-    EnsureEngineSideState(this).attachedLauncherAbiSurface = attachment;
+    EnsureEngineLauncherAbiAttachment(this) = attachment;
     SyncAttachedLauncherObjectStateScaffold();
 }
 
 // UNANCHORED: launcher ABI-shell detach/reset helper.
 void CLTThreadPerClientTCPEngine::DetachLauncherAbiSurfaceScaffold() {
-    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    if (!side) {
+    CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    if (!attachment) {
         return;
     }
 
-    if (side->attachedLauncherAbiSurface.field04CtorFlags) {
-        *side->attachedLauncherAbiSurface.field04CtorFlags = 0u;
+    if (attachment->field04CtorFlags) {
+        *attachment->field04CtorFlags = 0u;
     }
-    if (side->attachedLauncherAbiSurface.field08QueueThreadArray) {
-        *side->attachedLauncherAbiSurface.field08QueueThreadArray = nullptr;
+    if (attachment->field08QueueThreadArray) {
+        *attachment->field08QueueThreadArray = nullptr;
     }
-    if (side->attachedLauncherAbiSurface.list80EndpointTreeHead) {
-        *side->attachedLauncherAbiSurface.list80EndpointTreeHead = nullptr;
+    if (attachment->list80EndpointTreeHead) {
+        *attachment->list80EndpointTreeHead = nullptr;
     }
-    if (side->attachedLauncherAbiSurface.field84EndpointCount) {
-        *side->attachedLauncherAbiSurface.field84EndpointCount = 0u;
+    if (attachment->field84EndpointCount) {
+        *attachment->field84EndpointCount = 0u;
     }
-    if (side->attachedLauncherAbiSurface.list8CContextTreeHead) {
-        *side->attachedLauncherAbiSurface.list8CContextTreeHead = nullptr;
+    if (attachment->list8CContextTreeHead) {
+        *attachment->list8CContextTreeHead = nullptr;
     }
-    if (side->attachedLauncherAbiSurface.field90ContextCount) {
-        *side->attachedLauncherAbiSurface.field90ContextCount = 0u;
+    if (attachment->field90ContextCount) {
+        *attachment->field90ContextCount = 0u;
     }
-    side->attachedLauncherAbiSurface = {};
+
+    g_CLTThreadPerClientTCPEngineLauncherAbiAttachments.erase(this);
 }
 
 void CLTThreadPerClientTCPEngine::RefreshOwnedLauncherMirrorStateScaffold() {
@@ -2440,73 +2465,85 @@ void CLTThreadPerClientTCPEngine::RefreshOwnedLauncherMirrorStateScaffold() {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::SyncAttachedLauncherObjectStateScaffold() {
     RefreshOwnedLauncherMirrorStateScaffold();
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    if (side.attachedLauncherAbiSurface.field04CtorFlags) {
-        *side.attachedLauncherAbiSurface.field04CtorFlags = ctorFlagsField04_;
+    CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    if (!attachment) {
+        return;
     }
-    if (side.attachedLauncherAbiSurface.field08QueueThreadArray) {
-        *side.attachedLauncherAbiSurface.field08QueueThreadArray = queueThreadArrayField08_;
+
+    if (attachment->field04CtorFlags) {
+        *attachment->field04CtorFlags = ctorFlagsField04_;
     }
-    if (side.attachedLauncherAbiSurface.list80EndpointTreeHead) {
-        *side.attachedLauncherAbiSurface.list80EndpointTreeHead = ownedEndpointTreeHead80_;
+    if (attachment->field08QueueThreadArray) {
+        *attachment->field08QueueThreadArray = queueThreadArrayField08_;
     }
-    if (side.attachedLauncherAbiSurface.field84EndpointCount) {
-        *side.attachedLauncherAbiSurface.field84EndpointCount = ownedEndpointCount84_;
+    if (attachment->list80EndpointTreeHead) {
+        *attachment->list80EndpointTreeHead = ownedEndpointTreeHead80_;
     }
-    if (side.attachedLauncherAbiSurface.list8CContextTreeHead) {
-        *side.attachedLauncherAbiSurface.list8CContextTreeHead = ownedContextTreeHead8C_;
+    if (attachment->field84EndpointCount) {
+        *attachment->field84EndpointCount = ownedEndpointCount84_;
     }
-    if (side.attachedLauncherAbiSurface.field90ContextCount) {
-        *side.attachedLauncherAbiSurface.field90ContextCount = ownedContextCount90_;
+    if (attachment->list8CContextTreeHead) {
+        *attachment->list8CContextTreeHead = ownedContextTreeHead8C_;
+    }
+    if (attachment->field90ContextCount) {
+        *attachment->field90ContextCount = ownedContextCount90_;
     }
 }
 
 CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue0CScaffold() {
-    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return (side && side->attachedLauncherAbiSurface.queue0C)
-        ? side->attachedLauncherAbiSurface.queue0C
+    CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    return (attachment && attachment->queue0C)
+        ? attachment->queue0C
         : &ownedQueue0C_;
 }
 
 CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue34Scaffold() {
-    CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return (side && side->attachedLauncherAbiSurface.queue34)
-        ? side->attachedLauncherAbiSurface.queue34
+    CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    return (attachment && attachment->queue34)
+        ? attachment->queue34
         : &ownedQueue34_;
 }
 
 const CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue0CScaffold() const {
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return (side && side->attachedLauncherAbiSurface.queue0C)
-        ? side->attachedLauncherAbiSurface.queue0C
+    const CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    return (attachment && attachment->queue0C)
+        ? attachment->queue0C
         : &ownedQueue0C_;
 }
 
 const CLTThreadPerClientTCPEngine_Queue* CLTThreadPerClientTCPEngine::ActiveQueue34Scaffold() const {
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return (side && side->attachedLauncherAbiSurface.queue34)
-        ? side->attachedLauncherAbiSurface.queue34
+    const CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    return (attachment && attachment->queue34)
+        ? attachment->queue34
         : &ownedQueue34_;
 }
 
 void* CLTThreadPerClientTCPEngine::ActiveQueueLockScaffold() const {
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return (side && side->attachedLauncherAbiSurface.queueLock)
-        ? side->attachedLauncherAbiSurface.queueLock
+    const CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    return (attachment && attachment->queueLock)
+        ? attachment->queueLock
         : const_cast<CRITICAL_SECTION*>(&ownedQueueLockHelper60_.crit);
 }
 
 void* CLTThreadPerClientTCPEngine::ActiveQueueSignalEventScaffold() const {
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return (side && side->attachedLauncherAbiSurface.queueSignalEvent)
-        ? side->attachedLauncherAbiSurface.queueSignalEvent
+    const CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    return (attachment && attachment->queueSignalEvent)
+        ? attachment->queueSignalEvent
         : ownedQueueSignalEvent7C_;
 }
 
 void* CLTThreadPerClientTCPEngine::ActiveCleanupLockScaffold() const {
-    const CLTThreadPerClientTCPEngine_SideState* side = FindEngineSideState(this);
-    return (side && side->attachedLauncherAbiSurface.cleanupLock)
-        ? side->attachedLauncherAbiSurface.cleanupLock
+    const CLTThreadPerClientTCPEngine_LauncherAbiAttachment* attachment =
+        FindEngineLauncherAbiAttachment(this);
+    return (attachment && attachment->cleanupLock)
+        ? attachment->cleanupLock
         : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98_.crit);
 }
 
@@ -2600,13 +2637,26 @@ mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* CLTThreadPerClientTCPEn
     return *slot;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTThreadPerClientTCPEngine::AttachLauncherConnectionBridgeContextsScaffold(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext,
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext) {
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    side.authBridgeContext = authContext;
-    side.marginBridgeContext = marginContext;
+// UNANCHORED: source-owned connection registry for the current launcher bridge.
+void CLTThreadPerClientTCPEngine::RegisterKnownConnectionScaffold(CMessageConnection* connection) {
+    if (!connection) {
+        return;
+    }
+    connection->SetEngine(this);
+    EnsureEngineConnectionRegistry(this).insert(connection);
+}
+
+// UNANCHORED: source-owned connection registry for the current launcher bridge.
+void CLTThreadPerClientTCPEngine::UnregisterKnownConnectionScaffold(CMessageConnection* connection) {
+    if (!connection) {
+        return;
+    }
+    if (CLTThreadPerClientTCPEngine_ConnectionRegistry* registry = FindEngineConnectionRegistry(this)) {
+        registry->erase(connection);
+        if (registry->empty()) {
+            g_CLTThreadPerClientTCPEngineKnownConnections.erase(this);
+        }
+    }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2826,9 +2876,27 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaffold() {
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-    PumpLauncherConnectionContextScaffold(side.authBridgeContext, "AuthReceivePacket");
-    PumpLauncherConnectionContextScaffold(side.marginBridgeContext, "MarginReceivePacket");
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext = nullptr;
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext = nullptr;
+
+    if (CLTThreadPerClientTCPEngine_ConnectionRegistry* registry =
+            FindEngineConnectionRegistry(this)) {
+        for (CMessageConnection* connection : *registry) {
+            mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+                ResolveLauncherBridgeContextForConnectionScaffold(connection);
+            if (!context) {
+                continue;
+            }
+            if (context->isMarginConnection) {
+                marginContext = context;
+            } else {
+                authContext = context;
+            }
+        }
+    }
+
+    PumpLauncherConnectionContextScaffold(authContext, "AuthReceivePacket");
+    PumpLauncherConnectionContextScaffold(marginContext, "MarginReceivePacket");
 }
 
 // anchor: launcher.exe:0x436b10
@@ -3004,15 +3072,19 @@ CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* con
             connection->OwnerContext() == resolvedContextKey;
     };
 
-    CLTThreadPerClientTCPEngine_SideState& side = EnsureEngineSideState(this);
-
-    // Prefer the live auth/margin bridge-tracked sidecar connections. Current fidelity rule:
-    // do not fabricate generic engine-owned fallback `CMessageConnection` objects here.
-    if (side.authBridgeContext && matchesConnectionKey(side.authBridgeContext->sidecarConnection)) {
-        return side.authBridgeContext->sidecarConnection;
+    if (CMessageConnection* queuedConnection =
+            dynamic_cast<CMessageConnection*>(queueContextOwner);
+        queuedConnection && matchesConnectionKey(queuedConnection)) {
+        return queuedConnection;
     }
-    if (side.marginBridgeContext && matchesConnectionKey(side.marginBridgeContext->sidecarConnection)) {
-        return side.marginBridgeContext->sidecarConnection;
+
+    if (CLTThreadPerClientTCPEngine_ConnectionRegistry* registry =
+            FindEngineConnectionRegistry(this)) {
+        for (CMessageConnection* connection : *registry) {
+            if (matchesConnectionKey(connection)) {
+                return connection;
+            }
+        }
     }
 
     return nullptr;
@@ -3064,7 +3136,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
         return nullptr;
     }
 
-    connection->SetEngine(this);
+    RegisterKnownConnectionScaffold(connection);
     if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
         connection->SetOwnerContext(normalizedContextKey);
     }

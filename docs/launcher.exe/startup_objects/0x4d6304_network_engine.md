@@ -101,20 +101,19 @@ Base ctor `0x4366f0` / `CLTBaseThreadPerClientTCPEngine_ctor` itself:
 - allocates an array at `+0x08` when the effective queue-thread count is non-zero
 - constructs per-entry helper objects of size `0x3c` through `0x4365a0` / `CLTThreadPerClientTCPEngine_QueueThread_ctor`
 
-New side-state audit from the current constructor / destructor / worker-insert pass (`0x431c30`,
-`0x4366f0`, `0x431310`, `0x431ff0`):
+New non-original-state audit from the current constructor / destructor / worker-insert pass
+(`0x431c30`, `0x4366f0`, `0x431310`, `0x431ff0`):
 - the original `0xb4` object body is already fully spoken for by the recovered fields above plus:
   - endpoint tree / count at `+0x80/+0x84`
   - context tree / count at `+0x8c/+0x90`
   - cleanup lock helper at `+0x98`
-- so the current source-side `CLTThreadPerClientTCPEngine_SideState` members are **not** evidence
-  for hidden launcher fields
+- so any source-owned bookkeeping around launcher-ABI attachment or auth/margin bridge contexts is
+  **not** evidence for hidden launcher fields
 - current best mapping is now tighter in source too:
   - real object `+0x04/+0x08` now directly own the queue-thread count / pointer-array backing in the
-    class instead of hiding that family in side-state
+    class instead of hiding that family in a synthetic side record
   - recovered endpoint-keyed and context-keyed payload families are now kept in dedicated
-    source-owned tree backings keyed by engine identity, not inside
-    `CLTThreadPerClientTCPEngine_SideState` and not as pretend hidden launcher fields
+    source-owned tree backings keyed by engine identity, not as pretend hidden launcher fields
     - endpoint backing now uses direct MinGW `_Rb_tree_node<std::pair<key,payload*>>` node types
       with the same recovered `0x24` node size / layout expected by the
       `0x4318f0 / 0x42fdb0 / 0x4154d0` family and keeps launcher-visible head `+0x80`
@@ -131,8 +130,25 @@ New side-state audit from the current constructor / destructor / worker-insert p
         higher-level wrapper record: it now mirrors launcher.exe more closely as the direct
         `WorkerThread` object pointer, with source-owned backing only retaining ownership of that
         object outside the raw tree node
-  - side `attachedLauncherAbiSurface`, `authBridgeContext`, and `marginBridgeContext`
-    = source-only bridge baggage, not original `launcher.exe` class members
+  - source-only launcher-ABI attachment now lives in a discrete engine-keyed map, while launcher
+    bridge contexts remain mediator-owned records hung directly off each connection's owner/context
+    pointer instead of a synthetic `CLTThreadPerClientTCPEngine_SideState` aggregate
+    - current Ghidra pass also sharpened why auth/margin-specific engine maps were infidelity:
+      - `0x4325d0` / `0x4328a0` pass the direct connection object into worker helper `0x431ff0`
+      - `0x431ff0` stores `[connection+0x08] = workerThread` and inserts key=`connection` into the
+        `+0x8c` context tree
+      - `0x4316a0` / `CleanupConnection` later searches that same `+0x8c` tree by the raw
+        connection pointer
+      - `0x449d40` / `CLTTCPConnection::OnReceive` enqueues completed operations with
+        `context = this /* connection */`
+      - `0x436b10` then consumes that queued `context` directly and invokes slot 12 on type-1 work
+      - so the original engine tracks direct connection objects through this family, not separate
+        auth/margin bridge-context records
+    - current source consequence:
+      - the old auth/margin-specific engine maps were removed
+      - the remaining source-owned bridge lookup now resolves through
+        `connection->OwnerContext()` plus a generic engine-keyed known-connection registry keyed by
+        direct connection identity
   - earlier generic fallback engine-owned `CMessageConnection` allocation has now been retired from
     the active slot-resolution path because current RE does not support it as original engine state
   - dead source-only accessors kept only for compile compatibility (`MonitoredPorts()`,
@@ -1359,16 +1375,15 @@ Important limitation:
     - the direct connection object pointer,
     - the explicit queue-context bridge object that wraps the owning connection, or
     - the connection's stored owner/context key
-    and it now also searches the live auth/margin bridge-tracked sidecar connections before falling back to source-created generic entries
-  - newer bounded creation correction then normalizes queue-context bridge inputs back to the owning
-    connection/context key before creating any generic sidecar entry, which avoids inventing a
-    second synthetic connection record keyed only by the bridge object
+    while consulting a generic engine-keyed known-connection registry instead of auth/margin-specific engine maps
+  - newer bounded correction then normalizes queue-context bridge inputs back to the owning
+    connection/context key instead of inventing a second synthetic connection record keyed only by
+    the bridge object
   - newer bounded slot-6 correction now makes that normalization explicit on `Connect(...)` and
     the lower resolved-endpoint helper too:
-    - prefer an already-live auth/margin or engine-tracked connection-family object first
-    - only then create a generic sidecar fallback on the normalized owning key
-    - worker insertion on the connect path now also stores the normalized owning key and mirrors the
-      resulting socket/state back onto the matched connection-family object immediately
+    - prefer an already-known direct connection-family object first
+    - worker insertion on the connect path now also stores the direct connection object and mirrors
+      the resulting socket/state back onto the matched connection-family object immediately
   - newer source pruning there also collapsed repeated queue-context normalization into shared local
     engine helpers and moved repeated worker->connection state/socket mirroring behind one helper
     instead of open-coding that logic at each call site
@@ -1630,10 +1645,9 @@ A follow-up restructuring pass pulled `mxo::liblttcp::CLTThreadPerClientTCPEngin
 recovered original arg5 body instead of leaving later source-owned baggage inside the class.
 
 What changed:
-- non-original source bookkeeping moved out of the class body into external side-state keyed by
-  `this`
+- non-original source bookkeeping moved out of the class body into external engine-keyed storage
   - launcher-ABI attachment map
-  - bridge contexts
+  - generic known-connection registry
   - queue-thread vector
   - monitored-port / worker-thread / message-connection vectors
 - the native class body itself now again carries the recovered top-level arg5 fields at the

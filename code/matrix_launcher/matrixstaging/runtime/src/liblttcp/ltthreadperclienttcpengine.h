@@ -460,9 +460,12 @@ public:
         mxo::ltlogin::CLTLoginMediator* mediator,
         const char* label,
         bool isMarginConnection);
-    void AttachLauncherConnectionBridgeContextsScaffold(
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext,
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext);
+    // UNANCHORED: source-owned connection registry used by the current launcher bridge.
+    // Current static-RE reason this is closer than auth/margin-specific engine maps:
+    // - original `0x4325d0/0x4328a0 -> 0x431ff0` paths are keyed by the direct connection object
+    // - `0x449d40 -> 0x436820` also queues the direct connection object as `context`
+    void RegisterKnownConnectionScaffold(CMessageConnection* connection);
+    void UnregisterKnownConnectionScaffold(CMessageConnection* connection);
     bool EnqueueLauncherConnectionStatusWorkItemScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         uint32_t workType,
@@ -497,8 +500,10 @@ public:
     size_t QueueThreadCount() const;
 
     // Source-owned connection resolver. Current faithful preference order is:
-    // - real bridge-tracked auth/margin connection objects
-    // - no generic engine-owned synthetic fallback allocation
+    // - direct connection object / queue-context owner
+    // - mediator-owned launcher bridge context -> sidecarConnection
+    // - engine-owned generic connection registry keyed by direct connection identity
+    // - no generic synthetic fallback allocation
     CMessageConnection* FindMessageConnection(void* contextKey);
 
 private:

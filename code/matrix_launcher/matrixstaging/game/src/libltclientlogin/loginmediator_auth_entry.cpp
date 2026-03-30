@@ -336,9 +336,6 @@ void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
     }
 
     SetNetworkEngine(engine);
-    engine_->AttachLauncherConnectionBridgeContextsScaffold(
-        authConnectionContextScaffold_,
-        marginConnectionContextScaffold_);
     EnsureBuiltinScaffoldStatesRegistered();
     RegisterActiveStateSourceScaffold(this);
     spdlog::info(
@@ -372,9 +369,6 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         SetAuthConnectionContextKey(context);
         context->sidecarConnection = EnsureAuthConnectionObject();
     }
-    engine_->AttachLauncherConnectionBridgeContextsScaffold(
-        authConnectionContextScaffold_,
-        marginConnectionContextScaffold_);
 
     // Current replacement-side fidelity correction:
     // - the later existing-character state8 path still needs the earlier auth/bootstrap child at
@@ -399,9 +393,6 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     if (context) {
         context->sidecarConnection = AuthConnection();
     }
-    engine_->AttachLauncherConnectionBridgeContextsScaffold(
-        authConnectionContextScaffold_,
-        marginConnectionContextScaffold_);
 
     engine_->SyncAttachedLauncherObjectStateScaffold();
 
@@ -431,18 +422,12 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
         SetMarginConnectionContextKey(context);
         context->sidecarConnection = EnsureMarginConnectionObject();
     }
-    engine_->AttachLauncherConnectionBridgeContextsScaffold(
-        authConnectionContextScaffold_,
-        marginConnectionContextScaffold_);
 
     const uint32_t result = BeginMarginConnectionViaState4Scaffold();
     const std::string marginHost = ResolvedMarginHostName();
     if (context) {
         context->sidecarConnection = MarginConnection();
     }
-    engine_->AttachLauncherConnectionBridgeContextsScaffold(
-        authConnectionContextScaffold_,
-        marginConnectionContextScaffold_);
 
     engine_->SyncAttachedLauncherObjectStateScaffold();
 
@@ -1103,6 +1088,9 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
         dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
     if (!authConnection) {
         if (authConnectionOwnedByMediator_) {
+            if (engine_ != nullptr) {
+                engine_->UnregisterKnownConnectionScaffold(authConnection_);
+            }
             delete authConnection_;
         }
         authConnection = new mxo::liblttcp::CAuthStartupConnection(engine_);
@@ -1129,6 +1117,9 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
     authConnection->ConfigurePacketNameFamilyScaffold(
         mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kAuth,
         /*packetizedMessagesEnabled=*/true);
+    if (engine_ != nullptr) {
+        engine_->RegisterKnownConnectionScaffold(authConnection);
+    }
     return authConnection_;
 }
 
