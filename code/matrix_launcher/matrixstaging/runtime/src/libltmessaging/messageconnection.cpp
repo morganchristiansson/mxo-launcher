@@ -1,6 +1,7 @@
 #include "messageconnection.h"
 
 #include "../../../game/src/libltclientlogin/loginmediator.h"
+#include "../libltcrypto/auth_crypto.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -48,7 +49,25 @@ static uint32_t __thiscall CMessageConnectionRefCounted_Release(void* self) {
         return 0u;
     }
     current = InterlockedDecrement(refCount);
-    return static_cast<uint32_t>(current > 0 ? current : 0);
+    if (current == 0) {
+        void** const vtable = *reinterpret_cast<void***>(self);
+        if (vtable && vtable[3] != nullptr) {
+            using FinalReleaseFn = void(__thiscall*)(void*);
+            reinterpret_cast<FinalReleaseFn>(vtable[3])(self);
+        }
+        return 0u;
+    }
+    return static_cast<uint32_t>(current);
+}
+
+// anchor: launcher.exe:0x42f880 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x10`
+static void __thiscall CMessageConnectionRefCounted_ResetRefCount(void* self) {
+    if (!self) {
+        return;
+    }
+    InterlockedExchange(
+        reinterpret_cast<LONG*>(static_cast<uint8_t*>(self) + 4),
+        0);
 }
 
 // anchor: launcher.exe:0x42f890 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x14`
@@ -90,12 +109,16 @@ static void __thiscall CMessageConnectionReceivedMessageRef_GrowPayload(
             CMessageConnectionMessageScaffold::kMaxPayloadByteCount)));
 }
 
+// Source note:
+// - these local scaffold vtables now preserve the recovered slot ordering through `+0x14/+0x18`
+// - slot `+0x0c` stays null here because these specific source objects are local/non-deleting,
+//   unlike the original pooled heap families documented at `0x004ba208/0x004ba23c`
 static void* g_CMessageConnectionMessageStorageVtable[] = {
     reinterpret_cast<void*>(CMessageConnectionMessageStorage_Dtor),
     reinterpret_cast<void*>(CMessageConnectionRefCounted_AddRef),
     reinterpret_cast<void*>(CMessageConnectionRefCounted_Release),
     nullptr,
-    nullptr,
+    reinterpret_cast<void*>(CMessageConnectionRefCounted_ResetRefCount),
     reinterpret_cast<void*>(CMessageConnectionRefCounted_SetRefCountFromPtr),
 };
 
@@ -104,7 +127,7 @@ static void* g_CMessageConnectionReceivedMessageRefVtable[] = {
     reinterpret_cast<void*>(CMessageConnectionRefCounted_AddRef),
     reinterpret_cast<void*>(CMessageConnectionRefCounted_Release),
     nullptr,
-    nullptr,
+    reinterpret_cast<void*>(CMessageConnectionRefCounted_ResetRefCount),
     reinterpret_cast<void*>(CMessageConnectionRefCounted_SetRefCountFromPtr),
     reinterpret_cast<void*>(CMessageConnectionReceivedMessageRef_GrowPayload),
 };
@@ -242,6 +265,173 @@ void CMessageConnectionReceivedMessageRefScaffold::ResetForPacketBuilderScaffold
     messageStorage0c = &ownedMessageStorageScaffold24;
 }
 
+namespace {
+
+static bool CMessageConnection_ResolveTransformInputSpan(
+    const CMessageConnectionMessageRefScaffold& inputMessageRef,
+    const uint8_t** outPayloadBytes,
+    size_t* outPayloadByteCount) {
+    if (outPayloadBytes) {
+        *outPayloadBytes = nullptr;
+    }
+    if (outPayloadByteCount) {
+        *outPayloadByteCount = 0u;
+    }
+
+    const CMessageConnectionMessageScaffold* const messageStorage =
+        inputMessageRef.messageStorage0c;
+    if (!messageStorage) {
+        return false;
+    }
+
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint32_t skippedPrefixByteCount = inputMessageRef.field08;
+    if (!payloadBytes || skippedPrefixByteCount > payloadByteCount) {
+        return false;
+    }
+
+    if (outPayloadBytes) {
+        *outPayloadBytes = payloadBytes + skippedPrefixByteCount;
+    }
+    if (outPayloadByteCount) {
+        *outPayloadByteCount =
+            static_cast<size_t>(payloadByteCount - skippedPrefixByteCount);
+    }
+    return true;
+}
+
+static void CStreamPacketEncryptionModuleReadHelper_RecordSuccessfulTransformIndex(
+    CStreamPacketEncryptionModuleReadHelper* helper,
+    size_t successfulIndex) {
+    if (!helper || helper->transformWorkers.size() <= 1u) {
+        return;
+    }
+
+    // anchor: launcher.exe:0x44d2e0
+    if (successfulIndex == 0u) {
+        ++helper->collectionControl0c;
+    } else {
+        helper->collectionControl0c = 0u;
+    }
+}
+
+static std::vector<uint8_t> CStreamPacketEncryptionWorker_KeyBytes(
+    const std::array<uint8_t, 16>& seedBytes) {
+    return std::vector<uint8_t>(seedBytes.begin(), seedBytes.end());
+}
+
+}  // namespace
+
+// anchor: launcher.exe:0x44d390 / 0x44d500
+void CMessageConnectionMessageRefOutputBuffer::Reset() {
+    hasValue = false;
+    messageRef.ResetForPacketBuilderScaffold(false, 0u);
+}
+
+// anchor: launcher.exe:0x44c8b0
+bool CMessageConnectionMessageRefOutputBuffer::SetPayloadBytes(
+    const uint8_t* payloadBytes,
+    size_t payloadByteCount) {
+    Reset();
+    if (!payloadBytes || payloadByteCount == 0u ||
+        payloadByteCount > CMessageConnectionMessageScaffold::kMaxPayloadByteCount) {
+        return false;
+    }
+
+    CMessageConnectionMessageScaffold* const messageStorage = messageRef.messageStorage0c;
+    if (!messageStorage || !messageStorage->PayloadBaseScaffold()) {
+        return false;
+    }
+
+    messageStorage->ResetPayloadByteCountScaffold(
+        static_cast<uint16_t>(payloadByteCount));
+    std::copy_n(
+        payloadBytes,
+        payloadByteCount,
+        messageStorage->PayloadBaseScaffold());
+    hasValue = true;
+    return true;
+}
+
+// anchor: launcher.exe:0x44d390 / 0x44d500
+CMessageConnectionMessageRefScaffold* CMessageConnectionMessageRefOutputBuffer::MessageRef() {
+    return hasValue ? &messageRef : nullptr;
+}
+
+// anchor: launcher.exe:0x44d910 / 0x44daf0
+void CStreamPacketEncryptionModuleReadTransformWorker::ResetForSeed(
+    const std::array<uint8_t, 16>& seedBytes) {
+    associatedSeedBytes = seedBytes;
+}
+
+// anchor: launcher.exe:0x44d500
+bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
+    const CMessageConnectionMessageRefScaffold& inputMessageRef,
+    CMessageConnectionMessageRefOutputBuffer* outputBuffer) const {
+    if (!outputBuffer) {
+        return false;
+    }
+
+    const uint8_t* encryptedPayloadBytes = nullptr;
+    size_t encryptedPayloadByteCount = 0u;
+    if (!CMessageConnection_ResolveTransformInputSpan(
+            inputMessageRef,
+            &encryptedPayloadBytes,
+            &encryptedPayloadByteCount)) {
+        return false;
+    }
+
+    std::vector<uint8_t> decryptedPayloadBytes;
+    if (!mxo::auth::DecryptMarginPayloadPacket(
+            encryptedPayloadBytes,
+            encryptedPayloadByteCount,
+            CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
+            &decryptedPayloadBytes)) {
+        return false;
+    }
+    return outputBuffer->SetPayloadBytes(
+        decryptedPayloadBytes.data(),
+        decryptedPayloadBytes.size());
+}
+
+// anchor: launcher.exe:0x44d820 / 0x44daf0
+void CStreamPacketEncryptionModuleWriteTransformWorker::ResetForSeed(
+    const std::array<uint8_t, 16>& seedBytes) {
+    associatedSeedBytes = seedBytes;
+}
+
+// anchor: launcher.exe:0x44d390
+bool CStreamPacketEncryptionModuleWriteTransformWorker::TryTransform(
+    const CMessageConnectionMessageRefScaffold& inputMessageRef,
+    CMessageConnectionMessageRefOutputBuffer* outputBuffer) const {
+    if (!outputBuffer) {
+        return false;
+    }
+
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!CMessageConnection_ResolveTransformInputSpan(
+            inputMessageRef,
+            &payloadBytes,
+            &payloadByteCount)) {
+        return false;
+    }
+
+    mxo::auth::FramedPacket encryptedPacket;
+    if (!mxo::auth::EncryptMarginPayloadPacket(
+            payloadBytes,
+            payloadByteCount,
+            CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
+            mxo::auth::kFrameModeAuto,
+            &encryptedPacket)) {
+        return false;
+    }
+    return outputBuffer->SetPayloadBytes(
+        encryptedPacket.payloadBytes.data(),
+        encryptedPacket.payloadBytes.size());
+}
+
 void CStreamPacketEncryptionHelperBase::ForwardToNextHelper(
     void* opaqueMessageRef) {
     if (nextHelper04) {
@@ -252,13 +442,28 @@ void CStreamPacketEncryptionHelperBase::ForwardToNextHelper(
 // anchor: launcher.exe:0x44d500
 void CStreamPacketEncryptionModuleReadHelper::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
-    // Current source keeps the module read-helper body conservative until the concrete
-    // transform/decrypt worker objects at helper `+0x0c/+0x10/+0x14` are modeled faithfully.
-    // Static RE now narrows the missing local output family to:
-    // - `0x004b84f0` final message-ref sink
-    // - `0x004b8380` read-side 10-byte prefix-buffering sink in front of it
-    // but source does not yet model those helper-local buffered-transformation objects.
-    ForwardToNextHelper(opaqueMessageRef);
+    CMessageConnectionMessageRefScaffold* const inputMessageRef =
+        static_cast<CMessageConnectionMessageRefScaffold*>(opaqueMessageRef);
+    if (!inputMessageRef || transformWorkers.empty()) {
+        collectionControl0c = 0u;
+        ForwardToNextHelper(nullptr);
+        return;
+    }
+
+    for (size_t workerIndex = 0; workerIndex < transformWorkers.size(); ++workerIndex) {
+        if (!transformWorkers[workerIndex].TryTransform(*inputMessageRef, &transformedOutput)) {
+            continue;
+        }
+        CStreamPacketEncryptionModuleReadHelper_RecordSuccessfulTransformIndex(
+            this,
+            workerIndex);
+        ForwardToNextHelper(transformedOutput.MessageRef());
+        return;
+    }
+
+    collectionControl0c = 0u;
+    transformedOutput.Reset();
+    ForwardToNextHelper(nullptr);
 }
 
 // anchor: launcher.exe:0x44da00 / 0x44daf0
@@ -267,18 +472,33 @@ void CStreamPacketEncryptionModuleReadHelper::ResetForOwner(
     nextHelper04 = nullptr;
     owner08 = owner;
     collectionControl0c = 0u;
-    collectionBegin10 = nullptr;
-    collectionEnd14 = nullptr;
+    transformWorkers.clear();
+    transformedOutput.Reset();
+}
+
+// anchor: launcher.exe:0x44da00 / 0x44daf0
+void CStreamPacketEncryptionModuleReadHelper::ResetForSeed(
+    const std::array<uint8_t, 16>& seedBytes) {
+    collectionControl0c = 0u;
+    transformWorkers.clear();
+    transformWorkers.emplace_back();
+    transformWorkers.back().ResetForSeed(seedBytes);
+    transformedOutput.Reset();
 }
 
 // anchor: launcher.exe:0x44d390
 void CStreamPacketEncryptionModuleWriteHelper::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
-    // Current source keeps the module write-helper body conservative until the concrete
-    // transform worker rooted at helper `+0x0c/+0x10` is modeled faithfully.
-    // Static RE now narrows the missing local output sink there to `0x004b84f0`, but source does
-    // not yet model that helper-local buffered-transformation object family.
-    ForwardToNextHelper(opaqueMessageRef);
+    CMessageConnectionMessageRefScaffold* const inputMessageRef =
+        static_cast<CMessageConnectionMessageRefScaffold*>(opaqueMessageRef);
+    if (!inputMessageRef || !hasTransformWorker ||
+        !transformWorker.TryTransform(*inputMessageRef, &transformedOutput)) {
+        transformedOutput.Reset();
+        ForwardToNextHelper(nullptr);
+        return;
+    }
+
+    ForwardToNextHelper(transformedOutput.MessageRef());
 }
 
 // anchor: launcher.exe:0x44d820 / 0x44daf0
@@ -286,8 +506,17 @@ void CStreamPacketEncryptionModuleWriteHelper::ResetForOwner(
     CStreamPacketEncryptionModule* owner) {
     nextHelper04 = nullptr;
     owner08 = owner;
-    embeddedTransformAdapter0c = nullptr;
-    embeddedTransformAdapterMeta10 = nullptr;
+    hasTransformWorker = false;
+    transformWorker = {};
+    transformedOutput.Reset();
+}
+
+// anchor: launcher.exe:0x44d820 / 0x44daf0
+void CStreamPacketEncryptionModuleWriteHelper::ResetForSeed(
+    const std::array<uint8_t, 16>& seedBytes) {
+    hasTransformWorker = true;
+    transformWorker.ResetForSeed(seedBytes);
+    transformedOutput.Reset();
 }
 
 // anchor: launcher.exe:0x469980
@@ -320,6 +549,8 @@ void CStreamPacketEncryptionModule::InitializeForMarginConnectionSeed(
     configuredConnection10 = nullptr;
     ownedReadHelper14.ResetForOwner(this);
     ownedWriteHelper2c.ResetForOwner(this);
+    ownedReadHelper14.ResetForSeed(seedBytes85);
+    ownedWriteHelper2c.ResetForSeed(seedBytes85);
     readHelper04 = &ownedReadHelper14;
     writeHelper08 = &ownedWriteHelper2c;
     associatedSeedBytes40 = seedBytes85;
@@ -336,9 +567,11 @@ void CStreamPacketEncryptionModule::RefreshFromMarginConnectionSeed(
     }
     if (readHelper04) {
         readHelper04->owner08 = this;
+        readHelper04->ResetForSeed(seedBytes85);
     }
     if (writeHelper08) {
         writeHelper08->owner08 = this;
+        writeHelper08->ResetForSeed(seedBytes85);
     }
     associatedSeedBytes40 = seedBytes85;
 }
@@ -539,8 +772,8 @@ CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgenda(
     // Current bounded source model preserves the nearer `0x469950` handoff shape:
     // - no agenda / no active write helper (`+0x44 == 0`) => keep the original message-ref pointer
     // - active write helper => return agenda `+0x24` exactly after the helper chain runs
-    // That keeps helper-side replacement/discard visible even though the concrete source helper
-    // bodies currently remain conservative pass-through.
+    // Source now models that chain with real internal worker classes, keeping helper-side
+    // replacement/discard visible at the same seam as the original.
     CMessageConnectionPacketAgenda* agenda = packetAgenda_.get();
     if (!agenda || !agenda->created) {
         return &inputMessageRef;
@@ -1095,10 +1328,11 @@ static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
 
 // anchor: launcher.exe:0x469980 / embedded helper vtable `0x004baf48 +0x0c`
 // Source-owned mirror of the currently modeled read-side agenda effect:
-// store the incoming message-ref into the agenda read-output slot at `+0x08`.
+// drive the read-helper chain and let the eventual embedded agenda helper store the final
+// message-ref pointer into agenda `+0x08`.
 // With the internal-only family now modeled as full virtual C++ classes, source routes this
-// through the helper-chain head directly. The concrete helper implementations remain conservative:
-// module read helper forwards to the embedded agenda helper, which then stores the output slot.
+// through the helper-chain head directly, so module read helpers can now replace or discard the
+// message-ref before the embedded helper stores the output slot.
 static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
     CMessageConnectionPacketAgenda* agenda,
     CMessageConnectionReceivedMessageRefScaffold* inputMessageRef) {
@@ -1112,12 +1346,13 @@ static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
 // anchor: launcher.exe:0x469930
 // Source-owned mirror of the read-side packet-agenda handoff just before leaf dispatch.
 // Current bounded source model:
-// - a created agenda always has the embedded default read pass-through helper at `+0x0c`
+// - a created agenda always has the embedded default read helper at `+0x0c`
 // - source now owns that helper's concrete agenda `+0x08` output-slot effect
-// - source now keeps the nearer `0x4489d0` seam as a raw pointer handoff instead of deep-copying
-//   a source-owned message-ref owner tail first
-// - caller-installed read helpers are still modeled as pass-through-only until helper-side
-//   transformation/discard behavior is recovered
+// - source keeps the nearer `0x4489d0` seam as a raw pointer handoff instead of deep-copying a
+//   source-owned message-ref owner tail first
+// - caller-installed read helpers can now replace or discard the message-ref through the recovered
+//   module family, though the exact original worker object/lifetime split is still narrower than
+//   source
 static CMessageConnectionReceivedMessageRefScaffold* CMessageConnection_ApplyReceivePacketAgendaScaffold(
     CMessageConnectionPacketAgenda* agenda,
     CMessageConnectionReceivedMessageRefScaffold* inputMessageRef,

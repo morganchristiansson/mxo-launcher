@@ -266,6 +266,44 @@ protected:
 class CMessageConnection;
 class CStreamPacketEncryptionModule;
 
+class CMessageConnectionMessageRefOutputBuffer {
+public:
+    // Source-owned real C++ helper class for the recovered helper-local transformed-output family.
+    // Canonical original sink vtables remain documented under:
+    // - `0x004b8438`
+    // - `0x004b84f0`
+    CMessageConnectionMessageRefScaffold messageRef{};
+    bool hasValue = false;
+
+    void Reset();
+    bool SetPayloadBytes(const uint8_t* payloadBytes, size_t payloadByteCount);
+    CMessageConnectionMessageRefScaffold* MessageRef();
+};
+
+class CStreamPacketEncryptionModuleReadTransformWorker {
+public:
+    // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
+    // by `0x44d910`.
+    std::array<uint8_t, 16> associatedSeedBytes{};
+
+    void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
+    bool TryTransform(
+        const CMessageConnectionMessageRefScaffold& inputMessageRef,
+        CMessageConnectionMessageRefOutputBuffer* outputBuffer) const;
+};
+
+class CStreamPacketEncryptionModuleWriteTransformWorker {
+public:
+    // Source-owned real C++ mirror of the embedded write-side transform worker rooted at helper
+    // `+0x0c` by `0x44d820` / worker vtable `0x004b86a8`.
+    std::array<uint8_t, 16> associatedSeedBytes{};
+
+    void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
+    bool TryTransform(
+        const CMessageConnectionMessageRefScaffold& inputMessageRef,
+        CMessageConnectionMessageRefOutputBuffer* outputBuffer) const;
+};
+
 class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase {
 public:
     // Current common source-owned state on the two module child helpers.
@@ -283,16 +321,16 @@ public:
     // - owner `+0x04`
     // - inserted at agenda `+0x40` by `0x469740`
     // - therefore the concrete module-side **read helper**
-    // - helper `+0x0c/+0x10/+0x14` form the read-side collection front matter consumed by
+    // - original helper `+0x0c/+0x10/+0x14` form the read-side collection front matter consumed by
     //   `0x44d500 / 0x44d2e0 / 0x44d770`
-    // - the collection entries themselves are the larger transform-worker objects built by
-    //   `0x44d910` (worker vtable `0x004b7620`)
+    // - source now models that as a real worker collection rather than raw begin/end pointers
     uint32_t collectionControl0c = 0;
-    void* collectionBegin10 = nullptr;
-    void* collectionEnd14 = nullptr;
+    std::vector<CStreamPacketEncryptionModuleReadTransformWorker> transformWorkers;
+    CMessageConnectionMessageRefOutputBuffer transformedOutput;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
     void ResetForOwner(CStreamPacketEncryptionModule* owner);
+    void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 };
 
 class CStreamPacketEncryptionModuleWriteHelper
@@ -303,15 +341,16 @@ public:
     // - owner `+0x08`
     // - inserted at agenda `+0x44/+0x48` by `0x469740`
     // - therefore the concrete module-side **write helper**
-    // Current source still keeps only a narrow front placeholder here:
     // - original `0x44d820` constructs a much larger embedded transform worker at helper `+0x0c`
-    // - that embedded worker is then retabled to `0x004b86a8`
-    // - `0x44d390` drives the write-side transform through that embedded object
-    void* embeddedTransformAdapter0c = nullptr;
-    void* embeddedTransformAdapterMeta10 = nullptr;
+    //   and retables it to `0x004b86a8`
+    // - source now models that as a real worker class rather than raw placeholder pointers
+    CStreamPacketEncryptionModuleWriteTransformWorker transformWorker;
+    bool hasTransformWorker = false;
+    CMessageConnectionMessageRefOutputBuffer transformedOutput;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
     void ResetForOwner(CStreamPacketEncryptionModule* owner);
+    void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 };
 
 class CStreamPacketEncryptionAgendaHelper : public CStreamPacketEncryptionHelperBase {
@@ -462,8 +501,9 @@ public:
     // - `0x469740` installs owner `+0x04` as the agenda read helper and owner `+0x08` as the
     //   agenda write helper
     // Current source model now keeps the recovered raw agenda/helper front matter plus the
-    // installed named module pointer explicit, while still leaving helper-side
-    // transformation/discard behavior conservative.
+    // installed named module pointer explicit, and now also routes helper-side
+    // replacement/discard through source-owned real C++ worker classes for the newly recovered
+    // module family.
     void ConfigurePacketAgenda(
         CStreamPacketEncryptionModule* streamPacketEncryptionModule = nullptr);
     // UNANCHORED: source-owned accessor for the lazy packet-agenda scaffold pointer.
@@ -533,8 +573,9 @@ private:
     // UNANCHORED: source-owned send-side packet-agenda handoff helper.
     // Current bounded model preserves the nearer `0x469950` shape:
     // - no active write helper => keep the original message-ref pointer
-    // - active write helper => return agenda `+0x24` exactly, so helper-side replacement/discard
-    //   remains visible even while the concrete source helper bodies stay conservative pass-through
+    // - active write helper => return agenda `+0x24` exactly after the helper chain runs
+    // Source now models that chain with real internal worker classes, so helper-side
+    // replacement/discard remains visible at the same seam as the original.
     CMessageConnectionMessageRefScaffold* ApplySendPacketAgenda(
         CMessageConnectionMessageRefScaffold& inputMessageRef,
         bool* outAgendaTouched);
