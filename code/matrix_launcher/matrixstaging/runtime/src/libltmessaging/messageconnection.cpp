@@ -295,16 +295,33 @@ void CStreamPacketEncryptionAgendaHelper::ResetForAgenda(
     downstreamHelperSlot14 = downstreamHelperSlot;
 }
 
-void CStreamPacketEncryptionModule::ResetForMarginConnectionSeed(
+void CStreamPacketEncryptionModule::InitializeForMarginConnectionSeed(
     const std::array<uint8_t, 16>& seedBytes85) {
     readHelper04 = nullptr;
     writeHelper08 = nullptr;
     nextConfiguredModule0c = nullptr;
-    configuredAgendaIdentity10 = nullptr;
+    configuredConnection10 = nullptr;
     ownedReadHelper14.ResetForOwner(this);
     ownedWriteHelper2c.ResetForOwner(this);
     readHelper04 = &ownedReadHelper14;
     writeHelper08 = &ownedWriteHelper2c;
+    associatedSeedBytes40 = seedBytes85;
+}
+
+void CStreamPacketEncryptionModule::RefreshFromMarginConnectionSeed(
+    const std::array<uint8_t, 16>& seedBytes85) {
+    if (readHelper04 == nullptr) {
+        readHelper04 = &ownedReadHelper14;
+    }
+    if (writeHelper08 == nullptr) {
+        writeHelper08 = &ownedWriteHelper2c;
+    }
+    if (readHelper04) {
+        readHelper04->owner08 = this;
+    }
+    if (writeHelper08) {
+        writeHelper08->owner08 = this;
+    }
     associatedSeedBytes40 = seedBytes85;
 }
 
@@ -363,54 +380,71 @@ void CMessageConnection::ConfigurePacketAgenda(
     }
 
     CMessageConnectionPacketAgenda& agenda = *packetAgenda_;
-    agenda.configuredModuleList04 = nullptr;
-    agenda.readOutputSlot08 = nullptr;
-    agenda.embeddedReadHelper0c.ResetForAgenda(
-        "Agenda read helper",
-        reinterpret_cast<void**>(&agenda.readOutputSlot08),
-        &agenda.writeHelperChainHead44);
-    agenda.writeOutputSlot24 = nullptr;
-    agenda.embeddedWriteHelper28.ResetForAgenda(
-        "Agenda write helper",
-        reinterpret_cast<void**>(&agenda.writeOutputSlot24),
-        nullptr);
-    agenda.readHelperChainHead40 = &agenda.embeddedReadHelper0c;
-    agenda.writeHelperChainHead44 = nullptr;
-    agenda.writeHelperChainTail48 = nullptr;
-    agenda.configuredModuleCount4c = 0u;
-    agenda.reserved4e = 0u;
-    agenda.created = true;
-    agenda.configuredStreamPacketEncryptionModule = streamPacketEncryptionModule;
+    if (!agenda.created) {
+        // anchor: launcher.exe:0x448980 -> 0x469850
+        // Faithful agenda initialization recovered from `0x469850`:
+        // - agenda `+0x00` stores the owning connection pointer
+        // - agenda `+0x04` starts with no configured modules
+        // - embedded read helper at `+0x0c` stores into agenda `+0x08` and delegates via
+        //   helper field `+0x14 -> &agenda+0x44`
+        // - embedded write helper at `+0x28` stores into agenda `+0x24`
+        // - agenda `+0x40` starts at the embedded read helper
+        // - agenda `+0x44/+0x48` start empty
+        agenda.connectionOwner00 = this;
+        agenda.configuredModuleList04 = nullptr;
+        agenda.readOutputSlot08 = nullptr;
+        agenda.embeddedReadHelper0c.ResetForAgenda(
+            "Agenda read helper",
+            reinterpret_cast<void**>(&agenda.readOutputSlot08),
+            &agenda.writeHelperChainHead44);
+        agenda.writeOutputSlot24 = nullptr;
+        agenda.embeddedWriteHelper28.ResetForAgenda(
+            "Agenda write helper",
+            reinterpret_cast<void**>(&agenda.writeOutputSlot24),
+            nullptr);
+        agenda.readHelperChainHead40 = &agenda.embeddedReadHelper0c;
+        agenda.writeHelperChainHead44 = nullptr;
+        agenda.writeHelperChainTail48 = nullptr;
+        agenda.configuredModuleCount4c = 0u;
+        agenda.reserved4e = 0u;
+        agenda.created = true;
+        agenda.configuredStreamPacketEncryptionModule = nullptr;
+    }
 
     // anchor: launcher.exe:0x448980 -> 0x469740
     // Current tighter install read from `0x469740`:
-    // - agenda starts with embedded/default read helper at `+0x0c`
-    // - module `+0x04` becomes the read-chain head and links onward to that embedded helper
-    // - module `+0x08` becomes the write-chain head/tail and links onward to the embedded write
-    //   helper at `+0x28`
-    // - module `+0x0c/+0x10` are also updated as agenda-owned bookkeeping
+    // - module `+0x0c` becomes the next link in agenda `+0x04`
+    // - module `+0x04` is pushed onto agenda read head `+0x40`
+    // - module `+0x08` is appended onto the write chain rooted at agenda `+0x44/+0x48`
+    // - module `+0x10` receives agenda `+0x00` (the owning connection pointer)
     if (!streamPacketEncryptionModule) {
         return;
     }
 
     streamPacketEncryptionModule->nextConfiguredModule0c = agenda.configuredModuleList04;
-    streamPacketEncryptionModule->configuredAgendaIdentity10 = &agenda;
     agenda.configuredModuleList04 = streamPacketEncryptionModule;
 
     if (streamPacketEncryptionModule->readHelper04) {
-        streamPacketEncryptionModule->readHelper04->nextHelper04 =
-            agenda.readHelperChainHead40;
+        CStreamPacketEncryptionHelperBase* const previousReadHead = agenda.readHelperChainHead40;
         agenda.readHelperChainHead40 = streamPacketEncryptionModule->readHelper04;
+        streamPacketEncryptionModule->readHelper04->nextHelper04 = previousReadHead;
     }
 
     if (streamPacketEncryptionModule->writeHelper08) {
+        CStreamPacketEncryptionHelperBase* const previousWriteTail = agenda.writeHelperChainTail48;
         streamPacketEncryptionModule->writeHelper08->nextHelper04 =
             &agenda.embeddedWriteHelper28;
-        agenda.writeHelperChainHead44 = streamPacketEncryptionModule->writeHelper08;
         agenda.writeHelperChainTail48 = streamPacketEncryptionModule->writeHelper08;
+        if (previousWriteTail) {
+            previousWriteTail->nextHelper04 = streamPacketEncryptionModule->writeHelper08;
+        } else {
+            agenda.writeHelperChainHead44 = streamPacketEncryptionModule->writeHelper08;
+        }
     }
 
-    agenda.configuredModuleCount4c = 1u;
+    streamPacketEncryptionModule->configuredConnection10 = agenda.connectionOwner00;
+    agenda.configuredStreamPacketEncryptionModule = streamPacketEncryptionModule;
+    ++agenda.configuredModuleCount4c;
 }
 
 const CMessageConnectionPacketAgenda* CMessageConnection::PacketAgenda() const {
@@ -484,10 +518,9 @@ CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgenda(
     // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
     // Current bounded source model preserves the nearer `0x469950` handoff shape:
     // - no agenda / no active write helper (`+0x44 == 0`) => keep the original message-ref pointer
-    // - active write helper => return the agenda write-output slot at `+0x24`
-    // Current source still lacks helper-side transformation/discard, so the concrete helper
-    // implementations currently forward the same pointer through the virtual chain and let the
-    // embedded agenda helper populate output slot `+0x24`.
+    // - active write helper => return agenda `+0x24` exactly after the helper chain runs
+    // That keeps helper-side replacement/discard visible even though the concrete source helper
+    // bodies currently remain conservative pass-through.
     CMessageConnectionPacketAgenda* agenda = packetAgenda_.get();
     if (!agenda || !agenda->created) {
         return &inputMessageRef;
@@ -502,9 +535,7 @@ CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgenda(
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
-    return agenda->writeOutputSlot24
-        ? agenda->writeOutputSlot24
-        : &inputMessageRef;
+    return agenda->writeOutputSlot24;
 }
 
 // anchor: launcher.exe:0x448a00
@@ -1709,7 +1740,8 @@ void CMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85() {
         return;
     }
 
-    if (!streamPacketEncryptionModule9c_) {
+    const bool needsInitialInstall = (streamPacketEncryptionModule9c_ == nullptr);
+    if (needsInitialInstall) {
         streamPacketEncryptionModule9c_ =
             std::make_unique<CStreamPacketEncryptionModule>();
     }
@@ -1718,12 +1750,19 @@ void CMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85() {
         return;
     }
 
-    streamPacketEncryptionModule9c_->ResetForMarginConnectionSeed(
-        messageCode5SeedBytes85_);
-    ConfigurePacketAgenda(streamPacketEncryptionModule9c_.get());
+    if (needsInitialInstall) {
+        streamPacketEncryptionModule9c_->InitializeForMarginConnectionSeed(
+            messageCode5SeedBytes85_);
+        ConfigurePacketAgenda(streamPacketEncryptionModule9c_.get());
+    } else {
+        // Preserve the already-installed agenda links on the original `0x44daf0` refresh path.
+        streamPacketEncryptionModule9c_->RefreshFromMarginConnectionSeed(
+            messageCode5SeedBytes85_);
+    }
 
     spdlog::info(
-        "CMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85 synced connection+0x9c module from seed85_94 module={} agenda={} firstDword=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85 {} connection+0x9c module from seed85_94 module={} agenda={} firstDword=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        needsInitialInstall ? "installed" : "refreshed",
         fmt::ptr(streamPacketEncryptionModule9c_.get()),
         fmt::ptr(PacketAgenda()),
         static_cast<unsigned>(

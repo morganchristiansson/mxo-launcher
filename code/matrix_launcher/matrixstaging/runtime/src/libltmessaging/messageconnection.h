@@ -263,6 +263,7 @@ protected:
     void ForwardToNextHelper(void* opaqueMessageRef);
 };
 
+class CMessageConnection;
 class CStreamPacketEncryptionModule;
 
 class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase {
@@ -335,25 +336,26 @@ public:
     // - `readHelper04` = module **read helper** rooted at `0x004b86f0`
     // - `writeHelper08` = module **write helper** rooted at `0x004b8690`
     // - `nextConfiguredModule0c` = next configured module in the agenda-owned module list
-    // - `configuredAgendaIdentity10` = source-owned agenda identity copied during installation
+    // - `configuredConnection10` = agenda `+0x00` connection pointer copied during install
     CStreamPacketEncryptionModuleReadHelper* readHelper04 = nullptr;
     CStreamPacketEncryptionModuleWriteHelper* writeHelper08 = nullptr;
     CStreamPacketEncryptionModule* nextConfiguredModule0c = nullptr;
-    const void* configuredAgendaIdentity10 = nullptr;
+    CMessageConnection* configuredConnection10 = nullptr;
     CStreamPacketEncryptionModuleReadHelper ownedReadHelper14{};
     CStreamPacketEncryptionModuleWriteHelper ownedWriteHelper2c{};
     std::array<uint8_t, 16> associatedSeedBytes40{};
 
     const char* ClassName() const override { return "CStreamPacketEncryptionModule"; }
-    void ResetForMarginConnectionSeed(const std::array<uint8_t, 16>& seedBytes85);
+    void InitializeForMarginConnectionSeed(const std::array<uint8_t, 16>& seedBytes85);
+    void RefreshFromMarginConnectionSeed(const std::array<uint8_t, 16>& seedBytes85);
 };
 
 struct CMessageConnectionPacketAgenda {
     // Source-owned mirror of the lazy packet-processing agenda object rooted at original
     // connection `+0x74`.
-    // The original raw offsets remain documented in the canonical docs, but because the embedded
-    // helper/module family is now modeled as full internal-only C++ classes, this source mirror is
-    // intentionally behavioral rather than raw-layout-exact.
+    // This scaffold now keeps the recovered agenda front matter explicit where source can do so
+    // faithfully while still representing the two embedded helper objects as internal C++ wrappers.
+    CMessageConnection* connectionOwner00 = nullptr;
     CStreamPacketEncryptionModule* configuredModuleList04 = nullptr;
     CMessageConnectionReceivedMessageRefScaffold* readOutputSlot08 = nullptr;
     CStreamPacketEncryptionAgendaHelper embeddedReadHelper0c{};
@@ -523,8 +525,8 @@ private:
     // UNANCHORED: source-owned send-side packet-agenda handoff helper.
     // Current bounded model preserves the nearer `0x469950` shape:
     // - no active write helper => keep the original message-ref pointer
-    // - active write helper => preserve the agenda `+0x24` pointer handoff, but currently return
-    //   the same message-ref pointer until helper-side transformation/discard is recovered
+    // - active write helper => return agenda `+0x24` exactly, so helper-side replacement/discard
+    //   remains visible even while the concrete source helper bodies stay conservative pass-through
     CMessageConnectionMessageRefScaffold* ApplySendPacketAgenda(
         CMessageConnectionMessageRefScaffold& inputMessageRef,
         bool* outAgendaTouched);
