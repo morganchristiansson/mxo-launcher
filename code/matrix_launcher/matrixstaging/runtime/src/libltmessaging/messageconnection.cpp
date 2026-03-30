@@ -221,24 +221,6 @@ const uint8_t* CMessageConnectionMessageScaffold::PayloadBaseScaffold() const {
     return payloadBytes0c.data();
 }
 
-std::vector<uint8_t> CMessageConnectionMessageScaffold::BuildFramedBytesFrom0aScaffold() const {
-    const uint16_t payloadByteCount = PayloadByteCountScaffold();
-    std::vector<uint8_t> framedBytesFrom0a;
-    framedBytesFrom0a.reserve(static_cast<size_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u));
-
-    if (payloadByteCount > 0x7fu) {
-        framedBytesFrom0a.push_back(static_cast<uint8_t>(0x80u | ((payloadByteCount >> 8) & 0x7fu)));
-    } else {
-        framedBytesFrom0a.push_back(0u);
-    }
-    framedBytesFrom0a.push_back(static_cast<uint8_t>(payloadByteCount & 0xffu));
-    framedBytesFrom0a.insert(
-        framedBytesFrom0a.end(),
-        payloadBytes0c.begin(),
-        payloadBytes0c.begin() + payloadByteCount);
-    return framedBytesFrom0a;
-}
-
 
 const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family) {
     switch (family) {
@@ -295,6 +277,7 @@ void CMessageConnection::ConfigurePacketAgendaScaffold(const void* agendaConfigu
         packetAgendaScaffold_->hasReadOutputSlot08 = false;
         packetAgendaScaffold_->readOutputSlot08 = nullptr;
         packetAgendaScaffold_->hasWriteOutputSlot24 = false;
+        packetAgendaScaffold_->writeOutputSlot24 = nullptr;
         // anchor: launcher.exe:0x448980 -> 0x469740
         // Current best known original builder path (`0x41470 -> 0x44da00`) installs both a read
         // helper and a write helper on the agenda configuration object before `0x448980` forwards
@@ -351,40 +334,36 @@ CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPayloadEnvelopeScaff
     return envelope;
 }
 
-bool CMessageConnection::ApplySendPacketAgendaScaffold(
+const CMessageConnectionEnvelopeScaffold* CMessageConnection::ApplySendPacketAgendaScaffold(
     const CMessageConnectionEnvelopeScaffold& inputEnvelope,
-    CMessageConnectionEnvelopeScaffold* outputEnvelope,
     bool* outAgendaTouched) {
     if (outAgendaTouched) {
         *outAgendaTouched = false;
     }
-    if (outputEnvelope) {
-        *outputEnvelope = inputEnvelope;
-    }
 
     // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
     // Current bounded source model preserves the nearer `0x469950` handoff shape:
-    // - no agenda / no active write helper (`+0x44 == 0`) => keep the original envelope
+    // - no agenda / no active write helper (`+0x44 == 0`) => keep the original envelope pointer
     // - active write helper => return the agenda write-output slot at `+0x24`
     // Current source still lacks helper-side transformation/discard, so on the active helper path
-    // it seeds that output slot with the input envelope as a bounded pass-through fallback.
+    // it seeds that output slot with the same input envelope pointer as a bounded pass-through fallback.
     CMessageConnectionPacketAgendaScaffold* agenda = packetAgendaScaffold_.get();
     if (!agenda || !agenda->created) {
-        return true;
-    }
-    if (agenda->configuredWriteHelperCount == 0u) {
-        return true;
+        return &inputEnvelope;
     }
 
-    agenda->writeOutputSlot24 = inputEnvelope;
-    agenda->hasWriteOutputSlot24 = (agenda->writeOutputSlot24.sharedMessage != nullptr);
-    if (outputEnvelope && agenda->hasWriteOutputSlot24) {
-        *outputEnvelope = agenda->writeOutputSlot24;
+    agenda->hasWriteOutputSlot24 = false;
+    agenda->writeOutputSlot24 = nullptr;
+    if (agenda->configuredWriteHelperCount == 0u) {
+        return &inputEnvelope;
     }
+
+    agenda->writeOutputSlot24 = &inputEnvelope;
+    agenda->hasWriteOutputSlot24 = (agenda->writeOutputSlot24 != nullptr);
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
-    return agenda->hasWriteOutputSlot24;
+    return agenda->hasWriteOutputSlot24 ? agenda->writeOutputSlot24 : nullptr;
 }
 
 // anchor: launcher.exe:0x448a00
@@ -395,27 +374,21 @@ uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectio
         return 0u;
     }
 
-    const std::vector<uint8_t> framedBytesFrom0a = envelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
-    if (framedBytesFrom0a.size() < 2u) {
+    const CMessageConnectionMessageScaffold& messageStorage = *envelope.sharedMessage;
+    const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
+    const uint8_t* const payloadBase = messageStorage.PayloadBaseScaffold();
+    if (!payloadBase || payloadByteCount == 0u) {
         return 0u;
     }
 
-    const uint8_t frameByte0a = framedBytesFrom0a[0];
-    const uint8_t frameByte0b = framedBytesFrom0a[1];
-    const uint32_t payloadByteCount =
-        (static_cast<uint32_t>(frameByte0a & 0x7fu) << 8) |
-        static_cast<uint32_t>(frameByte0b);
+    const uint8_t frameByte0a = messageStorage.payloadLengthHigh0a;
     const size_t pointerOffsetFrom0a = ((frameByte0a >> 7) == 0u) ? 1u : 0u;
-    const uint32_t submittedByteCount = payloadByteCount + ((payloadByteCount > 0x7fu) ? 2u : 1u);
+    const uint32_t submittedByteCount = static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
+    const uint8_t* const submittedBytes = payloadBase - 2u + pointerOffsetFrom0a;
 
-    if (framedBytesFrom0a.size() < pointerOffsetFrom0a + submittedByteCount) {
-        return 0u;
-    }
-
-    const uint8_t* submittedBytes = framedBytesFrom0a.data() + pointerOffsetFrom0a;
     spdlog::info(
         "CMessageConnection::SubmitEnvelopeBytesScaffold reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(envelope.sharedMessage->reservedBytes08),
+        static_cast<unsigned>(messageStorage.reservedBytes08),
         static_cast<unsigned>(payloadByteCount),
         static_cast<unsigned>(submittedByteCount),
         static_cast<unsigned>(pointerOffsetFrom0a),
@@ -432,10 +405,10 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         return 0u;
     }
 
-    CMessageConnectionEnvelopeScaffold agendaEnvelope = {};
     bool agendaTouched = false;
-    if (!ApplySendPacketAgendaScaffold(envelope, &agendaEnvelope, &agendaTouched) ||
-        !agendaEnvelope.sharedMessage) {
+    const CMessageConnectionEnvelopeScaffold* const envelopeForSubmit =
+        ApplySendPacketAgendaScaffold(envelope, &agendaTouched);
+    if (!envelopeForSubmit || !envelopeForSubmit->sharedMessage) {
         spdlog::info(
             "CMessageConnection::SendPacketEnvelopeScaffold discarded packet at packet-agenda write handoff this={} ownerContext={} remoteHost='{}'",
             fmt::ptr(this),
@@ -444,18 +417,19 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         return 0u;
     }
 
-    const std::vector<uint8_t> framedBytesFrom0a = agendaEnvelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
-    const size_t submitOffset = (framedBytesFrom0a.empty() || ((framedBytesFrom0a[0] >> 7) != 0u)) ? 0u : 1u;
-    const size_t opcodeIndex = submitOffset + ((submitOffset == 0u) ? 2u : 1u);
-    const uint8_t rawOpcode = (opcodeIndex < framedBytesFrom0a.size()) ? framedBytesFrom0a[opcodeIndex] : 0u;
+    const CMessageConnectionMessageScaffold& messageStorage = *envelopeForSubmit->sharedMessage;
+    const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage.PayloadBaseScaffold();
+    const uint8_t rawOpcode = (payloadBytes && payloadByteCount != 0u) ? payloadBytes[0] : 0u;
+    const uint32_t submittedByteCount = static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
     const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
     spdlog::info(
-        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(agendaEnvelope.headerless10),
+        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(envelopeForSubmit->headerless10),
         static_cast<unsigned>(rawOpcode),
-        static_cast<unsigned>(agendaEnvelope.sharedMessage->reservedBytes08),
-        static_cast<unsigned>(agendaEnvelope.sharedMessage->PayloadByteCountScaffold()),
-        static_cast<unsigned>(framedBytesFrom0a.size()),
+        static_cast<unsigned>(messageStorage.reservedBytes08),
+        static_cast<unsigned>(payloadByteCount),
+        static_cast<unsigned>(submittedByteCount),
         static_cast<uint32_t>(packetNameCallbackScaffold_),
         PacketNameFamilyToString(PacketNameFamilyScaffold()),
         packetizedMessagesEnabledScaffold_ ? 1u : 0u,
@@ -467,7 +441,7 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return SubmitEnvelopeBytesScaffold(agendaEnvelope);
+    return SubmitEnvelopeBytesScaffold(*envelopeForSubmit);
 }
 
 // anchor: launcher.exe:0x448a60

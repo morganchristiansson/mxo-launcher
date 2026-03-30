@@ -1969,21 +1969,25 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
             nullptr);
     }
 
-    const std::vector<uint8_t> framedBytesFrom0a = envelope.sharedMessage->BuildFramedBytesFrom0aScaffold();
-    const size_t previewOffset = framedBytesFrom0a.empty() ? 0u : (((framedBytesFrom0a[0] >> 7) == 0u) ? 1u : 0u);
-    const std::string framedPreview =
-        (previewOffset < framedBytesFrom0a.size())
-            ? BuildHexPreview(framedBytesFrom0a.data() + previewOffset, framedBytesFrom0a.size() - previewOffset, 32u)
+    const uint16_t payloadByteCount = envelope.sharedMessage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBase = envelope.sharedMessage->PayloadBaseScaffold();
+    const size_t submitOffset = ((envelope.sharedMessage->payloadLengthHigh0a >> 7) == 0u) ? 1u : 0u;
+    const uint32_t submittedByteCount = static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
+    const uint8_t* const submittedBytes =
+        (payloadBase && payloadByteCount != 0u) ? (payloadBase - 2u + submitOffset) : nullptr;
+    const std::string submittedPreview =
+        (submittedBytes && submittedByteCount != 0u)
+            ? BuildHexPreview(submittedBytes, submittedByteCount, 32u)
             : std::string();
     spdlog::info(
-        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardEnvelopeToSendPacket host='{}' state={} reservedBytes08=0x{:04x} payloadBytes={} framedBytesFrom0a={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
+        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardEnvelopeToSendPacket host='{}' state={} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
         connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
         static_cast<unsigned>(connection->State()),
         static_cast<unsigned>(envelope.sharedMessage->reservedBytes08),
-        static_cast<unsigned>(envelope.sharedMessage->PayloadByteCountScaffold()),
-        static_cast<unsigned>(framedBytesFrom0a.size()),
-        static_cast<unsigned>(previewOffset),
-        framedPreview.empty() ? std::string("<empty>") : framedPreview);
+        static_cast<unsigned>(payloadByteCount),
+        static_cast<unsigned>(submittedByteCount),
+        static_cast<unsigned>(submitOffset),
+        submittedPreview.empty() ? std::string("<empty>") : submittedPreview);
     return connection->SendPacketEnvelopeScaffold(envelope);
 }
 

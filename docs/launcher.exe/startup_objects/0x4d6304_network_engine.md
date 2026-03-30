@@ -1183,6 +1183,10 @@ Current best virtual-method mapping on that class is now:
     - performs packet-agenda filtering first
     - then reaches lower submit helper `0x448a00`, which forwards final byte pointer/size into
       engine `+0x20`
+    - newer source tightening now mirrors that one step closer too:
+      - agenda write handoff stays pointer-first through agenda `+0x24`
+      - final send bytes are taken directly from inner raw `+0x0a/+0x0b/+0x0c..` storage instead of
+        rebuilding a temporary framed vector first
   - which matches current arg5 slot `8` / `SendBuffer`
 - vtable `+0x1c` / `0x449cd0` = likely endpoint-update / ensure-connected wrapper
   - copies a new endpoint into object `+0x24`

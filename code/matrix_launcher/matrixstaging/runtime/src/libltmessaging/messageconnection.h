@@ -165,8 +165,6 @@ struct CMessageConnectionMessageScaffold {
     uint8_t* PayloadBaseScaffold();
     // UNANCHORED: source-owned accessor for raw inline payload base `+0x0c`.
     const uint8_t* PayloadBaseScaffold() const;
-    // UNANCHORED: source-owned send-side framing helper rebuilt from raw `+0x0a/+0x0b/+0x0c..` bytes.
-    std::vector<uint8_t> BuildFramedBytesFrom0aScaffold() const;
 };
 
 static_assert(offsetof(CMessageConnectionMessageScaffold, payloadBytes0c) == 0x0c, "message storage payload offset mismatch");
@@ -240,6 +238,8 @@ struct CMessageConnectionPacketAgendaScaffold {
     // - send path `0x448cf0` consults the write side through `0x469950`, which returns agenda
     //   write-output slot `+0x24`, and may replace/discard the outgoing envelope when an active
     //   write helper exists at agenda `+0x44`
+    // - current source now keeps that `+0x24` effect as a transient raw envelope pointer handoff
+    //   instead of deep-copying the input envelope first
     bool created = false;
     bool hasEmbeddedDefaultReadPassThroughHelper0c = false;
     // Current source meaning of these counts:
@@ -250,7 +250,7 @@ struct CMessageConnectionPacketAgendaScaffold {
     bool hasReadOutputSlot08 = false;
     CMessageConnectionReceivedMessageRefScaffold* readOutputSlot08 = nullptr;
     bool hasWriteOutputSlot24 = false;
-    CMessageConnectionEnvelopeScaffold writeOutputSlot24;
+    const CMessageConnectionEnvelopeScaffold* writeOutputSlot24 = nullptr;
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
@@ -403,15 +403,15 @@ private:
     static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamilyScaffold family);
     // UNANCHORED: source-owned send-side packet-agenda handoff helper.
     // Current bounded model preserves the nearer `0x469950` shape:
-    // - no active write helper => keep the original envelope
-    // - active write helper => preserve the handoff/swap seam but currently pass the same envelope
-    //   through until helper-side transformation/discard is recovered
-    bool ApplySendPacketAgendaScaffold(
+    // - no active write helper => keep the original envelope pointer
+    // - active write helper => preserve the agenda `+0x24` pointer handoff, but currently return
+    //   the same envelope pointer until helper-side transformation/discard is recovered
+    const CMessageConnectionEnvelopeScaffold* ApplySendPacketAgendaScaffold(
         const CMessageConnectionEnvelopeScaffold& inputEnvelope,
-        CMessageConnectionEnvelopeScaffold* outputEnvelope,
         bool* outAgendaTouched);
     // UNANCHORED: source-owned lower submit helper beneath SendPacketEnvelopeScaffold.
-    // Current best original helper is `0x448a00`.
+    // Current best original helper is `0x448a00`; source now computes the final byte pointer/size
+    // directly from raw inner `+0x0a/+0x0b/+0x0c..` storage.
     uint32_t SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
 
     uintptr_t packetNameCallbackScaffold_ = 0;
