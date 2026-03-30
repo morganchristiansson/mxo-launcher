@@ -256,7 +256,8 @@ When the queue is **not** empty, client `0x62531e31..0x62531fe7` mirrors launche
 - it dequeues one 8-byte pair
 - interprets the first dword as a queued work-item object
 - interprets the second dword as an associated context/owner object
-- and then calls arg5 primary vtable offset `+0x30`
+- reads the work-item type from `[workItem+0x04]`
+- and only on the **type-1** path calls arg5 primary vtable offset `+0x30`
 
 On the client path that call is:
 
@@ -272,8 +273,10 @@ Launcher consumer `0x436d31..0x436ee7` does not simply dequeue and call slot `12
 It:
 - dequeues one `(workItem, context)` pair
 - uses `0x4816f0(workItem)` to read `[workItem+0x04]` for logging / dispatch context
-- calls arg5 primary slot `12` with the dequeued `context`
+- only on the **type-1** path calls arg5 primary slot `12` with the dequeued `context`
 - then calls `context->+0x10(workItem)`
+- on that same type-1 path, conditionally calls `context->+0x04()` when the low byte of
+  `context[1]` is non-zero, before the final `workItem->+0x04()` release
 
 A newer worker/connection pass also improves the likely type of that `context` pointer.
 It is now best treated not just as an anonymous owner pointer, but likely as a **`CMessageConnection`-family object** on important paths:

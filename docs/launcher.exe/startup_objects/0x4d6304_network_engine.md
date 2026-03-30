@@ -220,9 +220,12 @@ New queue-thread clarification from the current focused pass:
       helper path instead of open-coding a raw `Queue_PushPair(0,0)` write
     - newer bounded correction: source now also keeps the recovered `0x4816f0(workItem)`-style
       type read explicit at dequeue time before the later slot-12/context callback branch
-    - newer bounded correction: after the context callback returns, source now releases the work
-      item before any conditional type-1 context auto-release, which is a closer fit for the
-      recovered "later releases both objects as needed" continuation than the older reverse order
+    - newer bounded correction: after the context callback returns, source now mirrors the
+      recovered release order more closely by doing any conditional type-1 context auto-release
+      before the final work-item release
+    - remaining gap there is now sharper too: the order matches the current static read, but the
+      concrete release bodies are still source-owned vtable-dispatch scaffolds rather than exact
+      recovered object-class implementations
     - newer bounded correction: `CleanupConnection` now always runs the owner-state sync tail at
       function exit, even on miss/no-worker paths, as the bounded source stand-in for the later
       always-run `0x44ab60(arg)` side effect recovered from original slot `12`
@@ -750,9 +753,12 @@ On the non-empty dequeue branch it:
   - first dword = `workItem`
   - second dword = `context`
 - logs/debug-prints using `0x4816f0(workItem)`, which simply returns `[workItem+0x04]`
-- if both work item and context are present, calls arg5 primary slot `12` with the dequeued `context`
+- when `context` is non-NULL, reads the same work type again and only on the **type-1** path calls
+  arg5 primary slot `12` with the dequeued `context`
 - then calls `context->+0x10(workItem)`
-- and later releases both objects as needed
+- on that same type-1 path, conditionally calls `context->+0x04()` when the low byte of
+  `context[1]` is non-zero
+- and only after that runs the final `workItem->+0x04()` release
 
 That ties several earlier partial observations together:
 - the queued first-dword object really is a **work/status item** rather than only arbitrary pointer noise
@@ -1093,7 +1099,9 @@ When work is present, launcher consumer `0x436d31..0x436ee7` and client consumer
 - dequeue one 8-byte pair
 - treat the first dword as a queued work-item object
 - treat the second dword as a paired context/owner object
-- and then call arg5 primary vtable offset `+0x30`
+- read the work-item type from `[workItem+0x04]`
+- and only on the **type-1** path call arg5 primary vtable offset `+0x30` before the later
+  context callback / release tail
 
 On the client side that is:
 
@@ -1114,7 +1122,8 @@ Current best interpretation:
 - the queue cursor fields around `+0x0c/+0x1c` and `+0x34/+0x44` are also definitely live on that path
 - `RunClientDLL` is repeatedly exercising the **consumer** side of this engine in non-blocking poll mode
 - the original launcher producer side now has concrete xrefs and concrete queued pair shapes
-- and if queue0C were actually being fed, the next observable arg5 step would likely be primary slot `12` (`+0x30`)
+- and if queue0C were actually being fed with the recovered type-1 close/terminal items, the next
+  observable arg5 step would likely be primary slot `12` (`+0x30`)
 - but on the current implementation that producer side still does not appear to be feeding even the now-best-understood queue0C path, so both queues remain in a stable **empty cursor** state rather than advancing
 - so the next arg5 problem is no longer just “which missing slot causes the old late crash?”
 - it is now more specifically “which missing launcher-owned state should populate or advance this arg5-owned runtime work path beyond the current empty-loop behavior?”

@@ -2835,7 +2835,9 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
     // - nonBlocking=true matches the client poll form; false waits on the attached signal event
     // - null work item is the shutdown sentinel and cascades via the normal enqueue helper
     // - type-1 work runs slot-12-style cleanup before the later context callback
-    // - callback runs before work-item release; conditional type-1 context auto-release stays last
+    // - callback runs before the later release tail
+    // - on the type-1 path, conditional context auto-release precedes the final work-item release
+    // - the release bodies themselves are still source-owned vtable-dispatch scaffolds
     // - queue selection/pop happens under the attached arg5 lock
     CRITICAL_SECTION* queueLock =
         CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold());
@@ -2920,10 +2922,10 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
             QueueContext_OnOperationCompleted(context, workItem);
         }
 
-        QueueWorkItem_Release(workItem);
         if (shouldAutoReleaseContext) {
             QueueContext_Release(context);
         }
+        QueueWorkItem_Release(workItem);
     }
 }
 
