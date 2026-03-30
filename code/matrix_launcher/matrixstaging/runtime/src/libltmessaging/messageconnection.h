@@ -139,8 +139,8 @@ struct CMessageConnectionMessageScaffold {
     // - `+0x08` = reserved word initialized to `0x2b`
     // - `+0x0a/+0x0b` = payload-byte-count prefix/header bytes
     // - `+0x0c .. +0x100b` = inline payload storage
-    // Source keeps one trailing mirror vector only for convenience when higher-level C++ code wants
-    // a `std::vector` view; the raw first `0x100c` bytes stay aligned with the current static RE.
+    // Current source now treats that raw `+0x0a/+0x0b/+0x0c..` front matter as the primary truth and
+    // only materializes vector copies on demand from those bytes.
     static constexpr uint16_t kMaxPayloadByteCount = 0x1000u;
     static constexpr uint16_t kBuilderReservedBytes08 = 0x002bu;  // anchor: launcher.exe:0x455bd0
 
@@ -151,20 +151,23 @@ struct CMessageConnectionMessageScaffold {
     uint8_t payloadLengthLow0b = 0;
     std::array<uint8_t, 0x1000> payloadBytes0c{};
 
-    // Source-owned mirror/view for higher-level helpers. Keep it synchronized with the raw inline
-    // payload above instead of treating the vector as the primary object layout.
-    std::vector<uint8_t> payloadBytesFrom0c;
-
+    // UNANCHORED: source-owned raw-layout initializer for the recovered inner `0x100c` object.
     void InitializeRawLayoutScaffold();
-    void SyncRawPayloadFromMirrorScaffold();
-    void SyncMirrorPayloadFromRawScaffold();
+    // anchor: launcher.exe:0x455bd0 / 0x455c60 / 0x455cd0
     void ResetForPacketBuilderScaffold();
+    // UNANCHORED: source-owned raw byte-count reset helper over recovered `+0x0a/+0x0b/+0x0c..` storage.
     void ResetPayloadByteCountScaffold(uint16_t payloadByteCount);
+    // anchor: launcher.exe:0x4557b0
     uint16_t GrowPayloadByteCountScaffold(uint16_t additionalByteCount);
+    // UNANCHORED: source-owned raw payload-length decoder from `+0x0a/+0x0b`; clamp, do not bit-mask.
     uint16_t PayloadByteCountScaffold() const;
+    // UNANCHORED: source-owned capacity helper over the recovered raw payload-storage layout.
     uint16_t RemainingAppendableByteCountScaffold() const;
+    // UNANCHORED: source-owned accessor for raw inline payload base `+0x0c`.
     uint8_t* PayloadBaseScaffold();
+    // UNANCHORED: source-owned accessor for raw inline payload base `+0x0c`.
     const uint8_t* PayloadBaseScaffold() const;
+    // UNANCHORED: source-owned send-side framing helper rebuilt from raw `+0x0a/+0x0b/+0x0c..` bytes.
     std::vector<uint8_t> BuildFramedBytesFrom0aScaffold() const;
 };
 
@@ -182,8 +185,9 @@ struct CMessageConnectionReceivedMessageRefScaffold {
     // - `+0x10` = headerless/non-headerless flag written by `0x4490c0`
     // - `+0x14` = extra context dword passed as the second `0x455cd0` argument
     // - `+0x18/+0x1c/+0x20` = cleared on fresh create
-    // Source keeps ownership trailing the raw `0x24` front matter so the callback/client-visible
-    // face can stay closer to the original object instead of inventing a separate crash-only shim.
+    // Current source keeps one inline local inner-storage tail after the recovered raw `0x24`
+    // front matter and rebinds raw `+0x0c` to that tail on local copies instead of treating a
+    // source-owned shared_ptr identity as the primary message-ref shape.
     void** vtable00 = nullptr;
     volatile long referenceCount04 = 0;
     uint32_t field08 = 0;
@@ -194,13 +198,29 @@ struct CMessageConnectionReceivedMessageRefScaffold {
     uint32_t field18 = 0;
     uint32_t field1c = 0;
     uint32_t field20 = 0;
-    std::shared_ptr<CMessageConnectionMessageScaffold> messageStorageOwnerScaffold24;
+    CMessageConnectionMessageScaffold ownedMessageStorageScaffold24{};
 
+    CMessageConnectionReceivedMessageRefScaffold() = default;
+    // UNANCHORED: source-owned local-copy helper that preserves raw front matter and rebinds `+0x0c`
+    // to this instance's inline storage tail.
+    CMessageConnectionReceivedMessageRefScaffold(const CMessageConnectionReceivedMessageRefScaffold& other);
+    // UNANCHORED: source-owned local-copy helper that preserves raw front matter and rebinds `+0x0c`
+    // to this instance's inline storage tail.
+    CMessageConnectionReceivedMessageRefScaffold& operator=(const CMessageConnectionReceivedMessageRefScaffold& other);
+    // UNANCHORED: source-owned move spellings currently collapse to the same local-copy semantics.
+    CMessageConnectionReceivedMessageRefScaffold(CMessageConnectionReceivedMessageRefScaffold&& other) noexcept;
+    // UNANCHORED: source-owned move spellings currently collapse to the same local-copy semantics.
+    CMessageConnectionReceivedMessageRefScaffold& operator=(CMessageConnectionReceivedMessageRefScaffold&& other) noexcept;
+
+    // UNANCHORED: source-owned raw-layout initializer for the recovered outer `0x24` front matter.
     void InitializeRawLayoutScaffold(uint32_t field08Value = 0u);
+    // UNANCHORED: source-owned helper that resets the inline local inner-storage tail used by local copies.
+    void ResetOwnedMessageStorageScaffold();
+    // UNANCHORED: source-owned raw/local-storage synchronization helper for outer `+0x0c`.
     void SyncRawMessageStoragePointerScaffold();
 };
 
-static_assert(offsetof(CMessageConnectionReceivedMessageRefScaffold, messageStorageOwnerScaffold24) == 0x24, "message-ref ownership tail offset mismatch");
+static_assert(offsetof(CMessageConnectionReceivedMessageRefScaffold, ownedMessageStorageScaffold24) == 0x24, "message-ref local-storage tail offset mismatch");
 
 enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
     kUnknown = 0,
@@ -228,6 +248,8 @@ struct CMessageConnectionPacketAgendaScaffold {
     // - receive path `0x4490c0` consults the read side through `0x469930`, which returns agenda
     //   read-output slot `+0x08`, and then swaps that message-ref through `0x4489d0` before leaf
     //   dispatch
+    // - current source now keeps that agenda `+0x08` effect as a transient raw message-ref pointer
+    //   handoff rather than deep-copying a source-owned owner tail first
     // - send path `0x448cf0` consults the write side through `0x469950`, which returns agenda
     //   write-output slot `+0x24`, and may replace/discard the outgoing envelope when an active
     //   write helper exists at agenda `+0x44`
@@ -239,7 +261,7 @@ struct CMessageConnectionPacketAgendaScaffold {
     uint32_t configuredReadHelperCount = 0;
     uint32_t configuredWriteHelperCount = 0;
     bool hasReadOutputSlot08 = false;
-    CMessageConnectionReceivedMessageRefScaffold readOutputSlot08;
+    CMessageConnectionReceivedMessageRefScaffold* readOutputSlot08 = nullptr;
     bool hasWriteOutputSlot24 = false;
     CMessageConnectionEnvelopeScaffold writeOutputSlot24;
 };

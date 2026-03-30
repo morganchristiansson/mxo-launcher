@@ -686,16 +686,24 @@ Current source correction:
 - that outer scaffold now keeps its raw front matter closer to the recovered `0x455cd0/0x455c60`
   family instead of inventing a separate late-only bridge object
   - outer `+0x00/+0x04/+0x08/+0x0c/+0x10/+0x14/+0x18/+0x1c/+0x20`
-  - trailing source-owned ownership tail only after that recovered front matter
+  - one inline local inner-storage tail only after that recovered raw front matter
+  - local outer copies now rebind raw `+0x0c` to that inline tail instead of treating a
+    shared_ptr-first ownership shell as the primary identity
 - its inner message-storage object now likewise keeps the recovered raw front matter closer to the
   `0x455bd0/0x455c60/0x4557b0` family:
   - inner `+0x00/+0x04/+0x08/+0x0a/+0x0b/+0x0c..`
+  - source now materializes `std::vector` copies only on demand from those raw bytes instead of
+    keeping a persistent payload mirror field
 - the same real work-item pointer is threaded through:
   - `StageMarginPacketBytesAndDispatchCurrentHelperScaffold(..., workItem)`
   - `HandleMarginPacketBytes(..., workItem)`
   - `currentState_->Slot6_HandleSecondaryMessage(workItem, this)`
 - so state8/raw-`0x38` fallback no longer calls callback84 with null, and it now does so through a
   more RE-shaped outer message-ref object instead of a special crash-only wrapper
+- newer cleanup follow-up also pruned the remaining vector-first / ownership-first receive scaffolding:
+  - raw payload length is read directly from inner `+0x0a/+0x0b` and clamped to `0x1000`
+  - default packet-agenda read handoff now preserves the nearer message-ref pointer through agenda
+    `+0x08` instead of deep-copying a source-owned owner shell first
 
 One negative result from that fidelity follow-up is also worth keeping:
 - an intermediate refactor briefly regressed auth receive handling because the new raw inner

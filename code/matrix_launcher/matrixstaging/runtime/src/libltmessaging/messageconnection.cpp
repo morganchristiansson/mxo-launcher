@@ -80,15 +80,14 @@ static void __thiscall CMessageConnectionReceivedMessageRef_GrowPayload(
     CMessageConnectionReceivedMessageRefScaffold* self,
     uint32_t additionalByteCount,
     uint32_t /*unused*/) {
-    if (!self || !self->messageStorageOwnerScaffold24) {
+    if (!self || !self->messageStorage0c) {
         return;
     }
 
-    (void)self->messageStorageOwnerScaffold24->GrowPayloadByteCountScaffold(
+    (void)self->messageStorage0c->GrowPayloadByteCountScaffold(
         static_cast<uint16_t>(std::min<uint32_t>(
             additionalByteCount,
             CMessageConnectionMessageScaffold::kMaxPayloadByteCount)));
-    self->SyncRawMessageStoragePointerScaffold();
 }
 
 static void* g_CMessageConnectionMessageStorageVtable[] = {
@@ -142,50 +141,57 @@ CLTThreadPerClientTCPEngine* CMessageConnection::Engine() const {
     return CLTTCPConnection::Engine();
 }
 
+namespace {
+
+// UNANCHORED: source-owned raw length-encoder helper for inner `+0x0a/+0x0b`.
+static void CMessageConnectionMessage_WritePayloadByteCountScaffold(
+    CMessageConnectionMessageScaffold* self,
+    uint16_t payloadByteCount) {
+    if (!self) {
+        return;
+    }
+
+    const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, CMessageConnectionMessageScaffold::kMaxPayloadByteCount);
+    self->payloadLengthLow0b = static_cast<uint8_t>(clampedByteCount & 0xffu);
+    self->payloadLengthHigh0a =
+        (clampedByteCount > 0x7fu)
+            ? static_cast<uint8_t>(0x80u | ((clampedByteCount >> 8u) & 0x7fu))
+            : 0u;
+}
+
+}  // namespace
+
 // UNANCHORED: source-owned raw-layout initializer for the recovered inner `0x100c` object.
 void CMessageConnectionMessageScaffold::InitializeRawLayoutScaffold() {
     vtable00 = g_CMessageConnectionMessageStorageVtable;
     referenceCount04 = 1;
     reservedBytes08 = kBuilderReservedBytes08;
-    payloadLengthHigh0a = 0u;
-    payloadLengthLow0b = 0u;
-}
-
-// UNANCHORED: source-owned raw/mirror synchronization helper.
-void CMessageConnectionMessageScaffold::SyncRawPayloadFromMirrorScaffold() {
-    const uint16_t payloadByteCount = static_cast<uint16_t>(std::min<size_t>(
-        payloadBytesFrom0c.size(),
-        kMaxPayloadByteCount));
-    payloadLengthLow0b = static_cast<uint8_t>(payloadByteCount & 0xffu);
-    payloadLengthHigh0a =
-        (payloadByteCount > 0x7fu)
-            ? static_cast<uint8_t>(0x80u | ((payloadByteCount >> 8u) & 0x7fu))
-            : 0u;
-    if (payloadByteCount != 0u) {
-        std::copy_n(payloadBytesFrom0c.begin(), payloadByteCount, payloadBytes0c.begin());
-    }
-}
-
-// UNANCHORED: source-owned raw/mirror synchronization helper.
-void CMessageConnectionMessageScaffold::SyncMirrorPayloadFromRawScaffold() {
-    const uint16_t payloadByteCount = PayloadByteCountScaffold();
-    payloadBytesFrom0c.assign(payloadBytes0c.begin(), payloadBytes0c.begin() + payloadByteCount);
+    CMessageConnectionMessage_WritePayloadByteCountScaffold(this, 0u);
 }
 
 void CMessageConnectionMessageScaffold::ResetForPacketBuilderScaffold() {
     // anchor: launcher.exe:0x455bd0 / 0x455c60 / 0x455cd0
     // Current tighter source mirror now keeps the raw first `0x100c` bytes aligned with the
-    // recovered inner object instead of inventing a vector-only storage surrogate.
+    // recovered inner object instead of inventing a vector-first storage surrogate.
     InitializeRawLayoutScaffold();
-    payloadBytesFrom0c.clear();
-    SyncRawPayloadFromMirrorScaffold();
+    std::fill(payloadBytes0c.begin(), payloadBytes0c.end(), 0u);
 }
 
 void CMessageConnectionMessageScaffold::ResetPayloadByteCountScaffold(uint16_t payloadByteCount) {
+    const uint16_t oldByteCount = PayloadByteCountScaffold();
     const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, kMaxPayloadByteCount);
-    SyncMirrorPayloadFromRawScaffold();
-    payloadBytesFrom0c.assign(clampedByteCount, 0u);
-    SyncRawPayloadFromMirrorScaffold();
+    if (clampedByteCount < oldByteCount) {
+        std::fill(
+            payloadBytes0c.begin() + clampedByteCount,
+            payloadBytes0c.begin() + oldByteCount,
+            0u);
+    } else if (clampedByteCount > oldByteCount) {
+        std::fill(
+            payloadBytes0c.begin() + oldByteCount,
+            payloadBytes0c.begin() + clampedByteCount,
+            0u);
+    }
+    CMessageConnectionMessage_WritePayloadByteCountScaffold(this, clampedByteCount);
 }
 
 uint16_t CMessageConnectionMessageScaffold::GrowPayloadByteCountScaffold(uint16_t additionalByteCount) {
@@ -196,9 +202,13 @@ uint16_t CMessageConnectionMessageScaffold::GrowPayloadByteCountScaffold(uint16_
         return static_cast<uint16_t>(oldByteCount);
     }
 
-    SyncMirrorPayloadFromRawScaffold();
-    payloadBytesFrom0c.resize(static_cast<size_t>(requestedByteCount), 0u);
-    SyncRawPayloadFromMirrorScaffold();
+    std::fill(
+        payloadBytes0c.begin() + oldByteCount,
+        payloadBytes0c.begin() + requestedByteCount,
+        0u);
+    CMessageConnectionMessage_WritePayloadByteCountScaffold(
+        this,
+        static_cast<uint16_t>(requestedByteCount));
     return static_cast<uint16_t>(requestedByteCount);
 }
 
@@ -246,6 +256,59 @@ std::vector<uint8_t> CMessageConnectionMessageScaffold::BuildFramedBytesFrom0aSc
     return framedBytesFrom0a;
 }
 
+// UNANCHORED: source-owned local-copy helper that preserves raw front matter and rebinds `+0x0c`
+// to this instance's inline storage tail.
+CMessageConnectionReceivedMessageRefScaffold::CMessageConnectionReceivedMessageRefScaffold(
+    const CMessageConnectionReceivedMessageRefScaffold& other) {
+    *this = other;
+}
+
+// UNANCHORED: source-owned local-copy helper that preserves raw front matter and rebinds `+0x0c`
+// to this instance's inline storage tail.
+CMessageConnectionReceivedMessageRefScaffold& CMessageConnectionReceivedMessageRefScaffold::operator=(
+    const CMessageConnectionReceivedMessageRefScaffold& other) {
+    if (this == &other) {
+        return *this;
+    }
+
+    vtable00 = other.vtable00;
+    referenceCount04 = other.referenceCount04;
+    field08 = other.field08;
+    headerless10 = other.headerless10;
+    padding11_13[0] = other.padding11_13[0];
+    padding11_13[1] = other.padding11_13[1];
+    padding11_13[2] = other.padding11_13[2];
+    messageContext14 = other.messageContext14;
+    field18 = other.field18;
+    field1c = other.field1c;
+    field20 = other.field20;
+    if (other.messageStorage0c) {
+        ownedMessageStorageScaffold24 = *other.messageStorage0c;
+        messageStorage0c = &ownedMessageStorageScaffold24;
+    } else {
+        ownedMessageStorageScaffold24 = {};
+        messageStorage0c = nullptr;
+    }
+    return *this;
+}
+
+// UNANCHORED: source-owned move spelling that currently collapses to the same local-copy semantics.
+CMessageConnectionReceivedMessageRefScaffold::CMessageConnectionReceivedMessageRefScaffold(
+    CMessageConnectionReceivedMessageRefScaffold&& other) noexcept {
+    *this = other;
+}
+
+// UNANCHORED: source-owned move spelling that currently collapses to the same local-copy semantics.
+CMessageConnectionReceivedMessageRefScaffold& CMessageConnectionReceivedMessageRefScaffold::operator=(
+    CMessageConnectionReceivedMessageRefScaffold&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+
+    *this = static_cast<const CMessageConnectionReceivedMessageRefScaffold&>(other);
+    return *this;
+}
+
 // UNANCHORED: source-owned raw-layout initializer for the recovered outer `0x24` front matter.
 void CMessageConnectionReceivedMessageRefScaffold::InitializeRawLayoutScaffold(uint32_t field08Value) {
     vtable00 = g_CMessageConnectionReceivedMessageRefVtable;
@@ -260,11 +323,18 @@ void CMessageConnectionReceivedMessageRefScaffold::InitializeRawLayoutScaffold(u
     field18 = 0u;
     field1c = 0u;
     field20 = 0u;
+    ownedMessageStorageScaffold24 = {};
 }
 
-// UNANCHORED: source-owned raw/ownership synchronization helper.
+// UNANCHORED: source-owned helper that resets the inline local inner-storage tail used by local copies.
+void CMessageConnectionReceivedMessageRefScaffold::ResetOwnedMessageStorageScaffold() {
+    ownedMessageStorageScaffold24.ResetForPacketBuilderScaffold();
+    SyncRawMessageStoragePointerScaffold();
+}
+
+// UNANCHORED: source-owned raw/local-storage synchronization helper.
 void CMessageConnectionReceivedMessageRefScaffold::SyncRawMessageStoragePointerScaffold() {
-    messageStorage0c = messageStorageOwnerScaffold24.get();
+    messageStorage0c = &ownedMessageStorageScaffold24;
 }
 
 const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family) {
@@ -320,6 +390,7 @@ void CMessageConnection::ConfigurePacketAgendaScaffold(const void* agendaConfigu
         packetAgendaScaffold_->created = true;
         packetAgendaScaffold_->hasEmbeddedDefaultReadPassThroughHelper0c = true;
         packetAgendaScaffold_->hasReadOutputSlot08 = false;
+        packetAgendaScaffold_->readOutputSlot08 = nullptr;
         packetAgendaScaffold_->hasWriteOutputSlot24 = false;
         // anchor: launcher.exe:0x448980 -> 0x469740
         // Current best known original builder path (`0x41470 -> 0x44da00`) installs both a read
@@ -656,13 +727,7 @@ static CMessageConnectionReceivedMessageRefScaffold CMessageConnection_CreateRec
     uint32_t messageContext14 = 0u) {
     CMessageConnectionReceivedMessageRefScaffold messageRef = {};
     messageRef.InitializeRawLayoutScaffold(/*field08Value=*/0u);
-    messageRef.messageStorageOwnerScaffold24 = std::make_shared<CMessageConnectionMessageScaffold>();
-    if (!messageRef.messageStorageOwnerScaffold24) {
-        return messageRef;
-    }
-
-    messageRef.messageStorageOwnerScaffold24->ResetForPacketBuilderScaffold();
-    messageRef.SyncRawMessageStoragePointerScaffold();
+    messageRef.ResetOwnedMessageStorageScaffold();
     messageRef.headerless10 = headerless ? 1u : 0u;
     messageRef.messageContext14 = messageContext14;
     return messageRef;
@@ -675,7 +740,7 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
     CMessageConnectionReceivedMessageRefScaffold* messageRef,
     const uint8_t* payloadBytes,
     uint32_t payloadByteCount) {
-    if (!messageRef || !messageRef->messageStorageOwnerScaffold24) {
+    if (!messageRef || !messageRef->messageStorage0c) {
         return false;
     }
     if (payloadByteCount == 0u) {
@@ -685,7 +750,7 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
         return false;
     }
 
-    CMessageConnectionMessageScaffold& messageStorage = *messageRef->messageStorageOwnerScaffold24;
+    CMessageConnectionMessageScaffold& messageStorage = *messageRef->messageStorage0c;
     const uint16_t oldPayloadByteCount = messageStorage.PayloadByteCountScaffold();
     const uint32_t requestedPayloadByteCount =
         static_cast<uint32_t>(oldPayloadByteCount) + payloadByteCount;
@@ -708,7 +773,6 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
         payloadBytes,
         payloadByteCount,
         payloadBase + static_cast<size_t>(oldPayloadByteCount));
-    messageStorage.SyncMirrorPayloadFromRawScaffold();
     return true;
 }
 
@@ -723,7 +787,7 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
     if (outHadUnusedBuffers) {
         *outHadUnusedBuffers = false;
     }
-    if (!workItem || !outMessageRef || !outMessageRef->messageStorageOwnerScaffold24) {
+    if (!workItem || !outMessageRef || !outMessageRef->messageStorage0c) {
         return false;
     }
 
@@ -792,9 +856,57 @@ constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
     0x10u,
 };
 
-static const std::vector<uint8_t>* CMessageConnection_MessagePayloadBytesScaffold(
-    const CMessageConnectionReceivedMessageRefScaffold& messageRef) {
-    return messageRef.messageStorage0c ? &messageRef.messageStorage0c->payloadBytesFrom0c : nullptr;
+// UNANCHORED: source-owned raw-layout-first payload view helper over inner `+0x0a/+0x0b/+0x0c..`.
+static bool CMessageConnection_GetMessagePayloadViewScaffold(
+    const CMessageConnectionReceivedMessageRefScaffold& messageRef,
+    const uint8_t** outPayloadBytes,
+    size_t* outPayloadByteCount) {
+    if (outPayloadBytes) {
+        *outPayloadBytes = nullptr;
+    }
+    if (outPayloadByteCount) {
+        *outPayloadByteCount = 0u;
+    }
+
+    const CMessageConnectionMessageScaffold* const messageStorage = messageRef.messageStorage0c;
+    if (!messageStorage) {
+        return false;
+    }
+
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    if (!payloadBytes || payloadByteCount == 0u) {
+        return false;
+    }
+
+    if (outPayloadBytes) {
+        *outPayloadBytes = payloadBytes;
+    }
+    if (outPayloadByteCount) {
+        *outPayloadByteCount = payloadByteCount;
+    }
+    return true;
+}
+
+// UNANCHORED: source-owned copy-out helper for the few places that still need a vector view.
+static void CMessageConnection_CopyMessagePayloadBytesScaffold(
+    const CMessageConnectionReceivedMessageRefScaffold& messageRef,
+    std::vector<uint8_t>* outPayloadBytes) {
+    if (!outPayloadBytes) {
+        return;
+    }
+
+    outPayloadBytes->clear();
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!CMessageConnection_GetMessagePayloadViewScaffold(
+            messageRef,
+            &payloadBytes,
+            &payloadByteCount)) {
+        return;
+    }
+
+    outPayloadBytes->assign(payloadBytes, payloadBytes + payloadByteCount);
 }
 
 static bool CMessageConnection_ResolveMessageCodePointerScaffold(
@@ -816,15 +928,18 @@ static bool CMessageConnection_ResolveMessageCodePointerScaffold(
         *outUsedHeaderlessLocatorDecode = false;
     }
 
-    const std::vector<uint8_t>* payloadBytes =
-        CMessageConnection_MessagePayloadBytesScaffold(messageRef);
-    if (!payloadBytes || payloadBytes->empty()) {
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!CMessageConnection_GetMessagePayloadViewScaffold(
+            messageRef,
+            &payloadBytes,
+            &payloadByteCount)) {
         return false;
     }
 
     if (messageRef.headerless10 == 0u) {
         if (outMessageCodePointer) {
-            *outMessageCodePointer = payloadBytes->data();
+            *outMessageCodePointer = payloadBytes;
         }
         return true;
     }
@@ -832,11 +947,11 @@ static bool CMessageConnection_ResolveMessageCodePointerScaffold(
     if (outUsedHeaderlessLocatorDecode) {
         *outUsedHeaderlessLocatorDecode = true;
     }
-    if (payloadBytes->size() < 2u) {
+    if (payloadByteCount < 2u) {
         return false;
     }
 
-    const uint8_t locatorByte0d = (*payloadBytes)[1];
+    const uint8_t locatorByte0d = payloadBytes[1];
     const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
     const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
     if (outTargetLocatorType) {
@@ -855,12 +970,12 @@ static bool CMessageConnection_ResolveMessageCodePointerScaffold(
         0x12u +
         static_cast<size_t>(kMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
         static_cast<size_t>(kMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
-    if (payloadOffset >= payloadBytes->size()) {
+    if (payloadOffset >= payloadByteCount) {
         return false;
     }
 
     if (outMessageCodePointer) {
-        *outMessageCodePointer = payloadBytes->data() + payloadOffset;
+        *outMessageCodePointer = payloadBytes + payloadOffset;
     }
     return true;
 }
@@ -876,9 +991,12 @@ static bool CMessageConnection_DecodeMessageCodeScaffold(
         *outUsedHeaderlessLocatorDecode = false;
     }
 
-    const std::vector<uint8_t>* payloadBytes =
-        CMessageConnection_MessagePayloadBytesScaffold(messageRef);
-    if (!payloadBytes || payloadBytes->empty()) {
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!CMessageConnection_GetMessagePayloadViewScaffold(
+            messageRef,
+            &payloadBytes,
+            &payloadByteCount)) {
         return false;
     }
 
@@ -893,16 +1011,16 @@ static bool CMessageConnection_DecodeMessageCodeScaffold(
     }
 
     const size_t messageCodeOffset =
-        static_cast<size_t>(messageCodePointer - payloadBytes->data());
+        static_cast<size_t>(messageCodePointer - payloadBytes);
     const uint8_t firstByte = *messageCodePointer;
     uint16_t messageCode = firstByte;
     if ((firstByte & 0x80u) != 0u) {
-        if (messageCodeOffset + 1u >= payloadBytes->size()) {
+        if (messageCodeOffset + 1u >= payloadByteCount) {
             return false;
         }
         messageCode = static_cast<uint16_t>(
             ((static_cast<uint16_t>(firstByte) << 8) |
-             static_cast<uint16_t>((*payloadBytes)[messageCodeOffset + 1u])) &
+             static_cast<uint16_t>(payloadBytes[messageCodeOffset + 1u])) &
             0x7fffu);
     }
 
@@ -950,30 +1068,18 @@ static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
     }
 }
 
-// anchor: launcher.exe:0x4489d0
-// Source-owned mirror of the receive/message-ref swap helper used after
-// `0x469930` returns a read-side packet-agenda result.
-static void CMessageConnection_AssignReceivedMessageRefScaffold(
-    CMessageConnectionReceivedMessageRefScaffold* destination,
-    const CMessageConnectionReceivedMessageRefScaffold& source) {
-    if (!destination) {
-        return;
-    }
-    *destination = source;
-}
-
 // anchor: launcher.exe:0x469980 / embedded helper vtable `0x004baf48 +0x0c`
 // Source-owned mirror of the default read helper's concrete effect:
 // store the incoming message-ref into the agenda read-output slot at `+0x08`.
 static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
     CMessageConnectionPacketAgendaScaffold* agenda,
-    const CMessageConnectionReceivedMessageRefScaffold& inputMessageRef) {
+    CMessageConnectionReceivedMessageRefScaffold* inputMessageRef) {
     if (!agenda || !agenda->hasEmbeddedDefaultReadPassThroughHelper0c) {
         return false;
     }
     agenda->readOutputSlot08 = inputMessageRef;
-    agenda->hasReadOutputSlot08 = true;
-    return true;
+    agenda->hasReadOutputSlot08 = (inputMessageRef != nullptr);
+    return agenda->hasReadOutputSlot08;
 }
 
 // anchor: launcher.exe:0x469930
@@ -981,37 +1087,34 @@ static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
 // Current bounded source model:
 // - a created agenda always has the embedded default read pass-through helper at `+0x0c`
 // - source now owns that helper's concrete agenda `+0x08` output-slot effect
+// - source now keeps the nearer `0x4489d0` seam as a raw pointer handoff instead of deep-copying
+//   a source-owned message-ref owner tail first
 // - caller-installed read helpers are still modeled as pass-through-only until helper-side
 //   transformation/discard behavior is recovered
-static bool CMessageConnection_ApplyReceivePacketAgendaScaffold(
+static CMessageConnectionReceivedMessageRefScaffold* CMessageConnection_ApplyReceivePacketAgendaScaffold(
     CMessageConnectionPacketAgendaScaffold* agenda,
-    const CMessageConnectionReceivedMessageRefScaffold& inputMessageRef,
-    CMessageConnectionReceivedMessageRefScaffold* outputMessageRef,
+    CMessageConnectionReceivedMessageRefScaffold* inputMessageRef,
     bool* outAgendaTouched) {
     if (outAgendaTouched) {
         *outAgendaTouched = false;
     }
-    if (!outputMessageRef) {
-        return false;
+    if (!inputMessageRef) {
+        return nullptr;
     }
-
-    CMessageConnection_AssignReceivedMessageRefScaffold(outputMessageRef, inputMessageRef);
     if (!agenda || !agenda->created) {
-        return true;
+        return inputMessageRef;
     }
 
+    agenda->hasReadOutputSlot08 = false;
+    agenda->readOutputSlot08 = nullptr;
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
     if (!CMessageConnection_DefaultAgendaReadPassThroughScaffold(agenda, inputMessageRef)) {
-        return false;
+        return nullptr;
     }
 
-    if (agenda->hasReadOutputSlot08) {
-        CMessageConnection_AssignReceivedMessageRefScaffold(outputMessageRef, agenda->readOutputSlot08);
-        return true;
-    }
-    return false;
+    return agenda->hasReadOutputSlot08 ? agenda->readOutputSlot08 : nullptr;
 }
 
 }  // namespace
@@ -1128,9 +1231,9 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     }
 
-    lastReceivedPacketBodyBytesScaffold_ =
-        copiedMessageRef.messageStorage0c ? copiedMessageRef.messageStorage0c->payloadBytesFrom0c
-                                          : std::vector<uint8_t>{};
+    CMessageConnection_CopyMessagePayloadBytesScaffold(
+        copiedMessageRef,
+        &lastReceivedPacketBodyBytesScaffold_);
     lastReceivedPacketHeaderlessScaffold_ = (copiedMessageRef.headerless10 != 0u);
 
     if (lastReceivedPacketHeaderlessScaffold_) {
@@ -1154,16 +1257,15 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
-    CMessageConnectionReceivedMessageRefScaffold agendaMessageRef = {};
     CMessageConnectionReceivedMessageRefScaffold* messageRefForDispatch = &copiedMessageRef;
     bool agendaTouched = false;
     if (CMessageConnectionPacketAgendaScaffold* agenda = packetAgendaScaffold_.get();
         agenda && agenda->created) {
-        if (!CMessageConnection_ApplyReceivePacketAgendaScaffold(
-                agenda,
-                copiedMessageRef,
-                &agendaMessageRef,
-                &agendaTouched)) {
+        messageRefForDispatch = CMessageConnection_ApplyReceivePacketAgendaScaffold(
+            agenda,
+            &copiedMessageRef,
+            &agendaTouched);
+        if (!messageRefForDispatch) {
             spdlog::info(
                 "CMessageConnection::OnOperationCompleted discarded receive/message-ref through packet-agenda read handoff payloadBytes={} headerless={} this={} ownerContext={} remoteHost='{}'",
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
@@ -1174,14 +1276,12 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
             return 1u;
         }
         if (agendaTouched) {
-            messageRefForDispatch = &agendaMessageRef;
-            if (const std::vector<uint8_t>* agendaPayloadBytes =
-                    CMessageConnection_MessagePayloadBytesScaffold(*messageRefForDispatch)) {
-                lastReceivedPacketBodyBytesScaffold_ = *agendaPayloadBytes;
-            }
+            CMessageConnection_CopyMessagePayloadBytesScaffold(
+                *messageRefForDispatch,
+                &lastReceivedPacketBodyBytesScaffold_);
             lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
             spdlog::debug(
-                "CMessageConnection::OnOperationCompleted preserved source-owned packet-agenda read handoff via agenda+0x08 output slot payloadBytes={} configuredReadHelpers={} hasDefaultReadHelper={} this={} ownerContext={} remoteHost='{}'",
+                "CMessageConnection::OnOperationCompleted preserved raw packet-agenda read handoff via agenda+0x08 message-ref pointer payloadBytes={} configuredReadHelpers={} hasDefaultReadHelper={} this={} ownerContext={} remoteHost='{}'",
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
                 static_cast<unsigned>(agenda->configuredReadHelperCount),
                 agenda->hasEmbeddedDefaultReadPassThroughHelper0c ? 1u : 0u,
@@ -1317,9 +1417,13 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
         CMessageConnection_LoginMediatorContextScaffold(this);
     mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
-    const std::vector<uint8_t>* payloadBytes =
-        CMessageConnection_MessagePayloadBytesScaffold(messageRef);
-    if (!context || !mediator || context->isMarginConnection || !payloadBytes || payloadBytes->empty()) {
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!context || !mediator || context->isMarginConnection ||
+        !CMessageConnection_GetMessagePayloadViewScaffold(
+            messageRef,
+            &payloadBytes,
+            &payloadByteCount)) {
         return 0u;
     }
 
@@ -1332,7 +1436,7 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
         /*outSenderLocatorType=*/nullptr,
         /*outUsedHeaderlessLocatorDecode=*/nullptr);
     const uint8_t rawCode =
-        (resolvedMessageCodePointer && messageCodePointer) ? *messageCodePointer : (*payloadBytes)[0];
+        (resolvedMessageCodePointer && messageCodePointer) ? *messageCodePointer : payloadBytes[0];
 
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
@@ -1356,8 +1460,8 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
     }
 
     const uint32_t handled = mediator->StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
-        payloadBytes->data(),
-        payloadBytes->size(),
+        payloadBytes,
+        payloadByteCount,
         &messageRef);
     spdlog::info(
         "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
@@ -1366,7 +1470,7 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
         hadValidMessageCode ? 1u : 0u,
         headerless ? 1u : 0u,
         usedHeaderlessLocatorDecode ? 1u : 0u,
-        static_cast<unsigned>(payloadBytes->size()),
+        static_cast<unsigned>(payloadByteCount),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         fmt::ptr(mediator->CurrentState()),
@@ -1632,9 +1736,13 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
         CMessageConnection_LoginMediatorContextScaffold(this);
     mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
-    const std::vector<uint8_t>* payloadBytes =
-        CMessageConnection_MessagePayloadBytesScaffold(messageRef);
-    if (!context || !mediator || !context->isMarginConnection || !payloadBytes || payloadBytes->empty()) {
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    if (!context || !mediator || !context->isMarginConnection ||
+        !CMessageConnection_GetMessagePayloadViewScaffold(
+            messageRef,
+            &payloadBytes,
+            &payloadByteCount)) {
         return 0u;
     }
 
@@ -1657,7 +1765,7 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
         &hadValidMessageCode);
 
     const uint8_t rawCode =
-        (resolvedMessageCodePointer && messageCodePointer) ? *messageCodePointer : (*payloadBytes)[0];
+        (resolvedMessageCodePointer && messageCodePointer) ? *messageCodePointer : payloadBytes[0];
     const std::string remoteHostForLog =
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName();
 
@@ -1699,8 +1807,8 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
     if (hadValidMessageCode && decodedMessageCode == 2u) {
         const uint32_t handledCode2 =
             mediator->HandleMarginConsumedCode2AtConnectionSeamScaffold(
-                payloadBytes->data(),
-                payloadBytes->size(),
+                payloadBytes,
+                payloadByteCount,
                 /*transportEncrypted=*/false);
         logConsumedMarginBranch(decodedMessageCode, handledCode2, nullptr, 0u);
         if (handledCode2 != 0u) {
@@ -1711,8 +1819,8 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
     if (hadValidMessageCode && decodedMessageCode == 4u) {
         const uint32_t handledCode4 =
             mediator->HandleMarginConsumedCode4AtConnectionSeamScaffold(
-                payloadBytes->data(),
-                payloadBytes->size(),
+                payloadBytes,
+                payloadByteCount,
                 /*transportEncrypted=*/false);
         logConsumedMarginBranch(
             decodedMessageCode,
@@ -1724,9 +1832,9 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
         }
     }
 
-    if (hadValidMessageCode && decodedMessageCode == 5u && payloadBytes->size() >= 17u) {
+    if (hadValidMessageCode && decodedMessageCode == 5u && payloadByteCount >= 17u) {
         std::array<uint8_t, 16> seedBytes85 = {};
-        std::copy_n(payloadBytes->data() + 1u, seedBytes85.size(), seedBytes85.begin());
+        std::copy_n(payloadBytes + 1u, seedBytes85.size(), seedBytes85.begin());
         SetMessageCode5SeedBytes85Scaffold(seedBytes85);
         spdlog::info(
             "CMarginConnection::DispatchCopiedParsedPacketTailScaffold source-owned local code5 branch rawCode=0x{:02x} headerless={} locatorDecoded={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
@@ -1746,8 +1854,8 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
     }
 
     const uint32_t handled = mediator->StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
-        payloadBytes->data(),
-        payloadBytes->size(),
+        payloadBytes,
+        payloadByteCount,
         &messageRef);
     spdlog::info(
         "CMarginConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} messageRef={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
@@ -1756,7 +1864,7 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
         hadValidMessageCode ? 1u : 0u,
         headerless ? 1u : 0u,
         usedHeaderlessLocatorDecode ? 1u : 0u,
-        static_cast<unsigned>(payloadBytes->size()),
+        static_cast<unsigned>(payloadByteCount),
         fmt::ptr(&messageRef),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
