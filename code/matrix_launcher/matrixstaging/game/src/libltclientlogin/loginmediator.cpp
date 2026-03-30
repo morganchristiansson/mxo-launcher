@@ -318,7 +318,6 @@ CLTLoginMediator::~CLTLoginMediator() {
     ResetLauncherConnectionBridgeScaffold();
     ClearObserverTree674();
     EraseMarginBootstrapState(this);
-    AuthBootstrap680Ops::EraseSidecar(this);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2970,6 +2969,8 @@ bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
     // - if child `+0xf4` is null, state5 slot3 takes the helper-state-2 branch
     // - otherwise the copied `0x136` block stays usable only while
     //   `(time(NULL) - child+0x80) < *(uint32_t*)(child+0xf4 + 0xac)`
+    //   where child `+0x80` is the server-time bias seeded by `0x448140`, so the left side is
+    //   effectively the current auth-server time
     const auto* copyShadow =
         static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(authBootstrapChild680_.authReplyCopyShadowF4);
     if (copyShadow == nullptr) {
@@ -2978,11 +2979,11 @@ bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
 
     const uint32_t expiryTimeAc = ReadU32LE(copyShadow->signedData80.data() + 0x2cu);
     const std::time_t now = std::time(nullptr);
-    const uint32_t ageSinceGetPublicKey =
-        (now > static_cast<std::time_t>(authBootstrapChild680_.timestamp80))
-            ? static_cast<uint32_t>(now - static_cast<std::time_t>(authBootstrapChild680_.timestamp80))
+    const uint32_t currentAuthServerTime =
+        (now > static_cast<std::time_t>(authBootstrapChild680_.authServerTimeBias80))
+            ? static_cast<uint32_t>(now - static_cast<std::time_t>(authBootstrapChild680_.authServerTimeBias80))
             : 0u;
-    return ageSinceGetPublicKey < expiryTimeAc;
+    return currentAuthServerTime < expiryTimeAc;
 }
 
 // UNANCHORED: source-owned table mirror fed from parsed auth reply worlds
