@@ -321,23 +321,58 @@ Current runtime consequence:
   - `-> state6 slot6`
   - `-> state8 slot3`
 
-Current replacement milestone on that exact blocker (`2026-03-30`):
-- source now materializes owner `+0x680 +0xf4` on the active existing-character path before
-  state5 slot3 runs
-- source state5 slot3 now logs:
+Static recheck of the same existing-character continuation now also matches that runtime order:
+- `0x4393f0` / state4 slot2 zero-status success:
+  - reads cached upstream from `this+4`
+  - calls cached upstream vtable `+0x18`
+  - clears `this+4`
+  - switches helper through `0x41b450`
+  - posts event `0x0e`
+- `0x43bd48..0x43bd54` / state8 slot3 gate:
+  - if owner byte `+0xf14 == 0`, it switches helper state to `6` and returns
+- `0x439590` / state5 slot2 local type-`0x0b`:
+  - reads cached upstream from `this+4`
+  - calls its vtable `+0x18`
+  - switches helper through `0x41b450`
+- `0x440ab9..0x440ae5` / state6 slot6 opcode-`9` success:
+  - writes owner `+0xf18 = parsedReply(+0x09)`
+  - writes owner `+0xf14 = 1`
+  - reloads cached upstream from `this+4`
+  - calls its vtable `+0x18`
+  - switches helper through `0x41b450`
+  - posts event `0x12`
+
+Current replacement milestone on that exact blocker (`2026-03-30`, later same-day rerun):
+- source now preserves the runtime-backed existing-character happy-path order through:
+  - `state8(slot3 pre-connect gate)`
+  - `-> state4 slot2 success`
+  - `-> state8 slot3`
+  - `-> state6 slot3`
+  - `-> state5 slot3`
+  - `-> state5 slot2 local type-0x0b`
+  - `-> state6 slot3`
+  - `-> state6 slot6 opcode-9 success`
+  - `-> restored state8 slot3`
+- source state5 slot3 still materializes the runtime-backed owner `+0x680 +0xf4` copy/send path:
   - non-null `authReplyCopyShadowF4`
   - `replyCopyShadowStillValid=1`
-  - the confirmed `0x41b500` prep side too:
-    - copy into margin connection `+0x98`
-    - bounded mirror of the owner `+0x680` child `+0xb0/+0xc4/+0xd8` prep family into a
-      connection-side `+0xa0` sidecar
-  - raw type-1 send through the preserved `0x41ce80 -> 0x441f30` route with prefix bytes
-    `01 00 00`, then the copied `0x136` reply block (`payloadBytes=0x139`)
-- immediate new failure after that milestone:
-  - the margin socket returns EOF right after that state5 send on the current replacement path
-  - so the next blocker has moved forward from “materialize child `+0xf4`” to “make that copied
-    state5 raw type-1 packet faithful enough for server acceptance / later state6-state8
-    continuation”
+  - copy into margin connection `+0x98`
+  - bounded mirror of owner child `+0xb0/+0xc4/+0xd8` into connection-side `+0xa0`
+  - raw type-1 send through the preserved `0x41ce80 -> 0x441f30` route
+- source state6 slot6 now owns the opcode-`9` success side narrowly enough to match the
+  original restore model from `0x440ab9..0x440ae5`:
+  - owner byte `+0xf14 = 1`
+  - owner dword `+0xf18 = parsedReply(+0x09)`
+  - next helper chosen from cached upstream `this+4` phase code, not from `+0xf18`
+  - restored continuation re-enters state8 slot 3
+- source no longer synthesizes owner `+0xf14/+0xf18` directly from `MS_ConnectReply` bootstrap
+  completion when the state6 slot6 route is the active branch
+- active rerun/log milestone on this branch now shows:
+  - state6 slot6 handling opcode-`9` success
+  - owner `+0xf14` set
+  - owner `+0xf18` non-zero
+  - restored state8 slot3 after state6 slot6
+  - later continuation through state8 reply -> state9 -> game entry
 
 ## Current implementation-side milestone summary
 

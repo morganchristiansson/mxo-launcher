@@ -77,6 +77,10 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
         mediator->SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(true);
     }
 
+    // Ghidra/disassembly recheck for `0x4395c8..0x4395d9`:
+    // - local type-`0x0b` completion restores through cached upstream `this+4`
+    // - calls cached upstream vtable `+0x18`
+    // - passes that state id to `0x41b450`
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     CLTLoginState* nextState = LookupRegisteredScaffoldStateById(mediator, nextHelperStateId);
     const uint32_t switchDispatchResult = nextState != nullptr
@@ -102,6 +106,10 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
 // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
 uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     if (upstreamOrArg != nullptr) {
+        // Ghidra/disassembly recheck for `0x43952a..0x439549`:
+        // - if `this+4` already exists and incoming upstream phase is `2` or `4`, keep the
+        //   existing cached pointer
+        // - otherwise overwrite `this+4 = upstream`
         const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
         if (cachedUpstreamOrArg_ == nullptr || (upstreamPhaseCode != 2u && upstreamPhaseCode != 4u)) {
             cachedUpstreamOrArg_ = upstreamOrArg;

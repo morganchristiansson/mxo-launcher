@@ -497,14 +497,20 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
                   6u,
                   fallbackState,
                   this,
-                  "State8 slot3 owner+0xf14==0 -> helper6 margin-bootstrap continuation")
+                  "State8 slot3 owner+0xf14==0 -> helper6 (matches 0x43bd52 -> 0x41b450(6))")
             : 0u;
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x} currentState={}",
+            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
             static_cast<unsigned>(fallbackResult),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
         return fallbackResult;
     }
+
+    spdlog::info(
+        "ROUTE CHECKPOINT: state8 slot3 entered past the 0x43bd48 owner+0xf14 gate ownerF14={} ownerF18=0x{:08x} currentState={}",
+        static_cast<unsigned>(mediator->State10SendGateFlagF14()),
+        static_cast<unsigned>(mediator->State6UdpSessionSecretF18()),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
 
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;

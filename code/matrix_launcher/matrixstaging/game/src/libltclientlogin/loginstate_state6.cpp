@@ -81,10 +81,12 @@ const char* CLTLoginState_State6::DebugName() const {
 
 // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
 uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
-    // Current source-owned tightening from the anchored `0x43b8f0` prologue:
-    // - this object caches an upstream/helper pointer at `this+4`
-    // - when an incoming upstream object reports phase/state `4` or `5`, the original keeps the
-    //   existing cached pointer instead of replacing it
+    // Static recheck in Ghidra/disassembly for `0x43b8f0` now backs the cache rule directly:
+    // - `0x43b8fc` tests state6 `this+4`
+    // - `0x43b904..0x43b91a` calls incoming upstream vtable `+0x18`
+    // - if that reported phase is `4` or `5`, execution jumps to `0x43b91f` and preserves the
+    //   existing cached pointer
+    // - otherwise `0x43b91c` overwrites `this+4 = upstream`
     // - that cached upstream later matters on opcode-`9` success because `0x440acc..0x440ae0`
     //   reads it back and calls its vtable `+0x18` to choose the next helper-state target
     if (upstreamOrArg != nullptr) {
@@ -166,9 +168,8 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     //   - `+0x05` = `GoHereAddr`
     //   - `+0x09` = original debug label `UDPSessionSecret`
     //   - `+0x0d` = offset to `MetrIds` array header `(u16 count, then u16 ids...)`
-    // - open server/proxy mirrors place the changing `MS_ConnectReply` session id in that same
-    //   wire slot, so the current best cross-checked read is:
-    //   `parsedReply(+0x09) = opcode-9 UDPSessionSecret / session-id dword`
+    // - for this function's static source mirror, the important direct fact is narrower:
+    //   `parsedReply(+0x09)` is the dword copied into owner `+0xf18`
     // - on the opcode-`9` success side, the original writes owner byte `+0xf14 = 1`
     //   and owner dword `+0xf18 = parsedReply(+0x09)` before switching helper state and posting
     //   event `0x12`
@@ -229,10 +230,11 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             nextHelperStateId,
             nextState,
             this,
-            "State6 slot6 opcode-0x09 success -> restore cached upstream and re-enter new helper slot3");
+            "State6 slot6 opcode-0x09 success -> choose restored helper from cached upstream phase and re-enter its slot3");
         mediator->PostEventScaffold(0x12u);
         spdlog::info(
-            "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success re-entered helperState=0x{:02x} via 0x41b450 semantics switchDispatchResult=0x{:08x}",
+            "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
+            static_cast<unsigned>(parsed.udpSessionSecret09),
             static_cast<unsigned>(nextHelperStateId),
             static_cast<unsigned>(switchDispatchResult));
     } else {

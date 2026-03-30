@@ -2714,27 +2714,31 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             marginBootstrapState.marginSessionId = reply.sessionId;
             marginBootstrapState.phase = MarginBootstrapPhase::kReady;
 
-            // Newer runtime proof now makes the preferred existing-character continuation tighter:
-            // - after the state5/type-1 copy path and the code-4 local completion re-entry,
-            //   original reaches state6 slot 6 on opcode-`9` before restoring state8
-            // - keep that route preferred here when helper/state 6 is active
+            // Static + runtime-backed existing-character continuation boundary:
+            // - `0x440ab9..0x440ac9` writes owner `+0xf14/+0xf18` inside state6 slot 6
+            // - `0x440acc..0x440ae5` then restores the next helper through cached upstream `this+4`
+            // - `0x43bd48..0x43bd54` keeps state8 slot 3 gated on owner `+0xf14`
+            // Keep that as the only source-owned owner `+0xf14/+0xf18` writer and helper-restore
+            // route here instead of synthesizing readiness directly from bootstrap completion
+            const uint32_t currentHelperPhaseCodeBeforeReply =
+                currentState_ ? currentState_->DispatchPhaseCode() : 0u;
             uint32_t state6Handled = 0u;
-            if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 6u) {
+            if (currentHelperPhaseCodeBeforeReply == 6u) {
                 state6Handled = currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
             }
 
-            if (state6Handled == 0u) {
-                // Bounded fallback for the still-partly-source-owned non-state6 routes.
-                postAuthMarginLoadingState_.state10SendGateFlagF14 = 1u;
-                SetState6UdpSessionSecretF18(reply.sessionId);
+            if (state6Handled != 0u &&
+                currentState_ != nullptr &&
+                currentState_->DispatchPhaseCode() == 8u) {
+                expectedMarginRequestName_ = "existing-character state8 raw-0x0f margin packet";
+            } else if (state6Handled != 0u) {
+                expectedMarginRequestName_ = "post-auth helper state margin packet";
+            } else {
+                expectedMarginRequestName_ =
+                    "post-MS_ConnectReply continuation pending helper restore";
             }
-
-            expectedMarginRequestName_ =
-                (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u)
-                    ? "existing-character state8 raw-0x0f margin packet"
-                    : "post-auth helper state margin packet";
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned margin bootstrap completed sessionId=0x{:08x} field0d=0x{:04x} field0f=0x{:04x} field11=0x{:04x} field13=0x{:04x} field15=0x{:04x} state6Handled=0x{:08x} ownerF14={} ownerF18=0x{:08x} currentState={}",
+                "DIAGNOSTIC: launcher-owned margin bootstrap completed sessionId=0x{:08x} field0d=0x{:04x} field0f=0x{:04x} field11=0x{:04x} field13=0x{:04x} field15=0x{:04x} state6Handled=0x{:08x} ownerF14={} ownerF18=0x{:08x} currentHelperPhaseBeforeReply=0x{:02x} currentState={}",
                 reply.sessionId,
                 reply.field0d,
                 reply.field0f,
@@ -2744,11 +2748,19 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 state6Handled,
                 postAuthMarginLoadingState_.state10SendGateFlagF14,
                 State6UdpSessionSecretF18(),
+                currentHelperPhaseCodeBeforeReply,
                 currentState_ ? currentState_->DebugName() : "<null>");
             if (state6Handled != 0u) {
                 return state6Handled;
             }
-            return currentState_ ? currentState_->Slot3_BeginOrContinue(currentState_, this) : 1u;
+
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin bootstrap completed MS_ConnectReply outside the state6 slot6 route; not synthesizing owner+0xf14/+0xf18 or restoring slot3 from bootstrap completion alone currentHelperPhaseBeforeReply=0x{:02x} currentState={} ownerF14={} ownerF18=0x{:08x}",
+                currentHelperPhaseCodeBeforeReply,
+                currentState_ ? currentState_->DebugName() : "<null>",
+                postAuthMarginLoadingState_.state10SendGateFlagF14,
+                State6UdpSessionSecretF18());
+            return 1u;
         }
 
         default:
@@ -3159,7 +3171,7 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
         return localWorkItemHandled;
     }
 
-    // Current source now keeps the confirmed local code-4 seam explicit:
+    // Current source now keeps the runtime-backed local code-4 seam explicit:
     // - consume code 4 at the margin leaf
     // - synthesize the local type-0x0b work item (`0x441850` shape)
     // - let owner fallback `0x41afc0` re-enter current helper slot 2
@@ -3256,7 +3268,7 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
                 transportEncrypted);
         if (handledLocalCode4 != 0u) {
             spdlog::info(
-                "CLTLoginMediator::HandleMarginPacketBytes routed rawCode=0x04 directly into the confirmed state5 local completion seam currentHelperPhase=0x{:02x} transportEncrypted={} handled={}",
+                "CLTLoginMediator::HandleMarginPacketBytes routed rawCode=0x04 directly into the runtime-backed state5 local completion seam currentHelperPhase=0x{:02x} transportEncrypted={} handled={}",
                 static_cast<unsigned>(currentHelperPhaseCode),
                 transportEncrypted ? 1u : 0u,
                 static_cast<unsigned>(handledLocalCode4));

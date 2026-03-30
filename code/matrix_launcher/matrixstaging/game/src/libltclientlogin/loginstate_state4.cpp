@@ -111,6 +111,13 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
         return 1u;
     }
 
+    // Ghidra/disassembly recheck for `0x439495..0x4394c8`:
+    // - read cached upstream from `this+4`
+    // - call cached upstream vtable `+0x18`
+    // - clear `this+4 = 0`
+    // - write owner `+0x104 = -1`
+    // - switch helper through `0x41b450`
+    // - post event `0x0e`
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     cachedUpstreamOrArg_ = nullptr;
     mediator->MutableMarginRouteState().currentWorldId = -1;
