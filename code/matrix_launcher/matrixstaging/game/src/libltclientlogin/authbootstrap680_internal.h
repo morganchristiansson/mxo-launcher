@@ -7,6 +7,10 @@
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
 
+namespace mxo::liblttcp {
+class CMarginConnection;
+}
+
 namespace mxo::ltlogin {
 
 class CLTLoginMediator;
@@ -96,7 +100,13 @@ struct AuthBootstrap680ChildSketch {
     void* raw08PublicKeyWorkerA8 = nullptr;      // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x47780` and consumed by `0x4474f0`
     void* fieldAC = nullptr;                     // original child `+0xac`; sibling reply-validation/transform family still open
 
-    // Original child `+0xb0 .. +0xeb` is still unresolved in current source.
+    // Original child `+0xb0 .. +0xeb` now keeps the narrower `0x448140` success-side prep family
+    // explicit as three adjacent `0x14`-byte big-int wrapper objects:
+    // - `+0xb0` <- modulus bytes from copied `+0xf4 + 0xd2 .. + 0x131`
+    // - `+0xc4` <- low public-exponent byte from copied `+0xf4 + 0xd1`
+    // - `+0xd8` <- derived 96-byte private-exponent/transform output used by the same prep path
+    // Current source still stores the raw `0x3c` object span here and keeps any owned digit buffers
+    // in sidecar storage so the launcher child layout does not grow.
     std::array<uint8_t, 0x3c> opaqueStateB0ToEb{};
 
     uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
@@ -153,6 +163,9 @@ struct AuthBootstrap680Ops {
     static void SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
         CLTLoginMediator& mediator,
         const mxo::auth::AuthChallengeResponseBuildResult& buildResult);
+    static bool PrepareState5MarginConnectionCopySendScaffold(
+        CLTLoginMediator& mediator,
+        mxo::liblttcp::CMarginConnection& marginConnection);
     static void SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
         CLTLoginMediator& mediator,
         const mxo::auth::AuthReply& reply);

@@ -918,6 +918,19 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         // - control therefore falls through into the leaf owner-callback wrapper
         return 0u;
     }
+    if (workType == 0x0bu) {
+        // Preserve the explicit local code-4 continuation seam:
+        // `0x441850` synthesizes a type-0x0b work-item and routes it back through connection
+        // `OnOperationCompleted`; the base family must leave that work item for the later
+        // margin-leaf/owner fallback chain (`0x44af60 -> 0x41afc0 -> helper slot2`), not consume it
+        // as a generic unhandled op.
+        spdlog::info(
+            "CMessageConnection::OnOperationCompleted preserved local type0x0b completion workItem for leaf/owner fallback this={} ownerContext={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        return 0u;
+    }
     if (workType != CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket) {
         CMessageConnection_LogUnhandledOperationScaffold(workItem);
         return 1u;
@@ -1342,36 +1355,101 @@ bool CMarginConnection::StoreBootstrapReplyCopy98Scaffold(const void* bytes, siz
     return true;
 }
 
+// anchor: launcher.exe:0x443340 -> connection `+0xa0`
+bool CMarginConnection::StoreBootstrapPrepStateA0Scaffold(
+    const void* blockB0,
+    const void* blockC4,
+    const void* blockD8,
+    size_t blockByteCount) {
+    constexpr size_t kExpectedBlockByteCount = 0x14u;
+    if (!blockB0 || !blockC4 || !blockD8 || blockByteCount != kExpectedBlockByteCount) {
+        return false;
+    }
+
+    if (!bootstrapPrepStateA0Scaffold_) {
+        bootstrapPrepStateA0Scaffold_ = std::make_unique<CMarginConnectionBootstrapPrepStateA0Scaffold>();
+    }
+    if (!bootstrapPrepStateA0Scaffold_) {
+        return false;
+    }
+
+    std::copy_n(
+        static_cast<const uint8_t*>(blockB0),
+        kExpectedBlockByteCount,
+        bootstrapPrepStateA0Scaffold_->blockB0.begin());
+    std::copy_n(
+        static_cast<const uint8_t*>(blockC4),
+        kExpectedBlockByteCount,
+        bootstrapPrepStateA0Scaffold_->blockC4.begin());
+    std::copy_n(
+        static_cast<const uint8_t*>(blockD8),
+        kExpectedBlockByteCount,
+        bootstrapPrepStateA0Scaffold_->blockD8.begin());
+
+    const auto readFirstDword = [](const std::array<uint8_t, 0x14>& bytes) -> uint32_t {
+        return static_cast<uint32_t>(bytes[0]) |
+               (static_cast<uint32_t>(bytes[1]) << 8u) |
+               (static_cast<uint32_t>(bytes[2]) << 16u) |
+               (static_cast<uint32_t>(bytes[3]) << 24u);
+    };
+
+    spdlog::info(
+        "CMarginConnection::StoreBootstrapPrepStateA0Scaffold staged owner+0x680 child blocks +0xb0/+0xc4/+0xd8 into connection-side +0xa0 mirror blockBytes=0x{:02x} firstDwordB0=0x{:08x} firstDwordC4=0x{:08x} firstDwordD8=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(kExpectedBlockByteCount),
+        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0Scaffold_->blockB0)),
+        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0Scaffold_->blockC4)),
+        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0Scaffold_->blockD8)),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return true;
+}
+
 // anchor: launcher.exe:0x41f30
 uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold() {
     if (!hasBootstrapReplyCopy98Scaffold_) {
         return 0u;
     }
 
-    CMessageConnectionEnvelopeScaffold envelope = CMessageConnection::BuildPacketBuilderEnvelopeScaffold(false);
+    constexpr uint16_t kReplyCopyByteCount = 0x136u;
+    constexpr uint16_t kLeadingType1PrefixByteCount = 3u;
+    constexpr uint16_t kNestedReplyCopyLengthFieldByteCount = sizeof(uint16_t);
+    constexpr uint16_t kTotalPayloadByteCount =
+        kLeadingType1PrefixByteCount +
+        kNestedReplyCopyLengthFieldByteCount +
+        kReplyCopyByteCount;
+
+    CMessageConnectionEnvelopeScaffold envelope =
+        CMessageConnection::BuildPacketBuilderEnvelopeScaffold(false);
     if (!envelope.sharedMessage) {
         return 0u;
     }
 
-    envelope.sharedMessage->ResetPayloadByteCountScaffold(
-        static_cast<uint16_t>(3u + bootstrapReplyCopy98Scaffold_.size()));
+    envelope.sharedMessage->ResetPayloadByteCountScaffold(kTotalPayloadByteCount);
     uint8_t* payloadBytes = envelope.sharedMessage->PayloadBaseScaffold();
     if (!payloadBytes) {
         return 0u;
     }
 
+    // Tightest current static read from `0x441f30 -> 0x43a230(0x136)`:
+    // - leading raw type-1 prefix bytes `01 00 00`
+    // - `0x43a230` then grows the shared message by `(0x136 + 2)` and points the later copy at
+    //   the span immediately after that inner little-endian `0x0136` word
     payloadBytes[0] = 0x01u;
     payloadBytes[1] = 0u;
     payloadBytes[2] = 0u;
+    payloadBytes[3] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
+    payloadBytes[4] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
     std::copy(
         bootstrapReplyCopy98Scaffold_.begin(),
         bootstrapReplyCopy98Scaffold_.end(),
-        payloadBytes + 3u);
+        payloadBytes + kLeadingType1PrefixByteCount + kNestedReplyCopyLengthFieldByteCount);
 
     const uint32_t sendResult = SendPacketEnvelopeScaffold(envelope);
     spdlog::info(
-        "CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold sent rawType1PrefixPlusReplyCopy payloadBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(3u + bootstrapReplyCopy98Scaffold_.size()),
+        "CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold sent rawType1PrefixPlusLengthPrefixedReplyCopy payloadBytes=0x{:03x} nestedReplyCopyBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(kTotalPayloadByteCount),
+        static_cast<unsigned>(kReplyCopyByteCount),
         static_cast<unsigned>(sendResult),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),

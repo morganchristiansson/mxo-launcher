@@ -135,22 +135,20 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     }
 
     auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(mediator->MarginConnection());
-    const bool storedReplyCopy =
+    const bool preparedCopySendState =
         marginConnection != nullptr &&
-        marginConnection->StoreBootstrapReplyCopy98Scaffold(
-            authReplyCopyShadowF4,
-            sizeof(*authReplyCopyShadowF4));
+        mediator->PrepareState5MarginConnectionCopySendScaffold(marginConnection);
     const uint32_t sendResult =
-        (marginConnection != nullptr && storedReplyCopy)
+        (marginConnection != nullptr && preparedCopySendState)
             ? marginConnection->SendStoredBootstrapReplyCopy98Scaffold()
             : 0u;
     mediator->PostEventScaffold(0x10u);
     spdlog::info(
-        "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} storedReplyCopy={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
+        "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} preparedCopySendState={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
         fmt::ptr(cachedUpstreamOrArg_),
         fmt::ptr(upstreamOrArg),
         fmt::ptr(authReplyCopyShadowF4),
-        storedReplyCopy ? 1u : 0u,
+        preparedCopySendState ? 1u : 0u,
         static_cast<unsigned>(sendResult),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
     return sendResult;

@@ -1409,6 +1409,7 @@ public:
     uint32_t& ReplySectionData13cc() { return postAuthMarginLoadingState_.replySectionData13cc; }
     uint32_t& ReplySectionData13d0() { return postAuthMarginLoadingState_.replySectionData13d0; }
     uint8_t& CharacterRouteIndexCc8() { return postAuthMarginLoadingState_.characterRouteIndexCc8; }
+    bool PrepareState5MarginConnectionCopySendScaffold(mxo::liblttcp::CMarginConnection* marginConnection);
     const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
     // anchor: launcher.exe:0x004433c0 / 0x0044add0
     // Returns whether the owner `+0x680 +0xf4` auth-reply-derived `0x136` copy block is present

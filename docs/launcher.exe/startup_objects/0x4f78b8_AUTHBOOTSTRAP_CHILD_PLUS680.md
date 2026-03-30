@@ -256,11 +256,14 @@ Current bounded follow-up consequence:
 - this mirror is now enough to source-own the neighboring state5 helper chain directly on the live
   existing-character path:
   - `0x41ce80` copy into margin connection `+0x98`
-  - `0x41f30` raw-type-`1` prefix plus stored `0x136` block send
+  - `0x443340`-shaped prep mirror from child `+0xb0/+0xc4/+0xd8` into a bounded connection-side
+    `+0xa0` sidecar
+  - `0x41f30` raw-type-`1` prefix send with bytes `01 00 00`, then the copied `0x136` block
 - live replacement log on `2026-03-30` now shows:
   - state5 slot3 `replyCopyShadowStillValid=1`
   - non-null child `+0xf4`
   - `CMarginConnection::StoreBootstrapReplyCopy98Scaffold`
+  - `CMarginConnection::StoreBootstrapPrepStateA0Scaffold`
   - `CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold` with `payloadBytes=0x139`
 - immediate current limitation after that milestone:
   - the margin socket then returns EOF, so the next fidelity blocker has moved from

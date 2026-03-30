@@ -327,8 +327,12 @@ Current replacement milestone on that exact blocker (`2026-03-30`):
 - source state5 slot3 now logs:
   - non-null `authReplyCopyShadowF4`
   - `replyCopyShadowStillValid=1`
-  - copy into margin connection `+0x98`
-  - raw type-1 prefixed send through the preserved `0x41ce80 -> 0x441f30` route
+  - the confirmed `0x41b500` prep side too:
+    - copy into margin connection `+0x98`
+    - bounded mirror of the owner `+0x680` child `+0xb0/+0xc4/+0xd8` prep family into a
+      connection-side `+0xa0` sidecar
+  - raw type-1 send through the preserved `0x41ce80 -> 0x441f30` route with prefix bytes
+    `01 00 00`, then the copied `0x136` reply block (`payloadBytes=0x139`)
 - immediate new failure after that milestone:
   - the margin socket returns EOF right after that state5 send on the current replacement path
   - so the next blocker has moved forward from “materialize child `+0xf4`” to “make that copied

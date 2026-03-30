@@ -2810,6 +2810,13 @@ void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mx
     AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(*this, reply);
 }
 
+bool CLTLoginMediator::PrepareState5MarginConnectionCopySendScaffold(
+    mxo::liblttcp::CMarginConnection* marginConnection) {
+    return marginConnection != nullptr
+        ? AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold(*this, *marginConnection)
+        : false;
+}
+
 const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
     return authBootstrapChild680_.authReplyCopyShadowF4;
 }
@@ -3142,10 +3149,22 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
         static_cast<unsigned>(localWorkItemHandled),
         currentState_ ? currentState_->DebugName() : "<null>");
 
-    // Current source now mirrors the nearer `0x441850` local type-0x0b work-item re-entry before
-    // falling back to the existing launcher-owned bootstrap send/build continuation. Keep that
-    // fallback for the current working path until the later state5/state6 resumption behind the
-    // completion-fallback slot-2 chain is source-owned enough to replace it.
+    const uint32_t currentHelperPhaseCode =
+        currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    if (currentHelperPhaseCode == 5u && localWorkItemHandled != 0u) {
+        spdlog::info(
+            "CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold preserved explicit state5 local type0x0b seam currentHelperPhase=0x{:02x} localType0x0bHandled={} -> skipping broader bootstrap fallback",
+            static_cast<unsigned>(currentHelperPhaseCode),
+            static_cast<unsigned>(localWorkItemHandled));
+        return localWorkItemHandled;
+    }
+
+    // Current source now keeps the confirmed local code-4 seam explicit:
+    // - consume code 4 at the margin leaf
+    // - synthesize the local type-0x0b work item (`0x441850` shape)
+    // - let owner fallback `0x41afc0` re-enter current helper slot 2
+    // Any remaining bootstrap fallback here is only for the broader launcher-owned receive path,
+    // not because the local state5 slot2 continuation is still treated as speculative.
     const uint32_t bootstrapHandled =
         ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
     return (bootstrapHandled != 0u) ? bootstrapHandled : localWorkItemHandled;
@@ -3226,6 +3245,24 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
         static_cast<unsigned>(marginPacketFilteredBeforeSlot6CountScaffold_),
         static_cast<unsigned>(marginPacketSlot6DispatchCountScaffold_),
         static_cast<unsigned>(marginBootstrapState.phase));
+
+    const uint32_t currentHelperPhaseCode =
+        currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    if (rawCode == 0x04u && currentHelperPhaseCode == 5u) {
+        const uint32_t handledLocalCode4 =
+            HandleMarginConsumedCode4AtConnectionSeamScaffold(
+                effectivePacketBytes,
+                effectivePacketSize,
+                transportEncrypted);
+        if (handledLocalCode4 != 0u) {
+            spdlog::info(
+                "CLTLoginMediator::HandleMarginPacketBytes routed rawCode=0x04 directly into the confirmed state5 local completion seam currentHelperPhase=0x{:02x} transportEncrypted={} handled={}",
+                static_cast<unsigned>(currentHelperPhaseCode),
+                transportEncrypted ? 1u : 0u,
+                static_cast<unsigned>(handledLocalCode4));
+            return handledLocalCode4;
+        }
+    }
 
     // Route launcher-owned CERT/MS bootstrap packets first.
     // This keeps the bootstrap progression explicit instead of faking a ready state after

@@ -31,6 +31,9 @@ struct AuthBootstrap680ChildSidecarState {
     bool state2AuthReplySuccessOneTimeSideEffectsComplete = false;
     std::vector<uint8_t> opaqueReplyBlob108;
     std::vector<uint8_t> opaqueReplyBlob10C;
+    std::vector<uint32_t> blockB0Digits;
+    std::vector<uint32_t> blockC4Digits;
+    std::vector<uint32_t> blockD8Digits;
 };
 
 static std::unordered_map<const CLTLoginMediator*, std::unique_ptr<AuthBootstrap680ChildSidecarState>>
@@ -88,6 +91,97 @@ static uint32_t ReadU32LE(const uint8_t* bytes) {
            (static_cast<uint32_t>(bytes[1]) << 8u) |
            (static_cast<uint32_t>(bytes[2]) << 16u) |
            (static_cast<uint32_t>(bytes[3]) << 24u);
+}
+
+struct AuthBootstrap680BigIntObject20Scaffold {
+    uint32_t vtable00 = 0x004ba50cu;
+    uint32_t unused04 = 0u;
+    uint32_t capacityWords08 = 0u;
+    void* digits0c = nullptr;
+    uint32_t sign10 = 0u;
+};
+static_assert(sizeof(AuthBootstrap680BigIntObject20Scaffold) == 0x14u);
+
+static constexpr uint32_t kAuthBootstrap680BigIntCapacityTable[9] = {
+    2u, 2u, 2u, 4u, 4u, 8u, 8u, 8u, 8u,
+};
+
+static uint32_t RoundAuthBootstrap680BigIntCapacityWords(size_t requiredWordCount) {
+    if (requiredWordCount < std::size(kAuthBootstrap680BigIntCapacityTable)) {
+        return kAuthBootstrap680BigIntCapacityTable[requiredWordCount];
+    }
+    if (requiredWordCount < 0x11u) {
+        return 0x10u;
+    }
+    if (requiredWordCount < 0x21u) {
+        return 0x20u;
+    }
+    if (requiredWordCount < 0x41u) {
+        return 0x40u;
+    }
+
+    uint32_t rounded = 1u;
+    while (rounded < requiredWordCount && rounded < 0x80000000u) {
+        rounded <<= 1u;
+    }
+    return rounded;
+}
+
+static AuthBootstrap680BigIntObject20Scaffold* ChildBigIntBlockAt(
+    AuthBootstrap680ChildSketch& child,
+    size_t byteOffsetWithinB0ToEb) {
+    if (byteOffsetWithinB0ToEb + sizeof(AuthBootstrap680BigIntObject20Scaffold) >
+        child.opaqueStateB0ToEb.size()) {
+        return nullptr;
+    }
+    return reinterpret_cast<AuthBootstrap680BigIntObject20Scaffold*>(
+        child.opaqueStateB0ToEb.data() + byteOffsetWithinB0ToEb);
+}
+
+static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
+    AuthBootstrap680BigIntObject20Scaffold* outObject,
+    std::vector<uint32_t>* ownedDigits,
+    const uint8_t* bigEndianBytes,
+    size_t byteCount) {
+    if (!outObject || !ownedDigits || !bigEndianBytes || byteCount == 0u) {
+        return false;
+    }
+
+    const size_t requiredWordCount = (byteCount + 3u) / 4u;
+    const uint32_t capacityWords = RoundAuthBootstrap680BigIntCapacityWords(requiredWordCount);
+    ownedDigits->assign(static_cast<size_t>(capacityWords), 0u);
+    for (size_t i = 0; i < byteCount; ++i) {
+        const size_t reversedIndex = byteCount - 1u - i;
+        const size_t wordIndex = reversedIndex / 4u;
+        const size_t byteShift = (reversedIndex & 3u) * 8u;
+        (*ownedDigits)[wordIndex] |= static_cast<uint32_t>(bigEndianBytes[i]) << byteShift;
+    }
+
+    outObject->vtable00 = 0x004ba50cu;
+    outObject->unused04 = 0u;
+    outObject->capacityWords08 = capacityWords;
+    outObject->digits0c = ownedDigits->empty() ? nullptr : ownedDigits->data();
+    outObject->sign10 = 0u;
+    return true;
+}
+
+static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
+    AuthBootstrap680BigIntObject20Scaffold* outObject,
+    std::vector<uint32_t>* ownedDigits,
+    uint8_t value) {
+    if (!outObject || !ownedDigits) {
+        return false;
+    }
+
+    ownedDigits->assign(2u, 0u);
+    (*ownedDigits)[0] = static_cast<uint32_t>(value);
+
+    outObject->vtable00 = 0x004ba50cu;
+    outObject->unused04 = 0u;
+    outObject->capacityWords08 = 2u;
+    outObject->digits0c = ownedDigits->data();
+    outObject->sign10 = 0u;
+    return true;
 }
 
 static void ClearSmallStringMirror(AuthBootstrap680SmallStringMirror& mirror) {
@@ -783,6 +877,41 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseSc
         CopyPrefix16(buildResult.decryptedChallengeBytes);
 }
 
+// anchor: launcher.exe:0x41b500 -> 0x4435f0 -> 0x41ce80 / 0x443340
+bool AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold(
+    CLTLoginMediator& mediator,
+    mxo::liblttcp::CMarginConnection& marginConnection) {
+    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    const auto* copyShadow =
+        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(child.authReplyCopyShadowF4);
+    if (copyShadow == nullptr) {
+        return false;
+    }
+
+    constexpr size_t kBootstrapPrepBlockByteCount = 0x14u;
+    static_assert((kBootstrapPrepBlockByteCount * 3u) == sizeof(child.opaqueStateB0ToEb));
+
+    const uint8_t* prepBase = child.opaqueStateB0ToEb.data();
+    const bool storedReplyCopy =
+        marginConnection.StoreBootstrapReplyCopy98Scaffold(copyShadow, sizeof(*copyShadow));
+    const bool storedPrepState =
+        marginConnection.StoreBootstrapPrepStateA0Scaffold(
+            prepBase,
+            prepBase + kBootstrapPrepBlockByteCount,
+            prepBase + (kBootstrapPrepBlockByteCount * 2u),
+            kBootstrapPrepBlockByteCount);
+
+    spdlog::info(
+        "AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} storedPrepStateA0={} childBlockB0FirstDword=0x{:08x} childBlockC4FirstDword=0x{:08x} childBlockD8FirstDword=0x{:08x}",
+        fmt::ptr(copyShadow),
+        storedReplyCopy ? 1u : 0u,
+        storedPrepState ? 1u : 0u,
+        prepBase ? static_cast<unsigned>(ReadU32LE(prepBase)) : 0u,
+        prepBase ? static_cast<unsigned>(ReadU32LE(prepBase + kBootstrapPrepBlockByteCount)) : 0u,
+        prepBase ? static_cast<unsigned>(ReadU32LE(prepBase + (kBootstrapPrepBlockByteCount * 2u))) : 0u);
+    return storedReplyCopy && storedPrepState;
+}
+
 // UNANCHORED: source-owned owner+0x680 auth-reply copy-shadow update for later `+0xf4`
 // consumers such as `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
@@ -790,10 +919,14 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
     const mxo::auth::AuthReply& reply) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     child.authReplyCopyShadowF4 = nullptr;
+    child.opaqueStateB0ToEb = {};
 
     AuthBootstrap680ChildSidecarState* sidecar = FindAuthBootstrap680ChildSidecar(&mediator);
     if (sidecar) {
         sidecar->authReplyCopyShadowF4 = {};
+        sidecar->blockB0Digits.clear();
+        sidecar->blockC4Digits.clear();
+        sidecar->blockD8Digits.clear();
     }
 
     if (reply.isErrorReply || !reply.valid) {
@@ -804,6 +937,9 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
         MutableAuthBootstrap680ChildSidecar(&mediator);
     AuthBootstrapReplyCopyShadowF4Sketch& copyShadow = materializedSidecar.authReplyCopyShadowF4;
     copyShadow = {};
+    materializedSidecar.blockB0Digits.clear();
+    materializedSidecar.blockC4Digits.clear();
+    materializedSidecar.blockD8Digits.clear();
 
     // Prefer the exact length-prefixed `0x136` auth-data field recovered from
     // `0x443470 / 0x448140`: that field is the original copied child `+0xf4` material.
@@ -830,8 +966,43 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
 
     child.authReplyCopyShadowF4 = &copyShadow;
 
+    constexpr size_t kPrepBlockByteCount = sizeof(AuthBootstrap680BigIntObject20Scaffold);
+    constexpr size_t kBlockB0Offset = 0x00u;
+    constexpr size_t kBlockC4Offset = 0x14u;
+    constexpr size_t kBlockD8Offset = 0x28u;
+    static_assert(kBlockD8Offset + kPrepBlockByteCount == sizeof(child.opaqueStateB0ToEb));
+
+    AuthBootstrap680BigIntObject20Scaffold* blockB0 = ChildBigIntBlockAt(child, kBlockB0Offset);
+    AuthBootstrap680BigIntObject20Scaffold* blockC4 = ChildBigIntBlockAt(child, kBlockC4Offset);
+    AuthBootstrap680BigIntObject20Scaffold* blockD8 = ChildBigIntBlockAt(child, kBlockD8Offset);
+
+    const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
+        blockB0,
+        &materializedSidecar.blockB0Digits,
+        copyShadow.signedData80.data() + 0x52u,
+        0x60u);
+    const bool builtBlockC4 = BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
+        blockC4,
+        &materializedSidecar.blockC4Digits,
+        copyShadow.signedData80[0x51u]);
+
+    std::vector<uint8_t> decryptedPrivateExponentBytes;
+    const bool decryptedPrivateExponent = mxo::auth::DecryptAuthReplyPrivateExponent(
+        reply,
+        mediator.lastAuthRequestBuildResult_.twofishKeyBytes,
+        mediator.lastAuthChallenge_.encryptedChallengeBytes,
+        &decryptedPrivateExponentBytes);
+    const bool builtBlockD8 =
+        decryptedPrivateExponent &&
+        decryptedPrivateExponentBytes.size() == 0x60u &&
+        BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
+            blockD8,
+            &materializedSidecar.blockD8Digits,
+            decryptedPrivateExponentBytes.data(),
+            decryptedPrivateExponentBytes.size());
+
     spdlog::info(
-        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} replyAuthDataBytes=0x{:03x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' childTimestamp80=0x{:08x}",
+        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} replyAuthDataBytes=0x{:03x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' childTimestamp80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={}",
         static_cast<unsigned>(sizeof(copyShadow)),
         static_cast<unsigned>(reply.authDataBytes.size()),
         BuildHexPreview(
@@ -843,7 +1014,13 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
             copyShadow.signedData80.data() + 0x52u,
             16u,
             16u),
-        static_cast<unsigned>(child.timestamp80));
+        static_cast<unsigned>(child.timestamp80),
+        builtBlockB0 ? 1u : 0u,
+        builtBlockC4 ? 1u : 0u,
+        builtBlockD8 ? 1u : 0u,
+        blockB0 ? static_cast<unsigned>(blockB0->capacityWords08) : 0u,
+        blockC4 ? static_cast<unsigned>(blockC4->capacityWords08) : 0u,
+        blockD8 ? static_cast<unsigned>(blockD8->capacityWords08) : 0u);
 }
 
 // UNANCHORED: source-owned narrower mirror of the pre-gate `0x43f300` neighboring helper call

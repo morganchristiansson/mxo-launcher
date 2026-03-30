@@ -443,6 +443,15 @@ struct CMarginConnectionLocalCompletionWorkItemScaffold {
 
 static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
 
+struct CMarginConnectionBootstrapPrepStateA0Scaffold {
+    // anchor: launcher.exe:0x443340 -> helper object stored at connection `+0xa0`
+    // Bounded source-owned mirror of the owner `+0x680` prep object payload seeded from child
+    // `+0xb0/+0xc4/+0xd8` before the later raw type-1 state5 send.
+    std::array<uint8_t, 0x14> blockB0{};
+    std::array<uint8_t, 0x14> blockC4{};
+    std::array<uint8_t, 0x14> blockD8{};
+};
+
 class CMarginConnection : public CMessageConnection {
 public:
     // UNANCHORED: source-owned narrow leaf ctor over the `0x41cf80 -> 0x448b40` family.
@@ -474,9 +483,21 @@ public:
     // Source-owned mirror of the margin connection helper that stores a copied `0x136` auth-reply
     // shadow block for the later state5/state6 raw type-1 send path.
     bool StoreBootstrapReplyCopy98Scaffold(const void* bytes, size_t byteCount);
+    // anchor: launcher.exe:0x443340 -> connection `+0xa0`
+    // Source-owned mirror of the owner `+0x680` prep-object adoption from child
+    // `+0xb0/+0xc4/+0xd8` that `0x41b500` performs before the later raw type-1 send.
+    bool StoreBootstrapPrepStateA0Scaffold(
+        const void* blockB0,
+        const void* blockC4,
+        const void* blockD8,
+        size_t blockByteCount);
     // anchor: launcher.exe:0x41f30
-    // Source-owned mirror of the later raw type-1 send that prefixes `[0x01][u16 0]` and then
-    // appends the stored `+0x98` `0x136` block through connection vtable `+0x24`.
+    // Source-owned mirror of the later raw type-1 send that:
+    // - writes prefix bytes `01 00 00`
+    // - then reserves the copied reply span through the same `0x43a230(0x136)` helper shape used
+    //   by the original local envelope builder
+    // - then copies the stored `+0x98` reply-derived `0x136` block into that returned tail span
+    // - then forwards the completed envelope through connection vtable `+0x24`
     uint32_t SendStoredBootstrapReplyCopy98Scaffold();
     // anchor: launcher.exe:0x442d00 code-5 branch -> connection `+0x85 .. +0x94`
     // Narrow source-owned mirror of the consumed decoded-code-5 16-byte writeback.
@@ -523,6 +544,7 @@ private:
     bool messageCode4SuccessFlag84Scaffold_ = false;
     bool hasBootstrapReplyCopy98Scaffold_ = false;
     std::array<uint8_t, 0x136> bootstrapReplyCopy98Scaffold_{};
+    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0Scaffold_;
     bool hasMessageCode5SeedBytes85Scaffold_ = false;
     std::array<uint8_t, 16> messageCode5SeedBytes85Scaffold_{};
 };
