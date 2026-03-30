@@ -74,8 +74,10 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
     // - otherwise derive the incoming secondary-message opcode through `0x41bc20`
     // - then call callback84 vtable `+0x0c(&opcodeStorage, workItem)`
     // Current source scaffold note:
-    // - the replacement launcher does not yet materialize the original message wrapper object
-    // - so this mirror derives the opcode from staged auth/margin bytes when possible
+    // - the active margin post-copy path now passes a minimal client-compatible outer
+    //   receive/message-ref bridge so callback84 no longer receives null on the late raw-0x38 path
+    // - this mirror still derives the opcode from staged auth/margin bytes when possible because
+    //   the broader original callback84/message-ref reconstruction remains incomplete
     if (!ownerCallback84_) {
         return 1u;
     }

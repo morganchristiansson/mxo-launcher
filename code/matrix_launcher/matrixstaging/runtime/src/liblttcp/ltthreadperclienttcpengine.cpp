@@ -608,10 +608,6 @@ static void EraseEngineBackings(CLTThreadPerClientTCPEngine* self) {
     g_CLTThreadPerClientTCPEngineContextPayloadBackings.erase(self);
 }
 
-static bool IsSyntheticReceiveDrainWorkType(uint32_t workType) {
-    return workType == CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain;
-}
-
 // UNANCHORED: source-owned helper for the current queue-context unwrapping seam.
 // Current narrowed read:
 // - when the queued context is the bridge object, worker-tree and slot-12 paths need the owning
@@ -665,80 +661,16 @@ static void EnsureLauncherConnectionBridgeWorkItemVtableInitialized() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall LauncherConnectionBridgeContext_Release(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* self) {
-    LoggerForBridgeLabel(self ? self->debugLabel : nullptr)->info(
-        "CLTThreadPerClientTCPEngine launcher bridge context release self={} label='{}' autoRelease={}",
-        fmt::ptr(self),
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        (self && self->autoReleaseFlag) ? 1u : 0u);
-    return 1u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompleted(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* self,
-    mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
-    LoggerForBridgeLabel(workItem && workItem->debugLabel ? workItem->debugLabel : (self ? self->debugLabel : nullptr))->info(
-        "CLTThreadPerClientTCPEngine launcher bridge OnOperationCompleted context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x}",
-        fmt::ptr(self),
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        fmt::ptr(workItem),
-        workItem ? workItem->header.workType : 0u,
-        LauncherBridgeWorkTypeName(workItem ? workItem->header.workType : 0u),
-        workItem ? workItem->workPayload : 0u);
-
-    mxo::ltlogin::CLTLoginMediator* mediator = self ? self->mediator : nullptr;
-    if (!self || !workItem || !mediator) {
-        return 1u;
-    }
-
-    if (workItem->header.workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        const uint32_t handled = self->isMarginConnection
-            ? mediator->HandleMarginConnectStatus(workItem->workPayload)
-            : mediator->HandleAuthConnectStatus(workItem->workPayload);
-        const char* routeLabel = self->isMarginConnection ? "margin" : "auth";
-        const char* incomingReplyAnchor = self->isMarginConnection
-            ? mxo::ltlogin::CLTLoginMediator::kMessageMsLoadCharacterReply
-            : mxo::ltlogin::CLTLoginMediator::kMessageAsAuthReply;
-        spdlog::info(
-            "CLTThreadPerClientTCPEngine launcher bridge routed {} type-2 connect-status payload=0x{:08x} -> handled={} laterIncomingReplyAnchor='{}'",
-            routeLabel,
-            static_cast<unsigned>(workItem->workPayload),
-            static_cast<unsigned>(handled),
-            (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
-    }
-
-    if (IsSyntheticReceiveDrainWorkType(workItem->header.workType)) {
-        // Fallback only:
-        // - the bounded receive-entry correction now normally queues this synthetic proxy with the
-        //   connection-family queue context so it re-enters through `CMessageConnection`
-        // - keep the older mediator-context handling here as a defensive fallback until that seam is
-        //   fully retired
-        if (!self->isMarginConnection) {
-            const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
-            if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
-                const uint32_t marginConnectResult =
-                    mediator->BeginLauncherMarginConnectionScaffold();
-                spdlog::info(
-                    "CLTThreadPerClientTCPEngine launcher bridge synthetic receive-drain post-AS_AuthReply margin auto-begin result=0x{:08x}",
-                    static_cast<unsigned>(marginConnectResult));
-            }
-        } else {
-            (void)mediator->HandleMarginConnectionReceiveScaffold();
-        }
-    }
-
-    return 1u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void EnsureLauncherConnectionBridgeContextVtableInitialized() {
     if (!g_LauncherConnectionBridgeContextVtable[1]) {
+        // Fidelity correction from the current RE pass:
+        // - original queue/context traffic is still connection-centric
+        // - mediator-specific callback bodies are therefore kept on the outer login seam, not in
+        //   the engine core, until the bridge itself can be pruned further
         g_LauncherConnectionBridgeContextVtable[1] =
-            reinterpret_cast<void*>(LauncherConnectionBridgeContext_Release);
+            reinterpret_cast<void*>(mxo::ltlogin::LauncherConnectionBridgeContext_ReleaseScaffold);
         g_LauncherConnectionBridgeContextVtable[4] =
-            reinterpret_cast<void*>(LauncherConnectionBridgeContext_OnOperationCompleted);
+            reinterpret_cast<void*>(mxo::ltlogin::LauncherConnectionBridgeContext_OnOperationCompletedScaffold);
     }
 }
 
@@ -3207,28 +3139,18 @@ CLTThreadPerClientTCPEngineBinding::CLTThreadPerClientTCPEngineBinding()
 CLTThreadPerClientTCPEngineBinding::~CLTThreadPerClientTCPEngineBinding() = default;
 
 // UNANCHORED starter binding helper.
-bool CLTThreadPerClientTCPEngineBinding::Bind(void* owner, mxo::ltlogin::CLTLoginMediator* mediator) {
+bool CLTThreadPerClientTCPEngineBinding::Bind(void* owner) {
     if (owner_ == owner && engine_) {
         return true;
     }
 
-    if (engine_ && mediator) {
-        mediator->ResetLauncherConnectionBridgeScaffold();
-    }
-
     owner_ = owner;
     engine_ = std::make_unique<CLTThreadPerClientTCPEngine>();
-    if (engine_ && mediator) {
-        mediator->BindLauncherConnectionBridgeScaffold(engine_.get());
-    }
     return static_cast<bool>(engine_);
 }
 
 // UNANCHORED starter binding helper.
-void CLTThreadPerClientTCPEngineBinding::Reset(mxo::ltlogin::CLTLoginMediator* mediator) {
-    if (engine_ && mediator) {
-        mediator->ResetLauncherConnectionBridgeScaffold();
-    }
+void CLTThreadPerClientTCPEngineBinding::Reset() {
     engine_.reset();
     owner_ = nullptr;
 }

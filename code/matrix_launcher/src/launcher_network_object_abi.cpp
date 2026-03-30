@@ -1,5 +1,6 @@
 #include "launcher_network_object_abi.h"
 #include "launcher_mediator_abi_shared.h"
+#include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 #include <cstddef>
@@ -183,7 +184,17 @@ static void ResetLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner) {
     if (binding.Engine()) {
         binding.Engine()->DetachLauncherAbiSurfaceScaffold();
     }
-    binding.Reset(DiagnosticEnsureMediatorModel());
+
+    // Current fidelity correction from the latest queue/worker/context RE pass:
+    // - original engine evidence stays connection-centric (`0x431ff0`, `0x4316a0`, `0x436820`,
+    //   `0x436b10`, `0x449d40`)
+    // - there is still no positive Ghidra evidence that mediator bridge bind/reset belongs to the
+    //   engine object itself
+    // So keep mediator bridge teardown in the outer launcher/login seam, not in liblttcp binding.
+    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
+        mediator->ResetLauncherConnectionBridgeScaffold();
+    }
+    binding.Reset();
 }
 
 // UNANCHORED: replacement arg5 sidecar binder into liblttcp-owned engine state.
@@ -193,9 +204,16 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
 
     mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& binding = LauncherObjectEngineBinding();
     if (binding.Owner() != owner) {
-        if (!binding.Bind(owner, DiagnosticEnsureMediatorModel())) {
+        mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+        if (binding.Engine() && mediator) {
+            mediator->ResetLauncherConnectionBridgeScaffold();
+        }
+        if (!binding.Bind(owner)) {
             spdlog::warn("launcher arg5 ABI shell failed to bind CLTThreadPerClientTCPEngine sidecar for {}", fmt::ptr(owner));
             return NULL;
+        }
+        if (binding.Engine() && mediator) {
+            mediator->BindLauncherConnectionBridgeScaffold(binding.Engine());
         }
     }
 

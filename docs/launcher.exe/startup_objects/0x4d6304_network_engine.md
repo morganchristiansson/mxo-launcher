@@ -146,9 +146,19 @@ New non-original-state audit from the current constructor / destructor / worker-
         auth/margin bridge-context records
     - current source consequence:
       - the old auth/margin-specific engine maps were removed
-      - the remaining source-owned bridge lookup now resolves through
-        `connection->OwnerContext()` plus a generic engine-keyed known-connection registry keyed by
-        direct connection identity
+      - source connection resolution is now limited to RE-backed identities only:
+        - queue-context owner
+        - bridge context hanging off `connection->OwnerContext()`
+        - active worker/context-tree payloads keyed by the direct connection pointer
+      - there is no longer any generic engine-keyed known-connection registry on this path
+    - negative result from the current re-check of
+      `0x4316a0/0x431ff0/0x4325d0/0x4328a0/0x436820/0x436b10/0x449d40`:
+      - no positive Ghidra evidence shows original engine queue/worker paths owning
+        `CLTLoginMediator`-specific objects or class-specific context records
+      - current `CLTLoginMediatorConnectionContextScaffold` /
+        `CLTLoginMediatorQueuedWorkItemScaffold` remain source-owned bridge baggage only
+      - so any direct `loginmediator.h` dependency left inside `liblttcp` should still be treated
+        as non-original debt to prune, not as recovered engine structure
   - earlier generic fallback engine-owned `CMessageConnection` allocation has now been retired from
     the active slot-resolution path because current RE does not support it as original engine state
   - dead source-only accessors kept only for compile compatibility (`MonitoredPorts()`,
@@ -1371,11 +1381,11 @@ Important limitation:
   - that ABI layer now incrementally delegates slot `1` / `MonitorPort`, slot `2` / `UDPMonitorPort`, slot `3` / `MonitorEphemeralUDPPort`, slot `5` / `UnmonitorPort`, slot `6` / `Connect`, slot `7` / `Close`, slot `8` / `SendBuffer`, and slot `12` / `CleanupConnection` into the recovered `liblttcp` / `libltmessaging` classes through a sidecar engine/connection binding
   - `Connect`, `Close`, and `SendBuffer` are now routed through liblttcp-side context wrappers (`ConnectContext()` / `CloseContext()` / `SendPacketContext()`) instead of keeping those connection-oriented paths entirely inside `diagnostics.cpp`
   - newer bounded fidelity correction there now keeps slot `6` / `Connect` as the sidecar creation / ensure-connected seam, while slot `7` / `Close` and slot `8` / `SendBuffer` require an already-existing sidecar connection instead of implicitly materializing a new one on demand
-  - newer bounded lookup correction also lets the engine resolve those connection-oriented slots by either:
+  - newer bounded lookup correction also lets the engine resolve those connection-oriented slots by only the tighter RE-backed identities now left in source:
     - the direct connection object pointer,
     - the explicit queue-context bridge object that wraps the owning connection, or
-    - the connection's stored owner/context key
-    while consulting a generic engine-keyed known-connection registry instead of auth/margin-specific engine maps
+    - the connection's stored owner/context key / bridge context hanging off that connection
+  - the earlier generic engine-keyed known-connection registry is gone; current source falls back only through the active pointer-keyed worker/context tree payloads
   - newer bounded correction then normalizes queue-context bridge inputs back to the owning
     connection/context key instead of inventing a second synthetic connection record keyed only by
     the bridge object
@@ -1457,8 +1467,13 @@ Build-validated update:
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-ABI surface attachment / mirror rules used after engine-side connect work reached through connection wrappers
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now drives owner-visible arg5 state refresh after `MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, and `CleanupConnection` sidecar mutations instead of leaving those refresh calls open-coded in the ABI shell wrappers
-- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` / binding class now own the current mediator bind/reset handshake for the sidecar engine instead of keeping that controller logic in the ABI shell
+- later cleanup moved one more mediator-specific coupling point back out of `liblttcp`:
+  - `CLTThreadPerClientTCPEngineBinding` now owns only owner<->engine pairing
+  - outer launcher/login seam code in `src/launcher_network_object_abi.cpp` again owns the current mediator bind/reset handshake around that binding
+  - this is the current better source match for the negative RE result that the original engine object itself is not evidenced to own mediator lifecycle
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
+  - and now also owns the current source-only launcher-bridge context callback bodies that were previously sitting in `ltthreadperclienttcpengine.cpp`
+  - that callback move does **not** prove the bridge is original; it only narrows liblttcp's mediator knowledge while the bridge still exists as source-owned debt
 - `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, no longer calls the launcher-network ABI sidecar-sync helper directly, and no longer keeps a launcher-owner pointer just to gate/auth-start this seam
 - `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:
   - the file is now best read as a **raw arg5 ABI shell** rather than as the real engine implementation
@@ -1645,11 +1660,11 @@ A follow-up restructuring pass pulled `mxo::liblttcp::CLTThreadPerClientTCPEngin
 recovered original arg5 body instead of leaving later source-owned baggage inside the class.
 
 What changed:
-- non-original source bookkeeping moved out of the class body into external engine-keyed storage
+- non-original source bookkeeping moved out of the class body into external side storage instead of pretending to be hidden launcher fields
   - launcher-ABI attachment map
-  - generic known-connection registry
-  - queue-thread vector
-  - monitored-port / worker-thread / message-connection vectors
+  - endpoint-payload backing keyed by raw tree node identity
+  - context-payload backing keyed by raw tree node identity
+  - queue-thread ownership that mirrors real `+0x04/+0x08` class fields without inventing extra launcher offsets
 - the native class body itself now again carries the recovered top-level arg5 fields at the
   original offsets
 - helper roots at `+0x60` and `+0x98` now again embed inline `CRITICAL_SECTION` storage, matching

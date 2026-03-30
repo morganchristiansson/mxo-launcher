@@ -613,6 +613,115 @@ The current clean-init runtime path now has a more valuable signature:
 - repeated arg5 `+0x60`
 - no immediate crash during timed runs
 
+## Late raw-`0x38` callback84 crash narrowing and fix
+
+A newer late-client crash pass finally identified the concrete null producer path for the
+post-bootstrap margin crash that was landing at:
+- `client.dll:0x62133301`
+- inside constructor/helper `0x621332e0`
+- faulting on `mov al, [edi+0x10]`
+- with `EDI = 0`
+
+### What `param_2` really is at `0x621332e0`
+
+Static client-side chain:
+- caller: `0x62179e23 -> 0x62179e2f call 0x621332e0`
+- immediate consumer after construction: `0x62179e34 -> 0x621e0370`
+- constructor shape at `0x621332e0` expects an object with at least:
+  - vtable `+0x04` = AddRef-style retain
+  - `+0x0c` = inner message-storage pointer
+  - `+0x10` = headerless flag byte
+  - vtable `+0x18` on the inner message-storage side = grow/append helper used to build a local
+    wrapper whose first payload byte becomes raw `0x38`
+
+That matches the nearer outer receive/message-ref object family already recovered around:
+- `0x455cd0 / 0x455c60` outer ref
+- outer `+0x0c` -> inner message storage
+- outer `+0x10` -> headerless flag
+
+So the null `param_2` was **not** a connection object, mediator object, or parser object.
+It was the missing outer receive/message-ref handoff object expected by the later callback84 path.
+
+### Which caller passed null
+
+The direct client caller still passed its second stack argument straight through:
+- `0x62179e23: mov ecx,[ebp+0xc]`
+- `0x62179e28: push ecx`
+- `0x62179e29: lea ecx,[ebp-0x1824]`
+- `0x62179e2f: call 0x621332e0`
+
+On the replacement path, that stack arg was becoming null because source still routed the surviving
+post-bootstrap margin slot-6 path as:
+- `CMarginConnection::DispatchCopiedParsedPacketTailScaffold(...)
+  -> StageMarginPacketBytesAndDispatchCurrentHelperScaffold(..., workItem=nullptr)
+  -> HandleMarginPacketBytes(...)
+  -> currentState_->Slot6_HandleSecondaryMessage(nullptr, this)`
+- then state8 raw-non-`0x10` fallback reached:
+  - `CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(workItem)`
+- so callback84 received **null** instead of the expected outer receive/message-ref object
+- that null then became client caller arg2 at `0x62179e23 -> 0x621332e0`
+
+### What this disproved
+
+This pass usefully ruled out several earlier suspicions as the **direct** null producer:
+- not the engine↔mediator bind/reset decoupling seam from the previous session
+- not arg5 slot-12 cleanup / queue consumer teardown
+- not `0x621332e0` being handed a null connection object from the parser itself
+- not the earlier parser inconsistency log being, by itself, the concrete null producer
+
+Important nuance:
+- the parser anomaly and later `terminal parser result=0x0700000b` may still indicate a separate
+  receive/carry-over fidelity issue
+- but for this specific crash, the concrete null at `0x621332e0` came from the replacement's late
+  callback84/message-ref handoff bug on the raw-`0x38` path
+
+### Bounded fix landed
+
+The correction started as a narrow crash fix, but the current source now takes the more faithful
+step instead of keeping a one-off crash-only shim.
+
+Current source correction:
+- `CMarginConnection::DispatchCopiedParsedPacketTailScaffold` now passes the actual local outer
+  receive/message-ref scaffold through the surviving callback84 path
+- that outer scaffold now keeps its raw front matter closer to the recovered `0x455cd0/0x455c60`
+  family instead of inventing a separate late-only bridge object
+  - outer `+0x00/+0x04/+0x08/+0x0c/+0x10/+0x14/+0x18/+0x1c/+0x20`
+  - trailing source-owned ownership tail only after that recovered front matter
+- its inner message-storage object now likewise keeps the recovered raw front matter closer to the
+  `0x455bd0/0x455c60/0x4557b0` family:
+  - inner `+0x00/+0x04/+0x08/+0x0a/+0x0b/+0x0c..`
+- the same real work-item pointer is threaded through:
+  - `StageMarginPacketBytesAndDispatchCurrentHelperScaffold(..., workItem)`
+  - `HandleMarginPacketBytes(..., workItem)`
+  - `currentState_->Slot6_HandleSecondaryMessage(workItem, this)`
+- so state8/raw-`0x38` fallback no longer calls callback84 with null, and it now does so through a
+  more RE-shaped outer message-ref object instead of a special crash-only wrapper
+
+One negative result from that fidelity follow-up is also worth keeping:
+- an intermediate refactor briefly regressed auth receive handling because the new raw inner
+  payload-byte decoder incorrectly masked the reconstructed `+0x0a/+0x0b` length against `0x1000`
+  instead of clamping it
+- that caused valid payload sizes like `0x0196` to read back as zero and stalled auth dispatch
+- current source fixes that by clamping the decoded raw payload length rather than bit-masking it
+
+This still keeps the work bounded to the demonstrated handoff bug instead of reverting the recent
+engine↔mediator decoupling work.
+
+### Validation
+
+After landing that bounded receive/message-ref bridge fix:
+- project build still succeeds with `make -j6`
+- the next active-path rerun no longer reproduced the old `client.dll:0x62133301` null-object
+  crash on the late raw-`0x38` path
+- user-reported validation on the active path: **successfully launched into game**
+
+Current best reading:
+- the late null-object crash was independent of the recent engine↔mediator decoupling step
+- the direct root cause was the missing callback84/message-ref work item on the surviving
+  post-bootstrap margin fallback path
+- the parser inconsistency/terminal-close sequence remains worth later RE work, but it is no longer
+  the best explanation for that specific null dereference
+
 ## Related docs
 
 - `../InitClientDLL/README.md`

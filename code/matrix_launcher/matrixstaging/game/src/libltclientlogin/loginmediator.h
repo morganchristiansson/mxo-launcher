@@ -41,6 +41,16 @@ struct CLTLoginMediatorConnectionContextScaffold {
     bool peerCloseQueued;
 };
 
+// Source-owned outer-seam callback bodies for the current launcher bridge context.
+// Current static-RE direction:
+// - original queue/context traffic is connection-centric, not mediator-class-centric
+// - so these callbacks belong with the mediator-owned bridge seam, not with the engine core
+uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
+    CLTLoginMediatorConnectionContextScaffold* self);
+uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(
+    CLTLoginMediatorConnectionContextScaffold* self,
+    CLTLoginMediatorQueuedWorkItemScaffold* workItem);
+
 // owner `+0x674` listener tree sketch tightened from `0x41ddb0 / 0x41dde0 / 0x41cfb0 / 0x41d090`:
 // - container object is an 8-byte pair `{ headerPtr, count }`
 // - header node is std::_Tree-like and self-referential when empty
@@ -1107,7 +1117,10 @@ public:
     // - only other codes survive into owner `+0x184` / current helper slot 6
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
-    uint32_t HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize);
+    uint32_t HandleMarginPacketBytes(
+        const uint8_t* packetBytes,
+        size_t packetSize,
+        void* workItem = nullptr);
     // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441a30 / 0x4429b0
     // Narrow source-owned mirror of one consumed decoded-code-2 branch moved closer to the
     // connection/leaf dispatch seam.

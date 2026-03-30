@@ -644,9 +644,14 @@ public:
     ~CLTThreadPerClientTCPEngineBinding();
 
     // UNANCHORED: starter binding helper.
-    bool Bind(void* owner, mxo::ltlogin::CLTLoginMediator* mediator = nullptr);
+    // Faithfulness note from the current Ghidra pass:
+    // - launcher.exe shows the engine object itself as connection/queue/worker-owned state
+    // - no positive evidence puts mediator bind/reset lifecycle inside the original engine class
+    // So this binding now owns only owner<->engine pairing; outer launcher/login seams perform any
+    // mediator-specific bridge reset/bind around it.
+    bool Bind(void* owner);
     // UNANCHORED: starter binding helper.
-    void Reset(mxo::ltlogin::CLTLoginMediator* mediator = nullptr);
+    void Reset();
 
     // UNANCHORED: starter binding helper.
     void* Owner() const;

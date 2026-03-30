@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -130,32 +131,33 @@ namespace mxo::liblttcp {
 // - keep the names stable, but treat the exact live method signatures as still provisional
 
 struct CMessageConnectionMessageScaffold {
-    // Source-owned bridge for the original inner message-storage object:
-    // - send path: the envelope/shared-message family eventually submitted by `0x448cf0 -> 0x448a00`
-    // - receive path: the object stored at outer message-ref `+0x0c` after `0x455cd0 -> 0x455c60`
-    // Current best narrowed fields that materially affect the current send/receive seams:
-    // - original inner object `+0x08` participates in payload-cap checks (`0xffc`)
-    // - original inner object `+0x0a/+0x0b` hold the framed payload length/header bytes
-    // - original payload bytes begin at `+0x0c`
-    // - builder helpers such as `0x43acf0` grow the payload through shared-object vtable `+0x18`
-    //   (`0x4557b0`) before later copy helpers write bytes into the newly reserved tail
-    // - receive-side `0x4490c0` now also uses the same inner-object shape more directly:
-    //   copied parsed-packet spans are appended into this storage before `0x41bc20/0x41bbb0`
-    //   style opcode reads and later leaf dispatch
-    // - crucial newer live-original correction:
-    //   an earlier `0x448a00` capture with submitted bytes beginning `01 03 00 36 ...` and
-    //   length `0x13b` was later proven to return to `0x441f9f`, i.e. a different send family,
-    //   not the state8 `0x43bf64` call path
-    // - newer targeted state8 stops at `0x41af70/0x41cf30` with return `0x43bf64` instead show the
-    //   natural state8 shared object still carrying raw `0x0f` payload bytes and a length of
-    //   `0x0be`, so the remaining active state8 gap is much narrower than that earlier mixed-send
-    //   read suggested
-    static constexpr uint16_t kMaxPayloadByteCount = 0x0ffcu;
+    // Recovered inner message-storage object allocated at size `0x100c` under
+    // `0x455bd0 -> 0x455c60` and reached through outer message-ref `+0x0c`.
+    // Current best raw-layout read:
+    // - `+0x00` = vtable (`0x4ba208` on fresh builder-owned objects)
+    // - `+0x04` = refcount dword used with shared `0x42f850/0x42f860`-style AddRef/Release
+    // - `+0x08` = reserved word initialized to `0x2b`
+    // - `+0x0a/+0x0b` = payload-byte-count prefix/header bytes
+    // - `+0x0c .. +0x100b` = inline payload storage
+    // Source keeps one trailing mirror vector only for convenience when higher-level C++ code wants
+    // a `std::vector` view; the raw first `0x100c` bytes stay aligned with the current static RE.
+    static constexpr uint16_t kMaxPayloadByteCount = 0x1000u;
     static constexpr uint16_t kBuilderReservedBytes08 = 0x002bu;  // anchor: launcher.exe:0x455bd0
 
+    void** vtable00 = nullptr;
+    volatile long referenceCount04 = 0;
     uint16_t reservedBytes08 = kBuilderReservedBytes08;
+    uint8_t payloadLengthHigh0a = 0;
+    uint8_t payloadLengthLow0b = 0;
+    std::array<uint8_t, 0x1000> payloadBytes0c{};
+
+    // Source-owned mirror/view for higher-level helpers. Keep it synchronized with the raw inline
+    // payload above instead of treating the vector as the primary object layout.
     std::vector<uint8_t> payloadBytesFrom0c;
 
+    void InitializeRawLayoutScaffold();
+    void SyncRawPayloadFromMirrorScaffold();
+    void SyncMirrorPayloadFromRawScaffold();
     void ResetForPacketBuilderScaffold();
     void ResetPayloadByteCountScaffold(uint16_t payloadByteCount);
     uint16_t GrowPayloadByteCountScaffold(uint16_t additionalByteCount);
@@ -166,17 +168,39 @@ struct CMessageConnectionMessageScaffold {
     std::vector<uint8_t> BuildFramedBytesFrom0aScaffold() const;
 };
 
+static_assert(offsetof(CMessageConnectionMessageScaffold, payloadBytes0c) == 0x0c, "message storage payload offset mismatch");
+
 struct CMessageConnectionReceivedMessageRefScaffold {
-    // Source-owned mirror of the outer receive/message-ref object created by `0x455cd0/0x455c60`
-    // and consumed by later helpers such as `0x41bc20` / `0x41bbb0`.
-    // Current best narrowed material fields:
-    // - original outer `+0x0c` = inner message-storage object
-    // - original outer `+0x10` = headerless/non-headerless flag written by `0x4490c0`
-    // - original outer `+0x14` = extra context dword passed as the second `0x455cd0` argument
-    std::shared_ptr<CMessageConnectionMessageScaffold> messageStorage0c;
+    // Recovered outer receive/message-ref object created by `0x455cd0/0x455c60` and consumed by
+    // later helpers such as `0x41bc20`, `0x41bbb0`, callback84, and the client-side raw-`0x38`
+    // wrapper path.
+    // Current best raw-layout read:
+    // - `+0x00` = vtable (`0x4ba23c` on fresh builder-owned objects)
+    // - `+0x04` = refcount dword used with shared `0x42f850/0x42f860`-style AddRef/Release
+    // - `+0x08` = ctor/reset argument preserved by `0x455bd0`
+    // - `+0x0c` = inner message-storage pointer
+    // - `+0x10` = headerless/non-headerless flag written by `0x4490c0`
+    // - `+0x14` = extra context dword passed as the second `0x455cd0` argument
+    // - `+0x18/+0x1c/+0x20` = cleared on fresh create
+    // Source keeps ownership trailing the raw `0x24` front matter so the callback/client-visible
+    // face can stay closer to the original object instead of inventing a separate crash-only shim.
+    void** vtable00 = nullptr;
+    volatile long referenceCount04 = 0;
+    uint32_t field08 = 0;
+    CMessageConnectionMessageScaffold* messageStorage0c = nullptr;
     uint8_t headerless10 = 0;
+    uint8_t padding11_13[3] = {0u, 0u, 0u};
     uint32_t messageContext14 = 0;
+    uint32_t field18 = 0;
+    uint32_t field1c = 0;
+    uint32_t field20 = 0;
+    std::shared_ptr<CMessageConnectionMessageScaffold> messageStorageOwnerScaffold24;
+
+    void InitializeRawLayoutScaffold(uint32_t field08Value = 0u);
+    void SyncRawMessageStoragePointerScaffold();
 };
+
+static_assert(offsetof(CMessageConnectionReceivedMessageRefScaffold, messageStorageOwnerScaffold24) == 0x24, "message-ref ownership tail offset mismatch");
 
 enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
     kUnknown = 0,
@@ -360,7 +384,7 @@ protected:
     //   copied-packet queue / later synthetic receive-drain proxy
     virtual uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
-        const CMessageConnectionReceivedMessageRefScaffold& messageRef);
+        CMessageConnectionReceivedMessageRefScaffold& messageRef);
 
 private:
     // UNANCHORED: source-owned packet-family name helper for current diagnostics.
@@ -425,7 +449,7 @@ protected:
     // - source still does not materialize the full original refcounted message object / agenda tail
     uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
-        const CMessageConnectionReceivedMessageRefScaffold& messageRef) override;
+        CMessageConnectionReceivedMessageRefScaffold& messageRef) override;
 };
 
 // ============================================================
@@ -538,7 +562,7 @@ protected:
     //   of a naked payload vector before mirroring `0x44af20`
     uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
-        const CMessageConnectionReceivedMessageRefScaffold& messageRef) override;
+        CMessageConnectionReceivedMessageRefScaffold& messageRef) override;
 
 private:
     bool messageCode4SuccessFlag84Scaffold_ = false;

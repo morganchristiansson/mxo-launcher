@@ -360,6 +360,86 @@ void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
     spdlog::info("CLTLoginMediator::ResetLauncherConnectionBridgeScaffold completed");
 }
 
+static const char* LauncherConnectionBridgeContext_WorkTypeName(uint32_t workType) {
+    switch (workType) {
+        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose:
+            return "Close";
+        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus:
+            return "ConnectionStatus";
+        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket:
+            return "ParsedPacket";
+        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain:
+            return "SyntheticReceiveDrain";
+        default:
+            return "Unknown";
+    }
+}
+
+// UNANCHORED: source-owned outer-seam bridge callback, intentionally kept out of liblttcp.
+uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
+    CLTLoginMediatorConnectionContextScaffold* self) {
+    spdlog::info(
+        "CLTLoginMediator launcher bridge context release self={} label='{}' autoRelease={}",
+        fmt::ptr(self),
+        (self && self->debugLabel) ? self->debugLabel : "<null>",
+        (self && self->autoReleaseFlag) ? 1u : 0u);
+    return 1u;
+}
+
+// UNANCHORED: source-owned outer-seam bridge callback, intentionally kept out of liblttcp.
+uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(
+    CLTLoginMediatorConnectionContextScaffold* self,
+    CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
+    spdlog::info(
+        "CLTLoginMediator launcher bridge OnOperationCompleted context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x}",
+        fmt::ptr(self),
+        (self && self->debugLabel) ? self->debugLabel : "<null>",
+        fmt::ptr(workItem),
+        workItem ? workItem->header.workType : 0u,
+        LauncherConnectionBridgeContext_WorkTypeName(workItem ? workItem->header.workType : 0u),
+        workItem ? workItem->workPayload : 0u);
+
+    CLTLoginMediator* mediator = self ? self->mediator : nullptr;
+    if (!self || !workItem || !mediator) {
+        return 1u;
+    }
+
+    if (workItem->header.workType ==
+        mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+        const uint32_t handled = self->isMarginConnection
+            ? mediator->HandleMarginConnectStatus(workItem->workPayload)
+            : mediator->HandleAuthConnectStatus(workItem->workPayload);
+        const char* routeLabel = self->isMarginConnection ? "margin" : "auth";
+        const char* incomingReplyAnchor = self->isMarginConnection
+            ? CLTLoginMediator::kMessageMsLoadCharacterReply
+            : CLTLoginMediator::kMessageAsAuthReply;
+        spdlog::info(
+            "CLTLoginMediator launcher bridge routed {} type-2 connect-status payload=0x{:08x} -> handled={} laterIncomingReplyAnchor='{}'",
+            routeLabel,
+            static_cast<unsigned>(workItem->workPayload),
+            static_cast<unsigned>(handled),
+            (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
+    }
+
+    if (workItem->header.workType ==
+        mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain) {
+        if (!self->isMarginConnection) {
+            const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
+            if (receiveActions & CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
+                const uint32_t marginConnectResult =
+                    mediator->BeginLauncherMarginConnectionScaffold();
+                spdlog::info(
+                    "CLTLoginMediator launcher bridge synthetic receive-drain post-AS_AuthReply margin auto-begin result=0x{:08x}",
+                    static_cast<unsigned>(marginConnectResult));
+            }
+        } else {
+            (void)mediator->HandleMarginConnectionReceiveScaffold();
+        }
+    }
+
+    return 1u;
+}
+
 // +0x00
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetName() {
@@ -1250,13 +1330,12 @@ uint32_t CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffol
     const uint8_t* packetBytes,
     size_t packetSize,
     void* workItem) {
-    (void)workItem;
     if (!packetBytes || packetSize == 0u) {
         return 0u;
     }
 
     const uint8_t rawCode = packetBytes[0];
-    const uint32_t handled = HandleMarginPacketBytes(packetBytes, packetSize);
+    const uint32_t handled = HandleMarginPacketBytes(packetBytes, packetSize, workItem);
     spdlog::info(
         "CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={}",
         static_cast<unsigned>(rawCode),
@@ -3220,7 +3299,10 @@ uint32_t CLTLoginMediator::HandleMarginConnectionReceiveScaffold() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
+uint32_t CLTLoginMediator::HandleMarginPacketBytes(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    void* workItem) {
     if (!packetBytes || packetSize < 1u) {
         return 0u;
     }
@@ -3327,12 +3409,13 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(const uint8_t* packetBytes, s
     if (currentState_ != nullptr) {
         ++marginPacketSlot6DispatchCountScaffold_;
         spdlog::debug(
-            "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} routing post-bootstrap packet to current helper slot6 dispatchCount={} currentState={}",
+            "CLTLoginMediator::HandleMarginPacketBytes rawCode=0x{:02x} packetSize={} routing post-bootstrap packet to current helper slot6 dispatchCount={} currentState={} workItem={}",
             static_cast<unsigned>(rawCode),
             static_cast<unsigned>(effectivePacketSize),
             static_cast<unsigned>(marginPacketSlot6DispatchCountScaffold_),
-            currentState_->DebugName());
-        return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
+            currentState_->DebugName(),
+            fmt::ptr(workItem));
+        return currentState_->Slot6_HandleSecondaryMessage(workItem, this);
     }
 
     spdlog::debug(
