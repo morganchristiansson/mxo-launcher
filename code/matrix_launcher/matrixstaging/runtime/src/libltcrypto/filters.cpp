@@ -282,32 +282,68 @@ bool ParseAuthReplyPayload(
         }
     }
 
+    auto parseSignedDataFromCopyShadow = [&](const uint8_t* signedDataBytes) {
+        reply.signedData.valid = true;
+        reply.signedData.rawBytes.assign(signedDataBytes, signedDataBytes + kSignedDataSize);
+        reply.signedData.unknownByte = signedDataBytes[0];
+        reply.signedData.userId1 = ReadU32LE(signedDataBytes + 1u);
+        reply.signedData.userName = TrimFixedCString(signedDataBytes + 5u, 33u);
+        reply.signedData.unknownShort = ReadU16LE(signedDataBytes + 38u);
+        reply.signedData.padding1 = ReadU32LE(signedDataBytes + 40u);
+        reply.signedData.expiryTime = ReadU32LE(signedDataBytes + 44u);
+        reply.signedData.padding2.assign(signedDataBytes + 48u, signedDataBytes + 80u);
+        reply.signedData.publicExponent =
+            static_cast<uint16_t>((signedDataBytes[80u] << 8u) | signedDataBytes[81u]);
+        reply.signedData.modulusBytes.assign(signedDataBytes + 82u, signedDataBytes + 178u);
+        reply.signedData.timeCreated = ReadU32LE(signedDataBytes + 178u);
+    };
+
     if (reply.offsetAuthData + 2u <= payloadSize) {
-        reply.authDataMarker = ReadU16LE(payloadBytes + reply.offsetAuthData);
-        reply.hasAuthDataMarker = true;
+        static const size_t kAuthDataCopyShadowSize = 0x136u;
+        static const size_t kAuthDataSignatureOffset = 0x00u;
+        static const size_t kAuthDataSignatureSize = 0x80u;
+        static const size_t kAuthDataSignedDataOffset = 0x80u;
 
-        const size_t markerEnd = reply.offsetAuthData + 2u;
-        if (reply.offsetEncryptedData >= markerEnd + kSignedDataSize && reply.offsetEncryptedData <= payloadSize) {
-            const size_t signatureLen = reply.offsetEncryptedData - markerEnd - kSignedDataSize;
-            if (signatureLen <= payloadSize && markerEnd + signatureLen + kSignedDataSize <= payloadSize) {
-                reply.authSignatureBytes.assign(
-                    payloadBytes + markerEnd,
-                    payloadBytes + markerEnd + signatureLen);
+        const uint16_t authDataFieldLength = ReadU16LE(payloadBytes + reply.offsetAuthData);
+        const size_t authDataFieldStart = reply.offsetAuthData + 2u;
+        const size_t authDataFieldEnd = authDataFieldStart + authDataFieldLength;
+        reply.authDataFieldLength = authDataFieldLength;
 
-                const uint8_t* signedDataBytes = payloadBytes + markerEnd + signatureLen;
-                reply.signedData.valid = true;
-                reply.signedData.rawBytes.assign(signedDataBytes, signedDataBytes + kSignedDataSize);
-                reply.signedData.unknownByte = signedDataBytes[0];
-                reply.signedData.userId1 = ReadU32LE(signedDataBytes + 1u);
-                reply.signedData.userName = TrimFixedCString(signedDataBytes + 5u, 33u);
-                reply.signedData.unknownShort = ReadU16LE(signedDataBytes + 38u);
-                reply.signedData.padding1 = ReadU32LE(signedDataBytes + 40u);
-                reply.signedData.expiryTime = ReadU32LE(signedDataBytes + 44u);
-                reply.signedData.padding2.assign(signedDataBytes + 48u, signedDataBytes + 80u);
-                reply.signedData.publicExponent =
-                    static_cast<uint16_t>((signedDataBytes[80u] << 8u) | signedDataBytes[81u]);
-                reply.signedData.modulusBytes.assign(signedDataBytes + 82u, signedDataBytes + 178u);
-                reply.signedData.timeCreated = ReadU32LE(signedDataBytes + 178u);
+        if (authDataFieldLength != 0u && authDataFieldEnd <= payloadSize) {
+            reply.authDataBytes.assign(payloadBytes + authDataFieldStart, payloadBytes + authDataFieldEnd);
+        }
+
+        // Exact launcher parse-object consequence from `0x443470 / 0x448140`:
+        // `offsetAuthData` points at a u16 length prefix, and the bytes after that prefix are the
+        // copied `0x136` block later adopted at child `+0xf4`.
+        // Static suffix-offset use now tightens that copied block itself to:
+        // - `+0x00 .. +0x7f` = 128-byte signature span
+        // - `+0x80 .. +0x135` = `0xb6` signed-data span
+        if (authDataFieldLength == kAuthDataCopyShadowSize &&
+            authDataFieldEnd <= payloadSize) {
+            const uint8_t* copyShadowBytes = payloadBytes + authDataFieldStart;
+            reply.authDataFirstWord = 0u;
+            reply.authDataMarker = 0u;
+            reply.hasAuthDataMarker = false;
+            reply.authSignatureBytes.assign(
+                copyShadowBytes + kAuthDataSignatureOffset,
+                copyShadowBytes + kAuthDataSignatureOffset + kAuthDataSignatureSize);
+            parseSignedDataFromCopyShadow(copyShadowBytes + kAuthDataSignedDataOffset);
+        } else {
+            // Narrow fallback for older loose parser behavior while keeping the exact
+            // length-prefixed `0x136` block as the preferred active-path model.
+            reply.authDataMarker = ReadU16LE(payloadBytes + reply.offsetAuthData);
+            reply.hasAuthDataMarker = true;
+
+            const size_t markerEnd = reply.offsetAuthData + 2u;
+            if (reply.offsetEncryptedData >= markerEnd + kSignedDataSize && reply.offsetEncryptedData <= payloadSize) {
+                const size_t signatureLen = reply.offsetEncryptedData - markerEnd - kSignedDataSize;
+                if (signatureLen <= payloadSize && markerEnd + signatureLen + kSignedDataSize <= payloadSize) {
+                    reply.authSignatureBytes.assign(
+                        payloadBytes + markerEnd,
+                        payloadBytes + markerEnd + signatureLen);
+                    parseSignedDataFromCopyShadow(payloadBytes + markerEnd + signatureLen);
+                }
             }
         }
     }

@@ -273,11 +273,14 @@ struct AuthReply {
     uint32_t offsetUsername;
     uint16_t characterCount;
     uint16_t worldCount;
+    uint16_t authDataFieldLength;
+    uint16_t authDataFirstWord;
     uint16_t authDataMarker;
     uint16_t encryptedPrivateExponentLength;
     MxoString username;
     std::vector<AuthCharacterEntry> characters;
     std::vector<AuthWorldEntry> worlds;
+    std::vector<uint8_t> authDataBytes;
     std::vector<uint8_t> authSignatureBytes;
     AuthSignedData signedData;
     std::vector<uint8_t> encryptedPrivateExponentBytes;
@@ -303,6 +306,8 @@ struct AuthReply {
           offsetUsername(0),
           characterCount(0),
           worldCount(0),
+          authDataFieldLength(0),
+          authDataFirstWord(0),
           authDataMarker(0),
           encryptedPrivateExponentLength(0) {}
 };

@@ -25,25 +25,21 @@ struct __attribute__((packed)) AuthBootstrapReplyCopyShadowF4Sketch {
     // Source-owned shadow of the original reply-derived `0x136` heap block copied into child
     // `+0xf4` by `0x448140`.
     //
-    // Newer `0x448140 / 0x44ae40 / 0x44aec0` tightening materially changes the best read here:
-    // - this blob is no longer modeled as a partly-understood pointer-bearing helper object
-    // - the strongest current read is a wire-shaped `0x136` auth-reply-derived block later copied
-    //   to connection `+0x98` by `0x41ce80` and sent by `0x441f30`
-    // - current recovered layout:
-    //   - `+0x00 .. +0x01` = fixed first word `3`
-    //   - `+0x02 .. +0x03` = `AuthDataMarker` (`0x0136` on the active path)
-    //   - `+0x04 .. +0x7f` = auth-signature bytes (`0x7c` bytes on the active path)
-    //   - `+0x80 .. +0x135` = signed-data bytes (`0xb6` bytes)
-    // - concrete high-value derived offsets inside that signed-data tail:
+    // Static `0x448140` / `0x44add0` / `0x44aec0` now tightens this materially:
+    // - this block is not `[u16 3][u16 0x0136] + tail`
+    // - the copied `0x136` bytes line up directly as:
+    //   - `+0x00 .. +0x7f` = 128-byte auth-signature span
+    //   - `+0x80 .. +0x135` = signed-data span (`0xb6` bytes)
+    // - high-value verified suffix offsets:
+    //   - `+0x85` = signed-data `+0x05` (wrapper-facing `owner+0x680->+0xf4+0x85`)
+    //   - `+0xa8` = signed-data `+0x28` (wrapper-facing `owner+0x680->+0xf4+0xa8`)
     //   - `+0xac` = signed-data expiry-time dword used by `0x44add0 / 0x44aec0`
     //   - `+0xd1` = low public-exponent byte used by `0x448140`
     //   - `+0xd2 .. +0x131` = modulus bytes used by `0x448140`
-    uint16_t firstWord00 = 0;
-    uint16_t authDataMarker02 = 0;
-    std::array<uint8_t, 0x7c> authSignature04{};
+    std::array<uint8_t, 0x80> authSignature00{};
     std::array<uint8_t, 0xb6> signedData80{};
 };
-static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, authSignature04) == 0x04);
+static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, authSignature00) == 0x00);
 static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, signedData80) == 0x80);
 static_assert(sizeof(AuthBootstrapReplyCopyShadowF4Sketch) == 0x136);
 

@@ -1569,8 +1569,9 @@ private:
     //   `0x448050`
     // - `+0xa4` = lazy `pubkey.dat`-backed state primed by `0x447260/0x447c10`
     // - `+0xa8` = raw `0x08` reply-public-key worker used by `0x4474f0`
-    // - `+0xf4` = original reply-derived copied `0x136` block; current source keeps only a
-    //   narrowed shadow of its later exposed `+0x85/+0xa8` suffix family
+    // - `+0xf4` = original reply-derived copied `0x136` block; source now keeps that block as a
+    //   wire-faithful shadow so later wrapper/state5 users can read the original `+0x85/+0xa8`
+    //   suffix family without re-inventing a semantic object model
     AuthBootstrap680ChildSketch authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130

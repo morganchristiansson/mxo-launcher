@@ -178,13 +178,17 @@ Current best combined read:
 
 Current best read:
 - `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
-- on the raw `0x0b` success path it validates marker `0x0136`
+- on the raw `0x0b` success path it validates an auth-data field length of `0x136`
 - validation runs through child `+0xac` and the time-delta/cached state behind child `+0x80`
-- then it heap-copies a `0x136` block into child `+0xf4`
+- then it heap-copies that `0x136` auth-data field into child `+0xf4`
 
-That copied block is the important later exposure root:
-- `+0xf4 + 0x85`
-- `+0xf4 + 0xa8`
+Current tighter copied-block layout from static `0x448140 / 0x44add0 / 0x44aec0` plus live source logs:
+- `+0xf4 + 0x00 .. +0x7f` = 128-byte auth-signature span
+- `+0xf4 + 0x80 .. +0x135` = signed-data span (`0xb6` bytes)
+- high-value later exposures inside that signed-data suffix:
+  - `+0xf4 + 0x85`
+  - `+0xf4 + 0xa8`
+  - `+0xf4 + 0xac` = expiry-time dword used by `0x44add0 / 0x44aec0`
 
 Important neighboring-success restraint:
 - child `+0xf8` and byte `+0x104` are **not** written by `0x448140` itself
@@ -238,23 +242,30 @@ Practical consequence for the replacement launcher:
 
 Current replacement source keeps this split explicitly:
 - original child `+0xf4` = full reply-derived copied `0x136` block
-- source-owned mirror now preserves that **full structural width** too, but still only names a
-  narrower subset confidently:
-  - `+0x85 .. +0x94`
-  - `+0xa8`
-- the remaining bytes stay structural/opaque rather than semantically over-named
+- source-owned mirror now preserves that full structural width with the tighter current layout:
+  - `+0x00 .. +0x7f` signature span
+  - `+0x80 .. +0x135` signed-data span
+  - later wrapper/state users reached through the signed-data suffix (`+0x85`, `+0xa8`, `+0xac`)
+- the remaining bytes still stay structural rather than semantically over-named
 
 That is deliberate.
-It keeps the runtime path working without over-claiming that the entire copied block is already
-fully typed in source.
+It keeps the runtime path working without over-claiming that every byte of the copied block is
+already fully typed in source.
 
 Current bounded follow-up consequence:
-- this wider structural mirror is now enough to source-own the neighboring state5 helper chain
-  shape behind:
+- this mirror is now enough to source-own the neighboring state5 helper chain directly on the live
+  existing-character path:
   - `0x41ce80` copy into margin connection `+0x98`
   - `0x41f30` raw-type-`1` prefix plus stored `0x136` block send
-- but that chain remains dormant on the working path until the full copied block is validated more
-  strongly; the current launcher-owned bootstrap continuation still preserves the known-good route
+- live replacement log on `2026-03-30` now shows:
+  - state5 slot3 `replyCopyShadowStillValid=1`
+  - non-null child `+0xf4`
+  - `CMarginConnection::StoreBootstrapReplyCopy98Scaffold`
+  - `CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold` with `payloadBytes=0x139`
+- immediate current limitation after that milestone:
+  - the margin socket then returns EOF, so the next fidelity blocker has moved from
+    “materialize child `+0xf4`” to “make the raw type-1 state5 packet acceptable enough for the
+    server/original continuation”
 
 ## Reimplementation guidance
 

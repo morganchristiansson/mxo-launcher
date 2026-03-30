@@ -321,6 +321,20 @@ Current runtime consequence:
   - `-> state6 slot6`
   - `-> state8 slot3`
 
+Current replacement milestone on that exact blocker (`2026-03-30`):
+- source now materializes owner `+0x680 +0xf4` on the active existing-character path before
+  state5 slot3 runs
+- source state5 slot3 now logs:
+  - non-null `authReplyCopyShadowF4`
+  - `replyCopyShadowStillValid=1`
+  - copy into margin connection `+0x98`
+  - raw type-1 prefixed send through the preserved `0x41ce80 -> 0x441f30` route
+- immediate new failure after that milestone:
+  - the margin socket returns EOF right after that state5 send on the current replacement path
+  - so the next blocker has moved forward from “materialize child `+0xf4`” to “make that copied
+    state5 raw type-1 packet faithful enough for server acceptance / later state6-state8
+    continuation”
+
 ## Current implementation-side milestone summary
 
 Current implementation/runtime milestones already achieved:

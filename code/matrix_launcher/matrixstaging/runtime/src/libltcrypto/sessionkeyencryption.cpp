@@ -387,17 +387,29 @@ bool BuildMarginCertConnectRequestPacket(
     FramedPacket* outPacket) {
     using namespace internal;
 
-    if (!outPacket || !reply.signedData.valid || reply.signedData.rawBytes.empty() ||
+    if (!outPacket) {
+        return false;
+    }
+
+    std::vector<uint8_t> payload;
+    payload.push_back(0x01u);
+
+    if (!reply.authDataBytes.empty()) {
+        payload.reserve(1u + reply.authDataBytes.size());
+        payload.insert(payload.end(), reply.authDataBytes.begin(), reply.authDataBytes.end());
+        return BuildVariableLengthPacket(payload.data(), payload.size(), frameMode, outPacket);
+    }
+
+    if (!reply.signedData.valid || reply.signedData.rawBytes.empty() ||
         reply.authSignatureBytes.empty()) {
         return false;
     }
 
+    const uint16_t authDataFirstWord = reply.authDataFirstWord != 0u ? reply.authDataFirstWord : 3u;
     const uint16_t authDataMarker = reply.hasAuthDataMarker ? reply.authDataMarker : 0x0136u;
 
-    std::vector<uint8_t> payload;
     payload.reserve(1u + 2u + 2u + reply.authSignatureBytes.size() + reply.signedData.rawBytes.size());
-    payload.push_back(0x01u);
-    AppendU16LE(&payload, 3u);
+    AppendU16LE(&payload, authDataFirstWord);
     AppendU16LE(&payload, authDataMarker);
     payload.insert(payload.end(), reply.authSignatureBytes.begin(), reply.authSignatureBytes.end());
     payload.insert(payload.end(), reply.signedData.rawBytes.begin(), reply.signedData.rawBytes.end());

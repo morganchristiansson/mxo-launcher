@@ -394,9 +394,11 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
             }
 
             // Current source-owned validation is narrower than the original `0x44aec0` path:
-            // keep the marker/worker gate explicit while the full child `+0xac` validation family
+            // keep the length/worker gate explicit while the full child `+0xac` validation family
             // is still not typed tightly enough.
-            if (!reply.valid || !reply.hasAuthDataMarker || reply.authDataMarker != 0x0136u ||
+            // Static `0x448140` compares the parse-object field length against `0x136` before the
+            // later copied-block adoption; the earlier marker-style read was too loose.
+            if (!reply.valid || reply.authDataBytes.size() != sizeof(AuthBootstrapReplyCopyShadowF4Sketch) ||
                 child.raw08PublicKeyWorkerA8 == nullptr) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
@@ -414,10 +416,14 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator) {
-    // The reply-derived `+0xf4` copy block is now modeled as wire-shaped bytes.
-    // Keep this wrapper-facing helper on the original child `+0xa8` worker slot instead of
-    // re-inventing a pointer meaning inside the copied `0x136` blob.
-    void* value = mediator.authBootstrapChild680_.raw08PublicKeyWorkerA8;
+    // Static `0x41f370` is now concrete: this wrapper returns owner `+0x680 -> +0xf4 -> +0xa8`
+    // when the copied auth-data block is present, not the earlier child `+0xa8` public-key worker.
+    const auto* copyShadow = static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
+        mediator.authBootstrapChild680_.authReplyCopyShadowF4);
+    void* value = nullptr;
+    if (copyShadow != nullptr) {
+        value = reinterpret_cast<void*>(static_cast<uintptr_t>(ReadU32LE(copyShadow->signedData80.data() + 0x28u)));
+    }
 
     if (!mediator.bootstrapRaw08AuxHandle50Logged_ || mediator.lastBootstrapRaw08AuxHandle50_ != value) {
         spdlog::info(
@@ -433,7 +439,7 @@ void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& med
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
 bool AuthBootstrap680Ops::HasBootstrapRaw08AuxHandle54(const CLTLoginMediator& mediator) {
-    const bool present = mediator.authBootstrapChild680_.raw08PublicKeyWorkerA8 != nullptr;
+    const bool present = BootstrapRaw08AuxHandle50(mediator) != nullptr;
     spdlog::debug(
         "CLTLoginMediator::HasBootstrapRaw08AuxHandle54(+0x54) -> {}",
         present ? 1u : 0u);
@@ -665,7 +671,7 @@ void AuthBootstrap680Ops::LogParsedAuthReply(
     }
 
     spdlog::info(
-        "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply success characterCount={} worldCount={} username='{}' successHeaderUnknownWord05=0x{:04x} successHeaderUnknownDword07=0x{:08x} unknown2=0x{:08x} unknown3=0x{:08x} authDataMarker=0x{:04x} signatureLen={} encryptedPrivateExponentLen={}",
+        "DIAGNOSTIC: launcher-owned auth parsed AS_AuthReply success characterCount={} worldCount={} username='{}' successHeaderUnknownWord05=0x{:04x} successHeaderUnknownDword07=0x{:08x} unknown2=0x{:08x} unknown3=0x{:08x} authDataFieldLen=0x{:04x} signatureLen={} encryptedPrivateExponentLen={}",
         reply.characterCount,
         reply.worldCount,
         reply.username.text.empty() ? "<empty>" : reply.username.text,
@@ -673,7 +679,7 @@ void AuthBootstrap680Ops::LogParsedAuthReply(
         static_cast<unsigned>(reply.successHeaderUnknownDword07),
         static_cast<unsigned>(reply.unknown2),
         static_cast<unsigned>(reply.unknown3),
-        reply.authDataMarker,
+        static_cast<unsigned>(reply.authDataFieldLength),
         reply.authSignatureBytes.size(),
         reply.encryptedPrivateExponentLength);
 
@@ -790,10 +796,7 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
         sidecar->authReplyCopyShadowF4 = {};
     }
 
-    if (reply.isErrorReply || !reply.valid || !reply.hasAuthDataMarker ||
-        reply.authDataMarker != 0x0136u ||
-        reply.authSignatureBytes.size() != AuthBootstrapReplyCopyShadowF4Sketch{}.authSignature04.size() ||
-        reply.signedData.rawBytes.size() != AuthBootstrapReplyCopyShadowF4Sketch{}.signedData80.size()) {
+    if (reply.isErrorReply || !reply.valid) {
         return;
     }
 
@@ -801,23 +804,40 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
         MutableAuthBootstrap680ChildSidecar(&mediator);
     AuthBootstrapReplyCopyShadowF4Sketch& copyShadow = materializedSidecar.authReplyCopyShadowF4;
     copyShadow = {};
-    copyShadow.firstWord00 = 3u;
-    copyShadow.authDataMarker02 = reply.authDataMarker;
-    std::copy(
-        reply.authSignatureBytes.begin(),
-        reply.authSignatureBytes.end(),
-        copyShadow.authSignature04.begin());
-    std::copy(
-        reply.signedData.rawBytes.begin(),
-        reply.signedData.rawBytes.end(),
-        copyShadow.signedData80.begin());
+
+    // Prefer the exact length-prefixed `0x136` auth-data field recovered from
+    // `0x443470 / 0x448140`: that field is the original copied child `+0xf4` material.
+    if (reply.authDataBytes.size() == sizeof(copyShadow)) {
+        std::copy(
+            reply.authDataBytes.begin(),
+            reply.authDataBytes.end(),
+            reinterpret_cast<uint8_t*>(&copyShadow));
+    } else {
+        if (reply.authSignatureBytes.size() != copyShadow.authSignature00.size() ||
+            reply.signedData.rawBytes.size() != copyShadow.signedData80.size()) {
+            return;
+        }
+
+        std::copy(
+            reply.authSignatureBytes.begin(),
+            reply.authSignatureBytes.end(),
+            copyShadow.authSignature00.begin());
+        std::copy(
+            reply.signedData.rawBytes.begin(),
+            reply.signedData.rawBytes.end(),
+            copyShadow.signedData80.begin());
+    }
+
     child.authReplyCopyShadowF4 = &copyShadow;
 
     spdlog::info(
-        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} firstWord00=0x{:04x} authDataMarker02=0x{:04x} signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' childTimestamp80=0x{:08x}",
+        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} replyAuthDataBytes=0x{:03x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' childTimestamp80=0x{:08x}",
         static_cast<unsigned>(sizeof(copyShadow)),
-        static_cast<unsigned>(copyShadow.firstWord00),
-        static_cast<unsigned>(copyShadow.authDataMarker02),
+        static_cast<unsigned>(reply.authDataBytes.size()),
+        BuildHexPreview(
+            copyShadow.authSignature00.data(),
+            16u,
+            16u),
         static_cast<unsigned>(ReadU32LE(copyShadow.signedData80.data() + 0x2cu)),
         BuildHexPreview(
             copyShadow.signedData80.data() + 0x52u,
