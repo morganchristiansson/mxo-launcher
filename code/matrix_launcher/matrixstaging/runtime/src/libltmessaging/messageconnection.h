@@ -508,15 +508,15 @@ public:
     // engine field; no separate leaf-owned engine slot is evidenced here.
     CLTThreadPerClientTCPEngine* Engine() const;
 
-    // UNANCHORED: source-owned wrapper over base `CLTTCPConnection::Connect` / engine slot 6.
-    // This keeps the connection-object-oriented call site out of diagnostics.cpp.
+    // anchor family: launcher.exe:0x449cd0
+    // Source-owned bool-return wrapper over the inherited `CLTTCPConnection::Connect` body that
+    // copies `RemoteEndpoint()` into connection `+0x24` and then calls engine slot `+0x18`.
     uint32_t EnsureConnected();
 
-    // UNANCHORED: source-owned raw-byte send wrapper used by current auth/bootstrap direct-send
-    // callsites.
-    // Keep this distinct from the local packet-builder / message-ref path:
+    // anchor family: launcher.exe:0x449d20
+    // Source-owned raw-byte wrapper over the inherited `CLTTCPConnection::SendBuffer` path.
+    // Keep this distinct from the local packet-builder / message-ref send family rooted at:
     // - `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00`
-    // That original higher-level path consumes a message-ref object, not a bare byte span.
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
 
     // anchor: launcher.exe:0x41cf30
@@ -545,9 +545,11 @@ public:
     void ConfigurePacketNameFamily(
         CMessageConnectionPacketNameFamily family,
         bool packetizedMessagesEnabled);
-    // UNANCHORED: source-owned diagnostic family view derived from the callback-address scaffold.
+    // anchor family: launcher.exe:0x448960 -> connection `+0x70`
+    // Source-owned enum view over the recovered packet-name callback pointer field.
     CMessageConnectionPacketNameFamily PacketNameFamily() const;
-    // UNANCHORED: source-owned accessor for the packetized-messages enable scaffold byte.
+    // anchor family: launcher.exe:0x448960 -> connection `+0x78`
+    // Source-owned bool view over the recovered packetized-messages enable byte.
     bool PacketizedMessagesEnabled() const;
 
     // anchor: launcher.exe:0x448980
@@ -567,7 +569,8 @@ public:
     // module family.
     void ConfigurePacketAgenda(
         CStreamPacketEncryptionModule* streamPacketEncryptionModule = nullptr);
-    // UNANCHORED: source-owned accessor for the lazy packet-agenda scaffold pointer.
+    // anchor family: launcher.exe:0x448980 -> connection `+0x74`
+    // Source-owned accessor for the recovered lazy packet-agenda pointer.
     const CMessageConnectionPacketAgenda* PacketAgenda() const;
 
     // anchor: launcher.exe:0x4490c0
@@ -627,12 +630,15 @@ protected:
         CMessageConnectionMessageRef& messageRef);
 
 private:
-    // UNANCHORED: source-owned packet-family name helper for current diagnostics.
+    // UNANCHORED: source-owned diagnostic stringifier for the recovered packet-name family enum.
     static const char* PacketNameFamilyToString(CMessageConnectionPacketNameFamily family);
-    // UNANCHORED: source-owned helper that maps the diagnostic family enum onto the currently known
-    // original callback bodies stored at connection `+0x70`.
+    // anchor family: launcher.exe:0x448960 -> connection `+0x70`
+    // Source-owned helper mapping the recovered family enum onto the known callback bodies:
+    // - `0x41ce00` auth
+    // - `0x41ce40` margin
     static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamily family);
-    // UNANCHORED: source-owned send-side packet-agenda handoff helper.
+    // anchor: launcher.exe:0x469950
+    // Source-owned send-side packet-agenda handoff helper.
     // Current bounded model preserves the nearer
     // `0x469950 = CMessageConnectionPacketAgenda_DispatchWriteHelperChain` shape:
     // - no active write helper => keep the original message-ref pointer
@@ -643,9 +649,9 @@ private:
     CMessageConnectionMessageRef* ApplySendPacketAgenda(
         CMessageConnectionMessageRef& inputMessageRef,
         bool* outAgendaTouched);
-    // UNANCHORED: source-owned lower submit helper beneath `0x448cf0`.
-    // Current best original helper is `0x448a00`; source now computes the final byte pointer/size
-    // directly from raw inner `+0x0a/+0x0b/+0x0c..` storage.
+    // anchor: launcher.exe:0x448a00
+    // Lower submit helper beneath `0x448cf0`; source computes the final byte pointer/size directly
+    // from raw inner `+0x0a/+0x0b/+0x0c..` storage.
     uint32_t SubmitMessageRefBytes(const CMessageConnectionMessageRef& messageRef);
 
     uintptr_t packetNameCallback_ = 0;
@@ -729,18 +735,12 @@ public:
     // after restoring the shared base-margin vtable.
     ~CMarginConnection();
 
-    // UNANCHORED: source-owned compatibility pass-through over the recovered base `+0x10` engine
-    // field; no separate `CMarginConnection` engine slot is evidenced.
-    void SetMarginEngine(CLTThreadPerClientTCPEngine* marginEngine);
-    // UNANCHORED: source-owned compatibility accessor over the recovered base `+0x10` engine
-    // field; no separate `CMarginConnection` engine slot is evidenced.
-    CLTThreadPerClientTCPEngine* MarginEngine() const;
-
     // anchor: launcher.exe:0x441850
     // Narrow source-owned mirror of the consumed decoded-code-4 side effect that sets connection
     // byte `+0x84` when the inner status dword is zero.
     void SetMessageCode4SuccessFlag84(bool value);
-    // UNANCHORED: source-owned diagnostic accessor for the same narrowed `+0x84` mirror.
+    // anchor family: launcher.exe:0x441850 / 0x44af20 -> connection `+0x84`
+    // Source-owned readback of the same recovered success-side connection byte.
     bool MessageCode4SuccessFlag84() const;
     // anchor: launcher.exe:0x441850
     // Source-owned local type-`0x0b` continuation scaffold routed back through connection vtable
@@ -780,9 +780,8 @@ public:
     // `CStreamPacketEncryptionModule` install/refresh trigger that the original code reaches from
     // the earlier code-2 path (`0x4429b0 -> 0x441470`).
     void SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value);
-    // UNANCHORED: source-owned copy-out accessor for the same narrowed code-5 writeback.
-    bool CopyMessageCode5SeedBytes85(std::array<uint8_t, 16>* outValue) const;
-    // UNANCHORED: source-owned raw-pointer accessor for the same narrowed code-5 writeback.
+    // anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
+    // Source-owned raw-pointer readback of the same recovered seed-byte block.
     const uint8_t* MessageCode5SeedBytes85Pointer() const;
 
     // anchor: launcher.exe:0x44af60

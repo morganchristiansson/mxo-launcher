@@ -453,6 +453,8 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker::TryTransform(
         encryptedPacket.payloadBytes.size());
 }
 
+// UNANCHORED: source-owned helper forwarding through the recovered helper-family `nextHelper04`
+// link used by the agenda read/write chains.
 void CStreamPacketEncryptionHelperBase::ForwardToNextHelper(
     void* opaqueMessageRef) {
     if (nextHelper04) {
@@ -601,6 +603,7 @@ void CStreamPacketEncryptionModule::RefreshFromMarginConnectionSeed(
     associatedSeedBytes40 = seedBytes85;
 }
 
+// UNANCHORED: source-owned diagnostic stringifier for the recovered packet-name family enum.
 const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamily family) {
     switch (family) {
         case CMessageConnectionPacketNameFamily::kAuth:
@@ -612,6 +615,7 @@ const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacke
     }
 }
 
+// anchor family: launcher.exe:0x448960 -> connection `+0x70`
 uintptr_t CMessageConnection::PacketNameCallbackAddressScaffold(
     CMessageConnectionPacketNameFamily family) {
     switch (family) {
@@ -624,6 +628,7 @@ uintptr_t CMessageConnection::PacketNameCallbackAddressScaffold(
     }
 }
 
+// anchor: launcher.exe:0x448960
 void CMessageConnection::ConfigurePacketNameFamily(
     CMessageConnectionPacketNameFamily family,
     bool packetizedMessagesEnabled) {
@@ -631,6 +636,7 @@ void CMessageConnection::ConfigurePacketNameFamily(
     packetizedMessagesEnabled_ = packetizedMessagesEnabled;
 }
 
+// anchor family: launcher.exe:0x448960 -> connection `+0x70`
 CMessageConnectionPacketNameFamily CMessageConnection::PacketNameFamily() const {
     switch (packetNameCallback_) {
         case 0x0041ce00u:
@@ -642,6 +648,7 @@ CMessageConnectionPacketNameFamily CMessageConnection::PacketNameFamily() const 
     }
 }
 
+// anchor family: launcher.exe:0x448960 -> connection `+0x78`
 bool CMessageConnection::PacketizedMessagesEnabled() const {
     return packetizedMessagesEnabled_;
 }
@@ -724,6 +731,7 @@ void CMessageConnection::ConfigurePacketAgenda(
     ++agenda.configuredModuleCount4c;
 }
 
+// anchor family: launcher.exe:0x448980 -> connection `+0x74`
 const CMessageConnectionPacketAgenda* CMessageConnection::PacketAgenda() const {
     return packetAgenda_.get();
 }
@@ -760,6 +768,7 @@ static void CMessageConnection_ApplySendMessageRefMutations(
     payloadBase[11] = 0xffu;
 }
 
+// anchor: launcher.exe:0x448cf0 post-submit/or-discard cleanup on the original input message-ref
 static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(
     CMessageConnectionMessageRef* messageRef) {
     if (!messageRef || messageRef->headerless10 == 0u || !messageRef->messageStorage0c) {
@@ -919,6 +928,8 @@ static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
         fmt::ptr(workItem));
 }
 
+// UNANCHORED: source-owned typed owner-context view used by the current `0x4490c0/0x449a70/0x44af60`
+// reconstruction when the launcher-owned connection context is known to be a login-mediator slot.
 static mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*
 CMessageConnection_LoginMediatorContextScaffold(CMessageConnection* self) {
     return self
@@ -926,6 +937,8 @@ CMessageConnection_LoginMediatorContextScaffold(CMessageConnection* self) {
         : nullptr;
 }
 
+// UNANCHORED: source-owned synthetic receive-drain proxy standing in for the still-unmodeled tail
+// of `launcher.exe:0x4490c0` after the parsed-packet copy path.
 static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
     CMessageConnection* self,
     uint32_t workPayload) {
@@ -963,6 +976,7 @@ static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
     return 1u;
 }
 
+// anchor family: launcher.exe:0x449a70 / 0x44af60 type-2 owner-fallback tail
 static uint32_t CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
     CMessageConnection* self,
     uint32_t workPayload,
@@ -1183,6 +1197,7 @@ constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
     0x10u,
 };
 
+// anchor family: launcher.exe:0x41bc20 / 0x41bbb0 headerless-locator message-code decode
 static bool CMessageConnection_ResolveMessageCodePointerScaffold(
     const CMessageConnectionMessageRef& messageRef,
     const uint8_t** outMessageCodePointer,
@@ -1256,6 +1271,7 @@ static bool CMessageConnection_ResolveMessageCodePointerScaffold(
     return true;
 }
 
+// anchor family: launcher.exe:0x41bc20 / 0x41bbb0 decoded message-id read from a message-ref
 static bool CMessageConnection_DecodeMessageCodeScaffold(
     const CMessageConnectionMessageRef& messageRef,
     uint16_t* outMessageCode,
@@ -1308,6 +1324,9 @@ static bool CMessageConnection_DecodeMessageCodeScaffold(
     return true;
 }
 
+// anchor: launcher.exe:0x442d00
+// Source-owned narrow predicate exposing the specific consumed-code gate inside
+// `CBaseMarginConnection::DispatchMessage`.
 static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
     const CMessageConnectionMessageRef& messageRef,
     uint16_t* outDecodedMessageCode,
@@ -1401,6 +1420,7 @@ static CMessageConnectionMessageRef* CMessageConnection_ApplyReceivePacketAgenda
 
 }  // namespace
 
+// UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
 uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
     void* workItem,
     CMessageConnectionMessageRef& messageRef) {
@@ -1622,14 +1642,20 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     return 1u;
 }
 
+// UNANCHORED: source-owned accessor exposing the copied packet body staged from the current
+// bounded `launcher.exe:0x4490c0` reconstruction.
 const std::vector<uint8_t>& CMessageConnection::LastReceivedPacketBodyBytesScaffold() const {
     return lastReceivedPacketBodyBytesScaffold_;
 }
 
+// UNANCHORED: source-owned accessor exposing the current headerless flag staged from the bounded
+// `launcher.exe:0x4490c0` reconstruction.
 bool CMessageConnection::LastReceivedPacketHeaderlessScaffold() const {
     return lastReceivedPacketHeaderlessScaffold_;
 }
 
+// UNANCHORED: source-owned queue-drain helper used by the current launcher bridge for copied
+// packets that were not consumed on the in-callback post-copy dispatch path.
 bool CMessageConnection::TakeNextReceivedPacketScaffold(
     std::vector<uint8_t>* outPayloadBytes,
     bool* outHeaderless) {
@@ -1655,8 +1681,9 @@ bool CMessageConnection::TakeNextReceivedPacketScaffold(
     return true;
 }
 
-// UNANCHORED: source-owned raw-byte send wrapper used by current auth/bootstrap direct-send
-// callsites; keep it distinct from the local packet-builder/message-ref path at
+// anchor family: launcher.exe:0x449d20
+// Source-owned bool-return wrapper over the inherited `CLTTCPConnection_SendBuffer` path.
+// Keep it distinct from the message-ref send family rooted at
 // `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00`.
 uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext) {
     if (!Engine() || !packetData || packetByteCount == 0) {
@@ -1668,7 +1695,8 @@ uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetB
     return Engine()->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), packetData, packetByteCount, completionContext);
 }
 
-// UNANCHORED: source-owned wrapper over base `CLTTCPConnection::Connect` / engine slot 6.
+// anchor family: launcher.exe:0x449cd0
+// Source-owned bool-return wrapper over the inherited `CLTTCPConnection_Connect` path.
 uint32_t CMessageConnection::EnsureConnected() {
     if (!Engine()) {
         spdlog::debug(
@@ -1833,16 +1861,6 @@ CMarginConnection::CMarginConnection(CLTThreadPerClientTCPEngine* marginEngine)
 // restoring the shared base-margin vtable.
 CMarginConnection::~CMarginConnection() = default;
 
-// UNANCHORED: source-owned compatibility pass-through over the recovered base `+0x10` engine field.
-void CMarginConnection::SetMarginEngine(CLTThreadPerClientTCPEngine* marginEngine) {
-    CMessageConnection::SetEngine(marginEngine);
-}
-
-// UNANCHORED: source-owned compatibility accessor over the recovered base `+0x10` engine field.
-CLTThreadPerClientTCPEngine* CMarginConnection::MarginEngine() const {
-    return CMessageConnection::Engine();
-}
-
 namespace {
 
 static void** CMarginConnection_LocalCompletionWorkItemVtableScaffold() {
@@ -1860,6 +1878,7 @@ void CMarginConnection::SetMessageCode4SuccessFlag84(bool value) {
     messageCode4SuccessFlag84_ = value;
 }
 
+// anchor family: launcher.exe:0x441850 / 0x44af20 -> connection `+0x84`
 bool CMarginConnection::MessageCode4SuccessFlag84() const {
     return messageCode4SuccessFlag84_;
 }
@@ -2113,15 +2132,7 @@ void CMarginConnection::SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>
     EnsureStreamPacketEncryptionModuleFromSeed85();
 }
 
-bool CMarginConnection::CopyMessageCode5SeedBytes85(std::array<uint8_t, 16>* outValue) const {
-    if (!outValue || !hasMessageCode5SeedBytes85_) {
-        return false;
-    }
-
-    *outValue = messageCode5SeedBytes85_;
-    return true;
-}
-
+// anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
 const uint8_t* CMarginConnection::MessageCode5SeedBytes85Pointer() const {
     return hasMessageCode5SeedBytes85_ ? messageCode5SeedBytes85_.data() : nullptr;
 }

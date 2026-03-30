@@ -456,7 +456,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
     if (marginConnection_) {
         marginConnection_->SetEngine(engine_);
         if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
-            marginConnection->SetMarginEngine(engine_);
+            marginConnection->SetEngine(engine_);
         }
     }
 }
@@ -3563,13 +3563,13 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
         }
 
         marginConnection->SetEngine(engine_);
-        marginConnection->SetMarginEngine(engine_);
+        marginConnection->SetEngine(engine_);
         marginConnection_ = marginConnection;
         marginConnectionOwnedByMediator_ = true;
     }
 
     marginConnection->SetEngine(engine_);
-    marginConnection->SetMarginEngine(engine_);
+    marginConnection->SetEngine(engine_);
     marginConnection->ConfigurePacketNameFamily(
         mxo::liblttcp::CMessageConnectionPacketNameFamily::kMargin,
         /*packetizedMessagesEnabled=*/true);
