@@ -72,7 +72,7 @@ So `+0xa0` is a **byte readiness flag**, not a helper pointer.
 | `+0x2c` | launcher-version dword used by raw `0x06`; state2 `0x439210` feeds it from owner getter vtable `+0x20` / `0x41f070` returning owner `+0x08`, with paired nopatch setter vtable `+0x1c` / `0x41f060` | `0x439210`, `0x447eb0` |
 | `+0x54` | child-owned helper/transform subobject | `0x445500`, `VTABLES/0x004b695c.md` |
 | `+0x80` | time-delta/cache dword later consumed during auth-reply validation | `0x448140`, `0x44aec0` |
-| `+0x85 .. +0x94` | 16-byte challenge/material family | `0x448140`, neighboring corroboration `0x4429b0 / 0x41470` |
+| `+0x85 .. +0x94` | 16-byte challenge/material family | `0x448140`, neighboring corroboration `0x4429b0 / 0x441470` |
 | `+0x94` | large transform helper allocated on raw `0x08` send path | `0x4474f0`, `VTABLES/0x004b7620.md` |
 | `+0x98` | small transform helper allocated on raw `0x08` send path | `0x4474f0`, `VTABLES/0x004b74d4.md` |
 | `+0x9c` | current reply/request public-key id dword for this child | `0x447eb0`, `0x4474f0`, `0x447780` |
@@ -88,7 +88,7 @@ So `+0xa0` is a **byte readiness flag**, not a helper pointer.
 
 For **this child**, `+0x9c` still reads best as the current auth public-key id dword.
 
-Do **not** conflate that with the neighboring `0x4429b0 / 0x41470` sibling-object path where a
+Do **not** conflate that with the neighboring `0x4429b0 / 0x441470` sibling-object path where a
 separate object also has a `+0x9c` field that behaves like a wrapper/object pointer.
 Those two `+0x9c` reads do not need to belong to the same type.
 
@@ -167,14 +167,17 @@ Current strongest direct child-side anchor:
 
 Neighboring corroboration:
 - `0x4429b0`
-- `0x41470`
+- `0x441470`
 
 Current best combined read:
 - the `+0x85` family is real and reused
-- but the `0x4429b0 / 0x41470` path is now tightened further as a **neighboring margin-connection
+- but the `0x4429b0 / 0x441470` path is now tightened further as a **neighboring margin-connection
   object** path:
-  - `0x4429b0` is reached from `CBaseMarginConnection::DispatchMessage` consumed code-2 handling
-  - `0x41470` lazily builds/refeshes connection `+0x9c = CStreamPacketEncryptionModule`
+  - `0x4429b0 = CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse` is reached from
+    `CBaseMarginConnection::DispatchMessage` consumed code-2 handling
+  - `0x441470` lazily builds/refeshes connection `+0x9c = CStreamPacketEncryptionModule`
+  - that same `0x4429b0` body then sends raw code `0x03` through the margin connection's own
+    vtable `+0x24` packet-builder/message-ref path, not through this auth child's `+0x50`
 - so that path is still not proof that every `+0x85/+0x9c` write there belongs to this exact child
   type
 
@@ -280,7 +283,7 @@ Current bounded follow-up consequence:
 2. keep `+0xa4` tied to the lazy `pubkey.dat` state family
 3. keep `+0xa8` conservative as a reply-public-key worker/object family
 4. keep `+0xf4` documented as a **reply-derived copied block**, even if source currently narrows it
-5. do not use sibling `0x4429b0 / 0x41470` `+0x9c` behavior to overwrite the child `+0x9c`
+5. do not use sibling `0x4429b0 / 0x441470` `+0x9c` behavior to overwrite the child `+0x9c`
    meaning without stronger same-type proof
 
 ## Related docs

@@ -257,6 +257,10 @@ public:
     }
     virtual void HandleOpaqueMessageRef(void* opaqueMessageRef) = 0;
 
+    // Current best role for original helper `+0x04`:
+    // - a downstream helper-family object link, not a message-ref or owner pointer
+    // - read side: previous agenda read-chain head
+    // - write side: next write helper, or finally the embedded agenda write helper
     CStreamPacketEncryptionHelperBase* nextHelper04 = nullptr;
 
 protected:
@@ -284,6 +288,10 @@ class CStreamPacketEncryptionModuleReadTransformWorker {
 public:
     // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
     // by `0x44d910`.
+    // Original shape is the larger `FeedbackSizeTransformAdapter_ConstructLarge` branch reused by
+    // the auth-bootstrap transform family. `0x44d500` wraps each stored worker in a
+    // `StreamTransformationFilter` and passes a copied `LTTCPEndpointKey` peer block into
+    // `0x44bca0 = CPacketDecryptor_DecryptPacket`.
     std::array<uint8_t, 16> associatedSeedBytes{};
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
@@ -296,6 +304,10 @@ class CStreamPacketEncryptionModuleWriteTransformWorker {
 public:
     // Source-owned real C++ mirror of the embedded write-side transform worker rooted at helper
     // `+0x0c` by `0x44d820` / worker vtable `0x004b86a8`.
+    // Original shape is the smaller `FeedbackSizeTransformAdapter_ConstructSmall` branch.
+    // `0x44d250` then resolves the parameter block fed into
+    // `0x44c750 = CPacketEncryptor_EncryptPacket`, while the helper also snapshots
+    // `configuredConnection10->+0x24 = LTTCPEndpointKey` for the same packet-crypto family.
     std::array<uint8_t, 16> associatedSeedBytes{};
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
@@ -307,9 +319,16 @@ public:
 class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase {
 public:
     // Current common source-owned state on the two module child helpers.
-    // `0x469740` gives the tighter role for `nextHelper04`:
-    // - read helper (`0x004b86f0`) links to the previous agenda read-chain head there
-    // - write helper (`0x004b8690`) links to the embedded/default agenda write helper there
+    // `0x469740 = CMessageConnectionPacketAgenda_InstallStreamPacketEncryptionModule` gives the
+    // tighter roles here:
+    // - helper `+0x04` is the downstream helper-family link used by the agenda chains
+    // - helper `+0x08` is the owning `CStreamPacketEncryptionModule*`
+    //   - the transform bodies then read owner `+0x10 = configuredConnection10`
+    //     and copy connection `+0x24 = LTTCPEndpointKey` through
+    //     `0x44aff0 = LTTCPEndpointKey_Copy`
+    //   - read side passes that 16-byte peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`
+    //     for discard/expiry logging
+    //   - write side likewise passes it into `0x44c750 = CPacketEncryptor_EncryptPacket`
     CStreamPacketEncryptionModule* owner08 = nullptr;
 };
 
@@ -319,10 +338,13 @@ public:
     // anchor: launcher.exe vtable `0x004b86f0`
     // Current best recovered role:
     // - owner `+0x04`
-    // - inserted at agenda `+0x40` by `0x469740`
+    // - inserted at agenda `+0x40` by
+    //   `0x469740 = CMessageConnectionPacketAgenda_InstallStreamPacketEncryptionModule`
     // - therefore the concrete module-side **read helper**
-    // - original helper `+0x0c/+0x10/+0x14` form the read-side collection front matter consumed by
-    //   `0x44d500 / 0x44d2e0 / 0x44d770`
+    // - original helper `+0x0c` is a small repeated-success control dword consumed by `0x44d2e0`
+    // - original helper `+0x10/+0x14/+0x18` are the read-worker vector front matter consumed by
+    //   `0x44d500 / 0x44d770 / 0x44d130`
+    // - repeated success on worker 0 can collapse that collection back down to just worker 0
     // - source now models that as a real worker collection rather than raw begin/end pointers
     uint32_t collectionControl0c = 0;
     std::vector<CStreamPacketEncryptionModuleReadTransformWorker> transformWorkers;
@@ -339,10 +361,13 @@ public:
     // anchor: launcher.exe vtable `0x004b8690`
     // Current best recovered role:
     // - owner `+0x08`
-    // - inserted at agenda `+0x44/+0x48` by `0x469740`
+    // - inserted at agenda `+0x44/+0x48` by
+    //   `0x469740 = CMessageConnectionPacketAgenda_InstallStreamPacketEncryptionModule`
     // - therefore the concrete module-side **write helper**
     // - original `0x44d820` constructs a much larger embedded transform worker at helper `+0x0c`
     //   and retables it to `0x004b86a8`
+    // - `0x44d390` can forward either a fresh transformed message-ref or a null discard through
+    //   helper `+0x04`
     // - source now models that as a real worker class rather than raw placeholder pointers
     CStreamPacketEncryptionModuleWriteTransformWorker transformWorker;
     bool hasTransformWorker = false;
@@ -524,13 +549,14 @@ public:
     // - generic fallback logger on this path is helper `0x448a60`
     // Current source gap kept explicit:
     // - source now owns the copied-packet staging subset and two later leaf post-copy destinations:
-    //   - auth: optional `connection+0x74 -> 0x469930 -> 0x4489d0` pass-through handoff,
+    //   - auth: optional `connection+0x74 -> 0x469930 -> 0x4489d0` read-agenda handoff,
     //     then local message-ref/base-filter step -> `0x449a30 -> owner+0x180 / 0x41f250`
-    //   - margin: optional `connection+0x74 -> 0x469930 -> 0x4489d0` pass-through handoff,
+    //   - margin: optional `connection+0x74 -> 0x469930 -> 0x4489d0` read-agenda handoff,
     //     then `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
-    // - later original agenda helper transformation/discard behavior from this same callback is
-    //   still incomplete, so the launcher bridge keeps one extra synthetic receive-drain proxy item
-    //   for the remaining unconsumed paths
+    // - helper-side replacement/discard is now modeled through the recovered module family, but the
+    //   exact original helper-owned object/refcount tail from this same callback is still
+    //   incomplete, so the launcher bridge keeps one extra synthetic receive-drain proxy item for
+    //   the remaining unconsumed paths
     uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
@@ -571,9 +597,11 @@ private:
     // original callback bodies stored at connection `+0x70`.
     static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamily family);
     // UNANCHORED: source-owned send-side packet-agenda handoff helper.
-    // Current bounded model preserves the nearer `0x469950` shape:
+    // Current bounded model preserves the nearer
+    // `0x469950 = CMessageConnectionPacketAgenda_DispatchWriteHelperChain` shape:
     // - no active write helper => keep the original message-ref pointer
     // - active write helper => return agenda `+0x24` exactly after the helper chain runs
+    // - original returns that slot after dispatch without pre-clearing it first
     // Source now models that chain with real internal worker classes, so helper-side
     // replacement/discard remains visible at the same seam as the original.
     CMessageConnectionMessageRefScaffold* ApplySendPacketAgenda(
@@ -702,6 +730,14 @@ public:
     // - then copies the stored `+0x98` reply-derived `0x136` block into that returned tail span
     // - then forwards the completed envelope through connection vtable `+0x24`
     uint32_t SendStoredBootstrapReplyCopy98();
+    // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
+    // Source-owned mirror of the consumed decoded-code-2 CERT challenge-response send that:
+    // - requires the earlier code-2/5 seed mirror at `+0x85 .. +0x94`
+    // - re-runs the lazy `+0x9c` packet-agenda module ensure/refresh before send
+    // - builds payload `0x03 + 16 challenge bytes` in a retained message-ref
+    // - then forwards the completed local packet-builder envelope through connection vtable `+0x24`
+    uint32_t SendCertChallengeResponseFromChallengeBytes(
+        const std::array<uint8_t, 16>& challengeBytes);
     // anchor: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
     // Narrow source-owned mirror of the consumed decoded-code-2/5 seed-byte writeback.
     // Current tighter integration now also mirrors the neighboring lazy `+0x9c`

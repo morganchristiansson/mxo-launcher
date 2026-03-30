@@ -2667,21 +2667,43 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     fmt::ptr(marginConnection));
             }
 
-            mxo::auth::FramedPacket response;
-            if (!mxo::auth::BuildMarginCertChallengeResponsePacket(
-                    marginBootstrapState.certChallengeBytes,
-                    marginBootstrapState.marginTwofishKeyBytes,
-                    mxo::auth::kFrameModeAuto,
-                    &response)) {
-                spdlog::info("DIAGNOSTIC: launcher-owned margin failed to build CERT_ChallengeResponse");
-                return 0u;
+            uint32_t sendResult = 0u;
+            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
+                marginConnection != nullptr &&
+                marginBootstrapState.marginTwofishKeyBytes.size() == 16u &&
+                marginBootstrapState.certChallengeBytes.size() == 16u) {
+                std::array<uint8_t, 16> challengeBytes = {};
+                std::copy_n(
+                    marginBootstrapState.certChallengeBytes.begin(),
+                    challengeBytes.size(),
+                    challengeBytes.begin());
+                sendResult = marginConnection->SendCertChallengeResponseFromChallengeBytes(
+                    challengeBytes);
+                if (sendResult != 0u) {
+                    spdlog::info(
+                        "DIAGNOSTIC: launcher-owned margin mirrored original 0x4429b0 send seam by routing CERT_ChallengeResponse through CMarginConnection packet-builder/message-ref send connection={}",
+                        fmt::ptr(marginConnection));
+                }
             }
 
-            const uint32_t sendResult = SendMarginFramedPacket(
-                response,
-                0x03u,
-                "CERT_ChallengeResponse",
-                /*encryptedTransport=*/true);
+            if (sendResult == 0u) {
+                mxo::auth::FramedPacket response;
+                if (!mxo::auth::BuildMarginCertChallengeResponsePacket(
+                        marginBootstrapState.certChallengeBytes,
+                        marginBootstrapState.marginTwofishKeyBytes,
+                        mxo::auth::kFrameModeAuto,
+                        &response)) {
+                    spdlog::info("DIAGNOSTIC: launcher-owned margin failed to build CERT_ChallengeResponse");
+                    return 0u;
+                }
+
+                sendResult = SendMarginFramedPacket(
+                    response,
+                    0x03u,
+                    "CERT_ChallengeResponse",
+                    /*encryptedTransport=*/true);
+            }
+
             if (sendResult != 0u) {
                 marginBootstrapState.phase = MarginBootstrapPhase::kSentCertChallengeResponse;
                 expectedMarginRequestName_ = "CERT_ConnectReply";

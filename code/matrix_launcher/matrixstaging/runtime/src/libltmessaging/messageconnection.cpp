@@ -308,9 +308,17 @@ static void CStreamPacketEncryptionModuleReadHelper_RecordSuccessfulTransformInd
         return;
     }
 
-    // anchor: launcher.exe:0x44d2e0
+    // anchor: launcher.exe:0x44d2e0 / 0x44d130
+    // The original helper keeps a small hit counter in helper `+0x0c` while more than one worker
+    // is live. Repeated success on worker 0 eventually collapses the collection back down to just
+    // that first worker; success on any later worker resets the counter.
     if (successfulIndex == 0u) {
         ++helper->collectionControl0c;
+        if (helper->collectionControl0c > 4u && helper->transformWorkers.size() > 1u) {
+            helper->transformWorkers.erase(
+                helper->transformWorkers.begin() + 1,
+                helper->transformWorkers.end());
+        }
     } else {
         helper->collectionControl0c = 0u;
     }
@@ -369,6 +377,9 @@ void CStreamPacketEncryptionModuleReadTransformWorker::ResetForSeed(
 bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
     const CMessageConnectionMessageRefScaffold& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) const {
+    // Source collapses the original large FeedbackSize worker + StreamTransformationFilter +
+    // CPacketDecryptor chain down to the confirmed packet semantic: decrypt the current payload
+    // span with the associated 16-byte seed and materialize a replacement message-ref on success.
     if (!outputBuffer) {
         return false;
     }
@@ -405,6 +416,9 @@ void CStreamPacketEncryptionModuleWriteTransformWorker::ResetForSeed(
 bool CStreamPacketEncryptionModuleWriteTransformWorker::TryTransform(
     const CMessageConnectionMessageRefScaffold& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) const {
+    // Source collapses the original small FeedbackSize worker + CPacketEncryptor chain down to the
+    // confirmed packet semantic: encrypt the current payload span with the associated 16-byte seed
+    // and materialize a replacement message-ref on success.
     if (!outputBuffer) {
         return false;
     }
@@ -522,6 +536,10 @@ void CStreamPacketEncryptionModuleWriteHelper::ResetForSeed(
 // anchor: launcher.exe:0x469980
 void CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
+    // Original `0x469980` (`CMessageConnectionPacketAgendaHelper_StoreOpaqueMessageRef`) performs
+    // a refcounted replace/store through helper `+0x10`. Source keeps the narrower raw-pointer
+    // slot effect because these agenda-local message-ref scaffolds are source-owned stack/local
+    // objects rather than launcher heap objects with shared AddRef/Release tails.
     if (outputSlotAddress10) {
         *outputSlotAddress10 = opaqueMessageRef;
     }
@@ -769,9 +787,11 @@ CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgenda(
     }
 
     // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
-    // Current bounded source model preserves the nearer `0x469950` handoff shape:
+    // Current bounded source model preserves the nearer `0x469950`
+    // (`CMessageConnectionPacketAgenda_DispatchWriteHelperChain`) handoff shape:
     // - no agenda / no active write helper (`+0x44 == 0`) => keep the original message-ref pointer
     // - active write helper => return agenda `+0x24` exactly after the helper chain runs
+    // - original does not pre-clear agenda `+0x24`; it simply returns that slot after dispatch
     // Source now models that chain with real internal worker classes, keeping helper-side
     // replacement/discard visible at the same seam as the original.
     CMessageConnectionPacketAgenda* agenda = packetAgenda_.get();
@@ -779,7 +799,6 @@ CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgenda(
         return &inputMessageRef;
     }
 
-    agenda->writeOutputSlot24 = nullptr;
     if (agenda->writeHelperChainHead44 == nullptr) {
         return &inputMessageRef;
     }
@@ -874,7 +893,7 @@ uint32_t CMessageConnection::SendPacketMessageRef(
         (agenda && agenda->readHelperChainHead40 != nullptr) ? 1u : 0u,
         (agenda && agenda->writeHelperChainHead44 != nullptr) ? 1u : 0u,
         agendaTouched ? 1u : 0u,
-        (agenda && agenda->writeOutputSlot24 != nullptr) ? 1u : 0u,
+        (agendaTouched && agenda && agenda->writeOutputSlot24 != nullptr) ? 1u : 0u,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -1333,7 +1352,7 @@ static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
 // With the internal-only family now modeled as full virtual C++ classes, source routes this
 // through the helper-chain head directly, so module read helpers can now replace or discard the
 // message-ref before the embedded helper stores the output slot.
-static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
+static bool CMessageConnection_DriveAgendaReadHelperChainScaffold(
     CMessageConnectionPacketAgenda* agenda,
     CMessageConnectionReceivedMessageRefScaffold* inputMessageRef) {
     if (!agenda || agenda->readHelperChainHead40 == nullptr) {
@@ -1353,6 +1372,8 @@ static bool CMessageConnection_DefaultAgendaReadPassThroughScaffold(
 // - caller-installed read helpers can now replace or discard the message-ref through the recovered
 //   module family, though the exact original worker object/lifetime split is still narrower than
 //   source
+// - original `0x469930` (`CMessageConnectionPacketAgenda_DispatchReadHelperChain`) does not
+//   pre-clear agenda `+0x08`; it simply drives the chain and returns the slot afterward
 static CMessageConnectionReceivedMessageRefScaffold* CMessageConnection_ApplyReceivePacketAgendaScaffold(
     CMessageConnectionPacketAgenda* agenda,
     CMessageConnectionReceivedMessageRefScaffold* inputMessageRef,
@@ -1367,11 +1388,10 @@ static CMessageConnectionReceivedMessageRefScaffold* CMessageConnection_ApplyRec
         return inputMessageRef;
     }
 
-    agenda->readOutputSlot08 = nullptr;
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
-    if (!CMessageConnection_DefaultAgendaReadPassThroughScaffold(agenda, inputMessageRef)) {
+    if (!CMessageConnection_DriveAgendaReadHelperChainScaffold(agenda, inputMessageRef)) {
         return nullptr;
     }
 
@@ -1402,7 +1422,8 @@ uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
 //   - headerless packets now keep the original locator-id validity gate on that object before leaf dispatch
 // - current bounded leaf correction:
 //   - if connection `+0x74` is present, source now also preserves the nearer
-//     `0x469930 -> 0x4489d0` read-agenda handoff shape as a pass-through swap before dispatch
+//     `0x469930 -> 0x4489d0` read-agenda handoff shape before dispatch, including helper-side
+//     replacement/discard through the recovered module family
 //   - auth leaf `0x449a30 -> owner+0x180 / 0x41f250` can now re-enter current-helper slot 5
 //     through a local message-ref/base-filter step instead of jumping straight from copied bytes
 //   - margin leaf `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260` can now re-enter the nearer
@@ -1982,6 +2003,60 @@ uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98() {
         "CMarginConnection::SendStoredBootstrapReplyCopy98 sent rawType1PrefixPlusLengthPrefixedReplyCopy payloadBytes=0x{:03x} nestedReplyCopyBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(kTotalPayloadByteCount),
         static_cast<unsigned>(kReplyCopyByteCount),
+        static_cast<unsigned>(sendResult),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()),
+        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    return sendResult;
+}
+
+// anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
+uint32_t CMarginConnection::SendCertChallengeResponseFromChallengeBytes(
+    const std::array<uint8_t, 16>& challengeBytes) {
+    if (!hasMessageCode5SeedBytes85_) {
+        return 0u;
+    }
+
+    // Original `0x4429b0` writes `+0x85..+0x94`, then immediately reaches
+    // `0x441470 = CBaseMarginConnection_EnsureStreamPacketEncryptionModule` before building the
+    // local envelope and sending through connection vtable `+0x24`.
+    EnsureStreamPacketEncryptionModuleFromSeed85();
+    const CMessageConnectionPacketAgenda* const agenda = PacketAgenda();
+    if (!agenda || !agenda->created || agenda->writeHelperChainHead44 == nullptr) {
+        spdlog::info(
+            "CMarginConnection::SendCertChallengeResponseFromChallengeBytes missing agenda write helper after seed ensure this={} ownerContext={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        return 0u;
+    }
+
+    constexpr uint16_t kPayloadByteCount = 0x11u;
+    CMessageConnectionMessageRefScaffold messageRef = {};
+    messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
+    if (!messageRef.messageStorage0c) {
+        return 0u;
+    }
+
+    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kPayloadByteCount);
+    uint8_t* const payloadBytes = messageRef.messageStorage0c->PayloadBaseScaffold();
+    if (!payloadBytes) {
+        return 0u;
+    }
+
+    payloadBytes[0] = 0x03u;
+    std::copy_n(challengeBytes.begin(), challengeBytes.size(), payloadBytes + 1u);
+
+    CMessageConnectionPacketBuilderEnvelope envelope = {};
+    envelope.payloadBase04 = payloadBytes;
+    envelope.messageRef08 = &messageRef;
+
+    const uint32_t sendResult = ForwardPacketBuilderEnvelopeToSendPacket(envelope);
+    spdlog::info(
+        "CMarginConnection::SendCertChallengeResponseFromChallengeBytes sent packetBuilderEnvelopeOpcode03 challengeBytes=0x{:02x} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(challengeBytes.size()),
+        static_cast<unsigned>(agenda->configuredModuleCount4c),
+        agenda->writeHelperChainHead44 != nullptr ? 1u : 0u,
         static_cast<unsigned>(sendResult),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),

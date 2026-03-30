@@ -503,11 +503,14 @@ Current best reading remains:
           - also emits a later auxiliary raw `0x1b` packet on that same indirect path
       - newer follow-up on the neighboring consumed margin code-2 path now tightens those fields
         differently:
-        - `0x429b0` is reached from `CBaseMarginConnection::DispatchMessage`
+        - `0x4429b0 = CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse` is reached
+          from `CBaseMarginConnection::DispatchMessage`
         - it uses margin-connection helper pointer `+0xa0 -> +0x1c` on that later incoming path
         - it writes 16-byte challenge-derived material to margin connection `+0x85 .. +0x94`
-        - then `0x41470 = CBaseMarginConnection_EnsureStreamPacketEncryptionModule` lazily builds or
+        - then `0x441470 = CBaseMarginConnection_EnsureStreamPacketEncryptionModule` lazily builds or
           refreshes connection `+0x9c = CStreamPacketEncryptionModule`
+        - the same `0x4429b0` body then builds payload `0x03 + 16 challenge bytes` in a local
+          packet-builder envelope and sends it through connection vtable `+0x24`
         - that `+0x9c` value is therefore packet-agenda module state on the margin connection, not
           the earlier auth raw `0x06/0x08` send-builder state
       - important channel-specific correction from the same pass still holds:
