@@ -283,6 +283,10 @@ public:
     // - owner `+0x04`
     // - inserted at agenda `+0x40` by `0x469740`
     // - therefore the concrete module-side **read helper**
+    // - helper `+0x0c/+0x10/+0x14` form the read-side collection front matter consumed by
+    //   `0x44d500 / 0x44d2e0 / 0x44d770`
+    // - the collection entries themselves are the larger transform-worker objects built by
+    //   `0x44d910` (worker vtable `0x004b7620`)
     uint32_t collectionControl0c = 0;
     void* collectionBegin10 = nullptr;
     void* collectionEnd14 = nullptr;
@@ -299,6 +303,10 @@ public:
     // - owner `+0x08`
     // - inserted at agenda `+0x44/+0x48` by `0x469740`
     // - therefore the concrete module-side **write helper**
+    // Current source still keeps only a narrow front placeholder here:
+    // - original `0x44d820` constructs a much larger embedded transform worker at helper `+0x0c`
+    // - that embedded worker is then retabled to `0x004b86a8`
+    // - `0x44d390` drives the write-side transform through that embedded object
     void* embeddedTransformAdapter0c = nullptr;
     void* embeddedTransformAdapterMeta10 = nullptr;
 

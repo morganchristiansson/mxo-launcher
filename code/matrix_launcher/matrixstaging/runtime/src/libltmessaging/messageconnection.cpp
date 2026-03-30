@@ -249,11 +249,19 @@ void CStreamPacketEncryptionHelperBase::ForwardToNextHelper(
     }
 }
 
+// anchor: launcher.exe:0x44d500
 void CStreamPacketEncryptionModuleReadHelper::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
+    // Current source keeps the module read-helper body conservative until the concrete
+    // transform/decrypt worker objects at helper `+0x0c/+0x10/+0x14` are modeled faithfully.
+    // Static RE now narrows the missing local output family to:
+    // - `0x004b84f0` final message-ref sink
+    // - `0x004b8380` read-side 10-byte prefix-buffering sink in front of it
+    // but source does not yet model those helper-local buffered-transformation objects.
     ForwardToNextHelper(opaqueMessageRef);
 }
 
+// anchor: launcher.exe:0x44da00 / 0x44daf0
 void CStreamPacketEncryptionModuleReadHelper::ResetForOwner(
     CStreamPacketEncryptionModule* owner) {
     nextHelper04 = nullptr;
@@ -263,11 +271,17 @@ void CStreamPacketEncryptionModuleReadHelper::ResetForOwner(
     collectionEnd14 = nullptr;
 }
 
+// anchor: launcher.exe:0x44d390
 void CStreamPacketEncryptionModuleWriteHelper::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
+    // Current source keeps the module write-helper body conservative until the concrete
+    // transform worker rooted at helper `+0x0c/+0x10` is modeled faithfully.
+    // Static RE now narrows the missing local output sink there to `0x004b84f0`, but source does
+    // not yet model that helper-local buffered-transformation object family.
     ForwardToNextHelper(opaqueMessageRef);
 }
 
+// anchor: launcher.exe:0x44d820 / 0x44daf0
 void CStreamPacketEncryptionModuleWriteHelper::ResetForOwner(
     CStreamPacketEncryptionModule* owner) {
     nextHelper04 = nullptr;
@@ -276,6 +290,7 @@ void CStreamPacketEncryptionModuleWriteHelper::ResetForOwner(
     embeddedTransformAdapterMeta10 = nullptr;
 }
 
+// anchor: launcher.exe:0x469980
 void CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
     if (outputSlotAddress10) {
@@ -283,6 +298,7 @@ void CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef(
     }
 }
 
+// anchor: launcher.exe:0x469850
 void CStreamPacketEncryptionAgendaHelper::ResetForAgenda(
     const char* helperLabel,
     void** outputSlotAddress,
@@ -295,6 +311,7 @@ void CStreamPacketEncryptionAgendaHelper::ResetForAgenda(
     downstreamHelperSlot14 = downstreamHelperSlot;
 }
 
+// anchor: launcher.exe:0x44da00
 void CStreamPacketEncryptionModule::InitializeForMarginConnectionSeed(
     const std::array<uint8_t, 16>& seedBytes85) {
     readHelper04 = nullptr;
@@ -308,6 +325,7 @@ void CStreamPacketEncryptionModule::InitializeForMarginConnectionSeed(
     associatedSeedBytes40 = seedBytes85;
 }
 
+// anchor: launcher.exe:0x44daf0
 void CStreamPacketEncryptionModule::RefreshFromMarginConnectionSeed(
     const std::array<uint8_t, 16>& seedBytes85) {
     if (readHelper04 == nullptr) {
@@ -370,6 +388,7 @@ bool CMessageConnection::PacketizedMessagesEnabled() const {
     return packetizedMessagesEnabled_;
 }
 
+// anchor: launcher.exe:0x448980
 void CMessageConnection::ConfigurePacketAgenda(
     CStreamPacketEncryptionModule* streamPacketEncryptionModule) {
     if (!packetAgenda_) {
@@ -508,6 +527,7 @@ uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacket(
     return SendPacketMessageRef(*envelope.messageRef08);
 }
 
+// anchor: launcher.exe:0x469950
 CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgenda(
     CMessageConnectionMessageRefScaffold& inputMessageRef,
     bool* outAgendaTouched) {
