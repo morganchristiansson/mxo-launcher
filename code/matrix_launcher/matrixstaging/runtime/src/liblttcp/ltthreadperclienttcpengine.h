@@ -432,14 +432,24 @@ public:
     // so the raw arg5 object shell can mirror class-owned state changes.
     void SyncAttachedLauncherObjectStateScaffold();
 
-    // UNANCHORED: helper-family bodies now source-own the recovered +0x5c/+0x60/+0x98 semantics
-    // on the target class side; launcher ABI wrappers only route raw helper entrypoints here.
-    uint32_t SignalQueueEventHelperScaffold();
-    uint32_t WaitQueueEventHelperScaffold(int reasonMilliseconds);
-    uint32_t EnterQueueLockHelperScaffold(bool pumpLauncherBridge = false);
-    uint32_t LeaveQueueLockHelperScaffold();
-    uint32_t EnterCleanupLockHelperScaffold();
-    uint32_t LeaveCleanupLockHelperScaffold();
+    // Helper-family bodies now source-own the recovered +0x5c/+0x60/+0x98 semantics on the
+    // target class side; launcher ABI wrappers only route raw helper entrypoints here.
+    // Faithfulness split after the current helper pass:
+    // - these class methods now mirror only the original helper bodies themselves
+    // - the extra launcher-bridge pump side effect remains on the arg5 `+0x60` shell slot-0
+    //   wrapper, not in the pure enter-helper body
+    // anchor: launcher.exe:0x435f90
+    uint32_t SignalQueueEventHelper();
+    // anchor: launcher.exe:0x435fa0
+    uint32_t WaitQueueEventHelper(int reasonMilliseconds);
+    // anchor family: launcher.exe:0x4147b0
+    uint32_t EnterQueueLockHelper();
+    // anchor family: launcher.exe:0x4147c0
+    uint32_t LeaveQueueLockHelper();
+    // anchor family: launcher.exe:0x4147b0
+    uint32_t EnterCleanupLockHelper();
+    // anchor family: launcher.exe:0x4147c0
+    uint32_t LeaveCleanupLockHelper();
 
     // UNANCHORED: current replacement seam still keeps loginmediator-owned high-level auth/margin
     // handlers, but the arg5-side queue-context allocation/vtable, nonblocking producer/push path,

@@ -1455,7 +1455,8 @@ Build-validated update:
   - helper-side call-count throttling / queue-state debug logging used during earlier bridge bringup has been pruned back out of the ABI shell
   - helper subobject wrappers are now smaller again:
     - `+0x98` uses shared lock-helper enter/leave bodies directly
-    - `+0x60` keeps only the one extra engine-pump side effect on slot `0`
+    - `+0x60` keeps only the one extra engine-pump side effect on slot `0`, layered above the
+      now-separate pure `0x4147b0` enter-helper body
     - the helper-vtable arrays are now sized only for the live 2-slot surfaces instead of oversized diagnostic tables
   - the ABI shell keeps raw arg5 object layout ownership, but less of the bridge-controller logic and less diagnostic scaffolding
 
@@ -1534,12 +1535,12 @@ source-level implementation.
 |---|---|---|---|---|
 | `+0x0c` | queue0C object from `0x436610 -> 0x436340` | shell-owned live queue storage; class consumed through an explicit launcher-ABI attachment seam | class now owns a first-class fallback queue surrogate and chooses active queue storage through `AttachLauncherAbiSurfaceScaffold(...)`; live launcher ABI path still uses shell queue storage | **shared**: shell keeps raw storage, class owns queue semantics / fallback model |
 | `+0x34` | queue34 object from `0x436610 -> 0x436340` | same as `+0x0c` | same as `+0x0c` | **shared** |
-| `+0x5c` | wait/event helper root | shell-owned helper body (`SetEvent` / wait / reacquire) | helper body now lives on `CLTThreadPerClientTCPEngine::{SignalQueueEventHelperScaffold, WaitQueueEventHelperScaffold}`; shell helper thunk only routes raw embedded calls there | **raw address shell-owned; semantics class-owned** |
-| `+0x60` | helper root + `CRITICAL_SECTION` for queue lock | shell-owned enter/leave plus pump side effect | target class now owns queue-lock helper semantics and fallback lock surrogate; shell slot `0` now routes to `EnterQueueLockHelperScaffold(true)` and slot `1` to `LeaveQueueLockHelperScaffold()` | **raw address shell-owned; semantics class-owned** |
+| `+0x5c` | wait/event helper root | shell-owned helper body (`SetEvent` / wait / reacquire) | helper body now lives on `CLTThreadPerClientTCPEngine::{SignalQueueEventHelper, WaitQueueEventHelper}`; shell helper thunk only routes raw embedded calls there | **raw address shell-owned; semantics class-owned** |
+| `+0x60` | helper root + `CRITICAL_SECTION` for queue lock | shell-owned enter/leave plus pump side effect | target class now owns the pure `0x4147b0/0x4147c0` queue-lock helper bodies and fallback lock surrogate; the shell `+0x60` slot-0 wrapper now calls `EnterQueueLockHelper()` and then layers the extra engine-pump side effect above that pure helper body, while slot `1` routes to `LeaveQueueLockHelper()` | **raw address shell-owned; semantics class-owned** |
 | `+0x7c` | queue signal event from `CreateEventA` | shell-owned event and helper usage | target class now owns fallback event state and helper semantics; live launcher ABI path still uses the shell event handle through attached surface mapping | **shared** |
 | `+0x80` | endpoint-keyed sentinel/tree head pointer | shell allocated and shell synchronized empty/non-empty shape | target class now owns the sentinel-head object and count mirror; attachment updates shell `+0x80/+0x84` to point at class-owned head/count state | **class-owned data mirrored through shell** |
 | `+0x8c` | context-keyed sentinel/tree head pointer | shell allocated and shell synchronized empty/non-empty shape | target class now owns the sentinel-head object and count mirror; attachment updates shell `+0x8c/+0x90` to point at class-owned head/count state | **class-owned data mirrored through shell** |
-| `+0x98` | cleanup lock helper root + `CRITICAL_SECTION` | shell-owned enter/leave; shell wrapper also locked slot `12` manually | cleanup helper semantics now live in `EnterCleanupLockHelperScaffold()` / `LeaveCleanupLockHelperScaffold()` and `CleanupConnection()` now acquires/releases that lock internally | **raw address shell-owned; semantics class-owned** |
+| `+0x98` | cleanup lock helper root + `CRITICAL_SECTION` | shell-owned enter/leave; shell wrapper also locked slot `12` manually | cleanup helper semantics now live in `EnterCleanupLockHelper()` / `LeaveCleanupLockHelper()` and `CleanupConnection()` now acquires/releases that lock internally | **raw address shell-owned; semantics class-owned** |
 
 ### What moved into `CLTThreadPerClientTCPEngine`
 

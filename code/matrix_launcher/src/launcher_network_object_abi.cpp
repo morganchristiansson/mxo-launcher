@@ -491,8 +491,8 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot0(void* self) {
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromLockHelper(self, &helperOffset)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
             return (helperOffset == 0x98)
-                ? engine->EnterCleanupLockHelperScaffold()
-                : engine->EnterQueueLockHelperScaffold(/*pumpLauncherBridge=*/false);
+                ? engine->EnterCleanupLockHelper()
+                : engine->EnterQueueLockHelper();
         }
     }
 
@@ -508,8 +508,8 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromLockHelper(self, &helperOffset)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
             return (helperOffset == 0x98)
-                ? engine->LeaveCleanupLockHelperScaffold()
-                : engine->LeaveQueueLockHelperScaffold();
+                ? engine->LeaveCleanupLockHelper()
+                : engine->LeaveQueueLockHelper();
         }
     }
 
@@ -524,7 +524,7 @@ static uint32_t __thiscall LauncherObject_LockHelper_Slot1(void* self) {
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x5c)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
-            return engine->SignalQueueEventHelperScaffold();
+            return engine->SignalQueueEventHelper();
         }
     }
 
@@ -537,7 +537,7 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot0(void* self) {
 static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reason) {
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x5c)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
-            return engine->WaitQueueEventHelperScaffold(reason);
+            return engine->WaitQueueEventHelper(reason);
         }
     }
 
@@ -563,12 +563,18 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
     return 1u;
 }
 
-// anchor: launcher.exe:0x4147b0
+// anchor family: launcher.exe:0x4147b0
 // vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
+// Faithfulness note:
+// - the original helper body itself is just the `EnterCriticalSection` wrapper from `0x4147b0`
+// - the extra launcher-bridge pump remains a current shell-owned side effect layered on top of
+//   that pure enter-helper body for the arg5 `+0x60` slot-0 path only
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
-            return engine->EnterQueueLockHelperScaffold(/*pumpLauncherBridge=*/true);
+            const uint32_t result = engine->EnterQueueLockHelper();
+            engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+            return result;
         }
     }
 

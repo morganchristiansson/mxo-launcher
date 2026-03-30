@@ -2327,7 +2327,7 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     // - original `0x4316a0` also acquires arg5 helper `+0x98`; after the current ownership move,
     //   that lock behavior now lives here on the target class side and the shell wrapper only
     //   forwards the primary slot call
-    (void)EnterCleanupLockHelperScaffold();
+    (void)EnterCleanupLockHelper();
 
     CBaseConnection* queuedConnectionOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
     void* cleanupContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
@@ -2375,7 +2375,7 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
 
 cleanup_tail:
     SyncAttachedLauncherObjectStateScaffold();
-    (void)LeaveCleanupLockHelperScaffold();
+    (void)LeaveCleanupLockHelper();
     return result;
 }
 
@@ -2510,40 +2510,41 @@ void* CLTThreadPerClientTCPEngine::ActiveCleanupLockScaffold() const {
         : const_cast<CRITICAL_SECTION*>(&ownedCleanupLockHelper98_.crit);
 }
 
-uint32_t CLTThreadPerClientTCPEngine::SignalQueueEventHelperScaffold() {
+// anchor: launcher.exe:0x435f90
+uint32_t CLTThreadPerClientTCPEngine::SignalQueueEventHelper() {
     HANDLE eventHandle = static_cast<HANDLE>(ActiveQueueSignalEventScaffold());
     return (eventHandle && SetEvent(eventHandle)) ? 0u : 1u;
 }
 
-uint32_t CLTThreadPerClientTCPEngine::WaitQueueEventHelperScaffold(int reasonMilliseconds) {
-    (void)LeaveQueueLockHelperScaffold();
+// anchor: launcher.exe:0x435fa0
+uint32_t CLTThreadPerClientTCPEngine::WaitQueueEventHelper(int reasonMilliseconds) {
+    (void)LeaveQueueLockHelper();
     HANDLE eventHandle = static_cast<HANDLE>(ActiveQueueSignalEventScaffold());
     const DWORD waitResult = eventHandle
         ? WaitForSingleObject(eventHandle, static_cast<DWORD>(reasonMilliseconds))
         : WAIT_FAILED;
     if (waitResult == WAIT_OBJECT_0) {
-        (void)EnterQueueLockHelperScaffold(/*pumpLauncherBridge=*/false);
+        (void)EnterQueueLockHelper();
         return 0u;
     }
     if (waitResult == WAIT_TIMEOUT) {
-        (void)EnterQueueLockHelperScaffold(/*pumpLauncherBridge=*/false);
+        (void)EnterQueueLockHelper();
         return 3u;
     }
     return 1u;
 }
 
-uint32_t CLTThreadPerClientTCPEngine::EnterQueueLockHelperScaffold(bool pumpLauncherBridge) {
+// anchor family: launcher.exe:0x4147b0
+uint32_t CLTThreadPerClientTCPEngine::EnterQueueLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
         EnterCriticalSection(crit);
     }
-    if (pumpLauncherBridge) {
-        PumpLauncherConnectionBridgeFromArg5HelperScaffold();
-    }
     return 0u;
 }
 
-uint32_t CLTThreadPerClientTCPEngine::LeaveQueueLockHelperScaffold() {
+// anchor family: launcher.exe:0x4147c0
+uint32_t CLTThreadPerClientTCPEngine::LeaveQueueLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveQueueLockScaffold())) {
         LeaveCriticalSection(crit);
@@ -2551,7 +2552,8 @@ uint32_t CLTThreadPerClientTCPEngine::LeaveQueueLockHelperScaffold() {
     return 0u;
 }
 
-uint32_t CLTThreadPerClientTCPEngine::EnterCleanupLockHelperScaffold() {
+// anchor family: launcher.exe:0x4147b0
+uint32_t CLTThreadPerClientTCPEngine::EnterCleanupLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
         EnterCriticalSection(crit);
@@ -2559,7 +2561,8 @@ uint32_t CLTThreadPerClientTCPEngine::EnterCleanupLockHelperScaffold() {
     return 0u;
 }
 
-uint32_t CLTThreadPerClientTCPEngine::LeaveCleanupLockHelperScaffold() {
+// anchor family: launcher.exe:0x4147c0
+uint32_t CLTThreadPerClientTCPEngine::LeaveCleanupLockHelper() {
     if (CRITICAL_SECTION* crit =
             CriticalSectionFromOpaqueStorage(ActiveCleanupLockScaffold())) {
         LeaveCriticalSection(crit);
@@ -2643,7 +2646,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
     }
 
     if (queuePairWasEmpty) {
-        (void)SignalQueueEventHelperScaffold();
+        (void)SignalQueueEventHelper();
     }
 
     LoggerForBridgeLabel(label)->info(
@@ -2870,7 +2873,7 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
                 return;
             }
 
-            const uint32_t waitResult = WaitQueueEventHelperScaffold(INFINITE);
+            const uint32_t waitResult = WaitQueueEventHelper(INFINITE);
             if (waitResult == 0u || waitResult == 3u) {
                 continue;
             }
@@ -3086,7 +3089,7 @@ CLTThreadPerClientTCPEngine_WorkerThread* CLTThreadPerClientTCPEngine::CreateAnd
 
     CLTThreadPerClientTCPEngine_WorkerThread* result = nullptr;
     const uint32_t key = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(connection));
-    (void)EnterCleanupLockHelperScaffold();
+    (void)EnterCleanupLockHelper();
     bool inserted = false;
     CLTThreadPerClientTCPEngine_ContextTreeNode* node = ContextTreeInsertUniqueNode(
         this,
@@ -3100,7 +3103,7 @@ CLTThreadPerClientTCPEngine_WorkerThread* CLTThreadPerClientTCPEngine::CreateAnd
     } else if (node) {
         result = node->_M_valptr()->second;
     }
-    (void)LeaveCleanupLockHelperScaffold();
+    (void)LeaveCleanupLockHelper();
 
     if (result && startThread) {
         (void)result->Start(/*startPriority=*/2);
