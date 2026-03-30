@@ -3,9 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <string>
-#include <vector>
 
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
 
@@ -31,7 +29,9 @@ struct __attribute__((packed)) AuthBootstrapReplyCopyShadowF4Sketch {
     // Source-owned shadow of the original reply-derived `0x136` heap block copied into child
     // `+0xf4` by `0x448140`.
     //
-    // Static `0x448140` / `0x44add0` / `0x44aec0` now tightens this materially:
+    // Static `0x448140 = AuthBootstrap680_HandleInboundAuthMessage` /
+    // `0x44add0 = AuthBootstrapReplyCopyShadowF4_IsFresh` /
+    // `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` now tighten this materially:
     // - this block is not `[u16 3][u16 0x0136] + tail`
     // - the copied `0x136` bytes line up directly as:
     //   - `+0x00 .. +0x7f` = 128-byte auth-signature span
@@ -39,7 +39,9 @@ struct __attribute__((packed)) AuthBootstrapReplyCopyShadowF4Sketch {
     // - high-value verified suffix offsets:
     //   - `+0x85` = signed-data `+0x05` (wrapper-facing `owner+0x680->+0xf4+0x85`)
     //   - `+0xa8` = signed-data `+0x28` (wrapper-facing `owner+0x680->+0xf4+0xa8`)
-    //   - `+0xac` = signed-data expiry-time dword used by `0x44add0 / 0x44aec0`
+    //   - `+0xac` = signed-data expiry-time dword used by
+    //               `AuthBootstrapReplyCopyShadowF4_IsFresh` /
+    //               `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
     //   - `+0xd1` = low public-exponent byte used by `0x448140`
     //   - `+0xd2 .. +0x131` = modulus bytes used by `0x448140`
     std::array<uint8_t, 0x80> authSignature00{};
@@ -64,14 +66,6 @@ struct AuthBootstrap680BigIntObject20Scaffold {
     uint32_t sign10 = 0u;
 };
 static_assert(sizeof(AuthBootstrap680BigIntObject20Scaffold) == 0x14u);
-
-struct AuthBootstrap680WorkerPresenceScaffold {
-    // Source-owned presence-only stand-in for the refcounted worker families rooted at child
-    // `+0xa8` and `+0xac` until those concrete classes are typed tightly enough to deserve their
-    // own source-owned models.
-    uint32_t publicKeyId = 0u;
-};
-static_assert(sizeof(AuthBootstrap680WorkerPresenceScaffold) == 0x4u);
 
 struct AuthBootstrap680ChildSketch {
     // Current best source-owned mirror of the separate phase-2 auth/bootstrap child allocated by:
@@ -115,8 +109,8 @@ struct AuthBootstrap680ChildSketch {
     // helper is typed tightly enough to deserve its own source-owned model.
     std::array<uint8_t, 0x2c> opaqueState54To7f{};
 
-    uint32_t authServerTimeBias80 = 0;           // original child `+0x80`; `0x448140` stores `time(NULL) - GetPublicKeyReply.currentTime`, and later `0x4474f0/0x44add0/0x44aec0` use it to reconstruct current auth-server time
-    std::array<uint8_t, 16> challengeMaterial85{}; // original child `+0x84 .. +0x93`; seeded by the `+0x54` helper during `0x4474f0`, not by the later raw-`0x0a` send
+    uint32_t authServerTimeBias80 = 0;           // original child `+0x80`; `0x448140` stores `time(NULL) - GetPublicKeyReply.currentTime`, and later `0x4474f0` / `AuthBootstrapReplyCopyShadowF4_IsFresh` / `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` use it to reconstruct current auth-server time
+    std::array<uint8_t, 16> feedbackSeed84{}; // original child `+0x84 .. +0x93`; seeded by the `+0x54` helper during `0x4474f0`, not by the later raw-`0x0a` send
     void* feedbackTransformLarge94 = nullptr;    // original child `+0x94`; allocated in `0x4474f0`
     void* feedbackTransformSmall98 = nullptr;    // original child `+0x98`; allocated in `0x4474f0`
     uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
@@ -124,7 +118,7 @@ struct AuthBootstrap680ChildSketch {
     std::array<uint8_t, 3> paddingA1ToA3{};      // original child `+0xa1 .. +0xa3`
     void* lazyPubkeyDatStateA4 = nullptr;        // original child `+0xa4`; lazy `pubkey.dat`-backed state built by `0x447260/0x447c10` and reused by `0x447eb0/0x447f50`
     void* raw08PublicKeyWorkerA8 = nullptr;      // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x47780` and consumed by `0x4474f0`
-    void* replyAuthDataValidatorAC = nullptr;    // original child `+0xac`; sibling validation worker consumed by `0x44aec0` before the `+0xf4` copy is accepted
+    void* replyAuthDataValidatorAC = nullptr;    // original child `+0xac`; sibling validation worker consumed by `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` before the `+0xf4` copy is accepted
 
     // Original child `+0xb0 .. +0xeb` now keeps the narrower `0x448140` success-side prep family
     // explicit as the same three adjacent `0x14`-byte big-int objects the launcher ctor seeds with
@@ -137,29 +131,16 @@ struct AuthBootstrap680ChildSketch {
     AuthBootstrap680BigIntObject20Scaffold privateExponentBigIntD8{}; // original child `+0xd8`
 
     uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
-    void* authReplyParseObjectF0 = nullptr;      // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x449c0`, and `0x44900` later releases it
+    void* authReplyParseObjectF0 = nullptr;      // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x449c0`, and `0x44900` later releases it. Current source reserves the exact slot but does not yet materialize that object family.
     void* authReplyCopyShadowF4 = nullptr;       // original child `+0xf4`; reply-derived copied `0x136` block used later by `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`
     AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8 .. +0x100`; full three-dword small-string family whose begin pointer is surfaced by owner vtable `+0x60 / 0x41f3c0`
     uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; surfaced by owner vtable `+0x58 / 0x41f390`
     std::array<uint8_t, 3> padding105{};         // original child `+0x105 .. +0x107`
     void* opaqueReplyBlob108 = nullptr;          // original child `+0x108`; copied by `0x441170` from one opaque raw-`0x0b` parse-object blob family
     void* opaqueReplyBlob10C = nullptr;          // original child `+0x10c`; copied by `0x441170` from a second opaque raw-`0x0b` parse-object blob family
-    uint32_t field110 = 0;                       // original child `+0x110`; `0x43f300` writes it from raw-`0x0b` parse inner +0x07 before the one-time success gate
-    uint32_t field114 = 0;                       // original child `+0x114`; `0x441260` writes it from raw-`0x0b` parse inner +0x15 inside the one-time success gate
-    uint32_t field118 = 0;                       // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
-
-    // Source-owned companions below are not part of the original launcher child layout. They only
-    // keep heap-backed payload ownership and one-time source scaffolding adjacent to the child so
-    // that this area no longer needs a separate mediator-keyed side store.
-    AuthBootstrap680WorkerPresenceScaffold raw08PublicKeyWorkerA8Owned{};
-    AuthBootstrap680WorkerPresenceScaffold replyAuthDataValidatorACOwned{};
-    std::unique_ptr<AuthBootstrapReplyCopyShadowF4Sketch> authReplyCopyShadowF4Owned;
-    std::vector<uint32_t> modulusBigIntB0OwnedDigits;
-    std::vector<uint32_t> publicExponentBigIntC4OwnedDigits;
-    std::vector<uint32_t> privateExponentBigIntD8OwnedDigits;
-    bool state2AuthReplySuccessOneTimeSideEffectsComplete = false;
-    std::vector<uint8_t> opaqueReplyBlob108Owned;
-    std::vector<uint8_t> opaqueReplyBlob10COwned;
+    uint32_t authReplySuccessHeaderDword07_110 = 0;                       // original child `+0x110`; `0x43f300` writes it from raw-`0x0b` parse inner +0x07 before the one-time success gate
+    uint32_t authReplySuccessField15_114 = 0;                       // original child `+0x114`; `0x441260` writes it from raw-`0x0b` parse inner +0x15 inside the one-time success gate
+    uint32_t authReplySuccessField15Timestamp118 = 0;                       // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
 };
 
 enum AuthBootstrap680InboundAuthResult : uint32_t {
@@ -173,6 +154,8 @@ enum AuthBootstrap680InboundAuthResult : uint32_t {
 };
 
 struct AuthBootstrap680Ops {
+    static void EraseOwnedState(const CLTLoginMediator* mediator);
+
     static uint32_t PrepareAndDispatch(CLTLoginMediator& mediator);
     static uint32_t HandleInboundAuthMessage(CLTLoginMediator& mediator);
 

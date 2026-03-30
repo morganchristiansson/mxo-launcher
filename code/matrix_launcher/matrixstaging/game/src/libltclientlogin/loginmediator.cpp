@@ -318,6 +318,7 @@ CLTLoginMediator::~CLTLoginMediator() {
     ResetLauncherConnectionBridgeScaffold();
     ClearObserverTree674();
     EraseMarginBootstrapState(this);
+    AuthBootstrap680Ops::EraseOwnedState(this);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2965,7 +2966,7 @@ const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
 }
 
 bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
-    // Exact recovered gate split from `0x433c0 -> 0x44add0`:
+    // Exact recovered gate split from `0x433c0 -> AuthBootstrapReplyCopyShadowF4_IsFresh`:
     // - if child `+0xf4` is null, state5 slot3 takes the helper-state-2 branch
     // - otherwise the copied `0x136` block stays usable only while
     //   `(time(NULL) - child+0x80) < *(uint32_t*)(child+0xf4 + 0xac)`

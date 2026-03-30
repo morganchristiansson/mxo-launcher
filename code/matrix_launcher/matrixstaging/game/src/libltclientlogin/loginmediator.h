@@ -1587,8 +1587,8 @@ private:
     // - `+0xf4` = original reply-derived copied `0x136` block; source now keeps that block as a
     //   wire-faithful shadow so later wrapper/state5 users can read the original `+0x85/+0xa8`
     //   suffix family without re-inventing a semantic object model
-    // - source-owned ownership companions for that child now live adjacent to the child sketch
-    //   itself instead of in a separate mediator-keyed auth-bootstrap side store
+    // - source-owned ownership for heap-backed child helpers now stays outside the embedded child
+    //   sketch so this field can remain closer to the original launcher layout
     AuthBootstrap680ChildSketch authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
