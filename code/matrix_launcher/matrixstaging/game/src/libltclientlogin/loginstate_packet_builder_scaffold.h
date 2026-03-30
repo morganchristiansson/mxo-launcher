@@ -69,7 +69,7 @@ protected:
     }
 
     void ResizePayload(size_t fixedByteCount) {
-        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        mxo::liblttcp::CMessageConnectionMessageStorage* const messageStorage = MessageStorage();
         if (!messageStorage) {
             return;
         }
@@ -77,7 +77,7 @@ protected:
     }
 
     void WritePayloadByte(size_t offset, uint8_t value) {
-        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        mxo::liblttcp::CMessageConnectionMessageStorage* const messageStorage = MessageStorage();
         if (!messageStorage) {
             return;
         }
@@ -88,7 +88,7 @@ protected:
     }
 
     void WritePayloadU16LE(size_t offset, uint16_t value) {
-        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        mxo::liblttcp::CMessageConnectionMessageStorage* const messageStorage = MessageStorage();
         if (!messageStorage) {
             return;
         }
@@ -102,7 +102,7 @@ protected:
     }
 
     void WritePayloadU32LE(size_t offset, uint32_t value) {
-        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        mxo::liblttcp::CMessageConnectionMessageStorage* const messageStorage = MessageStorage();
         if (!messageStorage) {
             return;
         }
@@ -118,7 +118,7 @@ protected:
     }
 
     uint16_t AppendLengthPrefixedString(size_t offsetField, const char* text, size_t bound) {
-        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        mxo::liblttcp::CMessageConnectionMessageStorage* const messageStorage = MessageStorage();
         if (!messageStorage || !text) {
             return 0;
         }
@@ -167,16 +167,16 @@ protected:
     }
 
 private:
-    mxo::liblttcp::CMessageConnectionMessageScaffold* MessageStorage() {
+    mxo::liblttcp::CMessageConnectionMessageStorage* MessageStorage() {
         return messageRef_.messageStorage0c;
     }
 
-    const mxo::liblttcp::CMessageConnectionMessageScaffold* MessageStorage() const {
+    const mxo::liblttcp::CMessageConnectionMessageStorage* MessageStorage() const {
         return messageRef_.messageStorage0c;
     }
 
     mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope_{};
-    mxo::liblttcp::CMessageConnectionMessageRefScaffold messageRef_{};
+    mxo::liblttcp::CMessageConnectionMessageRef messageRef_{};
 };
 
 struct State10Packet0x0aFixedPayload {

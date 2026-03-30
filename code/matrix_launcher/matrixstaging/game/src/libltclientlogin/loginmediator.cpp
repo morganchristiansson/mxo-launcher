@@ -1929,8 +1929,8 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
         connection = EnsureMarginConnectionObject();
     }
 
-    mxo::liblttcp::CMessageConnectionMessageRefScaffold* const messageRef = envelope.messageRef08;
-    mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage =
+    mxo::liblttcp::CMessageConnectionMessageRef* const messageRef = envelope.messageRef08;
+    mxo::liblttcp::CMessageConnectionMessageStorage* const messageStorage =
         messageRef ? messageRef->messageStorage0c : nullptr;
     if (!connection || !messageRef || !messageStorage) {
         return 0u;
@@ -1999,11 +1999,11 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
     if (!packetBytes || packetByteCount == 0u ||
-        packetByteCount > mxo::liblttcp::CMessageConnectionMessageScaffold::kMaxPayloadByteCount) {
+        packetByteCount > mxo::liblttcp::CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
         return 0u;
     }
 
-    mxo::liblttcp::CMessageConnectionMessageRefScaffold messageRef = {};
+    mxo::liblttcp::CMessageConnectionMessageRef messageRef = {};
     messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
     if (!messageRef.messageStorage0c) {
         return 0u;
