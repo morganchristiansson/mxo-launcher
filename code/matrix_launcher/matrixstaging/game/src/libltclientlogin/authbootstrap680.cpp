@@ -80,6 +80,16 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
     return out;
 }
 
+static uint32_t ReadU32LE(const uint8_t* bytes) {
+    if (!bytes) {
+        return 0u;
+    }
+    return static_cast<uint32_t>(bytes[0]) |
+           (static_cast<uint32_t>(bytes[1]) << 8u) |
+           (static_cast<uint32_t>(bytes[2]) << 16u) |
+           (static_cast<uint32_t>(bytes[3]) << 24u);
+}
+
 static void ClearSmallStringMirror(AuthBootstrap680SmallStringMirror& mirror) {
     mirror.owned.clear();
     mirror.begin = nullptr;
@@ -404,10 +414,10 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator) {
-    const auto* authReplyCopyShadowF4 =
-        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
-            mediator.authBootstrapChild680_.authReplyCopyShadowF4);
-    void* value = authReplyCopyShadowF4 ? authReplyCopyShadowF4->raw08PublicKeyWorkerA8 : nullptr;
+    // The reply-derived `+0xf4` copy block is now modeled as wire-shaped bytes.
+    // Keep this wrapper-facing helper on the original child `+0xa8` worker slot instead of
+    // re-inventing a pointer meaning inside the copied `0x136` blob.
+    void* value = mediator.authBootstrapChild680_.raw08PublicKeyWorkerA8;
 
     if (!mediator.bootstrapRaw08AuxHandle50Logged_ || mediator.lastBootstrapRaw08AuxHandle50_ != value) {
         spdlog::info(
@@ -423,11 +433,7 @@ void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& med
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
 bool AuthBootstrap680Ops::HasBootstrapRaw08AuxHandle54(const CLTLoginMediator& mediator) {
-    const auto* authReplyCopyShadowF4 =
-        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
-            mediator.authBootstrapChild680_.authReplyCopyShadowF4);
-    const bool present =
-        authReplyCopyShadowF4 && authReplyCopyShadowF4->raw08PublicKeyWorkerA8 != nullptr;
+    const bool present = mediator.authBootstrapChild680_.raw08PublicKeyWorkerA8 != nullptr;
     spdlog::debug(
         "CLTLoginMediator::HasBootstrapRaw08AuxHandle54(+0x54) -> {}",
         present ? 1u : 0u);
@@ -771,9 +777,8 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseSc
         CopyPrefix16(buildResult.decryptedChallengeBytes);
 }
 
-// UNANCHORED: source-owned owner+0x680 auth-reply copy-shadow update for later `+0x50/+0x5c`
-// exposure. Original child `+0xf4` points at a reply-derived copied `0x136` block; current source
-// keeps only the narrower exposed `+0x85/+0xa8` suffix family shadow there.
+// UNANCHORED: source-owned owner+0x680 auth-reply copy-shadow update for later `+0xf4`
+// consumers such as `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
@@ -786,26 +791,39 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
     }
 
     if (reply.isErrorReply || !reply.valid || !reply.hasAuthDataMarker ||
-        reply.authDataMarker != 0x0136u || child.raw08PublicKeyWorkerA8 == nullptr) {
+        reply.authDataMarker != 0x0136u ||
+        reply.authSignatureBytes.size() != AuthBootstrapReplyCopyShadowF4Sketch{}.authSignature04.size() ||
+        reply.signedData.rawBytes.size() != AuthBootstrapReplyCopyShadowF4Sketch{}.signedData80.size()) {
         return;
     }
 
     AuthBootstrap680ChildSidecarState& materializedSidecar =
         MutableAuthBootstrap680ChildSidecar(&mediator);
-    materializedSidecar.authReplyCopyShadowF4.material85 = child.challengeMaterial85;
-    materializedSidecar.authReplyCopyShadowF4.raw08PublicKeyWorkerA8 = child.raw08PublicKeyWorkerA8;
-    child.authReplyCopyShadowF4 = &materializedSidecar.authReplyCopyShadowF4;
+    AuthBootstrapReplyCopyShadowF4Sketch& copyShadow = materializedSidecar.authReplyCopyShadowF4;
+    copyShadow = {};
+    copyShadow.firstWord00 = 3u;
+    copyShadow.authDataMarker02 = reply.authDataMarker;
+    std::copy(
+        reply.authSignatureBytes.begin(),
+        reply.authSignatureBytes.end(),
+        copyShadow.authSignature04.begin());
+    std::copy(
+        reply.signedData.rawBytes.begin(),
+        reply.signedData.rawBytes.end(),
+        copyShadow.signedData80.begin());
+    child.authReplyCopyShadowF4 = &copyShadow;
 
     spdlog::info(
-        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold challengeMaterial85='{}' raw08PublicKeyWorker={} authDataMarker=0x{:04x} childStringF8Begin={} childStringF8Len={}",
+        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} firstWord00=0x{:04x} authDataMarker02=0x{:04x} signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' childTimestamp80=0x{:08x}",
+        static_cast<unsigned>(sizeof(copyShadow)),
+        static_cast<unsigned>(copyShadow.firstWord00),
+        static_cast<unsigned>(copyShadow.authDataMarker02),
+        static_cast<unsigned>(ReadU32LE(copyShadow.signedData80.data() + 0x2cu)),
         BuildHexPreview(
-            materializedSidecar.authReplyCopyShadowF4.material85.data(),
-            materializedSidecar.authReplyCopyShadowF4.material85.size(),
-            materializedSidecar.authReplyCopyShadowF4.material85.size()),
-        fmt::ptr(materializedSidecar.authReplyCopyShadowF4.raw08PublicKeyWorkerA8),
-        static_cast<unsigned>(reply.authDataMarker),
-        fmt::ptr(SmallStringMirrorDataOrEmpty(child.stringF8)),
-        static_cast<unsigned>(SmallStringMirrorLength(child.stringF8)));
+            copyShadow.signedData80.data() + 0x52u,
+            16u,
+            16u),
+        static_cast<unsigned>(child.timestamp80));
 }
 
 // UNANCHORED: source-owned narrower mirror of the pre-gate `0x43f300` neighboring helper call

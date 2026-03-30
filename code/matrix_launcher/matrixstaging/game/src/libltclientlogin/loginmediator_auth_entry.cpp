@@ -376,10 +376,26 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         authConnectionContextScaffold_,
         marginConnectionContextScaffold_);
 
+    // Current replacement-side fidelity correction:
+    // - the later existing-character state8 path still needs the earlier auth/bootstrap child at
+    //   owner `+0x680` to materialize the reply-derived `+0xf4` copy block used by the now-proven
+    //   state5 `0x41b500 -> 0x41ce80 -> 0x441f30` path
+    // - so launcher auto-begin must re-enter helper/state 2 first, not treat raw auth connect
+    //   success as sufficient on its own
+    CLTLoginState* const upstreamState = currentState_;
+    CLTLoginState* const state2 = scaffoldState2_;
     spdlog::info(
-        "ROUTE CHECKPOINT: launcher bridge auto-begin auth from currentState={}",
-        currentState_ ? currentState_->DebugName() : "<null>");
-    const uint32_t result = BeginAuthConnectionViaState1Scaffold();
+        "ROUTE CHECKPOINT: launcher bridge auto-begin auth via state2 currentState={} upstreamState={} state2Registered={}",
+        currentState_ ? currentState_->DebugName() : "<null>",
+        upstreamState ? upstreamState->DebugName() : "<null>",
+        state2 ? 1u : 0u);
+    const uint32_t result = state2 != nullptr
+        ? SwitchHelperStateAndDispatchSlot3Scaffold(
+              2u,
+              state2,
+              upstreamState,
+              "BeginLauncherAuthConnectionScaffold -> helper2/auth-bootstrap continuation")
+        : BeginAuthConnectionViaState1Scaffold();
     if (context) {
         context->sidecarConnection = AuthConnection();
     }
@@ -1031,6 +1047,14 @@ uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
 uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
     lastAuthConnectStatus_ = workResultCode;
     ++authConnectStatusCount_;
+    if (authConnection_ != nullptr &&
+        ((workResultCode == 0u &&
+          authConnection_->State() == mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
+         workResultCode == kConnectStatusSuccess)) {
+        // Current source now re-enters helper/state 2 on auth connect success, so mirror the
+        // owner-side `+0x18 -> +0x34 == 2` ready state before state2 runs its `0x41b490` gate.
+        authConnection_->SetState(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+    }
     return ContinueRecordedAuthConnectStatusScaffold();
 }
 

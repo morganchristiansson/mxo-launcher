@@ -1379,12 +1379,10 @@ public:
     uint32_t State6UdpSessionSecretF18() const;
     void SetState6UdpSessionSecretF18(uint32_t value);
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50
-    // Later runtime uses the auth-reply-derived bootstrap `+0xf4` copy, not the earlier direct
-    // child `+0xa8` worker slot.
-    // Current tighter read:
-    // - original child `+0xf4` = reply-derived copied `0x136` block materialized by `0x448140`
-    // - current source keeps only a narrowed shadow of that copied block's exposed `+0x85/+0xa8`
-    //   suffix family
+    // Wrapper-facing helper related to the owner `+0x680` auth/bootstrap child.
+    // Newer `0x448140` tightening now keeps the reply-derived `+0xf4` copy as wire-shaped bytes,
+    // so current source leaves this accessor on the original child `+0xa8` worker slot instead of
+    // inventing a pointer semantic inside the copied `0x136` blob.
     void* BootstrapRaw08AuxHandle50() const override;
     const char* CharacterNameBufferF1c() { return postAuthMarginLoadingState_.characterNameBufferF1c; }
     const std::array<uint32_t, 8>& CharacterFlagsF48() { return postAuthMarginLoadingState_.characterFlagsF48; }
@@ -1412,6 +1410,10 @@ public:
     uint32_t& ReplySectionData13d0() { return postAuthMarginLoadingState_.replySectionData13d0; }
     uint8_t& CharacterRouteIndexCc8() { return postAuthMarginLoadingState_.characterRouteIndexCc8; }
     const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
+    // anchor: launcher.exe:0x004433c0 / 0x0044add0
+    // Returns whether the owner `+0x680 +0xf4` auth-reply-derived `0x136` copy block is present
+    // and still fresh enough for the state5 copy/send path.
+    bool HasValidState5ReplyCopyShadowF4Scaffold() const;
 
 private:
     uint32_t SendAuthGetPublicKeyRequest();

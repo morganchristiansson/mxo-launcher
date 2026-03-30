@@ -180,8 +180,22 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
             }
 
             CLTLoginState* nextState = LookupRegisteredScaffoldStateByPhaseCode(mediator, nextHelperStateId);
+            uint32_t switchDispatchResult = 0u;
             if (nextState != nullptr) {
-                mediator->SwitchHelperStateScaffold(nextHelperStateId, nextState);
+                if (nextHelperStateId == 8u) {
+                    // Current existing-character bridge refinement:
+                    // once early auth reply success has rebuilt the owner auth/bootstrap state,
+                    // re-enter state8 slot 3 immediately so the now-proven margin-connect
+                    // continuation can begin from the restored helper instead of stalling at the
+                    // bare helper install.
+                    switchDispatchResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+                        nextHelperStateId,
+                        nextState,
+                        this,
+                        "State2 raw-0x0b success -> existing-character state8 margin continuation");
+                } else {
+                    mediator->SwitchHelperStateScaffold(nextHelperStateId, nextState);
+                }
             } else {
                 spdlog::warn(
                     "CLTLoginState_AuthenticatePending::AuthMessageDispatch could not resolve registered helper state 0x{:02x} from cachedUpstream={} currentState={} after raw-0x0b success",
@@ -191,12 +205,13 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
             }
             mediator->PostEventScaffold(5u);
             spdlog::info(
-                "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} event=0x05",
+                "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05",
                 static_cast<unsigned>(rawCode),
                 static_cast<unsigned>(mediator->WorldListCountOrStatus80()),
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(nextHelperStateId),
-                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+                static_cast<unsigned>(switchDispatchResult));
             return 1u;
         }
 

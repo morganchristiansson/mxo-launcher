@@ -2714,17 +2714,20 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             marginBootstrapState.marginSessionId = reply.sessionId;
             marginBootstrapState.phase = MarginBootstrapPhase::kReady;
 
-            // Narrow live mirror of the anchored state6 opcode-`9` success core:
-            // - original `0x00440780` writes owner byte `+0xf14 = 1`
-            // - then writes owner dword `+0xf18 = parsedReply(+0x09)`
-            // - current best field read for that source dword is the opcode-`9`
-            //   `UDPSessionSecret` / session-id value
-            // Keep the live mirror limited to that proven write pair here; broader state6 wrapper
-            // behavior (metric-id list processing, cached-upstream helper-switch/event flow, opcode-7
-            // branch) remains source-owned but is not re-entered on the deliberate runtime path yet.
-            postAuthMarginLoadingState_.state10SendGateFlagF14 = 1u;
-            SetState6UdpSessionSecretF18(reply.sessionId);
-            const uint32_t state6Handled = 1u;
+            // Newer runtime proof now makes the preferred existing-character continuation tighter:
+            // - after the state5/type-1 copy path and the code-4 local completion re-entry,
+            //   original reaches state6 slot 6 on opcode-`9` before restoring state8
+            // - keep that route preferred here when helper/state 6 is active
+            uint32_t state6Handled = 0u;
+            if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 6u) {
+                state6Handled = currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
+            }
+
+            if (state6Handled == 0u) {
+                // Bounded fallback for the still-partly-source-owned non-state6 routes.
+                postAuthMarginLoadingState_.state10SendGateFlagF14 = 1u;
+                SetState6UdpSessionSecretF18(reply.sessionId);
+            }
 
             expectedMarginRequestName_ =
                 (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u)
@@ -2742,6 +2745,9 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 postAuthMarginLoadingState_.state10SendGateFlagF14,
                 State6UdpSessionSecretF18(),
                 currentState_ ? currentState_->DebugName() : "<null>");
+            if (state6Handled != 0u) {
+                return state6Handled;
+            }
             return currentState_ ? currentState_->Slot3_BeginOrContinue(currentState_, this) : 1u;
         }
 
@@ -2806,6 +2812,26 @@ void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mx
 
 const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
     return authBootstrapChild680_.authReplyCopyShadowF4;
+}
+
+bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
+    // Exact recovered gate split from `0x433c0 -> 0x44add0`:
+    // - if child `+0xf4` is null, state5 slot3 takes the helper-state-2 branch
+    // - otherwise the copied `0x136` block stays usable only while
+    //   `(time(NULL) - child+0x80) < *(uint32_t*)(child+0xf4 + 0xac)`
+    const auto* copyShadow =
+        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(authBootstrapChild680_.authReplyCopyShadowF4);
+    if (copyShadow == nullptr) {
+        return false;
+    }
+
+    const uint32_t expiryTimeAc = ReadU32LE(copyShadow->signedData80.data() + 0x2cu);
+    const std::time_t now = std::time(nullptr);
+    const uint32_t ageSinceGetPublicKey =
+        (now > static_cast<std::time_t>(authBootstrapChild680_.timestamp80))
+            ? static_cast<uint32_t>(now - static_cast<std::time_t>(authBootstrapChild680_.timestamp80))
+            : 0u;
+    return ageSinceGetPublicKey < expiryTimeAc;
 }
 
 // UNANCHORED: source-owned table mirror fed from parsed auth reply worlds

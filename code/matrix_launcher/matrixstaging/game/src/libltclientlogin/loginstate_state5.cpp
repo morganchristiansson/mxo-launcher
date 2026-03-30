@@ -114,20 +114,21 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     const auto* authReplyCopyShadowF4 =
         static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
             mediator->AuthBootstrapReplyCopyShadowF4Scaffold());
-    const bool helper680Ready = (authReplyCopyShadowF4 == nullptr);
-    if (helper680Ready) {
+    const bool replyCopyShadowStillValid = mediator->HasValidState5ReplyCopyShadowF4Scaffold();
+    if (!replyCopyShadowStillValid) {
         CLTLoginState* nextState = mediator->ScaffoldState2();
         const uint32_t switchDispatchResult = nextState
             ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
                   2u,
                   nextState,
                   this,
-                  "State5 slot3 helper680-ready -> helper2 continuation")
+                  "State5 slot3 missing-or-expired owner+0x680+0xf4 copy block -> helper2 continuation")
             : 0u;
         spdlog::info(
-            "CLTLoginState_State5::Slot3_BeginOrContinue helper680Ready=1 cachedUpstream={} incomingUpstream={} currentState={} -> helper2 switchDispatchResult=0x{:08x}",
+            "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=0 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} currentState={} -> helper2 switchDispatchResult=0x{:08x}",
             fmt::ptr(cachedUpstreamOrArg_),
             fmt::ptr(upstreamOrArg),
+            fmt::ptr(authReplyCopyShadowF4),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
             static_cast<unsigned>(switchDispatchResult));
         return switchDispatchResult;
@@ -145,7 +146,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             : 0u;
     mediator->PostEventScaffold(0x10u);
     spdlog::info(
-        "CLTLoginState_State5::Slot3_BeginOrContinue helper680Ready=0 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} storedReplyCopy={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
+        "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} storedReplyCopy={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
         fmt::ptr(cachedUpstreamOrArg_),
         fmt::ptr(upstreamOrArg),
         fmt::ptr(authReplyCopyShadowF4),

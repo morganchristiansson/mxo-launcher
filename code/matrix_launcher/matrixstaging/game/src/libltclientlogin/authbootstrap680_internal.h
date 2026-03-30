@@ -25,24 +25,26 @@ struct __attribute__((packed)) AuthBootstrapReplyCopyShadowF4Sketch {
     // Source-owned shadow of the original reply-derived `0x136` heap block copied into child
     // `+0xf4` by `0x448140`.
     //
-    // Important ownership split:
-    // - original child `+0xf4` points at the full copied block
-    // - replacement source still only *understands* a narrower suffix family with confidence
-    // - but later margin state5/state6 follow-up work now benefits from preserving the full block
-    //   width structurally so the old `0x41ce80 -> 0x41f30` copy/send path can be modeled without
-    //   pretending every byte is already semantically named
-    //
-    // Current strongest anchored fields inside that copied block are:
-    // - `+0x85 .. +0x94` = shared 16-byte challenge/material family
-    // - `+0xa8`         = raw-`0x08` public-key worker family
-    std::array<uint8_t, 0x85> prefix00{};
-    std::array<uint8_t, 16> material85{};
-    std::array<uint8_t, 0x13> gap95ToA7{};
-    void* raw08PublicKeyWorkerA8 = nullptr;
-    std::array<uint8_t, 0x8a> tailAcTo135{};
+    // Newer `0x448140 / 0x44ae40 / 0x44aec0` tightening materially changes the best read here:
+    // - this blob is no longer modeled as a partly-understood pointer-bearing helper object
+    // - the strongest current read is a wire-shaped `0x136` auth-reply-derived block later copied
+    //   to connection `+0x98` by `0x41ce80` and sent by `0x441f30`
+    // - current recovered layout:
+    //   - `+0x00 .. +0x01` = fixed first word `3`
+    //   - `+0x02 .. +0x03` = `AuthDataMarker` (`0x0136` on the active path)
+    //   - `+0x04 .. +0x7f` = auth-signature bytes (`0x7c` bytes on the active path)
+    //   - `+0x80 .. +0x135` = signed-data bytes (`0xb6` bytes)
+    // - concrete high-value derived offsets inside that signed-data tail:
+    //   - `+0xac` = signed-data expiry-time dword used by `0x44add0 / 0x44aec0`
+    //   - `+0xd1` = low public-exponent byte used by `0x448140`
+    //   - `+0xd2 .. +0x131` = modulus bytes used by `0x448140`
+    uint16_t firstWord00 = 0;
+    uint16_t authDataMarker02 = 0;
+    std::array<uint8_t, 0x7c> authSignature04{};
+    std::array<uint8_t, 0xb6> signedData80{};
 };
-static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, material85) == 0x85);
-static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, raw08PublicKeyWorkerA8) == 0xa8);
+static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, authSignature04) == 0x04);
+static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, signedData80) == 0x80);
 static_assert(sizeof(AuthBootstrapReplyCopyShadowF4Sketch) == 0x136);
 
 struct AuthBootstrap680ChildSketch {
@@ -103,7 +105,7 @@ struct AuthBootstrap680ChildSketch {
 
     uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
     void* fieldF0 = nullptr;                     // original child `+0xf0`; broader raw-`0x0b` parse object family still not source-owned tightly enough
-    void* authReplyCopyShadowF4 = nullptr;       // original child `+0xf4`; original points at the reply-derived copied `0x136` block, current source keeps a narrowed `AuthBootstrapReplyCopyShadowF4Sketch` shadow there
+    void* authReplyCopyShadowF4 = nullptr;       // original child `+0xf4`; reply-derived copied `0x136` block used later by `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`
     AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8`; small-string family whose begin pointer is surfaced by owner vtable `+0x60 / 0x41f3c0`
     void* fieldFC = nullptr;                     // original child `+0xfc`
     void* field100 = nullptr;                    // original child `+0x100`
