@@ -10,7 +10,7 @@ namespace mxo::ltlogin {
 
 struct State11Packet0x4dFixedPayload {
     // anchor: launcher.exe:0x43a470 / packet payload tag written after the outer builder reserves
-    // a fixed 0x4d-byte payload span through the shared envelope object.
+    // a fixed 0x4d-byte payload span through the retained message-ref's inner storage.
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
     // raw margin opcode `0x0c` = `MS_CreateCharacterRequest`
     static constexpr uint8_t kPayloadTag0c = 0x0c;
@@ -25,32 +25,41 @@ struct State11Packet0x4dFixedPayload {
 class RecoveredPacketBuilderEnvelope {
 public:
     // anchor: launcher.exe:0x439840
-    RecoveredPacketBuilderEnvelope()
-        : envelope_(mxo::liblttcp::CMessageConnection::BuildPacketBuilderEnvelopeScaffold(/*headerless=*/false)) {
-        // Current best source-owned mirror of the local helper object initialized by `0x439840`:
-        // - acquires/installs a shared payload object through the `0x455cd0 -> 0x455c60 -> 0x455bd0`
-        //   family
-        // - stores the active payload write base as `shared + 0x0c`
-        // - original local envelope layout is now a little tighter from disassembly:
-        //   - `this+0x08` = retained shared packet/message object
-        //   - `this+0x04` = base payload pointer (`shared + 0x0c`)
-        //   - state-specific builders then cache string-reservation pointers/lengths in later
-        //     helper-local fields before `0x41af70` forwards the whole envelope object
+    RecoveredPacketBuilderEnvelope() {
+        // Current tighter local builder mirror:
+        // - `0x439840` retains a live outer message-ref object through `0x455cd0 -> 0x455c60`
+        // - caches payload base at envelope `+0x04`
+        // - stores the retained message-ref at envelope `+0x08`
+        // Source keeps only that recovered raw front matter explicit here and leaves the larger
+        // state-specific helper-local reservation fields modeled by the higher-level builder
+        // methods instead of a shared_ptr-first shell.
+        messageRef_.ResetForPacketBuilderScaffold(/*headerless=*/false);
+        envelope_.payloadBase04 = MessageStorage() ? MessageStorage()->PayloadBaseScaffold() : nullptr;
+        envelope_.messageRef08 = &messageRef_;
     }
 
+    RecoveredPacketBuilderEnvelope(const RecoveredPacketBuilderEnvelope&) = delete;
+    RecoveredPacketBuilderEnvelope& operator=(const RecoveredPacketBuilderEnvelope&) = delete;
+    RecoveredPacketBuilderEnvelope(RecoveredPacketBuilderEnvelope&&) = delete;
+    RecoveredPacketBuilderEnvelope& operator=(RecoveredPacketBuilderEnvelope&&) = delete;
+
     uint8_t* PayloadBase() {
-        return envelope_.sharedMessage ? envelope_.sharedMessage->PayloadBaseScaffold() : nullptr;
+        return MessageStorage() ? MessageStorage()->PayloadBaseScaffold() : nullptr;
     }
 
     const uint8_t* PayloadBase() const {
-        return envelope_.sharedMessage ? envelope_.sharedMessage->PayloadBaseScaffold() : nullptr;
+        return MessageStorage() ? MessageStorage()->PayloadBaseScaffold() : nullptr;
     }
 
     uint32_t PayloadByteCount() const {
-        return envelope_.sharedMessage ? envelope_.sharedMessage->PayloadByteCountScaffold() : 0u;
+        return MessageStorage() ? MessageStorage()->PayloadByteCountScaffold() : 0u;
     }
 
-    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold& EnvelopeScaffold() const {
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& EnvelopeScaffold() {
+        return envelope_;
+    }
+
+    const mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& EnvelopeScaffold() const {
         return envelope_;
     }
 
@@ -60,28 +69,31 @@ protected:
     }
 
     void ResizePayload(size_t fixedByteCount) {
-        if (!envelope_.sharedMessage) {
+        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        if (!messageStorage) {
             return;
         }
-        envelope_.sharedMessage->ResetPayloadByteCountScaffold(static_cast<uint16_t>(fixedByteCount));
+        messageStorage->ResetPayloadByteCountScaffold(static_cast<uint16_t>(fixedByteCount));
     }
 
     void WritePayloadByte(size_t offset, uint8_t value) {
-        if (!envelope_.sharedMessage) {
+        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        if (!messageStorage) {
             return;
         }
-        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
-        if (payloadBytes && offset < envelope_.sharedMessage->PayloadByteCountScaffold()) {
+        uint8_t* payloadBytes = messageStorage->PayloadBaseScaffold();
+        if (payloadBytes && offset < messageStorage->PayloadByteCountScaffold()) {
             payloadBytes[offset] = value;
         }
     }
 
     void WritePayloadU16LE(size_t offset, uint16_t value) {
-        if (!envelope_.sharedMessage) {
+        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        if (!messageStorage) {
             return;
         }
-        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
-        const uint16_t payloadByteCount = envelope_.sharedMessage->PayloadByteCountScaffold();
+        uint8_t* payloadBytes = messageStorage->PayloadBaseScaffold();
+        const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
         if (!payloadBytes || offset + 1 >= payloadByteCount) {
             return;
         }
@@ -90,11 +102,12 @@ protected:
     }
 
     void WritePayloadU32LE(size_t offset, uint32_t value) {
-        if (!envelope_.sharedMessage) {
+        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        if (!messageStorage) {
             return;
         }
-        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
-        const uint16_t payloadByteCount = envelope_.sharedMessage->PayloadByteCountScaffold();
+        uint8_t* payloadBytes = messageStorage->PayloadBaseScaffold();
+        const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
         if (!payloadBytes || offset + 3 >= payloadByteCount) {
             return;
         }
@@ -105,7 +118,8 @@ protected:
     }
 
     uint16_t AppendLengthPrefixedString(size_t offsetField, const char* text, size_t bound) {
-        if (!envelope_.sharedMessage || !text) {
+        mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage = MessageStorage();
+        if (!messageStorage || !text) {
             return 0;
         }
 
@@ -114,8 +128,8 @@ protected:
             ++textLengthWithoutNul;
         }
 
-        const uint16_t currentPayloadByteCount = envelope_.sharedMessage->PayloadByteCountScaffold();
-        const uint16_t remainingAfterLength = envelope_.sharedMessage->RemainingAppendableByteCountScaffold();
+        const uint16_t currentPayloadByteCount = messageStorage->PayloadByteCountScaffold();
+        const uint16_t remainingAfterLength = messageStorage->RemainingAppendableByteCountScaffold();
         if (remainingAfterLength < 2u) {
             return 0;
         }
@@ -124,30 +138,45 @@ protected:
         // - reserve helper is passed the source string length **including** the terminating NUL
         // - even an empty-but-non-null string therefore still reserves one content byte plus the
         //   two-byte length field
-        const uint16_t storedLength = static_cast<uint16_t>(std::min<size_t>(textLengthWithoutNul + 1u, remainingAfterLength - 2u));
+        const uint16_t storedLength = static_cast<uint16_t>(
+            std::min<size_t>(textLengthWithoutNul + 1u, remainingAfterLength - 2u));
         const uint16_t requestedGrowth = static_cast<uint16_t>(storedLength + 2u);
-        const uint16_t newPayloadByteCount = envelope_.sharedMessage->GrowPayloadByteCountScaffold(requestedGrowth);
+        const uint16_t newPayloadByteCount =
+            messageStorage->GrowPayloadByteCountScaffold(requestedGrowth);
         if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
             return 0;
         }
 
-        uint8_t* payloadBytes = envelope_.sharedMessage->PayloadBaseScaffold();
+        uint8_t* payloadBytes = messageStorage->PayloadBaseScaffold();
         if (!payloadBytes) {
             return 0;
         }
 
         WritePayloadU16LE(offsetField, currentPayloadByteCount);
         payloadBytes[currentPayloadByteCount + 0u] = static_cast<uint8_t>(storedLength & 0xffu);
-        payloadBytes[currentPayloadByteCount + 1u] = static_cast<uint8_t>((storedLength >> 8) & 0xffu);
+        payloadBytes[currentPayloadByteCount + 1u] =
+            static_cast<uint8_t>((storedLength >> 8) & 0xffu);
         if (storedLength > 1u) {
-            std::copy_n(text, storedLength - 1u, reinterpret_cast<char*>(payloadBytes + currentPayloadByteCount + 2u));
+            std::copy_n(
+                text,
+                storedLength - 1u,
+                reinterpret_cast<char*>(payloadBytes + currentPayloadByteCount + 2u));
         }
         payloadBytes[currentPayloadByteCount + 2u + storedLength - 1u] = 0u;
         return storedLength;
     }
 
 private:
-    mxo::liblttcp::CMessageConnectionEnvelopeScaffold envelope_;
+    mxo::liblttcp::CMessageConnectionMessageScaffold* MessageStorage() {
+        return messageRef_.messageStorage0c;
+    }
+
+    const mxo::liblttcp::CMessageConnectionMessageScaffold* MessageStorage() const {
+        return messageRef_.messageStorage0c;
+    }
+
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold envelope_{};
+    mxo::liblttcp::CMessageConnectionMessageRefScaffold messageRef_{};
 };
 
 struct State10Packet0x0aFixedPayload {

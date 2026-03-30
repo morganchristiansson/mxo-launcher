@@ -447,8 +447,8 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //   - append `GameSessionID` through `0x43ada0`
     //     - newer `0x43acf0 + 0x4557b0` tightening now makes the growth rule explicit:
     //       reserve `(GameSessionID byte count including NUL) + 2` bytes at the tail of the
-    //       shared message object, write the resulting payload-relative offset back to fixed field
-    //       `+0xb9`, then copy the text into that reservation
+    //       retained message-ref's inner storage, write the resulting payload-relative offset back
+    //       to fixed field `+0xb9`, then copy the text into that reservation
     //     - but fresh original-launcher WineDbg validation on the natural first state8 send now
     //       shows owner `+0x664` / `GetGameSessionId()` returning `""` there
     //     - practical consequence: the natural `0x0bb -> 0x13b` growth is **not** explained by a
@@ -458,8 +458,8 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //       it does not serialize raw bytes itself
     //       it forwards the stack-local packet-envelope object into current margin connection
     //       vtable `+0x24` / `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
-    //       and that wrapper then forwards the envelope's shared packet/message object into
-    //       vtable `+0x28` / inherited `CMessageConnection::SendPacket` (`0x448cf0`)
+    //       and that wrapper then forwards envelope `+0x08` (the retained outer message-ref)
+    //       into vtable `+0x28` / inherited `CMessageConnection::SendPacket` (`0x448cf0`)
     //   - post event `9`
     // Practical current boundary from the newest original-launcher runs:
     // - natural original reaches this sender, crosses the `0x41af70/0x41cf30` send bridge, and

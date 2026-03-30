@@ -1314,16 +1314,17 @@ public:
     // `+0x24`.
     // Newer Ghidra tightening now makes that two-step downstream bridge more concrete:
     // - `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
-    // - that wrapper forwards the envelope's shared packet/message object into
+    // - that wrapper forwards envelope `+0x08` (the retained outer message-ref object) into
     //   `+0x28` = inherited `CMessageConnection::SendPacket` / `0x448cf0`
-    // - `0x448cf0` consumes a message/envelope object, not bare payload bytes
-    // Current source helper is therefore intentionally narrower/scaffold-only: it now wraps the
-    // recovered payload bytes in a source-owned envelope/message scaffold that matches the
-    // original `0x448a00` byte-derivation shape more closely, but it still does not reconstruct
-    // the original packet-envelope metadata / agenda semantics that sit between `0x43bd20` and a
-    // later natural `0x43f930`.
+    // - `0x448cf0` consumes that message-ref object, not bare payload bytes
+    // Current source helper is therefore intentionally narrower/scaffold-only:
+    // - local builder front matter now stays raw-first (`+0x04` payload base, `+0x08` message-ref)
+    // - `0x448cf0` consumption now happens on that retained message-ref object rather than a
+    //   shared_ptr-owned convenience shell
+    // - helper-side packet-agenda replacement/discard and the larger builder-local metadata tails
+    //   beyond that front matter still remain incomplete
     uint32_t SendCurrentMarginPacketScaffold(
-        const mxo::liblttcp::CMessageConnectionEnvelopeScaffold& envelope);
+        mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& envelope);
     uint32_t SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount);
 
     // anchor: launcher.exe:0x41e500

@@ -221,6 +221,26 @@ const uint8_t* CMessageConnectionMessageScaffold::PayloadBaseScaffold() const {
     return payloadBytes0c.data();
 }
 
+void CMessageConnectionReceivedMessageRefScaffold::ResetForPacketBuilderScaffold(
+    bool headerless,
+    uint32_t messageContext14) {
+    // anchor: launcher.exe:0x455cd0 / 0x455c60
+    vtable00 = g_CMessageConnectionReceivedMessageRefVtable;
+    referenceCount04 = 1;
+    field08 = 0u;
+    messageStorage0c = nullptr;
+    headerless10 = headerless ? 1u : 0u;
+    padding11_13[0] = 0u;
+    padding11_13[1] = 0u;
+    padding11_13[2] = 0u;
+    this->messageContext14 = messageContext14;
+    field18 = 0u;
+    field1c = 0u;
+    field20 = 0u;
+    ownedMessageStorageScaffold24 = {};
+    ownedMessageStorageScaffold24.ResetForPacketBuilderScaffold();
+    messageStorage0c = &ownedMessageStorageScaffold24;
+}
 
 const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family) {
     switch (family) {
@@ -295,47 +315,65 @@ const CMessageConnectionPacketAgendaScaffold* CMessageConnection::PacketAgendaSc
     return packetAgendaScaffold_.get();
 }
 
-// Source-owned launcher-only bridge for the narrowed margin send-authenticity gap.
-// Mirrors the now-recovered original split between:
-// - local packet-envelope object (`0x41af70` / `0x41cf30`)
-// - shared message object consumed by `0x448cf0 -> 0x448a00`
-CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPacketBuilderEnvelopeScaffold(bool headerless) {
-    CMessageConnectionEnvelopeScaffold envelope = {};
-    envelope.sharedMessage = std::make_shared<CMessageConnectionMessageScaffold>();
-    if (!envelope.sharedMessage) {
-        return envelope;
+static void CMessageConnection_ApplySendMessageRefMutationsScaffold(
+    CMessageConnectionMessageRefScaffold* messageRef) {
+    if (!messageRef || messageRef->headerless10 == 0u || !messageRef->messageStorage0c) {
+        return;
     }
 
-    envelope.sharedMessage->ResetForPacketBuilderScaffold();
-    envelope.headerless10 = headerless ? 1u : 0u;
-    return envelope;
+    // anchor: launcher.exe:0x448cf0
+    // The send-mode branch tests inner `+0x12` (`payload + 0x06`) and, only when that dword is
+    // still zero, writes:
+    // - inner `+0x12 .. +0x15` = 00 00 00 00
+    // - inner `+0x16` = 0xff
+    // - inner `+0x17` = 0xff
+    CMessageConnectionMessageScaffold& messageStorage = *messageRef->messageStorage0c;
+    uint8_t* const payloadBase = messageStorage.PayloadBaseScaffold();
+    if (!payloadBase) {
+        return;
+    }
+
+    const uint32_t locatorDword06 =
+        static_cast<uint32_t>(payloadBase[6]) |
+        (static_cast<uint32_t>(payloadBase[7]) << 8u) |
+        (static_cast<uint32_t>(payloadBase[8]) << 16u) |
+        (static_cast<uint32_t>(payloadBase[9]) << 24u);
+    if (locatorDword06 != 0u) {
+        return;
+    }
+
+    std::fill_n(payloadBase + 6u, 4u, 0u);
+    payloadBase[10] = 0xffu;
+    payloadBase[11] = 0xffu;
 }
 
-CMessageConnectionEnvelopeScaffold CMessageConnection::BuildPayloadEnvelopeScaffold(
-    const void* packetData,
-    uint32_t packetByteCount,
-    bool headerless) {
-    CMessageConnectionEnvelopeScaffold envelope = BuildPacketBuilderEnvelopeScaffold(headerless);
-    if (!packetData || packetByteCount == 0u ||
-        packetByteCount > CMessageConnectionMessageScaffold::kMaxPayloadByteCount ||
-        !envelope.sharedMessage) {
-        envelope.sharedMessage.reset();
-        return envelope;
+static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBitScaffold(
+    CMessageConnectionMessageRefScaffold* messageRef) {
+    if (!messageRef || messageRef->headerless10 == 0u || !messageRef->messageStorage0c) {
+        return;
     }
 
-    envelope.sharedMessage->ResetPayloadByteCountScaffold(static_cast<uint16_t>(packetByteCount));
-    uint8_t* payloadBytes = envelope.sharedMessage->PayloadBaseScaffold();
-    if (!payloadBytes) {
-        envelope.sharedMessage.reset();
-        return envelope;
+    // anchor: launcher.exe:0x448cf0
+    // After either submit or agenda discard, original code clears the first payload byte high bit
+    // on the original input message-ref's inner storage at `inner + 0x0c`.
+    uint8_t* const payloadBase = messageRef->messageStorage0c->PayloadBaseScaffold();
+    if (!payloadBase) {
+        return;
     }
-
-    std::copy_n(static_cast<const uint8_t*>(packetData), packetByteCount, payloadBytes);
-    return envelope;
+    payloadBase[0] &= 0x7fu;
 }
 
-const CMessageConnectionEnvelopeScaffold* CMessageConnection::ApplySendPacketAgendaScaffold(
-    const CMessageConnectionEnvelopeScaffold& inputEnvelope,
+// anchor: launcher.exe:0x41cf30
+uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacketScaffold(
+    CMessageConnectionPacketBuilderEnvelopeScaffold& envelope) {
+    if (!envelope.messageRef08) {
+        return 0u;
+    }
+    return SendPacketMessageRefScaffold(*envelope.messageRef08);
+}
+
+CMessageConnectionMessageRefScaffold* CMessageConnection::ApplySendPacketAgendaScaffold(
+    CMessageConnectionMessageRefScaffold& inputMessageRef,
     bool* outAgendaTouched) {
     if (outAgendaTouched) {
         *outAgendaTouched = false;
@@ -343,22 +381,22 @@ const CMessageConnectionEnvelopeScaffold* CMessageConnection::ApplySendPacketAge
 
     // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
     // Current bounded source model preserves the nearer `0x469950` handoff shape:
-    // - no agenda / no active write helper (`+0x44 == 0`) => keep the original envelope pointer
+    // - no agenda / no active write helper (`+0x44 == 0`) => keep the original message-ref pointer
     // - active write helper => return the agenda write-output slot at `+0x24`
     // Current source still lacks helper-side transformation/discard, so on the active helper path
-    // it seeds that output slot with the same input envelope pointer as a bounded pass-through fallback.
+    // it seeds that output slot with the same input pointer as a bounded pass-through fallback.
     CMessageConnectionPacketAgendaScaffold* agenda = packetAgendaScaffold_.get();
     if (!agenda || !agenda->created) {
-        return &inputEnvelope;
+        return &inputMessageRef;
     }
 
     agenda->hasWriteOutputSlot24 = false;
     agenda->writeOutputSlot24 = nullptr;
     if (agenda->configuredWriteHelperCount == 0u) {
-        return &inputEnvelope;
+        return &inputMessageRef;
     }
 
-    agenda->writeOutputSlot24 = &inputEnvelope;
+    agenda->writeOutputSlot24 = &inputMessageRef;
     agenda->hasWriteOutputSlot24 = (agenda->writeOutputSlot24 != nullptr);
     if (outAgendaTouched) {
         *outAgendaTouched = true;
@@ -367,14 +405,15 @@ const CMessageConnectionEnvelopeScaffold* CMessageConnection::ApplySendPacketAge
 }
 
 // anchor: launcher.exe:0x448a00
-// Narrow source-owned mirror of the lower submit helper beneath the original
-// envelope-based `CMessageConnection::SendPacket` family.
-uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope) {
-    if (!Engine() || !envelope.sharedMessage) {
+// Narrow source-owned mirror of the lower submit helper beneath the original message-ref-based
+// `CMessageConnection::SendPacket` family.
+uint32_t CMessageConnection::SubmitMessageRefBytesScaffold(
+    const CMessageConnectionMessageRefScaffold& messageRef) {
+    if (!Engine() || !messageRef.messageStorage0c) {
         return 0u;
     }
 
-    const CMessageConnectionMessageScaffold& messageStorage = *envelope.sharedMessage;
+    const CMessageConnectionMessageScaffold& messageStorage = *messageRef.messageStorage0c;
     const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
     const uint8_t* const payloadBase = messageStorage.PayloadBaseScaffold();
     if (!payloadBase || payloadByteCount == 0u) {
@@ -383,11 +422,12 @@ uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectio
 
     const uint8_t frameByte0a = messageStorage.payloadLengthHigh0a;
     const size_t pointerOffsetFrom0a = ((frameByte0a >> 7) == 0u) ? 1u : 0u;
-    const uint32_t submittedByteCount = static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
+    const uint32_t submittedByteCount =
+        static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
     const uint8_t* const submittedBytes = payloadBase - 2u + pointerOffsetFrom0a;
 
     spdlog::info(
-        "CMessageConnection::SubmitEnvelopeBytesScaffold reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::SubmitMessageRefBytesScaffold reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(messageStorage.reservedBytes08),
         static_cast<unsigned>(payloadByteCount),
         static_cast<unsigned>(submittedByteCount),
@@ -395,37 +435,46 @@ uint32_t CMessageConnection::SubmitEnvelopeBytesScaffold(const CMessageConnectio
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return Engine()->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), submittedBytes, submittedByteCount, nullptr);
+    return Engine()->SendBufferConnectionScaffold(
+        static_cast<CLTTCPConnection*>(this),
+        submittedBytes,
+        submittedByteCount,
+        nullptr);
 }
 
 // anchor: launcher.exe:0x448cf0
-// Narrow source-owned mirror of the envelope-based `CMessageConnection::SendPacket` family.
-uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope) {
-    if (!Engine() || !envelope.sharedMessage) {
+// Narrow source-owned mirror of the message-ref-based `CMessageConnection::SendPacket` family.
+uint32_t CMessageConnection::SendPacketMessageRefScaffold(
+    CMessageConnectionMessageRefScaffold& messageRef) {
+    if (!Engine() || !messageRef.messageStorage0c) {
         return 0u;
     }
 
+    CMessageConnection_ApplySendMessageRefMutationsScaffold(&messageRef);
+
     bool agendaTouched = false;
-    const CMessageConnectionEnvelopeScaffold* const envelopeForSubmit =
-        ApplySendPacketAgendaScaffold(envelope, &agendaTouched);
-    if (!envelopeForSubmit || !envelopeForSubmit->sharedMessage) {
+    CMessageConnectionMessageRefScaffold* const messageRefForSubmit =
+        ApplySendPacketAgendaScaffold(messageRef, &agendaTouched);
+    if (!messageRefForSubmit || !messageRefForSubmit->messageStorage0c) {
         spdlog::info(
-            "CMessageConnection::SendPacketEnvelopeScaffold discarded packet at packet-agenda write handoff this={} ownerContext={} remoteHost='{}'",
+            "CMessageConnection::SendPacketMessageRefScaffold discarded packet at packet-agenda write handoff this={} ownerContext={} remoteHost='{}'",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBitScaffold(&messageRef);
         return 0u;
     }
 
-    const CMessageConnectionMessageScaffold& messageStorage = *envelopeForSubmit->sharedMessage;
+    const CMessageConnectionMessageScaffold& messageStorage = *messageRefForSubmit->messageStorage0c;
     const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
     const uint8_t* const payloadBytes = messageStorage.PayloadBaseScaffold();
     const uint8_t rawOpcode = (payloadBytes && payloadByteCount != 0u) ? payloadBytes[0] : 0u;
-    const uint32_t submittedByteCount = static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
+    const uint32_t submittedByteCount =
+        static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
     const CMessageConnectionPacketAgendaScaffold* agenda = PacketAgendaScaffold();
     spdlog::info(
-        "CMessageConnection::SendPacketEnvelopeScaffold headerless={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(envelopeForSubmit->headerless10),
+        "CMessageConnection::SendPacketMessageRefScaffold sendMode10={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaReadHelpers={} agendaWriteHelpers={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(messageRefForSubmit->headerless10),
         static_cast<unsigned>(rawOpcode),
         static_cast<unsigned>(messageStorage.reservedBytes08),
         static_cast<unsigned>(payloadByteCount),
@@ -441,7 +490,10 @@ uint32_t CMessageConnection::SendPacketEnvelopeScaffold(const CMessageConnection
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return SubmitEnvelopeBytesScaffold(*envelopeForSubmit);
+
+    const uint32_t sendResult = SubmitMessageRefBytesScaffold(*messageRefForSubmit);
+    CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBitScaffold(&messageRef);
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x448a60
@@ -597,32 +649,8 @@ static const CLTTCPReadOperationFragmentScaffold* CMessageConnection_NextRetaine
 }
 
 // anchor: launcher.exe:0x455cd0 / 0x455c60
-// Source-owned creation of the outer receive/message-ref scaffold that `0x4490c0` materializes
-// before later `0x41bc20/0x41bbb0`-style message-code reads.
-static void CMessageConnection_CreateReceivedMessageRefScaffold(
-    CMessageConnectionReceivedMessageRefScaffold* outMessageRef,
-    bool headerless,
-    uint32_t messageContext14 = 0u) {
-    if (!outMessageRef) {
-        return;
-    }
-
-    outMessageRef->vtable00 = g_CMessageConnectionReceivedMessageRefVtable;
-    outMessageRef->referenceCount04 = 1;
-    outMessageRef->field08 = 0u;
-    outMessageRef->messageStorage0c = nullptr;
-    outMessageRef->headerless10 = headerless ? 1u : 0u;
-    outMessageRef->padding11_13[0] = 0u;
-    outMessageRef->padding11_13[1] = 0u;
-    outMessageRef->padding11_13[2] = 0u;
-    outMessageRef->messageContext14 = messageContext14;
-    outMessageRef->field18 = 0u;
-    outMessageRef->field1c = 0u;
-    outMessageRef->field20 = 0u;
-    outMessageRef->ownedMessageStorageScaffold24 = {};
-    outMessageRef->ownedMessageStorageScaffold24.ResetForPacketBuilderScaffold();
-    outMessageRef->messageStorage0c = &outMessageRef->ownedMessageStorageScaffold24;
-}
+// Source-owned creation/reset of the local outer message-ref scaffold that `0x4490c0`
+// materializes before later `0x41bc20/0x41bbb0`-style message-code reads.
 
 // anchor: launcher.exe:0x4557b0
 // Source-owned append helper mirroring the outer message-ref vtable `+0x18` growth path used by
@@ -1045,9 +1073,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
 
     bool hadUnusedBuffers = false;
     CMessageConnectionReceivedMessageRefScaffold copiedMessageRef = {};
-    CMessageConnection_CreateReceivedMessageRefScaffold(
-        &copiedMessageRef,
-        !packetizedMessagesEnabledScaffold_);
+    copiedMessageRef.ResetForPacketBuilderScaffold(!packetizedMessagesEnabledScaffold_);
     const bool copied = CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
         parsedPacketWorkItem,
         &copiedMessageRef,
@@ -1213,8 +1239,9 @@ bool CMessageConnection::TakeNextReceivedPacketScaffold(
     return true;
 }
 
-// UNANCHORED: source-owned payload-span submit wrapper beneath the original envelope-based
-// `CMessageConnection::SendPacket` family at `0x448cf0 -> 0x448a00`.
+// UNANCHORED: source-owned raw-byte send wrapper used by current auth/bootstrap direct-send
+// callsites; keep it distinct from the local packet-builder/message-ref path at
+// `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00`.
 uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext) {
     if (!Engine() || !packetData || packetByteCount == 0) {
         return 0;
@@ -1529,21 +1556,22 @@ uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold() {
         kNestedReplyCopyLengthFieldByteCount +
         kReplyCopyByteCount;
 
-    CMessageConnectionEnvelopeScaffold envelope =
-        CMessageConnection::BuildPacketBuilderEnvelopeScaffold(false);
-    if (!envelope.sharedMessage) {
+    CMessageConnectionMessageRefScaffold messageRef = {};
+    messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
+    if (!messageRef.messageStorage0c) {
         return 0u;
     }
 
-    envelope.sharedMessage->ResetPayloadByteCountScaffold(kTotalPayloadByteCount);
-    uint8_t* payloadBytes = envelope.sharedMessage->PayloadBaseScaffold();
+    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kTotalPayloadByteCount);
+    uint8_t* payloadBytes = messageRef.messageStorage0c->PayloadBaseScaffold();
     if (!payloadBytes) {
         return 0u;
     }
 
     // Tightest current static read from `0x441f30 -> 0x43a230(0x136)`:
     // - leading raw type-1 prefix bytes `01 00 00`
-    // - `0x43a230` then grows the shared message by `(0x136 + 2)` and points the later copy at
+    // - `0x43a230` then grows the retained message-ref's inner storage by `(0x136 + 2)` and
+    //   points the later copy at
     //   the span immediately after that inner little-endian `0x0136` word
     payloadBytes[0] = 0x01u;
     payloadBytes[1] = 0u;
@@ -1555,7 +1583,7 @@ uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold() {
         bootstrapReplyCopy98Scaffold_.end(),
         payloadBytes + kLeadingType1PrefixByteCount + kNestedReplyCopyLengthFieldByteCount);
 
-    const uint32_t sendResult = SendPacketEnvelopeScaffold(envelope);
+    const uint32_t sendResult = SendPacketMessageRefScaffold(messageRef);
     spdlog::info(
         "CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold sent rawType1PrefixPlusLengthPrefixedReplyCopy payloadBytes=0x{:03x} nestedReplyCopyBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(kTotalPayloadByteCount),

@@ -1919,24 +1919,28 @@ const char* CLTLoginMediator::GetGameSessionId() const {
 
 // anchor: launcher.exe:0x41af70
 uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
-    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold& envelope) {
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& envelope) {
     // anchor: launcher.exe:0x41af70
-    // Keep this narrow: `0x41af70` forwards the shared message/envelope object through the current
+    // Keep this narrow: `0x41af70` forwards the local packet-builder envelope through the current
     // margin connection send bridge (`0x41cf30 -> 0x448cf0`) instead of flattening caller bytes
     // directly.
     mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     if (!connection) {
         connection = EnsureMarginConnectionObject();
     }
-    if (!connection || !envelope.sharedMessage) {
+
+    mxo::liblttcp::CMessageConnectionMessageRefScaffold* const messageRef = envelope.messageRef08;
+    mxo::liblttcp::CMessageConnectionMessageScaffold* const messageStorage =
+        messageRef ? messageRef->messageStorage0c : nullptr;
+    if (!connection || !messageRef || !messageStorage) {
         return 0u;
     }
 
     MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
     if (marginBootstrapState.phase == MarginBootstrapPhase::kReady &&
         !marginBootstrapState.marginTwofishKeyBytes.empty()) {
-        const uint8_t* payloadBytes = envelope.sharedMessage->PayloadBaseScaffold();
-        const uint32_t payloadByteCount = envelope.sharedMessage->PayloadByteCountScaffold();
+        const uint8_t* payloadBytes = messageStorage->PayloadBaseScaffold();
+        const uint32_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
         mxo::auth::FramedPacket encryptedPacket;
         if (!payloadBytes || payloadByteCount == 0u ||
             !mxo::auth::EncryptMarginPayloadPacket(
@@ -1969,10 +1973,11 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
             nullptr);
     }
 
-    const uint16_t payloadByteCount = envelope.sharedMessage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBase = envelope.sharedMessage->PayloadBaseScaffold();
-    const size_t submitOffset = ((envelope.sharedMessage->payloadLengthHigh0a >> 7) == 0u) ? 1u : 0u;
-    const uint32_t submittedByteCount = static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBase = messageStorage->PayloadBaseScaffold();
+    const size_t submitOffset = ((messageStorage->payloadLengthHigh0a >> 7) == 0u) ? 1u : 0u;
+    const uint32_t submittedByteCount =
+        static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
     const uint8_t* const submittedBytes =
         (payloadBase && payloadByteCount != 0u) ? (payloadBase - 2u + submitOffset) : nullptr;
     const std::string submittedPreview =
@@ -1980,25 +1985,40 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
             ? BuildHexPreview(submittedBytes, submittedByteCount, 32u)
             : std::string();
     spdlog::info(
-        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardEnvelopeToSendPacket host='{}' state={} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
+        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardPacketBuilderEnvelopeToSendPacket host='{}' state={} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
         connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
         static_cast<unsigned>(connection->State()),
-        static_cast<unsigned>(envelope.sharedMessage->reservedBytes08),
+        static_cast<unsigned>(messageStorage->reservedBytes08),
         static_cast<unsigned>(payloadByteCount),
         static_cast<unsigned>(submittedByteCount),
         static_cast<unsigned>(submitOffset),
         submittedPreview.empty() ? std::string("<empty>") : submittedPreview);
-    return connection->SendPacketEnvelopeScaffold(envelope);
+    return connection->ForwardPacketBuilderEnvelopeToSendPacketScaffold(envelope);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
-    if (!packetBytes || packetByteCount == 0u) {
+    if (!packetBytes || packetByteCount == 0u ||
+        packetByteCount > mxo::liblttcp::CMessageConnectionMessageScaffold::kMaxPayloadByteCount) {
         return 0u;
     }
 
-    const mxo::liblttcp::CMessageConnectionEnvelopeScaffold envelope =
-        mxo::liblttcp::CMessageConnection::BuildPayloadEnvelopeScaffold(packetBytes, packetByteCount, /*headerless=*/false);
+    mxo::liblttcp::CMessageConnectionMessageRefScaffold messageRef = {};
+    messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
+    if (!messageRef.messageStorage0c) {
+        return 0u;
+    }
+
+    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(static_cast<uint16_t>(packetByteCount));
+    uint8_t* const payloadBytes = messageRef.messageStorage0c->PayloadBaseScaffold();
+    if (!payloadBytes) {
+        return 0u;
+    }
+    std::copy_n(static_cast<const uint8_t*>(packetBytes), packetByteCount, payloadBytes);
+
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold envelope = {};
+    envelope.payloadBase04 = payloadBytes;
+    envelope.messageRef08 = &messageRef;
     return SendCurrentMarginPacketScaffold(envelope);
 }
 

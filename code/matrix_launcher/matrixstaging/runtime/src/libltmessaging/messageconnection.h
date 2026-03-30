@@ -85,8 +85,8 @@ namespace mxo::liblttcp {
 //     through to owner callbacks instead of using these helper objects
 // - inherited send path now tightens better as:
 //   - vtable slot 10 / `0x448cf0` = `CMessageConnection::SendPacket`
-//   - consumes a message/envelope object, performs packet-agenda filtering, then reaches the
-//     lower submit helper `0x448a00`
+//   - consumes the retained outer message-ref object from local envelope `+0x08`, performs
+//     packet-agenda filtering, then reaches the lower submit helper `0x448a00`
 //   - that lower helper forwards final byte pointer/size together with `self` to engine `+0x20`
 //   - current best engine mapping there is slot-8 / SendBuffer
 // - vtable +0x1c / 0x449cd0 -> likely endpoint-update / ensure-connected wrapper
@@ -170,20 +170,23 @@ struct CMessageConnectionMessageScaffold {
 static_assert(offsetof(CMessageConnectionMessageScaffold, payloadBytes0c) == 0x0c, "message storage payload offset mismatch");
 
 struct CMessageConnectionReceivedMessageRefScaffold {
-    // Recovered outer receive/message-ref object created by `0x455cd0/0x455c60` and consumed by
-    // later helpers such as `0x41bc20`, `0x41bbb0`, callback84, and the client-side raw-`0x38`
-    // wrapper path.
+    // Recovered outer live message-ref object created by `0x455cd0/0x455c60`.
+    // Current confirmed consumers now include both:
+    // - receive-side helpers such as `0x4490c0`, `0x41bc20`, `0x41bbb0`, callback84, and the
+    //   client-side raw-`0x38` wrapper path
+    // - send-side packet builders that retain this object at local envelope `+0x08` before
+    //   `0x41cf30 -> 0x448cf0`
     // Current best raw-layout read:
     // - `+0x00` = vtable (`0x4ba23c` on fresh builder-owned objects)
     // - `+0x04` = refcount dword used with shared `0x42f850/0x42f860`-style AddRef/Release
     // - `+0x08` = ctor/reset argument preserved by `0x455bd0`
     // - `+0x0c` = inner message-storage pointer
-    // - `+0x10` = headerless/non-headerless flag written by `0x4490c0`
+    // - `+0x10` = send-mode/headerless flag consumed by `0x448cf0` and written by `0x4490c0`
     // - `+0x14` = extra context dword passed as the second `0x455cd0` argument
     // - `+0x18/+0x1c/+0x20` = cleared on fresh create
     // Current source keeps one inline local inner-storage tail after the recovered raw `0x24`
-    // front matter and rebinds raw `+0x0c` to that tail on the single local receive-path object
-    // instead of treating a source-owned shared_ptr identity as the primary message-ref shape.
+    // front matter and rebinds raw `+0x0c` to that tail on the local scaffold instead of treating
+    // a source-owned shared_ptr identity as the primary message-ref shape.
     void** vtable00 = nullptr;
     volatile long referenceCount04 = 0;
     uint32_t field08 = 0;
@@ -197,6 +200,8 @@ struct CMessageConnectionReceivedMessageRefScaffold {
     CMessageConnectionMessageScaffold ownedMessageStorageScaffold24{};
 
     CMessageConnectionReceivedMessageRefScaffold() = default;
+    // anchor: launcher.exe:0x455cd0 / 0x455c60
+    void ResetForPacketBuilderScaffold(bool headerless, uint32_t messageContext14 = 0u);
     // Source note: keep the local outer scaffold noncopyable so raw `+0x0c` never silently keeps a
     // pointer into another instance's inline `+0x24` tail.
     CMessageConnectionReceivedMessageRefScaffold(const CMessageConnectionReceivedMessageRefScaffold&) = delete;
@@ -207,21 +212,27 @@ struct CMessageConnectionReceivedMessageRefScaffold {
 
 static_assert(offsetof(CMessageConnectionReceivedMessageRefScaffold, ownedMessageStorageScaffold24) == 0x24, "message-ref local-storage tail offset mismatch");
 
+using CMessageConnectionMessageRefScaffold = CMessageConnectionReceivedMessageRefScaffold;
+
 enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
     kUnknown = 0,
     kAuth = 1,
     kMargin = 2,
 };
 
-struct CMessageConnectionEnvelopeScaffold {
-    // Source-owned bridge for the original local envelope family forwarded by `0x41af70`
-    // through `0x41cf30` into `0x448cf0`.
-    // Current best narrowed material fields:
-    // - original envelope `+0x08` = shared message object
-    // - original envelope `+0x10` = headerless/send-mode flag consumed by `0x448cf0`
-    std::shared_ptr<CMessageConnectionMessageScaffold> sharedMessage;
-    uint8_t headerless10 = 0;
+struct CMessageConnectionPacketBuilderEnvelopeScaffold {
+    // Recovered raw local packet-builder envelope front matter initialized by `0x439840` and
+    // forwarded by `0x41af70 -> 0x41cf30`.
+    // Current best material fields from `0x439840` / `0x41cf30`:
+    // - `+0x00` = local helper vtable / derived builder vtable slot
+    // - `+0x04` = payload base cached as `messageRef+0x0c -> inner+0x0c`
+    // - `+0x08` = retained outer message-ref object consumed by `0x448cf0`
+    void** vtable00 = nullptr;
+    uint8_t* payloadBase04 = nullptr;
+    CMessageConnectionMessageRefScaffold* messageRef08 = nullptr;
 };
+
+static_assert(offsetof(CMessageConnectionPacketBuilderEnvelopeScaffold, messageRef08) == 0x08, "packet-builder envelope message-ref offset mismatch");
 
 struct CMessageConnectionPacketAgendaScaffold {
     // Source-owned mirror of the lazy packet-processing agenda object rooted at original
@@ -236,10 +247,10 @@ struct CMessageConnectionPacketAgendaScaffold {
     // - current source now keeps that agenda `+0x08` effect as a transient raw message-ref pointer
     //   handoff rather than deep-copying a source-owned owner tail first
     // - send path `0x448cf0` consults the write side through `0x469950`, which returns agenda
-    //   write-output slot `+0x24`, and may replace/discard the outgoing envelope when an active
-    //   write helper exists at agenda `+0x44`
-    // - current source now keeps that `+0x24` effect as a transient raw envelope pointer handoff
-    //   instead of deep-copying the input envelope first
+    //   write-output slot `+0x24`, and may replace/discard the outgoing message-ref object when an
+    //   active write helper exists at agenda `+0x44`
+    // - current source now keeps that `+0x24` effect as a transient raw message-ref pointer
+    //   handoff instead of deep-copying a source-owned envelope shell first
     bool created = false;
     bool hasEmbeddedDefaultReadPassThroughHelper0c = false;
     // Current source meaning of these counts:
@@ -250,7 +261,7 @@ struct CMessageConnectionPacketAgendaScaffold {
     bool hasReadOutputSlot08 = false;
     CMessageConnectionReceivedMessageRefScaffold* readOutputSlot08 = nullptr;
     bool hasWriteOutputSlot24 = false;
-    const CMessageConnectionEnvelopeScaffold* writeOutputSlot24 = nullptr;
+    CMessageConnectionMessageRefScaffold* writeOutputSlot24 = nullptr;
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
@@ -281,38 +292,29 @@ public:
     // This keeps the connection-object-oriented call site out of diagnostics.cpp.
     uint32_t EnsureConnected();
 
-    // UNANCHORED: source-owned payload-span submit wrapper beneath the original
-    // `CMessageConnection::SendPacket` envelope family.
-    // Current best original `0x448cf0` consumes a message/envelope object, performs packet-agenda
-    // filtering, then reaches lower submit helper `0x448a00`.
+    // UNANCHORED: source-owned raw-byte send wrapper used by current auth/bootstrap direct-send
+    // callsites.
+    // Keep this distinct from the local packet-builder / message-ref path:
+    // - `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00`
+    // That original higher-level path consumes a message-ref object, not a bare byte span.
     uint32_t SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext = nullptr);
 
-    // Source-owned launcher-only bridge for the narrowed state8/state10/state11 send-authenticity
-    // gap. It preserves the now-recovered envelope/message split from
-    // `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00` without pretending the full original shared
-    // message-object shape is already recovered.
-    // Important current narrowing from original-launcher WineDbg at the natural first state8 send:
-    // - margin connection `+0x70` was live (`0x41ce40`)
-    // - connection `+0x74` was still null on that send
-    // - submitted payload length there was `0x13b`, not the current replacement `0x0bb`
-    // So the remaining blocker is no longer best framed as agenda presence alone; the stronger
-    // current gap is the richer original message-object content that our scaffold still does not
-    // build.
-    // UNANCHORED: source-owned launcher-only bridge for the local envelope builder seam.
-    static CMessageConnectionEnvelopeScaffold BuildPacketBuilderEnvelopeScaffold(bool headerless = false);
-    // UNANCHORED: source-owned launcher-only bridge that wraps raw payload bytes in the local envelope scaffold.
-    static CMessageConnectionEnvelopeScaffold BuildPayloadEnvelopeScaffold(
-        const void* packetData,
-        uint32_t packetByteCount,
-        bool headerless = false);
+    // anchor: launcher.exe:0x41cf30
+    // Wrapper immediately beneath mediator send helper `0x41af70`.
+    // Original body extracts envelope `+0x08` and forwards that retained message-ref object into
+    // vtable `+0x28` / `0x448cf0`.
+    uint32_t ForwardPacketBuilderEnvelopeToSendPacketScaffold(
+        CMessageConnectionPacketBuilderEnvelopeScaffold& envelope);
+
     // anchor: launcher.exe:0x448cf0
-    // Narrow source-owned mirror of the envelope-based `CMessageConnection::SendPacket` family.
-    // Original input is a local envelope / shared-message object, not a bare byte span.
-    // Current bounded send-side tightening also preserves the nearer packet-agenda write seam:
+    // Narrow source-owned mirror of the message-ref-based send path.
+    // Current bounded send-side tightening preserves three concrete original facts:
+    // - original input is the retained outer message-ref object, not the local packet-builder shell
     // - if connection `+0x74` exists, `0x448cf0` consults `0x469950` before submit
-    // - source now keeps that handoff shape explicit even though helper-side replacement/discard is
-    //   still pass-through-only in source
-    uint32_t SendPacketEnvelopeScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
+    // - the send-mode/headerless branch mutates raw inner bytes around `+0x12/+0x16/+0x17`, then
+    //   later clears the first payload byte high bit on the original input object after the
+    //   agenda/submit branch
+    uint32_t SendPacketMessageRefScaffold(CMessageConnectionMessageRefScaffold& messageRef);
 
     // anchor: launcher.exe:0x448960
     // Narrow source-owned wrapper over the per-connection packet-name callback configuration:
@@ -403,16 +405,16 @@ private:
     static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamilyScaffold family);
     // UNANCHORED: source-owned send-side packet-agenda handoff helper.
     // Current bounded model preserves the nearer `0x469950` shape:
-    // - no active write helper => keep the original envelope pointer
+    // - no active write helper => keep the original message-ref pointer
     // - active write helper => preserve the agenda `+0x24` pointer handoff, but currently return
-    //   the same envelope pointer until helper-side transformation/discard is recovered
-    const CMessageConnectionEnvelopeScaffold* ApplySendPacketAgendaScaffold(
-        const CMessageConnectionEnvelopeScaffold& inputEnvelope,
+    //   the same message-ref pointer until helper-side transformation/discard is recovered
+    CMessageConnectionMessageRefScaffold* ApplySendPacketAgendaScaffold(
+        CMessageConnectionMessageRefScaffold& inputMessageRef,
         bool* outAgendaTouched);
-    // UNANCHORED: source-owned lower submit helper beneath SendPacketEnvelopeScaffold.
+    // UNANCHORED: source-owned lower submit helper beneath `0x448cf0`.
     // Current best original helper is `0x448a00`; source now computes the final byte pointer/size
     // directly from raw inner `+0x0a/+0x0b/+0x0c..` storage.
-    uint32_t SubmitEnvelopeBytesScaffold(const CMessageConnectionEnvelopeScaffold& envelope);
+    uint32_t SubmitMessageRefBytesScaffold(const CMessageConnectionMessageRefScaffold& messageRef);
 
     uintptr_t packetNameCallbackScaffold_ = 0;
     bool packetizedMessagesEnabledScaffold_ = false;

@@ -1177,16 +1177,23 @@ Current best virtual-method mapping on that class is now:
 - send bridge on this class family now tightens as:
   - vtable `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
     - wrapper used by mediator-side send helper `0x41af70`
-    - extracts the envelope/shared message object from the stack-local packet builder
+    - extracts envelope `+0x08`, i.e. the retained outer live message-ref object from the
+      stack-local packet builder
   - vtable `+0x28` = `0x448cf0 = CMessageConnection::SendPacket`
-    - consumes that message/envelope object rather than raw bytes
+    - consumes that outer message-ref object rather than raw bytes
     - performs packet-agenda filtering first
+    - headerless/send-mode branch there also conditionally mutates inner payload storage around
+      `+0x12/+0x16/+0x17` and later clears the first payload byte high bit at inner `+0x0c`
     - then reaches lower submit helper `0x448a00`, which forwards final byte pointer/size into
       engine `+0x20`
     - newer source tightening now mirrors that one step closer too:
       - agenda write handoff stays pointer-first through agenda `+0x24`
       - final send bytes are taken directly from inner raw `+0x0a/+0x0b/+0x0c..` storage instead of
         rebuilding a temporary framed vector first
+      - remaining source-owned tails are now sharper too:
+        - helper-side agenda transformation/discard still pass through unchanged
+        - exact refcount/release lifetime after `0x448a00` is still not modeled as the original
+          pooled heap object family
   - which matches current arg5 slot `8` / `SendBuffer`
 - vtable `+0x1c` / `0x449cd0` = likely endpoint-update / ensure-connected wrapper
   - copies a new endpoint into object `+0x24`

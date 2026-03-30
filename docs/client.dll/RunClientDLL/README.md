@@ -724,6 +724,15 @@ After landing that bounded receive/message-ref bridge fix:
   crash on the late raw-`0x38` path
 - user-reported validation on the active path: **successfully launched into game**
 
+A later send-side fidelity/pruning pass also preserved that runtime result:
+- local send builders now keep raw packet-envelope front matter (`+0x04` payload base,
+  `+0x08` retained outer message-ref) instead of a source-owned shared-message shell
+- inherited send path `0x41cf30 -> 0x448cf0 -> 0x448a00` now consumes that raw message-ref object
+  more directly, including the confirmed headerless/send-mode mutation at inner
+  `+0x12/+0x16/+0x17` and the post-send high-bit clear at inner `+0x0c`
+- the active path still launched into game after that pruning, so the newer send-side tightening
+  did not regress the now-proven auth receive or late margin callback84 path
+
 Current best reading:
 - the late null-object crash was independent of the recent engine↔mediator decoupling step
 - the direct root cause was the missing callback84/message-ref work item on the surviving
