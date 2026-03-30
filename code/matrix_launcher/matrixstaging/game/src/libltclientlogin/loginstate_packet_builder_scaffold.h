@@ -55,11 +55,11 @@ public:
         return MessageStorage() ? MessageStorage()->PayloadByteCountScaffold() : 0u;
     }
 
-    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& EnvelopeScaffold() {
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& Envelope() {
         return envelope_;
     }
 
-    const mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& EnvelopeScaffold() const {
+    const mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& Envelope() const {
         return envelope_;
     }
 
@@ -175,7 +175,7 @@ private:
         return messageRef_.messageStorage0c;
     }
 
-    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold envelope_{};
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope_{};
     mxo::liblttcp::CMessageConnectionMessageRefScaffold messageRef_{};
 };
 

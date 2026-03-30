@@ -213,7 +213,7 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
     packetBuilder.ResetAndInitialize();
     packetBuilder.SetCharacterName(mediator->SourceLeadString108().data());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.EnvelopeScaffold());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
     mediator->PostEventScaffold(0x13u);
 
     spdlog::info(

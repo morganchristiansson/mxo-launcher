@@ -1919,7 +1919,7 @@ const char* CLTLoginMediator::GetGameSessionId() const {
 
 // anchor: launcher.exe:0x41af70
 uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
-    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& envelope) {
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& envelope) {
     // anchor: launcher.exe:0x41af70
     // Keep this narrow: `0x41af70` forwards the local packet-builder envelope through the current
     // margin connection send bridge (`0x41cf30 -> 0x448cf0`) instead of flattening caller bytes
@@ -1993,7 +1993,7 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
         static_cast<unsigned>(submittedByteCount),
         static_cast<unsigned>(submitOffset),
         submittedPreview.empty() ? std::string("<empty>") : submittedPreview);
-    return connection->ForwardPacketBuilderEnvelopeToSendPacketScaffold(envelope);
+    return connection->ForwardPacketBuilderEnvelopeToSendPacket(envelope);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2016,7 +2016,7 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetByt
     }
     std::copy_n(static_cast<const uint8_t*>(packetBytes), packetByteCount, payloadBytes);
 
-    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold envelope = {};
+    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope = {};
     envelope.payloadBase04 = payloadBytes;
     envelope.messageRef08 = &messageRef;
     return SendCurrentMarginPacketScaffold(envelope);
@@ -3548,8 +3548,8 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
 
     marginConnection->SetEngine(engine_);
     marginConnection->SetMarginEngine(engine_);
-    marginConnection->ConfigurePacketNameFamilyScaffold(
-        mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kMargin,
+    marginConnection->ConfigurePacketNameFamily(
+        mxo::liblttcp::CMessageConnectionPacketNameFamily::kMargin,
         /*packetizedMessagesEnabled=*/true);
     if (marginConnectionContextKey_) {
         marginConnection->SetOwnerContext(marginConnectionContextKey_);

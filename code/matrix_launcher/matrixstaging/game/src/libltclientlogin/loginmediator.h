@@ -1324,7 +1324,7 @@ public:
     // - helper-side packet-agenda replacement/discard and the larger builder-local metadata tails
     //   beyond that front matter still remain incomplete
     uint32_t SendCurrentMarginPacketScaffold(
-        mxo::liblttcp::CMessageConnectionPacketBuilderEnvelopeScaffold& envelope);
+        mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& envelope);
     uint32_t SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount);
 
     // anchor: launcher.exe:0x41e500

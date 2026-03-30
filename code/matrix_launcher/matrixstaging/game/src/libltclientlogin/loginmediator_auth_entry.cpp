@@ -1111,8 +1111,8 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
     // - auth startup no longer materializes only a base `CMessageConnection` here
     // - source now keeps the auth-side leaf completion wrapper explicit so type-2 status and the
     //   later receive-drain proxy can re-enter through the nearer connection callback surface
-    authConnection->ConfigurePacketNameFamilyScaffold(
-        mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kAuth,
+    authConnection->ConfigurePacketNameFamily(
+        mxo::liblttcp::CMessageConnectionPacketNameFamily::kAuth,
         /*packetizedMessagesEnabled=*/true);
     return authConnection_;
 }

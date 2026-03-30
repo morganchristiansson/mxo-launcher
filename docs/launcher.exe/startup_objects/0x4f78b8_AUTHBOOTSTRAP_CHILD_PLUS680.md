@@ -266,9 +266,9 @@ Current bounded follow-up consequence:
 - live replacement log on `2026-03-30` now shows:
   - state5 slot3 `replyCopyShadowStillValid=1`
   - non-null child `+0xf4`
-  - `CMarginConnection::StoreBootstrapReplyCopy98Scaffold`
-  - `CMarginConnection::StoreBootstrapPrepStateA0Scaffold`
-  - `CMarginConnection::SendStoredBootstrapReplyCopy98Scaffold` with `payloadBytes=0x139`
+  - `CMarginConnection::StoreBootstrapReplyCopy98`
+  - `CMarginConnection::StoreBootstrapPrepStateA0`
+  - `CMarginConnection::SendStoredBootstrapReplyCopy98` with `payloadBytes=0x139`
 - immediate current limitation after that milestone:
   - the margin socket then returns EOF, so the next fidelity blocker has moved from
     “materialize child `+0xf4`” to “make the raw type-1 state5 packet acceptable enough for the

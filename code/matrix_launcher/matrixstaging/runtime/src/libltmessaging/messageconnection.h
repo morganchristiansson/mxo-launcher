@@ -214,13 +214,13 @@ static_assert(offsetof(CMessageConnectionReceivedMessageRefScaffold, ownedMessag
 
 using CMessageConnectionMessageRefScaffold = CMessageConnectionReceivedMessageRefScaffold;
 
-enum class CMessageConnectionPacketNameFamilyScaffold : uint8_t {
+enum class CMessageConnectionPacketNameFamily : uint8_t {
     kUnknown = 0,
     kAuth = 1,
     kMargin = 2,
 };
 
-struct CMessageConnectionPacketBuilderEnvelopeScaffold {
+struct CMessageConnectionPacketBuilderEnvelope {
     // Recovered raw local packet-builder envelope front matter initialized by `0x439840` and
     // forwarded by `0x41af70 -> 0x41cf30`.
     // Current best material fields from `0x439840` / `0x41cf30`:
@@ -232,50 +232,50 @@ struct CMessageConnectionPacketBuilderEnvelopeScaffold {
     CMessageConnectionMessageRefScaffold* messageRef08 = nullptr;
 };
 
-static_assert(offsetof(CMessageConnectionPacketBuilderEnvelopeScaffold, messageRef08) == 0x08, "packet-builder envelope message-ref offset mismatch");
+static_assert(offsetof(CMessageConnectionPacketBuilderEnvelope, messageRef08) == 0x08, "packet-builder envelope message-ref offset mismatch");
 
-class CStreamPacketEncryptionOwnerBaseScaffold {
+class CStreamPacketEncryptionOwnerBase {
 public:
     // anchor: launcher.exe vtable `0x004b81dc`
     // Source-owned full virtual C++ mirror of the owner-side base. This family is only used by
     // our own code, so we intentionally let the compiler own the C++ vptr instead of storing a
     // fake raw `vtable00` field.
-    virtual ~CStreamPacketEncryptionOwnerBaseScaffold() = default;
-    virtual const char* ClassName() const { return "CStreamPacketEncryptionOwnerBaseScaffold"; }
+    virtual ~CStreamPacketEncryptionOwnerBase() = default;
+    virtual const char* ClassName() const { return "CStreamPacketEncryptionOwnerBase"; }
 };
 
-class CStreamPacketEncryptionHelperBaseScaffold {
+class CStreamPacketEncryptionHelperBase {
 public:
     // anchor: launcher.exe vtable `0x004b81c8`
     // Source-owned full virtual C++ mirror of the helper-side base shared by:
     // - module read helper `0x004b86f0`
     // - module write helper `0x004b8690`
     // - embedded agenda helper `0x004baf48`
-    virtual ~CStreamPacketEncryptionHelperBaseScaffold() = default;
+    virtual ~CStreamPacketEncryptionHelperBase() = default;
     virtual const void* Descriptor() const {
         return reinterpret_cast<const void*>(0x004aafbbu);
     }
     virtual void HandleOpaqueMessageRef(void* opaqueMessageRef) = 0;
 
-    CStreamPacketEncryptionHelperBaseScaffold* nextHelper04 = nullptr;
+    CStreamPacketEncryptionHelperBase* nextHelper04 = nullptr;
 
 protected:
     void ForwardToNextHelper(void* opaqueMessageRef);
 };
 
-class CStreamPacketEncryptionModuleScaffold;
+class CStreamPacketEncryptionModule;
 
-class CStreamPacketEncryptionModuleHelperScaffold : public CStreamPacketEncryptionHelperBaseScaffold {
+class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase {
 public:
     // Current common source-owned state on the two module child helpers.
     // `0x469740` gives the tighter role for `nextHelper04`:
     // - read helper (`0x004b86f0`) links to the previous agenda read-chain head there
     // - write helper (`0x004b8690`) links to the embedded/default agenda write helper there
-    CStreamPacketEncryptionModuleScaffold* owner08 = nullptr;
+    CStreamPacketEncryptionModule* owner08 = nullptr;
 };
 
-class CStreamPacketEncryptionModuleReadHelperScaffold
-    : public CStreamPacketEncryptionModuleHelperScaffold {
+class CStreamPacketEncryptionModuleReadHelper
+    : public CStreamPacketEncryptionModuleHelper {
 public:
     // anchor: launcher.exe vtable `0x004b86f0`
     // Current best recovered role:
@@ -287,11 +287,11 @@ public:
     void* collectionEnd14 = nullptr;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
-    void ResetForOwner(CStreamPacketEncryptionModuleScaffold* owner);
+    void ResetForOwner(CStreamPacketEncryptionModule* owner);
 };
 
-class CStreamPacketEncryptionModuleWriteHelperScaffold
-    : public CStreamPacketEncryptionModuleHelperScaffold {
+class CStreamPacketEncryptionModuleWriteHelper
+    : public CStreamPacketEncryptionModuleHelper {
 public:
     // anchor: launcher.exe vtable `0x004b8690`
     // Current best recovered role:
@@ -302,10 +302,10 @@ public:
     void* embeddedTransformAdapterMeta10 = nullptr;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
-    void ResetForOwner(CStreamPacketEncryptionModuleScaffold* owner);
+    void ResetForOwner(CStreamPacketEncryptionModule* owner);
 };
 
-class CStreamPacketEncryptionAgendaHelperScaffold : public CStreamPacketEncryptionHelperBaseScaffold {
+class CStreamPacketEncryptionAgendaHelper : public CStreamPacketEncryptionHelperBase {
 public:
     // anchor: launcher.exe vtable `0x004baf48`
     // Source-owned full virtual C++ mirror of the embedded agenda helper object materialized twice
@@ -316,16 +316,16 @@ public:
     uint32_t field08 = 0;
     const char* helperLabel0c = nullptr;
     void** outputSlotAddress10 = nullptr;
-    CStreamPacketEncryptionHelperBaseScaffold** downstreamHelperSlot14 = nullptr;
+    CStreamPacketEncryptionHelperBase** downstreamHelperSlot14 = nullptr;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
     void ResetForAgenda(
         const char* helperLabel,
         void** outputSlotAddress,
-        CStreamPacketEncryptionHelperBaseScaffold** downstreamHelperSlot);
+        CStreamPacketEncryptionHelperBase** downstreamHelperSlot);
 };
 
-class CStreamPacketEncryptionModuleScaffold : public CStreamPacketEncryptionOwnerBaseScaffold {
+class CStreamPacketEncryptionModule : public CStreamPacketEncryptionOwnerBase {
 public:
     // anchor: launcher.exe:0x44da00 / vtable `0x004b8704`
     // Named owner/aggregator recovered from:
@@ -336,42 +336,42 @@ public:
     // - `writeHelper08` = module **write helper** rooted at `0x004b8690`
     // - `nextConfiguredModule0c` = next configured module in the agenda-owned module list
     // - `configuredAgendaIdentity10` = source-owned agenda identity copied during installation
-    CStreamPacketEncryptionModuleReadHelperScaffold* readHelper04 = nullptr;
-    CStreamPacketEncryptionModuleWriteHelperScaffold* writeHelper08 = nullptr;
-    CStreamPacketEncryptionModuleScaffold* nextConfiguredModule0c = nullptr;
+    CStreamPacketEncryptionModuleReadHelper* readHelper04 = nullptr;
+    CStreamPacketEncryptionModuleWriteHelper* writeHelper08 = nullptr;
+    CStreamPacketEncryptionModule* nextConfiguredModule0c = nullptr;
     const void* configuredAgendaIdentity10 = nullptr;
-    CStreamPacketEncryptionModuleReadHelperScaffold ownedReadHelperScaffold14{};
-    CStreamPacketEncryptionModuleWriteHelperScaffold ownedWriteHelperScaffold2c{};
+    CStreamPacketEncryptionModuleReadHelper ownedReadHelper14{};
+    CStreamPacketEncryptionModuleWriteHelper ownedWriteHelper2c{};
     std::array<uint8_t, 16> associatedSeedBytes40{};
 
     const char* ClassName() const override { return "CStreamPacketEncryptionModule"; }
     void ResetForMarginConnectionSeed(const std::array<uint8_t, 16>& seedBytes85);
 };
 
-struct CMessageConnectionPacketAgendaScaffold {
+struct CMessageConnectionPacketAgenda {
     // Source-owned mirror of the lazy packet-processing agenda object rooted at original
     // connection `+0x74`.
     // The original raw offsets remain documented in the canonical docs, but because the embedded
     // helper/module family is now modeled as full internal-only C++ classes, this source mirror is
     // intentionally behavioral rather than raw-layout-exact.
-    CStreamPacketEncryptionModuleScaffold* configuredModuleList04 = nullptr;
+    CStreamPacketEncryptionModule* configuredModuleList04 = nullptr;
     CMessageConnectionReceivedMessageRefScaffold* readOutputSlot08 = nullptr;
-    CStreamPacketEncryptionAgendaHelperScaffold embeddedReadHelper0c{};
+    CStreamPacketEncryptionAgendaHelper embeddedReadHelper0c{};
     CMessageConnectionMessageRefScaffold* writeOutputSlot24 = nullptr;
-    CStreamPacketEncryptionAgendaHelperScaffold embeddedWriteHelper28{};
+    CStreamPacketEncryptionAgendaHelper embeddedWriteHelper28{};
     // faithful raw-field naming from the recovered agenda object:
     // - `readHelperChainHead40` mirrors original agenda `+0x40`
     // - `writeHelperChainHead44` mirrors original agenda `+0x44`
     // - `writeHelperChainTail48` mirrors original agenda `+0x48`
     // Ghidra evidence from `0x469850 / 0x469740` shows `+0x44/+0x48` are real write-chain
     // head/tail pointers, not source-invented convenience state.
-    CStreamPacketEncryptionHelperBaseScaffold* readHelperChainHead40 = nullptr;
-    CStreamPacketEncryptionHelperBaseScaffold* writeHelperChainHead44 = nullptr;
-    CStreamPacketEncryptionHelperBaseScaffold* writeHelperChainTail48 = nullptr;
+    CStreamPacketEncryptionHelperBase* readHelperChainHead40 = nullptr;
+    CStreamPacketEncryptionHelperBase* writeHelperChainHead44 = nullptr;
+    CStreamPacketEncryptionHelperBase* writeHelperChainTail48 = nullptr;
     uint16_t configuredModuleCount4c = 0;
     uint16_t reserved4e = 0;
     bool created = false;
-    CStreamPacketEncryptionModuleScaffold* configuredStreamPacketEncryptionModule = nullptr;
+    CStreamPacketEncryptionModule* configuredStreamPacketEncryptionModule = nullptr;
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
@@ -413,8 +413,8 @@ public:
     // Wrapper immediately beneath mediator send helper `0x41af70`.
     // Original body extracts envelope `+0x08` and forwards that retained message-ref object into
     // vtable `+0x28` / `0x448cf0`.
-    uint32_t ForwardPacketBuilderEnvelopeToSendPacketScaffold(
-        CMessageConnectionPacketBuilderEnvelopeScaffold& envelope);
+    uint32_t ForwardPacketBuilderEnvelopeToSendPacket(
+        CMessageConnectionPacketBuilderEnvelope& envelope);
 
     // anchor: launcher.exe:0x448cf0
     // Narrow source-owned mirror of the message-ref-based send path.
@@ -424,7 +424,7 @@ public:
     // - the send-mode/headerless branch mutates raw inner bytes around `+0x12/+0x16/+0x17`, then
     //   later clears the first payload byte high bit on the original input object after the
     //   agenda/submit branch
-    uint32_t SendPacketMessageRefScaffold(CMessageConnectionMessageRefScaffold& messageRef);
+    uint32_t SendPacketMessageRef(CMessageConnectionMessageRefScaffold& messageRef);
 
     // anchor: launcher.exe:0x448960
     // Narrow source-owned wrapper over the per-connection packet-name callback configuration:
@@ -432,13 +432,13 @@ public:
     // - when enabled, original writes connection `+0x70 = callback`
     // Current source API still accepts a family enum, but immediately maps that family to the
     // currently known callback bodies (`0x41ce00` auth, `0x41ce40` margin).
-    void ConfigurePacketNameFamilyScaffold(
-        CMessageConnectionPacketNameFamilyScaffold family,
+    void ConfigurePacketNameFamily(
+        CMessageConnectionPacketNameFamily family,
         bool packetizedMessagesEnabled);
     // UNANCHORED: source-owned diagnostic family view derived from the callback-address scaffold.
-    CMessageConnectionPacketNameFamilyScaffold PacketNameFamilyScaffold() const;
+    CMessageConnectionPacketNameFamily PacketNameFamily() const;
     // UNANCHORED: source-owned accessor for the packetized-messages enable scaffold byte.
-    bool PacketizedMessagesEnabledScaffold() const;
+    bool PacketizedMessagesEnabled() const;
 
     // anchor: launcher.exe:0x448980
     // Narrow source-owned mirror of the lazy packet-agenda install/configure helper at
@@ -454,10 +454,10 @@ public:
     // Current source model now keeps the recovered raw agenda/helper front matter plus the
     // installed named module pointer explicit, while still leaving helper-side
     // transformation/discard behavior conservative.
-    void ConfigurePacketAgendaScaffold(
-        CStreamPacketEncryptionModuleScaffold* streamPacketEncryptionModule = nullptr);
+    void ConfigurePacketAgenda(
+        CStreamPacketEncryptionModule* streamPacketEncryptionModule = nullptr);
     // UNANCHORED: source-owned accessor for the lazy packet-agenda scaffold pointer.
-    const CMessageConnectionPacketAgendaScaffold* PacketAgendaScaffold() const;
+    const CMessageConnectionPacketAgenda* PacketAgenda() const;
 
     // anchor: launcher.exe:0x4490c0
     // string-backed original name: CMessageConnection::OnOperationCompleted
@@ -516,26 +516,26 @@ protected:
 
 private:
     // UNANCHORED: source-owned packet-family name helper for current diagnostics.
-    static const char* PacketNameFamilyToString(CMessageConnectionPacketNameFamilyScaffold family);
+    static const char* PacketNameFamilyToString(CMessageConnectionPacketNameFamily family);
     // UNANCHORED: source-owned helper that maps the diagnostic family enum onto the currently known
     // original callback bodies stored at connection `+0x70`.
-    static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamilyScaffold family);
+    static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamily family);
     // UNANCHORED: source-owned send-side packet-agenda handoff helper.
     // Current bounded model preserves the nearer `0x469950` shape:
     // - no active write helper => keep the original message-ref pointer
     // - active write helper => preserve the agenda `+0x24` pointer handoff, but currently return
     //   the same message-ref pointer until helper-side transformation/discard is recovered
-    CMessageConnectionMessageRefScaffold* ApplySendPacketAgendaScaffold(
+    CMessageConnectionMessageRefScaffold* ApplySendPacketAgenda(
         CMessageConnectionMessageRefScaffold& inputMessageRef,
         bool* outAgendaTouched);
     // UNANCHORED: source-owned lower submit helper beneath `0x448cf0`.
     // Current best original helper is `0x448a00`; source now computes the final byte pointer/size
     // directly from raw inner `+0x0a/+0x0b/+0x0c..` storage.
-    uint32_t SubmitMessageRefBytesScaffold(const CMessageConnectionMessageRefScaffold& messageRef);
+    uint32_t SubmitMessageRefBytes(const CMessageConnectionMessageRefScaffold& messageRef);
 
-    uintptr_t packetNameCallbackScaffold_ = 0;
-    bool packetizedMessagesEnabledScaffold_ = false;
-    std::unique_ptr<CMessageConnectionPacketAgendaScaffold> packetAgendaScaffold_;
+    uintptr_t packetNameCallback_ = 0;
+    bool packetizedMessagesEnabled_ = false;
+    std::unique_ptr<CMessageConnectionPacketAgenda> packetAgenda_;
     std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
     bool lastReceivedPacketHeaderlessScaffold_ = false;
     std::vector<CMessageConnectionReceivedPacketScaffold> pendingReceivedPacketsScaffold_;
@@ -707,7 +707,7 @@ private:
     std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_;
     bool hasMessageCode5SeedBytes85_ = false;
     std::array<uint8_t, 16> messageCode5SeedBytes85_{};
-    std::unique_ptr<CStreamPacketEncryptionModuleScaffold> streamPacketEncryptionModule9c_;
+    std::unique_ptr<CStreamPacketEncryptionModule> streamPacketEncryptionModule9c_;
 };
 
 }  // namespace mxo::liblttcp
