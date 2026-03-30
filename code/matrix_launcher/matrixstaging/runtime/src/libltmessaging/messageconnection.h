@@ -151,8 +151,6 @@ struct CMessageConnectionMessageScaffold {
     uint8_t payloadLengthLow0b = 0;
     std::array<uint8_t, 0x1000> payloadBytes0c{};
 
-    // UNANCHORED: source-owned raw-layout initializer for the recovered inner `0x100c` object.
-    void InitializeRawLayoutScaffold();
     // anchor: launcher.exe:0x455bd0 / 0x455c60 / 0x455cd0
     void ResetForPacketBuilderScaffold();
     // UNANCHORED: source-owned raw byte-count reset helper over recovered `+0x0a/+0x0b/+0x0c..` storage.
@@ -186,8 +184,8 @@ struct CMessageConnectionReceivedMessageRefScaffold {
     // - `+0x14` = extra context dword passed as the second `0x455cd0` argument
     // - `+0x18/+0x1c/+0x20` = cleared on fresh create
     // Current source keeps one inline local inner-storage tail after the recovered raw `0x24`
-    // front matter and rebinds raw `+0x0c` to that tail on local copies instead of treating a
-    // source-owned shared_ptr identity as the primary message-ref shape.
+    // front matter and rebinds raw `+0x0c` to that tail on the single local receive-path object
+    // instead of treating a source-owned shared_ptr identity as the primary message-ref shape.
     void** vtable00 = nullptr;
     volatile long referenceCount04 = 0;
     uint32_t field08 = 0;
@@ -201,23 +199,12 @@ struct CMessageConnectionReceivedMessageRefScaffold {
     CMessageConnectionMessageScaffold ownedMessageStorageScaffold24{};
 
     CMessageConnectionReceivedMessageRefScaffold() = default;
-    // UNANCHORED: source-owned local-copy helper that preserves raw front matter and rebinds `+0x0c`
-    // to this instance's inline storage tail.
-    CMessageConnectionReceivedMessageRefScaffold(const CMessageConnectionReceivedMessageRefScaffold& other);
-    // UNANCHORED: source-owned local-copy helper that preserves raw front matter and rebinds `+0x0c`
-    // to this instance's inline storage tail.
-    CMessageConnectionReceivedMessageRefScaffold& operator=(const CMessageConnectionReceivedMessageRefScaffold& other);
-    // UNANCHORED: source-owned move spellings currently collapse to the same local-copy semantics.
-    CMessageConnectionReceivedMessageRefScaffold(CMessageConnectionReceivedMessageRefScaffold&& other) noexcept;
-    // UNANCHORED: source-owned move spellings currently collapse to the same local-copy semantics.
-    CMessageConnectionReceivedMessageRefScaffold& operator=(CMessageConnectionReceivedMessageRefScaffold&& other) noexcept;
-
-    // UNANCHORED: source-owned raw-layout initializer for the recovered outer `0x24` front matter.
-    void InitializeRawLayoutScaffold(uint32_t field08Value = 0u);
-    // UNANCHORED: source-owned helper that resets the inline local inner-storage tail used by local copies.
-    void ResetOwnedMessageStorageScaffold();
-    // UNANCHORED: source-owned raw/local-storage synchronization helper for outer `+0x0c`.
-    void SyncRawMessageStoragePointerScaffold();
+    // Source note: keep the local outer scaffold noncopyable so raw `+0x0c` never silently keeps a
+    // pointer into another instance's inline `+0x24` tail.
+    CMessageConnectionReceivedMessageRefScaffold(const CMessageConnectionReceivedMessageRefScaffold&) = delete;
+    CMessageConnectionReceivedMessageRefScaffold& operator=(const CMessageConnectionReceivedMessageRefScaffold&) = delete;
+    CMessageConnectionReceivedMessageRefScaffold(CMessageConnectionReceivedMessageRefScaffold&&) = delete;
+    CMessageConnectionReceivedMessageRefScaffold& operator=(CMessageConnectionReceivedMessageRefScaffold&&) = delete;
 };
 
 static_assert(offsetof(CMessageConnectionReceivedMessageRefScaffold, ownedMessageStorageScaffold24) == 0x24, "message-ref local-storage tail offset mismatch");

@@ -687,8 +687,9 @@ Current source correction:
   family instead of inventing a separate late-only bridge object
   - outer `+0x00/+0x04/+0x08/+0x0c/+0x10/+0x14/+0x18/+0x1c/+0x20`
   - one inline local inner-storage tail only after that recovered raw front matter
-  - local outer copies now rebind raw `+0x0c` to that inline tail instead of treating a
-    shared_ptr-first ownership shell as the primary identity
+  - the receive-path local outer scaffold is now kept noncopyable in source so raw `+0x0c`
+    stays bound to that inline tail instead of treating a shared_ptr-first ownership shell as the
+    primary identity
 - its inner message-storage object now likewise keeps the recovered raw front matter closer to the
   `0x455bd0/0x455c60/0x4557b0` family:
   - inner `+0x00/+0x04/+0x08/+0x0a/+0x0b/+0x0c..`
