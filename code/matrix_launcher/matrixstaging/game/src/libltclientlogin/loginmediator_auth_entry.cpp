@@ -1088,9 +1088,6 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
         dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
     if (!authConnection) {
         if (authConnectionOwnedByMediator_) {
-            if (engine_ != nullptr) {
-                engine_->UnregisterKnownConnectionScaffold(authConnection_);
-            }
             delete authConnection_;
         }
         authConnection = new mxo::liblttcp::CAuthStartupConnection(engine_);
@@ -1117,9 +1114,6 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
     authConnection->ConfigurePacketNameFamilyScaffold(
         mxo::liblttcp::CMessageConnectionPacketNameFamilyScaffold::kAuth,
         /*packetizedMessagesEnabled=*/true);
-    if (engine_ != nullptr) {
-        engine_->RegisterKnownConnectionScaffold(authConnection);
-    }
     return authConnection_;
 }
 

@@ -369,24 +369,12 @@ const char* CLTLoginMediator::GetName() {
 // +0x08
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
-    mxo::liblttcp::CLTThreadPerClientTCPEngine* oldEngine = engine_;
-    if (oldEngine && oldEngine != engine) {
-        oldEngine->UnregisterKnownConnectionScaffold(authConnection_);
-        oldEngine->UnregisterKnownConnectionScaffold(marginConnection_);
-    }
-
     engine_ = engine;
     if (authConnection_) {
         authConnection_->SetEngine(engine_);
-        if (engine_) {
-            engine_->RegisterKnownConnectionScaffold(authConnection_);
-        }
     }
     if (marginConnection_) {
         marginConnection_->SetEngine(engine_);
-        if (engine_) {
-            engine_->RegisterKnownConnectionScaffold(marginConnection_);
-        }
         if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
             marginConnection->SetMarginEngine(engine_);
         }
@@ -3432,9 +3420,6 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
         dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_);
     if (!marginConnection) {
         if (marginConnectionOwnedByMediator_) {
-            if (engine_ != nullptr) {
-                engine_->UnregisterKnownConnectionScaffold(marginConnection_);
-            }
             delete marginConnection_;
         }
         marginConnection = new mxo::liblttcp::CMarginConnection(engine_);
@@ -3460,9 +3445,6 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
     }
     if (marginConnectionContextScaffold_ != nullptr) {
         marginConnectionContextScaffold_->sidecarConnection = marginConnection;
-    }
-    if (engine_ != nullptr) {
-        engine_->RegisterKnownConnectionScaffold(marginConnection);
     }
     return marginConnection_;
 }

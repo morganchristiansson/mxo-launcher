@@ -15,7 +15,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -99,7 +98,6 @@ static std::unordered_map<CLTThreadPerClientTCPEngine_Queue*, std::vector<uint32
 // - so none of the source-owned maps below should be mistaken for hidden original class fields
 // - recovered runtime payload families are tracked separately from source-only launcher bridge
 //   baggage using node shapes that match the launcher tree families rather than source vectors
-using CLTThreadPerClientTCPEngine_ConnectionRegistry = std::unordered_set<CMessageConnection*>;
 
 static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
 using CLTThreadPerClientTCPEngine_EndpointTreeNode =
@@ -131,16 +129,6 @@ struct CLTThreadPerClientTCPEngine_ContextPayloadBacking {
 
 static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_LauncherAbiAttachment>
     g_CLTThreadPerClientTCPEngineLauncherAbiAttachments;
-// Static RE anchors proving the original engine family is keyed by direct connection objects:
-// - `0x4325d0` / `0x4328a0` pass the direct connection object to `0x431ff0`
-// - `0x431ff0` stores `[connection+0x08] = workerThread` and inserts key=`connection` into `+0x8c`
-// - `0x4316a0` later searches `+0x8c` with that same raw connection pointer
-// - `0x449d40` enqueues completed operations with `context = connection`
-// - `0x436b10` consumes that queued `context` directly and calls slot 12 on type-1 items
-// Current source therefore tracks known live connections generically by direct connection identity
-// rather than by auth/margin-specific bridge maps.
-static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_ConnectionRegistry>
-    g_CLTThreadPerClientTCPEngineKnownConnections;
 static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_EndpointPayloadBacking>
     g_CLTThreadPerClientTCPEngineEndpointPayloadBackings;
 static std::unordered_map<CLTThreadPerClientTCPEngine*, CLTThreadPerClientTCPEngine_ContextPayloadBacking>
@@ -160,21 +148,6 @@ static CLTThreadPerClientTCPEngine_LauncherAbiAttachment* FindEngineLauncherAbiA
 static CLTThreadPerClientTCPEngine_LauncherAbiAttachment& EnsureEngineLauncherAbiAttachment(
     CLTThreadPerClientTCPEngine* self) {
     return g_CLTThreadPerClientTCPEngineLauncherAbiAttachments[self];
-}
-
-static CLTThreadPerClientTCPEngine_ConnectionRegistry* FindEngineConnectionRegistry(
-    const CLTThreadPerClientTCPEngine* self) {
-    if (!self) {
-        return nullptr;
-    }
-    auto it = g_CLTThreadPerClientTCPEngineKnownConnections.find(
-        const_cast<CLTThreadPerClientTCPEngine*>(self));
-    return (it != g_CLTThreadPerClientTCPEngineKnownConnections.end()) ? &it->second : nullptr;
-}
-
-static CLTThreadPerClientTCPEngine_ConnectionRegistry& EnsureEngineConnectionRegistry(
-    CLTThreadPerClientTCPEngine* self) {
-    return g_CLTThreadPerClientTCPEngineKnownConnections[self];
 }
 
 static CLTThreadPerClientTCPEngine_EndpointPayloadBacking* FindEngineEndpointPayloadBacking(
@@ -631,7 +604,6 @@ static bool ContextTreeEraseNode(
 
 static void EraseEngineBackings(CLTThreadPerClientTCPEngine* self) {
     g_CLTThreadPerClientTCPEngineLauncherAbiAttachments.erase(self);
-    g_CLTThreadPerClientTCPEngineKnownConnections.erase(self);
     g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.erase(self);
     g_CLTThreadPerClientTCPEngineContextPayloadBackings.erase(self);
 }
@@ -2637,28 +2609,6 @@ mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* CLTThreadPerClientTCPEn
     return *slot;
 }
 
-// UNANCHORED: source-owned connection registry for the current launcher bridge.
-void CLTThreadPerClientTCPEngine::RegisterKnownConnectionScaffold(CMessageConnection* connection) {
-    if (!connection) {
-        return;
-    }
-    connection->SetEngine(this);
-    EnsureEngineConnectionRegistry(this).insert(connection);
-}
-
-// UNANCHORED: source-owned connection registry for the current launcher bridge.
-void CLTThreadPerClientTCPEngine::UnregisterKnownConnectionScaffold(CMessageConnection* connection) {
-    if (!connection) {
-        return;
-    }
-    if (CLTThreadPerClientTCPEngine_ConnectionRegistry* registry = FindEngineConnectionRegistry(this)) {
-        registry->erase(connection);
-        if (registry->empty()) {
-            g_CLTThreadPerClientTCPEngineKnownConnections.erase(this);
-        }
-    }
-}
-
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
     void* workItem,
@@ -2738,15 +2688,14 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     workItem->debugLabel = label;
 
     void* queuedContext = context;
-    if ((IsSyntheticReceiveDrainWorkType(workType) ||
-         workType == kWorkTypeConnectionStatus) &&
-        context->sidecarConnection) {
-        // Current bounded fidelity step:
-        // - original queue consumer dispatches type-2/type-3-adjacent work into the
-        //   connection-family callback path with `context == connection`
-        // - the source-owned receive-drain proxy is still synthetic, but it now reaches that
-        //   nearer connection callback surface first instead of jumping straight to the
-        //   mediator-owned bridge context callback
+    if (context->sidecarConnection) {
+        // Current tighter RE-backed correction:
+        // - original worker-thread producers queue the direct connection object as `context`
+        //   for type-1 close, type-2 status, and type-3 parsed-packet work
+        // - current source still needs the queue-context bridge object so consumer callback
+        //   dispatch can land on `vtable[4]` despite the non-byte-faithful C++ connection layout
+        // - so once a sidecar connection exists, all launcher-bridge work items queue through that
+        //   connection-family context bridge instead of the mediator-owned bridge context record
         queuedContext = context->sidecarConnection->QueueContextScaffold();
     }
 
@@ -2879,9 +2828,13 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaf
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext = nullptr;
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext = nullptr;
 
-    if (CLTThreadPerClientTCPEngine_ConnectionRegistry* registry =
-            FindEngineConnectionRegistry(this)) {
-        for (CMessageConnection* connection : *registry) {
+    if (CLTThreadPerClientTCPEngine_ContextPayloadBacking* contextBacking =
+            FindEngineContextPayloadBacking(this)) {
+        for (const auto& it : contextBacking->entries) {
+            const CLTThreadPerClientTCPEngine_WorkerThread* worker = it.second->payload.get();
+            CMessageConnection* connection = worker
+                ? static_cast<CMessageConnection*>(worker->ContextKey())
+                : nullptr;
             mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
                 ResolveLauncherBridgeContextForConnectionScaffold(connection);
             if (!context) {
@@ -3078,9 +3031,31 @@ CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* con
         return queuedConnection;
     }
 
-    if (CLTThreadPerClientTCPEngine_ConnectionRegistry* registry =
-            FindEngineConnectionRegistry(this)) {
-        for (CMessageConnection* connection : *registry) {
+    auto bridgeContextConnection =
+        [](void* candidate) -> CMessageConnection* {
+            mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+                static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(candidate);
+            return IsLauncherBridgeContextScaffold(context) ? context->sidecarConnection : nullptr;
+        };
+
+    if (CMessageConnection* bridgedConnection = bridgeContextConnection(contextKey);
+        bridgedConnection && matchesConnectionKey(bridgedConnection)) {
+        return bridgedConnection;
+    }
+    if (resolvedContextKey != contextKey) {
+        if (CMessageConnection* bridgedConnection = bridgeContextConnection(resolvedContextKey);
+            bridgedConnection && matchesConnectionKey(bridgedConnection)) {
+            return bridgedConnection;
+        }
+    }
+
+    if (CLTThreadPerClientTCPEngine_ContextPayloadBacking* contextBacking =
+            FindEngineContextPayloadBacking(this)) {
+        for (const auto& it : contextBacking->entries) {
+            const CLTThreadPerClientTCPEngine_WorkerThread* worker = it.second->payload.get();
+            CMessageConnection* connection = worker
+                ? static_cast<CMessageConnection*>(worker->ContextKey())
+                : nullptr;
             if (matchesConnectionKey(connection)) {
                 return connection;
             }
@@ -3132,11 +3107,24 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
     if (!connection && normalizedContextKey != contextKey) {
         connection = FindMessageConnection(normalizedContextKey);
     }
+
+    // Static RE of `0x449cd0`, `0x449d20`, and `0x449d40` keeps the public engine slot family on
+    // the direct connection object itself. After queue-context unwrapping and bridge-context
+    // handling above, remaining callers are expected to already be passing that connection object.
+    if (!connection) {
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* bridgeContext =
+            static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(normalizedContextKey);
+        if (IsLauncherBridgeContextScaffold(bridgeContext)) {
+            connection = bridgeContext->sidecarConnection;
+        } else {
+            connection = static_cast<CMessageConnection*>(normalizedContextKey);
+        }
+    }
     if (!connection) {
         return nullptr;
     }
 
-    RegisterKnownConnectionScaffold(connection);
+    connection->SetEngine(this);
     if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
         connection->SetOwnerContext(normalizedContextKey);
     }

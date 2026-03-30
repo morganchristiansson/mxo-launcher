@@ -460,12 +460,6 @@ public:
         mxo::ltlogin::CLTLoginMediator* mediator,
         const char* label,
         bool isMarginConnection);
-    // UNANCHORED: source-owned connection registry used by the current launcher bridge.
-    // Current static-RE reason this is closer than auth/margin-specific engine maps:
-    // - original `0x4325d0/0x4328a0 -> 0x431ff0` paths are keyed by the direct connection object
-    // - `0x449d40 -> 0x436820` also queues the direct connection object as `context`
-    void RegisterKnownConnectionScaffold(CMessageConnection* connection);
-    void UnregisterKnownConnectionScaffold(CMessageConnection* connection);
     bool EnqueueLauncherConnectionStatusWorkItemScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         uint32_t workType,
@@ -500,9 +494,9 @@ public:
     size_t QueueThreadCount() const;
 
     // Source-owned connection resolver. Current faithful preference order is:
-    // - direct connection object / queue-context owner
+    // - queue-context owner
     // - mediator-owned launcher bridge context -> sidecarConnection
-    // - engine-owned generic connection registry keyed by direct connection identity
+    // - active worker/context-tree payloads keyed by the direct connection object
     // - no generic synthetic fallback allocation
     CMessageConnection* FindMessageConnection(void* contextKey);
 
@@ -547,11 +541,11 @@ private:
     // - source-owned receive-drain proxies use `kWorkTypeSyntheticReceiveDrain`
     //   because original type `3` is already consumed by the parsed-packet queue items emitted from
     //   `CLTTCPConnection::OnReceive`
-    // Current bounded destination correction:
-    // - type-2 connection-status items and synthetic receive-drain items now prefer the
-    //   connection-family queue context when one is available
-    // - that lets queue dispatch land on the nearer `CMessageConnection`/leaf callback path before
-    //   any later mediator-owned handling
+    // Current tighter destination correction:
+    // - once a sidecar connection exists, launcher-bridge work items queue through the
+    //   connection-family queue context for type-1/type-2/synthetic paths alike
+    // - that keeps the queued `context` closer to the original direct-connection identity while
+    //   still landing callback dispatch on the nearer `CMessageConnection`/leaf callback path
     bool EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
         uint32_t workType,
