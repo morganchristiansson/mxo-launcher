@@ -44,8 +44,20 @@ Reason for the provisional name:
   - `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
   - `0x40d530 = LauncherSelectionList_OnSelectionChanged`
   - `0x40d820 = LauncherSelectionList_OnDoubleClickActivate`
+- secondary-vtable evidence is now tighter too:
+  - primary vtable `0x004aae28`
+  - final secondary subobject vtable at dialog `+0x54` = `0x004aae24`
+  - ctor-only seed for that same subobject = `0x004aadf8`
 - there is still no class-name string proving the exact original C++ type spelling, so keep this
   as the strongest current method-family name rather than a final recovered source symbol
+
+Important method-identity tightening:
+- `0x406470` is currently better read as a **custom modeless create/setup body**
+- it is not just `OnCreate`
+- it is not a `CDialog::OnInitDialog`
+- it is called directly from `CLauncherThread_InitInstance`, performs the CWnd create call itself,
+  creates all child controls manually, switches to page state `1`, and only then sets dialog
+  ready byte `+0x68`
 
 So the object `0x402ec0` waits on is not just an abstract thread shell.
 It is waiting for a worker thread whose `InitInstance` creates the real launcher dialog object.
@@ -104,12 +116,49 @@ Current best concrete corridor:
 - thread `InitInstance` allocates the real launcher dialog/controller object
 - wait for dialog `+0x68` ready
 - pump process messages while that launcher dialog runs
-- successful selection later exits through launcher dialog code such as:
-  - state-7 page setup `0x4047d0`
-  - selection observer `0x40f070`
+- successful login/selection later exits through launcher dialog code such as:
+  - page/command switcher `0x4047d0`
+  - page key handler `0x406350`
+  - page timer/observer pump `0x4071e0`
   - command dispatcher `0x405a20`
 - that dialog path eventually sets `DAT_004d259c` and posts quit
 - only then does `0x402ec0` return so startup can continue into the DLL-load corridor
+
+### New launcher dialog corridor tightening
+
+#### Manual nopatch credential path
+
+The closest concrete launcher-side credential producer is now:
+
+- page `2` primary button (`dialog +0x204`) dispatches command `11`
+- command `11` enters page `6` when `g_LauncherGlobal4C8B1D004c8b1d == 0`
+- page `6` key handling goes through:
+  - `0x408ee0 = LauncherLoginRichEdit_SwitchPromptState`
+  - `0x408840 = LauncherLoginRichEdit_HandlePromptInputCharacter`
+  - `0x408400 = LauncherLoginRichEdit_SubmitCredentialsViaResolvedLoginService`
+  - `0x4091d0 = LauncherLoginRichEdit_LoginServiceObserverCallback`
+- `0x408400` builds the exact `0x41ecd0`-style credential block on the stack:
+  - `+0x00` username
+  - `+0x20` password
+  - zeroed `block40/block50`
+  - small-string at `+0x60`
+- it then submits that block through sibling resolved slot `0x4d2734` vtable `+0x30`
+- callback success dispatches command `7`, which on the nopatch branch leads into page `11`
+
+Important negative result:
+- this dialog-side submit corridor is now concrete, but the exact static bridge from sibling slot
+  `0x4d2734` into owner `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` is still open
+
+#### Selection-page action split
+
+Page `7` now has a tighter split too:
+
+- selection-changed `0x40d530` only posts commands `0x0f/0x10/0x11/0x12` to update button state
+- page-`7` primary button / Enter dispatch command `11`
+  - this is a page-transition path, not the direct resolve/writeback path
+- list double-click `0x40d820` dispatches command `8`
+  - this is the tighter direct `0x40d6f0 -> optional patch gate -> DAT_004d259c / quit` corridor
+- observer callback `0x40f070` code `0x21` also exits through the same quit-side unblock family
 
 ## New clarification from current scaffold work
 

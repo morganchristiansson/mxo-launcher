@@ -242,6 +242,43 @@ Bounded practical consequence:
 - but the helper body itself still looks like selection validation/writeback, not the whole modal /
   observer wait that keeps original startup blocked until auth + character choice are complete
 
+### New credential-submit sibling-slot clarification
+
+A second sibling slot now matters on the launcher login-page side too.
+
+Fresh static review of `launcher.exe:0x4943e0` shows another binder registration with the same
+interface string:
+
+- wrapper object: `0x4d282c`
+- output slot: `0x4d2734`
+- service string: `"ILTLoginMediator.Default"`
+
+That slot is now important because the manual nopatch credential page on the launcher dialog uses it
+concretely:
+
+- page `6` rich-edit key handler `0x408840`
+  - collects the first input string, then the second input string
+- submit helper `0x408400`
+  - trims the first string
+  - copies the second string
+  - builds the exact stack layout now associated with owner `0x41ecd0`
+    - `+0x00` username
+    - `+0x20` password
+    - zeroed `block40/block50`
+    - small-string at `+0x60`
+  - registers observer callback `0x4091d0` through sibling slot `+0x170`
+  - then calls sibling slot `+0x30` with that stack block
+- callback `0x4091d0`
+  - handles success/error through sibling slots `+0x34/+0x58/+0x5c/+0x60/+0x174/+0x178`
+  - on success dispatches launcher dialog command `7`
+
+Important negative result:
+- this dialog-side producer corridor is now concrete
+- but the exact static bridge from sibling slot `0x4d2734 + 0x30` to owner
+  `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` is still unresolved
+- so current source should keep the trusted implementation boundary on owner `0x41ecd0` while
+  documenting this launcher-side producer separately as the nearest upstream submit surface
+
 ## Early method surface observed so far
 
 ### Launcher-observed offsets on `0x4d2c58`

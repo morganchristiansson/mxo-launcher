@@ -2377,7 +2377,7 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 // - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
 // - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
 // - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
-// - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName
+// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList / available-world list population
 //
 // VTABLE METHODS (at offset +0xc from object pointer):
 // +0xfc = GetWorldNameByIndex(index) -> char* world name string
@@ -2419,7 +2419,7 @@ void* CLTLoginMediator::WorldSlot(uint32_t index) const {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void* CLTLoginMediator::WorldPayloadSlot(uint32_t index) const {
     // Faithful implementation should call:
-    // - launcher.exe:0x40e6c0 = ILTLoginMediator_GetAvailableWorldName(index)
+    // - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList / available-world list population
     // - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
 
     // Transitional stub preserves the payload structure for later completion.

@@ -155,12 +155,12 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
     - shows the list control at `CLauncher+0xa0c`
     - registers observer callback `+0x170` when needed
     - immediately posts UI command `0x0f` through `0x405a20` to disable selection/continue controls
-    - then calls the world-list population helper at `0x40e6c0`
+    - then calls the world-list population helper at `0x40e480`
   - practical read: this is the launcher-owned selection-page setup that precedes later
     `0x40d530/0x40d820` interaction
 - `0x40f070`
   - callback registered from the same case-`7` selection-page setup
-  - on callback code `0x1c` it rebuilds the list through `0x40e6c0 -> 0x40e1c0`
+  - on callback code `0x1c` it rebuilds the list through `0x40e480 -> 0x40e1c0`
   - preserves the selected row by low-16 world index across that rebuild instead of by the full
     packed item-data dword
   - on callback code `0x21` it exits through `0x40b8f0` / quit-message path
@@ -210,8 +210,16 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
     - it is **not** an in-place match for the later mediator-owned `0xb4` input consumed by
       `0x41c1f0`
 - `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
-  - case `8` calls `0x40d6f0`
-  - on success it continues through patch-check / launch-side logic and eventually exits that UI path
+  - newer command split is tighter than the older single-success-path read:
+    - command `11`
+      - reached from the page-`7` primary button (`dialog +0x204`) and from Enter on page `7`
+      - enters page `6` when `0x4c8b1d == 0`, otherwise page `3`
+      - practical consequence: the primary page-`7` button is **not** the direct `0x40d6f0`
+        resolve/writeback path
+    - command `8`
+      - reached from list double-click `0x40d820`
+      - calls `0x40d6f0`
+      - on success continues through patch-check / launch-side logic and eventually exits that UI path
   - case `9` calls `0x40ec70`
     - newer decompile-backed tightening from that helper family:
       - it loads resource `0x0008` (`Deleted characters cannot be recovered. Are you certain...`) and
@@ -246,7 +254,20 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
     not the final arg7 writeback itself
 - `0x40d820 = LauncherSelectionList_OnDoubleClickActivate`
   - posts UI command id `8` back into `0x405a20`
-  - practical read: launcher double-click activation routes into the same selection-resolve action
+  - practical read: launcher double-click activation routes into the direct selection-resolve path,
+    while page-`7` primary-button / Enter still route through command `11`
+
+- newer manual credential-side tightening from the same dialog family now closes the upstream page
+  corridor better too:
+  - page `2` primary button command `11` enters page `6` on the nopatch branch (`0x4c8b1d == 0`)
+  - page `6` key handling runs through
+    `0x408ee0 -> 0x408840 -> 0x408400 -> 0x4091d0`
+  - `0x408400` builds the exact `0x41ecd0`-style credential block on the stack and submits it
+    through sibling resolved slot `0x4d2734` vtable `+0x30`
+  - callback success dispatches command `7`, which on the nopatch branch leads into page `11`
+  - page `11` Enter / command `10` returns to page `7`
+  - important negative result: the exact static bridge from sibling submit slot `0x4d2734` into
+    owner `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` is still open
 
 Practical consequence:
 
@@ -310,6 +331,7 @@ Implication for the replacement source:
   - the successful selection corridor on that dialog is now tighter too:
     - state-7 page setup `0x4047d0` shows the selection list, registers observer `0x40f070`, and
       posts UI command `0x0f`
+    - page-`7` primary button / Enter post command `11`, which is a page-transition path
     - list double-click `0x40d820` posts command `8` into `0x405a20`
     - `0x405a20` case `8` calls `0x40d6f0`
     - case `8` falls through to `DAT_004d259c = 1` only when:

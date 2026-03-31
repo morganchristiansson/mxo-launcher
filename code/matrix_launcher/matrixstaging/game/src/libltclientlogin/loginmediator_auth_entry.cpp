@@ -48,6 +48,19 @@ static void AssignOwnedSmallStringForAuthEntry(
 }
 
 // anchor: launcher.exe:0x41ecd0 / owner vtable +0x24
+// Current upstream launcher dialog tightening around the same input shape:
+// - manual nopatch login on page state `6` routes keystrokes through
+//   `0x408840 = LauncherLoginRichEdit_HandlePromptInputCharacter`
+// - its submit helper `0x408400 = LauncherLoginRichEdit_SubmitCredentialsViaResolvedLoginService`
+//   builds the same stack block layout now used here:
+//   - `+0x00` username
+//   - `+0x20` password
+//   - zeroed `block40/block50`
+//   - small-string at `+0x60`
+// - that helper then submits through sibling resolved slot `0x4d2734` vtable `+0x30`
+// - important negative result: the exact static bridge from that sibling submit surface to the
+//   owner-side `0x41ecd0` call is still open, so the current replacement keeps the nearest
+//   faithful implementation boundary on `ProcessLoginRequest` itself
 static bool BuildConfiguredProcessLoginRequestInput(
     const CLTLoginMediator& mediator,
     ProcessLoginRequestInputSketch* outInput,
@@ -420,10 +433,15 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     // Current replacement-side fidelity correction:
     // - original launcher password submit does not jump straight into `0x439210` with an
     //   out-of-band username/password store
-    // - owner vtable `+0x24` / `0x41ecd0 = ProcessLoginRequest` is the earlier anchored API that
-    //   accepts the username/password block, copies it into owner `+0x94`, clears owner `+0xf4`
-    //   on the happy path, and then performs the observed `state0 -> state2 -> state1 -> state2`
-    //   chain feeding the owner `+0x680` bootstrap child
+    // - upstream dialog tightening now shows the manual nopatch page-`6` rich-edit host collecting
+    //   username then password and building the exact `0x41ecd0`-style stack block before handing
+    //   it to sibling resolved slot `0x4d2734` vtable `+0x30`
+    // - but that sibling submit surface is still not statically closed as the direct
+    //   `0x41ecd0 = ProcessLoginRequest` caller
+    // - keep the exact trusted owner boundary on `0x41ecd0` anyway: it is the earlier anchored API
+    //   that accepts the username/password block, copies it into owner `+0x94`, clears owner
+    //   `+0xf4` on the happy path, and then performs the observed
+    //   `state0 -> state2 -> state1 -> state2` chain feeding the owner `+0x680` bootstrap child
     // - preserve the older direct state2 fallback only when we are no longer in the initial idle
     //   helper or when no launcher-configured auth block is available to mirror through
     //   `ProcessLoginRequest`

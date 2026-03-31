@@ -409,12 +409,19 @@ bool CLauncher::ParseCommandLineStage() const {
     }
 
     // UNANCHORED replacement bridge toward the original launcher-owned login prompt:
-    // - launcher.exe could gather missing username/password before client.dll load
-    // - when `-user` / `-pwd` are supplied, the original launcher pre-fills and auto-submits the
-    //   same login flow rather than bypassing it
-    // - replacement startup now mirrors that bounded behavior on stdin/CLI:
-    //   use provided credentials as launcher-flow prefill, prompt only when absent, then feed the
-    //   recovered submit path through `0x41ecd0 = ProcessLoginRequest`
+    // - newer nopatch/manual-login tightening now gives the closest launcher dialog corridor:
+    //   - page `2` primary button (`dialog +0x204`, command `11`) enters page `6` when
+    //     `g_LauncherGlobal4C8B1D004c8b1d == 0`
+    //   - page `6` rich-edit host (`dialog +0x95c`) uses
+    //     `0x408ee0/0x408840/0x408400/0x4091d0` to gather username, gather password, submit the
+    //     exact `0x41ecd0`-style stack block, and handle success/error callbacks
+    //   - important negative result: that sibling submit surface (`0x4d2734` vtable `+0x30`) is
+    //     still not statically closed as the direct `0x41ecd0` caller
+    // - when `-user` / `-pwd` are supplied, the original launcher still behaves like prefill +
+    //   auto-submit for the same launcher flow rather than as a bypass
+    // - replacement startup therefore keeps the nearest trusted owner boundary on
+    //   `0x41ecd0 = ProcessLoginRequest`: use provided credentials as launcher-flow prefill, prompt
+    //   only when absent, then feed the recovered owner-side submit path
     // - character choice is no longer required up front on the CLI path; after successful auth the
     //   replacement now chooses from the recovered launcher-owned character list before client load
     if (!PromptForMissingLauncherCredentialsIfNeeded()) {
@@ -860,10 +867,13 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 &selectedDescriptorIndex)) {
             // anchor: launcher.exe owner-side selection commit pair 0x41c390 -> 0x41c1f0
             // Bounded no-GUI bridge:
-            // - original launcher UI eventually resolves selection through the list/dialog path
-            //   (`0x4047d0` selection-page setup -> observer-refreshed list `0x40f070/0x40e1c0`
-            //   -> `0x40d530/0x40d820` list interaction -> `0x405a20` command `8`
-            //   -> `0x40d6f0` launcher-side selection resolve/writeback)
+            // - page-`7` launcher UI now has two distinct action families that should stay split:
+            //   - selection-changed `0x40d530` only posts commands `0x0f/0x10/0x11/0x12` to toggle
+            //     the page-`7` buttons
+            //   - page-`7` primary button (`dialog +0x204`) and Enter key dispatch command `11`,
+            //     which transitions into page `6` / page `3` instead of directly resolving arg7
+            //   - list double-click `0x40d820` dispatches command `8`, which is the tighter direct
+            //     `0x40d6f0 -> optional patch gate -> DAT_004d259c/quit` unblock corridor
             // - newer bridge tightening keeps the ownership split narrower than a launcher-local
             //   `+0xec` caller:
             //   - launcher closes selection into `CLauncher+0xa8/+0xac` plus `Last_WorldName`
@@ -958,6 +968,7 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     } else {
         spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
+    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented, but the no-GUI host still enters at owner 0x41ecd0 instead of reconstructing the exact sibling 0x4d2734 submit surface");
     spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
     spdlog::info("file/access gate status: original 0x40b790..0x40b7af _access(DAT_004d4cbc,0) / 0x41ab10(0) side path is still not modeled on the replacement path");
     spdlog::info("");
