@@ -410,18 +410,21 @@ bool CLauncher::ParseCommandLineStage() const {
 
     // UNANCHORED replacement bridge toward the original launcher-owned login prompt:
     // - launcher.exe could gather missing username/password before client.dll load
-    // - replacement startup now prompts on stdin for those two fields when absent, then feeds the
-    //   recovered submit path later through `0x41ecd0 = ProcessLoginRequest`
-    // - `-char` remains required because the broader faithful selection/login UI is still absent
+    // - when `-user` / `-pwd` are supplied, the original launcher pre-fills and auto-submits the
+    //   same login flow rather than bypassing it
+    // - replacement startup now mirrors that bounded behavior on stdin/CLI:
+    //   use provided credentials as launcher-flow prefill, prompt only when absent, then feed the
+    //   recovered submit path through `0x41ecd0 = ProcessLoginRequest`
+    // - character choice is no longer required up front on the CLI path; after successful auth the
+    //   replacement now chooses from the recovered launcher-owned character list before client load
     if (!PromptForMissingLauncherCredentialsIfNeeded()) {
         return false;
     }
 
     const bool hasUser = (g_LauncherCommandLine.AuthUsername()[0] != '\0');
     const bool hasPwd = (g_LauncherCommandLine.AuthPassword()[0] != '\0');
-    const bool hasChar = (g_LauncherCommandLine.LauncherCharacter()[0] != '\0');
-    if (!hasUser || !hasPwd || !hasChar) {
-        spdlog::error("ERROR: replacement launcher currently requires prompted/provided user+pwd and a -char argument");
+    if (!hasUser || !hasPwd) {
+        spdlog::error("ERROR: replacement launcher currently requires prompted/provided user+pwd for the launcher-owned login flow");
         return false;
     }
 
@@ -705,7 +708,7 @@ bool CLauncher::RunRecoveredPreClientBringupStage() const {
 // UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
 // This intentionally moves launcher auth sequencing earlier so client.dll load can happen only
 // after successful launcher-owned auth plus a selected recovered character.
-bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() const {
+bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
     g_PreClientAuthAndCharacterSelectionCompleted = false;
     if (!DiagnosticCanBeginAuthConnection()) {
         spdlog::error("ERROR: pre-client auth cannot begin because the launcher-mediated auth bridge is unavailable");
@@ -816,19 +819,67 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() const {
             }
         }
 
-        if (!DiagnosticSelectRecoveredCharacter(selectedCharacterIndex)) {
+        char selectedCharacterName[256] = {};
+        char selectedWorldName[256] = {};
+        uint32_t selectedDescriptorIndex = 0u;
+        if (!DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
+                selectedCharacterIndex,
+                selectedCharacterName,
+                sizeof(selectedCharacterName),
+                selectedWorldName,
+                sizeof(selectedWorldName),
+                &selectedDescriptorIndex)) {
             spdlog::error(
-                "ERROR: failed to seed pre-client recovered character selection index={} into mediator source block",
+                "ERROR: failed to adopt pre-client recovered character selection index={} into launcher/mediator state",
                 static_cast<unsigned>(selectedCharacterIndex));
             return false;
         }
 
+        if (selectedCharacterName[0]) {
+            g_LauncherCommandLine.SetLauncherCharacter(selectedCharacterName);
+        }
+
+        if (selectedWorldName[0]) {
+            std::strncpy(g_LastWorldName, selectedWorldName, sizeof(g_LastWorldName) - 1u);
+            g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
+            StoreLastWorldNameInRegistry(g_LastWorldName);
+
+            if (const RecoveredLauncherSelectionRecord* recoveredSelection =
+                    FindRecoveredLauncherSelectionRecord(selectedWorldName)) {
+                m_FieldA8 = recoveredSelection->variantIndexHigh8;
+                m_FieldAC = recoveredSelection->worldIndexLow24;
+                g_PackedArg7Selection = BuildPackedArg7Selection();
+                DiagnosticConfigureMediatorSelection(
+                    (m_FieldAC < 0xffu) ? (m_FieldAC + 1u) : 1u,
+                    (m_FieldA8 < 0xffu) ? (m_FieldA8 + 1u) : 1u,
+                    recoveredSelection->worldName,
+                    recoveredSelection->worldName,
+                    m_FieldAC,
+                    m_FieldA8,
+                    recoveredSelection->selectionGateByte100,
+                    recoveredSelection->variantState);
+                spdlog::info(
+                    "DIAGNOSTIC: CLI launcher selection adopted recovered world '{}' -> descriptorIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
+                    recoveredSelection->worldName,
+                    static_cast<unsigned>(selectedDescriptorIndex),
+                    m_FieldA8,
+                    m_FieldAC,
+                    g_PackedArg7Selection);
+            } else {
+                spdlog::warn(
+                    "WARNING: selected world '{}' has no recovered launcher selection record; keeping existing a8/ac while persisting Last_WorldName",
+                    selectedWorldName);
+            }
+        }
+
         g_PreClientAuthAndCharacterSelectionCompleted = true;
         spdlog::info(
-            "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} characterCount={} selectedIndex={}",
+            "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} characterCount={} selectedIndex={} character='{}' world='{}'",
             static_cast<unsigned>(DiagnosticLastLoginEvent()),
             static_cast<unsigned>(characterCount),
-            static_cast<unsigned>(selectedCharacterIndex));
+            static_cast<unsigned>(selectedCharacterIndex),
+            selectedCharacterName[0] ? selectedCharacterName : "<unresolved>",
+            selectedWorldName[0] ? selectedWorldName : "<unresolved>");
         return true;
     }
 }

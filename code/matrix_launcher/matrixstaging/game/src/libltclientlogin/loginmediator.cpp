@@ -1745,10 +1745,26 @@ const SlotRecordState004b5328* CLTLoginMediator::RecoveredCharacterByIndexScaffo
 // UNANCHORED: source-owned pre-client launcher helper that seeds the later `+0x120` source block
 // from a recovered auth-reply character slot before client.dll load.
 bool CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold(uint32_t slotIndex) {
+    return AdoptRecoveredCharacterSelectionForLauncherScaffold(
+        slotIndex,
+        nullptr,
+        0u,
+        nullptr,
+        0u,
+        nullptr);
+}
+
+bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
+    uint32_t slotIndex,
+    char* outCharacterName,
+    uint32_t outCharacterNameCapacity,
+    char* outWorldName,
+    uint32_t outWorldNameCapacity,
+    uint32_t* outDescriptorIndex) {
     const SlotRecordState004b5328* slotRecord = RecoveredCharacterByIndexScaffold(slotIndex);
     if (!slotRecord || slotRecord->heapString14.empty()) {
         spdlog::info(
-            "CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold rejected slotIndex={} (missing slot record or name)",
+            "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold rejected slotIndex={} (missing slot record or name)",
             static_cast<unsigned>(slotIndex));
         return false;
     }
@@ -1756,26 +1772,57 @@ bool CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold(uint32_t slotInde
     const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord->worldId0c);
     if (matchedWorldIndex < 0) {
         spdlog::info(
-            "CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold rejected slotIndex={} name='{}' worldId=0x{:04x} (no recovered world descriptor)",
+            "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold rejected slotIndex={} name='{}' worldId=0x{:04x} (no recovered world descriptor)",
             static_cast<unsigned>(slotIndex),
             slotRecord->heapString14.c_str(),
             static_cast<unsigned>(slotRecord->worldId0c));
         return false;
     }
 
+    const char* worldName = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex));
+    if (outCharacterName && outCharacterNameCapacity != 0u) {
+        outCharacterName[0] = '\0';
+        std::strncpy(outCharacterName, slotRecord->heapString14.c_str(), outCharacterNameCapacity - 1u);
+        outCharacterName[outCharacterNameCapacity - 1u] = '\0';
+    }
+    if (outWorldName && outWorldNameCapacity != 0u) {
+        outWorldName[0] = '\0';
+        if (worldName && worldName[0]) {
+            std::strncpy(outWorldName, worldName, outWorldNameCapacity - 1u);
+            outWorldName[outWorldNameCapacity - 1u] = '\0';
+        }
+    }
+    if (outDescriptorIndex) {
+        *outDescriptorIndex = static_cast<uint32_t>(matchedWorldIndex);
+    }
+
     CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
     const uint32_t seedResult = MirrorCharacterSeedIntoSourceBlock120Scaffold(
         slotRecord->heapString14.c_str(),
         static_cast<uint32_t>(matchedWorldIndex));
+
+    State3SelectionContextInputSketch selectionContext = {};
+    selectionContext.slotOrSelectionIndex00 = slotIndex;
+    // anchor: launcher.exe:0x41c1f0
+    // Bounded CLI-faithful bridge:
+    // - original launcher UI eventually commits character selection through the owner-side
+    //   state3(wait)->state8 selection snapshot writer
+    // - our no-GUI path still lacks the real launcher UI producer for the surrounding `0xb4` block
+    // - so for now keep only the proven slot/index commit and preserve the rest as zero until that
+    //   upstream producer is recovered
+    const uint32_t persistResult = PersistSelectionContextForState8(selectionContext);
+
     spdlog::info(
-        "CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x}",
+        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} persistResult=0x{:08x}",
         static_cast<unsigned>(slotIndex),
         slotRecord->heapString14.c_str(),
         static_cast<unsigned>(slotRecord->worldId0c),
         matchedWorldIndex,
+        (worldName && worldName[0]) ? worldName : "<null>",
         static_cast<unsigned>(CharacterRouteIndexCc8()),
-        static_cast<unsigned>(seedResult));
-    return seedResult == 0u;
+        static_cast<unsigned>(seedResult),
+        static_cast<unsigned>(persistResult));
+    return seedResult == 0u && persistResult == 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

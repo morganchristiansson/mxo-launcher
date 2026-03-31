@@ -1586,6 +1586,24 @@ bool DiagnosticSelectRecoveredCharacter(uint32_t slotIndex) {
     return mediator ? mediator->SelectRecoveredCharacterByIndexScaffold(slotIndex) : false;
 }
 
+bool DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
+    uint32_t slotIndex,
+    char* outCharacterName,
+    uint32_t outCharacterNameCapacity,
+    char* outWorldName,
+    uint32_t outWorldNameCapacity,
+    uint32_t* outDescriptorIndex) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->AdoptRecoveredCharacterSelectionForLauncherScaffold(
+                          slotIndex,
+                          outCharacterName,
+                          outCharacterNameCapacity,
+                          outWorldName,
+                          outWorldNameCapacity,
+                          outDescriptorIndex)
+                    : false;
+}
+
 // UNANCHORED: diagnostic profile/session-name configurator for arg6.
 void DiagnosticConfigureMediatorProfileName(const char* profileName) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();

@@ -1274,6 +1274,13 @@ public:
     uint32_t RecoveredCharacterCountScaffold() const;
     const SlotRecordState004b5328* RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const;
     bool SelectRecoveredCharacterByIndexScaffold(uint32_t slotIndex);
+    bool AdoptRecoveredCharacterSelectionForLauncherScaffold(
+        uint32_t slotIndex,
+        char* outCharacterName,
+        uint32_t outCharacterNameCapacity,
+        char* outWorldName,
+        uint32_t outWorldNameCapacity,
+        uint32_t* outDescriptorIndex);
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
     // Keep the instance-role split explicit in source:
     // - the wrapper-facing `ILTLoginMediator.Default` mirror should capture the source block even

@@ -50,6 +50,13 @@ uint32_t DiagnosticLastLoginError();
 uint32_t DiagnosticRecoveredCharacterCount();
 bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_t outNameCapacity);
 bool DiagnosticSelectRecoveredCharacter(uint32_t slotIndex);
+bool DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
+    uint32_t slotIndex,
+    char* outCharacterName,
+    uint32_t outCharacterNameCapacity,
+    char* outWorldName,
+    uint32_t outWorldNameCapacity,
+    uint32_t* outDescriptorIndex);
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);

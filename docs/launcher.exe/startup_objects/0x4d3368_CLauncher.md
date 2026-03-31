@@ -150,6 +150,13 @@ Practical consequence:
 - current best mediator-side **selection commit** anchor remains:
   - `0x41c1f0 = CLTLoginMediator_PersistSelectionContextAndSwitchToState8`
   - sibling narrower variant: `0x41c390 = CLTLoginMediator_SetSelectionIndexAndSwitchToState7`
+- launcher CLI-faithfulness consequence from the newer pass:
+  - original `-user` / `-pwd` should be treated as launcher-login **prefill + auto-submit** inputs,
+    not as permission to bypass the launcher-owned login flow
+  - a no-GUI replacement therefore should not require `-char` up front
+  - instead it should submit credentials through the same launcher-owned auth path first, then only
+    after successful auth adopt a recovered character selection and mirror the selection commit into
+    the mediator-side `0x41c1f0` boundary before client load
 - so the remaining high-value question is the caller/message path that bridges launcher UI selection
   into those mediator-side writers and only then lets `InitInstance` resume into `0x40b7af`
 

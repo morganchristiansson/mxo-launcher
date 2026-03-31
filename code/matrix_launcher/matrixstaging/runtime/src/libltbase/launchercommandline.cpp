@@ -143,8 +143,18 @@ void CLauncherCommandLine::SetAuthPassword(const char* value) {
     CopyIntoFixedBuffer(authPassword_, sizeof(authPassword_), value ? value : "");
 }
 
+// UNANCHORED: replacement-only CLI mirror of launcher UI character prefill.
+void CLauncherCommandLine::SetLauncherCharacter(const char* value) {
+    CopyIntoFixedBuffer(launcherCharacter_, sizeof(launcherCharacter_), value ? value : "");
+}
+
 const char* CLauncherCommandLine::LauncherSession() const {
     return launcherSession_;
+}
+
+// UNANCHORED: replacement-only CLI mirror of launcher UI session prefill.
+void CLauncherCommandLine::SetLauncherSession(const char* value) {
+    CopyIntoFixedBuffer(launcherSession_, sizeof(launcherSession_), value ? value : "");
 }
 
 bool CLauncherCommandLine::SwitchClone() const {

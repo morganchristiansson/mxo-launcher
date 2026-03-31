@@ -65,7 +65,7 @@ public:
     bool RunRecoveredPreClientBringupStage() const;
 
     // UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
-    bool RunPreClientAuthAndCharacterSelectionStage() const;
+    bool RunPreClientAuthAndCharacterSelectionStage();
 
     // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
     void LogInitInstanceFaithfulnessGaps() const;

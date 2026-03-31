@@ -39,7 +39,9 @@ public:
     const char* LauncherCharacter() const;
     void SetAuthUsername(const char* value);
     void SetAuthPassword(const char* value);
+    void SetLauncherCharacter(const char* value);
     const char* LauncherSession() const;
+    void SetLauncherSession(const char* value);
 
     bool SwitchClone() const;
     bool SwitchSilent() const;
