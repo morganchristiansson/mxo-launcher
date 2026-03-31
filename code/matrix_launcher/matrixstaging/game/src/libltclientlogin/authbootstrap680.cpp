@@ -702,20 +702,29 @@ static bool BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(
         outPublicKey);
 }
 
-// anchor: launcher.exe:0x468f80 / 0x44aec0
-// Current bounded source-side hypothesis for the common validator-family `+0x2c` path.
-// Newer decompilation proves both callsites do *not* jump straight to one leaf verifier; they go
-// through `0x437ba0`, which:
-// - asks the outer validator for a temporary worker object through vtable `+0x1c`
-// - loads the signature into that worker through vtable `+0x20 / 0x468520`
-// - feeds caller bytes through the worker's own vtable `+0x0c`
-// - then asks the outer validator to finalize through vtable `+0x28`
+// anchor: launcher.exe:0x468f80 / 0x44aec0 / 0x467ee0 / 0x4680a0 / 0x468e20
+// Static RE now closes the common validator-family finalize path tightly enough to mirror the real
+// launcher call shape instead of a generic RSA-signature guess:
+// - `0x437ba0` allocates a temporary worker through validator vtable `+0x1c`
+// - `0x468520` loads the signature by applying the outer RSA public-key path and storing the
+//   encoded representative bytes into worker `+0x14/+0x18`
+// - worker vtable `+0x0c / 0x447340` feeds caller bytes into the worker-local MD5 object
+//   returned by worker vtable `+0x44 / 0x447380`
+// - `0x445410` returns the 18-byte MD5 `DigestInfo` prefix at `0x004baefc`
+// - `0x468e20` builds the exact EMSA-PKCS1-v1_5 encoded block:
+//     [optional leading 0 when (modulusBitCount-1)&7 != 0]
+//     0x01 || 0xff... || 0x00 || DigestInfoPrefix || workerMd5Digest
+// - `0x4680a0` compares that generated block byte-for-byte against the worker's stored decoded
+//   signature bytes
 //
-// The helper below is therefore only the current source-side PKCS#1-v1.5-style hypothesis for
-// that still-untyped inner stack. Live runtime evidence already proves it false-negatives against
-// the real launcher/server path, so callers must keep it diagnostic-only until the validator body
-// is recovered more faithfully.
-static bool VerifyAuthBootstrap680ValidatorFamilyPkcs1HypothesisScaffold(
+// So the remaining source-side logic below is now a direct mirror of the recovered launcher
+// finalize semantics. Keep it source-local instead of pretending it is one recovered library
+// function: this helper is a composite mirror of the concrete launcher chain
+// `0x467ee0 -> 0x4680a0 -> 0x468e20 -> 0x445410`, not a single standalone leaf.
+// On the child `+0xac` path this intentionally means a second MD5 stage over
+// the caller's already-prebuilt 16-byte MD5 digest, because `0x44ae40` hashes signed-data first
+// and the temporary worker then hashes those 16 bytes again before the final compare.
+static bool VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     const uint8_t* signedBytes,
     size_t signedByteCount,
@@ -725,16 +734,32 @@ static bool VerifyAuthBootstrap680ValidatorFamilyPkcs1HypothesisScaffold(
         return false;
     }
 
+    static constexpr std::array<uint8_t, 0x12u> kMd5DigestInfoPrefix = {
+        0x30u, 0x20u, 0x30u, 0x0cu, 0x06u, 0x08u, 0x2au, 0x86u, 0x48u,
+        0x86u, 0xf7u, 0x0du, 0x02u, 0x05u, 0x05u, 0x00u, 0x04u, 0x10u,
+    };
+
     CryptoPP::RSA::PublicKey publicKey;
     if (!BuildAuthBootstrap680CryptoPublicKeyFromOwnedState(ownedState, &publicKey)) {
         return false;
     }
 
     const CryptoPP::Integer& modulus = publicKey.GetModulus();
-    const size_t modulusByteCount = static_cast<size_t>(modulus.ByteCount());
-    if (signatureByteCount != modulusByteCount || signedByteCount + 3u > modulusByteCount) {
+    const size_t modulusBitCount = static_cast<size_t>(modulus.BitCount());
+    if (modulusBitCount == 0u) {
         return false;
     }
+
+    const size_t modulusBitCountMinusOne = modulusBitCount - 1u;
+    const size_t representativeByteCount = (modulusBitCountMinusOne + 7u) >> 3u;
+    if (representativeByteCount == 0u || signatureByteCount != representativeByteCount) {
+        return false;
+    }
+
+    std::array<uint8_t, 16> workerMd5Digest{};
+    CryptoPP::Weak::MD5 md5;
+    md5.Update(signedBytes, signedByteCount);
+    md5.Final(workerMd5Digest.data());
 
     const CryptoPP::Integer signatureInteger(signatureBytes, signatureByteCount);
     if (signatureInteger >= modulus) {
@@ -742,36 +767,46 @@ static bool VerifyAuthBootstrap680ValidatorFamilyPkcs1HypothesisScaffold(
     }
 
     const CryptoPP::Integer representativeInteger = publicKey.ApplyFunction(signatureInteger);
-    std::vector<uint8_t> representativeBytes(modulusByteCount, 0u);
+    std::vector<uint8_t> representativeBytes(representativeByteCount, 0u);
     representativeInteger.Encode(representativeBytes.data(), representativeBytes.size());
 
-    const size_t signedDataOffset = representativeBytes.size() - signedByteCount;
-    if (signedDataOffset < 3u || representativeBytes[0] != 0x00u || representativeBytes[1] != 0x01u) {
+    std::vector<uint8_t> expectedEncodedBytes(representativeByteCount, 0u);
+    uint8_t* outputCursor = expectedEncodedBytes.data();
+    if ((modulusBitCountMinusOne & 7u) != 0u) {
+        *outputCursor++ = 0x00u;
+    }
+
+    if (expectedEncodedBytes.size() <
+        static_cast<size_t>(outputCursor - expectedEncodedBytes.data()) + 1u +
+            kMd5DigestInfoPrefix.size() + workerMd5Digest.size() + 1u) {
         return false;
     }
-    if (representativeBytes[signedDataOffset - 1u] != 0x00u) {
+
+    *outputCursor++ = 0x01u;
+    uint8_t* const digestStart =
+        expectedEncodedBytes.data() + expectedEncodedBytes.size() - workerMd5Digest.size();
+    uint8_t* const digestInfoStart = digestStart - kMd5DigestInfoPrefix.size();
+    if (digestInfoStart <= outputCursor) {
         return false;
     }
-    for (size_t i = 2u; i + 1u < signedDataOffset; ++i) {
-        if (representativeBytes[i] != 0xffu) {
-            return false;
-        }
-    }
-    return std::memcmp(
-               representativeBytes.data() + signedDataOffset,
-               signedBytes,
-               signedByteCount) == 0;
+
+    std::fill(outputCursor, digestInfoStart - 1u, 0xffu);
+    *(digestInfoStart - 1u) = 0x00u;
+    std::copy(kMd5DigestInfoPrefix.begin(), kMd5DigestInfoPrefix.end(), digestInfoStart);
+    std::copy(workerMd5Digest.begin(), workerMd5Digest.end(), digestStart);
+
+    return representativeBytes == expectedEncodedBytes;
 }
 
 }  // namespace
 
-bool AuthBootstrap680ReplyAuthDataValidatorACSketch::VerifySignatureHypothesisScaffold(
+bool AuthBootstrap680ReplyAuthDataValidatorACSketch::VerifySignatureRecoveredFinalizeScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     const uint8_t* signedBytes,
     size_t signedByteCount,
     const uint8_t* signatureBytes,
     size_t signatureByteCount) const {
-    return VerifyAuthBootstrap680ValidatorFamilyPkcs1HypothesisScaffold(
+    return VerifyAuthBootstrap680ValidatorFamilyRecoveredFinalizeScaffold(
         ownedState,
         signedBytes,
         signedByteCount,
@@ -785,9 +820,15 @@ namespace {
 // Static RE now closes the outer formula tightly even though the inner worker stack is still
 // bounded in source: `0x468ea0` computes
 //   ciphertextBlockBytes * ceil(plaintextByteCount / plaintextChunkBytes)
-// where ciphertext block bytes come from the reply modulus and plaintext chunk bytes come from the
-// worker's helper family. The OAEP-based source scaffold below is therefore still only a bounded
-// stand-in for that helper-family query, but it matches the recovered chunked-call shape.
+// where:
+// - ciphertext block bytes come from worker vtable `+0x24 -> 0x41f090 -> this+0x0c -> modulus`
+// - plaintext chunk bytes come from the helper family behind outer `this+4/+8`
+//   (`0x468f00` re-queries that chunk bound each loop)
+//
+// Disassembly also proves `0x468f00` pushes four stack args into worker vtable `+0x1c`, and
+// `0x468280` returns with `ret 0x10`; the decompiler undercounts that unless checked against the
+// assembly. The OAEP-based source scaffold below is therefore still only a bounded stand-in for
+// that helper-family query, but it matches the recovered chunked-call shape.
 static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     size_t plaintextByteCount) {
@@ -908,13 +949,15 @@ static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorSca
     // - convert the reply modulus big-int to exactly `0x80` bytes
     // - append the exponent low byte read from bit offset `0`
     // - pass the reply signature buffer to validator vtable `+0x2c` with fixed byte count `0x100`
-    // So the current live false negative is much more likely to sit in the still-unmodeled
-    // validator-family internals and/or the `qspubkey.dat` init path than in this signed-byte span
-    // selection itself.
+    // Combined with the recovered finalize path, source now mirrors this exactly as:
+    // - worker MD5 over those `0x81` bytes
+    // - EMSA-PKCS1-v1_5(MD5) block build
+    // - byte-for-byte compare against the RSA-decoded representative
+    // Current live fallback-key runs now pass through this source-side validator path.
     std::array<uint8_t, 0x81u> signedReplyPublicKeyBytes{};
     std::copy(reply.modulusBytes.begin(), reply.modulusBytes.end(), signedReplyPublicKeyBytes.begin());
     signedReplyPublicKeyBytes.back() = reply.publicExponentByte;
-    return child.lazyPubkeyDatValidatorA4->VerifySignatureHypothesisScaffold(
+    return child.lazyPubkeyDatValidatorA4->VerifySignatureRecoveredFinalizeScaffold(
         ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c,
         signedReplyPublicKeyBytes.data(),
         signedReplyPublicKeyBytes.size(),
@@ -940,11 +983,13 @@ static bool VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold(
     // `0x44ae40/0x44aec0` now closes the caller-side bytes tightly too:
     // - build MD5 over copied signed-data `this+0x80 .. +0x135` (`0xb6` bytes)
     // - then call validator vtable `+0x2c(md5Digest10, 0x10, this, 0x80)`
-    // So the current live false negative here likewise points at the shared validator-family
-    // internals, not at the MD5 span or the copied `0x80`-byte signature slice.
+    // Combined with the recovered finalize path, source now mirrors this exactly as a second MD5
+    // stage inside the worker before the EMSA-PKCS1-v1_5(MD5) compare. Current live runs now pass
+    // this source-side validator path too, so the copied `0xb6`-byte span and `0x80`-byte
+    // signature slice are now enforced instead of bypassed.
     std::array<uint8_t, 16> md5Digest10{};
     BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold(copyShadow, &md5Digest10);
-    return child.replyAuthDataValidatorAC->VerifySignatureHypothesisScaffold(
+    return child.replyAuthDataValidatorAC->VerifySignatureRecoveredFinalizeScaffold(
         validatorOwnedState.publicKeyPair0c,
         md5Digest10.data(),
         md5Digest10.size(),
@@ -1360,16 +1405,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
                     ownedState.replyAuthDataValidatorAC,
                     copyShadowCandidate);
             if (!replyAuthDataValidatorAccepted) {
-                // Static `0x44aec0` proves child `+0xac` validates the copied `+0xf4` block before
-                // success-side adoption, but the exact validator-family implementation is still not
-                // recovered tightly enough to let source reject live replies here without risking
-                // launcher-breaking false negatives. Keep the typed child `+0xac` validator object
-                // and the exact freshness/length gates above, but downgrade the signature result to
-                // diagnostic-only until the validator body is closed more faithfully.
-                spdlog::warn(
-                    "DIAGNOSTIC: source-side child+0xac reply validator rejected auth reply copyShadowF4 expiryAc=0x{:08x} authServerTimeBias80=0x{:08x}; continuing because 0x44aec0 validator semantics are still incomplete in source",
-                    static_cast<unsigned>(ReadU32LE(copyShadowCandidate.signedData80.data() + 0x2cu)),
-                    static_cast<unsigned>(child.authServerTimeBias80));
+                return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
             mediator.SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
@@ -1838,17 +1874,8 @@ uint32_t AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplySc
     const bool lazyPubkeyDatValidatorAccepted =
         VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorScaffold(mediator, child, reply);
     if (!lazyPubkeyDatValidatorAccepted) {
-        // Static `0x468f80` proves the lazy child `+0xa4` validator participates in raw-`0x07`
-        // handling, but the exact `qspubkey.dat` init + validator-family semantics are still not
-        // recovered tightly enough to let source reject live servers here without false negatives.
-        // Keep the typed `+0xa4`/`+0xa8`/`+0xac` object model, but make this source-side
-        // reimplementation diagnostic-only until the validator path is closed more faithfully.
-        spdlog::warn(
-            "DIAGNOSTIC: source-side child+0xa4 lazy pubkey validator rejected raw0x07 publicKeyId={} modulusLen={} signatureLen={} exponentByte=0x{:02x}; continuing because 0x447c10/0x468f80 semantics are still incomplete in source",
-            static_cast<unsigned>(reply.publicKeyId),
-            static_cast<unsigned>(reply.modulusBytes.size()),
-            static_cast<unsigned>(reply.signatureBytes.size()),
-            static_cast<unsigned>(reply.publicExponentByte));
+        child.authRequestReadyA0 = 0u;
+        return 1u;
     }
 
     ResetAuthBootstrap680ReplyPublicKeyWorkers(child, ownedState);

@@ -93,6 +93,35 @@ static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, modulu
 static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, exponent1c) == 0x1cu);
 static_assert(sizeof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch) == 0x40u);
 
+struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
+    // Temporary `0x48`-byte helper allocated by
+    // `0x4382c0 = AuthBootstrap680Raw08PublicKeyWorker_CreatePerChunkWorker` and consumed by
+    // `0x468280 = AuthBootstrap680Raw08PublicKeyWorker_EncryptChunkIntoCiphertext`.
+    //
+    // Strong current bounded map from `0x438120 / 0x4382c0 / 0x468280`:
+    // - final vtable `0x004b4478`
+    // - `+0x14` = constructor-initialized `0x100`-byte scratch/buffer helper
+    // - `+0x30` = caller arg1 captured from `0x468280`
+    // - `+0x34` = outer raw-`0x08` worker pointer
+    // - `+0x40/+0x44` = ctor-zeroed tail state used by the chunk path
+    //
+    // `0x468280` proves this helper is part of the exact launcher encrypt path, but its inherited
+    // filter/transform family is still too loose to claim a faithful source reimplementation.
+    uint32_t vtable00 = 0u;
+    uint32_t helperVtable04 = 0u;
+    std::array<uint8_t, 0x28> reserved08To2f{};
+    uint32_t capturedArg30 = 0u;
+    void* ownerWorker34 = nullptr;
+    uint32_t reserved38 = 0u;
+    uint32_t reserved3c = 0u;
+    uint32_t tailState40 = 0u;
+    uint32_t tailState44 = 0u;
+};
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, capturedArg30) == 0x30u);
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ownerWorker34) == 0x34u);
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, tailState40) == 0x40u);
+static_assert(sizeof(AuthBootstrap680Raw08PerChunkWorker48Sketch) == 0x48u);
+
 struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     // Concrete `+0xa8` worker family rebuilt by `0x447780` through:
     // - pool `0x466580` (`size = 0x5c`)
@@ -105,7 +134,11 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     // - final vtable `0x004b75e4`
     // - `+0x0c` = common RSA public-key pair subobject above
     // - vtable `+0x1c` = per-chunk encrypt step used from `0x468f00`
+    //   - disassembly proves `0x468f00` pushes four stack args here and `0x468280` returns
+    //     with `ret 0x10`; the decompiler undercounts this unless checked against assembly
+    // - vtable `+0x20` = allocate the temporary `0x48` helper above
     // - vtable `+0x24` = ciphertext-block/modulus query consumed by `0x468ea0/0x468f00`
+    // - vtable `+0x28` = same tiny getter reused again
     // - `0x468f00` itself loops over plaintext chunks and advances the packet-builder output by one
     //   ciphertext block per iteration
     // - `+0x4c/+0x50/+0x54/+0x58` = ctor-seeded helper/vtable family still kept raw pending deeper
@@ -137,6 +170,49 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
 static_assert(offsetof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch, publicKeyPair0c) == 0x0cu);
 static_assert(sizeof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch) == 0x5cu);
 
+struct AuthBootstrap680ValidatorTemporaryWorker84Sketch {
+    // Temporary validator worker allocated by `0x4472f0` through pool `0x4665b0` (`size = 0x84`)
+    // and returned from validator vtable `0x004b7580 +0x1c`.
+    //
+    // Strong current inner-worker map from `0x4472f0 / 0x447390 / 0x468520 / 0x447340`:
+    // - final vtable `0x004b7668`
+    // - ctor-stage vtable `0x004b76b0`
+    // - `+0x14/+0x18` = decoded-signature representative byte count / pointer written by
+    //   `0x468520` after the outer validator applies its RSA public-key path to the signature
+    // - `+0x34` and `+0x48` = adjacent `0x14`-byte big-int objects seeded by `0x45d000`
+    // - `+0x5c` = one-byte ready/empty-update flag toggled by `0x447340`
+    // - `+0x60` = MD5 accumulator object initialized by `0x43d410`; worker vtable `+0x44`
+    //   returns `this+0x60`
+    //
+    // Keep the untouched front-matter dwords reserved until the remaining inherited helper
+    // families on `0x004b7668 / 0x004b76b0` are named more tightly.
+    uint32_t vtable00 = 0u;
+    uint32_t reserved04 = 0u;
+    uint32_t reserved08 = 0u;
+    uint32_t reserved0c = 0u;
+    uint32_t reserved10 = 0u;
+    uint32_t decodedSignatureByteCount14 = 0u;
+    void* decodedSignatureBytes18 = nullptr;
+    uint32_t reserved1c = 0u;
+    uint32_t reserved20 = 0u;
+    uint32_t reserved24 = 0u;
+    uint32_t reserved28 = 0u;
+    uint32_t reserved2c = 0u;
+    uint32_t reserved30 = 0u;
+    AuthBootstrap680BigIntObject20Scaffold bigInt34{};
+    AuthBootstrap680BigIntObject20Scaffold bigInt48{};
+    uint8_t readyOrEmptyUpdateFlag5c = 0u;
+    std::array<uint8_t, 3> padding5d{};
+    std::array<uint8_t, 0x24> md5Accumulator60{};
+};
+static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, decodedSignatureByteCount14) == 0x14u);
+static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, decodedSignatureBytes18) == 0x18u);
+static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, bigInt34) == 0x34u);
+static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, bigInt48) == 0x48u);
+static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, readyOrEmptyUpdateFlag5c) == 0x5cu);
+static_assert(offsetof(AuthBootstrap680ValidatorTemporaryWorker84Sketch, md5Accumulator60) == 0x60u);
+static_assert(sizeof(AuthBootstrap680ValidatorTemporaryWorker84Sketch) == 0x84u);
+
 struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
     // Concrete validator family used at child `+0xa4` and `+0xac`:
     // - `0x447260` allocates this family lazily for the `qspubkey.dat` validator at child `+0xa4`
@@ -144,7 +220,7 @@ struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
     // - pool `0x4665a0` (`size = 0x54`)
     // - ctor `0x447020 = AuthBootstrap680ReplyAuthDataValidator_ConstructFromReplyPublicKey`
     // - high-value vtable chain now closed from `0x468f80 / 0x44aec0`:
-    //   - `+0x1c` = allocate/return a temporary validator worker object
+    //   - `+0x1c` = allocate/return the `0x84` temporary validator worker above
     //   - `+0x20` = load signature bytes into that worker (`0x468520`)
     //   - `+0x28` = finalize verification on the temporary worker
     //   - `+0x2c` = convenience wrapper that performs allocate/load/finalize around caller bytes
@@ -152,8 +228,11 @@ struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
     // Current concrete layout certainty:
     // - final vtable `0x004b7580`
     // - `+0x0c` = same RSA public-key pair subobject used by the raw-`0x08` worker
-    // - `+0x4c/+0x50` = ctor-seeded helper/vtable family still kept raw pending deeper recovery
-    //   of the exact validator inheritance stack
+    // - helper family now points much more specifically at RSA/EMSA-PKCS1-v1_5(MD5):
+    //   - `0x446f30` builds the algorithm string `RSA/EMSA-PKCS1-v1_5(MD5)`
+    //   - `0x445410` returns the 18-byte MD5 `DigestInfo` prefix used by the finalize path
+    // - `+0x4c/+0x50` = ctor-seeded helper/vtable family still kept raw pending the last naming
+    //   pass over the inherited validator stack
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
     uint32_t helperVtable08 = 0u;
@@ -167,7 +246,7 @@ struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
         const uint8_t* modulusBytes,
         size_t modulusByteCount,
         uint8_t exponentByte);
-    bool VerifySignatureHypothesisScaffold(
+    bool VerifySignatureRecoveredFinalizeScaffold(
         const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
         const uint8_t* signedBytes,
         size_t signedByteCount,
