@@ -840,6 +840,10 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             // - current source now keeps the closest recovered interface on the mediator side first:
             //   build partial state3 selection context from recovered slot/world state, then commit
             //   through the owner pair before client.dll load
+            // - newer selection-page RE still keeps the missing producer boundary open:
+            //   the launcher row nodes built by `0x40e480` / replayed by `0x40e1c0` are only
+            //   `0x48`-byte UI payload nodes (packed low/high indices, four strings, one dword
+            //   flag, one timestamp), so they are not yet evidence for the full `0xb4` owner input
             // - the full original launcher UI producer for the rest of the `0xb4` selection snapshot
             //   remains under reconstruction
             spdlog::error(

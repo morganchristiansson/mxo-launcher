@@ -168,9 +168,34 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
     a one-shot static producer
 - `0x40e1c0`
   - repaints the visible list from the launcher-owned node list at `CListCtrl+0x68`
-  - current mode byte `0x4d3588` selects one of two iteration orders / node layouts
+  - newer node-layout tightening from `0x40dbb0/0x40dc40/0x40d8d0/0x40dfd0` now makes that list
+    materially more concrete:
+    - the real row object is `0x48` bytes
+    - layout is:
+      - `+0x00/+0x04` = intrusive next/prev pointers
+      - `+0x08` = total-world index dword
+      - `+0x0c` = active-world index dword (`0xffff` when unmatched)
+      - `+0x10/+0x1c/+0x28/+0x34` = four copied display strings
+      - `+0x40` = dword availability/sort-class flag
+      - `+0x44` = `GetTickCount()` stamp from row creation
+    - `0x40e480` builds those rows through `0x40dc40 -> 0x40dbb0`
+    - `0x40e1c0` has two replay modes:
+      - direct row-node iteration
+      - wrapper-node iteration where node `+0x04` points at the real `0x48` row object and the
+        replay path then consumes that pointed row's payload
+    - current mode byte `0x4d3588` plus comparator `0x40cf40` drive the sort/replay behavior:
+      - mode `1` compares row string `+0x08`
+      - mode `2` compares row string `+0x14`
+      - mode `3` compares row string `+0x20`
+      - mode `4` compares numeric `atoi(+0x2c)`
+      - mode `5` uses the `+0x14/+0x20` status class family with `+0x44` timestamp tiebreak
+      - mode `0` falls back to direct unsorted row order
   - it rehydrates each row's packed item data from stored low/high 16-bit indices and restores the
     selected row by matching the remembered low-16 world index
+  - negative result for the deeper mediator bridge:
+    - this launcher-owned row payload is still only a `0x40` UI display/sort snapshot
+    - it is **not** an in-place match for the later mediator-owned `0xb4` input consumed by
+      `0x41c1f0`
 - `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
   - case `8` calls `0x40d6f0`
   - on success it continues through patch-check / launch-side logic and eventually exits that UI path
@@ -241,3 +266,9 @@ Implication for the replacement source:
   `0x40b7af..0x40b7c7`?
 - How does that earlier UI path synchronize with the mediator-side state3 selection-context writers
   `0x41c390 / 0x41c1f0` on the successful-auth branch?
+- New negative result from this pass:
+  - direct xrefs to mediator commit writers still do not close the upstream bridge
+  - `0x41c1f0` currently shows only the vtable data reference at `0x004b02b4`
+  - sibling `0x41c3c0` likewise only shows its vtable data reference at `0x004b02e8`
+  - so the real launcher-side producer still appears to reach these through object dispatch rather
+    than a simple direct caller xref that can be recovered trivially from the code browser

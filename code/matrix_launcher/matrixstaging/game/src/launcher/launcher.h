@@ -18,6 +18,35 @@ struct RecoveredLauncherStartupContext {
     uint32_t nopatchClientVersionValue;
 };
 
+// launcher.exe:0x40dc40 / 0x40d8d0 / 0x40e1c0
+// Launcher-owned selection-page row payload kept in the `CListCtrl+0x68` node list.
+// Current static-RE tightening from the live selection-page family:
+// - `0x40e480` builds one 0x48-byte row node per visible world entry
+// - the payload stores two indices, four strings, one dword flag, and one dword timestamp
+// - `0x40e1c0` later repaints from that stored payload instead of re-querying every column cell
+// - negative result for the deeper mediator bridge: this row payload is only a 0x40-byte display /
+//   sort / packed-item snapshot and is not yet evidence for the later mediator-owned `0xb4`
+//   `0x41c1f0` selection-context input block
+struct LauncherSelectionRowPayload40Sketch {
+    uint32_t totalWorldIndex00 = 0;        // low 16 bits later reused as packed item-data low word
+    uint32_t activeWorldIndex04 = 0;       // low 16 bits later reused as packed item-data high word
+    char column0WorldName08[0x0c] = {};   // copied by `0x40dc40`
+    char column1Display14[0x0c] = {};     // copied by `0x40dc40`
+    char column2Status20[0x0c] = {};      // copied by `0x40dc40`
+    char column3Population2c[0x0c] = {};  // copied by `0x40dc40`
+    uint32_t availabilityOrSortClass38 = 0; // source dword from `0x40e480` local `+0xfdd8`
+    uint32_t tickCount3c = 0;              // `GetTickCount()` at row creation time
+};
+
+struct LauncherSelectionRowNode48Sketch {
+    LauncherSelectionRowNode48Sketch* next = nullptr;
+    LauncherSelectionRowNode48Sketch* prev = nullptr;
+    LauncherSelectionRowPayload40Sketch payload08 = {};
+};
+
+static_assert(sizeof(LauncherSelectionRowPayload40Sketch) == 0x40, "row payload size drifted");
+static_assert(sizeof(LauncherSelectionRowNode48Sketch) == 0x48, "row node size drifted");
+
 // anchor: launcher.exe:0x004abfe0
 // anchor: launcher.exe:0x4097f0
 class CLauncher {

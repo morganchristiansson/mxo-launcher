@@ -198,6 +198,15 @@ That is important because the current arg7-selection writer is now closed to the
   - avoid routing those anchored getters back through separate unanchored
     `Arg6MappedSelectionName` / `Arg6MappedVariantName` / selected-state helpers when the same
     values can live in the table the original launcher-side world-list code actually walks
+- newer `0x40dbb0/0x40dc40/0x40d8d0/0x40e1c0` tightening also makes the launcher-owned list row
+  storage materially more concrete:
+  - row object size = `0x48`
+  - payload = two indices, four copied strings, one dword availability/sort-class field, one tick
+    count timestamp
+  - `0x40e1c0` can replay that either directly from the row list or indirectly through a wrapper
+    node whose `+0x04` points at the real row object
+  - negative result: that launcher row payload is still only UI display/sort state, not an obvious
+    direct match for the mediator-owned `0xb4` selection-context block committed later by `+0xec`
 - the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
   `CListCtrl`-style selection UI object rather than on a raw config parser path
 

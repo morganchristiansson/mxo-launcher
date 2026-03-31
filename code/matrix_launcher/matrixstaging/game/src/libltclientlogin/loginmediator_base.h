@@ -249,6 +249,13 @@ struct State3SelectionContextInputSketch {
     //   - `block04[2]`    = current slot/world id
     //   - `block04[3]`    = matched world-descriptor index
     //   - `block14[0..3]` = current arg7-style world/variant/gate/state summary
+    // - newer launcher selection-page tightening still does **not** close the remaining `0xb4`
+    //   producer question:
+    //   - row nodes built by `0x40e480` / repainted by `0x40e1c0` are only `0x48` bytes total
+    //   - their payload covers packed low/high row indices, four visible strings, and one dword
+    //     availability/sort field
+    //   - that launcher-owned node layout therefore looks like UI display/sort state, not a direct
+    //     in-place match for this mediator-owned `0xb4` commit block
     uint32_t slotOrSelectionIndex00 = 0;            // input `+0x00`, must be `< 100`
     std::array<uint32_t, 4> block04{};             // input `+0x04 .. +0x13`
     std::array<uint32_t, 4> block14{};             // input `+0x14 .. +0x23`
