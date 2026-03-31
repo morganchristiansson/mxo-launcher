@@ -141,22 +141,42 @@ A concrete new anchor on that earlier phase is the launcher selection writer:
   - writes the final split selection into `CLauncher+0xa8/+0xac`
     (`0x4d3410 / 0x4d3414`)
 
+New surrounding launcher-UI tightening now narrows the upstream caller path too:
+
+- `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
+  - case `8` calls `0x40d6f0`
+  - on success it continues through patch-check / launch-side logic and eventually exits that UI path
+- `0x40d530 = LauncherSelectionList_OnSelectionChanged`
+  - samples the current list selection through the same sibling mediator slot `0x4d3584`
+  - posts UI command ids `0x0f`, `0x10`, `0x11`, or `0x12` back into `0x405a20`
+  - practical read: this is launcher-side enable/disable/status control for the selection action,
+    not the final arg7 writeback itself
+- `0x40d820 = LauncherSelectionList_OnDoubleClickActivate`
+  - posts UI command id `8` back into `0x405a20`
+  - practical read: launcher double-click activation routes into the same selection-resolve action
+
 Practical consequence:
 
 - `CLauncher+0xa8/+0xac` are not merely late synthetic launch parameters
 - they are written by a launcher-owned selection UI path before the client-load corridor
 - but `0x40d6f0` still looks like **selection resolution/writeback**, not the whole blocking gate by
   itself
-- current best mediator-side **selection commit** anchor remains:
+- current best mediator-side **selection commit** anchors are now best treated as a pair:
+  - `0x41c390 = CLTLoginMediator_SetSelectionIndexAndSwitchToState7`
   - `0x41c1f0 = CLTLoginMediator_PersistSelectionContextAndSwitchToState8`
-  - sibling narrower variant: `0x41c390 = CLTLoginMediator_SetSelectionIndexAndSwitchToState7`
 - launcher CLI-faithfulness consequence from the newer pass:
   - original `-user` / `-pwd` should be treated as launcher-login **prefill + auto-submit** inputs,
     not as permission to bypass the launcher-owned login flow
   - a no-GUI replacement therefore should not require `-char` up front
   - instead it should submit credentials through the same launcher-owned auth path first, then only
     after successful auth adopt a recovered character selection and mirror the selection commit into
-    the mediator-side `0x41c1f0` boundary before client load
+    the mediator-side `0x41c390 -> 0x41c1f0` boundary before client load
+- current bounded source consequence:
+  - the no-GUI launcher bridge now does exactly that paired owner-side commit
+  - but the surrounding `0xb4` snapshot for `0x41c1f0` is still only partially recovered: current
+    source fills the highest-confidence fields (slot/index, character id pair, world id,
+    descriptor index, current arg7-selection summary) while the original launcher UI producer for
+    the rest of the block remains unresolved
 - so the remaining high-value question is the caller/message path that bridges launcher UI selection
   into those mediator-side writers and only then lets `InitInstance` resume into `0x40b7af`
 

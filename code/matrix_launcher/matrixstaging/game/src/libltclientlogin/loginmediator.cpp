@@ -1505,6 +1505,20 @@ void CLTLoginMediator::ResetSelectionContext0ecMirror() {
         selection0ecCount_);
 }
 
+// +0xf0
+// anchor: launcher.exe:0x41c390
+uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectionIndex) {
+    if (currentState_ && currentState_->DispatchPhaseCode() > 2u && selectionIndex < 100u) {
+        state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = static_cast<uint8_t>(selectionIndex & 0xffu);
+        // Bounded source note:
+        // - original `0x41c390` switches helper state to `7`
+        // - current active replacement route does not yet model a dedicated state7 scaffold here
+        // - keep the exact owner byte write anchored now, and let the later `0x41c1f0` state8
+        //   transition remain the concrete source-owned continuation on the no-GUI path
+    }
+    return 0u;
+}
+
 // +0xec
 // anchor: launcher.exe:0x41c1f0
 uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) {
@@ -1801,6 +1815,8 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
         slotRecord->heapString14.c_str(),
         static_cast<uint32_t>(matchedWorldIndex));
 
+    const uint32_t state7Result = SetSelectionIndexAndSwitchToState7(slotIndex);
+
     State3SelectionContextInputSketch selectionContext = {};
     selectionContext.slotOrSelectionIndex00 = slotIndex;
     // anchor: launcher.exe:0x41c1f0
@@ -1808,12 +1824,22 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
     // - original launcher UI eventually commits character selection through the owner-side
     //   state3(wait)->state8 selection snapshot writer
     // - our no-GUI path still lacks the real launcher UI producer for the surrounding `0xb4` block
-    // - so for now keep only the proven slot/index commit and preserve the rest as zero until that
-    //   upstream producer is recovered
+    // - keep the exact slot/index commit anchored through `0x41c390` first
+    // - then seed only the highest-confidence currently recovered fields in the `0xb4` block:
+    //   current character ids, world id, matched world-descriptor index, and current launcher
+    //   arg7-selection summary values
+    selectionContext.block04[0] = slotRecord->globalCharacterIdLow03;
+    selectionContext.block04[1] = slotRecord->globalCharacterIdHigh07;
+    selectionContext.block04[2] = static_cast<uint32_t>(slotRecord->worldId0c);
+    selectionContext.block04[3] = static_cast<uint32_t>(matchedWorldIndex);
+    selectionContext.block14[0] = Arg6SelectedWorldIndexLow24();
+    selectionContext.block14[1] = Arg6SelectedVariantIndexHigh8();
+    selectionContext.block14[2] = Arg6SelectedSelectionGateByte100();
+    selectionContext.block14[3] = Arg6SelectedVariantState();
     const uint32_t persistResult = PersistSelectionContextForState8(selectionContext);
 
     spdlog::info(
-        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} persistResult=0x{:08x}",
+        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} state7Result=0x{:08x} persistResult=0x{:08x} block04=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] block14=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}]",
         static_cast<unsigned>(slotIndex),
         slotRecord->heapString14.c_str(),
         static_cast<unsigned>(slotRecord->worldId0c),
@@ -1821,8 +1847,17 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
         (worldName && worldName[0]) ? worldName : "<null>",
         static_cast<unsigned>(CharacterRouteIndexCc8()),
         static_cast<unsigned>(seedResult),
-        static_cast<unsigned>(persistResult));
-    return seedResult == 0u && persistResult == 0u;
+        static_cast<unsigned>(state7Result),
+        static_cast<unsigned>(persistResult),
+        selectionContext.block04[0],
+        selectionContext.block04[1],
+        selectionContext.block04[2],
+        selectionContext.block04[3],
+        selectionContext.block14[0],
+        selectionContext.block14[1],
+        selectionContext.block14[2],
+        selectionContext.block14[3]);
+    return seedResult == 0u && state7Result == 0u && persistResult == 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

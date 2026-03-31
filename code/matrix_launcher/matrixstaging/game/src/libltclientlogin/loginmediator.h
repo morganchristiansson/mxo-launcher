@@ -1250,6 +1250,11 @@ public:
     // anchor: launcher.exe:0x41ecd0
     uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input);
 
+    // +0xf0
+    // anchor: launcher.exe:0x41c390
+    // Owner-side narrower state3-wait advance: stores selection index and switches to state7.
+    uint32_t SetSelectionIndexAndSwitchToState7(uint32_t selectionIndex);
+
     // +0xec
     // anchor: launcher.exe:0x41c1f0
     // Owner-side state3-wait advance: persists the selection/config snapshot and switches to state8.
