@@ -24,12 +24,17 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
     }
 
     // Address anchors:
-    // - launcher.exe:0x4401a0 / `0x43f300`
-    // Rebuild the owner auth-reply tables now in active scope:
-    // - `+0x688/+0x818/+0xd84` slot/world/route families
-    // - `+0x80/+0xcc8` summary/current-index fields
-    // This still does not reconstruct the separate later post-auth human-name / appearance writer
-    // rooted at owner `+0x108`.
+    // - launcher.exe:0x4401a0 slot-6 success branch
+    // - launcher.exe:0x43f300 slot-record initializer
+    // Direct `0x4401a0` tightening now makes the original success-side writeback more concrete:
+    // - allocate a new slot record into owner `+0x688[currentCount]`
+    // - copy the selected world-descriptor inline name into owner `+0x818[currentCount]`
+    // - write owner `+0xcc8 = currentCount`, then increment owner `+0x684`
+    // - copy current `CharacterName` (`+0x108`) plus parsed reply ids into that new slot record
+    // - then switch helper state to `11` and post event `0x14`
+    // Current source still rebuilds the broader recovered auth-reply tables rather than mirroring
+    // that one slot-record append byte-for-byte, but keep the success-side ownership on state10
+    // slot6 instead of inventing a mediator shortcut.
     mediator->worldSlots_.fill(nullptr);
     mediator->worldPayloadSlots_.fill(nullptr);
     mediator->slotRecordValid688_.fill(false);
@@ -241,7 +246,11 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // - `0x4401a0` belongs to `CLTLoginState_State10` slot 6, not to the mediator vtable
     // - non-`0x0b` packets are rejected here with owner `+0x80 = 0x12000005`
     // - parsed error replies switch helper state to `3` and post error `0x0b`
-    // - parsed success replies switch helper state to `11` and post event `0x14`
+    // - parsed success replies perform the owner-side slot-record/route-name writeback, switch
+    //   helper state to `11`, and post event `0x14`
+    // - immediate continuation after that success is now tighter too:
+    //   `state11 slot3 / 0x43c020 -> state11 slot6 / 0x440320 -> helper9 slot3 / 0x439780
+    //    -> owner 0x41de40`
     // - mediator now keeps only the staged auth bytes; the shared parse/adopt plus owner-state
     //   writeback helpers live here
     if (rawCode != 0x0bu) {

@@ -248,16 +248,17 @@ struct State3SelectionContextInputSketch {
     // - negative result from `0x43bd20`: the fixed packet dwords at `0x01/0x05` do **not** come
     //   from `block04[0..1]`; state8 slot3 fetches those character id dwords separately from the
     //   current slot record through owner vtable `+0x44`
-    // - current source-owned CLI bridge therefore only seeds the highest-confidence subset:
-    //   - `block04[0..1]` = current character id low/high (persisted here by the bridge, but not
-    //                       used as the state8 packet's fixed `0x01/0x05` GCID fields)
-    //   - `block04[2]`    = current slot/world id
-    //   - `block04[3]`    = matched world-descriptor index
-    //   - newer client-side layout tightening from `0x62170e2a..0x62170f48` now cuts against the
-    //     older bridge guess for `block14[0..3]`:
-    //     - the direct client-built handoff proves writes at `+0x00` and `+0x24..+0xa4`
-    //     - the intervening `+0x14` block is therefore currently better treated as zero on that
-    //       proven path than as a launcher-side arg7-summary payload
+    // - newer direct-producer tightening from `client.dll:0x6211d3e0 + 0x62170e2a..0x62170f48` is
+    //   stronger than the older bridge-side guess:
+    //   - the client first zero-initializes the full `0xb4` handoff
+    //   - then it only proves writes at `+0x00` and `+0x24..+0xa4`
+    //   - practical consequence: the proven direct success-side path leaves both `block04` and
+    //     `block14` zero
+    // - current source-owned CLI bridge now mirrors that tighter direct-producer read:
+    //   - `block04[0..3]` remain zero in the persisted snapshot
+    //   - `block14[0..3]` remain zero in the persisted snapshot
+    //   - recovered slot-record GCID/world/descriptor data are kept only as separate diagnostic
+    //     shadow information, not as proven `+0xec` input semantics
     // - newer launcher/client bridge tightening narrows the remaining producer split further:
     //   - launcher-side selection UI now closes concretely through
     //     `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`, which writes
@@ -275,8 +276,8 @@ struct State3SelectionContextInputSketch {
     //   - that launcher-owned node layout therefore looks like UI display/sort state, not a direct
     //     in-place match for this mediator-owned `0xb4` commit block
     uint32_t slotOrSelectionIndex00 = 0;            // input `+0x00`, must be `< 100`
-    std::array<uint32_t, 4> block04{};             // input `+0x04 .. +0x13`
-    std::array<uint32_t, 4> block14{};             // input `+0x14 .. +0x23`
+    std::array<uint32_t, 4> block04{};             // input `+0x04 .. +0x13`; zero on the proven direct client path
+    std::array<uint32_t, 4> block14{};             // input `+0x14 .. +0x23`; zero on the proven direct client path
     std::array<uint32_t, 4> block24{};             // input `+0x24 .. +0x33`
     std::array<uint32_t, 4> block34{};             // input `+0x34 .. +0x43`
     std::array<uint32_t, 4> block44{};             // input `+0x44 .. +0x53`

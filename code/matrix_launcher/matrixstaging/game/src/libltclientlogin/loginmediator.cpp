@@ -1859,29 +1859,22 @@ bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold
     if (outInput) {
         *outInput = {};
         outInput->slotOrSelectionIndex00 = selectionIndex00;
-        // anchor: launcher.exe:0x41c1f0 / launcher.exe:0x43bd20 / client.dll:0x62170e2a..0x62170f48
-        // Bounded faithful bridge only for the highest-confidence recovered subset:
+        // anchor: launcher.exe:0x41c1f0 / launcher.exe:0x43bd20 / client.dll:0x6211d3e0 / client.dll:0x62170e2a..0x62170f48
+        // Tightened direct-producer read:
         // - original launcher-side resolution writes `CLauncher+0xa8`, and client
         //   `InitClientDLL_BeginLoadingCharacterFlow` then stores arg7 high-8 into the first dword
         //   of the stack-local `0xb4` handoff before arg6 `+0xec`
         // - `0x40ec70` likewise passes the active-world/high-word selection value to owner `+0xf0`
         // - practical consequence for the no-GUI bridge: use the launcher-selected high-8
         //   selection index here, not the recovered character slot index
-        // - `0x41c1f0` persists these dwords into the first two owner snapshot blocks
-        // - later state8 slot3 emits those as packet blocks `0x09` and `0x19`
+        // - the concrete client producer first zero-initializes all `0xb4` bytes through
+        //   `0x6211d3e0`, then only proves writes at `+0x00` and `+0x24..+0xa4`
+        // - so the proven direct success-side path leaves both `+0x04..+0x13` (`block04`) and
+        //   `+0x14..+0x23` (`block14`) as zero rather than sourcing them from launcher slot tables
         // - negative result from `0x43bd20`: fixed GCID packet fields `0x01/0x05` still come from
-        //   the current slot record fetched through owner vtable `+0x44`, not from `block04[0..1]`
-        outInput->block04[0] = slotRecord->globalCharacterIdLow03;
-        outInput->block04[1] = slotRecord->globalCharacterIdHigh07;
-        outInput->block04[2] = static_cast<uint32_t>(slotRecord->worldId0c);
-        outInput->block04[3] = static_cast<uint32_t>(matchedWorldIndex);
-        // Newer client-side layout tightening from `0x62170e2a..0x62170f48`:
-        // - after zero-init, the direct client-built `+0xec` handoff only proves writes at
-        //   `+0x00` and `+0x24..+0xa4`
-        // - the intervening `+0x14` block is therefore currently better treated as zero on that
-        //   proven path than as a launcher-side arg7-summary structure
-        // Keep `block04` as the last bounded pre-client bridge subset for now, but stop seeding the
-        // less-supported `block14` arg7 summary.
+        //   the current slot record fetched through owner vtable `+0x44`, not from persisted
+        //   `block04[0..1]`
+        outInput->block04 = {};
         outInput->block14 = {};
     }
     if (outDescriptorIndex) {
@@ -1892,20 +1885,24 @@ bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold
     }
 
     spdlog::info(
-        "CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold slotIndex={} selectionIndex00=0x{:02x} name='{}' worldId=0x{:04x} descriptorIndex={} block04=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] block14=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}]",
+        "CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold slotIndex={} selectionIndex00=0x{:02x} name='{}' worldId=0x{:04x} descriptorIndex={} persistedBlock04=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] persistedBlock14=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] recoveredSlotShadow=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}]",
         static_cast<unsigned>(slotIndex),
         static_cast<unsigned>(selectionIndex00 & 0xffu),
         slotRecord->heapString14.c_str(),
         static_cast<unsigned>(slotRecord->worldId0c),
         matchedWorldIndex,
-        outInput ? outInput->block04[0] : slotRecord->globalCharacterIdLow03,
-        outInput ? outInput->block04[1] : slotRecord->globalCharacterIdHigh07,
-        outInput ? outInput->block04[2] : static_cast<uint32_t>(slotRecord->worldId0c),
-        outInput ? outInput->block04[3] : static_cast<uint32_t>(matchedWorldIndex),
-        outInput ? outInput->block14[0] : Arg6SelectedWorldIndexLow24(),
-        outInput ? outInput->block14[1] : Arg6SelectedVariantIndexHigh8(),
-        outInput ? outInput->block14[2] : Arg6SelectedSelectionGateByte100(),
-        outInput ? outInput->block14[3] : Arg6SelectedVariantState());
+        outInput ? outInput->block04[0] : 0u,
+        outInput ? outInput->block04[1] : 0u,
+        outInput ? outInput->block04[2] : 0u,
+        outInput ? outInput->block04[3] : 0u,
+        outInput ? outInput->block14[0] : 0u,
+        outInput ? outInput->block14[1] : 0u,
+        outInput ? outInput->block14[2] : 0u,
+        outInput ? outInput->block14[3] : 0u,
+        slotRecord->globalCharacterIdLow03,
+        slotRecord->globalCharacterIdHigh07,
+        static_cast<uint32_t>(slotRecord->worldId0c),
+        static_cast<uint32_t>(matchedWorldIndex));
     return true;
 }
 

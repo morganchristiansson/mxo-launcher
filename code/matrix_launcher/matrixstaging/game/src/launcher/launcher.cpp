@@ -691,13 +691,23 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 //
 // Newer static RE tightens the original 0x402ec0 gate enough to keep one important ownership fact
 // explicit in source:
-// - `0x402ec0` is not a tiny setup helper; it launches the pre-client UI thread and then blocks,
-//   pumping messages until that launcher-thread/dialog path exits
-// - on the successful selection path, `0x405a20` case `8` first calls `0x40d6f0` to resolve the
-//   current list selection into `CLauncher+0xa8/+0xac` and `Last_WorldName`
-// - after the patch gate returns, that same case writes global `DAT_004d259c = 1`, calls
-//   `0x40b8f0`, posts quit, and thereby lets `0x402ec0` return non-zero so `InitInstance` can
-//   fall through to the later client-load corridor
+// - `0x402ec0` is not a tiny setup helper; it starts `CLauncherThread`
+//   (`runtimeclass 0x4aa134`, create object `0x403750`, InitInstance `0x407580`), then blocks
+// - that worker thread allocates the separate `0xb30` launcher dialog/controller object at
+//   `thread+0x48`, calls its window/control initializer `0x406470`, and marks dialog `+0x68` when
+//   the UI is ready
+// - `0x402ec0` waits for that dialog pointer + ready flag, then pumps messages until thread
+//   `+0x45` shows the launcher dialog path has exited
+// - on the successful selection path, the dialog's state-7 page setup (`0x4047d0`) registers the
+//   selection observer `0x40f070`, list interaction reaches `0x40d820 -> 0x405a20` case `8`, and
+//   case `8` first calls `0x40d6f0` to resolve the current list selection into
+//   `CLauncher+0xa8/+0xac` and `Last_WorldName`
+// - `0x405a20` case `8` only falls through to `DAT_004d259c = 1` when:
+//   - `0x40d6f0` succeeds
+//   - the optional patch gate either skips `0x40ac00` or `0x40ac00` returns `0`
+//   - mediator slot `+0x138` does not divert into the launchpad-gated state18 branch
+// - after that, case `8` calls `0x40b8f0`, posts quit, and thereby lets `0x402ec0` return
+//   non-zero so `InitInstance` can fall through to the later client-load corridor
 // - negative result kept explicit: this still does not make `0x40d6f0` or `0x405a20` the owner of
 //   mediator `+0xec`; the direct `+0xec` call is still later on the client side
 // The current source maps the 0x402ec0-style pre-client bringup and the optional 0x40b75a
@@ -1067,9 +1077,13 @@ bool CLauncher::InitInstance() {
 
     // Original corridor in 0x40b430:
     // - 0x40b74d..0x40b752: `0x402ec0` pre-client UI-thread/message gate
-    //   - blocks `InitInstance` until the launcher dialog path exits
-    //   - current best successful-selection exit is `0x405a20` case `8`:
-    //     `0x40d6f0` resolves selection -> patch gate -> `DAT_004d259c = 1` -> `0x40b8f0` -> quit
+    //   - starts `CLauncherThread`, waits for `thread+0x48` dialog + dialog `+0x68` ready, then
+    //     pumps messages until thread `+0x45` shows the launcher dialog path has exited
+    //   - state-7 page setup (`0x4047d0`) on that dialog registers observer `0x40f070`, while list
+    //     interaction reaches `0x40d820 -> 0x405a20` case `8`
+    //   - case `8` success is now tighter:
+    //     `0x40d6f0` resolves selection -> optional patch gate / `0x40ac00` -> mediator `+0x138`
+    //     must not divert -> `DAT_004d259c = 1` -> `0x40b8f0` -> quit
     //   - replacement consequence: launcher auth/selection should complete before the later
     //     `LoadCresDLL` / `LoadClientDLL` fallthrough too
     // - 0x40b75a..0x40b790: optional autodetect dialog path when 0x4d2c64 is set

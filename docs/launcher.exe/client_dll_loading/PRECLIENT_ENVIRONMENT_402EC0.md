@@ -14,48 +14,54 @@ It is not part of `client.dll` and it is not optional launcher fluff.
 
 ## Static evidence
 
-### Creates / starts a launcher-side object
-The function begins with:
-
-```asm
-push 0
-push 4
-push 0
-push 0
-push 0x4aa134
-call 0x48b970
-mov  edi, eax
-```
-
-The nearby rdata includes the string:
+### Starts `CLauncherThread`
+The function begins with `AfxBeginThread((CRuntimeClass *)0x4aa134, ...)`.
+The runtime-class record at `0x4aa134` contains the class-name string:
 
 - `CLauncherThread`
 
-which strongly suggests this path constructs or starts a launcher-thread-style object.
+and its create-object hook is now tightened as:
 
-### Waits for readiness
-It repeatedly polls fields in the returned object:
+- `0x403750 = CLauncherThread_CreateObject`
 
-- `[edi+0x48]`
-- `[edi+0x44]`
-- `[edi+0x45]`
+### `CLauncherThread` init allocates the real launcher dialog/controller object
+The thread's init path is now tightened too:
 
-with `Sleep(10)`-style waits between polls.
+- `0x407580 = CLauncherThread_InitInstance`
+  - allocates a separate `0xb30` CWnd-derived launcher dialog/controller object
+  - stores it at thread `+0x48`
+  - calls `0x406470` to create the window and child controls
+  - shows the window on success
+  - sets thread byte `+0x44` on init failure
 
-That means startup blocks until this launcher-side environment reaches a ready state.
+So the object `0x402ec0` waits on is not just an abstract thread shell.
+It is waiting for a worker thread whose `InitInstance` creates the real launcher dialog object.
 
-### Uses Windows messaging / event style APIs
-The function later loops over an API pair loaded from imports and repeatedly processes objects referenced through a local stack slot.
-This is consistent with message/event pumping or queued work processing before the client phase proceeds.
+### Waits for dialog creation and readiness
+`0x402ec0` repeatedly polls the returned thread object:
 
-### Uses a class / event identifier
-The path pushes:
+- thread `+0x48` = dialog/controller pointer
+- thread `+0x44` = init-failure flag
+- thread `+0x45` = thread/dialog exit-complete flag
 
-- `0x4aa134`
-- later `0x12`
-- and uses readiness flags in the created object
+When thread `+0x44 == 0`, it also waits for:
 
-which further supports the conclusion that this is launcher runtime setup, not dead code.
+- dialog `+0x68 != 0`
+
+The dialog initializer `0x406470` sets that `+0x68` byte after the window and controls are created.
+So `0x402ec0` blocks until the launcher dialog path is genuinely live.
+
+### Pumps the process message queue while blocked
+After the dialog is ready, `0x402ec0` repeatedly runs:
+
+- `PeekMessage`
+- `TranslateMessage`
+- `DispatchMessage`
+
+until thread `+0x45` becomes non-zero.
+Then it posts `WM_QUIT` (`0x12`) to the worker thread and waits again.
+
+This is a real pre-client launcher UI gate, not optional fluff.
 
 ## What it means for reimplementation
 
@@ -78,7 +84,19 @@ So a launcher that skips `0x402ec0` is still missing part of the original path.
 
 ## Current best interpretation
 
-`0x402ec0` likely establishes a launcher thread / message / event environment that the rest of the launcher assumes is live before handing off to the client.
+`0x402ec0` is the outer pre-client launcher UI gate used by `CLauncher::InitInstance`.
+Current best concrete corridor:
+
+- start `CLauncherThread`
+- thread `InitInstance` allocates the real launcher dialog/controller object
+- wait for dialog `+0x68` ready
+- pump process messages while that launcher dialog runs
+- successful selection later exits through launcher dialog code such as:
+  - state-7 page setup `0x4047d0`
+  - selection observer `0x40f070`
+  - command dispatcher `0x405a20`
+- that dialog path eventually sets `DAT_004d259c` and posts quit
+- only then does `0x402ec0` return so startup can continue into the DLL-load corridor
 
 ## New clarification from current scaffold work
 
@@ -116,9 +134,9 @@ That is useful evidence:
 
 ## Open questions
 
-- What exact concrete class is returned by `0x48b970` here?
-- Which import functions in the loops correspond to message retrieval / dispatch / wait operations?
-- Is this environment required by `InitClientDLL` directly, or by later launcher/client interaction during `RunClientDLL`?
+- What is the concrete class name of the separate `0xb30` launcher dialog/controller object allocated by `CLauncherThread_InitInstance`?
+- Which exact dialog method corresponds to the `0x406470` create-and-initialize body?
+- Is thread byte `+0x45` set by dialog destruction, by `ExitInstance`, or by a narrower thread helper on the quit path?
 
 ## Updated priority note
 

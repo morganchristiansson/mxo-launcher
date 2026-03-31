@@ -266,21 +266,20 @@ Practical consequence:
     the mediator-side `0x41c390 -> 0x41c1f0` boundary before client load
 - current bounded source consequence:
   - the no-GUI launcher bridge now does exactly that paired owner-side commit
-  - but the surrounding `0xb4` snapshot for `0x41c1f0` is still only partially recovered: current
-    source fills the highest-confidence fields (launcher-selected high-8 selection index and a
-    bounded `block04` character/world/descriptor subset) while the original launcher UI producer
-    for the rest of the block remains unresolved
-  - newer client-side layout tightening now also removes one older bridge guess:
-    - the direct client-built path only proves writes at `+0x00` and `+0x24..+0xa4`
-    - so the replacement no longer seeds `block14` with the old arg7-summary guess
+  - newer direct-producer tightening from `client.dll:0x6211d3e0 + 0x62170e2a..0x62170f48` narrows
+    the `0xb4` snapshot more than before:
+    - the client first zero-initializes the full handoff
+    - then only proves writes at `+0x00` and `+0x24..+0xa4`
+    - practical consequence: both `block04` (`+0x04..+0x13`) and `block14` (`+0x14..+0x23`) are
+      currently better treated as zero on the proven direct success-side path
   - newer owner-side tightening from `0x41c1f0 + 0x43bd20` matters for how far that bridge claim
     can go:
     - state8 later serializes the persisted snapshot blocks in packet order
       `0x09/0x19/0x29`, `0x79/0x89/0x99/0xa9`, then `0x39/0x49/0x59/0x69`
     - but the packet's fixed GCID dwords still come separately from the current slot record, not
       from persisted snapshot block `+0xcd0[0..1]`
-    - so the bridge's seeded character-id pair should still be treated as a bounded persisted-input
-      guess, not as proof that state8 slot3 reads those exact dwords back as the outbound GCID
+    - so recovered slot-record character/world/descriptor data should stay only as separate shadow
+      evidence for now, not as proven `+0xec` input semantics
 - so the remaining high-value question is the caller/message path that bridges launcher UI selection
   into those mediator-side writers and only then lets `InitInstance` resume into `0x40b7af`
 
@@ -297,15 +296,22 @@ Implication for the replacement source:
 - Which inherited base class does `CLauncher` derive from through the imported vtable thunks in `0x4abfe0`?
 - New answer for the outer blocking gate before `InitInstance` falls through:
   - `0x40b74d..0x40b752` calls `0x402ec0`
-  - `0x402ec0` starts the pre-client launcher UI thread, then pumps messages until that launcher
-    thread/dialog path exits
-  - on the successful selection path, `0x405a20` case `8`:
-    - calls `0x40d6f0`
-    - on success passes the patch gate (`0x4024c0`, current best read = patch-check cooldown gate
-      rooted in `DAT_004d2c54/DAT_004d3450`)
-    - writes `DAT_004d259c = 1`
-    - calls `0x40b8f0`
-    - posts quit
+  - `0x402ec0` starts `CLauncherThread` (`runtimeclass 0x4aa134`)
+    - `0x407580 = CLauncherThread_InitInstance` allocates the separate `0xb30` launcher
+      dialog/controller object and stores it at thread `+0x48`
+    - `0x406470` creates that dialog window + child controls and marks dialog `+0x68` ready
+    - `0x402ec0` waits for `thread+0x48`, waits for dialog `+0x68`, then pumps messages until
+      thread `+0x45` says the launcher dialog path has exited
+  - the successful selection corridor on that dialog is now tighter too:
+    - state-7 page setup `0x4047d0` shows the selection list, registers observer `0x40f070`, and
+      posts UI command `0x0f`
+    - list double-click `0x40d820` posts command `8` into `0x405a20`
+    - `0x405a20` case `8` calls `0x40d6f0`
+    - case `8` falls through to `DAT_004d259c = 1` only when:
+      - `0x40d6f0` succeeds
+      - the optional patch gate either skips `0x40ac00` or `0x40ac00` returns `0`
+      - mediator slot `+0x138` does not divert into the launchpad-gated state18 branch
+    - then it calls `0x40b8f0` and posts quit
   - that is the current best read for how original `InitInstance` stays blocked until launcher UI
     login/selection is complete before the later `0x40b7af..0x40b7c7` fallthrough
   - implementation consequence for the replacement launcher:
@@ -324,8 +330,8 @@ Implication for the replacement source:
   - practical consequence: the missing bridge is no longer best modeled as a hidden direct launcher
     virtual call into `+0xec`; it is a launcher-writeback-then-client-producer corridor
 - Remaining question:
-  - which exact launcher dialog / observer wait path keeps `InitInstance` blocked until the user has
-    completed login + character selection before the later `0x40b7af..0x40b7c7` fallthrough?
+  - what is the concrete class name of the separate `0xb30` launcher dialog/controller object whose
+    methods include `0x4047d0`, `0x405a20`, `0x40d530`, and `0x40d820`?
 - New negative result from this pass:
   - direct xrefs to mediator commit writers still do not close the upstream bridge
   - `0x41c1f0` currently shows only the vtable data reference at `0x004b02b4`

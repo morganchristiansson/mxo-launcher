@@ -374,6 +374,10 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             mediator->SwitchHelperStateScaffold(9u, nextBase);
         }
         // anchor: launcher.exe:0x440320 completion tail posts event 0x16 after switching to helper9.
+        // Next owner-controlled continuation is now tighter too:
+        // - helper9 slot3 (`0x439780`) immediately consumes that handoff word
+        // - it then calls owner `0x41de40`
+        // - later state9 slot6 raw `0x11` success switches to helper12 and posts event `0x18`
         mediator->PostEventScaffold(0x16u);
 
         spdlog::info(
