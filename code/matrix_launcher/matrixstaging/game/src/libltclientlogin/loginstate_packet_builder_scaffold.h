@@ -179,6 +179,39 @@ private:
     mxo::liblttcp::CMessageConnectionMessageRef messageRef_{};
 };
 
+struct State7Packet0x0dFixedPayload {
+    // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
+    // raw margin opcode `0x0d` = smaller current-selection/current-character route probe used by
+    // state7 (`0x43ba20`).
+    static constexpr uint8_t kPayloadTag0d = 0x0d;
+    static constexpr size_t kCharacterNameOffset = 0x01;
+    static constexpr size_t kCharacterIdLowOffset = 0x03;
+    static constexpr size_t kCharacterIdHighOffset = 0x07;
+    static constexpr size_t kFixedByteCount = 0x0b;
+};
+
+class State7Packet0x0dBuilder final : public RecoveredPacketBuilderEnvelope {
+public:
+    // anchor: launcher.exe:0x43a9a0
+    void ResetAndInitialize() {
+        ResizePayload(State7Packet0x0dFixedPayload::kFixedByteCount);
+        WritePayloadByte(0x00, State7Packet0x0dFixedPayload::kPayloadTag0d);
+        WritePayloadU16LE(State7Packet0x0dFixedPayload::kCharacterNameOffset, 0);
+        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdLowOffset, 0u);
+        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdHighOffset, 0u);
+    }
+
+    // anchor: launcher.exe:0x43aa80
+    void SetCharacterName(const char* text) {
+        AppendLengthPrefixedString(State7Packet0x0dFixedPayload::kCharacterNameOffset, text, 0xffffu);
+    }
+
+    void SetCharacterIdPair(uint32_t low, uint32_t high) {
+        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdLowOffset, low);
+        WritePayloadU32LE(State7Packet0x0dFixedPayload::kCharacterIdHighOffset, high);
+    }
+};
+
 struct State10Packet0x0aFixedPayload {
     // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
     // raw margin opcode `0x0a` = `MS_ClaimCharacterNameRequest`

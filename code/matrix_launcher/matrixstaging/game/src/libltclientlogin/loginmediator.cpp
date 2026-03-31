@@ -1514,9 +1514,16 @@ uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selection
         // - original `0x41c390` switches helper state to `7`
         // - one concrete launcher-side upstream caller now visible in static RE is
         //   `launcher.exe:0x40ec70`, reached from `0x405a20` case `9`, which:
+        //   - loads UI strings/resource `0x0008` (`Deleted characters cannot be recovered...`) and
+        //     `0x00aa`, confirms against the selected character name, then
         //   - reads the selected row item-data high word as a signed active-world index
         //   - calls sibling mediator slot `+0xf0` with that active-world index
-        //   - then waits for event `8` through `0x41b6c0`
+        //   - waits for event `8` through `0x41b6c0`
+        //   - on success (`WaitForEvent` returns `0`) deletes `Profiles\%s\%s`, calls sibling
+        //     `+0xe8 = 0x41ec00`, and rebuilds the list
+        // - practical consequence: the current concrete `0x40ec70 -> +0xf0 -> event 8` corridor is
+        //   now better read as the launcher's delete-character/removal action, not as the hidden
+        //   success-side producer for the later `+0xec / 0x41c1f0` `0xb4` commit
         // - negative result from that same helper family: it still does not expose the later
         //   `+0xec / 0x41c1f0` `0xb4` producer
         // - current active replacement route does not yet model a dedicated state7 scaffold here

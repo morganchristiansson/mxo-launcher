@@ -213,17 +213,23 @@ That is important because the current arg7-selection writer is now closed to the
   full `0xb4` bridge:
   - `0x405a20` case `9` calls `0x40ec70`
   - decompile now tightens that helper's exact launcher-side argument shape too:
+    - it uses resource `0x0008` (`Deleted characters cannot be recovered...`) as the confirmation
+      text and resource `0x00aa` as the caption, formatting the selected character name into the
+      prompt first
     - it reads the selected row item-data high word as a signed active-world index
     - passes that value to sibling mediator slot `+0xf0 = 0x41c390`
     - it then waits through `0x41b6c0` for event `8`
   - a direct launcher byte-pattern scan found that `0x40ed76` call as the current concrete
     launcher-side `+0xf0` site, while still finding no equally direct launcher callsite to `+0xec`
     or `+0x120`
-  - failure-side follow-on is now slightly tighter too:
-    - `0x40ec70` then calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`
-    - and rebuilds the world list through `0x40e480 -> 0x40e1c0`
-  - negative result: this still does not expose the later `+0xec = 0x41c1f0` producer, so it is
-    evidence for the narrower launcher-side selection-index/state7 action only
+  - success-side follow-on is now materially tighter too:
+    - when `WaitForEvent(8)` returns `0`, `0x40ec70` deletes `Profiles\%s\%s` via sibling `+0xdc`
+      then `+0x5c`, calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`, and rebuilds the world list through `0x40e480 -> 0x40e1c0`
+  - practical consequence: this concrete `+0xf0` callsite is now best read as a
+    **delete-character / removal corridor**, not as the hidden success-side producer for
+    `+0xec = 0x41c1f0`
+  - negative result: that means event `8` on this launcher path is currently tied to removal
+    completion, and this corridor still does not expose the later `+0xec = 0x41c1f0` producer
 - the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
   `CListCtrl`-style selection UI object rather than on a raw config parser path
 

@@ -214,14 +214,22 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
   - on success it continues through patch-check / launch-side logic and eventually exits that UI path
   - case `9` calls `0x40ec70`
     - newer decompile-backed tightening from that helper family:
+      - it loads resource `0x0008` (`Deleted characters cannot be recovered. Are you certain...`) and
+        formats it with the selected character name, using resource `0x00aa` as the message-box
+        caption
       - it reads the selected row item-data high word as a signed active-world index
       - calls sibling mediator slot `+0xf0 = 0x41c390` with that active-world index
       - waits through `0x41b6c0` for event `8`
-      - on failure it also calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`, then rebuilds the list through
-        `0x40e480 -> 0x40e1c0`
-      - but this still does **not** show the later `+0xec = 0x41c1f0` `0xb4` producer
-      - so it is evidence for an upstream launcher-side **selection-index/state7** action, not yet
-        for the full persisted selection-context commit
+      - on **success** (`WaitForEvent` result `0`) it:
+        - builds `Profiles\%s\%s` from sibling mediator `+0xdc` then `+0x5c`
+        - deletes that profile directory with `SHFileOperationA(FO_DELETE)` when present
+        - calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`
+        - rebuilds the list through `0x40e480 -> 0x40e1c0`
+      - practical consequence: this is now best read as the launcher **delete-character** command /
+        state7-event8 removal corridor, not as the hidden success-side producer for the later
+        `+0xec = 0x41c1f0` `0xb4` selection-context commit
+      - negative result: because this whole corridor is removal-oriented, it still does **not**
+        expose the later `+0xec = 0x41c1f0` producer
   - newer negative result from `0x405a20 + 0x40ac00`:
     - this success path immediately enters patch/launch-side work
     - it is **not** itself the mediator-owned selection commit boundary `0x41c390/0x41c1f0`
@@ -287,8 +295,9 @@ Implication for the replacement source:
 - Which launcher dialog / command handler / observer wait path calls `0x40d6f0` and blocks until the
   user has completed login + character selection before `InitInstance` falls through to
   `0x40b7af..0x40b7c7`?
-- How does that earlier UI path synchronize with the mediator-side state3 selection-context writers
-  `0x41c390 / 0x41c1f0` on the successful-auth branch?
+- How does the earlier UI path synchronize with the mediator-side state3 selection-context writers
+  `0x41c390 / 0x41c1f0` on the successful-auth branch, now that the concrete `0x40ec70 -> +0xf0 -> event 8`
+  corridor looks deletion-oriented rather than like the hidden success-side `+0xec` producer?
 - New negative result from this pass:
   - direct xrefs to mediator commit writers still do not close the upstream bridge
   - `0x41c1f0` currently shows only the vtable data reference at `0x004b02b4`
