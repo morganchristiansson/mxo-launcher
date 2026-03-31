@@ -205,8 +205,20 @@ That is important because the current arg7-selection writer is now closed to the
     count timestamp
   - `0x40e1c0` can replay that either directly from the row list or indirectly through a wrapper
     node whose `+0x04` points at the real row object
+  - `0x40f180` now closes `DAT_004d3588` more tightly as the replay/sort-mode selector that feeds
+    comparator `0x40cf40`
   - negative result: that launcher row payload is still only UI display/sort state, not an obvious
     direct match for the mediator-owned `0xb4` selection-context block committed later by `+0xec`
+- newer launcher-command tightening also narrows one upstream mediator callsite without solving the
+  full `0xb4` bridge:
+  - `0x405a20` case `9` calls `0x40ec70`
+  - `0x40ec70` explicitly calls sibling mediator slot `+0xf0 = 0x41c390`
+  - it then waits through `0x41b6c0` for event `8`
+  - a direct launcher byte-pattern scan found that `0x40ed76` call as the current concrete
+    launcher-side `+0xf0` site, while still finding no equally direct launcher callsite to `+0xec`
+    or `+0x120`
+  - negative result: this still does not expose the later `+0xec = 0x41c1f0` producer, so it is
+    evidence for the narrower launcher-side selection-index/state7 action only
 - the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
   `CListCtrl`-style selection UI object rather than on a raw config parser path
 

@@ -166,6 +166,19 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
   - on callback code `0x21` it exits through `0x40b8f0` / quit-message path
   - practical read: selection UI is observer-refreshed while the page is live; the list is not just
     a one-shot static producer
+- `0x40f180`
+  - newer secondary-family tightening now closes `DAT_004d3588` materially:
+    - it writes `DAT_004d3588 = columnIndex + 1`
+    - rotates per-column phase bytes in `0x004d358c[mode]`
+    - when that phase rolls back to `0`, it also clears `DAT_004d3588` to `0`
+    - then calls `0x40e1c0`
+  - together with comparator `0x40cf40`, current best read is:
+    - `DAT_004d3588 = 0` -> insertion-order replay
+    - `1` -> compare payload string `+0x08`
+    - `2` -> compare payload string `+0x14`
+    - `3` -> compare payload string `+0x20`
+    - `4` -> compare numeric `atoi(payload + 0x2c)`
+    - `5` -> special status-class compare with payload `+0x44` tick-count tiebreak
 - `0x40e1c0`
   - repaints the visible list from the launcher-owned node list at `CListCtrl+0x68`
   - newer node-layout tightening from `0x40dbb0/0x40dc40/0x40d8d0/0x40dfd0` now makes that list
@@ -199,6 +212,13 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
 - `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
   - case `8` calls `0x40d6f0`
   - on success it continues through patch-check / launch-side logic and eventually exits that UI path
+  - case `9` calls `0x40ec70`
+    - newer negative result from that helper family:
+      - it explicitly calls sibling mediator slot `+0xf0 = 0x41c390` with the selected row's
+        active-world index, then waits through `0x41b6c0` for event `8`
+      - but this still does **not** show the later `+0xec = 0x41c1f0` `0xb4` producer
+      - so it is evidence for an upstream launcher-side **selection-index/state7** action, not yet
+        for the full persisted selection-context commit
   - newer negative result from `0x405a20 + 0x40ac00`:
     - this success path immediately enters patch/launch-side work
     - it is **not** itself the mediator-owned selection commit boundary `0x41c390/0x41c1f0`
@@ -270,5 +290,8 @@ Implication for the replacement source:
   - direct xrefs to mediator commit writers still do not close the upstream bridge
   - `0x41c1f0` currently shows only the vtable data reference at `0x004b02b4`
   - sibling `0x41c3c0` likewise only shows its vtable data reference at `0x004b02e8`
-  - so the real launcher-side producer still appears to reach these through object dispatch rather
-    than a simple direct caller xref that can be recovered trivially from the code browser
+  - a byte-pattern scan for direct launcher virtual calls also found:
+    - one concrete launcher call to `+0xf0` at `0x40ed76`
+    - no matching direct launcher call sites to `+0xec` or `+0x120` on the current scan
+  - so the real launcher-side producer still appears to reach those later commit writers through a
+    narrower indirect/object-dispatch path than a simple easy-to-xref direct virtual call

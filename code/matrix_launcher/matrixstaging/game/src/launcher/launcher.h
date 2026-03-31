@@ -44,6 +44,15 @@ struct LauncherSelectionRowNode48Sketch {
     LauncherSelectionRowPayload40Sketch payload08 = {};
 };
 
+enum class LauncherSelectionListSortMode004d3588 : uint32_t {
+    kInsertionOrder = 0,
+    kWorldName = 1,          // `0x40cf40` compares payload `+0x08`
+    kDisplayName = 2,        // `0x40cf40` compares payload `+0x14`
+    kStatusText = 3,         // `0x40cf40` compares payload `+0x20`
+    kPopulationNumeric = 4,  // `0x40cf40` compares `atoi(payload + 0x2c)`
+    kStatusClassThenAge = 5, // special status-class compare with `+0x44` timestamp tiebreak
+};
+
 static_assert(sizeof(LauncherSelectionRowPayload40Sketch) == 0x40, "row payload size drifted");
 static_assert(sizeof(LauncherSelectionRowNode48Sketch) == 0x48, "row node size drifted");
 

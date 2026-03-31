@@ -10,6 +10,7 @@
 - Classes and methods should map directly to orignal launcher.exe vtable and implementation
 - Fields and methods should be ordered by VTable slot from launcher.exe
 - All fidelity improvements that don't require further exploration or static-RE investigation are in scope
+- When discovering new VTables on the active path, exploring, documenting and implementing them as C++ classes is a big improvement to fidelity.
 
 ## Rule 2: Keep launcher working
 
@@ -34,13 +35,15 @@ At end of task:
 - when finishing one area of work and the next task likely moves into a different area
   - pruning of code that is no longer needed and can be cleaned up
   - suggest areas where further fidelity gains can be made
+- Prefer batching tool calls
+- Prefer batched small edit tool calls over single large edit
 - When done, git add <paths ..> && git commit -m "<commit message>"
 
 # Ghidra MCP
 
 Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
 
-- Verify with disassembly tools when in doubt about calling conventions, stack cleanup, or field semantics
+- Prefer decompile and verify with disassembly when extra confidence is needed.
 - **Rename functions**: Sync method names with source code. When log message strings contain method names, use it. Otherwise use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - **Rename variables**: Sync variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - retype parameters / locals / globals in Ghidra when evidence supports it
@@ -49,6 +52,7 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 - when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
 - push confirmed Ghidra findings into source and canonical docs in the same task so knowledge does not live only in Ghidra
 - record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
+- Create function in ghidra when you have high confidence that it should be a function. You have done this before.
 
 ## Ghidra usage
 
@@ -62,9 +66,18 @@ mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "CLTSocketLayer_Init,
 # Disassemble a function
 mcp({ tool: "ghidra_disassemble_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
 
+# Current program info (tool requires an explicit program)
+mcp({ tool: "ghidra_get_current_program_info", args: '{"program": "launcher.exe"}' })
+
 # Get function callers/callees
+# NOTE: ghidra_get_function_callers / ghidra_get_function_callees take a FUNCTION NAME, not an address.
+# If you only have an address, first resolve/create the function, then query by name.
+mcp({ tool: "ghidra_get_function_by_address", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
 mcp({ tool: "ghidra_get_function_callers", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
 mcp({ tool: "ghidra_get_function_callees", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
+
+# Create a function when bytes clearly form one but Ghidra has not created it yet
+mcp({ tool: "ghidra_create_function", args: '{"address": "0x4472f0", "name": "AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker", "program": "launcher.exe"}' })
 
 # Get xrefs from/to an address
 mcp({ tool: "ghidra_get_xrefs_from", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
@@ -81,4 +94,10 @@ mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "
 
 # Read memory at an address
 mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "program": "launcher.exe"}' })
+
+# Search direct virtual-call byte patterns (example: call [edx+0xf0])
+mcp({ tool: "ghidra_search_byte_patterns", args: '{"pattern": "ff 92 f0 00 00 00", "mask": "xx xx xx xx xx xx", "program": "launcher.exe"}' })
+
+# Switch/discriminator tables near current function
+mcp({ tool: "ghidra_read_memory", args: '{"address": "0x41c4e4", "program": "launcher.exe", "length": 40}' })
 ```
