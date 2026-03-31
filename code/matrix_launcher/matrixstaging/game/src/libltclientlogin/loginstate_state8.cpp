@@ -526,6 +526,16 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     packetBuilder.SetFixedDword(0x05, currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u);
 
     // Keep block write order aligned with the original `0x43bd20` disassembly, not numeric order.
+    // Newer client-side layout aliasing helps interpret the later blocks too:
+    // - `cf0` = il.cfg
+    // - `d00` = hl.cfg
+    // - `d10` = an.cfg
+    // - `d20` = rl.cfg
+    // - `d30` = cl.cfg
+    // - `d40` = pi.cfg
+    // - `d50` = ai.cfg
+    // - `d60` = shared cs/bl temporary slot on the proven client path
+    // - `d70` = cui.cfg
     packetBuilder.SetSelectionBlock(0x09, mediator->SelectionContextBlockCd0());
     packetBuilder.SetSelectionBlock(0x19, mediator->SelectionContextBlockCe0());
     packetBuilder.SetSelectionBlock(0x29, mediator->SelectionContextBlockCf0());
@@ -544,7 +554,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     mediator->PostEventScaffold(0x09u);
 
     spdlog::debug(
-        "CLTLoginState_State8::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0={} d00={} d10={} d20={} d30={} d40={} d50={} d60={} d70={}",
+        "CLTLoginState_State8::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0(il.cfg)={} d00(hl.cfg)={} d10(an.cfg)={} d20(rl.cfg)={} d30(cl.cfg)={} d40(pi.cfg)={} d50(ai.cfg)={} d60(bl/cs.cfg)={} d70(cui.cfg)={}",
         FormatU32x4Block(mediator->SelectionContextBlockCd0()),
         FormatU32x4Block(mediator->SelectionContextBlockCe0()),
         FormatU32x4Block(mediator->SelectionContextBlockCf0()),

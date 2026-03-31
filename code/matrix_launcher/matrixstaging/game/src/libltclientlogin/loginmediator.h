@@ -1384,6 +1384,25 @@ public:
     const std::array<uint32_t, 4>& SelectionContextBlockD50() const { return state8SelectionContextSnapshotState_.blockD50; }
     const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return state8SelectionContextSnapshotState_.blockD60; }
     const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return state8SelectionContextSnapshotState_.blockD70; }
+    // New client-layout aliases from `client.dll:0x62170e2a..0x62170f48`:
+    // - `+0x24` = il.cfg
+    // - `+0x34` = hl.cfg
+    // - `+0x44` = an.cfg
+    // - `+0x54` = rl.cfg
+    // - `+0x64` = cl.cfg
+    // - `+0x74` = pi.cfg
+    // - `+0x84` = ai.cfg
+    // - `+0x94` = shared temp reused by cs.cfg then bl.cfg on the proven path
+    // - `+0xa4` = cui.cfg
+    const std::array<uint32_t, 4>& SelectionContextBlockIlCfg24() const { return state8SelectionContextSnapshotState_.blockCf0; }
+    const std::array<uint32_t, 4>& SelectionContextBlockHlCfg34() const { return state8SelectionContextSnapshotState_.blockD00; }
+    const std::array<uint32_t, 4>& SelectionContextBlockAnCfg44() const { return state8SelectionContextSnapshotState_.blockD10; }
+    const std::array<uint32_t, 4>& SelectionContextBlockRlCfg54() const { return state8SelectionContextSnapshotState_.blockD20; }
+    const std::array<uint32_t, 4>& SelectionContextBlockClCfg64() const { return state8SelectionContextSnapshotState_.blockD30; }
+    const std::array<uint32_t, 4>& SelectionContextBlockPiCfg74() const { return state8SelectionContextSnapshotState_.blockD40; }
+    const std::array<uint32_t, 4>& SelectionContextBlockAiCfg84() const { return state8SelectionContextSnapshotState_.blockD50; }
+    const std::array<uint32_t, 4>& SelectionContextBlockBlOrCsCfg94() const { return state8SelectionContextSnapshotState_.blockD60; }
+    const std::array<uint32_t, 4>& SelectionContextBlockCuiCfgA4() const { return state8SelectionContextSnapshotState_.blockD70; }
 
     // Later post-auth source block (`0x43c020`, `0x440320`):
     const std::array<char, 0x20>& SourceLeadString108() const { return postAuthMarginLoadingState_.sourceLeadString108; }

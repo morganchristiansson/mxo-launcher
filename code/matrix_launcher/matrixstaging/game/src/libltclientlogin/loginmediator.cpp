@@ -1839,10 +1839,14 @@ bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold
         outInput->block04[1] = slotRecord->globalCharacterIdHigh07;
         outInput->block04[2] = static_cast<uint32_t>(slotRecord->worldId0c);
         outInput->block04[3] = static_cast<uint32_t>(matchedWorldIndex);
-        outInput->block14[0] = Arg6SelectedWorldIndexLow24();
-        outInput->block14[1] = Arg6SelectedVariantIndexHigh8();
-        outInput->block14[2] = Arg6SelectedSelectionGateByte100();
-        outInput->block14[3] = Arg6SelectedVariantState();
+        // Newer client-side layout tightening from `0x62170e2a..0x62170f48`:
+        // - after zero-init, the direct client-built `+0xec` handoff only proves writes at
+        //   `+0x00` and `+0x24..+0xa4`
+        // - the intervening `+0x14` block is therefore currently better treated as zero on that
+        //   proven path than as a launcher-side arg7-summary structure
+        // Keep `block04` as the last bounded pre-client bridge subset for now, but stop seeding the
+        // less-supported `block14` arg7 summary.
+        outInput->block14 = {};
     }
     if (outDescriptorIndex) {
         *outDescriptorIndex = static_cast<uint32_t>(matchedWorldIndex);

@@ -926,7 +926,9 @@ Representative non-zero arg7 result from that same run:
   - it is a launcher selection-writeback corridor followed by a client-owned `0xb4` producer
 
 So the current `+0xec` object is not just "some paths blob":
-- its first dword now looks like the current variant/high-8 selector,
+- its first dword now looks like the launcher-selected / arg7-derived high-8 selector,
+- that same bounded read also matches launcher-side `0x40ec70`, which passes the selected row
+  item-data high word to owner `+0xf0`,
 - and later fields are built from selection-specific config helpers rooted under `Profiles\%s\%s_%X\`.
 
 ## Decision for reimplementation direction

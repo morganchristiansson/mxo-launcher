@@ -719,8 +719,13 @@ bool CLauncher::RunRecoveredPreClientBringupStage() const {
 }
 
 // UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
-// This intentionally moves launcher auth sequencing earlier so client.dll load can happen only
-// after successful launcher-owned auth plus a selected recovered character.
+// Fidelity direction tightened by the newer `0x402ec0` read:
+// - original `InitInstance` does not fall through to `0x40a780/0x40a420` until the pre-client UI
+//   gate has finished
+// - so launcher auth + selection belong on the pre-client side of that fallthrough, not after the
+//   later DLL loads
+// This replacement stage therefore stays before client.dll load and should stay before the later
+// `LoadCresDLL` / `LoadClientDLL` corridor unless newer static evidence disproves that ordering.
 bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
     g_PreClientAuthAndCharacterSelectionCompleted = false;
     if (!DiagnosticCanBeginAuthConnection()) {
@@ -1065,6 +1070,8 @@ bool CLauncher::InitInstance() {
     //   - blocks `InitInstance` until the launcher dialog path exits
     //   - current best successful-selection exit is `0x405a20` case `8`:
     //     `0x40d6f0` resolves selection -> patch gate -> `DAT_004d259c = 1` -> `0x40b8f0` -> quit
+    //   - replacement consequence: launcher auth/selection should complete before the later
+    //     `LoadCresDLL` / `LoadClientDLL` fallthrough too
     // - 0x40b75a..0x40b790: optional autodetect dialog path when 0x4d2c64 is set
     // - 0x40b790..0x40b7af: file/access gate remains explicitly unmodeled here
     if (!RunRecoveredPreClientBringupStage()) {
@@ -1073,11 +1080,11 @@ bool CLauncher::InitInstance() {
 
     LogInitInstanceFaithfulnessGaps();
 
-    if (!LoadCresDLL()) {
-        spdlog::info("ERROR: failed to load cres.dll");
+    if (!RunPreClientAuthAndCharacterSelectionStage()) {
         return false;
     }
-    if (!RunPreClientAuthAndCharacterSelectionStage()) {
+    if (!LoadCresDLL()) {
+        spdlog::info("ERROR: failed to load cres.dll");
         return false;
     }
     if (!LoadClientDLL()) {

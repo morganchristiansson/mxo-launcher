@@ -233,7 +233,12 @@ struct State3SelectionContextInputSketch {
     // - do not model this as a state3-local slot-3 body
     //
     // Current bounded field recovery:
-    // - `+0x00` is the selection/slot index byte consumed directly by `0x41c390/0x41c1f0`
+    // - `+0x00` is the launcher-selected high-8 selection index byte consumed directly by
+    //   `0x41c390/0x41c1f0`
+    //   - bounded evidence now lines up across both sides of the bridge:
+    //     - launcher `0x40ec70` passes the selected row item-data high word to `+0xf0`
+    //     - client `0x62170e2a..0x62170f48` stores arg7 high-8 into the first dword of the
+    //       stack-local `0xb4` handoff immediately before arg6 `+0xec`
     // - the remaining `0xb0` bytes are still only partially understood globally
     // - `0x41c1f0` copies them monotonically into owner `+0xcd0..+0xd7f`, but state8 slot3 later
     //   serializes those owner blocks in a different packet order:
@@ -248,7 +253,11 @@ struct State3SelectionContextInputSketch {
     //                       used as the state8 packet's fixed `0x01/0x05` GCID fields)
     //   - `block04[2]`    = current slot/world id
     //   - `block04[3]`    = matched world-descriptor index
-    //   - `block14[0..3]` = current arg7-style world/variant/gate/state summary
+    //   - newer client-side layout tightening from `0x62170e2a..0x62170f48` now cuts against the
+    //     older bridge guess for `block14[0..3]`:
+    //     - the direct client-built handoff proves writes at `+0x00` and `+0x24..+0xa4`
+    //     - the intervening `+0x14` block is therefore currently better treated as zero on that
+    //       proven path than as a launcher-side arg7-summary payload
     // - newer launcher/client bridge tightening narrows the remaining producer split further:
     //   - launcher-side selection UI now closes concretely through
     //     `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`, which writes

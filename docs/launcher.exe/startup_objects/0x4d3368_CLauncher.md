@@ -267,9 +267,12 @@ Practical consequence:
 - current bounded source consequence:
   - the no-GUI launcher bridge now does exactly that paired owner-side commit
   - but the surrounding `0xb4` snapshot for `0x41c1f0` is still only partially recovered: current
-    source fills the highest-confidence fields (launcher-selected high-8 selection index,
-    character id pair, world id, descriptor index, current arg7-selection summary) while the
-    original launcher UI producer for the rest of the block remains unresolved
+    source fills the highest-confidence fields (launcher-selected high-8 selection index and a
+    bounded `block04` character/world/descriptor subset) while the original launcher UI producer
+    for the rest of the block remains unresolved
+  - newer client-side layout tightening now also removes one older bridge guess:
+    - the direct client-built path only proves writes at `+0x00` and `+0x24..+0xa4`
+    - so the replacement no longer seeds `block14` with the old arg7-summary guess
   - newer owner-side tightening from `0x41c1f0 + 0x43bd20` matters for how far that bridge claim
     can go:
     - state8 later serializes the persisted snapshot blocks in packet order
@@ -298,12 +301,16 @@ Implication for the replacement source:
     thread/dialog path exits
   - on the successful selection path, `0x405a20` case `8`:
     - calls `0x40d6f0`
-    - on success passes the patch gate
+    - on success passes the patch gate (`0x4024c0`, current best read = patch-check cooldown gate
+      rooted in `DAT_004d2c54/DAT_004d3450`)
     - writes `DAT_004d259c = 1`
     - calls `0x40b8f0`
     - posts quit
   - that is the current best read for how original `InitInstance` stays blocked until launcher UI
     login/selection is complete before the later `0x40b7af..0x40b7c7` fallthrough
+  - implementation consequence for the replacement launcher:
+    - launcher auth/selection belongs on the pre-client side of the later DLL-load corridor
+    - it should happen before the replacement falls through to `LoadCresDLL` / `LoadClientDLL`
 - New narrowed bridge read from launcher selection into mediator `+0xec`:
   - launcher-side success path now closes concretely through
     `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`
