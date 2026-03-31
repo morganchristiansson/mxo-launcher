@@ -833,9 +833,11 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             // Bounded no-GUI bridge:
             // - original launcher UI eventually resolves selection through the list/dialog path and
             //   then advances the mediator-owned state3 wait branch via the owner-side commit pair
-            // - current source adopts the recovered character slot and mirrors that paired commit
-            //   before client.dll load, while the full original launcher UI producer for the rest of
-            //   the `0xb4` selection snapshot remains under reconstruction
+            // - current source now keeps the closest recovered interface on the mediator side first:
+            //   build partial state3 selection context from recovered slot/world state, then commit
+            //   through the owner pair before client.dll load
+            // - the full original launcher UI producer for the rest of the `0xb4` selection snapshot
+            //   remains under reconstruction
             spdlog::error(
                 "ERROR: failed to adopt pre-client recovered character selection index={} into launcher/mediator state",
                 static_cast<unsigned>(selectedCharacterIndex));

@@ -1768,17 +1768,15 @@ bool CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold(uint32_t slotInde
         nullptr);
 }
 
-bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
+bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold(
     uint32_t slotIndex,
-    char* outCharacterName,
-    uint32_t outCharacterNameCapacity,
-    char* outWorldName,
-    uint32_t outWorldNameCapacity,
-    uint32_t* outDescriptorIndex) {
+    State3SelectionContextInputSketch* outInput,
+    uint32_t* outDescriptorIndex,
+    const SlotRecordState004b5328** outSlotRecord) {
     const SlotRecordState004b5328* slotRecord = RecoveredCharacterByIndexScaffold(slotIndex);
     if (!slotRecord || slotRecord->heapString14.empty()) {
         spdlog::info(
-            "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold rejected slotIndex={} (missing slot record or name)",
+            "CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold rejected slotIndex={} (missing slot record or name)",
             static_cast<unsigned>(slotIndex));
         return false;
     }
@@ -1786,14 +1784,68 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
     const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord->worldId0c);
     if (matchedWorldIndex < 0) {
         spdlog::info(
-            "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold rejected slotIndex={} name='{}' worldId=0x{:04x} (no recovered world descriptor)",
+            "CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold rejected slotIndex={} name='{}' worldId=0x{:04x} (no recovered world descriptor)",
             static_cast<unsigned>(slotIndex),
             slotRecord->heapString14.c_str(),
             static_cast<unsigned>(slotRecord->worldId0c));
         return false;
     }
 
-    const char* worldName = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex));
+    if (outInput) {
+        *outInput = {};
+        outInput->slotOrSelectionIndex00 = slotIndex;
+        outInput->block04[0] = slotRecord->globalCharacterIdLow03;
+        outInput->block04[1] = slotRecord->globalCharacterIdHigh07;
+        outInput->block04[2] = static_cast<uint32_t>(slotRecord->worldId0c);
+        outInput->block04[3] = static_cast<uint32_t>(matchedWorldIndex);
+        outInput->block14[0] = Arg6SelectedWorldIndexLow24();
+        outInput->block14[1] = Arg6SelectedVariantIndexHigh8();
+        outInput->block14[2] = Arg6SelectedSelectionGateByte100();
+        outInput->block14[3] = Arg6SelectedVariantState();
+    }
+    if (outDescriptorIndex) {
+        *outDescriptorIndex = static_cast<uint32_t>(matchedWorldIndex);
+    }
+    if (outSlotRecord) {
+        *outSlotRecord = slotRecord;
+    }
+
+    spdlog::info(
+        "CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} block04=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] block14=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}]",
+        static_cast<unsigned>(slotIndex),
+        slotRecord->heapString14.c_str(),
+        static_cast<unsigned>(slotRecord->worldId0c),
+        matchedWorldIndex,
+        outInput ? outInput->block04[0] : slotRecord->globalCharacterIdLow03,
+        outInput ? outInput->block04[1] : slotRecord->globalCharacterIdHigh07,
+        outInput ? outInput->block04[2] : static_cast<uint32_t>(slotRecord->worldId0c),
+        outInput ? outInput->block04[3] : static_cast<uint32_t>(matchedWorldIndex),
+        outInput ? outInput->block14[0] : Arg6SelectedWorldIndexLow24(),
+        outInput ? outInput->block14[1] : Arg6SelectedVariantIndexHigh8(),
+        outInput ? outInput->block14[2] : Arg6SelectedSelectionGateByte100(),
+        outInput ? outInput->block14[3] : Arg6SelectedVariantState());
+    return true;
+}
+
+bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
+    uint32_t slotIndex,
+    char* outCharacterName,
+    uint32_t outCharacterNameCapacity,
+    char* outWorldName,
+    uint32_t outWorldNameCapacity,
+    uint32_t* outDescriptorIndex) {
+    State3SelectionContextInputSketch selectionContext = {};
+    const SlotRecordState004b5328* slotRecord = nullptr;
+    uint32_t descriptorIndex = 0u;
+    if (!BuildPartialSelectionContextForRecoveredCharacterScaffold(
+            slotIndex,
+            &selectionContext,
+            &descriptorIndex,
+            &slotRecord)) {
+        return false;
+    }
+
+    const char* worldName = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
     if (outCharacterName && outCharacterNameCapacity != 0u) {
         outCharacterName[0] = '\0';
         std::strncpy(outCharacterName, slotRecord->heapString14.c_str(), outCharacterNameCapacity - 1u);
@@ -1807,56 +1859,27 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
         }
     }
     if (outDescriptorIndex) {
-        *outDescriptorIndex = static_cast<uint32_t>(matchedWorldIndex);
+        *outDescriptorIndex = descriptorIndex;
     }
 
     CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
     const uint32_t seedResult = MirrorCharacterSeedIntoSourceBlock120Scaffold(
         slotRecord->heapString14.c_str(),
-        static_cast<uint32_t>(matchedWorldIndex));
-
+        descriptorIndex);
     const uint32_t state7Result = SetSelectionIndexAndSwitchToState7(slotIndex);
-
-    State3SelectionContextInputSketch selectionContext = {};
-    selectionContext.slotOrSelectionIndex00 = slotIndex;
-    // anchor: launcher.exe:0x41c1f0
-    // Bounded CLI-faithful bridge:
-    // - original launcher UI eventually commits character selection through the owner-side
-    //   state3(wait)->state8 selection snapshot writer
-    // - our no-GUI path still lacks the real launcher UI producer for the surrounding `0xb4` block
-    // - keep the exact slot/index commit anchored through `0x41c390` first
-    // - then seed only the highest-confidence currently recovered fields in the `0xb4` block:
-    //   current character ids, world id, matched world-descriptor index, and current launcher
-    //   arg7-selection summary values
-    selectionContext.block04[0] = slotRecord->globalCharacterIdLow03;
-    selectionContext.block04[1] = slotRecord->globalCharacterIdHigh07;
-    selectionContext.block04[2] = static_cast<uint32_t>(slotRecord->worldId0c);
-    selectionContext.block04[3] = static_cast<uint32_t>(matchedWorldIndex);
-    selectionContext.block14[0] = Arg6SelectedWorldIndexLow24();
-    selectionContext.block14[1] = Arg6SelectedVariantIndexHigh8();
-    selectionContext.block14[2] = Arg6SelectedSelectionGateByte100();
-    selectionContext.block14[3] = Arg6SelectedVariantState();
     const uint32_t persistResult = PersistSelectionContextForState8(selectionContext);
 
     spdlog::info(
-        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} state7Result=0x{:08x} persistResult=0x{:08x} block04=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] block14=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}]",
+        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} state7Result=0x{:08x} persistResult=0x{:08x}",
         static_cast<unsigned>(slotIndex),
         slotRecord->heapString14.c_str(),
         static_cast<unsigned>(slotRecord->worldId0c),
-        matchedWorldIndex,
+        descriptorIndex,
         (worldName && worldName[0]) ? worldName : "<null>",
         static_cast<unsigned>(CharacterRouteIndexCc8()),
         static_cast<unsigned>(seedResult),
         static_cast<unsigned>(state7Result),
-        static_cast<unsigned>(persistResult),
-        selectionContext.block04[0],
-        selectionContext.block04[1],
-        selectionContext.block04[2],
-        selectionContext.block04[3],
-        selectionContext.block14[0],
-        selectionContext.block14[1],
-        selectionContext.block14[2],
-        selectionContext.block14[3]);
+        static_cast<unsigned>(persistResult));
     return seedResult == 0u && state7Result == 0u && persistResult == 0u;
 }
 

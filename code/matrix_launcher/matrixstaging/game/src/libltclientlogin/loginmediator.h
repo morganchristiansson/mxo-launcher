@@ -1279,6 +1279,11 @@ public:
     uint32_t RecoveredCharacterCountScaffold() const;
     const SlotRecordState004b5328* RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const;
     bool SelectRecoveredCharacterByIndexScaffold(uint32_t slotIndex);
+    bool BuildPartialSelectionContextForRecoveredCharacterScaffold(
+        uint32_t slotIndex,
+        State3SelectionContextInputSketch* outInput,
+        uint32_t* outDescriptorIndex,
+        const SlotRecordState004b5328** outSlotRecord);
     bool AdoptRecoveredCharacterSelectionForLauncherScaffold(
         uint32_t slotIndex,
         char* outCharacterName,

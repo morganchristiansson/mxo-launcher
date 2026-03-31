@@ -231,6 +231,15 @@ struct State3SelectionContextInputSketch {
     // - the owner-side mediator method consumes this `0xb4` selection/config snapshot and then
     //   switches to state `8`
     // - do not model this as a state3-local slot-3 body
+    //
+    // Current bounded field recovery:
+    // - `+0x00` is the selection/slot index byte consumed directly by `0x41c390/0x41c1f0`
+    // - the remaining `0xb0` bytes are still only partially understood globally
+    // - current source-owned CLI bridge only seeds the highest-confidence subset:
+    //   - `block04[0..1]` = current character id low/high
+    //   - `block04[2]`    = current slot/world id
+    //   - `block04[3]`    = matched world-descriptor index
+    //   - `block14[0..3]` = current arg7-style world/variant/gate/state summary
     uint32_t slotOrSelectionIndex00 = 0;            // input `+0x00`, must be `< 100`
     std::array<uint32_t, 4> block04{};             // input `+0x04 .. +0x13`
     std::array<uint32_t, 4> block14{};             // input `+0x14 .. +0x23`
