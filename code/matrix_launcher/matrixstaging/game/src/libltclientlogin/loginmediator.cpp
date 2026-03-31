@@ -3069,7 +3069,7 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
 
 // anchor: launcher.exe:0x41e760
 void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() const {
-    const char* profileName = authUsername_.empty() ? Arg6AuthName() : authUsername_.c_str();
+    const char* profileName = Arg6AuthName();
     if (!profileName || profileName[0] == '\0') {
         spdlog::info(
             "CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold skipped (no auth/profile name available for Profiles/<name>/characters.ini)");

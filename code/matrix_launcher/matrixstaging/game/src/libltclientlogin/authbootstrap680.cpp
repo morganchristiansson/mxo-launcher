@@ -1135,9 +1135,10 @@ static AuthBootstrap680PrepareCallShape BuildAuthBootstrap680PrepareCallShape(
     void* sendTarget50) {
     AuthBootstrap680PrepareCallShape callShape;
     callShape.ownerSource94 = &ownerSource94;
-    // Preserve the recovered owner+0x94 -> child copy flow as the primary model, but keep the
-    // current live state8 auto-begin path working when it reaches `0x448050` without an original
-    // ProcessLoginRequest-populated owner+0x94 inline-string pair yet.
+    // Preserve the recovered owner+0x94 -> child copy flow as the primary model.
+    // The original `0x439210 -> 0x448050` call shape only feeds owner `+0x94`; any fallback to
+    // wrapper-facing auth strings remains a bounded replacement-only escape hatch for paths that
+    // still reach this child without first passing through `0x41ecd0 = ProcessLoginRequest`.
     callShape.sourceString00 = ownerSource94.inlineString00[0] ? ownerSource94.inlineString00.data() : fallbackUsername;
     callShape.sourceString20 = ownerSource94.inlineString20[0] ? ownerSource94.inlineString20.data() : fallbackPassword;
     callShape.sourceString60Begin = ownerSource94.string60.begin;
@@ -1216,8 +1217,8 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
 
     const AuthBootstrap680PrepareCallShape callShape = BuildAuthBootstrap680PrepareCallShape(
         mediator.authBootstrapSource38_,
-        mediator.authUsername_.c_str(),
-        mediator.authPassword_.c_str(),
+        mediator.Arg6AuthName(),
+        mediator.Arg6AuthPassword(),
         recoveredLauncherVersion,
         sendTarget50);
 

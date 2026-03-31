@@ -37,6 +37,8 @@ public:
     const char* AuthUsername() const;
     const char* AuthPassword() const;
     const char* LauncherCharacter() const;
+    void SetAuthUsername(const char* value);
+    void SetAuthPassword(const char* value);
     const char* LauncherSession() const;
 
     bool SwitchClone() const;

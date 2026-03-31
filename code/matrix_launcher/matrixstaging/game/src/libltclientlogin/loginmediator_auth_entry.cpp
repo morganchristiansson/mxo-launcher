@@ -47,6 +47,53 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.capacity = dest.string60.current;
 }
 
+// anchor: launcher.exe:0x41ecd0 / owner vtable +0x24
+static bool BuildConfiguredProcessLoginRequestInput(
+    const CLTLoginMediator& mediator,
+    ProcessLoginRequestInputSketch* outInput,
+    const char** outUsernameSource,
+    const char** outPasswordSource) {
+    if (!outInput) {
+        return false;
+    }
+
+    *outInput = {};
+    if (outUsernameSource) {
+        *outUsernameSource = "<none>";
+    }
+    if (outPasswordSource) {
+        *outPasswordSource = "<none>";
+    }
+
+    const char* username = mediator.Arg6AuthName();
+    const char* password = mediator.Arg6AuthPassword();
+    if (outUsernameSource) {
+        *outUsernameSource = "arg6 +0x5c";
+    }
+    if (outPasswordSource) {
+        *outPasswordSource = "arg6 +0x60";
+    }
+
+    if (!username || username[0] == '\0' || !password || password[0] == '\0') {
+        return false;
+    }
+
+    const auto copyBoundedString = [](auto& dest, const char* src) {
+        std::fill(dest.begin(), dest.end(), '\0');
+        if (!src || src[0] == '\0') {
+            return;
+        }
+        const size_t copyCount = std::min(
+            std::char_traits<char>::length(src),
+            dest.size() - 1u);
+        std::copy_n(src, copyCount, dest.begin());
+        dest[copyCount] = '\0';
+    };
+
+    copyBoundedString(outInput->inlineString00, username);
+    copyBoundedString(outInput->inlineString20, password);
+    return true;
+}
 
 struct BuiltinScaffoldStates {
     CLTLoginState_State0 state0 = {};
@@ -371,25 +418,52 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     }
 
     // Current replacement-side fidelity correction:
-    // - the later existing-character state8 path still needs the earlier auth/bootstrap child at
-    //   owner `+0x680` to materialize the reply-derived `+0xf4` copy block used by the now-proven
-    //   state5 `0x41b500 -> 0x41ce80 -> 0x441f30` path
-    // - so launcher auto-begin must re-enter helper/state 2 first, not treat raw auth connect
-    //   success as sufficient on its own
-    CLTLoginState* const upstreamState = currentState_;
-    CLTLoginState* const state2 = scaffoldState2_;
-    spdlog::info(
-        "ROUTE CHECKPOINT: launcher bridge auto-begin auth via state2 currentState={} upstreamState={} state2Registered={}",
-        currentState_ ? currentState_->DebugName() : "<null>",
-        upstreamState ? upstreamState->DebugName() : "<null>",
-        state2 ? 1u : 0u);
-    const uint32_t result = state2 != nullptr
-        ? SwitchHelperStateAndDispatchSlot3Scaffold(
-              2u,
-              state2,
-              upstreamState,
-              "BeginLauncherAuthConnectionScaffold -> helper2/auth-bootstrap continuation")
-        : BeginAuthConnectionViaState1Scaffold();
+    // - original launcher password submit does not jump straight into `0x439210` with an
+    //   out-of-band username/password store
+    // - owner vtable `+0x24` / `0x41ecd0 = ProcessLoginRequest` is the earlier anchored API that
+    //   accepts the username/password block, copies it into owner `+0x94`, clears owner `+0xf4`
+    //   on the happy path, and then performs the observed `state0 -> state2 -> state1 -> state2`
+    //   chain feeding the owner `+0x680` bootstrap child
+    // - preserve the older direct state2 fallback only when we are no longer in the initial idle
+    //   helper or when no launcher-configured auth block is available to mirror through
+    //   `ProcessLoginRequest`
+    const uint32_t currentPhaseCode = currentState_ ? currentState_->DispatchPhaseCode() : 0xffu;
+    ProcessLoginRequestInputSketch submitInput = {};
+    const char* usernameSource = "<none>";
+    const char* passwordSource = "<none>";
+    const bool haveConfiguredSubmitInput = BuildConfiguredProcessLoginRequestInput(
+        *this,
+        &submitInput,
+        &usernameSource,
+        &passwordSource);
+
+    uint32_t result = 0u;
+    if (currentPhaseCode == 0u && haveConfiguredSubmitInput) {
+        spdlog::info(
+            "ROUTE CHECKPOINT: launcher bridge auto-begin auth via owner ProcessLoginRequest currentState={} usernameSource={} passwordSource={} ownerSource94Empty={}",
+            currentState_ ? currentState_->DebugName() : "<null>",
+            usernameSource,
+            passwordSource,
+            (authBootstrapSource38_.inlineString00[0] == '\0' && authBootstrapSource38_.inlineString20[0] == '\0') ? 1u : 0u);
+        result = ProcessLoginRequest(submitInput);
+    } else {
+        CLTLoginState* const upstreamState = currentState_;
+        CLTLoginState* const state2 = scaffoldState2_;
+        spdlog::info(
+            "ROUTE CHECKPOINT: launcher bridge auto-begin auth via state2 fallback currentState={} upstreamState={} state2Registered={} currentPhaseCode={} haveConfiguredSubmitInput={}",
+            currentState_ ? currentState_->DebugName() : "<null>",
+            upstreamState ? upstreamState->DebugName() : "<null>",
+            state2 ? 1u : 0u,
+            static_cast<unsigned>(currentPhaseCode),
+            haveConfiguredSubmitInput ? 1u : 0u);
+        result = state2 != nullptr
+            ? SwitchHelperStateAndDispatchSlot3Scaffold(
+                  2u,
+                  state2,
+                  upstreamState,
+                  "BeginLauncherAuthConnectionScaffold -> helper2/auth-bootstrap continuation")
+            : BeginAuthConnectionViaState1Scaffold();
+    }
     if (context) {
         context->sidecarConnection = AuthConnection();
     }
@@ -438,7 +512,10 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     return result;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// UNANCHORED: replacement-owned reset/config shim.
+// Keep this separate from the recovered password-submit API at `0x41ecd0`:
+// - launcher.exe feeds submitted username/password through `ProcessLoginRequest`
+// - this shim now only preserves diagnostic mirrors and resets transient auth/bootstrap state
 void CLTLoginMediator::SetAuthCredentials(const char* username, const char* password) {
     authUsername_ = username ? username : "";
     authPassword_ = password ? password : "";
@@ -454,7 +531,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     ResetRecoveredAuthBootstrapDynamicStateScaffold();
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator auth credentials configured username='{}' password={}",
+        "DIAGNOSTIC: CLTLoginMediator auth reset/config shim updated username='{}' password={} (live submit path should still enter through 0x41ecd0 / ProcessLoginRequest)",
         authUsername_.empty() ? "<empty>" : authUsername_.c_str(),
         MaskedAuthValue(authPassword_));
 }

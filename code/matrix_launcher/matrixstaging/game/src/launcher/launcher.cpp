@@ -92,6 +92,56 @@ const char* MaskedArgValue(const char* value) {
     return "<provided>";
 }
 
+bool ReadInteractiveLauncherField(const char* prompt, char* buffer, size_t bufferSize) {
+    if (!prompt || !buffer || bufferSize < 2u) {
+        return false;
+    }
+
+    std::fprintf(stderr, "%s", prompt);
+    std::fflush(stderr);
+
+    if (!std::fgets(buffer, static_cast<int>(bufferSize), stdin)) {
+        buffer[0] = '\0';
+        return false;
+    }
+
+    size_t length = std::strlen(buffer);
+    while (length != 0u && (buffer[length - 1u] == '\n' || buffer[length - 1u] == '\r')) {
+        buffer[--length] = '\0';
+    }
+    return true;
+}
+
+bool PromptForMissingLauncherCredentialsIfNeeded() {
+    const bool missingUser = (g_LauncherCommandLine.AuthUsername()[0] == '\0');
+    const bool missingPwd = (g_LauncherCommandLine.AuthPassword()[0] == '\0');
+    if (!missingUser && !missingPwd) {
+        return true;
+    }
+
+    char inputBuffer[256] = {};
+    if (missingUser) {
+        if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
+            spdlog::error("ERROR: interactive username prompt failed or was left empty");
+            return false;
+        }
+        g_LauncherCommandLine.SetAuthUsername(inputBuffer);
+    }
+    if (missingPwd) {
+        if (!ReadInteractiveLauncherField("Password: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
+            spdlog::error("ERROR: interactive password prompt failed or was left empty");
+            return false;
+        }
+        g_LauncherCommandLine.SetAuthPassword(inputBuffer);
+    }
+
+    spdlog::info(
+        "DIAGNOSTIC: replacement startup prompted for missing launcher credentials username={} password={}",
+        MaskedArgValue(g_LauncherCommandLine.AuthUsername()),
+        MaskedArgValue(g_LauncherCommandLine.AuthPassword()));
+    return true;
+}
+
 void LogLauncherPreprocessingState() {
     spdlog::info("=== Launcher switch preprocessing ===");
     spdlog::info("auth username      = {}", MaskedArgValue(g_LauncherCommandLine.AuthUsername()));
@@ -336,14 +386,20 @@ bool CLauncher::ParseCommandLineStage() const {
         return false;
     }
 
-    // UNANCHORED: the original launcher could continue into launcher-owned UI paths when these
-    // auth parameters were absent. The replacement has no faithful prompt/login UI yet, so keep a
-    // launcher-stage hard fail instead of pretending 0x409950 itself enforced it.
+    // UNANCHORED replacement bridge toward the original launcher-owned login prompt:
+    // - launcher.exe could gather missing username/password before client.dll load
+    // - replacement startup now prompts on stdin for those two fields when absent, then feeds the
+    //   recovered submit path later through `0x41ecd0 = ProcessLoginRequest`
+    // - `-char` remains required because the broader faithful selection/login UI is still absent
+    if (!PromptForMissingLauncherCredentialsIfNeeded()) {
+        return false;
+    }
+
     const bool hasUser = (g_LauncherCommandLine.AuthUsername()[0] != '\0');
     const bool hasPwd = (g_LauncherCommandLine.AuthPassword()[0] != '\0');
     const bool hasChar = (g_LauncherCommandLine.LauncherCharacter()[0] != '\0');
     if (!hasUser || !hasPwd || !hasChar) {
-        spdlog::error("ERROR: replacement launcher currently requires -user, -pwd AND -char arguments");
+        spdlog::error("ERROR: replacement launcher currently requires prompted/provided user+pwd and a -char argument");
         return false;
     }
 

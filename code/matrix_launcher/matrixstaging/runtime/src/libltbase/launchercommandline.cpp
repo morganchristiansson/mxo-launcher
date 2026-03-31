@@ -133,6 +133,16 @@ const char* CLauncherCommandLine::LauncherCharacter() const {
     return launcherCharacter_;
 }
 
+// UNANCHORED: replacement-only interactive startup helper; original launcher used a UI prompt.
+void CLauncherCommandLine::SetAuthUsername(const char* value) {
+    CopyIntoFixedBuffer(authUsername_, sizeof(authUsername_), value ? value : "");
+}
+
+// UNANCHORED: replacement-only interactive startup helper; original launcher used a UI prompt.
+void CLauncherCommandLine::SetAuthPassword(const char* value) {
+    CopyIntoFixedBuffer(authPassword_, sizeof(authPassword_), value ? value : "");
+}
+
 const char* CLauncherCommandLine::LauncherSession() const {
     return launcherSession_;
 }
