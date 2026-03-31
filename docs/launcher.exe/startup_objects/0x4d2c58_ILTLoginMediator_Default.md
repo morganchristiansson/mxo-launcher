@@ -930,6 +930,8 @@ Representative non-zero arg7 result from that same run:
     `0x62054d1d`
   - owner semantics stay intentionally disabled there, so this remains a mirror-only pre-client
     bridge rather than a false claim that original `0x41c3c0` already dispatched at that point
+  - that bridge now also preserves any already-known recovered appearance/customization ids from the
+    source `+0x134..+0x177` family instead of zeroing `+0x2c..+0x6f`
 
 So the current `+0xec` object is not just "some paths blob":
 - its first dword now looks like the launcher-selected / arg7-derived high-8 selector,

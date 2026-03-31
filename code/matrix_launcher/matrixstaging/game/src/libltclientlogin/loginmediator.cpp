@@ -1745,6 +1745,19 @@ bool CLTLoginMediator::BuildProcessLoginCredentialsForRecoveredCharacterScaffold
     const ActiveCharacterStateViewScaffold characterState = DescribeOwnCharacterStateScaffold();
     copyCStringIntoFixed(outInput->string00, characterName);
     outInput->field24 = descriptorIndex & 0x00ffffffu;
+
+    // Reuse any already-known appearance/customization payload from the owner-side source block.
+    // This is a better pre-client bridge than leaving the `+0x2c..+0x6f` family zeroed when the
+    // recovered mediator already carries post-auth customization state.
+    const auto& sourceDwords134 = SourceDwords134();
+    std::copy_n(sourceDwords134.begin(), 8, outInput->dwords2c.begin());
+    std::copy_n(sourceDwords134.begin() + 8, 8, outInput->dwords4c.begin());
+    const uint32_t trailingAppearanceId16 = sourceDwords134[16];
+    outInput->bytes6c[0] = static_cast<uint8_t>(trailingAppearanceId16 & 0xffu);
+    outInput->bytes6c[1] = static_cast<uint8_t>((trailingAppearanceId16 >> 8) & 0xffu);
+    outInput->bytes6c[2] = static_cast<uint8_t>((trailingAppearanceId16 >> 16) & 0xffu);
+    outInput->bytes6c[3] = static_cast<uint8_t>((trailingAppearanceId16 >> 24) & 0xffu);
+
     copyCStringIntoFixed(outInput->string70, characterState.realFirstName);
     copyCStringIntoFixed(outInput->string90, characterState.realLastName);
     copyCStringIntoFixed(outInput->stringB0, characterState.background);
@@ -1772,11 +1785,13 @@ uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
         nullptr,
         /*applyOwnerSemantics=*/false);
     spdlog::info(
-        "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold name='{}' field12c=0x{:08x} realFirst='{}' realLast='{}' background='{}' currentState={} captureResult=0x{:08x} (mirror-only; no 0x41c3c0 state-3 gate claim)",
+        "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold name='{}' field12c=0x{:08x} appearance0=0x{:08x} appearance16=0x{:08x} realFirst='{}' realLast='{}' background='{}' currentState={} captureResult=0x{:08x} (mirror-only; no 0x41c3c0 state-3 gate claim)",
         postAuthMarginLoadingState_.sourceLeadString108[0]
             ? postAuthMarginLoadingState_.sourceLeadString108.data()
             : "<empty>",
         static_cast<unsigned>(postAuthMarginLoadingState_.sourceField12c),
+        postAuthMarginLoadingState_.sourceDwords134[0],
+        postAuthMarginLoadingState_.sourceDwords134[16],
         postAuthMarginLoadingState_.sourceBlock178[0]
             ? reinterpret_cast<const char*>(postAuthMarginLoadingState_.sourceBlock178.data())
             : "<empty>",

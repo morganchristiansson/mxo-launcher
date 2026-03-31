@@ -301,6 +301,10 @@ struct ProcessLoginCredentialsInputSketch {
     // - `+0x00`  -> CharacterName (`owner +0x108`)
     // - `+0x24`  -> selected world-descriptor index / selector (`owner +0x12c`)
     // - `+0x2c .. +0x6f` -> 17 appearance/customization ids (`owner +0x134 .. +0x177`)
+    //   - newer `0x43c020` sender tightening gives the current best names/order:
+    //     SkinToneID, BodyID, HeadID, HairID, HairColorID, TattooID, FacialHairID,
+    //     FacialHairColorID, StartingHat, StartingGlasses, StartingShirt, StartingGloves,
+    //     StartingCoat, StartingPants, StartingTights, StartingShoes, TraitID
     // - `+0x70`  -> RealFirstName (`owner +0x178`)
     // - `+0x90`  -> RealLastName (`owner +0x198`)
     // - `+0xb0`  -> Background (`owner +0x1b8`), with the current client caller copying up to

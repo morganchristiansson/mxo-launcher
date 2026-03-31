@@ -288,11 +288,16 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     mediator->PostEventScaffold(0x15u);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
+        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
         State11Packet0x4dFixedPayload::kPayloadTag0c,
         State11Packet0x4dFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
         sourceDwords134[0],
+        sourceDwords134[1],
+        sourceDwords134[2],
+        sourceDwords134[3],
+        sourceDwords134[4],
+        sourceDwords134[16],
         std::string(reinterpret_cast<const char*>(mediator->SourceBlock178().data())),
         std::string(reinterpret_cast<const char*>(mediator->SourceBlock198().data())),
         std::string(reinterpret_cast<const char*>(mediator->SourceBlock1b8().data())),
