@@ -1273,9 +1273,15 @@ public:
     // Narrow mirror-only seed helper for the still-unrecovered upstream producer that eventually
     // feeds `0x41c3c0`. This builds the same source block family (`+0x108/+0x12c/+0x134..+0x1b8`)
     // without claiming the original state-3-gated owner dispatch happened.
+    bool BuildProcessLoginCredentialsForRecoveredCharacterScaffold(
+        const char* characterName,
+        uint32_t descriptorIndex,
+        ProcessLoginCredentialsInputSketch* outInput) const;
+    // descriptorIndex here matches owner `+0x12c`, i.e. the selected world-descriptor index read
+    // by `0x41c3c0`, not the lower-level slot/world id.
     uint32_t MirrorCharacterSeedIntoSourceBlock120Scaffold(
         const char* characterName,
-        uint32_t selectedWorldIndexLow24);
+        uint32_t descriptorIndex);
     uint32_t RecoveredCharacterCountScaffold() const;
     const SlotRecordState004b5328* RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const;
     bool SelectRecoveredCharacterByIndexScaffold(uint32_t slotIndex);

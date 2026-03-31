@@ -1723,9 +1723,10 @@ void CLTLoginMediator::MirrorProcessLoginCredentialsSourceBlock120(const Process
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
+bool CLTLoginMediator::BuildProcessLoginCredentialsForRecoveredCharacterScaffold(
     const char* characterName,
-    uint32_t selectedWorldIndexLow24) {
+    uint32_t descriptorIndex,
+    ProcessLoginCredentialsInputSketch* outInput) const {
     auto copyCStringIntoFixed = [](auto& dest, const char* src) {
         std::fill(dest.begin(), dest.end(), 0);
         if (!src || !src[0]) {
@@ -1736,23 +1737,42 @@ uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
         dest[copyCount] = '\0';
     };
 
-    if (!characterName || !characterName[0]) {
+    if (!outInput || !characterName || !characterName[0]) {
+        return false;
+    }
+
+    *outInput = {};
+    const ActiveCharacterStateViewScaffold characterState = DescribeOwnCharacterStateScaffold();
+    copyCStringIntoFixed(outInput->string00, characterName);
+    outInput->field24 = descriptorIndex & 0x00ffffffu;
+    copyCStringIntoFixed(outInput->string70, characterState.realFirstName);
+    copyCStringIntoFixed(outInput->string90, characterState.realLastName);
+    copyCStringIntoFixed(outInput->stringB0, characterState.background);
+    return true;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
+    const char* characterName,
+    uint32_t descriptorIndex) {
+    ProcessLoginCredentialsInputSketch input = {};
+    if (!BuildProcessLoginCredentialsForRecoveredCharacterScaffold(
+            characterName,
+            descriptorIndex,
+            &input)) {
         spdlog::info(
             "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold skipped (empty characterName)");
         return 1u;
     }
 
-    ProcessLoginCredentialsInputSketch input = {};
-    const ActiveCharacterStateViewScaffold characterState = DescribeOwnCharacterStateScaffold();
-    copyCStringIntoFixed(input.string00, characterName);
-    input.field24 = selectedWorldIndexLow24 & 0x00ffffffu;
-    copyCStringIntoFixed(input.string70, characterState.realFirstName);
-    copyCStringIntoFixed(input.string90, characterState.realLastName);
-    copyCStringIntoFixed(input.stringB0, characterState.background);
-
-    MirrorProcessLoginCredentialsSourceBlock120(input);
+    // Prefer the same wrapper-facing capture surface that client.dll later uses at arg6 `+0x120`,
+    // but keep owner semantics disabled on this pre-client bridge so this remains mirror-only.
+    const uint32_t result = CaptureProcessLoginCredentialsArg6Slot120(
+        &input,
+        nullptr,
+        /*applyOwnerSemantics=*/false);
     spdlog::info(
-        "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold name='{}' field12c=0x{:08x} realFirst='{}' realLast='{}' background='{}' currentState={} (mirror-only; no 0x41c3c0 state-3 gate claim)",
+        "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold name='{}' field12c=0x{:08x} realFirst='{}' realLast='{}' background='{}' currentState={} captureResult=0x{:08x} (mirror-only; no 0x41c3c0 state-3 gate claim)",
         postAuthMarginLoadingState_.sourceLeadString108[0]
             ? postAuthMarginLoadingState_.sourceLeadString108.data()
             : "<empty>",
@@ -1766,8 +1786,9 @@ uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
         postAuthMarginLoadingState_.sourceBlock1b8[0]
             ? reinterpret_cast<const char*>(postAuthMarginLoadingState_.sourceBlock1b8.data())
             : "<empty>",
-        currentState_ ? currentState_->DebugName() : "<null>");
-    return 0u;
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(result));
+    return result;
 }
 
 // UNANCHORED: source-owned pre-client launcher helper over the recovered owner `+0x688` table.
@@ -1909,6 +1930,10 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
     }
 
     CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
+    // Newer bridge tightening:
+    // - pre-client replacement now seeds the later owner `+0x120` source block through the same
+    //   wrapper-facing capture surface client.dll uses (`arg6 +0x120`), but with owner semantics
+    //   intentionally disabled so this remains a mirror-only launcher bridge.
     const uint32_t seedResult = MirrorCharacterSeedIntoSourceBlock120Scaffold(
         slotRecord->heapString14.c_str(),
         descriptorIndex);

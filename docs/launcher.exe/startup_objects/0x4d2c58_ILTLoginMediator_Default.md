@@ -924,6 +924,12 @@ Representative non-zero arg7 result from that same run:
   - the still-missing success path is no longer best framed as a hidden direct launcher callsite to
     `0x41c1f0`
   - it is a launcher selection-writeback corridor followed by a client-owned `0xb4` producer
+- newer source tightening also improves the neighboring `+0x120` bridge:
+  - the replacement pre-client path now seeds the later owner `+0x108/+0x12c/+0x134..+0x1b8`
+    family through the same wrapper-facing `arg6 +0x120` capture surface client.dll uses at
+    `0x62054d1d`
+  - owner semantics stay intentionally disabled there, so this remains a mirror-only pre-client
+    bridge rather than a false claim that original `0x41c3c0` already dispatched at that point
 
 So the current `+0xec` object is not just "some paths blob":
 - its first dword now looks like the launcher-selected / arg7-derived high-8 selector,
