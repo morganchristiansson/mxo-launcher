@@ -2350,7 +2350,8 @@ void CLTLoginMediator::InitializeArg6DefaultObject() {
         "Default", "Starter", "Classic", "Advanced", "Extreme"
     };
     arg6WorldList_.worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
-    arg6WorldList_.worldValid_ = {true, true, true, true, true, false, false, false, false, false};
+    arg6WorldList_.activeVariantStatesE4_ = {3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
+    arg6WorldList_.activeWorldDisplayNamesDc_ = {"", "", "", "", "", "", "", "", "", ""};
     arg6WorldList_.activeWorldMatchNamesE0_ = {"", "", "", "", "", "", "", "", "", ""};
     arg6WorldList_.totalCount_ = 5;
     arg6WorldList_.activeCount_ = 5;
@@ -2396,9 +2397,14 @@ void CLTLoginMediator::ConfigureArg6Selection(
     arg6WorldList_.activeCount_ = std::min<uint32_t>(arg6Selection_.variantUpperBoundExclusive_, arg6WorldList_.activeWorldMatchNamesE0_.size());
     if (arg6Selection_.selectedWorldIndexLow24_ < arg6WorldList_.worldNames_.size()) {
         arg6WorldList_.worldNames_[arg6Selection_.selectedWorldIndexLow24_] = arg6Selection_.mappedSelectionName_;
+        arg6WorldList_.worldSelectionGateBytes100_[arg6Selection_.selectedWorldIndexLow24_] =
+            static_cast<uint8_t>(arg6Selection_.selectedSelectionGateByte100_ & 0xffu);
     }
     if (arg6Selection_.selectedVariantIndexHigh8_ < arg6WorldList_.activeWorldMatchNamesE0_.size()) {
         arg6WorldList_.activeWorldMatchNamesE0_[arg6Selection_.selectedVariantIndexHigh8_] = arg6Selection_.mappedSelectionName_;
+        arg6WorldList_.activeWorldDisplayNamesDc_[arg6Selection_.selectedVariantIndexHigh8_] = arg6Selection_.mappedVariantName_;
+        arg6WorldList_.activeVariantStatesE4_[arg6Selection_.selectedVariantIndexHigh8_] =
+            static_cast<uint8_t>(arg6Selection_.selectedVariantState_ & 0xffu);
     }
 }
 
@@ -2577,7 +2583,7 @@ uint32_t CLTLoginMediator::GetWorldCount() const {
     const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
     const uint32_t worldCount = useRecoveredDescriptorTable
         ? static_cast<uint32_t>(worldDescriptorCountD80_)
-        : Arg6GetWorldListCount();
+        : arg6WorldList_.totalCount_;
 
     spdlog::info(
         "CLTLoginMediator::GetWorldCount(+0xf8) -> {} [source={}]",
@@ -2588,6 +2594,10 @@ uint32_t CLTLoginMediator::GetWorldCount() const {
 
 // anchor: launcher.exe:0x41b2e0 / launcher.exe:0x40cd10
 // vtable: ILTLoginMediator.Default slot +0xfc
+// Fidelity tightening:
+// - keep this anchored getter table-backed on the startup path
+// - do not route it through the unanchored `Arg6MappedSelectionName()` helper when the same
+//   selection name has already been seeded into `arg6WorldList_.worldNames_`
 const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
     const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
 
@@ -2598,11 +2608,9 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
             ? GetDescriptorInlineNameByIndex(static_cast<uint8_t>(index))
             : nullptr;
         source = "owner+0xd84.inlineName+0x03";
-    } else if (index < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(index)) {
-        worldName = Arg6MappedSelectionName();
-        source = "arg6-selection-mapped-name";
     } else if (index < arg6WorldList_.totalCount_) {
         worldName = arg6WorldList_.worldNames_[index].c_str();
+        source = "arg6-world-list.table";
     }
 
     spdlog::info(
@@ -2616,6 +2624,8 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
 // anchor: launcher.exe:0x41b320 / launcher.exe:0x4d3584 +0x100
 // vtable: ILTLoginMediator.Default slot +0x100
 // Keep the wrapper/owner split explicit:
+// - like `+0xfc`, keep the startup fallback table-backed instead of routing through the separate
+//   unanchored selected-gate helper once `ConfigureArg6Selection()` has seeded the startup table
 // - once auth-reply world descriptors exist, this slot reads owner descriptor Status byte `+0x17`
 // - before that, startup selection still needs the older synthetic gate byte path
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2629,9 +2639,6 @@ uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const
             ? GetDescriptorStatusByIndex(static_cast<uint8_t>(index))
             : 0u;
         source = "owner+0xd84.status+0x17";
-    } else if (index < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(index)) {
-        selectionGateByte100 = static_cast<uint8_t>(Arg6SelectedSelectionGateByte100());
-        source = "arg6-selection-gate-byte100";
     } else if (index < arg6WorldList_.totalCount_) {
         selectionGateByte100 = arg6WorldList_.worldSelectionGateBytes100_[index];
         source = "arg6-world-list-gate-byte100";
@@ -2682,10 +2689,11 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
 // anchor: launcher.exe:0x4d3584 +0xe4
 // vtable: launcher.exe:0x4d3584 +0xe4
 uint8_t CLTLoginMediator::Arg6ValidateWorldSelection(uint8_t variant) {
-    if (variant < Arg6VariantUpperBoundExclusive() && Arg6VariantIndexMatchesSelection(variant)) {
-        return static_cast<uint8_t>(Arg6SelectedVariantState());
-    }
-    return 3u;
+    // Keep this anchored startup validator table-backed instead of routing through the separate
+    // unanchored selected-variant-state helper on the active startup path.
+    return (variant < arg6WorldList_.activeVariantStatesE4_.size())
+        ? arg6WorldList_.activeVariantStatesE4_[variant]
+        : 3u;
 }
 
 // anchor: launcher.exe:0x40e5b0
@@ -2697,7 +2705,7 @@ uint32_t CLTLoginMediator::Arg6GetWorldListCount() const {
 // anchor: launcher.exe:0x40e560
 // vtable: launcher.exe:0x4d3584 +0xd8
 uint32_t CLTLoginMediator::Arg6GetActiveWorldListCount() const {
-    return Arg6VariantUpperBoundExclusive();
+    return arg6WorldList_.activeCount_;
 }
 
 // anchor: launcher.exe:0x40e670
@@ -2706,9 +2714,6 @@ const char* CLTLoginMediator::Arg6GetAvailableWorldMatchName(uint32_t index) con
     // anchor: launcher.exe:0x40e670 / launcher.exe:0x40e480
     // `0x40e480` calls sibling slot `+0xe0` twice and compares the returned text against the
     // total-world name from `+0xfc`; this is therefore a string producer, not a bool gate.
-    if (index < Arg6VariantUpperBoundExclusive() && Arg6VariantIndexMatchesSelection(index)) {
-        return Arg6MappedSelectionName();
-    }
     return (index < arg6WorldList_.activeWorldMatchNamesE0_.size())
         ? arg6WorldList_.activeWorldMatchNamesE0_[index].c_str()
         : nullptr;
@@ -2718,10 +2723,9 @@ const char* CLTLoginMediator::Arg6GetAvailableWorldMatchName(uint32_t index) con
 // vtable: launcher.exe:0x4d3584 +0xdc
 const char* CLTLoginMediator::Arg6GetAvailableWorldName(uint32_t index) {
     // `0x40e480` inserts this text into list column 1 on the matched-row path.
-    if (index < Arg6VariantUpperBoundExclusive() && Arg6VariantIndexMatchesSelection(index)) {
-        return Arg6MappedVariantName();
-    }
-    return (index < arg6WorldList_.totalCount_) ? arg6WorldList_.worldNames_[index].c_str() : nullptr;
+    return (index < arg6WorldList_.activeWorldDisplayNamesDc_.size())
+        ? arg6WorldList_.activeWorldDisplayNamesDc_[index].c_str()
+        : nullptr;
 }
 
 // =============================================================================
@@ -2739,9 +2743,14 @@ void CLTLoginMediator::PopulateClientWorldView() {
         worldSlots_[i] = const_cast<void*>(reinterpret_cast<const void*>(arg6WorldList_.worldNames_[i].c_str()));
         worldPayloadSlots_[i] = const_cast<void*>(
             reinterpret_cast<const void*>(&arg6WorldList_.worldSelectionGateBytes100_[i]));
-        arg6WorldList_.worldValid_[i] = true;
+        if (arg6WorldList_.activeVariantStatesE4_[i] == 3u && i < arg6WorldList_.activeCount_) {
+            arg6WorldList_.activeVariantStatesE4_[i] = 0u;
+        }
         if (arg6WorldList_.activeWorldMatchNamesE0_[i].empty()) {
             arg6WorldList_.activeWorldMatchNamesE0_[i] = arg6WorldList_.worldNames_[i];
+        }
+        if (arg6WorldList_.activeWorldDisplayNamesDc_[i].empty()) {
+            arg6WorldList_.activeWorldDisplayNamesDc_[i] = arg6WorldList_.worldNames_[i];
         }
     }
 

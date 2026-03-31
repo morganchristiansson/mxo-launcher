@@ -192,6 +192,12 @@ That is important because the current arg7-selection writer is now closed to the
   - row item-data then packs:
     - low 16 bits = total-world index (`+0xfc`)
     - high 16 bits = matching active-world index, else `0xffff`
+- replacement-side fidelity consequence from that tightening:
+  - anchored startup getters `+0xf8/+0xd8/+0xe4/+0xfc/+0x100/+0xdc/+0xe0` should prefer startup
+    table storage seeded from the recovered launcher selection state
+  - avoid routing those anchored getters back through separate unanchored
+    `Arg6MappedSelectionName` / `Arg6MappedVariantName` / selected-state helpers when the same
+    values can live in the table the original launcher-side world-list code actually walks
 - the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
   `CListCtrl`-style selection UI object rather than on a raw config parser path
 

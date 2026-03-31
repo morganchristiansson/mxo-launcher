@@ -1781,14 +1781,20 @@ private:
         // recovered owner `+0xd84` descriptor table exists
         std::array<uint8_t, 10> worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
 
-        // launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
-        std::array<bool, 10> worldValid_ = {true, true, true, true, true, false, false, false, false, false};
+        // launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(variant) -> startup-side state code
+        // per active-world index; current bounded fallback keeps the selected variant's recovered
+        // state here and leaves non-selected entries at `3`.
+        std::array<uint8_t, 10> activeVariantStatesE4_ = {3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
 
         // launcher.exe:0x4d3584 +0xf8 = GetWorldListCount() -> uint total count
         uint32_t totalCount_ = 5;
 
         // launcher.exe:0x4d3584 +0xd8 = GetActiveWorldCount() -> uint active count
         uint32_t activeCount_ = 5;
+
+        // launcher.exe:0x4d3584 +0xdc = active-world display text used for list column 1 on the
+        // matched-row path in `0x40e480`
+        std::array<std::string, 10> activeWorldDisplayNamesDc_ = {"", "", "", "", "", "", "", "", "", ""};
 
         // launcher.exe:0x4d3584 +0xe0 = active-world/world-match string used by `0x40e480`
         // while correlating total worlds (`+0xfc`) against the active-world list before building
