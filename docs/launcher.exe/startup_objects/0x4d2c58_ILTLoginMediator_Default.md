@@ -176,10 +176,22 @@ Fresh static review of `launcher.exe:0x496480..0x496491` shows that the launcher
 
 - output slot: `0x4d3584`
 
-That is important because the current arg7-selection writer around `0x40d763..0x40d810` consults `0x4d3584` through methods `+0xfc`, `+0x100`, and `+0xe4` before writing `0x4d3410 / 0x4d3414`.
+That is important because the current arg7-selection writer is now closed to the surrounding helper:
+
+- `launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`
+- inside that function, the final writeback at `0x40d763..0x40d810` consults `0x4d3584` through
+  methods `+0xfc`, `+0x100`, and `+0xe4` before writing `0x4d3410 / 0x4d3414`
+- the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
+  `CListCtrl`-style selection UI object rather than on a raw config parser path
 
 So `0x4d2c58` is not the only launcher-global slot tied to this interface name.
 The launcher appears to keep at least one **sibling `ILTLoginMediator.Default`-style pointer slot** involved in world/selection resolution.
+
+Bounded practical consequence:
+- this sibling slot is now a concrete static bridge between launcher UI selection state and the
+  `CLauncher+0xa8/+0xac` values later consumed by `InitClientDLL`
+- but the helper body itself still looks like selection validation/writeback, not the whole modal /
+  observer wait that keeps original startup blocked until auth + character choice are complete
 
 ## Early method surface observed so far
 

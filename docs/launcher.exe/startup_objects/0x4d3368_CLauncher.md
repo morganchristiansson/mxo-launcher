@@ -46,6 +46,18 @@ and the binary/source path strings point directly at the launcher codebase:
 - `\matrixstaging\game\src\launcher\launcher.cpp`
 - `c:\matrixstaging\game\matrix\launcher.pdb`
 
+## Entry-flow relation
+
+The PE entrypoint is `0x48be94`, which resolves CRT startup and then calls:
+
+```asm
+AfxWinMain(GetModuleHandleA(NULL), NULL, commandLineTail, showWindow)
+```
+
+So the original launcher reaches `CLauncher::InitInstance` through the normal MFC GUI startup,
+not through a custom top-level launcher stub. The replacement `main()` is therefore only a bounded
+host-side stand-in for that MFC path.
+
 ## Startup-method usage
 Within startup driver `0x40b430`, the object is passed as `ecx`/`this` into the original path methods:
 
@@ -80,11 +92,66 @@ contains a few static segments that matter more than any invented helper boundar
 
 - `0x40b739`: `AfxInitRichEdit()`
 - `0x40b740`: `this->0x40a380()` (`Launcher_InitializeThreadPerClientTCPEngine`)
+  - newer decompilation now makes this tighter:
+    - allocates `0xb4` bytes for the arg5 `CLTThreadPerClientTCPEngine`
+    - runs `CLTThreadPerClientTCPEngine_ctor(this, 0)`
+    - immediately registers the object with `ILTLoginMediator.Default` through vtable slot `+0x08`
+    - practical negative result: this helper itself does **not** show username/password prompt or
+      character-selection logic; it is engine construction/registration
 - `0x40b74d..0x40b752`: `0x402ec0()` pre-client thread / message bringup gate
+  - newer decompilation now makes this tighter too:
+    - starts an MFC worker thread with `AfxBeginThread`
+    - waits on worker-side readiness bytes/fields
+    - pumps the launcher message queue with `PeekMessage/TranslateMessage/DispatchMessage`
+    - posts `WM_QUIT` to that thread and waits for completion
+    - practical negative result: this looks like launcher pre-client environment bringup, not the
+      missing password-submit / character-choice API
 - `0x40b75a..0x40b790`: optional autodetect dialog path when `0x4d2c64 != 0`
 - `0x40b790..0x40b7af`: `_access(DAT_004d4cbc,0)` plus `0x41ab10(0)` side gate
+  - newer decompilation now closes this more tightly too:
+    - `_access(...)` checks the DXDiag-style output file path at `DAT_004d4cbc`
+    - on missing file it calls `0x41ab10(0)`, which creates/overwrites that file through DXDiag
+      COM interfaces and returns
+    - practical negative result: this is a diagnostics-file side gate, not the missing auth /
+      character-selection authorization step
 - `0x40b7af..0x40b7da`: `this->0x40a780()`, `this->0x40a420()`, `this->0x40a4d0()`, then
   `this->0x40a760()` / `this->0x40a7a0()` cleanup
+
+## New tightening on the real pre-corridor gate question
+
+The current best static read is now narrower:
+
+- the straight-line corridor at `0x40b7af..0x40b7c7` is real and unconditional once reached
+- the helpers immediately before it inside `InitInstance` (`0x40a380`, `0x402ec0`, autodetect,
+  `_access` / `0x41ab10`) do **not** look like the original username/password re-prompt or
+  character-choice authorization boundary
+- so the real launcher-owned gate that delays progress before client load is more likely in an
+  **earlier launcher UI / observer-driven phase that must complete before control returns to this
+  tail of `CLauncher::InitInstance`**
+
+A concrete new anchor on that earlier phase is the launcher selection writer:
+
+- `launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`
+- this helper operates on a launcher-owned `CListCtrl`-style object
+- at `0x40d763..0x40d810` it:
+  - reads the selected row's packed item data
+  - consults sibling `ILTLoginMediator.Default` slot `0x4d3584` through methods `+0xfc`, `+0x100`,
+    and `+0xe4`
+  - persists `Last_WorldName`
+  - writes the final split selection into `CLauncher+0xa8/+0xac`
+    (`0x4d3410 / 0x4d3414`)
+
+Practical consequence:
+
+- `CLauncher+0xa8/+0xac` are not merely late synthetic launch parameters
+- they are written by a launcher-owned selection UI path before the client-load corridor
+- but `0x40d6f0` still looks like **selection resolution/writeback**, not the whole blocking gate by
+  itself
+- current best mediator-side **selection commit** anchor remains:
+  - `0x41c1f0 = CLTLoginMediator_PersistSelectionContextAndSwitchToState8`
+  - sibling narrower variant: `0x41c390 = CLTLoginMediator_SetSelectionIndexAndSwitchToState7`
+- so the remaining high-value question is the caller/message path that bridges launcher UI selection
+  into those mediator-side writers and only then lets `InitInstance` resume into `0x40b7af`
 
 Implication for the replacement source:
 
@@ -97,4 +164,8 @@ Implication for the replacement source:
 ## Open questions
 
 - Which inherited base class does `CLauncher` derive from through the imported vtable thunks in `0x4abfe0`?
-- Which startup methods on `CLauncher` are responsible for populating `+0xa8/+0xac` before `InitClientDLL`?
+- Which launcher dialog / command handler / observer wait path calls `0x40d6f0` and blocks until the
+  user has completed login + character selection before `InitInstance` falls through to
+  `0x40b7af..0x40b7c7`?
+- How does that earlier UI path synchronize with the mediator-side state3 selection-context writers
+  `0x41c390 / 0x41c1f0` on the successful-auth branch?
