@@ -158,6 +158,19 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
     - then calls the world-list population helper at `0x40e6c0`
   - practical read: this is the launcher-owned selection-page setup that precedes later
     `0x40d530/0x40d820` interaction
+- `0x40f070`
+  - callback registered from the same case-`7` selection-page setup
+  - on callback code `0x1c` it rebuilds the list through `0x40e6c0 -> 0x40e1c0`
+  - preserves the selected row by low-16 world index across that rebuild instead of by the full
+    packed item-data dword
+  - on callback code `0x21` it exits through `0x40b8f0` / quit-message path
+  - practical read: selection UI is observer-refreshed while the page is live; the list is not just
+    a one-shot static producer
+- `0x40e1c0`
+  - repaints the visible list from the launcher-owned node list at `CListCtrl+0x68`
+  - current mode byte `0x4d3588` selects one of two iteration orders / node layouts
+  - it rehydrates each row's packed item data from stored low/high 16-bit indices and restores the
+    selected row by matching the remembered low-16 world index
 - `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
   - case `8` calls `0x40d6f0`
   - on success it continues through patch-check / launch-side logic and eventually exits that UI path
