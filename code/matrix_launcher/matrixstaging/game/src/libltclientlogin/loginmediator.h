@@ -465,15 +465,11 @@ public:
 
     struct RouteHostStringTripleState {
         // Current best source-owned mirror of the owner `+0x818` family.
-        // Evidence chain:
-        // - owner vtable `+0xe0` / `0x41b260` returns the first dword of each 0x0c-byte slot
-        //   when begin != current
-        // - owner writer `0x41f840 = CLTLoginMediator_AppendRouteHostStringTriple`
-        //   forwards into `0x41f640 = StringTripleArray_Append`
-        // - `0x41f640` either copies one 3-dword string object directly or grows the backing
-        //   array through `0x41f3e0 = StringTripleArray_GrowAndAppend`
-        // Current best semantic read:
-        // - one per-slot route/host prefix string consumed by the state-7/8/0x0d margin path.
+        // Keep the split from owner `+0x1470` explicit:
+        // - `+0x818` = per-slot route/host prefix strings consumed by the state-7/8/0x0d margin path
+        // - `+0x1470` = later late-entry string-triple vector exposed through arg6 `+0x118`
+        // Newer tightening moved one old misread out of this family:
+        // - owner slot `+0x190 / 0x41f840` is now better read as a writer for `+0x1470`, not `+0x818`
         std::string text;
     };
 
@@ -1651,7 +1647,7 @@ private:
     // - `+0x44`  = current-slot record object for later save/profile work
     // - `+0xd0`  = owner `+0x1460` small-string-like state8 section-11 view
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
-    // - `+0x118` = owner `+0x1470` vector-like late-entry list
+    // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     Arg6SelectionDescriptor40PackedSketch arg6SelectionDescriptor40Packed_{};
     Arg6SelectionDescriptor40ObjectSketch arg6SelectionDescriptor40_{};
     Arg6CurrentSlotRecord44PayloadSketch arg6CurrentSlotRecord44Payload_{};
@@ -1662,7 +1658,7 @@ private:
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
     std::string routeDescriptor30Owned_;
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
-    std::vector<LateEntryList1470EntrySketch> lateEntryList1470Entries_{};
+    std::vector<LateEntryList1470EntrySketch> lateEntryList1470Entries_{}; // owner +0x1470 string-triple entries later exposed through arg6 +0x118
     LateEntryList1470VectorLikeSketch lateEntryList1470_{};
     // Narrow source-owned post-state9 / post-state12 owner collaborators from
     // `0x41f1d0` / `0x41de40` / `0x41c5c0` / `0x41c510`.

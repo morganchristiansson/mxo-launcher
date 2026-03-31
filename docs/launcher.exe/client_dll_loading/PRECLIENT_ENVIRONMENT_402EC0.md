@@ -30,9 +30,22 @@ The thread's init path is now tightened too:
 - `0x407580 = CLauncherThread_InitInstance`
   - allocates a separate `0xb30` CWnd-derived launcher dialog/controller object
   - stores it at thread `+0x48`
-  - calls `0x406470` to create the window and child controls
+  - calls `0x406470 = LauncherLoginDialog_CreateAndInitializeWindow`
   - shows the window on success
   - sets thread byte `+0x44` on init failure
+
+Current best provisional class identity for that `0xb30` object is now:
+- **`LauncherLoginDialog`**
+
+Reason for the provisional name:
+- ctor `0x403390` builds the same `0xb30` object and owns the child controls at `+0xe4..+0xb0c`
+- neighboring methods already on the same object family are:
+  - `0x4047d0 = LauncherLoginDialog_SwitchPageState`
+  - `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
+  - `0x40d530 = LauncherSelectionList_OnSelectionChanged`
+  - `0x40d820 = LauncherSelectionList_OnDoubleClickActivate`
+- there is still no class-name string proving the exact original C++ type spelling, so keep this
+  as the strongest current method-family name rather than a final recovered source symbol
 
 So the object `0x402ec0` waits on is not just an abstract thread shell.
 It is waiting for a worker thread whose `InitInstance` creates the real launcher dialog object.
@@ -134,9 +147,9 @@ That is useful evidence:
 
 ## Open questions
 
-- What is the concrete class name of the separate `0xb30` launcher dialog/controller object allocated by `CLauncherThread_InitInstance`?
-- Which exact dialog method corresponds to the `0x406470` create-and-initialize body?
+- Current best provisional class name is now `LauncherLoginDialog`, but the exact original C++ type spelling is still open.
 - Is thread byte `+0x45` set by dialog destruction, by `ExitInstance`, or by a narrower thread helper on the quit path?
+- Which later owner method(s) append the `+0x1470` late-entry string-triple list later exposed through arg6 `+0x118`?
 
 ## Updated priority note
 

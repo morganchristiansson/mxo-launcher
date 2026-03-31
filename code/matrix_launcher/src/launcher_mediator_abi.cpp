@@ -801,9 +801,11 @@ static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator
 
 // anchor: launcher.exe:0x41af50
 // vtable: ILTLoginMediator.Default slot +0x118
-// Current best late-runtime read from the event-0x18 observer callback:
+// Current best late-runtime read:
 // - returns owner `+0x1470`
-// - client reads it as a vector-like begin/current/capacity triple of 12-byte entries
+// - client reads it as a vector-like begin/current/capacity triple of 12-byte string-triple entries
+// - later consumer `0x62017150` reads the first dword of each entry as a filename-like string and
+//   maps it through `FUN_622a9cf0` / `METR` metadata
 static mxo::ltlogin::LateEntryList1470VectorLikeSketch* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator::Default->GetLateEntryList1470();

@@ -180,6 +180,9 @@ New live/runtime proof now tightens the client-facing registration side too:
 - function bodies now read as:
   - `0x41f2c0`: return owner `+0x30` small-string-like route descriptor
   - `0x41af50`: return owner `+0x1470` vector-like late-entry list
+    - newer `0x41f840 -> 0x41f640` tightening now shows those are 12-byte string-triple entries
+    - later client consumer `0x62017150` reads the first dword of each entry as a filename-like
+      string and maps it through `FUN_622a9cf0` / `METR` metadata
   - `0x41ddb0`: insert observer into owner `+0x674`
   - `0x41dde0`: remove observer from owner `+0x674`
   - `0x41f240`: return owner `+0x80`
@@ -192,8 +195,13 @@ New live/runtime proof now tightens the client-facing registration side too:
     `0x6298a760` into `+0x170`
 - replacement-side runtime progress now tightens the event-`0x18` callback path further too:
   - event-`0x18` observer callback now reaches and consumes arg6 `+0x10c`
-  - it also now tolerates an empty arg6 `+0x118` late-entry list scaffold
-  - after that callback, the replacement later reaches a second observer registration:
+  - immediate event-`0x18` handling still does not need populated `+0x118`
+  - but newer client-side cross-check now shows `+0x118` is a real later consumer surface, not a
+    permanently ignorable empty scaffold:
+    - `0x62017150` iterates 12-byte entries from arg6 `+0x118`
+    - compares metric ids derived from each entry's first-dword string
+    - later runtime callers `0x620181f0 / 0x62018250` use that helper
+  - after the event-`0x18` callback, the replacement later reaches a second observer registration:
     - `client.dll:LoadingAreaCommonLayoutView_ctor` (`0x62030d90`) at `0x62031136`
     - observer object `0x6298a5e8`
 
@@ -264,8 +272,8 @@ now-live arg6 observer bridge.
 Most likely missing concrete work now lives in one of these areas:
 1. stabilizing or understanding the later second observer registration (`client.dll:0x62031136`,
    object `0x6298a5e8`)
-2. replacing placeholder late arg6 data surfaces (`+0x118`, possibly later siblings) with more
-   faithful content once runtime evidence demands it
+2. replacing the still-empty arg6 `+0x118` late-entry string-triple vector with faithful owner-side
+   content once the `0x440780 -> +0x190 -> +0x1470` producer is mirrored tightly enough
 3. checking replacement parity against the natural-original later `0x438df0 -> 0x41cfb0(0x0f)`
    tail and any post-entry follow-on behavior
 

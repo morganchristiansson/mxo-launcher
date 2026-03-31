@@ -2133,13 +2133,18 @@ LateEntryList1470VectorLikeSketch* CLTLoginMediator::GetLateEntryList1470() {
     lateEntryList1470_.current = begin ? (begin + lateEntryList1470Entries_.size()) : nullptr;
     lateEntryList1470_.capacity = begin ? (begin + lateEntryList1470Entries_.capacity()) : nullptr;
 
+    const char* firstEntryText =
+        (!lateEntryList1470Entries_.empty() && lateEntryList1470Entries_[0].begin)
+            ? lateEntryList1470Entries_[0].begin
+            : "<empty>";
     spdlog::info(
-        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> begin={} current={} capacity={} entryCount={} entryCapacity={}{}",
+        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> begin={} current={} capacity={} entryCount={} entryCapacity={} firstEntry='{}'{}",
         fmt::ptr(lateEntryList1470_.begin),
         fmt::ptr(lateEntryList1470_.current),
         fmt::ptr(lateEntryList1470_.capacity),
         static_cast<unsigned>(lateEntryList1470Entries_.size()),
         static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
+        firstEntryText,
         lateEntryList1470Entries_.empty() ? " (empty scaffold)" : "");
     return &lateEntryList1470_;
 }

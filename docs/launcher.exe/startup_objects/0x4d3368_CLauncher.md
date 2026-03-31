@@ -299,6 +299,11 @@ Implication for the replacement source:
   - `0x402ec0` starts `CLauncherThread` (`runtimeclass 0x4aa134`)
     - `0x407580 = CLauncherThread_InitInstance` allocates the separate `0xb30` launcher
       dialog/controller object and stores it at thread `+0x48`
+    - current best provisional class identity for that object is now `LauncherLoginDialog`
+      - ctor `0x403390`
+      - create/init body `0x406470 = LauncherLoginDialog_CreateAndInitializeWindow`
+      - neighboring methods `0x4047d0 / 0x405a20 / 0x40d530 / 0x40d820`
+      - exact original C++ type spelling is still open
     - `0x406470` creates that dialog window + child controls and marks dialog `+0x68` ready
     - `0x402ec0` waits for `thread+0x48`, waits for dialog `+0x68`, then pumps messages until
       thread `+0x45` says the launcher dialog path has exited
@@ -329,9 +334,10 @@ Implication for the replacement source:
     - calls arg6 `+0xec` at `0x62170f48`
   - practical consequence: the missing bridge is no longer best modeled as a hidden direct launcher
     virtual call into `+0xec`; it is a launcher-writeback-then-client-producer corridor
-- Remaining question:
-  - what is the concrete class name of the separate `0xb30` launcher dialog/controller object whose
-    methods include `0x4047d0`, `0x405a20`, `0x40d530`, and `0x40d820`?
+- Remaining questions:
+  - exact original C++ type spelling for the provisional `LauncherLoginDialog` class
+  - which later owner method(s) append the `+0x1470` late-entry string-triple list later exposed
+    through arg6 `+0x118`?
 - New negative result from this pass:
   - direct xrefs to mediator commit writers still do not close the upstream bridge
   - `0x41c1f0` currently shows only the vtable data reference at `0x004b02b4`

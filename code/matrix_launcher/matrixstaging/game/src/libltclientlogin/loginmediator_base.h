@@ -102,11 +102,15 @@ struct RouteDescriptor30SmallStringLikeSketch {
 
 struct LateEntryList1470EntrySketch {
     // anchor: launcher.exe:0x41af50 / owner vtable `+0x118`
-    // Current best late-runtime read is only the fixed 12-byte entry width.
-    // Keep the payload words structural until stronger evidence names them.
-    uint32_t field00 = 0;
-    uint32_t field04 = 0;
-    uint32_t field08 = 0;
+    // Newer tightening from `0x41f840 -> 0x41f640` plus client consumer `0x62017150`:
+    // - owner `+0x1470` is a vector of 12-byte string-triple objects
+    // - owner slot `+0x190 / 0x41f840` appends one entry by forwarding to
+    //   `0x41f640 = StringTripleArray_Append`
+    // - later client code reads the first dword of each entry as a filename-like string and maps
+    //   it through `FUN_622a9cf0` / `METR` metadata
+    const char* begin = nullptr;
+    const char* current = nullptr;
+    const char* capacity = nullptr;
 };
 
 struct LateEntryList1470VectorLikeSketch {
@@ -559,7 +563,7 @@ public:
     // +0x18c
     virtual uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) = 0;
     // +0x190
-    // virtual void AppendRouteHostStringTriple(uint32_t index, const char* begin, const char* current) = 0;
+    // virtual void AppendLateEntryStringTriple1470(const LateEntryList1470EntrySketch* entry) = 0;
     // virtual ~ILTLoginMediator() {}
 };
 

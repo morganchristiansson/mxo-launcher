@@ -22,6 +22,13 @@ this narrower submit surface:
 - `+0x118`
 - `+0x13c`
 
+Newer tightening also sharpens what `+0x118` really is on that later side:
+- owner `+0x1470` is a vector-like container of 12-byte string-triple entries
+- owner slot `+0x190 / 0x41f840` appends one entry at a time by forwarding into
+  `0x41f640 = StringTripleArray_Append`
+- state6 opcode-`9` success clears `+0x1470`, appends metric-name strings through `+0x190`, and
+  later arg6 `+0x118 / 0x41af50` exposes that same vector to client late-runtime consumers
+
 See:
 - `../state_machine/POST_STATE9_CONTINUATION.md`
 - `../VTABLES/0x004b01c8.md`

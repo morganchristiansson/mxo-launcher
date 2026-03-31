@@ -694,8 +694,9 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 // - `0x402ec0` is not a tiny setup helper; it starts `CLauncherThread`
 //   (`runtimeclass 0x4aa134`, create object `0x403750`, InitInstance `0x407580`), then blocks
 // - that worker thread allocates the separate `0xb30` launcher dialog/controller object at
-//   `thread+0x48`, calls its window/control initializer `0x406470`, and marks dialog `+0x68` when
-//   the UI is ready
+//   `thread+0x48`; current best provisional class identity for it is `LauncherLoginDialog`
+// - it calls `0x406470 = LauncherLoginDialog_CreateAndInitializeWindow` and marks dialog `+0x68`
+//   when the UI is ready
 // - `0x402ec0` waits for that dialog pointer + ready flag, then pumps messages until thread
 //   `+0x45` shows the launcher dialog path has exited
 // - on the successful selection path, the dialog's state-7 page setup (`0x4047d0`) registers the
@@ -1077,7 +1078,8 @@ bool CLauncher::InitInstance() {
 
     // Original corridor in 0x40b430:
     // - 0x40b74d..0x40b752: `0x402ec0` pre-client UI-thread/message gate
-    //   - starts `CLauncherThread`, waits for `thread+0x48` dialog + dialog `+0x68` ready, then
+    //   - starts `CLauncherThread`, waits for `thread+0x48` provisional `LauncherLoginDialog`
+    //     object + dialog `+0x68` ready, then
     //     pumps messages until thread `+0x45` shows the launcher dialog path has exited
     //   - state-7 page setup (`0x4047d0`) on that dialog registers observer `0x40f070`, while list
     //     interaction reaches `0x40d820 -> 0x405a20` case `8`

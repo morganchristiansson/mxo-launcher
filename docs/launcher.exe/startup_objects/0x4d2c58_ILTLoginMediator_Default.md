@@ -588,6 +588,10 @@ Later original-launcher runtime + vtable proof materially corrected the old read
   (`0x41f2c0`)
 - `+0x118` is now better read as the wrapper-facing vector-like getter over owner `+0x1470`
   (`0x41af50`)
+  - newer `0x41f840 -> 0x41f640` tightening now shows the entries are 12-byte string-triple
+    objects, not generic opaque triples
+  - later client consumer `0x62017150` reads the first dword of each entry as a filename-like
+    string and maps it through `FUN_622a9cf0` / `METR` metadata
 - `+0x13c` is now better read as the `WaitForEvent` loop pump that invokes owner helper `+0x65c`
   vtable `+0x04` when present (`0x4202c0`)
 - replacement wrapper minimization now keeps the ABI-shaped `+0x10c/+0x118` objects and the
