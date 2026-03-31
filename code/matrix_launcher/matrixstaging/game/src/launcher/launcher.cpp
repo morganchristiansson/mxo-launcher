@@ -831,8 +831,11 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 &selectedDescriptorIndex)) {
             // anchor: launcher.exe owner-side selection commit pair 0x41c390 -> 0x41c1f0
             // Bounded no-GUI bridge:
-            // - original launcher UI eventually resolves selection through the list/dialog path and
-            //   then advances the mediator-owned state3 wait branch via the owner-side commit pair
+            // - original launcher UI eventually resolves selection through the list/dialog path
+            //   (`0x4047d0` selection-page setup -> `0x40d530/0x40d820` list interaction ->
+            //   `0x405a20` command `8` -> `0x40d6f0` launcher-side selection resolve/writeback)
+            // - that upstream launcher path is still distinct from the later mediator-owned
+            //   state3-wait advance via the owner-side commit pair
             // - current source now keeps the closest recovered interface on the mediator side first:
             //   build partial state3 selection context from recovered slot/world state, then commit
             //   through the owner pair before client.dll load

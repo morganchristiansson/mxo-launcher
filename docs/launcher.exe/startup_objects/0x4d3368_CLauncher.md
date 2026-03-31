@@ -143,9 +143,21 @@ A concrete new anchor on that earlier phase is the launcher selection writer:
 
 New surrounding launcher-UI tightening now narrows the upstream caller path too:
 
+- `0x4047d0`
+  - launcher dialog/page switcher over owner byte/dword state at `CLauncher+0x74...`
+  - newer review of case `7` is the important selection-page anchor:
+    - shows the list control at `CLauncher+0xa0c`
+    - registers observer callback `+0x170` when needed
+    - immediately posts UI command `0x0f` through `0x405a20` to disable selection/continue controls
+    - then calls the world-list population helper at `0x40e6c0`
+  - practical read: this is the launcher-owned selection-page setup that precedes later
+    `0x40d530/0x40d820` interaction
 - `0x405a20 = LauncherLoginDialog_DispatchUiCommand`
   - case `8` calls `0x40d6f0`
   - on success it continues through patch-check / launch-side logic and eventually exits that UI path
+  - newer negative result from `0x405a20 + 0x40ac00`:
+    - this success path immediately enters patch/launch-side work
+    - it is **not** itself the mediator-owned selection commit boundary `0x41c390/0x41c1f0`
 - `0x40d530 = LauncherSelectionList_OnSelectionChanged`
   - samples the current list selection through the same sibling mediator slot `0x4d3584`
   - validates it through the same `+0x100 -> 0x40cdb0 -> (+0x54 when gate byte is 2/5) -> +0xe4`
