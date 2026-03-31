@@ -235,8 +235,17 @@ struct State3SelectionContextInputSketch {
     // Current bounded field recovery:
     // - `+0x00` is the selection/slot index byte consumed directly by `0x41c390/0x41c1f0`
     // - the remaining `0xb0` bytes are still only partially understood globally
-    // - current source-owned CLI bridge only seeds the highest-confidence subset:
-    //   - `block04[0..1]` = current character id low/high
+    // - `0x41c1f0` copies them monotonically into owner `+0xcd0..+0xd7f`, but state8 slot3 later
+    //   serializes those owner blocks in a different packet order:
+    //   - input `block04/block14/block24` -> packet `0x09/0x19/0x29`
+    //   - input `block34/block44/block54/block64` -> packet `0x39/0x49/0x59/0x69`
+    //   - input `block74/block84/block94/blockA4` -> packet `0x79/0x89/0x99/0xa9`
+    // - negative result from `0x43bd20`: the fixed packet dwords at `0x01/0x05` do **not** come
+    //   from `block04[0..1]`; state8 slot3 fetches those character id dwords separately from the
+    //   current slot record through owner vtable `+0x44`
+    // - current source-owned CLI bridge therefore only seeds the highest-confidence subset:
+    //   - `block04[0..1]` = current character id low/high (persisted here by the bridge, but not
+    //                       used as the state8 packet's fixed `0x01/0x05` GCID fields)
     //   - `block04[2]`    = current slot/world id
     //   - `block04[3]`    = matched world-descriptor index
     //   - `block14[0..3]` = current arg7-style world/variant/gate/state summary

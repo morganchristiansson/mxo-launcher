@@ -177,6 +177,14 @@ Practical consequence:
     source fills the highest-confidence fields (slot/index, character id pair, world id,
     descriptor index, current arg7-selection summary) while the original launcher UI producer for
     the rest of the block remains unresolved
+  - newer owner-side tightening from `0x41c1f0 + 0x43bd20` matters for how far that bridge claim
+    can go:
+    - state8 later serializes the persisted snapshot blocks in packet order
+      `0x09/0x19/0x29`, `0x79/0x89/0x99/0xa9`, then `0x39/0x49/0x59/0x69`
+    - but the packet's fixed GCID dwords still come separately from the current slot record, not
+      from persisted snapshot block `+0xcd0[0..1]`
+    - so the bridge's seeded character-id pair should still be treated as a bounded persisted-input
+      guess, not as proof that state8 slot3 reads those exact dwords back as the outbound GCID
 - so the remaining high-value question is the caller/message path that bridges launcher UI selection
   into those mediator-side writers and only then lets `InitInstance` resume into `0x40b7af`
 

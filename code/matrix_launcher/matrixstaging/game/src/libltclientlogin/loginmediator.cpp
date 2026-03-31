@@ -1794,6 +1794,12 @@ bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold
     if (outInput) {
         *outInput = {};
         outInput->slotOrSelectionIndex00 = slotIndex;
+        // anchor: launcher.exe:0x41c1f0 / launcher.exe:0x43bd20
+        // Bounded faithful bridge only for the highest-confidence recovered subset:
+        // - `0x41c1f0` persists these dwords into the first two owner snapshot blocks
+        // - later state8 slot3 emits those as packet blocks `0x09` and `0x19`
+        // - negative result from `0x43bd20`: fixed GCID packet fields `0x01/0x05` still come from
+        //   the current slot record fetched through owner vtable `+0x44`, not from `block04[0..1]`
         outInput->block04[0] = slotRecord->globalCharacterIdLow03;
         outInput->block04[1] = slotRecord->globalCharacterIdHigh07;
         outInput->block04[2] = static_cast<uint32_t>(slotRecord->worldId0c);

@@ -442,8 +442,12 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //     - on zero, original switches helper state to `6`
     //   - fetch current slot record through owner vtable `+0x44`
     //   - initialize packet-builder family `0x43ac10`
-    //   - write the current character id pair plus selection snapshot blocks
-    //     `+0xcd0..+0xd7f` in the original write order
+    //   - write the current character id pair from that current slot record into fixed packet
+    //     dwords `0x01/0x05`
+    //   - then write selection snapshot blocks from owner `+0xcd0..+0xd7f` in the original packet
+    //     order (`0x09/0x19/0x29`, `0x79/0x89/0x99/0xa9`, then `0x39/0x49/0x59/0x69`)
+    //   - negative result worth keeping explicit: state8 slot3 does **not** reuse persisted
+    //     snapshot `blockCd0[0..1]` for those fixed GCID packet fields
     //   - append `GameSessionID` through `0x43ada0`
     //     - newer `0x43acf0 + 0x4557b0` tightening now makes the growth rule explicit:
     //       reserve `(GameSessionID byte count including NUL) + 2` bytes at the tail of the
