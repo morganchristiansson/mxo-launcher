@@ -1513,9 +1513,10 @@ uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selection
         // Bounded source note:
         // - original `0x41c390` switches helper state to `7`
         // - one concrete launcher-side upstream caller now visible in static RE is
-        //   `launcher.exe:0x40ec70`, reached from `0x405a20` case `9`, which calls sibling
-        //   mediator slot `+0xf0` with the selected row's active-world index and then waits for
-        //   event `8` through `0x41b6c0`
+        //   `launcher.exe:0x40ec70`, reached from `0x405a20` case `9`, which:
+        //   - reads the selected row item-data high word as a signed active-world index
+        //   - calls sibling mediator slot `+0xf0` with that active-world index
+        //   - then waits for event `8` through `0x41b6c0`
         // - negative result from that same helper family: it still does not expose the later
         //   `+0xec / 0x41c1f0` `0xb4` producer
         // - current active replacement route does not yet model a dedicated state7 scaffold here

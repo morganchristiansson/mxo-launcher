@@ -213,9 +213,12 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
   - case `8` calls `0x40d6f0`
   - on success it continues through patch-check / launch-side logic and eventually exits that UI path
   - case `9` calls `0x40ec70`
-    - newer negative result from that helper family:
-      - it explicitly calls sibling mediator slot `+0xf0 = 0x41c390` with the selected row's
-        active-world index, then waits through `0x41b6c0` for event `8`
+    - newer decompile-backed tightening from that helper family:
+      - it reads the selected row item-data high word as a signed active-world index
+      - calls sibling mediator slot `+0xf0 = 0x41c390` with that active-world index
+      - waits through `0x41b6c0` for event `8`
+      - on failure it also calls sibling slot `+0xe8`, then rebuilds the list through
+        `0x40e480 -> 0x40e1c0`
       - but this still does **not** show the later `+0xec = 0x41c1f0` `0xb4` producer
       - so it is evidence for an upstream launcher-side **selection-index/state7** action, not yet
         for the full persisted selection-context commit
