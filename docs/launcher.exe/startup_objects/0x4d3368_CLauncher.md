@@ -288,10 +288,15 @@ Practical consequence:
     not as permission to bypass the launcher-owned login flow
   - a no-GUI replacement therefore should not require `-char` up front
   - instead it should submit credentials through the same launcher-owned auth path first, then only
-    after successful auth adopt a recovered character selection and mirror the selection commit into
-    the mediator-side `0x41c390 -> 0x41c1f0` boundary before client load
+    after successful auth mirror the launcher dialog's page `11` -> command `10` -> page `7`
+    transition and page-`7` command-`8` selection writeback before client load
+  - keep the later direct owner `+0xec` call on the proven client-side producer path at
+    `client.dll:0x62170f48`
 - current bounded source consequence:
-  - the no-GUI launcher bridge now does exactly that paired owner-side commit
+  - the no-GUI launcher bridge now mirrors launcher-side page-`7` command-`8` writeback into
+    `CLauncher+0xa8/+0xac` plus `Last_WorldName`
+  - it seeds the later wrapper-facing `+0x120` character source block and current slot route index
+  - but it no longer claims a pre-client direct `+0xf0/+0xec` owner commit
   - newer direct-producer tightening from `client.dll:0x6211d3e0 + 0x62170e2a..0x62170f48` narrows
     the `0xb4` snapshot more than before:
     - the client first zero-initializes the full handoff

@@ -1286,6 +1286,14 @@ public:
         State3SelectionContextInputSketch* outInput,
         uint32_t* outDescriptorIndex,
         const SlotRecordState004b5328** outSlotRecord);
+    // Pre-client launcher-side recovered character adoption helper.
+    // Current bounded fidelity read:
+    // - mirrors the selected character slot into the later wrapper-facing `+0x120` source block
+    //   and current-slot route index
+    // - does **not** claim to be the original success-side `+0xf0/+0xec` producer
+    // - launcher-side selection success is currently better modeled as page-`7`
+    //   list-activate -> command `8` -> `0x40d6f0` writeback, with the direct `+0xec` call later
+    //   coming from `client.dll:0x62170f48`
     bool AdoptRecoveredCharacterSelectionForLauncherScaffold(
         uint32_t slotIndex,
         char* outCharacterName,

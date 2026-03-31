@@ -859,6 +859,8 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         char selectedCharacterName[256] = {};
         char selectedWorldName[256] = {};
         uint32_t selectedDescriptorIndex = 0u;
+        spdlog::info(
+            "ROUTE CHECKPOINT: pre-client no-GUI selection mirroring LauncherLoginDialog page11 Enter/command10 -> page7, then page7 list activation command8 (not page7 primary-button command11)");
         if (!DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
                 selectedCharacterIndex,
                 selectedCharacterName,
@@ -866,33 +868,26 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 selectedWorldName,
                 sizeof(selectedWorldName),
                 &selectedDescriptorIndex)) {
-            // anchor: launcher.exe owner-side selection commit pair 0x41c390 -> 0x41c1f0
+            // anchor: launcher.exe:0x4047d0 / case 7
+            // anchor: launcher.exe:0x40d820
+            // anchor: launcher.exe:0x405a20 / command 8
+            // anchor: launcher.exe:0x40d6f0
             // Bounded no-GUI bridge:
-            // - page-`7` launcher UI now has two distinct action families that should stay split:
-            //   - selection-changed `0x40d530` only posts commands `0x0f/0x10/0x11/0x12` to toggle
-            //     the page-`7` buttons
-            //   - page-`7` primary button (`dialog +0x204`) and Enter key dispatch command `11`,
-            //     which transitions into page `6` / page `3` instead of directly resolving arg7
-            //   - list double-click `0x40d820` dispatches command `8`, which is the tighter direct
-            //     `0x40d6f0 -> optional patch gate -> DAT_004d259c/quit` unblock corridor
-            // - newer bridge tightening keeps the ownership split narrower than a launcher-local
-            //   `+0xec` caller:
-            //   - launcher closes selection into `CLauncher+0xa8/+0xac` plus `Last_WorldName`
+            // - auth success page flow is now tighter:
+            //   - command `7` leads to page `11`
+            //   - page `11` Enter / command `10` returns to page `7`
+            //   - page-`7` list activation posts command `8`
+            //   - command `8` resolves launcher selection through `0x40d6f0`
+            // - keep the ownership split narrower than a launcher-local `+0xec` caller:
+            //   - launcher success writes `CLauncher+0xa8/+0xac` plus `Last_WorldName`
             //   - the direct `+0xec` call is then best read later from
-            //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`, which builds
-            //     the stack-local `0xb4` selection/config handoff immediately before calling arg6
-            // - current source still keeps the closest recovered interface on the mediator side for
-            //   the no-GUI pre-client bridge:
-            //   build partial state3 selection context from recovered slot/world state, then commit
-            //   through the owner pair before client.dll load
-            // - newer selection-page RE still keeps the missing producer boundary open:
-            //   the launcher row nodes built by `0x40e480` / replayed by `0x40e1c0` are only
-            //   `0x48`-byte UI payload nodes (packed low/high indices, four strings, one dword
-            //   flag, one timestamp), so they are not yet evidence for the full `0xb4` owner input
-            // - the full original launcher UI producer for the rest of the `0xb4` selection snapshot
-            //   remains under reconstruction
+            //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
+            // - current no-GUI host therefore treats recovered character choice as:
+            //   - launcher-side page-`7` command-`8` writeback mirror
+            //   - plus mediator-side current-slot / `+0x120` source-block seeding
+            //   - but not as proof that original launcher directly called `+0xf0/+0xec` here
             spdlog::error(
-                "ERROR: failed to adopt pre-client recovered character selection index={} into launcher/mediator state",
+                "ERROR: failed to adopt pre-client recovered character selection index={} into launcher-side selection seed state",
                 static_cast<unsigned>(selectedCharacterIndex));
             return false;
         }
@@ -902,34 +897,72 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         }
 
         if (selectedWorldName[0]) {
-            std::strncpy(g_LastWorldName, selectedWorldName, sizeof(g_LastWorldName) - 1u);
-            g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
-            StoreLastWorldNameInRegistry(g_LastWorldName);
-
             if (const RecoveredLauncherSelectionRecord* recoveredSelection =
                     FindRecoveredLauncherSelectionRecord(selectedWorldName)) {
-                m_FieldA8 = recoveredSelection->variantIndexHigh8;
-                m_FieldAC = recoveredSelection->worldIndexLow24;
-                g_PackedArg7Selection = BuildPackedArg7Selection();
                 DiagnosticConfigureMediatorSelection(
-                    (m_FieldAC < 0xffu) ? (m_FieldAC + 1u) : 1u,
-                    (m_FieldA8 < 0xffu) ? (m_FieldA8 + 1u) : 1u,
+                    (recoveredSelection->worldIndexLow24 < 0xffu) ? (recoveredSelection->worldIndexLow24 + 1u) : 1u,
+                    (recoveredSelection->variantIndexHigh8 < 0xffu) ? (recoveredSelection->variantIndexHigh8 + 1u) : 1u,
                     recoveredSelection->worldName,
                     recoveredSelection->worldName,
-                    m_FieldAC,
-                    m_FieldA8,
+                    recoveredSelection->worldIndexLow24,
+                    recoveredSelection->variantIndexHigh8,
                     recoveredSelection->selectionGateByte100,
                     recoveredSelection->variantState);
-                spdlog::info(
-                    "DIAGNOSTIC: CLI launcher selection adopted recovered world '{}' -> descriptorIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
-                    recoveredSelection->worldName,
-                    static_cast<unsigned>(selectedDescriptorIndex),
-                    m_FieldA8,
-                    m_FieldAC,
-                    g_PackedArg7Selection);
+
+                void* selectionMediatorSlot =
+                    g_pILTLoginMediatorSelection3584 ? g_pILTLoginMediatorSelection3584 : g_pILTLoginMediatorDefault;
+                uint32_t resolvedA8 = m_FieldA8;
+                uint32_t resolvedAC = m_FieldAC;
+                char resolvedWorldName[sizeof(g_LastWorldName)] = {};
+                const bool resolvedViaCommand8 =
+                    selectionMediatorSlot != nullptr &&
+                    DiagnosticResolveLauncherSelectionFromMediator(
+                        selectionMediatorSlot,
+                        recoveredSelection->worldIndexLow24,
+                        recoveredSelection->variantIndexHigh8,
+                        &resolvedA8,
+                        &resolvedAC,
+                        resolvedWorldName,
+                        sizeof(resolvedWorldName));
+
+                if (resolvedViaCommand8) {
+                    m_FieldA8 = resolvedA8;
+                    m_FieldAC = resolvedAC;
+                    g_PackedArg7Selection = BuildPackedArg7Selection();
+                    const char* persistedWorldName = resolvedWorldName[0]
+                        ? resolvedWorldName
+                        : recoveredSelection->worldName;
+                    std::strncpy(g_LastWorldName, persistedWorldName, sizeof(g_LastWorldName) - 1u);
+                    g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
+                    StoreLastWorldNameInRegistry(g_LastWorldName);
+                    spdlog::info(
+                        "DIAGNOSTIC: pre-client no-GUI selection mirrored page7 command8 / 0x40d6f0 world='{}' descriptorIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
+                        g_LastWorldName,
+                        static_cast<unsigned>(selectedDescriptorIndex),
+                        m_FieldA8,
+                        m_FieldAC,
+                        g_PackedArg7Selection);
+                } else {
+                    m_FieldA8 = recoveredSelection->variantIndexHigh8;
+                    m_FieldAC = recoveredSelection->worldIndexLow24;
+                    g_PackedArg7Selection = BuildPackedArg7Selection();
+                    std::strncpy(g_LastWorldName, recoveredSelection->worldName, sizeof(g_LastWorldName) - 1u);
+                    g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
+                    StoreLastWorldNameInRegistry(g_LastWorldName);
+                    spdlog::warn(
+                        "WARNING: pre-client no-GUI selection could not mirror page7 command8 / 0x40d6f0 exactly; using bounded recovered writeback world='{}' descriptorIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
+                        g_LastWorldName,
+                        static_cast<unsigned>(selectedDescriptorIndex),
+                        m_FieldA8,
+                        m_FieldAC,
+                        g_PackedArg7Selection);
+                }
             } else {
+                std::strncpy(g_LastWorldName, selectedWorldName, sizeof(g_LastWorldName) - 1u);
+                g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
+                StoreLastWorldNameInRegistry(g_LastWorldName);
                 spdlog::warn(
-                    "WARNING: selected world '{}' has no recovered launcher selection record; keeping existing a8/ac while persisting Last_WorldName",
+                    "WARNING: selected world '{}' has no recovered launcher selection record; persisting Last_WorldName without changing a8/ac",
                     selectedWorldName);
             }
         }

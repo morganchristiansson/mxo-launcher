@@ -1913,17 +1913,25 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
     char* outWorldName,
     uint32_t outWorldNameCapacity,
     uint32_t* outDescriptorIndex) {
-    State3SelectionContextInputSketch selectionContext = {};
-    const SlotRecordState004b5328* slotRecord = nullptr;
-    uint32_t descriptorIndex = 0u;
-    if (!BuildPartialSelectionContextForRecoveredCharacterScaffold(
-            slotIndex,
-            &selectionContext,
-            &descriptorIndex,
-            &slotRecord)) {
+    const SlotRecordState004b5328* slotRecord = RecoveredCharacterByIndexScaffold(slotIndex);
+    if (!slotRecord || slotRecord->heapString14.empty()) {
+        spdlog::info(
+            "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold rejected slotIndex={} (missing slot record or name)",
+            static_cast<unsigned>(slotIndex));
         return false;
     }
 
+    const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord->worldId0c);
+    if (matchedWorldIndex < 0) {
+        spdlog::info(
+            "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold rejected slotIndex={} name='{}' worldId=0x{:04x} (no recovered world descriptor)",
+            static_cast<unsigned>(slotIndex),
+            slotRecord->heapString14.c_str(),
+            static_cast<unsigned>(slotRecord->worldId0c));
+        return false;
+    }
+
+    const uint32_t descriptorIndex = static_cast<uint32_t>(matchedWorldIndex);
     const char* worldName = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
     if (outCharacterName && outCharacterNameCapacity != 0u) {
         outCharacterName[0] = '\0';
@@ -1942,29 +1950,29 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
     }
 
     CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
-    // Newer bridge tightening:
-    // - pre-client replacement now seeds the later owner `+0x120` source block through the same
-    //   wrapper-facing capture surface client.dll uses (`arg6 +0x120`), but with owner semantics
-    //   intentionally disabled so this remains a mirror-only launcher bridge.
+    // Selection-success corridor tightening:
+    // - launcher page-`7` success is currently better modeled as
+    //   `0x40d820 -> command 8 -> 0x40d6f0 -> CLauncher+0xa8/+0xac + Last_WorldName`
+    // - the direct owner-side selection-context commit `+0xec` is then best read later from
+    //   `client.dll:0x62170f48`, not as a hidden pre-client launcher virtual call
+    // - so this pre-client recovered helper only mirrors the launcher-selected current-slot route
+    //   index plus the later wrapper-facing `+0x120` character source block
+    // - keep owner semantics disabled on that `+0x120` capture so this remains a launcher-side seed
+    //   helper rather than a claim that original `0x41c3c0` already ran here
     const uint32_t seedResult = MirrorCharacterSeedIntoSourceBlock120Scaffold(
         slotRecord->heapString14.c_str(),
         descriptorIndex);
-    const uint32_t state7Result = SetSelectionIndexAndSwitchToState7(selectionContext.slotOrSelectionIndex00);
-    const uint32_t persistResult = PersistSelectionContextForState8(selectionContext);
 
     spdlog::info(
-        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} selectionIndex00=0x{:02x} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} state7Result=0x{:08x} persistResult=0x{:08x}",
+        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} deferOwnerSelectionCommitToClient=1",
         static_cast<unsigned>(slotIndex),
-        static_cast<unsigned>(selectionContext.slotOrSelectionIndex00 & 0xffu),
         slotRecord->heapString14.c_str(),
         static_cast<unsigned>(slotRecord->worldId0c),
         descriptorIndex,
         (worldName && worldName[0]) ? worldName : "<null>",
         static_cast<unsigned>(CharacterRouteIndexCc8()),
-        static_cast<unsigned>(seedResult),
-        static_cast<unsigned>(state7Result),
-        static_cast<unsigned>(persistResult));
-    return seedResult == 0u && state7Result == 0u && persistResult == 0u;
+        static_cast<unsigned>(seedResult));
+    return seedResult == 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
