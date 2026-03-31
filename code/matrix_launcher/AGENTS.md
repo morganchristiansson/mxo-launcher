@@ -4,7 +4,12 @@
 
 - Implementations must be faithful to static-RE of launcher.exe
 - Use Ghidra for static-RE
-- Annotate with `// anchor: launcher.exe:0x41f390 / owner vtable +0x58`
+- Anchor code to static-RE with comments like `// anchor: launcher.exe:0x41f390 / vtable +0x58`
+- VTables are documented in ../../docs/launcher.exe/VTABLES/0x*.md
+- Decompile and xrefs nearby anchored methods to discover static-RE faithful implementations
+- Classes and methods should map directly to orignal launcher.exe vtable and implementation
+- Fields and methods should be ordered by VTable slot from launcher.exe
+- All fidelity improvements that don't require further exploration or static-RE investigation are in scope
 
 ## Rule 2: Keep launcher working
 
@@ -14,28 +19,66 @@ At end of task:
 ### Rule 3: Implementation, documentation and Ghidra should move together
 - Do not treat documentation as a separate afterthought.
 - When experiments, disassembly, or runtime traces change our understanding, update the canonical docs as part of the same work.
-- Keep knowledge consolidated under: `docs/<binary>/<component>/`
+- Keep knowledge consolidated under: `../../docs/<binary>/<component>/`
 - Prefer updating an existing canonical doc rather than creating a new overlapping note.
 - If a doc becomes stale or redundant, prune or merge it.
 - If doc grows large (2000 lines), split it.
 - when an entry becomes resolved or stops steering current work, prune it instead of appending more history
 - prefer owning recovered code structure, local TODOs, and active implementation notes in inline/header source comments
 - avoid duplicate documentation; merge/prune overlapping docs and keep each topic in the smallest obvious canonical home instead of letting one large doc sprawl across many components
+- prefer canonical `../../docs/<binary>/<component>/` docs for experiment evidence, crash references, and cross-component conclusions
 
 # Misc
 
 - deploy built binaries into the game/runtime directory only for execution
-- treat diagnostic-only hacks as diagnostics, not architecture
-- prefer canonical `docs/<binary>/<component>/` docs for experiment evidence, crash references, and cross-component conclusions
 - when finishing one area of work and the next task likely moves into a different area
-  - Suggest cleanup and pruing of code that is no longer needed and can be cleaned up
-  - suggest areas where fidelity can increase further
+  - pruning of code that is no longer needed and can be cleaned up
+  - suggest areas where further fidelity gains can be made
+- When done, git add <paths ..> && git commit -m "<commit message>"
 
-# Ghidra
+# Ghidra MCP
 
-Decompile function with Ghidra:
+Use Ghidra as the primary static-analysis tool for launcher/client control flow, object layout, and call-shape recovery.
+
+- Verify with disassembly tools when in doubt about calling conventions, stack cleanup, or field semantics
+- **Rename functions**: Sync method names with source code. When log message strings contain method names, use it. Otherwise use descriptive names to improve long term clarity, improve existing names when our understanding improves.
+- **Rename variables**: Sync variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
+- retype parameters / locals / globals in Ghidra when evidence supports it
+- mirror confirmed names/types/anchors back into source comments and canonical docs in the same task
+- use callers/callees/xrefs so isolated helper bodies are not over-interpreted
+- when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
+- push confirmed Ghidra findings into source and canonical docs in the same task so knowledge does not live only in Ghidra
+- record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
+
+## Ghidra usage
+
 ```
+# Decompile one function by address
 mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
-```
 
-Read `./GHIDRA.md` for more
+# Decompile multiple functions by name
+mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "CLTSocketLayer_Init,CLTBaseThreadPerClientTCPEngine_ctor", "program": "launcher.exe"}' })
+
+# Disassemble a function
+mcp({ tool: "ghidra_disassemble_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+
+# Get function callers/callees
+mcp({ tool: "ghidra_get_function_callers", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_get_function_callees", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
+
+# Get xrefs from/to an address
+mcp({ tool: "ghidra_get_xrefs_from", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_get_xrefs_to", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+
+# Rename function by address:
+mcp({ tool: "ghidra_rename_function_by_address", args: '{"function_address": "0x43b300", "new_name": "CLTLoginMediator_InitializeHelperDispatchTable", "program": "launcher.exe"}' })
+
+# Rename function by name:
+mcp({ tool: "ghidra_rename_function", args: '{"oldName": "FUN_0043b300", "newName": "CLTLoginMediator_InitializeHelperDispatchTable", "program": "launcher.exe"}' })
+
+# Rename variables in a function
+mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "variable_renames": {"puVar1": "ptr", "DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}, "program": "launcher.exe"}' })
+
+# Read memory at an address
+mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "program": "launcher.exe"}' })
+```
