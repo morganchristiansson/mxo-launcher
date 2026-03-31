@@ -1437,7 +1437,7 @@ private:
     void LogParsedAuthReply(const mxo::auth::AuthReply& reply) const;
     void SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
     void ResetRecoveredAuthBootstrapDynamicStateScaffold();
-    void SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(const mxo::auth::GetPublicKeyReply& reply);
+    uint32_t SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(const mxo::auth::GetPublicKeyReply& reply);
     void SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
         const mxo::auth::AuthChallengeResponseBuildResult& buildResult);
     void SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mxo::auth::AuthReply& reply);
@@ -1582,8 +1582,11 @@ private:
     // Current tightened high-value family inside that child:
     // - `+0xa0` = auth-request-ready byte set by successful raw `0x07` handling and tested by
     //   `0x448050`
-    // - `+0xa4` = lazy `pubkey.dat`-backed state primed by `0x447260/0x447c10`
-    // - `+0xa8` = raw `0x08` reply-public-key worker used by `0x4474f0`
+    // - `+0xa4` = lazy `pubkey.dat` validator-family pointer primed by `0x447260/0x447c10`
+    // - `+0xa8` = raw `0x08` reply-public-key worker rebuilt by `0x447780` and consumed by
+    //   `0x4474f0` through `0x468ea0/0x468f00`
+    // - `+0xac` = sibling reply validator rebuilt by `0x447780` and consumed by
+    //   `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
     // - `+0xf4` = original reply-derived copied `0x136` block; source now keeps that block as a
     //   wire-faithful shadow so later wrapper/state5 users can read the original `+0x85/+0xa8`
     //   suffix family without re-inventing a semantic object model

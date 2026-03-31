@@ -67,6 +67,82 @@ struct AuthBootstrap680BigIntObject20Scaffold {
 };
 static_assert(sizeof(AuthBootstrap680BigIntObject20Scaffold) == 0x14u);
 
+struct AuthBootstrap680RsaPublicKeyPairSubobject0cSketch {
+    // Common `0x40`-byte subobject constructed at worker `+0x0c` by `0x4420f0` inside both the
+    // raw-`0x08` worker and the validator families.
+    //
+    // Strong current field map from `0x4420f0 / 0x447120 / 0x447020`:
+    // - `+0x08` = reply/public-key modulus big-int object copied from constructor arg1
+    // - `+0x1c` = reply/public-key exponent big-int object copied from constructor arg2
+    // - both outer worker constructors therefore store the parsed raw-`0x07` public key at outer
+    //   `+0x14` and `+0x28`
+    // - `0x41f090` returns outer `this+0x0c`, and
+    //   `0x468ea0 = AuthBootstrap680Raw08PublicKeyWorker_QueryEncryptedOutputLength` then reads
+    //   the embedded modulus object through this subobject `+0x08`
+    uint32_t vtable00 = 0u;
+    uint32_t helperVtable04 = 0u;
+    AuthBootstrap680BigIntObject20Scaffold modulus08{};
+    AuthBootstrap680BigIntObject20Scaffold exponent1c{};
+    uint32_t helperThunk30 = 0u;
+    uint32_t helperThunk34 = 0u;
+    uint32_t helperThunk38 = 0u;
+    uint32_t helperVtable3c = 0u;
+};
+static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, modulus08) == 0x08u);
+static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, exponent1c) == 0x1cu);
+static_assert(sizeof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch) == 0x40u);
+
+struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
+    // Concrete `+0xa8` worker family rebuilt by `0x447780` through:
+    // - pool `0x466580` (`size = 0x5c`)
+    // - ctor `0x447120 = AuthBootstrap680Raw08PublicKeyWorker_ConstructFromReplyPublicKey`
+    // - raw send-time consumers:
+    //   - `0x468ea0 = AuthBootstrap680Raw08PublicKeyWorker_QueryEncryptedOutputLength`
+    //   - `0x468f00 = AuthBootstrap680Raw08PublicKeyWorker_EncryptIntoPacketBuilder`
+    //
+    // Current concrete layout certainty:
+    // - final vtable `0x004b75e4`
+    // - `+0x0c` = common RSA public-key pair subobject above
+    // - `+0x4c/+0x50/+0x54/+0x58` = ctor-seeded helper/vtable family still kept raw pending deeper
+    //   recovery of the exact encryption-worker inheritance stack
+    uint32_t vtable00 = 0u;
+    uint32_t helperVtable04 = 0u;
+    uint32_t helperVtable08 = 0u;
+    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch publicKeyPair0c{};
+    uint32_t helperThunk4c = 0u;
+    uint32_t helperThunk50 = 0u;
+    uint32_t helperThunk54 = 0u;
+    uint32_t helperVtable58 = 0u;
+};
+static_assert(offsetof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch, publicKeyPair0c) == 0x0cu);
+static_assert(sizeof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch) == 0x5cu);
+
+struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
+    // Concrete validator family used at child `+0xa4` and `+0xac`:
+    // - `0x447260` allocates this family lazily for the `pubkey.dat` validator at child `+0xa4`
+    // - `0x447780` allocates the same family again for child `+0xac`
+    // - pool `0x4665a0` (`size = 0x54`)
+    // - ctor `0x447020 = AuthBootstrap680ReplyAuthDataValidator_ConstructFromReplyPublicKey`
+    // - concrete validator entry point: `0x44aec0` -> vtable `+0x2c`
+    //
+    // Current concrete layout certainty:
+    // - final vtable `0x004b7580`
+    // - `+0x0c` = same RSA public-key pair subobject used by the raw-`0x08` worker
+    // - `+0x4c/+0x50` = ctor-seeded helper/vtable family still kept raw pending deeper recovery
+    //   of the exact validator inheritance stack
+    uint32_t vtable00 = 0u;
+    uint32_t helperVtable04 = 0u;
+    uint32_t helperVtable08 = 0u;
+    AuthBootstrap680RsaPublicKeyPairSubobject0cSketch publicKeyPair0c{};
+    uint32_t helperThunk4c = 0u;
+    uint32_t helperThunk50 = 0u;
+};
+static_assert(offsetof(AuthBootstrap680ReplyAuthDataValidatorACSketch, publicKeyPair0c) == 0x0cu);
+static_assert(sizeof(AuthBootstrap680ReplyAuthDataValidatorACSketch) == 0x54u);
+
+using AuthBootstrap680LazyPubkeyDatValidatorA4Sketch =
+    AuthBootstrap680ReplyAuthDataValidatorACSketch;
+
 struct AuthBootstrap680Field54HelperSketch {
     // Concrete helper subobject rooted at child `+0x54`.
     // High-value anchors:
@@ -236,9 +312,9 @@ struct AuthBootstrap680ChildSketch {
     uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
     uint8_t authRequestReadyA0 = 0;              // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
     std::array<uint8_t, 3> paddingA1ToA3{};      // original child `+0xa1 .. +0xa3`
-    void* lazyPubkeyDatStateA4 = nullptr;        // original child `+0xa4`; lazy `pubkey.dat`-backed state built by `0x447260/0x447c10` and reused by `0x447eb0/0x447f50`
-    void* raw08PublicKeyWorkerA8 = nullptr;      // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x47780` and consumed by `0x4474f0`
-    void* replyAuthDataValidatorAC = nullptr;    // original child `+0xac`; sibling validation worker consumed by `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` before the `+0xf4` copy is accepted
+    AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `pubkey.dat` validator family built by `0x447260/0x447c10` and consulted by `0x447780 -> 0x468f80`
+    AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780` and consumed by `0x4474f0` through `0x468ea0/0x468f00`
+    AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780` and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
 
     // Original child `+0xb0 .. +0xeb` now keeps the narrower `0x448140` success-side prep family
     // explicit as the same three adjacent `0x14`-byte big-int objects the launcher ctor seeds with
@@ -296,7 +372,7 @@ struct AuthBootstrap680Ops {
 
     static void SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(CLTLoginMediator& mediator);
     static void ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLoginMediator& mediator);
-    static void SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
+    static uint32_t SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
         CLTLoginMediator& mediator,
         const mxo::auth::GetPublicKeyReply& reply);
     static void SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(

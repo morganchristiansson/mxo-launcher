@@ -2936,9 +2936,9 @@ void CLTLoginMediator::ResetRecoveredAuthBootstrapDynamicStateScaffold() {
 
 // UNANCHORED: thin mediator wrapper over parsed `AS_GetPublicKeyReply` sync for the owner `+0x680`
 // bootstrap child.
-void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
+uint32_t CLTLoginMediator::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
     const mxo::auth::GetPublicKeyReply& reply) {
-    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(*this, reply);
+    return AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(*this, reply);
 }
 
 // UNANCHORED: thin mediator wrapper over post-`0x0a` challenge-material sync for the owner `+0x680`
