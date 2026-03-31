@@ -10,6 +10,8 @@
 
 #include <spdlog/spdlog.h>
 
+extern void* g_pLauncherObject6304;
+
 // Broad ILTLoginMediator.Default ABI shell:
 // - keep startup-selection and general arg6 surface here
 
@@ -1528,6 +1530,60 @@ uint32_t DiagnosticBeginMarginConnection() {
         return 0u;
     }
     return mediator->BeginLauncherMarginConnectionScaffold();
+}
+
+void DiagnosticPumpLauncherNetwork(bool nonBlocking) {
+    LauncherPumpNetworkEngineAbiShell(g_pLauncherObject6304, nonBlocking);
+}
+
+void DiagnosticResetPostedLoginResult() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (mediator) {
+        mediator->ResetPostedLoginResultScaffold();
+    }
+}
+
+bool DiagnosticHasSuccessfulPreClientAuthState() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator && mediator->LastPostedEventScaffold() == 5u && mediator->RecoveredCharacterCountScaffold() != 0u;
+}
+
+uint32_t DiagnosticLastLoginEvent() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->LastPostedEventScaffold() : 0u;
+}
+
+uint32_t DiagnosticLastLoginError() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->LastPostedErrorScaffold() : 0u;
+}
+
+uint32_t DiagnosticRecoveredCharacterCount() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->RecoveredCharacterCountScaffold() : 0u;
+}
+
+bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_t outNameCapacity) {
+    if (!outName || outNameCapacity == 0u) {
+        return false;
+    }
+    outName[0] = '\0';
+
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    const mxo::ltlogin::SlotRecordState004b5328* slotRecord =
+        mediator ? mediator->RecoveredCharacterByIndexScaffold(slotIndex) : nullptr;
+    if (!slotRecord || slotRecord->heapString14.empty()) {
+        return false;
+    }
+
+    std::strncpy(outName, slotRecord->heapString14.c_str(), outNameCapacity - 1u);
+    outName[outNameCapacity - 1u] = '\0';
+    return true;
+}
+
+bool DiagnosticSelectRecoveredCharacter(uint32_t slotIndex) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->SelectRecoveredCharacterByIndexScaffold(slotIndex) : false;
 }
 
 // UNANCHORED: diagnostic profile/session-name configurator for arg6.

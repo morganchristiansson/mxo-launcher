@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <winver.h>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -47,6 +48,7 @@ extern bool IsRecoveredPreclientEnvironmentActive();
 namespace {
 
 const char* kLauncherRegistryKeyPath = "Software\\Monolith Productions\\The Matrix Online\\";
+bool g_PreClientAuthAndCharacterSelectionCompleted = false;
 
 struct RecoveredLauncherSelectionRecord {
     const char* worldName;
@@ -109,6 +111,26 @@ bool ReadInteractiveLauncherField(const char* prompt, char* buffer, size_t buffe
     while (length != 0u && (buffer[length - 1u] == '\n' || buffer[length - 1u] == '\r')) {
         buffer[--length] = '\0';
     }
+    return true;
+}
+
+bool ReadInteractiveLauncherIndex(const char* prompt, uint32_t upperBoundExclusive, uint32_t* outIndex) {
+    if (!prompt || !outIndex || upperBoundExclusive == 0u) {
+        return false;
+    }
+
+    char inputBuffer[64] = {};
+    if (!ReadInteractiveLauncherField(prompt, inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
+        return false;
+    }
+
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(inputBuffer, &end, 10);
+    if (end == inputBuffer || (end && *end != '\0') || parsed >= upperBoundExclusive) {
+        return false;
+    }
+
+    *outIndex = static_cast<uint32_t>(parsed);
     return true;
 }
 
@@ -680,6 +702,137 @@ bool CLauncher::RunRecoveredPreClientBringupStage() const {
     return true;
 }
 
+// UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
+// This intentionally moves launcher auth sequencing earlier so client.dll load can happen only
+// after successful launcher-owned auth plus a selected recovered character.
+bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() const {
+    g_PreClientAuthAndCharacterSelectionCompleted = false;
+    if (!DiagnosticCanBeginAuthConnection()) {
+        spdlog::error("ERROR: pre-client auth cannot begin because the launcher-mediated auth bridge is unavailable");
+        return false;
+    }
+
+    for (uint32_t attempt = 1u;; ++attempt) {
+        DiagnosticConfigureMediatorProfileName(
+            g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
+        DiagnosticConfigureMediatorAuthName(
+            g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
+        DiagnosticConfigureMediatorAuthPassword(
+            g_LauncherCommandLine.AuthPassword()[0] ? g_LauncherCommandLine.AuthPassword() : NULL);
+        DiagnosticResetPostedLoginResult();
+
+        const uint32_t authBeginResult = DiagnosticBeginAuthConnection();
+        spdlog::info(
+            "DIAGNOSTIC: pre-client launcher auth attempt={} beginResult=0x{:08x}",
+            static_cast<unsigned>(attempt),
+            static_cast<unsigned>(authBeginResult));
+
+        const DWORD startTick = GetTickCount();
+        bool authSucceeded = false;
+        while ((GetTickCount() - startTick) < 30000u) {
+            DiagnosticPumpLauncherNetwork(/*nonBlocking=*/true);
+            if (DiagnosticHasSuccessfulPreClientAuthState()) {
+                authSucceeded = true;
+                break;
+            }
+            const uint32_t loginError = DiagnosticLastLoginError();
+            if (loginError != 0u) {
+                spdlog::info(
+                    "DIAGNOSTIC: pre-client launcher auth attempt={} terminated with loginError=0x{:02x}",
+                    static_cast<unsigned>(attempt),
+                    static_cast<unsigned>(loginError));
+                break;
+            }
+            Sleep(10u);
+        }
+
+        if (!authSucceeded) {
+            const uint32_t loginError = DiagnosticLastLoginError();
+            if (loginError == 0u) {
+                spdlog::warn("WARNING: pre-client launcher auth timed out before success/error resolution; falling back to later post-InitClientDLL auth path");
+                return true;
+            }
+            if (loginError != 4u) {
+                spdlog::warn(
+                    "WARNING: pre-client launcher auth ended with error=0x{:02x}; falling back to later post-InitClientDLL auth path while pre-client auth adoption remains incomplete",
+                    static_cast<unsigned>(loginError));
+                return true;
+            }
+
+            spdlog::info(
+                "DIAGNOSTIC: pre-client launcher auth failure will re-prompt credentials error=0x{:02x}",
+                static_cast<unsigned>(loginError));
+            if (!PromptForMissingLauncherCredentialsIfNeeded()) {
+                return false;
+            }
+            char inputBuffer[256] = {};
+            if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
+                spdlog::error("ERROR: interactive username re-prompt failed or was left empty");
+                return false;
+            }
+            g_LauncherCommandLine.SetAuthUsername(inputBuffer);
+            if (!ReadInteractiveLauncherField("Password: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
+                spdlog::error("ERROR: interactive password re-prompt failed or was left empty");
+                return false;
+            }
+            g_LauncherCommandLine.SetAuthPassword(inputBuffer);
+            continue;
+        }
+
+        const uint32_t characterCount = DiagnosticRecoveredCharacterCount();
+        if (characterCount == 0u) {
+            spdlog::warn("WARNING: pre-client auth reported success but no recovered characters were available; falling back to later post-InitClientDLL auth path");
+            return true;
+        }
+
+        std::fprintf(stderr, "Available characters:\n");
+        for (uint32_t i = 0; i < characterCount; ++i) {
+            char characterName[256] = {};
+            const bool haveCharacterName =
+                DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName));
+            std::fprintf(
+                stderr,
+                "  [%u] %s\n",
+                static_cast<unsigned>(i),
+                haveCharacterName ? characterName : "<unresolved>");
+        }
+
+        uint32_t selectedCharacterIndex = 0u;
+        bool selectedCharacterResolvedFromCommandLine = false;
+        if (g_LauncherCommandLine.LauncherCharacter()[0] != '\0') {
+            for (uint32_t i = 0; i < characterCount; ++i) {
+                char characterName[256] = {};
+                if (DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName)) &&
+                    std::strcmp(characterName, g_LauncherCommandLine.LauncherCharacter()) == 0) {
+                    selectedCharacterIndex = i;
+                    selectedCharacterResolvedFromCommandLine = true;
+                    break;
+                }
+            }
+        }
+        if (characterCount != 1u && !selectedCharacterResolvedFromCommandLine) {
+            while (!ReadInteractiveLauncherIndex("Character index: ", characterCount, &selectedCharacterIndex)) {
+                std::fprintf(stderr, "Invalid character index.\n");
+            }
+        }
+
+        if (!DiagnosticSelectRecoveredCharacter(selectedCharacterIndex)) {
+            spdlog::error(
+                "ERROR: failed to seed pre-client recovered character selection index={} into mediator source block",
+                static_cast<unsigned>(selectedCharacterIndex));
+            return false;
+        }
+
+        g_PreClientAuthAndCharacterSelectionCompleted = true;
+        spdlog::info(
+            "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} characterCount={} selectedIndex={}",
+            static_cast<unsigned>(DiagnosticLastLoginEvent()),
+            static_cast<unsigned>(characterCount),
+            static_cast<unsigned>(selectedCharacterIndex));
+        return true;
+    }
+}
+
 // UNANCHORED: no-GUI wrapper for launcher.exe:0x40b75a -> 0x401520 -> DoModal -> 0x401640 -> 0x401590.
 bool CLauncher::RunAutodetectDialogWithoutGui() const {
     spdlog::info("=== Running autodetect dialog path without GUI ===");
@@ -770,7 +923,10 @@ bool CLauncher::RunClientDllLifecycle() const {
 
     if (DiagnosticCanBeginAuthConnection()) {
         const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
-        spdlog::info("DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x}", (unsigned)authConnectResult);
+        spdlog::info(
+            "DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x} preClientAuthComplete={}",
+            static_cast<unsigned>(authConnectResult),
+            g_PreClientAuthAndCharacterSelectionCompleted ? 1u : 0u);
     }
 
     spdlog::info("=== Calling RunClientDLL on the active launcher path ===");
@@ -830,6 +986,9 @@ bool CLauncher::InitInstance() {
 
     if (!LoadCresDLL()) {
         spdlog::info("ERROR: failed to load cres.dll");
+        return false;
+    }
+    if (!RunPreClientAuthAndCharacterSelectionStage()) {
         return false;
     }
     if (!LoadClientDLL()) {

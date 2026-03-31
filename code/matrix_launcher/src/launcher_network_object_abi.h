@@ -19,3 +19,6 @@ void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediat
 // UNANCHORED: launcher-owned diagnostic log for the active arg5 primary-dispatch mode / vptr.
 void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, const char* phase);
 
+// UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
+void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking);
+

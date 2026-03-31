@@ -42,6 +42,14 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
 bool DiagnosticCanBeginAuthConnection();
 uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();
+void DiagnosticPumpLauncherNetwork(bool nonBlocking);
+void DiagnosticResetPostedLoginResult();
+bool DiagnosticHasSuccessfulPreClientAuthState();
+uint32_t DiagnosticLastLoginEvent();
+uint32_t DiagnosticLastLoginError();
+uint32_t DiagnosticRecoveredCharacterCount();
+bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_t outNameCapacity);
+bool DiagnosticSelectRecoveredCharacter(uint32_t slotIndex);
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);

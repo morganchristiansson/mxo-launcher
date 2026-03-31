@@ -758,6 +758,7 @@ public:
     uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
     const std::array<uint32_t, 8>& RecentPostedEventsScaffold() const { return recentPostedEventsScaffold_; }
     uint32_t RecentPostedEventCountScaffold() const { return recentPostedEventCountScaffold_; }
+    void ResetPostedLoginResultScaffold();
 
     // Narrow post-auth receive-boundary counters used only for short runtime discrimination:
     // - no packet arrived yet
@@ -1270,6 +1271,9 @@ public:
     uint32_t MirrorCharacterSeedIntoSourceBlock120Scaffold(
         const char* characterName,
         uint32_t selectedWorldIndexLow24);
+    uint32_t RecoveredCharacterCountScaffold() const;
+    const SlotRecordState004b5328* RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const;
+    bool SelectRecoveredCharacterByIndexScaffold(uint32_t slotIndex);
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
     // Keep the instance-role split explicit in source:
     // - the wrapper-facing `ILTLoginMediator.Default` mirror should capture the source block even

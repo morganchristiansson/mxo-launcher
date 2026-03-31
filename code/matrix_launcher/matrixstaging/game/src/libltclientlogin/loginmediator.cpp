@@ -1729,6 +1729,55 @@ uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
     return 0u;
 }
 
+// UNANCHORED: source-owned pre-client launcher helper over the recovered owner `+0x688` table.
+uint32_t CLTLoginMediator::RecoveredCharacterCountScaffold() const {
+    return static_cast<uint32_t>(slotRecordCount684_);
+}
+
+// UNANCHORED: source-owned pre-client launcher helper over the recovered owner `+0x688` table.
+const SlotRecordState004b5328* CLTLoginMediator::RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const {
+    if (slotIndex > 0xffu) {
+        return nullptr;
+    }
+    return GetSlotRecordByIndex(static_cast<uint8_t>(slotIndex));
+}
+
+// UNANCHORED: source-owned pre-client launcher helper that seeds the later `+0x120` source block
+// from a recovered auth-reply character slot before client.dll load.
+bool CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold(uint32_t slotIndex) {
+    const SlotRecordState004b5328* slotRecord = RecoveredCharacterByIndexScaffold(slotIndex);
+    if (!slotRecord || slotRecord->heapString14.empty()) {
+        spdlog::info(
+            "CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold rejected slotIndex={} (missing slot record or name)",
+            static_cast<unsigned>(slotIndex));
+        return false;
+    }
+
+    const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord->worldId0c);
+    if (matchedWorldIndex < 0) {
+        spdlog::info(
+            "CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold rejected slotIndex={} name='{}' worldId=0x{:04x} (no recovered world descriptor)",
+            static_cast<unsigned>(slotIndex),
+            slotRecord->heapString14.c_str(),
+            static_cast<unsigned>(slotRecord->worldId0c));
+        return false;
+    }
+
+    CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
+    const uint32_t seedResult = MirrorCharacterSeedIntoSourceBlock120Scaffold(
+        slotRecord->heapString14.c_str(),
+        static_cast<uint32_t>(matchedWorldIndex));
+    spdlog::info(
+        "CLTLoginMediator::SelectRecoveredCharacterByIndexScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x}",
+        static_cast<unsigned>(slotIndex),
+        slotRecord->heapString14.c_str(),
+        static_cast<unsigned>(slotRecord->worldId0c),
+        matchedWorldIndex,
+        static_cast<unsigned>(CharacterRouteIndexCc8()),
+        static_cast<unsigned>(seedResult));
+    return seedResult == 0u;
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(
     const void* input120,

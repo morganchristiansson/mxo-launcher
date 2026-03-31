@@ -474,6 +474,13 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     return returnValue;
 }
 
+void CLTLoginMediator::ResetPostedLoginResultScaffold() {
+    lastPostedEventScaffold_ = 0u;
+    lastPostedErrorScaffold_ = 0u;
+    recentPostedEventCountScaffold_ = 0u;
+    recentPostedEventsScaffold_.fill(0u);
+}
+
 void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     // anchor: launcher.exe:0x41cfb0
     // Current post-state9 continuation read:

@@ -825,6 +825,15 @@ void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, cons
         vptrMatchesNativeAddressPoint ? 1 : 0);
 }
 
+// UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
+void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking) {
+    if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(launcherObjectPtr)) {
+        engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+        engine->RunCompletedOperationQueue(nonBlocking);
+        engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+    }
+}
+
 // UNANCHORED: public replacement-launcher entrypoint that installs the arg5 ABI shell.
 void LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr) {
     if (outLauncherObjectPtr && *outLauncherObjectPtr) {
