@@ -827,8 +827,20 @@ namespace {
 //
 // Disassembly also proves `0x468f00` pushes four stack args into worker vtable `+0x1c`, and
 // `0x468280` returns with `ret 0x10`; the decompiler undercounts that unless checked against the
-// assembly. The OAEP-based source scaffold below is therefore still only a bounded stand-in for
-// that helper-family query, but it matches the recovered chunked-call shape.
+// assembly. Source therefore now mirrors the outer formula more literally:
+// - ciphertext block bytes are derived from the RSA modulus bit count like the launcher path
+// - plaintext chunk bytes remain a bounded OAEP-backed stand-in for the still-unclosed helper
+//   family behind outer `this+4/+8`
+static size_t QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(
+    const CryptoPP::RSA::PublicKey& publicKey) {
+    const size_t modulusBitCount = static_cast<size_t>(publicKey.GetModulus().BitCount());
+    if (modulusBitCount == 0u) {
+        return 0u;
+    }
+
+    return ((modulusBitCount - 1u) + 7u) >> 3u;
+}
+
 static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthScaffold(
     const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
     size_t plaintextByteCount) {
@@ -839,7 +851,8 @@ static uint32_t QueryAuthBootstrap680Raw08PublicKeyWorkerEncryptedOutputLengthSc
 
     CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
     const size_t maxPlaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
-    const size_t ciphertextChunkByteCount = encryptor.FixedCiphertextLength();
+    const size_t ciphertextChunkByteCount =
+        QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey);
     if (maxPlaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
         return 0u;
     }
@@ -877,7 +890,8 @@ bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextIntoCiphertex
         CryptoPP::AutoSeededRandomPool rng;
         CryptoPP::RSAES_OAEP_SHA_Encryptor encryptor(publicKey);
         const size_t maxPlaintextChunkByteCount = encryptor.FixedMaxPlaintextLength();
-        const size_t ciphertextChunkByteCount = encryptor.FixedCiphertextLength();
+        const size_t ciphertextChunkByteCount =
+            QueryAuthBootstrap680Raw08RecoveredCiphertextBlockByteCount(publicKey);
         if (maxPlaintextChunkByteCount == 0u || ciphertextChunkByteCount == 0u) {
             outCiphertextBytes->clear();
             return false;

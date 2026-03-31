@@ -93,33 +93,64 @@ static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, modulu
 static_assert(offsetof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch, exponent1c) == 0x1cu);
 static_assert(sizeof(AuthBootstrap680RsaPublicKeyPairSubobject0cSketch) == 0x40u);
 
+struct AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch {
+    // Constructor-built `0x1c` helper rooted at per-chunk worker `+0x14` by `0x454f10(..., 0x100)`.
+    // Current bounded map from `0x454f10 / 0x454ff0 / 0x455520 / 0x455560`:
+    // - final ctor-time vtable `0x004ba110`
+    // - `+0x08` = ctor-requested node size (`0x100` in the raw-`0x08` path)
+    // - `+0x0c/+0x10` = duplicated heap-node pointer seeded by `0x454f10`
+    // - `+0x18` = pending-byte count / tail state drained by `0x454ff0`
+    // - sibling virtuals query strings `"NodeSize"` and `"OutputBuffer"`, so this helper sits
+    //   in a node-buffer / output-buffer adapter family rather than being a plain inline scratch
+    //   byte array
+    // Keep the untouched dword at `+0x14` reserved until the node object at `+0x0c/+0x10` is
+    // typed more tightly.
+    uint32_t vtable00 = 0u;
+    uint32_t helperVtable04 = 0u;
+    uint32_t nodeSize08 = 0u;
+    void* heapNode0c = nullptr;
+    void* heapNode10 = nullptr;
+    uint32_t reserved14 = 0u;
+    uint32_t pendingByteCount18 = 0u;
+};
+static_assert(sizeof(AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch) == 0x1cu);
+
 struct AuthBootstrap680Raw08PerChunkWorker48Sketch {
     // Temporary `0x48`-byte helper allocated by
     // `0x4382c0 = AuthBootstrap680Raw08PublicKeyWorker_CreatePerChunkWorker` and consumed by
     // `0x468280 = AuthBootstrap680Raw08PublicKeyWorker_EncryptChunkIntoCiphertext`.
     //
-    // Strong current bounded map from `0x438120 / 0x4382c0 / 0x468280`:
+    // Stronger current bounded map from `0x438120 / 0x4382c0 / 0x468280` plus the helper vtable:
     // - final vtable `0x004b4478`
-    // - `+0x14` = constructor-initialized `0x100`-byte scratch/buffer helper
-    // - `+0x30` = caller arg1 captured from `0x468280`
-    // - `+0x34` = outer raw-`0x08` worker pointer
-    // - `+0x40/+0x44` = ctor-zeroed tail state used by the chunk path
+    // - `0x438120` first runs `0x453570(this, param3)`
+    //   - that seeds the inherited helper front matter and stores ctor arg3 at `+0x08`
+    // - `+0x14` = constructed node-buffer/output-buffer helper subobject above
+    //   from `0x454f10(this+0x14, 0x100)`
+    // - `+0x30` = ctor arg1 copied verbatim by `0x438120`
+    // - `+0x34` = ctor arg2 / outer raw-`0x08` worker pointer copied verbatim by `0x438120`
+    // - `+0x40/+0x44` = ctor-zeroed tail dwords
+    // - active encrypt path `0x468280` does not read `+0x30/+0x34/+0x40/+0x44`; current evidence
+    //   says those belong to sibling virtuals on the same helper family, not to the hot chunk body
+    // - helper vtable `+0x1c / 0x437870` releases the constructed `+0x14` subobject through
+    //   `0x455470`
     //
     // `0x468280` proves this helper is part of the exact launcher encrypt path, but its inherited
     // filter/transform family is still too loose to claim a faithful source reimplementation.
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
-    std::array<uint8_t, 0x28> reserved08To2f{};
-    uint32_t capturedArg30 = 0u;
-    void* ownerWorker34 = nullptr;
+    std::array<uint8_t, 0x0c> reserved08To13{};
+    AuthBootstrap680Raw08PerChunkNodeBufferHelper1cSketch nodeBufferHelper14{};
+    uint32_t ctorArg30 = 0u;
+    void* ctorOwnerWorker34 = nullptr;
     uint32_t reserved38 = 0u;
     uint32_t reserved3c = 0u;
-    uint32_t tailState40 = 0u;
-    uint32_t tailState44 = 0u;
+    uint32_t ctorZeroTail40 = 0u;
+    uint32_t ctorZeroTail44 = 0u;
 };
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, capturedArg30) == 0x30u);
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ownerWorker34) == 0x34u);
-static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, tailState40) == 0x40u);
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, nodeBufferHelper14) == 0x14u);
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorArg30) == 0x30u);
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorOwnerWorker34) == 0x34u);
+static_assert(offsetof(AuthBootstrap680Raw08PerChunkWorker48Sketch, ctorZeroTail40) == 0x40u);
 static_assert(sizeof(AuthBootstrap680Raw08PerChunkWorker48Sketch) == 0x48u);
 
 struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
@@ -138,6 +169,9 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     //     with `ret 0x10`; the decompiler undercounts this unless checked against assembly
     // - vtable `+0x20` = allocate the temporary `0x48` helper above
     // - vtable `+0x24` = ciphertext-block/modulus query consumed by `0x468ea0/0x468f00`
+    //   - `0x468ea0` then runs the modulus object through `0x45a400`, so the ciphertext block
+    //     byte count is derived from the RSA modulus bit length rather than from a generic
+    //     encryptor-side constant
     // - vtable `+0x28` = same tiny getter reused again
     // - `0x468f00` itself loops over plaintext chunks and advances the packet-builder output by one
     //   ciphertext block per iteration
