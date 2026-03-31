@@ -2303,8 +2303,9 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 // +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
 // +0xf8 = GetWorldListCount() -> uint total count
 // +0xd8 = GetActiveWorldCount() -> uint active count
-// +0xe0 = GetAvailableWorlds(index) -> bool (fallback path check)
-// +0xdc = GetAvailableWorldName(index) -> char* (fallback path)
+// +0xe0 = active-world/world-match string getter used by `0x40e480` while pairing the total-world
+//         list against the active-world list before writing packed row item-data
+// +0xdc = active-world display-name getter used for list column 1 on the matched-row path
 //
 // ARG7 PACKING FORMAT:
 // g_PackedArg7Selection = (high8bits << 24) | low24bits
@@ -2350,7 +2351,7 @@ void CLTLoginMediator::InitializeArg6DefaultObject() {
     };
     arg6WorldList_.worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
     arg6WorldList_.worldValid_ = {true, true, true, true, true, false, false, false, false, false};
-    arg6WorldList_.available_ = {true, true, true, true, true, false, false, false, false, false};
+    arg6WorldList_.activeWorldMatchNamesE0_ = {"", "", "", "", "", "", "", "", "", ""};
     arg6WorldList_.totalCount_ = 5;
     arg6WorldList_.activeCount_ = 5;
 
@@ -2385,6 +2386,20 @@ void CLTLoginMediator::ConfigureArg6Selection(
         (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : "standalone";
     arg6Selection_.mappedVariantName_ =
         (mappedVariantName && mappedVariantName[0]) ? mappedVariantName : arg6Selection_.mappedSelectionName_;
+
+    // anchor: launcher.exe:0x40e480 / sibling slot `0x4d3584`
+    // Bounded startup-side world-list mirror:
+    // - total-world rows come from `+0xfc`
+    // - active rows use `+0xe0` text to match against those world names before the row's packed
+    //   item-data high word is written from the active-list index
+    arg6WorldList_.totalCount_ = std::min<uint32_t>(arg6Selection_.worldUpperBoundExclusive_, arg6WorldList_.worldNames_.size());
+    arg6WorldList_.activeCount_ = std::min<uint32_t>(arg6Selection_.variantUpperBoundExclusive_, arg6WorldList_.activeWorldMatchNamesE0_.size());
+    if (arg6Selection_.selectedWorldIndexLow24_ < arg6WorldList_.worldNames_.size()) {
+        arg6WorldList_.worldNames_[arg6Selection_.selectedWorldIndexLow24_] = arg6Selection_.mappedSelectionName_;
+    }
+    if (arg6Selection_.selectedVariantIndexHigh8_ < arg6WorldList_.activeWorldMatchNamesE0_.size()) {
+        arg6WorldList_.activeWorldMatchNamesE0_[arg6Selection_.selectedVariantIndexHigh8_] = arg6Selection_.mappedSelectionName_;
+    }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2687,16 +2702,22 @@ uint32_t CLTLoginMediator::Arg6GetActiveWorldListCount() const {
 
 // anchor: launcher.exe:0x40e670
 // vtable: launcher.exe:0x4d3584 +0xe0
-bool CLTLoginMediator::Arg6GetAvailableWorlds(uint32_t index) const {
+const char* CLTLoginMediator::Arg6GetAvailableWorldMatchName(uint32_t index) const {
+    // anchor: launcher.exe:0x40e670 / launcher.exe:0x40e480
+    // `0x40e480` calls sibling slot `+0xe0` twice and compares the returned text against the
+    // total-world name from `+0xfc`; this is therefore a string producer, not a bool gate.
     if (index < Arg6VariantUpperBoundExclusive() && Arg6VariantIndexMatchesSelection(index)) {
-        return true;
+        return Arg6MappedSelectionName();
     }
-    return (index < arg6WorldList_.available_.size()) ? arg6WorldList_.available_[index] : false;
+    return (index < arg6WorldList_.activeWorldMatchNamesE0_.size())
+        ? arg6WorldList_.activeWorldMatchNamesE0_[index].c_str()
+        : nullptr;
 }
 
 // anchor: launcher.exe:0x40cd60
 // vtable: launcher.exe:0x4d3584 +0xdc
 const char* CLTLoginMediator::Arg6GetAvailableWorldName(uint32_t index) {
+    // `0x40e480` inserts this text into list column 1 on the matched-row path.
     if (index < Arg6VariantUpperBoundExclusive() && Arg6VariantIndexMatchesSelection(index)) {
         return Arg6MappedVariantName();
     }
@@ -2719,10 +2740,14 @@ void CLTLoginMediator::PopulateClientWorldView() {
         worldPayloadSlots_[i] = const_cast<void*>(
             reinterpret_cast<const void*>(&arg6WorldList_.worldSelectionGateBytes100_[i]));
         arg6WorldList_.worldValid_[i] = true;
-        arg6WorldList_.available_[i] = true;
+        if (arg6WorldList_.activeWorldMatchNamesE0_[i].empty()) {
+            arg6WorldList_.activeWorldMatchNamesE0_[i] = arg6WorldList_.worldNames_[i];
+        }
     }
 
-    spdlog::info("launcher-owned PopulateClientWorldView populated {} worlds", kRecoveredWorldSlotCapacity);
+    spdlog::info(
+        "launcher-owned PopulateClientWorldView populated {} world slots and seeded activeWorldMatchNamesE0 where empty",
+        std::min<uint32_t>(kRecoveredWorldSlotCapacity, arg6WorldList_.totalCount_));
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

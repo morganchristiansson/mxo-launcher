@@ -991,7 +991,7 @@ public:
     uint8_t Arg6ValidateWorldSelection(uint8_t variant);
     uint32_t Arg6GetWorldListCount() const;
     uint32_t Arg6GetActiveWorldListCount() const;
-    bool Arg6GetAvailableWorlds(uint32_t index) const;
+    const char* Arg6GetAvailableWorldMatchName(uint32_t index) const;
 
     // Focused source home for auth-entry/connect-status scaffolding:
     // - `loginmediator_auth_entry.cpp`
@@ -1771,7 +1771,7 @@ private:
     // launcher.exe:0x4d3584 +0x1c = Arg6ValidateWorldSelection(uint -> 0 or 7)
     // launcher.exe:0x4d3584 +0x20 = Arg6GetWorldListCount(uint)
     // launcher.exe:0x4d3584 +0x24 = Arg6GetActiveWorldListCount(uint)
-    // launcher.exe:0x4d3584 +0x28 = Arg6GetAvailableWorlds(bool)
+    // launcher.exe:0x4d3584 +0x28 = Arg6GetAvailableWorldMatchName(char*)
     // =============================================================================
     struct Arg6WorldListData {
         // launcher.exe:0x4d3584 +0xfc = GetWorldNameByIndex(index) -> char*
@@ -1790,8 +1790,11 @@ private:
         // launcher.exe:0x4d3584 +0xd8 = GetActiveWorldCount() -> uint active count
         uint32_t activeCount_ = 5;
 
-        // launcher.exe:0x4d3584 +0xe0 = GetAvailableWorlds(index) -> bool (fallback path check)
-        std::array<bool, 10> available_ = {true, true, true, true, true, false, false, false, false, false};
+        // launcher.exe:0x4d3584 +0xe0 = active-world/world-match string used by `0x40e480`
+        // while correlating total worlds (`+0xfc`) against the active-world list before building
+        // the packed list-row item-data high word.
+        // Negative result from the newer decompilation: this slot is not a bool gate.
+        std::array<std::string, 10> activeWorldMatchNamesE0_ = {"", "", "", "", "", "", "", "", "", ""};
     };
 
     struct Arg6SelectionConfig {

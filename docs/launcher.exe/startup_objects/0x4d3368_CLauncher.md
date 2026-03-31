@@ -140,6 +140,12 @@ A concrete new anchor on that earlier phase is the launcher selection writer:
   - persists `Last_WorldName`
   - writes the final split selection into `CLauncher+0xa8/+0xac`
     (`0x4d3410 / 0x4d3414`)
+- newer upstream producer tightening from `0x40e480` now explains that packed list-row item data:
+  - low 16 bits = total-world index from sibling slot `+0xfc`
+  - high 16 bits = matching active-world index when sibling slot `+0xe0` returns the same world
+    name, otherwise `0xffff`
+  - negative result: sibling slot `+0xe0` is a string getter used for world-name matching there,
+    not a bool gate
 
 New surrounding launcher-UI tightening now narrows the upstream caller path too:
 

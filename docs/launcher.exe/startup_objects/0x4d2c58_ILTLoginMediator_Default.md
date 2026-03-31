@@ -185,6 +185,13 @@ That is important because the current arg7-selection writer is now closed to the
   - `+0x100 == 1` accepts directly
   - `+0x100 == 2/5` calls sibling slot `+0x54`
   - any other value rejects before the final writeback
+- newer `0x40e480` review now also fixes one stale read of the sibling list-builder family:
+  - slot `+0xe0` returns a world-name string used to match active-world entries against the
+    total-world list before packed row item-data is written
+  - it is **not** a bool-style availability gate
+  - row item-data then packs:
+    - low 16 bits = total-world index (`+0xfc`)
+    - high 16 bits = matching active-world index, else `0xffff`
 - the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
   `CListCtrl`-style selection UI object rather than on a raw config parser path
 
