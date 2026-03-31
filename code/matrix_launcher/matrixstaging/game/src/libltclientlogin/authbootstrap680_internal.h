@@ -67,6 +67,126 @@ struct AuthBootstrap680BigIntObject20Scaffold {
 };
 static_assert(sizeof(AuthBootstrap680BigIntObject20Scaffold) == 0x14u);
 
+struct AuthBootstrap680Field54HelperSketch {
+    // Concrete helper subobject rooted at child `+0x54`.
+    // High-value anchors:
+    // - `0x445500` seeds `0x004b695c / 0x004b68a8 / 0x004b41e0`
+    // - `0x4686e0(this+0x54, 0x180)` builds the buffered helper body
+    // - `0x468dc0(this+0x54, 0, 0x20)` applies the initial `0x20`-byte setup
+    // - vtable `+0x18 / 0x468640 = AuthBootstrap680Field54Helper_FillBytes` fills caller bytes;
+    //   `0x4474f0` asks for `0x10`
+    //   and writes the result into child `+0x84 .. +0x93`
+    // - the same helper family is reused by `0x44d250` for transform-worker associated seeds
+    // Current bounded field map from `0x4686e0 / 0x468b60 / 0x468d30`:
+    // - `+0x0c` = reserved / still-untyped dword between the front-matter vtable family and the
+    //             buffered-output body
+    // - `+0x10/+0x14` = buffered output window byte count / pointer (`0x180` bytes)
+    // - `+0x18` = reserved / still-untyped dword between the two buffer families
+    // - `+0x1c/+0x20` = scratch-prefix byte count / pointer (`0x40` bytes)
+    // - `+0x24/+0x28` = internal buffered-stream state used by the refill/read helpers
+    uint32_t vtable00 = 0u;
+    uint32_t helperVtable04 = 0u;
+    uint32_t helperVtable08 = 0u;
+    uint32_t reserved0c = 0u;
+    uint32_t bufferedOutputByteCount10 = 0u;
+    uint8_t* bufferedOutputBytes14 = nullptr;
+    uint32_t reserved18 = 0u;
+    uint32_t scratchPrefixByteCount1c = 0u;
+    uint8_t* scratchPrefixBytes20 = nullptr;
+    uint32_t bufferedStreamState24 = 0u;
+    uint32_t nextBufferedOutputByte28 = 0u;
+};
+static_assert(sizeof(AuthBootstrap680Field54HelperSketch) == 0x2cu);
+
+struct AuthBootstrap680AuthReplyParseAccessor10Sketch {
+    // Common packet-bound `0x10` accessor family used inside the copied `+0xf0` auth-reply parse
+    // object.
+    // - `0x4399e0 = AuthBootstrap680AuthReplyWorldDescriptorAccessor_InitFromIncomingMessage`
+    // - `0x444300 = AuthBootstrap680AuthReplySlotRecordAccessor_InitFromIncomingMessage`
+    // Those helpers show the same front matter for the world-descriptor and slot-record accessors
+    // rooted at parse-copy `+0x5c` and `+0x70`.
+    uint32_t vtable00 = 0u;
+    const uint8_t* packetBody04 = nullptr;
+    void* incomingMessage08 = nullptr;
+    uint8_t resolveFields0c = 0u;
+    std::array<uint8_t, 3> padding0d{};
+};
+static_assert(sizeof(AuthBootstrap680AuthReplyParseAccessor10Sketch) == 0x10u);
+
+struct AuthBootstrap680AuthReplyParseObjectF0Sketch {
+    // Source-owned mirror of the copied `0x8c` auth-reply parse object stored at child `+0xf0` by
+    // `0x448140`, copied through `0x4449c0`, and later released by `0x444900`.
+    //
+    // Strong current field map from `0x444390 / 0x443470 / 0x4449c0 / 0x43f300`, plus
+    // `0x438990 = AuthBootstrap680AuthReplyParseObject_SelectCharacterTempRecordByIndex` for the
+    // later character-temp-record cursor at `+0x80/+0x84/+0x88`:
+    // - `+0x10` = resolved reply-header/body base; later fixed-field consumers read
+    //   `replyHeader10 + 0x07` and `replyHeader10 + 0x15`
+    // - variable field pairs are length-prefixed packet-body views keyed by raw reply-header
+    //   offsets:
+    //   - `+0x14/+0x18` <- header offset `+0x05` string-like field
+    //   - `+0x1c/+0x20` <- header offset `+0x0b` auth-data copy-shadow bytes
+    //   - `+0x24/+0x28` <- header offset `+0x0d` encrypted private-exponent bytes
+    //   - `+0x2c/+0x30` <- header offset `+0x0f` opaque blob copied later to child `+0x108`
+    //   - `+0x34/+0x38` <- header offset `+0x11` opaque blob copied later to child `+0x10c`
+    //   - `+0x3c/+0x40` <- header offset `+0x13` character temp-record base/count
+    //   - `+0x44/+0x48` <- header offset `+0x19` world temp-record base/count
+    //   - `+0x4c/+0x50` <- header offset `+0x1b` another opaque blob family
+    //   - `+0x54/+0x58` <- header offset `+0x1d` trailing reply string copied by
+    //                     `0x43d480 = AuthBootstrap680_CopyReplyString54`
+    uint32_t vtable00 = 0u;
+    const uint8_t* packetBody04 = nullptr;
+    void* incomingMessage08 = nullptr;
+    uint8_t resolveFields0c = 0u;
+    std::array<uint8_t, 3> padding0d{};
+    const uint8_t* replyHeader10 = nullptr;
+    const uint8_t* stringField05Bytes14 = nullptr;
+    uint16_t stringField05Length18 = 0u;
+    std::array<uint8_t, 2> padding1a{};
+    const uint8_t* authDataBytes1c = nullptr;
+    uint16_t authDataByteLength20 = 0u;
+    std::array<uint8_t, 2> padding22{};
+    const uint8_t* encryptedPrivateExponentBytes24 = nullptr;
+    uint16_t encryptedPrivateExponentByteLength28 = 0u;
+    std::array<uint8_t, 2> padding2a{};
+    const uint8_t* opaqueField0fBytes2c = nullptr;
+    uint16_t opaqueField0fByteLength30 = 0u;
+    std::array<uint8_t, 2> padding32{};
+    const uint8_t* opaqueField11Bytes34 = nullptr;
+    uint16_t opaqueField11ByteLength38 = 0u;
+    std::array<uint8_t, 2> padding3a{};
+    const uint8_t* characterTempRecords3c = nullptr;
+    uint16_t characterTempRecordCount40 = 0u;
+    std::array<uint8_t, 2> padding42{};
+    const uint8_t* worldTempRecords44 = nullptr;
+    uint16_t worldTempRecordCount48 = 0u;
+    std::array<uint8_t, 2> padding4a{};
+    const uint8_t* opaqueField1bBytes4c = nullptr;
+    uint16_t opaqueField1bByteLength50 = 0u;
+    std::array<uint8_t, 2> padding52{};
+    const uint8_t* replyString1dBytes54 = nullptr;
+    uint16_t replyString1dByteLength58 = 0u;
+    std::array<uint8_t, 2> padding5a{};
+    AuthBootstrap680AuthReplyParseAccessor10Sketch worldDescriptorAccessor5c{};
+    const uint8_t* currentWorldTempRecord6c = nullptr;
+    AuthBootstrap680AuthReplyParseAccessor10Sketch slotRecordAccessor70{};
+    const uint8_t* currentCharacterTempRecord80 = nullptr;
+    const uint8_t* currentCharacterHandle84 = nullptr;
+    uint16_t currentCharacterHandleByteLength88 = 0u;
+    std::array<uint8_t, 2> padding8a{};
+};
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, replyHeader10) == 0x10u);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, authDataBytes1c) == 0x1cu);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, encryptedPrivateExponentBytes24) == 0x24u);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, opaqueField0fBytes2c) == 0x2cu);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, opaqueField11Bytes34) == 0x34u);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, characterTempRecords3c) == 0x3cu);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldTempRecords44) == 0x44u);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, replyString1dBytes54) == 0x54u);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldDescriptorAccessor5c) == 0x5cu);
+static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, slotRecordAccessor70) == 0x70u);
+static_assert(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch) == 0x8cu);
+
 struct AuthBootstrap680ChildSketch {
     // Current best source-owned mirror of the separate phase-2 auth/bootstrap child allocated by:
     // - launcher.exe:0x41b160 = owner init path
@@ -104,13 +224,13 @@ struct AuthBootstrap680ChildSketch {
     std::array<uint8_t, 16> block40{};          // original child `+0x40 .. +0x4f`
     void* sendTarget50 = nullptr;                // original child `+0x50`; indirect sender target consumed by `0x447eb0/0x4474f0`
 
-    // Original child `+0x54 .. +0x7f` is a concrete helper subobject seeded from ctor `0x445500`
-    // with vtable `0x004b695c`. Current source keeps only the occupied span explicit until that
-    // helper is typed tightly enough to deserve its own source-owned model.
-    std::array<uint8_t, 0x2c> opaqueState54To7f{};
+    // Original child `+0x54 .. +0x7f` is the concrete helper subobject above, not an opaque gap.
+    // `0x4474f0` calls helper vtable `+0x18 / 0x468640` here and copies the returned `0x10` bytes
+    // into child `+0x84 .. +0x93`.
+    AuthBootstrap680Field54HelperSketch feedbackSeedHelper54{}; // original child `+0x54 .. +0x7f`
 
     uint32_t authServerTimeBias80 = 0;           // original child `+0x80`; `0x448140` stores `time(NULL) - GetPublicKeyReply.currentTime`, and later `0x4474f0` / `AuthBootstrapReplyCopyShadowF4_IsFresh` / `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` use it to reconstruct current auth-server time
-    std::array<uint8_t, 16> feedbackSeed84{}; // original child `+0x84 .. +0x93`; seeded by the `+0x54` helper during `0x4474f0`, not by the later raw-`0x0a` send
+    std::array<uint8_t, 16> feedbackSeed84{}; // original child `+0x84 .. +0x93`; helper-generated seed block from child `+0x54`, later reused by the `0x4474f0` transform-worker setup
     void* feedbackTransformLarge94 = nullptr;    // original child `+0x94`; allocated in `0x4474f0`
     void* feedbackTransformSmall98 = nullptr;    // original child `+0x98`; allocated in `0x4474f0`
     uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
@@ -131,16 +251,16 @@ struct AuthBootstrap680ChildSketch {
     AuthBootstrap680BigIntObject20Scaffold privateExponentBigIntD8{}; // original child `+0xd8`
 
     uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
-    void* authReplyParseObjectF0 = nullptr;      // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x449c0`, and `0x44900` later releases it. Current source reserves the exact slot but does not yet materialize that object family.
+    AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
     void* authReplyCopyShadowF4 = nullptr;       // original child `+0xf4`; reply-derived copied `0x136` block used later by `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`
-    AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8 .. +0x100`; full three-dword small-string family whose begin pointer is surfaced by owner vtable `+0x60 / 0x41f3c0`
-    uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; surfaced by owner vtable `+0x58 / 0x41f390`
+    AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8 .. +0x100`; `0x441330` writes the prompt-password small-string neighboring the `+0xf0` auth-reply parse/copy family, and owner vtable `+0x60 / 0x41f3c0` later surfaces its begin pointer
+    uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; sibling `0x441330` SecurID-tail flag surfaced by owner vtable `+0x58 / 0x41f390`
     std::array<uint8_t, 3> padding105{};         // original child `+0x105 .. +0x107`
-    void* opaqueReplyBlob108 = nullptr;          // original child `+0x108`; copied by `0x441170` from one opaque raw-`0x0b` parse-object blob family
-    void* opaqueReplyBlob10C = nullptr;          // original child `+0x10c`; copied by `0x441170` from a second opaque raw-`0x0b` parse-object blob family
-    uint32_t authReplySuccessHeaderDword07_110 = 0;                       // original child `+0x110`; `0x43f300` writes it from raw-`0x0b` parse inner +0x07 before the one-time success gate
-    uint32_t authReplySuccessField15_114 = 0;                       // original child `+0x114`; `0x441260` writes it from raw-`0x0b` parse inner +0x15 inside the one-time success gate
-    uint32_t authReplySuccessField15Timestamp118 = 0;                       // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
+    void* opaqueReplyBlob108 = nullptr;          // original child `+0x108`; `0x441170` copies parse-object field `+0x2c/+0x30` (raw reply-header offset `+0x0f`) from the copied `+0xf0` family
+    void* opaqueReplyBlob10C = nullptr;          // original child `+0x10c`; `0x441170` copies parse-object field `+0x34/+0x38` (raw reply-header offset `+0x11`) from the copied `+0xf0` family
+    uint32_t authReplySuccessHeaderDword07_110 = 0; // original child `+0x110`; `0x43f300` writes the fixed raw reply-header dword at `authReplyParseObjectF0->replyHeader10 + 0x07` before the one-time success gate
+    uint32_t authReplySuccessField15_114 = 0; // original child `+0x114`; `0x441260` writes the fixed raw reply-header dword at `authReplyParseObjectF0->replyHeader10 + 0x15`
+    uint32_t authReplySuccessField15Timestamp118 = 0; // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
 };
 
 enum AuthBootstrap680InboundAuthResult : uint32_t {
