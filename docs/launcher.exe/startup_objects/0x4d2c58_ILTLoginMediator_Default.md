@@ -272,12 +272,14 @@ concretely:
   - handles success/error through sibling slots `+0x34/+0x58/+0x5c/+0x60/+0x174/+0x178`
   - on success dispatches launcher dialog command `7`
 
-Important negative result:
+Direct raw-vtable clarification:
 - this dialog-side producer corridor is now concrete
-- but the exact static bridge from sibling slot `0x4d2734 + 0x30` to owner
-  `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` is still unresolved
-- so current source should keep the trusted implementation boundary on owner `0x41ecd0` while
-  documenting this launcher-side producer separately as the nearest upstream submit surface
+- raw mediator vtable memory stores `0x41ecd0` at `0x004b01f8`
+- so sibling slot `0x4d2734 + 0x30` is the same recovered raw virtual for
+  `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest`
+- current source should still keep the trusted implementation boundary on owner `0x41ecd0`, but
+  the remaining open work is now the page-`6` observer/prompt lifecycle rather than the last submit
+  call bridge itself
 
 ## Early method surface observed so far
 

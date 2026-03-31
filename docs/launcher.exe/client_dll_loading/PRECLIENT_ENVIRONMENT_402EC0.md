@@ -145,9 +145,16 @@ The closest concrete launcher-side credential producer is now:
 - it then submits that block through sibling resolved slot `0x4d2734` vtable `+0x30`
 - callback success dispatches command `7`, which on the nopatch branch leads into page `11`
 
-Important negative result:
-- this dialog-side submit corridor is now concrete, but the exact static bridge from sibling slot
-  `0x4d2734` into owner `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` is still open
+Direct raw-vtable clarification:
+- raw mediator vtable memory now shows `0x41ecd0` stored at `0x004b01f8`
+- the launcher page-`6` helper `0x408400` calls sibling slot `+0x30`
+- practical consequence: this dialog-side submit corridor already reaches
+  `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` through the resolved
+  `ILTLoginMediator.Default`-style surface
+
+Remaining negative result:
+- current source still does not recreate `0x408400` observer registration `+0x170`, callback
+  `0x4091d0`, or the full page-`6` rich-edit prompt lifecycle
 
 #### Selection-page action split
 

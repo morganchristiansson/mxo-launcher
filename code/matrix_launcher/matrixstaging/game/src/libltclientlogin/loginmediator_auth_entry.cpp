@@ -15,6 +15,7 @@
 
 #include "loginstate.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
+#include "../../../../src/diagnostics.h"
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
@@ -47,7 +48,7 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.capacity = dest.string60.current;
 }
 
-// anchor: launcher.exe:0x41ecd0 / owner vtable +0x24
+// anchor: launcher.exe:0x41ecd0 / raw owner vtable +0x30
 // Current upstream launcher dialog tightening around the same input shape:
 // - manual nopatch login on page state `6` routes keystrokes through
 //   `0x408840 = LauncherLoginRichEdit_HandlePromptInputCharacter`
@@ -58,9 +59,13 @@ static void AssignOwnedSmallStringForAuthEntry(
 //   - zeroed `block40/block50`
 //   - small-string at `+0x60`
 // - that helper then submits through sibling resolved slot `0x4d2734` vtable `+0x30`
-// - important negative result: the exact static bridge from that sibling submit surface to the
-//   owner-side `0x41ecd0` call is still open, so the current replacement keeps the nearest
-//   faithful implementation boundary on `ProcessLoginRequest` itself
+// - newer raw-vtable clarification closes that bridge directly:
+//   - raw mediator vtable memory at `0x004b01f8` stores `0x41ecd0`
+//   - so the launcher page-`6` helper's `call [eax+0x30]` is the same recovered
+//     `CLTLoginMediator::ProcessLoginRequest` boundary
+// - current replacement keeps that same owner boundary but can now mirror the launcher submit
+//   surface through the binder-backed raw `+0x30` slot instead of only by calling the owner method
+//   directly
 static bool BuildConfiguredProcessLoginRequestInput(
     const CLTLoginMediator& mediator,
     ProcessLoginRequestInputSketch* outInput,
@@ -436,8 +441,12 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
     // - upstream dialog tightening now shows the manual nopatch page-`6` rich-edit host collecting
     //   username then password and building the exact `0x41ecd0`-style stack block before handing
     //   it to sibling resolved slot `0x4d2734` vtable `+0x30`
-    // - but that sibling submit surface is still not statically closed as the direct
-    //   `0x41ecd0 = ProcessLoginRequest` caller
+    // - raw mediator-vtable clarification now closes that callsite more tightly:
+    //   `0x41ecd0` lives at raw vtable entry `0x004b01f8`, so the launcher helper's
+    //   `call [eax+0x30]` reaches `CLTLoginMediator::ProcessLoginRequest`
+    // - current replacement mirrors that same submit surface when the binder-backed raw `+0x30`
+    //   slot is available, then falls back to the direct owner call only when the raw surface is
+    //   unavailable
     // - keep the exact trusted owner boundary on `0x41ecd0` anyway: it is the earlier anchored API
     //   that accepts the username/password block, copies it into owner `+0x94`, clears owner
     //   `+0xf4` on the happy path, and then performs the observed
@@ -457,13 +466,20 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
 
     uint32_t result = 0u;
     if (currentPhaseCode == 0u && haveConfiguredSubmitInput) {
+        const bool haveResolvedSubmitSurface =
+            DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
         spdlog::info(
-            "ROUTE CHECKPOINT: launcher bridge auto-begin auth via owner ProcessLoginRequest currentState={} usernameSource={} passwordSource={} ownerSource94Empty={}",
+            "ROUTE CHECKPOINT: launcher bridge auto-begin auth via {} currentState={} usernameSource={} passwordSource={} ownerSource94Empty={}",
+            haveResolvedSubmitSurface
+                ? "resolved ILTLoginMediator.Default-style raw +0x30 ProcessLoginRequest surface"
+                : "direct owner ProcessLoginRequest fallback",
             currentState_ ? currentState_->DebugName() : "<null>",
             usernameSource,
             passwordSource,
             (authBootstrapSource38_.inlineString00[0] == '\0' && authBootstrapSource38_.inlineString20[0] == '\0') ? 1u : 0u);
-        result = ProcessLoginRequest(submitInput);
+        result = haveResolvedSubmitSurface
+            ? DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(submitInput)
+            : ProcessLoginRequest(submitInput);
     } else {
         CLTLoginState* const upstreamState = currentState_;
         CLTLoginState* const state2 = scaffoldState2_;

@@ -264,10 +264,15 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
     `0x408ee0 -> 0x408840 -> 0x408400 -> 0x4091d0`
   - `0x408400` builds the exact `0x41ecd0`-style credential block on the stack and submits it
     through sibling resolved slot `0x4d2734` vtable `+0x30`
+  - raw mediator-vtable clarification now closes that call more tightly:
+    - raw mediator vtable memory stores `0x41ecd0` at `0x004b01f8`
+    - so the launcher page-`6` helper's `call [eax+0x30]` reaches
+      `CLTLoginMediator::ProcessLoginRequest`
   - callback success dispatches command `7`, which on the nopatch branch leads into page `11`
   - page `11` Enter / command `10` returns to page `7`
-  - important negative result: the exact static bridge from sibling submit slot `0x4d2734` into
-    owner `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` is still open
+  - remaining negative result: the original rich-edit observer/prompt lifecycle
+    (`+0x170` register, `0x4091d0` callback, unregister on success/error) is still not modeled
+    exactly on the replacement host
 
 Practical consequence:
 

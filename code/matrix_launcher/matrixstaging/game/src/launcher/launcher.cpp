@@ -415,13 +415,14 @@ bool CLauncher::ParseCommandLineStage() const {
     //   - page `6` rich-edit host (`dialog +0x95c`) uses
     //     `0x408ee0/0x408840/0x408400/0x4091d0` to gather username, gather password, submit the
     //     exact `0x41ecd0`-style stack block, and handle success/error callbacks
-    //   - important negative result: that sibling submit surface (`0x4d2734` vtable `+0x30`) is
-    //     still not statically closed as the direct `0x41ecd0` caller
+    //   - raw-vtable clarification now closes the submit bridge directly:
+    //     `0x408400` calls resolved mediator slot `+0x30`, and raw mediator vtable memory stores
+    //     `0x41ecd0 = ProcessLoginRequest` at that same displacement
     // - when `-user` / `-pwd` are supplied, the original launcher still behaves like prefill +
     //   auto-submit for the same launcher flow rather than as a bypass
-    // - replacement startup therefore keeps the nearest trusted owner boundary on
-    //   `0x41ecd0 = ProcessLoginRequest`: use provided credentials as launcher-flow prefill, prompt
-    //   only when absent, then feed the recovered owner-side submit path
+    // - replacement startup therefore keeps the same owner boundary on `0x41ecd0`, but now prefers
+    //   mirroring the launcher submit through the binder-backed raw `+0x30` surface before falling
+    //   back to the direct owner call
     // - character choice is no longer required up front on the CLI path; after successful auth the
     //   replacement now chooses from the recovered launcher-owned character list before client load
     if (!PromptForMissingLauncherCredentialsIfNeeded()) {
@@ -968,7 +969,7 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     } else {
         spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
-    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented, but the no-GUI host still enters at owner 0x41ecd0 instead of reconstructing the exact sibling 0x4d2734 submit surface");
+    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented and the no-GUI host now mirrors the recovered raw +0x30 submit surface into 0x41ecd0, but it still does not recreate the original rich-edit observer/prompt lifecycle");
     spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
     spdlog::info("file/access gate status: original 0x40b790..0x40b7af _access(DAT_004d4cbc,0) / 0x41ab10(0) side path is still not modeled on the replacement path");
     spdlog::info("");

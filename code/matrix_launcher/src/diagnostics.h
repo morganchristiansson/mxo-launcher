@@ -3,6 +3,10 @@
 #include <windows.h>
 #include <cstdint>
 
+namespace mxo::ltlogin {
+struct ProcessLoginRequestInputSketch;
+}
+
 void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr);
 void DiagnosticConfigureMediatorSelection(
     uint32_t worldUpperBoundExclusive,
@@ -40,6 +44,9 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
     const char* gameSessionId,
     uint32_t selectedWorldIndexLow24);
 bool DiagnosticCanBeginAuthConnection();
+bool DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
+uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
+    const mxo::ltlogin::ProcessLoginRequestInputSketch& input);
 uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();
 void DiagnosticPumpLauncherNetwork(bool nonBlocking);

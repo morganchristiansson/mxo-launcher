@@ -299,6 +299,23 @@ static void __thiscall Mediator_SetValue2(MinimalLoginMediatorStub* self, void* 
     mxo::ltlogin::ILTLoginMediator::Default->SetValue2(value);
 }
 
+// anchor: launcher.exe:0x408400 / sibling resolved slot 0x4d2734 vtable +0x30
+// Raw-vtable clarification from the same submit pass:
+// - launcher page-6 rich-edit submit helper `0x408400` calls resolved mediator slot `+0x30`
+// - raw memory read of launcher mediator vtable family `0x004b01c8` shows `0x41ecd0` stored at
+//   `0x004b01f8`, i.e. the same raw virtual displacement
+// - practical consequence: the launcher dialog submit helper reaches
+//   `CLTLoginMediator::ProcessLoginRequest` through the resolved `ILTLoginMediator.Default`-style
+//   surface rather than through a separate launcher-only credential API
+static uint32_t __thiscall Mediator_ProcessLoginRequest30(
+    MinimalLoginMediatorStub* self,
+    const mxo::ltlogin::ProcessLoginRequestInputSketch* input) {
+    (void)self;
+    return input
+        ? mxo::ltlogin::ILTLoginMediator::Default->ProcessLoginRequest(*input)
+        : 0u;
+}
+
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
 // vtable: ILTLoginMediator.Default slot +0x2c
 static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) {
@@ -1157,6 +1174,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c
     g_LoginMediatorVtable[9] = (void*)Mediator_SetValue2;        // +0x24
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
+    g_LoginMediatorVtable[12] = (void*)Mediator_ProcessLoginRequest30; // +0x30
     g_LoginMediatorVtable[14] = (void*)Mediator_GetProfileRootName38;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor40; // +0x40
@@ -1516,6 +1534,24 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
 bool DiagnosticCanBeginAuthConnection() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->CanBeginLauncherAuthConnectionScaffold() : false;
+}
+
+bool DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface() {
+    return g_LoginMediatorStub.vtable != nullptr && g_LoginMediatorStub.vtable[12] != nullptr;
+}
+
+uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
+    const mxo::ltlogin::ProcessLoginRequestInputSketch& input) {
+    using SubmitFn = uint32_t (__thiscall*)(
+        MinimalLoginMediatorStub*,
+        const mxo::ltlogin::ProcessLoginRequestInputSketch*);
+
+    if (!DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface()) {
+        return 0u;
+    }
+
+    SubmitFn submitFn = reinterpret_cast<SubmitFn>(g_LoginMediatorStub.vtable[12]);
+    return submitFn(&g_LoginMediatorStub, &input);
 }
 
 uint32_t DiagnosticBeginAuthConnection() {
