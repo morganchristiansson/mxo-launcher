@@ -687,9 +687,22 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 }
 
 // UNANCHORED: recovered continuation for the original 0x40b74d..0x40b790 corridor after the
-// 0x40a380 success gate. The current source maps the 0x402ec0-style pre-client bringup and the
-// optional 0x40b75a autodetect dialog path here, while leaving the later 0x40b790 _access /
-// 0x41ab10 file gate explicitly unmodeled.
+// 0x40a380 success gate.
+//
+// Newer static RE tightens the original 0x402ec0 gate enough to keep one important ownership fact
+// explicit in source:
+// - `0x402ec0` is not a tiny setup helper; it launches the pre-client UI thread and then blocks,
+//   pumping messages until that launcher-thread/dialog path exits
+// - on the successful selection path, `0x405a20` case `8` first calls `0x40d6f0` to resolve the
+//   current list selection into `CLauncher+0xa8/+0xac` and `Last_WorldName`
+// - after the patch gate returns, that same case writes global `DAT_004d259c = 1`, calls
+//   `0x40b8f0`, posts quit, and thereby lets `0x402ec0` return non-zero so `InitInstance` can
+//   fall through to the later client-load corridor
+// - negative result kept explicit: this still does not make `0x40d6f0` or `0x405a20` the owner of
+//   mediator `+0xec`; the direct `+0xec` call is still later on the client side
+// The current source maps the 0x402ec0-style pre-client bringup and the optional 0x40b75a
+// autodetect dialog path here, while leaving the later 0x40b790 _access / 0x41ab10 file gate
+// explicitly unmodeled.
 bool CLauncher::RunRecoveredPreClientBringupStage() const {
     if (!DiagnosticInitializePreclientEnvironmentLike402EC0()) {
         spdlog::info("WARNING: pre-client environment bringup failed to initialize");
@@ -835,9 +848,14 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             //   (`0x4047d0` selection-page setup -> observer-refreshed list `0x40f070/0x40e1c0`
             //   -> `0x40d530/0x40d820` list interaction -> `0x405a20` command `8`
             //   -> `0x40d6f0` launcher-side selection resolve/writeback)
-            // - that upstream launcher path is still distinct from the later mediator-owned
-            //   state3-wait advance via the owner-side commit pair
-            // - current source now keeps the closest recovered interface on the mediator side first:
+            // - newer bridge tightening keeps the ownership split narrower than a launcher-local
+            //   `+0xec` caller:
+            //   - launcher closes selection into `CLauncher+0xa8/+0xac` plus `Last_WorldName`
+            //   - the direct `+0xec` call is then best read later from
+            //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`, which builds
+            //     the stack-local `0xb4` selection/config handoff immediately before calling arg6
+            // - current source still keeps the closest recovered interface on the mediator side for
+            //   the no-GUI pre-client bridge:
             //   build partial state3 selection context from recovered slot/world state, then commit
             //   through the owner pair before client.dll load
             // - newer selection-page RE still keeps the missing producer boundary open:
@@ -1043,7 +1061,10 @@ bool CLauncher::InitInstance() {
     }
 
     // Original corridor in 0x40b430:
-    // - 0x40b74d..0x40b752: 0x402ec0 pre-client thread/message bringup gate
+    // - 0x40b74d..0x40b752: `0x402ec0` pre-client UI-thread/message gate
+    //   - blocks `InitInstance` until the launcher dialog path exits
+    //   - current best successful-selection exit is `0x405a20` case `8`:
+    //     `0x40d6f0` resolves selection -> patch gate -> `DAT_004d259c = 1` -> `0x40b8f0` -> quit
     // - 0x40b75a..0x40b790: optional autodetect dialog path when 0x4d2c64 is set
     // - 0x40b790..0x40b7af: file/access gate remains explicitly unmodeled here
     if (!RunRecoveredPreClientBringupStage()) {

@@ -1524,8 +1524,14 @@ uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selection
         // - practical consequence: the current concrete `0x40ec70 -> +0xf0 -> event 8` corridor is
         //   now better read as the launcher's delete-character/removal action, not as the hidden
         //   success-side producer for the later `+0xec / 0x41c1f0` `0xb4` commit
-        // - negative result from that same helper family: it still does not expose the later
-        //   `+0xec / 0x41c1f0` `0xb4` producer
+        // - newer launcher/client bridge tightening narrows that missing producer path:
+        //   - launcher selection UI closes through `0x40d6f0`, which writes
+        //     `CLauncher+0xa8/+0xac` and persists `Last_WorldName`
+        //   - the concrete direct `+0xec` call then appears later on the client side at
+        //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`, after that client
+        //     branch zero-initializes and fills a stack-local `0xb4` object
+        // - negative result from the launcher-side helper family itself: it still does not expose a
+        //   direct launcher virtual-call site for `+0xec / 0x41c1f0`
         // - current active replacement route does not yet model a dedicated state7 scaffold here
         // - keep the exact owner byte write anchored now, and let the later `0x41c1f0` state8
         //   transition remain the concrete source-owned continuation on the no-GUI path
@@ -1547,6 +1553,13 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     //   `state0 -> ProcessLoginRequest -> state2 -> state1 -> state2 -> state3(wait) -> 0x41c1f0`
     // - no additional early helper-switch hits were observed in the narrow state3 wait window
     //   before the live `0x41c1f0` stop
+    // - newer launcher/client bridge tightening also narrows the immediate producer split:
+    //   - launcher-side selection resolution currently closes through `0x40d6f0` writing
+    //     `CLauncher+0xa8/+0xac` plus `Last_WorldName`
+    //   - the direct success-side `+0xec` call is then best read from
+    //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`, where the client
+    //     zero-initializes and fills the stack-local `0xb4` handoff immediately before calling
+    //     this owner method
     selectionContext0ecCopy_ = input;
     selectionContext0ecCopyValid_ = true;
     ++selection0ecCount_;
@@ -1805,11 +1818,19 @@ bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold
         return false;
     }
 
+    const uint32_t selectionIndex00 = Arg6SelectedVariantIndexHigh8();
+
     if (outInput) {
         *outInput = {};
-        outInput->slotOrSelectionIndex00 = slotIndex;
-        // anchor: launcher.exe:0x41c1f0 / launcher.exe:0x43bd20
+        outInput->slotOrSelectionIndex00 = selectionIndex00;
+        // anchor: launcher.exe:0x41c1f0 / launcher.exe:0x43bd20 / client.dll:0x62170e2a..0x62170f48
         // Bounded faithful bridge only for the highest-confidence recovered subset:
+        // - original launcher-side resolution writes `CLauncher+0xa8`, and client
+        //   `InitClientDLL_BeginLoadingCharacterFlow` then stores arg7 high-8 into the first dword
+        //   of the stack-local `0xb4` handoff before arg6 `+0xec`
+        // - `0x40ec70` likewise passes the active-world/high-word selection value to owner `+0xf0`
+        // - practical consequence for the no-GUI bridge: use the launcher-selected high-8
+        //   selection index here, not the recovered character slot index
         // - `0x41c1f0` persists these dwords into the first two owner snapshot blocks
         // - later state8 slot3 emits those as packet blocks `0x09` and `0x19`
         // - negative result from `0x43bd20`: fixed GCID packet fields `0x01/0x05` still come from
@@ -1831,8 +1852,9 @@ bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold
     }
 
     spdlog::info(
-        "CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} block04=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] block14=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}]",
+        "CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold slotIndex={} selectionIndex00=0x{:02x} name='{}' worldId=0x{:04x} descriptorIndex={} block04=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}] block14=[0x{:08x},0x{:08x},0x{:08x},0x{:08x}]",
         static_cast<unsigned>(slotIndex),
+        static_cast<unsigned>(selectionIndex00 & 0xffu),
         slotRecord->heapString14.c_str(),
         static_cast<unsigned>(slotRecord->worldId0c),
         matchedWorldIndex,
@@ -1886,12 +1908,13 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
     const uint32_t seedResult = MirrorCharacterSeedIntoSourceBlock120Scaffold(
         slotRecord->heapString14.c_str(),
         descriptorIndex);
-    const uint32_t state7Result = SetSelectionIndexAndSwitchToState7(slotIndex);
+    const uint32_t state7Result = SetSelectionIndexAndSwitchToState7(selectionContext.slotOrSelectionIndex00);
     const uint32_t persistResult = PersistSelectionContextForState8(selectionContext);
 
     spdlog::info(
-        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} state7Result=0x{:08x} persistResult=0x{:08x}",
+        "CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold slotIndex={} selectionIndex00=0x{:02x} name='{}' worldId=0x{:04x} descriptorIndex={} worldName='{}' characterRouteIndexCc8=0x{:02x} seedResult=0x{:08x} state7Result=0x{:08x} persistResult=0x{:08x}",
         static_cast<unsigned>(slotIndex),
+        static_cast<unsigned>(selectionContext.slotOrSelectionIndex00 & 0xffu),
         slotRecord->heapString14.c_str(),
         static_cast<unsigned>(slotRecord->worldId0c),
         descriptorIndex,

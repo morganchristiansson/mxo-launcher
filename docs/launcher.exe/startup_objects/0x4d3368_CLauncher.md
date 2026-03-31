@@ -267,9 +267,9 @@ Practical consequence:
 - current bounded source consequence:
   - the no-GUI launcher bridge now does exactly that paired owner-side commit
   - but the surrounding `0xb4` snapshot for `0x41c1f0` is still only partially recovered: current
-    source fills the highest-confidence fields (slot/index, character id pair, world id,
-    descriptor index, current arg7-selection summary) while the original launcher UI producer for
-    the rest of the block remains unresolved
+    source fills the highest-confidence fields (launcher-selected high-8 selection index,
+    character id pair, world id, descriptor index, current arg7-selection summary) while the
+    original launcher UI producer for the rest of the block remains unresolved
   - newer owner-side tightening from `0x41c1f0 + 0x43bd20` matters for how far that bridge claim
     can go:
     - state8 later serializes the persisted snapshot blocks in packet order
@@ -292,12 +292,33 @@ Implication for the replacement source:
 ## Open questions
 
 - Which inherited base class does `CLauncher` derive from through the imported vtable thunks in `0x4abfe0`?
-- Which launcher dialog / command handler / observer wait path calls `0x40d6f0` and blocks until the
-  user has completed login + character selection before `InitInstance` falls through to
-  `0x40b7af..0x40b7c7`?
-- How does the earlier UI path synchronize with the mediator-side state3 selection-context writers
-  `0x41c390 / 0x41c1f0` on the successful-auth branch, now that the concrete `0x40ec70 -> +0xf0 -> event 8`
-  corridor looks deletion-oriented rather than like the hidden success-side `+0xec` producer?
+- New answer for the outer blocking gate before `InitInstance` falls through:
+  - `0x40b74d..0x40b752` calls `0x402ec0`
+  - `0x402ec0` starts the pre-client launcher UI thread, then pumps messages until that launcher
+    thread/dialog path exits
+  - on the successful selection path, `0x405a20` case `8`:
+    - calls `0x40d6f0`
+    - on success passes the patch gate
+    - writes `DAT_004d259c = 1`
+    - calls `0x40b8f0`
+    - posts quit
+  - that is the current best read for how original `InitInstance` stays blocked until launcher UI
+    login/selection is complete before the later `0x40b7af..0x40b7c7` fallthrough
+- New narrowed bridge read from launcher selection into mediator `+0xec`:
+  - launcher-side success path now closes concretely through
+    `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`
+  - that helper writes `CLauncher+0xa8/+0xac` (`0x4d3410/0x4d3414`) and persists `Last_WorldName`
+  - the direct success-side `+0xec` call is then best read later from
+    `client.dll:0x62170e2a..0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
+    - zero-inits a stack-local `0xb4` object
+    - stores arg7 high-8 selector into the first dword
+    - fills later fields through the selection-cfg loader family
+    - calls arg6 `+0xec` at `0x62170f48`
+  - practical consequence: the missing bridge is no longer best modeled as a hidden direct launcher
+    virtual call into `+0xec`; it is a launcher-writeback-then-client-producer corridor
+- Remaining question:
+  - which exact launcher dialog / observer wait path keeps `InitInstance` blocked until the user has
+    completed login + character selection before the later `0x40b7af..0x40b7c7` fallthrough?
 - New negative result from this pass:
   - direct xrefs to mediator commit writers still do not close the upstream bridge
   - `0x41c1f0` currently shows only the vtable data reference at `0x004b02b4`

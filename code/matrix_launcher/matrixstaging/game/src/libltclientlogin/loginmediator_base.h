@@ -249,8 +249,17 @@ struct State3SelectionContextInputSketch {
     //   - `block04[2]`    = current slot/world id
     //   - `block04[3]`    = matched world-descriptor index
     //   - `block14[0..3]` = current arg7-style world/variant/gate/state summary
-    // - newer launcher selection-page tightening still does **not** close the remaining `0xb4`
-    //   producer question:
+    // - newer launcher/client bridge tightening narrows the remaining producer split further:
+    //   - launcher-side selection UI now closes concretely through
+    //     `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`, which writes
+    //     `CLauncher+0xa8/+0xac` (`0x4d3410/0x4d3414`) and persists `Last_WorldName`
+    //   - the direct success-side caller into owner `+0xec` is then best read as
+    //     `client.dll:0x62170e2a..0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
+    //     rather than a trivially xref-able launcher virtual call
+    //   - that client branch zero-initializes a stack-local `0xb4` object, stores the arg7-derived
+    //     high-8 selector in its first dword, fills later fields through selection-cfg loaders, and
+    //     finally calls arg6 `+0xec`
+    // - important negative result kept explicit:
     //   - row nodes built by `0x40e480` / repainted by `0x40e1c0` are only `0x48` bytes total
     //   - their payload covers packed low/high row indices, four visible strings, and one dword
     //     availability/sort field

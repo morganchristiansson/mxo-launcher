@@ -911,6 +911,19 @@ Representative non-zero arg7 result from that same run:
   source-owned `CLTLoginMediator::PersistSelectionContextForState8(...)` model path instead of
   leaving the recovered `0xb4` object only as ABI-side diagnostic storage
 - no printable ASCII strings were found in the copied object itself
+- newer static bridge tightening now also closes the direct producer corridor more narrowly:
+  - launcher-side success path resolves selection through `0x40d6f0`, which writes
+    `CLauncher+0xa8/+0xac` and persists `Last_WorldName`
+  - the direct success-side arg6 `+0xec` call is then best read from
+    `client.dll:0x62170e2a..0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
+    - `0x62170e2a` zero-initializes the stack-local `0xb4` handoff
+    - stores the arg7-derived high-8 selector in the first dword
+    - loads later sections through the `0x621996a0` cfg-reader family
+    - finally calls arg6 `+0xec` at `0x62170f48`
+- practical correction from that combined launcher/client read:
+  - the still-missing success path is no longer best framed as a hidden direct launcher callsite to
+    `0x41c1f0`
+  - it is a launcher selection-writeback corridor followed by a client-owned `0xb4` producer
 
 So the current `+0xec` object is not just "some paths blob":
 - its first dword now looks like the current variant/high-8 selector,
