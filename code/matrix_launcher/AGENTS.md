@@ -92,6 +92,12 @@ mcp({ tool: "ghidra_rename_function", args: '{"oldName": "FUN_0043b300", "newNam
 # Rename variables in a function
 mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "variable_renames": {"puVar1": "ptr", "DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}, "program": "launcher.exe"}' })
 
+# Rename data / globals
+mcp({ tool: "ghidra_rename_data", args: '{"address": "0x004d3588", "newName": "g_LauncherSelectionListSortMode004d3588", "program": "launcher.exe"}' })
+
+# Plate comment on a function
+mcp({ tool: "ghidra_set_plate_comment", args: '{"function_address": "0x40ec70", "comment": "Launcher selection command helper: reads selected row high word as active-world index, calls mediator +0xf0, waits for event 8.", "program": "launcher.exe"}' })
+
 # Read memory at an address
 mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "program": "launcher.exe"}' })
 

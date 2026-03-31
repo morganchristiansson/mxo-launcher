@@ -219,6 +219,9 @@ That is important because the current arg7-selection writer is now closed to the
   - a direct launcher byte-pattern scan found that `0x40ed76` call as the current concrete
     launcher-side `+0xf0` site, while still finding no equally direct launcher callsite to `+0xec`
     or `+0x120`
+  - failure-side follow-on is now slightly tighter too:
+    - `0x40ec70` then calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`
+    - and rebuilds the world list through `0x40e480 -> 0x40e1c0`
   - negative result: this still does not expose the later `+0xec = 0x41c1f0` producer, so it is
     evidence for the narrower launcher-side selection-index/state7 action only
 - the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
