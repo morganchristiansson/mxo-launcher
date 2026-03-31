@@ -1377,8 +1377,10 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     typedef uint32_t (__thiscall *SignedIndexUIntFn)(void*, int32_t);
 
     // Keep the semantic split explicit here:
-    // - launcher arg7-selection resolution reuses wrapper slot `+0x54` as a generic bool gate for
-    //   accepting world-type values `2/5`
+    // - launcher arg7-selection resolution reuses wrapper slot `+0x54` only on the exact
+    //   selection-gate-byte `2/5` branch recovered through `0x40cdb0`
+    // - gate byte `1` is accepted unconditionally there
+    // - any other gate byte is rejected before the final `0x4d3410/0x4d3414` writeback
     // - the slot body itself is now named from the owner-side evidence: a tiny `+0x50`
     //   truthiness wrapper over the auth/bootstrap raw08 aux-handle family
     NoArgUIntFn hasBootstrapRaw08AuxHandle54Fn = (NoArgUIntFn)vtable[21]; // +0x54

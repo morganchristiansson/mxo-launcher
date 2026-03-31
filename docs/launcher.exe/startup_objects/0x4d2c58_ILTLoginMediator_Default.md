@@ -181,6 +181,10 @@ That is important because the current arg7-selection writer is now closed to the
 - `launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`
 - inside that function, the final writeback at `0x40d763..0x40d810` consults `0x4d3584` through
   methods `+0xfc`, `+0x100`, and `+0xe4` before writing `0x4d3410 / 0x4d3414`
+- newer `0x40cdb0` tightening now narrows that middle gate:
+  - `+0x100 == 1` accepts directly
+  - `+0x100 == 2/5` calls sibling slot `+0x54`
+  - any other value rejects before the final writeback
 - the same helper also persists `Last_WorldName` and clearly operates on a launcher-owned
   `CListCtrl`-style selection UI object rather than on a raw config parser path
 

@@ -148,7 +148,13 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
   - on success it continues through patch-check / launch-side logic and eventually exits that UI path
 - `0x40d530 = LauncherSelectionList_OnSelectionChanged`
   - samples the current list selection through the same sibling mediator slot `0x4d3584`
+  - validates it through the same `+0x100 -> 0x40cdb0 -> (+0x54 when gate byte is 2/5) -> +0xe4`
+    family later reused by `0x40d6f0`
   - posts UI command ids `0x0f`, `0x10`, `0x11`, or `0x12` back into `0x405a20`
+  - newer `0x405a20` read keeps the practical split narrower than before:
+    - `0x0f` disables the selection/continue controls
+    - `0x10/0x11` enable the same path with different button visuals/state
+    - `0x12` is a separate launcher-side status/action branch, not the final mediator commit
   - practical read: this is launcher-side enable/disable/status control for the selection action,
     not the final arg7 writeback itself
 - `0x40d820 = LauncherSelectionList_OnDoubleClickActivate`
