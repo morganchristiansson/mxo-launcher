@@ -14,6 +14,7 @@ class CMarginConnection;
 namespace mxo::ltlogin {
 
 class CLTLoginMediator;
+struct AuthBootstrap680RsaPublicKeyPairOwnedState;
 
 struct AuthBootstrap680SmallStringMirror {
     // Source-owned mirror of the three-dword small-string family populated by `0x407dd0`.
@@ -103,6 +104,10 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     // Current concrete layout certainty:
     // - final vtable `0x004b75e4`
     // - `+0x0c` = common RSA public-key pair subobject above
+    // - vtable `+0x1c` = per-chunk encrypt step used from `0x468f00`
+    // - vtable `+0x24` = ciphertext-block/modulus query consumed by `0x468ea0/0x468f00`
+    // - `0x468f00` itself loops over plaintext chunks and advances the packet-builder output by one
+    //   ciphertext block per iteration
     // - `+0x4c/+0x50/+0x54/+0x58` = ctor-seeded helper/vtable family still kept raw pending deeper
     //   recovery of the exact encryption-worker inheritance stack
     uint32_t vtable00 = 0u;
@@ -113,17 +118,36 @@ struct AuthBootstrap680Raw08PublicKeyWorkerA8Sketch {
     uint32_t helperThunk50 = 0u;
     uint32_t helperThunk54 = 0u;
     uint32_t helperVtable58 = 0u;
+
+    void ResetAsRecoveredLeaf(AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState);
+    bool ConstructFromReplyPublicKey(
+        AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
+        const uint8_t* modulusBytes,
+        size_t modulusByteCount,
+        uint8_t exponentByte);
+    uint32_t QueryEncryptedOutputLengthScaffold(
+        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
+        size_t plaintextByteCount) const;
+    bool EncryptPlaintextIntoCiphertextScaffold(
+        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
+        const uint8_t* plaintextBytes,
+        size_t plaintextByteCount,
+        std::vector<uint8_t>* outCiphertextBytes) const;
 };
 static_assert(offsetof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch, publicKeyPair0c) == 0x0cu);
 static_assert(sizeof(AuthBootstrap680Raw08PublicKeyWorkerA8Sketch) == 0x5cu);
 
 struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
     // Concrete validator family used at child `+0xa4` and `+0xac`:
-    // - `0x447260` allocates this family lazily for the `pubkey.dat` validator at child `+0xa4`
+    // - `0x447260` allocates this family lazily for the `qspubkey.dat` validator at child `+0xa4`
     // - `0x447780` allocates the same family again for child `+0xac`
     // - pool `0x4665a0` (`size = 0x54`)
     // - ctor `0x447020 = AuthBootstrap680ReplyAuthDataValidator_ConstructFromReplyPublicKey`
-    // - concrete validator entry point: `0x44aec0` -> vtable `+0x2c`
+    // - high-value vtable chain now closed from `0x468f80 / 0x44aec0`:
+    //   - `+0x1c` = allocate/return a temporary validator worker object
+    //   - `+0x20` = load signature bytes into that worker (`0x468520`)
+    //   - `+0x28` = finalize verification on the temporary worker
+    //   - `+0x2c` = convenience wrapper that performs allocate/load/finalize around caller bytes
     //
     // Current concrete layout certainty:
     // - final vtable `0x004b7580`
@@ -136,6 +160,19 @@ struct AuthBootstrap680ReplyAuthDataValidatorACSketch {
     AuthBootstrap680RsaPublicKeyPairSubobject0cSketch publicKeyPair0c{};
     uint32_t helperThunk4c = 0u;
     uint32_t helperThunk50 = 0u;
+
+    void ResetAsRecoveredLeaf(AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState);
+    bool ConstructFromReplyPublicKey(
+        AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState,
+        const uint8_t* modulusBytes,
+        size_t modulusByteCount,
+        uint8_t exponentByte);
+    bool VerifySignatureHypothesisScaffold(
+        const AuthBootstrap680RsaPublicKeyPairOwnedState& ownedState,
+        const uint8_t* signedBytes,
+        size_t signedByteCount,
+        const uint8_t* signatureBytes,
+        size_t signatureByteCount) const;
 };
 static_assert(offsetof(AuthBootstrap680ReplyAuthDataValidatorACSketch, publicKeyPair0c) == 0x0cu);
 static_assert(sizeof(AuthBootstrap680ReplyAuthDataValidatorACSketch) == 0x54u);
@@ -312,7 +349,7 @@ struct AuthBootstrap680ChildSketch {
     uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
     uint8_t authRequestReadyA0 = 0;              // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
     std::array<uint8_t, 3> paddingA1ToA3{};      // original child `+0xa1 .. +0xa3`
-    AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `pubkey.dat` validator family built by `0x447260/0x447c10` and consulted by `0x447780 -> 0x468f80`
+    AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* lazyPubkeyDatValidatorA4 = nullptr; // original child `+0xa4`; lazy `qspubkey.dat` validator family built by `0x447260/0x447c10` and consulted by `0x447780 -> 0x468f80`
     AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* raw08PublicKeyWorkerA8 = nullptr; // original child `+0xa8`; live reply-public-key worker materialized by `0x447f50 -> 0x447780` and consumed by `0x4474f0` through `0x468ea0/0x468f00`
     AuthBootstrap680ReplyAuthDataValidatorACSketch* replyAuthDataValidatorAC = nullptr; // original child `+0xac`; sibling validator materialized by `0x447f50 -> 0x447780` and consumed by `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
 

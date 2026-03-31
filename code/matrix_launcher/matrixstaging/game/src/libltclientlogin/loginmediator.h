@@ -1582,7 +1582,7 @@ private:
     // Current tightened high-value family inside that child:
     // - `+0xa0` = auth-request-ready byte set by successful raw `0x07` handling and tested by
     //   `0x448050`
-    // - `+0xa4` = lazy `pubkey.dat` validator-family pointer primed by `0x447260/0x447c10`
+    // - `+0xa4` = lazy `qspubkey.dat` validator-family pointer primed by `0x447260/0x447c10`
     // - `+0xa8` = raw `0x08` reply-public-key worker rebuilt by `0x447780` and consumed by
     //   `0x4474f0` through `0x468ea0/0x468f00`
     // - `+0xac` = sibling reply validator rebuilt by `0x447780` and consumed by
