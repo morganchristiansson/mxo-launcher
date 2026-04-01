@@ -308,8 +308,8 @@ CLTLoginMediator::CLTLoginMediator()
       worldSlots_{},
       worldPayloadSlots_{} {
     InitializeObserverTree674();
-    SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
-    ResetRecoveredAuthBootstrapDynamicStateScaffold();
+    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(*this);
+    AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(*this);
     InitializeArg6DefaultObject();
 }
 
@@ -3255,58 +3255,6 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
     }
 
     return 0u;
-}
-
-// anchor: launcher.exe:0x447eb0
-uint32_t CLTLoginMediator::SendAuthGetPublicKeyRequest() {
-    return AuthBootstrap680Ops::SendAuthGetPublicKeyRequest(*this);
-}
-
-// anchor: launcher.exe:0x4474f0
-uint32_t CLTLoginMediator::SendAuthRequestFromReply(const mxo::auth::GetPublicKeyReply& reply) {
-    return AuthBootstrap680Ops::SendAuthRequestFromReply(*this, reply);
-}
-
-// UNANCHORED: thin mediator wrapper over the source-owned owner+0x680 bootstrap child raw `0x0a`
-// send bridge.
-uint32_t CLTLoginMediator::SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge) {
-    return AuthBootstrap680Ops::SendAuthChallengeResponse(*this, challenge);
-}
-
-// UNANCHORED: thin mediator wrapper over the source-owned owner+0x680 parsed-auth logging helper.
-void CLTLoginMediator::LogParsedAuthReply(const mxo::auth::AuthReply& reply) const {
-    AuthBootstrap680Ops::LogParsedAuthReply(*this, reply);
-}
-
-// UNANCHORED: thin mediator wrapper over fixed-field sync for the owner `+0x680` bootstrap child.
-void CLTLoginMediator::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig() {
-    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(*this);
-}
-
-// UNANCHORED: thin mediator wrapper over dynamic-state reset for the owner `+0x680` bootstrap
-// child.
-void CLTLoginMediator::ResetRecoveredAuthBootstrapDynamicStateScaffold() {
-    AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(*this);
-}
-
-// UNANCHORED: thin mediator wrapper over parsed `AS_GetPublicKeyReply` sync for the owner `+0x680`
-// bootstrap child.
-uint32_t CLTLoginMediator::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
-    const mxo::auth::GetPublicKeyReply& reply) {
-    return AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(*this, reply);
-}
-
-// UNANCHORED: thin mediator wrapper over post-`0x0a` challenge-material sync for the owner `+0x680`
-// bootstrap child.
-void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
-    const mxo::auth::AuthChallengeResponseBuildResult& buildResult) {
-    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(*this, buildResult);
-}
-
-// UNANCHORED: thin mediator wrapper over auth-reply shadow sync for the owner `+0x680` bootstrap
-// child.
-void CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mxo::auth::AuthReply& reply) {
-    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(*this, reply);
 }
 
 bool CLTLoginMediator::PrepareState5MarginConnectionCopySendScaffold(

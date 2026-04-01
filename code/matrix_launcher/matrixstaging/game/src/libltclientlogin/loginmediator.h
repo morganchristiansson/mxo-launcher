@@ -1487,16 +1487,6 @@ public:
     bool HasValidState5ReplyCopyShadowF4Scaffold() const;
 
 private:
-    uint32_t SendAuthGetPublicKeyRequest();
-    uint32_t SendAuthRequestFromReply(const mxo::auth::GetPublicKeyReply& reply);
-    uint32_t SendAuthChallengeResponse(const mxo::auth::AuthChallenge& challenge);
-    void LogParsedAuthReply(const mxo::auth::AuthReply& reply) const;
-    void SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
-    void ResetRecoveredAuthBootstrapDynamicStateScaffold();
-    uint32_t SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(const mxo::auth::GetPublicKeyReply& reply);
-    void SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
-        const mxo::auth::AuthChallengeResponseBuildResult& buildResult);
-    void SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(const mxo::auth::AuthReply& reply);
     void RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(const mxo::auth::AuthReply& reply);
     void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);

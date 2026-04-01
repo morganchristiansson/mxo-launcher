@@ -562,7 +562,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     lastAuthReply_ = mxo::auth::AuthReply();
     postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
-    ResetRecoveredAuthBootstrapDynamicStateScaffold();
+    AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(*this);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginMediator auth reset/config shim updated username='{}' password={} (live submit path should still enter through 0x41ecd0 / ProcessLoginRequest)",
@@ -582,7 +582,7 @@ void CLTLoginMediator::SetAuthBootstrapConfig(
     authLoginType_ = loginType;
     authKeyConfigMd5_ = keyConfigMd5;
     authUiConfigMd5_ = uiConfigMd5;
-    SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig();
+    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(*this);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginMediator auth bootstrap configured launcherVersion={} currentPublicKeyId={} loginType={} keyConfigMd5Len={} uiConfigMd5Len={}",
@@ -1043,7 +1043,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     lastAuthReply_ = mxo::auth::AuthReply();
     postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
-    ResetRecoveredAuthBootstrapDynamicStateScaffold();
+    AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(*this);
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();

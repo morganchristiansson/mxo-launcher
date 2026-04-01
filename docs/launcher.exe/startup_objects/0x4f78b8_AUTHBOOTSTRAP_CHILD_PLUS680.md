@@ -62,6 +62,13 @@ Direct branch condition recovered there:
 
 So `+0xa0` is a **byte readiness flag**, not a helper pointer.
 
+Bridge consequence for source:
+- `0x439210` calls `0x448050` directly
+- current Ghidra callers/callees do **not** show a separate launcher mediator wrapper between
+  those two methods
+- replacement `CLTLoginMediator::BeginAuthHandshake(...)` should therefore stay documented as a
+  source-owned bridge into the real child entry instead of claiming a new launcher anchor
+
 ## Tightened field-family summary
 
 ### Stable enough current names/roles
@@ -171,6 +178,10 @@ Neighboring corroboration:
 
 Current best combined read:
 - the `+0x85` family is real and reused
+- Ghidra callers currently show `0x43f300` reaching this work only through
+  `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
+- the narrowed raw-`0x0a` builder/send at `0x44831c..0x448467` is inline inside that child helper,
+  not a separate launcher mediator method
 - but the `0x4429b0 / 0x441470` path is now tightened further as a **neighboring margin-connection
   object** path:
   - `0x4429b0 = CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse` is reached from
@@ -188,6 +199,12 @@ Current best read:
 - on the raw `0x0b` success path it validates an auth-data field length of `0x136`
 - validation runs through child `+0xac` and the time-delta/cached state behind child `+0x80`
 - then it heap-copies that `0x136` auth-data field into child `+0xf4`
+- important later-path restraint from Ghidra callee review:
+  - `0x4401a0 = CLTLoginState_State10_Slot6_HandleSecondaryMessage` does **not** call `0x448140`
+  - its callees stay inside the local state10 parse/object/slot-record/event helpers
+  - so any replacement helper shared between the broader state2 auth-reply path and the later
+    state10 auth-reply path is a deliberate source bridge, not a newly discovered standalone
+    launcher method
 
 Current tighter copied-block layout from static `0x448140 / 0x44add0 / 0x44aec0` plus live source logs:
 - `+0xf4 + 0x00 .. +0x7f` = 128-byte auth-signature span
@@ -246,6 +263,12 @@ Practical consequence for the replacement launcher:
 - a permanent fake non-null `+0x50` is less faithful than the real lifecycle
 
 ## Source-ownership consequence
+
+Ctor/reset restraint now tightened from `0x445500 / 0x441290`:
+- construction zeros the child's dynamic families across `+0x80 .. +0x118`
+- replacement reset helpers should therefore aim to restore that ctor-like transient subset only
+- fixed config mirrors such as child `+0x28/+0x2c/+0x9c` stay better modeled under the separate
+  prepare/config bridge feeding `0x448050 / 0x447eb0 / 0x4474f0 / 0x447780`
 
 Current replacement source keeps this split explicitly:
 - original child `+0xf4` = full reply-derived copied `0x136` block

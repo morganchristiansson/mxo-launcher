@@ -1291,7 +1291,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
             child.authServerTimeBias80 = static_cast<uint32_t>(
                 std::time(nullptr) - static_cast<std::time_t>(reply.currentTime));
             const uint32_t workerResult =
-                mediator.SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(reply);
+                SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(mediator, reply);
             if (workerResult == 0u) {
                 mediator.authCurrentPublicKeyId_ = child.currentPublicKeyId9C;
             } else {
@@ -1423,7 +1423,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
-            mediator.SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(reply);
+            SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(mediator, reply);
             return kAuthBootstrap680InboundAuthReplySuccess;
         }
 
@@ -1760,8 +1760,11 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
     return sendResult;
 }
 
-// UNANCHORED: source-owned parsed-auth logging helper around the
-// `0x4401a0 / State10AuthReplyParseObject_InitFromIncomingPacket` family.
+// Source-owned diagnostics helper shared by the anchored auth-reply owners:
+// - launcher.exe:0x43f300 = broader state2 auth-reply dispatcher
+// - launcher.exe:0x4401a0 = later state10 selected-slot auth-reply handler
+// This remains intentionally source-owned; Ghidra callers/callees show no standalone launcher
+// logging helper between those paths and the parser families.
 void AuthBootstrap680Ops::LogParsedAuthReply(
     const CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
@@ -1823,9 +1826,12 @@ void AuthBootstrap680Ops::LogParsedAuthReply(
     }
 }
 
-// UNANCHORED: source-owned fixed-field preseed for the owner `+0x680` bootstrap child.
-// The ready-side `0x439210 -> 0x448050` path still rewrites child `+0x28/+0x2c` from its own
-// recovered call shape before raw `0x06` / raw `0x08` dispatch.
+// Source-owned owner->child fixed-field preseed for the owner `+0x680` bootstrap child.
+// Bridge anchors:
+// - launcher.exe:0x439210 -> 0x448050 rewrites child `+0x28/+0x2c` and copies the owner MD5 blocks
+// - launcher.exe:0x447eb0 / 0x4474f0 consume child `+0x2c/+0x9c` and `+0x28/+0x9c`
+// - launcher.exe:0x447f50 / 0x447780 refresh child `+0x9c` on raw `0x07`
+// So this helper only preserves replacement-side config mirrors between those anchored uses.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(CLTLoginMediator& mediator) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     child.loginType28 = mediator.authLoginType_;
@@ -1836,7 +1842,12 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig
     child.currentPublicKeyId9C = mediator.authCurrentPublicKeyId_;
 }
 
-// UNANCHORED: source-owned dynamic-state reset for the owner `+0x680` bootstrap child.
+// Source-owned dynamic-state reset for the owner `+0x680` bootstrap child.
+// Bridge anchors:
+// - launcher.exe:0x445500 / 0x441290 zero the child `+0x80..+0x118` dynamic families at construction
+// - launcher.exe:0x448050 / 0x4474f0 / 0x447780 / 0x448140 later repopulate subsets during use
+// Keep this reset ctor-like for transient fields while leaving fixed config mirrors to the separate
+// preseed helper above.
 void AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLoginMediator& mediator) {
     AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
@@ -1933,11 +1944,12 @@ uint32_t AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplySc
     return 0u;
 }
 
-// UNANCHORED: source-owned post-raw-`0x0a` hook.
-// Static `0x44831c..0x448467` does not write back into child `+0x84 .. +0x93`; that seed block is
-// produced earlier by `0x4474f0` through the child `+0x54` helper and then consumed indirectly via
-// the `+0x94/+0x98` transform objects during raw `0x09` handling. So keep this as a no-op instead
-// of the older less-faithful convenience write.
+// Source-owned no-op bridge around the launcher-owned raw-`0x09` inline continuation.
+// Bridge anchors:
+// - launcher.exe:0x43f300 -> 0x448140 case `0x09`
+// - launcher.exe:0x44831c..0x448467 = raw `0x0a` build/send inline range
+// Static RE shows no post-send child mutation there; the `+0x84..+0x93` seed block was produced
+// earlier by `0x4474f0` through child `+0x54` and is only consumed indirectly here.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthChallengeResponseBuildResult& buildResult) {
@@ -1984,8 +1996,16 @@ bool AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold(
     return storedReplyCopy && storedPrepState;
 }
 
-// UNANCHORED: source-owned owner+0x680 auth-reply copy-shadow update for later `+0xf4`
-// consumers such as `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`.
+// Source-owned shared auth-reply materialization bridge for later child `+0xf4` consumers such as
+// `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`.
+// Bridge anchors:
+// - launcher.exe:0x448140 raw `0x0b` success copies the validated `0x136` auth-data block into
+//   child `+0xf4` and rebuilds child `+0xb0/+0xc4/+0xd8`
+// - launcher.exe:0x43f300 consumes that child-side result on the broader state2 path
+// - launcher.exe:0x4401a0 is the later state10 selected-slot auth-reply handler and does not call
+//   `0x448140`
+// The shared replacement helper is therefore a deliberate bridge between anchored original owners,
+// not a newly claimed standalone launcher method.
 void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {

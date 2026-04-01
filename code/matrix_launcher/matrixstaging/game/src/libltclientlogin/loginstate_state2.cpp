@@ -159,7 +159,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
                 mediator->lastAuthReply_);
             mediator->ResetMarginBootstrapState();
             mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(mediator->lastAuthReply_);
-            mediator->LogParsedAuthReply(mediator->lastAuthReply_);
+            AuthBootstrap680Ops::LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
             if (AuthBootstrap680Ops::ConsumeState2AuthReplySuccessOneTimeGateScaffold(*mediator)) {
                 CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
                 AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold(
@@ -217,7 +217,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
 
         case kAuthBootstrap680InboundAuthReplyError: {
             mediator->expectedMarginRequestName_ = nullptr;
-            mediator->LogParsedAuthReply(mediator->lastAuthReply_);
+            AuthBootstrap680Ops::LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
             if (CLTLoginState* state0 = mediator->ScaffoldState0()) {
                 mediator->SwitchHelperStateScaffold(0u, state0);
             }
@@ -243,7 +243,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
 
         case kAuthBootstrap680InboundAuthReplyValidationError: {
             mediator->expectedMarginRequestName_ = nullptr;
-            mediator->LogParsedAuthReply(mediator->lastAuthReply_);
+            AuthBootstrap680Ops::LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
             mediator->WorldListCountOrStatus80() = 0x1200000bu;
             if (CLTLoginState* state0 = mediator->ScaffoldState0()) {
                 mediator->SwitchHelperStateScaffold(0u, state0);
