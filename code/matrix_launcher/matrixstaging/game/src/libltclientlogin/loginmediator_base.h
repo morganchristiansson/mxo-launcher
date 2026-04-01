@@ -462,12 +462,20 @@ public:
     // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8
+    // Launcher page-`7` active-entry count used by `0x40e480` while correlating active selection
+    // entries against total worlds before row item-data high words are written.
     virtual uint32_t GetArg7SelectionUpperBoundExclusive() const = 0;
     // +0xdc
+    // Launcher page-`7` active-entry display text getter; current tighter auth-valid read is the
+    // slot-record / character-entry name for the selected row high-word index.
     virtual const char* MapSelectionName(uint32_t selectionHighByte) const = 0;
     // +0xe0
+    // Launcher page-`7` active-entry world-match string getter; current tighter auth-valid read is
+    // the world-descriptor inline name reached from the slot-record's `worldId0c`.
     virtual const char* GetVariantWorldName(uint32_t variantIndex) = 0;
     // +0xe4
+    // Launcher page-`7` active-entry status getter; current tighter auth-valid read is owner
+    // slot-record status byte `+0x0b` indexed by the selected row high word.
     virtual uint8_t GetVariantState(int32_t variantIndex) const = 0;
     // +0xe8
     void UnknownSlot59();

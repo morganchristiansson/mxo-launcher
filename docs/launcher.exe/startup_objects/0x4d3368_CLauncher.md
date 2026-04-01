@@ -141,9 +141,11 @@ A concrete new anchor on that earlier phase is the launcher selection writer:
   - writes the final split selection into `CLauncher+0xa8/+0xac`
     (`0x4d3410 / 0x4d3414`)
 - newer upstream producer tightening from `0x40e480` now explains that packed list-row item data:
-  - low 16 bits = total-world index from sibling slot `+0xfc`
-  - high 16 bits = matching active-world index when sibling slot `+0xe0` returns the same world
-    name, otherwise `0xffff`
+  - low 16 bits = total-world / descriptor index from sibling slot `+0xfc`
+  - high 16 bits = matching active selection-entry index when sibling slot `+0xe0` returns the
+    same world name, otherwise `0xffff`
+  - tighter auth-valid read from the paired `+0xe4 = 0x41b2a0` consumer now makes that high word
+    better fit the slot-record / character-entry index on page `7`
   - negative result: sibling slot `+0xe0` is a string getter used for world-name matching there,
     not a bool gate
 
@@ -187,7 +189,7 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
     - layout is:
       - `+0x00/+0x04` = intrusive next/prev pointers
       - `+0x08` = total-world index dword
-      - `+0x0c` = active-world index dword (`0xffff` when unmatched)
+      - `+0x0c` = active selection-entry index dword (`0xffff` when unmatched)
       - `+0x10/+0x1c/+0x28/+0x34` = four copied display strings
       - `+0x40` = dword availability/sort-class flag
       - `+0x44` = `GetTickCount()` stamp from row creation
@@ -225,8 +227,9 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
       - it loads resource `0x0008` (`Deleted characters cannot be recovered. Are you certain...`) and
         formats it with the selected character name, using resource `0x00aa` as the message-box
         caption
-      - it reads the selected row item-data high word as a signed active-world index
-      - calls sibling mediator slot `+0xf0 = 0x41c390` with that active-world index
+      - it reads the selected row item-data high word as a signed active selection-entry index
+        (current tighter auth-valid read: slot-record / character-entry index)
+      - calls sibling mediator slot `+0xf0 = 0x41c390` with that selected row high word
       - waits through `0x41b6c0` for event `8`
       - on **success** (`WaitForEvent` result `0`) it:
         - builds `Profiles\%s\%s` from sibling mediator `+0xdc` then `+0x5c`
@@ -295,6 +298,10 @@ Practical consequence:
 - current bounded source consequence:
   - the no-GUI launcher bridge now mirrors launcher-side page-`7` command-`8` writeback into
     `CLauncher+0xa8/+0xac` plus `Last_WorldName`
+  - newer tightening now also mirrors the packed row-item split more closely there:
+    - low word = matched world / descriptor index
+    - high word = selected active entry index (current tighter auth-valid read: slot-record /
+      character-entry index)
   - it seeds the later wrapper-facing `+0x120` character source block and current slot route index
   - but it no longer claims a pre-client direct `+0xf0/+0xec` owner commit
   - newer direct-producer tightening from `client.dll:0x6211d3e0 + 0x62170e2a..0x62170f48` narrows

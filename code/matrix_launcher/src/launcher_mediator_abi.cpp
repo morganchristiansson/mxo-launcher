@@ -733,6 +733,8 @@ static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalL
 
 // anchor: client.dll:0x62170b00 gates arg7 high-byte selection flow through arg6 +0xd8
 // vtable: ILTLoginMediator.Default slot +0xd8
+// Tighter launcher page-`7` read now keeps this high byte aligned with the active selection-entry
+// count, and on the auth-valid path that is currently better modeled through owner slot records.
 static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalLoginMediatorStub* self) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator::Default->GetArg7SelectionUpperBoundExclusive();
@@ -740,6 +742,8 @@ static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalL
 
 // anchor: deeper client init maps arg7-derived selection names through arg6 +0xdc
 // vtable: ILTLoginMediator.Default slot +0xdc
+// Tighter launcher page-`7` read now keeps this closer to the active selection-entry display text
+// (auth-valid path: slot-record / character-entry name by selected-row high word).
 static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub* self, uint32_t selectionHighByte) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator::Default->MapSelectionName(selectionHighByte);
@@ -751,6 +755,8 @@ static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub
 
 // anchor: arg7-selection resolution consults the sibling ILTLoginMediator surface through +0xe0
 // vtable: ILTLoginMediator.Default slot +0xe0
+// Tighter launcher page-`7` read now keeps this closer to the active selection-entry world-match
+// string (auth-valid path: slot-record worldId -> world-descriptor inline name).
 static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorStub* self, uint32_t variantIndex) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator::Default->GetVariantWorldName(variantIndex);
@@ -758,6 +764,8 @@ static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorS
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4
 // vtable: ILTLoginMediator.Default slot +0xe4
+// Tighter launcher page-`7` read now keeps this high-word consumer aligned with active
+// selection-entry status, i.e. slot-record status on the auth-valid path.
 static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* self, int32_t variantIndex) {
     (void)self;
     return mxo::ltlogin::ILTLoginMediator::Default->GetVariantState(variantIndex);
@@ -1372,10 +1380,15 @@ void DiagnosticConfigureMediatorSelection(
 }
 
 // UNANCHORED: launcher-style selection resolver used to model the current arg7 reconstruction path.
+// Current tighter page-`7` read:
+// - `requestedWorldIndexLow24` mirrors the selected row low word (`0x40e480` total-world index)
+// - `requestedSelectionIndexHighWord` mirrors the selected row high word (`0x40e480` active-entry
+//   index, currently tighter on the auth-valid path as the slot-record / character-entry index)
+// - `0x40d6f0` sign-extends that high word before writing `CLauncher+0xa8`
 bool DiagnosticResolveLauncherSelectionFromMediator(
     void* mediatorPtr,
     uint32_t requestedWorldIndexLow24,
-    uint32_t requestedVariantIndexHigh8,
+    uint32_t requestedSelectionIndexHighWord,
     uint32_t* outFieldA8,
     uint32_t* outFieldAC,
     char* outWorldName,
@@ -1403,13 +1416,15 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     // - any other gate byte is rejected before the final `0x4d3410/0x4d3414` writeback
     // - the slot body itself is now named from the owner-side evidence: a tiny `+0x50`
     //   truthiness wrapper over the auth/bootstrap raw08 aux-handle family
+    // - on the auth-valid launcher page-`7` path, `+0xe4` is now tighter as slot-record status by
+    //   selected-row high word rather than a generic world-variant code
     NoArgUIntFn hasBootstrapRaw08AuxHandle54Fn = (NoArgUIntFn)vtable[21]; // +0x54
     IndexStringFn worldNameFn = (IndexStringFn)vtable[63];         // +0xfc
     IndexUIntFn selectionGateByte100Fn = (IndexUIntFn)vtable[64];  // +0x100
     SignedIndexUIntFn variantStateFn = (SignedIndexUIntFn)vtable[57]; // +0xe4
 
     const uint32_t worldIndexLow24 = requestedWorldIndexLow24 & 0x00ffffffu;
-    const uint32_t variantIndexHigh8 = requestedVariantIndexHigh8 & 0xffu;
+    const uint32_t selectionIndexHighWord = requestedSelectionIndexHighWord & 0xffffu;
     const char* worldName = worldNameFn(mediatorPtr, worldIndexLow24);
     const uint32_t selectionGateByte100 = selectionGateByte100Fn(mediatorPtr, worldIndexLow24);
 
@@ -1420,15 +1435,16 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
         selectionGateAccepted = hasBootstrapRaw08AuxHandle54Fn(mediatorPtr) != 0;
     }
 
-    const int32_t signedVariantIndex = static_cast<int32_t>(variantIndexHigh8);
-    const uint32_t variantState = variantStateFn(mediatorPtr, signedVariantIndex);
+    const int32_t signedSelectionIndex = static_cast<int16_t>(selectionIndexHighWord);
+    const uint32_t variantState = variantStateFn(mediatorPtr, signedSelectionIndex);
     const bool variantAccepted = (variantState == 0u || variantState == 7u);
 
     if (!worldName || !selectionGateAccepted || !variantAccepted) {
         spdlog::info(
-            "DIAGNOSTIC: launcher selection resolve failed worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} worldName={} selectionGateByte100={} selectionGateAccepted={} variantState={} variantAccepted={}",
+            "DIAGNOSTIC: launcher selection resolve failed worldIndexLow24=0x{:06x} selectionIndexHighWord=0x{:04x} signedSelectionIndex={} worldName={} selectionGateByte100={} selectionGateAccepted={} variantState={} variantAccepted={}",
             worldIndexLow24,
-            variantIndexHigh8,
+            selectionIndexHighWord,
+            signedSelectionIndex,
             worldName ? worldName : "<null>",
             selectionGateByte100,
             selectionGateAccepted ? 1u : 0u,
@@ -1437,7 +1453,7 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
         return false;
     }
 
-    *outFieldA8 = variantIndexHigh8;
+    *outFieldA8 = static_cast<uint32_t>(signedSelectionIndex);
     *outFieldAC = worldIndexLow24;
 
     if (outWorldName && outWorldNameCapacity) {
@@ -1447,9 +1463,10 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     }
 
     spdlog::info(
-        "DIAGNOSTIC: launcher-style selection resolve via mediator worldIndexLow24=0x{:06x} variantIndexHigh8=0x{:02x} -> worldName='{}' selectionGateByte100={} variantState={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
+        "DIAGNOSTIC: launcher-style selection resolve via mediator worldIndexLow24=0x{:06x} selectionIndexHighWord=0x{:04x} signedSelectionIndex={} -> worldName='{}' selectionGateByte100={} variantState={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
         worldIndexLow24,
-        variantIndexHigh8,
+        selectionIndexHighWord,
+        signedSelectionIndex,
         worldName,
         selectionGateByte100,
         variantState,

@@ -186,18 +186,24 @@ That is important because the current arg7-selection writer is now closed to the
   - `+0x100 == 2/5` calls sibling slot `+0x54`
   - any other value rejects before the final writeback
 - newer `0x40e480` review now also fixes one stale read of the sibling list-builder family:
-  - slot `+0xe0` returns a world-name string used to match active-world entries against the
+  - slot `+0xe0` returns a world-name string used to match active selection entries against the
     total-world list before packed row item-data is written
   - it is **not** a bool-style availability gate
   - row item-data then packs:
-    - low 16 bits = total-world index (`+0xfc`)
-    - high 16 bits = matching active-world index, else `0xffff`
+    - low 16 bits = total-world / descriptor index (`+0xfc`)
+    - high 16 bits = matching active selection-entry index, else `0xffff`
+  - tighter auth-valid read from the paired `+0xe4 = 0x41b2a0` consumer now makes that high word
+    better fit the slot-record / character-entry index on page `7`
 - replacement-side fidelity consequence from that tightening:
-  - anchored startup getters `+0xf8/+0xd8/+0xe4/+0xfc/+0x100/+0xdc/+0xe0` should prefer startup
-    table storage seeded from the recovered launcher selection state
+  - anchored startup getters `+0xf8/+0xd8/+0xe4/+0xfc/+0x100/+0xdc/+0xe0` should prefer the
+    same table family the original launcher-side world-list code actually walks
+  - tighter auth-valid split now makes that family two-layered rather than purely startup-static:
+    - total-world side = owner world-descriptor table (`+0xd84`) for `+0xf8/+0xfc/+0x100`
+    - active-entry side = owner slot-record table (`+0x688`) joined back to descriptors for
+      `+0xd8/+0xdc/+0xe0/+0xe4`
   - avoid routing those anchored getters back through separate unanchored
     `Arg6MappedSelectionName` / `Arg6MappedVariantName` / selected-state helpers when the same
-    values can live in the table the original launcher-side world-list code actually walks
+    values can live in the table family the launcher page-`7` world-list code actually walks
 - newer `0x40dbb0/0x40dc40/0x40d8d0/0x40e1c0` tightening also makes the launcher-owned list row
   storage materially more concrete:
   - row object size = `0x48`
@@ -216,7 +222,8 @@ That is important because the current arg7-selection writer is now closed to the
     - it uses resource `0x0008` (`Deleted characters cannot be recovered...`) as the confirmation
       text and resource `0x00aa` as the caption, formatting the selected character name into the
       prompt first
-    - it reads the selected row item-data high word as a signed active-world index
+    - it reads the selected row item-data high word as a signed active selection-entry index
+      (current tighter auth-valid read: slot-record / character-entry index)
     - passes that value to sibling mediator slot `+0xf0 = 0x41c390`
     - it then waits through `0x41b6c0` for event `8`
   - a direct launcher byte-pattern scan found that `0x40ed76` call as the current concrete

@@ -20,7 +20,7 @@ void DiagnosticConfigureMediatorSelection(
 bool DiagnosticResolveLauncherSelectionFromMediator(
     void* mediatorPtr,
     uint32_t requestedWorldIndexLow24,
-    uint32_t requestedVariantIndexHigh8,
+    uint32_t requestedSelectionIndexHighWord,
     uint32_t* outFieldA8,
     uint32_t* outFieldAC,
     char* outWorldName,

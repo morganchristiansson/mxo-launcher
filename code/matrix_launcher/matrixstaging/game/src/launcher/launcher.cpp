@@ -899,15 +899,31 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         if (selectedWorldName[0]) {
             if (const RecoveredLauncherSelectionRecord* recoveredSelection =
                     FindRecoveredLauncherSelectionRecord(selectedWorldName)) {
+                const uint32_t selectedRowLowWordWorldIndex = selectedDescriptorIndex & 0x00ffffffu;
+                const uint32_t selectedRowHighWordSelectionIndex = selectedCharacterIndex & 0xffffu;
+                const uint32_t worldUpperBoundExclusive =
+                    (selectedDescriptorIndex < 0xffu) ? (selectedDescriptorIndex + 1u) : 1u;
+                const uint32_t selectionUpperBoundExclusive =
+                    (characterCount != 0u && characterCount < 0x100u)
+                        ? characterCount
+                        : ((selectedCharacterIndex < 0xffu) ? (selectedCharacterIndex + 1u) : 1u);
+
                 DiagnosticConfigureMediatorSelection(
-                    (recoveredSelection->worldIndexLow24 < 0xffu) ? (recoveredSelection->worldIndexLow24 + 1u) : 1u,
-                    (recoveredSelection->variantIndexHigh8 < 0xffu) ? (recoveredSelection->variantIndexHigh8 + 1u) : 1u,
-                    recoveredSelection->worldName,
-                    recoveredSelection->worldName,
-                    recoveredSelection->worldIndexLow24,
-                    recoveredSelection->variantIndexHigh8,
+                    worldUpperBoundExclusive,
+                    selectionUpperBoundExclusive,
+                    selectedWorldName,
+                    selectedCharacterName[0] ? selectedCharacterName : selectedWorldName,
+                    selectedRowLowWordWorldIndex,
+                    selectedRowHighWordSelectionIndex,
                     recoveredSelection->selectionGateByte100,
                     recoveredSelection->variantState);
+
+                spdlog::info(
+                    "ROUTE CHECKPOINT: pre-client no-GUI page7 row mirror lowWord(worldIndex)=0x{:04x} highWord(selectionIndex)=0x{:04x} world='{}' character='{}'",
+                    static_cast<unsigned>(selectedRowLowWordWorldIndex & 0xffffu),
+                    static_cast<unsigned>(selectedRowHighWordSelectionIndex & 0xffffu),
+                    selectedWorldName,
+                    selectedCharacterName[0] ? selectedCharacterName : "<unresolved>");
 
                 void* selectionMediatorSlot =
                     g_pILTLoginMediatorSelection3584 ? g_pILTLoginMediatorSelection3584 : g_pILTLoginMediatorDefault;
@@ -918,8 +934,8 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                     selectionMediatorSlot != nullptr &&
                     DiagnosticResolveLauncherSelectionFromMediator(
                         selectionMediatorSlot,
-                        recoveredSelection->worldIndexLow24,
-                        recoveredSelection->variantIndexHigh8,
+                        selectedRowLowWordWorldIndex,
+                        selectedRowHighWordSelectionIndex,
                         &resolvedA8,
                         &resolvedAC,
                         resolvedWorldName,
@@ -936,9 +952,10 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                     g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
                     StoreLastWorldNameInRegistry(g_LastWorldName);
                     spdlog::info(
-                        "DIAGNOSTIC: pre-client no-GUI selection mirrored page7 command8 / 0x40d6f0 world='{}' descriptorIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
+                        "DIAGNOSTIC: pre-client no-GUI selection mirrored page7 command8 / 0x40d6f0 world='{}' descriptorIndex={} selectionIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
                         g_LastWorldName,
                         static_cast<unsigned>(selectedDescriptorIndex),
+                        static_cast<unsigned>(selectedCharacterIndex),
                         m_FieldA8,
                         m_FieldAC,
                         g_PackedArg7Selection);
@@ -950,9 +967,10 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                     g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
                     StoreLastWorldNameInRegistry(g_LastWorldName);
                     spdlog::warn(
-                        "WARNING: pre-client no-GUI selection could not mirror page7 command8 / 0x40d6f0 exactly; using bounded recovered writeback world='{}' descriptorIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
-                        g_LastWorldName,
+                        "WARNING: pre-client no-GUI selection could not mirror page7 command8 / 0x40d6f0 via descriptorIndex={} selectionIndex={}; using bounded recovered writeback world='{}' fallbackA8=0x{:08x} fallbackAC=0x{:08x} packed=0x{:08x}",
                         static_cast<unsigned>(selectedDescriptorIndex),
+                        static_cast<unsigned>(selectedCharacterIndex),
+                        g_LastWorldName,
                         m_FieldA8,
                         m_FieldAC,
                         g_PackedArg7Selection);

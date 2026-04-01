@@ -1208,19 +1208,37 @@ RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11Stri
 
 // anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4
 // vtable: ILTLoginMediator.Default slot +0xe4
+// Tighter launcher page-`7` read now makes this high-word consumer better fit the active
+// selection-entry / slot-record index on the auth-valid path.
 uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
+    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+
     uint32_t state = 3u;
-    if (variantIndex >= 0) {
+    const char* source = "arg6-selection-fallback";
+    if (useRecoveredActiveEntryTable) {
+        if (variantIndex >= 0 && variantIndex <= 0xff) {
+            state = GetSlotRecordStatusByIndex(static_cast<uint8_t>(variantIndex));
+            source = "owner+0x688.status+0x0b";
+        } else {
+            source = "owner+0x688.<out-of-range>";
+        }
+    } else if (variantIndex >= 0) {
         const uint32_t unsignedVariantIndex = static_cast<uint32_t>(variantIndex);
         if (unsignedVariantIndex < this->Arg6VariantUpperBoundExclusive() &&
             this->Arg6VariantIndexMatchesSelection(unsignedVariantIndex)) {
             state = this->Arg6SelectedVariantState();
+            source = "arg6-selected-active-entry-state";
+        } else {
+            source = "arg6-selection-fallback.<not-selected>";
         }
+    } else {
+        source = "negative-index";
     }
     spdlog::info(
-        "MediatorStub::GetVariantState(+0xe4 variantIndex={}) -> {} (configuredVariant=0x{:02x} configuredState={})",
+        "MediatorStub::GetVariantState(+0xe4 variantIndex={}) -> {} [source={} configuredVariant=0x{:02x} configuredState={}]",
         variantIndex,
         state,
+        source,
         this->Arg6SelectedVariantIndexHigh8(),
         this->Arg6SelectedVariantState());
     return state;
@@ -1516,8 +1534,9 @@ uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selection
         //   `launcher.exe:0x40ec70`, reached from `0x405a20` case `9`, which:
         //   - loads UI strings/resource `0x0008` (`Deleted characters cannot be recovered...`) and
         //     `0x00aa`, confirms against the selected character name, then
-        //   - reads the selected row item-data high word as a signed active-world index
-        //   - calls sibling mediator slot `+0xf0` with that active-world index
+        //   - reads the selected row item-data high word as a signed active-selection-entry index
+        //     (current tighter auth-valid read: slot-record / character-entry index)
+        //   - calls sibling mediator slot `+0xf0` with that selected row high word
         //   - waits for event `8` through `0x41b6c0`
         //   - on success (`WaitForEvent` returns `0`) deletes `Profiles\%s\%s`, calls sibling
         //     `+0xe8 = 0x41ec00`, and rebuilds the list
@@ -1864,9 +1883,11 @@ bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold
         // - original launcher-side resolution writes `CLauncher+0xa8`, and client
         //   `InitClientDLL_BeginLoadingCharacterFlow` then stores arg7 high-8 into the first dword
         //   of the stack-local `0xb4` handoff before arg6 `+0xec`
-        // - `0x40ec70` likewise passes the active-world/high-word selection value to owner `+0xf0`
-        // - practical consequence for the no-GUI bridge: use the launcher-selected high-8
-        //   selection index here, not the recovered character slot index
+        // - `0x40ec70` likewise passes the selected row high word to owner `+0xf0`
+        // - tighter page-`7` read from `0x40e480/0x40d530/0x40d6f0` now makes that high word
+        //   better fit the active selection-entry / slot-record index on the auth-valid path
+        // - practical consequence for the no-GUI bridge: use the launcher-selected row high-byte
+        //   selection index here, not an invented world-variant id
         // - the concrete client producer first zero-initializes all `0xb4` bytes through
         //   `0x6211d3e0`, then only proves writes at `+0x00` and `+0x24..+0xa4`
         // - so the proven direct success-side path leaves both `+0x04..+0x13` (`block04`) and
@@ -2483,7 +2504,9 @@ void CLTLoginMediator::ConfigureArg6Selection(
     // Bounded startup-side world-list mirror:
     // - total-world rows come from `+0xfc`
     // - active rows use `+0xe0` text to match against those world names before the row's packed
-    //   item-data high word is written from the active-list index
+    //   item-data high word is written from the active selection-entry index
+    // - tighter auth-valid read now makes that active-entry index better fit the slot-record /
+    //   character-entry index than a free-standing world-variant id
     arg6WorldList_.totalCount_ = std::min<uint32_t>(arg6Selection_.worldUpperBoundExclusive_, arg6WorldList_.worldNames_.size());
     arg6WorldList_.activeCount_ = std::min<uint32_t>(arg6Selection_.variantUpperBoundExclusive_, arg6WorldList_.activeWorldMatchNamesE0_.size());
     if (arg6Selection_.selectedWorldIndexLow24_ < arg6WorldList_.worldNames_.size()) {
@@ -2611,30 +2634,60 @@ uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+// Tighter launcher page-`7` read from `0x40e480/0x40d530/0x40d6f0`:
+// - this high-byte upper bound is the active selection-entry count
+// - once auth reply state is live, that active-entry list is currently better modeled through
+//   owner slot records (`+0x688`) than through a separate variant-only startup fallback
 uint32_t CLTLoginMediator::GetArg7SelectionUpperBoundExclusive() const {
-    const uint32_t upperBoundExclusive = Arg6VariantUpperBoundExclusive();
+    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+    const uint32_t upperBoundExclusive = useRecoveredActiveEntryTable
+        ? static_cast<uint32_t>(slotRecordCount684_)
+        : Arg6VariantUpperBoundExclusive();
+
     spdlog::info(
-        "CLTLoginMediator::GetArg7SelectionUpperBoundExclusive(+0xd8) -> {}",
-        static_cast<unsigned>(upperBoundExclusive));
+        "CLTLoginMediator::GetArg7SelectionUpperBoundExclusive(+0xd8) -> {} [source={}]",
+        static_cast<unsigned>(upperBoundExclusive),
+        useRecoveredActiveEntryTable ? "owner+0x684.slotRecordCount" : "arg6-selection-fallback");
     return upperBoundExclusive;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+// Tighter launcher page-`7` read:
+// - the selected row high word indexes the active selection-entry list
+// - on the auth-valid path that list is currently better modeled as slot-record / character-entry
+//   names than as a free-standing variant text table
 const char* CLTLoginMediator::MapSelectionName(uint32_t selectionHighByte) const {
+    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+
     const char* selectionName = nullptr;
-    if (selectionHighByte < Arg6VariantUpperBoundExclusive() &&
-        Arg6VariantIndexMatchesSelection(selectionHighByte)) {
+    const char* source = "no-active-entry";
+    if (useRecoveredActiveEntryTable) {
+        const SlotRecordState004b5328* slotRecord =
+            (selectionHighByte <= 0xffu) ? GetSlotRecordByIndex(static_cast<uint8_t>(selectionHighByte)) : nullptr;
+        if (slotRecord && !slotRecord->heapString14.empty()) {
+            selectionName = slotRecord->heapString14.c_str();
+            source = "owner+0x688.heapString14";
+        } else {
+            source = "owner+0x688.<missing>";
+        }
+    } else if (selectionHighByte < Arg6VariantUpperBoundExclusive() &&
+               Arg6VariantIndexMatchesSelection(selectionHighByte)) {
         selectionName = Arg6MappedVariantName();
+        source = "arg6-selected-active-entry-name";
     }
 
     spdlog::info(
-        "CLTLoginMediator::MapSelectionName(+0xdc selectionHighByte={}) -> '{}'",
+        "CLTLoginMediator::MapSelectionName(+0xdc selectionHighByte={}) -> '{}' [source={}]",
         static_cast<unsigned>(selectionHighByte),
-        selectionName ? selectionName : "<null>");
+        selectionName ? selectionName : "<null>",
+        source);
     return selectionName;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+// Tighter launcher page-`7` read:
+// - the active selection-entry index currently joins owner slot-record `worldId0c` back to the
+//   owner world-descriptor inline-name table on the auth-valid path
 const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
     ++arg6VariantWorldNameQueryCountE0_;
     if ((arg6VariantWorldNameQueryCountE0_ % 5u) == 0u) {
@@ -2643,28 +2696,45 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
             arg6VariantWorldNameQueryCountE0_);
     }
 
-    const uint32_t worldIndex = Arg6SelectedWorldIndexLow24();
+    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
     const char* worldName = nullptr;
-    if (worldIndex < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(worldIndex)) {
-        worldName = Arg6MappedSelectionName();
+    const char* source = "no-active-entry";
+    if (useRecoveredActiveEntryTable) {
+        const SlotRecordState004b5328* slotRecord =
+            (variantIndex <= 0xffu) ? GetSlotRecordByIndex(static_cast<uint8_t>(variantIndex)) : nullptr;
+        if (slotRecord) {
+            const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord->worldId0c);
+            if (matchedWorldIndex >= 0) {
+                worldName = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex));
+                source = "owner+0x688.worldId0c -> owner+0xd84.inlineName+0x03";
+            } else {
+                source = "owner+0x688.worldId0c -> <no-descriptor-match>";
+            }
+        } else {
+            source = "owner+0x688.<missing>";
+        }
+    } else {
+        const uint32_t worldIndex = Arg6SelectedWorldIndexLow24();
+        if (worldIndex < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(worldIndex) &&
+            variantIndex < Arg6VariantUpperBoundExclusive() && Arg6VariantIndexMatchesSelection(variantIndex)) {
+            worldName = Arg6MappedSelectionName();
+            source = "arg6-selected-world-name";
+        }
     }
 
-    if (!worldName ||
-        variantIndex >= Arg6VariantUpperBoundExclusive() ||
-        !Arg6VariantIndexMatchesSelection(variantIndex)) {
+    if (!worldName) {
         spdlog::info(
-            "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> NULL (world='{}' configuredVariant=0x{:02x} variantUpperBoundExclusive={})",
+            "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> NULL [source={}]",
             static_cast<unsigned>(variantIndex & 0xffu),
-            worldName ? worldName : "<null>",
-            Arg6SelectedVariantIndexHigh8(),
-            static_cast<unsigned>(Arg6VariantUpperBoundExclusive()));
+            source);
         return nullptr;
     }
 
     spdlog::info(
-        "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> '{}'",
+        "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> '{}' [source={}]",
         static_cast<unsigned>(variantIndex & 0xffu),
-        worldName);
+        worldName,
+        source);
     return worldName;
 }
 

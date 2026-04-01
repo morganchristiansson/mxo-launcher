@@ -984,6 +984,12 @@ public:
     uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const override;
 
     // Startup-only arg6 selection/world-list helpers.
+    // Current tighter launcher page-`7` read from `0x40e480/0x40d530/0x40d6f0`:
+    // - the low row-item word indexes world descriptors (`+0xfc/+0x100/+0x104/+0x108`)
+    // - the high row-item word indexes the active selection-entry list (`+0xd8/+0xdc/+0xe0/+0xe4`)
+    // - once auth reply state is live, that active-entry list is currently better modeled through
+    //   the owner slot-record table (`+0x688`) than through a separate free-floating variant-only
+    //   abstraction
     uint8_t Arg6ValidateWorldSelection(uint8_t variant);
     uint32_t Arg6GetWorldListCount() const;
     uint32_t Arg6GetActiveWorldListCount() const;
@@ -1811,8 +1817,9 @@ private:
         std::array<uint8_t, 10> worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
 
         // launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(variant) -> startup-side state code
-        // per active-world index; current bounded fallback keeps the selected variant's recovered
-        // state here and leaves non-selected entries at `3`.
+        // per active selection-entry index (current tighter auth-valid read: slot-record index /
+        // selected row high word). Startup fallback still keeps one configured selected entry here
+        // and leaves non-selected entries at `3`.
         std::array<uint8_t, 10> activeVariantStatesE4_ = {3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
 
         // launcher.exe:0x4d3584 +0xf8 = GetWorldListCount() -> uint total count
@@ -1836,6 +1843,9 @@ private:
         uint32_t worldUpperBoundExclusive_ = 1;
         uint32_t variantUpperBoundExclusive_ = 1;
         uint32_t selectedWorldIndexLow24_ = 0;
+        // Current tighter page-`7` read: this high byte is the selected row's high-word active
+        // entry index. On the auth-valid launcher selection path that is currently better modeled
+        // as the slot-record / character-entry index rather than a free-standing world variant id.
         uint32_t selectedVariantIndexHigh8_ = 0;
         // Startup-only synthetic fallback for wrapper slot `+0x100` before the owner-side
         // descriptor table exists. Keep the split explicit: this is not yet a proved direct alias
