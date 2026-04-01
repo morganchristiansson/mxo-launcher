@@ -8,16 +8,6 @@
 
 namespace mxo::ltlogin {
 
-static std::string LowercaseAsciiString(const std::string& value) {
-    std::string out = value;
-    for (char& c : out) {
-        if (c >= 'A' && c <= 'Z') {
-            c = static_cast<char>(c - 'A' + 'a');
-        }
-    }
-    return out;
-}
-
 void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator) {
     if (!mediator) {
         return;
@@ -59,12 +49,12 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         const SlotRecordState004b5328& slotRecord = mediator->slotRecords688_[i];
         const int matchedWorldIndex = mediator->FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId0c);
         if (matchedWorldIndex >= 0) {
-            // Current source-owned tightening for the active state-8 margin path:
-            // preserve the original descriptor-name join, but lowercase the copied text so the
-            // reconstructed `+0x818` family can feed DNS host-prefix use directly (`Reality`
-            // -> `reality`).
-            mediator->routeHostStrings818_[i].text = LowercaseAsciiString(
-                mediator->worldDescriptorsD84_[static_cast<size_t>(matchedWorldIndex)].inlineNamePlus03);
+            // Faithful to launcher.exe `0x43f300 / 0x4401a0`:
+            // - owner `+0x818[currentSlot]` stores the copied descriptor inline-name string
+            // - preserve that exact descriptor text here instead of lowercasing it into a
+            //   replacement-only host-prefix variant
+            mediator->routeHostStrings818_[i].text =
+                mediator->worldDescriptorsD84_[static_cast<size_t>(matchedWorldIndex)].inlineNamePlus03;
         }
     }
     mediator->slotRecordCount684_ = static_cast<uint8_t>(characterCount);

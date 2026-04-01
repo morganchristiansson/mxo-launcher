@@ -503,6 +503,13 @@ static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
     return count <= 8u || (count && ((count & (count - 1u)) == 0u)) || ((count % 1024u) == 0u);
 }
 
+// Source-owned helper for tightening owner-backed selection/world readers toward launcher.exe
+// state-gated table access patterns (`stateCode >= 3`).
+static uint32_t CurrentHelperStateCodeOrZero(const mxo::ltlogin::CLTLoginMediator* mediator) {
+    const mxo::ltlogin::CLTLoginState* state = mediator ? mediator->CurrentState() : nullptr;
+    return state ? state->DispatchPhaseCode() : 0u;
+}
+
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
 // vtable: ILTLoginMediator.Default slot +0x2c
 uint32_t CLTLoginMediator::IsConnected() {
@@ -2565,10 +2572,18 @@ void CLTLoginMediator::SetArg6AuthPassword(const char* authPassword) {
 }
 
 uint32_t CLTLoginMediator::Arg6WorldUpperBoundExclusive() const {
+    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
+    if (stateCode >= 3u && worldDescriptorCountD80_ != 0u) {
+        return static_cast<uint32_t>(worldDescriptorCountD80_);
+    }
     return arg6Selection_.worldUpperBoundExclusive_;
 }
 
 uint32_t CLTLoginMediator::Arg6VariantUpperBoundExclusive() const {
+    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
+    if (stateCode >= 3u) {
+        return static_cast<uint32_t>(slotRecordCount684_);
+    }
     return arg6Selection_.variantUpperBoundExclusive_;
 }
 
@@ -2581,10 +2596,20 @@ uint32_t CLTLoginMediator::Arg6SelectedVariantIndexHigh8() const {
 }
 
 uint32_t CLTLoginMediator::Arg6SelectedSelectionGateByte100() const {
+    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
+    const uint32_t worldIndex = arg6Selection_.selectedWorldIndexLow24_;
+    if (stateCode >= 3u && worldIndex < 100u) {
+        return static_cast<uint32_t>(GetWorldSelectionGateByteByIndex(worldIndex));
+    }
     return arg6Selection_.selectedSelectionGateByte100_;
 }
 
 uint32_t CLTLoginMediator::Arg6SelectedVariantState() const {
+    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
+    const uint32_t variantIndex = arg6Selection_.selectedVariantIndexHigh8_;
+    if (stateCode >= 3u && variantIndex < 100u) {
+        return static_cast<uint32_t>(GetSlotRecordStatusByIndex(static_cast<uint8_t>(variantIndex)));
+    }
     return arg6Selection_.selectedVariantState_;
 }
 
@@ -2593,23 +2618,40 @@ uint32_t CLTLoginMediator::Arg6MappedSelectionId() const {
 }
 
 const char* CLTLoginMediator::Arg6MappedSelectionName() const {
+    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
+    const uint32_t variantIndex = arg6Selection_.selectedVariantIndexHigh8_;
+    if (stateCode >= 3u && variantIndex < 100u) {
+        if (const char* worldName = LookupRouteHostPrefixBySlot(static_cast<uint8_t>(variantIndex))) {
+            return worldName;
+        }
+    }
     return arg6Selection_.mappedSelectionName_.c_str();
 }
 
 const char* CLTLoginMediator::Arg6MappedVariantName() const {
+    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
+    const uint32_t variantIndex = arg6Selection_.selectedVariantIndexHigh8_;
+    if (stateCode >= 3u && variantIndex < 100u) {
+        if (const char* selectionName = LookupSlotRecordHeapStringByIndex(static_cast<uint8_t>(variantIndex))) {
+            return selectionName;
+        }
+    }
     return arg6Selection_.mappedVariantName_.c_str();
 }
 
 const char* CLTLoginMediator::Arg6ProfileName() const {
-    return arg6Selection_.profileName_.c_str();
+    const char* profileName = authBootstrapSource38_.inlineString00.data();
+    return (profileName && profileName[0] != '\0') ? profileName : arg6Selection_.profileName_.c_str();
 }
 
 const char* CLTLoginMediator::Arg6AuthName() const {
-    return arg6Selection_.authName_.c_str();
+    const char* authName = authBootstrapSource38_.inlineString00.data();
+    return (authName && authName[0] != '\0') ? authName : arg6Selection_.authName_.c_str();
 }
 
 const char* CLTLoginMediator::Arg6AuthPassword() const {
-    return arg6Selection_.authPassword_.c_str();
+    const char* authPassword = authBootstrapSource38_.inlineString20.data();
+    return (authPassword && authPassword[0] != '\0') ? authPassword : arg6Selection_.authPassword_.c_str();
 }
 
 bool CLTLoginMediator::Arg6WorldIndexMatchesSelection(uint32_t worldIndex) const {
@@ -2688,10 +2730,11 @@ const char* CLTLoginMediator::MapSelectionName(uint32_t selectionHighByte) const
     return selectionName;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-// Tighter launcher page-`7` read:
-// - the active selection-entry index currently joins owner slot-record `worldId0c` back to the
-//   owner world-descriptor inline-name table on the auth-valid path
+// anchor: launcher.exe:0x41b260 / owner vtable +0xe0
+// Exact owner-side string reader shared with the launcher page-`7` world-list path:
+// - gate on current helper/state code `>= 3`
+// - require index `< 100`
+// - return owner `+0x818[index*3].begin` when begin != end, else `0`
 const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
     ++arg6VariantWorldNameQueryCountE0_;
     if ((arg6VariantWorldNameQueryCountE0_ % 5u) == 0u) {
@@ -2700,44 +2743,31 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
             arg6VariantWorldNameQueryCountE0_);
     }
 
-    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-    const char* worldName = nullptr;
-    const char* source = "no-active-entry";
-    if (useRecoveredActiveEntryTable) {
-        const SlotRecordState004b5328* slotRecord =
-            (variantIndex <= 0xffu) ? GetSlotRecordByIndex(static_cast<uint8_t>(variantIndex)) : nullptr;
-        if (slotRecord) {
-            const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(slotRecord->worldId0c);
-            if (matchedWorldIndex >= 0) {
-                worldName = GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex));
-                source = "owner+0x688.worldId0c -> owner+0xd84.inlineName+0x03";
-            } else {
-                source = "owner+0x688.worldId0c -> <no-descriptor-match>";
-            }
-        } else {
-            source = "owner+0x688.<missing>";
-        }
-    } else {
-        const uint32_t worldIndex = Arg6SelectedWorldIndexLow24();
-        if (worldIndex < Arg6WorldUpperBoundExclusive() && Arg6WorldIndexMatchesSelection(worldIndex) &&
-            variantIndex < Arg6VariantUpperBoundExclusive() && Arg6VariantIndexMatchesSelection(variantIndex)) {
-            worldName = Arg6MappedSelectionName();
-            source = "arg6-selected-world-name";
-        }
-    }
+    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
+    const bool stateAllowsRead = stateCode >= 3u;
+    const bool indexInRange = variantIndex < 100u;
+    const char* worldName = (stateAllowsRead && indexInRange)
+        ? LookupRouteHostPrefixBySlot(static_cast<uint8_t>(variantIndex))
+        : nullptr;
 
+    const char* source =
+        !stateAllowsRead ? "state-gated-zero" :
+        !indexInRange ? "index>=100" :
+        (worldName ? "owner+0x818[index*3].begin" : "owner+0x818[index*3]=<empty>");
     if (!worldName) {
         spdlog::info(
-            "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> NULL [source={}]",
+            "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> NULL [stateCode={} source={}]",
             static_cast<unsigned>(variantIndex & 0xffu),
+            static_cast<unsigned>(stateCode),
             source);
         return nullptr;
     }
 
     spdlog::info(
-        "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> '{}' [source={}]",
+        "CLTLoginMediator::GetVariantWorldName(+0xe0 variantIndex=0x{:02x}) -> '{}' [stateCode={} source={}]",
         static_cast<unsigned>(variantIndex & 0xffu),
         worldName,
+        static_cast<unsigned>(stateCode),
         source);
     return worldName;
 }

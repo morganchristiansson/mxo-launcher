@@ -480,12 +480,13 @@ public:
     };
 
     struct RouteHostStringTripleState {
-        // Current best source-owned mirror of the owner `+0x818` family.
-        // Keep the split from owner `+0x1470` explicit:
-        // - `+0x818` = per-slot route/host prefix strings consumed by the state-7/8/0x0d margin path
-        // - `+0x1470` = later late-entry string-triple vector exposed through arg6 `+0x118`
-        // Newer tightening moved one old misread out of this family:
-        // - owner slot `+0x190 / 0x41f840` is now better read as a writer for `+0x1470`, not `+0x818`
+        // Source-owned mirror of owner `+0x818`.
+        // Faithful current read from `0x43f300 / 0x4401a0 / 0x41b260`:
+        // - `+0x818` stores the copied world-descriptor inline-name string (`payload + 0x03`)
+        // - wrapper-facing arg6 `+0xe0` returns that same begin pointer when the slot is live
+        // - state-7/8/0x0d margin-route consumers then reuse that copied descriptor text as their
+        //   route/world string input instead of a replacement-only lowercase host-prefix variant
+        // - `+0x1470` remains a separate later late-entry string-triple vector
         std::string text;
     };
 
@@ -674,6 +675,8 @@ public:
     // owner `+0x688[index]`
     const char* MapSelectionName(uint32_t selectionHighByte) const override;
     // +0xe0
+    // anchor: launcher.exe:0x41b260 / exact body is the state-gated owner `+0x818[index*3]`
+    // string reader reused by the launcher page-`7` world-list path
     const char* GetVariantWorldName(uint32_t variantIndex) override;
     // +0xe4
     uint8_t GetVariantState(int32_t variantIndex) const override;

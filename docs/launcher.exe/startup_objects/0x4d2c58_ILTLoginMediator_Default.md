@@ -199,8 +199,8 @@ That is important because the current arg7-selection writer is now closed to the
     same table family the original launcher-side world-list code actually walks
   - tighter auth-valid split now makes that family two-layered rather than purely startup-static:
     - total-world side = owner world-descriptor table (`+0xd84`) for `+0xf8/+0xfc/+0x100`
-    - active-entry side = owner slot-record table (`+0x688`) joined back to descriptors for
-      `+0xd8/+0xdc/+0xe0/+0xe4`
+    - active-entry side = owner slot-record table (`+0x688`) plus the copied descriptor-name
+      string table at owner `+0x818` for `+0xd8/+0xdc/+0xe0/+0xe4`
   - avoid routing those anchored getters back through separate unanchored
     `Arg6MappedSelectionName` / `Arg6MappedVariantName` / selected-state helpers when the same
     values can live in the table family the launcher page-`7` world-list code actually walks
