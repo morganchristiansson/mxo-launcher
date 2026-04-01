@@ -566,9 +566,10 @@ public:
     // +0x2c
     uint32_t IsConnected() override;
     // +0x38
-    // Current best wrapper-facing name from the client `Profiles\%s\...` builder.
+    // anchor: launcher.exe:0x41f0a0 / exact tiny body returns owner `+0x94`
     const char* GetProfileRootName() const override;
     // +0x3c
+    // anchor: launcher.exe:0x41f2d0 / exact tiny body returns owner byte `+0xcc8`
     uint32_t GetDefaultSelectionIndex() const override;
     // +0x48
     // Current best wrapper-facing name from the later `Profiles\%s\%s_%X\` builder.
@@ -665,8 +666,12 @@ public:
     // sibling state8 section-`0x0b` small-string-like getter; launcher getter returns owner `+0x1460`
     RouteDescriptor30SmallStringLikeSketch* GetState8Section11String1460() override;
     // +0xd8
+    // anchor: launcher.exe:0x41af00 / exact body returns owner byte `+0x684` only when the
+    // current helper/state code is `>= 3`
     uint32_t GetArg7SelectionUpperBoundExclusive() const override;
     // +0xdc
+    // anchor: launcher.exe:0x41b220 / same direct body as the slot-record heap-string reader over
+    // owner `+0x688[index]`
     const char* MapSelectionName(uint32_t selectionHighByte) const override;
     // +0xe0
     const char* GetVariantWorldName(uint32_t variantIndex) override;
@@ -962,6 +967,8 @@ public:
         uint32_t selectedVariantIndexHigh8,
         uint32_t selectedSelectionGateByte100,
         uint32_t selectedVariantState);
+    // Source-owned arg6 bootstrap seed helpers.
+    // These are replacement-side setup helpers, not recovered launcher.exe vtable slots.
     void SetArg6ProfileName(const char* profileName);
     void SetArg6AuthName(const char* authName);
     void SetArg6AuthPassword(const char* authPassword);

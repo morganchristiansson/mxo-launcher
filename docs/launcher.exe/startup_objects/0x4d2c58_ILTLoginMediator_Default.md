@@ -846,16 +846,21 @@ Current late-crash result:
 
 That materially strengthens the current interpretation that the later failure is collapsing into stale `InitClientDLL` startup-frame data rather than reaching a hidden valid continuation.
 
-### 2. Arg7-related mediator probes are now stricter and exposed a more specific `+0x40` scratch shape
+### 2. Arg7-related mediator probes are now stricter, and a raw-vtable pass closes `+0x3c/+0xd8/+0xdc` further
 
-The diagnostic mediator no longer generically accepts every in-range world/variant value for the arg7-related surface.
-It now:
-- returns the configured selected world from `+0x3c`
-- exact-matches the configured selected world / variant pair for:
-  - `+0xfc`
-  - `+0x100`
-  - `+0xe4`
-- and now also accepts one specific client-side `+0x40` scratch-shaped request derived from the current configured arg7 state
+Fresh raw-vtable / disassembly review of `0x004b01c8` tightens the earlier diagnostic read:
+- `+0x3c = 0x41f2d0 = CLTLoginMediator_GetDefaultSelectionIndex`
+  - exact body: `mov al,[ecx+0xcc8] ; ret`
+  - practical correction: this is the current owner selection/slot byte, not a free-standing configured world id
+- `+0xd8 = 0x41af00 = CLTLoginMediator_GetArg7SelectionUpperBoundExclusive`
+  - exact body: if current helper/state code `< 3`, return `0`; otherwise return owner byte `+0x684`
+- `+0xdc = 0x41b220 = CLTLoginMediator_MapSelectionName`
+  - exact body: if state code `>= 3`, index `< 100`, and owner `+0x688[index]` is non-null, return that slot record's heap-string pointer at `+0x14`; otherwise return `0`
+
+So the remaining replacement-side diagnostic acceptance is narrower:
+- `+0x40` still accepts the exact client scratch-shaped request derived from the current configured arg7 state
+- `+0xfc`, `+0x100`, and `+0xe4` still exact-match the configured selected world / variant pair on that bounded fallback path
+- but `+0x3c/+0xd8/+0xdc` should now stay anchored to the direct owner reads above instead of routing through the older configured-world / arg6-fallback interpretation
 
 Representative earlier non-zero arg7 run family:
 - packed selection `0x0500002a`

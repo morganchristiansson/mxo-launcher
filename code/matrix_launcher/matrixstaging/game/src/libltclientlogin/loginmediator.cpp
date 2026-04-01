@@ -514,11 +514,11 @@ uint32_t CLTLoginMediator::IsConnected() {
     return 1;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41f0a0 / owner vtable +0x38
 const char* CLTLoginMediator::GetProfileRootName() const {
-    const char* profileRootName = Arg6ProfileName();
+    const char* profileRootName = authBootstrapSource38_.inlineString00.data();
     spdlog::debug(
-        "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}'",
+        "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}' [source=owner+0x94.inlineString00]",
         NonEmptyTextOrPlaceholder(profileRootName));
     return profileRootName;
 }
@@ -2536,92 +2536,90 @@ void CLTLoginMediator::ConfigureArg6Selection(
     }
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// Source-owned arg6 bootstrap-selection seed helpers.
+// These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They seed the
+// startup-side arg6/arg7 bridge while the anchored wrapper-facing readers below stay tied to the
+// recovered owner fields.
 void CLTLoginMediator::SetArg6ProfileName(const char* profileName) {
     arg6Selection_.profileName_ = (profileName && profileName[0]) ? profileName : "resurrections";
+    SetLaunchPadSourceBlock94FirstString(arg6Selection_.profileName_.c_str());
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetArg6AuthName(const char* authName) {
     arg6Selection_.authName_ = (authName && authName[0]) ? authName : arg6Selection_.profileName_;
+    SetLaunchPadSourceBlock94FirstString(arg6Selection_.authName_.c_str());
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetArg6AuthPassword(const char* authPassword) {
     arg6Selection_.authPassword_ = authPassword ? authPassword : "";
+
+    std::fill(authBootstrapSource38_.inlineString20.begin(), authBootstrapSource38_.inlineString20.end(), '\0');
+    const size_t copyCount = std::min(
+        arg6Selection_.authPassword_.size(),
+        authBootstrapSource38_.inlineString20.size() - 1);
+    std::copy_n(
+        arg6Selection_.authPassword_.data(),
+        copyCount,
+        authBootstrapSource38_.inlineString20.begin());
+    authBootstrapSource38_.inlineString20[copyCount] = '\0';
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6WorldUpperBoundExclusive() const {
     return arg6Selection_.worldUpperBoundExclusive_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6VariantUpperBoundExclusive() const {
     return arg6Selection_.variantUpperBoundExclusive_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedWorldIndexLow24() const {
     return arg6Selection_.selectedWorldIndexLow24_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedVariantIndexHigh8() const {
     return arg6Selection_.selectedVariantIndexHigh8_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedSelectionGateByte100() const {
     return arg6Selection_.selectedSelectionGateByte100_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6SelectedVariantState() const {
     return arg6Selection_.selectedVariantState_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6MappedSelectionId() const {
     return arg6Selection_.mappedSelectionId_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6MappedSelectionName() const {
     return arg6Selection_.mappedSelectionName_.c_str();
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6MappedVariantName() const {
     return arg6Selection_.mappedVariantName_.c_str();
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6ProfileName() const {
     return arg6Selection_.profileName_.c_str();
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6AuthName() const {
     return arg6Selection_.authName_.c_str();
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::Arg6AuthPassword() const {
     return arg6Selection_.authPassword_.c_str();
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::Arg6WorldIndexMatchesSelection(uint32_t worldIndex) const {
     return worldIndex == arg6Selection_.selectedWorldIndexLow24_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const {
     return variantIndex == arg6Selection_.selectedVariantIndexHigh8_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::Arg6ExpectedSelectionDescriptorScratchRequest() const {
     const uint32_t variantHigh8 = (arg6Selection_.selectedVariantIndexHigh8_ & 0xffu) << 24;
     const uint32_t preservedMiddle16 = arg6Selection_.selectedWorldIndexLow24_ & 0x00ffff00u;
@@ -2629,7 +2627,6 @@ uint32_t CLTLoginMediator::Arg6ExpectedSelectionDescriptorScratchRequest() const
     return variantHigh8 | preservedMiddle16 | lowByteOverwrittenWithVariant;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const {
     const uint32_t normalizedSelectionIndex = selectionIndex & 0xffffffffu;
     if ((normalizedSelectionIndex & 0x00ffffffu) == arg6Selection_.selectedWorldIndexLow24_) {
@@ -2638,62 +2635,55 @@ bool CLTLoginMediator::Arg6SelectionDescriptorMatchesRequest(uint32_t selectionI
     return normalizedSelectionIndex == Arg6ExpectedSelectionDescriptorScratchRequest();
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41f2d0 / owner vtable +0x3c
 uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
-    const uint32_t selectionIndex = Arg6SelectedWorldIndexLow24();
+    const uint32_t selectionIndex = static_cast<uint32_t>(CurrentCharacterRouteIndexCc8Scaffold());
     spdlog::debug(
-        "CLTLoginMediator::GetDefaultSelectionIndex(+0x3c) -> 0x{:06x}",
-        static_cast<unsigned>(selectionIndex));
+        "CLTLoginMediator::GetDefaultSelectionIndex(+0x3c) -> 0x{:02x} [source=owner+0xcc8]",
+        static_cast<unsigned>(selectionIndex & 0xffu));
     return selectionIndex;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-// Tighter launcher page-`7` read from `0x40e480/0x40d530/0x40d6f0`:
-// - this high-byte upper bound is the active selection-entry count
-// - once auth reply state is live, that active-entry list is currently better modeled through
-//   owner slot records (`+0x688`) than through a separate variant-only startup fallback
+// anchor: launcher.exe:0x41af00 / owner vtable +0xd8
+// Tiny original state gate:
+// - if the current helper/state exists and its slot-7-style phase code is `>= 3`, return owner
+//   byte `+0x684`
+// - otherwise return `0`
 uint32_t CLTLoginMediator::GetArg7SelectionUpperBoundExclusive() const {
-    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-    const uint32_t upperBoundExclusive = useRecoveredActiveEntryTable
-        ? static_cast<uint32_t>(slotRecordCount684_)
-        : Arg6VariantUpperBoundExclusive();
+    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    const bool stateAllowsRead = stateCode >= 3u;
+    const uint32_t upperBoundExclusive = stateAllowsRead ? static_cast<uint32_t>(slotRecordCount684_) : 0u;
 
     spdlog::info(
-        "CLTLoginMediator::GetArg7SelectionUpperBoundExclusive(+0xd8) -> {} [source={}]",
+        "CLTLoginMediator::GetArg7SelectionUpperBoundExclusive(+0xd8) -> {} [stateCode={} source={}]",
         static_cast<unsigned>(upperBoundExclusive),
-        useRecoveredActiveEntryTable ? "owner+0x684.slotRecordCount" : "arg6-selection-fallback");
+        static_cast<unsigned>(stateCode),
+        stateAllowsRead ? "owner+0x684" : "state-gated-zero");
     return upperBoundExclusive;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-// Tighter launcher page-`7` read:
-// - the selected row high word indexes the active selection-entry list
-// - on the auth-valid path that list is currently better modeled as slot-record / character-entry
-//   names than as a free-standing variant text table
+// anchor: launcher.exe:0x41b220 / owner vtable +0xdc
+// Same recovered body as the slot-record heap-string reader:
+// - gate on current helper/state code `>= 3`
+// - require index `< 100`
+// - return owner `+0x688[index] +0x14` when the slot exists, else `0`
 const char* CLTLoginMediator::MapSelectionName(uint32_t selectionHighByte) const {
-    const bool useRecoveredActiveEntryTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
+    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    const bool stateAllowsRead = stateCode >= 3u;
+    const bool indexInRange = selectionHighByte < 100u;
+    const char* selectionName = (stateAllowsRead && indexInRange)
+        ? LookupSlotRecordHeapStringByIndex(static_cast<uint8_t>(selectionHighByte))
+        : nullptr;
 
-    const char* selectionName = nullptr;
-    const char* source = "no-active-entry";
-    if (useRecoveredActiveEntryTable) {
-        const SlotRecordState004b5328* slotRecord =
-            (selectionHighByte <= 0xffu) ? GetSlotRecordByIndex(static_cast<uint8_t>(selectionHighByte)) : nullptr;
-        if (slotRecord && !slotRecord->heapString14.empty()) {
-            selectionName = slotRecord->heapString14.c_str();
-            source = "owner+0x688.heapString14";
-        } else {
-            source = "owner+0x688.<missing>";
-        }
-    } else if (selectionHighByte < Arg6VariantUpperBoundExclusive() &&
-               Arg6VariantIndexMatchesSelection(selectionHighByte)) {
-        selectionName = Arg6MappedVariantName();
-        source = "arg6-selected-active-entry-name";
-    }
-
+    const char* source =
+        !stateAllowsRead ? "state-gated-zero" :
+        !indexInRange ? "index>=100" :
+        (selectionName ? "owner+0x688[index].heapString14" : "owner+0x688[index]=<null>");
     spdlog::info(
-        "CLTLoginMediator::MapSelectionName(+0xdc selectionHighByte={}) -> '{}' [source={}]",
+        "CLTLoginMediator::MapSelectionName(+0xdc selectionHighByte={}) -> '{}' [stateCode={} source={}]",
         static_cast<unsigned>(selectionHighByte),
         selectionName ? selectionName : "<null>",
+        static_cast<unsigned>(stateCode),
         source);
     return selectionName;
 }
