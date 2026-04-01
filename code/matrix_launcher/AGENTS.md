@@ -92,11 +92,26 @@ mcp({ tool: "ghidra_rename_function", args: '{"oldName": "FUN_0043b300", "newNam
 # Rename variables in a function
 mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "variable_renames": {"puVar1": "ptr", "DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}, "program": "launcher.exe"}' })
 
+# Retype a function signature / improve decompiler output
+mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x403390", "prototype": "LauncherLoginDialog * LauncherLoginDialog_ctor(void *this)", "calling_convention": "__thiscall", "program": "launcher.exe"}' })
+
+# Search OOAnalyzer / recovered data types by name
+mcp({ tool: "ghidra_search_data_types", args: '{"pattern": "4aae28", "program": "launcher.exe"}' })
+
 # Rename data / globals
 mcp({ tool: "ghidra_rename_data", args: '{"address": "0x004d3588", "newName": "g_LauncherSelectionListSortMode004d3588", "program": "launcher.exe"}' })
 
+# Delete an accidental cloned data type
+mcp({ tool: "ghidra_delete_data_type", args: '{"type_name": "LauncherLoginDialog", "program": "launcher.exe"}' })
+
 # Plate comment on a function
-mcp({ tool: "ghidra_set_plate_comment", args: '{"function_address": "0x40ec70", "comment": "Launcher selection command helper: reads selected row high word as active-world index, calls mediator +0xf0, waits for event 8.", "program": "launcher.exe"}' })
+mcp({ tool: "ghidra_set_plate_comment", args: '{"function_address": "0x40ec70", "comment": "Launcher selection command helper: reads selected row high word as active selection-entry index, calls mediator +0xf0, waits for event 8.", "program": "launcher.exe"}' })
+
+# Namespace/class rename caveat
+# - MCP rename tools currently do flat symbol renames only; they do not reliably place methods into
+#   Ghidra class namespaces with `::` the same way the UI does.
+# - Prefer Ghidra UI for moving methods into OOAnalyzer/recovered class namespaces and for true
+#   datatype/class renames when that ownership matters to decompilation.
 
 # Read memory at an address
 mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "program": "launcher.exe"}' })
