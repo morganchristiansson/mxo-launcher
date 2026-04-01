@@ -413,8 +413,9 @@ static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldDescri
 static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, slotRecordAccessor70) == 0x70u);
 static_assert(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch) == 0x8cu);
 
-struct AuthBootstrap680ChildSketch {
-    // Current best source-owned mirror of the separate phase-2 auth/bootstrap child allocated by:
+struct AuthBootstrap680Child {
+    // Current best source-owned class boundary for the separate phase-2 auth/bootstrap child
+    // allocated by:
     // - launcher.exe:0x41b160 = owner init path
     // - launcher.exe:0x441290 = child ctor used by that path
     // - launcher.exe:0x445500 = earlier base-ctor layer used by the same child
@@ -429,7 +430,8 @@ struct AuthBootstrap680ChildSketch {
     // Keep this source-owned mirror explicitly child-scoped:
     // - it is rooted at mediator owner `+0x680`
     // - it is not evidence that the original child type was literally named after the mediator
-    // - wrapper methods on `CLTLoginMediator` stay thin so callers do not need broad churn
+    // - state and owner code should call the child directly instead of routing through fake
+    //   mediator methods
 
     // Direct `0x439210 -> 0x448050` staging writes now closed concretely enough to keep the
     // destination mapping inline here:
@@ -487,6 +489,38 @@ struct AuthBootstrap680ChildSketch {
     uint32_t authReplySuccessHeaderDword07_110 = 0; // original child `+0x110`; `0x43f300` writes the fixed raw reply-header dword at `authReplyParseObjectF0->replyHeader10 + 0x07` before the one-time success gate
     uint32_t authReplySuccessField15_114 = 0; // original child `+0x114`; `0x441260` writes the fixed raw reply-header dword at `authReplyParseObjectF0->replyHeader10 + 0x15`
     uint32_t authReplySuccessField15Timestamp118 = 0; // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
+
+    // anchor: launcher.exe:0x441290 / 0x445500
+    AuthBootstrap680Child();
+    // anchor: launcher.exe:0x445a40 / 0x445610
+    ~AuthBootstrap680Child();
+
+    // anchor: launcher.exe:0x448050
+    uint32_t PrepareAndDispatch(CLTLoginMediator& owner);
+    // anchor: launcher.exe:0x448140
+    uint32_t HandleInboundAuthMessage(CLTLoginMediator& owner);
+
+    void* BootstrapRaw08AuxHandle50() const;
+    bool HasBootstrapRaw08AuxHandle54() const;
+    uint8_t GetCrashReporterPromptForSecurId58() const;
+
+    // anchor: launcher.exe:0x447eb0
+    uint32_t SendGetPublicKeyRequest(CLTLoginMediator& owner);
+    // anchor: launcher.exe:0x4474f0
+    uint32_t SendAuthRequest(CLTLoginMediator& owner, const mxo::auth::GetPublicKeyReply& reply);
+    // anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
+    uint32_t HandleGetPublicKeyReply(CLTLoginMediator& owner, const mxo::auth::GetPublicKeyReply& reply);
+    // anchor: launcher.exe:0x44831c..0x448467
+    uint32_t SendAuthChallengeResponse(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
+
+    // anchor: launcher.exe:0x41b500 -> 0x4435f0 -> 0x41ce80 / 0x443340
+    bool PrepareState5MarginConnectionCopySendScaffold(
+        CLTLoginMediator& owner,
+        mxo::liblttcp::CMarginConnection& marginConnection);
+
+private:
+    // anchor: launcher.exe:0x445610
+    void ReleaseOwnedState();
 };
 
 enum AuthBootstrap680InboundAuthResult : uint32_t {
@@ -499,48 +533,21 @@ enum AuthBootstrap680InboundAuthResult : uint32_t {
     kAuthBootstrap680InboundAuthReplyValidationError = 6u,
 };
 
-struct AuthBootstrap680Ops {
-    static void EraseOwnedState(const CLTLoginMediator* mediator);
-
-    static uint32_t PrepareAndDispatch(CLTLoginMediator& mediator);
-    static uint32_t HandleInboundAuthMessage(CLTLoginMediator& mediator);
-
-    static void* BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator);
-    static bool HasBootstrapRaw08AuxHandle54(const CLTLoginMediator& mediator);
-    static uint8_t GetCrashReporterPromptForSecurId58(const CLTLoginMediator& mediator);
-
-    static uint32_t SendAuthGetPublicKeyRequest(CLTLoginMediator& mediator);
-    static uint32_t SendAuthRequestFromReply(
-        CLTLoginMediator& mediator,
-        const mxo::auth::GetPublicKeyReply& reply);
-    static uint32_t SendAuthChallengeResponse(
-        CLTLoginMediator& mediator,
-        const mxo::auth::AuthChallenge& challenge);
-    static void LogParsedAuthReply(
-        const CLTLoginMediator& mediator,
-        const mxo::auth::AuthReply& reply);
-
-    static void SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(CLTLoginMediator& mediator);
-    static void ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLoginMediator& mediator);
-    static uint32_t SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
-        CLTLoginMediator& mediator,
-        const mxo::auth::GetPublicKeyReply& reply);
-    static void SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
-        CLTLoginMediator& mediator,
-        const mxo::auth::AuthChallengeResponseBuildResult& buildResult);
-    static bool PrepareState5MarginConnectionCopySendScaffold(
-        CLTLoginMediator& mediator,
-        mxo::liblttcp::CMarginConnection& marginConnection);
-    static void SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
-        CLTLoginMediator& mediator,
-        const mxo::auth::AuthReply& reply);
-    static void SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessPregateScaffold(
-        CLTLoginMediator& mediator,
-        const mxo::auth::AuthReply& reply);
-    static bool ConsumeState2AuthReplySuccessOneTimeGateScaffold(CLTLoginMediator& mediator);
-    static void SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold(
-        CLTLoginMediator& mediator,
-        const mxo::auth::AuthReply& reply);
-};
+void AuthBootstrap680LogParsedAuthReply(
+    const CLTLoginMediator& owner,
+    const mxo::auth::AuthReply& reply);
+void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
+    AuthBootstrap680Child& child,
+    CLTLoginMediator& owner,
+    const mxo::auth::AuthReply& reply);
+void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
+    AuthBootstrap680Child& child,
+    CLTLoginMediator& owner,
+    const mxo::auth::AuthReply& reply);
+bool AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold();
+void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
+    AuthBootstrap680Child& child,
+    CLTLoginMediator& owner,
+    const mxo::auth::AuthReply& reply);
 
 }  // namespace mxo::ltlogin

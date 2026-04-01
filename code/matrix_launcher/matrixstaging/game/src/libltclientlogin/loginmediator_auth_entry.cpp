@@ -562,7 +562,7 @@ void CLTLoginMediator::SetAuthCredentials(const char* username, const char* pass
     lastAuthReply_ = mxo::auth::AuthReply();
     postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
-    AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(*this);
+    authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginMediator auth reset/config shim updated username='{}' password={} (live submit path should still enter through 0x41ecd0 / ProcessLoginRequest)",
@@ -582,7 +582,6 @@ void CLTLoginMediator::SetAuthBootstrapConfig(
     authLoginType_ = loginType;
     authKeyConfigMd5_ = keyConfigMd5;
     authUiConfigMd5_ = uiConfigMd5;
-    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(*this);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginMediator auth bootstrap configured launcherVersion={} currentPublicKeyId={} loginType={} keyConfigMd5Len={} uiConfigMd5Len={}",
@@ -1043,7 +1042,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     lastAuthReply_ = mxo::auth::AuthReply();
     postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
-    AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(*this);
+    authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();
@@ -1136,7 +1135,9 @@ uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
         return currentState_->Slot1_HandlePrimaryGate(this);
     }
 
-    return (lastAuthConnectStatus_ == kConnectStatusSuccess) ? BeginAuthHandshake() : 0u;
+    return (lastAuthConnectStatus_ == kConnectStatusSuccess)
+        ? AuthBootstrapChild680().PrepareAndDispatch(*this)
+        : 0u;
 }
 
 // UNANCHORED: source-owned owner-side cache/update entry for auth type-2 connect-status work.
@@ -1152,24 +1153,6 @@ uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
         authConnection_->SetState(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
     }
     return ContinueRecordedAuthConnectStatusScaffold();
-}
-
-// UNANCHORED: thin mediator wrapper over the state2 ready-side `0x439210 -> 0x448050`
-// owner+0x680 child prepare/dispatch path.
-uint32_t CLTLoginMediator::BeginAuthHandshake() {
-    // Address anchors:
-    // - launcher.exe:0x439210 = CLTLoginState_AuthenticatePending slot 3 ready/not-ready split
-    // - launcher.exe:0x448050 = owner+0x680 child prepare/dispatch body
-    // - launcher.exe:0x447eb0 = raw `0x06` builder on that child
-    // - launcher.exe:0x4474f0 = raw `0x08` builder on that child
-    //
-    // Keep the ownership boundary explicit in source:
-    // - state2 owns the ready/not-ready gate and the decision to enter the child
-    // - this mediator method is only a thin bridge
-    // - `AuthBootstrap680Ops::PrepareAndDispatch(...)` owns the concrete `0x439210` call shape:
-    //   source owner `+0x94`, child destinations `+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50`,
-    //   and the branch keyed off child `+0xa0`
-    return AuthBootstrap680Ops::PrepareAndDispatch(*this);
 }
 
 // UNANCHORED: source-owned builder for the auth endpoint mirror rooted at owner `+0x5c`.

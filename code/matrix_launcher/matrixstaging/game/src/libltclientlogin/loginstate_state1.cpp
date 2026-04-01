@@ -85,9 +85,9 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediato
             mediator->SwitchHelperStateScaffold(cachedUpstreamPhaseCode, cachedUpstreamState);
         }
 
-        const uint32_t handshakeResult = mediator->BeginAuthHandshake();
+        const uint32_t handshakeResult = mediator->AuthBootstrapChild680().PrepareAndDispatch(*mediator);
         spdlog::info(
-            "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} BeginAuthHandshake(owner+0x680 child)=0x{:08x}",
+            "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} owner+0x680::PrepareAndDispatch=0x{:08x}",
             static_cast<unsigned>(workResultCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),

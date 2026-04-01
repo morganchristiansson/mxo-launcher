@@ -6,8 +6,10 @@
  * mediator wrappers.
  *
  * Important ownership split:
- * - this file intentionally models the owner `+0x680` bootstrap child as source-owned helper ops
- * - thin `CLTLoginMediator` wrappers remain elsewhere only so current callers/ABI do not churn
+ * - this file intentionally models the owner `+0x680` bootstrap child as its own source-owned
+ *   child class boundary
+ * - state/owner paths should call that child directly instead of routing through fake mediator
+ *   auth-bootstrap wrappers
  * - do not treat this file as proof that the bootstrap child is literally the mediator class
  */
 
@@ -36,7 +38,7 @@ namespace {
 // anchor: launcher.exe:DAT_004f79e0
 static bool g_authBootstrap680State2AuthReplySuccessOneTimeGate = false;
 
-// Keep non-layout ownership outside `AuthBootstrap680ChildSketch` so the child mirror can stay
+// Keep non-layout ownership outside `AuthBootstrap680Child` so the child mirror can stay
 // faithful to launcher field boundaries while source still owns heap-backed helper payloads.
 struct AuthBootstrap680Field54HelperOwnedState {
     std::vector<uint8_t> bufferedOutput14;
@@ -99,12 +101,12 @@ static constexpr std::array<uint8_t, 0x100u> kAuthBootstrap680PubkeyDatFallbackM
     0x67u, 0x9cu, 0x71u, 0x73u,
 };
 
-static std::unordered_map<const CLTLoginMediator*, AuthBootstrap680ChildOwnedState>
-    g_authBootstrap680ChildOwnedStateByMediator;
+static std::unordered_map<const AuthBootstrap680Child*, AuthBootstrap680ChildOwnedState>
+    g_authBootstrap680ChildOwnedStateByChild;
 
 static AuthBootstrap680ChildOwnedState& MutableAuthBootstrap680ChildOwnedState(
-    const CLTLoginMediator* mediator) {
-    return g_authBootstrap680ChildOwnedStateByMediator[mediator];
+    const AuthBootstrap680Child* child) {
+    return g_authBootstrap680ChildOwnedStateByChild[child];
 }
 
 static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t maxPreviewBytes) {
@@ -359,7 +361,7 @@ bool AuthBootstrap680ReplyAuthDataValidatorACSketch::ConstructFromReplyPublicKey
 namespace {
 
 static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
-    AuthBootstrap680ChildSketch& child,
+    AuthBootstrap680Child& child,
     AuthBootstrap680ChildOwnedState& ownedState) {
     child.raw08PublicKeyWorkerA8 = nullptr;
     child.replyAuthDataValidatorAC = nullptr;
@@ -381,9 +383,9 @@ static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
 // exact file-reader/object stack and on-disk field framing are still not recovered tightly enough
 // to replace the current fallback-only source model.
 static bool EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(
-    CLTLoginMediator& mediator,
-    AuthBootstrap680ChildSketch& child) {
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
+    CLTLoginMediator& /*mediator*/,
+    AuthBootstrap680Child& child) {
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     if (child.lazyPubkeyDatValidatorA4 != nullptr && ownedState.lazyPubkeyDatValidatorA4.object) {
         return true;
     }
@@ -466,7 +468,7 @@ static void ResetAuthBootstrap680AuthReplyParseAccessor(
 }
 
 static void ResetAuthBootstrap680ReplyParseObject(
-    AuthBootstrap680ChildSketch& child,
+    AuthBootstrap680Child& child,
     AuthBootstrap680ChildOwnedState& ownedState) {
     child.authReplyParseObjectF0 = nullptr;
     ownedState.authReplyParseObjectF0.reset();
@@ -605,10 +607,10 @@ static bool BuildAuthBootstrap680AuthReplyParseObjectFromPacketBody(
 }
 
 static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
-    CLTLoginMediator& mediator,
-    AuthBootstrap680ChildSketch& child,
+    CLTLoginMediator& /*mediator*/,
+    AuthBootstrap680Child& child,
     const std::vector<uint8_t>& stagedBytes) {
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     ResetAuthBootstrap680ReplyParseObject(child, ownedState);
 
     if (stagedBytes.empty()) {
@@ -629,7 +631,7 @@ static bool StoreAuthBootstrap680AuthReplyParseObjectFromStagedPacket(
 }
 
 static void ResetAuthBootstrap680ReplyMaterialization(
-    AuthBootstrap680ChildSketch& child,
+    AuthBootstrap680Child& child,
     AuthBootstrap680ChildOwnedState& ownedState) {
     child.authReplyCopyShadowF4 = nullptr;
     ownedState.authReplyCopyShadowF4.reset();
@@ -948,9 +950,9 @@ static void BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold(
 // anchor: launcher.exe:0x468f80
 static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorScaffold(
     CLTLoginMediator& mediator,
-    AuthBootstrap680ChildSketch& child,
+    AuthBootstrap680Child& child,
     const mxo::auth::GetPublicKeyReply& reply) {
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     if (!EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(mediator, child) ||
         child.lazyPubkeyDatValidatorA4 == nullptr) {
         return false;
@@ -981,7 +983,7 @@ static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorSca
 
 // anchor: launcher.exe:0x44aec0 / 0x44add0
 static bool VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold(
-    const AuthBootstrap680ChildSketch& child,
+    const AuthBootstrap680Child& child,
     const AuthBootstrap680ReplyAuthDataValidatorOwnedState& validatorOwnedState,
     const AuthBootstrapReplyCopyShadowF4Sketch& copyShadow) {
     const std::time_t now = std::time(nullptr);
@@ -1158,7 +1160,7 @@ static AuthBootstrap680PrepareCallShape BuildAuthBootstrap680PrepareCallShape(
 }
 
 static void StageAuthBootstrap680ChildFromPrepareCallShape(
-    AuthBootstrap680ChildSketch& child,
+    AuthBootstrap680Child& child,
     const AuthBootstrap680PrepareCallShape& callShape) {
     AssignSmallStringMirror(
         child.string04,
@@ -1191,13 +1193,35 @@ static void StageAuthBootstrap680ChildFromPrepareCallShape(
 
 }  // namespace
 
-void AuthBootstrap680Ops::EraseOwnedState(const CLTLoginMediator* mediator) {
-    g_authBootstrap680ChildOwnedStateByMediator.erase(mediator);
+AuthBootstrap680Child::AuthBootstrap680Child() {
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
+    ResetAuthBootstrap680Field54Helper(&feedbackSeedHelper54, &ownedState.field54Helper);
+    ResetAuthBootstrap680ReplyPublicKeyWorkers(*this, ownedState);
+    ownedState.lazyPubkeyDatValidatorA4.object.reset();
+    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c);
+    ResetAuthBootstrap680ReplyParseObject(*this, ownedState);
+    ResetAuthBootstrap680ReplyMaterialization(*this, ownedState);
+    ClearSmallStringMirror(stringF8);
+    ownedState.opaqueReplyBlob108Owned.clear();
+    ownedState.opaqueReplyBlob10COwned.clear();
+    opaqueReplyBlob108 = nullptr;
+    opaqueReplyBlob10C = nullptr;
+    authReplySuccessHeaderDword07_110 = 0u;
+    authReplySuccessField15_114 = 0u;
+    authReplySuccessField15Timestamp118 = 0u;
+}
+
+AuthBootstrap680Child::~AuthBootstrap680Child() {
+    ReleaseOwnedState();
+}
+
+void AuthBootstrap680Child::ReleaseOwnedState() {
+    g_authBootstrap680ChildOwnedStateByChild.erase(this);
 }
 
 // anchor: launcher.exe:0x448050
-uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+uint32_t AuthBootstrap680Child::PrepareAndDispatch(CLTLoginMediator& mediator) {
+    AuthBootstrap680Child& child = *this;
     if (mediator.authLoginType_ != 1u) {
         spdlog::warn(
             "AuthBootstrap680_PrepareAndDispatch current source config loginType={} differs from recovered 0x439210 immediate write28=1; ready-side staging still mirrors the original call shape",
@@ -1229,7 +1253,7 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
     const bool sendAuthRequestBranch = authRequestReadyA0 != 0u;
 
     spdlog::info(
-        "AuthBootstrap680Ops::PrepareAndDispatch staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={}",
+        "AuthBootstrap680Child::PrepareAndDispatch staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={}",
         fmt::ptr(callShape.ownerSource94),
         static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
@@ -1247,25 +1271,25 @@ uint32_t AuthBootstrap680Ops::PrepareAndDispatch(CLTLoginMediator& mediator) {
         mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
         if (!mediator.lastAuthPublicKeyReply_.valid || !mediator.lastAuthPublicKeyReply_.hasEmbeddedPublicKey) {
             spdlog::warn(
-                "AuthBootstrap680Ops::PrepareAndDispatch expected auth-request branch from owner+0x680 child but no valid cached AS_GetPublicKeyReply is present authRequestReadyA0=0x{:02x}",
+                "AuthBootstrap680Child::PrepareAndDispatch expected auth-request branch from owner+0x680 child but no valid cached AS_GetPublicKeyReply is present authRequestReadyA0=0x{:02x}",
                 static_cast<unsigned>(authRequestReadyA0));
             return 0u;
         }
-        return SendAuthRequestFromReply(mediator, mediator.lastAuthPublicKeyReply_);
+        return SendAuthRequest(mediator, mediator.lastAuthPublicKeyReply_);
     }
 
     mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsGetPublicKeyRequest;
-    return SendAuthGetPublicKeyRequest(mediator);
+    return SendGetPublicKeyRequest(mediator);
 }
 
 // anchor: launcher.exe:0x448140
-uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediator) {
+uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(CLTLoginMediator& mediator) {
     const std::vector<uint8_t>& stagedBytes = mediator.stagedIncomingAuthPacketBytes_;
     if (stagedBytes.empty()) {
         return kAuthBootstrap680InboundUnhandled;
     }
 
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    AuthBootstrap680Child& child = *this;
     const uint8_t rawCode = stagedBytes[0];
     switch (rawCode) {
         case CLTLoginMediator::kAuthRawCodeGetPublicKeyReply: {
@@ -1274,7 +1298,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
                     stagedBytes.data(),
                     stagedBytes.size(),
                     &reply)) {
-                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Ops::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
+                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Child::HandleInboundAuthMessage failed to parse AS_GetPublicKeyReply");
                 return kAuthBootstrap680InboundUnhandled;
             }
 
@@ -1291,7 +1315,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
             child.authServerTimeBias80 = static_cast<uint32_t>(
                 std::time(nullptr) - static_cast<std::time_t>(reply.currentTime));
             const uint32_t workerResult =
-                SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(mediator, reply);
+                HandleGetPublicKeyReply(mediator, reply);
             if (workerResult == 0u) {
                 mediator.authCurrentPublicKeyId_ = child.currentPublicKeyId9C;
             } else {
@@ -1318,7 +1342,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
             }
 
             mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
-            return SendAuthRequestFromReply(mediator, reply) != 0u
+            return SendAuthRequest(mediator, reply) != 0u
                 ? kAuthBootstrap680InboundHandledContinueWaiting
                 : kAuthBootstrap680InboundGetPublicKeyWorkerError;
         }
@@ -1329,7 +1353,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
                     stagedBytes.data(),
                     stagedBytes.size(),
                     &challenge)) {
-                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Ops::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
+                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Child::HandleInboundAuthMessage failed to parse AS_AuthChallenge");
                 return kAuthBootstrap680InboundUnhandled;
             }
 
@@ -1349,7 +1373,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
                     stagedBytes.data(),
                     stagedBytes.size(),
                     &reply)) {
-                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Ops::HandleInboundAuthMessage failed to parse AS_AuthReply");
+                spdlog::warn("DIAGNOSTIC: AuthBootstrap680Child::HandleInboundAuthMessage failed to parse AS_AuthReply");
                 return kAuthBootstrap680InboundUnhandled;
             }
 
@@ -1368,7 +1392,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
                     : (reply.isErrorReply ? reply.errorCode : 0u);
 
             spdlog::debug(
-                "AuthBootstrap680Ops::HandleInboundAuthMessage stored child+0xf0 parse copy={} status=0x{:08x} authDataLen=0x{:04x} encryptedPrivateExponentLen=0x{:04x} characterCount={} worldCount={} replyString1dLen=0x{:04x}",
+                "AuthBootstrap680Child::HandleInboundAuthMessage stored child+0xf0 parse copy={} status=0x{:08x} authDataLen=0x{:04x} encryptedPrivateExponentLen=0x{:04x} characterCount={} worldCount={} replyString1dLen=0x{:04x}",
                 storedParseObjectF0 ? 1u : 0u,
                 static_cast<unsigned>(child.inboundAuthStatusEc),
                 static_cast<unsigned>(parseObject ? parseObject->authDataByteLength20 : 0u),
@@ -1413,7 +1437,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
             }
 
             AuthBootstrap680ChildOwnedState& ownedState =
-                MutableAuthBootstrap680ChildOwnedState(&mediator);
+                MutableAuthBootstrap680ChildOwnedState(&child);
             const bool replyAuthDataValidatorAccepted =
                 VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold(
                     child,
@@ -1423,7 +1447,7 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
-            SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(mediator, reply);
+            AuthBootstrap680MaterializeReplyCopyShadowScaffold(child, mediator, reply);
             return kAuthBootstrap680InboundAuthReplySuccess;
         }
 
@@ -1435,51 +1459,33 @@ uint32_t AuthBootstrap680Ops::HandleInboundAuthMessage(CLTLoginMediator& mediato
 }
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
-void* AuthBootstrap680Ops::BootstrapRaw08AuxHandle50(const CLTLoginMediator& mediator) {
+void* AuthBootstrap680Child::BootstrapRaw08AuxHandle50() const {
     // Static `0x41f370` is now concrete: this wrapper returns owner `+0x680 -> +0xf4 -> +0xa8`
     // when the copied auth-data block is present, not the earlier child `+0xa8` public-key worker.
-    const auto* copyShadow = static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
-        mediator.authBootstrapChild680_.authReplyCopyShadowF4);
+    const auto* copyShadow =
+        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(authReplyCopyShadowF4);
     void* value = nullptr;
     if (copyShadow != nullptr) {
         value = reinterpret_cast<void*>(static_cast<uintptr_t>(ReadU32LE(copyShadow->signedData80.data() + 0x28u)));
     }
-
-    if (!mediator.bootstrapRaw08AuxHandle50Logged_ || mediator.lastBootstrapRaw08AuxHandle50_ != value) {
-        spdlog::info(
-            "CLTLoginMediator::BootstrapRaw08AuxHandle50(+0x50) -> {}{}",
-            fmt::ptr(value),
-            mediator.bootstrapRaw08AuxHandle50Logged_ ? " [changed]" : " [first]");
-        mediator.bootstrapRaw08AuxHandle50Logged_ = true;
-        mediator.lastBootstrapRaw08AuxHandle50_ = value;
-    }
-
     return value;
 }
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
-bool AuthBootstrap680Ops::HasBootstrapRaw08AuxHandle54(const CLTLoginMediator& mediator) {
-    const bool present = BootstrapRaw08AuxHandle50(mediator) != nullptr;
-    spdlog::debug(
-        "CLTLoginMediator::HasBootstrapRaw08AuxHandle54(+0x54) -> {}",
-        present ? 1u : 0u);
-    return present;
+bool AuthBootstrap680Child::HasBootstrapRaw08AuxHandle54() const {
+    return BootstrapRaw08AuxHandle50() != nullptr;
 }
 
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
-uint8_t AuthBootstrap680Ops::GetCrashReporterPromptForSecurId58(const CLTLoginMediator& mediator) {
-    const uint8_t prompt = mediator.authBootstrapChild680_.crashReporterPromptForSecurId104;
-    spdlog::debug(
-        "CLTLoginMediator::GetCrashReporterPromptForSecurId58(+0x58) -> {}",
-        static_cast<unsigned>(prompt));
-    return prompt;
+uint8_t AuthBootstrap680Child::GetCrashReporterPromptForSecurId58() const {
+    return crashReporterPromptForSecurId104;
 }
 
 // anchor: launcher.exe:0x447eb0
-uint32_t AuthBootstrap680Ops::SendAuthGetPublicKeyRequest(CLTLoginMediator& mediator) {
-    const AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+uint32_t AuthBootstrap680Child::SendGetPublicKeyRequest(CLTLoginMediator& mediator) {
+    const AuthBootstrap680Child& child = *this;
     const bool ensuredLazyPubkeyDatValidatorA4 =
-        EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(mediator, mediator.authBootstrapChild680_);
+        EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(mediator, *this);
 
     mxo::auth::FramedPacket packet;
     if (!mxo::auth::BuildGetPublicKeyRequestPacket(
@@ -1520,7 +1526,7 @@ uint32_t AuthBootstrap680Ops::SendAuthGetPublicKeyRequest(CLTLoginMediator& medi
 }
 
 // anchor: launcher.exe:0x4474f0
-uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
+uint32_t AuthBootstrap680Child::SendAuthRequest(
     CLTLoginMediator& mediator,
     const mxo::auth::GetPublicKeyReply& reply) {
     if (!reply.hasEmbeddedPublicKey) {
@@ -1528,8 +1534,8 @@ uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
         return 0;
     }
 
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
+    AuthBootstrap680Child& child = *this;
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     const char* username = SmallStringMirrorDataOrEmpty(child.string04);
     if (SmallStringMirrorLength(child.string04) == 0u) {
         spdlog::info("DIAGNOSTIC: launcher-owned auth cannot build AS_AuthRequest without child+0x04 username data");
@@ -1685,10 +1691,10 @@ uint32_t AuthBootstrap680Ops::SendAuthRequestFromReply(
 }
 
 // anchor: launcher.exe:0x44831c..0x448467 (raw `0x09` inbound case building/sending raw `0x0a`)
-uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
+uint32_t AuthBootstrap680Child::SendAuthChallengeResponse(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthChallenge& challenge) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    AuthBootstrap680Child& child = *this;
     const char* password = SmallStringMirrorDataOrEmpty(child.string10);
     const char* soePassword = SmallStringMirrorDataOrEmpty(child.string1C);
     if (SmallStringMirrorLength(child.string10) == 0u) {
@@ -1747,7 +1753,10 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
         static_cast<unsigned>(sendResult));
     mediator.authChallengeResponseSent_ = (sendResult != 0u);
     if (sendResult != 0u) {
-        SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(mediator, buildResult);
+        spdlog::debug(
+            "AuthBootstrap680Child::SendAuthChallengeResponse observed raw0x0a send without post-send child-state mutation decryptedChallengeBytes={} processedChallengeMd5Bytes={}",
+            static_cast<unsigned>(buildResult.decryptedChallengeBytes.size()),
+            static_cast<unsigned>(buildResult.processedChallengeMd5Bytes.size()));
         spdlog::info(
             "DIAGNOSTIC: launcher-owned auth built AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} childString10Len={} childString1CLen={}",
             (unsigned)buildResult.passwordLengthField,
@@ -1765,7 +1774,7 @@ uint32_t AuthBootstrap680Ops::SendAuthChallengeResponse(
 // - launcher.exe:0x4401a0 = later state10 selected-slot auth-reply handler
 // This remains intentionally source-owned; Ghidra callers/callees show no standalone launcher
 // logging helper between those paths and the parser families.
-void AuthBootstrap680Ops::LogParsedAuthReply(
+void AuthBootstrap680LogParsedAuthReply(
     const CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
     if (reply.isErrorReply) {
@@ -1826,63 +1835,12 @@ void AuthBootstrap680Ops::LogParsedAuthReply(
     }
 }
 
-// Source-owned owner->child fixed-field preseed for the owner `+0x680` bootstrap child.
-// Bridge anchors:
-// - launcher.exe:0x439210 -> 0x448050 rewrites child `+0x28/+0x2c` and copies the owner MD5 blocks
-// - launcher.exe:0x447eb0 / 0x4474f0 consume child `+0x2c/+0x9c` and `+0x28/+0x9c`
-// - launcher.exe:0x447f50 / 0x447780 refresh child `+0x9c` on raw `0x07`
-// So this helper only preserves replacement-side config mirrors between those anchored uses.
-void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapFixedFieldsFromCurrentConfig(CLTLoginMediator& mediator) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
-    child.loginType28 = mediator.authLoginType_;
-    const uint32_t* launcherVersionPtr = mediator.GetNoPatchLauncherVersionValuePtr08();
-    child.launcherVersion2C = (launcherVersionPtr && *launcherVersionPtr != 0u)
-        ? *launcherVersionPtr
-        : mediator.authLauncherVersion_;
-    child.currentPublicKeyId9C = mediator.authCurrentPublicKeyId_;
-}
-
-// Source-owned dynamic-state reset for the owner `+0x680` bootstrap child.
-// Bridge anchors:
-// - launcher.exe:0x445500 / 0x441290 zero the child `+0x80..+0x118` dynamic families at construction
-// - launcher.exe:0x448050 / 0x4474f0 / 0x447780 / 0x448140 later repopulate subsets during use
-// Keep this reset ctor-like for transient fields while leaving fixed config mirrors to the separate
-// preseed helper above.
-void AuthBootstrap680Ops::ResetRecoveredAuthBootstrapDynamicStateScaffold(CLTLoginMediator& mediator) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
-
-    child.authServerTimeBias80 = 0u;
-    child.sendTarget50 = nullptr;
-    ResetAuthBootstrap680Field54Helper(&child.feedbackSeedHelper54, &ownedState.field54Helper);
-    std::fill(child.feedbackSeed84.begin(), child.feedbackSeed84.end(), 0u);
-    child.feedbackTransformLarge94 = nullptr;
-    child.feedbackTransformSmall98 = nullptr;
-    child.authRequestReadyA0 = 0u;
-    child.paddingA1ToA3 = {};
-    child.lazyPubkeyDatValidatorA4 = nullptr;
-    ResetAuthBootstrap680ReplyPublicKeyWorkers(child, ownedState);
-    ownedState.lazyPubkeyDatValidatorA4.object.reset();
-    ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c);
-
-    ResetAuthBootstrap680ReplyParseObject(child, ownedState);
-    ResetAuthBootstrap680ReplyMaterialization(child, ownedState);
-    ClearSmallStringMirror(child.stringF8);
-    ownedState.opaqueReplyBlob108Owned.clear();
-    ownedState.opaqueReplyBlob10COwned.clear();
-    child.opaqueReplyBlob108 = nullptr;
-    child.opaqueReplyBlob10C = nullptr;
-    child.authReplySuccessHeaderDword07_110 = 0u;
-    child.authReplySuccessField15_114 = 0u;
-    child.authReplySuccessField15Timestamp118 = 0u;
-}
-
 // anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
-uint32_t AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold(
+uint32_t AuthBootstrap680Child::HandleGetPublicKeyReply(
     CLTLoginMediator& mediator,
     const mxo::auth::GetPublicKeyReply& reply) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
+    AuthBootstrap680Child& child = *this;
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
 
     // Static `0x447f50` only rebuilds the child `+0xa8/+0xac` worker pair when the incoming
     // public-key id differs from child `+0x9c`; otherwise it just sets child `+0xa0 = 1`.
@@ -1933,7 +1891,7 @@ uint32_t AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplySc
 
     child.authRequestReadyA0 = 1u;
     spdlog::info(
-        "AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplyScaffold rebuilt child+0xa8/+0xac from raw0x07 publicKeyId={} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} modulusLen={} signatureLen={} exponentByte=0x{:02x}",
+        "AuthBootstrap680Child::HandleGetPublicKeyReply rebuilt child+0xa8/+0xac from raw0x07 publicKeyId={} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={} modulusLen={} signatureLen={} exponentByte=0x{:02x}",
         static_cast<unsigned>(reply.publicKeyId),
         fmt::ptr(child.lazyPubkeyDatValidatorA4),
         fmt::ptr(child.raw08PublicKeyWorkerA8),
@@ -1944,27 +1902,11 @@ uint32_t AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterGetPublicKeyReplySc
     return 0u;
 }
 
-// Source-owned no-op bridge around the launcher-owned raw-`0x09` inline continuation.
-// Bridge anchors:
-// - launcher.exe:0x43f300 -> 0x448140 case `0x09`
-// - launcher.exe:0x44831c..0x448467 = raw `0x0a` build/send inline range
-// Static RE shows no post-send child mutation there; the `+0x84..+0x93` seed block was produced
-// earlier by `0x4474f0` through child `+0x54` and is only consumed indirectly here.
-void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold(
-    CLTLoginMediator& mediator,
-    const mxo::auth::AuthChallengeResponseBuildResult& buildResult) {
-    (void)mediator;
-    spdlog::debug(
-        "AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthChallengeResponseScaffold observed raw0x0a send without child-state mutation decryptedChallengeBytes={} processedChallengeMd5Bytes={}",
-        static_cast<unsigned>(buildResult.decryptedChallengeBytes.size()),
-        static_cast<unsigned>(buildResult.processedChallengeMd5Bytes.size()));
-}
-
 // anchor: launcher.exe:0x41b500 -> 0x4435f0 -> 0x41ce80 / 0x443340
-bool AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold(
-    CLTLoginMediator& mediator,
+bool AuthBootstrap680Child::PrepareState5MarginConnectionCopySendScaffold(
+    CLTLoginMediator& /*mediator*/,
     mxo::liblttcp::CMarginConnection& marginConnection) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
+    AuthBootstrap680Child& child = *this;
     const auto* copyShadow =
         static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(child.authReplyCopyShadowF4);
     if (copyShadow == nullptr) {
@@ -1986,7 +1928,7 @@ bool AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold(
             kBootstrapPrepBlockByteCount);
 
     spdlog::info(
-        "AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} storedPrepStateA0={} childBlockB0FirstDword=0x{:08x} childBlockC4FirstDword=0x{:08x} childBlockD8FirstDword=0x{:08x}",
+        "AuthBootstrap680Child::PrepareState5MarginConnectionCopySendScaffold staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} storedPrepStateA0={} childBlockB0FirstDword=0x{:08x} childBlockC4FirstDword=0x{:08x} childBlockD8FirstDword=0x{:08x}",
         fmt::ptr(copyShadow),
         storedReplyCopy ? 1u : 0u,
         storedPrepState ? 1u : 0u,
@@ -2006,11 +1948,11 @@ bool AuthBootstrap680Ops::PrepareState5MarginConnectionCopySendScaffold(
 //   `0x448140`
 // The shared replacement helper is therefore a deliberate bridge between anchored original owners,
 // not a newly claimed standalone launcher method.
-void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
+void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
+    AuthBootstrap680Child& child,
     CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
     ResetAuthBootstrap680ReplyMaterialization(child, ownedState);
 
@@ -2084,7 +2026,7 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
             decryptedPrivateExponentBytes.size());
 
     spdlog::info(
-        "CLTLoginMediator::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} replyAuthDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={} parseObjectF0={}",
+        "AuthBootstrap680MaterializeReplyCopyShadowScaffold materialized owner+0x680+0xf4 copyShadow bytes=0x{:03x} replyAuthDataBytes=0x{:03x} parseObjectAuthDataLen=0x{:04x} signaturePrefix00='{}' signedDataExpiryAc=0x{:08x} modulusPrefixD2='{}' authServerTimeBias80=0x{:08x} builtBlockB0={} builtBlockC4={} builtBlockD8={} blockB0Words={} blockC4Words={} blockD8Words={} parseObjectF0={}",
         static_cast<unsigned>(sizeof(copyShadow)),
         static_cast<unsigned>(reply.authDataBytes.size()),
         static_cast<unsigned>(parseObject ? parseObject->authDataByteLength20 : 0u),
@@ -2114,10 +2056,10 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(
 // - set child `+0x104` from the original slash+6-digit SecurID-tail test and strip that tail
 //   from child `+0xf8` when present
 // - mirror child `+0x110` from the parsed success-header dword at payload offset `0x07`
-void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessPregateScaffold(
+void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
+    AuthBootstrap680Child& child,
     CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
 
     std::string promptPassword = mediator.authBootstrapSource38_.inlineString20.data();
@@ -2133,7 +2075,7 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessP
             : reply.successHeaderUnknownDword07;
 
     spdlog::info(
-        "AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessPregateScaffold childStringF8Len={} promptForSecurId={} childField110=0x{:08x} parseObjectF0={}",
+        "AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold childStringF8Len={} promptForSecurId={} childField110=0x{:08x} parseObjectF0={}",
         static_cast<unsigned>(SmallStringMirrorLength(child.stringF8)),
         static_cast<unsigned>(child.crashReporterPromptForSecurId104),
         static_cast<unsigned>(child.authReplySuccessHeaderDword07_110),
@@ -2141,8 +2083,7 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessP
 }
 
 // anchor: launcher.exe:DAT_004f79e0 / 0x43f300 success-side global one-time gate
-bool AuthBootstrap680Ops::ConsumeState2AuthReplySuccessOneTimeGateScaffold(CLTLoginMediator& mediator) {
-    (void)mediator;
+bool AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold() {
     if (g_authBootstrap680State2AuthReplySuccessOneTimeGate) {
         return false;
     }
@@ -2157,10 +2098,10 @@ bool AuthBootstrap680Ops::ConsumeState2AuthReplySuccessOneTimeGateScaffold(CLTLo
 // - `0x441260 = AuthBootstrap680_StoreField114AndTimestamp118`
 // - owner vtable `+0x150` fed from `0x43d480 = AuthBootstrap680_CopyReplyString54`
 // - `0x441170 = AuthBootstrap680_CopyOpaqueReplyBlobs108_10c`
-void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold(
+void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
+    AuthBootstrap680Child& child,
     CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
-    AuthBootstrap680ChildSketch& child = mediator.authBootstrapChild680_;
     const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
 
     child.authReplySuccessField15_114 =
@@ -2180,7 +2121,7 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessO
         mediator.SetLaunchPadSourceBlock94FirstString(reply.username.text.c_str());
     }
 
-    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&mediator);
+    AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     if (parseObject != nullptr) {
         CopyAuthBootstrap680ParseFieldToOwnedBytes(
             ownedState.opaqueReplyBlob108Owned,
@@ -2198,7 +2139,7 @@ void AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessO
     PointOpaqueBlobPointerAtOwnedBytes(child.opaqueReplyBlob10C, ownedState.opaqueReplyBlob10COwned);
 
     spdlog::info(
-        "AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterState2AuthReplySuccessOneTimeScaffold childField114=0x{:08x} childField118=0x{:08x} ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
+        "AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold childField114=0x{:08x} childField118=0x{:08x} ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
         static_cast<unsigned>(child.authReplySuccessField15_114),
         static_cast<unsigned>(child.authReplySuccessField15Timestamp118),
         mediator.authBootstrapSource38_.inlineString00[0] != '\0'

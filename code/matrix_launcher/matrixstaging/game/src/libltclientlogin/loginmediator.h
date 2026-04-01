@@ -3,6 +3,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -117,7 +118,22 @@ class CLTLoginMediator : public ILTLoginMediator {
     //   is source-owned there instead of in the mediator wrapper
     // - keep access narrow by granting focused friendship instead of widening the mediator
     //   surface generically
-    friend struct AuthBootstrap680Ops;
+    friend struct AuthBootstrap680Child;
+    friend void AuthBootstrap680LogParsedAuthReply(
+        const CLTLoginMediator& owner,
+        const mxo::auth::AuthReply& reply);
+    friend void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
+        AuthBootstrap680Child& child,
+        CLTLoginMediator& owner,
+        const mxo::auth::AuthReply& reply);
+    friend void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
+        AuthBootstrap680Child& child,
+        CLTLoginMediator& owner,
+        const mxo::auth::AuthReply& reply);
+    friend void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
+        AuthBootstrap680Child& child,
+        CLTLoginMediator& owner,
+        const mxo::auth::AuthReply& reply);
     friend class CLTLoginState_AuthenticatePending;
     friend class CLTLoginState_State10;
 
@@ -1068,12 +1084,13 @@ public:
     //   branch to prioritize
     // - the earlier auth bootstrap/send lead is still the helper2 / `0x448050` family, not the
     //   later world-list sender
-    // - `BeginAuthHandshake()` stays only as a thin wrapper name; the concrete owner+0x680 child
-    //   prepare/write/branch logic lives in `AuthBootstrap680Ops::PrepareAndDispatch(...)`
+    // - state1/state2 should therefore call the separate owner+0x680 child directly instead of
+    //   routing through a fake mediator-owned auth-bootstrap method
     uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
     uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
-    uint32_t BeginAuthHandshake();
     uint32_t BeginMarginHandshake();
+    AuthBootstrap680Child& AuthBootstrapChild680() { return *authBootstrapChild680_; }
+    const AuthBootstrap680Child& AuthBootstrapChild680() const { return *authBootstrapChild680_; }
     uint32_t LastAuthConnectStatus() const { return lastAuthConnectStatus_; }
     uint32_t AuthConnectStatusCount() const { return authConnectStatusCount_; }
     void ResetAuthConnectRetryStateScaffold();
@@ -1636,9 +1653,9 @@ private:
     // - `+0xf4` = original reply-derived copied `0x136` block; source now keeps that block as a
     //   wire-faithful shadow so later wrapper/state5 users can read the original `+0x85/+0xa8`
     //   suffix family without re-inventing a semantic object model
-    // - source-owned ownership for heap-backed child helpers now stays outside the embedded child
-    //   sketch so this field can remain closer to the original launcher layout
-    AuthBootstrap680ChildSketch authBootstrapChild680_;
+    // Replacement source now also keeps the ownership boundary explicit by storing this as a
+    // separate child object instead of flattening it into the mediator body.
+    std::unique_ptr<AuthBootstrap680Child> authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
     // Lazily allocated session callback helper whose `+0x18` string can later feed owner `+0x664`.

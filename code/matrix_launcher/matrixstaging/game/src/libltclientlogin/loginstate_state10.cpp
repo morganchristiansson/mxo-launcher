@@ -146,15 +146,18 @@ uint32_t CLTLoginState_State10::HandleStagedAuthReplyScaffold(CLTLoginMediator* 
     if (reply.isErrorReply) {
         mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 = reply.errorCode;
         mediator->expectedMarginRequestName_ = nullptr;
-        AuthBootstrap680Ops::LogParsedAuthReply(*mediator, reply);
+        AuthBootstrap680LogParsedAuthReply(*mediator, reply);
         return 1u;
     }
 
-    AuthBootstrap680Ops::SyncRecoveredAuthBootstrapAfterAuthReplyScaffold(*mediator, reply);
+    AuthBootstrap680MaterializeReplyCopyShadowScaffold(
+        mediator->AuthBootstrapChild680(),
+        *mediator,
+        reply);
     mediator->ResetMarginBootstrapState();
     mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(reply);
     AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
-    AuthBootstrap680Ops::LogParsedAuthReply(*mediator, reply);
+    AuthBootstrap680LogParsedAuthReply(*mediator, reply);
     mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
     return 1u;
 }

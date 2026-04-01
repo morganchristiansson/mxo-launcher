@@ -66,8 +66,8 @@ Bridge consequence for source:
 - `0x439210` calls `0x448050` directly
 - current Ghidra callers/callees do **not** show a separate launcher mediator wrapper between
   those two methods
-- replacement `CLTLoginMediator::BeginAuthHandshake(...)` should therefore stay documented as a
-  source-owned bridge into the real child entry instead of claiming a new launcher anchor
+- replacement source should therefore call the separate owner `+0x680` child directly from
+  state/owner flow instead of keeping a fake mediator-owned auth-bootstrap bridge
 
 ## Tightened field-family summary
 
@@ -271,6 +271,8 @@ Ctor/reset restraint now tightened from `0x445500 / 0x441290`:
   prepare/config bridge feeding `0x448050 / 0x447eb0 / 0x4474f0 / 0x447780`
 
 Current replacement source keeps this split explicitly:
+- source now also stores the bootstrap child as a separate child object rather than flattening it
+  into the mediator body, which better matches the original owner `+0x680` pointer relationship
 - original child `+0xf4` = full reply-derived copied `0x136` block
 - source-owned mirror now preserves that full structural width with the tighter current layout:
   - `+0x00 .. +0x7f` signature span
