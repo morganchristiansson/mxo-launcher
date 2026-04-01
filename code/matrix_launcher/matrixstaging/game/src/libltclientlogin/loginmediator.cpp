@@ -372,30 +372,83 @@ static const char* LauncherConnectionBridgeContext_WorkTypeName(uint32_t workTyp
     }
 }
 
-// UNANCHORED: source-owned outer-seam bridge callback, intentionally kept out of liblttcp.
+// anchor: launcher.exe:0x436b10 non-empty dequeue tail uses the queued context object's
+// `+0x10(workItem)` completion hook and, on the type-1 path, may then call context `+0x04`.
+// The original queued context is connection-centric (`0x449a70` / `0x44af60` / `0x4490c0`), not a
+// mediator-owned record, so this bridge first resolves the current sidecar connection and then
+// forwards into that narrower path instead of open-coding mediator-specific completion logic here.
+static mxo::liblttcp::CMessageConnection* LauncherConnectionBridgeContext_ResolveSidecarConnection(
+    CLTLoginMediatorConnectionContextScaffold* self) {
+    if (!self) {
+        return nullptr;
+    }
+    if (self->sidecarConnection != nullptr) {
+        return self->sidecarConnection;
+    }
+
+    CLTLoginMediator* mediator = self->mediator;
+    if (!mediator) {
+        return nullptr;
+    }
+
+    mxo::liblttcp::CMessageConnection* connection =
+        self->isMarginConnection ? mediator->MarginConnection() : mediator->AuthConnection();
+    if (connection != nullptr) {
+        self->sidecarConnection = connection;
+    }
+    return connection;
+}
+
+// anchor: launcher.exe:0x436b10 type-1 queue path may call queued-context `+0x04` after the
+// connection-centric completion hook. Current bridge records remain mediator-owned and are freed by
+// `ResetLauncherConnectionBridgeScaffold()`, so this seam mirrors the connection queue-context's
+// no-op release when it cannot forward to a resolved sidecar connection.
 uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
     CLTLoginMediatorConnectionContextScaffold* self) {
-    spdlog::info(
-        "CLTLoginMediator launcher bridge context release self={} label='{}' autoRelease={}",
+    mxo::liblttcp::CMessageConnection* connection =
+        LauncherConnectionBridgeContext_ResolveSidecarConnection(self);
+    spdlog::debug(
+        "CLTLoginMediator launcher bridge context release self={} label='{}' autoRelease={} sidecarConnection={}",
         fmt::ptr(self),
         (self && self->debugLabel) ? self->debugLabel : "<null>",
-        (self && self->autoReleaseFlag) ? 1u : 0u);
+        (self && self->autoReleaseFlag) ? 1u : 0u,
+        fmt::ptr(connection));
+
+    if (connection != nullptr) {
+        void* queueContext = connection->QueueContextScaffold();
+        void** vtable = queueContext ? *static_cast<void***>(queueContext) : nullptr;
+        if (vtable != nullptr && vtable[1] != nullptr) {
+            using ReleaseFn = uint32_t(__thiscall*)(void*);
+            return reinterpret_cast<ReleaseFn>(vtable[1])(queueContext);
+        }
+    }
     return 1u;
 }
 
-// UNANCHORED: source-owned outer-seam bridge callback, intentionally kept out of liblttcp.
+// anchor: launcher.exe:0x436b10 -> queued context `+0x10(workItem)`
+// anchor: launcher.exe:0x449a70 / 0x44af60 / 0x4490c0
 uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(
     CLTLoginMediatorConnectionContextScaffold* self,
     CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
-    spdlog::info(
-        "CLTLoginMediator launcher bridge OnOperationCompleted context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x}",
+    mxo::liblttcp::CMessageConnection* connection =
+        LauncherConnectionBridgeContext_ResolveSidecarConnection(self);
+    spdlog::debug(
+        "CLTLoginMediator launcher bridge OnOperationCompleted context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x} sidecarConnection={}",
         fmt::ptr(self),
         (self && self->debugLabel) ? self->debugLabel : "<null>",
         fmt::ptr(workItem),
         workItem ? workItem->header.workType : 0u,
         LauncherConnectionBridgeContext_WorkTypeName(workItem ? workItem->header.workType : 0u),
-        workItem ? workItem->workPayload : 0u);
+        workItem ? workItem->workPayload : 0u,
+        fmt::ptr(connection));
 
+    if (connection != nullptr && workItem != nullptr) {
+        return connection->OnOperationCompleted(workItem);
+    }
+
+    // Bounded no-sidecar fallback: if the bridge is reached before a connection object exists,
+    // keep only the earlier work-type-specific mediator shim instead of claiming a broader
+    // original queue-context shape.
     CLTLoginMediator* mediator = self ? self->mediator : nullptr;
     if (!self || !workItem || !mediator) {
         return 1u;
@@ -403,35 +456,16 @@ uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold
 
     if (workItem->header.workType ==
         mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        const uint32_t handled = self->isMarginConnection
+        return self->isMarginConnection
             ? mediator->HandleMarginConnectStatus(workItem->workPayload)
             : mediator->HandleAuthConnectStatus(workItem->workPayload);
-        const char* routeLabel = self->isMarginConnection ? "margin" : "auth";
-        const char* incomingReplyAnchor = self->isMarginConnection
-            ? CLTLoginMediator::kMessageMsLoadCharacterReply
-            : CLTLoginMediator::kMessageAsAuthReply;
-        spdlog::info(
-            "CLTLoginMediator launcher bridge routed {} type-2 connect-status payload=0x{:08x} -> handled={} laterIncomingReplyAnchor='{}'",
-            routeLabel,
-            static_cast<unsigned>(workItem->workPayload),
-            static_cast<unsigned>(handled),
-            (incomingReplyAnchor && incomingReplyAnchor[0]) ? incomingReplyAnchor : "<none>");
     }
 
     if (workItem->header.workType ==
         mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain) {
-        if (!self->isMarginConnection) {
-            const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
-            if (receiveActions & CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
-                const uint32_t marginConnectResult =
-                    mediator->BeginLauncherMarginConnectionScaffold();
-                spdlog::info(
-                    "CLTLoginMediator launcher bridge synthetic receive-drain post-AS_AuthReply margin auto-begin result=0x{:08x}",
-                    static_cast<unsigned>(marginConnectResult));
-            }
-        } else {
-            (void)mediator->HandleMarginConnectionReceiveScaffold();
-        }
+        return self->isMarginConnection
+            ? mediator->HandleMarginConnectionReceiveScaffold()
+            : mediator->HandleAuthConnectionReceiveScaffold();
     }
 
     return 1u;

@@ -1484,6 +1484,11 @@ Build-validated update:
   - this is the current better source match for the negative RE result that the original engine object itself is not evidenced to own mediator lifecycle
 - `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
   - and now also owns the current source-only launcher-bridge context callback bodies that were previously sitting in `ltthreadperclienttcpengine.cpp`
+  - newer `2026-04-01` bridge tightening now narrows those callbacks further to the original queue/connection shape seen in `0x436b10`
+    - the bridge first resolves the current sidecar auth/margin connection
+    - then forwards queue-context `+0x10(workItem)` traffic into the connection-family completion path instead of open-coding mediator-specific type-2 / synthetic-receive handling there
+    - practical anchored targets are the already-recovered connection callbacks `0x4490c0`, `0x449a70`, and `0x44af60`
+    - the old mediator-only type-2 / synthetic receive dispatch now survives only as a bounded no-sidecar fallback when no connection object exists yet
   - that callback move does **not** prove the bridge is original; it only narrows liblttcp's mediator knowledge while the bridge still exists as source-owned debt
 - `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, no longer calls the launcher-network ABI sidecar-sync helper directly, and no longer keeps a launcher-owner pointer just to gate/auth-start this seam
 - `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:
