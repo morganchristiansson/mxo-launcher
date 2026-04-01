@@ -937,8 +937,8 @@ CMessageConnection_LoginMediatorContextScaffold(CMessageConnection* self) {
         : nullptr;
 }
 
-// UNANCHORED: source-owned synthetic receive-drain proxy standing in for the still-unmodeled tail
-// of `launcher.exe:0x4490c0` after the parsed-packet copy path.
+// UNANCHORED: source-owned synthetic receive-drain proxy standing in only for copied-packet
+// fallthroughs that the narrowed in-callback `0x4490c0` post-copy leaf path still leaves queued.
 static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
     CMessageConnection* self,
     uint32_t workPayload) {
@@ -1450,7 +1450,8 @@ uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
 //   - margin leaf `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260` can now re-enter the nearer
 //     base-dispatch/current-helper-slot6 path directly from this callback on the handled margin path
 // - remaining message-object / agenda work is still incomplete, so the launcher bridge still keeps
-//   the later synthetic receive-drain proxy for the paths that are not yet consumed here
+//   the later synthetic receive-drain proxy only when this callback leaves copied packets in the
+//   pending fallback queue
 uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
@@ -1654,8 +1655,12 @@ bool CMessageConnection::LastReceivedPacketHeaderlessScaffold() const {
     return lastReceivedPacketHeaderlessScaffold_;
 }
 
-// UNANCHORED: source-owned queue-drain helper used by the current launcher bridge for copied
-// packets that were not consumed on the in-callback post-copy dispatch path.
+bool CMessageConnection::HasPendingReceivedPacketsScaffold() const {
+    return !pendingReceivedPacketsScaffold_.empty();
+}
+
+// UNANCHORED: source-owned queue-drain helper used only for copied packets that were not consumed
+// on the in-callback post-copy dispatch path.
 bool CMessageConnection::TakeNextReceivedPacketScaffold(
     std::vector<uint8_t>* outPayloadBytes,
     bool* outHeaderless) {

@@ -45,7 +45,11 @@ struct CLTLoginMediatorConnectionContextScaffold {
 // Source-owned outer-seam callback bodies for the current launcher bridge context.
 // Current static-RE direction:
 // - original queue/context traffic is connection-centric, not mediator-class-centric
-// - so these callbacks belong with the mediator-owned bridge seam, not with the engine core
+// - newer producer-side tightening now queues launcher-bridge work only through the sidecar
+//   connection's queue-context object
+// - so this bridge vtable survives only as an unexpected-path guard / identity marker on the
+//   mediator-owned owner/context record, while the callback bodies still live with the outer login
+//   seam rather than in the engine core
 uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
     CLTLoginMediatorConnectionContextScaffold* self);
 uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(

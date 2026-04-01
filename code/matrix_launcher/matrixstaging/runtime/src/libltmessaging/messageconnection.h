@@ -594,8 +594,8 @@ public:
     //     then `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
     // - helper-side replacement/discard is now modeled through the recovered module family, but the
     //   exact original helper-owned object/refcount tail from this same callback is still
-    //   incomplete, so the launcher bridge keeps one extra synthetic receive-drain proxy item for
-    //   the remaining unconsumed paths
+    //   incomplete, so the launcher bridge keeps one extra synthetic receive-drain proxy item only
+    //   for the remaining copied-packet paths that this in-callback leaf step left unconsumed
     uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
@@ -604,11 +604,13 @@ public:
     // UNANCHORED: source-owned accessor exposing the current headerless/packetized split narrowed
     // from the `0x4490c0` message-ref flag write.
     bool LastReceivedPacketHeaderlessScaffold() const;
-    // UNANCHORED: source-owned queue-drain helper exposing copied parsed-packet bodies from the
-    // narrowed `0x4490c0` type-3 path.
+    // UNANCHORED: source-owned fallback queue-drain helper exposing copied parsed-packet bodies
+    // only when the narrowed in-callback `0x4490c0` post-copy leaf path left work unconsumed.
     bool TakeNextReceivedPacketScaffold(
         std::vector<uint8_t>* outPayloadBytes,
         bool* outHeaderless = nullptr);
+    // UNANCHORED: source-owned probe for whether that fallback copied-packet queue is non-empty.
+    bool HasPendingReceivedPacketsScaffold() const;
 
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
@@ -623,8 +625,8 @@ protected:
     //   byte vector, matching the real `0x455cd0 -> 0x41bc20/0x41bbb0` seam more closely
     // - leaf families can optionally source-own one later dispatch destination without pretending
     //   the full original message-object / agenda tail is already reconstructed
-    // - returning non-zero means the leaf consumed this copied packet without needing the pending
-    //   copied-packet queue / later synthetic receive-drain proxy
+    // - returning non-zero means the leaf consumed this copied packet inside the same callback
+    //   without needing the pending copied-packet queue / later synthetic receive-drain proxy
     virtual uint32_t DispatchCopiedParsedPacketTailScaffold(
         void* workItem,
         CMessageConnectionMessageRef& messageRef);

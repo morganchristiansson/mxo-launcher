@@ -665,8 +665,10 @@ static void EnsureLauncherConnectionBridgeContextVtableInitialized() {
     if (!g_LauncherConnectionBridgeContextVtable[1]) {
         // Fidelity correction from the current RE pass:
         // - original queue/context traffic is still connection-centric
-        // - mediator-specific callback bodies are therefore kept on the outer login seam, not in
-        //   the engine core, until the bridge itself can be pruned further
+        // - launcher-bridge work items are now queued only through the sidecar connection's own
+        //   queue-context object, not through this mediator-owned owner/context record
+        // - this vtable therefore remains only as an unexpected-path guard / identity marker while
+        //   source still keeps the bridge record attached to `connection->OwnerContext()`
         g_LauncherConnectionBridgeContextVtable[1] =
             reinterpret_cast<void*>(mxo::ltlogin::LauncherConnectionBridgeContext_ReleaseScaffold);
         g_LauncherConnectionBridgeContextVtable[4] =
@@ -2619,18 +2621,28 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     workItem->workPayload = workPayload;
     workItem->debugLabel = label;
 
-    void* queuedContext = context;
-    if (context->sidecarConnection) {
-        // Current tighter RE-backed correction:
-        // - original worker-thread producers queue the direct connection object as `context`
-        //   for type-1 close, type-2 status, and type-3 parsed-packet work
-        // - current source still needs the queue-context bridge object so consumer callback
-        //   dispatch can land on `vtable[4]` despite the non-byte-faithful C++ connection layout
-        // - so once a sidecar connection exists, all launcher-bridge work items queue through that
-        //   connection-family context bridge instead of the mediator-owned bridge context record
-        queuedContext = context->sidecarConnection->QueueContextScaffold();
+    // Current tighter RE-backed correction:
+    // - original worker-thread producers queue the direct connection object as `context`
+    //   for type-1 close, type-2 status, and type-3 parsed-packet work
+    // - current source therefore routes launcher-bridge work through the sidecar connection's
+    //   queue-context scaffold, not through the mediator-owned owner/context record
+    // - bounded active-path proof now closes this enough to prune the older no-sidecar fallback:
+    //   current callers either resolve `launcherContext` from a live connection first or only enter
+    //   this helper after `PumpLauncherConnectionContextScaffold()` proved `sidecarConnection`
+    //   non-null
+    if (context->sidecarConnection == nullptr) {
+        LoggerForBridgeLabel(label)->warn(
+            "CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold missing sidecarConnection label='{}' context={} type=0x{:08x} ({}) payload=0x{:08x}",
+            label ? label : "<null>",
+            fmt::ptr(context),
+            workType,
+            LauncherBridgeWorkTypeName(workType),
+            workPayload);
+        std::free(workItem);
+        return false;
     }
 
+    void* queuedContext = context->sidecarConnection->QueueContextScaffold();
     const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
         queuedContext,
@@ -2714,26 +2726,33 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
     //     `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
     // - so the later synthetic receive-drain item is increasingly a fallback/no-op path rather
     //   than the primary live consumer on those handled branches
+    // - newer bounded active-path proof now narrows it further:
+    //   successful launcher-into-game runs show the active auth/margin path no longer logging any
+    //   `pendingCopiedPackets=` or synthetic receive-drain handling; copied packets are consumed on
+    //   the in-callback post-copy leaf path instead
+    // - current source therefore emits the synthetic proxy only when the narrower `0x4490c0`
+    //   reconstruction actually left copied packets queued in the fallback pending-packet buffer
     // - current source queue order on one helper poll is therefore:
     //   - `OnReceive` first queues all parsed-packet work items emitted from the current fragment
-    //   - then this helper queues one synthetic receive-drain proxy for that same fragment
+    //   - only if that later callback still leaves copied packets pending does this helper queue a
+    //     synthetic receive-drain proxy for the same fragment
     //   - if a later recv in the same poll returns peer-close/error, the type-1 close item queues
     //     after those successful-fragment submissions
-    // - that proxy lines up better with the original worker-thread cadence when it is emitted once
-    //   per successful recv fragment / `OnReceive` iteration rather than once per whole helper poll
     // - later peer-close notification still queues after any successful fragment notifications from
     //   the same helper poll, matching the original `0x42fe50` ordering more closely than the old
-    //   once-per-pump synthetic receive path
+    //   once-per-fragment unconditional synthetic receive path
     while (true) {
         const int received =
             context->sidecarConnection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
         if (received > 0) {
-            (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-                context,
-                /*workType=*/kWorkTypeSyntheticReceiveDrain,
-                /*workPayload=*/static_cast<uint32_t>(received),
-                receiveLabel,
-                /*queueLockAlreadyHeld=*/true);
+            if (context->sidecarConnection->HasPendingReceivedPacketsScaffold()) {
+                (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+                    context,
+                    /*workType=*/kWorkTypeSyntheticReceiveDrain,
+                    /*workPayload=*/static_cast<uint32_t>(received),
+                    receiveLabel,
+                    /*queueLockAlreadyHeld=*/true);
+            }
             continue;
         }
 

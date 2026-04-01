@@ -1467,13 +1467,15 @@ Build-validated update:
 - `src/launcher_network_object_abi.cpp` arg5 helper `+0x60` slot `0` now calls into the liblttcp engine sidecar instead of directly calling a mediator poll helper
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now owns the current narrow nonblocking launcher-bridge pump and the current queue0C enqueue helper used by that seam
   - newer bounded pacing correction there keeps `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` as the one-fragment recv seam, but lets the bridge re-enter it within one arg5 helper poll
-  - source-owned `AuthReceivePacket` / `MarginReceivePacket` notifications therefore remain explicit and are now paced once per successful recv fragment rather than once per whole helper poll
+  - source-owned `AuthReceivePacket` / `MarginReceivePacket` notifications therefore remain explicit only as fallback receive-drain proxies after successful recv fragments whose later `0x4490c0` callback still leaves copied packets pending
   - newer static RE also narrows their role more strictly:
     - they are not another original type-3 family
     - original type `3` already comes from the parsed-packet work items queued by `CLTTCPConnection::OnReceive`
     - the extra notification is only a source-owned receive-drain proxy for the later original
       `CMessageConnection::OnOperationCompleted` tail that source still does not execute there yet
     - source now reflects that with a distinct synthetic work type instead of reusing original type `3`
+    - newer `2026-04-01` gating now only emits that synthetic item when the copied-packet fallback
+      queue is actually non-empty after the in-callback post-copy leaf step
   - this narrower bridge-level batching is the current compromise because the earlier fuller same-poll recv-drain restoration regressed live runs into the later `Loading Character` stall
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-ABI surface attachment / mirror rules used after engine-side connect work reached through connection wrappers
@@ -1488,7 +1490,11 @@ Build-validated update:
     - the bridge first resolves the current sidecar auth/margin connection
     - then forwards queue-context `+0x10(workItem)` traffic into the connection-family completion path instead of open-coding mediator-specific type-2 / synthetic-receive handling there
     - practical anchored targets are the already-recovered connection callbacks `0x4490c0`, `0x449a70`, and `0x44af60`
-    - the old mediator-only type-2 / synthetic receive dispatch now survives only as a bounded no-sidecar fallback when no connection object exists yet
+    - producer-side tightening now also prunes the older no-sidecar queued-context fallback: launcher-bridge type-1/type-2/synthetic items are only queued through the sidecar connection's queue-context object, while the bridge-context vtable is left as an unexpected-path guard
+  - newer successful launcher-into-game runtime logs now line up with that read on the active path too:
+    - no `pendingCopiedPackets=` logs
+    - no synthetic receive-drain handling logs
+    - copied auth/margin packets log as consumed directly on the in-callback post-copy leaf path instead
   - that callback move does **not** prove the bridge is original; it only narrows liblttcp's mediator knowledge while the bridge still exists as source-owned debt
 - `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, no longer calls the launcher-network ABI sidecar-sync helper directly, and no longer keeps a launcher-owner pointer just to gate/auth-start this seam
 - `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:

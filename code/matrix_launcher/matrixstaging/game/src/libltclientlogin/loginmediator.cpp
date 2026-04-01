@@ -400,27 +400,27 @@ static mxo::liblttcp::CMessageConnection* LauncherConnectionBridgeContext_Resolv
 }
 
 // anchor: launcher.exe:0x436b10 type-1 queue path may call queued-context `+0x04` after the
-// connection-centric completion hook. Current bridge records remain mediator-owned and are freed by
-// `ResetLauncherConnectionBridgeScaffold()`, so this seam mirrors the connection queue-context's
-// no-op release when it cannot forward to a resolved sidecar connection.
+// connection-centric completion hook. Newer bounded producer-side tightening now always queues the
+// sidecar connection's own queue-context object for launcher-bridge type-1/type-2/synthetic items,
+// so reaching this bridge vtable means source has fallen off the intended connection-centric path.
 uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
     CLTLoginMediatorConnectionContextScaffold* self) {
     mxo::liblttcp::CMessageConnection* connection =
         LauncherConnectionBridgeContext_ResolveSidecarConnection(self);
-    spdlog::debug(
-        "CLTLoginMediator launcher bridge context release self={} label='{}' autoRelease={} sidecarConnection={}",
-        fmt::ptr(self),
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        (self && self->autoReleaseFlag) ? 1u : 0u,
-        fmt::ptr(connection));
+    if (connection == nullptr) {
+        spdlog::warn(
+            "CLTLoginMediator launcher bridge context release reached without sidecarConnection self={} label='{}' autoRelease={}",
+            fmt::ptr(self),
+            (self && self->debugLabel) ? self->debugLabel : "<null>",
+            (self && self->autoReleaseFlag) ? 1u : 0u);
+        return 1u;
+    }
 
-    if (connection != nullptr) {
-        void* queueContext = connection->QueueContextScaffold();
-        void** vtable = queueContext ? *static_cast<void***>(queueContext) : nullptr;
-        if (vtable != nullptr && vtable[1] != nullptr) {
-            using ReleaseFn = uint32_t(__thiscall*)(void*);
-            return reinterpret_cast<ReleaseFn>(vtable[1])(queueContext);
-        }
+    void* queueContext = connection->QueueContextScaffold();
+    void** vtable = queueContext ? *static_cast<void***>(queueContext) : nullptr;
+    if (vtable != nullptr && vtable[1] != nullptr) {
+        using ReleaseFn = uint32_t(__thiscall*)(void*);
+        return reinterpret_cast<ReleaseFn>(vtable[1])(queueContext);
     }
     return 1u;
 }
@@ -432,43 +432,20 @@ uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold
     CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
     mxo::liblttcp::CMessageConnection* connection =
         LauncherConnectionBridgeContext_ResolveSidecarConnection(self);
-    spdlog::debug(
-        "CLTLoginMediator launcher bridge OnOperationCompleted context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x} sidecarConnection={}",
-        fmt::ptr(self),
-        (self && self->debugLabel) ? self->debugLabel : "<null>",
-        fmt::ptr(workItem),
-        workItem ? workItem->header.workType : 0u,
-        LauncherConnectionBridgeContext_WorkTypeName(workItem ? workItem->header.workType : 0u),
-        workItem ? workItem->workPayload : 0u,
-        fmt::ptr(connection));
-
-    if (connection != nullptr && workItem != nullptr) {
-        return connection->OnOperationCompleted(workItem);
-    }
-
-    // Bounded no-sidecar fallback: if the bridge is reached before a connection object exists,
-    // keep only the earlier work-type-specific mediator shim instead of claiming a broader
-    // original queue-context shape.
-    CLTLoginMediator* mediator = self ? self->mediator : nullptr;
-    if (!self || !workItem || !mediator) {
+    if (connection == nullptr || workItem == nullptr) {
+        spdlog::warn(
+            "CLTLoginMediator launcher bridge OnOperationCompleted reached off the connection-centric path context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x} sidecarConnection={}",
+            fmt::ptr(self),
+            (self && self->debugLabel) ? self->debugLabel : "<null>",
+            fmt::ptr(workItem),
+            workItem ? workItem->header.workType : 0u,
+            LauncherConnectionBridgeContext_WorkTypeName(workItem ? workItem->header.workType : 0u),
+            workItem ? workItem->workPayload : 0u,
+            fmt::ptr(connection));
         return 1u;
     }
 
-    if (workItem->header.workType ==
-        mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        return self->isMarginConnection
-            ? mediator->HandleMarginConnectStatus(workItem->workPayload)
-            : mediator->HandleAuthConnectStatus(workItem->workPayload);
-    }
-
-    if (workItem->header.workType ==
-        mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain) {
-        return self->isMarginConnection
-            ? mediator->HandleMarginConnectionReceiveScaffold()
-            : mediator->HandleAuthConnectionReceiveScaffold();
-    }
-
-    return 1u;
+    return connection->OnOperationCompleted(workItem);
 }
 
 // +0x00
