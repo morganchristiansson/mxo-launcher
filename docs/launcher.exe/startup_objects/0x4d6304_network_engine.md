@@ -1060,8 +1060,18 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
   - current source now also moved closer to that read:
     - connect no longer fabricates an immediate launcher-bridge success work item from the mediator
       begin wrapper
-    - the worker-thread slot `0x42fe50` now owns a narrow source-side connect-completion poll that
-      waits for socket writability / `SO_ERROR == 0` and then queues type-2 status `0`
+    - the worker-thread slot `0x42fe50` now owns the nearer blocking select/connect-completion path
+      instead of a mediator-side synthetic completion
+      - read set = connection socket + wakeup socket
+      - except set = connection socket
+      - write set = connection socket while connect completion is pending, and later again while a
+        queued send buffer is being drained
+      - current source now mirrors the original post-select order as:
+        1. except/connect-failure handling
+        2. readable-socket recv drain
+        3. writable-socket connect-success or send-progress handling
+        4. wakeup-socket drain / exit-by-request
+      - successful connect completion now queues type-2 status `0`
   - so `0x4329cc` is now best read as part of a **TCP connect / connect-status / worker-start** producer path
 
 #### `launcher.exe:0x432d86`, `0x432dc1`, and `0x432dd7`
@@ -1522,16 +1532,45 @@ Build-validated update:
     - the helper-vtable arrays are now sized only for the live 2-slot surfaces instead of oversized diagnostic tables
   - the ABI shell keeps raw arg5 object layout ownership, but less of the bridge-controller logic and less diagnostic scaffolding
 
-Runtime note:
-- newer runs after the current fidelity passes have regressed before entering game
-- current evidence points at remaining worker/connect/send fidelity gaps rather than a launcher-main
-  startup-order failure
+Current tightened worker-loop read after the latest `0x42fe50 / 0x42f970 / 0x42fbd0 / 0x44a9f0 / 0x44aa70 / 0x44ac90` pass:
+- worker-thread socket ordering is now much narrower than the older source-owned poll loop
+  - `select()` is blocking
+  - main-loop sets are rebuilt each iteration as:
+    - read  = connection socket + wakeup socket
+    - except = connection socket
+    - write = connection socket only while TCP connect completion is pending or while a queued send
+      buffer is being drained
+  - after select returns, current best original order is:
+    1. connection except handling
+    2. readable-socket recv drain
+    3. writable-socket connect/send handling
+    4. wakeup-socket drain / exit-by-request
+  - after terminal close/failure, original code falls into a wakeup-only wait loop rather than
+    returning immediately; current source now mirrors that intent more closely
+- connection-side send/close state is also tighter now:
+  - `0x431ff0` writes the direct worker pointer back to `[connection+0x08]`
+  - `0x44a9f0` seeds connection byte `+0x38 = 1`
+  - `0x42fbd0 -> 0x44ad80` pushes copied send buffers through the connection-owned queue rooted at
+    `+0x3c`, clears `+0x38`, and signals the worker wakeup socket
+  - `0x42f970` writes state `4` first, then:
+    - graceful close uses `shutdown(socket, 1)` immediately only when the send queue is already
+      empty
+    - otherwise the worker-thread write side issues that same half-close after queued sends drain
+    - hard close uses `closesocket(socket)` directly
+- active receive ownership is tighter too:
+  - worker-backed connections now use the direct worker-thread recv -> `OnReceive` path on the live
+    socket
+  - the launcher-bridge pump remains only as a fallback for no-worker source-owned paths, not as
+    the primary active-path receive producer
 
-Important limitation:
-- this is still only a **starter ownership cleanup**, not proof that the original launcher's worker-thread producers are fully reconstructed
-- current source now has a narrow source-owned connect-completion loop in worker-thread slot `0x42fe50`, but broader original send/select/wakeup behavior there is still incomplete
-- the current receive-side producer remains synthetic and sidecar-driven
-- only the ownership boundary moved closer to the recovered arg5 / engine family
+Important remaining gaps:
+- this is still not a byte-faithful end state for the whole worker family
+- current source still does **not** enqueue the original send-failure/type-6 work-item family from
+  the worker write path; non-`WSAEWOULDBLOCK` send failure is only logged at the moment
+- datagram-specific `recvfrom` / `sendto` peer-address side effects from the original worker body
+  remain outside the active source path
+- some later wakeup-only / teardown queue item combinations are still source-owned approximations
+  rather than exact original class implementations
 
 Newer source-ownership cleanup on the launcher entry side:
 - launcher-facing arg5 entrypoints no longer hang off `src/diagnostics.h`

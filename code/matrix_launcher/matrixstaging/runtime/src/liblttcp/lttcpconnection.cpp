@@ -170,8 +170,12 @@ CLTTCPConnection::CLTTCPConnection()
       engine_(nullptr),
       ownerContext_(nullptr),
       socketHandle_(kInvalidSocketHandle),
+      workerThread08_(nullptr),
       remoteEndpoint_(),
       remoteHostName_(),
+      sendQueueEmptyFlag38_(true),
+      sendQueueMutex_(),
+      sendQueue3c_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family that also seeds the
@@ -181,8 +185,12 @@ CLTTCPConnection::CLTTCPConnection(void* ownerContext)
       engine_(nullptr),
       ownerContext_(ownerContext),
       socketHandle_(kInvalidSocketHandle),
+      workerThread08_(nullptr),
       remoteEndpoint_(),
       remoteHostName_(),
+      sendQueueEmptyFlag38_(true),
+      sendQueueMutex_(),
+      sendQueue3c_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
 // anchor: launcher.exe:0x44ac40
@@ -253,6 +261,15 @@ uint32_t CLTTCPConnection::SocketHandle() const {
     return socketHandle_;
 }
 
+void CLTTCPConnection::SetWorkerThreadScaffold(
+    CLTThreadPerClientTCPEngine_WorkerThread* workerThread) {
+    workerThread08_ = workerThread;
+}
+
+CLTThreadPerClientTCPEngine_WorkerThread* CLTTCPConnection::WorkerThreadScaffold() const {
+    return workerThread08_;
+}
+
 // UNANCHORED: source-owned connection-state setter used by the current scaffolds.
 void CLTTCPConnection::SetState(LTTCPEngineConnectionState state) {
     state_ = state;
@@ -281,6 +298,129 @@ void CLTTCPConnection::SetRemoteHostName(const char* hostName) {
 // UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
 const std::string& CLTTCPConnection::RemoteHostName() const {
     return remoteHostName_;
+}
+
+bool CLTTCPConnection::QueueSendBufferScaffold(
+    const void* buffer,
+    uint32_t byteCount,
+    uintptr_t ownershipMode) {
+    if (!buffer || byteCount == 0u) {
+        return false;
+    }
+
+    // Tightened worker/send-path read from `0x448a00 -> vtable +0x20(..., 1)` and
+    // `0x42fbd0 -> 0x44ad80`:
+    // - the active message-envelope send path reaches slot `8` with ownership mode `1`, i.e. the
+    //   copied-byte queue path
+    // - current source therefore keeps the active path faithful and safe by copying queued bytes
+    //   into owned storage before the worker-thread write loop drains them
+    // - other historical queue modes (`0` borrowed / `2` caller-owned pointer`) remain a later
+    //   fidelity target if a live source path starts proving them
+    CLTTCPConnection_SendQueueItemScaffold item = {};
+    item.remoteEndpoint = remoteEndpoint_;
+    item.ownedBytes.assign(
+        static_cast<const uint8_t*>(buffer),
+        static_cast<const uint8_t*>(buffer) + byteCount);
+
+    {
+        std::lock_guard<std::mutex> lock(sendQueueMutex_);
+        sendQueue3c_.push_back(std::move(item));
+        sendQueueEmptyFlag38_ = false;
+    }
+
+    spdlog::debug(
+        "CLTTCPConnection::QueueSendBufferScaffold queued copied send bytes ownershipMode={} this={} worker={} byteCount={} remoteHost='{}'",
+        static_cast<unsigned>(ownershipMode),
+        fmt::ptr(this),
+        fmt::ptr(workerThread08_),
+        byteCount,
+        remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+    return true;
+}
+
+bool CLTTCPConnection::TryPopQueuedSendBufferScaffold(
+    CLTTCPConnection_SendQueueItemScaffold* outItem) {
+    if (!outItem) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(sendQueueMutex_);
+    if (sendQueue3c_.empty()) {
+        sendQueueEmptyFlag38_ = true;
+        return false;
+    }
+
+    *outItem = std::move(sendQueue3c_.front());
+    sendQueue3c_.pop_front();
+    sendQueueEmptyFlag38_ = sendQueue3c_.empty();
+    return true;
+}
+
+bool CLTTCPConnection::SendQueueEmptyFlagScaffold() const {
+    std::lock_guard<std::mutex> lock(sendQueueMutex_);
+    return sendQueueEmptyFlag38_;
+}
+
+int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
+    uint32_t* outWsaError,
+    bool* outPeerClosed) {
+    if (outWsaError) {
+        *outWsaError = 0u;
+    }
+    if (outPeerClosed) {
+        *outPeerClosed = false;
+    }
+
+    if (socketHandle_ == kInvalidSocketHandle ||
+        (state_ != LTTCPEngineConnectionState::kConnectActive &&
+         state_ != LTTCPEngineConnectionState::kUdpMonitorActive &&
+         state_ != LTTCPEngineConnectionState::kClosing)) {
+        return -1;
+    }
+
+    CLTTCPReadOperationFragmentScaffold* readOperationFragment =
+        AllocateReadOperationFragmentSourceScaffold();
+    if (!readOperationFragment) {
+        spdlog::warn(
+            "CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold failed fragment allocation this={} remoteHost='{}'",
+            fmt::ptr(this),
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+        return 0;
+    }
+
+    // anchor: launcher.exe:0x42fe50 TCP receive success path
+    // Keep the same two worker-side fragment refs explicit here:
+    // - one outer worker-owned ref immediately after allocation/setup
+    // - one delivery-temp ref immediately before `OnReceive(fragment)`
+    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
+    const int received = recv(
+        static_cast<SOCKET>(socketHandle_),
+        reinterpret_cast<char*>(readOperationFragment->bytes0C),
+        0x1000,
+        0);
+    if (received <= 0) {
+        CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
+        if (received == 0) {
+            if (outPeerClosed) {
+                *outPeerClosed = true;
+            }
+            return -1;
+        }
+
+        const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
+        if (outWsaError) {
+            *outWsaError = wsaError;
+        }
+        return (wsaError == WSAEWOULDBLOCK) ? 0 : -1;
+    }
+
+    ReadOperationFragmentSource_SetByteCountScaffold(
+        readOperationFragment,
+        static_cast<uint32_t>(received));
+    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
+    OnReceive(readOperationFragment);
+    CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
+    return received;
 }
 
 // anchor: launcher.exe:0x42fe50 TCP receive subpath
@@ -313,69 +453,32 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
         return 0;
     }
 
-    CLTTCPReadOperationFragmentScaffold* readOperationFragment =
-        AllocateReadOperationFragmentSourceScaffold();
-    if (!readOperationFragment) {
-        spdlog::warn(
-            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold failed fragment allocation this={} remoteHost='{}'",
-            fmt::ptr(this),
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
-        return 0;
+    uint32_t wsaError = 0u;
+    bool peerClosed = false;
+    const int received = ReceiveReadyReadOperationFragmentScaffold(&wsaError, &peerClosed);
+    if (received >= 0) {
+        return received;
     }
 
-    // Current bounded fidelity step from `0x42fe50`:
-    // - recv lands directly into the `CLTTCPReadOperation` fragment payload instead of first
-    //   copying through a connection-owned staging vector
-    // - we also keep the two worker-side refs proved on the TCP success path:
-    //   - one outer worker-owned ref immediately after allocation/setup
-    //   - one delivery-temp ref immediately before `OnReceive`
-    // This helper still intentionally models one successful recv/OnReceive iteration per call so
-    // the faithful fragment-delivery seam stays isolated in one place.
-    // Current bridge pacing may re-enter this helper multiple times within one arg5 helper poll,
-    // but the original `0x42fe50` same-poll recv-drain loop is still not reconstructed here inside
-    // `CLTTCPConnection` itself.
-    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
-    const int received = recv(
-        socket,
-        reinterpret_cast<char*>(readOperationFragment->bytes0C),
-        0x1000,
-        0);
-    if (received <= 0) {
-        CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
-        if (received == 0) {
-            spdlog::info(
-                "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv returned EOF socket=0x{:08x} remoteHost='{}'",
-                socketHandle_,
-                remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
-            // Bounded fidelity step:
-            // - the later queue/type-1 cleanup path is what ultimately settles the connection into
-            //   the fully closed state
-            // - keep this earlier terminal-recv transition on the lower close helper so source now
-            //   uses the same intermediate `kClosing` transport state as the anchored close wrapper
-            (void)CloseSocketTransportScaffold(/*graceful=*/false);
-            return -1;
-        }
-
-        const int wsaError = WSAGetLastError();
-        if (wsaError == WSAEWOULDBLOCK) {
-            return 0;
-        }
+    if (peerClosed) {
+        spdlog::info(
+            "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv returned EOF socket=0x{:08x} remoteHost='{}'",
+            socketHandle_,
+            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+    } else {
         spdlog::warn(
             "CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold recv failed socket=0x{:08x} remoteHost='{}' wsaError={} -> closing",
             socketHandle_,
             remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_,
             wsaError);
-        (void)CloseSocketTransportScaffold(/*graceful=*/false);
-        return -1;
     }
 
-    ReadOperationFragmentSource_SetByteCountScaffold(
-        readOperationFragment,
-        static_cast<uint32_t>(received));
-    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
-    OnReceive(readOperationFragment);
-    CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
-    return received;
+    // The legacy helper keeps its older source-owned transport-close side effect for the fallback
+    // launcher bridge seam. The tighter worker-thread path now uses
+    // `ReceiveReadyReadOperationFragmentScaffold()` directly so it can mirror `0x42fe50`
+    // terminal ordering without forcing this older helper to own those later state transitions.
+    (void)CloseSocketTransportScaffold(/*graceful=*/false);
+    return -1;
 }
 
 // anchor: launcher.exe:0x449ca0

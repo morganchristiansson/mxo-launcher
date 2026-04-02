@@ -1373,7 +1373,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
     }
 
     CLTThreadPerClientTCPEngine* engine = connection->Engine();
-    if (!engine) {
+    if (!engine || wakeupSocketHandle_ == kInvalidSocketHandle) {
         return;
     }
 
@@ -1382,14 +1382,106 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
     const char* connectStatusLabel =
         (launcherContext && launcherContext->isMarginConnection) ? "MarginConnectStatus"
                                                                  : "AuthConnectStatus";
-    bool completionQueued = false;
+    const char* closeStatusLabel =
+        (launcherContext && launcherContext->isMarginConnection) ? "MarginPeerClosed"
+                                                                 : "AuthPeerClosed";
 
-    while (!exitRequested_) {
+    // Tightened `0x42fe50` read/write/except/wakeup state:
+    // - blocking select with no timeout
+    // - sets are rebuilt each iteration as:
+    //   1) read  = connection socket + wakeup socket
+    //   2) except = connection socket
+    //   3) write = connection socket only while connect completion is pending or a queued send is
+    //      already being drained
+    // - post-select work order is:
+    //   1) except-on-socket (connect phase only)
+    //   2) readable socket drain
+    //   3) writable socket connect/send handling
+    //   4) wakeup-socket drain / exit-by-request
+    bool connectCompletionPending = !datagramMode_;
+    bool connectStatusQueued = false;
+    bool closeQueued = false;
+    bool waitWakeupOnly = false;
+    CLTTCPConnection_SendQueueItemScaffold currentSend = {};
+    size_t currentSendOffset = 0u;
+
+    const auto queueConnectStatus =
+        [&](uint32_t workPayload) {
+            if (!launcherContext || connectStatusQueued) {
+                return;
+            }
+            (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
+                launcherContext,
+                CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
+                workPayload,
+                connectStatusLabel);
+            connectStatusQueued = true;
+        };
+
+    const auto queueClose = [&]() {
+        if (!launcherContext || closeQueued) {
+            return;
+        }
+        launcherContext->peerCloseQueued = true;
+        (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
+            launcherContext,
+            CLTThreadPerClientTCPEngine::kWorkTypeClose,
+            0u,
+            closeStatusLabel);
+        closeQueued = true;
+    };
+
+    const auto closeAndInvalidateSocket = [&]() {
+        const uint32_t socketHandle = connection->SocketHandle();
+        if (socketHandle != kInvalidSocketHandle) {
+            closesocket(static_cast<SOCKET>(socketHandle));
+            connection->SetSocketHandle(kInvalidSocketHandle);
+        }
+    };
+
+    const auto issueDeferredShutdownIfClosing = [&](SOCKET socket) {
+        if (connection->State() == LTTCPEngineConnectionState::kClosing &&
+            connection->SendQueueEmptyFlagScaffold()) {
+            (void)shutdown(socket, SD_SEND);
+        }
+    };
+
+    while (true) {
+        if (waitWakeupOnly) {
+            fd_set wakeupReadSet;
+            FD_ZERO(&wakeupReadSet);
+            const SOCKET wakeupSocket = static_cast<SOCKET>(wakeupSocketHandle_);
+            FD_SET(wakeupSocket, &wakeupReadSet);
+
+            const int readyCount = select(
+                static_cast<int>(wakeupSocket + 1),
+                &wakeupReadSet,
+                nullptr,
+                nullptr,
+                nullptr);
+            if (readyCount == SOCKET_ERROR) {
+                continue;
+            }
+            if (FD_ISSET(wakeupSocket, &wakeupReadSet)) {
+                DrainWakeupSocketHandleScaffold(wakeupSocketHandle_);
+                if (exitRequested_) {
+                    break;
+                }
+            }
+            continue;
+        }
+
         const uint32_t socketHandle = connection->SocketHandle();
         if (socketHandle == kInvalidSocketHandle) {
+            if (launcherContext && (closeQueued || connectStatusQueued || connection->State() == LTTCPEngineConnectionState::kClosed)) {
+                waitWakeupOnly = true;
+                continue;
+            }
             break;
         }
 
+        const SOCKET socket = static_cast<SOCKET>(socketHandle);
+        const SOCKET wakeupSocket = static_cast<SOCKET>(wakeupSocketHandle_);
         fd_set readSet;
         fd_set writeSet;
         fd_set exceptSet;
@@ -1397,28 +1489,158 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
         FD_ZERO(&writeSet);
         FD_ZERO(&exceptSet);
 
-        const SOCKET socket = static_cast<SOCKET>(socketHandle);
-        const SOCKET wakeupSocket = static_cast<SOCKET>(wakeupSocketHandle_);
+        FD_SET(socket, &readSet);
         FD_SET(wakeupSocket, &readSet);
         FD_SET(socket, &exceptSet);
 
-        if (!completionQueued && !datagramMode_) {
-            FD_SET(socket, &writeSet);
+        const bool hasCurrentSend =
+            currentSendOffset < currentSend.ownedBytes.size();
+        bool monitorWrite = false;
+        if (connectCompletionPending) {
+            monitorWrite = true;
+        } else if (hasCurrentSend) {
+            monitorWrite = true;
         } else {
-            FD_SET(socket, &readSet);
+            if (connection->TryPopQueuedSendBufferScaffold(&currentSend)) {
+                currentSendOffset = 0u;
+                monitorWrite = !currentSend.ownedBytes.empty();
+            } else {
+                issueDeferredShutdownIfClosing(socket);
+            }
+        }
+        if (monitorWrite) {
+            FD_SET(socket, &writeSet);
         }
 
-        timeval timeout = {};
-        timeout.tv_sec = 0;
-        timeout.tv_usec = 100000;
         const int readyCount = select(
             static_cast<int>((socket > wakeupSocket ? socket : wakeupSocket) + 1),
             &readSet,
             &writeSet,
             &exceptSet,
-            &timeout);
+            nullptr);
         if (readyCount == SOCKET_ERROR) {
-            break;
+            const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
+            if (wsaError == WSAENOTSOCK || wsaError == WSAEBADF) {
+                waitWakeupOnly = launcherContext != nullptr;
+                if (!waitWakeupOnly) {
+                    break;
+                }
+                continue;
+            }
+
+            spdlog::debug(
+                "CLTThreadPerClientTCPEngine::WorkerThread select failed connection={} socket=0x{:08x} wsaError={} remoteHost='{}'",
+                fmt::ptr(connection),
+                socketHandle,
+                wsaError,
+                connection->RemoteHostName().empty() ? std::string("<empty>")
+                                                     : connection->RemoteHostName());
+            continue;
+        }
+
+        if (connectCompletionPending && FD_ISSET(socket, &exceptSet)) {
+            int soError = 0;
+            int soErrorSize = sizeof(soError);
+            (void)getsockopt(
+                socket,
+                SOL_SOCKET,
+                SO_ERROR,
+                reinterpret_cast<char*>(&soError),
+                &soErrorSize);
+            connection->SetState(LTTCPEngineConnectionState::kClosed);
+            queueConnectStatus(static_cast<uint32_t>(soError != 0 ? soError : 1u));
+            queueClose();
+            waitWakeupOnly = launcherContext != nullptr;
+            if (!waitWakeupOnly) {
+                break;
+            }
+            continue;
+        }
+
+        if (FD_ISSET(socket, &readSet)) {
+            while (true) {
+                uint32_t wsaError = 0u;
+                bool peerClosed = false;
+                const int receiveResult =
+                    connection->ReceiveReadyReadOperationFragmentScaffold(&wsaError, &peerClosed);
+                if (receiveResult > 0) {
+                    continue;
+                }
+                if (receiveResult == 0) {
+                    break;
+                }
+
+                spdlog::debug(
+                    "CLTThreadPerClientTCPEngine::WorkerThread terminal recv connection={} socket=0x{:08x} peerClosed={} wsaError={} remoteHost='{}'",
+                    fmt::ptr(connection),
+                    socketHandle,
+                    peerClosed ? 1u : 0u,
+                    wsaError,
+                    connection->RemoteHostName().empty() ? std::string("<empty>")
+                                                         : connection->RemoteHostName());
+                closeAndInvalidateSocket();
+                connection->SetState(LTTCPEngineConnectionState::kClosed);
+                queueClose();
+                waitWakeupOnly = launcherContext != nullptr;
+                if (!waitWakeupOnly) {
+                    goto worker_exit;
+                }
+                goto worker_continue;
+            }
+        }
+
+        if (FD_ISSET(socket, &writeSet)) {
+            if (connectCompletionPending) {
+                int soError = 0;
+                int soErrorSize = sizeof(soError);
+                const int getSockOptResult = getsockopt(
+                    socket,
+                    SOL_SOCKET,
+                    SO_ERROR,
+                    reinterpret_cast<char*>(&soError),
+                    &soErrorSize);
+                if (getSockOptResult == 0 && soError == 0) {
+                    connection->SetState(LTTCPEngineConnectionState::kUdpMonitorActive);
+                    queueConnectStatus(0u);
+                    connectCompletionPending = false;
+                } else {
+                    connection->SetState(LTTCPEngineConnectionState::kClosed);
+                    queueConnectStatus(static_cast<uint32_t>(soError != 0 ? soError : 1u));
+                    queueClose();
+                    waitWakeupOnly = launcherContext != nullptr;
+                    if (!waitWakeupOnly) {
+                        break;
+                    }
+                    continue;
+                }
+            } else if (currentSendOffset < currentSend.ownedBytes.size()) {
+                const int remainingByteCount =
+                    static_cast<int>(currentSend.ownedBytes.size() - currentSendOffset);
+                const int sentByteCount = send(
+                    socket,
+                    reinterpret_cast<const char*>(currentSend.ownedBytes.data() + currentSendOffset),
+                    remainingByteCount,
+                    0);
+                if (sentByteCount != SOCKET_ERROR) {
+                    currentSendOffset += static_cast<size_t>(sentByteCount);
+                    if (currentSendOffset >= currentSend.ownedBytes.size()) {
+                        currentSend = {};
+                        currentSendOffset = 0u;
+                    }
+                } else {
+                    const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
+                    if (wsaError != WSAEWOULDBLOCK) {
+                        spdlog::debug(
+                            "CLTThreadPerClientTCPEngine::WorkerThread send failed connection={} socket=0x{:08x} wsaError={} remaining={} remoteHost='{}'",
+                            fmt::ptr(connection),
+                            socketHandle,
+                            wsaError,
+                            remainingByteCount,
+                            connection->RemoteHostName().empty() ? std::string("<empty>")
+                                                                 : connection->RemoteHostName());
+                    }
+                }
+            }
         }
 
         if (FD_ISSET(wakeupSocket, &readSet)) {
@@ -1428,66 +1650,12 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
             }
         }
 
-        if (FD_ISSET(socket, &exceptSet)) {
-            int soError = 0;
-            int soErrorSize = sizeof(soError);
-            (void)getsockopt(
-                socket,
-                SOL_SOCKET,
-                SO_ERROR,
-                reinterpret_cast<char*>(&soError),
-                &soErrorSize);
-            (void)connection->CloseSocketTransportScaffold(/*graceful=*/false);
-            if (!completionQueued && launcherContext) {
-                (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
-                    launcherContext,
-                    CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-                    static_cast<uint32_t>(soError != 0 ? soError : 1u),
-                    connectStatusLabel);
-            }
-            break;
-        }
-
-        if (!completionQueued && !datagramMode_ && FD_ISSET(socket, &writeSet)) {
-            int soError = 0;
-            int soErrorSize = sizeof(soError);
-            if (getsockopt(
-                    socket,
-                    SOL_SOCKET,
-                    SO_ERROR,
-                    reinterpret_cast<char*>(&soError),
-                    &soErrorSize) == 0 &&
-                soError == 0) {
-                if (launcherContext) {
-                    (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
-                        launcherContext,
-                        CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-                        0u,
-                        connectStatusLabel);
-                }
-                completionQueued = true;
-                continue;
-            }
-
-            (void)connection->CloseSocketTransportScaffold(/*graceful=*/false);
-            if (launcherContext) {
-                (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
-                    launcherContext,
-                    CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-                    static_cast<uint32_t>(soError != 0 ? soError : 1u),
-                    connectStatusLabel);
-            }
-            break;
-        }
-
-        if (FD_ISSET(socket, &readSet)) {
-            const int receiveResult =
-                connection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
-            if (receiveResult < 0) {
-                break;
-            }
-        }
+worker_continue:
+        continue;
     }
+
+worker_exit:
+    connection->SetWorkerThreadScaffold(nullptr);
 }
 
 // anchor: launcher.exe:0x436340
@@ -2177,15 +2345,43 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
         return 0;
     }
 
-    const uint32_t result = connection->CloseSocketTransportScaffold(graceful);
-    if (result != 0) {
-        if (CLTThreadPerClientTCPEngine_WorkerThread* worker = FindWorker(connection)) {
-            worker->RequestExit();
-            worker->SignalWakeup();
+    const LTTCPEngineConnectionState state = connection->State();
+    if (state != LTTCPEngineConnectionState::kConnectActive &&
+        state != LTTCPEngineConnectionState::kUdpMonitorActive) {
+        return 0u;
+    }
+
+    connection->SetState(LTTCPEngineConnectionState::kClosing);
+    if (graceful) {
+        // Tightened slot `7` / `0x42f970` read:
+        // - Close first writes connection state `4`
+        // - if the recovered connection `+0x38` send-queue-empty byte is non-zero, it immediately
+        //   issues `shutdown(socket, 1)`
+        // - otherwise the worker-thread write loop defers that same half-close until the queued
+        //   send backlog drains
+        if (connection->SendQueueEmptyFlagScaffold() &&
+            connection->SocketHandle() != kInvalidSocketHandle) {
+            (void)shutdown(static_cast<SOCKET>(connection->SocketHandle()), SD_SEND);
         }
         SyncAttachedLauncherObjectStateScaffold();
+        return 1u;
     }
-    return result;
+
+    if (connection->SocketHandle() != kInvalidSocketHandle) {
+        const int closeResult = closesocket(static_cast<SOCKET>(connection->SocketHandle()));
+        if (closeResult == SOCKET_ERROR) {
+            spdlog::debug(
+                "CLTThreadPerClientTCPEngine::CloseConnectionScaffold closesocket failed connection={} socket=0x{:08x} remoteHost='{}' wsaError={}",
+                fmt::ptr(connection),
+                connection->SocketHandle(),
+                connection->RemoteHostName().empty() ? std::string("<empty>")
+                                                     : connection->RemoteHostName(),
+                WSAGetLastError());
+        }
+    }
+
+    SyncAttachedLauncherObjectStateScaffold();
+    return 1u;
 }
 
 // anchor: launcher.exe:0x42f970
@@ -2204,9 +2400,33 @@ uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
 
 // UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
 uint32_t CLTThreadPerClientTCPEngine::SendBufferConnectionScaffold(CLTTCPConnection* connection, const void* buffer, uint32_t byteCount, void* completionContext) {
-    if (!connection) {
+    if (!connection || !buffer || byteCount == 0u) {
         return 0;
     }
+
+    if (connection->State() != LTTCPEngineConnectionState::kConnectActive &&
+        connection->State() != LTTCPEngineConnectionState::kUdpMonitorActive) {
+        return 0u;
+    }
+
+    if (CLTThreadPerClientTCPEngine_WorkerThread* worker = connection->WorkerThreadScaffold()) {
+        // Tightened slot `8` / `0x42fbd0` read:
+        // - enqueue through the connection-owned `+0x3c` send queue first
+        // - clear the recovered `+0x38` empty flag on push
+        // - then signal the direct worker pointer kept at connection `+0x08`
+        const bool queued = connection->QueueSendBufferScaffold(
+            buffer,
+            byteCount,
+            reinterpret_cast<uintptr_t>(completionContext));
+        if (!queued) {
+            return 0u;
+        }
+        worker->SignalWakeup();
+        return 1u;
+    }
+
+    // Source-only fallback for unexpected no-worker paths; active RE-backed paths are expected to
+    // have `[connection+0x08]` populated by `0x431ff0` before slot `8` is used.
     return connection->SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
 }
 
@@ -2281,12 +2501,14 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
             dynamic_cast<CLTTCPConnection*>(queuedConnectionOwner)) {
         queuedTcpConnection->SetState(LTTCPEngineConnectionState::kClosed);
         queuedTcpConnection->SetSocketHandle(kInvalidSocketHandle);
+        queuedTcpConnection->SetWorkerThreadScaffold(nullptr);
         touchedConnectionState = true;
     }
 
     if (CMessageConnection* connection = FindMessageConnection(cleanupContextKey)) {
         connection->SetState(LTTCPEngineConnectionState::kClosed);
         connection->SetSocketHandle(kInvalidSocketHandle);
+        connection->SetWorkerThreadScaffold(nullptr);
         touchedConnectionState = true;
     }
 
@@ -2721,6 +2943,15 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
         return;
     }
 
+    // Current active-path tightening after the `0x42fe50` worker-loop pass:
+    // - once the direct connection already has its recovered worker object in `[connection+0x08]`,
+    //   that worker owns the blocking select/read/write/wakeup loop
+    // - keep this helper only as a legacy fallback for source-owned no-worker paths instead of
+    //   racing the live worker on the same socket from the arg5 helper poll
+    if (context->sidecarConnection->WorkerThreadScaffold() != nullptr) {
+        return;
+    }
+
     // Keep the connection seam itself on the faithful one-fragment
     // `0x42fe50 -> 0x449d40 -> 0x469bf0` receive handoff, but let the launcher bridge re-enter
     // that helper repeatedly within one arg5 helper poll.
@@ -3143,6 +3374,9 @@ CLTThreadPerClientTCPEngine_WorkerThread* CLTThreadPerClientTCPEngine::CreateAnd
     }
     (void)LeaveCleanupLockHelper();
 
+    if (result) {
+        connection->SetWorkerThreadScaffold(result);
+    }
     if (result && startThread) {
         (void)result->Start(/*startPriority=*/2);
     }
@@ -3173,6 +3407,9 @@ void CLTThreadPerClientTCPEngine::StopWorkerThreadScaffold(
     workerThread->RequestExit();
     workerThread->SignalWakeup();
     (void)workerThread->Stop(/*waitAfterTerminate=*/true);
+    if (CMessageConnection* connection = static_cast<CMessageConnection*>(workerThread->ContextKey())) {
+        connection->SetWorkerThreadScaffold(nullptr);
+    }
 }
 
 // UNANCHORED starter binding helper.

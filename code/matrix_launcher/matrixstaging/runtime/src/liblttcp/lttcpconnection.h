@@ -2,11 +2,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
+#include <mutex>
 #include <string>
+#include <vector>
 
 namespace mxo::liblttcp {
 
 class CLTThreadPerClientTCPEngine;
+class CLTThreadPerClientTCPEngine_WorkerThread;
 
 // Reimplementation note:
 // This is still a starter original-name skeleton.
@@ -18,9 +22,9 @@ class CLTThreadPerClientTCPEngine;
 // Only the meanings marked in comments are evidence-backed so far.
 enum class LTTCPEngineConnectionState : uint32_t {
     kUnknown = 0,
-    kConnectActive = 1,     // written by Connect success path
-    kUdpMonitorActive = 2,  // written by UDPMonitorPort success path
-    kClosing = 4,           // provisional: written by low-level close path
+    kConnectActive = 1,     // written by Connect success path before worker-thread completion
+    kUdpMonitorActive = 2,  // written by UDPMonitorPort success path and by TCP worker connect-complete success
+    kClosing = 4,           // written by low-level close path before deferred shutdown / wakeup-only cleanup
     kClosed = 8,            // required by connection-wrapper and engine prechecks
 };
 
@@ -116,6 +120,22 @@ static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold) == 0x2c, "pa
 class CVariableLengthPrefixedTCPStreamParser;
 class CBaseConnection;
 
+// Recovered worker/send family tightening from `0x44a9f0`, `0x44aa70`, `0x44ac90`, `0x44ad80`,
+// and `0x42fe50`:
+// - connection `+0x08` stores the direct worker-thread object pointer
+// - connection `+0x38` is a byte flag flipped by send-queue push/pop helpers
+//   - ctor seeds it to `1`
+//   - send-buffer queue push clears it to `0`
+//   - worker pop helper restores it to `1` when the queue empties
+// - connection `+0x3c` roots the pending-send queue consumed by the worker-thread write path
+// Current source-owned queue item keeps only the active send-path facts explicit:
+// - queued byte storage
+// - remote endpoint snapshot used by the datagram sendto path
+struct CLTTCPConnection_SendQueueItemScaffold {
+    LTTCPEndpointKey remoteEndpoint;
+    std::vector<uint8_t> ownedBytes;
+};
+
 // UNANCHORED: source-owned helper that recognizes the current queue-context bridge object and
 // returns its owning `CBaseConnection` when present.
 CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext);
@@ -209,6 +229,10 @@ public:
     // UNANCHORED: source-owned socket-handle accessor used by the current scaffolds.
     uint32_t SocketHandle() const;
 
+    // Recovered direct connection `+0x08` worker pointer from `0x431ff0` / `0x42fbd0` / `0x42fe50`.
+    void SetWorkerThreadScaffold(CLTThreadPerClientTCPEngine_WorkerThread* workerThread);
+    CLTThreadPerClientTCPEngine_WorkerThread* WorkerThreadScaffold() const;
+
     // UNANCHORED: source-owned connection-state setter used by the current scaffolds.
     void SetState(LTTCPEngineConnectionState state);
     // UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
@@ -237,6 +261,10 @@ public:
     // poll, but the original `0x42fe50` same-poll recv-drain loop is still not reconstructed here
     // inside `CLTTCPConnection` itself.
     int PollReceiveAndDeliverReadOperationFragmentsScaffold();
+    // Lower recv/fragment seam used by the worker-thread select loop after readability is already
+    // known. Unlike the legacy poll helper above, this does not run its own select and does not
+    // synthesize transport close side effects on terminal recv outcomes.
+    int ReceiveReadyReadOperationFragmentScaffold(uint32_t* outWsaError = nullptr, bool* outPeerClosed = nullptr);
 
     // anchor: launcher.exe:0x449ca0
     // vtable: launcher.exe:0x004b8040
@@ -248,6 +276,8 @@ public:
 
     // anchor: launcher.exe:0x449d20
     // vtable: launcher.exe:0x004b8054
+    // Active `0x448a00` callers currently reach this wrapper with ownership-mode `1` in the
+    // fourth stack slot, not an arbitrary callback pointer.
     uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* completionContext);
 
     // anchor: launcher.exe:0x449fd0
@@ -273,6 +303,13 @@ public:
     // reference.
     void OnReceive(void* readOperationFragment) override;
 
+    // Recovered send-queue seam beneath slot `8` / `0x42fbd0`.
+    // Current bounded source mirror keeps the active `0x448a00 -> vtable +0x20(...,1)` copied-byte
+    // path explicit while still using source-owned `std::deque` storage under the hood.
+    bool QueueSendBufferScaffold(const void* buffer, uint32_t byteCount, uintptr_t ownershipMode = 1u);
+    bool TryPopQueuedSendBufferScaffold(CLTTCPConnection_SendQueueItemScaffold* outItem);
+    bool SendQueueEmptyFlagScaffold() const;
+
     // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
     uint32_t CloseSocketTransportScaffold(bool graceful);
     // UNANCHORED: low-level raw-socket send helper used beneath the anchored SendBuffer wrapper.
@@ -290,8 +327,12 @@ private:
     CLTThreadPerClientTCPEngine* engine_;
     void* ownerContext_;
     uint32_t socketHandle_;
+    CLTThreadPerClientTCPEngine_WorkerThread* workerThread08_;
     LTTCPEndpointKey remoteEndpoint_;
     std::string remoteHostName_;
+    bool sendQueueEmptyFlag38_;
+    mutable std::mutex sendQueueMutex_;
+    std::deque<CLTTCPConnection_SendQueueItemScaffold> sendQueue3c_;
     // High-confidence original seam: `CLTTCPConnection_ctor` stores a concrete
     // `CVariableLengthPrefixedTCPStreamParser` object pointer at connection `+0x6c`.
     CVariableLengthPrefixedTCPStreamParser* parser06c_;
