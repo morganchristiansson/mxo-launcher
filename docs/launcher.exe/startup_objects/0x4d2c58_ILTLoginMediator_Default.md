@@ -430,7 +430,9 @@ Newest post-state9/runtime consequence from the successful replacement game-entr
     `0x629ddfc8`
   - `+0x10c` from `0x6217082b` inside `ClientShell_LoginMediatorObserver_OnEvent`
   - `+0x118` from `0x621c6db3` inside `0x621c6d90`
-- the same successful run did **not** show:
+    - that list now contains 17 entries after the replacement mirrored the state6 opcode-`9`
+      metric-id producer into owner `+0x1470`
+- the same successful run still did **not** show:
   - `+0x118` from later metric matcher `0x62017150`
   - `+0x170` from `LoadingAreaCommonLayoutView_ctor` site `0x62031136`
 - practical consequence:

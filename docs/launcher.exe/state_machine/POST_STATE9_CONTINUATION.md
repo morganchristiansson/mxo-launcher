@@ -94,13 +94,16 @@ Current active existing-character path is source-owned/live enough to reach:
 - late arg6 observer bridge through:
   - `+0x170` registration
   - `+0x10c` route-descriptor getter
-  - `+0x118` late-entry-list getter (currently empty scaffold)
+  - `+0x118` late-entry-list getter
 - newer successful-run caller logging now tightens that post-`0x18` surface further:
   - `+0x10c` is hit from `client.dll:ClientShell_LoginMediatorObserver_OnEvent` return site
     `0x6217082b`
   - `+0x118` is hit immediately from `0x621c6d90`, the event-`0x18` late-entry/loading-area
     setup helper
-  - the same successful run did **not** show a later `+0x118` caller from `0x62017150`
+  - the replacement now mirrors state6 opcode-`9` success closely enough to populate that list with
+    17 filename entries mapped from the decoded metric ids through the loaded client METR table
+  - even with that populated list, the same successful run still did **not** show a later
+    `+0x118` caller from `0x62017150`
   - and did **not** show a later `+0x170` caller from `0x62031136`
 
 Newest replacement milestone that closed the old state9 submit blocker:
@@ -228,7 +231,8 @@ New live/runtime proof now tightens the client-facing registration side too:
     split concrete:
     - the observed caller was `0x621c6db3` inside `0x621c6d90`
     - that is the immediate event-`0x18` late-entry/loading-area setup helper
-    - the returned list was still empty on that successful run
+    - the returned list now held 17 entries on the successful run, starting with:
+      `resource/worlds/final_world/slums_barrens_full.metr`
   - client-side static proof still says `+0x118` is a real later consumer surface, not a
     permanently ignorable empty scaffold:
     - `0x62017150` iterates 12-byte entries from arg6 `+0x118`
@@ -318,7 +322,7 @@ The old state9 submit blocker is no longer the active one.
 Current replacement boundary moved later into the post-state12 / event-`0x18` continuation, and
 current replacement validation now shows that this is no longer a hard game-entry blocker.
 
-Representative successful replacement run (`2026-04-02`, latest caller-logging pass):
+Representative successful replacement run (`2026-04-02`, latest caller-logging + late-entry pass):
 - reaches:
   - state9 submit return `0`
   - event `0x17`
@@ -329,7 +333,7 @@ Representative successful replacement run (`2026-04-02`, latest caller-logging p
 - event-`0x18` observer work then visibly consumes:
   - arg6 `+0x10c` route descriptor (`"Reality"`) from caller `0x6217082b`
   - arg6 `+0x118` late-entry list from caller `0x621c6db3` (`0x621c6d90`)
-  - that returned list is still empty on the successful run
+  - that returned list now contains 17 entries populated from state6 opcode-`9` metric ids
 - then replacement continues far enough to:
   - show the in-game `MATRIX_ONLINE` window
   - return `RunClientDLL = 1`
@@ -343,7 +347,8 @@ Important remaining fidelity note from that same successful run:
   missing `0x62017150` / `0x62031136` activity is no longer best read as a logging blind spot
 - practical current read:
   - successful replacement game entry already works
-  - the absent later metric-matcher work is a true not-currently-taken later runtime path
+  - even after populating the late-entry list, the later metric-matcher work is still a true
+    not-currently-taken later runtime path
   - the absent second observer registration is now concretely explained by the
     `DAT_629e689d != 0` shortcut in `ClientShell_LoginMediatorObserver_AdvanceState`
   - later event `0x0f` likewise remains a true missing/not-yet-taken fidelity path, and the
@@ -352,9 +357,9 @@ Important remaining fidelity note from that same successful run:
     `currentReplacementDoesNotInvokeCloseYet=1`
 
 Current strongest remaining concrete suspects:
-1. the still-empty arg6 `+0x118` late-entry string-triple vector
-2. whether populating that list would materially enable any later `0x62017150`-driven runtime work
-3. whether the remaining natural-original `0x0f` tail can be reintroduced by a faithful real
+1. whether the still-missing later `0x62017150` path is actually optional on the working route or
+   gated by additional client state beyond the now-populated late-entry list
+2. whether the remaining natural-original `0x0f` tail can be reintroduced by a faithful real
    margin-connection close at `0x41b420` without regressing the now-working game-entry path
 
 ## First files to read next session

@@ -6,6 +6,7 @@
 #include "../../../../src/diagnostics.h"
 
 #include <array>
+#include <sstream>
 
 namespace mxo::ltlogin {
 namespace {
@@ -87,7 +88,93 @@ struct ParsedState6Opcode9ReplyScaffold {
     uint32_t udpSessionSecret09 = 0;
     uint16_t metricIdsOffset0d = 0;
     uint16_t metricIdCount = 0;
+    std::vector<uint16_t> metricIds{};
 };
+
+static std::string BuildMetricIdPreview(const std::vector<uint16_t>& metricIds) {
+    if (metricIds.empty()) {
+        return "[]";
+    }
+
+    std::ostringstream out;
+    out << '[';
+    for (size_t i = 0; i < metricIds.size(); ++i) {
+        if (i != 0u) {
+            out << ", ";
+        }
+        out << "0x" << std::hex << std::uppercase << static_cast<unsigned>(metricIds[i]);
+    }
+    out << ']';
+    return out.str();
+}
+
+static const char* ResolveClientMetricFilenameById(uint16_t metricId) {
+    // Original launcher `0x48ce00` maps one METRID to its Filename by iterating the launcher-side
+    // METR metadata table. The replacement keeps that question local to the post-state9/state12
+    // path by using the already loaded client-side copy of the same METR metadata instead of
+    // widening this pass into a launcher-owned SetMasterDatabase reconstruction first.
+    static constexpr uintptr_t kClientMetricArrayBeginRva = 0x009f1934u;
+    static constexpr uintptr_t kClientMetricArrayEndRva = 0x009f1938u;
+    static constexpr uintptr_t kClientFindFieldRva = 0x002abb60u;
+    static constexpr uintptr_t kClientFieldGetStringRva = 0x002add50u;
+    static constexpr uintptr_t kClientFieldGetDwordRva = 0x002add30u;
+
+    using FindFieldFn = void*(__thiscall*)(void*, const char*);
+    using GetStringFn = const char*(__thiscall*)(void*);
+    using GetDwordFn = uint32_t(__thiscall*)(void*);
+
+    void* const clientModule = GetModuleHandleA("client.dll");
+    if (clientModule == nullptr) {
+        return nullptr;
+    }
+
+    const uintptr_t clientBase = reinterpret_cast<uintptr_t>(clientModule);
+    const auto findField = reinterpret_cast<FindFieldFn>(clientBase + kClientFindFieldRva);
+    const auto getString = reinterpret_cast<GetStringFn>(clientBase + kClientFieldGetStringRva);
+    const auto getDword = reinterpret_cast<GetDwordFn>(clientBase + kClientFieldGetDwordRva);
+
+    const uintptr_t entriesBegin = *reinterpret_cast<const uintptr_t*>(clientBase + kClientMetricArrayBeginRva);
+    const uintptr_t entriesEnd = *reinterpret_cast<const uintptr_t*>(clientBase + kClientMetricArrayEndRva);
+    if (entriesBegin == 0u || entriesEnd <= entriesBegin) {
+        return nullptr;
+    }
+
+    for (uintptr_t current = entriesBegin; current < entriesEnd; current += sizeof(uint32_t)) {
+        void* const entry = *reinterpret_cast<void* const*>(current);
+        if (entry == nullptr) {
+            continue;
+        }
+
+        const char* const tag = *reinterpret_cast<const char* const*>(entry);
+        if (!tag || std::strcmp(tag, "METR") != 0) {
+            continue;
+        }
+
+        void* const metricIdField = findField(entry, "METRID");
+        if (metricIdField == nullptr) {
+            continue;
+        }
+        void* const metricIdValueHolder = *reinterpret_cast<void**>(static_cast<uint8_t*>(metricIdField) + 4u);
+        void* const metricIdValueObject = metricIdValueHolder ? *reinterpret_cast<void**>(metricIdValueHolder) : nullptr;
+        if (metricIdValueObject == nullptr) {
+            continue;
+        }
+        const uint16_t currentMetricId = static_cast<uint16_t>(getDword(metricIdValueObject) & 0xffffu);
+        if (currentMetricId != metricId) {
+            continue;
+        }
+
+        void* const filenameField = findField(entry, "Filename");
+        if (filenameField == nullptr) {
+            return nullptr;
+        }
+        void* const filenameValueHolder = *reinterpret_cast<void**>(static_cast<uint8_t*>(filenameField) + 4u);
+        void* const filenameValueObject = filenameValueHolder ? *reinterpret_cast<void**>(filenameValueHolder) : nullptr;
+        return filenameValueObject ? getString(filenameValueObject) : nullptr;
+    }
+
+    return nullptr;
+}
 
 static ParsedState6Opcode9ReplyScaffold ParseState6Opcode9ReplyScaffold(
     const std::vector<uint8_t>& bytes) {
@@ -110,6 +197,14 @@ static ParsedState6Opcode9ReplyScaffold ParseState6Opcode9ReplyScaffold(
             const size_t metricBodyBytes = static_cast<size_t>(out.metricIdCount) * sizeof(uint16_t);
             if (metricBodyOffset + metricBodyBytes > bytes.size()) {
                 out.metricIdCount = static_cast<uint16_t>((bytes.size() - metricBodyOffset) / sizeof(uint16_t));
+            }
+            out.metricIds.reserve(out.metricIdCount);
+            for (uint16_t i = 0; i < out.metricIdCount; ++i) {
+                const size_t metricOffset = metricBodyOffset + static_cast<size_t>(i) * sizeof(uint16_t);
+                if (metricOffset + sizeof(uint16_t) > bytes.size()) {
+                    break;
+                }
+                out.metricIds.push_back(ReadU16LE(bytes.data() + metricOffset));
             }
         }
     }
@@ -316,14 +411,32 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         return 1u;
     }
 
+    mediator->ClearLateEntryList1470Scaffold();
+    uint32_t resolvedMetricFilenameCount = 0u;
+    uint32_t unresolvedMetricFilenameCount = 0u;
+    for (uint16_t metricId : parsed.metricIds) {
+        const char* const filename = ResolveClientMetricFilenameById(metricId);
+        if (filename && filename[0] != '\0' && mediator->AppendLateEntryFilename1470Scaffold(filename)) {
+            ++resolvedMetricFilenameCount;
+        } else {
+            ++unresolvedMetricFilenameCount;
+            spdlog::info(
+                "CLTLoginState_State6::Slot6_HandleSecondaryMessage could not resolve opcode-0x09 metricId=0x{:04x} to a Filename through the loaded client METR table",
+                static_cast<unsigned>(metricId));
+        }
+    }
+
     mediator->State10SendGateFlagF14() = 1u;
     mediator->SetState6UdpSessionSecretF18(parsed.udpSessionSecret09);
 
     if (cachedUpstreamOrArg_ == nullptr) {
         spdlog::info(
-            "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} but has no cached upstream helper at this+4 yet; leaving helper-switch/event-0x12 to the broader caller flow currentState={}",
+            "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} but has no cached upstream helper at this+4 yet; leaving helper-switch/event-0x12 to the broader caller flow currentState={}",
             static_cast<unsigned>(parsed.udpSessionSecret09),
             static_cast<unsigned>(parsed.metricIdCount),
+            resolvedMetricFilenameCount,
+            unresolvedMetricFilenameCount,
+            BuildMetricIdPreview(parsed.metricIds),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         return 1u;
     }
@@ -343,9 +456,12 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             static_cast<unsigned>(switchDispatchResult));
     } else {
         spdlog::info(
-            "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} but could not resolve nextHelperState={} from cachedUpstream={}; preserving currentState={}",
+            "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} but could not resolve nextHelperState={} from cachedUpstream={}; preserving currentState={}",
             static_cast<unsigned>(parsed.udpSessionSecret09),
             static_cast<unsigned>(parsed.metricIdCount),
+            resolvedMetricFilenameCount,
+            unresolvedMetricFilenameCount,
+            BuildMetricIdPreview(parsed.metricIds),
             static_cast<unsigned>(nextHelperStateId),
             fmt::ptr(cachedUpstreamOrArg_),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
@@ -353,11 +469,14 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     }
 
     spdlog::info(
-        "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x} metricIdCount={} -> nextHelperState={} currentState={}",
+        "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} -> nextHelperState={} currentState={}",
         static_cast<unsigned>(parsed.status01),
         static_cast<unsigned>(parsed.goHereAddr05),
         static_cast<unsigned>(parsed.udpSessionSecret09),
         static_cast<unsigned>(parsed.metricIdCount),
+        resolvedMetricFilenameCount,
+        unresolvedMetricFilenameCount,
+        BuildMetricIdPreview(parsed.metricIds),
         static_cast<unsigned>(nextHelperStateId),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
     return 1u;

@@ -2228,6 +2228,38 @@ SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() 
     return sessionCallbackHelper65c_;
 }
 
+// anchor: launcher.exe:0x41f5f0
+void CLTLoginMediator::ClearLateEntryList1470Scaffold() {
+    lateEntryList1470Entries_.clear();
+    spdlog::info(
+        "CLTLoginMediator::ClearLateEntryList1470Scaffold cleared owner+0x1470 entryCount={} entryCapacity={}",
+        static_cast<unsigned>(lateEntryList1470Entries_.size()),
+        static_cast<unsigned>(lateEntryList1470Entries_.capacity()));
+}
+
+// anchor: launcher.exe:0x41f840 / owner vtable +0x190
+bool CLTLoginMediator::AppendLateEntryFilename1470Scaffold(const char* filename) {
+    if (!filename || !filename[0]) {
+        spdlog::info(
+            "CLTLoginMediator::AppendLateEntryFilename1470Scaffold skipped empty filename owner+0x1470 entryCount={}",
+            static_cast<unsigned>(lateEntryList1470Entries_.size()));
+        return false;
+    }
+
+    const size_t filenameLength = std::strlen(filename);
+    lateEntryList1470Entries_.push_back(LateEntryList1470EntrySketch{
+        filename,
+        filename + filenameLength,
+        filename + filenameLength,
+    });
+    spdlog::info(
+        "CLTLoginMediator::AppendLateEntryFilename1470Scaffold appended filename='{}' owner+0x1470 entryCount={} entryCapacity={} (bounded source mirror of 0x41f840 -> 0x41f640 string-triple append)",
+        filename,
+        static_cast<unsigned>(lateEntryList1470Entries_.size()),
+        static_cast<unsigned>(lateEntryList1470Entries_.capacity()));
+    return true;
+}
+
 // anchor: launcher.exe:0x41af50
 LateEntryList1470VectorLikeSketch* CLTLoginMediator::GetLateEntryList1470() {
     // Keep the wrapper-facing arg6 `+0x118` vector-like object explicit instead of leaving this

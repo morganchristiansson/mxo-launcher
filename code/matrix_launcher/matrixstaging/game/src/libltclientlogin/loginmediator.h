@@ -1215,9 +1215,13 @@ public:
     // owner-side route-text helper family.
     RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() override;
     // anchor: launcher.exe:0x41af50 / ILTLoginMediator.Default slot +0x118
-    // Keep the wrapper-facing late-entry vector-like object explicit; the current source-owned
-    // replacement still exposes an empty list scaffold, but the ABI shape now lives on the owner.
+    // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape now lives on
+    // the owner.
     LateEntryList1470VectorLikeSketch* GetLateEntryList1470() override;
+    // anchor: launcher.exe:0x41f5f0 / owner helper clearing owner `+0x1470`
+    void ClearLateEntryList1470Scaffold();
+    // anchor: launcher.exe:0x41f840 / owner vtable +0x190
+    bool AppendLateEntryFilename1470Scaffold(const char* filename);
     // Wrapper-facing arg6 profile-path/current-slot ABI objects.
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
     // slot-record helpers onto the wrapper-facing `ILTLoginMediator.Default +0x40/+0x44` object

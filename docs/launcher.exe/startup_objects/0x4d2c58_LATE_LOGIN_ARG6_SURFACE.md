@@ -28,6 +28,9 @@ Newer tightening also sharpens what `+0x118` really is on that later side:
   `0x41f640 = StringTripleArray_Append`
 - state6 opcode-`9` success clears `+0x1470`, appends metric-name strings through `+0x190`, and
   later arg6 `+0x118 / 0x41af50` exposes that same vector to client late-runtime consumers
+- current replacement now mirrors that producer closely enough on the active path by decoding the
+  metric-id array from the opcode-`9` reply and mapping each id through the loaded client METR
+  table to filename strings before filling owner `+0x1470`
 
 See:
 - `../state_machine/POST_STATE9_CONTINUATION.md`
@@ -129,8 +132,8 @@ Closed enough on the deliberate existing-character path:
   concrete too:
   - `+0x10c` is called from `0x6217082b` inside `ClientShell_LoginMediatorObserver_OnEvent`
   - `+0x118` is called from `0x621c6db3` inside `0x621c6d90`
-  - that `+0x118` list is still empty on the successful run
-- the same successful run did **not** show:
+  - that `+0x118` list now holds 17 filename entries on the successful run
+- the same successful run still did **not** show:
   - a later `+0x118` caller from `0x62017150`
   - a later `+0x170` caller from `0x62031136` / observer `0x6298a5e8`
 
@@ -147,7 +150,9 @@ Newest tightening on that question:
   - later `ClientShell_LoginMediatorObserver_AdvanceState` treats `DAT_629e689d != 0` as an early
     shortcut that bypasses `GetOrCreateViewById(0x67)` / `0x6298a5e8`
 - so the still-open late-runtime question is now narrower again:
-  - mainly the empty `+0x118` list and whatever later optional work would have consumed it
+  - not the producer anymore — the list is populated
+  - instead, why the later optional `0x62017150` consumer family still does not run on the working
+    route
 
 ## Related docs
 
