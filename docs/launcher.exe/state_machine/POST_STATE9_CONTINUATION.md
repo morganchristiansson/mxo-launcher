@@ -284,32 +284,38 @@ Source home:
 
 The old state9 submit blocker is no longer the active one.
 
-Current replacement boundary has moved later again, into the post-state12 / event-`0x18`
-continuation:
+Current replacement boundary moved later into the post-state12 / event-`0x18` continuation, and
+current replacement validation now shows that this is no longer a hard game-entry blocker.
 
-- replacement now reaches:
+Representative successful replacement run (`2026-04-02`):
+- reaches:
   - state9 submit return `0`
   - event `0x17`
   - raw `0x11` success
   - `0x41b420`
   - helper switch to state12 / `0x0c`
   - event `0x18`
-- event-`0x18` observer work now visibly consumes:
+- event-`0x18` observer work still visibly consumes:
   - arg6 `+0x10c` route descriptor (`"Reality"`)
   - arg6 `+0x118` late-entry list (still empty scaffold)
-- latest bounded replacement run still did **not** yet show:
+- then replacement continues far enough to:
+  - show the in-game `MATRIX_ONLINE` window
+  - return `RunClientDLL = 1`
+  - terminate normally on the harness path
+
+Important remaining fidelity note from that same successful run:
+- current replacement logs still did **not** explicitly show:
   - later event `0x0f`
   - second observer registration (`0x6298a5e8`)
-  - game entry
+- so those are now best treated as **remaining fidelity/instrumentation questions**, not as the
+  active functional blocker for game entry on the replacement path
 
-So the next active issue is back in the later post-state9 continuation family, now narrowed by the
-fact that state9 submit itself is no longer the blocker.
-
-Current strongest concrete suspects:
+Current strongest remaining concrete suspects:
 1. event-`0x18` client observer/runtime continuation after consuming arg6 `+0x10c`
 2. the still-empty arg6 `+0x118` late-entry string-triple vector
 3. later shared gate / close completion path leading to event `0x0f`
 4. second observer registration / loading-area runtime setup after event `0x18`
+5. possible logging blind spot after event `0x18` on the successful replacement route
 
 ## First files to read next session
 
