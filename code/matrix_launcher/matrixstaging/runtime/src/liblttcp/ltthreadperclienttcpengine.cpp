@@ -2743,12 +2743,15 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
     // - newer bounded active-path proof now narrows it further:
     //   successful launcher-into-game runs show the active auth/margin path no longer logging any
     //   `pendingCopiedPackets=` or synthetic receive-drain handling; copied packets are consumed on
-    //   the in-callback post-copy leaf path instead
-    // - current source therefore emits the synthetic proxy only when the narrower `0x4490c0`
-    //   reconstruction actually left copied packets queued in the fallback pending-packet buffer
+    //   the in-callback post-copy tail instead
+    // - tighter `2026-04-02` tail read now matches that runtime shape better:
+    //   once `0x4490c0` reaches its post-copy virtual dispatch family, the packet is already
+    //   consumed locally inside the same callback
+    // - so the synthetic proxy below is now expected to stay dormant and only survives as
+    //   compatibility scaffolding for unexpected source-owned paths
     // - current source queue order on one helper poll is therefore:
     //   - `OnReceive` first queues all parsed-packet work items emitted from the current fragment
-    //   - only if that later callback still leaves copied packets pending does this helper queue a
+    //   - only if some unexpected path still leaves copied packets pending would this helper queue a
     //     synthetic receive-drain proxy for the same fragment
     //   - if a later recv in the same poll returns peer-close/error, the type-1 close item queues
     //     after those successful-fragment submissions

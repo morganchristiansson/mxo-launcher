@@ -1470,16 +1470,18 @@ Build-validated update:
 - `src/launcher_network_object_abi.cpp` arg5 helper `+0x60` slot `0` now calls into the liblttcp engine sidecar instead of directly calling a mediator poll helper
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now owns the current narrow nonblocking launcher-bridge pump and the current queue0C enqueue helper used by that seam
   - newer bounded pacing correction there keeps `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` as the one-fragment recv seam, but lets the bridge re-enter it within one arg5 helper poll
-  - source-owned `AuthReceivePacket` / `MarginReceivePacket` notifications therefore remain explicit only as fallback receive-drain proxies after successful recv fragments whose later `0x4490c0` callback still leaves copied packets pending
-  - newer static RE also narrows their role more strictly:
+  - source-owned `AuthReceivePacket` / `MarginReceivePacket` notifications are now best read as
+    legacy synthetic receive-drain baggage only
+  - newer static RE narrows why:
     - they are not another original type-3 family
     - original type `3` already comes from the parsed-packet work items queued by `CLTTCPConnection::OnReceive`
-    - the extra notification is only a source-owned receive-drain proxy for the later original
-      `CMessageConnection::OnOperationCompleted` tail that source still does not execute there yet
-    - source now reflects that with a distinct synthetic work type instead of reusing original type `3`
-    - newer `2026-04-01` gating now only emits that synthetic item when the copied-packet fallback
-      queue is actually non-empty after the in-callback post-copy leaf step
-  - this narrower bridge-level batching is the current compromise because the earlier fuller same-poll recv-drain restoration regressed live runs into the later `Loading Character` stall
+    - once `0x4490c0` reaches its post-copy virtual tail (`+0x38`, then `+0x2c/+0x30/+0x34`), the
+      packet is already consumed locally inside the same callback
+    - so current source keeps a distinct synthetic work type only as dormant compatibility
+      scaffolding for unexpected paths, not as a faithful later fallback on the auth/margin startup
+      path
+  - this narrower bridge-level batching remains the current compromise because the earlier fuller
+    same-poll recv-drain restoration regressed live runs into the later `Loading Character` stall
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-ABI surface attachment / mirror rules used after engine-side connect work reached through connection wrappers
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now drives owner-visible arg5 state refresh after `MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, and `CleanupConnection` sidecar mutations instead of leaving those refresh calls open-coded in the ABI shell wrappers

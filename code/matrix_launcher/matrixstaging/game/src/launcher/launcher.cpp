@@ -1086,7 +1086,13 @@ bool CLauncher::RunClientDllLifecycle() const {
         return false;
     }
 
-    if (DiagnosticCanBeginAuthConnection()) {
+    // Current bounded guard after the tighter `0x4490c0` auth tail work:
+    // - when the no-GUI launcher path already completed pre-client auth + character selection, the
+    //   client should enter with that recovered state intact instead of restarting auth from
+    //   helper2 immediately after `InitClientDLL`
+    // - keep the old post-init auth auto-begin only for the paths that still arrive without that
+    //   earlier pre-client completion
+    if (!g_PreClientAuthAndCharacterSelectionCompleted && DiagnosticCanBeginAuthConnection()) {
         const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
         spdlog::info(
             "DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x} preClientAuthComplete={}",

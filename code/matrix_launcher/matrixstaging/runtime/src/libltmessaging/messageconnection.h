@@ -579,20 +579,30 @@ public:
     // - work type `3` copies packet-body bytes out of the retained-fragment-backed
     //   `CParsedPacketWorkItem` via `+0x24/+0x28` into a local receive/message-ref scaffold
     //   built on the same outer-ref/inner-storage split used by `0x455cd0/0x455c60`
-    // - source now also mirrors one narrower original post-copy step there:
+    // - later inside that same callback, the tighter current tail is now:
     //   - keep the original headerless locator-id validity gate on that receive/message-ref
-    //   - read message codes through the nearer `0x41bc20/0x41bbb0`-style object path before leaf dispatch
-    // - generic fallback logger on this path is helper `0x448a60`
-    // Current source gap kept explicit:
-    // - source now owns the copied-packet staging subset and two later leaf post-copy destinations:
-    //   - auth: optional `connection+0x74 -> 0x469930 -> 0x4489d0` read-agenda handoff,
-    //     then local message-ref/base-filter step -> `0x449a30 -> owner+0x180 / 0x41f250`
-    //   - margin: optional `connection+0x74 -> 0x469930 -> 0x4489d0` read-agenda handoff,
-    //     then `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
-    // - helper-side replacement/discard is now modeled through the recovered module family, but the
-    //   exact original helper-owned object/refcount tail from this same callback is still
-    //   incomplete, so the launcher bridge keeps one extra synthetic receive-drain proxy item only
-    //   for the remaining copied-packet paths that this in-callback leaf step left unconsumed
+    //   - optional read-agenda handoff `connection+0x74 -> 0x469930 -> 0x4489d0`
+    //   - always hit the vtable `+0x38` pre-dispatch hook first
+    //   - when the local message-ref keeps the original non-zero `+0x10` flag, the callback then
+    //     branches on `inner+0x0f & 0x07`
+    //     - protocol `5` -> vtable `+0x30`
+    //     - protocol `7` -> vtable `+0x34`
+    //     - otherwise -> vtable `+0x2c`
+    //   - the simpler zero-flag path goes straight to vtable `+0x2c`
+    // - current startup auth/margin leaf tables keep `+0x30/+0x34/+0x38` on `0x441790` no-op, so
+    //   those protocol-`5/7` branches are still consumed locally before any later owner fallback
+    // - current source now mirrors the nearer local `+0x2c` auth/margin destinations too:
+    //   - auth: local message-ref/base-filter step -> `0x449a30 -> owner+0x180 / 0x41f250`
+    //   - margin: `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
+    // - remaining source gap kept explicit:
+    //   - packet-name callback / log-name side effects are still only partially mirrored
+    //   - exact heap/refcount lifetime on the original message-object tail remains narrower than
+    //     the current local scaffolds
+    // - practical synthetic-receive consequence of the current correction:
+    //   - once this in-callback tail reaches the virtual dispatch family, source now treats the
+    //     packet as consumed locally just like original `0x4490c0`
+    //   - the older copied-packet fallback queue therefore remains only as dormant compatibility
+    //     scaffolding while the last synthetic receive-drain code is pruned
     uint32_t OnOperationCompleted(void* workItem);
 
     // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
@@ -601,12 +611,14 @@ public:
     // UNANCHORED: source-owned accessor exposing the current headerless/packetized split narrowed
     // from the `0x4490c0` message-ref flag write.
     bool LastReceivedPacketHeaderlessScaffold() const;
-    // UNANCHORED: source-owned fallback queue-drain helper exposing copied parsed-packet bodies
-    // only when the narrowed in-callback `0x4490c0` post-copy leaf path left work unconsumed.
+    // UNANCHORED: legacy source-owned fallback queue-drain helper over copied parsed-packet
+    // bodies. After the tighter `0x4490c0` tail correction this is expected to stay empty on the
+    // normal auth/margin startup path and remains only as dormant compatibility scaffolding.
     bool TakeNextReceivedPacketScaffold(
         std::vector<uint8_t>* outPayloadBytes,
         bool* outHeaderless = nullptr);
-    // UNANCHORED: source-owned probe for whether that fallback copied-packet queue is non-empty.
+    // UNANCHORED: source-owned probe for whether that dormant copied-packet fallback queue is
+    // non-empty.
     bool HasPendingReceivedPacketsScaffold() const;
 
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
@@ -617,14 +629,36 @@ protected:
     // anchor: launcher.exe:0x4490c0 -> vtable `+0x2c`
     // Source-owned post-copy dispatch seam beneath the narrowed type-3 receive path.
     // Current bounded use:
-    // - base `0x4490c0` now still owns the copied-packet extraction
-    // - leaf families now receive a nearer outer-ref/inner-storage scaffold instead of a naked
-    //   byte vector, matching the real `0x455cd0 -> 0x41bc20/0x41bbb0` seam more closely
-    // - leaf families can optionally source-own one later dispatch destination without pretending
-    //   the full original message-object / agenda tail is already reconstructed
-    // - returning non-zero means the leaf consumed this copied packet inside the same callback
-    //   without needing the pending copied-packet queue / later synthetic receive-drain proxy
+    // - base `0x4490c0` now still owns the copied-packet extraction, locator gate, agenda handoff,
+    //   and the later packetized protocol branch that chooses `+0x2c/+0x30/+0x34`
+    // - leaf families receive a nearer outer-ref/inner-storage scaffold instead of a naked byte
+    //   vector, matching the real `0x455cd0 -> 0x41bc20/0x41bbb0` seam more closely
+    // - this local seam stands in for the original `+0x2c` body only
+    // - unlike earlier source-owned fallback logic, original `0x4490c0` still consumes the packet
+    //   locally after calling this seam even when the callee returns false-ish
     virtual uint32_t DispatchCopiedParsedPacketTailScaffold(
+        void* workItem,
+        CMessageConnectionMessageRef& messageRef);
+    // anchor: launcher.exe:0x4490c0 -> vtable `+0x30`
+    // Non-zero-flag protocol-`5` receive seam beneath the same callback tail.
+    // Current startup auth/margin leaf tables keep this row on `0x441790`, so the default source
+    // implementation mirrors that as a locally consumed no-op.
+    virtual uint32_t DispatchPacketizedProtocol5MessageRefScaffold(
+        void* workItem,
+        CMessageConnectionMessageRef& messageRef);
+    // anchor: launcher.exe:0x4490c0 -> vtable `+0x34`
+    // Non-zero-flag protocol-`7` receive seam beneath the same callback tail.
+    // Current startup auth/margin leaf tables also keep this row on `0x441790`, so the default
+    // source implementation mirrors that as a locally consumed no-op.
+    virtual uint32_t DispatchPacketizedProtocol7MessageRefScaffold(
+        void* workItem,
+        CMessageConnectionMessageRef& messageRef);
+    // anchor: launcher.exe:0x4490c0 -> vtable `+0x38`
+    // Pre-dispatch receive hook reached after the optional read-agenda handoff and before the
+    // later `+0x2c/+0x30/+0x34` branch.
+    // Current startup auth/margin/base tables keep this row on `0x441790`, so the default source
+    // implementation remains a no-op.
+    virtual void PreDispatchMessageRefScaffold(
         void* workItem,
         CMessageConnectionMessageRef& messageRef);
 
@@ -658,6 +692,8 @@ private:
     std::unique_ptr<CMessageConnectionPacketAgenda> packetAgenda_;
     std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
     bool lastReceivedPacketHeaderlessScaffold_ = false;
+    // Legacy fallback queue retained only as dormant compatibility scaffolding now that the
+    // tightened `0x4490c0` receive tail consumes the auth/margin packet path locally.
     std::vector<CMessageConnectionReceivedPacketScaffold> pendingReceivedPacketsScaffold_;
 };
 

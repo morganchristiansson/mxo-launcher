@@ -1318,12 +1318,31 @@ uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
     stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
     const uint8_t rawCode = stagedIncomingAuthPacketBytes_[0];
     const uint32_t handled = DispatchCurrentHelperAuthMessageScaffold(workItem);
+
+    // Current bounded replacement for the old synthetic receive-drain-only post-AS_AuthReply side
+    // effect:
+    // - the tighter `0x4490c0` tail now consumes handled auth packets inside the same callback
+    // - so the one-shot margin auto-begin that previously piggybacked on the later fallback queue
+    //   must move up to the handled auth-reply path itself
+    // - keep the same practical gate: only successful handled AS_AuthReply should arm the margin
+    //   connect, and only once per auth cycle
+    uint32_t marginAutoBeginResult = 0u;
+    bool triggeredMarginAutoBegin = false;
+    if (handled != 0u && rawCode == 0x0bu && lastAuthReply_.valid && !lastAuthReply_.isErrorReply &&
+        !postAuthMarginAutoBeginAttemptedScaffold_) {
+        postAuthMarginAutoBeginAttemptedScaffold_ = true;
+        triggeredMarginAutoBegin = true;
+        marginAutoBeginResult = BeginLauncherMarginConnectionScaffold();
+    }
+
     spdlog::info(
-        "CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={}",
+        "CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={} triggeredMarginAutoBegin={} marginAutoBeginResult=0x{:08x}",
         static_cast<unsigned>(rawCode),
         static_cast<unsigned>(packetSize),
         currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(handled));
+        static_cast<unsigned>(handled),
+        triggeredMarginAutoBegin ? 1u : 0u,
+        static_cast<unsigned>(marginAutoBeginResult));
     return handled;
 }
 

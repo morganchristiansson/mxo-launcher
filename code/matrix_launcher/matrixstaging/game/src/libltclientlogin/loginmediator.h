@@ -1146,10 +1146,10 @@ public:
     // - original type-3 parsed-packet queue work already reaches `CMessageConnection::OnOperationCompleted`
     // - handled auth copied packets can now continue one step later through
     //   `0x449a30 -> owner+0x180 / 0x41f250 -> current helper slot5`
-    // - this mediator method remains the later source-owned drain target for the packets/branches
-    //   that still are not consumed on that nearer connection-side path
-    // Keep the post-auth auth-reply semantics and the one-shot margin auto-begin request here so
-    // they stay mediator-owned.
+    // - this mediator method now remains only as a legacy/dormant drain target for unexpected
+    //   paths that still bypass the nearer connection-side handling
+    // - the one-shot post-AS_AuthReply margin auto-begin side effect now lives on the handled auth
+    //   in-callback path itself instead of waiting for this later fallback drain
     uint32_t HandleAuthConnectionReceiveScaffold();
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:

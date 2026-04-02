@@ -954,8 +954,9 @@ static bool CMessageConnection_IsMediatorMarginConnectionScaffold(
     return self != nullptr && mediator != nullptr && self == mediator->MarginConnection();
 }
 
-// UNANCHORED: source-owned synthetic receive-drain proxy standing in only for copied-packet
-// fallthroughs that the narrowed in-callback `0x4490c0` post-copy leaf path still leaves queued.
+// UNANCHORED: legacy source-owned synthetic receive-drain proxy.
+// After the tighter `0x4490c0` tail correction this is expected to stay dormant on the normal
+// auth/margin startup path and only remains as unexpected-path compatibility scaffolding.
 static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
     CMessageConnection* self,
     uint32_t workPayload) {
@@ -1440,6 +1441,31 @@ static CMessageConnectionMessageRef* CMessageConnection_ApplyReceivePacketAgenda
     return agenda->readOutputSlot08;
 }
 
+// anchor: launcher.exe:0x4490c0 packetized branch reads inner `+0x0f & 0x07`
+static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
+    const CMessageConnectionMessageRef& messageRef,
+    uint8_t* outProtocolId) {
+    if (outProtocolId) {
+        *outProtocolId = 0u;
+    }
+
+    const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
+    if (!messageStorage) {
+        return false;
+    }
+
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    if (!payloadBytes || payloadByteCount < 4u) {
+        return false;
+    }
+
+    if (outProtocolId) {
+        *outProtocolId = static_cast<uint8_t>(payloadBytes[3] & 0x07u);
+    }
+    return true;
+}
+
 }  // namespace
 
 // UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
@@ -1451,29 +1477,53 @@ uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
     return 0u;
 }
 
+// anchor family: launcher.exe:0x4490c0 -> vtable `+0x30`
+uint32_t CMessageConnection::DispatchPacketizedProtocol5MessageRefScaffold(
+    void* workItem,
+    CMessageConnectionMessageRef& messageRef) {
+    (void)workItem;
+    (void)messageRef;
+    return 1u;
+}
+
+// anchor family: launcher.exe:0x4490c0 -> vtable `+0x34`
+uint32_t CMessageConnection::DispatchPacketizedProtocol7MessageRefScaffold(
+    void* workItem,
+    CMessageConnectionMessageRef& messageRef) {
+    (void)workItem;
+    (void)messageRef;
+    return 1u;
+}
+
+// anchor family: launcher.exe:0x4490c0 -> vtable `+0x38`
+void CMessageConnection::PreDispatchMessageRefScaffold(
+    void* workItem,
+    CMessageConnectionMessageRef& messageRef) {
+    (void)workItem;
+    (void)messageRef;
+}
+
 // anchor: launcher.exe:0x4490c0
 // string-backed original name: CMessageConnection::OnOperationCompleted
-// Current source body now mirrors the smallest static-RE-backed live subset of the type-3 path:
+// Current source body now mirrors the tighter current read of the type-3 tail:
 // - dispatch on `workItem+0x04`
 // - on type `3`, copy packet-body bytes from the retained-fragment-backed parsed-packet work item
 //   via `currentCursor24` / `assembledByteCount28`
 // - preserve the original oversized-packet close branch before later dispatch/agenda work
-// - newer bounded base-step correction at the post-copy seam:
-//   - source now also materializes the nearer local receive/message-ref scaffold that mirrors
-//     `0x455cd0/0x455c60` outer-ref + inner-storage construction
-//   - copied packet spans are appended into that inner storage before later code reads
-//   - headerless packets now keep the original locator-id validity gate on that object before leaf dispatch
-// - current bounded leaf correction:
-//   - if connection `+0x74` is present, source now also preserves the nearer
-//     `0x469930 -> 0x4489d0` read-agenda handoff shape before dispatch, including helper-side
-//     replacement/discard through the recovered module family
-//   - auth leaf `0x449a30 -> owner+0x180 / 0x41f250` can now re-enter current-helper slot 5
-//     through a local message-ref/base-filter step instead of jumping straight from copied bytes
-//   - margin leaf `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260` can now re-enter the nearer
-//     base-dispatch/current-helper-slot6 path directly from this callback on the handled margin path
-// - remaining message-object / agenda work is still incomplete, so the launcher bridge still keeps
-//   the later synthetic receive-drain proxy only when this callback leaves copied packets in the
-//   pending fallback queue
+// - materialize the nearer local receive/message-ref scaffold mirroring
+//   `0x455cd0/0x455c60` outer-ref + inner-storage construction
+// - keep the original locator-id validity gate on the non-zero-flag branch before later dispatch
+// - preserve the optional `0x469930 -> 0x4489d0` read-agenda handoff
+// - then mirror the later in-callback virtual tail more closely:
+//   - call the vtable `+0x38` pre-dispatch hook first
+//   - non-zero-flag protocol `5` -> vtable `+0x30`
+//   - non-zero-flag protocol `7` -> vtable `+0x34`
+//   - zero-flag/simple path and all other cases -> vtable `+0x2c`
+// - crucial current fidelity correction:
+//   - once original `0x4490c0` reaches that virtual dispatch family, it still consumes the packet
+//     locally inside the same callback even when the callee returns false-ish
+//   - source therefore no longer re-queues that post-dispatch fallthrough as synthetic
+//     receive-drain work on the auth/margin startup path
 uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
@@ -1634,31 +1684,55 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
-    const uint32_t postCopyDispatchHandled = DispatchCopiedParsedPacketTailScaffold(
-        workItem,
-        *messageRefForDispatch);
-    if (postCopyDispatchHandled != 0u) {
-        spdlog::info(
-            "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} and dispatched it on the post-copy leaf path this={} ownerContext={} remoteHost='{}'",
+    PreDispatchMessageRefScaffold(workItem, *messageRefForDispatch);
+
+    const bool headerlessForDispatch = (messageRefForDispatch->headerless10 != 0u);
+    uint8_t headerlessProtocolId = 0u;
+    const bool hasHeaderlessProtocolId =
+        headerlessForDispatch &&
+        CMessageConnection_ResolvePacketizedProtocolIdScaffold(
+            *messageRefForDispatch,
+            &headerlessProtocolId);
+
+    const char* dispatchSlotLabel = "+0x2c";
+    uint32_t postCopyDispatchResult = 0u;
+    if (hasHeaderlessProtocolId && headerlessProtocolId == 5u) {
+        dispatchSlotLabel = "+0x30";
+        postCopyDispatchResult = DispatchPacketizedProtocol5MessageRefScaffold(
+            workItem,
+            *messageRefForDispatch);
+    } else if (hasHeaderlessProtocolId && headerlessProtocolId == 7u) {
+        dispatchSlotLabel = "+0x34";
+        postCopyDispatchResult = DispatchPacketizedProtocol7MessageRefScaffold(
+            workItem,
+            *messageRefForDispatch);
+    } else {
+        postCopyDispatchResult = DispatchCopiedParsedPacketTailScaffold(
+            workItem,
+            *messageRefForDispatch);
+    }
+
+    if (postCopyDispatchResult == 0u) {
+        spdlog::debug(
+            "CMessageConnection::OnOperationCompleted mirrored original local type-3 consume after dispatchSlot={} returned false-ish payloadBytes={} headerless={} headerlessProtocolValid={} headerlessProtocol={} this={} ownerContext={} remoteHost='{}'",
+            dispatchSlotLabel,
             static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
-            lastReceivedPacketHeaderlessScaffold_ ? 1u : 0u,
-            static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
+            headerlessForDispatch ? 1u : 0u,
+            hasHeaderlessProtocolId ? 1u : 0u,
+            static_cast<unsigned>(headerlessProtocolId),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-        return 1u;
     }
 
-    pendingReceivedPacketsScaffold_.push_back(
-        CMessageConnectionReceivedPacketScaffold{
-            lastReceivedPacketBodyBytesScaffold_,
-            lastReceivedPacketHeaderlessScaffold_});
     spdlog::info(
-        "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} pendingCopiedPackets={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::OnOperationCompleted copied parsed packet body payloadBytes={} headerless={} retainedFragmentCount={} headerlessProtocolValid={} headerlessProtocol={} dispatchSlot={} and handled it on the in-callback post-copy tail this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
-        lastReceivedPacketHeaderlessScaffold_ ? 1u : 0u,
+        headerlessForDispatch ? 1u : 0u,
         static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
-        static_cast<unsigned>(pendingReceivedPacketsScaffold_.size()),
+        hasHeaderlessProtocolId ? 1u : 0u,
+        static_cast<unsigned>(headerlessProtocolId),
+        dispatchSlotLabel,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
