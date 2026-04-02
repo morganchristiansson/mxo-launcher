@@ -2,9 +2,83 @@
 #include "loginstate.h"
 #include "loginmediator.h"
 #include "loginstate_loadcharacterreply_scaffold.h"
+#include "loginstate_packet_builder_scaffold.h"
 #include "../../../../src/diagnostics.h"
 
+#include <array>
+
 namespace mxo::ltlogin {
+namespace {
+
+struct State6Packet0x06FixedPayload {
+    // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
+    // raw margin opcode `0x06` = `MS_ConnectRequest`
+    static constexpr uint8_t kPayloadTag06 = 0x06;
+    static constexpr size_t kLauncherVersionOffset = 0x01;
+    static constexpr size_t kClientVersionOffset = 0x05;
+    static constexpr size_t kStateByteOffset = 0x09;
+    static constexpr uint8_t kStateByteValue = 0x01;
+    static constexpr size_t kFixedDwordAOffset = 0x0a;
+    static constexpr uint32_t kFixedDwordA = 0x11186887u;
+    static constexpr size_t kFixedDwordEOffset = 0x0e;
+    static constexpr uint32_t kFixedDwordE = 0x7460a4b0u;
+    static constexpr size_t kGobFileGuidOffset = 0x12;
+    static constexpr size_t kCurrentHelperPhaseOffset = 0x22;
+    static constexpr size_t kFixedByteCount = 0x23;
+};
+
+class State6Packet0x06Builder final : public RecoveredPacketBuilderEnvelope {
+public:
+    // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
+    void ResetAndInitialize() {
+        ResizePayload(State6Packet0x06FixedPayload::kFixedByteCount);
+        WritePayloadByte(0x00, State6Packet0x06FixedPayload::kPayloadTag06);
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kLauncherVersionOffset, 0u);
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kClientVersionOffset, 0u);
+        WritePayloadByte(
+            State6Packet0x06FixedPayload::kStateByteOffset,
+            State6Packet0x06FixedPayload::kStateByteValue);
+        WritePayloadU32LE(
+            State6Packet0x06FixedPayload::kFixedDwordAOffset,
+            State6Packet0x06FixedPayload::kFixedDwordA);
+        WritePayloadU32LE(
+            State6Packet0x06FixedPayload::kFixedDwordEOffset,
+            State6Packet0x06FixedPayload::kFixedDwordE);
+        SetGobFileGuid({0u, 0u, 0u, 0u});
+        WritePayloadByte(State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset, 0u);
+    }
+
+    void SetLauncherVersion(uint32_t value) {
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kLauncherVersionOffset, value);
+    }
+
+    void SetClientVersion(uint32_t value) {
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kClientVersionOffset, value);
+    }
+
+    void SetGobFileGuid(const std::array<uint32_t, 4>& guidWords) {
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0, guidWords[0]);
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4, guidWords[1]);
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8, guidWords[2]);
+        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc, guidWords[3]);
+    }
+
+    void SetCurrentHelperPhaseByte(uint8_t value) {
+        WritePayloadByte(State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset, value);
+    }
+};
+
+static std::array<uint32_t, 4> ResolveState6GobFileGuidWords(CLTLoginMediator* mediator) {
+    (void)mediator;
+
+    // anchor: launcher.exe:0x438e60 = GetGOBFileGUID
+    // Original `0x43b8f0` reads a 16-byte LTGUID for packed GOB resource `0x3e000000` and falls
+    // back to the baked-in dwords at `0x4ae6c0..0x4ae6cc` when that resource cannot be opened.
+    // Current replacement does not yet own that launcher resource-manager bridge, but the baked-in
+    // fallback bytes are now at least mirrored explicitly instead of leaving state6 slot3 on a
+    // synthetic packet shape.
+    return {0u, 0u, 0u, 0u};
+}
 
 struct ParsedState6Opcode9ReplyScaffold {
     bool valid = false;
@@ -74,6 +148,8 @@ static CLTLoginState* LookupRegisteredScaffoldStateById(CLTLoginMediator* mediat
     }
 }
 
+}  // namespace
+
 // anchor: launcher.exe vtable 0x004b508c
 const char* CLTLoginState_State6::DebugName() const {
     return "CLTLoginState_State6";
@@ -134,17 +210,45 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         return fallbackResult;
     }
 
-    // Narrow currently validated send-side mirror from `0x43b8f0`:
-    // - copied payload fields now resolved to owner getter pairs `+0x20/+0x28`
-    //   (`owner+0x08` / `owner+0x0c` via tiny getters), fixed constants, GOB file GUID,
-    //   and owner current helper phase byte at payload `+0x22`
-    // - the exact packet-builder body remains a later fidelity target once the state5/state6
-    //   continuation is stable on the active path
+    // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
+    // Current tighter send-side mirror:
+    // - payload `+0x00` = raw opcode `0x06` (`MS_ConnectRequest`)
+    // - payload `+0x01/+0x05` = owner `+0x08/+0x0c` launcher/client version dwords
+    // - payload `+0x09` = fixed byte `1`
+    // - payload `+0x0a/+0x0e` = fixed dwords `0x11186887` / `0x7460a4b0`
+    // - payload `+0x12..+0x21` = packed-GOB LTGUID from `0x438e60` fallback family
+    // - payload `+0x22` = owner current helper phase byte
+    State6Packet0x06Builder packetBuilder;
+    packetBuilder.ResetAndInitialize();
+
+    const uint32_t* launcherVersionPtr = mediator->GetNoPatchLauncherVersionValuePtr08();
+    const uint32_t* clientVersionPtr = mediator->GetNoPatchClientVersionValuePtr0c();
+    const uint32_t launcherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
+    const uint32_t clientVersion = clientVersionPtr ? *clientVersionPtr : 0u;
+    const auto gobFileGuidWords = ResolveState6GobFileGuidWords(mediator);
+    const uint8_t currentHelperPhaseByte = static_cast<uint8_t>(
+        mediator->CurrentState() ? mediator->CurrentState()->DispatchPhaseCode() : 0u);
+
+    packetBuilder.SetLauncherVersion(launcherVersion);
+    packetBuilder.SetClientVersion(clientVersion);
+    packetBuilder.SetGobFileGuid(gobFileGuidWords);
+    packetBuilder.SetCurrentHelperPhaseByte(currentHelperPhaseByte);
+
+    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
     mediator->PostEventScaffold(0x11u);
     spdlog::info(
-        "CLTLoginState_State6::Slot3_BeginOrContinue passed owner+0x1c state==2 and margin connection +0x84 gate; packet builder/send still bounded, posted event=0x11 currentState={}",
+        "CLTLoginState_State6::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
+        State6Packet0x06FixedPayload::kFixedByteCount,
+        static_cast<unsigned>(launcherVersion),
+        static_cast<unsigned>(clientVersion),
+        static_cast<unsigned>(gobFileGuidWords[0]),
+        static_cast<unsigned>(gobFileGuidWords[1]),
+        static_cast<unsigned>(gobFileGuidWords[2]),
+        static_cast<unsigned>(gobFileGuidWords[3]),
+        static_cast<unsigned>(currentHelperPhaseByte),
+        static_cast<unsigned>(sendResult),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
-    return 1u;
+    return sendResult;
 }
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)

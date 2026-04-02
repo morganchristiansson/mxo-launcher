@@ -1652,16 +1652,33 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     std::copy(input.block94.begin(), input.block94.end(), state8SelectionContextSnapshotState_.blockD60.begin());
     std::copy(input.blockA4.begin(), input.blockA4.end(), state8SelectionContextSnapshotState_.blockD70.begin());
 
+    const CLTLoginState* const oldState = currentState_;
+    uint32_t state8EntryResult = 0u;
     if (scaffoldState8_ != nullptr) {
-        SwitchHelperStateScaffold(8u, scaffoldState8_);
+        // anchor: launcher.exe:0x41c1f0 -> 0x41b450(8)
+        // Important existing-character continuation detail:
+        // - the original owner `+0xec` tail does not stop at `currentState = state8`
+        // - `0x41b450` immediately re-enters the new helper's slot 3 with the old helper object
+        // - on the active path that means `state8 slot3` runs right here, sees margin state != 2,
+        //   and hands off into helper/state4 before the later margin connect-status arrives
+        // - without that immediate slot-3 continuation, the later type-2 margin completion lands on
+        //   shared state8 slot2 and returns 0 instead of restoring the original state4/state5/state6
+        //   chain back toward the first natural state8 raw-0x0f send
+        state8EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
+            8u,
+            scaffoldState8_,
+            const_cast<CLTLoginState*>(oldState),
+            "PersistSelectionContextForState8 0x41c1f0 -> 0x41b450 immediate state8 slot3 continuation");
     }
 
     spdlog::info(
-        "CLTLoginMediator::PersistSelectionContextForState8 mirrored owner-advanced state3(wait)->state8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} currentState={}",
+        "CLTLoginMediator::PersistSelectionContextForState8 mirrored owner-advanced state3(wait)->state8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} oldState={} currentState={} state8EntryResult=0x{:08x}",
         state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8,
         state8SelectionContextSnapshotState_.blockCd0[0],
         state8SelectionContextSnapshotState_.blockD70[3],
-        currentState_ ? currentState_->DebugName() : "<unchanged>");
+        oldState ? oldState->DebugName() : "<null>",
+        currentState_ ? currentState_->DebugName() : "<unchanged>",
+        static_cast<unsigned>(state8EntryResult));
     return 0u;
 }
 
