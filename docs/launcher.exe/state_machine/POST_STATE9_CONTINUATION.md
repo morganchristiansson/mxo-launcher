@@ -95,6 +95,13 @@ Current active existing-character path is source-owned/live enough to reach:
   - `+0x170` registration
   - `+0x10c` route-descriptor getter
   - `+0x118` late-entry-list getter (currently empty scaffold)
+- newer successful-run caller logging now tightens that post-`0x18` surface further:
+  - `+0x10c` is hit from `client.dll:ClientShell_LoginMediatorObserver_OnEvent` return site
+    `0x6217082b`
+  - `+0x118` is hit immediately from `0x621c6d90`, the event-`0x18` late-entry/loading-area
+    setup helper
+  - the same successful run did **not** show a later `+0x118` caller from `0x62017150`
+  - and did **not** show a later `+0x170` caller from `0x62031136`
 
 Newest replacement milestone that closed the old state9 submit blocker:
 - the active timeout at `0x41de40` was caused by duplicate replacement bootstrap handling of
@@ -213,15 +220,21 @@ New live/runtime proof now tightens the client-facing registration side too:
     `0x6298a760` into `+0x170`
 - replacement-side runtime progress now tightens the event-`0x18` callback path further too:
   - event-`0x18` observer callback now reaches and consumes arg6 `+0x10c`
-  - immediate event-`0x18` handling still does not need populated `+0x118`
-  - but newer client-side cross-check now shows `+0x118` is a real later consumer surface, not a
+  - newer caller logging on a successful replacement game-entry run makes the immediate `+0x118`
+    split concrete:
+    - the observed caller was `0x621c6db3` inside `0x621c6d90`
+    - that is the immediate event-`0x18` late-entry/loading-area setup helper
+    - the returned list was still empty on that successful run
+  - client-side static proof still says `+0x118` is a real later consumer surface, not a
     permanently ignorable empty scaffold:
     - `0x62017150` iterates 12-byte entries from arg6 `+0x118`
     - compares metric ids derived from each entry's first-dword string
     - later runtime callers `0x620181f0 / 0x62018250` use that helper
-  - after the event-`0x18` callback, the replacement later reaches a second observer registration:
+  - but the newest successful replacement run did **not** show a `+0x118` call from `0x62017150`
+  - static client proof also still says a second observer registration exists at:
     - `client.dll:LoadingAreaCommonLayoutView_ctor` (`0x62030d90`) at `0x62031136`
     - observer object `0x6298a5e8`
+  - but the newest successful replacement run did **not** show that `+0x170` call either
 
 Practical consequence:
 - the client-visible observer registration bridge is no longer speculative
@@ -257,6 +270,9 @@ Practical consequence:
 - treat event `0x18` as the listener/observer handoff boundary
 - treat shared gate `0x438df0` as the now-live-backed later-source for the natural
   `0x41cfb0(0x0f)` tail
+- newer successful replacement runs still do **not** hit that later close-completion / event-`0x0f`
+  bridge before entering game, so this is now best tracked as a remaining fidelity gap rather than
+  as a current game-entry prerequisite on the replacement route
 - this strengthens the case that the post-state9 continuation remains observer/event-driven before
   any later unproven `0x004397e0` / `0x0041c5c0` involvement
 
@@ -287,7 +303,7 @@ The old state9 submit blocker is no longer the active one.
 Current replacement boundary moved later into the post-state12 / event-`0x18` continuation, and
 current replacement validation now shows that this is no longer a hard game-entry blocker.
 
-Representative successful replacement run (`2026-04-02`):
+Representative successful replacement run (`2026-04-02`, latest caller-logging pass):
 - reaches:
   - state9 submit return `0`
   - event `0x17`
@@ -295,27 +311,36 @@ Representative successful replacement run (`2026-04-02`):
   - `0x41b420`
   - helper switch to state12 / `0x0c`
   - event `0x18`
-- event-`0x18` observer work still visibly consumes:
-  - arg6 `+0x10c` route descriptor (`"Reality"`)
-  - arg6 `+0x118` late-entry list (still empty scaffold)
+- event-`0x18` observer work then visibly consumes:
+  - arg6 `+0x10c` route descriptor (`"Reality"`) from caller `0x6217082b`
+  - arg6 `+0x118` late-entry list from caller `0x621c6db3` (`0x621c6d90`)
+  - that returned list is still empty on the successful run
 - then replacement continues far enough to:
   - show the in-game `MATRIX_ONLINE` window
   - return `RunClientDLL = 1`
-  - terminate normally on the harness path
 
 Important remaining fidelity note from that same successful run:
-- current replacement logs still did **not** explicitly show:
+- current replacement logs still did **not** show:
   - later event `0x0f`
-  - second observer registration (`0x6298a5e8`)
-- so those are now best treated as **remaining fidelity/instrumentation questions**, not as the
-  active functional blocker for game entry on the replacement path
+  - any later `+0x118` caller from `0x62017150`
+  - second observer registration (`0x6298a5e8`) through `+0x170`
+- because the ABI shell now logs exact caller addresses for `+0x10c/+0x118/+0x170/+0x174`, the
+  missing `0x62017150` / `0x62031136` activity is no longer best read as a logging blind spot
+- practical current read:
+  - successful replacement game entry already works
+  - the absent later metric-matcher / second-observer work is a true not-currently-taken runtime
+    path on the replacement route
+  - later event `0x0f` likewise remains a true missing/not-yet-taken fidelity path, but not a game
+    entry prerequisite on the current replacement route
 
 Current strongest remaining concrete suspects:
-1. event-`0x18` client observer/runtime continuation after consuming arg6 `+0x10c`
+1. why the successful event-`0x18` continuation stops after the immediate `0x621c6d90` helper
+   instead of later reaching `0x62017150`
 2. the still-empty arg6 `+0x118` late-entry string-triple vector
-3. later shared gate / close completion path leading to event `0x0f`
-4. second observer registration / loading-area runtime setup after event `0x18`
-5. possible logging blind spot after event `0x18` on the successful replacement route
+3. why the successful replacement route does not currently take the later shared-gate / close
+   completion path to event `0x0f`
+4. why the successful replacement route does not currently instantiate
+   `LoadingAreaCommonLayoutView_ctor` / observer `0x6298a5e8`
 
 ## First files to read next session
 

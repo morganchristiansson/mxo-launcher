@@ -140,6 +140,53 @@ const char* DescribeMediatorCaller(void* returnAddress) {
     return "client.dll:<unclassified>";
 }
 
+static const char* DescribeLateMediatorAbiCaller(void* returnAddress) {
+    const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
+    if (address >= 0x621707e0u && address <= 0x62170af8u) {
+        return "client.dll:ClientShell_LoginMediatorObserver_OnEvent";
+    }
+    if (address >= 0x621c6d90u && address <= 0x621c7427u) {
+        return "client.dll:late-entry loading-area setup helper";
+    }
+    if (address >= 0x62017150u && address <= 0x62017278u) {
+        return "client.dll:late-entry metric matcher";
+    }
+    if (address >= 0x62030d90u && address <= 0x6203134du) {
+        return "client.dll:LoadingAreaCommonLayoutView ctor family";
+    }
+    if (address >= 0x620301e0u && address <= 0x620304ffu) {
+        return "client.dll:LoadingAreaCommonLayoutView dtor family";
+    }
+    if (address >= 0x620557c0u && address <= 0x62056700u) {
+        return "client.dll:RsiLayoutsView ctor family";
+    }
+    return DescribeMediatorCaller(returnAddress);
+}
+
+static const char* DescribeKnownMediatorObserver(void* observer) {
+    switch (reinterpret_cast<uintptr_t>(observer)) {
+        case 0x629ddfc8u:
+            return "ClientShell login-mediator observer";
+        case 0x6298a5e8u:
+            return "LoadingAreaCommonLayoutView forwarder";
+        case 0x6298a760u:
+            return "RsiLayoutsView forwarder";
+        default:
+            return "unknown/static observer";
+    }
+}
+
+static std::string DescribeRouteDescriptorText(
+    const mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* descriptor) {
+    if (!descriptor || !descriptor->begin || !descriptor->current || descriptor->current < descriptor->begin) {
+        return "<empty>";
+    }
+    if (descriptor->current == descriptor->begin) {
+        return "<empty>";
+    }
+    return std::string(descriptor->begin, descriptor->current);
+}
+
 void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     if (!mediator) {
@@ -819,9 +866,24 @@ static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLogin
 // Current best late-runtime read from the event-0x18 observer callback:
 // - returns owner `+0x30`
 // - client immediately consumes the first two dwords there as a small-string begin/current pair
+// - wrapper also logs the exact client return address so the successful post-0x18 route can prove
+//   whether the current run actually executed the event-0x18 body or skipped it on observer byte
+//   `this+0xcc`
 static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator_GetRouteDescriptor10c(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetRouteDescriptor30();
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* const descriptor =
+        mxo::ltlogin::ILTLoginMediator::Default->GetRouteDescriptor30();
+    const std::string descriptorText = DescribeRouteDescriptorText(descriptor);
+    spdlog::info(
+        "MediatorStub::GetRouteDescriptor10c caller={} [{}] result={} begin={} current={} text='{}'",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        fmt::ptr(descriptor),
+        fmt::ptr(descriptor ? descriptor->begin : nullptr),
+        fmt::ptr(descriptor ? descriptor->current : nullptr),
+        descriptorText);
+    return descriptor;
 }
 
 // anchor: launcher.exe:0x41af50
@@ -829,11 +891,33 @@ static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator
 // Current best late-runtime read:
 // - returns owner `+0x1470`
 // - client reads it as a vector-like begin/current/capacity triple of 12-byte string-triple entries
-// - later consumer `0x62017150` reads the first dword of each entry as a filename-like string and
-//   maps it through `FUN_622a9cf0` / `METR` metadata
+// - immediate event-0x18 helper `0x621c6d90` and later consumer `0x62017150` both use this slot
+// - wrapper logs the exact client return address so successful runs can show whether only the
+//   immediate event-0x18 helper fired or the later metric-matcher path also ran
 static mxo::ltlogin::LateEntryList1470VectorLikeSketch* __thiscall Mediator_GetLateEntryList118(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLateEntryList1470();
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    mxo::ltlogin::LateEntryList1470VectorLikeSketch* const list =
+        mxo::ltlogin::ILTLoginMediator::Default->GetLateEntryList1470();
+    size_t entryCount = 0u;
+    const char* firstEntry = "<empty>";
+    if (list && list->begin && list->current && list->current >= list->begin) {
+        entryCount = static_cast<size_t>(list->current - list->begin);
+        if (entryCount != 0u && list->begin->begin && list->begin->begin[0] != '\0') {
+            firstEntry = list->begin->begin;
+        }
+    }
+    spdlog::info(
+        "MediatorStub::GetLateEntryList118 caller={} [{}] result={} begin={} current={} capacity={} entryCount={} firstEntry='{}'",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        fmt::ptr(list),
+        fmt::ptr(list ? list->begin : nullptr),
+        fmt::ptr(list ? list->current : nullptr),
+        fmt::ptr(list ? list->capacity : nullptr),
+        entryCount,
+        firstEntry);
+    return list;
 }
 
 // UNANCHORED: C helper behind the recovered +0xec ABI wrapper.
@@ -1021,15 +1105,25 @@ static void __thiscall Mediator_InvokeSessionCallbackHelper13c(MinimalLoginMedia
 }
 
 // UNANCHORED: C helper behind the recovered +0x170 observer-registration ABI wrapper.
-// Wrapper now forwards to CLTLoginMediator::RegisterLoginObserver; all state/logging moved to owner.
+// Wrapper now forwards to CLTLoginMediator::RegisterLoginObserver; owner keeps the tree state while
+// the ABI shell logs the exact client callsite (`InitClientDLL`, `LoadingAreaCommonLayoutView_ctor`,
+// `RsiLayoutsView_ctor`, etc.) so post-event-0x18 runs can prove which observer registrations did
+// or did not happen.
 extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
     MinimalLoginMediatorStub* self,
     void* observer,
     void* returnAddress) {
     (void)self;
-    (void)returnAddress;
 
-    return mxo::ltlogin::ILTLoginMediator::Default->RegisterLoginObserver(observer);
+    const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->RegisterLoginObserver(observer);
+    spdlog::info(
+        "MediatorStub::RegisterLoginObserver170 caller={} [{}] observer={} ({}) -> returnValue={}",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        fmt::ptr(observer),
+        DescribeKnownMediatorObserver(observer),
+        result);
+    return result;
 }
 
 // anchor: launcher.exe:0x41ddb0
@@ -1069,15 +1163,24 @@ static const char* __thiscall Mediator_GetGameSessionId(MinimalLoginMediatorStub
 }
 
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
-// Wrapper now forwards to CLTLoginMediator::UnregisterLoginObserver; all state/logging moved to owner.
+// Wrapper now forwards to CLTLoginMediator::UnregisterLoginObserver; owner keeps the tree state
+// while the ABI shell logs exact client callsites so paired view ctor/dtor observer lifetimes stay
+// visible during late-runtime investigation.
 extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
     MinimalLoginMediatorStub* self,
     void* observer,
     void* returnAddress) {
     (void)self;
-    (void)returnAddress;
 
-    return mxo::ltlogin::ILTLoginMediator::Default->UnregisterLoginObserver(observer);
+    const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->UnregisterLoginObserver(observer);
+    spdlog::info(
+        "MediatorStub::UnregisterLoginObserver174 caller={} [{}] observer={} ({}) -> returnValue={}",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        fmt::ptr(observer),
+        DescribeKnownMediatorObserver(observer),
+        result);
+    return result;
 }
 
 // anchor: launcher.exe:0x41dde0

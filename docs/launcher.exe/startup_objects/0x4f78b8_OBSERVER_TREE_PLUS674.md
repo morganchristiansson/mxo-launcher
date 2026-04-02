@@ -17,6 +17,20 @@ The replacement now source-owns that shape closely enough to do in-order event/e
 flattening it into a vector, but balancing/color bits and original node-pool recycling are still not
 fully reconstructed.
 
+Current concrete observer identities on the active route:
+- `0x629ddfc8`
+  - `ClientShell_LoginMediatorObserver`
+  - ctor now named in Ghidra as `ClientShell_LoginMediatorObserver_ctor` (`0x6217f370`)
+  - the successful replacement game-entry run still shows this as the only observed live
+    registration on the post-state9 path
+- `0x6298a760`
+  - `LoginMediatorObserverForwarder` registered from `RsiLayoutsView_ctor` (`0x62056585`)
+- `0x6298a5e8`
+  - `LoginMediatorObserverForwarder` registered from `LoadingAreaCommonLayoutView_ctor`
+    (`0x62031136`) and unregistered by the paired dtors at `0x620301e0 / 0x620304a0`
+  - latest successful replacement caller-logging run did **not** observe this registration, so its
+    absence is currently a real not-taken late-runtime branch rather than a logging blind spot
+
 ## Container shape
 
 Recovered from `0x41cfb0 / 0x41d090 / 0x41ddb0 / 0x41dde0 / 0x419510 / 0x41d430`.
@@ -158,5 +172,8 @@ Still unresolved / only partially mirrored:
 - balancing/color bits of the original std::_Tree-like nodes
 - original node allocation / free-list recycling path around `0x41d430`
 - exact semantics of node field `+0x00`
+- why the current successful replacement route still keeps the tree at only the
+  `0x629ddfc8` client-shell observer after event `0x18`, instead of later adding
+  `0x6298a5e8`
 - whether any caller materially depends on the inverted register/unregister return values
   (no current active path has shown that yet)

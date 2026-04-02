@@ -125,9 +125,19 @@ Closed enough on the deliberate existing-character path:
   - `0x41b420`
   - switch to state `0x0c`
   - event `0x18`
+- newest successful replacement caller-logging run then makes the immediate post-`0x18` arg6 use
+  concrete too:
+  - `+0x10c` is called from `0x6217082b` inside `ClientShell_LoginMediatorObserver_OnEvent`
+  - `+0x118` is called from `0x621c6db3` inside `0x621c6d90`
+  - that `+0x118` list is still empty on the successful run
+- the same successful run did **not** show:
+  - a later `+0x118` caller from `0x62017150`
+  - a later `+0x170` caller from `0x62031136` / observer `0x6298a5e8`
 
 So the active blocker is no longer “missing arg6 late-login ABI”.
-The next blocker is later post-state9 / state-`0x0c` continuation.
+The next blocker is later post-state9 / state-`0x0c` continuation, specifically why the working
+replacement route currently stops after the immediate `0x621c6d90` helper instead of taking the
+later original-looking late-entry / second-observer branches.
 
 ## Related docs
 

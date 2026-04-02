@@ -422,6 +422,22 @@ From `client.dll` static init and early `InitClientDLL` analysis:
 
 Many later runtime paths use even more offsets (`+0xf4`, `+0x10c`, `+0x118`, `+0x120`, `+0x148`, `+0x154`, `+0x158`, `+0x160`, `+0x174`, `+0x178`, etc.), which is strong evidence that the real interface is broad and not a tiny ad-hoc object.
 
+Newest post-state9/runtime consequence from the successful replacement game-entry run (`2026-04-02`):
+- exact ABI-shell caller logging now makes the late post-`0x18` arg6 surface concrete on the
+  working route too
+- observed calls on that successful run were:
+  - `+0x170` from `0x62170da1` (`InitClientDLL_BeginLoadingCharacterFlow` family) for observer
+    `0x629ddfc8`
+  - `+0x10c` from `0x6217082b` inside `ClientShell_LoginMediatorObserver_OnEvent`
+  - `+0x118` from `0x621c6db3` inside `0x621c6d90`
+- the same successful run did **not** show:
+  - `+0x118` from later metric matcher `0x62017150`
+  - `+0x170` from `LoadingAreaCommonLayoutView_ctor` site `0x62031136`
+- practical consequence:
+  - the missing second observer registration is no longer best read as a logging blind spot on the
+    successful replacement route
+  - it is currently a true not-taken late-runtime branch, even though game entry already works
+
 New late-runtime crash consequence from the current in-game path:
 - replacement-launcher crash dumps `MatrixOnline_0.0_crash_95.dmp` / `_96.dmp` now pin one missing arg6 ABI slot concretely
 - both dumps stop at `EIP=0x00000000` with top return address `0x625c86db`
