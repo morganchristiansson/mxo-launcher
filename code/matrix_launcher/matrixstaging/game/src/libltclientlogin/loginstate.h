@@ -376,6 +376,10 @@ public:
         pendingWord6_ = word6;
     }
 
+    bool HasPendingPayload() const {
+        return pendingByte4_ != 0u || pendingWord6_ != 0u;
+    }
+
     // anchor: launcher.exe vtable 0x004b517c
     const char* DebugName() const override;
 

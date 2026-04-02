@@ -83,6 +83,9 @@ Practical read from that single narrow pass:
 Current active existing-character path is source-owned/live enough to reach:
 - state8 raw `0x0f`
 - state8 raw `0x10` receive and helper9/state9 handoff
+- immediate helper9/state9 slot-3 continuation during the `0x41b450` install itself
+  - practical correction: helper9 submit must happen before the later event `0x0b` observer/UI work
+  - the older source-owned event-`0x0b` continuation bridge was temporally too late on the active path
 - `0x41de40` submit followup
 - state9 raw `0x11` success
 - `0x41b420`
@@ -92,10 +95,21 @@ Current active existing-character path is source-owned/live enough to reach:
   - `+0x170` registration
   - `+0x10c` route-descriptor getter
   - `+0x118` late-entry-list getter (currently empty scaffold)
-- later second observer registration after event `0x18`
-- first entry into game on the active existing-character path
 
-So the old state9 submit blocker is closed enough for the active path.
+Newest replacement milestone that closed the old state9 submit blocker:
+- the active timeout at `0x41de40` was caused by duplicate replacement bootstrap handling of
+  `MS_ConnectChallenge` / later extra `MS_ConnectReply`
+- on that broken run family:
+  - bootstrap sent a second challenge-response after the first had already advanced the state
+  - server then produced an extra later `MS_ConnectReply` with a different session id outside the
+    proven state6 slot-6 route
+  - state9 submit returned `0x00000003`
+- current replacement now consumes duplicate late bootstrap opcode-`7` / redundant opcode-`9`
+  packets without re-driving the single-shot existing-character state6 continuation
+- practical result on the active path now matches the original submit boundary again:
+  - state9 submit returns `0`
+  - event `0x17` is posted
+  - later raw `0x11` success reaches state12 and event `0x18`
 
 ## Current anchored pieces
 
@@ -123,6 +137,10 @@ Current best read:
 - direct vtable reads now tighten those offsets to:
   - old helper `+0x0c` -> slot 4
   - new helper `+0x08` -> slot 3 / BeginOrContinue
+- important path split:
+  - state8/state11 -> helper9/state9 is **not** a tiny-stub case
+  - that install immediately re-enters helper9 slot 3 / `0x439780`, so state9 submit belongs before the later event `0x0b/0x16` observer work
+  - state9 -> state12 is the tiny-stub pair
 - active post-state9 consequence:
   - on the state9 -> state12 switch, old helper slot 4 is the shared tiny stub
   - new helper state12 slot 3 is also the shared tiny stub
@@ -264,30 +282,47 @@ Source home:
 
 ## Current blocker
 
-The old post-state9 / state-`0x0c` continuation blocker is no longer the active one.
+The old state9 submit blocker is no longer the active one.
 
-The active replacement boundary has moved later, into the post-entry late-runtime surface behind the
-now-live arg6 observer bridge.
+Current replacement boundary has moved later again, into the post-state12 / event-`0x18`
+continuation:
 
-Most likely missing concrete work now lives in one of these areas:
-1. stabilizing or understanding the later second observer registration (`client.dll:0x62031136`,
-   object `0x6298a5e8`)
-2. replacing the still-empty arg6 `+0x118` late-entry string-triple vector with faithful owner-side
-   content once the `0x440780 -> +0x190 -> +0x1470` producer is mirrored tightly enough
-3. checking replacement parity against the natural-original later `0x438df0 -> 0x41cfb0(0x0f)`
-   tail and any post-entry follow-on behavior
+- replacement now reaches:
+  - state9 submit return `0`
+  - event `0x17`
+  - raw `0x11` success
+  - `0x41b420`
+  - helper switch to state12 / `0x0c`
+  - event `0x18`
+- event-`0x18` observer work now visibly consumes:
+  - arg6 `+0x10c` route descriptor (`"Reality"`)
+  - arg6 `+0x118` late-entry list (still empty scaffold)
+- latest bounded replacement run still did **not** yet show:
+  - later event `0x0f`
+  - second observer registration (`0x6298a5e8`)
+  - game entry
+
+So the next active issue is back in the later post-state9 continuation family, now narrowed by the
+fact that state9 submit itself is no longer the blocker.
+
+Current strongest concrete suspects:
+1. event-`0x18` client observer/runtime continuation after consuming arg6 `+0x10c`
+2. the still-empty arg6 `+0x118` late-entry string-triple vector
+3. later shared gate / close completion path leading to event `0x0f`
+4. second observer registration / loading-area runtime setup after event `0x18`
 
 ## First files to read next session
 
-- `matrixstaging/game/src/libltclientlogin/loginstate_state9.cpp`
-- `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
-- `src/launcher_mediator_abi.cpp`
-- `matrixstaging/game/src/libltclientlogin/loginmediator_state9_submit_scaffold.h`
+- `matrixstaging/game/src/libltclientlogin/loginstate.cpp`
 - `matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp`
-- `../../docs/launcher.exe/VTABLES/0x004b517c.md`
-- `../../docs/launcher.exe/VTABLES/0x004b5230.md`
+- `matrixstaging/game/src/libltclientlogin/loginmediator.cpp`
+- `src/launcher_mediator_abi.cpp`
+- `../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md`
+- `../../docs/launcher.exe/startup_objects/0x4f78b8_OBSERVER_TREE_PLUS674.md`
 - `../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+- `../../docs/client.dll/VTABLES/0x628836ec.md`
+- `../../docs/client.dll/VTABLES/0x6286e924.md`
 
 ## Related docs
 

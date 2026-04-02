@@ -372,10 +372,17 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
                 nextState->SetPendingPayload(/*byte4=*/0, parsed.handoffWord09);
             }
             mediator->SwitchHelperStateScaffold(9u, nextBase);
+            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
+                const uint32_t slot3Result = nextState->Slot3_BeginOrContinue(this, mediator);
+                spdlog::info(
+                    "CLTLoginState_State11::Slot6_HandleSecondaryMessage mirrored 0x41b450 new-helper slot3 notification into helper9 before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
+                    parsed.handoffWord09,
+                    static_cast<unsigned>(slot3Result));
+            }
         }
         // anchor: launcher.exe:0x440320 completion tail posts event 0x16 after switching to helper9.
         // Next owner-controlled continuation is now tighter too:
-        // - helper9 slot3 (`0x439780`) immediately consumes that handoff word
+        // - helper9 slot3 (`0x439780`) immediately consumes that handoff word during `0x41b450`
         // - it then calls owner `0x41de40`
         // - later state9 slot6 raw `0x11` success switches to helper12 and posts event `0x18`
         mediator->PostEventScaffold(0x16u);

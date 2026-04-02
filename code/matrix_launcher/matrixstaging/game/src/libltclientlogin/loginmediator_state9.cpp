@@ -323,6 +323,14 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
         remoteHostName,
         shouldExecuteSubmit ? 1u : 0u,
         static_cast<unsigned>(submitResult));
+    if (shouldExecuteSubmit && submitResult == 3u) {
+        spdlog::warn(
+            "CLTLoginMediator::State9SubmitFollowupScaffold managed join returned 0x00000003 (client.dll: CUDPDriver_ReallyJoinSession timeout path) target='{}' callbackBlobPtr=0x{:08x} callbackBlobLen=0x{:08x} cachedHandle147c={} -- current boundary is before state9 raw-0x11 success / event=0x18",
+            submitTargetText,
+            static_cast<unsigned>(callbackOutLow),
+            static_cast<unsigned>(callbackOutHigh),
+            ownerCachedHandle147c_);
+    }
     return submitResult;
 }
 

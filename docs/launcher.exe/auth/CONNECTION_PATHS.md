@@ -367,6 +367,15 @@ Current replacement milestone on that exact blocker (`2026-03-30`, later same-da
   - restored continuation re-enters state8 slot 3
 - source no longer synthesizes owner `+0xf14/+0xf18` directly from `MS_ConnectReply` bootstrap
   completion when the state6 slot6 route is the active branch
+- newer late-login/state9 submit tightening also exposed one narrower replacement-only fidelity bug
+  on this same bootstrap corridor:
+  - replacement was re-driving duplicate `MS_ConnectChallenge` handling after phase `4`
+  - that produced an extra later `MS_ConnectReply` with a different session id outside the proven
+    state6 slot-6 route
+  - on that bad run family, state9 submit later returned `0x00000003` instead of the original
+    success-side `0`
+  - current source now treats late duplicate opcode-`7` / redundant opcode-`9` packets as consumed
+    without re-driving the single-shot state6 continuation
 - active rerun/log milestone on this branch now shows:
   - state6 slot6 handling opcode-`9` success
   - owner `+0xf14` set

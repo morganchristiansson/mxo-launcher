@@ -3241,9 +3241,27 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 
         case 0x07u: {
             spdlog::info(
-                "launcher-owned margin bootstrap received MS_ConnectChallenge transportEncrypted={} payloadLen={}",
+                "launcher-owned margin bootstrap received MS_ConnectChallenge transportEncrypted={} payloadLen={} phase={}",
                 transportEncrypted ? 1u : 0u,
-                payloadSize);
+                payloadSize,
+                static_cast<unsigned>(marginBootstrapState.phase));
+
+            // Active fidelity tightening from the state9-submit timeout investigation:
+            // - current replacement runs were sending a second challenge-response after bootstrap had
+            //   already advanced past the first `MS_ConnectChallenge`
+            // - that later produced an extra `MS_ConnectReply` with a different session id outside
+            //   the proven state6 slot-6 route, which is not part of the bounded original model
+            // - keep the bootstrap state machine single-shot here: once we have already sent the
+            //   first challenge-response (or moved to ready), consume duplicate opcode-7 packets
+            //   without re-sending another response.
+            if (marginBootstrapState.phase == MarginBootstrapPhase::kSentMsConnectChallengeResponse ||
+                marginBootstrapState.phase == MarginBootstrapPhase::kReady) {
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned margin ignoring duplicate MS_ConnectChallenge after first response phase={} currentState={}",
+                    static_cast<unsigned>(marginBootstrapState.phase),
+                    currentState_ ? currentState_->DebugName() : "<null>");
+                return 1u;
+            }
 
             std::array<uint8_t, 16> md5Bytes = {};
             if (authKeyConfigMd5_.size() >= md5Bytes.size()) {
@@ -3273,10 +3291,27 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
         }
 
         case 0x09u: {
+            const uint32_t currentHelperPhaseCodeBeforeReply =
+                currentState_ ? currentState_->DispatchPhaseCode() : 0u;
             spdlog::info(
-                "launcher-owned margin bootstrap received MS_ConnectReply transportEncrypted={} payloadLen={}",
+                "launcher-owned margin bootstrap received MS_ConnectReply transportEncrypted={} payloadLen={} phase={} currentHelperPhaseBeforeReply=0x{:02x}",
                 transportEncrypted ? 1u : 0u,
-                payloadSize);
+                payloadSize,
+                static_cast<unsigned>(marginBootstrapState.phase),
+                currentHelperPhaseCodeBeforeReply);
+
+            if (marginBootstrapState.phase == MarginBootstrapPhase::kReady &&
+                currentHelperPhaseCodeBeforeReply != 6u &&
+                (postAuthMarginLoadingState_.state10SendGateFlagF14 != 0u ||
+                 State6UdpSessionSecretF18() != 0u)) {
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned margin ignoring duplicate MS_ConnectReply outside the proven state6 slot6 route phase={} ownerF14={} ownerF18=0x{:08x} currentState={}",
+                    static_cast<unsigned>(marginBootstrapState.phase),
+                    postAuthMarginLoadingState_.state10SendGateFlagF14,
+                    State6UdpSessionSecretF18(),
+                    currentState_ ? currentState_->DebugName() : "<null>");
+                return 1u;
+            }
 
             mxo::auth::MarginConnectReply reply;
             if (!mxo::auth::ParseMarginConnectReplyPayload(payloadBytes, payloadSize, &reply)) {
@@ -3296,8 +3331,6 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             // - `0x43bd48..0x43bd54` keeps state8 slot 3 gated on owner `+0xf14`
             // Keep that as the only source-owned owner `+0xf14/+0xf18` writer and helper-restore
             // route here instead of synthesizing readiness directly from bootstrap completion
-            const uint32_t currentHelperPhaseCodeBeforeReply =
-                currentState_ ? currentState_->DispatchPhaseCode() : 0u;
             uint32_t state6Handled = 0u;
             if (currentHelperPhaseCodeBeforeReply == 6u) {
                 state6Handled = currentState_->Slot6_HandleSecondaryMessage(nullptr, this);

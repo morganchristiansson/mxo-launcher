@@ -562,22 +562,26 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
         node = ObserverTreeSuccessor674(node);
     }
 
-    // Narrow source-owned continuation bridge for the now-live state8 -> helper9/state9 path:
-    // - natural original switches to helper9, then posts event `0x0b`, and helper9 slot 3
-    //   (`0x439780`) is immediately part of the same active progression family
-    // - the owner `+0x674` container/traversal shape is now source-owned enough to walk here,
-    //   but this helper9 continuation bridge is still intentionally narrower than claiming the
-    //   whole later observer/UI runtime is fully understood
+    // State9/helper9 continuation note:
+    // - the earlier narrow event-`0x0b` bridge here was only compensating for a source-side gap
+    //   where `0x41b450` helper installs were not yet mirroring the new-helper slot-3 notify
+    // - the active state8/state11 completion tails now explicitly mirror that immediate helper9
+    //   slot-3 call before their later `PostEvent(0x0b/0x16)` tail
+    // - keep only a guarded fallback here for any future path that still reaches event `0x0b`
+    //   with helper9/state9 pending payload not yet consumed
     if (eventId == 0x0bu && currentState_ != nullptr && currentState_->DispatchPhaseCode() == 9u) {
-        const uint32_t continueResult = currentState_->Slot3_BeginOrContinue(currentState_, this);
-        spdlog::info(
-            "CLTLoginMediator::PostEventScaffold narrow helper9 continuation bridge event=0x0b currentState={} -> slot3Result=0x{:08x}",
-            currentState_->DebugName(),
-            static_cast<unsigned>(continueResult));
-        spdlog::info(
-            "DIAGNOSTIC: CLTLoginMediator::PostEvent() narrow helper9 continuation bridge event=0x0b currentState={} -> slot3Result=0x{:08x}",
-            currentState_->DebugName(),
-            continueResult);
+        if (auto* state9 = dynamic_cast<CLTLoginState_State9*>(currentState_); state9 != nullptr &&
+            state9->HasPendingPayload()) {
+            const uint32_t continueResult = state9->Slot3_BeginOrContinue(state9, this);
+            spdlog::info(
+                "CLTLoginMediator::PostEventScaffold guarded helper9 continuation fallback event=0x0b currentState={} -> slot3Result=0x{:08x}",
+                currentState_->DebugName(),
+                static_cast<unsigned>(continueResult));
+            spdlog::info(
+                "DIAGNOSTIC: CLTLoginMediator::PostEvent() guarded helper9 continuation fallback event=0x0b currentState={} -> slot3Result=0x{:08x}",
+                currentState_->DebugName(),
+                continueResult);
+        }
     }
 }
 

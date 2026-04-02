@@ -684,12 +684,22 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
                 nextState->SetPendingPayload(/*byte4=*/0, parsed.handoffWord09);
             }
             mediator->SwitchHelperStateScaffold(9u, nextBase);
+            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
+                const uint32_t slot3Result = nextState->Slot3_BeginOrContinue(this, mediator);
+                spdlog::info(
+                    "CLTLoginState_State8::Slot6_HandleSecondaryMessage mirrored 0x41b450 new-helper slot3 notification into helper9 before event=0x0b handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
+                    parsed.handoffWord09,
+                    static_cast<unsigned>(slot3Result));
+            }
         }
         spdlog::info(
             "ROUTE CHECKPOINT: late-login state8 complete -> state9 handoffWord=0x{:04x} currentState={}",
             parsed.handoffWord09,
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
+        // Important recovered ordering detail from `0x41b450`:
+        // - the helper9/state9 install itself immediately notifies the new helper through slot 3
+        // - `0x439780` therefore runs before this later `PostEvent(0x0b)` tail
         mediator->PostEventScaffold(0x0bu);
 
         spdlog::info(
