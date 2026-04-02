@@ -735,9 +735,23 @@ static void* __thiscall Mediator_GetState8PersistenceHeaderBc(MinimalLoginMediat
 // anchor: launcher.exe:0x41f180
 // vtable: ILTLoginMediator.Default slot +0xc0
 // Live original `client.dll:0x62198fa0` copies 0x465 bytes from this pointer into DAT_629ea648-backed state.
+// Post-event-0x18 continuation note:
+// - event `0x0b` later reads byte `+0x464` from this returned block into client global
+//   `DAT_629e689d`
+// - `0x621704a0` then uses that same global as an early state-0 branch gate before any possible
+//   `ClientViewFactory_GetOrCreateViewById(0x67)` / `0x6298a5e8` observer-registration path
 static void* __thiscall Mediator_GetState8PersistenceBodyC0(MinimalLoginMediatorStub* self) {
     (void)self;
-    return const_cast<void*>(mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceBodyC0());
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    void* const body = const_cast<void*>(mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceBodyC0());
+    const uint8_t byte464 = body ? *(reinterpret_cast<const uint8_t*>(body) + 0x464u) : 0u;
+    spdlog::info(
+        "MediatorStub::GetState8PersistenceBodyC0 caller={} [{}] result={} byte464=0x{:02x}",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        fmt::ptr(body),
+        static_cast<unsigned>(byte464));
+    return body;
 }
 
 // anchor: launcher.exe:0x41aec0

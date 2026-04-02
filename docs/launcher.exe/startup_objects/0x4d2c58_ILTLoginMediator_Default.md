@@ -436,6 +436,12 @@ Newest post-state9/runtime consequence from the successful replacement game-entr
 - practical consequence:
   - the missing second observer registration is no longer best read as a logging blind spot on the
     successful replacement route
+  - newer `+0xc0` caller logging now also shows the concrete gate feeding that behavior:
+    - event `0x0b` caller `0x62170ae0` reads mediator `+0xc0`
+    - the returned body had byte `+0x464 = 0x01` on the successful run
+    - that byte feeds client global `DAT_629e689d`, which later causes
+      `ClientShell_LoginMediatorObserver_AdvanceState` to skip the `GetOrCreateViewById(0x67)` /
+      `0x6298a5e8` path
   - it is currently a true not-taken late-runtime branch, even though game entry already works
 
 New late-runtime crash consequence from the current in-game path:

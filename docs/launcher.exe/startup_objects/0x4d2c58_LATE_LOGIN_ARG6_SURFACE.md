@@ -139,6 +139,16 @@ The next blocker is later post-state9 / state-`0x0c` continuation, specifically 
 replacement route currently stops after the immediate `0x621c6d90` helper instead of taking the
 later original-looking late-entry / second-observer branches.
 
+Newest tightening on that question:
+- the second-observer half is now concretely explained by a neighboring arg6 family too:
+  - event `0x0b` reads mediator `+0xc0`
+  - latest successful replacement run logged returned-body byte `+0x464 = 0x01`
+  - that feeds client global `DAT_629e689d`
+  - later `ClientShell_LoginMediatorObserver_AdvanceState` treats `DAT_629e689d != 0` as an early
+    shortcut that bypasses `GetOrCreateViewById(0x67)` / `0x6298a5e8`
+- so the still-open late-runtime question is now narrower again:
+  - mainly the empty `+0x118` list and whatever later optional work would have consumed it
+
 ## Related docs
 
 - `../state_machine/POST_STATE9_CONTINUATION.md`

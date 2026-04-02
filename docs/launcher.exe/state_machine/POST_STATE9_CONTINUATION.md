@@ -220,6 +220,10 @@ New live/runtime proof now tightens the client-facing registration side too:
     `0x6298a760` into `+0x170`
 - replacement-side runtime progress now tightens the event-`0x18` callback path further too:
   - event-`0x18` observer callback now reaches and consumes arg6 `+0x10c`
+  - newer client renames/plate comments also correct the immediate helper ownership:
+    - `0x62130700 = ClientShell_LoginMediatorObserver_PrepareTransition`
+    - `0x621704a0 = ClientShell_LoginMediatorObserver_AdvanceState`
+    - the older loading-area naming on those two helpers was too strong
   - newer caller logging on a successful replacement game-entry run makes the immediate `+0x118`
     split concrete:
     - the observed caller was `0x621c6db3` inside `0x621c6d90`
@@ -230,11 +234,22 @@ New live/runtime proof now tightens the client-facing registration side too:
     - `0x62017150` iterates 12-byte entries from arg6 `+0x118`
     - compares metric ids derived from each entry's first-dword string
     - later runtime callers `0x620181f0 / 0x62018250` use that helper
+    - newer xref review also matters negatively: `0x62017150` is only reached from those later
+      helpers, not directly from the immediate event-`0x18` callback body
   - but the newest successful replacement run did **not** show a `+0x118` call from `0x62017150`
   - static client proof also still says a second observer registration exists at:
     - `client.dll:LoadingAreaCommonLayoutView_ctor` (`0x62030d90`) at `0x62031136`
     - observer object `0x6298a5e8`
-  - but the newest successful replacement run did **not** show that `+0x170` call either
+  - newest static+runtime explanation for why that second observer is skipped on the working route:
+    - event `0x0b` reads mediator `+0xc0` and copies byte `returnedBlock+0x464` into client global
+      `DAT_629e689d`
+    - latest successful replacement run now logs that source byte concretely as `0x01`
+    - `ClientShell_LoginMediatorObserver_AdvanceState` state-0 branch immediately checks
+      `DAT_629e689d != 0`
+    - when that flag is non-zero, it switches straight to state `2` and skips the later
+      `ClientViewFactory_GetOrCreateViewById(0x67)` path entirely
+    - that is the current concrete reason the successful replacement route does not reach
+      `LoadingAreaCommonLayoutView_ctor` / observer `0x6298a5e8`
 
 Practical consequence:
 - the client-visible observer registration bridge is no longer speculative
@@ -328,19 +343,19 @@ Important remaining fidelity note from that same successful run:
   missing `0x62017150` / `0x62031136` activity is no longer best read as a logging blind spot
 - practical current read:
   - successful replacement game entry already works
-  - the absent later metric-matcher / second-observer work is a true not-currently-taken runtime
-    path on the replacement route
-  - later event `0x0f` likewise remains a true missing/not-yet-taken fidelity path, but not a game
-    entry prerequisite on the current replacement route
+  - the absent later metric-matcher work is a true not-currently-taken later runtime path
+  - the absent second observer registration is now concretely explained by the
+    `DAT_629e689d != 0` shortcut in `ClientShell_LoginMediatorObserver_AdvanceState`
+  - later event `0x0f` likewise remains a true missing/not-yet-taken fidelity path, and the
+    current launcher-side reason is also concrete now: `0x41b420` sees `marginConnectionState=2`
+    and would call close with arg `1`, but the replacement still logs
+    `currentReplacementDoesNotInvokeCloseYet=1`
 
 Current strongest remaining concrete suspects:
-1. why the successful event-`0x18` continuation stops after the immediate `0x621c6d90` helper
-   instead of later reaching `0x62017150`
-2. the still-empty arg6 `+0x118` late-entry string-triple vector
-3. why the successful replacement route does not currently take the later shared-gate / close
-   completion path to event `0x0f`
-4. why the successful replacement route does not currently instantiate
-   `LoadingAreaCommonLayoutView_ctor` / observer `0x6298a5e8`
+1. the still-empty arg6 `+0x118` late-entry string-triple vector
+2. whether populating that list would materially enable any later `0x62017150`-driven runtime work
+3. whether the remaining natural-original `0x0f` tail can be reintroduced by a faithful real
+   margin-connection close at `0x41b420` without regressing the now-working game-entry path
 
 ## First files to read next session
 

@@ -30,6 +30,11 @@ Current concrete observer identities on the active route:
     (`0x62031136`) and unregistered by the paired dtors at `0x620301e0 / 0x620304a0`
   - latest successful replacement caller-logging run did **not** observe this registration, so its
     absence is currently a real not-taken late-runtime branch rather than a logging blind spot
+  - strongest current reason is now concrete:
+    - event `0x0b` loads mediator `+0xc0` byte `+0x464` into client global `DAT_629e689d`
+    - latest successful replacement run logged that byte as `0x01`
+    - `ClientShell_LoginMediatorObserver_AdvanceState` checks that flag first and, when non-zero,
+      skips the later `GetOrCreateViewById(0x67)` path that would have reached this registration
 
 ## Container shape
 
