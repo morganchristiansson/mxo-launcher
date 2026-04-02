@@ -272,6 +272,49 @@ struct CMessageConnectionPacketBuilderEnvelope {
 
 static_assert(offsetof(CMessageConnectionPacketBuilderEnvelope, messageRef08) == 0x08, "packet-builder envelope message-ref offset mismatch");
 
+struct CMessageConnectionPacketBuilderReservationScaffold {
+    // Recovered repeated reservation sidecar used by the local packet-builder helpers after
+    // `0x43a230` / `0x43acf0` reserve `(requestedBytes + 2)` at the tail of the retained
+    // message-ref payload:
+    // - `+0x00` = concrete write pointer immediately after the little-endian reserved-length word
+    // - `+0x04` = reserved content byte count (not including that 2-byte length field)
+    uint8_t* writePointer00 = nullptr;
+    uint16_t reservedContentByteCount04 = 0u;
+    uint16_t reservedPadding06 = 0u;
+};
+
+static_assert(sizeof(CMessageConnectionPacketBuilderReservationScaffold) == 0x08, "packet-builder reservation scaffold size mismatch");
+
+struct CMessageConnectionPacketBuilderPayloadScaffold {
+    // Common active derived local packet-builder shape laid on top of the raw `0x439840` envelope
+    // by families such as:
+    // - `0x004b53b4` / packet `0x0a`
+    // - `0x004b53f0` / packet `0x0d`
+    // - `0x004b5418` / packet `0x0f`
+    // - `0x004b5364` / packet `0x06`
+    // - `0x004b6524` / packet `0x01 + length-prefixed blob`
+    // - `0x004b6560` / packet `0x03 + 16-byte challenge response`
+    // Current best common raw fields after the base envelope front matter:
+    // - `+0x0c` = helper-local byte/flag cleared by the init/reset helpers
+    // - `+0x10` = packet payload base pointer used by the fixed-field writers and reservation
+    //   helpers as the offset base
+    CMessageConnectionPacketBuilderEnvelope envelope00{};
+    uint8_t builderFlag0c = 0u;
+    uint8_t padding0d_0f[3] = {0u, 0u, 0u};
+    uint8_t* packetPayload10 = nullptr;
+};
+
+static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPayload10) == 0x10, "packet-builder payload pointer offset mismatch");
+
+struct CMessageConnectionPacketBuilderPayloadWithReservationScaffold {
+    // Most common next step on top of `CMessageConnectionPacketBuilderPayloadScaffold`:
+    // - one trailing reservation triplet rooted at raw `+0x14`
+    CMessageConnectionPacketBuilderPayloadScaffold builder00{};
+    CMessageConnectionPacketBuilderReservationScaffold reservation14{};
+};
+
+static_assert(offsetof(CMessageConnectionPacketBuilderPayloadWithReservationScaffold, reservation14) == 0x14, "packet-builder reservation offset mismatch");
+
 class CStreamPacketEncryptionOwnerBase {
 public:
     // anchor: launcher.exe vtable `0x004b81dc`
@@ -803,7 +846,11 @@ public:
         const void* blockD8,
         size_t blockByteCount);
     // anchor: launcher.exe:0x41f30
-    // Source-owned mirror of the later raw type-1 send that:
+    // Source-owned mirror of the later raw type-1 send that now keeps the nearer original local
+    // builder shape explicit too:
+    // - local builder vtable `0x004b6524`
+    // - builder `+0x10` = packet payload base
+    // - builder `+0x14/+0x18` = reserved reply-copy write pointer / byte count
     // - writes prefix bytes `01 00 00`
     // - then reserves the copied reply span through the same `0x43a230(0x136)` helper shape used
     //   by the original local envelope builder
@@ -811,10 +858,13 @@ public:
     // - then forwards the completed envelope through connection vtable `+0x24`
     uint32_t SendStoredBootstrapReplyCopy98();
     // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
-    // Source-owned mirror of the consumed decoded-code-2 CERT challenge-response send that:
+    // Source-owned mirror of the consumed decoded-code-2 CERT challenge-response send that now
+    // keeps the original local builder surface tighter too:
     // - requires the earlier code-2/5 seed mirror at `+0x85 .. +0x94`
     // - re-runs the lazy `+0x9c` packet-agenda module ensure/refresh before send
-    // - builds payload `0x03 + 16 challenge bytes` in a retained message-ref
+    // - local builder vtable `0x004b6560`
+    // - builder `+0x10` = packet payload base
+    // - builds payload `0x03 + 16 challenge bytes` in that retained message-ref-backed builder
     // - then forwards the completed local packet-builder envelope through connection vtable `+0x24`
     uint32_t SendCertChallengeResponseFromChallengeBytes(
         const std::array<uint8_t, 16>& challengeBytes);

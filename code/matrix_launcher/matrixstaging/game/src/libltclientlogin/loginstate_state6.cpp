@@ -28,11 +28,20 @@ struct State6Packet0x06FixedPayload {
     static constexpr size_t kFixedByteCount = 0x23;
 };
 
-class State6Packet0x06Builder final : public RecoveredPacketBuilderEnvelope {
+struct State6Packet0x06BuilderRawScaffold {
+    mxo::liblttcp::CMessageConnectionPacketBuilderPayloadScaffold builder00{};
+};
+
+class State6Packet0x06Builder final
+    : public RecoveredPacketBuilderEnvelopeBase<State6Packet0x06BuilderRawScaffold> {
 public:
+    static constexpr uintptr_t kPacketBuilderVtable00 = 0x004b5364u;
+
     // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
     void ResetAndInitialize() {
-        ResizePayload(State6Packet0x06FixedPayload::kFixedByteCount);
+        ResetPacketPayloadBuilderScaffold(
+            kPacketBuilderVtable00,
+            State6Packet0x06FixedPayload::kFixedByteCount);
         WritePayloadByte(0x00, State6Packet0x06FixedPayload::kPayloadTag06);
         WritePayloadU32LE(State6Packet0x06FixedPayload::kLauncherVersionOffset, 0u);
         WritePayloadU32LE(State6Packet0x06FixedPayload::kClientVersionOffset, 0u);

@@ -374,6 +374,9 @@ Current replacement milestone on that exact blocker (`2026-03-30`, later same-da
   - copy into margin connection `+0x98`
   - bounded mirror of owner child `+0xb0/+0xc4/+0xd8` into connection-side `+0xa0`
   - raw type-1 send through the preserved `0x41ce80 -> 0x441f30` route
+    - newer local-builder tightening now keeps that sender on vtable `0x004b6524`
+    - builder `+0x10` = payload base
+    - builder `+0x14/+0x18` = reserved reply-copy write pointer / byte count after `0x43a230`
 - source state6 slot6 now owns the opcode-`9` success side narrowly enough to match the
   original restore model from `0x440ab9..0x440ae5`:
   - owner byte `+0xf14 = 1`

@@ -785,6 +785,10 @@ static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(
     payloadBase[0] &= 0x7fu;
 }
 
+static void** CMessageConnection_PacketBuilderVtablePointerScaffold(uintptr_t address) {
+    return reinterpret_cast<void**>(address);
+}
+
 // anchor: launcher.exe:0x41cf30
 uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacket(
     CMessageConnectionPacketBuilderEnvelope& envelope) {
@@ -2094,44 +2098,65 @@ uint32_t CMarginConnection::SendStoredBootstrapReplyCopy98() {
 
     constexpr uint16_t kReplyCopyByteCount = 0x136u;
     constexpr uint16_t kLeadingType1PrefixByteCount = 3u;
-    constexpr uint16_t kNestedReplyCopyLengthFieldByteCount = sizeof(uint16_t);
-    constexpr uint16_t kTotalPayloadByteCount =
-        kLeadingType1PrefixByteCount +
-        kNestedReplyCopyLengthFieldByteCount +
-        kReplyCopyByteCount;
+    constexpr uintptr_t kPacketBuilderVtable00 = 0x004b6524u;
 
+    mxo::liblttcp::CMessageConnectionPacketBuilderPayloadWithReservationScaffold builder = {};
     CMessageConnectionMessageRef messageRef = {};
     messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
     if (!messageRef.messageStorage0c) {
         return 0u;
     }
 
-    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kTotalPayloadByteCount);
-    uint8_t* payloadBytes = messageRef.messageStorage0c->PayloadBaseScaffold();
-    if (!payloadBytes) {
+    builder.builder00.envelope00.vtable00 =
+        CMessageConnection_PacketBuilderVtablePointerScaffold(kPacketBuilderVtable00);
+    builder.builder00.envelope00.payloadBase04 =
+        messageRef.messageStorage0c->PayloadBaseScaffold();
+    builder.builder00.envelope00.messageRef08 = &messageRef;
+    builder.builder00.builderFlag0c = 0u;
+    builder.builder00.packetPayload10 = builder.builder00.envelope00.payloadBase04;
+    if (!builder.builder00.packetPayload10) {
         return 0u;
     }
 
-    // Tightest current static read from `0x441f30 -> 0x43a230(0x136)`:
-    // - leading raw type-1 prefix bytes `01 00 00`
-    // - `0x43a230` then grows the retained message-ref's inner storage by `(0x136 + 2)` and
-    //   points the later copy at
-    //   the span immediately after that inner little-endian `0x0136` word
-    payloadBytes[0] = 0x01u;
-    payloadBytes[1] = 0u;
-    payloadBytes[2] = 0u;
-    payloadBytes[3] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
-    payloadBytes[4] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
+    // Tightened local builder mirror from `0x441f30` / vtable `0x004b6524`:
+    // - raw builder `+0x10` is the packet payload base
+    // - helper `0x43a230(0x136)` then reserves `(0x136 + 2)` bytes at the tail, caches the
+    //   concrete copy target in builder `+0x14`, and stores reserved content byte count at `+0x18`
+    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kLeadingType1PrefixByteCount);
+    builder.builder00.packetPayload10[0] = 0x01u;
+    builder.builder00.packetPayload10[1] = 0u;
+    builder.builder00.packetPayload10[2] = 0u;
+
+    const uint16_t currentPayloadByteCount =
+        messageRef.messageStorage0c->PayloadByteCountScaffold();
+    uint8_t* const reservationHeader =
+        builder.builder00.envelope00.payloadBase04 + currentPayloadByteCount;
+    const uint16_t requestedGrowth =
+        static_cast<uint16_t>(kReplyCopyByteCount + sizeof(uint16_t));
+    const uint16_t newPayloadByteCount =
+        messageRef.messageStorage0c->GrowPayloadByteCountScaffold(requestedGrowth);
+    if (!reservationHeader ||
+        newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
+        return 0u;
+    }
+
+    reservationHeader[0] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
+    reservationHeader[1] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
+    builder.reservation14.writePointer00 = reservationHeader + 2u;
+    builder.reservation14.reservedContentByteCount04 = kReplyCopyByteCount;
     std::copy(
         bootstrapReplyCopy98_.begin(),
         bootstrapReplyCopy98_.end(),
-        payloadBytes + kLeadingType1PrefixByteCount + kNestedReplyCopyLengthFieldByteCount);
+        builder.reservation14.writePointer00);
 
-    const uint32_t sendResult = SendPacketMessageRef(messageRef);
+    const uint32_t sendResult =
+        ForwardPacketBuilderEnvelopeToSendPacket(builder.builder00.envelope00);
     spdlog::info(
-        "CMarginConnection::SendStoredBootstrapReplyCopy98 sent rawType1PrefixPlusLengthPrefixedReplyCopy payloadBytes=0x{:03x} nestedReplyCopyBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(kTotalPayloadByteCount),
-        static_cast<unsigned>(kReplyCopyByteCount),
+        "CMarginConnection::SendStoredBootstrapReplyCopy98 sent packetBuilderVtable=0x{:08x} payloadBase10={} reservedReplyCopyBytes=0x{:03x} totalPayloadBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(kPacketBuilderVtable00),
+        fmt::ptr(builder.builder00.packetPayload10),
+        static_cast<unsigned>(builder.reservation14.reservedContentByteCount04),
+        static_cast<unsigned>(messageRef.messageStorage0c->PayloadByteCountScaffold()),
         static_cast<unsigned>(sendResult),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
@@ -2161,28 +2186,37 @@ uint32_t CMarginConnection::SendCertChallengeResponseFromChallengeBytes(
     }
 
     constexpr uint16_t kPayloadByteCount = 0x11u;
+    constexpr uintptr_t kPacketBuilderVtable00 = 0x004b6560u;
+    CMessageConnectionPacketBuilderPayloadScaffold builder = {};
     CMessageConnectionMessageRef messageRef = {};
     messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
     if (!messageRef.messageStorage0c) {
         return 0u;
     }
 
-    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kPayloadByteCount);
-    uint8_t* const payloadBytes = messageRef.messageStorage0c->PayloadBaseScaffold();
-    if (!payloadBytes) {
+    builder.envelope00.vtable00 =
+        CMessageConnection_PacketBuilderVtablePointerScaffold(kPacketBuilderVtable00);
+    builder.envelope00.payloadBase04 = messageRef.messageStorage0c->PayloadBaseScaffold();
+    builder.envelope00.messageRef08 = &messageRef;
+    builder.builderFlag0c = 0u;
+    builder.packetPayload10 = builder.envelope00.payloadBase04;
+    if (!builder.packetPayload10) {
         return 0u;
     }
 
-    payloadBytes[0] = 0x03u;
-    std::copy_n(challengeBytes.begin(), challengeBytes.size(), payloadBytes + 1u);
+    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kPayloadByteCount);
+    builder.packetPayload10[0] = 0x03u;
+    std::copy_n(
+        challengeBytes.begin(),
+        challengeBytes.size(),
+        builder.packetPayload10 + 1u);
 
-    CMessageConnectionPacketBuilderEnvelope envelope = {};
-    envelope.payloadBase04 = payloadBytes;
-    envelope.messageRef08 = &messageRef;
-
-    const uint32_t sendResult = ForwardPacketBuilderEnvelopeToSendPacket(envelope);
+    const uint32_t sendResult =
+        ForwardPacketBuilderEnvelopeToSendPacket(builder.envelope00);
     spdlog::info(
-        "CMarginConnection::SendCertChallengeResponseFromChallengeBytes sent packetBuilderEnvelopeOpcode03 challengeBytes=0x{:02x} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CMarginConnection::SendCertChallengeResponseFromChallengeBytes sent packetBuilderVtable=0x{:08x} packetPayload10={} challengeBytes=0x{:02x} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(kPacketBuilderVtable00),
+        fmt::ptr(builder.packetPayload10),
         static_cast<unsigned>(challengeBytes.size()),
         static_cast<unsigned>(agenda->configuredModuleCount4c),
         agenda->writeHelperChainHead44 != nullptr ? 1u : 0u,
