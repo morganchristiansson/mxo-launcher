@@ -102,6 +102,9 @@ Current active existing-character path is source-owned/live enough to reach:
     setup helper
   - the replacement now mirrors state6 opcode-`9` success closely enough to populate that list with
     17 filename entries mapped from the decoded metric ids through the loaded client METR table
+  - source now also mirrors the original `0x41f840 -> 0x41f640` append contract more closely by
+    keeping copied owned filename strings behind owner `+0x1470`, so later `+0x118` consumers do
+    not borrow transient caller buffers
   - even with that populated list, the same successful run still did **not** show a later
     `+0x118` caller from `0x62017150`
   - and did **not** show a later `+0x170` caller from `0x62031136`
@@ -130,6 +133,9 @@ Current best read:
 - clears owner byte `+0xf14`
 - sets owner byte `+0x2d`
 - if margin connection state is `1` or `2`, calls connection vtable `+0x0c(1)`
+- source now mirrors that more faithfully too by actually invoking graceful close on the live
+  replacement path when the same state check passes; this is the best current launcher-side route
+  toward the later natural `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` tail
 - important slot-split note:
   - owner-side strongest meaning is still this state9 opcode-`0x11` success side effect
   - launcher teardown also reuses the same vtable slot as a wrapper-facing
@@ -209,8 +215,13 @@ New live/runtime proof now tightens the client-facing registration side too:
   - `0x41f2c0`: return owner `+0x30` small-string-like route descriptor
   - `0x41af50`: return owner `+0x1470` vector-like late-entry list
     - newer `0x41f840 -> 0x41f640` tightening now shows those are 12-byte string-triple entries
+    - exact active-path producer is state6 slot-6 opcode-`0x09` success (`0x440780`):
+      clear `+0x1470`, map each metric id through the client METR table, then append one filename
+      entry per id through owner `+0x190`
     - later client consumer `0x62017150` reads the first dword of each entry as a filename-like
       string and maps it through `FUN_622a9cf0` / `METR` metadata
+    - source now keeps copied owned filename storage behind that vector too, which better matches
+      the original append/copy contract than the earlier borrowed-string scaffold
   - `0x41ddb0`: insert observer into owner `+0x674`
   - `0x41dde0`: remove observer from owner `+0x674`
   - `0x41f240`: return owner `+0x80`
@@ -289,9 +300,12 @@ Practical consequence:
 - treat event `0x18` as the listener/observer handoff boundary
 - treat shared gate `0x438df0` as the now-live-backed later-source for the natural
   `0x41cfb0(0x0f)` tail
-- newer successful replacement runs still do **not** hit that later close-completion / event-`0x0f`
-  bridge before entering game, so this is now best tracked as a remaining fidelity gap rather than
-  as a current game-entry prerequisite on the replacement route
+- source now also invokes the matching graceful margin close from `0x41b420` / wrapper `+0x16c`
+  when margin state is `1/2`, so the remaining question is runtime reach/order, not whether the
+  close call itself is still missing from the replacement
+- earlier successful replacement runs still did **not** hit that later close-completion /
+  event-`0x0f` bridge before entering game, so this remains a fidelity question rather than a
+  current game-entry prerequisite on the replacement route
 - this strengthens the case that the post-state9 continuation remains observer/event-driven before
   any later unproven `0x004397e0` / `0x0041c5c0` involvement
 
@@ -315,12 +329,12 @@ Practical consequence:
 Source home:
 - `matrixstaging/game/src/libltclientlogin/loginstate_state12.cpp`
 
-## Current blocker
+## Current remaining fidelity questions
 
-The old state9 submit blocker is no longer the active one.
+The old state9 submit blocker is no longer active.
 
-Current replacement boundary moved later into the post-state12 / event-`0x18` continuation, and
-current replacement validation now shows that this is no longer a hard game-entry blocker.
+Current replacement work has moved later into the post-state12 / event-`0x18` continuation, and
+current validation now shows that this is no longer a hard game-entry blocker.
 
 Representative successful replacement run (`2026-04-02`, latest caller-logging + late-entry pass):
 - reaches:
@@ -334,6 +348,10 @@ Representative successful replacement run (`2026-04-02`, latest caller-logging +
   - arg6 `+0x10c` route descriptor (`"Reality"`) from caller `0x6217082b`
   - arg6 `+0x118` late-entry list from caller `0x621c6db3` (`0x621c6d90`)
   - that returned list now contains 17 entries populated from state6 opcode-`9` metric ids
+- latest source pass also tightens fidelity on two later-runtime seams behind that success:
+  - owner `+0x1470` now keeps copied owned filename storage behind the exposed 12-byte entries
+  - `0x41b420` / wrapper `+0x16c` now invoke graceful margin close when the original state test
+    says they should
 - then replacement continues far enough to:
   - show the in-game `MATRIX_ONLINE` window
   - return `RunClientDLL = 1`
@@ -356,11 +374,12 @@ Important remaining fidelity note from that same successful run:
     and would call close with arg `1`, but the replacement still logs
     `currentReplacementDoesNotInvokeCloseYet=1`
 
-Current strongest remaining concrete suspects:
+Current strongest remaining concrete questions:
 1. whether the still-missing later `0x62017150` path is actually optional on the working route or
    gated by additional client state beyond the now-populated late-entry list
-2. whether the remaining natural-original `0x0f` tail can be reintroduced by a faithful real
-   margin-connection close at `0x41b420` without regressing the now-working game-entry path
+2. whether the now-restored faithful margin close at `0x41b420` is sufficient by itself to make
+   the replacement visibly re-hit the natural later `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` tail,
+   or whether another runtime/order dependency is still missing
 
 ## First files to read next session
 

@@ -2260,10 +2260,12 @@ SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() 
 // anchor: launcher.exe:0x41f5f0
 void CLTLoginMediator::ClearLateEntryList1470Scaffold() {
     lateEntryList1470Entries_.clear();
+    lateEntryList1470OwnedStrings_.clear();
     spdlog::info(
-        "CLTLoginMediator::ClearLateEntryList1470Scaffold cleared owner+0x1470 entryCount={} entryCapacity={}",
+        "CLTLoginMediator::ClearLateEntryList1470Scaffold cleared owner+0x1470 entryCount={} entryCapacity={} ownedStringCount={}",
         static_cast<unsigned>(lateEntryList1470Entries_.size()),
-        static_cast<unsigned>(lateEntryList1470Entries_.capacity()));
+        static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
+        static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()));
 }
 
 // anchor: launcher.exe:0x41f840 / owner vtable +0x190
@@ -2275,17 +2277,21 @@ bool CLTLoginMediator::AppendLateEntryFilename1470Scaffold(const char* filename)
         return false;
     }
 
-    const size_t filenameLength = std::strlen(filename);
+    lateEntryList1470OwnedStrings_.emplace_back(filename);
+    const std::string& ownedFilename = lateEntryList1470OwnedStrings_.back();
+    const char* const begin = ownedFilename.c_str();
+    const char* const end = begin + ownedFilename.size();
     lateEntryList1470Entries_.push_back(LateEntryList1470EntrySketch{
-        filename,
-        filename + filenameLength,
-        filename + filenameLength,
+        begin,
+        end,
+        end,
     });
     spdlog::info(
-        "CLTLoginMediator::AppendLateEntryFilename1470Scaffold appended filename='{}' owner+0x1470 entryCount={} entryCapacity={} (bounded source mirror of 0x41f840 -> 0x41f640 string-triple append)",
-        filename,
+        "CLTLoginMediator::AppendLateEntryFilename1470Scaffold appended filename='{}' owner+0x1470 entryCount={} entryCapacity={} ownedStringCount={} (bounded source mirror of 0x41f840 -> 0x41f640 string-triple copy/append)",
+        ownedFilename,
         static_cast<unsigned>(lateEntryList1470Entries_.size()),
-        static_cast<unsigned>(lateEntryList1470Entries_.capacity()));
+        static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
+        static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()));
     return true;
 }
 
@@ -2293,6 +2299,12 @@ bool CLTLoginMediator::AppendLateEntryFilename1470Scaffold(const char* filename)
 LateEntryList1470VectorLikeSketch* CLTLoginMediator::GetLateEntryList1470() {
     // Keep the wrapper-facing arg6 `+0x118` vector-like object explicit instead of leaving this
     // scratch state in the ABI shell.
+    // Current bounded fidelity improvement behind the now-live observer bridge:
+    // - state6 opcode-0x09 success is the exact producer for owner `+0x1470`
+    // - original `0x41f840 -> 0x41f640` copies each 12-byte string-triple entry into that vector
+    // - source therefore keeps copied filename storage on the mediator, then exposes only the
+    //   vector-of-triples ABI here for the immediate event-0x18 helper and the later map/metric
+    //   consumer family
     const LateEntryList1470EntrySketch* begin =
         lateEntryList1470Entries_.capacity() ? lateEntryList1470Entries_.data() : nullptr;
     lateEntryList1470_.begin = begin;
@@ -2304,12 +2316,13 @@ LateEntryList1470VectorLikeSketch* CLTLoginMediator::GetLateEntryList1470() {
             ? lateEntryList1470Entries_[0].begin
             : "<empty>";
     spdlog::info(
-        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> begin={} current={} capacity={} entryCount={} entryCapacity={} firstEntry='{}'{}",
+        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={} firstEntry='{}'{}",
         fmt::ptr(lateEntryList1470_.begin),
         fmt::ptr(lateEntryList1470_.current),
         fmt::ptr(lateEntryList1470_.capacity),
         static_cast<unsigned>(lateEntryList1470Entries_.size()),
         static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
+        static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()),
         firstEntryText,
         lateEntryList1470Entries_.empty() ? " (empty scaffold)" : "");
     return &lateEntryList1470_;

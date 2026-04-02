@@ -26,11 +26,15 @@ Newer tightening also sharpens what `+0x118` really is on that later side:
 - owner `+0x1470` is a vector-like container of 12-byte string-triple entries
 - owner slot `+0x190 / 0x41f840` appends one entry at a time by forwarding into
   `0x41f640 = StringTripleArray_Append`
-- state6 opcode-`9` success clears `+0x1470`, appends metric-name strings through `+0x190`, and
-  later arg6 `+0x118 / 0x41af50` exposes that same vector to client late-runtime consumers
+- exact active-path producer is state6 opcode-`9` success (`0x440780`): clear `+0x1470`, map each
+  metric id through the loaded client METR table, then append one filename entry per id through
+  `+0x190`
+- later arg6 `+0x118 / 0x41af50` exposes that same vector to client late-runtime consumers
 - current replacement now mirrors that producer closely enough on the active path by decoding the
   metric-id array from the opcode-`9` reply and mapping each id through the loaded client METR
   table to filename strings before filling owner `+0x1470`
+- source now also keeps copied owned filename storage behind those exposed 12-byte entries, which
+  better matches the original append/copy contract than the earlier borrowed-string scaffold
 
 See:
 - `../state_machine/POST_STATE9_CONTINUATION.md`
@@ -39,7 +43,7 @@ See:
 ## Canonical source homes
 
 - ABI shell:
-  - `src/launcher_mediator_state9_abi.cpp`
+  - `src/launcher_mediator_abi.cpp`
 - mediator-owned late-login logic:
   - `matrixstaging/game/src/libltclientlogin/loginmediator_state9.cpp`
   - `matrixstaging/game/src/libltclientlogin/loginmediator_state9_submit_scaffold.h`
@@ -133,14 +137,19 @@ Closed enough on the deliberate existing-character path:
   - `+0x10c` is called from `0x6217082b` inside `ClientShell_LoginMediatorObserver_OnEvent`
   - `+0x118` is called from `0x621c6db3` inside `0x621c6d90`
   - that `+0x118` list now holds 17 filename entries on the successful run
+- latest source tightening also improves two later-runtime seams behind that same path:
+  - owner `+0x1470` now keeps copied owned filename storage behind the exposed entry array
+  - `0x41b420` / wrapper `+0x16c` now invoke graceful margin close when the original state check
+    says they should, which is the best current path toward the later natural event-`0x0f` tail
 - the same successful run still did **not** show:
   - a later `+0x118` caller from `0x62017150`
   - a later `+0x170` caller from `0x62031136` / observer `0x6298a5e8`
 
-So the active blocker is no longer “missing arg6 late-login ABI”.
-The next blocker is later post-state9 / state-`0x0c` continuation, specifically why the working
-replacement route currently stops after the immediate `0x621c6d90` helper instead of taking the
-later original-looking late-entry / second-observer branches.
+So the remaining question is no longer “missing arg6 late-login ABI”.
+The next fidelity questions are later post-state9 / state-`0x0c` continuation, specifically why
+working runs still stop after the immediate `0x621c6d90` helper instead of taking the later
+original-looking late-entry / second-observer branches, and whether the now-restored graceful close
+is enough to make the natural later event-`0x0f` tail visible on replacement runs.
 
 Newest tightening on that question:
 - the second-observer half is now concretely explained by a neighboring arg6 family too:

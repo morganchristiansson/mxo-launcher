@@ -12,6 +12,18 @@
 
 namespace mxo::ltlogin {
 namespace state9submit = mxo::ltlogin::state9submit_scaffold;
+namespace {
+
+static uint32_t TryInvokeGracefulMarginConnectionClose0cScaffold(
+    mxo::liblttcp::CMessageConnection* marginConnection,
+    bool wouldCallConnectionClose0c) {
+    if (!marginConnection || !wouldCallConnectionClose0c) {
+        return 0u;
+    }
+    return marginConnection->Close(/*graceful=*/true);
+}
+
+}  // namespace
 
 // Focused late-login/state9 split:
 // - `loginmediator_state9.cpp` now keeps only the mediator-owned state9 methods
@@ -379,14 +391,18 @@ bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
         &rawState,
         &wouldCallConnectionClose0c,
         /*clearState10SendGateF14=*/true);
+    const uint32_t closeResult = TryInvokeGracefulMarginConnectionClose0cScaffold(
+        marginConnection_,
+        wouldCallConnectionClose0c);
 
     spdlog::info(
-        "CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f(+0x16c wrapper-facing) -> {} [owner+0xf14={} owner+0x2d={} marginConnectionState={} wouldCallConnectionClose0cArg1={} currentState={} split=teardown-wait-event-0x0f vs owner-state9-success-helper currentReplacementDoesNotInvokeCloseYet=1]",
+        "CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f(+0x16c wrapper-facing) -> {} [owner+0xf14={} owner+0x2d={} marginConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x} currentState={} split=teardown-wait-event-0x0f vs owner-state9-success-helper laterExpectedTail=0x41afc0->0x438df0->0x41cfb0(0x0f)]",
         armed ? 1u : 0u,
         static_cast<unsigned>(postAuthMarginLoadingState_.state10SendGateFlagF14),
         static_cast<unsigned>(marginConnectionFlag2d_),
         rawState,
         wouldCallConnectionClose0c ? 1u : 0u,
+        static_cast<unsigned>(closeResult),
         currentState_ ? currentState_->DebugName() : "<null>");
     return armed;
 }
@@ -401,6 +417,8 @@ uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
     // - clear owner byte `+0xf14`
     // - set owner byte `+0x2d`
     // - if margin connection state `+0x34` is `1` or `2`, call connection vtable `+0x0c(1)`
+    // - that graceful close is what later enables the natural `0x41afc0 -> 0x438df0`
+    //   completion-fallback re-entry into shared slot 2 and event `0x0f`
     //
     // Keep the wrapper/owner split explicit in source too:
     // - wrapper-facing arg6 `+0x16c` is teardown-visible close/wait-event-`0x0f`
@@ -411,11 +429,15 @@ uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
         &rawState,
         &wouldCallConnectionClose0c,
         /*clearState10SendGateF14=*/true);
+    const uint32_t closeResult = TryInvokeGracefulMarginConnectionClose0cScaffold(
+        marginConnection_,
+        wouldCallConnectionClose0c);
 
     spdlog::info(
-        "CLTLoginMediator::HandleState9Opcode11SuccessSideEffect cleared owner+0xf14, set owner+0x2d, marginConnectionState={} wouldCallConnectionClose0cArg1={} currentReplacementDoesNotInvokeCloseYet=1",
+        "CLTLoginMediator::HandleState9Opcode11SuccessSideEffect cleared owner+0xf14, set owner+0x2d, marginConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x} expectedLaterTail=0x41afc0->0x438df0->0x41cfb0(0x0f)",
         rawState,
-        wouldCallConnectionClose0c ? 1u : 0u);
+        wouldCallConnectionClose0c ? 1u : 0u,
+        static_cast<unsigned>(closeResult));
     return armed ? 1u : 0u;
 }
 
