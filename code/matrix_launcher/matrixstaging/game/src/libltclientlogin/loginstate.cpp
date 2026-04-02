@@ -35,12 +35,6 @@ const char* CLTLoginState_AbstractFinalLeafBase::DebugName() const {
     return "CLTLoginState_AbstractFinalLeafBase";
 }
 
-// anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
-uint32_t CLTLoginState::Slot1_HandlePrimaryGate(CLTLoginMediator* mediator) {
-    (void)mediator;
-    return 1;
-}
-
 namespace {
 
 static uint32_t LoginStateWorkItemTypeScaffold(const void* workItem) {
@@ -54,6 +48,45 @@ static uint32_t LoginStateWorkItemTypeScaffold(const void* workItem) {
 }
 
 }  // namespace
+
+// anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
+uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator) {
+    if (!workItem || !mediator) {
+        return 0u;
+    }
+
+    const uint32_t workType = LoginStateWorkItemTypeScaffold(workItem);
+    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        return 0u;
+    }
+
+    if (mediator->AuthConnectionFlag2c() != 0u) {
+        mediator->PostEventScaffold(1u);
+        spdlog::info(
+            "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed armed owner+0x2c -> event=0x01 currentState={}",
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        return 1u;
+    }
+
+    if (mediator->GetLastLoginStatus() == 0u) {
+        mediator->WorldListCountOrStatus80() = 1u;
+    }
+    CLTLoginState* const fallbackState = mediator->ScaffoldState0();
+    const uint32_t switchDispatchResult = fallbackState
+        ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+              0u,
+              fallbackState,
+              this,
+              "Shared slot1 auth close-gate -> state0 / error1")
+        : 0u;
+    mediator->PostErrorScaffold(1u);
+    spdlog::info(
+        "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed unarmed owner+0x2c -> owner+0x80=0x{:08x} currentState={} switchDispatchResult=0x{:08x}",
+        static_cast<unsigned>(mediator->WorldListCountOrStatus80()),
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        static_cast<unsigned>(switchDispatchResult));
+    return 1u;
+}
 
 // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
 uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) {

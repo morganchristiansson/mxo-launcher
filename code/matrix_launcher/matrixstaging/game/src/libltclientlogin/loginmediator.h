@@ -706,9 +706,13 @@ public:
     // - tail-jumps to helper vtable `+0x10`
     // - current best read is helper slot 5 / `AuthMessageDispatch`
     uint32_t DispatchCurrentHelperAuthMessageScaffold(void* workItem);
-    // anchor: launcher.exe:0x41af80 / 0x41afc0 -> current helper vtable `+0x04`
-    // Narrow source-owned mirror of the shared auth/margin completion-fallback re-entry used when
-    // the connection leaf leaves work unconsumed.
+    // anchor: launcher.exe:0x41af80 -> current helper vtable `+0x00`
+    // Auth-side completion-fallback re-entry used by `0x449a70` after base `0x4490c0` leaves a
+    // work item unconsumed.
+    uint32_t DispatchCurrentHelperPrimaryGateScaffold(void* workItem);
+    // anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
+    // Margin-side completion-fallback re-entry used by `0x44af60` and the local type-`0x0b`
+    // margin completion seam.
     uint32_t DispatchCurrentHelperSecondaryGateScaffold(void* workItem);
     // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
     // `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
@@ -1097,6 +1101,8 @@ public:
     //   happy path remains intact until the producer/result semantics are fully source-owned
     // - auth and margin derived connection families fall through wrappers into owner callback /
     //   current-state dispatch rather than being fully handled by optional helper slots alone
+    //   - auth `0x449a70 -> 0x41af80` re-enters current helper slot 1 / raw vtable `+0x00`
+    //   - margin `0x44af60 -> 0x41afc0` re-enters current helper slot 2 / raw vtable `+0x04`
     // - active default password-submit continuation is now tighter:
     //   `0x41ecd0 -> state2 -> state1 -> state2 -> state3(wait) -> 0x41c1f0(owner advance)
     //    -> 0x439300 -> 0x43bd20 / 0x43f930`
@@ -1593,6 +1599,8 @@ private:
     //     - newer late natural-original proof now places that fallback concretely on the later
     //       post-state9 tail: `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)`
     // - `+0x18` = auth connection, `+0x1c` = margin connection
+    //   - auth leaf fallback `0x41af80` compares its incoming connection against `+0x18`, clears
+    //     `+0x18` on work type `1`, then re-enters current helper slot 1 / raw vtable `+0x00`
     // - `+0x4c/+0x5c` = auth route + endpoint
     // - `+0x6c` = margin endpoint
     // - `+0x94` = auth/bootstrap source block (`0x41ecd0` consumer family)

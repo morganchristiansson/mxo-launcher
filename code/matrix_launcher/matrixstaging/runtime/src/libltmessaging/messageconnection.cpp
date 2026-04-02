@@ -1537,6 +1537,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
             this,
             syntheticWorkItem ? syntheticWorkItem->workPayload : 0u);
     }
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        // Current best startup-path read from `0x4490c0` + wrapper callers `0x449a70/0x44af60`:
+        // - base type-1 handling first tries optional completion helper `+0x80`
+        // - on the auth/margin startup path that helper is null
+        // - control therefore falls through into the leaf owner-callback wrapper
+        return 0u;
+    }
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
         // Current best startup-path read from `0x4490c0` + wrapper callers `0x449a70/0x44af60`:
         // - base type-2 handling first tries optional completion helper `+0x7c`
@@ -1920,18 +1927,12 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
         return 1u;
     }
 
+    // Tightened `0x449a70 -> 0x41af80` read:
+    // - after base `0x4490c0` returns 0, the auth leaf does not split type-2 status work away to
+    //   a different owner helper
+    // - it always falls through owner `+0x17c`, and that owner callback then re-enters current
+    //   helper slot 1 / vtable `+0x00`
     mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
-    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* statusWorkItem =
-            static_cast<const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
-        return CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
-            this,
-            statusWorkItem ? statusWorkItem->workPayload : 0u,
-            /*isMarginConnection=*/false,
-            "+0x17c");
-    }
-
     if (mediator && CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator)) {
         const uint32_t handled =
             mediator->HandleAuthConnectionCompletionFallbackScaffold(this, workItem);
@@ -1941,8 +1942,9 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
     }
 
     spdlog::debug(
-        "CAuthStartupConnection::OnOperationCompleted unresolved owner+0x17c fallback workItem={} this={} ownerContext={} remoteHost='{}'",
+        "CAuthStartupConnection::OnOperationCompleted unresolved owner+0x17c fallback workItem={} workType=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         fmt::ptr(workItem),
+        static_cast<unsigned>(CMessageConnection_WorkItemTypeScaffold(workItem)),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());

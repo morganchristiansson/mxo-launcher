@@ -55,7 +55,12 @@ namespace mxo::liblttcp {
 //       directly to the `CLTLoginMediator*`, not to a bridge/context record
 //     - `+0x17c` itself is `0x41af80 = CLTLoginMediator_HandleAuthConnectionCompletionFallback`
 //     - that fallback filters to owner `+0x18`, clears owner `+0x18` on type `1`, then re-enters
-//       the current helper through vtable `+0x04`
+//       the current helper through raw vtable entry `+0x00` / slot 1
+//     - practical auth-side consequence:
+//       - type-2 connect status is not a separate slot-2/secondary-gate route here
+//       - state1 slot 1 (`0x4390b0`) sees type `2`
+//       - non-type-2 auth close work falls through the same callback into shared slot-1 gate
+//         `0x438d80`
 //     - so the concrete handling target still depends on the current helper selected through the
 //       `0x4f7868` family and `0x41b450(...)`, not on one fixed owner-body function alone
 //     - if that helper re-entry returns 0, `0x449a70` falls through to `0x448a60`, which is
@@ -574,8 +579,9 @@ public:
     // string-backed original name: CMessageConnection::OnOperationCompleted
     // current best read:
     // - main completion/receive-side bridge back into engine/queue handling
-    // - work type `2` first tries optional completion helper `+0x7c`; on the launcher startup path
-    //   that then falls through into the leaf owner-callback wrapper
+    // - work types `1/2` first try optional completion helpers `+0x80/+0x7c`; on the launcher
+    //   startup path those are null, so both then fall through into the leaf owner-callback
+    //   wrappers
     // - work type `3` copies packet-body bytes out of the retained-fragment-backed
     //   `CParsedPacketWorkItem` via `+0x24/+0x28` into a local receive/message-ref scaffold
     //   built on the same outer-ref/inner-storage split used by `0x455cd0/0x455c60`

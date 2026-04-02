@@ -11,15 +11,20 @@ const char* CLTLoginState_State1::DebugName() const {
 }
 
 // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
-uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediator) {
-    if (!mediator) {
+uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator) {
+    if (!workItem || !mediator) {
         return 0u;
     }
 
+    const auto* workHeader =
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    const uint32_t workType = workHeader ? workHeader->workType : 0u;
+
     // Tightened current read from decompilation + direct disassembly:
-    // - consume only type-2 auth connect-status payload already cached by the mediator
-    // - always mirror that payload into owner `+0x80`
-    // - exact original branch split is payload-zero vs payload-non-zero
+    // - `0x41af80` re-enters raw state1 slot 1 on every unconsumed auth completion work item
+    // - if that work item is not type `2`, state1 tail-calls shared slot-1 gate `0x438d80`
+    // - only the type-2 branch consumes the cached auth connect-status payload, mirrors it into
+    //   owner `+0x80`, and then splits on payload zero-vs-non-zero
     //   - zero      -> switch back to the cached upstream helper, let `0x41b450` re-enter that
     //                  helper's slot 3 with old-state `this`, then post event `0`
     //   - non-zero  -> set owner byte `+0x2c`, then either retry state1 slot 3 using the
@@ -28,6 +33,10 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(CLTLoginMediator* mediato
     // - current replacement happy path still produces `0x07000001` for connect success, so keep a
     //   narrow live success alias for that code while preserving the exact recovered helper
     //   switch/event/error shape
+    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+        return CLTLoginState::Slot1_HandlePrimaryGate(workItem, mediator);
+    }
+
     const uint32_t workResultCode = mediator->LastAuthConnectStatus();
     mediator->WorldListCountOrStatus80() = workResultCode;
 

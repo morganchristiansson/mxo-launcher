@@ -1132,11 +1132,16 @@ uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
 uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
     // Keep the status-recording contract explicit:
     // - `HandleAuthConnectStatus` must cache the type-2 payload on the mediator first
-    // - state1 slot 1 then consumes that cached payload through `LastAuthConnectStatus()`
-    // - non-state1 callers still use the narrow historical fallback while earlier startup
-    //   ownership remains only partially source-owned
+    // - the natural auth leaf now routes that same work through `0x449a70 -> 0x41af80 -> slot1`
+    // - this replay helper therefore synthesizes only the same narrow type-2 work-item shape when
+    //   state1 is still active, while non-state1 callers retain the older live-success fallback
     if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 1u) {
-        return currentState_->Slot1_HandlePrimaryGate(this);
+        CLTLoginMediatorQueuedWorkItemScaffold statusWorkItem = {};
+        statusWorkItem.header.workType =
+            mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus;
+        statusWorkItem.workPayload = lastAuthConnectStatus_;
+        statusWorkItem.debugLabel = "Synthetic auth connect-status replay";
+        return DispatchCurrentHelperPrimaryGateScaffold(&statusWorkItem);
     }
 
     return (lastAuthConnectStatus_ == kConnectStatusSuccess)

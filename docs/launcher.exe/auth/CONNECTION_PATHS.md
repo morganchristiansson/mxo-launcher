@@ -166,6 +166,21 @@ Important nuance:
 
 ## State1 connect-status gate now tightened
 
+### `launcher.exe:0x449a70 -> 0x41af80` auth completion fallback clarification
+- after base `0x4490c0` returns `0`, the auth leaf always falls through owner `+0x17c`
+- `0x41af80` is **not** the same re-entry shape as margin `0x41afc0`
+  - auth `0x41af80`
+    - compares incoming connection against owner `+0x18`
+    - clears owner `+0x18` on work type `1`
+    - then calls current helper raw vtable entry `+0x00` / slot 1
+  - margin `0x41afc0`
+    - compares against owner `+0x1c`
+    - clears owner `+0x1c/+0x20` on work type `1`
+    - then calls current helper raw vtable entry `+0x04` / slot 2
+- practical state1 consequence:
+  - auth type-`2` connect status reaches state1 slot 1 (`0x4390b0`)
+  - non-type-`2` auth completion work falls through the same slot-1 body into shared auth close gate `0x438d80`
+
 ### `launcher.exe:0x4390b0` exact current read
 - if `LaunchPadClient_GetVtableOffset(workItem) != 2`
   - tail-calls shared slot-1 gate `0x438d80`

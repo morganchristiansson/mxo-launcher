@@ -1290,6 +1290,18 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessageScaffold(void* workIt
     return currentState_->AuthMessageDispatch(workItem, this);
 }
 
+// anchor: launcher.exe:0x41af80 -> current helper vtable `+0x00`
+uint32_t CLTLoginMediator::DispatchCurrentHelperPrimaryGateScaffold(void* workItem) {
+    if (!currentState_) {
+        spdlog::info(
+            "CLTLoginMediator::DispatchCurrentHelperPrimaryGateScaffold skipped because currentState is null workItem={}",
+            fmt::ptr(workItem));
+        return 0u;
+    }
+
+    return currentState_->Slot1_HandlePrimaryGate(workItem, this);
+}
+
 // anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
 uint32_t CLTLoginMediator::DispatchCurrentHelperSecondaryGateScaffold(void* workItem) {
     if (!currentState_) {
@@ -1399,7 +1411,23 @@ uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold(
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
     const uint32_t workType = workHeader ? workHeader->workType : 0u;
-    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+        const auto* statusWorkItem =
+            static_cast<const CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
+        const uint32_t workResultCode = statusWorkItem ? statusWorkItem->workPayload : 0u;
+        lastAuthConnectStatus_ = workResultCode;
+        ++authConnectStatusCount_;
+        if (authConnection_ != nullptr &&
+            ((workResultCode == 0u &&
+              authConnection_->State() ==
+                  mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
+             workResultCode == kConnectStatusSuccess)) {
+            // Current source still needs the ready-state promotion before state2 re-entry, but the
+            // leaf/fallback routing itself now mirrors the original more closely:
+            // `0x449a70 -> 0x41af80 -> current helper slot1`.
+            authConnection_->SetState(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+        }
+    } else if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
         authConnection_ = nullptr;
         if (authConnectionContextScaffold_ != nullptr) {
             authConnectionContextScaffold_->sidecarConnection = nullptr;
@@ -1407,13 +1435,14 @@ uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold(
         }
     }
 
-    const uint32_t handled = DispatchCurrentHelperSecondaryGateScaffold(workItem);
+    const uint32_t handled = DispatchCurrentHelperPrimaryGateScaffold(workItem);
     spdlog::info(
-        "CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerAuthConnection={} bridgeContext={}",
+        "CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} lastAuthConnectStatus=0x{:08x} ownerAuthConnection={} bridgeContext={}",
         static_cast<unsigned>(workType),
         fmt::ptr(connection),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(handled),
+        static_cast<unsigned>(lastAuthConnectStatus_),
         fmt::ptr(authConnection_),
         fmt::ptr(authConnectionContextScaffold_));
     return handled;

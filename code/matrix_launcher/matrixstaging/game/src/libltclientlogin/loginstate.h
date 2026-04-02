@@ -41,7 +41,9 @@ public:
     virtual const char* DebugName() const = 0;
 
     // anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
-    virtual uint32_t Slot1_HandlePrimaryGate(CLTLoginMediator* mediator);
+    // Exact launcher call shape keeps the queued work item on the stack and reads its type through
+    // `LaunchPadClient_GetVtableOffset(workItem)`.
+    virtual uint32_t Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator);
 
     // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
     virtual uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator);
@@ -142,7 +144,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
-    uint32_t Slot1_HandlePrimaryGate(CLTLoginMediator* mediator) override;
+    uint32_t Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator) override;
 
     // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
