@@ -1328,20 +1328,39 @@ uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
     //   connect, and only once per auth cycle
     uint32_t marginAutoBeginResult = 0u;
     bool triggeredMarginAutoBegin = false;
+    bool deferredMarginAutoBeginToState8 = false;
     if (handled != 0u && rawCode == 0x0bu && lastAuthReply_.valid && !lastAuthReply_.isErrorReply &&
         !postAuthMarginAutoBeginAttemptedScaffold_) {
-        postAuthMarginAutoBeginAttemptedScaffold_ = true;
-        triggeredMarginAutoBegin = true;
-        marginAutoBeginResult = BeginLauncherMarginConnectionScaffold();
+        const uint32_t currentHelperPhaseCode =
+            currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+
+        // Existing-character continuation correction:
+        // - the earlier replacement moved margin auto-begin up to the handled AS_AuthReply seam
+        // - that starts helper/state4 too early and leaves its cached upstream pointer set to the
+        //   old state3 wait leaf
+        // - on the natural existing-character path the first meaningful state4 margin-connect
+        //   entry for this continuation is the later `+0xec -> state8 slot3 -> helper4` handoff
+        //   during "Loading Character"
+        // - deferring the connect begin while we are still sitting in state3 keeps state4's cached
+        //   upstream aligned with state8, which in turn lets the later type-2 connect completion
+        //   restore into state8/state6/state5 instead of falling back to state3 and stalling
+        if (currentHelperPhaseCode == 3u) {
+            deferredMarginAutoBeginToState8 = true;
+        } else {
+            postAuthMarginAutoBeginAttemptedScaffold_ = true;
+            triggeredMarginAutoBegin = true;
+            marginAutoBeginResult = BeginLauncherMarginConnectionScaffold();
+        }
     }
 
     spdlog::info(
-        "CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={} triggeredMarginAutoBegin={} marginAutoBeginResult=0x{:08x}",
+        "CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={} triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x}",
         static_cast<unsigned>(rawCode),
         static_cast<unsigned>(packetSize),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(handled),
         triggeredMarginAutoBegin ? 1u : 0u,
+        deferredMarginAutoBeginToState8 ? 1u : 0u,
         static_cast<unsigned>(marginAutoBeginResult));
     return handled;
 }
