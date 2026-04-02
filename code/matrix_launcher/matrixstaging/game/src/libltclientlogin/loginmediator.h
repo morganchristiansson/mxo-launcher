@@ -33,7 +33,7 @@ struct CLTLoginMediatorQueuedWorkItemScaffold {
 
 struct CLTLoginMediatorConnectionContextScaffold {
     void** vtable;
-    unsigned char autoReleaseFlag;
+    unsigned char autoReleaseFlag; // stand-in for the original queued connection object's byte `+0x04`, initialized to 0 by `CBaseConnection_ctor` (`launcher.exe:0x44a9f0`)
     unsigned char padding05[3];
     mxo::liblttcp::CMessageConnection* sidecarConnection;
     const char* debugLabel;
@@ -45,11 +45,14 @@ struct CLTLoginMediatorConnectionContextScaffold {
 // Source-owned outer-seam callback bodies for the current launcher bridge context.
 // Current static-RE direction:
 // - original queue/context traffic is connection-centric, not mediator-class-centric
-// - newer producer-side tightening now queues launcher-bridge work only through the sidecar
-//   connection's queue-context object
-// - so this bridge vtable survives only as an unexpected-path guard / identity marker on the
-//   mediator-owned owner/context record, while the callback bodies still live with the outer login
-//   seam rather than in the engine core
+// - `CLTTCPConnection::OnReceive` (`launcher.exe:0x449d40`) queues the direct connection object as
+//   `context=this`
+// - `CLTBaseThreadPerClientTCPEngine_RunCompletedOperationQueue` (`launcher.exe:0x436b10`) then
+//   consumes that object through context slot `+0x10(workItem)` and only conditionally touches
+//   context `+0x04` when the low byte of `[context+4]` is non-zero
+// - current source still keeps a mediator-owned owner/context sidecar record, so this bridge
+//   survives only as a stand-in / identity marker that re-enters the already-anchored
+//   connection-family completion path instead of inventing mediator-local queue semantics
 uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
     CLTLoginMediatorConnectionContextScaffold* self);
 uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(

@@ -357,26 +357,11 @@ void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
     spdlog::info("CLTLoginMediator::ResetLauncherConnectionBridgeScaffold completed");
 }
 
-static const char* LauncherConnectionBridgeContext_WorkTypeName(uint32_t workType) {
-    switch (workType) {
-        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose:
-            return "Close";
-        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus:
-            return "ConnectionStatus";
-        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket:
-            return "ParsedPacket";
-        case mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain:
-            return "SyntheticReceiveDrain";
-        default:
-            return "Unknown";
-    }
-}
-
-// anchor: launcher.exe:0x436b10 non-empty dequeue tail uses the queued context object's
-// `+0x10(workItem)` completion hook and, on the type-1 path, may then call context `+0x04`.
-// The original queued context is connection-centric (`0x449a70` / `0x44af60` / `0x4490c0`), not a
-// mediator-owned record, so this bridge first resolves the current sidecar connection and then
-// forwards into that narrower path instead of open-coding mediator-specific completion logic here.
+// anchor: launcher.exe:0x449d40 queues the direct connection object as `context=this`.
+// anchor: launcher.exe:0x436b10 then consumes that queued context through slot `+0x10(workItem)`.
+// Current source still keeps a mediator-owned owner/context sidecar record, so when this bridge
+// vtable is hit we first recover the live auth/margin connection object and then re-enter the
+// original connection-family completion path instead of inventing mediator-local queue semantics.
 static mxo::liblttcp::CMessageConnection* LauncherConnectionBridgeContext_ResolveSidecarConnection(
     CLTLoginMediatorConnectionContextScaffold* self) {
     if (!self) {
@@ -399,53 +384,27 @@ static mxo::liblttcp::CMessageConnection* LauncherConnectionBridgeContext_Resolv
     return connection;
 }
 
-// anchor: launcher.exe:0x436b10 type-1 queue path may call queued-context `+0x04` after the
-// connection-centric completion hook. Newer bounded producer-side tightening now always queues the
-// sidecar connection's own queue-context object for launcher-bridge type-1/type-2/synthetic items,
-// so reaching this bridge vtable means source has fallen off the intended connection-centric path.
+// anchor: launcher.exe:0x44a9f0 seeds the queued connection object's byte `+0x04` to 0.
+// anchor: launcher.exe:0x436b10 only calls queued-context `+0x04` on the type-1 path when the low
+// byte of `[context+4]` is non-zero.
+// Current bridge records preserve that same zero byte at `autoReleaseFlag`, so the bridge `+0x04`
+// slot remains only an inert stand-in / identity marker on the unexpected bridge-vtable path.
 uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
-    CLTLoginMediatorConnectionContextScaffold* self) {
-    mxo::liblttcp::CMessageConnection* connection =
-        LauncherConnectionBridgeContext_ResolveSidecarConnection(self);
-    if (connection == nullptr) {
-        spdlog::warn(
-            "CLTLoginMediator launcher bridge context release reached without sidecarConnection self={} label='{}' autoRelease={}",
-            fmt::ptr(self),
-            (self && self->debugLabel) ? self->debugLabel : "<null>",
-            (self && self->autoReleaseFlag) ? 1u : 0u);
-        return 1u;
-    }
-
-    void* queueContext = connection->QueueContextScaffold();
-    void** vtable = queueContext ? *static_cast<void***>(queueContext) : nullptr;
-    if (vtable != nullptr && vtable[1] != nullptr) {
-        using ReleaseFn = uint32_t(__thiscall*)(void*);
-        return reinterpret_cast<ReleaseFn>(vtable[1])(queueContext);
-    }
+    CLTLoginMediatorConnectionContextScaffold* /*self*/) {
     return 1u;
 }
 
 // anchor: launcher.exe:0x436b10 -> queued context `+0x10(workItem)`
-// anchor: launcher.exe:0x449a70 / 0x44af60 / 0x4490c0
+// anchor: launcher.exe:0x4490c0 / 0x449a70 / 0x44af60 are the concrete auth/margin connection
+// completion targets reached from that slot.
 uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(
     CLTLoginMediatorConnectionContextScaffold* self,
     CLTLoginMediatorQueuedWorkItemScaffold* workItem) {
     mxo::liblttcp::CMessageConnection* connection =
         LauncherConnectionBridgeContext_ResolveSidecarConnection(self);
-    if (connection == nullptr || workItem == nullptr) {
-        spdlog::warn(
-            "CLTLoginMediator launcher bridge OnOperationCompleted reached off the connection-centric path context={} label='{}' workItem={} type=0x{:08x} ({}) payload=0x{:08x} sidecarConnection={}",
-            fmt::ptr(self),
-            (self && self->debugLabel) ? self->debugLabel : "<null>",
-            fmt::ptr(workItem),
-            workItem ? workItem->header.workType : 0u,
-            LauncherConnectionBridgeContext_WorkTypeName(workItem ? workItem->header.workType : 0u),
-            workItem ? workItem->workPayload : 0u,
-            fmt::ptr(connection));
-        return 1u;
-    }
-
-    return connection->OnOperationCompleted(workItem);
+    return (connection != nullptr && workItem != nullptr)
+        ? connection->OnOperationCompleted(workItem)
+        : 0u;
 }
 
 // +0x00

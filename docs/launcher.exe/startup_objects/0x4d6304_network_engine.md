@@ -1488,8 +1488,12 @@ Build-validated update:
   - and now also owns the current source-only launcher-bridge context callback bodies that were previously sitting in `ltthreadperclienttcpengine.cpp`
   - newer `2026-04-01` bridge tightening now narrows those callbacks further to the original queue/connection shape seen in `0x436b10`
     - the bridge first resolves the current sidecar auth/margin connection
-    - then forwards queue-context `+0x10(workItem)` traffic into the connection-family completion path instead of open-coding mediator-specific type-2 / synthetic-receive handling there
+    - then forwards queued-context `+0x10(workItem)` traffic into the connection-family completion path instead of open-coding mediator-specific type-2 / synthetic-receive handling there
     - practical anchored targets are the already-recovered connection callbacks `0x4490c0`, `0x449a70`, and `0x44af60`
+    - a fresh `0x449d40` / `0x44a9f0` re-check tightened the stand-in one step further:
+      - original parsed-packet producers queue the **direct connection object** as `context=this`
+      - `CBaseConnection_ctor` seeds byte `+0x04 = 0`, which is the same low byte `0x436b10` later tests before any conditional `context->+0x04()` type-1 release tail
+      - current mediator bridge records now mirror that by leaving `autoReleaseFlag` at zero and keeping bridge slot `+0x04` as an inert success stub; only bridge slot `+0x10` re-enters the sidecar connection-family completion path
     - producer-side tightening now also prunes the older no-sidecar queued-context fallback: launcher-bridge type-1/type-2/synthetic items are only queued through the sidecar connection's queue-context object, while the bridge-context vtable is left as an unexpected-path guard
   - newer successful launcher-into-game runtime logs now line up with that read on the active path too:
     - no `pendingCopiedPackets=` logs
