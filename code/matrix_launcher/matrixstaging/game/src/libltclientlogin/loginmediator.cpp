@@ -264,8 +264,6 @@ CLTLoginMediator::CLTLoginMediator()
       marginConnection_(nullptr),
       authConnectionOwnedByMediator_(false),
       marginConnectionOwnedByMediator_(false),
-      authConnectionContextKey_(nullptr),
-      marginConnectionContextKey_(nullptr),
       helpers_{},
       marginRouteState_{},
       marginAddressList3c_{},
@@ -337,8 +335,6 @@ void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
     }
 
     SetCurrentState(nullptr);
-    SetAuthConnectionContextKey(nullptr);
-    SetMarginConnectionContextKey(nullptr);
     SetNetworkEngine(nullptr);
     UnregisterActiveStateSourceScaffold(this);
 
@@ -1354,6 +1350,37 @@ uint32_t CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffol
     return handled;
 }
 
+// anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
+uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold(
+    mxo::liblttcp::CMessageConnection* connection,
+    void* workItem) {
+    if (!connection || !workItem || connection != authConnection_) {
+        return 0u;
+    }
+
+    const auto* workHeader =
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    const uint32_t workType = workHeader ? workHeader->workType : 0u;
+    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        authConnection_ = nullptr;
+        if (authConnectionContextScaffold_ != nullptr) {
+            authConnectionContextScaffold_->sidecarConnection = nullptr;
+            authConnectionContextScaffold_->peerCloseQueued = false;
+        }
+    }
+
+    const uint32_t handled = DispatchCurrentHelperSecondaryGateScaffold(workItem);
+    spdlog::info(
+        "CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerAuthConnection={} bridgeContext={}",
+        static_cast<unsigned>(workType),
+        fmt::ptr(connection),
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(handled),
+        fmt::ptr(authConnection_),
+        fmt::ptr(authConnectionContextScaffold_));
+    return handled;
+}
+
 // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
 uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold(
     mxo::liblttcp::CMessageConnection* connection,
@@ -1367,18 +1394,21 @@ uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold(
     const uint32_t workType = workHeader ? workHeader->workType : 0u;
     if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
         marginConnection_ = nullptr;
-        marginConnectionContextKey_ = nullptr;
+        if (marginConnectionContextScaffold_ != nullptr) {
+            marginConnectionContextScaffold_->sidecarConnection = nullptr;
+            marginConnectionContextScaffold_->peerCloseQueued = false;
+        }
     }
 
     const uint32_t handled = DispatchCurrentHelperSecondaryGateScaffold(workItem);
     spdlog::info(
-        "CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerMarginConnection={} ownerContextKey={}",
+        "CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerMarginConnection={} bridgeContext={}",
         static_cast<unsigned>(workType),
         fmt::ptr(connection),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(handled),
         fmt::ptr(marginConnection_),
-        fmt::ptr(marginConnectionContextKey_));
+        fmt::ptr(marginConnectionContextScaffold_));
     return handled;
 }
 
@@ -3842,7 +3872,7 @@ bool CLTLoginMediator::SelectMarginEndpointIpv4() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObject() {
-    if (marginConnectionContextKey_ == nullptr && engine_ != nullptr) {
+    if (marginConnectionContextScaffold_ == nullptr && engine_ != nullptr) {
         // Bounded source-owned bridge correction:
         // - original `0x41e500` is reached directly from state4 and does not pass through the
         //   outer `BeginLauncherMarginConnectionScaffold()` helper
@@ -3856,7 +3886,6 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
                 /*isMarginConnection=*/true);
         if (context) {
             context->peerCloseQueued = false;
-            SetMarginConnectionContextKey(context);
         }
     }
 
@@ -3884,9 +3913,7 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObjec
     marginConnection->ConfigurePacketNameFamily(
         mxo::liblttcp::CMessageConnectionPacketNameFamily::kMargin,
         /*packetizedMessagesEnabled=*/true);
-    if (marginConnectionContextKey_) {
-        marginConnection->SetOwnerContext(marginConnectionContextKey_);
-    }
+    marginConnection->SetOwnerContext(this);
     if (marginConnectionContextScaffold_ != nullptr) {
         marginConnectionContextScaffold_->sidecarConnection = marginConnection;
     }

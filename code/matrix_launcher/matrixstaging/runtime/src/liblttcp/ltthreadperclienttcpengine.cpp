@@ -187,8 +187,10 @@ static bool IsLauncherBridgeContextScaffold(
 
 // Static-RE note for the current bridge seam:
 // - original `0x4325d0/0x4328a0 -> 0x431ff0` and `0x449d40 -> 0x436820` paths are connection-keyed
-// - keep the source-owned mediator bridge context attached to the direct connection object's
-//   owner/context pointer instead of mirroring auth/margin-specific maps on the engine
+// - auth/margin connection ctors (`0x41d170` / `0x41e500`) store the owning mediator directly at
+//   connection `+0xa4`
+// - current source therefore keeps the extra launcher-bridge context only as a mediator-owned
+//   sidecar resolved from that direct owner pointer, not as the connection's actual owner/context
 static mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*
 ResolveLauncherBridgeContextForConnectionScaffold(
     const CMessageConnection* connection) {
@@ -196,12 +198,23 @@ ResolveLauncherBridgeContextForConnectionScaffold(
         return nullptr;
     }
 
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* directContext =
         static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(
             connection->OwnerContext());
-    return (IsLauncherBridgeContextScaffold(context) && context->sidecarConnection == connection)
-        ? context
-        : nullptr;
+    if (IsLauncherBridgeContextScaffold(directContext) &&
+        directContext->sidecarConnection == connection) {
+        return directContext;
+    }
+
+    mxo::ltlogin::CLTLoginMediator* mediator =
+        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+    if (mediator == nullptr || connection->OwnerContext() != mediator) {
+        return nullptr;
+    }
+
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
+        mediator->ResolveConnectionBridgeContextScaffold(connection);
+    return (context != nullptr && context->sidecarConnection == connection) ? context : nullptr;
 }
 
 template <typename Head>
@@ -666,9 +679,10 @@ static void EnsureLauncherConnectionBridgeContextVtableInitialized() {
         // Fidelity correction from the current RE pass:
         // - original queue/context traffic is still connection-centric
         // - launcher-bridge work items are now queued only through the sidecar connection's own
-        //   queue-context object, not through this mediator-owned owner/context record
-        // - this vtable therefore remains only as an unexpected-path guard / identity marker while
-        //   source still keeps the bridge record attached to `connection->OwnerContext()`
+        //   queue-context object, not through this mediator-owned bridge record
+        // - auth/margin connection ctors store the mediator directly at connection `+0xa4`, so this
+        //   bridge vtable remains only as an unexpected-path guard / identity marker on the
+        //   separate mediator-owned sidecar record
         g_LauncherConnectionBridgeContextVtable[1] =
             reinterpret_cast<void*>(mxo::ltlogin::LauncherConnectionBridgeContext_ReleaseScaffold);
         g_LauncherConnectionBridgeContextVtable[4] =
@@ -1780,8 +1794,8 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
     // - keep the real recovered arg5 fields on the object body itself
     // - keep only source-only launcher-shell attachment + generic direct-connection bookkeeping in
     //   discrete engine-keyed maps instead of a synthetic per-engine side-state record
-    // - keep launcher bridge contexts on the connection owner/context pointers rather than in
-    //   auth/margin-specific engine maps
+    // - keep launcher bridge contexts as mediator-owned sidecars resolved from the connection's
+    //   direct owner pointer rather than inventing auth/margin-specific engine maps
     // - keep recovered payload families (`+0x08`, `+0x80/+0x84`, `+0x8c/+0x90`) in dedicated
     //   source backings keyed by `this`, not as pretend hidden object fields
     ownedQueueLockHelper60_.vtable = nullptr;
@@ -2969,11 +2983,16 @@ CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* con
         if (!connection) {
             return false;
         }
+
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* bridgeContext =
+            ResolveLauncherBridgeContextForConnectionScaffold(connection);
         return connection == contextKey ||
             connection == resolvedContextKey ||
             connection == queueContextOwner ||
             connection->OwnerContext() == contextKey ||
-            connection->OwnerContext() == resolvedContextKey;
+            connection->OwnerContext() == resolvedContextKey ||
+            bridgeContext == contextKey ||
+            bridgeContext == resolvedContextKey;
     };
 
     if (CMessageConnection* queuedConnection =
@@ -3060,7 +3079,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
     }
 
     // Static RE of `0x449cd0`, `0x449d20`, and `0x449d40` keeps the public engine slot family on
-    // the direct connection object itself. After queue-context unwrapping and bridge-context
+    // the direct connection object itself. After queue-context unwrapping and bridge-sidecar
     // handling above, remaining callers are expected to already be passing that connection object.
     if (!connection) {
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* bridgeContext =
@@ -3077,7 +3096,12 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
 
     connection->SetEngine(this);
     if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
-        connection->SetOwnerContext(normalizedContextKey);
+        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* bridgeContext =
+            static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(normalizedContextKey);
+        connection->SetOwnerContext(
+            IsLauncherBridgeContextScaffold(bridgeContext) && bridgeContext->mediator != nullptr
+                ? static_cast<void*>(bridgeContext->mediator)
+                : normalizedContextKey);
     }
     return connection;
 }

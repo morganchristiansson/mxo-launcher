@@ -495,7 +495,7 @@ public:
 
     // Source-owned connection resolver. Current faithful preference order is:
     // - queue-context owner
-    // - mediator-owned launcher bridge context -> sidecarConnection
+    // - launcher bridge sidecar resolved from the connection's direct mediator owner at `+0xa4`
     // - active worker/context-tree payloads keyed by the direct connection object
     // - no generic synthetic fallback allocation
     CMessageConnection* FindMessageConnection(void* contextKey);

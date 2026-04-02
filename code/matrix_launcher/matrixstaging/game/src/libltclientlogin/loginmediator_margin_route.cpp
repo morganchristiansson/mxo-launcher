@@ -118,7 +118,6 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
                 /*isMarginConnection=*/true);
         if (context) {
             context->peerCloseQueued = false;
-            SetMarginConnectionContextKey(context);
         }
     }
 

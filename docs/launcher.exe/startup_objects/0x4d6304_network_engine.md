@@ -148,7 +148,8 @@ New non-original-state audit from the current constructor / destructor / worker-
       - the old auth/margin-specific engine maps were removed
       - source connection resolution is now limited to RE-backed identities only:
         - queue-context owner
-        - bridge context hanging off `connection->OwnerContext()`
+        - direct mediator owner stored at connection `+0xa4`, with any extra bridge record kept as a
+          mediator-owned sidecar resolved from that owner/child pair
         - active worker/context-tree payloads keyed by the direct connection pointer
       - there is no longer any generic engine-keyed known-connection registry on this path
     - negative result from the current re-check of
@@ -1338,11 +1339,13 @@ Concrete evidence:
 - `launcher.exe:0x41d170`
   - allocates / constructs a `CMessageConnection`-family object through `0x4417e0 -> 0x448b40`
   - stores it at owner `+0x18`
+  - stores the owning `CLTLoginMediator*` directly at connection `+0xa4`
   - builds endpoint data into owner `+0x5c`
   - immediately calls `connection->+0x1c(owner+0x5c)`
 - `launcher.exe:0x41e500`
   - allocates / constructs another `CMessageConnection`-family object through the same `0x4417e0 -> 0x448b40`
   - stores it at owner `+0x1c`
+  - stores the owning `CLTLoginMediator*` directly at connection `+0xa4`
   - builds endpoint data into owner `+0x6c`
   - immediately calls `connection->+0x1c(owner+0x6c)`
 - those calls match the current best `CMessageConnection` mapping where virtual `+0x1c` is the connection-oriented ensure-connected / engine-`Connect` wrapper
@@ -1395,7 +1398,7 @@ Important limitation:
   - newer bounded lookup correction also lets the engine resolve those connection-oriented slots by only the tighter RE-backed identities now left in source:
     - the direct connection object pointer,
     - the explicit queue-context bridge object that wraps the owning connection, or
-    - the connection's stored owner/context key / bridge context hanging off that connection
+    - the connection's direct mediator owner at `+0xa4`, with any extra launcher-bridge record kept only as a mediator-owned sidecar keyed by that auth/margin child pointer
   - the earlier generic engine-keyed known-connection registry is gone; current source falls back only through the active pointer-keyed worker/context tree payloads
   - newer bounded correction then normalizes queue-context bridge inputs back to the owning
     connection/context key instead of inventing a second synthetic connection record keyed only by
@@ -1490,10 +1493,11 @@ Build-validated update:
     - the bridge first resolves the current sidecar auth/margin connection
     - then forwards queued-context `+0x10(workItem)` traffic into the connection-family completion path instead of open-coding mediator-specific type-2 / synthetic-receive handling there
     - practical anchored targets are the already-recovered connection callbacks `0x4490c0`, `0x449a70`, and `0x44af60`
-    - a fresh `0x449d40` / `0x44a9f0` re-check tightened the stand-in one step further:
+    - a fresh `0x449d40` / `0x44a9f0` / `0x41d170` / `0x41e500` re-check tightened the stand-in one step further:
       - original parsed-packet producers queue the **direct connection object** as `context=this`
+      - auth/margin connection ctors store the owning mediator directly at connection `+0xa4`
       - `CBaseConnection_ctor` seeds byte `+0x04 = 0`, which is the same low byte `0x436b10` later tests before any conditional `context->+0x04()` type-1 release tail
-      - current mediator bridge records now mirror that by leaving `autoReleaseFlag` at zero and keeping bridge slot `+0x04` as an inert success stub; only bridge slot `+0x10` re-enters the sidecar connection-family completion path
+      - current mediator bridge records now mirror that by leaving `autoReleaseFlag` at zero, keeping the real connection owner pointer as the mediator, and using bridge slot `+0x10` only as the sidecar re-entry path into the connection-family completion callbacks
     - producer-side tightening now also prunes the older no-sidecar queued-context fallback: launcher-bridge type-1/type-2/synthetic items are only queued through the sidecar connection's queue-context object, while the bridge-context vtable is left as an unexpected-path guard
   - newer successful launcher-into-game runtime logs now line up with that read on the active path too:
     - no `pendingCopiedPackets=` logs

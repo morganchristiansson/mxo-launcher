@@ -47,12 +47,14 @@ struct CLTLoginMediatorConnectionContextScaffold {
 // - original queue/context traffic is connection-centric, not mediator-class-centric
 // - `CLTTCPConnection::OnReceive` (`launcher.exe:0x449d40`) queues the direct connection object as
 //   `context=this`
+// - auth/margin connection ctors (`launcher.exe:0x41d170` / `0x41e500`) store the owning
+//   `CLTLoginMediator*` directly at connection `+0xa4`
 // - `CLTBaseThreadPerClientTCPEngine_RunCompletedOperationQueue` (`launcher.exe:0x436b10`) then
 //   consumes that object through context slot `+0x10(workItem)` and only conditionally touches
 //   context `+0x04` when the low byte of `[context+4]` is non-zero
-// - current source still keeps a mediator-owned owner/context sidecar record, so this bridge
-//   survives only as a stand-in / identity marker that re-enters the already-anchored
-//   connection-family completion path instead of inventing mediator-local queue semantics
+// - current source therefore keeps this mediator-owned bridge record only as a separate sidecar for
+//   the nonblocking arg5 helper pump / synthetic work-item path; it is no longer the connection's
+//   stand-in owner pointer
 uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
     CLTLoginMediatorConnectionContextScaffold* self);
 uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(
@@ -704,9 +706,9 @@ public:
     // - tail-jumps to helper vtable `+0x10`
     // - current best read is helper slot 5 / `AuthMessageDispatch`
     uint32_t DispatchCurrentHelperAuthMessageScaffold(void* workItem);
-    // anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
-    // Narrow source-owned mirror of the margin completion-fallback re-entry used from
-    // `CMarginConnection::OnOperationCompleted` when base `0x4490c0` leaves work unconsumed.
+    // anchor: launcher.exe:0x41af80 / 0x41afc0 -> current helper vtable `+0x04`
+    // Narrow source-owned mirror of the shared auth/margin completion-fallback re-entry used when
+    // the connection leaf leaves work unconsumed.
     uint32_t DispatchCurrentHelperSecondaryGateScaffold(void* workItem);
     // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
     // `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
@@ -724,6 +726,10 @@ public:
         const uint8_t* packetBytes,
         size_t packetSize,
         void* workItem = nullptr);
+    // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
+    uint32_t HandleAuthConnectionCompletionFallbackScaffold(
+        mxo::liblttcp::CMessageConnection* connection,
+        void* workItem);
     // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
     uint32_t HandleMarginConnectionCompletionFallbackScaffold(
         mxo::liblttcp::CMessageConnection* connection,
@@ -889,9 +895,6 @@ public:
     // prefer this over rebuilding the concrete scaffold-state table from diagnostics code.
     void EnsureBuiltinScaffoldStatesRegistered();
 
-    void SetAuthConnectionContextKey(void* contextKey);
-    void SetMarginConnectionContextKey(void* contextKey);
-
     // Recovered config anchors:
     // - launcher `qsAuthServerDNSName` / `AuthServerPort`
     // - launcher `MarginServerDNSSuffix` / `MarginServerPort`
@@ -904,6 +907,8 @@ public:
 
     mxo::liblttcp::CMessageConnection* AuthConnection() const;
     mxo::liblttcp::CMessageConnection* MarginConnection() const;
+    CLTLoginMediatorConnectionContextScaffold* ResolveConnectionBridgeContextScaffold(
+        const mxo::liblttcp::CMessageConnection* connection) const;
 
     void SetMarginRouteHostPrefix(const char* routeHostPrefix);
     void SetExactMarginHostName(const char* exactMarginHostName);
@@ -1628,8 +1633,8 @@ private:
     mxo::liblttcp::CMessageConnection* marginConnection_;
     bool authConnectionOwnedByMediator_ = false;
     bool marginConnectionOwnedByMediator_ = false;
-    void* authConnectionContextKey_;
-    void* marginConnectionContextKey_;
+    // Source-owned launcher-bridge sidecars kept separate from the original connection `+0xa4`
+    // owner pointer, which current static RE now ties directly to the mediator object itself.
     CLTLoginMediatorConnectionContextScaffold* authConnectionContextScaffold_ = nullptr;
     CLTLoginMediatorConnectionContextScaffold* marginConnectionContextScaffold_ = nullptr;
 

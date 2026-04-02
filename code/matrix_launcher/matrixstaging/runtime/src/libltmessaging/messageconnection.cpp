@@ -929,12 +929,29 @@ static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
 }
 
 // UNANCHORED: source-owned typed owner-context view used by the current `0x4490c0/0x449a70/0x44af60`
-// reconstruction when the launcher-owned connection context is known to be a login-mediator slot.
-static mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*
-CMessageConnection_LoginMediatorContextScaffold(CMessageConnection* self) {
-    return self
-        ? static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(self->OwnerContext())
-        : nullptr;
+// reconstruction when the launcher-owned connection owner at `+0xa4` is the active login
+// mediator. Current static-RE anchor for that ownership write is `0x41d170 / 0x41e500`.
+static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaffold(
+    CMessageConnection* self) {
+    if (!self) {
+        return nullptr;
+    }
+
+    mxo::ltlogin::CLTLoginMediator* mediator =
+        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+    return (mediator != nullptr && self->OwnerContext() == mediator) ? mediator : nullptr;
+}
+
+static bool CMessageConnection_IsMediatorAuthConnectionScaffold(
+    CMessageConnection* self,
+    const mxo::ltlogin::CLTLoginMediator* mediator) {
+    return self != nullptr && mediator != nullptr && self == mediator->AuthConnection();
+}
+
+static bool CMessageConnection_IsMediatorMarginConnectionScaffold(
+    CMessageConnection* self,
+    const mxo::ltlogin::CLTLoginMediator* mediator) {
+    return self != nullptr && mediator != nullptr && self == mediator->MarginConnection();
 }
 
 // UNANCHORED: source-owned synthetic receive-drain proxy standing in only for copied-packet
@@ -942,19 +959,21 @@ CMessageConnection_LoginMediatorContextScaffold(CMessageConnection* self) {
 static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
     CMessageConnection* self,
     uint32_t workPayload) {
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-        CMessageConnection_LoginMediatorContextScaffold(self);
-    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
-    if (!self || !context || !mediator) {
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(self);
+    const bool isAuthConnection =
+        CMessageConnection_IsMediatorAuthConnectionScaffold(self, mediator);
+    const bool isMarginConnection =
+        CMessageConnection_IsMediatorMarginConnectionScaffold(self, mediator);
+    if (!self || !mediator || (!isAuthConnection && !isMarginConnection)) {
         spdlog::debug(
-            "CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold missing mediator context this={} ownerContext={} payload=0x{:08x}",
+            "CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold missing mediator owner this={} ownerContext={} payload=0x{:08x}",
             fmt::ptr(self),
             fmt::ptr(self ? self->OwnerContext() : nullptr),
             workPayload);
         return 0u;
     }
 
-    if (!context->isMarginConnection) {
+    if (!isMarginConnection) {
         const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
         if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
             const uint32_t marginConnectResult = mediator->BeginLauncherMarginConnectionScaffold();
@@ -971,7 +990,7 @@ static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
         workPayload,
         fmt::ptr(self),
         fmt::ptr(self->OwnerContext()),
-        context->isMarginConnection ? 1u : 0u,
+        isMarginConnection ? 1u : 0u,
         self->RemoteHostName().empty() ? std::string("<empty>") : self->RemoteHostName());
     return 1u;
 }
@@ -982,12 +1001,15 @@ static uint32_t CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
     uint32_t workPayload,
     bool isMarginConnection,
     const char* ownerSlotLabel) {
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-        CMessageConnection_LoginMediatorContextScaffold(self);
-    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
-    if (!self || !context || !mediator) {
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(self);
+    const bool liveIsAuthConnection =
+        CMessageConnection_IsMediatorAuthConnectionScaffold(self, mediator);
+    const bool liveIsMarginConnection =
+        CMessageConnection_IsMediatorMarginConnectionScaffold(self, mediator);
+    if (!self || !mediator || (!liveIsAuthConnection && !liveIsMarginConnection) ||
+        liveIsMarginConnection != isMarginConnection) {
         spdlog::debug(
-            "CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold missing mediator context this={} ownerContext={} payload=0x{:08x} ownerSlot={} expectedMargin={}",
+            "CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold missing mediator owner this={} ownerContext={} payload=0x{:08x} ownerSlot={} expectedMargin={}",
             fmt::ptr(self),
             fmt::ptr(self ? self->OwnerContext() : nullptr),
             workPayload,
@@ -1748,11 +1770,10 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
     CMessageConnectionMessageRef& messageRef) {
     (void)workItem;
 
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-        CMessageConnection_LoginMediatorContextScaffold(this);
-    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
     const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
-    if (!context || !mediator || context->isMarginConnection || !messageStorage) {
+    if (!mediator || !CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator) ||
+        !messageStorage) {
         return 0u;
     }
 
@@ -1825,6 +1846,7 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
         return 1u;
     }
 
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
         const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* statusWorkItem =
@@ -1834,6 +1856,14 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
             statusWorkItem ? statusWorkItem->workPayload : 0u,
             /*isMarginConnection=*/false,
             "+0x17c");
+    }
+
+    if (mediator && CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator)) {
+        const uint32_t handled =
+            mediator->HandleAuthConnectionCompletionFallbackScaffold(this, workItem);
+        if (handled != 0u) {
+            return 1u;
+        }
     }
 
     spdlog::debug(
@@ -1903,10 +1933,8 @@ uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint32_t
         handled,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
-        fmt::ptr(CMessageConnection_LoginMediatorContextScaffold(this)
-                     ? CMessageConnection_LoginMediatorContextScaffold(this)->mediator
-                           ? CMessageConnection_LoginMediatorContextScaffold(this)->mediator->CurrentState()
-                           : nullptr
+        fmt::ptr(CMessageConnection_LoginMediatorOwnerScaffold(this)
+                     ? CMessageConnection_LoginMediatorOwnerScaffold(this)->CurrentState()
                      : nullptr),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     return handled;
@@ -2148,11 +2176,10 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
     CMessageConnectionMessageRef& messageRef) {
     (void)workItem;
 
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-        CMessageConnection_LoginMediatorContextScaffold(this);
-    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
     const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
-    if (!context || !mediator || !context->isMarginConnection || !messageStorage) {
+    if (!mediator || !CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator) ||
+        !messageStorage) {
         return 0u;
     }
 
@@ -2304,9 +2331,9 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
         return 1u;
     }
 
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-        CMessageConnection_LoginMediatorContextScaffold(this);
-    mxo::ltlogin::CLTLoginMediator* mediator = context ? context->mediator : nullptr;
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+    const bool isMarginConnection =
+        CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator);
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
@@ -2329,7 +2356,7 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
                 RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
         }
 
-        if (context && mediator && context->isMarginConnection) {
+        if (isMarginConnection && mediator) {
             const uint32_t handled = mediator->DispatchCurrentHelperSecondaryGateScaffold(workItem);
             spdlog::info(
                 "CMarginConnection::OnOperationCompleted routed type-2 connect-status through current helper slot2 payload=0x{:08x} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
@@ -2349,7 +2376,7 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
             "+0x188");
     }
 
-    if (context && mediator && context->isMarginConnection) {
+    if (isMarginConnection && mediator) {
         const uint32_t handled =
             mediator->HandleMarginConnectionCompletionFallbackScaffold(this, workItem);
         if (handled != 0u) {

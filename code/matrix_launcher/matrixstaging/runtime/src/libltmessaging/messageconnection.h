@@ -51,18 +51,15 @@ namespace mxo::liblttcp {
 //   - those families wrap base completion through `0x449a70` / `0x44af60`
 //   - later leaf `0x449a70` is now narrowed one step further:
 //     - after base `0x4490c0` returns 0, it calls owner `[self+0xa4]->+0x17c`
-//     - that owner surface is now resolved as thunk `0x41f260`, which forwards to the
-//       owner's current helper/state object at `owner+0x10`, then jumps to helper vtable `+0x14`
-//     - so the concrete handling target depends on the current helper selected through the
+//     - current ctor-side proof from `0x41d170 / 0x41e500` now ties that `+0xa4` owner field
+//       directly to the `CLTLoginMediator*`, not to a bridge/context record
+//     - `+0x17c` itself is `0x41af80 = CLTLoginMediator_HandleAuthConnectionCompletionFallback`
+//     - that fallback filters to owner `+0x18`, clears owner `+0x18` on type `1`, then re-enters
+//       the current helper through vtable `+0x04`
+//     - so the concrete handling target still depends on the current helper selected through the
 //       `0x4f7868` family and `0x41b450(...)`, not on one fixed owner-body function alone
-//     - important correction: later body `0x4401a0` is **not** the generic owner `+0x17c`
-//       target by itself; it is helper `0x4f7890` (`CLTLoginState_State10`, vtable `0x4b512c`) slot `+0x14`
-//     - that helper body only meaningfully handles later raw auth code `0x0b`
-//       (`AS_AuthReply`), then updates owner state and reaches
-//       `0x41b450` + `CLTLoginMediator::PostEvent()` / `PostError()`
-//     - if the current helper `+0x14` target returns 0, `0x449a70` falls through to
-//       `0x448a60`, which is string-backed only as a generic
-//       `Got unhandled op of type %d with status %s` logger
+//     - if that helper re-entry returns 0, `0x449a70` falls through to `0x448a60`, which is
+//       string-backed only as a generic `Got unhandled op of type %d with status %s` logger
 //   - important nuance: that owner/helper/fallback chain is therefore a later derived-leaf
 //     incoming packet/owner-handling anchor, not direct proof of the first outbound request
 //     after connect
@@ -669,6 +666,9 @@ private:
 // ============================================================
 // Source-owned leaf mirror of the auth-side startup child built at `0x41d170` and assigned
 // vtable `0x004afef0` before the initial `connection->+0x1c(owner+0x5c)` call.
+// Current constructor-side proof also keeps the owner split explicit here:
+// - connection `+0xa4` = direct `CLTLoginMediator*`
+// - extra launcher-bridge records remain separate source-owned sidecars only
 // Keep the class name conservative in source for now:
 // - the surrounding canonical docs still carry older naming on `0x004afef0`
 // - but current static RE is strong that this is the auth-side leaf completion wrapper reached

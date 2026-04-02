@@ -384,16 +384,6 @@ void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::SetAuthConnectionContextKey(void* contextKey) {
-    authConnectionContextKey_ = contextKey;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::SetMarginConnectionContextKey(void* contextKey) {
-    marginConnectionContextKey_ = contextKey;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
     if (!engine) {
@@ -431,7 +421,6 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
             /*isMarginConnection=*/false);
     if (context) {
         context->peerCloseQueued = false;
-        SetAuthConnectionContextKey(context);
         context->sidecarConnection = EnsureAuthConnectionObject();
     }
 
@@ -527,7 +516,6 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
             /*isMarginConnection=*/true);
     if (context) {
         context->peerCloseQueued = false;
-        SetMarginConnectionContextKey(context);
         context->sidecarConnection = EnsureMarginConnectionObject();
     }
 
@@ -688,6 +676,22 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::AuthConnection() const {
 // UNANCHORED: source-owned accessor for the margin `CMessageConnection` child mirrored from owner `+0x1c`.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::MarginConnection() const {
     return marginConnection_;
+}
+
+// UNANCHORED: source-owned launcher-bridge sidecar resolver.
+// Current static-RE split:
+// - auth/margin connection constructors store the owning mediator directly at connection `+0xa4`
+// - the extra bridge record remains only as source-owned helper-pump state keyed by the mediator's
+//   auth/margin child pointers rather than as the connection's actual owner field
+CLTLoginMediatorConnectionContextScaffold* CLTLoginMediator::ResolveConnectionBridgeContextScaffold(
+    const mxo::liblttcp::CMessageConnection* connection) const {
+    if (connection == authConnection_) {
+        return authConnectionContextScaffold_;
+    }
+    if (connection == marginConnection_) {
+        return marginConnectionContextScaffold_;
+    }
+    return nullptr;
 }
 
 // UNANCHORED: source-owned setter for the reconstructed margin route-host prefix.
@@ -1196,8 +1200,9 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
     }
 
     authConnection->SetEngine(engine_);
-    if (authConnectionContextKey_) {
-        authConnection->SetOwnerContext(authConnectionContextKey_);
+    authConnection->SetOwnerContext(this);
+    if (authConnectionContextScaffold_ != nullptr) {
+        authConnectionContextScaffold_->sidecarConnection = authConnection;
     }
 
     // anchor: launcher.exe:0x41d170 / vtable `0x004afef0`
