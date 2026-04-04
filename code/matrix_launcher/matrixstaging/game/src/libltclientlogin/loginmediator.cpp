@@ -444,7 +444,6 @@ uint32_t CLTLoginMediator::IsReady() {
 // anchor: launcher.exe:0x409a73..0x409b5f explicit nopatch path
 // vtable: ILTLoginMediator.Default slot +0x1c
 void CLTLoginMediator::SetValue1(void* value) {
-    lastNopatchValue1Ptr_ = value;
     nopatchLauncherVersionValue08_ = value ? *static_cast<const uint32_t*>(value) : 0u;
     spdlog::debug(
         "CLTLoginMediator::SetValue1({}) -> owner+0x08=0x{:08x}",
@@ -457,7 +456,6 @@ void CLTLoginMediator::SetValue1(void* value) {
 // anchor: launcher.exe:0x409a98..0x409c2d explicit nopatch path
 // vtable: ILTLoginMediator.Default slot +0x24
 void CLTLoginMediator::SetValue2(void* value) {
-    lastNopatchValue2Ptr_ = value;
     nopatchClientVersionValue0c_ = value ? *static_cast<const uint32_t*>(value) : 0u;
     spdlog::debug(
         "CLTLoginMediator::SetValue2({}) -> owner+0x0c=0x{:08x}",
@@ -2229,17 +2227,6 @@ bool CLTLoginMediator::State10HasReadyConnectionState2() const {
     const mxo::liblttcp::CMessageConnection* connection = MarginConnection();
     return connection != nullptr &&
            connection->State() == mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive;
-}
-
-// Accessors for migrated state fields (diagnostics only)
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-const void* CLTLoginMediator::LastNopatchValue1Ptr() const {
-    return lastNopatchValue1Ptr_;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-const void* CLTLoginMediator::LastNopatchValue2Ptr() const {
-    return lastNopatchValue2Ptr_;
 }
 
 // anchor: launcher.exe:0x41f070
