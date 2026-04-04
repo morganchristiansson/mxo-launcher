@@ -63,16 +63,16 @@ Within startup driver `0x40b430`, the object is passed as `ecx`/`this` into the 
 
 ```asm
 mov ecx, ebx
-call 0x40a380
+call 0x40a380  ; Launcher_InitializeThreadPerClientTCPEngine
 ...
 mov ecx, ebx
-call 0x40a780
+call 0x40a780  ; CLauncher_LoadCresDLL
 ...
 mov ecx, ebx
-call 0x40a420
+call 0x40a420  ; CLauncher_LoadClientDLL
 ...
 mov ecx, ebx
-call 0x40a4d0
+call 0x40a4d0  ; Launcher_RunClientDllLifecycle
 ```
 
 So the `this` used at the `InitClientDLL` call site is the global object at `0x4d3368`.
@@ -84,6 +84,29 @@ Because the object base is `0x4d3368`, the arg7 source fields at the `InitClient
 - `[this+0xac]` = `0x4d3414`
 
 These should now be treated as object fields on `CLauncher`, not as unrelated globals.
+
+## New naming pass for `CLauncher::InitInstance`
+
+A focused Ghidra readability pass on `launcher.exe:0x40b430` now uses these helper names for the
+called subroutines on the original startup path:
+
+- `0x40a000 = Launcher_FreeFilteredCommandLineStorage`
+- `0x40a0c0 = Launcher_HasMultipleLauncherOrMatrixProcesses`
+- `0x40a180 = Launcher_CheckExpectedBootstrapParentExited`
+- `0x40a300 = Launcher_CopyFileIfMissingOrChanged`
+- `0x40a880 = Launcher_PrepareTempMatrixCloneFiles`
+- `0x40a900 = Launcher_RelaunchSelfAsTempMatrixCloneAndQuit`
+- `0x40aa70 = Launcher_RelaunchLauncherWithoutCloneOrRecoverAndQuit`
+- `0x40b360 = Launcher_TeardownThreadPerClientEngineAndMediator`
+- `0x41ab10 = Launcher_WriteDxDiagReport`
+
+Important scope note for the replacement launcher:
+- the original patch/update corridor copies the launcher into a temp `matrix.exe` and relaunches
+  itself there so patching can proceed without normal Windows file-lock conflicts
+- current project direction keeps the active replacement on the effective nopatch path and does
+  **not** treat that temp self-copy/relaunch behavior as a fidelity target
+- so the names above stay as original-path documentation, not as a mandate to recreate that patch
+  bootstrap in source
 
 ## Relevant internal segments inside `0x40b430`
 
@@ -114,8 +137,9 @@ contains a few static segments that matter more than any invented helper boundar
       COM interfaces and returns
     - practical negative result: this is a diagnostics-file side gate, not the missing auth /
       character-selection authorization step
-- `0x40b7af..0x40b7da`: `this->0x40a780()`, `this->0x40a420()`, `this->0x40a4d0()`, then
-  `this->0x40a760()` / `this->0x40a7a0()` cleanup
+- `0x40b7af..0x40b7da`: `this->CLauncher_LoadCresDLL()`, `this->CLauncher_LoadClientDLL()`,
+  `this->Launcher_RunClientDllLifecycle()`, then `this->CLauncher_UnloadClientDLL()` /
+  `this->CLauncher_UnloadCresDLL()` cleanup
 
 ## New tightening on the real pre-corridor gate question
 

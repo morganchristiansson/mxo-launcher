@@ -56,69 +56,66 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 
 ## Ghidra usage
 
+Some Ghidra installs report extra grouped tools internally, but this harness consistently exposes the common gateway-visible calls below; use `ghidra_list_tool_groups` / `ghidra_load_tool_group` to probe that gap when needed.
+
 ```
+# List optional Ghidra tool groups and their load state
+mcp({ tool: "ghidra_list_tool_groups", args: '{}' })
+
+# Ask Ghidra to load extra tool groups when they are available
+mcp({ tool: "ghidra_load_tool_group", args: '{"group": "all"}' })
+
+# Confirm the active program and image base
+mcp({ tool: "ghidra_get_current_program_info", args: '{"program": "launcher.exe"}' })
+
+# Resolve the function currently owning an address
+mcp({ tool: "ghidra_get_function_by_address", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+
 # Decompile one function by address
 mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
 
-# Decompile multiple functions by name
+# Decompile several named functions together
 mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "CLTSocketLayer_Init,CLTBaseThreadPerClientTCPEngine_ctor", "program": "launcher.exe"}' })
 
-# Disassemble a function
+# Inspect assembly for one function
 mcp({ tool: "ghidra_disassemble_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
 
-# Current program info (tool requires an explicit program)
-mcp({ tool: "ghidra_get_current_program_info", args: '{"program": "launcher.exe"}' })
+# List renameable parameters and locals in one function
+mcp({ tool: "ghidra_get_function_variables", args: '{"function_name": "CLauncher_InitInstance", "program": "launcher.exe"}' })
 
-# Get function callers/callees
-# NOTE: ghidra_get_function_callers / ghidra_get_function_callees take a FUNCTION NAME, not an address.
-# If you only have an address, first resolve/create the function, then query by name.
-mcp({ tool: "ghidra_get_function_by_address", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
-mcp({ tool: "ghidra_get_function_callers", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
-mcp({ tool: "ghidra_get_function_callees", args: '{"name": "CLTSocketLayer_Init", "program": "launcher.exe"}' })
-
-# Create a function when bytes clearly form one but Ghidra has not created it yet
-mcp({ tool: "ghidra_create_function", args: '{"address": "0x4472f0", "name": "AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker", "program": "launcher.exe"}' })
-
-# Get xrefs from/to an address
-mcp({ tool: "ghidra_get_xrefs_from", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
-mcp({ tool: "ghidra_get_xrefs_to", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
-
-# Rename function by address:
+# Rename a function when the address is known
 mcp({ tool: "ghidra_rename_function_by_address", args: '{"function_address": "0x43b300", "new_name": "CLTLoginMediator_InitializeHelperDispatchTable", "program": "launcher.exe"}' })
 
-# Rename function by name:
-mcp({ tool: "ghidra_rename_function", args: '{"oldName": "FUN_0043b300", "newName": "CLTLoginMediator_InitializeHelperDispatchTable", "program": "launcher.exe"}' })
+# Rename the function, params, and locals in one shot
+mcp({ tool: "ghidra_batch_rename_function_components", args: '{"function_address": "0x43b300", "function_name": "CLTLoginMediator_InitializeHelperDispatchTable", "parameter_renames": {"param_1": "mediator"}, "local_renames": {"local_18": "dispatchTable"}, "program": "launcher.exe"}' })
 
-# Rename variables in a function
-mcp({ tool: "ghidra_rename_variables", args: '{"function_address": "0x43b300", "variable_renames": {"puVar1": "ptr", "DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}, "program": "launcher.exe"}' })
+# Batch rename variables referenced from one function
+mcp({ tool: "ghidra_batch_rename_variables", args: '{"function_address": "0x43b300", "variable_renames": {"DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}, "program": "launcher.exe"}' })
 
-# Retype a function signature / improve decompiler output
+# Improve a function signature for cleaner decompilation
 mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x403390", "prototype": "LauncherLoginDialog * LauncherLoginDialog_ctor(void *this)", "calling_convention": "__thiscall", "program": "launcher.exe"}' })
 
-# Search OOAnalyzer / recovered data types by name
-mcp({ tool: "ghidra_search_data_types", args: '{"pattern": "4aae28", "program": "launcher.exe"}' })
+# Retype a local variable when layout is known
+mcp({ tool: "ghidra_set_local_variable_type", args: '{"function_address": "0x43b300", "variable_name": "local_18", "new_type": "char[260]", "program": "launcher.exe"}' })
 
-# Rename data / globals
-mcp({ tool: "ghidra_rename_data", args: '{"address": "0x004d3588", "newName": "g_LauncherSelectionListSortMode004d3588", "program": "launcher.exe"}' })
+# Retype one parameter
+mcp({ tool: "ghidra_set_parameter_type", args: '{"function_address": "0x403390", "parameter_name": "this", "new_type": "LauncherLoginDialog *", "program": "launcher.exe"}' })
 
-# Delete an accidental cloned data type
-mcp({ tool: "ghidra_delete_data_type", args: '{"type_name": "LauncherLoginDialog", "program": "launcher.exe"}' })
+# Read raw memory, strings, or tables at an address
+mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "length": 64, "program": "launcher.exe"}' })
 
-# Plate comment on a function
-mcp({ tool: "ghidra_set_plate_comment", args: '{"function_address": "0x40ec70", "comment": "Launcher selection command helper: reads selected row high word as active selection-entry index, calls mediator +0xf0, waits for event 8.", "program": "launcher.exe"}' })
+# Search functions by name substring
+mcp({ tool: "ghidra_search_functions", args: '{"name_pattern": "LoginMediator", "program": "launcher.exe"}' })
 
-# Namespace/class rename caveat
-# - MCP rename tools currently do flat symbol renames only; they do not reliably place methods into
-#   Ghidra class namespaces with `::` the same way the UI does.
-# - Prefer Ghidra UI for moving methods into OOAnalyzer/recovered class namespaces and for true
-#   datatype/class renames when that ownership matters to decompilation.
+# Search defined strings by regex
+mcp({ tool: "ghidra_search_strings", args: '{"pattern": "launcher\\.cpp", "program": "launcher.exe"}' })
 
-# Read memory at an address
-mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "program": "launcher.exe"}' })
+# Create a missing function at a high-confidence entry
+mcp({ tool: "ghidra_create_function", args: '{"address": "0x4472f0", "name": "AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker", "program": "launcher.exe"}' })
 
-# Search direct virtual-call byte patterns (example: call [edx+0xf0])
-mcp({ tool: "ghidra_search_byte_patterns", args: '{"pattern": "ff 92 f0 00 00 00", "mask": "xx xx xx xx xx xx", "program": "launcher.exe"}' })
+# Leave a small recoverability note in the listing
+mcp({ tool: "ghidra_set_bookmark", args: '{"address": "0x40ec70", "category": "RENOTE", "comment": "selection command helper", "program": "launcher.exe"}' })
 
-# Switch/discriminator tables near current function
-mcp({ tool: "ghidra_read_memory", args: '{"address": "0x41c4e4", "program": "launcher.exe", "length": 40}' })
+# Save rename/type/comment changes back to the project
+mcp({ tool: "ghidra_save_program", args: '{"program": "launcher.exe"}' })
 ```
