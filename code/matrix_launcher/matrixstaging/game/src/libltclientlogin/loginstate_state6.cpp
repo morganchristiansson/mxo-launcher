@@ -6,6 +6,7 @@
 #include "../../../../src/diagnostics.h"
 
 #include <array>
+#include <cstring>
 #include <sstream>
 
 namespace mxo::ltlogin {
@@ -425,14 +426,22 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     uint32_t unresolvedMetricFilenameCount = 0u;
     for (uint16_t metricId : parsed.metricIds) {
         const char* const filename = ResolveClientMetricFilenameById(metricId);
-        if (filename && filename[0] != '\0' && mediator->AppendLateEntryFilename1470Scaffold(filename)) {
-            ++resolvedMetricFilenameCount;
-        } else {
-            ++unresolvedMetricFilenameCount;
-            spdlog::info(
-                "CLTLoginState_State6::Slot6_HandleSecondaryMessage could not resolve opcode-0x09 metricId=0x{:04x} to a Filename through the loaded client METR table",
-                static_cast<unsigned>(metricId));
+        if (filename && filename[0] != '\0') {
+            const size_t filenameLength = std::strlen(filename);
+            LateEntryList1470EntrySketch metricFilenameStringTriple{};
+            metricFilenameStringTriple.begin = const_cast<char*>(filename);
+            metricFilenameStringTriple.current = metricFilenameStringTriple.begin + filenameLength;
+            metricFilenameStringTriple.capacity = metricFilenameStringTriple.current + 1u;
+            if (mediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple)) {
+                ++resolvedMetricFilenameCount;
+                continue;
+            }
         }
+
+        ++unresolvedMetricFilenameCount;
+        spdlog::info(
+            "CLTLoginState_State6::Slot6_HandleSecondaryMessage could not resolve opcode-0x09 metricId=0x{:04x} to a Filename through the loaded client METR table",
+            static_cast<unsigned>(metricId));
     }
 
     mediator->State10SendGateFlagF14() = 1u;

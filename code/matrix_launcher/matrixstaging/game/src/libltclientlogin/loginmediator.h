@@ -1222,18 +1222,18 @@ public:
     // owner-side route-text helper family.
     RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() override;
     // anchor: launcher.exe:0x41af50 / ILTLoginMediator.Default slot +0x118
-    // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape now lives on
-    // the owner and is kept current by the owner-side clear/append helpers so this getter can
-    // stay close to the original tiny `lea eax,[ecx+0x1470]; ret`.
+    // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape lives directly
+    // on the owner at `+0x1470/+0x1474/+0x1478`, so this getter can stay close to the original
+    // tiny `lea eax,[ecx+0x1470]; ret`.
     LateEntryList1470VectorLikeSketch* GetLateEntryList1470() override;
     // anchor: launcher.exe:0x41f5f0 / owner helper clearing owner `+0x1470`
     void ClearLateEntryList1470Scaffold();
     // anchor: launcher.exe:0x41f840 / owner vtable +0x190
-    // Current bounded source mirror keeps the client-visible first-dword Filename semantics from
-    // `0x41f640`, while also owning copied string storage on the mediator so the authoritative
-    // owner-side begin/current/capacity triple returned by `+0x118` never borrows transient
-    // caller buffers.
-    bool AppendLateEntryFilename1470Scaffold(const char* filename);
+    // Faithful owner-side append contract:
+    // - caller passes one source string-triple
+    // - `0x41f840` forwards `this+0x1470` into `0x41f640 = StringTripleArray_Append`
+    // - append deep-copies the source string into owner-managed storage
+    bool AppendLateEntryStringTriple1470Scaffold(const LateEntryList1470EntrySketch* sourceEntry);
     // Wrapper-facing arg6 profile-path/current-slot ABI objects.
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
     // slot-record helpers onto the wrapper-facing `ILTLoginMediator.Default +0x40/+0x44` object
@@ -1583,7 +1583,7 @@ private:
     //   mediator pointer in `loginmediator.cpp`
     // - do not add those transient fields into the middle of `CLTLoginMediator`
     void ResetMarginBootstrapState();
-    void RefreshLateEntryList1470VectorLikeScaffold();
+    void FreeLateEntryList1470StorageScaffold();
 
     void BuildAuthEndpoint();
     void RefreshAuthAddressListForCurrentHostScaffold();
@@ -1721,13 +1721,10 @@ private:
     std::string routeDescriptor30Owned_;
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
-    // - original `0x41f840 -> 0x41f640` copies each source string-triple into the vector slot
-    // - keep the exposed begin/current/capacity triple authoritative on the owner and update it
-    //   eagerly on clear/append so `0x41af50` remains a tiny getter over owner `+0x1470`
-    // - keep copied filename storage separate from the exposed 12-byte entry array so the later
-    //   client metric-matcher family (`0x62017150 / 0x620181f0 / 0x62018250`) sees stable pointers
-    std::deque<std::string> lateEntryList1470OwnedStrings_{};
-    std::vector<LateEntryList1470EntrySketch> lateEntryList1470Entries_{};
+    // - owner `+0x1470/+0x1474/+0x1478` is the real vector header returned by `0x41af50`
+    // - entries are 12-byte owned string-triples copied by `0x41f640`
+    // - growth / destruction helpers around this header now mirror the original array semantics
+    //   directly instead of routing through STL containers
     LateEntryList1470VectorLikeSketch lateEntryList1470_{};
     // Narrow source-owned post-state9 / post-state12 owner collaborators from
     // `0x41f1d0` / `0x41de40` / `0x41c5c0` / `0x41c510`.

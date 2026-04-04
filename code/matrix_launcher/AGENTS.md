@@ -47,6 +47,9 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 - **Rename functions**: Sync method names with source code. When log message strings contain method names, use it. Otherwise use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - **Rename variables**: Sync variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - **Rename fields / struct members**: When class layouts become clearer, update OOAnalyzer / recovered structs in Ghidra so decompilation uses field names instead of raw offsets.
+  - `ghidra_data_types update` currently replaces the **entire** struct `members` array; there is no partial member-patch helper yet.
+  - always `list`/`get` the exact current struct name first (OOAnalyzer names may include the vtable/address suffix, e.g. `CLTLoginMediator_0x4b01c8`).
+  - when renaming one member, preserve every member/offset you care about in the replacement payload.
 - retype parameters / locals / globals in Ghidra when evidence supports it
 - when renaming many decompiler locals in one function, prefer small batches and re-run `list_variables` between batches; Ghidra can renumber synthetic locals after a rename
 - mirror confirmed names/types/anchors back into source comments and canonical docs in the same task
@@ -59,6 +62,7 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 ## Ghidra usage
 
 Use the current `ghidra_functions` / `ghidra_inspect` / `ghidra_symbols` tool family below, not the older legacy command names. Default to `file_name: "launcher.exe"` and swap to `client.dll` when needed. Prefer `ghidra_batch_operations` for grouped edits, then `ghidra_project save`.
+- if `ghidra_batch_operations` fails with an active transaction / lock issue, retry the same edits as sequential tool calls.
 
 ```js
 // Programs
@@ -83,10 +87,12 @@ mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"get",
 mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}' })
 
 // Data types / field renames
-mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"list","name_pattern":".*LauncherLoginDialog.*"}' })
+mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"list","name_pattern":".*LauncherLoginDialog.*","category_path":"/OOAnalyzer"}' })
+mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"list","name_pattern":".*CLTLoginMediator.*","category_path":"/OOAnalyzer"}' })
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"get","data_type_kind":"struct","name":"LauncherLoginDialog_0x4aae28","category_path":"/OOAnalyzer"}' })
+mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"get","data_type_kind":"struct","name":"CLTLoginMediator_0x4b01c8","category_path":"/OOAnalyzer"}' })
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"update","data_type_kind":"struct","name":"LauncherLoginDialog_0x4aae28","category_path":"/OOAnalyzer","members":[{"name":"vftptr_0x0","data_type_path":"/OOAnalyzer/LauncherLoginDialog_0x4aae28::vftable_4aae28 *","offset":0},{"name":"currentPageState","data_type_path":"int","offset":116},{"name":"selectionList","data_type_path":"/OOAnalyzer/cls_0x4acd98","offset":2572},{"name":"hostedBrowserControl","data_type_path":"/Demangler/Browser/IControl *","offset":2792}]}' })
-// note: data_types update replaces the struct member list; preserve/rename every member you care about and keep explicit offsets
+// note: data_types update replaces the full struct member list; preserve every member you care about and keep explicit offsets
 
 // Comments / bookmarks
 mcp({ tool: "ghidra_annotate", args: '{"file_name":"launcher.exe","action":"set_comment","address":"0x40ec70","comment_type":"EOL","text":"selection command helper"}' })

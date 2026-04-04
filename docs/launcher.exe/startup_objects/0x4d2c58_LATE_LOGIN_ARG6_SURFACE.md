@@ -33,8 +33,10 @@ Newer tightening also sharpens what `+0x118` really is on that later side:
 - current replacement now mirrors that producer closely enough on the active path by decoding the
   metric-id array from the opcode-`9` reply and mapping each id through the loaded client METR
   table to filename strings before filling owner `+0x1470`
-- source now also keeps copied owned filename storage behind those exposed 12-byte entries, which
-  better matches the original append/copy contract than the earlier borrowed-string scaffold
+- source now mirrors owner `+0x1470` more directly as the raw begin/current/capacity vector
+  header of deep-copied 12-byte string-triple entries, matching the original
+  `0x41f640 / 0x41f3e0 / 0x41e410 / 0x41eb20` contract more closely than the earlier STL-backed
+  borrowed-string scaffold
 
 See:
 - `../state_machine/POST_STATE9_CONTINUATION.md`
@@ -138,7 +140,7 @@ Closed enough on the deliberate existing-character path:
   - `+0x118` is called from `0x621c6db3` inside `0x621c6d90`
   - that `+0x118` list now holds 17 filename entries on the successful run
 - latest source tightening also improves two later-runtime seams behind that same path:
-  - owner `+0x1470` now keeps copied owned filename storage behind the exposed entry array
+  - owner `+0x1470` is now mirrored as the raw vector header of deep-copied string-triple entries
   - `0x41b420` / wrapper `+0x16c` now invoke graceful margin close when the original state check
     says they should, which is the best current path toward the later natural event-`0x0f` tail
 - the same successful run still did **not** show:

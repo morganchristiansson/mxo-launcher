@@ -220,8 +220,10 @@ New live/runtime proof now tightens the client-facing registration side too:
       entry per id through owner `+0x190`
     - later client consumer `0x62017150` reads the first dword of each entry as a filename-like
       string and maps it through `FUN_622a9cf0` / `METR` metadata
-    - source now keeps copied owned filename storage behind that vector too, which better matches
-      the original append/copy contract than the earlier borrowed-string scaffold
+    - source now mirrors that vector more directly as the raw owner `+0x1470/+0x1474/+0x1478`
+      header of deep-copied 12-byte string-triple entries, which better matches the original
+      `0x41f640 / 0x41f3e0 / 0x41e410 / 0x41eb20` contract than the earlier borrowed-string
+      scaffold
   - `0x41ddb0`: insert observer into owner `+0x674`
   - `0x41dde0`: remove observer from owner `+0x674`
   - `0x41f240`: return owner `+0x80`
@@ -349,7 +351,7 @@ Representative successful replacement run (`2026-04-02`, latest caller-logging +
   - arg6 `+0x118` late-entry list from caller `0x621c6db3` (`0x621c6d90`)
   - that returned list now contains 17 entries populated from state6 opcode-`9` metric ids
 - latest source pass also tightens fidelity on two later-runtime seams behind that success:
-  - owner `+0x1470` now keeps copied owned filename storage behind the exposed 12-byte entries
+  - owner `+0x1470` is now mirrored as the raw vector header of deep-copied 12-byte entries
   - `0x41b420` / wrapper `+0x16c` now invoke graceful margin close when the original state test
     says they should
 - then replacement continues far enough to:

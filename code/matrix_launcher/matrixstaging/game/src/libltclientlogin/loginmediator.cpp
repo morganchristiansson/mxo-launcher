@@ -311,6 +311,7 @@ CLTLoginMediator::CLTLoginMediator()
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::~CLTLoginMediator() {
+    FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionBridgeScaffold();
     ClearObserverTree674();
     EraseMarginBootstrapState(this);
@@ -2257,95 +2258,239 @@ SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() 
     return sessionCallbackHelper65c_;
 }
 
-void CLTLoginMediator::RefreshLateEntryList1470VectorLikeScaffold() {
-    const LateEntryList1470EntrySketch* const begin =
-        lateEntryList1470Entries_.capacity() != 0u ? lateEntryList1470Entries_.data() : nullptr;
-    lateEntryList1470_.begin = begin;
-    lateEntryList1470_.current = begin ? (begin + lateEntryList1470Entries_.size()) : nullptr;
-    lateEntryList1470_.capacity = begin ? (begin + lateEntryList1470Entries_.capacity()) : nullptr;
+namespace {
+
+static size_t LateEntryList1470EntryCountScaffold(const LateEntryList1470VectorLikeSketch& list) {
+    return (list.begin != nullptr && list.current != nullptr && list.current >= list.begin)
+        ? static_cast<size_t>(list.current - list.begin)
+        : 0u;
+}
+
+static size_t LateEntryList1470EntryCapacityCountScaffold(
+    const LateEntryList1470VectorLikeSketch& list) {
+    return (list.begin != nullptr && list.capacity != nullptr && list.capacity >= list.begin)
+        ? static_cast<size_t>(list.capacity - list.begin)
+        : 0u;
+}
+
+static void LateEntryList1470ResetEntryScaffold(LateEntryList1470EntrySketch* entry) {
+    if (!entry) {
+        return;
+    }
+    entry->begin = nullptr;
+    entry->current = nullptr;
+    entry->capacity = nullptr;
+}
+
+static void LateEntryList1470DestroyRangeScaffold(
+    LateEntryList1470EntrySketch* begin,
+    LateEntryList1470EntrySketch* end) {
+    if (begin == nullptr || end == nullptr || end < begin) {
+        return;
+    }
+
+    for (LateEntryList1470EntrySketch* entry = begin; entry != end; ++entry) {
+        if (entry->begin != nullptr) {
+            std::free(entry->begin);
+        }
+        LateEntryList1470ResetEntryScaffold(entry);
+    }
+}
+
+static bool LateEntryList1470CopyConstructSingleScaffold(
+    LateEntryList1470EntrySketch* destination,
+    const LateEntryList1470EntrySketch* source) {
+    if (destination == nullptr || source == nullptr || source->begin == nullptr ||
+        source->current == nullptr || source->current < source->begin) {
+        return false;
+    }
+
+    const size_t stringLength = static_cast<size_t>(source->current - source->begin);
+    char* const ownedCopy = static_cast<char*>(std::malloc(stringLength + 1u));
+    if (ownedCopy == nullptr) {
+        return false;
+    }
+
+    if (stringLength != 0u) {
+        std::memcpy(ownedCopy, source->begin, stringLength);
+    }
+    ownedCopy[stringLength] = '\0';
+    destination->begin = ownedCopy;
+    destination->current = ownedCopy + stringLength;
+    destination->capacity = ownedCopy + stringLength + 1u;
+    return true;
+}
+
+static LateEntryList1470EntrySketch* LateEntryList1470CopyConstructRangeScaffold(
+    const LateEntryList1470EntrySketch* sourceBegin,
+    const LateEntryList1470EntrySketch* sourceEnd,
+    LateEntryList1470EntrySketch* destinationBegin) {
+    LateEntryList1470EntrySketch* destination = destinationBegin;
+    for (const LateEntryList1470EntrySketch* source = sourceBegin; source != sourceEnd;
+         ++source, ++destination) {
+        LateEntryList1470ResetEntryScaffold(destination);
+        if (!LateEntryList1470CopyConstructSingleScaffold(destination, source)) {
+            LateEntryList1470DestroyRangeScaffold(destinationBegin, destination);
+            return nullptr;
+        }
+    }
+    return destination;
+}
+
+}  // namespace
+
+void CLTLoginMediator::FreeLateEntryList1470StorageScaffold() {
+    LateEntryList1470DestroyRangeScaffold(lateEntryList1470_.begin, lateEntryList1470_.current);
+    if (lateEntryList1470_.begin != nullptr) {
+        std::free(lateEntryList1470_.begin);
+    }
+    lateEntryList1470_.begin = nullptr;
+    lateEntryList1470_.current = nullptr;
+    lateEntryList1470_.capacity = nullptr;
 }
 
 // anchor: launcher.exe:0x41f5f0
 void CLTLoginMediator::ClearLateEntryList1470Scaffold() {
-    lateEntryList1470Entries_.clear();
-    lateEntryList1470OwnedStrings_.clear();
-    RefreshLateEntryList1470VectorLikeScaffold();
+    // Static RE: `0x41f5f0` treats owner `+0x1470/+0x1474/+0x1478` as a raw vector header over
+    // 12-byte owned string-triples. The helper first computes the post-erase cursor with
+    // `0x41eb20`, then destroys the old `[begin,current)` range with `0x41e410`, and finally
+    // stores `current = begin`.
+    const size_t oldEntryCount = LateEntryList1470EntryCountScaffold(lateEntryList1470_);
+    const size_t oldEntryCapacity = LateEntryList1470EntryCapacityCountScaffold(lateEntryList1470_);
+    LateEntryList1470DestroyRangeScaffold(lateEntryList1470_.begin, lateEntryList1470_.current);
+    lateEntryList1470_.current = lateEntryList1470_.begin;
     spdlog::info(
-        "CLTLoginMediator::ClearLateEntryList1470Scaffold cleared owner+0x1470 begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={}",
+        "CLTLoginMediator::ClearLateEntryList1470Scaffold cleared owner+0x1470 begin={} current={} capacity={} oldEntryCount={} entryCapacity={}",
         fmt::ptr(lateEntryList1470_.begin),
         fmt::ptr(lateEntryList1470_.current),
         fmt::ptr(lateEntryList1470_.capacity),
-        static_cast<unsigned>(lateEntryList1470Entries_.size()),
-        static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
-        static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()));
+        static_cast<unsigned>(oldEntryCount),
+        static_cast<unsigned>(oldEntryCapacity));
 }
 
 // anchor: launcher.exe:0x41f840 / owner vtable +0x190
-bool CLTLoginMediator::AppendLateEntryFilename1470Scaffold(const char* filename) {
-    if (!filename || !filename[0]) {
+bool CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold(
+    const LateEntryList1470EntrySketch* sourceEntry) {
+    if (sourceEntry == nullptr || sourceEntry->begin == nullptr || sourceEntry->current == nullptr ||
+        sourceEntry->current < sourceEntry->begin) {
         spdlog::info(
-            "CLTLoginMediator::AppendLateEntryFilename1470Scaffold skipped empty filename owner+0x1470 entryCount={}",
-            static_cast<unsigned>(lateEntryList1470Entries_.size()));
+            "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold rejected invalid source owner+0x1470 begin={} current={} capacity={}",
+            fmt::ptr(lateEntryList1470_.begin),
+            fmt::ptr(lateEntryList1470_.current),
+            fmt::ptr(lateEntryList1470_.capacity));
         return false;
     }
 
-    lateEntryList1470OwnedStrings_.emplace_back(filename);
-    const std::string& ownedFilename = lateEntryList1470OwnedStrings_.back();
-    const char* const begin = ownedFilename.c_str();
-    const char* const end = begin + ownedFilename.size();
-    lateEntryList1470Entries_.push_back(LateEntryList1470EntrySketch{
-        begin,
-        end,
-        end,
-    });
-    RefreshLateEntryList1470VectorLikeScaffold();
+    const char* const sourceText = sourceEntry->begin;
+    LateEntryList1470EntrySketch* const insertion = lateEntryList1470_.current;
+    if (insertion != lateEntryList1470_.capacity) {
+        if (insertion == nullptr) {
+            spdlog::info(
+                "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold rejected inconsistent owner+0x1470 header begin={} current={} capacity={}",
+                fmt::ptr(lateEntryList1470_.begin),
+                fmt::ptr(lateEntryList1470_.current),
+                fmt::ptr(lateEntryList1470_.capacity));
+            return false;
+        }
+
+        LateEntryList1470ResetEntryScaffold(insertion);
+        if (!LateEntryList1470CopyConstructSingleScaffold(insertion, sourceEntry)) {
+            spdlog::info(
+                "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold failed in-place deep-copy source='{}' owner+0x1470 begin={} current={} capacity={}",
+                sourceText,
+                fmt::ptr(lateEntryList1470_.begin),
+                fmt::ptr(lateEntryList1470_.current),
+                fmt::ptr(lateEntryList1470_.capacity));
+            return false;
+        }
+
+        lateEntryList1470_.current = insertion + 1;
+        spdlog::info(
+            "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold appended source='{}' owner+0x1470 begin={} current={} capacity={} entryCount={} entryCapacity={} (in-place deep-copy mirror of 0x41f640)",
+            sourceText,
+            fmt::ptr(lateEntryList1470_.begin),
+            fmt::ptr(lateEntryList1470_.current),
+            fmt::ptr(lateEntryList1470_.capacity),
+            static_cast<unsigned>(LateEntryList1470EntryCountScaffold(lateEntryList1470_)),
+            static_cast<unsigned>(LateEntryList1470EntryCapacityCountScaffold(lateEntryList1470_)));
+        return true;
+    }
+
+    const size_t oldEntryCount = LateEntryList1470EntryCountScaffold(lateEntryList1470_);
+    const size_t newEntryCapacity = oldEntryCount + std::max<size_t>(oldEntryCount, 1u);
+    LateEntryList1470EntrySketch* const grownBegin = static_cast<LateEntryList1470EntrySketch*>(
+        std::calloc(newEntryCapacity, sizeof(LateEntryList1470EntrySketch)));
+    if (grownBegin == nullptr) {
+        spdlog::info(
+            "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold failed to grow owner+0x1470 oldEntryCount={} requestedEntryCapacity={}",
+            static_cast<unsigned>(oldEntryCount),
+            static_cast<unsigned>(newEntryCapacity));
+        return false;
+    }
+
+    LateEntryList1470EntrySketch* grownCurrent =
+        LateEntryList1470CopyConstructRangeScaffold(
+            lateEntryList1470_.begin,
+            lateEntryList1470_.current,
+            grownBegin);
+    if (grownCurrent == nullptr) {
+        std::free(grownBegin);
+        spdlog::info(
+            "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold failed while deep-copying existing entries during grow owner+0x1470 oldEntryCount={} requestedEntryCapacity={}",
+            static_cast<unsigned>(oldEntryCount),
+            static_cast<unsigned>(newEntryCapacity));
+        return false;
+    }
+
+    if (!LateEntryList1470CopyConstructSingleScaffold(grownCurrent, sourceEntry)) {
+        LateEntryList1470DestroyRangeScaffold(grownBegin, grownCurrent);
+        std::free(grownBegin);
+        spdlog::info(
+            "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold failed while appending grown source='{}' owner+0x1470 oldEntryCount={} requestedEntryCapacity={}",
+            sourceText,
+            static_cast<unsigned>(oldEntryCount),
+            static_cast<unsigned>(newEntryCapacity));
+        return false;
+    }
+    ++grownCurrent;
+
+    LateEntryList1470DestroyRangeScaffold(lateEntryList1470_.begin, lateEntryList1470_.current);
+    if (lateEntryList1470_.begin != nullptr) {
+        std::free(lateEntryList1470_.begin);
+    }
+
+    lateEntryList1470_.begin = grownBegin;
+    lateEntryList1470_.current = grownCurrent;
+    lateEntryList1470_.capacity = grownBegin + newEntryCapacity;
     spdlog::info(
-        "CLTLoginMediator::AppendLateEntryFilename1470Scaffold appended filename='{}' owner+0x1470 begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={} (bounded source mirror of 0x41f840 -> 0x41f640 string-triple copy/append)",
-        ownedFilename,
+        "CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold appended source='{}' owner+0x1470 begin={} current={} capacity={} entryCount={} entryCapacity={} (grow+deep-copy mirror of 0x41f3e0 -> 0x41f640)",
+        sourceText,
         fmt::ptr(lateEntryList1470_.begin),
         fmt::ptr(lateEntryList1470_.current),
         fmt::ptr(lateEntryList1470_.capacity),
-        static_cast<unsigned>(lateEntryList1470Entries_.size()),
-        static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
-        static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()));
+        static_cast<unsigned>(LateEntryList1470EntryCountScaffold(lateEntryList1470_)),
+        static_cast<unsigned>(LateEntryList1470EntryCapacityCountScaffold(lateEntryList1470_)));
     return true;
 }
 
 // anchor: launcher.exe:0x41af50
 LateEntryList1470VectorLikeSketch* CLTLoginMediator::GetLateEntryList1470() {
     // Original `0x41af50` is only `lea eax,[ecx+0x1470]; ret`.
-    // Keep the returned owner-side vector-like object authoritative at the producer sites
-    // (`0x41f5f0` / `0x41f840`) so this getter stays a direct owner return instead of rebuilding
-    // scratch state here.
-    size_t entryCount = 0u;
-    size_t entryCapacity = 0u;
-    if (lateEntryList1470_.begin != nullptr) {
-        if (lateEntryList1470_.current != nullptr &&
-            lateEntryList1470_.current >= lateEntryList1470_.begin) {
-            entryCount =
-                static_cast<size_t>(lateEntryList1470_.current - lateEntryList1470_.begin);
-        }
-        if (lateEntryList1470_.capacity != nullptr &&
-            lateEntryList1470_.capacity >= lateEntryList1470_.begin) {
-            entryCapacity =
-                static_cast<size_t>(lateEntryList1470_.capacity - lateEntryList1470_.begin);
-        }
-    }
-
+    size_t entryCount = LateEntryList1470EntryCountScaffold(lateEntryList1470_);
+    size_t entryCapacity = LateEntryList1470EntryCapacityCountScaffold(lateEntryList1470_);
     const char* firstEntryText =
         (entryCount != 0u && lateEntryList1470_.begin != nullptr &&
          lateEntryList1470_.begin->begin != nullptr)
             ? lateEntryList1470_.begin->begin
             : "<empty>";
     spdlog::info(
-        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> result={} begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={} firstEntry='{}'{}",
+        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> result={} begin={} current={} capacity={} entryCount={} entryCapacity={} firstEntry='{}'{}",
         fmt::ptr(&lateEntryList1470_),
         fmt::ptr(lateEntryList1470_.begin),
         fmt::ptr(lateEntryList1470_.current),
         fmt::ptr(lateEntryList1470_.capacity),
         static_cast<unsigned>(entryCount),
         static_cast<unsigned>(entryCapacity),
-        static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()),
         firstEntryText,
         entryCount == 0u ? " (empty scaffold)" : "");
     return &lateEntryList1470_;
