@@ -1223,14 +1223,16 @@ public:
     RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() override;
     // anchor: launcher.exe:0x41af50 / ILTLoginMediator.Default slot +0x118
     // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape now lives on
-    // the owner.
+    // the owner and is kept current by the owner-side clear/append helpers so this getter can
+    // stay close to the original tiny `lea eax,[ecx+0x1470]; ret`.
     LateEntryList1470VectorLikeSketch* GetLateEntryList1470() override;
     // anchor: launcher.exe:0x41f5f0 / owner helper clearing owner `+0x1470`
     void ClearLateEntryList1470Scaffold();
     // anchor: launcher.exe:0x41f840 / owner vtable +0x190
     // Current bounded source mirror keeps the client-visible first-dword Filename semantics from
-    // `0x41f640`, while also owning copied string storage on the mediator so the returned
-    // `+0x118` vector does not borrow transient caller buffers.
+    // `0x41f640`, while also owning copied string storage on the mediator so the authoritative
+    // owner-side begin/current/capacity triple returned by `+0x118` never borrows transient
+    // caller buffers.
     bool AppendLateEntryFilename1470Scaffold(const char* filename);
     // Wrapper-facing arg6 profile-path/current-slot ABI objects.
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
@@ -1581,6 +1583,7 @@ private:
     //   mediator pointer in `loginmediator.cpp`
     // - do not add those transient fields into the middle of `CLTLoginMediator`
     void ResetMarginBootstrapState();
+    void RefreshLateEntryList1470VectorLikeScaffold();
 
     void BuildAuthEndpoint();
     void RefreshAuthAddressListForCurrentHostScaffold();
@@ -1719,6 +1722,8 @@ private:
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};
     // owner `+0x1470` / arg6 `+0x118` late-entry family:
     // - original `0x41f840 -> 0x41f640` copies each source string-triple into the vector slot
+    // - keep the exposed begin/current/capacity triple authoritative on the owner and update it
+    //   eagerly on clear/append so `0x41af50` remains a tiny getter over owner `+0x1470`
     // - keep copied filename storage separate from the exposed 12-byte entry array so the later
     //   client metric-matcher family (`0x62017150 / 0x620181f0 / 0x62018250`) sees stable pointers
     std::deque<std::string> lateEntryList1470OwnedStrings_{};

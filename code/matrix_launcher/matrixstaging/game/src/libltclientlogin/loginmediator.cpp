@@ -2257,12 +2257,24 @@ SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() 
     return sessionCallbackHelper65c_;
 }
 
+void CLTLoginMediator::RefreshLateEntryList1470VectorLikeScaffold() {
+    const LateEntryList1470EntrySketch* const begin =
+        lateEntryList1470Entries_.capacity() != 0u ? lateEntryList1470Entries_.data() : nullptr;
+    lateEntryList1470_.begin = begin;
+    lateEntryList1470_.current = begin ? (begin + lateEntryList1470Entries_.size()) : nullptr;
+    lateEntryList1470_.capacity = begin ? (begin + lateEntryList1470Entries_.capacity()) : nullptr;
+}
+
 // anchor: launcher.exe:0x41f5f0
 void CLTLoginMediator::ClearLateEntryList1470Scaffold() {
     lateEntryList1470Entries_.clear();
     lateEntryList1470OwnedStrings_.clear();
+    RefreshLateEntryList1470VectorLikeScaffold();
     spdlog::info(
-        "CLTLoginMediator::ClearLateEntryList1470Scaffold cleared owner+0x1470 entryCount={} entryCapacity={} ownedStringCount={}",
+        "CLTLoginMediator::ClearLateEntryList1470Scaffold cleared owner+0x1470 begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={}",
+        fmt::ptr(lateEntryList1470_.begin),
+        fmt::ptr(lateEntryList1470_.current),
+        fmt::ptr(lateEntryList1470_.capacity),
         static_cast<unsigned>(lateEntryList1470Entries_.size()),
         static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
         static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()));
@@ -2286,9 +2298,13 @@ bool CLTLoginMediator::AppendLateEntryFilename1470Scaffold(const char* filename)
         end,
         end,
     });
+    RefreshLateEntryList1470VectorLikeScaffold();
     spdlog::info(
-        "CLTLoginMediator::AppendLateEntryFilename1470Scaffold appended filename='{}' owner+0x1470 entryCount={} entryCapacity={} ownedStringCount={} (bounded source mirror of 0x41f840 -> 0x41f640 string-triple copy/append)",
+        "CLTLoginMediator::AppendLateEntryFilename1470Scaffold appended filename='{}' owner+0x1470 begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={} (bounded source mirror of 0x41f840 -> 0x41f640 string-triple copy/append)",
         ownedFilename,
+        fmt::ptr(lateEntryList1470_.begin),
+        fmt::ptr(lateEntryList1470_.current),
+        fmt::ptr(lateEntryList1470_.capacity),
         static_cast<unsigned>(lateEntryList1470Entries_.size()),
         static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
         static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()));
@@ -2297,34 +2313,41 @@ bool CLTLoginMediator::AppendLateEntryFilename1470Scaffold(const char* filename)
 
 // anchor: launcher.exe:0x41af50
 LateEntryList1470VectorLikeSketch* CLTLoginMediator::GetLateEntryList1470() {
-    // Keep the wrapper-facing arg6 `+0x118` vector-like object explicit instead of leaving this
-    // scratch state in the ABI shell.
-    // Current bounded fidelity improvement behind the now-live observer bridge:
-    // - state6 opcode-0x09 success is the exact producer for owner `+0x1470`
-    // - original `0x41f840 -> 0x41f640` copies each 12-byte string-triple entry into that vector
-    // - source therefore keeps copied filename storage on the mediator, then exposes only the
-    //   vector-of-triples ABI here for the immediate event-0x18 helper and the later map/metric
-    //   consumer family
-    const LateEntryList1470EntrySketch* begin =
-        lateEntryList1470Entries_.capacity() ? lateEntryList1470Entries_.data() : nullptr;
-    lateEntryList1470_.begin = begin;
-    lateEntryList1470_.current = begin ? (begin + lateEntryList1470Entries_.size()) : nullptr;
-    lateEntryList1470_.capacity = begin ? (begin + lateEntryList1470Entries_.capacity()) : nullptr;
+    // Original `0x41af50` is only `lea eax,[ecx+0x1470]; ret`.
+    // Keep the returned owner-side vector-like object authoritative at the producer sites
+    // (`0x41f5f0` / `0x41f840`) so this getter stays a direct owner return instead of rebuilding
+    // scratch state here.
+    size_t entryCount = 0u;
+    size_t entryCapacity = 0u;
+    if (lateEntryList1470_.begin != nullptr) {
+        if (lateEntryList1470_.current != nullptr &&
+            lateEntryList1470_.current >= lateEntryList1470_.begin) {
+            entryCount =
+                static_cast<size_t>(lateEntryList1470_.current - lateEntryList1470_.begin);
+        }
+        if (lateEntryList1470_.capacity != nullptr &&
+            lateEntryList1470_.capacity >= lateEntryList1470_.begin) {
+            entryCapacity =
+                static_cast<size_t>(lateEntryList1470_.capacity - lateEntryList1470_.begin);
+        }
+    }
 
     const char* firstEntryText =
-        (!lateEntryList1470Entries_.empty() && lateEntryList1470Entries_[0].begin)
-            ? lateEntryList1470Entries_[0].begin
+        (entryCount != 0u && lateEntryList1470_.begin != nullptr &&
+         lateEntryList1470_.begin->begin != nullptr)
+            ? lateEntryList1470_.begin->begin
             : "<empty>";
     spdlog::info(
-        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={} firstEntry='{}'{}",
+        "CLTLoginMediator::GetLateEntryList1470(+0x118) -> result={} begin={} current={} capacity={} entryCount={} entryCapacity={} ownedStringCount={} firstEntry='{}'{}",
+        fmt::ptr(&lateEntryList1470_),
         fmt::ptr(lateEntryList1470_.begin),
         fmt::ptr(lateEntryList1470_.current),
         fmt::ptr(lateEntryList1470_.capacity),
-        static_cast<unsigned>(lateEntryList1470Entries_.size()),
-        static_cast<unsigned>(lateEntryList1470Entries_.capacity()),
+        static_cast<unsigned>(entryCount),
+        static_cast<unsigned>(entryCapacity),
         static_cast<unsigned>(lateEntryList1470OwnedStrings_.size()),
         firstEntryText,
-        lateEntryList1470Entries_.empty() ? " (empty scaffold)" : "");
+        entryCount == 0u ? " (empty scaffold)" : "");
     return &lateEntryList1470_;
 }
 
