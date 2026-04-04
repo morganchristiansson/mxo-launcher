@@ -44,14 +44,14 @@ add esp, 0x20
 
 ```c
 int InitClientDLL(
-    uint32_t filteredArgCount,         // from 0x4d2c5c
-    char**   filteredArgv,             // from 0x4d2c60
+    uint32_t filteredArgCount,         // from g_LauncherFilteredArgCount (0x4d2c5c)
+    char**   filteredArgv,             // from g_LauncherFilteredArgv (0x4d2c60)
     HMODULE  hClientDll,               // from 0x4d2c50
     HMODULE  hCresDll,                 // from 0x4d2c4c
     void*    launcherNetworkObject,    // from 0x4d6304
     void*    pILTLoginMediatorDefault, // from 0x4d2c58
     uint32_t packedArg7Selection,      // [this+0xa8]/[this+0xac]
-    uint32_t flagByte                  // from 0x4d2c69
+    uint32_t noPatchFlowFlagByte       // from g_LauncherNoPatchFlowFlagByte (0x4d2c69)
 );
 ```
 
@@ -66,7 +66,7 @@ Before the call, the original launcher has already:
 3. loaded `cres.dll` into `0x4d2c4c`
 4. loaded `client.dll` into `0x4d2c50`
 5. resolved the runtime interface pointer at `0x4d2c58` (`ILTLoginMediator.Default`)
-6. selected nopatch-related state reflected in `0x4d2c69`
+6. selected nopatch-related state reflected in `g_LauncherNoPatchFlowFlagByte` (`0x4d2c69`)
 
 ### New clarification: arg1/arg2 are filtered launcher-owned argv storage
 
