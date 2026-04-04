@@ -19,7 +19,7 @@ It means "skip the patch pipeline, but still initialize launcher-side runtime st
 0x409a5e: jne  0x409c47      ; not nopatch -> other branch
 
 0x409a64: push 0x4ac18c      ; "0.1"
-0x409a69: mov  [0x4c8b1d], al
+0x409a69: mov  [g_LauncherPatchFlowEnabled], al   ; 0x4c8b1d
 0x409a6e: call 0x417440      ; parse "0.1"
 0x409a73: mov  ecx, [g_pILTLoginMediatorDefault]   ; 0x4d2c58
 ...

@@ -182,9 +182,9 @@ void LogLauncherPreprocessingState() {
         g_LauncherCommandLine.SwitchSkipLaunch() ? 1 : 0,
         g_LauncherCommandLine.SwitchLPTest() ? "1" : "0");
     spdlog::info(
-        "launcher globals    = 4c8b1c:{} 4c8b1d:{} 4d2c64:{} 4d2c65:{} 4d2c66:{} 4d2c6a:{} replacement-default-nopatch:{}",
-        g_LauncherCommandLine.LauncherGlobal4C8B1C() ? 1 : 0,
-        g_LauncherCommandLine.LauncherGlobal4C8B1D() ? 1 : 0,
+        "launcher globals    = eulaFlowEnabled:{} patchFlowEnabled:{} optionsCfgAutodetectGate:{} recoverRequested:{} justPatchRequested:{} runningAsTempMatrixClone:{} replacement-default-nopatch:{}",
+        g_LauncherCommandLine.EulaFlowEnabled() ? 1 : 0,
+        g_LauncherCommandLine.PatchFlowEnabled() ? 1 : 0,
         g_LauncherCommandLine.LauncherGlobal4D2C64() ? 1 : 0,
         g_LauncherCommandLine.SwitchRecover() ? 1 : 0,
         g_LauncherCommandLine.SwitchJustPatch() ? 1 : 0,
@@ -411,7 +411,7 @@ bool CLauncher::ParseCommandLineStage() const {
     // UNANCHORED replacement bridge toward the original launcher-owned login prompt:
     // - newer nopatch/manual-login tightening now gives the closest launcher dialog corridor:
     //   - page `2` primary button (`dialog +0x204`, command `11`) enters page `6` when
-    //     `g_LauncherGlobal4C8B1D004c8b1d == 0`
+    //     `g_LauncherPatchFlowEnabled == 0`
     //   - page `6` rich-edit host (`dialog +0x95c`) uses
     //     `0x408ee0/0x408840/0x408400/0x4091d0` to gather username, gather password, submit the
     //     exact `0x41ecd0`-style stack block, and handle success/error callbacks

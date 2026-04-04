@@ -77,7 +77,7 @@ void CLauncherCommandLine::ApplyReplacementDefaultNoPatchPolicy() {
     }
 
     forcedDefaultNoPatchBranch_ = true;
-    launcherGlobal4C8B1D_ = false;
+    patchFlowEnabled_ = false;
 }
 
 void CLauncherCommandLine::Reset() {
@@ -100,8 +100,8 @@ void CLauncherCommandLine::Reset() {
     switchSkipLaunch_ = false;
     switchLPTest_ = false;
 
-    launcherGlobal4C8B1C_ = true;
-    launcherGlobal4C8B1D_ = true;
+    eulaFlowEnabled_ = true;
+    patchFlowEnabled_ = true;
     launcherGlobal4D2C64_ = false;
     forcedDefaultNoPatchBranch_ = false;
 
@@ -193,12 +193,12 @@ bool CLauncherCommandLine::SwitchLPTest() const {
     return switchLPTest_;
 }
 
-bool CLauncherCommandLine::LauncherGlobal4C8B1C() const {
-    return launcherGlobal4C8B1C_;
+bool CLauncherCommandLine::EulaFlowEnabled() const {
+    return eulaFlowEnabled_;
 }
 
-bool CLauncherCommandLine::LauncherGlobal4C8B1D() const {
-    return launcherGlobal4C8B1D_;
+bool CLauncherCommandLine::PatchFlowEnabled() const {
+    return patchFlowEnabled_;
 }
 
 bool CLauncherCommandLine::LauncherGlobal4D2C64() const {
@@ -378,7 +378,7 @@ bool CLauncherCommandLine::ConsumeBooleanSwitch(const char* value) {
     }
     if (::lstrcmpiA(value, "-nopatch") == 0) {
         switchNoPatch_ = true;
-        launcherGlobal4C8B1D_ = false;
+        patchFlowEnabled_ = false;
         RebuildNoPatchVersionState();
         return true;
     }
@@ -392,12 +392,12 @@ bool CLauncherCommandLine::ConsumeBooleanSwitch(const char* value) {
     }
     if (::lstrcmpiA(value, "-justpatch") == 0) {
         switchJustPatch_ = true;
-        launcherGlobal4C8B1C_ = false;
+        eulaFlowEnabled_ = false;
         return true;
     }
     if (::lstrcmpiA(value, "-noeula") == 0) {
         switchNoEula_ = true;
-        launcherGlobal4C8B1C_ = false;
+        eulaFlowEnabled_ = false;
         return true;
     }
     if (::lstrcmpiA(value, "-skiplaunch") == 0) {

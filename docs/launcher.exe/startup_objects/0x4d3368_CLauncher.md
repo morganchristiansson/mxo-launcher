@@ -239,7 +239,7 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
   - newer command split is tighter than the older single-success-path read:
     - command `11`
       - reached from the page-`7` primary button (`dialog +0x204`) and from Enter on page `7`
-      - enters page `6` when `0x4c8b1d == 0`, otherwise page `3`
+      - enters page `6` when `g_LauncherPatchFlowEnabled == 0`, otherwise page `3`
       - practical consequence: the primary page-`7` button is **not** the direct `0x40d6f0`
         resolve/writeback path
     - command `8`
@@ -286,7 +286,7 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
 
 - newer manual credential-side tightening from the same dialog family now closes the upstream page
   corridor better too:
-  - page `2` primary button command `11` enters page `6` on the nopatch branch (`0x4c8b1d == 0`)
+  - page `2` primary button command `11` enters page `6` on the nopatch branch (`g_LauncherPatchFlowEnabled == 0`)
   - page `6` key handling runs through
     `0x408ee0 -> 0x408840 -> 0x408400 -> 0x4091d0`
   - `0x408400` builds the exact `0x41ecd0`-style credential block on the stack and submits it

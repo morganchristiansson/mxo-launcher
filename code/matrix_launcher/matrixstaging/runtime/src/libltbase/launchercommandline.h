@@ -53,8 +53,8 @@ public:
     bool SwitchSkipLaunch() const;
     bool SwitchLPTest() const;
 
-    bool LauncherGlobal4C8B1C() const;
-    bool LauncherGlobal4C8B1D() const;
+    bool EulaFlowEnabled() const;
+    bool PatchFlowEnabled() const;
     bool LauncherGlobal4D2C64() const;
     bool ReplacementDefaultNoPatchPolicyActive() const;
 
@@ -112,8 +112,8 @@ private:
     bool switchSkipLaunch_ = false; // observed -skiplaunch presence; 0x409950 shows no extra state write here
     bool switchLPTest_ = false;     // observed -lptest presence; 0x409950 shows no extra state write here
 
-    bool launcherGlobal4C8B1C_ = true;
-    bool launcherGlobal4C8B1D_ = true;
+    bool eulaFlowEnabled_ = true;  // anchor: launcher.exe:0x4c8b1c
+    bool patchFlowEnabled_ = true; // anchor: launcher.exe:0x4c8b1d
     bool launcherGlobal4D2C64_ = false;
     bool forcedDefaultNoPatchBranch_ = false;
 

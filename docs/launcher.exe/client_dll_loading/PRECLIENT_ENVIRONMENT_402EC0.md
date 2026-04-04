@@ -131,7 +131,7 @@ Current best concrete corridor:
 The closest concrete launcher-side credential producer is now:
 
 - page `2` primary button (`dialog +0x204`) dispatches command `11`
-- command `11` enters page `6` when `g_LauncherGlobal4C8B1D004c8b1d == 0`
+- command `11` enters page `6` when `g_LauncherPatchFlowEnabled == 0`
 - page `6` key handling goes through:
   - `0x408ee0 = LauncherLoginRichEdit_SwitchPromptState`
   - `0x408840 = LauncherLoginRichEdit_HandlePromptInputCharacter`

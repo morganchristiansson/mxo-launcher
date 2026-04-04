@@ -75,10 +75,10 @@ Static tracing of `0x409950` now supports this tighter switch map:
 
 - `-clone` -> sets launcher byte `0x4d2c6a = 1`
 - `-silent` -> consumed with no direct retained-byte write recovered yet
-- `-nopatch` -> clears launcher byte `0x4c8b1d = 0` and runs the nopatch mediator setup path
+- `-nopatch` -> clears `g_LauncherPatchFlowEnabled` (`0x4c8b1d`) = `0` and runs the nopatch mediator setup path
 - `-recover` -> sets `g_LauncherRecoverDirectoryRequested` (`0x4d2c65`) = `1`
-- `-justpatch` -> sets `g_LauncherJustPatchRequested` (`0x4d2c66`) = `1` and clears `0x4c8b1c = 0`
-- `-noeula` -> clears launcher byte `0x4c8b1c = 0`
+- `-justpatch` -> sets `g_LauncherJustPatchRequested` (`0x4d2c66`) = `1` and clears `g_LauncherEulaFlowEnabled` (`0x4c8b1c`) = `0`
+- `-noeula` -> clears `g_LauncherEulaFlowEnabled` (`0x4c8b1c`) = `0`
 - `-deletechar`, `-skiplaunch`, `-lptest` -> currently observed as consumed without an immediately recovered retained-byte write in `0x409950`
 - value-bearing switches are handled by a small pending-state machine:
   - `-user` / `-qluser` -> copy next token to `g_LauncherAuthUsername` (`0x4d2c70`)
@@ -89,8 +89,8 @@ Static tracing of `0x409950` now supports this tighter switch map:
 
 Also important from `.data` initialization:
 
-- `0x4c8b1c` starts as `1`
-- `0x4c8b1d` starts as `1`
+- `g_LauncherEulaFlowEnabled` (`0x4c8b1c`) starts as `1`
+- `g_LauncherPatchFlowEnabled` (`0x4c8b1d`) starts as `1`
 - `g_LauncherNoPatchFlowFlagByte` (`0x4d2c69`) starts as `0`
 
 This is useful because it lets the replacement launcher reconstruct bigger chunks of original preprocessing state at once instead of only mirroring "stripped vs forwarded argv" behavior.
