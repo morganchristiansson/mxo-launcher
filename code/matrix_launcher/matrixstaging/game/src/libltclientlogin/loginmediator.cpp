@@ -2275,6 +2275,7 @@ static void LateEntryList1470ResetEntryScaffold(LateEntryList1470EntrySketch* en
     entry->capacity = nullptr;
 }
 
+// anchor: launcher.exe:0x41e410 = StringTripleArray_DestroyRange
 static void LateEntryList1470DestroyRangeScaffold(
     LateEntryList1470EntrySketch* begin,
     LateEntryList1470EntrySketch* end) {
@@ -2314,6 +2315,7 @@ static bool LateEntryList1470CopyConstructSingleScaffold(
     return true;
 }
 
+// anchor: launcher.exe:0x41d750 = StringTripleArray_CopyConstructRange
 static LateEntryList1470EntrySketch* LateEntryList1470CopyConstructRangeScaffold(
     const LateEntryList1470EntrySketch* sourceBegin,
     const LateEntryList1470EntrySketch* sourceEnd,
@@ -2342,6 +2344,8 @@ void CLTLoginMediator::FreeLateEntryList1470StorageScaffold() {
     lateEntryList1470_.capacity = nullptr;
 }
 
+// anchor: launcher.exe:0x407dd0 = StringTriple_AssignFromRange
+// Narrow source-owned bridge over the original per-entry assignment helper.
 static bool LateEntryList1470AssignFromRangeScaffold(
     LateEntryList1470EntrySketch* destination,
     const char* sourceBegin,
@@ -2363,6 +2367,7 @@ static bool LateEntryList1470AssignFromRangeScaffold(
     return LateEntryList1470CopyConstructSingleScaffold(destination, &sourceEntry);
 }
 
+// anchor: launcher.exe:0x41eb20 = StringTripleArray_CopyAssignRange
 static LateEntryList1470EntrySketch* StringTripleArray_CopyAssignRangeScaffold(
     LateEntryList1470EntrySketch* sourceBegin,
     LateEntryList1470EntrySketch* sourceEnd,
@@ -2377,6 +2382,7 @@ static LateEntryList1470EntrySketch* StringTripleArray_CopyAssignRangeScaffold(
     return destination;
 }
 
+// anchor: launcher.exe:0x41d7a0 = StringTripleArray_CopyConstructRepeatedEntry
 static LateEntryList1470EntrySketch* StringTripleArray_CopyConstructRepeatedEntryScaffold(
     LateEntryList1470EntrySketch* destinationBegin,
     size_t repeatCount,
@@ -2392,6 +2398,7 @@ static LateEntryList1470EntrySketch* StringTripleArray_CopyConstructRepeatedEntr
     return destination;
 }
 
+// anchor: launcher.exe:0x41f3e0 = StringTripleArray_GrowAndAppend
 static bool StringTripleArray_GrowAndAppendScaffold(
     LateEntryList1470VectorLikeSketch* vectorHeader,
     LateEntryList1470EntrySketch* insertPosition,
@@ -2461,6 +2468,7 @@ static bool StringTripleArray_GrowAndAppendScaffold(
     return true;
 }
 
+// anchor: launcher.exe:0x41f640 = StringTripleArray_Append
 static bool StringTripleArray_AppendScaffold(
     LateEntryList1470VectorLikeSketch* vectorHeader,
     const LateEntryList1470EntrySketch* sourceEntry) {
