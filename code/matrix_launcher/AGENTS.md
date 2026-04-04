@@ -56,66 +56,40 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 
 ## Ghidra usage
 
-Some Ghidra installs report extra grouped tools internally, but this harness consistently exposes the common gateway-visible calls below; use `ghidra_list_tool_groups` / `ghidra_load_tool_group` to probe that gap when needed.
+Use the current `ghidra_functions` / `ghidra_inspect` / `ghidra_symbols` tool family below, not the older legacy command names. Default to `file_name: "launcher.exe"` and swap to `client.dll` when needed. Prefer `ghidra_batch_operations` for grouped edits, then `ghidra_project save`.
 
-```
-# List optional Ghidra tool groups and their load state
-mcp({ tool: "ghidra_list_tool_groups", args: '{}' })
+```js
+// Programs
+mcp({ tool: "ghidra_get_program_list", args: '{}' })
+mcp({ tool: "ghidra_project", args: '{"file_name":"launcher.exe","action":"save"}' })
 
-# Ask Ghidra to load extra tool groups when they are available
-mcp({ tool: "ghidra_load_tool_group", args: '{"group": "all"}' })
+// Find / inspect
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list","name_pattern":"CLauncher.*"}' })
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"get","address":"0x40b430"}' })
+mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"decompile","name":"CLauncher_InitInstance"}' })
+mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"listing","address":"0x40b430","end_address":"0x40b4d0"}' })
+mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"references_to","address":"0x004d2c69"}' })
+mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"references_from","address":"0x0040a5a4"}' })
 
-# Confirm the active program and image base
-mcp({ tool: "ghidra_get_current_program_info", args: '{"program": "launcher.exe"}' })
+// Locals / functions
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"Launcher_ParseCommandLine"}' })
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"Launcher_ParseCommandLine","current_name":"pcVar6","new_name":"stringCursor"}' })
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"create","address":"0x4472f0","function_name":"AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker"}' })
 
-# Resolve the function currently owning an address
-mcp({ tool: "ghidra_get_function_by_address", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+// Globals / symbols
+mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"get","address":"0x004d2c69"}' })
+mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}' })
 
-# Decompile one function by address
-mcp({ tool: "ghidra_decompile_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+// Comments / bookmarks
+mcp({ tool: "ghidra_annotate", args: '{"file_name":"launcher.exe","action":"set_comment","address":"0x40ec70","comment_type":"EOL","text":"selection command helper"}' })
+mcp({ tool: "ghidra_annotate", args: '{"file_name":"launcher.exe","action":"create_bookmark","address":"0x40ec70","bookmark_type":"Analysis","bookmark_category":"RENOTE","comment":"selection command helper"}' })
 
-# Decompile several named functions together
-mcp({ tool: "ghidra_batch_decompile", args: '{"functions": "CLTSocketLayer_Init,CLTBaseThreadPerClientTCPEngine_ctor", "program": "launcher.exe"}' })
+// Memory / tables
+mcp({ tool: "ghidra_memory", args: '{"file_name":"launcher.exe","action":"read","address":"0x4b51e0","length":64}' })
 
-# Inspect assembly for one function
-mcp({ tool: "ghidra_disassemble_function", args: '{"address": "0x43b300", "program": "launcher.exe"}' })
+// Batch related edits in one transaction
+mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"symbols","arguments":{"action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"Launcher_ParseCommandLine","current_name":"pcVar6","new_name":"stringCursor"}}]}' })
 
-# List renameable parameters and locals in one function
-mcp({ tool: "ghidra_get_function_variables", args: '{"function_name": "CLauncher_InitInstance", "program": "launcher.exe"}' })
-
-# Rename a function when the address is known
-mcp({ tool: "ghidra_rename_function_by_address", args: '{"function_address": "0x43b300", "new_name": "CLTLoginMediator_InitializeHelperDispatchTable", "program": "launcher.exe"}' })
-
-# Rename the function, params, and locals in one shot
-mcp({ tool: "ghidra_batch_rename_function_components", args: '{"function_address": "0x43b300", "function_name": "CLTLoginMediator_InitializeHelperDispatchTable", "parameter_renames": {"param_1": "mediator"}, "local_renames": {"local_18": "dispatchTable"}, "program": "launcher.exe"}' })
-
-# Batch rename variables referenced from one function
-mcp({ tool: "ghidra_batch_rename_variables", args: '{"function_address": "0x43b300", "variable_renames": {"DAT_004d3d4c": "mutexCounter", "DAT_004d3d50": "initCounter"}, "program": "launcher.exe"}' })
-
-# Improve a function signature for cleaner decompilation
-mcp({ tool: "ghidra_set_function_prototype", args: '{"function_address": "0x403390", "prototype": "LauncherLoginDialog * LauncherLoginDialog_ctor(void *this)", "calling_convention": "__thiscall", "program": "launcher.exe"}' })
-
-# Retype a local variable when layout is known
-mcp({ tool: "ghidra_set_local_variable_type", args: '{"function_address": "0x43b300", "variable_name": "local_18", "new_type": "char[260]", "program": "launcher.exe"}' })
-
-# Retype one parameter
-mcp({ tool: "ghidra_set_parameter_type", args: '{"function_address": "0x403390", "parameter_name": "this", "new_type": "LauncherLoginDialog *", "program": "launcher.exe"}' })
-
-# Read raw memory, strings, or tables at an address
-mcp({ tool: "ghidra_read_memory", args: '{"address": "0x4b51e0", "length": 64, "program": "launcher.exe"}' })
-
-# Search functions by name substring
-mcp({ tool: "ghidra_search_functions", args: '{"name_pattern": "LoginMediator", "program": "launcher.exe"}' })
-
-# Search defined strings by regex
-mcp({ tool: "ghidra_search_strings", args: '{"pattern": "launcher\\.cpp", "program": "launcher.exe"}' })
-
-# Create a missing function at a high-confidence entry
-mcp({ tool: "ghidra_create_function", args: '{"address": "0x4472f0", "name": "AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker", "program": "launcher.exe"}' })
-
-# Leave a small recoverability note in the listing
-mcp({ tool: "ghidra_set_bookmark", args: '{"address": "0x40ec70", "category": "RENOTE", "comment": "selection command helper", "program": "launcher.exe"}' })
-
-# Save rename/type/comment changes back to the project
-mcp({ tool: "ghidra_save_program", args: '{"program": "launcher.exe"}' })
+// Oversized output
+mcp({ tool: "ghidra_read_tool_output", args: '{"action":"read","session_id":"ses_...","output_id":"out_...","offset":0,"max_chars":12000}' })
 ```
