@@ -49,7 +49,7 @@ int InitClientDLL(
     HMODULE  hClientDll,               // from 0x4d2c50
     HMODULE  hCresDll,                 // from 0x4d2c4c
     void*    launcherNetworkObject,    // from 0x4d6304
-    void*    pILTLoginMediatorDefault, // from 0x4d2c58
+    void*    pILTLoginMediatorDefault, // from g_pILTLoginMediatorDefault (0x4d2c58)
     uint32_t packedArg7Selection,      // [this+0xa8]/[this+0xac]
     uint32_t noPatchFlowFlagByte       // from g_LauncherNoPatchFlowFlagByte (0x4d2c69)
 );
@@ -65,7 +65,7 @@ Before the call, the original launcher has already:
 2. built a launcher-owned object and stored it at `0x4d6304`
 3. loaded `cres.dll` into `0x4d2c4c`
 4. loaded `client.dll` into `0x4d2c50`
-5. resolved the runtime interface pointer at `0x4d2c58` (`ILTLoginMediator.Default`)
+5. resolved the runtime interface pointer at `g_pILTLoginMediatorDefault` (`0x4d2c58`, `ILTLoginMediator.Default`)
 6. selected nopatch-related state reflected in `g_LauncherNoPatchFlowFlagByte` (`0x4d2c69`)
 
 ### New clarification: arg1/arg2 are filtered launcher-owned argv storage

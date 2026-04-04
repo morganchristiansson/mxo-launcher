@@ -15,7 +15,7 @@ The original launcher passes an 8-argument frame into `client.dll!InitClientDLL`
 - parsed argument count / argv-like storage (`g_LauncherFilteredArgCount`, `g_LauncherFilteredArgv`)
 - `client.dll` handle (`0x4d2c50`)
 - `cres.dll` handle (`0x4d2c4c`)
-- launcher-owned objects (`0x4d6304`, `0x4d2c58`)
+- launcher-owned objects (`0x4d6304`, `g_pILTLoginMediatorDefault` / `0x4d2c58`)
 - packed launcher selection / saved-world state from `CLauncher+0xa8/+0xac`
 - nopatch-flow flag byte (`g_LauncherNoPatchFlowFlagByte` / `0x4d2c69`)
 

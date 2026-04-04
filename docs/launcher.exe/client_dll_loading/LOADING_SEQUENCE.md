@@ -81,10 +81,10 @@ Static tracing of `0x409950` now supports this tighter switch map:
 - `-noeula` -> clears launcher byte `0x4c8b1c = 0`
 - `-deletechar`, `-skiplaunch`, `-lptest` -> currently observed as consumed without an immediately recovered retained-byte write in `0x409950`
 - value-bearing switches are handled by a small pending-state machine:
-  - `-user` / `-qluser` -> copy next token to `0x4d2c70`
-  - `-pwd` / `-qlpwd` -> copy next token to `0x4d2d70`
-  - `-char` / `-qlchar` -> copy next token to `0x4d2e70`
-  - `-session` / `-qlsession` -> copy next token to `0x4d3070`
+  - `-user` / `-qluser` -> copy next token to `g_LauncherAuthUsername` (`0x4d2c70`)
+  - `-pwd` / `-qlpwd` -> copy next token to `g_LauncherAuthPassword` (`0x4d2d70`)
+  - `-char` / `-qlchar` -> copy next token to `g_LauncherCharacterName` (`0x4d2e70`)
+  - `-session` / `-qlsession` -> copy next token to `g_LauncherSessionToken` (`0x4d3070`)
   - `-qlver` -> consumes the next token, but the current state-table recovery does **not** show a retained destination buffer write for that value
 
 Also important from `.data` initialization:
@@ -100,6 +100,9 @@ Neighboring startup bytes on this same corridor are now better closed too:
   `0x402a00 = Launcher_RequestRelaunchWithoutCloneOrRecoverAndQuit`
 - `CLauncher::InitInstance` later checks that byte before calling
   `0x40aa70 = Launcher_RelaunchLauncherWithoutCloneOrRecoverAndQuit`
+- patch worker threads later also treat `g_LauncherPatchRecoveryRequired` (`0x4d3418`) as a second
+  recover-directory force byte alongside `g_LauncherRecoverDirectoryRequested`
+  - current negative result: the write-side producer for `0x4d3418` is still open from static xrefs
 
 ### New clarification: `options.cfg` is not just probed, it gates a pre-client launcher step
 

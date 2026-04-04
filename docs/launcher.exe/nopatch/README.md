@@ -21,13 +21,13 @@ It means "skip the patch pipeline, but still initialize launcher-side runtime st
 0x409a64: push 0x4ac18c      ; "0.1"
 0x409a69: mov  [0x4c8b1d], al
 0x409a6e: call 0x417440      ; parse "0.1"
-0x409a73: mov  ecx, [0x4d2c58]
+0x409a73: mov  ecx, [g_pILTLoginMediatorDefault]   ; 0x4d2c58
 ...
 0x409a8b: call [edx+0x1c]
 
 0x409a8e: push 0x4ac18c      ; "0.1"
 0x409a93: call 0x417440
-0x409a98: mov  ecx, [0x4d2c58]
+0x409a98: mov  ecx, [g_pILTLoginMediatorDefault]   ; 0x4d2c58
 ...
 0x409ab0: call [edx+0x24]
 ```
@@ -39,7 +39,7 @@ In the original launcher, the nopatch branch:
 1. detects the `-nopatch` argument,
 2. updates launcher-global state,
 3. parses the string `"0.1"`,
-4. invokes methods on the launcher-owned object at `0x4d2c58`.
+4. invokes methods on the launcher-owned object at `g_pILTLoginMediatorDefault` (`0x4d2c58`).
 
 Important parser clarification from `0x417440`:
 - this is **not** an IEEE-float parser
@@ -49,7 +49,7 @@ Important parser clarification from `0x417440`:
   - `client.dll` -> `7.6005`
 - the launcher-side `7.6004` value also matches the current `vlck.ltb` corpus
 
-So even in nopatch mode, launcher object `0x4d2c58` is actively configured before the client startup path.
+So even in nopatch mode, launcher object `g_pILTLoginMediatorDefault` (`0x4d2c58`) is actively configured before the client startup path.
 
 ## Reimplementation guidance
 
