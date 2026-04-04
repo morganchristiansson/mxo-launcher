@@ -432,10 +432,9 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             metricFilenameStringTriple.begin = const_cast<char*>(filename);
             metricFilenameStringTriple.current = metricFilenameStringTriple.begin + filenameLength;
             metricFilenameStringTriple.capacity = metricFilenameStringTriple.current + 1u;
-            if (mediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple)) {
-                ++resolvedMetricFilenameCount;
-                continue;
-            }
+            mediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple);
+            ++resolvedMetricFilenameCount;
+            continue;
         }
 
         ++unresolvedMetricFilenameCount;

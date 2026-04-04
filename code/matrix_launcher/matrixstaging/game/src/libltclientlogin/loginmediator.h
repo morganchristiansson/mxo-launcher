@@ -1229,11 +1229,9 @@ public:
     // anchor: launcher.exe:0x41f5f0 / owner helper clearing owner `+0x1470`
     void ClearLateEntryList1470Scaffold();
     // anchor: launcher.exe:0x41f840 / owner vtable +0x190
-    // Faithful owner-side append contract:
-    // - caller passes one source string-triple
-    // - `0x41f840` forwards `this+0x1470` into `0x41f640 = StringTripleArray_Append`
-    // - append deep-copies the source string into owner-managed storage
-    bool AppendLateEntryStringTriple1470Scaffold(const LateEntryList1470EntrySketch* sourceEntry);
+    // Keep this wrapper tiny like the original: it forwards owner `+0x1470` into the lower-level
+    // string-triple array append helper.
+    void AppendLateEntryStringTriple1470Scaffold(const LateEntryList1470EntrySketch* sourceEntry);
     // Wrapper-facing arg6 profile-path/current-slot ABI objects.
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
     // slot-record helpers onto the wrapper-facing `ILTLoginMediator.Default +0x40/+0x44` object
