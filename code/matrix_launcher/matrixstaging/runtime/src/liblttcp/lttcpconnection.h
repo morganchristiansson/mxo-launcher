@@ -73,9 +73,13 @@ struct CLTTCPReadOperationFragmentScaffold {
 // Recovered `0x2c` parsed-packet work-item family built via
 // `CVariableLengthPrefixedTCPStreamParser_AllocatePacketBuffer -> CParsedPacketWorkItem_ctor`.
 // Current best parser-family read from `0x469bf0`, `0x4725c0`, `0x435e60`, `0x4355c0`,
-// `0x4350c0`, `0x435510`, and `0x4490c0`:
+// `0x4350c0`, `0x435510`, `0x435f30`, and `0x4490c0`:
 // - vtable = `0x4b3e08`
+// - strong inheritance signal from shared 12-byte work-item root `0x004b2134`
+//   - ctor writes the shared `+0x04/+0x08` prefix first
+//   - dtor retables back to `0x004b2134` before final free path
 // - `+0x04` = work type `3`
+// - `+0x08` = shared status/payload dword; parser-produced packets zero it
 // - this same object family is used in two phases:
 //   - parser-owned assembly state while stream bytes are being accumulated
 //   - emitted completed packet object after `Parse(...)` returns `0`
@@ -98,7 +102,7 @@ static_assert(sizeof(CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold) ==
 struct CLTTCPConnection_ParsedPacketWorkItemScaffold {
     void** vtable; // +0x00
     uint32_t workType; // +0x04 = 3
-    uint32_t field08; // +0x08 unresolved in the current parser-focused read
+    uint32_t statusOrPayloadDword08; // +0x08 shared work-item-root status/payload dword; zero on parser-produced packets
     uint32_t retainedFragmentCount0C; // +0x0c retained fragment count (`AppendFragment` / `GetTailFragment`)
     CLTTCPReadOperationFragmentScaffold* firstRetainedFragment10; // +0x10 first retained fragment
     CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold* retainedFragmentListOwner14; // +0x14 optional wrapper for additional retained fragments beyond `+0x10`
