@@ -925,7 +925,8 @@ uint32_t CMessageConnection::SendPacketMessageRef(
 
 // anchor: launcher.exe:0x448a60
 // UNANCHORED: source-owned narrow fallback helper for the generic unhandled-operation log branch
-// reached from the much larger `CMessageConnection::OnOperationCompleted` family.
+// reached from the later leaf wrappers (for example `0x449a70` / `0x44af60`) after base
+// `0x4490c0` returns false-ish.
 static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
     spdlog::debug(
         "CMessageConnection_LogUnhandledOperationScaffold workItem={}",
@@ -956,48 +957,6 @@ static bool CMessageConnection_IsMediatorMarginConnectionScaffold(
     CMessageConnection* self,
     const mxo::ltlogin::CLTLoginMediator* mediator) {
     return self != nullptr && mediator != nullptr && self == mediator->MarginConnection();
-}
-
-// UNANCHORED: legacy source-owned synthetic receive-drain proxy.
-// After the tighter `0x4490c0` tail correction this is expected to stay dormant on the normal
-// auth/margin startup path and only remains as unexpected-path compatibility scaffolding.
-static uint32_t CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
-    CMessageConnection* self,
-    uint32_t workPayload) {
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(self);
-    const bool isAuthConnection =
-        CMessageConnection_IsMediatorAuthConnectionScaffold(self, mediator);
-    const bool isMarginConnection =
-        CMessageConnection_IsMediatorMarginConnectionScaffold(self, mediator);
-    if (!self || !mediator || (!isAuthConnection && !isMarginConnection)) {
-        spdlog::debug(
-            "CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold missing mediator owner this={} ownerContext={} payload=0x{:08x}",
-            fmt::ptr(self),
-            fmt::ptr(self ? self->OwnerContext() : nullptr),
-            workPayload);
-        return 0u;
-    }
-
-    if (!isMarginConnection) {
-        const uint32_t receiveActions = mediator->HandleAuthConnectionReceiveScaffold();
-        if (receiveActions & mxo::ltlogin::CLTLoginMediator::kReceiveActionBeginMarginAfterAuthReply) {
-            const uint32_t marginConnectResult = mediator->BeginLauncherMarginConnectionScaffold();
-            spdlog::info(
-                "CMessageConnection::OnOperationCompleted synthetic receive-drain post-AS_AuthReply margin auto-begin result=0x{:08x}",
-                static_cast<unsigned>(marginConnectResult));
-        }
-    } else {
-        (void)mediator->HandleMarginConnectionReceiveScaffold();
-    }
-
-    spdlog::info(
-        "CMessageConnection::OnOperationCompleted handled synthetic receive-drain proxy payload=0x{:08x} this={} ownerContext={} isMargin={} remoteHost='{}'",
-        workPayload,
-        fmt::ptr(self),
-        fmt::ptr(self->OwnerContext()),
-        isMarginConnection ? 1u : 0u,
-        self->RemoteHostName().empty() ? std::string("<empty>") : self->RemoteHostName());
-    return 1u;
 }
 
 // anchor family: launcher.exe:0x449a70 / 0x44af60 type-2 owner-fallback tail
@@ -1049,6 +1008,28 @@ static uint32_t CMessageConnection_WorkItemTypeScaffold(const void* workItem) {
     const CLTThreadPerClientTCPEngine_WorkItemHeader* header =
         static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
     return header->workType;
+}
+
+struct CMessageConnectionWorkItemStatusOrPayloadScaffold {
+    CLTThreadPerClientTCPEngine_WorkItemHeader header;
+    uint32_t statusOrPayloadDword08 = 0u;
+};
+
+static_assert(
+    sizeof(CMessageConnectionWorkItemStatusOrPayloadScaffold) == 0x0c,
+    "message connection work-item status/payload scaffold size mismatch");
+
+// anchor: launcher.exe:0x4490c0 -> 0x434d00
+// Source-owned read of the shared `workItem+0x08` status/payload dword used by the type-3 early
+// return and by several later source-owned owner-fallback helpers.
+static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const void* workItem) {
+    if (!workItem) {
+        return 0u;
+    }
+
+    const CMessageConnectionWorkItemStatusOrPayloadScaffold* statusWorkItem =
+        static_cast<const CMessageConnectionWorkItemStatusOrPayloadScaffold*>(workItem);
+    return statusWorkItem->statusOrPayloadDword08;
 }
 
 // anchor: launcher.exe:0x4490c0 type-3 first-fragment copy setup
@@ -1474,51 +1455,50 @@ static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
 
 // UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
 uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
-    void* workItem,
     CMessageConnectionMessageRef& messageRef) {
-    (void)workItem;
     (void)messageRef;
     return 0u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x30`
 uint32_t CMessageConnection::DispatchPacketizedProtocol5MessageRefScaffold(
-    void* workItem,
     CMessageConnectionMessageRef& messageRef) {
-    (void)workItem;
     (void)messageRef;
     return 1u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x34`
 uint32_t CMessageConnection::DispatchPacketizedProtocol7MessageRefScaffold(
-    void* workItem,
     CMessageConnectionMessageRef& messageRef) {
-    (void)workItem;
     (void)messageRef;
     return 1u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x38`
 void CMessageConnection::PreDispatchMessageRefScaffold(
-    void* workItem,
     CMessageConnectionMessageRef& messageRef) {
-    (void)workItem;
     (void)messageRef;
 }
 
 // anchor: launcher.exe:0x4490c0
 // string-backed original name: CMessageConnection::OnOperationCompleted
-// Current source body now mirrors the tighter current read of the type-3 tail:
-// - dispatch on `workItem+0x04`
-// - on type `3`, copy packet-body bytes from the retained-fragment-backed parsed-packet work item
+// Current source body now mirrors the tighter current boundary read:
+// - the initial `workItem+0x04` dispatch only directly handles work types `1`, `2`, and `3`
+// - work types `1/2` are the optional completion-helper signal branches (`+0x80/+0x7c`)
+//   - current source still does not materialize those helper objects, so it preserves only the
+//     original false-ish return boundary seen on the auth/margin startup path where they are null
+// - every other non-type-3 work item returns false-ish to the later leaf wrappers unchanged
+//   instead of being consumed or generically logged by base `0x4490c0`
+// - on type `3`, the callback first checks shared `workItem+0x08` status/payload through the
+//   `0x434d00` helper family and returns handled immediately when that dword is non-zero
+// - otherwise it copies packet-body bytes from the retained-fragment-backed parsed-packet work item
 //   via `currentCursor24` / `assembledByteCount28`
 // - preserve the original oversized-packet close branch before later dispatch/agenda work
 // - materialize the nearer local receive/message-ref scaffold mirroring
 //   `0x455cd0/0x455c60` outer-ref + inner-storage construction
 // - keep the original locator-id validity gate on the non-zero-flag branch before later dispatch
 // - preserve the optional `0x469930 -> 0x4489d0` read-agenda handoff
-// - then mirror the later in-callback virtual tail more closely:
+// - the later in-callback virtual tail consumes only that local message-ref object:
 //   - call the vtable `+0x38` pre-dispatch hook first
 //   - non-zero-flag protocol `5` -> vtable `+0x30`
 //   - non-zero-flag protocol `7` -> vtable `+0x34`
@@ -1526,50 +1506,24 @@ void CMessageConnection::PreDispatchMessageRefScaffold(
 // - crucial current fidelity correction:
 //   - once original `0x4490c0` reaches that virtual dispatch family, it still consumes the packet
 //     locally inside the same callback even when the callee returns false-ish
-//   - source therefore no longer re-queues that post-dispatch fallthrough as synthetic
-//     receive-drain work on the auth/margin startup path
+//   - source-owned synthetic receive-drain and local type-`0x0b` continuations therefore belong to
+//     later compatibility / leaf-owner fallback scaffolding, not to base `0x4490c0`
 uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
     }
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
-    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeSyntheticReceiveDrain) {
-        const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* syntheticWorkItem =
-            static_cast<const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
-        return CMessageConnection_HandleSyntheticReceiveDrainProxyScaffold(
-            this,
-            syntheticWorkItem ? syntheticWorkItem->workPayload : 0u);
-    }
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeClose) {
-        // Current best startup-path read from `0x4490c0` + wrapper callers `0x449a70/0x44af60`:
-        // - base type-1 handling first tries optional completion helper `+0x80`
-        // - on the auth/margin startup path that helper is null
-        // - control therefore falls through into the leaf owner-callback wrapper
         return 0u;
     }
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        // Current best startup-path read from `0x4490c0` + wrapper callers `0x449a70/0x44af60`:
-        // - base type-2 handling first tries optional completion helper `+0x7c`
-        // - on the auth/margin startup path those helpers are null
-        // - control therefore falls through into the leaf owner-callback wrapper
-        return 0u;
-    }
-    if (workType == 0x0bu) {
-        // Preserve the explicit local code-4 continuation seam:
-        // `0x441850` synthesizes a type-0x0b work-item and routes it back through connection
-        // `OnOperationCompleted`; the base family must leave that work item for the later
-        // margin-leaf/owner fallback chain (`0x44af60 -> 0x41afc0 -> helper slot2`), not consume it
-        // as a generic unhandled op.
-        spdlog::info(
-            "CMessageConnection::OnOperationCompleted preserved local type0x0b completion workItem for leaf/owner fallback this={} ownerContext={} remoteHost='{}'",
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
         return 0u;
     }
     if (workType != CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket) {
-        CMessageConnection_LogUnhandledOperationScaffold(workItem);
+        return 0u;
+    }
+    if (CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem) != 0u) {
         return 1u;
     }
 
@@ -1695,7 +1649,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
-    PreDispatchMessageRefScaffold(workItem, *messageRefForDispatch);
+    PreDispatchMessageRefScaffold(*messageRefForDispatch);
 
     const bool headerlessForDispatch = (messageRefForDispatch->headerless10 != 0u);
     uint8_t headerlessProtocolId = 0u;
@@ -1709,18 +1663,15 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     uint32_t postCopyDispatchResult = 0u;
     if (hasHeaderlessProtocolId && headerlessProtocolId == 5u) {
         dispatchSlotLabel = "+0x30";
-        postCopyDispatchResult = DispatchPacketizedProtocol5MessageRefScaffold(
-            workItem,
-            *messageRefForDispatch);
+        postCopyDispatchResult =
+            DispatchPacketizedProtocol5MessageRefScaffold(*messageRefForDispatch);
     } else if (hasHeaderlessProtocolId && headerlessProtocolId == 7u) {
         dispatchSlotLabel = "+0x34";
-        postCopyDispatchResult = DispatchPacketizedProtocol7MessageRefScaffold(
-            workItem,
-            *messageRefForDispatch);
+        postCopyDispatchResult =
+            DispatchPacketizedProtocol7MessageRefScaffold(*messageRefForDispatch);
     } else {
-        postCopyDispatchResult = DispatchCopiedParsedPacketTailScaffold(
-            workItem,
-            *messageRefForDispatch);
+        postCopyDispatchResult =
+            DispatchCopiedParsedPacketTailScaffold(*messageRefForDispatch);
     }
 
     if (postCopyDispatchResult == 0u) {
@@ -1851,9 +1802,7 @@ CAuthStartupConnection::~CAuthStartupConnection() = default;
 
 // anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
 uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
-    void* workItem,
     CMessageConnectionMessageRef& messageRef) {
-    (void)workItem;
 
     mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
     const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
@@ -1945,13 +1894,7 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
-    spdlog::debug(
-        "CAuthStartupConnection::OnOperationCompleted unresolved owner+0x17c fallback workItem={} workType=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        fmt::ptr(workItem),
-        static_cast<unsigned>(CMessageConnection_WorkItemTypeScaffold(workItem)),
-        fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    CMessageConnection_LogUnhandledOperationScaffold(workItem);
     return 0u;
 }
 
@@ -2282,9 +2225,7 @@ const uint8_t* CMarginConnection::MessageCode5SeedBytes85Pointer() const {
 
 // anchor: launcher.exe:0x44af20 -> 0x442d00 -> owner vtable `+0x184` / `0x41f260`
 uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
-    void* workItem,
     CMessageConnectionMessageRef& messageRef) {
-    (void)workItem;
 
     mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
     const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
@@ -2447,9 +2388,8 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* statusWorkItem =
-            static_cast<const mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
-        const uint32_t workPayload = statusWorkItem ? statusWorkItem->workPayload : 0u;
+        const uint32_t workPayload =
+            CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem);
 
         // Bounded fidelity correction for the active state4 existing-character margin path:
         // - original margin type-2 completion re-enters the current helper slot-2 chain
@@ -2494,13 +2434,7 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
-    spdlog::debug(
-        "CMarginConnection::OnOperationCompleted unresolved owner+0x188 fallback workItem={} workType=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        fmt::ptr(workItem),
-        static_cast<unsigned>(workType),
-        fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    CMessageConnection_LogUnhandledOperationScaffold(workItem);
     return 0u;
 }
 
