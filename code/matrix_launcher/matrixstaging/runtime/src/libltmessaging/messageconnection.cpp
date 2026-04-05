@@ -1010,15 +1010,6 @@ static uint32_t CMessageConnection_WorkItemTypeScaffold(const void* workItem) {
     return header->workType;
 }
 
-struct CMessageConnectionWorkItemStatusOrPayloadScaffold {
-    CLTThreadPerClientTCPEngine_WorkItemHeader header;
-    uint32_t statusOrPayloadDword08 = 0u;
-};
-
-static_assert(
-    sizeof(CMessageConnectionWorkItemStatusOrPayloadScaffold) == 0x0c,
-    "message connection work-item status/payload scaffold size mismatch");
-
 // anchor: launcher.exe:0x4490c0 -> 0x434d00
 // Source-owned read of the shared `workItem+0x08` status/payload dword used by the type-3 early
 // return and by several later source-owned owner-fallback helpers.
@@ -1027,8 +1018,8 @@ static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const vo
         return 0u;
     }
 
-    const CMessageConnectionWorkItemStatusOrPayloadScaffold* statusWorkItem =
-        static_cast<const CMessageConnectionWorkItemStatusOrPayloadScaffold*>(workItem);
+    const CLTThreadPerClientTCPEngine_WorkItemHeader* statusWorkItem =
+        static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
     return statusWorkItem->statusOrPayloadDword08;
 }
 
@@ -1946,7 +1937,7 @@ uint32_t CMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint32_t
     CMarginConnectionLocalCompletionWorkItemScaffold workItem = {};
     workItem.header.vtable = CMarginConnection_LocalCompletionWorkItemVtableScaffold();
     workItem.header.workType = 0x0bu;
-    workItem.workPayload = workPayloadStatus;
+    workItem.header.statusOrPayloadDword08 = workPayloadStatus;
 
     CMessageConnection* selfAsMessageConnection = this;
     const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&workItem);

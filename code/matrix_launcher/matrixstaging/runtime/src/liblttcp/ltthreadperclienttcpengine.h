@@ -51,15 +51,23 @@ struct CLTThreadPerClientTCPEngine_QueuedPair {
 };
 
 // Recovered queued work-item header shape.
-// Current high-confidence anchor:
-// - launcher helper 0x4816f0 returns [workItem+0x04]
+// anchor family: launcher.exe:0x4816f0 / 0x434d00
+// Current high-confidence anchors:
+// - launcher helper `0x4816f0` returns `[workItem+0x04]`
+// - launcher helper `0x434d00` returns `[workItem+0x08]`
 // Current best read:
-// - +0x00 = vtable
-// - +0x04 = work-item type/code consumed by the queue consumer
+// - `+0x00` = vtable
+// - `+0x04` = work-item type/code consumed by the queue consumer
+// - `+0x08` = shared status/payload dword used by connection/completion consumers
 struct CLTThreadPerClientTCPEngine_WorkItemHeader {
-    void** vtable;
-    uint32_t workType;
+    void** vtable; // +0x00
+    uint32_t workType; // +0x04
+    uint32_t statusOrPayloadDword08; // +0x08
 };
+
+static_assert(sizeof(CLTThreadPerClientTCPEngine_WorkItemHeader) == 0x0c, "work-item header size mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_WorkItemHeader, workType) == 0x04, "work-item header workType offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_WorkItemHeader, statusOrPayloadDword08) == 0x08, "work-item header status/payload offset mismatch");
 
 // Recovered launcher-visible arg5 helper root at +0x5c.
 // Current source note:

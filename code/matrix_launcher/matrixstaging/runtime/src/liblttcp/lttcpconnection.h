@@ -70,6 +70,15 @@ struct CLTTCPReadOperationFragmentScaffold {
     uint8_t bytes0C[1];                        // +0x0c variable-length fragment bytes begin here
 };
 
+struct CLTTCPReadOperationFragmentRefScaffold {
+    // anchor: launcher.exe:0x434fa0
+    // Tiny retained-fragment handle helper used by parser state (`0x469bf0` / `0x4725c0`) and by
+    // `CMessageConnection::OnOperationCompleted` stack locals.
+    CLTTCPReadOperationFragmentScaffold* retainedFragment00 = nullptr; // +0x00
+};
+
+static_assert(sizeof(CLTTCPReadOperationFragmentRefScaffold) == 0x04, "fragment ref handle size mismatch");
+
 // Recovered `0x2c` parsed-packet work-item family built via
 // `CVariableLengthPrefixedTCPStreamParser_AllocatePacketBuffer -> CParsedPacketWorkItem_ctor`.
 // Current best parser-family read from `0x469bf0`, `0x4725c0`, `0x435e60`, `0x4355c0`,
@@ -80,6 +89,9 @@ struct CLTTCPReadOperationFragmentScaffold {
 //   - dtor retables back to `0x004b2134` before final free path
 // - `+0x04` = work type `3`
 // - `+0x08` = shared status/payload dword; parser-produced packets zero it
+// - utility child/helper objects directly touched on this path now also include:
+//   - `0x434fa0` = retained-fragment ref helper over a single `CLTTCPReadOperationFragment*`
+//   - shared work-item root prefix `CLTThreadPerClientTCPEngine_WorkItemHeader`
 // - this same object family is used in two phases:
 //   - parser-owned assembly state while stream bytes are being accumulated
 //   - emitted completed packet object after `Parse(...)` returns `0`

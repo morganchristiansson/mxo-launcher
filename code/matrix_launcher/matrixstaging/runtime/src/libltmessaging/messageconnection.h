@@ -252,6 +252,28 @@ public:
     CMessageConnectionMessageRef& operator=(CMessageConnectionMessageRef&&) = delete;
 };
 
+struct CMessageConnectionMessageRefHandleScaffold {
+    // anchor family: launcher.exe:0x455cd0 / 0x4489d0
+    // Tiny retained outer-message-ref handle helper used by packet-agenda read handoff and by
+    // `CMessageConnection::OnOperationCompleted` stack locals.
+    CMessageConnectionMessageRef* messageRef00 = nullptr; // +0x00
+};
+
+static_assert(sizeof(CMessageConnectionMessageRefHandleScaffold) == 0x04, "message-ref handle size mismatch");
+
+struct CMessageConnectionCompletionHelperScaffold {
+    // anchor family: launcher.exe:0x436080 / vtable `0x004b3e20`
+    // Small event + embedded-lock helper reached by `CMessageConnection::OnOperationCompleted`
+    // on work types `1` and `2` through connection `+0x7c/+0x80`.
+    void** vtable00 = nullptr; // +0x00
+    CLTThreadPerClientTCPEngine_LockHelperScaffold embeddedLockHelper04{}; // +0x04
+    HANDLE eventHandle20 = nullptr; // +0x20
+};
+
+static_assert(offsetof(CMessageConnectionCompletionHelperScaffold, embeddedLockHelper04) == 0x04, "completion helper lock offset mismatch");
+static_assert(offsetof(CMessageConnectionCompletionHelperScaffold, eventHandle20) == 0x20, "completion helper event offset mismatch");
+static_assert(sizeof(CMessageConnectionCompletionHelperScaffold) == 0x24, "completion helper size mismatch");
+
 enum class CMessageConnectionPacketNameFamily : uint8_t {
     kUnknown = 0,
     kAuth = 1,
@@ -625,9 +647,9 @@ public:
     // - the initial dispatch on `workItem+0x04` only directly handles work types `1`, `2`, and `3`
     //   - type `1` = optional close-completion helper `+0x80`
     //   - type `2` = optional connect-completion helper `+0x7c`
-    //   - current source does not yet materialize those helper objects, so it preserves only the
-    //     original false-ish return boundary seen on the auth/margin startup path where both are
-    //     null
+    //   - source now carries the raw helper layout explicitly, but still does not allocate live
+    //     helper instances on the current auth/margin startup path; it therefore preserves only
+    //     the original false-ish return boundary seen there when both helper pointers are null
     //   - every other non-type-3 work item falls straight back to the later leaf wrappers instead
     //     of being consumed or generically logged by base `0x4490c0`
     // - work type `3` first checks the shared `workItem+0x08` status/payload dword (`0x434d00`)
@@ -799,13 +821,10 @@ protected:
 // ============================================================
 struct CMarginConnectionLocalCompletionWorkItemScaffold {
     // anchor: launcher.exe:0x434ce0 -> 0x464870 / 0x4444e0
-    // Minimal local stack work-item shape recovered for the `0x441850` continuation:
-    // - `+0x00` = vtable pointer (type-specific local completion object)
-    // - `+0x04` = work-item type / CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType() result
-    // - `+0x08` = status / payload dword read back through
-    //   `CLTThreadPerClientTCPEngine_WorkItemHeader_GetStatusOrPayloadDword` (`0x434d00`)
+    // Minimal local stack work-item shape recovered for the `0x441850` continuation.
+    // Current tighter read: this is just the shared `0x0c` work-item header/root with a
+    // type-specific vtable plus `workType/statusOrPayload` values.
     CLTThreadPerClientTCPEngine_WorkItemHeader header{};
-    uint32_t workPayload = 0u;
 };
 
 static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
