@@ -43,7 +43,10 @@ struct LTTCPEndpointKey {
 // This is a refcounted read-buffer fragment object, not a completed-packet work item.
 // High-confidence fields from `0x42fe50`, `0x42f850`, `0x42f860`, `0x42f880`, `0x42f890`,
 // `0x452350`, `0x469bf0`, `0x435e60`, `0x4350c0`, and `0x435510`:
-// - worker-thread receive path installs vtable `0x004b2300` and allocates `0x100c` bytes for this family
+// - worker-thread receive path installs live leaf vtable `0x004b2300` and allocates `0x100c`
+//   bytes for this family
+// - deleting dtor `0x42fd50` collapses that live leaf back to shared low-level refcounted base
+//   `0x004b211c` before final free
 // - `+0x04` = interlocked refcount
 // - `+0x08` = byte count
 // - `+0x0c` = first payload byte
