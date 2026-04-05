@@ -51,7 +51,11 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
   - always `list`/`get` the exact current struct name first (OOAnalyzer names may include the vtable/address suffix, e.g. `CLTLoginMediator_0x4b01c8`).
   - when renaming one member, preserve every member/offset you care about in the replacement payload.
 - retype parameters / locals / globals in Ghidra when evidence supports it
-- when renaming many decompiler locals in one function, prefer small batches and re-run `list_variables` between batches; Ghidra can renumber synthetic locals after a rename
+  - current MCP surface exposes `ghidra_functions update_prototype` for parameters / return types, but does **not** currently expose local-variable type edits; if a task needs local retyping, note the limitation and follow up upstream / use the UI manually.
+- when renaming many decompiler locals in one function, prefer small batches and re-run `list_variables` / `decompile` between batches; Ghidra can renumber synthetic locals after a rename
+- when renaming numbered stack locals like `local_1cc`, work from the highest stack offset / highest numbered local downward; this minimizes fill-gap renumbering churn
+- `ghidra_batch_operations` works well for descending stack-local rename batches, but mixed batches of decompiler temps (`uVar*`, `bVar*`, `extraout_*`) can still fail even when the same renames succeed one-by-one
+- renaming decompiler temps through MCP can leave the old synthetic name visible in `list_variables` while the decompiler switches to the new user-defined alias; treat `decompile` as the source of truth for whether the new name actually stuck
 - mirror confirmed names/types/anchors back into source comments and canonical docs in the same task
 - use callers/callees/xrefs so isolated helper bodies are not over-interpreted
 - when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
@@ -82,21 +86,24 @@ mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"refer
 
 // Locals / functions
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"Launcher_ParseCommandLine"}' })
-mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"CMessageConnection_OnOperationCompleted","cursor":"v1:..."}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"Launcher_ParseCommandLine","current_name":"pcVar6","new_name":"stringCursor"}' })
+// numbered stack locals: list, then rename from highest offset / highest local number downward
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"CMessageConnection_OnOperationCompleted","cursor":"v1:..."}' })
+mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"functions","arguments":{"action":"rename_variable","name":"CMessageConnection_OnOperationCompleted","current_name":"local_1cc","new_name":"headerlessDispatchLogEndpointKeyCopyD"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"CMessageConnection_OnOperationCompleted","current_name":"local_1c8","new_name":"headerlessDispatchLogIpv4ByteD"}}]}' })
+// decompiler temps: rename one-at-a-time, then re-decompile because names can renumber (`uVar*`, `bVar*`, `extraout_*`)
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"CMessageConnection_OnOperationCompleted","current_name":"uVar1","new_name":"currentFragmentCopyByteCount"}' })
+mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"decompile","name":"CMessageConnection_OnOperationCompleted"}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"update_prototype","name":"CMessageConnection_OnOperationCompleted","return_type":"uint","parameters":[{"name":"operationWorkItem","data_type":"void *"}]}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"update_prototype","name":"CMessageConnectionMessage_CreateRef","return_type":"cls_0x4489d0 *","parameters":[{"name":"outMessageRef","data_type":"cls_0x4489d0 *"},{"name":"messageContext","data_type":"int"}]}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"create","address":"0x4472f0","function_name":"AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker"}' })
 
 // Globals / symbols
 mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"get","address":"0x004d2c69"}' })
-mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"get","address":"0x00448c30"}' })
 mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}' })
 mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"OOAnalyzer::cls_0x4b7928::~cls_0x4b7928","new_name":"CMessageConnection_dtor"}' })
 
 // Data types / field renames
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"list","name_pattern":".*LauncherLoginDialog.*","category_path":"/OOAnalyzer"}' })
-mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"list","name_pattern":".*CLTLoginMediator.*","category_path":"/OOAnalyzer"}' })
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"get","data_type_kind":"struct","name":"LauncherLoginDialog_0x4aae28","category_path":"/OOAnalyzer"}' })
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"get","data_type_kind":"struct","name":"CLTLoginMediator_0x4b01c8","category_path":"/OOAnalyzer"}' })
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"update","data_type_kind":"struct","name":"LauncherLoginDialog_0x4aae28","category_path":"/OOAnalyzer","members":[{"name":"vftptr_0x0","data_type_path":"/OOAnalyzer/LauncherLoginDialog_0x4aae28::vftable_4aae28 *","offset":0},{"name":"currentPageState","data_type_path":"int","offset":116},{"name":"selectionList","data_type_path":"/OOAnalyzer/cls_0x4acd98","offset":2572},{"name":"hostedBrowserControl","data_type_path":"/Demangler/Browser/IControl *","offset":2792}]}' })
