@@ -205,14 +205,16 @@ public:
         // Discovered function names from Ghidra renaming:
         // - launcher.exe:0x438d80 = shared `CLTLoginState_*` slot-1 gate
         //   - older Ghidra label: `LaunchPadClient_ProcessEvent0x17`
-        // - launcher.exe:0x4816f0 = reused inline helper that returns a vtable offset
+        // - launcher.exe:0x4816f0 = reused inline helper that returns the queued work-item type
+        //   - current Ghidra name: `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType`
         //   - older Ghidra label: `LaunchPadClient_GetVtableOffset`
         // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
         // - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
         // - launcher.exe:0x41d090 = CLTLoginMediator_PostError (error reporting via fprintf)
         //
         // Disassembly of 0x438d80 shows:
-        //   - Calls reused inline helper `0x4816f0(this+8)` to get a vtable offset
+        //   - Calls reused inline helper
+        //     `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType(this+8)`
         //   - Checks if event flag at [this+0x2c] is set
         //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
         //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]

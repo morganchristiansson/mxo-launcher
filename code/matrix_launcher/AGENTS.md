@@ -63,6 +63,9 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 
 Use the current `ghidra_functions` / `ghidra_inspect` / `ghidra_symbols` tool family below, not the older legacy command names. Default to `file_name: "launcher.exe"` and swap to `client.dll` when needed. Prefer `ghidra_batch_operations` for grouped edits, then `ghidra_project save`.
 - if `ghidra_batch_operations` fails with an active transaction / lock issue, retry the same edits as sequential tool calls.
+- `ghidra_functions update_prototype` parameter entries use `data_type`, **not** `type`.
+- for `ghidra_functions update_prototype`, pointer types are easiest to spell with the Ghidra display name (e.g. `cls_0x4ba23c *`), not the full `/OOAnalyzer/...` path.
+- if `ghidra_symbols update` hits duplicate OOAnalyzer names, first `get` by address and then rename using the fully-qualified `Namespace::symbol` form.
 
 ```js
 // Programs
@@ -79,12 +82,17 @@ mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"refer
 
 // Locals / functions
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"Launcher_ParseCommandLine"}' })
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"CMessageConnection_OnOperationCompleted","cursor":"v1:..."}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"Launcher_ParseCommandLine","current_name":"pcVar6","new_name":"stringCursor"}' })
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"update_prototype","name":"CMessageConnection_OnOperationCompleted","return_type":"uint","parameters":[{"name":"operationWorkItem","data_type":"void *"}]}' })
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"update_prototype","name":"CMessageConnectionMessage_CreateRef","return_type":"cls_0x4489d0 *","parameters":[{"name":"outMessageRef","data_type":"cls_0x4489d0 *"},{"name":"messageContext","data_type":"int"}]}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"create","address":"0x4472f0","function_name":"AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker"}' })
 
 // Globals / symbols
 mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"get","address":"0x004d2c69"}' })
+mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"get","address":"0x00448c30"}' })
 mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}' })
+mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"OOAnalyzer::cls_0x4b7928::~cls_0x4b7928","new_name":"CMessageConnection_dtor"}' })
 
 // Data types / field renames
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"list","name_pattern":".*LauncherLoginDialog.*","category_path":"/OOAnalyzer"}' })

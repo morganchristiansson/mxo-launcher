@@ -795,8 +795,9 @@ struct CMarginConnectionLocalCompletionWorkItemScaffold {
     // anchor: launcher.exe:0x434ce0 -> 0x464870 / 0x4444e0
     // Minimal local stack work-item shape recovered for the `0x441850` continuation:
     // - `+0x00` = vtable pointer (type-specific local completion object)
-    // - `+0x04` = work-item type / LaunchPadClient_GetVtableOffset() result
-    // - `+0x08` = status / payload dword read back through `0x434d00`
+    // - `+0x04` = work-item type / CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType() result
+    // - `+0x08` = status / payload dword read back through
+    //   `CLTThreadPerClientTCPEngine_WorkItemHeader_GetStatusOrPayloadDword` (`0x434d00`)
     CLTThreadPerClientTCPEngine_WorkItemHeader header{};
     uint32_t workPayload = 0u;
 };

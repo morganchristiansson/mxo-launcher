@@ -182,7 +182,7 @@ Important nuance:
   - non-type-`2` auth completion work falls through the same slot-1 body into shared auth close gate `0x438d80`
 
 ### `launcher.exe:0x4390b0` exact current read
-- if `LaunchPadClient_GetVtableOffset(workItem) != 2`
+- if `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType(workItem) != 2`
   - tail-calls shared slot-1 gate `0x438d80`
 - otherwise
   - `owner +0x80 = workItem +0x08`
