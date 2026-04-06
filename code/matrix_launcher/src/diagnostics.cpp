@@ -52,6 +52,7 @@ static const void* g_LastClientShellObserved = nullptr;
 static uint32_t g_LastClientShellState20 = 0xffffffffu;
 static const void* g_LastClientShellRuntimeObjectD0 = nullptr;
 static const void* g_LastClientShellRuntimeVftableD0 = nullptr;
+static bool g_DumpedClientPiTableAtRuntime = false;
 static DiagnosticD3DCompileFunc g_OriginalD3DCompile = nullptr;
 static std::set<std::string> g_DumpedShaderSourcePaths;
 
@@ -136,6 +137,41 @@ static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) 
     return clientBase + (absoluteAddress - 0x62000000u);
 }
 
+static void DiagnosticLogClientPiTable() {
+    // client.dll:0x621c9d70 writes live `pi.cfg` records into DAT_629ea4e8 entry fields
+    // `+0x1d8/+0x1dc` as 9-byte records: byte id + two dwords.
+    const uint8_t* piTableBase = static_cast<const uint8_t*>(DiagnosticClientAbsoluteToPointer(0x629ea4e8u));
+    if (!piTableBase) {
+        return;
+    }
+    std::vector<unsigned> ids;
+    for (unsigned index = 0; index < 0x6bu; ++index) {
+        const uint8_t* entry = piTableBase + 0x1d8u + index * 0x0cu;
+        if (!DiagnosticReadableMemoryRange(entry, 8)) {
+            return;
+        }
+        const uint32_t value0 = *reinterpret_cast<const uint32_t*>(entry + 0x0);
+        const uint32_t value1 = *reinterpret_cast<const uint32_t*>(entry + 0x4);
+        if (value0 == 0u && value1 == 0u) {
+            continue;
+        }
+        ids.push_back(index);
+        spdlog::info(
+            "ClientPiTable entry id={} value0=0x{:08x} value1=0x{:08x}",
+            index,
+            value0,
+            value1);
+    }
+    std::string idsText;
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i != 0) {
+            idsText += ",";
+        }
+        idsText += std::to_string(ids[i]);
+    }
+    spdlog::info("ClientPiTable nonZeroEntryCount={} ids={}", ids.size(), idsText);
+}
+
 static const char* DiagnosticDescribeClientRuntimeVftable(const void* vftable) {
     if (!vftable) {
         return "<null>";
@@ -210,6 +246,11 @@ static void DiagnosticLogClientShellRuntimeTransitionState() {
                     field2e4);
             }
         }
+    }
+
+    if (!g_DumpedClientPiTableAtRuntime && (state20 == 2u || state20 == 3u)) {
+        DiagnosticLogClientPiTable();
+        g_DumpedClientPiTableAtRuntime = true;
     }
 
     g_LastClientShellObserved = clientShell;
