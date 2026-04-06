@@ -3175,13 +3175,47 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
         const bool shouldAutoReleaseContext =
             context && isType1 && QueueContext_ShouldAutoReleaseAfterType1(context);
 
+        CLTTCPConnection* queuedConnection = nullptr;
+        if (context) {
+            CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context);
+            if (completionTarget == nullptr) {
+                completionTarget = static_cast<CBaseConnection*>(context);
+            }
+            queuedConnection = dynamic_cast<CLTTCPConnection*>(completionTarget);
+        }
+        const bool sameWorkerThreadCloseSelfDispatch =
+            isType1 && queuedConnection != nullptr && queuedConnection->WorkerThreadScaffold() != nullptr &&
+            queuedConnection->WorkerThreadScaffold()->IsCurrentThread();
+
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={}",
+            "CLTThreadPerClientTCPEngine::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} sameWorkerThreadCloseSelfDispatch={}",
             (selectedQueue == ActiveQueue34Scaffold()) ? "queue34" : "queue0C",
             fmt::ptr(workItem),
             workType,
             fmt::ptr(context),
-            shouldAutoReleaseContext ? 1u : 0u);
+            shouldAutoReleaseContext ? 1u : 0u,
+            sameWorkerThreadCloseSelfDispatch ? 1u : 0u);
+
+        if (sameWorkerThreadCloseSelfDispatch) {
+            // Bounded single-process bridge correction:
+            // - on the replacement path we may dequeue the close work on the same socket worker
+            //   thread that produced it
+            // - if we run slot-12 cleanup first there, `Stop(true)` hits `ExitThread(0)` on the
+            //   current thread and we never reach the later margin callback / event-0x0f tail
+            // - keep the normal original order everywhere else, but on this one self-dispatch seam
+            //   let the callback run before worker teardown
+            if (context) {
+                QueueContext_OnOperationCompleted(context, workItem);
+            }
+            if (shouldAutoReleaseContext) {
+                QueueContext_Release(context);
+            }
+            QueueWorkItem_Release(workItem);
+            if (context) {
+                CleanupConnection(context);
+            }
+            return;
+        }
 
         if (context && isType1) {
             CleanupConnection(context);
