@@ -2606,44 +2606,36 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
     }
 
     MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
-    if (marginBootstrapState.phase == MarginBootstrapPhase::kReady &&
-        !marginBootstrapState.marginTwofishKeyBytes.empty()) {
-        const uint8_t* payloadBytes = messageStorage->PayloadBaseScaffold();
-        const uint32_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-        mxo::auth::FramedPacket encryptedPacket;
-        if (!payloadBytes || payloadByteCount == 0u ||
-            !mxo::auth::EncryptMarginPayloadPacket(
-                payloadBytes,
-                payloadByteCount,
-                marginBootstrapState.marginTwofishKeyBytes,
-                mxo::auth::kFrameModeAuto,
-                &encryptedPacket)) {
-            spdlog::warn(
-                "CLTLoginMediator::SendCurrentMarginPacketScaffold failed to encrypt post-bootstrap margin payload rawOpcode=0x{:02x} payloadBytes={} state={} sessionId=0x{:08x}",
-                payloadBytes ? static_cast<unsigned>(payloadBytes[0]) : 0u,
-                static_cast<unsigned>(payloadByteCount),
-                static_cast<unsigned>(connection->State()),
-                static_cast<unsigned>(marginBootstrapState.marginSessionId));
-            return 0u;
-        }
-
-        spdlog::info(
-            "CLTLoginMediator::SendCurrentMarginPacketScaffold encrypted post-bootstrap margin payload rawOpcode=0x{:02x} payloadBytes={} outerHeaderBytes={} outerPayloadBytes={} sessionId=0x{:08x} host='{}' state={}",
-            static_cast<unsigned>(payloadBytes[0]),
-            static_cast<unsigned>(payloadByteCount),
-            static_cast<unsigned>(encryptedPacket.headerBytes.size()),
-            static_cast<unsigned>(encryptedPacket.payloadBytes.size()),
-            static_cast<unsigned>(marginBootstrapState.marginSessionId),
-            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-            static_cast<unsigned>(connection->State()));
-        return connection->SendBuffer(
-            encryptedPacket.bytes.data(),
-            static_cast<uint32_t>(encryptedPacket.bytes.size()),
-            nullptr);
-    }
-
     const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
     const uint8_t* const payloadBase = messageStorage->PayloadBaseScaffold();
+    const mxo::liblttcp::CMessageConnectionPacketAgenda* const agenda = connection->PacketAgenda();
+    if (marginBootstrapState.phase == MarginBootstrapPhase::kReady) {
+        // Fidelity correction from live original-launcher WineDbg on the natural state8 send:
+        // - post-bootstrap state8 does not bypass the message-ref path with a raw encrypted-byte
+        //   send
+        // - the natural call chain is:
+        //   `0x43bf5f -> 0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x44d390 -> 0x448a00`
+        // - concrete observed transformed-storage facts at `0x448a00` on that send:
+        //   - output payload length bytes at inner `+0x0a/+0x0b` = `0x80/0xe0`
+        //   - transformed payload bytes = `0xe0`
+        //   - submitted framed bytes = `0xe2`
+        // Practical consequence:
+        // - keep ready-phase packets on the inherited connection send/agenda path so the installed
+        //   `CStreamPacketEncryptionModule` write helper owns the post-bootstrap transform.
+        spdlog::info(
+            "CLTLoginMediator::SendCurrentMarginPacketScaffold ready-phase envelope send rawOpcode=0x{:02x} payloadBytes={} sessionId=0x{:08x} packetizedEnabled={} agendaCreated={} agendaModuleCount={} agendaHasWriteHead={} host='{}' state={}",
+            payloadBase ? static_cast<unsigned>(payloadBase[0]) : 0u,
+            static_cast<unsigned>(payloadByteCount),
+            static_cast<unsigned>(marginBootstrapState.marginSessionId),
+            connection->PacketizedMessagesEnabled() ? 1u : 0u,
+            (agenda && agenda->created) ? 1u : 0u,
+            agenda ? static_cast<unsigned>(agenda->configuredModuleCount4c) : 0u,
+            (agenda && agenda->writeHelperChainHead44 != nullptr) ? 1u : 0u,
+            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
+            static_cast<unsigned>(connection->State()));
+        return connection->ForwardPacketBuilderEnvelopeToSendPacket(envelope);
+    }
+
     const size_t submitOffset = ((messageStorage->payloadLengthHigh0a >> 7) == 0u) ? 1u : 0u;
     const uint32_t submittedByteCount =
         static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
@@ -3344,6 +3336,11 @@ uint32_t CLTLoginMediator::SendMarginFramedPacket(
         return 0u;
     }
 
+    // Keep the current narrower builder contract explicit:
+    // - these bootstrap helpers currently materialize already-encrypted/framed bytes
+    // - so they still submit through the raw byte-send seam here
+    // - moving them onto `0x41af70` cleanly requires splitting out the original raw logical
+    //   payload builders first, otherwise the agenda/write path would encrypt them a second time
     const uint32_t sendResult = connection->SendBuffer(
         packet.bytes.data(),
         static_cast<uint32_t>(packet.bytes.size()),
@@ -3567,15 +3564,16 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 payloadSize,
                 static_cast<unsigned>(marginBootstrapState.phase));
 
-            // Active-path compatibility tightening:
-            // - some runs still show a retransmitted `MS_ConnectChallenge` while state6 is waiting
-            //   for the first real opcode-`9` continuation
-            // - older source blindly re-sent here and could later produce an extra off-route
-            //   `MS_ConnectReply` with a different session id
-            // - keep both facts explicit by allowing one compatibility resend only while the live
-            //   continuation is still sitting on the state6 route with no `+0xf14/+0xf18` write yet
-            // - once bootstrap is already fully ready, or once the state6 success-side writeback has
-            //   happened, consume later duplicate opcode-7 packets without another response.
+            // Current tighter fidelity read from launcher.exe:0x440780:
+            // - state6 slot 6 handles opcode `7` directly
+            // - the recovered body does not show a bootstrap-phase single-shot guard, seed/body
+            //   compare, or other duplicate-challenge cache before it goes straight into the
+            //   parse/hash/send path (`0x4407a5 -> 0x43d800 -> 0x4566a0 -> 0x41af70`)
+            // - practical replay consequence on the active path: while state6 is still waiting for
+            //   the first real opcode-`9` continuation, a retransmitted `MS_ConnectChallenge`
+            //   still needs another response
+            // - once the state6 success-side writeback has happened, or once a later helper owns the
+            //   route, consume duplicates without another response.
             const uint32_t currentHelperPhaseCode =
                 currentState_ ? currentState_->DispatchPhaseCode() : 0u;
             const bool awaitingFirstState6ConnectReply =
@@ -3595,18 +3593,35 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 return 1u;
             }
 
-            std::array<uint8_t, 16> md5Bytes = {};
-            if (authKeyConfigMd5_.size() >= md5Bytes.size()) {
-                std::copy_n(authKeyConfigMd5_.begin(), md5Bytes.size(), md5Bytes.begin());
+            mxo::auth::MarginConnectChallenge challenge;
+            if (!mxo::auth::ParseMarginConnectChallengePayload(payloadBytes, payloadSize, &challenge)) {
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned margin failed to parse MS_ConnectChallenge transportEncrypted={} payloadLen={}",
+                    transportEncrypted ? 1u : 0u,
+                    payloadSize);
+                return 0u;
             }
+
+            spdlog::info(
+                "DIAGNOSTIC: launcher-owned margin parsed MS_ConnectChallenge chunkBytes={} seed16={} currentState={} helperPhase=0x{:02x}",
+                static_cast<unsigned>(challenge.chunkByteCount),
+                BuildHexPreview(
+                    challenge.seedBytes.data(),
+                    challenge.seedBytes.size(),
+                    challenge.seedBytes.size()),
+                currentState_ ? currentState_->DebugName() : "<null>",
+                static_cast<unsigned>(currentHelperPhaseCode));
 
             mxo::auth::FramedPacket response;
             if (!mxo::auth::BuildMarginConnectChallengeResponsePacket(
-                    md5Bytes,
+                    challenge,
                     marginBootstrapState.marginTwofishKeyBytes,
                     mxo::auth::kFrameModeAuto,
                     &response)) {
-                spdlog::info("DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectChallengeResponse");
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned margin failed to build MS_ConnectChallengeResponse chunkBytes={} seed00=0x{:02x}",
+                    static_cast<unsigned>(challenge.chunkByteCount),
+                    static_cast<unsigned>(challenge.seedBytes[0]));
                 return 0u;
             }
 
@@ -3632,15 +3647,25 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 static_cast<unsigned>(marginBootstrapState.phase),
                 currentHelperPhaseCodeBeforeReply);
 
+            mxo::auth::MarginConnectReply duplicateReadyReplyPreview;
+            const bool duplicateReadyReplyParsed =
+                mxo::auth::ParseMarginConnectReplyPayload(
+                    payloadBytes,
+                    payloadSize,
+                    &duplicateReadyReplyPreview);
             if (marginBootstrapState.phase == MarginBootstrapPhase::kReady &&
                 currentHelperPhaseCodeBeforeReply != 6u &&
                 (postAuthMarginLoadingState_.state10SendGateFlagF14 != 0u ||
                  State6UdpSessionSecretF18() != 0u)) {
                 spdlog::info(
-                    "DIAGNOSTIC: launcher-owned margin ignoring duplicate MS_ConnectReply outside the proven state6 slot6 route phase={} ownerF14={} ownerF18=0x{:08x} currentState={}",
+                    "DIAGNOSTIC: launcher-owned margin ignoring duplicate MS_ConnectReply outside the proven state6 slot6 route phase={} ownerF14={} ownerF18=0x{:08x} parsed={} duplicateSessionId=0x{:08x} duplicateStatus0=0x{:08x} duplicateStatus1=0x{:08x} currentState={}",
                     static_cast<unsigned>(marginBootstrapState.phase),
                     postAuthMarginLoadingState_.state10SendGateFlagF14,
                     State6UdpSessionSecretF18(),
+                    duplicateReadyReplyParsed ? 1u : 0u,
+                    duplicateReadyReplyParsed ? duplicateReadyReplyPreview.sessionId : 0u,
+                    duplicateReadyReplyParsed ? duplicateReadyReplyPreview.status0 : 0u,
+                    duplicateReadyReplyParsed ? duplicateReadyReplyPreview.status1 : 0u,
                     currentState_ ? currentState_->DebugName() : "<null>");
                 return 1u;
             }
@@ -4056,9 +4081,9 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
 
     const uint32_t currentHelperPhaseCode =
         currentState_ ? currentState_->DispatchPhaseCode() : 0u;
-    if (currentHelperPhaseCode == 5u && localWorkItemHandled != 0u) {
+    if (localWorkItemHandled != 0u) {
         spdlog::info(
-            "CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold preserved explicit state5 local type0x0b seam currentHelperPhase=0x{:02x} localType0x0bHandled={} -> skipping broader bootstrap fallback",
+            "CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold preserved explicit local type0x0b seam currentHelperPhaseAfterLocalDispatch=0x{:02x} localType0x0bHandled={} -> skipping broader bootstrap fallback so state5/state6 own the natural MS_ConnectRequest send",
             static_cast<unsigned>(currentHelperPhaseCode),
             static_cast<unsigned>(localWorkItemHandled));
         return localWorkItemHandled;
@@ -4068,8 +4093,8 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
     // - consume code 4 at the margin leaf
     // - synthesize the local type-0x0b work item (`0x441850` shape)
     // - let owner fallback `0x41afc0` re-enter current helper slot 2
-    // Any remaining bootstrap fallback here is only for the broader launcher-owned receive path,
-    // not because the local state5 slot2 continuation is still treated as speculative.
+    // Any remaining bootstrap fallback here is only for the broader launcher-owned receive path
+    // when that local continuation did not already handle the packet.
     const uint32_t bootstrapHandled =
         ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
     return (bootstrapHandled != 0u) ? bootstrapHandled : localWorkItemHandled;
@@ -4123,13 +4148,22 @@ uint32_t CLTLoginMediator::HandleMarginPacketBytes(
     const uint8_t* effectivePacketBytes = packetBytes;
     size_t effectivePacketSize = packetSize;
     bool transportEncrypted = false;
-    if (!marginBootstrapState.marginTwofishKeyBytes.empty() &&
+    const mxo::liblttcp::CMessageConnection* const marginConnection = MarginConnection();
+    const mxo::liblttcp::CMessageConnectionPacketAgenda* const agenda =
+        marginConnection ? marginConnection->PacketAgenda() : nullptr;
+    const bool hasInstalledAgendaReadHelper =
+        agenda != nullptr && agenda->created && agenda->readHelperChainHead40 != nullptr;
+    if (!hasInstalledAgendaReadHelper && !marginBootstrapState.marginTwofishKeyBytes.empty() &&
         mxo::auth::DecryptMarginPayloadPacket(
             packetBytes,
             packetSize,
             marginBootstrapState.marginTwofishKeyBytes,
             &decryptedPayloadBytes) &&
         !decryptedPayloadBytes.empty()) {
+        // Fidelity tightening from the current `0x4490c0 -> 0x469930 -> 0x44d500` reconstruction:
+        // once the margin connection has its packet-agenda read helper installed, post-bootstrap
+        // decrypt/materialization should already have happened inside `CMessageConnection`
+        // before the launcher-owned mediator sees the queued packet body.
         effectivePacketBytes = decryptedPayloadBytes.data();
         effectivePacketSize = decryptedPayloadBytes.size();
         transportEncrypted = true;

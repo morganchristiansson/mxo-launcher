@@ -866,7 +866,7 @@ uint32_t CMessageConnection::SubmitMessageRefBytes(
         static_cast<CLTTCPConnection*>(this),
         submittedBytes,
         submittedByteCount,
-        nullptr);
+        reinterpret_cast<void*>(1u));
 }
 
 // anchor: launcher.exe:0x448cf0
@@ -900,8 +900,9 @@ uint32_t CMessageConnection::SendPacketMessageRef(
         static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
     const CMessageConnectionPacketAgenda* agenda = PacketAgenda();
     spdlog::info(
-        "CMessageConnection::SendPacketMessageRef sendMode10={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaModuleCount={} agendaHasReadHead={} agendaHasWriteHead={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
+        "CMessageConnection::SendPacketMessageRef sendMode10={} field08SkipPrefix={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaModuleCount={} agendaHasReadHead={} agendaHasWriteHead={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(messageRefForSubmit->headerless10),
+        static_cast<unsigned>(messageRefForSubmit->field08),
         static_cast<unsigned>(rawOpcode),
         static_cast<unsigned>(messageStorage.reservedBytes08),
         static_cast<unsigned>(payloadByteCount),

@@ -117,12 +117,32 @@ Newest replacement milestone that closed the old state9 submit blocker:
   - server then produced an extra later `MS_ConnectReply` with a different session id outside the
     proven state6 slot-6 route
   - state9 submit returned `0x00000003`
-- current replacement now consumes duplicate late bootstrap opcode-`7` / redundant opcode-`9`
-  packets without re-driving the single-shot existing-character state6 continuation
+- duplicate-bootstrap handling on the replacement path is still a narrower open fidelity seam,
+  not a closed single-shot conclusion:
+  - one bad run family showed duplicate replacement handling of `MS_ConnectChallenge` / later extra
+    `MS_ConnectReply`, and state9 submit then returned `0x00000003`
+  - but a stricter follow-up that consumed duplicate opcode-`7` packets outright stalled earlier at
+    visible `Loading Character`
+  - current static RE now outweighs that temporary single-shot guess:
+    `launcher.exe:0x440780 = CLTLoginState_State6_Slot6_HandleMarginOpcode7Or9Reply` owns opcode
+    `7` directly and does not show a bootstrap-phase guard before sending opcode `8`
+  - practical current source stance: keep duplicate opcode-`7` resend-capable while state6 is still
+    the active receiver, and keep only later/off-route duplicate suppression
 - practical result on the active path now matches the original submit boundary again:
   - state9 submit returns `0`
   - event `0x17` is posted
   - later raw `0x11` success reaches state12 and event `0x18`
+- newest replacement validation after tightening the decoded-code-`0x04` seam now moves the
+  blocker later again:
+  - the earlier **Loading Character** stall was caused by a duplicate mediator-owned
+    `CERT_ConnectReply -> MS_ConnectRequest` fallback send after the local type-`0x0b`
+    state5/state6 continuation had already re-entered state6 slot 3
+  - once that duplicate send was removed, replacement again reached:
+    - state8 raw `0x10`
+    - state9 raw `0x11`
+    - state12 / event `0x18`
+    - visible **Waiting for Regionserver**
+  - current blocker is now a later post-`0x18` crash, not the old state8/state9 transport stall
 
 ## Current anchored pieces
 

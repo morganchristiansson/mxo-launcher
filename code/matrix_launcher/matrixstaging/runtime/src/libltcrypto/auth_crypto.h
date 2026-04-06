@@ -479,6 +479,19 @@ struct MarginCertChallenge {
     MarginCertChallenge() : valid(false) {}
 };
 
+struct MarginConnectChallenge {
+    bool valid;
+    std::vector<uint8_t> payloadBytes;
+    std::array<uint8_t, 16> seedBytes;
+    uint32_t chunkByteCount;
+
+    MarginConnectChallenge()
+        : valid(false),
+          payloadBytes(),
+          seedBytes{},
+          chunkByteCount(0) {}
+};
+
 struct MarginConnectReply {
     bool valid;
     std::vector<uint8_t> headerBytes;
@@ -552,16 +565,28 @@ bool BuildMarginConnectRequestPacket(
     FrameMode frameMode,
     FramedPacket* outPacket);
 
+// Plaintext raw 0x07 / MS_ConnectChallenge parse helper.
+bool ParseMarginMsConnectChallengePayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectChallenge* outChallenge);
+
+// Transitional compatibility alias for earlier call sites.
+bool ParseMarginConnectChallengePayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectChallenge* outChallenge);
+
 // Encrypted raw 0x08 / MS_ConnectChallengeResponse builder.
 bool BuildMarginMsConnectChallengeResponsePacket(
-    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const MarginConnectChallenge& challenge,
     const std::vector<uint8_t>& twofishKeyBytes,
     FrameMode frameMode,
     FramedPacket* outPacket);
 
 // Transitional compatibility alias for earlier call sites.
 bool BuildMarginConnectChallengeResponsePacket(
-    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const MarginConnectChallenge& challenge,
     const std::vector<uint8_t>& twofishKeyBytes,
     FrameMode frameMode,
     FramedPacket* outPacket);

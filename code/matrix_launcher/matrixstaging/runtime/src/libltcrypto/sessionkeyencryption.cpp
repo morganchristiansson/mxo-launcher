@@ -18,7 +18,105 @@
 
 #include "auth_internal.h"
 
+#include <cstdio>
+#include <windows.h>
+
 namespace mxo::auth {
+namespace {
+
+// anchor: launcher.exe:0x43d800 = GenerateClientChunkHashes
+static bool GenerateClientChunkHashesScaffold(
+    const MarginConnectChallenge& challenge,
+    std::vector<std::array<uint8_t, 16>>* outChunkDigests) {
+    using namespace internal;
+
+    if (!outChunkDigests || challenge.chunkByteCount == 0u) {
+        return false;
+    }
+
+    char executablePath[MAX_PATH] = {};
+    const DWORD executablePathLength = GetModuleFileNameA(nullptr, executablePath, MAX_PATH);
+    if (executablePathLength == 0u || executablePathLength >= MAX_PATH) {
+        return false;
+    }
+
+    const char* const filePaths[] = {"client.dll", executablePath};
+    std::vector<uint8_t> chunkBytes;
+    chunkBytes.resize(static_cast<size_t>(challenge.chunkByteCount));
+
+    outChunkDigests->clear();
+    for (const char* filePath : filePaths) {
+        FILE* const file = std::fopen(filePath, "rb");
+        if (file == nullptr) {
+            outChunkDigests->clear();
+            return false;
+        }
+
+        while (true) {
+            const size_t bytesRead = std::fread(chunkBytes.data(), 1u, chunkBytes.size(), file);
+            if (bytesRead != 0u) {
+                std::vector<uint8_t> digestBytes;
+                if (!Md5DigestBytes(
+                        std::vector<uint8_t>(chunkBytes.begin(), chunkBytes.begin() + bytesRead),
+                        &digestBytes) ||
+                    digestBytes.size() != 16u) {
+                    std::fclose(file);
+                    outChunkDigests->clear();
+                    return false;
+                }
+
+                std::array<uint8_t, 16> digestArray = {};
+                std::copy(digestBytes.begin(), digestBytes.end(), digestArray.begin());
+                outChunkDigests->push_back(digestArray);
+            }
+
+            if (bytesRead < chunkBytes.size()) {
+                const bool readFailed = std::ferror(file) != 0;
+                std::fclose(file);
+                if (readFailed) {
+                    outChunkDigests->clear();
+                    return false;
+                }
+                break;
+            }
+        }
+    }
+
+    return true;
+}
+
+// anchor: launcher.exe:0x4566a0 folds the server seed and every 16-byte chunk digest through the
+// same MD5 family used by 0x43d800.
+static bool BuildClientChunkHashResponseDigestScaffold(
+    const MarginConnectChallenge& challenge,
+    const std::vector<std::array<uint8_t, 16>>& chunkDigests,
+    std::array<uint8_t, 16>* outDigest) {
+    using namespace internal;
+
+    if (!outDigest) {
+        return false;
+    }
+
+    std::vector<uint8_t> foldedBytes;
+    foldedBytes.reserve(16u + chunkDigests.size() * 16u);
+    foldedBytes.insert(
+        foldedBytes.end(),
+        challenge.seedBytes.begin(),
+        challenge.seedBytes.end());
+    for (const auto& digest : chunkDigests) {
+        foldedBytes.insert(foldedBytes.end(), digest.begin(), digest.end());
+    }
+
+    std::vector<uint8_t> digestBytes;
+    if (!Md5DigestBytes(foldedBytes, &digestBytes) || digestBytes.size() != 16u) {
+        return false;
+    }
+
+    std::copy(digestBytes.begin(), digestBytes.end(), outDigest->begin());
+    return true;
+}
+
+}  // namespace
 
 bool BuildGetPublicKeyRequestPacket(
     uint32_t launcherVersion,
@@ -683,25 +781,69 @@ bool BuildMarginConnectRequestPacket(
         outPacket);
 }
 
+bool ParseMarginMsConnectChallengePayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectChallenge* outChallenge) {
+    using namespace internal;
+
+    if (!payloadBytes || !outChallenge || payloadSize < 21u || payloadBytes[0] != 0x07u) {
+        return false;
+    }
+
+    MarginConnectChallenge challenge;
+    challenge.valid = true;
+    challenge.payloadBytes.assign(payloadBytes, payloadBytes + payloadSize);
+    std::copy_n(payloadBytes + 1u, challenge.seedBytes.size(), challenge.seedBytes.begin());
+    challenge.chunkByteCount = ReadU32LE(payloadBytes + 17u);
+    if (challenge.chunkByteCount == 0u) {
+        return false;
+    }
+
+    *outChallenge = challenge;
+    return true;
+}
+
+bool ParseMarginConnectChallengePayload(
+    const uint8_t* payloadBytes,
+    size_t payloadSize,
+    MarginConnectChallenge* outChallenge) {
+    return ParseMarginMsConnectChallengePayload(payloadBytes, payloadSize, outChallenge);
+}
+
 bool BuildMarginMsConnectChallengeResponsePacket(
-    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const MarginConnectChallenge& challenge,
     const std::vector<uint8_t>& twofishKeyBytes,
     FrameMode frameMode,
     FramedPacket* outPacket) {
+    std::vector<std::array<uint8_t, 16>> chunkDigests;
+    if (!challenge.valid ||
+        !GenerateClientChunkHashesScaffold(challenge, &chunkDigests)) {
+        return false;
+    }
+
+    std::array<uint8_t, 16> responseDigest = {};
+    if (!BuildClientChunkHashResponseDigestScaffold(
+            challenge,
+            chunkDigests,
+            &responseDigest)) {
+        return false;
+    }
+
     std::vector<uint8_t> payload;
-    payload.reserve(1u + gameFilesMd5Bytes.size());
+    payload.reserve(1u + responseDigest.size());
     payload.push_back(0x08u);
-    payload.insert(payload.end(), gameFilesMd5Bytes.begin(), gameFilesMd5Bytes.end());
+    payload.insert(payload.end(), responseDigest.begin(), responseDigest.end());
     return EncryptMarginPayloadPacket(payload.data(), payload.size(), twofishKeyBytes, frameMode, outPacket);
 }
 
 bool BuildMarginConnectChallengeResponsePacket(
-    const std::array<uint8_t, 16>& gameFilesMd5Bytes,
+    const MarginConnectChallenge& challenge,
     const std::vector<uint8_t>& twofishKeyBytes,
     FrameMode frameMode,
     FramedPacket* outPacket) {
     return BuildMarginMsConnectChallengeResponsePacket(
-        gameFilesMd5Bytes,
+        challenge,
         twofishKeyBytes,
         frameMode,
         outPacket);

@@ -349,6 +349,13 @@ Static recheck of the same existing-character continuation now also matches that
   - reads cached upstream from `this+4`
   - calls its vtable `+0x18`
   - switches helper through `0x41b450`
+  - practical fidelity consequence for replacement receive seams:
+    - once decoded margin code `0x04` has already synthesized/handled the local type-`0x0b`
+      completion path, do **not** also run a second launcher-owned bootstrap-side
+      `CERT_ConnectReply -> MS_ConnectRequest` send
+    - that duplicate source-owned send creates an extra `MS_ConnectRequest`, which then cascades
+      into duplicated `0x07/0x09` traffic not supported by the recovered existing-character
+      continuation
 - `0x440ab9..0x440ae5` / state6 slot6 opcode-`9` success:
   - writes owner `+0xf18 = parsedReply(+0x09)`
   - writes owner `+0xf14 = 1`
@@ -368,6 +375,15 @@ Current replacement milestone on that exact blocker (`2026-03-30`, later same-da
   - `-> state6 slot3`
   - `-> state6 slot6 opcode-9 success`
   - `-> restored state8 slot3`
+- source now also keeps the raw code-`0x04` seam narrower on that branch:
+  - if the local type-`0x0b` completion path already handled the packet, the broader bootstrap
+    fallback is skipped
+  - practical consequence: the natural state5/state6 continuation remains the sole owner of the
+    first `MS_ConnectRequest` send instead of synthesizing a duplicate mediator-side resend
+  - latest validation confirms that this was the active `Loading Character` blocker:
+    removing the duplicate mediator-side resend restored the first state8 raw `0x10`
+    `MS_LoadCharacterReply` and moved the run forward to the later
+    **Waiting for Regionserver** crash
 - source state5 slot3 still materializes the runtime-backed owner `+0x680 +0xf4` copy/send path:
   - non-null `authReplyCopyShadowF4`
   - `replyCopyShadowStillValid=1`
@@ -385,15 +401,30 @@ Current replacement milestone on that exact blocker (`2026-03-30`, later same-da
   - restored continuation re-enters state8 slot 3
 - source no longer synthesizes owner `+0xf14/+0xf18` directly from `MS_ConnectReply` bootstrap
   completion when the state6 slot6 route is the active branch
-- newer late-login/state9 submit tightening also exposed one narrower replacement-only fidelity bug
-  on this same bootstrap corridor:
-  - replacement was re-driving duplicate `MS_ConnectChallenge` handling after phase `4`
-  - that produced an extra later `MS_ConnectReply` with a different session id outside the proven
-    state6 slot-6 route
-  - on that bad run family, state9 submit later returned `0x00000003` instead of the original
-    success-side `0`
-  - current source now treats late duplicate opcode-`7` / redundant opcode-`9` packets as consumed
-    without re-driving the single-shot state6 continuation
+- newer state6 opcode-`7` tightening also closed the bootstrap response builder much further:
+  - `launcher.exe:0x440780` parses raw `0x07` as:
+    - seed bytes at `+0x01..+0x10`
+    - chunk-byte count at `+0x11..+0x14`
+  - `0x43d800 = GenerateClientChunkHashes` then MD5-hashes each chunk of:
+    - `client.dll`
+    - the current module path from `GetModuleFileNameA(NULL, ...)`
+  - `0x4566a0` MD5-folds `seed16 || chunkDigest0 || ... || chunkDigestN`
+  - raw `0x08 / MS_ConnectChallengeResponse` carries that final 16-byte digest, not the older
+    source-side auth-key-MD5 shortcut
+- newer late-login/state9 submit tightening also exposed a narrower replacement-only fidelity
+  question on this same bootstrap corridor:
+  - replacement runs can see a retransmitted `MS_ConnectChallenge` while state6 is still waiting for
+    the first opcode-`9` continuation
+  - one bad run family also showed an extra later `MS_ConnectReply` with a different session id
+    outside the proven state6 slot-6 route, and state9 submit then returned `0x00000003`
+  - but a stricter follow-up experiment that consumed duplicate opcode-`7` packets outright stalled
+    earlier at visible `Loading Character`
+  - current static-RE now matters more than that temporary runtime guess:
+    `launcher.exe:0x440780 = CLTLoginState_State6_Slot6_HandleMarginOpcode7Or9Reply` owns opcode
+    `7` directly and does not show a bootstrap-phase single-shot guard before sending opcode `8`
+  - practical source consequence: late duplicate opcode-`7` handling on the active path should stay
+    resend-capable while state6 is still the live receiver; only later/off-route duplicates should be
+    consumed
 - active rerun/log milestone on this branch now shows:
   - state6 slot6 handling opcode-`9` success
   - owner `+0xf14` set
