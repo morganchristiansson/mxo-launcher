@@ -228,11 +228,16 @@ static void DiagnosticLogD3DErrorContext(HWND hwnd) {
     }
     if (clientShell != nullptr) {
         LogWordSpanIfReadable(
+            "WindowTrace D3D Error client shell state18..34",
+            static_cast<const uint8_t*>(clientShell) + 0x18,
+            8);
+        LogWordSpanIfReadable(
             "WindowTrace D3D Error client shell d0..ec",
             static_cast<const uint8_t*>(clientShell) + 0xd0,
             8);
         const void* const d0Field = static_cast<const uint8_t*>(clientShell) + 0xd0;
         const void* currentRuntimeObject = nullptr;
+        const void* currentRuntimeVftable = nullptr;
         if (DiagnosticReadableMemoryRange(d0Field, sizeof(void*))) {
             currentRuntimeObject = *static_cast<const void* const*>(d0Field);
         }
@@ -241,8 +246,37 @@ static void DiagnosticLogD3DErrorContext(HWND hwnd) {
                 "WindowTrace D3D Error client shell +0xd0 object",
                 currentRuntimeObject,
                 8);
+            if (DiagnosticReadableMemoryRange(currentRuntimeObject, sizeof(void*))) {
+                currentRuntimeVftable = *static_cast<const void* const*>(currentRuntimeObject);
+            }
+            LogWordSpanIfReadable(
+                "WindowTrace D3D Error client shell +0xd0 vftable",
+                currentRuntimeVftable,
+                8);
+            if (currentRuntimeVftable == DiagnosticClientAbsoluteToPointer(0x628b1638u)) {
+                const uint8_t* objectBytes = static_cast<const uint8_t*>(currentRuntimeObject);
+                if (DiagnosticReadableMemoryRange(objectBytes + 0x2e4, sizeof(uint32_t))) {
+                    const uint32_t field0c = *reinterpret_cast<const uint32_t*>(objectBytes + 0x0c);
+                    const uint8_t flags154 = *(objectBytes + 0x154);
+                    const uint8_t flag2d8 = *(objectBytes + 0x2d8);
+                    const uint8_t flag2d9 = *(objectBytes + 0x2d9);
+                    const uint8_t flag2da = *(objectBytes + 0x2da);
+                    const uint32_t field2e4 = *reinterpret_cast<const uint32_t*>(objectBytes + 0x2e4);
+                    spdlog::info(
+                        "WindowTrace D3D Error CLTRemoteCommCtx fields field0c=0x{:08x} flags154=0x{:02x} flag2d8={} flag2d9={} flag2da=0x{:02x} field2e4=0x{:08x}",
+                        field0c,
+                        static_cast<unsigned>(flags154),
+                        static_cast<unsigned>(flag2d8),
+                        static_cast<unsigned>(flag2d9),
+                        static_cast<unsigned>(flag2da),
+                        field2e4);
+                }
+            }
         }
     }
+
+    const void* const state9CallbackBlob = DiagnosticClientAbsoluteToPointer(0x629e0284u);
+    LogWordSpanIfReadable("WindowTrace D3D Error state9 callback blob", state9CallbackBlob, 8);
 }
 
 // UNANCHORED: diagnostic-only display-mode snapshot helper.

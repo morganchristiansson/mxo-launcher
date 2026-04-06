@@ -1584,10 +1584,15 @@ void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
         if (const uint8_t* seedPointer = marginConnection->MessageCode5SeedBytes85Pointer()) {
+            const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(seedPointer);
             spdlog::info(
-                "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=connection+0x85 mirror connection={}]",
+                "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=connection+0x85 mirror connection={} seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}]]",
                 fmt::ptr(seedPointer),
-                fmt::ptr(marginConnection));
+                fmt::ptr(marginConnection),
+                static_cast<unsigned>(seedWords[0]),
+                static_cast<unsigned>(seedWords[1]),
+                static_cast<unsigned>(seedWords[2]),
+                static_cast<unsigned>(seedWords[3]));
             return seedPointer;
         }
     }
@@ -1595,10 +1600,15 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     const auto it = g_marginBootstrapStateByMediator.find(this);
     if (it != g_marginBootstrapStateByMediator.end() && it->second.marginTwofishKeyBytes.size() == 16u) {
         const void* seedPointer = it->second.marginTwofishKeyBytes.data();
+        const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(seedPointer);
         spdlog::info(
-            "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=bootstrap-sidecar-fallback marginConnection={} original+0xd4=owner+0x1c+0x85]",
+            "CLTLoginMediator::GetState9CallbackSeedPointer85D4(+0xd4) -> {} [source=bootstrap-sidecar-fallback marginConnection={} original+0xd4=owner+0x1c+0x85 seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}]]",
             fmt::ptr(seedPointer),
-            fmt::ptr(marginConnection_));
+            fmt::ptr(marginConnection_),
+            static_cast<unsigned>(seedWords[0]),
+            static_cast<unsigned>(seedWords[1]),
+            static_cast<unsigned>(seedWords[2]),
+            static_cast<unsigned>(seedWords[3]));
         return seedPointer;
     }
 

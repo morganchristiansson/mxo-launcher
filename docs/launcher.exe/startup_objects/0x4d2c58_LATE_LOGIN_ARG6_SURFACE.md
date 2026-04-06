@@ -89,6 +89,16 @@ Current best recovered shape:
   - transformed in place through the shared `ValueNames` / `FeedbackSize` helper family
   - current live-matched replacement read: one-block Twofish transform of `[ownerF18, 0, 0, 0]`
     with the current margin-bootstrap 16-byte key and zero IV
+  - refreshed live-original cross-check on a healthy original route now reconfirms that exactly:
+    - resolved mediator pointer = `0x004d4e38`
+    - owner `+0xf18` sample at `0x004d5d50` = `0x21a59dc5`
+    - live `+0xd4` seed bytes at connection `+0x85 .. +0x94` =
+      `[0x25842225 0xb0936734 0x90a16482 0x90354ffb]`
+    - client scratch blob at `0x629e0284` held tail dwords:
+      `[0x50c7e320 0x720352e4 0x25dc6237 0xcb1d4056]`
+    - a direct repro with the current replacement helper on those exact original inputs produced the
+      same tail, so the active remaining crash is no longer best explained by a wrong `+0x18c`
+      transform algorithm
 
 Client-side consequence:
 - callback84-side `ClientNetShell +0x38` is not self-contained

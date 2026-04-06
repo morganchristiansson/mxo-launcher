@@ -211,6 +211,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords
         return 1u;
     }
     std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
+    const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(marginTwofishKey.data());
 
     std::vector<uint8_t> ciphertext;
     if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
@@ -228,12 +229,16 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords
 
     std::memcpy(outDwords + 4, ciphertext.data(), 16u);
     spdlog::info(
-        "CLTLoginMediator::FillState9CallbackBlob18cScaffold built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource=mediator+0xd4 tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
+        "CLTLoginMediator::FillState9CallbackBlob18cScaffold built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource=mediator+0xd4 seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
         static_cast<unsigned>(outDwords[0]),
         static_cast<unsigned>(outDwords[1]),
         static_cast<unsigned>(outDwords[2]),
         static_cast<unsigned>(outDwords[3]),
         static_cast<unsigned>(ownerF18),
+        static_cast<unsigned>(seedWords[0]),
+        static_cast<unsigned>(seedWords[1]),
+        static_cast<unsigned>(seedWords[2]),
+        static_cast<unsigned>(seedWords[3]),
         static_cast<unsigned>(outDwords[4]),
         static_cast<unsigned>(outDwords[5]),
         static_cast<unsigned>(outDwords[6]),

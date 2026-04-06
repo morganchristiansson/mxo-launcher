@@ -54,6 +54,12 @@ Current best read:
     graphics fault
 - on the popup run, client-shell field `+0xd0` is already a non-null object with vftable
   `0x628b1638`, now identified as `CLTRemoteCommCtx`-like rather than an arbitrary unknown object
+- live original comparison now proves that a healthy original route also installs the same
+  `0x628b1638` RCC-like object into client-shell `+0xd0`, and later cleanly calls its `+0x68`
+  predicate from `ClientShell_RunFrame`
+- practical consequence: the active replacement bug is no longer "why does RCC exist?" but
+  "what late replacement-specific state/timing difference makes the otherwise-normal RCC/runtime
+  path poison rendering or sometimes crash the later `+0x68` call?"
 
 ## Crash family B: alternate null-vcall in `ClientShell_RunFrame`
 
