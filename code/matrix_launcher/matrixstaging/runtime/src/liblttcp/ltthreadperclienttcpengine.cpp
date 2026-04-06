@@ -2905,6 +2905,14 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         workType,
         LauncherBridgeWorkTypeName(workType),
         workPayload);
+
+    // Source-owned active-path tightening for the current launcher/client single-process bridge:
+    // some late startup consumers expect type-2 status work to become visible with less latency
+    // than the current queue-thread/poll cadence always guarantees. Drain the shared completed-work
+    // queue once here, non-blocking, after the enqueue succeeds.
+    if (workType == kWorkTypeConnectionStatus) {
+        RunCompletedOperationQueue(/*nonBlocking=*/true);
+    }
     return true;
 }
 
@@ -2935,12 +2943,15 @@ void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffol
     //   emit on this path; null work items belong to later lifecycle/shutdown producers instead
     // - original caller does not test a success result or reclaim `workItem`; ownership is already
     //   transferred to the queue/consumer boundary when this helper is entered
-    (void)EnqueueCompletedOperationScaffold(
+    const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
         static_cast<void*>(connection),
         /*useQueue34=*/false,
         label,
         /*queueLockAlreadyHeld=*/false);
+    if (queued) {
+        RunCompletedOperationQueue(/*nonBlocking=*/true);
+    }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

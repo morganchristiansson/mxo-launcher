@@ -48,13 +48,18 @@ struct __attribute__((packed)) Arg6SelectionDescriptor40PackedSketch {
 };
 
 struct Arg6SelectionDescriptor40ObjectSketch {
-    uint8_t reserved[0x10];
-    Arg6SelectionDescriptor40PackedSketch* packed;
+    void** vtable00;                           // +0x00 wrapper-owned tiny virtual surface
+    void* bufferBase04;                        // +0x04 conservative object-local helper slot
+    void* backingObject08;                     // +0x08 conservative object-local helper slot
+    uint8_t flag0c;                            // +0x0c conservative presence/helper byte
+    uint8_t padding0d[3];
+    Arg6SelectionDescriptor40PackedSketch* packed; // +0x10
 };
 
 static_assert(offsetof(Arg6SelectionDescriptor40PackedSketch, field03) == 0x03);
 static_assert(offsetof(Arg6SelectionDescriptor40PackedSketch, field07) == 0x07);
 static_assert(offsetof(Arg6SelectionDescriptor40ObjectSketch, packed) == 0x10);
+static_assert(sizeof(Arg6SelectionDescriptor40ObjectSketch) == 0x14);
 
 struct __attribute__((packed)) Arg6CurrentSlotRecord44PayloadSketch {
     uint8_t reserved0;

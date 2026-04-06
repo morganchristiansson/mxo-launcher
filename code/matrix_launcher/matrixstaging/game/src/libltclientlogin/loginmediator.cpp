@@ -130,6 +130,50 @@ static uint32_t ReadU32LE(const uint8_t* p) {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall Arg6SelectionDescriptor40_Destroy(Arg6SelectionDescriptor40ObjectSketch* self) {
+    (void)self;
+    return 1u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall Arg6SelectionDescriptor40_TinyGetter(Arg6SelectionDescriptor40ObjectSketch* self) {
+    return (self && self->packed) ? 1u : 0u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall Arg6SelectionDescriptor40_ReleaseLike(Arg6SelectionDescriptor40ObjectSketch* self) {
+    (void)self;
+    return 1u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall Arg6SelectionDescriptor40_ResetForCaller(Arg6SelectionDescriptor40ObjectSketch* self) {
+    if (!self) {
+        return 0u;
+    }
+    self->backingObject08 = nullptr;
+    self->flag0c = (self->packed != nullptr) ? 1u : 0u;
+    return 1u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static uint32_t __thiscall Arg6SelectionDescriptor40_TinyHelper(Arg6SelectionDescriptor40ObjectSketch* self) {
+    return (self && self->bufferBase04) ? 1u : 0u;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+static void** Arg6SelectionDescriptor40Vtable() {
+    static void* vtable[5] = {
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_Destroy),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_TinyGetter),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ReleaseLike),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ResetForCaller),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_TinyHelper),
+    };
+    return vtable;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
@@ -551,9 +595,28 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
     const uint32_t expectedScratchRequest = Arg6ExpectedSelectionDescriptorScratchRequest();
     const bool matchedConfiguredRequest = Arg6SelectionDescriptorMatchesRequest(selectionIndex);
-    const char* worldName = matchedConfiguredRequest ? Arg6MappedSelectionName() : nullptr;
 
-    if (!worldName) {
+    const SlotRecordState004b5328* const currentSlotRecord =
+        matchedConfiguredRequest ? ResolveArg6CurrentSlotRecord44Source() : nullptr;
+    const char* descriptorName = nullptr;
+    uint32_t descriptorSelectionId = Arg6MappedSelectionId();
+    const char* descriptorSource = "mapped-selection";
+
+    if (currentSlotRecord && !currentSlotRecord->heapString14.empty()) {
+        descriptorName = currentSlotRecord->heapString14.c_str();
+        descriptorSelectionId = currentSlotRecord->globalCharacterIdLow03;
+        descriptorSource = "current-slot";
+    } else if (matchedConfiguredRequest) {
+        descriptorName = Arg6MappedVariantName();
+        descriptorSelectionId = Arg6MappedSelectionId();
+        descriptorSource = "mapped-variant";
+        if (!descriptorName || !descriptorName[0]) {
+            descriptorName = Arg6MappedSelectionName();
+            descriptorSource = "mapped-selection";
+        }
+    }
+
+    if (!descriptorName) {
         spdlog::debug(
             "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
             static_cast<unsigned>(selectionIndex),
@@ -569,21 +632,27 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
     arg6SelectionDescriptor40Packed_ = {};
     arg6SelectionDescriptor40_ = {};
     arg6SelectionDescriptor40Packed_.field03 =
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worldName));
-    arg6SelectionDescriptor40Packed_.field07 = Arg6MappedSelectionId();
+        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(descriptorName));
+    arg6SelectionDescriptor40Packed_.field07 = descriptorSelectionId;
+    arg6SelectionDescriptor40_.vtable00 = Arg6SelectionDescriptor40Vtable();
+    arg6SelectionDescriptor40_.bufferBase04 = &arg6SelectionDescriptor40Packed_;
+    arg6SelectionDescriptor40_.backingObject08 = nullptr;
+    arg6SelectionDescriptor40_.flag0c = 1u;
     arg6SelectionDescriptor40_.packed = &arg6SelectionDescriptor40Packed_;
 
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         ((low24 == Arg6SelectedWorldIndexLow24()) ? "low24-world-match" : "other-match");
     spdlog::debug(
-        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} mappedName='{}' field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
+        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} descriptorSource={} mappedName='{}' vtable={} field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
         static_cast<unsigned>(selectionIndex),
         static_cast<unsigned>(low24),
         static_cast<unsigned>(high8),
         fmt::ptr(&arg6SelectionDescriptor40_),
         matchMode,
-        worldName,
+        descriptorSource,
+        descriptorName,
+        fmt::ptr(arg6SelectionDescriptor40_.vtable00),
         static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field03),
         static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field07),
         fmt::ptr(reinterpret_cast<const void*>(static_cast<uintptr_t>(arg6SelectionDescriptor40Packed_.field03))),
@@ -3498,20 +3567,31 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 payloadSize,
                 static_cast<unsigned>(marginBootstrapState.phase));
 
-            // Active fidelity tightening from the state9-submit timeout investigation:
-            // - current replacement runs were sending a second challenge-response after bootstrap had
-            //   already advanced past the first `MS_ConnectChallenge`
-            // - that later produced an extra `MS_ConnectReply` with a different session id outside
-            //   the proven state6 slot-6 route, which is not part of the bounded original model
-            // - keep the bootstrap state machine single-shot here: once we have already sent the
-            //   first challenge-response (or moved to ready), consume duplicate opcode-7 packets
-            //   without re-sending another response.
-            if (marginBootstrapState.phase == MarginBootstrapPhase::kSentMsConnectChallengeResponse ||
-                marginBootstrapState.phase == MarginBootstrapPhase::kReady) {
+            // Active-path compatibility tightening:
+            // - some runs still show a retransmitted `MS_ConnectChallenge` while state6 is waiting
+            //   for the first real opcode-`9` continuation
+            // - older source blindly re-sent here and could later produce an extra off-route
+            //   `MS_ConnectReply` with a different session id
+            // - keep both facts explicit by allowing one compatibility resend only while the live
+            //   continuation is still sitting on the state6 route with no `+0xf14/+0xf18` write yet
+            // - once bootstrap is already fully ready, or once the state6 success-side writeback has
+            //   happened, consume later duplicate opcode-7 packets without another response.
+            const uint32_t currentHelperPhaseCode =
+                currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+            const bool awaitingFirstState6ConnectReply =
+                marginBootstrapState.phase == MarginBootstrapPhase::kSentMsConnectChallengeResponse &&
+                currentHelperPhaseCode == 6u &&
+                postAuthMarginLoadingState_.state10SendGateFlagF14 == 0u &&
+                State6UdpSessionSecretF18() == 0u;
+            if ((marginBootstrapState.phase == MarginBootstrapPhase::kSentMsConnectChallengeResponse ||
+                 marginBootstrapState.phase == MarginBootstrapPhase::kReady) &&
+                !awaitingFirstState6ConnectReply) {
                 spdlog::info(
-                    "DIAGNOSTIC: launcher-owned margin ignoring duplicate MS_ConnectChallenge after first response phase={} currentState={}",
+                    "DIAGNOSTIC: launcher-owned margin ignoring duplicate MS_ConnectChallenge after first response phase={} currentState={} ownerF14={} ownerF18=0x{:08x}",
                     static_cast<unsigned>(marginBootstrapState.phase),
-                    currentState_ ? currentState_->DebugName() : "<null>");
+                    currentState_ ? currentState_->DebugName() : "<null>",
+                    postAuthMarginLoadingState_.state10SendGateFlagF14,
+                    State6UdpSessionSecretF18());
                 return 1u;
             }
 

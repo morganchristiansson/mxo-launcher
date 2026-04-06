@@ -31,6 +31,12 @@ namespace mxo::liblttcp {
 //   its vtable to the CMessageConnection-family vtable at `0x4b7928`
 // - captures a CLTThreadPerClientTCPEngine pointer at +0x10
 // - carries an endpoint copy at +0x24
+// - carries the inherited parser pointer at +0x6c
+// - Ghidra/OOAnalyzer fidelity note for the active receive path:
+//   - keep `+0x00` as a real `vftptr_0x0` field, not an inline vtable struct member
+//   - otherwise `0x4490c0` decompilation loses the inherited `remoteEndpoint24` field and starts
+//     rendering endpoint copies as `&(this->vtable...).slot_36`-style artifacts instead of the
+//     real connection `+0x24` endpoint block
 // - participates in queue0C producer traffic by enqueueing (workItem, this, 0)
 // - likely appears as the dequeued queue0C `context` on important consumer paths
 // - string-backed methods include:
