@@ -2,7 +2,7 @@
 #include <cstdio>
 
 static void AppendLogLine(const char* line) {
-    FILE* f = std::fopen("crashreporter_stub.log", "a");
+    FILE* f = std::fopen("crashreporter_stub.log", "w");
     if (!f) return;
     std::fprintf(f, "%s\n", line);
     std::fclose(f);
