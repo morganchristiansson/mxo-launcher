@@ -24,7 +24,7 @@ Newest tightening from live original + replacement comparison:
 - so neither RCC object existence nor the current `+0x18c` transform algorithm is the best primary
   suspect anymore
 
-## Crash family A: late render / widget recursion
+## Crash family A: late render / widget recursion / client FX render
 
 Latest representative dump:
 - `~/MxO_7.6005/MatrixOnline_0.0_crash_39.dmp`
@@ -48,6 +48,11 @@ Current named function map:
 - `0x62159ef0 = ClientShell_RenderFrameAndPresent`
 - `0x624299d0 = WidgetManager_DrawCurrentRootWidget`
 - `0x62432fa0 = UIWidget_DrawChildWidgetsRecursive`
+- newer deeper no-popup family also now names:
+  - `0x6219af00 = ClientFxManager_RenderAll`
+  - `0x622e5f10 = RenderFxAttachmentGroup_Draw`
+  - `0x622f9530 = RenderFxBillboardGroup_Draw`
+  - `0x62337440 = RenderDevice_DrawPrimitiveBatchPositionColored`
 
 Current best read:
 - the active replacement route survives the immediate late-login handoff
@@ -100,25 +105,29 @@ Current best read:
 
 The current crash investigation should stay focused on:
 1. how client-shell field `+0xd0` is populated on the late runtime path
-2. which widget/runtime object tree later reaches:
-   - `WidgetManager_DrawCurrentRootWidget`
-   - `UIWidget_DrawChildWidgetsRecursive`
-   - deeper draw submission
+2. which later render/fx path reaches the eventual d3d9 crash
 3. what replacement-specific late state/data mismatch poisons the later shader/material path even
    though:
    - the `+0xd0` RCC-like object family now matches the healthy original route closely enough
-   - and the current state9 callback blob transform now cross-checks against a live original sample
+   - the current state9 callback blob transform now cross-checks against a live original sample
+   - and the queued margin close path now also reaches the natural later callback/event tail
 4. popup-specific shader path is now concretely narrowed too:
    - replacement now dumps the in-memory compiled source to
      `C:\users\morgan\AppData\Local\The Matrix Online\Shaders\a7f16968.fx`
    - current failing source proves the generated `VS_INPUT` struct is empty while `vs_main` still
      uses `input.pos`, which explains the popup compiler error directly
-5. current next concrete runtime experiment:
-   - drain queued type-1 close work (`MarginPeerClosed`) immediately on the single-process bridge,
-     the same way status/type-3 work is already drained
-   - reason: current replacement often queues the post-state9 margin close but then crashes in late
-     rendering before the next outer queue pump can reach the natural
-     `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` tail
+   - a bounded diagnostic retry that synthesizes `float3 pos : POSITION;` can suppress the popup,
+     but the run can still continue into later graphics corruption + deeper render crash, so the
+     empty-`VS_INPUT` compile failure is a real bug but not obviously the final root cause
+5. current named no-popup crash chain is now narrower too:
+   - `ClientFxManager_RenderAll` (`0x6219af00`)
+   - `RenderFxAttachmentGroup_Draw` (`0x622e5f10`)
+   - `RenderFxBillboardGroup_Draw` (`0x622f9530`)
+   - `RenderDevice_DrawPrimitiveBatchPositionColored` (`0x62337440`)
+   - then top d3d9 crash
+6. practical current read:
+   - the remaining blocker now looks increasingly like replacement-specific character/fx render
+     state, not the old margin close/event tail itself
 
 ## Non-root-cause notes
 
