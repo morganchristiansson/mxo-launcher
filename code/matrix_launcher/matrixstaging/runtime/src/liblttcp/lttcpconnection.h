@@ -53,42 +53,78 @@ public:
 
 static_assert(sizeof(LTTCPEndpointKey) == 0x10, "endpoint key size mismatch");
 
-// Recovered parser input fragment prefix consumed by connection `+0x6c`
+// Recovered parser input fragment family consumed by connection `+0x6c`
 // (`CVariableLengthPrefixedTCPStreamParser::Parse`).
 // Current best family name comes from `CMessageConnection::OnOperationCompleted` logging
 // ("Unused buffers were attached to CLTTCPReadOperation ...") plus the worker-thread receive path.
 // This is a refcounted read-buffer fragment object, not a completed-packet work item.
-// High-confidence fields from `0x42fe50`, `0x42f850`, `0x42f860`, `0x42f880`, `0x42f890`,
-// `0x452350`, `0x469bf0`, `0x435e60`, `0x4350c0`, and `0x435510`:
+// High-confidence fields / methods from `0x42fe50`, `0x42f820`, `0x42f850`, `0x42f860`,
+// `0x42f880`, `0x42f890`, `0x452350`, `0x469bf0`, `0x435e60`, `0x4350c0`, and `0x435510`:
 // - worker-thread receive path installs live leaf vtable `0x004b2300` and allocates `0x100c`
 //   bytes for this family
 // - deleting dtor `0x42fd50` collapses that live leaf back to shared low-level refcounted base
 //   `0x004b211c` before final free
-// - `+0x04` = interlocked refcount
-// - `+0x08` = byte count
-// - `+0x0c` = first payload byte
-// - vtable `+0x00` = deleting-dtor-style entry (`this, deleteFlag`)
-// - vtable `+0x04` = no-arg AddRef / retain on the fragment object itself
-// - vtable `+0x08` = no-arg Release on the fragment object itself
-// - vtable `+0x10` = reset refcount to zero
-// - vtable `+0x14` = set refcount from pointed-to value
-struct CLTTCPReadOperationFragmentScaffold;
+// - base `0x004b211c` owns the shared low-level refcount contract at `+0x00..+0x07`
+// - derived `CLTTCPReadOperation` adds `+0x08 = byte count`
+// - `+0x0c` = first payload byte in the variable-length inline tail allocation
+// Source lockstep note:
+// - this family is now modeled here as a real C++ class hierarchy instead of a manual struct plus
+//   hand-built vtable record
+// - the active source still exposes wrapper helpers because the parser / connection seam passes
+//   this family around by the recovered original shape
+class CRefCountedReadOperationBaseScaffold {
+public:
+    // anchor: launcher.exe:0x42f820 / vtable 0x004b211c +0x00
+    virtual CRefCountedReadOperationBaseScaffold* DeletingDtor(uint8_t deleteFlag);
+    // anchor: launcher.exe:0x42f7e0 / vtable 0x004b211c +0x04
+    virtual void AddRef();
+    // anchor: launcher.exe:0x42f7f0 / vtable 0x004b211c +0x08
+    virtual void Release();
+    // anchor: launcher.exe:0x004199b0 / vtable 0x004b211c +0x0c
+    virtual void DeleteIfNonNull();
+    // anchor: launcher.exe:0x42f800 / vtable 0x004b211c +0x10
+    virtual void ResetRefCount();
+    // anchor: launcher.exe:0x42f810 / vtable 0x004b211c +0x14
+    virtual void SetRefCountFromPtr(const long* value);
 
-struct CLTTCPReadOperationFragmentVTable {
-    void* (__thiscall *deletingDtor)(CLTTCPReadOperationFragmentScaffold* self, uint8_t deleteFlag); // +0x00
-    void (__thiscall *addRef)(CLTTCPReadOperationFragmentScaffold* self);                             // +0x04
-    void (__thiscall *release)(CLTTCPReadOperationFragmentScaffold* self);                            // +0x08
-    void (__thiscall *deleteIfNonNull)(CLTTCPReadOperationFragmentScaffold* self);                    // +0x0c
-    void (__thiscall *resetRefCount)(CLTTCPReadOperationFragmentScaffold* self);                      // +0x10
-    void (__thiscall *setRefCountFromPtr)(CLTTCPReadOperationFragmentScaffold* self, const long* value); // +0x14
+    volatile long referenceCount04; // +0x04
+
+    explicit CRefCountedReadOperationBaseScaffold(long initialReferenceCount = 0);
 };
 
-struct CLTTCPReadOperationFragmentScaffold {
-    CLTTCPReadOperationFragmentVTable* vtable; // +0x00
-    volatile long referenceCount;              // +0x04 interlocked by AddRef / Release
-    uint32_t byteCount;                        // +0x08
-    uint8_t bytes0C[1];                        // +0x0c variable-length fragment bytes begin here
+static_assert(sizeof(CRefCountedReadOperationBaseScaffold) == 0x08, "refcounted read-operation base size mismatch");
+
+class CLTTCPReadOperationFragmentScaffold final : public CRefCountedReadOperationBaseScaffold {
+public:
+    static constexpr uint32_t kPayloadCapacity = 0x1000u;
+
+    // anchor: launcher.exe:0x42fd50 / vtable 0x004b2300 +0x00
+    CRefCountedReadOperationBaseScaffold* DeletingDtor(uint8_t deleteFlag) override;
+    // anchor: launcher.exe:0x42f850 / vtable 0x004b2300 +0x04
+    void AddRef() override;
+    // anchor: launcher.exe:0x42f860 / vtable 0x004b2300 +0x08
+    void Release() override;
+    // anchor: launcher.exe:0x42f880 / vtable 0x004b2300 +0x10
+    void ResetRefCount() override;
+    // anchor: launcher.exe:0x42f890 / vtable 0x004b2300 +0x14
+    void SetRefCountFromPtr(const long* value) override;
+
+    static CLTTCPReadOperationFragmentScaffold* AllocateScaffold();
+
+    // anchor: launcher.exe:0x452350
+    void SetByteCount(uint32_t byteCount);
+    uint8_t* PayloadBegin();
+    const uint8_t* PayloadBegin() const;
+    const uint8_t* PayloadEnd() const;
+    uint32_t BytesRemainingFromCursor(const uint8_t* cursor) const;
+
+    uint32_t byteCount08; // +0x08
+
+private:
+    CLTTCPReadOperationFragmentScaffold();
 };
+
+static_assert(sizeof(CLTTCPReadOperationFragmentScaffold) == 0x0c, "read-operation fragment prefix size mismatch");
 
 struct CLTTCPReadOperationFragmentRefScaffold {
     // anchor: launcher.exe:0x434fa0
@@ -208,6 +244,10 @@ class CBaseConnection {
   virtual uint32_t OnOperationCompleted(void* workItem) = 0;
   // UNANCHORED: source-owned abstraction over the recovered send callback surface.
   virtual uint32_t SendPacket(const void*, uint32_t, void*) = 0;
+  // UNANCHORED: source-owned abstraction over the recovered shared close wrapper.
+  // Original `0x449ca0` lives in the base connection slot family and `0x449d40` reaches it
+  // through the inherited virtual dispatch at `this->+0x0c(false)`.
+  virtual uint32_t Close(bool graceful) = 0;
 
   // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
   virtual bool IsConnected() const;
@@ -304,7 +344,8 @@ public:
 
     // anchor: launcher.exe:0x449ca0
     // vtable: launcher.exe:0x004b8040
-    uint32_t Close(bool graceful);
+    // Shared inherited close wrapper body also present in `CBaseConnection` vtable `0x004b8018`.
+    uint32_t Close(bool graceful) override;
 
     // anchor: launcher.exe:0x449cd0
     // vtable: launcher.exe:0x004b8050

@@ -2,6 +2,7 @@
 
 #include "../../../game/src/libltclientlogin/loginmediator.h"
 #include "../libltcrypto/auth_crypto.h"
+#include "variablelengthprefixedtcpstreamparser.h"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -1142,8 +1143,9 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
         return false;
     }
 
-    const uint8_t* fragmentBegin = currentFragment->bytes0C;
-    const uint8_t* fragmentEnd = fragmentBegin + currentFragment->byteCount;
+    const uint8_t* fragmentBegin =
+        CLTTCPReadOperationFragment_PayloadBeginScaffold(currentFragment);
+    const uint8_t* fragmentEnd = CLTTCPReadOperationFragment_PayloadEndScaffold(currentFragment);
     const uint8_t* currentCursor = workItem->currentCursor24;
     if (currentCursor < fragmentBegin || currentCursor > fragmentEnd) {
         return false;
@@ -1170,10 +1172,10 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
         }
 
         const uint32_t copyByteCount =
-            std::min<uint32_t>(remainingPacketBodyByteCount, currentFragment->byteCount);
+            std::min<uint32_t>(remainingPacketBodyByteCount, currentFragment->byteCount08);
         if (!CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
                 outMessageRef,
-                currentFragment->bytes0C,
+                CLTTCPReadOperationFragment_PayloadBeginScaffold(currentFragment),
                 copyByteCount)) {
             return false;
         }

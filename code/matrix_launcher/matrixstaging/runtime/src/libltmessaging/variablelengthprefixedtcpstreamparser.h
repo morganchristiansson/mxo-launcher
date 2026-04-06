@@ -4,7 +4,7 @@
 
 namespace mxo::liblttcp {
 
-struct CLTTCPReadOperationFragmentScaffold;
+class CLTTCPReadOperationFragmentScaffold;
 struct CLTTCPConnection_ParsedPacketWorkItemScaffold;
 
 // anchor: launcher.exe:0x42f850 / vtable 0x004b2300 +0x04
@@ -15,6 +15,8 @@ void CLTTCPReadOperationFragment_ReleaseScaffold(CLTTCPReadOperationFragmentScaf
 // UNANCHORED: source-owned helpers over the recovered `CLTTCPReadOperation` fragment layout.
 uint8_t* CLTTCPReadOperationFragment_PayloadBeginScaffold(
     CLTTCPReadOperationFragmentScaffold* fragment);
+const uint8_t* CLTTCPReadOperationFragment_PayloadBeginScaffold(
+    const CLTTCPReadOperationFragmentScaffold* fragment);
 const uint8_t* CLTTCPReadOperationFragment_PayloadEndScaffold(
     const CLTTCPReadOperationFragmentScaffold* fragment);
 uint32_t CLTTCPReadOperationFragment_BytesRemainingFromCursorScaffold(

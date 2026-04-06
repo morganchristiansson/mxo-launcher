@@ -459,7 +459,7 @@ static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold
                     passedCurrentCursorFragment = true;
                 }
             } else {
-                if (remainingToConsume <= traversedFragment->byteCount) {
+                if (remainingToConsume <= traversedFragment->byteCount08) {
                     if (traversedFragment != parser->currentCursorFragment04) {
                         CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(
                             parser,
@@ -472,7 +472,7 @@ static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold
                     traversedFragment = nullptr;
                     break;
                 }
-                remainingToConsume -= traversedFragment->byteCount;
+                remainingToConsume -= traversedFragment->byteCount08;
             }
 
             CLTTCPReadOperationFragmentScaffold* nextFragment =
@@ -508,30 +508,35 @@ CVariableLengthPrefixedTCPStreamParser_AllocatePacketBufferScaffold() {
 
 // anchor: launcher.exe:0x42f850 / vtable 0x004b2300 +0x04
 void CLTTCPReadOperationFragment_AddRefScaffold(CLTTCPReadOperationFragmentScaffold* fragment) {
-    if (!fragment || !fragment->vtable || !fragment->vtable->addRef) {
+    if (!fragment) {
         return;
     }
 
-    fragment->vtable->addRef(fragment);
+    fragment->AddRef();
 }
 
 // anchor: launcher.exe:0x42f860 / vtable 0x004b2300 +0x08
 void CLTTCPReadOperationFragment_ReleaseScaffold(CLTTCPReadOperationFragmentScaffold* fragment) {
-    if (!fragment || !fragment->vtable || !fragment->vtable->release) {
+    if (!fragment) {
         return;
     }
 
-    fragment->vtable->release(fragment);
+    fragment->Release();
 }
 
 uint8_t* CLTTCPReadOperationFragment_PayloadBeginScaffold(
     CLTTCPReadOperationFragmentScaffold* fragment) {
-    return fragment ? fragment->bytes0C : nullptr;
+    return fragment ? fragment->PayloadBegin() : nullptr;
+}
+
+const uint8_t* CLTTCPReadOperationFragment_PayloadBeginScaffold(
+    const CLTTCPReadOperationFragmentScaffold* fragment) {
+    return fragment ? fragment->PayloadBegin() : nullptr;
 }
 
 const uint8_t* CLTTCPReadOperationFragment_PayloadEndScaffold(
     const CLTTCPReadOperationFragmentScaffold* fragment) {
-    return fragment ? (fragment->bytes0C + fragment->byteCount) : nullptr;
+    return fragment ? fragment->PayloadEnd() : nullptr;
 }
 
 uint32_t CLTTCPReadOperationFragment_BytesRemainingFromCursorScaffold(
@@ -541,7 +546,7 @@ uint32_t CLTTCPReadOperationFragment_BytesRemainingFromCursorScaffold(
         return 0u;
     }
 
-    const uint8_t* begin = fragment->bytes0C;
+    const uint8_t* begin = fragment->PayloadBegin();
     const uint8_t* end = CLTTCPReadOperationFragment_PayloadEndScaffold(fragment);
     if (cursor < begin || cursor > end) {
         return 0u;
@@ -746,7 +751,7 @@ uint32_t CVariableLengthPrefixedTCPStreamParser::Parse(
 
     CLTTCPConnection_ParsedPacketWorkItemScaffold* currentWorkItem = currentPacketWorkItem14;
     CLTTCPReadOperationFragmentScaffold* inputFragment = readOperationFragment;
-    if (readOperationFragment && readOperationFragment->byteCount != 0u) {
+    if (readOperationFragment && readOperationFragment->byteCount08 != 0u) {
         // `0x469bf0` takes a transient fragment ref immediately before `0x435e60`, and the helper
         // now mirrors the original trailing `Release(param_1)` again. That keeps the Parse-side
         // handoff narrower and closer to the original worker->OnReceive->Parse ownership chain.
@@ -762,7 +767,7 @@ uint32_t CVariableLengthPrefixedTCPStreamParser::Parse(
             currentCursor08 =
                 CLTTCPReadOperationFragment_PayloadBeginScaffold(readOperationFragment);
         }
-        unreadBufferedByteCount0C += readOperationFragment->byteCount;
+        unreadBufferedByteCount0C += readOperationFragment->byteCount08;
         if (!appended) {
             if (inputFragment) {
                 CLTTCPReadOperationFragment_ReleaseScaffold(inputFragment);

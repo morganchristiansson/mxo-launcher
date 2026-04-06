@@ -77,6 +77,20 @@ worker thread
 So this family is the **front-end input fragment family**, not the queued parsed-packet work-item
 family.
 
+## Source lockstep
+
+Current source now models this family as an actual class hierarchy instead of a raw prefix struct
+plus manual vtable record:
+
+- `matrixstaging/runtime/src/liblttcp/lttcpconnection.h/.cpp`
+  - `CRefCountedReadOperationBaseScaffold` mirrors the shared `0x004b211c` base contract
+  - `CLTTCPReadOperationFragmentScaffold` mirrors the live `0x004b2300` leaf and keeps the exact
+    12-byte prefix explicit (`sizeof(...) == 0x0c`)
+  - payload bytes are now represented as the variable-length tail beginning immediately after that
+    prefix rather than as a fake inline `bytes0C[1]` field with a hand-built vtable object
+- parser / connection call sites still use the same recovered helper seam, so this fidelity change
+  tightened the class modeling without widening the active receive-path behavior
+
 ## Related docs
 
 - `CMessageConnection_OnOperationCompleted_families.md`
