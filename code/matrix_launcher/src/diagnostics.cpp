@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cctype>
 #include <cstdio>
 #include <cstring>
 #include <set>
@@ -197,6 +198,50 @@ static void DiagnosticLogClientShellRuntimeTransitionState() {
     g_LastClientShellRuntimeVftableD0 = runtimeVftableD0;
 }
 
+static void DiagnosticLogDirectorySnapshot(const char* label, const char* pattern) {
+    if (!label || !pattern || !pattern[0]) {
+        return;
+    }
+
+    WIN32_FIND_DATAA findData = {};
+    HANDLE findHandle = FindFirstFileA(pattern, &findData);
+    if (findHandle == INVALID_HANDLE_VALUE) {
+        spdlog::info("{} pattern='{}' no entries", label, pattern);
+        return;
+    }
+
+    do {
+        const char* type = ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) ? "dir" : "file";
+        const unsigned long long size =
+            (static_cast<unsigned long long>(findData.nFileSizeHigh) << 32) |
+            static_cast<unsigned long long>(findData.nFileSizeLow);
+        spdlog::info(
+            "{} pattern='{}' {}='{}' size={}",
+            label,
+            pattern,
+            type,
+            findData.cFileName,
+            size);
+    } while (FindNextFileA(findHandle, &findData));
+
+    FindClose(findHandle);
+}
+
+static void DiagnosticLogShaderPathIfPresent(const char* path) {
+    if (!path || !path[0]) {
+        return;
+    }
+    FILE* file = std::fopen(path, "rb");
+    if (!file) {
+        spdlog::info("WindowTrace D3D Error shader aux path='{}' exists=0", path);
+        return;
+    }
+    std::fseek(file, 0, SEEK_END);
+    const long fileSize = std::ftell(file);
+    std::fclose(file);
+    spdlog::info("WindowTrace D3D Error shader aux path='{}' exists=1 size={}", path, static_cast<long long>(fileSize));
+}
+
 static void DiagnosticLogShaderFileContextFromDialogText(const char* text) {
     if (!text || !text[0]) {
         return;
@@ -204,6 +249,45 @@ static void DiagnosticLogShaderFileContextFromDialogText(const char* text) {
 
     std::set<std::string> seenPaths;
     const size_t textLength = std::strlen(text);
+    const char* shaderHashStart = std::strstr(text, "shader '");
+    if (shaderHashStart) {
+        shaderHashStart += std::strlen("shader '");
+        char shaderHash[16] = {0};
+        size_t hashLen = 0;
+        while (hashLen < 8 && std::isxdigit(static_cast<unsigned char>(shaderHashStart[hashLen]))) {
+            shaderHash[hashLen] = shaderHashStart[hashLen];
+            ++hashLen;
+        }
+        if (hashLen == 8) {
+            char auxPath[512] = {0};
+            std::snprintf(
+                auxPath,
+                sizeof(auxPath),
+                "C:\\users\\morgan\\AppData\\Local\\The Matrix Online\\Shaders\\Requests\\%s.bin",
+                shaderHash);
+            DiagnosticLogShaderPathIfPresent(auxPath);
+            std::snprintf(
+                auxPath,
+                sizeof(auxPath),
+                "C:\\users\\morgan\\AppData\\Local\\The Matrix Online\\Shaders\\%s.vsh",
+                shaderHash);
+            DiagnosticLogShaderPathIfPresent(auxPath);
+            std::snprintf(
+                auxPath,
+                sizeof(auxPath),
+                "C:\\users\\morgan\\AppData\\Local\\The Matrix Online\\Shaders\\%s.psh",
+                shaderHash);
+            DiagnosticLogShaderPathIfPresent(auxPath);
+        }
+    }
+
+    DiagnosticLogDirectorySnapshot(
+        "WindowTrace D3D Error shader dir snapshot",
+        "C:\\users\\morgan\\AppData\\Local\\The Matrix Online\\Shaders\\*");
+    DiagnosticLogDirectorySnapshot(
+        "WindowTrace D3D Error shader requests dir snapshot",
+        "C:\\users\\morgan\\AppData\\Local\\The Matrix Online\\Shaders\\Requests\\*");
+
     for (size_t i = 0; i + 4 < textLength; ++i) {
         const char drive = text[i];
         if (!((drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z')) ||
