@@ -1847,11 +1847,35 @@ static void QueueContext_OnOperationCompleted(void* context, void* workItem) {
     // - the direct connection object (`context=this`) on the original type-1/type-2/type-3 paths
     // - the source-owned `CBaseConnection_QueueContextScaffold` bridge on older/fallback paths
     CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context);
+    const bool usedQueueContextBridge = (completionTarget != nullptr);
     if (completionTarget == nullptr) {
         completionTarget = static_cast<CBaseConnection*>(context);
     }
 
-    (void)completionTarget->OnOperationCompleted(workItem);
+    const uint32_t workType = QueueWorkItem_GetType(workItem);
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        void* targetVtable = nullptr;
+        if (completionTarget != nullptr) {
+            targetVtable = *reinterpret_cast<void**>(completionTarget);
+        }
+        CLTTCPConnection* tcpTarget = dynamic_cast<CLTTCPConnection*>(completionTarget);
+        spdlog::info(
+            "QueueContext_OnOperationCompleted close work context={} completionTarget={} targetVtable={} usedQueueContextBridge={} ownerContext={} state={}",
+            fmt::ptr(context),
+            fmt::ptr(completionTarget),
+            fmt::ptr(targetVtable),
+            usedQueueContextBridge ? 1u : 0u,
+            fmt::ptr(tcpTarget ? tcpTarget->OwnerContext() : nullptr),
+            completionTarget ? static_cast<unsigned>(completionTarget->State()) : 0u);
+    }
+
+    const uint32_t handled = completionTarget->OnOperationCompleted(workItem);
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        spdlog::info(
+            "QueueContext_OnOperationCompleted close work result completionTarget={} handled=0x{:08x}",
+            fmt::ptr(completionTarget),
+            handled);
+    }
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
