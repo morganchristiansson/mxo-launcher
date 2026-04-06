@@ -206,6 +206,14 @@ bool PreloadDependencies() {
         HMODULE h = LoadLibraryA(dlls[i]);
         spdlog::info("preload {:12s} : {} ({})", dlls[i], h ? "OK" : "FAIL", fmt::ptr(h));
         if (!h) return false;
+        if (std::strcmp(dlls[i], "r3d9.dll") == 0) {
+            const bool installedD3DCompileHook = DiagnosticInstallR3d9D3DCompileHook(h);
+            spdlog::info(
+                "preload {:12s} : DiagnosticInstallR3d9D3DCompileHook={} ({})",
+                dlls[i],
+                installedD3DCompileHook ? 1 : 0,
+                fmt::ptr(h));
+        }
     }
     return true;
 }

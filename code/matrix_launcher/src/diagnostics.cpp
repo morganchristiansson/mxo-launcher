@@ -20,6 +20,24 @@ struct WindowTraceEntry {
     BOOL iconic;
 };
 
+struct DiagnosticD3DShaderMacro {
+    LPCSTR Name;
+    LPCSTR Definition;
+};
+
+using DiagnosticD3DCompileFunc = HRESULT(WINAPI*)(
+    LPCVOID,
+    SIZE_T,
+    LPCSTR,
+    const DiagnosticD3DShaderMacro*,
+    void*,
+    LPCSTR,
+    LPCSTR,
+    UINT,
+    UINT,
+    void**,
+    void**);
+
 static DWORD g_MainProcessId = 0;
 static HANDLE g_hWindowTraceThread = NULL;
 static volatile LONG g_WindowTraceRunning = 0;
@@ -34,6 +52,8 @@ static const void* g_LastClientShellObserved = nullptr;
 static uint32_t g_LastClientShellState20 = 0xffffffffu;
 static const void* g_LastClientShellRuntimeObjectD0 = nullptr;
 static const void* g_LastClientShellRuntimeVftableD0 = nullptr;
+static DiagnosticD3DCompileFunc g_OriginalD3DCompile = nullptr;
+static std::set<std::string> g_DumpedShaderSourcePaths;
 
 static bool DiagnosticReadableMemoryRange(const void* base, size_t byteCount) {
     if (!base || byteCount == 0) {
@@ -196,6 +216,153 @@ static void DiagnosticLogClientShellRuntimeTransitionState() {
     g_LastClientShellState20 = state20;
     g_LastClientShellRuntimeObjectD0 = runtimeObjectD0;
     g_LastClientShellRuntimeVftableD0 = runtimeVftableD0;
+}
+
+static bool DiagnosticEnsureParentDirectoriesForFile(const char* path) {
+    if (!path || !path[0]) {
+        return false;
+    }
+
+    std::string mutablePath(path);
+    for (size_t i = 3; i < mutablePath.size(); ++i) {
+        if (mutablePath[i] != '\\' && mutablePath[i] != '/') {
+            continue;
+        }
+        const char saved = mutablePath[i];
+        mutablePath[i] = '\0';
+        if (mutablePath.size() > 3) {
+            const DWORD attrs = GetFileAttributesA(mutablePath.c_str());
+            if (attrs == INVALID_FILE_ATTRIBUTES) {
+                (void)CreateDirectoryA(mutablePath.c_str(), NULL);
+            }
+        }
+        mutablePath[i] = saved;
+    }
+    return true;
+}
+
+static void DiagnosticDumpShaderSourceFile(const char* path, const void* sourceData, size_t sourceBytes) {
+    if (!path || !path[0] || !sourceData || sourceBytes == 0) {
+        return;
+    }
+    if (!g_DumpedShaderSourcePaths.insert(path).second) {
+        return;
+    }
+
+    DiagnosticEnsureParentDirectoriesForFile(path);
+    FILE* file = std::fopen(path, "wb");
+    if (!file) {
+        spdlog::info("DiagnosticD3DCompile dump path='{}' openFailed=1", path);
+        return;
+    }
+    const size_t written = std::fwrite(sourceData, 1, sourceBytes, file);
+    std::fclose(file);
+    spdlog::info(
+        "DiagnosticD3DCompile dump path='{}' bytes={} written={}",
+        path,
+        static_cast<unsigned long long>(sourceBytes),
+        static_cast<unsigned long long>(written));
+}
+
+static HRESULT WINAPI DiagnosticD3DCompile(
+    LPCVOID sourceData,
+    SIZE_T sourceBytes,
+    LPCSTR sourceName,
+    const DiagnosticD3DShaderMacro* defines,
+    void* includeHandler,
+    LPCSTR entryPoint,
+    LPCSTR target,
+    UINT flags1,
+    UINT flags2,
+    void** codeBlob,
+    void** errorBlob) {
+    if (!g_OriginalD3DCompile) {
+        return E_FAIL;
+    }
+
+    if (sourceName && std::strstr(sourceName, "\\Shaders\\") != nullptr &&
+        std::strstr(sourceName, ".fx") != nullptr) {
+        DiagnosticDumpShaderSourceFile(sourceName, sourceData, static_cast<size_t>(sourceBytes));
+    }
+
+    const HRESULT result = g_OriginalD3DCompile(
+        sourceData,
+        sourceBytes,
+        sourceName,
+        defines,
+        includeHandler,
+        entryPoint,
+        target,
+        flags1,
+        flags2,
+        codeBlob,
+        errorBlob);
+    if (FAILED(result)) {
+        spdlog::info(
+            "DiagnosticD3DCompile source='{}' entry='{}' target='{}' bytes={} hr=0x{:08x}",
+            sourceName ? sourceName : "<null>",
+            entryPoint ? entryPoint : "<null>",
+            target ? target : "<null>",
+            static_cast<unsigned long long>(sourceBytes),
+            static_cast<unsigned>(result));
+    }
+    return result;
+}
+
+bool DiagnosticInstallR3d9D3DCompileHook(HMODULE r3d9Module) {
+    if (!r3d9Module) {
+        return false;
+    }
+
+    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(r3d9Module);
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
+        return false;
+    }
+    auto* nt = reinterpret_cast<IMAGE_NT_HEADERS*>(reinterpret_cast<uint8_t*>(r3d9Module) + dos->e_lfanew);
+    if (nt->Signature != IMAGE_NT_SIGNATURE) {
+        return false;
+    }
+    const auto& importDir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    if (importDir.VirtualAddress == 0 || importDir.Size == 0) {
+        return false;
+    }
+
+    auto* importDesc = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDir.VirtualAddress);
+    for (; importDesc->Name != 0; ++importDesc) {
+        const char* dllName = reinterpret_cast<const char*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDesc->Name);
+        if (_stricmp(dllName, "D3DCOMPILER_43.dll") != 0) {
+            continue;
+        }
+
+        auto* thunk = reinterpret_cast<IMAGE_THUNK_DATA*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDesc->FirstThunk);
+        auto* origThunk = reinterpret_cast<IMAGE_THUNK_DATA*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDesc->OriginalFirstThunk);
+        for (; origThunk->u1.AddressOfData != 0; ++origThunk, ++thunk) {
+            if (IMAGE_SNAP_BY_ORDINAL(origThunk->u1.Ordinal)) {
+                continue;
+            }
+            auto* importByName = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(reinterpret_cast<uint8_t*>(r3d9Module) + origThunk->u1.AddressOfData);
+            if (std::strcmp(reinterpret_cast<const char*>(importByName->Name), "D3DCompile") != 0) {
+                continue;
+            }
+
+            DWORD oldProtect = 0;
+            if (!VirtualProtect(&thunk->u1.Function, sizeof(thunk->u1.Function), PAGE_READWRITE, &oldProtect)) {
+                return false;
+            }
+            g_OriginalD3DCompile = reinterpret_cast<DiagnosticD3DCompileFunc>(static_cast<uintptr_t>(thunk->u1.Function));
+            thunk->u1.Function = reinterpret_cast<ULONG_PTR>(&DiagnosticD3DCompile);
+            DWORD restoreProtect = 0;
+            (void)VirtualProtect(&thunk->u1.Function, sizeof(thunk->u1.Function), oldProtect, &restoreProtect);
+            spdlog::info(
+                "DiagnosticInstallR3d9D3DCompileHook installed module={} original={} replacement={}",
+                fmt::ptr(r3d9Module),
+                fmt::ptr(reinterpret_cast<void*>(g_OriginalD3DCompile)),
+                fmt::ptr(reinterpret_cast<void*>(&DiagnosticD3DCompile)));
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static void DiagnosticLogDirectorySnapshot(const char* label, const char* pattern) {
