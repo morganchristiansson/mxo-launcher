@@ -47,6 +47,11 @@ Current best read:
 - then later dies during recursive widget drawing / render submission
 - the deepest client frames now look like ordinary UI/render traversal rather than direct login
   mediator logic
+- newer replacement-only reruns can also surface a `D3D Error` popup first, e.g.:
+  - `MXODirect3DDevice9::CreateD3D9Shader() failed to compile shader ...`
+  - user cross-check now says original launcher/client does **not** reproduce that popup on the same
+    comparison pass, so treat it as replacement-specific evidence, not a generic Wine/original
+    graphics fault
 
 ## Crash family B: alternate null-vcall in `ClientShell_RunFrame`
 

@@ -2,7 +2,10 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstring>
 #include <string>
+
+extern HMODULE g_hClient;
 
 struct WindowTraceEntry {
     HWND hwnd;
@@ -22,6 +25,139 @@ static int g_LastWindowTraceCount = -1;
 static std::string g_LastClientLoadingStateText;
 static std::string g_LastClientLoadingStateSource;
 static bool g_KnownClientEngineInitStatusTextsLogged = false;
+static HWND g_LastLoggedD3DErrorDialog = NULL;
+
+static bool DiagnosticReadableMemoryRange(const void* base, size_t byteCount) {
+    if (!base || byteCount == 0) {
+        return false;
+    }
+
+    const uint8_t* cursor = static_cast<const uint8_t*>(base);
+    size_t remaining = byteCount;
+    while (remaining != 0) {
+        MEMORY_BASIC_INFORMATION mbi = {};
+        if (VirtualQuery(cursor, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+            return false;
+        }
+        if (mbi.State != MEM_COMMIT) {
+            return false;
+        }
+        if ((mbi.Protect & PAGE_GUARD) != 0 || (mbi.Protect & PAGE_NOACCESS) != 0) {
+            return false;
+        }
+
+        const bool readable =
+            (mbi.Protect & PAGE_READONLY) != 0 ||
+            (mbi.Protect & PAGE_READWRITE) != 0 ||
+            (mbi.Protect & PAGE_WRITECOPY) != 0 ||
+            (mbi.Protect & PAGE_EXECUTE_READ) != 0 ||
+            (mbi.Protect & PAGE_EXECUTE_READWRITE) != 0 ||
+            (mbi.Protect & PAGE_EXECUTE_WRITECOPY) != 0;
+        if (!readable) {
+            return false;
+        }
+
+        const uintptr_t regionEnd =
+            reinterpret_cast<uintptr_t>(mbi.BaseAddress) + static_cast<uintptr_t>(mbi.RegionSize);
+        const uintptr_t current = reinterpret_cast<uintptr_t>(cursor);
+        if (regionEnd <= current) {
+            return false;
+        }
+        const size_t covered = static_cast<size_t>(regionEnd - current);
+        if (covered >= remaining) {
+            return true;
+        }
+        cursor += covered;
+        remaining -= covered;
+    }
+    return true;
+}
+
+static void LogWordSpanIfReadable(const char* label, const void* base, size_t wordCount) {
+    if (!label || !base || wordCount == 0) {
+        return;
+    }
+    if (!DiagnosticReadableMemoryRange(base, wordCount * sizeof(uint32_t))) {
+        spdlog::info("{} @ {} <unreadable>", label, fmt::ptr(base));
+        return;
+    }
+
+    const uint32_t* words = static_cast<const uint32_t*>(base);
+    for (size_t i = 0; i < wordCount; i += 4) {
+        spdlog::info(
+            "{} @ {} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x}",
+            label,
+            fmt::ptr(base),
+            static_cast<unsigned>(i * 4),
+            words[i + 0],
+            static_cast<unsigned>((i + 1) * 4),
+            (i + 1 < wordCount) ? words[i + 1] : 0,
+            static_cast<unsigned>((i + 2) * 4),
+            (i + 2 < wordCount) ? words[i + 2] : 0,
+            static_cast<unsigned>((i + 3) * 4),
+            (i + 3 < wordCount) ? words[i + 3] : 0);
+    }
+}
+
+static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) {
+    const uint8_t* clientBase =
+        reinterpret_cast<const uint8_t*>(g_hClient ? g_hClient : GetModuleHandleA("client.dll"));
+    if (!clientBase || absoluteAddress < 0x62000000u) {
+        return nullptr;
+    }
+    return clientBase + (absoluteAddress - 0x62000000u);
+}
+
+static BOOL CALLBACK D3DErrorChildEnumProc(HWND hwnd, LPARAM) {
+    char className[256] = {0};
+    char title[1024] = {0};
+    GetClassNameA(hwnd, className, sizeof(className));
+    GetWindowTextA(hwnd, title, sizeof(title));
+    spdlog::info(
+        "WindowTrace D3D Error child hwnd={} class='{}' text='{}'",
+        fmt::ptr(hwnd),
+        className,
+        title);
+    return TRUE;
+}
+
+static void DiagnosticLogD3DErrorContext(HWND hwnd) {
+    if (!hwnd || hwnd == g_LastLoggedD3DErrorDialog) {
+        return;
+    }
+    g_LastLoggedD3DErrorDialog = hwnd;
+
+    spdlog::info("WindowTrace D3D Error dialog snapshot begin hwnd={}", fmt::ptr(hwnd));
+    EnumChildWindows(hwnd, D3DErrorChildEnumProc, 0);
+
+    // anchor: client.dll:0x62001180 = RunClientDLL drives the global client-shell object rooted at
+    // DAT_629ddfc8; late replacement-specific D3D/shader failures appear after event 0x18, so log
+    // the same client-shell runtime object field used by the later null-vcall family.
+    const void* const clientShellSlot = DiagnosticClientAbsoluteToPointer(0x629e68a8u);
+    LogWordSpanIfReadable("WindowTrace D3D Error DAT_629e68a8 slot", clientShellSlot, 4);
+
+    const void* clientShell = nullptr;
+    if (clientShellSlot && DiagnosticReadableMemoryRange(clientShellSlot, sizeof(void*))) {
+        clientShell = *static_cast<const void* const*>(clientShellSlot);
+    }
+    if (clientShell != nullptr) {
+        LogWordSpanIfReadable(
+            "WindowTrace D3D Error client shell d0..ec",
+            static_cast<const uint8_t*>(clientShell) + 0xd0,
+            8);
+        const void* const d0Field = static_cast<const uint8_t*>(clientShell) + 0xd0;
+        const void* currentRuntimeObject = nullptr;
+        if (DiagnosticReadableMemoryRange(d0Field, sizeof(void*))) {
+            currentRuntimeObject = *static_cast<const void* const*>(d0Field);
+        }
+        if (currentRuntimeObject != nullptr) {
+            LogWordSpanIfReadable(
+                "WindowTrace D3D Error client shell +0xd0 object",
+                currentRuntimeObject,
+                8);
+        }
+    }
+}
 
 // UNANCHORED: diagnostic-only display-mode snapshot helper.
 static void LogCurrentDisplayMode(const char* prefix) {
@@ -88,6 +224,9 @@ static void UpsertWindowTraceEntry(
             (long)rect.top,
             (long)rect.right,
             (long)rect.bottom);
+        if (std::strcmp(title, "D3D Error") == 0) {
+            DiagnosticLogD3DErrorContext(hwnd);
+        }
     }
 
     if (isNew) {
