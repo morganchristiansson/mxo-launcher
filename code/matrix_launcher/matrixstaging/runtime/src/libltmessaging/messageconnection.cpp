@@ -2381,6 +2381,17 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
         CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator);
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
+    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        spdlog::info(
+            "CMarginConnection::OnOperationCompleted close work this={} ownerContext={} mediator={} isMarginConnection={} currentState={} connectionState={} remoteHost='{}'",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            fmt::ptr(mediator),
+            isMarginConnection ? 1u : 0u,
+            fmt::ptr(mediator ? mediator->CurrentState() : nullptr),
+            static_cast<unsigned>(State()),
+            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    }
     if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
         const uint32_t workPayload =
             CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem);
