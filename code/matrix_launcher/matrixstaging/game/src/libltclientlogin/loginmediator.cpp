@@ -595,35 +595,49 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
     const uint32_t expectedScratchRequest = Arg6ExpectedSelectionDescriptorScratchRequest();
     const bool matchedConfiguredRequest = Arg6SelectionDescriptorMatchesRequest(selectionIndex);
+    const bool matchedCurrentSlotIndexRequest =
+        CurrentHelperStateCodeOrZero(this) >= 3u &&
+        high8 == 0u &&
+        low24 == static_cast<uint32_t>(CurrentCharacterRouteIndexCc8Scaffold());
 
     const SlotRecordState004b5328* const currentSlotRecord =
-        matchedConfiguredRequest ? ResolveArg6CurrentSlotRecord44Source() : nullptr;
+        (matchedConfiguredRequest || matchedCurrentSlotIndexRequest)
+            ? ResolveArg6CurrentSlotRecord44Source()
+            : nullptr;
     const char* descriptorName = nullptr;
-    uint32_t descriptorSelectionId = Arg6MappedSelectionId();
-    const char* descriptorSource = "mapped-selection";
+    uint32_t descriptorField03 = low24;
+    uint32_t descriptorField07 = 0u;
+    const char* descriptorSource = "scratch-low24-selection-id";
 
     if (currentSlotRecord && !currentSlotRecord->heapString14.empty()) {
         descriptorName = currentSlotRecord->heapString14.c_str();
-        descriptorSelectionId = currentSlotRecord->globalCharacterIdLow03;
-        descriptorSource = "current-slot";
-    } else if (matchedConfiguredRequest) {
+        descriptorField03 = currentSlotRecord->globalCharacterIdLow03;
+        descriptorField07 = currentSlotRecord->globalCharacterIdHigh07;
+        descriptorSource = "current-slot-global-character-id";
+    } else if (matchedConfiguredRequest || matchedCurrentSlotIndexRequest) {
         descriptorName = Arg6MappedVariantName();
-        descriptorSelectionId = Arg6MappedSelectionId();
-        descriptorSource = "mapped-variant";
+        descriptorField03 = Arg6MappedSelectionId();
+        descriptorField07 = 0u;
+        descriptorSource = matchedCurrentSlotIndexRequest
+            ? "current-slot-index-mapped-selection-id"
+            : "mapped-variant-selection-id";
         if (!descriptorName || !descriptorName[0]) {
             descriptorName = Arg6MappedSelectionName();
-            descriptorSource = "mapped-selection";
+            descriptorSource = matchedCurrentSlotIndexRequest
+                ? "current-slot-index-fallback-selection-id"
+                : "mapped-selection-selection-id";
         }
     }
 
     if (!descriptorName) {
         spdlog::debug(
-            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
+            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
             static_cast<unsigned>(selectionIndex),
             static_cast<unsigned>(low24),
             static_cast<unsigned>(high8),
             static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
             static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
+            static_cast<unsigned>(CurrentCharacterRouteIndexCc8Scaffold()),
             static_cast<unsigned>(expectedScratchRequest),
             static_cast<unsigned>(Arg6WorldUpperBoundExclusive()));
         return nullptr;
@@ -631,9 +645,17 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
 
     arg6SelectionDescriptor40Packed_ = {};
     arg6SelectionDescriptor40_ = {};
-    arg6SelectionDescriptor40Packed_.field03 =
-        static_cast<uint32_t>(reinterpret_cast<uintptr_t>(descriptorName));
-    arg6SelectionDescriptor40Packed_.field07 = descriptorSelectionId;
+    // Current tight static read from `client.dll:0x62195ff0`:
+    // - the profile-path builder pushes payload dword `+0x03` into the `%X` suffix slot for
+    //   `"Profiles\\%s\\%s_%X\\"`
+    // - the middle `%s` comes from client global `DAT_629de48c`, not from this descriptor payload
+    // - so using a transient string pointer in field03 is lower fidelity and creates heap-address-
+    //   shaped profile folders (`Morg4n_3E75D8`, etc.)
+    // Keep the descriptor payload id-shaped on the active path instead:
+    // - current-slot route: GlobalCharacterId low/high dwords
+    // - scratch/current-slot-index fallback: stable selection-id low dword, zero high dword
+    arg6SelectionDescriptor40Packed_.field03 = descriptorField03;
+    arg6SelectionDescriptor40Packed_.field07 = descriptorField07;
     arg6SelectionDescriptor40_.vtable00 = Arg6SelectionDescriptor40Vtable();
     arg6SelectionDescriptor40_.bufferBase04 = &arg6SelectionDescriptor40Packed_;
     arg6SelectionDescriptor40_.backingObject08 = nullptr;
@@ -642,9 +664,10 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
 
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
-        ((low24 == Arg6SelectedWorldIndexLow24()) ? "low24-world-match" : "other-match");
+        (matchedCurrentSlotIndexRequest ? "current-slot-index" :
+         ((low24 == Arg6SelectedWorldIndexLow24()) ? "low24-world-match" : "other-match"));
     spdlog::debug(
-        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} descriptorSource={} mappedName='{}' vtable={} field03=0x{:08x} field07=0x{:08x} field03AsPtr={} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
+        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} descriptorSource={} mappedName='{}' vtable={} field03=0x{:08x} field07=0x{:08x} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
         static_cast<unsigned>(selectionIndex),
         static_cast<unsigned>(low24),
         static_cast<unsigned>(high8),
@@ -655,7 +678,6 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
         fmt::ptr(arg6SelectionDescriptor40_.vtable00),
         static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field03),
         static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field07),
-        fmt::ptr(reinterpret_cast<const void*>(static_cast<uintptr_t>(arg6SelectionDescriptor40Packed_.field03))),
         static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
         static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
         static_cast<unsigned>(expectedScratchRequest));
@@ -1798,7 +1820,11 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     return 0u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// replacement materializer over the original producer-owned state8/load-character family:
+// - producer boundary remains `launcher.exe:0x43f930`
+// - getter boundary remains `launcher.exe:0x41f1c0`
+// Keep this limited to stitching the already-recovered owner `+0xf1c/+0xf48/+0xf88/+0x13f0`
+// state back into one contiguous `+0xf4` client view.
 const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8PersistenceF1cView() const {
     auto copyCStringIntoFixed = [](std::array<char, 0x20>& dest, const char* src) {
         std::fill(dest.begin(), dest.end(), '\0');
@@ -1840,9 +1866,10 @@ const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8Pe
     }
 
     characterName = preferNonEmpty(characterName, ownerState.characterNameBufferF1c);
-    realFirstName = preferNonEmpty(realFirstName, ownerState.characterNameBufferF1c);
-    realLastName = preferNonEmpty(realLastName, ownerState.characterNameBufferF1c);
-    background = preferNonEmpty(background, ownerState.characterNameBufferF1c);
+    // Keep ancillary +0xf4 strings as the already-recovered first/last/background view instead of
+    // fabricating character-name fallbacks here.
+    // Current original-vs-replacement `Morg4n_6DCE/mcd.cfg` comparison shows the original leaves
+    // the background slot empty while the lower-fidelity replacement injected `Morg4n` there.
 
     copyCStringIntoFixed(state8PersistenceF1c_.string00, characterName);
     state8PersistenceF1c_.field20 = ownerState.characterReplyFieldF3c;
@@ -1873,8 +1900,12 @@ const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8Pe
     return state8PersistenceF1c_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41f1c0 / owner vtable +0xf4
 const void* CLTLoginMediator::GetState8PersistenceF1c() const {
+    // Keep the wrapper-facing body close to the original tiny getter:
+    // - original `0x41f1c0` returns owner `+0xf1c`
+    // - current replacement still synthesizes that contiguous view from the already-recovered
+    //   state8/load-character producer family instead of re-parsing anything at getter time
     const State8PersistenceF1cSnapshot& snapshot = State8PersistenceF1cView();
     ++profile0f4Count_;
     const auto& ownerState = PostAuthMarginLoadingStateView();

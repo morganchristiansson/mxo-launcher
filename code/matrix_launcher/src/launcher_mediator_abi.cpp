@@ -374,23 +374,45 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 // vtable: ILTLoginMediator.Default slot +0x38
 static const char* __thiscall Mediator_GetProfileRootName38(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    const char* const result = mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
+    spdlog::info(
+        "MediatorStub::GetProfileRootName38 caller={} [{}] result='{}'",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        NonEmptyOrPlaceholder(result));
+    return result;
 }
 
 // anchor: client.dll fallback-selection path asks arg6 +0x3c for the default selection index when given 0xff
 // vtable: ILTLoginMediator.Default slot +0x3c
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
+    spdlog::info(
+        "MediatorStub::GetDefaultSelectionIndex3c caller={} [{}] result=0x{:08x}",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        static_cast<unsigned>(result));
+    return result;
 }
 
 // UNANCHORED: C helper behind the recovered +0x40 ABI wrapper.
 extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     MinimalLoginMediatorStub* self,
-    uint32_t selectionIndex) {
+    uint32_t selectionIndex,
+    void* returnAddress) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetArg6SelectionDescriptorObject40(
+    void* const result = mxo::ltlogin::ILTLoginMediator::Default->GetArg6SelectionDescriptorObject40(
         selectionIndex);
+    spdlog::info(
+        "MediatorStub::GetSelectionDescriptor40 caller={} [{}] selectionIndex=0x{:08x} result={}",
+        fmt::ptr(returnAddress),
+        DescribeLateMediatorAbiCaller(returnAddress),
+        static_cast<unsigned>(selectionIndex),
+        fmt::ptr(result));
+    return result;
 }
 
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
@@ -399,16 +421,18 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
 // `0x004b01c8 +0x40/+0x44` slot-record accessor names onto it.
 __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
     __asm__ volatile(
+        "mov (%%esp), %%edx\n\t"
         "mov 4(%%esp), %%eax\n\t"
+        "push %%edx\n\t"
         "push %%eax\n\t"
         "push %%ecx\n\t"
         "mov %0, %%eax\n\t"
         "call *%%eax\n\t"
-        "add $8, %%esp\n\t"
+        "add $12, %%esp\n\t"
         "ret $4\n\t"
         :
         : "i"(Mediator_GetSelectionDescriptor40_Impl)
-        : "eax");
+        : "eax", "edx");
 }
 
 // UNANCHORED: C helper behind the recovered +0x44 ABI wrapper.

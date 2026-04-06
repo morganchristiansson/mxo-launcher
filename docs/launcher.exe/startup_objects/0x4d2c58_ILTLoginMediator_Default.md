@@ -777,7 +777,11 @@ The same `InitClientDLL_BeginLoadingCharacterFlow` (`0x62170b00`) family also ca
 That materially strengthens the interpretation that:
 
 - `+0x38` is a **profile-root string input** to the client's config-path builder,
-- `+0x40` maps an arg7-derived selection request into a descriptor payload whose fields at `+3` and `+7` feed the `%s_%X` path suffix formatting,
+- `+0x40` maps an arg7-derived selection request into a descriptor payload whose fields at `+3` / `+7` are read by the later profile-path builder,
+  and current static tightening of `client.dll:0x62195ff0` now makes one concrete part of that contract explicit:
+  - payload dword `+0x03` is pushed into the `%X` suffix slot of `"Profiles\\%s\\%s_%X\\"`
+  - the middle `%s` comes from client global `DAT_629de48c`
+  - so replacement-side field `+0x03` should stay ID-shaped on the active route, not a transient string pointer,
 - `+0xec` is a **selection/config state handoff**,
 - and `+0xf4` is **not** just a plain string helper and now also appears broader than the older plain selection/config-snapshot read.
   Newer client-side UI/persistence proof later tightens that further:
@@ -883,6 +887,10 @@ Fresh raw-vtable / disassembly review of `0x004b01c8` tightens the earlier diagn
 
 So the remaining replacement-side diagnostic acceptance is narrower:
 - `+0x40` still accepts the exact client scratch-shaped request derived from the current configured arg7 state
+- but newer static tightening of `client.dll:0x62195ff0` also proves a second concrete request family:
+  - when the profile-path builder is passed `0xff`, it first calls mediator `+0x3c`
+  - then immediately passes that returned current-slot byte straight into mediator `+0x40`
+  - so replacement `+0x40` must also accept the exact current selected slot index from owner `+0xcc8`, not only the arg7 scratch-shaped request
 - `+0xfc`, `+0x100`, and `+0xe4` still exact-match the configured selected world / variant pair on that bounded fallback path
 - but `+0x3c/+0xd8/+0xdc` should now stay anchored to the direct owner reads above instead of routing through the older configured-world / arg6-fallback interpretation
 
@@ -925,8 +933,9 @@ Important neighboring detail from the same block:
   - specifically through that client-owned `0x629e1c7c` state path
   - and the later scratch-shaped `+0x40` request key
 
-The replacement launcher now accepts that scratch-shaped request diagnostically and returns the configured descriptor with the expected:
-- `packedSelectionId=0x00002a`
+The replacement launcher now accepts that scratch-shaped request diagnostically and returns the configured descriptor with the expected stable id-shaped payload:
+- current-slot route: low/high global-character-id dwords
+- fallback route: stable selection-id low dword + zero high dword
 - `matchMode=arg7-scratch-shape`
 
 Current correction:

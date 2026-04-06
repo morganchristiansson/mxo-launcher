@@ -83,6 +83,10 @@ extern "C" DLLEXPORT void __stdcall SetMasterDatabase(void* pMasterDatabase);
 static constexpr DWORD kMsvcThreadNameException = 0x406d1388u;
 
 static void LogWordSpan(const char* label, const void* base, size_t wordCount);
+static bool DiagnosticReadableMemoryRange(const void* base, size_t byteCount);
+static void LogWordSpanIfReadable(const char* label, const void* base, size_t wordCount);
+static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress);
+static void LogClientCrashContext();
 static const char* DiagnosticExceptionCodeName(DWORD exceptionCode);
 static const char* DiagnosticExceptionClassification(DWORD exceptionCode);
 static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTERS* exceptionInfo);
@@ -105,6 +109,135 @@ static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
             (i + 2 < wordCount) ? words[i + 2] : 0,
             static_cast<unsigned>((i + 3) * 4),
             (i + 3 < wordCount) ? words[i + 3] : 0);
+    }
+}
+
+static bool DiagnosticReadableMemoryRange(const void* base, size_t byteCount) {
+    if (!base || byteCount == 0) {
+        return false;
+    }
+
+    const uint8_t* cursor = static_cast<const uint8_t*>(base);
+    size_t remaining = byteCount;
+    while (remaining != 0) {
+        MEMORY_BASIC_INFORMATION mbi = {};
+        if (VirtualQuery(cursor, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+            return false;
+        }
+        if (mbi.State != MEM_COMMIT) {
+            return false;
+        }
+        if ((mbi.Protect & PAGE_GUARD) != 0 || (mbi.Protect & PAGE_NOACCESS) != 0) {
+            return false;
+        }
+
+        const bool readable =
+            (mbi.Protect & PAGE_READONLY) != 0 ||
+            (mbi.Protect & PAGE_READWRITE) != 0 ||
+            (mbi.Protect & PAGE_WRITECOPY) != 0 ||
+            (mbi.Protect & PAGE_EXECUTE_READ) != 0 ||
+            (mbi.Protect & PAGE_EXECUTE_READWRITE) != 0 ||
+            (mbi.Protect & PAGE_EXECUTE_WRITECOPY) != 0;
+        if (!readable) {
+            return false;
+        }
+
+        const uintptr_t regionEnd =
+            reinterpret_cast<uintptr_t>(mbi.BaseAddress) + static_cast<uintptr_t>(mbi.RegionSize);
+        const uintptr_t current = reinterpret_cast<uintptr_t>(cursor);
+        if (regionEnd <= current) {
+            return false;
+        }
+        const size_t covered = static_cast<size_t>(regionEnd - current);
+        if (covered >= remaining) {
+            return true;
+        }
+        cursor += covered;
+        remaining -= covered;
+    }
+    return true;
+}
+
+static void LogWordSpanIfReadable(const char* label, const void* base, size_t wordCount) {
+    if (!label || !base || wordCount == 0) {
+        return;
+    }
+    if (!DiagnosticReadableMemoryRange(base, wordCount * sizeof(uint32_t))) {
+        spdlog::info("{} @ {} <unreadable>", label, fmt::ptr(base));
+        return;
+    }
+    LogWordSpan(label, base, wordCount);
+}
+
+static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) {
+    // anchor: client.dll is loaded as the real module; crash-time helper converts fixed static-RE
+    // addresses back into the live mapped image base instead of assuming 0x62000000 is still the
+    // active load address.
+    const uint8_t* clientBase =
+        reinterpret_cast<const uint8_t*>(g_hClient ? g_hClient : GetModuleHandleA("client.dll"));
+    if (!clientBase || absoluteAddress < 0x62000000u) {
+        return nullptr;
+    }
+    return clientBase + (absoluteAddress - 0x62000000u);
+}
+
+static void LogClientCrashContext() {
+    // anchor: client.dll:0x62001180 = RunClientDLL passes the global ClientShell object rooted at
+    // DAT_629ddfc8 into 0x62006c30; client.dll:0x6217f370 also stores `this` into DAT_629e68a8.
+    const void* const clientShellSlot = DiagnosticClientAbsoluteToPointer(0x629e68a8u);
+    LogWordSpanIfReadable("client DAT_629e68a8 slot", clientShellSlot, 4);
+
+    const void* clientShell = nullptr;
+    if (clientShellSlot && DiagnosticReadableMemoryRange(clientShellSlot, sizeof(void*))) {
+        clientShell = *static_cast<const void* const*>(clientShellSlot);
+    }
+    if (clientShell != nullptr) {
+        LogWordSpanIfReadable(
+            "client shell state18..34",
+            static_cast<const uint8_t*>(clientShell) + 0x18,
+            8);
+        // anchor: client.dll:0x62173bcd reads `this + 0xd0` before the alternate null-vcall family
+        // at `0x62173bd9`, so keep that current transition/runtime object visible in crash logs.
+        LogWordSpanIfReadable(
+            "client shell d0..ec",
+            static_cast<const uint8_t*>(clientShell) + 0xd0,
+            8);
+
+        const void* currentRuntimeObject = nullptr;
+        const void* currentRuntimeVftable = nullptr;
+        const void* const d0Field = static_cast<const uint8_t*>(clientShell) + 0xd0;
+        if (DiagnosticReadableMemoryRange(d0Field, sizeof(void*))) {
+            currentRuntimeObject = *static_cast<const void* const*>(d0Field);
+        }
+        if (currentRuntimeObject != nullptr) {
+            LogWordSpanIfReadable("client shell +0xd0 object", currentRuntimeObject, 8);
+            if (DiagnosticReadableMemoryRange(currentRuntimeObject, sizeof(void*))) {
+                currentRuntimeVftable = *static_cast<const void* const*>(currentRuntimeObject);
+            }
+            LogWordSpanIfReadable("client shell +0xd0 vftable", currentRuntimeVftable, 8);
+        }
+    }
+
+    // Late render-family globals seen in the active d3d9 crash chain:
+    // - client.dll:0x62337d70 uses DAT_62a01e5c
+    // - client.dll:0x62452780 uses DAT_62a333a4
+    // - client.dll:0x62159ef0 / broader frame loop repeatedly use DAT_629f84e8 and DAT_629f1748
+    for (const auto& globalInfo : {
+             std::pair<const char*, uintptr_t>{"client DAT_629f84e8 slot", 0x629f84e8u},
+             std::pair<const char*, uintptr_t>{"client DAT_629f1748 slot", 0x629f1748u},
+             std::pair<const char*, uintptr_t>{"client DAT_62a01e5c slot", 0x62a01e5cu},
+             std::pair<const char*, uintptr_t>{"client DAT_62a333a4 slot", 0x62a333a4u},
+         }) {
+        const void* const slot = DiagnosticClientAbsoluteToPointer(globalInfo.second);
+        LogWordSpanIfReadable(globalInfo.first, slot, 4);
+        const void* pointedObject = nullptr;
+        if (slot && DiagnosticReadableMemoryRange(slot, sizeof(void*))) {
+            pointedObject = *static_cast<const void* const*>(slot);
+        }
+        if (pointedObject != nullptr) {
+            std::string label = std::string(globalInfo.first) + " -> object";
+            LogWordSpanIfReadable(label.c_str(), pointedObject, 8);
+        }
     }
 }
 
@@ -208,6 +341,7 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
     if (g_pILTLoginMediatorDefault) {
         LogWordSpan("current arg6 mediator", g_pILTLoginMediatorDefault, 8);
     }
+    LogClientCrashContext();
 }
 
 static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo) {

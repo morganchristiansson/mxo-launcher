@@ -517,6 +517,22 @@ Current active runtime split inside those exact mappings:
 - `cui.cfg` is currently absent on the active path
 - the rest above reach the non-zero payloads already confirmed by rerun logs
 
+Important exact correction on the similarly-named `btl.cfg` sibling:
+- `btl.cfg` is **not** one of the state8 live mediator sections above
+- client static proof now splits it cleanly:
+  - `client.dll:0x62197230 = LoadSelectionBtlCfgIfPresent`
+    - only **loads an already-existing** `btl.cfg` during `PersistSelectionCfgCorpusIfDirty`
+  - `client.dll:0x62196b80 = PersistSelectionBtlCfg`
+    - is the dedicated **writer** used only by the later bulk save helper
+      `0x62198490 = PersistSelectionCfgCorpusFromEnableFlags`
+- refreshed active reference check now leaves the remaining neighboring file diffs as:
+  - original-only `btl.cfg`
+  - saved `cs.cfg` five-byte low-bit family `{0,1,7,15,19}`
+  - while `mcd.cfg` has returned to bit-identical parity on the active route
+- practical consequence:
+  - missing replacement `btl.cfg` on a crash/early-stop route is a later direct-save reach/order
+    gap, not evidence that the current state8 section mappings are wrong
+
 ## Active source ownership after cleanup split
 
 Focused replacement source files:
@@ -553,12 +569,17 @@ Recommended next pass:
 2. treat the old `cs.cfg` size mismatch as a **format** question, not a missing-entry-count question
    - live section `5` is now proven compact `6`-byte records
    - saved `cs.cfg` is the later expanded `10`-byte per-entry form
-3. the next highest-value remaining exact question inside this corpus is now the narrowed `cui.cfg` save mismatch:
+3. keep the remaining on-disk parity questions split by the exact client save family that owns them:
+   - `cs.cfg` final low-bit parity and `btl.cfg` creation both belong to the later bulk-save path
+     rooted at `0x62198490 = PersistSelectionCfgCorpusFromEnableFlags`
+   - do **not** try to "fix" those by inventing new mediator/state8 payloads when the real missing
+     thing may only be later reach/order into the client-owned bulk save writer family
+4. the next highest-value remaining exact question inside this corpus is now the narrowed `cui.cfg` save mismatch:
    - live mediator pair `+0x90/+0xb8` is still absent on the active replacement path
    - but the later replacement shutdown/direct-save family still recreates on-disk `cui.cfg`
    - while the bounded original route still omits it
    - focus next on which later client-owned save-path condition preserves or clears the dirty/save gate before `0x62198490 -> 0x62197050`
-4. after that, if any skills / bonus-skills parity is still missing, focus next on:
+5. after that, if any skills / bonus-skills parity is still missing, focus next on:
    - what the saved-`cs.cfg` second dword really means on the client side
    - whether the current `il.cfg` empty payload is faithful on the active path
 

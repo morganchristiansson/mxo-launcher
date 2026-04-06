@@ -391,17 +391,75 @@ Important remaining fidelity note from that same successful run:
     not-currently-taken later runtime path
   - the absent second observer registration is now concretely explained by the
     `DAT_629e689d != 0` shortcut in `ClientShell_LoginMediatorObserver_AdvanceState`
-  - later event `0x0f` likewise remains a true missing/not-yet-taken fidelity path, and the
-    current launcher-side reason is also concrete now: `0x41b420` sees `marginConnectionState=2`
-    and would call close with arg `1`, but the replacement still logs
-    `currentReplacementDoesNotInvokeCloseYet=1`
+  - later event `0x0f` likewise remains a true missing/not-yet-taken fidelity path
+  - launcher-side graceful margin close is now source-owned at `0x41b420` / wrapper `+0x16c`, so
+    the remaining question there is reach/order into the natural later tail, not whether the close
+    call itself is still omitted
 
-Current strongest remaining concrete questions:
-1. whether the still-missing later `0x62017150` path is actually optional on the working route or
-   gated by additional client state beyond the now-populated late-entry list
-2. whether the now-restored faithful margin close at `0x41b420` is sufficient by itself to make
-   the replacement visibly re-hit the natural later `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` tail,
-   or whether another runtime/order dependency is still missing
+Newer replacement reruns (`2026-04-06`) tighten the active post-`0x18` failure further and split it
+into two concrete families inside the same later client-shell frame path.
+
+### Active render-family crash (`MatrixOnline_0.0_crash_39.dmp`)
+Current latest successful-to-crash chain now reaches:
+- `RunClientDLL`
+- `client.dll:0x62006c30 = ClientShell_MainLoopPumpAndRunFrame`
+- `client.dll:0x621736f0 = ClientShell_RunFrame`
+- `client.dll:0x62159ef0 = ClientShell_RenderFrameAndPresent`
+- `client.dll:0x624299d0 = WidgetManager_DrawCurrentRootWidget`
+- repeated `client.dll:0x62432fa0 = UIWidget_DrawChildWidgetsRecursive`
+- deeper widget/render helpers including:
+  - `0x6244aa80`
+  - `0x6244ef30`
+  - `0x62452780`
+  - `0x62337d70`
+- then top crash in `d3d9+0x32e2c`
+
+Latest dump/backtrace (`crash_39`):
+- `d3d9+0x32e2c`
+- `client+0x33821a` (`0x6233821a` inside `0x62337d70` draw submission)
+- `client+0x452827`
+- `client+0x44ef4d`
+- `client+0x4330b7`
+- `client+0x44ad4b`
+- repeated `client+0x4330b7`
+- `client+0x429a29`
+- `client+0x17477f`
+- `client+0x6c8e`
+
+Current best read:
+- the active replacement path now gets through immediate event-`0x18` observer/late-entry setup and
+  dies later during recursive widget rendering / draw submission, not during the earlier login-state
+  handoff itself
+- the repeated `+0xec` widget recursion frames make the current failure look more like later UI /
+  render-tree state than a direct margin/bootstrap failure
+
+### Alternate null-vcall family (`MatrixOnline_0.0_crash_38.dmp`)
+A second late-family crash still appears on nearby reruns:
+- top `EIP = 0x00000000`
+- return address on stack = `client.dll:0x62173bdc`
+- exact static site is `ClientShell_RunFrame` at:
+  - `0x62173bcd: mov ecx,[esi+0xd0]`
+  - `0x62173bd7: mov edx,[ecx]`
+  - `0x62173bd9: call [edx+0x68]`
+
+Important dump fact from that family:
+- crash-time `EDX = 0x0a2eb1c8`, i.e. a heap-shaped pointer instead of a static client `.rdata`
+  vftable address
+- current best narrow read is therefore:
+  - client-shell field `+0xd0` sometimes points at a wrong/incomplete runtime object on this route,
+    or at least one whose first dword is not the expected polymorphic vftable for this call site
+
+### Practical consequence
+The remaining crash question is now tighter than before:
+1. render-family crash:
+   - which late UI/widget/runtime object tree reaches
+     `WidgetManager_DrawCurrentRootWidget -> UIWidget_DrawChildWidgetsRecursive -> draw submission`
+     with bad render state/data on the replacement route?
+2. alternate null-vcall family:
+   - which path populates client-shell `+0xd0`, and why can that field still hold a bad object type
+     on nearby replacement reruns?
+3. because original launcher/client now reaches game without this failure, both families remain
+   replacement-specific until proven otherwise
 
 ## First files to read next session
 

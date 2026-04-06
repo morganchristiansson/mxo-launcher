@@ -203,19 +203,45 @@ Observer/event bridge relevant to entering the save family:
 - `matrixstaging/game/src/libltclientlogin/loginmediator_events.cpp`
   - `dispatching observer=... event=0x0b`
 
+## Refreshed active reference status (2026-04-06)
+
+After the narrow `+0xf4` tightening, a refreshed original reference run on the active
+`Morg4n_6DCE` route now brings `mcd.cfg` back to bit-identical parity with the current replacement
+output.
+
+Current checked pair:
+- original reference corpus observed under:
+  - `~/.wine/drive_c/users/morgan/AppData/Local/The Matrix Online/Profiles/morgan/Morg4n_6DCE/`
+- current replacement corpus observed under:
+  - `~/MxO_7.6005/Profiles/morgan/Morg4n_6DCE/`
+
+Current content result:
+- `mcd.cfg`
+  - original md5: `a0ae34af5211ae1c45ecf4735ece388e`
+  - replacement md5: `a0ae34af5211ae1c45ecf4735ece388e`
+  - bit-identical again
+- remaining neighboring diffs are now outside this narrowed `mcd.cfg` body question:
+  - original-only `btl.cfg`
+  - saved `cs.cfg` five-byte low-bit family `{0,1,7,15,19}`
+
+Current project scope note from the latest user clarification:
+- the original temp-copy + alternate-profile-root behavior is **not** a desired reimplementation
+  target for now
+- so the active fidelity question here is file **content**, not reproducing the original temp/
+  AppData path side effects
+
 ## Practical next step
 
-`mcd.cfg` content parity is now closed enough to count as successful for the current session.
+For `mcd.cfg`, keep the issue closed unless a new concrete mismatch appears.
 
-If another pass is needed, keep it narrow and evidence-backed:
-1. decide whether **path parity** matters beyond file-content parity
-   - current replacement output path:
-     - `~/MxO_7.6005/Profiles/morgan/Reality_3ED980/mcd.cfg`
-   - current original reference path:
-     - `~/.wine/drive_c/users/morgan/AppData/Local/The Matrix Online/Profiles/morgan/Morg4n_6DCE/mcd.cfg`
-2. if path parity matters, isolate which client path-builder input still differs
-   - likely current-slot / descriptor naming/id surfaces rather than the already-closed file body
-3. otherwise leave the pre-`0x62198fa0` live-corpus family (`+0x68 .. +0xb8`) alone until a new
-   concrete mismatch requires reopening it
+The remaining cfg-parity work should stay on its own exact client-owned surfaces:
+1. `btl.cfg`
+   - later bulk-save writer `client.dll:0x62196b80 = PersistSelectionBtlCfg`
+2. saved `cs.cfg` final-form parity
+   - later save path centered on
+     `client.dll:0x621966d0 = PersistSelectionCsCfg`
+   - current five-byte difference still matches the already-documented later-save ordering issue
+3. keep the pre-`0x62198fa0` live-corpus family (`+0x68 .. +0xb8`) separate unless a new concrete
+   mismatch forces it back open
 
 Do not regress into broad client-side archaeology unless a new concrete parity failure appears.

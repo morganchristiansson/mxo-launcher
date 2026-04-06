@@ -1,101 +1,114 @@
-# Current Crash Analysis - 2025-03-11
+# Current crash analysis - 2026-04-06
 
-## Crash Location
-- **Address**: `client.dll+0x875895`
-- **EIP**: `0x62875895` (relative to base `0x62000000`)
+This file replaces the older stale `0x875895` note.
 
-## Register State
-```
-EAX: 620af9d0    - Vtable pointer (0x628af9d0)
-EBX: 629ddfc8    - Unknown object
-ECX: 62999968    - State object (our injected object!)
-EDX: 00000002    - Parameter
-ESI: 003e1ef4
-EDI: 0000002b
-ESP: 0063fe40    - Stack pointer
-EBP: 0063fe71    - Base pointer
-```
+Current active crash work should be anchored to the later post-login client-shell/runtime path that
+now starts successfully, reaches visible game entry, and then dies in one of two late families.
 
-## Analysis
+## Current state
 
-### The Problem: Invalid Memory
-The crash location (`0x875895` relative offset) shows:
-```
-0x00875890: ff ff ff ff ff ff ff ff ...
-```
+Replacement now reliably reaches:
+- state8 raw `0x10`
+- state9 raw `0x11`
+- state12 / event `0x18`
+- visible **Waiting for Regionserver**
+- in-game `MATRIX_ONLINE` window
+- `RunClientDLL` active frame loop
 
-All bytes are `0xFF` - this is **uninitialized memory** or beyond code section!
+So the current crash is no longer an early auth/bootstrap or immediate event-`0x18` blocker.
 
-### What Happened
+## Crash family A: late render / widget recursion
 
-The code flow:
-1. RunClientDLL calls function via vtable
-2. That function calls another function
-3. Eventually jumps/calls to `client+0x875895`
-4. This is garbage/uninitialized memory -> CRASH
+Latest representative dump:
+- `~/MxO_7.6005/MatrixOnline_0.0_crash_39.dmp`
 
-### Root Cause
+Backtrace:
+- `d3d9+0x32e2c`
+- `client.dll:0x6233821a`
+- `client.dll:0x62452827`
+- `client.dll:0x6244ef4d`
+- `client.dll:0x624330b7`
+- `client.dll:0x6244ad4b`
+- repeated `client.dll:0x624330b7`
+- `client.dll:0x62429a29`
+- `client.dll:0x6217477f`
+- `client.dll:0x62006c8e`
+- `client.dll:0x6200118a`
 
-The managed object we injected has a vtable, but the vtable entries are pointing to:
-- Our stub functions (which just return)
-- Or uninitialized memory
+Current named function map:
+- `0x62006c30 = ClientShell_MainLoopPumpAndRunFrame`
+- `0x621736f0 = ClientShell_RunFrame`
+- `0x62159ef0 = ClientShell_RenderFrameAndPresent`
+- `0x624299d0 = WidgetManager_DrawCurrentRootWidget`
+- `0x62432fa0 = UIWidget_DrawChildWidgetsRecursive`
 
-The code at `client+0x3b3560` expects:
-```c
-mov ecx, [ebx+0x4]      ; Get pManagedObject from StateObject
-mov eax, [ecx]           ; Get vtable from ManagedObject
-call [eax+0x3c]          ; Call function at offset 0x3C in vtable
-```
+Current best read:
+- the active replacement route survives the immediate late-login handoff
+- then later dies during recursive widget drawing / render submission
+- the deepest client frames now look like ordinary UI/render traversal rather than direct login
+  mediator logic
 
-If `eax+0x3c` points to `0x620af9d0 + 0x3c = 0x628af9d0`, that's the actual client.dll vtable.
+## Crash family B: alternate null-vcall in `ClientShell_RunFrame`
 
-### Looking at the Data
+Representative dump:
+- `~/MxO_7.6005/MatrixOnline_0.0_crash_38.dmp`
 
-The vtable at `0x628af9d0`:
-```
-000af9d0: 60313b62  b8926a62  b8926a62  a0363b62
-         ^^^^^^^^
-         0x623b3160 - First function
-```
+Backtrace:
+- `EIP = 0x00000000`
+- return address on stack = `client.dll:0x62173bdc`
+- then back out through:
+  - `client.dll:0x62006c8e`
+  - `client.dll:0x6200118a`
 
-First function at `0x623b3160`:
-```
-mov eax, 0x628afa28
-ret
-```
-
-This just returns a pointer. If called via `call [eax+0x3c]`, this would return immediately.
-
-But the problem is our StateObject has:
-```c
-StateObject* pState = 0x62999968;
-pState->vtable = 0x620af9d0;  // Use client's vtable
-pState->pManagedObject = &ourManagedObject;  // Our managed object
+Exact static site:
+```asm
+62173bcd  mov ecx,[esi+0xd0]
+62173bd7  mov edx,[ecx]
+62173bd9  call [edx+0x68]
 ```
 
-When the code does:
-```c
-mov ecx, [ebx+0x4]      ; ecx = pManagedObject (ourManagedObject)
-mov eax, [ecx]           ; eax = ourManagedObject.vtable
-```
+Important dump fact from this family:
+- crash-time `EDX = 0x0a2eb1c8`
+- that is heap-shaped, not a static client `.rdata` vftable address
 
-Our managedObject.vtable is **0x4040d0c0** (our vtable), which is in our process memory. This is valid but the function pointers point to our stub functions.
+Current best read:
+- client-shell field `+0xd0` sometimes holds a wrong/incomplete runtime object on the replacement
+  route
+- or at least one whose first dword is not the expected polymorphic vftable for this call site
 
-**The crash is in client.dll code after the stub returns!**
+## Practical consequence
 
-## Next Steps
+The current crash investigation should stay focused on:
+1. how client-shell field `+0xd0` is populated on the late runtime path
+2. which widget/runtime object tree later reaches:
+   - `WidgetManager_DrawCurrentRootWidget`
+   - `UIWidget_DrawChildWidgetsRecursive`
+   - deeper draw submission
+3. which replacement-specific late state/data mismatch can produce either:
+   - a bad `+0xd0` runtime object
+   - or a bad widget/render tree deeper in the same frame path
 
-1. Need to understand what function at vtable[15] (offset 0x3c) should do
-2. Look at actual client.dll vtable at 0x628af9d0, entry 15
-3. See what that function does and implement proper behavior
+## Non-root-cause notes
 
-## References
+These are no longer the best primary crash explanations:
+- early auth/bootstrap fidelity
+- immediate event-`0x18` handoff failure
+- `mcd.cfg` body mismatch
+  - current active original/reference and replacement `mcd.cfg` are bit-identical again
+- original temp-copy / alternate AppData path side effects
+  - user explicitly does **not** want those reproduced for now
 
-- Test code: `test_fixed_state.cpp`
-- Crash dump: `MatrixOnline_0.0_crash_66.dmp`
-- Vtable: `client.dll+0xaf9d0`
-- State object: `client.dll+0x999968`
+## Current supporting diagnostics in source
 
----
+`src/resurrections.cpp` now logs extra crash-time client context for this path:
+- `DAT_629e68a8` client-shell slot
+- client-shell state around `+0x18 .. +0x34`
+- client-shell runtime-object field `+0xd0 .. +0xec`
+- `client shell +0xd0` pointed object and first vftable words when readable
+- render-family globals used by the late frames:
+  - `DAT_629f84e8`
+  - `DAT_629f1748`
+  - `DAT_62a01e5c`
+  - `DAT_62a333a4`
 
-**Status**: Investigating - need to find proper vtable function at offset 0x3c
+Use those logs on the next rerun before widening scope.
