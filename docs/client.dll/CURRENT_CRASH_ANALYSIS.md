@@ -108,10 +108,17 @@ The current crash investigation should stay focused on:
    though:
    - the `+0xd0` RCC-like object family now matches the healthy original route closely enough
    - and the current state9 callback blob transform now cross-checks against a live original sample
-4. current next concrete diagnostic step:
-   - dump the popup-referenced shader `.fx` file from the running process and log the lines around
-     the reported compile errors so the bad generated source can be compared directly against the
-     expected path
+4. popup-specific shader path is now concretely narrowed too:
+   - replacement now dumps the in-memory compiled source to
+     `C:\users\morgan\AppData\Local\The Matrix Online\Shaders\a7f16968.fx`
+   - current failing source proves the generated `VS_INPUT` struct is empty while `vs_main` still
+     uses `input.pos`, which explains the popup compiler error directly
+5. current next concrete runtime experiment:
+   - drain queued type-1 close work (`MarginPeerClosed`) immediately on the single-process bridge,
+     the same way status/type-3 work is already drained
+   - reason: current replacement often queues the post-state9 margin close but then crashes in late
+     rendering before the next outer queue pump can reach the natural
+     `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` tail
 
 ## Non-root-cause notes
 

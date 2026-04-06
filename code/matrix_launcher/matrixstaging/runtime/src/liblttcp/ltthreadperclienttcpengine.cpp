@@ -2907,10 +2907,13 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         workPayload);
 
     // Source-owned active-path tightening for the current launcher/client single-process bridge:
-    // some late startup consumers expect type-2 status work to become visible with less latency
-    // than the current queue-thread/poll cadence always guarantees. Drain the shared completed-work
-    // queue once here, non-blocking, after the enqueue succeeds.
-    if (workType == kWorkTypeConnectionStatus) {
+    // some late startup consumers expect queued status/close work to become visible with less
+    // latency than the current queue-thread/poll cadence always guarantees.
+    // In particular, the post-state9 healthy original tail eventually reaches the queued margin
+    // peer-close -> `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` path, while the replacement can crash
+    // in late rendering before the next outer pump drains that close work.
+    // Drain the shared completed-work queue once here, non-blocking, after the enqueue succeeds.
+    if (workType == kWorkTypeConnectionStatus || workType == kWorkTypeClose) {
         RunCompletedOperationQueue(/*nonBlocking=*/true);
     }
     return true;
