@@ -700,6 +700,8 @@ void CLTTCPConnection::EnqueueCompletedPacketWorkItemScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
     // Current best static read of `0x449d40` / `0x469bf0`:
     // - the queue handoff is exactly `(engine+0x10, completedPacketWorkItem, this, false)`
+    // - the queued context on that path is the direct connection object (`this`), not the
+    //   source-owned queue-context bridge kept around for consumer-side compatibility fallback
     // - this receive path therefore always targets queue0C through `0x436820`
     // - original caller-side lifetime does not depend on enqueue success because `0x436820`
     //   returns `void`; once we reach this seam the completed parsed-packet work item is

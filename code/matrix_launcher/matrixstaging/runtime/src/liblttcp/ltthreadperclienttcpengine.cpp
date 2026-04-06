@@ -1843,42 +1843,47 @@ static void QueueContext_OnOperationCompleted(void* context, void* workItem) {
         return;
     }
 
-    void** vtable = *reinterpret_cast<void***>(context);
-    if (!vtable || !vtable[4]) {
-        return;
+    // Current recovered producer set now reaches the queue consumer with either:
+    // - the direct connection object (`context=this`) on the original type-1/type-2/type-3 paths
+    // - the source-owned `CBaseConnection_QueueContextScaffold` bridge on older/fallback paths
+    CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context);
+    if (completionTarget == nullptr) {
+        completionTarget = static_cast<CBaseConnection*>(context);
     }
 
-    typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
-    OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
-    (void)fn(context, workItem);
+    (void)completionTarget->OnOperationCompleted(workItem);
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
 // Current best consumer anchor is the conditional context->+0x04 release after type-1 work.
+// Only the explicit source-owned queue-context bridge participates in that compatibility release.
 static void QueueContext_Release(void* context) {
-    if (!context) {
+    CBaseConnection_QueueContextScaffold* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(context);
+    if (!queueContext || CBaseConnection_FromQueueContextScaffold(queueContext) == nullptr) {
         return;
     }
 
-    void** vtable = *reinterpret_cast<void***>(context);
+    void** vtable = *reinterpret_cast<void***>(queueContext);
     if (!vtable || !vtable[1]) {
         return;
     }
 
     typedef uint32_t (__thiscall *ReleaseFn)(void*);
     ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-    (void)fn(context);
+    (void)fn(queueContext);
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
 // Current best consumer anchor is the `(char)context[1]` test in 0x436d31..0x436ee7.
+// The direct connection object path now reaches the queue consumer directly, so only the explicit
+// queue-context bridge keeps a source-owned `autoReleaseFlag` here.
 static bool QueueContext_ShouldAutoReleaseAfterType1(void* context) {
-    if (!context) {
-        return false;
-    }
-
-    const uint8_t* bytes = static_cast<const uint8_t*>(context);
-    return bytes[4] != 0;
+    CBaseConnection_QueueContextScaffold* queueContext =
+        static_cast<CBaseConnection_QueueContextScaffold*>(context);
+    return queueContext != nullptr &&
+        CBaseConnection_FromQueueContextScaffold(context) != nullptr &&
+        queueContext->autoReleaseFlag != 0u;
 }
 
 // Keep the implementation intentionally conservative.
@@ -2482,9 +2487,10 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     // Current bounded fidelity correction:
     // - original queue consumers dequeue a real connection-family object as `context` before
     //   calling arg5 slot 12 / CleanupConnection
-    // - current source often queues the explicit `CBaseConnection_QueueContextScaffold` bridge
-    //   instead so later callback dispatch can still land on `vtable[4]`
-    // - slot-12-style worker lookup/teardown therefore has to unwrap that bridge back to the
+    // - current source now follows that direct-connection shape on the recovered type-1/type-2/
+    //   type-3 producers, but still accepts the older `CBaseConnection_QueueContextScaffold`
+    //   bridge on fallback paths
+    // - slot-12-style worker lookup/teardown therefore still normalizes bridge inputs back to the
     //   owning connection object instead of searching worker/message tables with the bridge
     //   pointer itself
     // - original `0x4316a0` also acquires arg5 helper `+0x98`; after the current ownership move,
@@ -2860,8 +2866,9 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     // Current tighter RE-backed correction:
     // - original worker-thread producers queue the direct connection object as `context`
     //   for type-1 close, type-2 status, and type-3 parsed-packet work
-    // - current source therefore routes launcher-bridge work through the sidecar connection's
-    //   queue-context scaffold, not through the mediator-owned owner/context record
+    // - current source now follows that on this launcher-bridge status path too by queueing the
+    //   sidecar connection object itself, not the source-owned queue-context bridge and not the
+    //   mediator-owned owner/context record
     // - bounded active-path proof now closes this enough to prune the older no-sidecar fallback:
     //   current callers either resolve `launcherContext` from a live connection first or only enter
     //   this helper after `PumpLauncherConnectionContextScaffold()` proved `sidecarConnection`
@@ -2878,7 +2885,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         return false;
     }
 
-    void* queuedContext = context->sidecarConnection->QueueContextScaffold();
+    void* queuedContext = static_cast<void*>(context->sidecarConnection);
     const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
         queuedContext,
@@ -2922,6 +2929,7 @@ void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffol
     const char* label) {
     // Current best original read for this receive path:
     // - `CLTTCPConnection::OnReceive` always calls `0x436820(engine+0x10, workItem, self, false)`
+    // - the queued context on that path is the direct connection object (`self`), not a wrapper
     // - queue selection is therefore fixed to queue0C here
     // - current parser read does not support an intentional `Parse(...) == 0` / `workItem == NULL`
     //   emit on this path; null work items belong to later lifecycle/shutdown producers instead
@@ -2929,7 +2937,7 @@ void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffol
     //   transferred to the queue/consumer boundary when this helper is entered
     (void)EnqueueCompletedOperationScaffold(
         workItem,
-        connection ? connection->QueueContextScaffold() : nullptr,
+        static_cast<void*>(connection),
         /*useQueue34=*/false,
         label,
         /*queueLockAlreadyHeld=*/false);

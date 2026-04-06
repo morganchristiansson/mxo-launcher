@@ -1518,7 +1518,10 @@ Build-validated update:
       - auth/margin connection ctors store the owning mediator directly at connection `+0xa4`
       - `CBaseConnection_ctor` seeds byte `+0x04 = 0`, which is the same low byte `0x436b10` later tests before any conditional `context->+0x04()` type-1 release tail
       - current mediator bridge records now mirror that by leaving `autoReleaseFlag` at zero, keeping the real connection owner pointer as the mediator, and using bridge slot `+0x10` only as the sidecar re-entry path into the connection-family completion callbacks
-    - producer-side tightening now also prunes the older no-sidecar queued-context fallback: launcher-bridge type-1/type-2/synthetic items are only queued through the sidecar connection's queue-context object, while the bridge-context vtable is left as an unexpected-path guard
+    - producer-side tightening now closes that one step further on the recovered active path:
+      - launcher-bridge type-1/type-2 submissions now also queue the sidecar connection object itself
+      - parsed-packet type-3 submissions likewise queue the direct connection object from `OnReceive`
+      - the older queue-context bridge survives only as an unexpected-path / consumer-compatibility guard
   - newer successful launcher-into-game runtime logs now line up with that read on the active path too:
     - no `pendingCopiedPackets=` logs
     - no synthetic receive-drain handling logs

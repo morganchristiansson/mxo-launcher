@@ -355,6 +355,8 @@ public:
     // Current best original read:
     // - argument order after engine `this` is `(workItem, connection, useQueue34)`
     // - this `OnReceive` path always uses `(completedPacketWorkItem, this, false)`
+    // - the queued context is the direct connection object itself, not the source-owned
+    //   queue-context bridge that remains only as a consumer-side compatibility fallback
     // - ownership transfers to the engine queue here; caller-side lifetime does not branch on an
     //   enqueue success result because original `0x436820` returns `void`
     void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
