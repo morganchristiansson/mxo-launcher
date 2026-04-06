@@ -2938,7 +2938,9 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     // in late rendering before the next outer pump drains that close work.
     // Drain the shared completed-work queue once here, non-blocking, after the enqueue succeeds.
     if (workType == kWorkTypeConnectionStatus || workType == kWorkTypeClose) {
-        RunCompletedOperationQueue(/*nonBlocking=*/true);
+        RunCompletedOperationQueue(
+            /*nonBlocking=*/true,
+            /*preferType1CallbackBeforeCleanup=*/workType == kWorkTypeClose);
     }
     return true;
 }
@@ -3098,7 +3100,9 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaf
 }
 
 // anchor: launcher.exe:0x436b10
-void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
+void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(
+    bool nonBlocking,
+    bool preferType1CallbackBeforeCleanup) {
     // Current bounded mirror of the shared launcher/client consumer family:
     // - prefer queue34, else queue0C
     // - nonBlocking=true matches the client poll form; false waits on the attached signal event
@@ -3183,17 +3187,21 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(bool nonBlocking) {
             }
             queuedConnection = dynamic_cast<CLTTCPConnection*>(completionTarget);
         }
-        const bool sameWorkerThreadCloseSelfDispatch =
+        const bool detectedSameWorkerThreadCloseSelfDispatch =
             isType1 && queuedConnection != nullptr && queuedConnection->WorkerThreadScaffold() != nullptr &&
             queuedConnection->WorkerThreadScaffold()->IsCurrentThread();
+        const bool sameWorkerThreadCloseSelfDispatch =
+            isType1 && (preferType1CallbackBeforeCleanup || detectedSameWorkerThreadCloseSelfDispatch);
 
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} sameWorkerThreadCloseSelfDispatch={}",
+            "CLTThreadPerClientTCPEngine::RunCompletedOperationQueue consume queue=[{}] workItem={} workType=0x{:08x} context={} autoReleaseType1Context={} preferType1CallbackBeforeCleanup={} detectedSameWorkerThreadCloseSelfDispatch={} sameWorkerThreadCloseSelfDispatch={}",
             (selectedQueue == ActiveQueue34Scaffold()) ? "queue34" : "queue0C",
             fmt::ptr(workItem),
             workType,
             fmt::ptr(context),
             shouldAutoReleaseContext ? 1u : 0u,
+            preferType1CallbackBeforeCleanup ? 1u : 0u,
+            detectedSameWorkerThreadCloseSelfDispatch ? 1u : 0u,
             sameWorkerThreadCloseSelfDispatch ? 1u : 0u);
 
         if (sameWorkerThreadCloseSelfDispatch) {

@@ -495,7 +495,7 @@ public:
     // - nonBlocking=false now also waits on the attached arg5 queue-signal event when both queues
     //   are empty, matching the recovered `+0x5c` wait-helper role more closely than the older
     //   immediate-return scaffold
-    void RunCompletedOperationQueue(bool nonBlocking);
+    void RunCompletedOperationQueue(bool nonBlocking, bool preferType1CallbackBeforeCleanup = false);
 
     // anchor family: launcher.exe:0x4366f0 / 0x436920
     // Current source helper owns the real `+0x04/+0x08` queue-thread array/count fields directly
