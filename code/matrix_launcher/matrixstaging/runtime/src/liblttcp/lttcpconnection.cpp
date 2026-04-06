@@ -1,5 +1,6 @@
 #include "lttcpconnection.h"
 
+#include "../libltbase/ltresult.h"
 #include "../libltmessaging/variablelengthprefixedtcpstreamparser.h"
 #include "ltthreadperclienttcpengine.h"
 
@@ -162,6 +163,14 @@ static void ReadOperationFragmentSource_SetByteCountScaffold(
         return;
     }
     fragment->byteCount = std::min<uint32_t>(byteCount, 0x1000u);
+}
+
+// UNANCHORED: source-owned endpoint formatting helper that mirrors the byte/port extraction shape
+// used by `CLTTCPConnection::OnReceive` terminal parser-error logging.
+static unsigned EndpointIpv4OctetForOnReceiveLogScaffold(
+    const LTTCPEndpointKey& endpoint,
+    unsigned byteIndex) {
+    return static_cast<unsigned>((endpoint.ipv4NetworkOrder >> (byteIndex * 8u)) & 0xffu);
 }
 
 }  // namespace
@@ -534,9 +543,9 @@ void CLTTCPConnection::OnClose(
 }
 
 // anchor: launcher.exe:0x449d40
-void CLTTCPConnection::OnReceive(void* readOperationFragment) {
+void CLTTCPConnection::OnReceive(CLTTCPReadOperationFragmentScaffold* readOperationFragment) {
     // Current best static read of `0x449d40`:
-    // - the explicit arg is a refcounted `CLTTCPReadOperation`-family buffer fragment
+    // - the explicit arg is a typed, refcounted `CLTTCPReadOperation`-family buffer fragment
     // - the early fragment `+0x04` call is a no-arg AddRef / retain on that fragment only
     // - connection `+0x6c` is a concrete `CVariableLengthPrefixedTCPStreamParser` object
     //   at vtable `0x004baf84`, not an anonymous helper blob
@@ -544,39 +553,53 @@ void CLTTCPConnection::OnReceive(void* readOperationFragment) {
     // - later drain handoffs are `parser->Parse(nullptr, &completedPacketWorkItem)`
     // - successful emits then hand off exactly `(engine+0x10, completedPacketWorkItem, this, false)`
     //   through `0x436820`
-    CLTTCPReadOperationFragmentScaffold* fragment =
-        static_cast<CLTTCPReadOperationFragmentScaffold*>(readOperationFragment);
     CLTTCPConnection_ParsedPacketWorkItemScaffold* completedPacketWorkItem = nullptr;
 
-    CLTTCPReadOperationFragment_AddRefScaffold(fragment);
-    uint32_t parseResult = parser06c_
-        ? parser06c_->Parse(fragment, &completedPacketWorkItem)
-        : 1u;
+    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
+    uint32_t parseResult = parser06c_->Parse(readOperationFragment, &completedPacketWorkItem);
     while (parseResult == 0u) {
         EnqueueCompletedPacketWorkItemScaffold(completedPacketWorkItem);
         completedPacketWorkItem = nullptr;
-        parseResult = parser06c_
-            ? parser06c_->Parse(nullptr, &completedPacketWorkItem)
-            : 1u;
+        parseResult = parser06c_->Parse(nullptr, &completedPacketWorkItem);
     }
 
     if (static_cast<int32_t>(parseResult) > 0 && parseResult != 0x7000000u) {
-        // Current source scaffolds still do not reconstruct the original `+0x24` endpoint-copy
-        // logging helper family used here before close. Keep the control-flow shape faithful first,
-        // but preserve the recovered "log then close" structure on terminal parser errors.
-        spdlog::info(
-            "CLTTCPConnection::OnReceive terminal parser result=0x{:08x} this={} ownerContext={} remoteHost='{}' -> closing",
-            parseResult,
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            remoteHostName_.empty() ? std::string("<empty>") : remoteHostName_);
+        const unsigned ipv4Byte0 = EndpointIpv4OctetForOnReceiveLogScaffold(remoteEndpoint_, 0u);
+        const unsigned ipv4Byte1 = EndpointIpv4OctetForOnReceiveLogScaffold(remoteEndpoint_, 1u);
+        const unsigned ipv4Byte2 = EndpointIpv4OctetForOnReceiveLogScaffold(remoteEndpoint_, 2u);
+        const unsigned ipv4Byte3 = EndpointIpv4OctetForOnReceiveLogScaffold(remoteEndpoint_, 3u);
+        const unsigned portHostOrder = static_cast<unsigned>(ntohs(remoteEndpoint_.portNetworkOrder));
+
+        // anchor: launcher.exe:0x449dbc / 0x449eb7 terminal parser-error logging split
+        // `0x449d40` special-cases `0x7000000b` as a stream-corruption log and otherwise emits the
+        // generic unrecoverable-error text plus `CResultNameArrayItem_GetResultName(parseResult)`.
+        // The helper strips the original `LT` / `LT_` prefix family just like `0x417650`.
+        if (parseResult == 0x700000bu) {
+            spdlog::warn(
+                "CLTTCPConnection::OnReceive(): Stream corrupted on connection to {}.{}.{}.{}:{}!  Closing connection!",
+                ipv4Byte0,
+                ipv4Byte1,
+                ipv4Byte2,
+                ipv4Byte3,
+                portHostOrder);
+        } else {
+            const char* resultName = libltbase::CResultNameArrayItem_GetResultName(parseResult);
+            spdlog::warn(
+                "CLTTCPConnection::OnReceive(): An unrecoverable error ({}) occurred on connection to {}.{}.{}.{}:{}!  Closing connection!",
+                resultName,
+                ipv4Byte0,
+                ipv4Byte1,
+                ipv4Byte2,
+                ipv4Byte3,
+                portHostOrder);
+        }
         (void)Close(false);
     }
 
     // `0x449d40` ends with a direct `readOperationFragment->Release()` on the outer OnReceive-held
     // temp ref. Keep that narrower than routing the final release back through the wider
     // `OnClose(fragment, opaqueArg08, opaqueArg0c)` callback wrapper.
-    CLTTCPReadOperationFragment_ReleaseScaffold(fragment);
+    CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
 }
 
 // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.

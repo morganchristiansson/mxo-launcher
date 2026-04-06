@@ -203,7 +203,7 @@ class CBaseConnection {
   virtual ~CBaseConnection() = default;
 
   // UNANCHORED: source-owned abstraction over the recovered receive entry surface.
-  virtual void OnReceive(void* callbackContext) = 0;
+  virtual void OnReceive(CLTTCPReadOperationFragmentScaffold* readOperationFragment) = 0;
   // UNANCHORED: source-owned abstraction over the recovered completion callback surface.
   virtual uint32_t OnOperationCompleted(void* workItem) = 0;
   // UNANCHORED: source-owned abstraction over the recovered send callback surface.
@@ -332,12 +332,12 @@ public:
 
     // anchor: launcher.exe:0x449d40
     // vtable: launcher.exe:0x004b8048
-    // Current best read: retain one `CLTTCPReadOperation`-family fragment, hand it to the parser at
-    // connection `+0x6c` as `Parse(fragment, &completedPacketWorkItem)`, enqueue each parser-emitted
-    // completed packet work item as the exact `0x449d8a -> 0x436820` handoff
-    // `(engine+0x10, completedPacketWorkItem, this, false)`, then release the outer fragment
-    // reference.
-    void OnReceive(void* readOperationFragment) override;
+    // Current best read: retain one typed `CLTTCPReadOperation`-family fragment, hand it to the
+    // parser at connection `+0x6c` as `Parse(fragment, &completedPacketWorkItem)`, enqueue each
+    // parser-emitted completed packet work item as the exact `0x449d8a -> 0x436820` handoff
+    // `(engine+0x10, completedPacketWorkItem, this, false)`, then branch through the original
+    // endpoint-based terminal-error log split before releasing the outer fragment reference.
+    void OnReceive(CLTTCPReadOperationFragmentScaffold* readOperationFragment) override;
 
     // Recovered send-queue seam beneath slot `8` / `0x42fbd0`.
     // Current bounded source mirror keeps the active `0x448a00 -> vtable +0x20(...,1)` copied-byte
