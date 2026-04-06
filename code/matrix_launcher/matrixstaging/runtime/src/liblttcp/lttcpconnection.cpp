@@ -7,25 +7,37 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 
 #include "spdlog/spdlog.h"
 
 namespace mxo::liblttcp {
+
+// anchor: launcher.exe:0x44b070
+LTTCPEndpointKey::LTTCPEndpointKey()
+    : family(0),
+      portNetworkOrder(0),
+      ipv4NetworkOrder(0),
+      reserved0(0),
+      reserved1(0) {
+    family = AF_INET;
+}
+
+// anchor: launcher.exe:0x44b020
+bool LTTCPEndpointKey::DiffersFrom(const LTTCPEndpointKey& other) const {
+    return std::memcmp(this, &other, sizeof(*this)) != 0;
+}
+
+// anchor: launcher.exe:0x44aff0
+void LTTCPEndpointKey::CopyTo(LTTCPEndpointKey* outEndpointKey) const {
+    std::memcpy(outEndpointKey, this, sizeof(*this));
+}
 
 namespace {
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_BaseConnectionQueueContextVtable[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
 static CLTTCPReadOperationFragmentVTable g_ReadOperationFragmentSourceVtable = {};
-
-// UNANCHORED: source-owned endpoint-key comparison helper for the current connection wrapper.
-static bool EndpointKeysDiffer(const LTTCPEndpointKey& lhs, const LTTCPEndpointKey& rhs) {
-    return lhs.family != rhs.family ||
-        lhs.portNetworkOrder != rhs.portNetworkOrder ||
-        lhs.ipv4NetworkOrder != rhs.ipv4NetworkOrder ||
-        lhs.reserved0 != rhs.reserved0 ||
-        lhs.reserved1 != rhs.reserved1;
-}
 
 // UNANCHORED: source-owned queue-context release bridge for current non-byte-faithful C++ objects.
 static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
@@ -282,7 +294,7 @@ LTTCPEngineConnectionState CLTTCPConnection::State() const {
 
 // UNANCHORED: source-owned endpoint setter over the recovered connection `+0x24` copy.
 void CLTTCPConnection::SetRemoteEndpoint(const LTTCPEndpointKey& endpoint) {
-    remoteEndpoint_ = endpoint;
+    endpoint.CopyTo(&remoteEndpoint_);
 }
 
 // UNANCHORED: source-owned endpoint accessor over the recovered connection `+0x24` copy.
@@ -317,7 +329,7 @@ bool CLTTCPConnection::QueueSendBufferScaffold(
     // - other historical queue modes (`0` borrowed / `2` caller-owned pointer`) remain a later
     //   fidelity target if a live source path starts proving them
     CLTTCPConnection_SendQueueItemScaffold item = {};
-    item.remoteEndpoint = remoteEndpoint_;
+    remoteEndpoint_.CopyTo(&item.remoteEndpoint);
     item.ownedBytes.assign(
         static_cast<const uint8_t*>(buffer),
         static_cast<const uint8_t*>(buffer) + byteCount);
@@ -494,9 +506,9 @@ uint32_t CLTTCPConnection::Close(bool graceful) {
 
 // anchor: launcher.exe:0x449cd0
 uint32_t CLTTCPConnection::Connect(const LTTCPEndpointKey& endpoint) {
-    if (EndpointKeysDiffer(remoteEndpoint_, endpoint)) {
+    if (remoteEndpoint_.DiffersFrom(endpoint)) {
         (void)Close(false);
-        remoteEndpoint_ = endpoint;
+        endpoint.CopyTo(&remoteEndpoint_);
     }
 
     return engine_ ? engine_->ConnectConnectionScaffold(this) : 0u;

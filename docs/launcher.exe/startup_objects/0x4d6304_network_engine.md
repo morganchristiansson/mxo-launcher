@@ -694,6 +694,14 @@ rather than as a guessed count-based condition.
 A newer static pass tightens the semantic split between the two containers.
 
 Recovered helper meaning:
+- `0x44b070 = LTTCPEndpointKey_ctor`
+  - zeroes the full 16-byte key
+  - then writes `family = AF_INET`
+- `0x44b020 = LTTCPEndpointKey_DiffersFrom`
+  - compares the full 16-byte key as four dwords (`repe cmpsd`)
+  - returns true when any dword differs
+- `0x44aff0 = LTTCPEndpointKey_Copy`
+  - copies the full 16-byte key as four dwords
 - `0x44b090` builds a `sockaddr_in`-shaped 16-byte key from IPv4 + port
 - `0x44b040` compares two such keys by:
   - port at `+0x02`

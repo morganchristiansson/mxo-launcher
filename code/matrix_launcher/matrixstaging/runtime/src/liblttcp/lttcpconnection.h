@@ -28,13 +28,30 @@ enum class LTTCPEngineConnectionState : uint32_t {
     kClosed = 8,            // required by connection-wrapper and engine prechecks
 };
 
-struct LTTCPEndpointKey {
-    uint16_t family = 2;          // AF_INET
+class LTTCPEndpointKey {
+public:
+    // anchor: launcher.exe:0x44b070
+    // Default endpoint-key constructor used by the connection / parser / worker families.
+    // Original body zeros the full 16-byte block first, then writes `family = AF_INET`.
+    LTTCPEndpointKey();
+
+    // anchor: launcher.exe:0x44b020
+    // Original helper compares the 16-byte key as four dwords (`repe cmpsd`) and returns true
+    // when any dword differs.
+    bool DiffersFrom(const LTTCPEndpointKey& other) const;
+
+    // anchor: launcher.exe:0x44aff0
+    // Original helper copies the 16-byte key as four dwords.
+    void CopyTo(LTTCPEndpointKey* outEndpointKey) const;
+
+    uint16_t family = 0; // AF_INET after ctor
     uint16_t portNetworkOrder = 0;
     uint32_t ipv4NetworkOrder = 0;
     uint32_t reserved0 = 0;
     uint32_t reserved1 = 0;
 };
+
+static_assert(sizeof(LTTCPEndpointKey) == 0x10, "endpoint key size mismatch");
 
 // Recovered parser input fragment prefix consumed by connection `+0x6c`
 // (`CVariableLengthPrefixedTCPStreamParser::Parse`).
