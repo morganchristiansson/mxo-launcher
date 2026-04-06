@@ -92,8 +92,30 @@ Static proof now closes ten exact corpus pairs end-to-end:
    - replacement state8 producer:
      - section selector `3`
      - owner `allocatedBuffer1418/141c/flag141e`
+   - newer client-side tightening:
+     - `0x62198870 = LoadOrAdoptSelectionPiCfgAndMaybePersist`
+     - live arg6 path calls `0x621c9d70 = AdoptLiveSelectionPiCfgCompactRecords`
+     - that live adopter consumes compact **9-byte** tuples:
+       - `u8 id + u32 value0 + u32 value1`
+       - and writes only the first two dwords of each in-memory 12-byte slot at
+         `DAT_629ea4e8 + 0x1d8 + id*0xc`
+     - file fallback instead calls `0x621c9ce0 = LoadSelectionPiCfgIfPresent`
+     - that file loader consumes on-disk **13-byte** records:
+       - `u8 id + 12-byte slot body`
    - user-visible validation:
      - wiring this pair live moved the old missing Inventory/equipment-loadout symptom
+   - newest replacement live comparison now shows the compact arg6 path is at least internally
+     self-consistent across characters:
+     - `Morg4n`: `HasLivePiCfg70/GetLivePiCfg9c` length `0x010e = 30 * 9`, and the client later logs
+       exactly `30` non-zero `DAT_629ea4e8` entries
+     - `Noobish`: `HasLivePiCfg70/GetLivePiCfg9c` length `0x002d = 5 * 9`, and the client later logs
+       exactly `5` non-zero entries
+     - practical consequence:
+       - current replacement no longer looks like it is flattening `Morg4n` into the sparse
+         `Noobish` live table on the launcher->client seam
+       - the remaining fidelity question is narrower: whether the compact live bytes are still
+         original-faithful, and/or how the client later consumes the richer `Morg4n` table into the
+         render/fx path
 
 4. `ai.cfg`
    - client helper `0x62198970`

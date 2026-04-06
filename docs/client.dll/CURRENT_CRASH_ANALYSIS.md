@@ -21,8 +21,14 @@ Newest tightening from live original + replacement comparison:
 - the late `CLTRemoteCommCtx`-like object at client-shell `+0xd0` is present on the healthy
   original route too
 - the state9 callback blob transform also now cross-checks against a live original sample
+- newer replacement cross-character logging also tightens the `pi.cfg` seam itself:
+  - `Morg4n` live arg6 `+0x70/+0x9c` length = `0x010e = 30 * 9`
+  - `Noobish` live arg6 `+0x70/+0x9c` length = `0x002d = 5 * 9`
+  - client-side `0x621c9d70 = AdoptLiveSelectionPiCfgCompactRecords` then materializes exactly
+    those same `30` vs `5` non-zero table entries into `DAT_629ea4e8`
 - so neither RCC object existence nor the current `+0x18c` transform algorithm is the best primary
-  suspect anymore
+  suspect anymore, and the launcher->client compact `pi.cfg` handoff no longer looks like a simple
+  replacement-side collapse of `Morg4n` into `Noobish`
 
 ## Crash family A: late render / widget recursion / client FX render
 
@@ -128,6 +134,12 @@ The current crash investigation should stay focused on:
 6. practical current read:
    - the remaining blocker now looks increasingly like replacement-specific character/fx render
      state, not the old margin close/event tail itself
+   - newest cross-character `pi.cfg` evidence sharpens that further:
+     - `Morg4n` still reaches the usual rich 30-entry live table before the familiar render-family
+       crash
+     - an intermittent `Noobish` crash can still happen, but the sampled run used the sparse 5-entry
+       live table and landed in an older/deeper d3d9 family instead of proving the same
+       `Morg4n`-style rich-table corruption path
 
 ## Non-root-cause notes
 

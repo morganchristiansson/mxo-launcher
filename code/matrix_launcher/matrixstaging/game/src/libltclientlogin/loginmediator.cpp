@@ -221,6 +221,51 @@ struct LiveSelectionCfgCorpusView {
     uint32_t length = 0u;
 };
 
+static const void* g_LastLoggedLivePiCfgBuffer = nullptr;
+static uint32_t g_LastLoggedLivePiCfgLength = 0u;
+
+// UNANCHORED: client.dll:0x62198870 / 0x621c9d70 consume compact live `pi.cfg` records as
+// 9-byte tuples: `u8 id + u32 value0 + u32 value1`. Keep the log bounded to one pass per live
+// buffer so later repeated getter chatter does not drown the more important late-runtime evidence.
+static void MaybeLogLivePiCfgCompactRecords(const LiveSelectionCfgCorpusView& view) {
+    if (view.buffer == nullptr || view.length == 0u) {
+        return;
+    }
+    if (view.buffer == g_LastLoggedLivePiCfgBuffer && view.length == g_LastLoggedLivePiCfgLength) {
+        return;
+    }
+    g_LastLoggedLivePiCfgBuffer = view.buffer;
+    g_LastLoggedLivePiCfgLength = view.length;
+
+    const uint8_t* bytes = static_cast<const uint8_t*>(view.buffer);
+    if ((view.length % 9u) != 0u) {
+        spdlog::info(
+            "CLTLoginMediator::GetLivePiCfg9c(+0x9c) unexpected compact pi.cfg length=0x{:04x} preview={}"
+            ,
+            static_cast<unsigned>(view.length),
+            BuildHexPreview(bytes, view.length, 36u));
+        return;
+    }
+
+    const uint32_t recordCount = view.length / 9u;
+    spdlog::info(
+        "CLTLoginMediator::GetLivePiCfg9c(+0x9c) compact pi.cfg recordCount={} length=0x{:04x}",
+        static_cast<unsigned>(recordCount),
+        static_cast<unsigned>(view.length));
+    for (uint32_t recordIndex = 0; recordIndex < recordCount; ++recordIndex) {
+        const size_t offset = static_cast<size_t>(recordIndex) * 9u;
+        const uint8_t recordId = bytes[offset + 0u];
+        const uint32_t value0 = ReadU32LE(bytes + offset + 1u);
+        const uint32_t value1 = ReadU32LE(bytes + offset + 5u);
+        spdlog::info(
+            "CLTLoginMediator::GetLivePiCfg9c(+0x9c) record[{}] id={} value0=0x{:08x} value1=0x{:08x}",
+            static_cast<unsigned>(recordIndex),
+            static_cast<unsigned>(recordId),
+            static_cast<unsigned>(value0),
+            static_cast<unsigned>(value1));
+    }
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 static const CLTLoginMediator* ResolveActiveSelectionCfgCorpusOwner(const CLTLoginMediator* mediator) {
     return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
@@ -1047,6 +1092,7 @@ void* CLTLoginMediator::GetLivePiCfg9c(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1418;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength141c);
     }
+    MaybeLogLivePiCfgCompactRecords(view);
     return LogLiveSelectionCfgCorpusGetter(
         "CLTLoginMediator::GetLivePiCfg9c(+0x9c)",
         "pi.cfg / state8 section3",

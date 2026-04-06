@@ -138,29 +138,36 @@ static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) 
 }
 
 static void DiagnosticLogClientPiTable() {
-    // client.dll:0x621c9d70 writes live `pi.cfg` records into DAT_629ea4e8 entry fields
-    // `+0x1d8/+0x1dc` as 9-byte records: byte id + two dwords.
+    // client.dll:0x621c9d70 (`AdoptLiveSelectionPiCfgCompactRecords`) only materializes compact live
+    // `pi.cfg` tuples into the first two dwords of each 12-byte slot. Log the third dword too so
+    // replacement runs can prove whether that tail stays zero/defaulted or is being poisoned later.
     const uint8_t* piTableBase = static_cast<const uint8_t*>(DiagnosticClientAbsoluteToPointer(0x629ea4e8u));
     if (!piTableBase) {
         return;
     }
     std::vector<unsigned> ids;
+    unsigned nonZeroValue2Count = 0;
     for (unsigned index = 0; index < 0x6bu; ++index) {
         const uint8_t* entry = piTableBase + 0x1d8u + index * 0x0cu;
-        if (!DiagnosticReadableMemoryRange(entry, 8)) {
+        if (!DiagnosticReadableMemoryRange(entry, 12)) {
             return;
         }
         const uint32_t value0 = *reinterpret_cast<const uint32_t*>(entry + 0x0);
         const uint32_t value1 = *reinterpret_cast<const uint32_t*>(entry + 0x4);
-        if (value0 == 0u && value1 == 0u) {
+        const uint32_t value2 = *reinterpret_cast<const uint32_t*>(entry + 0x8);
+        if (value0 == 0u && value1 == 0u && value2 == 0u) {
             continue;
+        }
+        if (value2 != 0u) {
+            ++nonZeroValue2Count;
         }
         ids.push_back(index);
         spdlog::info(
-            "ClientPiTable entry id={} value0=0x{:08x} value1=0x{:08x}",
+            "ClientPiTable entry id={} value0=0x{:08x} value1=0x{:08x} value2=0x{:08x}",
             index,
             value0,
-            value1);
+            value1,
+            value2);
     }
     std::string idsText;
     for (size_t i = 0; i < ids.size(); ++i) {
@@ -169,7 +176,11 @@ static void DiagnosticLogClientPiTable() {
         }
         idsText += std::to_string(ids[i]);
     }
-    spdlog::info("ClientPiTable nonZeroEntryCount={} ids={}", ids.size(), idsText);
+    spdlog::info(
+        "ClientPiTable nonZeroEntryCount={} nonZeroValue2Count={} ids={}",
+        ids.size(),
+        nonZeroValue2Count,
+        idsText);
 }
 
 static const char* DiagnosticDescribeClientRuntimeVftable(const void* vftable) {
