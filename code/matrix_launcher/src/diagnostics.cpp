@@ -26,6 +26,10 @@ static std::string g_LastClientLoadingStateText;
 static std::string g_LastClientLoadingStateSource;
 static bool g_KnownClientEngineInitStatusTextsLogged = false;
 static HWND g_LastLoggedD3DErrorDialog = NULL;
+static const void* g_LastClientShellObserved = nullptr;
+static uint32_t g_LastClientShellState20 = 0xffffffffu;
+static const void* g_LastClientShellRuntimeObjectD0 = nullptr;
+static const void* g_LastClientShellRuntimeVftableD0 = nullptr;
 
 static bool DiagnosticReadableMemoryRange(const void* base, size_t byteCount) {
     if (!base || byteCount == 0) {
@@ -106,6 +110,88 @@ static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) 
         return nullptr;
     }
     return clientBase + (absoluteAddress - 0x62000000u);
+}
+
+static const char* DiagnosticDescribeClientRuntimeVftable(const void* vftable) {
+    if (!vftable) {
+        return "<null>";
+    }
+    if (vftable == DiagnosticClientAbsoluteToPointer(0x628b1638u)) {
+        return "CLTRemoteCommCtx-like";
+    }
+    return "<unclassified>";
+}
+
+static void DiagnosticLogClientShellRuntimeTransitionState() {
+    // anchor: client.dll:0x62172552 writes client-shell `+0xd0`; client.dll:0x62173bcd later reads
+    // that same field before the alternate null-vcall family at `0x62173bd9`.
+    const void* const clientShellSlot = DiagnosticClientAbsoluteToPointer(0x629e68a8u);
+    if (!clientShellSlot || !DiagnosticReadableMemoryRange(clientShellSlot, sizeof(void*))) {
+        return;
+    }
+
+    const void* const clientShell = *static_cast<const void* const*>(clientShellSlot);
+    uint32_t state20 = 0xffffffffu;
+    const void* runtimeObjectD0 = nullptr;
+    const void* runtimeVftableD0 = nullptr;
+    if (clientShell && DiagnosticReadableMemoryRange(static_cast<const uint8_t*>(clientShell) + 0x20, sizeof(uint32_t))) {
+        state20 = *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(clientShell) + 0x20);
+    }
+    if (clientShell && DiagnosticReadableMemoryRange(static_cast<const uint8_t*>(clientShell) + 0xd0, sizeof(void*))) {
+        runtimeObjectD0 = *reinterpret_cast<const void* const*>(static_cast<const uint8_t*>(clientShell) + 0xd0);
+    }
+    if (runtimeObjectD0 && DiagnosticReadableMemoryRange(runtimeObjectD0, sizeof(void*))) {
+        runtimeVftableD0 = *static_cast<const void* const*>(runtimeObjectD0);
+    }
+
+    if (clientShell == g_LastClientShellObserved &&
+        state20 == g_LastClientShellState20 &&
+        runtimeObjectD0 == g_LastClientShellRuntimeObjectD0 &&
+        runtimeVftableD0 == g_LastClientShellRuntimeVftableD0) {
+        return;
+    }
+
+    spdlog::info(
+        "ClientShell runtime transition shell={} state20=0x{:08x} d0Object={} d0Vftable={} [{}]",
+        fmt::ptr(clientShell),
+        state20,
+        fmt::ptr(runtimeObjectD0),
+        fmt::ptr(runtimeVftableD0),
+        DiagnosticDescribeClientRuntimeVftable(runtimeVftableD0));
+
+    if (runtimeObjectD0 != nullptr) {
+        LogWordSpanIfReadable("ClientShell runtime d0 object", runtimeObjectD0, 8);
+        if (runtimeVftableD0 == DiagnosticClientAbsoluteToPointer(0x628b1638u)) {
+            // Current tightened static read on this vftable family:
+            // - `0x623baf60 = CLTRemoteCommCtx_ResetIO`
+            // - `0x623bc640 = CLTRemoteCommCtx_IsIdle`
+            // - `0x623bdd60` (`vftable +0x68`) checks object `+0x0c` and low bits of `+0x154`
+            // - `0x623bdd40` reads bit 2 from byte `+0x2da`
+            // - `0x623bdd10` returns dword `+0x2e4`
+            const uint8_t* objectBytes = static_cast<const uint8_t*>(runtimeObjectD0);
+            if (DiagnosticReadableMemoryRange(objectBytes + 0x2e4, sizeof(uint32_t))) {
+                const uint32_t field0c = *reinterpret_cast<const uint32_t*>(objectBytes + 0x0c);
+                const uint8_t flags154 = *(objectBytes + 0x154);
+                const uint8_t flag2d8 = *(objectBytes + 0x2d8);
+                const uint8_t flag2d9 = *(objectBytes + 0x2d9);
+                const uint8_t flag2da = *(objectBytes + 0x2da);
+                const uint32_t field2e4 = *reinterpret_cast<const uint32_t*>(objectBytes + 0x2e4);
+                spdlog::info(
+                    "ClientShell runtime d0 CLTRemoteCommCtx fields field0c=0x{:08x} flags154=0x{:02x} flag2d8={} flag2d9={} flag2da=0x{:02x} field2e4=0x{:08x}",
+                    field0c,
+                    static_cast<unsigned>(flags154),
+                    static_cast<unsigned>(flag2d8),
+                    static_cast<unsigned>(flag2d9),
+                    static_cast<unsigned>(flag2da),
+                    field2e4);
+            }
+        }
+    }
+
+    g_LastClientShellObserved = clientShell;
+    g_LastClientShellState20 = state20;
+    g_LastClientShellRuntimeObjectD0 = runtimeObjectD0;
+    g_LastClientShellRuntimeVftableD0 = runtimeVftableD0;
 }
 
 static BOOL CALLBACK D3DErrorChildEnumProc(HWND hwnd, LPARAM) {
@@ -307,6 +393,7 @@ static DWORD WINAPI WindowTraceThreadProc(LPVOID) {
             g_LastWindowTraceCount = count;
             spdlog::info("WindowTrace top-level window count: {}", count);
         }
+        DiagnosticLogClientShellRuntimeTransitionState();
 
         Sleep(250);
     }

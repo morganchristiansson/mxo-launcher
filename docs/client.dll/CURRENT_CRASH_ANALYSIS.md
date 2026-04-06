@@ -52,6 +52,8 @@ Current best read:
   - user cross-check now says original launcher/client does **not** reproduce that popup on the same
     comparison pass, so treat it as replacement-specific evidence, not a generic Wine/original
     graphics fault
+- on the popup run, client-shell field `+0xd0` is already a non-null object with vftable
+  `0x628b1638`, now identified as `CLTRemoteCommCtx`-like rather than an arbitrary unknown object
 
 ## Crash family B: alternate null-vcall in `ClientShell_RunFrame`
 
