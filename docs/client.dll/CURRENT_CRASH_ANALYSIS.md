@@ -17,6 +17,13 @@ Replacement now reliably reaches:
 
 So the current crash is no longer an early auth/bootstrap or immediate event-`0x18` blocker.
 
+Newest tightening from live original + replacement comparison:
+- the late `CLTRemoteCommCtx`-like object at client-shell `+0xd0` is present on the healthy
+  original route too
+- the state9 callback blob transform also now cross-checks against a live original sample
+- so neither RCC object existence nor the current `+0x18c` transform algorithm is the best primary
+  suspect anymore
+
 ## Crash family A: late render / widget recursion
 
 Latest representative dump:
@@ -97,9 +104,14 @@ The current crash investigation should stay focused on:
    - `WidgetManager_DrawCurrentRootWidget`
    - `UIWidget_DrawChildWidgetsRecursive`
    - deeper draw submission
-3. which replacement-specific late state/data mismatch can produce either:
-   - a bad `+0xd0` runtime object
-   - or a bad widget/render tree deeper in the same frame path
+3. what replacement-specific late state/data mismatch poisons the later shader/material path even
+   though:
+   - the `+0xd0` RCC-like object family now matches the healthy original route closely enough
+   - and the current state9 callback blob transform now cross-checks against a live original sample
+4. current next concrete diagnostic step:
+   - dump the popup-referenced shader `.fx` file from the running process and log the lines around
+     the reported compile errors so the bad generated source can be compared directly against the
+     expected path
 
 ## Non-root-cause notes
 

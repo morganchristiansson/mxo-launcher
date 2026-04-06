@@ -2,8 +2,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include <cstdio>
 #include <cstring>
+#include <set>
 #include <string>
+#include <vector>
 
 extern HMODULE g_hClient;
 
@@ -194,6 +197,107 @@ static void DiagnosticLogClientShellRuntimeTransitionState() {
     g_LastClientShellRuntimeVftableD0 = runtimeVftableD0;
 }
 
+static void DiagnosticLogShaderFileContextFromDialogText(const char* text) {
+    if (!text || !text[0]) {
+        return;
+    }
+
+    std::set<std::string> seenPaths;
+    const size_t textLength = std::strlen(text);
+    for (size_t i = 0; i + 4 < textLength; ++i) {
+        const char drive = text[i];
+        if (!((drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z')) ||
+            text[i + 1] != ':' || text[i + 2] != '\\') {
+            continue;
+        }
+
+        const char* pathStart = text + i;
+        const char* fxSuffix = std::strstr(pathStart, ".fx");
+        if (!fxSuffix) {
+            continue;
+        }
+        const char* afterFx = fxSuffix + 3;
+        std::string path(pathStart, afterFx);
+        if (!seenPaths.insert(path).second) {
+            continue;
+        }
+
+        FILE* file = std::fopen(path.c_str(), "rb");
+        if (!file) {
+            spdlog::info("WindowTrace D3D Error shader file path='{}' exists=0", path);
+            continue;
+        }
+
+        std::fseek(file, 0, SEEK_END);
+        const long fileSize = std::ftell(file);
+        std::rewind(file);
+        std::string content;
+        if (fileSize > 0) {
+            content.resize(static_cast<size_t>(fileSize));
+            const size_t bytesRead = std::fread(content.data(), 1, content.size(), file);
+            content.resize(bytesRead);
+        }
+        std::fclose(file);
+
+        spdlog::info(
+            "WindowTrace D3D Error shader file path='{}' exists=1 size={} bytes",
+            path,
+            static_cast<long long>(fileSize));
+
+        std::vector<unsigned> interestingLines;
+        const char* search = pathStart;
+        while ((search = std::strstr(search, path.c_str())) != nullptr) {
+            const char* afterPath = search + path.size();
+            if (*afterPath == '(') {
+                char* endPtr = nullptr;
+                const unsigned long lineNumber = std::strtoul(afterPath + 1, &endPtr, 10);
+                if (endPtr && *endPtr == ',') {
+                    interestingLines.push_back(static_cast<unsigned>(lineNumber));
+                }
+            }
+            search = afterPath;
+        }
+
+        if (interestingLines.empty()) {
+            interestingLines.push_back(1u);
+        }
+
+        std::vector<std::string> lines;
+        size_t cursor = 0;
+        while (cursor <= content.size()) {
+            size_t end = content.find('\n', cursor);
+            if (end == std::string::npos) {
+                end = content.size();
+            }
+            std::string line = content.substr(cursor, end - cursor);
+            if (!line.empty() && line.back() == '\r') {
+                line.pop_back();
+            }
+            lines.push_back(line);
+            if (end == content.size()) {
+                break;
+            }
+            cursor = end + 1;
+        }
+
+        std::set<unsigned> emitted;
+        for (unsigned lineNumber : interestingLines) {
+            const unsigned begin = (lineNumber > 3u) ? (lineNumber - 3u) : 1u;
+            const unsigned end = std::min<unsigned>(lineNumber + 3u, static_cast<unsigned>(lines.size()));
+            for (unsigned lineIndex = begin; lineIndex <= end; ++lineIndex) {
+                if (!emitted.insert(lineIndex).second) {
+                    continue;
+                }
+                spdlog::info(
+                    "WindowTrace D3D Error shader {}:{} {}",
+                    path,
+                    lineIndex,
+                    (lineIndex >= 1u && lineIndex <= lines.size()) ? lines[lineIndex - 1u] : "<out-of-range>");
+            }
+        }
+    }
+}
+
 static BOOL CALLBACK D3DErrorChildEnumProc(HWND hwnd, LPARAM) {
     char className[256] = {0};
     char title[1024] = {0};
@@ -204,6 +308,7 @@ static BOOL CALLBACK D3DErrorChildEnumProc(HWND hwnd, LPARAM) {
         fmt::ptr(hwnd),
         className,
         title);
+    DiagnosticLogShaderFileContextFromDialogText(title);
     return TRUE;
 }
 
