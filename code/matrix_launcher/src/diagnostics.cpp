@@ -264,6 +264,64 @@ static void DiagnosticDumpShaderSourceFile(const char* path, const void* sourceD
         static_cast<unsigned long long>(written));
 }
 
+static void DiagnosticReleaseD3DBlob(void* blob) {
+    if (!blob) {
+        return;
+    }
+    void** vtable = *reinterpret_cast<void***>(blob);
+    if (!vtable || !vtable[2]) {
+        return;
+    }
+    using ReleaseFn = ULONG(__stdcall*)(void*);
+    ReleaseFn releaseFn = reinterpret_cast<ReleaseFn>(vtable[2]);
+    (void)releaseFn(blob);
+}
+
+static bool DiagnosticShaderSourceLooksLikeMissingPositionInput(
+    const std::string& sourceText,
+    std::string* outPatchedText) {
+    if (outPatchedText) {
+        outPatchedText->clear();
+    }
+    if (sourceText.find("matrixTransformNoBones(input.pos,normal);") == std::string::npos) {
+        return false;
+    }
+    if (sourceText.find("pos : POSITION") != std::string::npos) {
+        return false;
+    }
+
+    const size_t structStart = sourceText.find("struct VS_INPUT {");
+    if (structStart == std::string::npos) {
+        return false;
+    }
+    const size_t bodyStart = sourceText.find('{', structStart);
+    if (bodyStart == std::string::npos) {
+        return false;
+    }
+    const size_t structEnd = sourceText.find("};", bodyStart);
+    if (structEnd == std::string::npos) {
+        return false;
+    }
+
+    const std::string body = sourceText.substr(bodyStart + 1, structEnd - (bodyStart + 1));
+    for (char ch : body) {
+        if (!std::isspace(static_cast<unsigned char>(ch))) {
+            return false;
+        }
+    }
+
+    if (!outPatchedText) {
+        return true;
+    }
+
+    *outPatchedText = sourceText;
+    outPatchedText->replace(
+        structStart,
+        structEnd + 2 - structStart,
+        "struct VS_INPUT {\nfloat3 pos : POSITION;\n};");
+    return true;
+}
+
 static HRESULT WINAPI DiagnosticD3DCompile(
     LPCVOID sourceData,
     SIZE_T sourceBytes,
@@ -305,6 +363,58 @@ static HRESULT WINAPI DiagnosticD3DCompile(
             target ? target : "<null>",
             static_cast<unsigned long long>(sourceBytes),
             static_cast<unsigned>(result));
+
+        std::string patchedSource;
+        const std::string sourceText(
+            static_cast<const char*>(sourceData),
+            static_cast<size_t>(sourceBytes));
+        if (target && std::strncmp(target, "vs_", 3) == 0 &&
+            DiagnosticShaderSourceLooksLikeMissingPositionInput(sourceText, &patchedSource)) {
+            std::string patchedPath = sourceName ? sourceName : "shader_patched.fx";
+            const size_t extPos = patchedPath.rfind(".fx");
+            if (extPos != std::string::npos) {
+                patchedPath.insert(extPos, ".patched");
+            } else {
+                patchedPath += ".patched.fx";
+            }
+            DiagnosticDumpShaderSourceFile(
+                patchedPath.c_str(),
+                patchedSource.data(),
+                patchedSource.size());
+            spdlog::info(
+                "DiagnosticD3DCompile retrying with synthesized POSITION input source='{}' patched='{}'",
+                sourceName ? sourceName : "<null>",
+                patchedPath);
+
+            if (errorBlob && *errorBlob) {
+                DiagnosticReleaseD3DBlob(*errorBlob);
+                *errorBlob = nullptr;
+            }
+            if (codeBlob && *codeBlob) {
+                DiagnosticReleaseD3DBlob(*codeBlob);
+                *codeBlob = nullptr;
+            }
+
+            const HRESULT retryResult = g_OriginalD3DCompile(
+                patchedSource.data(),
+                patchedSource.size(),
+                sourceName,
+                defines,
+                includeHandler,
+                entryPoint,
+                target,
+                flags1,
+                flags2,
+                codeBlob,
+                errorBlob);
+            spdlog::info(
+                "DiagnosticD3DCompile retry result source='{}' entry='{}' target='{}' hr=0x{:08x}",
+                sourceName ? sourceName : "<null>",
+                entryPoint ? entryPoint : "<null>",
+                target ? target : "<null>",
+                static_cast<unsigned>(retryResult));
+            return retryResult;
+        }
     }
     return result;
 }
