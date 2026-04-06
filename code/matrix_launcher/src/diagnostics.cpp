@@ -286,9 +286,6 @@ static bool DiagnosticShaderSourceLooksLikeMissingPositionInput(
     if (sourceText.find("matrixTransformNoBones(input.pos,normal);") == std::string::npos) {
         return false;
     }
-    if (sourceText.find("pos : POSITION") != std::string::npos) {
-        return false;
-    }
 
     const size_t structStart = sourceText.find("struct VS_INPUT {");
     if (structStart == std::string::npos) {
@@ -304,6 +301,9 @@ static bool DiagnosticShaderSourceLooksLikeMissingPositionInput(
     }
 
     const std::string body = sourceText.substr(bodyStart + 1, structEnd - (bodyStart + 1));
+    if (body.find(": POSITION") != std::string::npos || body.find(":POSITION") != std::string::npos) {
+        return false;
+    }
     for (char ch : body) {
         if (!std::isspace(static_cast<unsigned char>(ch))) {
             return false;
