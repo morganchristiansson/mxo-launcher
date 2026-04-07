@@ -39,10 +39,12 @@ bool DiagnosticCanBeginAuthConnection();
 bool DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
 uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
     const mxo::ltlogin::ProcessLoginRequestInputSketch& input);
+void DiagnosticRequestAuthCloseAndSwitchToState0();
 uint32_t DiagnosticBeginAuthConnection();
 uint32_t DiagnosticBeginMarginConnection();
 void DiagnosticPumpLauncherNetwork(bool nonBlocking);
 void DiagnosticResetPostedLoginResult();
+bool DiagnosticIsAuthConnectionQuiescentForRetry();
 bool DiagnosticHasSuccessfulPreClientAuthState();
 uint32_t DiagnosticLastLoginEvent();
 uint32_t DiagnosticLastLoginError();

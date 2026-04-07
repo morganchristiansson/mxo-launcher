@@ -554,6 +554,13 @@ public:
     // Exact original body returns `owner + 0x08`; callers then dereference that dword.
     const uint32_t* GetNoPatchLauncherVersionValuePtr08() const;
 
+    // source-owned narrow accessor for owner `+0x94 + 0x60` small-string begin pointer.
+    // Current concrete state7 use from `0x43ba20`:
+    // - owner vtable `+0x38` returns `this+0x94`
+    // - state7 slot3 then reads the first dword at `+0x60` and threads it into the raw-`0x0d`
+    //   delete-character packet's optional string field via `0x43aa80`
+    const char* GetSourceBlock94SmallString60BeginScaffold() const;
+
     // anchor: launcher.exe:0x41f090
     // Tiny owner getter paired with `0x41f080`; exact original body returns `owner + 0x0c`.
     const uint32_t* GetNoPatchClientVersionValuePtr0c() const;
@@ -688,6 +695,12 @@ public:
     uint8_t GetVariantState(int32_t variantIndex) const override;
     // +0x164
     bool RequestAuthConnectionCloseWaitEvent1() override;
+
+    // +0x34
+    // anchor: launcher.exe:0x41c0d0
+    // owner-side auth-close/state-reset helper used by the page-6 rich-edit observer failure path
+    // before launcher retry/re-prompt.
+    void RequestAuthCloseAndSwitchToState0() override;
     // +0x16c
     // Wrapper-facing split kept explicit from the owner-side state9 helper below.
     bool RequestMarginConnectionCloseWaitEvent0f() override;
@@ -728,10 +741,16 @@ public:
         size_t packetSize,
         void* workItem = nullptr);
     // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
+    uint32_t HandleAuthConnectionCompletionFallback(void* connection, void* workItem) override;
     uint32_t HandleAuthConnectionCompletionFallbackScaffold(
         mxo::liblttcp::CMessageConnection* connection,
         void* workItem);
+    // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
+    uint32_t DispatchCurrentHelperAuthMessage(void* workItem) override;
+    // anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
+    uint32_t DispatchCurrentHelperSlot6(void* workItem) override;
     // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
+    uint32_t HandleMarginConnectionCompletionFallback(void* connection, void* workItem) override;
     uint32_t HandleMarginConnectionCompletionFallbackScaffold(
         mxo::liblttcp::CMessageConnection* connection,
         void* workItem);
@@ -876,6 +895,7 @@ public:
     CLTLoginState* ScaffoldState4() const;
     CLTLoginState* ScaffoldState5() const;
     CLTLoginState* ScaffoldState6() const;
+    CLTLoginState* ScaffoldState7() const;
     CLTLoginState* ScaffoldState8() const;
     CLTLoginState* ScaffoldState9() const;
     CLTLoginState* ScaffoldState10() const;
@@ -1066,6 +1086,7 @@ public:
     bool CanBeginLauncherAuthConnectionScaffold() const;
     uint32_t BeginLauncherAuthConnectionScaffold();
     uint32_t BeginLauncherMarginConnectionScaffold();
+    bool IsAuthConnectionQuiescentForRetryScaffold() const;
     // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
     // `0x41b450` on the early auth path. Keep this narrow instead of changing the generic
     // switch scaffold until more of the broader helper transition surface is source-owned.

@@ -511,6 +511,8 @@ public:
     // - no generic synthetic fallback allocation
     CMessageConnection* FindMessageConnection(void* contextKey);
 
+    friend class CLTThreadPerClientTCPEngine_WorkerThread;
+
 private:
     // UNANCHORED: starter helper mirroring the recovered endpoint-key shape.
     static LTTCPEndpointKey MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
@@ -559,6 +561,12 @@ private:
     //   still landing callback dispatch on the nearer `CMessageConnection`/leaf callback path
     bool EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
         mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+        uint32_t workType,
+        uint32_t workPayload,
+        const char* label,
+        bool queueLockAlreadyHeld);
+    bool EnqueueDirectConnectionStatusWorkItemScaffold(
+        CLTTCPConnection* connection,
         uint32_t workType,
         uint32_t workPayload,
         const char* label,

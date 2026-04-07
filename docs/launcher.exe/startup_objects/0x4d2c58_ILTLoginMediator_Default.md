@@ -237,7 +237,8 @@ That is important because the current arg7-selection writer is now closed to the
     - it reads the selected row item-data high word as a signed active selection-entry index
       (current tighter auth-valid read: slot-record / character-entry index)
     - passes that value to sibling mediator slot `+0xf0 = 0x41c390`
-    - it then waits through `0x41b6c0` for event `8`
+    - practical call-shape note from the current decompile/listing: this corridor does **not**
+      branch on the return value from `+0xf0`; it then waits through `0x41b6c0` for event `8`
   - a direct launcher byte-pattern scan found that `0x40ed76` call as the current concrete
     launcher-side `+0xf0` site, while still finding no equally direct launcher callsite to `+0xec`
     or `+0x120`

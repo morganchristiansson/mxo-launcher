@@ -1708,6 +1708,15 @@ uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
     return submitFn(&g_LoginMediatorStub, &input);
 }
 
+void DiagnosticRequestAuthCloseAndSwitchToState0() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        spdlog::info("DIAGNOSTIC: installed CLTLoginMediator unavailable for auth close/state0 reset");
+        return;
+    }
+    mediator->RequestAuthCloseAndSwitchToState0();
+}
+
 uint32_t DiagnosticBeginAuthConnection() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     if (!mediator) {
@@ -1737,6 +1746,11 @@ void DiagnosticResetPostedLoginResult() {
     }
 }
 
+bool DiagnosticIsAuthConnectionQuiescentForRetry() {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->IsAuthConnectionQuiescentForRetryScaffold() : true;
+}
+
 bool DiagnosticHasSuccessfulPreClientAuthState() {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator && mediator->LastPostedEventScaffold() == 5u && mediator->RecoveredCharacterCountScaffold() != 0u;
@@ -1753,7 +1767,7 @@ uint32_t DiagnosticLastLoginError() {
 }
 
 uint32_t DiagnosticRecoveredCharacterCount() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     return mediator ? mediator->RecoveredCharacterCountScaffold() : 0u;
 }
 
@@ -1763,7 +1777,7 @@ bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_
     }
     outName[0] = '\0';
 
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     const mxo::ltlogin::SlotRecordState004b5328* slotRecord =
         mediator ? mediator->RecoveredCharacterByIndexScaffold(slotIndex) : nullptr;
     if (!slotRecord || slotRecord->heapString14.empty()) {
@@ -1776,7 +1790,7 @@ bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_
 }
 
 void DiagnosticSetLauncherSelectedCharacterIndex(uint32_t slotIndex) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     if (!mediator) {
         return;
     }
@@ -1790,7 +1804,7 @@ bool DiagnosticFindRecoveredWorldDescriptorIndexByName(const char* worldName, ui
     if (!worldName || !worldName[0] || !outDescriptorIndex) {
         return false;
     }
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     if (!mediator) {
         return false;
     }
@@ -1812,7 +1826,7 @@ bool DiagnosticGetDeleteCharacterProfileRootName(char* outName, uint32_t outName
     }
     outName[0] = '\0';
 
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     if (!mediator) {
         return false;
     }
@@ -1831,12 +1845,12 @@ bool DiagnosticGetDeleteCharacterProfileRootName(char* outName, uint32_t outName
 }
 
 uint32_t DiagnosticBeginDeleteRecoveredCharacter(uint32_t slotIndex) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     return mediator ? mediator->BeginDeleteCharacterBySlotIndexScaffold(slotIndex) : 1u;
 }
 
 uint32_t DiagnosticFinalizeDeleteRecoveredCharacter(uint32_t slotIndex) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     return mediator ? mediator->RemoveSlotRecordAndCompactRouteStateByIndex(slotIndex) : 1u;
 }
 
@@ -1847,7 +1861,7 @@ bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
     char* outWorldName,
     uint32_t outWorldNameCapacity,
     uint32_t* outDescriptorIndex) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
     if (!mediator) {
         return false;
     }

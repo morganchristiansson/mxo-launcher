@@ -280,6 +280,11 @@ CLTLoginState* CLTLoginMediator::ScaffoldState6() const {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+CLTLoginState* CLTLoginMediator::ScaffoldState7() const {
+    return scaffoldState7_;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::ScaffoldState8() const {
     return scaffoldState8_;
 }
@@ -507,6 +512,38 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+bool CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold() const {
+    mxo::liblttcp::CMessageConnection* connection = authConnection_;
+    if (connection == nullptr && authConnectionContextScaffold_ != nullptr) {
+        connection = authConnectionContextScaffold_->sidecarConnection;
+    }
+
+    auto* authConnection = dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(connection);
+    const bool quiescent = (authConnection == nullptr) || (authConnection->WorkerThreadScaffold() == nullptr);
+    if (quiescent && authConnection != nullptr && authConnectionContextScaffold_ != nullptr &&
+        authConnectionContextScaffold_->sidecarConnection == authConnection) {
+        // Fidelity improvement for launcher retry:
+        // - original auth-close/reset path `0x41c0d0` clears owner `+0x18`
+        // - later auth begin `0x41d170` then materializes a fresh auth-side child again
+        // Keep the old closed connection only until its worker becomes quiescent, then discard the
+        // sidecar so the next retry allocates a new auth connection object instead of reusing a
+        // stale closed child.
+        authConnectionContextScaffold_->sidecarConnection = nullptr;
+        authConnectionContextScaffold_->peerCloseQueued = false;
+        if (authConnectionOwnedByMediator_ && authConnection_ == nullptr) {
+            delete authConnection;
+        }
+    }
+    spdlog::info(
+        "CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold authConnection={} sidecarConnection={} worker={} state={} -> {}",
+        fmt::ptr(authConnection_),
+        fmt::ptr(authConnectionContextScaffold_ ? authConnectionContextScaffold_->sidecarConnection : nullptr),
+        fmt::ptr(authConnection ? authConnection->WorkerThreadScaffold() : nullptr),
+        authConnection ? static_cast<unsigned>(authConnection->State()) : 0xffffffffu,
+        quiescent ? 1u : 0u);
+    return quiescent;
+}
+
 uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     if (engine_ == nullptr) {
         spdlog::info(
@@ -692,11 +729,31 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::MarginConnection() const {
 //   auth/margin child pointers rather than as the connection's actual owner field
 CLTLoginMediatorConnectionContextScaffold* CLTLoginMediator::ResolveConnectionBridgeContextScaffold(
     const mxo::liblttcp::CMessageConnection* connection) const {
-    if (connection == authConnection_) {
-        return authConnectionContextScaffold_;
+    if (connection == nullptr) {
+        return nullptr;
     }
-    if (connection == marginConnection_) {
-        return marginConnectionContextScaffold_;
+
+    if (authConnectionContextScaffold_ != nullptr && !authConnectionContextScaffold_->isMarginConnection) {
+        if (connection == authConnection_ ||
+            authConnectionContextScaffold_->sidecarConnection == connection ||
+            connection->OwnerContext() == this) {
+            if (authConnectionContextScaffold_->sidecarConnection == nullptr) {
+                const_cast<CLTLoginMediatorConnectionContextScaffold*>(authConnectionContextScaffold_)->sidecarConnection =
+                    const_cast<mxo::liblttcp::CMessageConnection*>(connection);
+            }
+            return authConnectionContextScaffold_;
+        }
+    }
+    if (marginConnectionContextScaffold_ != nullptr && marginConnectionContextScaffold_->isMarginConnection) {
+        if (connection == marginConnection_ ||
+            marginConnectionContextScaffold_->sidecarConnection == connection ||
+            connection->OwnerContext() == this) {
+            if (marginConnectionContextScaffold_->sidecarConnection == nullptr) {
+                const_cast<CLTLoginMediatorConnectionContextScaffold*>(marginConnectionContextScaffold_)->sidecarConnection =
+                    const_cast<mxo::liblttcp::CMessageConnection*>(connection);
+            }
+            return marginConnectionContextScaffold_;
+        }
     }
     return nullptr;
 }
@@ -1047,13 +1104,21 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     authRequestSent_ = false;
     authChallengeResponseSent_ = false;
     authConnectionFlag2c_ = 0u;
-    lastAuthPublicKeyReply_ = mxo::auth::GetPublicKeyReply();
+    // Fidelity improvement for launcher retry:
+    // - `0x41d170` allocates a fresh auth connection child at owner `+0x18`, but current static RE
+    //   does not show it clearing the broader owner `+0x680` bootstrap child or cached public-key
+    //   state on every retry
+    // - preserve the cached AS_GetPublicKeyReply / currentPublicKeyId / child worker family across
+    //   retries so later compact raw-`0x07` replies with no embedded key material can still reuse
+    //   the previously validated key when the publicKeyId matches
     lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
     lastAuthChallenge_ = mxo::auth::AuthChallenge();
     lastAuthReply_ = mxo::auth::AuthReply();
     postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
-    authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
+    if (!authBootstrapChild680_) {
+        authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
+    }
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();
@@ -1197,7 +1262,7 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
     mxo::liblttcp::CAuthStartupConnection* authConnection =
         dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
     if (!authConnection) {
-        if (authConnectionOwnedByMediator_) {
+        if (authConnectionOwnedByMediator_ && authConnection_ != nullptr) {
             delete authConnection_;
         }
         authConnection = new mxo::liblttcp::CAuthStartupConnection(engine_);

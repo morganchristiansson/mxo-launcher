@@ -4,6 +4,18 @@
 #include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
+namespace {
+
+static uint32_t LoginState1WorkItemPayloadScaffold(const void* workItem) {
+    if (!workItem) {
+        return 0u;
+    }
+
+    const auto* payload = static_cast<const uint32_t*>(workItem);
+    return payload[2];
+}
+
+}  // namespace
 
 // UNANCHORED: source debug-name helper for launcher.exe vtable 0x004b4fc4.
 const char* CLTLoginState_State1::DebugName() const {
@@ -37,7 +49,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginM
         return CLTLoginState::Slot1_HandlePrimaryGate(workItem, mediator);
     }
 
-    const uint32_t workResultCode = mediator->LastAuthConnectStatus();
+    const uint32_t workResultCode = LoginState1WorkItemPayloadScaffold(workItem);
     mediator->WorldListCountOrStatus80() = workResultCode;
 
     CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_);

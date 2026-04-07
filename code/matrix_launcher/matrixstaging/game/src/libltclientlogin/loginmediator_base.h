@@ -379,7 +379,10 @@ public:
     // +0x30
     virtual const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t index) const = 0;
     // +0x34
-    void UnknownSlot12();
+    // anchor: launcher.exe:0x41c0d0
+    // owner-side auth-close/state-reset helper used by the page-6 rich-edit observer failure path
+    // before launcher retry/re-prompt.
+    virtual void RequestAuthCloseAndSwitchToState0() = 0;
     // +0x38
     virtual const char* GetProfileRootName() const = 0;
     // +0x3c
@@ -570,13 +573,16 @@ public:
     // +0x178
     virtual uint32_t GetLastLoginStatus() = 0;
     // +0x17c
-    void UnknownSlot93();
+    // anchor: launcher.exe:0x41af80
+    virtual uint32_t HandleAuthConnectionCompletionFallback(void* connection, void* workItem) = 0;
     // +0x180
-    void UnknownSlot94();
+    // anchor: launcher.exe:0x41f250
+    virtual uint32_t DispatchCurrentHelperAuthMessage(void* workItem) = 0;
     // +0x184
-    void UnknownSlot95();
+    // anchor: launcher.exe:0x41f260
+    virtual uint32_t DispatchCurrentHelperSlot6(void* workItem) = 0;
     // +0x188
-    void UnknownSlot96();
+    virtual uint32_t HandleMarginConnectionCompletionFallback(void* connection, void* workItem) = 0;
     // +0x18c
     virtual uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) = 0;
     // +0x190

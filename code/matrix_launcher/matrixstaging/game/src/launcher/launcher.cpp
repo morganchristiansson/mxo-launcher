@@ -973,20 +973,12 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             static_cast<unsigned>(attempt),
             static_cast<unsigned>(submitResult));
 
-        // Replacement-only continuation shim over the still-missing GUI timer/observer pump:
-        // - original launcher keeps running inside the `0x402ec0` UI interval after page-6 submit
-        // - that live dialog path continues through `0x4071e0` / page timer+observer work
-        // - current no-GUI host still lacks that exact launcher-owned prompt/timer lifecycle
-        // - so after the faithful `+0x30` submit we still allow the older owner-side auth begin
-        //   continuation to nudge the replacement back onto the observed auth request path
-        if (submitResult == 0u && DiagnosticCanBeginAuthConnection()) {
-            const uint32_t authContinuationResult = DiagnosticBeginAuthConnection();
-            spdlog::info(
-                "DIAGNOSTIC: pre-client launcher auth attempt={} post-submit continuation result=0x{:08x}",
-                static_cast<unsigned>(attempt),
-                static_cast<unsigned>(authContinuationResult));
-        }
-
+        // Fidelity correction:
+        // - original launcher page-6 submit enters through `0x408400 -> +0x30 -> 0x41ecd0`
+        // - `ProcessLoginRequest` itself already performs the happy-path `state0 -> state2`
+        //   handoff, and state2/state1 own the later auth-connect/bootstrap continuation
+        // - so the text-mode host should not issue an extra out-of-band auth begin after a
+        //   successful `+0x30` submit; doing so is less faithful and perturbs retry behavior
         const DWORD startTick = GetTickCount();
         bool authSucceeded = false;
         // Replacement text-mode pre-client gate:
@@ -1026,6 +1018,20 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 WriteMatrixConsoleFormattedLine(
                     "Login failed (0x%08x). Please re-enter your username and password.",
                     static_cast<unsigned>(loginError));
+            }
+
+            // anchor: launcher.exe:0x4091d0 -> sibling +0x34 -> launcher.exe:0x41c0d0
+            // Rich-edit observer failure path in the original launcher closes the current auth
+            // connection and restores helper state0 before the user retries credentials.
+            DiagnosticResetPostedLoginResult();
+            DiagnosticRequestAuthCloseAndSwitchToState0();
+            const DWORD authRetryResetStartTick = GetTickCount();
+            while ((GetTickCount() - authRetryResetStartTick) < 5000u) {
+                DiagnosticPumpLauncherNetwork(/*nonBlocking=*/true);
+                if (DiagnosticLastLoginEvent() == 1u || DiagnosticIsAuthConnectionQuiescentForRetry()) {
+                    break;
+                }
+                Sleep(10u);
             }
 
             char inputBuffer[256] = {};
@@ -1156,13 +1162,14 @@ character_selection_menu:
 
             DiagnosticResetPostedLoginResult();
             const uint32_t deleteBeginResult = DiagnosticBeginDeleteRecoveredCharacter(deleteSlotIndex);
-            if (deleteBeginResult != 0u) {
-                WriteMatrixConsoleFormattedLine(
-                    "Delete request failed to start (0x%08x).",
-                    static_cast<unsigned>(deleteBeginResult));
-                goto character_selection_menu;
-            }
+            spdlog::info(
+                "DIAGNOSTIC: text-mode delete-character begin slotIndex={} beginResult=0x{:08x}",
+                static_cast<unsigned>(deleteSlotIndex),
+                static_cast<unsigned>(deleteBeginResult));
 
+            // anchor: launcher.exe:0x40ec70
+            // The original launcher calls sibling `+0xf0 = 0x41c390` and immediately enters the
+            // event-8 wait; it does not gate the flow on the return value from `+0xf0`.
             const DWORD deleteStartTick = GetTickCount();
             bool deleteSucceeded = false;
             while ((GetTickCount() - deleteStartTick) < 30000u) {
@@ -1196,7 +1203,17 @@ character_selection_menu:
             (void)DeleteLauncherProfileDirectoryForCharacter(
                 deleteProfileRootNameToUse,
                 deleteCharacterName);
-            (void)DiagnosticFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
+
+            const uint32_t deleteCountBeforeFinalize = DiagnosticRecoveredCharacterCount();
+            const uint32_t deleteFinalizeResult = DiagnosticFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
+            const uint32_t deleteCountAfterFinalize = DiagnosticRecoveredCharacterCount();
+            spdlog::info(
+                "DIAGNOSTIC: text-mode delete-character finalize slotIndex={} countBefore={} countAfter={} finalizeResult=0x{:08x}",
+                static_cast<unsigned>(deleteSlotIndex),
+                static_cast<unsigned>(deleteCountBeforeFinalize),
+                static_cast<unsigned>(deleteCountAfterFinalize),
+                static_cast<unsigned>(deleteFinalizeResult));
+
             WriteMatrixConsoleFormattedLine("Deleted character '%s'.", deleteCharacterName);
             goto character_selection_menu;
         }

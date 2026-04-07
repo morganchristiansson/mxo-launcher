@@ -227,17 +227,25 @@ ResolveLauncherBridgeContextForConnectionScaffold(
         return nullptr;
     }
 
+    void* const ownerContext = connection->OwnerContext();
     mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* directContext =
-        static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(
-            connection->OwnerContext());
+        static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(ownerContext);
     if (IsLauncherBridgeContextScaffold(directContext) &&
         directContext->sidecarConnection == connection) {
         return directContext;
     }
 
+    // Fidelity improvement:
+    // - static RE for auth/margin connection construction says connection `+0xa4` stores the
+    //   owning mediator directly
+    // - prefer that concrete owner-context pointer over the replacement-only active-state global
+    //   when resolving the launcher bridge sidecar
+    // - fall back to the global only if owner-context is null
     mxo::ltlogin::CLTLoginMediator* mediator =
-        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
-    if (mediator == nullptr || connection->OwnerContext() != mediator) {
+        ownerContext != nullptr
+            ? static_cast<mxo::ltlogin::CLTLoginMediator*>(ownerContext)
+            : mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+    if (mediator == nullptr) {
         return nullptr;
     }
 
@@ -1414,6 +1422,16 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
     const char* closeStatusLabel =
         (launcherContext && launcherContext->isMarginConnection) ? "MarginPeerClosed"
                                                                  : "AuthPeerClosed";
+    spdlog::info(
+        "CLTThreadPerClientTCPEngine::WorkerThread Run connection={} ownerContext={} launcherContext={} isMargin={} wakeupSocket=0x{:08x} initialState={} connectCompletionPending={} remoteHost='{}'",
+        fmt::ptr(connection),
+        fmt::ptr(connection->OwnerContext()),
+        fmt::ptr(launcherContext),
+        (launcherContext && launcherContext->isMarginConnection) ? 1u : 0u,
+        wakeupSocketHandle_,
+        static_cast<unsigned>(connection->State()),
+        !datagramMode_ ? 1u : 0u,
+        connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName());
 
     // Tightened `0x42fe50` read/write/except/wakeup state:
     // - blocking select with no timeout
@@ -1436,28 +1454,58 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
 
     const auto queueConnectStatus =
         [&](uint32_t workPayload) {
-            if (!launcherContext || connectStatusQueued) {
+            if (connectStatusQueued) {
                 return;
             }
-            (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
-                launcherContext,
-                CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-                workPayload,
-                connectStatusLabel);
-            connectStatusQueued = true;
+            const bool queued = launcherContext != nullptr
+                ? engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
+                      launcherContext,
+                      CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
+                      workPayload,
+                      connectStatusLabel)
+                : engine->EnqueueDirectConnectionStatusWorkItemScaffold(
+                      connection,
+                      CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
+                      workPayload,
+                      connectStatusLabel,
+                      /*queueLockAlreadyHeld=*/false);
+            if (!queued && launcherContext == nullptr) {
+                spdlog::warn(
+                    "CLTThreadPerClientTCPEngine::WorkerThread direct queue connect status failed connection={} ownerContext={} payload=0x{:08x}",
+                    fmt::ptr(connection),
+                    fmt::ptr(connection->OwnerContext()),
+                    static_cast<unsigned>(workPayload));
+            }
+            connectStatusQueued = queued;
         };
 
     const auto queueClose = [&]() {
-        if (!launcherContext || closeQueued) {
+        if (closeQueued) {
             return;
         }
-        launcherContext->peerCloseQueued = true;
-        (void)engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
-            launcherContext,
-            CLTThreadPerClientTCPEngine::kWorkTypeClose,
-            0u,
-            closeStatusLabel);
-        closeQueued = true;
+        if (launcherContext != nullptr) {
+            launcherContext->peerCloseQueued = true;
+        }
+        const bool queued = launcherContext != nullptr
+            ? engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
+                  launcherContext,
+                  CLTThreadPerClientTCPEngine::kWorkTypeClose,
+                  0u,
+                  closeStatusLabel)
+            : engine->EnqueueDirectConnectionStatusWorkItemScaffold(
+                  connection,
+                  CLTThreadPerClientTCPEngine::kWorkTypeClose,
+                  0u,
+                  closeStatusLabel,
+                  /*queueLockAlreadyHeld=*/false);
+        if (!queued && launcherContext == nullptr) {
+            spdlog::warn(
+                "CLTThreadPerClientTCPEngine::WorkerThread direct queue close failed connection={} ownerContext={} state={}",
+                fmt::ptr(connection),
+                fmt::ptr(connection->OwnerContext()),
+                static_cast<unsigned>(connection->State()));
+        }
+        closeQueued = queued;
     };
 
     const auto closeAndInvalidateSocket = [&]() {
@@ -2549,12 +2597,17 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     // - original `0x4316a0` also acquires arg5 helper `+0x98`; after the current ownership move,
     //   that lock behavior now lives here on the target class side and the shell wrapper only
     //   forwards the primary slot call
+    // Active retry/deadlock correction:
+    // - do not hold the cleanup lock while waiting for a worker thread to stop
+    // - detach/erase the worker node under the lock, then stop the worker after releasing it
+    // - this keeps new auth-connect worker creation from blocking on the same lock during retry
     (void)EnterCleanupLockHelper();
 
     CBaseConnection* queuedConnectionOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
     void* cleanupContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
     bool touchedConnectionState = false;
     uint32_t result = 0u;
+    std::unique_ptr<CLTThreadPerClientTCPEngine_WorkerThread> workerPayload;
 
     if (CLTTCPConnection* queuedTcpConnection =
             dynamic_cast<CLTTCPConnection*>(queuedConnectionOwner)) {
@@ -2575,18 +2628,12 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
         CLTThreadPerClientTCPEngine_ContextTreeNode* node = ContextTreeFindNode(
             ownedContextTreeHead8C_,
             static_cast<uint32_t>(reinterpret_cast<uintptr_t>(worker->ContextKey())));
-        std::unique_ptr<CLTThreadPerClientTCPEngine_WorkerThread> workerPayload =
-            ContextTreeDetachPayload(this, node);
-        StopWorkerThreadScaffold(workerPayload.get());
+        workerPayload = ContextTreeDetachPayload(this, node);
         if (node) {
             (void)ContextTreeEraseNode(this, ownedContextTreeHead8C_, node);
         }
-        workerPayload.reset();
         result = kResultSuccess;
-        goto cleanup_tail;
-    }
-
-    {
+    } else {
         if (!touchedConnectionState) {
             spdlog::debug(
                 "CLTThreadPerClientTCPEngine::CleanupConnection couldn't find socket/context key={} normalizedKey={} owner={}",
@@ -2597,9 +2644,14 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
         result = touchedConnectionState ? kResultSuccess : 0u;
     }
 
-cleanup_tail:
-    SyncAttachedLauncherObjectStateScaffold();
     (void)LeaveCleanupLockHelper();
+
+    if (workerPayload) {
+        StopWorkerThreadScaffold(workerPayload.get());
+        workerPayload.reset();
+    }
+
+    SyncAttachedLauncherObjectStateScaffold();
     return result;
 }
 
@@ -2889,14 +2941,13 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
     return true;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
+    CLTTCPConnection* connection,
     uint32_t workType,
     uint32_t workPayload,
     const char* label,
     bool queueLockAlreadyHeld) {
-    if (!context) {
+    if (!connection) {
         return false;
     }
 
@@ -2906,7 +2957,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
             std::calloc(1, sizeof(mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold)));
     if (!workItem) {
         LoggerForBridgeLabel(label)->info(
-            "CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold failed label='{}'",
+            "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
             label ? label : "<null>");
         return false;
     }
@@ -2916,30 +2967,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     workItem->workPayload = workPayload;
     workItem->debugLabel = label;
 
-    // Current tighter RE-backed correction:
-    // - original worker-thread producers queue the direct connection object as `context`
-    //   for type-1 close, type-2 status, and type-3 parsed-packet work
-    // - current source now follows that on this launcher-bridge status path too by queueing the
-    //   sidecar connection object itself, not the source-owned queue-context bridge and not the
-    //   mediator-owned owner/context record
-    // - bounded active-path proof now closes this enough to prune the older no-sidecar fallback:
-    //   current callers either resolve `launcherContext` from a live connection first or only enter
-    //   this helper after `PumpLauncherConnectionContextScaffold()` proved `sidecarConnection`
-    //   non-null
-    if (context->sidecarConnection == nullptr) {
-        LoggerForBridgeLabel(label)->warn(
-            "CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold missing sidecarConnection label='{}' context={} type=0x{:08x} ({}) payload=0x{:08x}",
-            label ? label : "<null>",
-            fmt::ptr(context),
-            workType,
-            LauncherBridgeWorkTypeName(workType),
-            workPayload);
-        std::free(workItem);
-        return false;
-    }
-
-    void* queuedContext = ResolveQueuedConnectionContextForProducerAblation(
-        context->sidecarConnection);
+    void* queuedContext = ResolveQueuedConnectionContextForProducerAblation(connection);
     const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
         queuedContext,
@@ -2952,7 +2980,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
     }
 
     LoggerForBridgeLabel(label)->info(
-        "CLTThreadPerClientTCPEngine launcher bridge queued work label='{}' workItem={} context={} type=0x{:08x} ({}) payload=0x{:08x}",
+        "CLTThreadPerClientTCPEngine direct queued work label='{}' workItem={} context={} type=0x{:08x} ({}) payload=0x{:08x}",
         label ? label : "<null>",
         fmt::ptr(workItem),
         fmt::ptr(queuedContext),
@@ -2960,14 +2988,79 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         LauncherBridgeWorkTypeName(workType),
         workPayload);
 
+    bool shouldImmediateDrain = (workType == kWorkTypeConnectionStatus || workType == kWorkTypeClose);
+    if (shouldImmediateDrain && workType == kWorkTypeClose) {
+        if (auto* worker = connection->WorkerThreadScaffold(); worker != nullptr && worker->IsCurrentThread()) {
+            shouldImmediateDrain = false;
+        }
+    }
+    if (shouldImmediateDrain) {
+        RunCompletedOperationQueue(
+            /*nonBlocking=*/true,
+            /*preferType1CallbackBeforeCleanup=*/workType == kWorkTypeClose);
+    }
+    return true;
+}
+
+// UNANCHORED: no original launcher.exe anchor assigned yet.
+bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
+    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+    uint32_t workType,
+    uint32_t workPayload,
+    const char* label,
+    bool queueLockAlreadyHeld) {
+    if (!context) {
+        return false;
+    }
+
+    // Fidelity note:
+    // - original worker-thread producers queue the direct connection object as `context` for
+    //   type-1 close and type-2 status work too
+    // - when the replacement-only launcher bridge context is available, use its sidecar
+    //   connection only as the route back to that same direct connection object
+    if (context->sidecarConnection == nullptr) {
+        LoggerForBridgeLabel(label)->warn(
+            "CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold missing sidecarConnection label='{}' context={} type=0x{:08x} ({}) payload=0x{:08x}",
+            label ? label : "<null>",
+            fmt::ptr(context),
+            workType,
+            LauncherBridgeWorkTypeName(workType),
+            workPayload);
+        return false;
+    }
+
+    const bool queued = EnqueueDirectConnectionStatusWorkItemScaffold(
+        context->sidecarConnection,
+        workType,
+        workPayload,
+        label,
+        queueLockAlreadyHeld);
+    if (!queued) {
+        return false;
+    }
+
     // Source-owned active-path tightening for the current launcher/client single-process bridge:
     // some late startup consumers expect queued status/close work to become visible with less
     // latency than the current queue-thread/poll cadence always guarantees.
     // In particular, the post-state9 healthy original tail eventually reaches the queued margin
     // peer-close -> `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` path, while the replacement can crash
     // in late rendering before the next outer pump drains that close work.
-    // Drain the shared completed-work queue once here, non-blocking, after the enqueue succeeds.
-    if (workType == kWorkTypeConnectionStatus || workType == kWorkTypeClose) {
+    // Fidelity/retry correction:
+    // - draining a type-1 close immediately on the same socket worker thread that produced it can
+    //   hit the source-owned self-dispatch cleanup path in `RunCompletedOperationQueue`
+    // - that path is still not faithful enough to tear down the worker without leaving retry-hostile
+    //   state behind
+    // - original queued close consumption belongs to the later shared queue-consumer family, so keep
+    //   same-worker type-1 auth close work queued for the next outer pump instead of forcing an
+    //   immediate local drain here
+    bool shouldImmediateDrain = (workType == kWorkTypeConnectionStatus || workType == kWorkTypeClose);
+    if (shouldImmediateDrain && workType == kWorkTypeClose && context->sidecarConnection != nullptr) {
+        auto* worker = context->sidecarConnection->WorkerThreadScaffold();
+        if (worker != nullptr && worker->IsCurrentThread()) {
+            shouldImmediateDrain = false;
+        }
+    }
+    if (shouldImmediateDrain) {
         RunCompletedOperationQueue(
             /*nonBlocking=*/true,
             /*preferType1CallbackBeforeCleanup=*/workType == kWorkTypeClose);

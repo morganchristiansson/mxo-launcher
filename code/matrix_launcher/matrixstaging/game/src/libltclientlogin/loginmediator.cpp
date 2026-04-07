@@ -880,6 +880,10 @@ bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
     return present;
 }
 
+const char* CLTLoginMediator::GetSourceBlock94SmallString60BeginScaffold() const {
+    return authBootstrapSource38_.string60.begin;
+}
+
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
 uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
     const uint8_t prompt = authBootstrapChild680_ ? authBootstrapChild680_->GetCrashReporterPromptForSecurId58() : 0u;
@@ -1449,13 +1453,42 @@ bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
     const bool wouldCallConnectionClose0c =
         rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
         rawState == static_cast<uint32_t>(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
+    const uint32_t closeResult = wouldCallConnectionClose0c
+        ? authConnection_->Close(/*graceful=*/true)
+        : 0u;
 
     spdlog::info(
-        "CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1(+0x164 wrapper-facing) -> 1 [owner+0x2c={} authConnectionState={} wouldCallConnectionClose0cArg1={} currentReplacementDoesNotInvokeCloseYet=1]",
+        "CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1(+0x164 wrapper-facing) -> 1 [owner+0x2c={} authConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x}]",
         static_cast<unsigned>(authConnectionFlag2c_),
         rawState,
-        wouldCallConnectionClose0c ? 1u : 0u);
+        wouldCallConnectionClose0c ? 1u : 0u,
+        static_cast<unsigned>(closeResult));
     return true;
+}
+
+void CLTLoginMediator::RequestAuthCloseAndSwitchToState0() {
+    // anchor: launcher.exe:0x41c0d0
+    // Current best original shape:
+    // - call owner vtable `+0x164`
+    // - if old helper exists, notify it with the global state0 object
+    // - install global state0 object at owner `+0x10`
+    // - notify state0 with the old helper object
+    const CLTLoginState* const oldState = currentState_;
+    const bool authCloseArmed = RequestAuthConnectionCloseWaitEvent1();
+    uint32_t state0EntryResult = 0u;
+    if (scaffoldState0_ != nullptr) {
+        state0EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
+            0u,
+            scaffoldState0_,
+            const_cast<CLTLoginState*>(oldState),
+            "RequestAuthCloseAndSwitchToState0 0x41c0d0");
+    }
+    spdlog::info(
+        "CLTLoginMediator::RequestAuthCloseAndSwitchToState0 authCloseArmed={} oldState={} currentState={} state0EntryResult=0x{:08x}",
+        authCloseArmed ? 1u : 0u,
+        oldState ? oldState->DebugName() : "<null>",
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(state0EntryResult));
 }
 
 // anchor: launcher.exe:0x41f240
@@ -1600,6 +1633,13 @@ uint32_t CLTLoginMediator::StageMarginPacketBytesAndDispatchCurrentHelperScaffol
 }
 
 // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
+uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connection, void* workItem) {
+    return HandleAuthConnectionCompletionFallbackScaffold(
+        static_cast<mxo::liblttcp::CMessageConnection*>(connection),
+        workItem);
+}
+
+// anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
 uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold(
     mxo::liblttcp::CMessageConnection* connection,
     void* workItem) {
@@ -1610,41 +1650,40 @@ uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold(
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
     const uint32_t workType = workHeader ? workHeader->workType : 0u;
-    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        const auto* statusWorkItem =
-            static_cast<const CLTLoginMediatorQueuedWorkItemScaffold*>(workItem);
-        const uint32_t workResultCode = statusWorkItem ? statusWorkItem->workPayload : 0u;
-        lastAuthConnectStatus_ = workResultCode;
-        ++authConnectStatusCount_;
-        if (authConnection_ != nullptr &&
-            ((workResultCode == 0u &&
-              authConnection_->State() ==
-                  mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
-             workResultCode == kConnectStatusSuccess)) {
-            // Current source still needs the ready-state promotion before state2 re-entry, but the
-            // leaf/fallback routing itself now mirrors the original more closely:
-            // `0x449a70 -> 0x41af80 -> current helper slot1`.
-            authConnection_->SetState(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
-        }
-    } else if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
         authConnection_ = nullptr;
         if (authConnectionContextScaffold_ != nullptr) {
-            authConnectionContextScaffold_->sidecarConnection = nullptr;
             authConnectionContextScaffold_->peerCloseQueued = false;
         }
     }
 
     const uint32_t handled = DispatchCurrentHelperPrimaryGateScaffold(workItem);
     spdlog::info(
-        "CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} lastAuthConnectStatus=0x{:08x} ownerAuthConnection={} bridgeContext={}",
+        "CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerAuthConnection={} bridgeContext={}",
         static_cast<unsigned>(workType),
         fmt::ptr(connection),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(handled),
-        static_cast<unsigned>(lastAuthConnectStatus_),
         fmt::ptr(authConnection_),
         fmt::ptr(authConnectionContextScaffold_));
     return handled;
+}
+
+// anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
+uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessage(void* workItem) {
+    return DispatchCurrentHelperAuthMessageScaffold(workItem);
+}
+
+// anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
+uint32_t CLTLoginMediator::DispatchCurrentHelperSlot6(void* workItem) {
+    return currentState_ ? currentState_->Slot6_HandleSecondaryMessage(workItem, this) : 0u;
+}
+
+// anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
+uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallback(void* connection, void* workItem) {
+    return HandleMarginConnectionCompletionFallbackScaffold(
+        static_cast<mxo::liblttcp::CMessageConnection*>(connection),
+        workItem);
 }
 
 // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
@@ -1825,12 +1864,30 @@ void CLTLoginMediator::ResetSelectionContext0ecMirror() {
 uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) {
     const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
     if (stateCode <= 2u || selectedSlotRecordIndex >= 100u || slotRecordCount684_ == 0u) {
+        spdlog::info(
+            "CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex rejected slotIndex={} stateCode={} count={} currentState={}",
+            static_cast<unsigned>(selectedSlotRecordIndex),
+            static_cast<unsigned>(stateCode),
+            static_cast<unsigned>(slotRecordCount684_),
+            currentState_ ? currentState_->DebugName() : "<null>");
         return 0u;
     }
 
     const size_t slotIndex = static_cast<size_t>(selectedSlotRecordIndex);
     if (slotIndex >= slotRecords688_.size() || !slotRecordValid688_[slotIndex]) {
+        spdlog::info(
+            "CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex rejected invalid slotIndex={} count={} valid={} currentState={}",
+            static_cast<unsigned>(selectedSlotRecordIndex),
+            static_cast<unsigned>(slotRecordCount684_),
+            (slotIndex < slotRecordValid688_.size() && slotRecordValid688_[slotIndex]) ? 1u : 0u,
+            currentState_ ? currentState_->DebugName() : "<null>");
         return 0u;
+    }
+
+    const std::string removedName = slotRecords688_[slotIndex].heapString14;
+    const uint32_t oldCount = slotRecordCount684_;
+    if (slotIndex < lastAuthReply_.characters.size()) {
+        lastAuthReply_.characters.erase(lastAuthReply_.characters.begin() + static_cast<std::ptrdiff_t>(slotIndex));
     }
 
     if (slotRecordCount684_ != 0u) {
@@ -1854,6 +1911,13 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
     }
 
     PersistCharactersIniFromRecoveredAuthStateScaffold();
+    spdlog::info(
+        "CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex removed slotIndex={} oldCount={} newCount={} removedName='{}' currentState={}",
+        static_cast<unsigned>(selectedSlotRecordIndex),
+        static_cast<unsigned>(oldCount),
+        static_cast<unsigned>(slotRecordCount684_),
+        removedName.empty() ? "<empty>" : removedName.c_str(),
+        currentState_ ? currentState_->DebugName() : "<null>");
     return 0u;
 }
 

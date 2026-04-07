@@ -1302,9 +1302,11 @@ uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(CLTLoginMediator& media
                 return kAuthBootstrap680InboundUnhandled;
             }
 
-            mediator.lastAuthPublicKeyReply_ = reply;
+            const mxo::auth::GetPublicKeyReply cachedPublicKeyReplyBeforeUpdate =
+                mediator.lastAuthPublicKeyReply_;
             child.inboundAuthStatusEc = reply.status;
             if (reply.status != 0u) {
+                mediator.lastAuthPublicKeyReply_ = reply;
                 return kAuthBootstrap680InboundGetPublicKeyReplyError;
             }
 
@@ -1322,8 +1324,23 @@ uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(CLTLoginMediator& media
                 child.inboundAuthStatusEc = workerResult;
             }
 
+            mxo::auth::GetPublicKeyReply effectiveReplyForSend = reply;
+            const bool reusedCachedEmbeddedPublicKey =
+                !reply.hasEmbeddedPublicKey &&
+                cachedPublicKeyReplyBeforeUpdate.valid &&
+                cachedPublicKeyReplyBeforeUpdate.hasEmbeddedPublicKey &&
+                cachedPublicKeyReplyBeforeUpdate.publicKeyId == reply.publicKeyId &&
+                child.currentPublicKeyId9C == reply.publicKeyId;
+            if (reusedCachedEmbeddedPublicKey) {
+                effectiveReplyForSend = cachedPublicKeyReplyBeforeUpdate;
+                effectiveReplyForSend.status = reply.status;
+                effectiveReplyForSend.currentTime = reply.currentTime;
+                effectiveReplyForSend.publicKeyId = reply.publicKeyId;
+            }
+            mediator.lastAuthPublicKeyReply_ = effectiveReplyForSend;
+
             spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={} workerResult=0x{:08x} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={}",
+                "DIAGNOSTIC: launcher-owned auth parsed AS_GetPublicKeyReply status={} currentTime={} publicKeyId={} keySize={} modulusLength={} signatureLength={} exponentByte=0x{:02x} hasEmbeddedPublicKey={} reusedCachedEmbeddedPublicKey={} workerResult=0x{:08x} childLazyPubkeyDatValidatorA4={} childRaw08PublicKeyWorkerA8={} childReplyAuthDataValidatorAC={}",
                 static_cast<unsigned>(reply.status),
                 static_cast<unsigned>(reply.currentTime),
                 static_cast<unsigned>(reply.publicKeyId),
@@ -1332,6 +1349,7 @@ uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(CLTLoginMediator& media
                 static_cast<unsigned>(reply.signatureLength),
                 static_cast<unsigned>(reply.publicExponentByte),
                 reply.hasEmbeddedPublicKey ? 1u : 0u,
+                reusedCachedEmbeddedPublicKey ? 1u : 0u,
                 static_cast<unsigned>(workerResult),
                 fmt::ptr(child.lazyPubkeyDatValidatorA4),
                 fmt::ptr(child.raw08PublicKeyWorkerA8),
@@ -1342,7 +1360,7 @@ uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(CLTLoginMediator& media
             }
 
             mediator.expectedAuthRequestName_ = CLTLoginMediator::kMessageAsAuthRequest;
-            return SendAuthRequest(mediator, reply) != 0u
+            return SendAuthRequest(mediator, effectiveReplyForSend) != 0u
                 ? kAuthBootstrap680InboundHandledContinueWaiting
                 : kAuthBootstrap680InboundGetPublicKeyWorkerError;
         }

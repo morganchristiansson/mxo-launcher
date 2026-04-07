@@ -254,7 +254,8 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
       - it reads the selected row item-data high word as a signed active selection-entry index
         (current tighter auth-valid read: slot-record / character-entry index)
       - calls sibling mediator slot `+0xf0 = 0x41c390` with that selected row high word
-      - waits through `0x41b6c0` for event `8`
+      - practical call-shape note from the current decompile/listing: this corridor does **not**
+        branch on the return value from `+0xf0`; it immediately waits through `0x41b6c0` for event `8`
       - on **success** (`WaitForEvent` result `0`) it:
         - calls sibling `+0xdc(selectedSlotRecordIndex)` first to recover the slot-record heap string
         - then calls sibling `+0x5c(chainedToken)` with that returned value before building `Profiles\%s\%s`

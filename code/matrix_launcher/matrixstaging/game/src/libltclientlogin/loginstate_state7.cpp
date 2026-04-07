@@ -58,8 +58,10 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     // - gate on owner `+0x1c` ready-state through `0x41b4b0`; on failure switch helper `4`
     // - gate on owner byte `+0xf14`; on zero switch helper `6`
     // - initialize local raw-`0x0d` margin packet (`0x43a9a0`)
-    // - copy current character name through owner `+0x38`, then current slot-record id pair
-    //   through owner `+0x44`
+    // - fetch current slot record through owner `+0x44`
+    // - fetch owner source block `+0x94` through owner `+0x38`, then read the embedded
+    //   small-string begin pointer at `+0x60` and thread that into `0x43aa80`
+    // - copy current slot-record id pair from the record payload at `+0x10 + 0x03/+0x07`
     // - send through `0x41af70`
     // - post event `7`
     if (!mediator->State10HasReadyConnectionState2()) {
@@ -92,11 +94,11 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     }
 
     const SlotRecordState004b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
-    const char* characterName = mediator->SourceLeadString108().data();
+    const char* sourceBlock94String60Begin = mediator->GetSourceBlock94SmallString60BeginScaffold();
 
     State7Packet0x0dBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();
-    packetBuilder.SetCharacterName(characterName);
+    packetBuilder.SetCharacterName(sourceBlock94String60Begin);
     packetBuilder.SetCharacterIdPair(
         currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
         currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u);
@@ -105,12 +107,13 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     mediator->PostEventScaffold(0x07u);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceLeadString108='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} -> sendResult=0x{:08x} then posts event=0x07",
+        "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' -> sendResult=0x{:08x} then posts event=0x07",
         State7Packet0x0dFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
-        characterName ? characterName : "<empty>",
+        sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
         currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
         currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u,
+        (currentSlotRecord && !currentSlotRecord->heapString14.empty()) ? currentSlotRecord->heapString14.c_str() : "<empty>",
         sendResult);
     return sendResult;
 }
