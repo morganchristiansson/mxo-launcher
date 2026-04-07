@@ -271,13 +271,21 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         return 1u;
     }
 
+    uint32_t helper11EntryResult = 0u;
     if (CLTLoginState* nextState = mediator->ScaffoldState11()) {
-        mediator->SwitchHelperStateScaffold(0x0bu, nextState);
+        helper11EntryResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
+            0x0bu,
+            nextState,
+            this,
+            "State10 slot6 successful AS_AuthReply -> helper11 immediate slot3 continuation");
     } else {
         spdlog::warn(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed successful AS_AuthReply but has no registered helper11 state");
     }
     mediator->PostEventScaffold(0x14u);
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage successful AS_AuthReply -> helper11 entry result=0x{:08x} then PostEvent(0x14)",
+        static_cast<unsigned>(helper11EntryResult));
     return 1u;
 }
 

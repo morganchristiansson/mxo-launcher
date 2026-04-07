@@ -2298,12 +2298,22 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
 
     MirrorCreateCharacterInput120SourceBlock(input);
 
+    const CLTLoginState* const oldState = currentState_;
+    uint32_t state10EntryResult = 0u;
     if (scaffoldState10_ != nullptr) {
-        SwitchHelperStateScaffold(10u, scaffoldState10_);
+        // anchor: launcher.exe:0x41c3c0 -> 0x41b450(10)
+        // Like the neighboring owner-side state writers, the original helper switch does not stop
+        // at plain `currentState = state10`; the active continuation needs the immediate state10
+        // slot-3 claim-name send (`0x43bf90`) to start `MS_ClaimCharacterNameRequest`.
+        state10EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
+            10u,
+            scaffoldState10_,
+            const_cast<CLTLoginState*>(oldState),
+            "ProcessCreateCharacterInput120 0x41c3c0 -> 0x41b450 immediate state10 slot3 continuation");
     }
 
     spdlog::info(
-        "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120 owner) name='{}' field12c=0x{:08x} firstDword134=0x{:08x} backgroundPreview='{}' -> currentState={}",
+        "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120 owner) name='{}' field12c=0x{:08x} firstDword134=0x{:08x} backgroundPreview='{}' oldState={} currentState={} state10EntryResult=0x{:08x}",
         postAuthMarginLoadingState_.sourceLeadString108[0]
             ? postAuthMarginLoadingState_.sourceLeadString108.data()
             : "<empty>",
@@ -2312,7 +2322,9 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
         postAuthMarginLoadingState_.sourceBlock1b8[0]
             ? reinterpret_cast<const char*>(postAuthMarginLoadingState_.sourceBlock1b8.data())
             : "<empty>",
-        currentState_ ? currentState_->DebugName() : "<null>");
+        oldState ? oldState->DebugName() : "<null>",
+        currentState_ ? currentState_->DebugName() : "<null>",
+        static_cast<unsigned>(state10EntryResult));
     return 0u;
 }
 
