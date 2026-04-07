@@ -175,6 +175,7 @@ At `0x40b360..0x40b409` the launcher uses the same interface during cleanup, inc
 Fresh static review of `launcher.exe:0x496480..0x496491` shows that the launcher also registers **another output slot** through the same wrapper ctor `0x4030d0` with the same interface string `"ILTLoginMediator.Default"`:
 
 - output slot: `0x4d3584`
+- replacement cleanup note: the current launcher collapses that lookup onto the live `ILTLoginMediator.Default` pointer instead of keeping a second runtime pointer; `0x4d3584` remains original-path evidence only.
 
 That is important because the current arg7-selection writer is now closed to the surrounding helper:
 

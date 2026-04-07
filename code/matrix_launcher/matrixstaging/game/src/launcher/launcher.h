@@ -81,11 +81,11 @@ public:
 
     // UNANCHORED: replacement-only synthesis inside launcher.exe:0x40b430 that seeds the
     // launcher-owned selection / nopatch inputs consumed later by the active nopatch path.
-    bool BuildStartupContextFromRecoveredSelection(char* startupSelectionName, size_t startupSelectionNameCapacity);
+    bool BuildRecoveredSelectionNameAndState(char* selectionName, size_t selectionNameCapacity);
 
     // UNANCHORED: replacement-only synthesis that materializes arg6/arg7-owned InitClientDLL
     // state before the later 0x40a380 / 0x40b74d..0x40b7af pre-client continuation corridor.
-    bool MaterializeRecoveredInitClientStateFromStartupContext(const char* startupSelectionName);
+    bool MaterializeRecoveredInitClientStateFromSelectionName(const char* selectionName);
 
     // UNANCHORED: recovered continuation for the 0x40b74d..0x40b790 pre-client corridor
     // (0x402ec0 gate + optional 0x40b75a autodetect path). This is not claimed as a separate
