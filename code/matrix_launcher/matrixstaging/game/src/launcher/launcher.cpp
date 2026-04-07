@@ -876,19 +876,14 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         if (!authSucceeded) {
             const uint32_t loginError = DiagnosticLastLoginError();
             if (loginError == 0u) {
-                spdlog::warn("WARNING: pre-client launcher auth timed out before success/error resolution; falling back to later post-InitClientDLL auth path");
-                return true;
-            }
-            if (loginError != 4u) {
                 spdlog::warn(
-                    "WARNING: pre-client launcher auth ended with error=0x{:02x}; falling back to later post-InitClientDLL auth path while pre-client auth adoption remains incomplete",
+                    "WARNING: pre-client launcher auth timed out before success/error resolution; re-prompting credentials instead of falling through into client load");
+            } else {
+                spdlog::warn(
+                    "WARNING: pre-client launcher auth ended with error=0x{:02x}; re-prompting credentials instead of falling through into client load",
                     static_cast<unsigned>(loginError));
-                return true;
             }
 
-            spdlog::info(
-                "DIAGNOSTIC: pre-client launcher auth failure will re-prompt credentials error=0x{:02x}",
-                static_cast<unsigned>(loginError));
             char inputBuffer[256] = {};
             if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
                 spdlog::error("ERROR: interactive username re-prompt failed or was left empty");
