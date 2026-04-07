@@ -93,6 +93,8 @@ public:
     bool RunRecoveredPreClientBringupStage() const;
 
     // UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
+    // Implementation intentionally lives in `src/textmode_launcher_flow.cpp` so recovered
+    // launcher.cpp stays focused on launcher-owned startup coordination.
     bool RunPreClientAuthAndCharacterSelectionStage();
 
     // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
