@@ -141,6 +141,32 @@ Replacement-side state8 producer logs still match the key original header/body f
 - `overflow13f4 = 0x0029`
 - neighboring `cl.cfg` gate `1452 = 1` is also present on the same active reply materialization path, but that field is no longer the `mcd.cfg` gate after the corrected `0x41f150 -> +0x13f6` proof
 
+### New original-live getter spot checks (2026-04-07)
+A fresh original `launcher.exe` / spawned `matrix.exe` WineDbg pass tightened the same family at
+its concrete getters:
+- breakpoint `0x41f1c0` (`+0xf4`)
+  - owner pointer still resolves as `0x004d4e38`
+  - owner `+0xf48` first dword read back as `0x00000006`
+- breakpoint `0x41f170` (`+0xbc`)
+  - owner `+0xf48` leading dwords read back as:
+    - `0x00000006`
+    - `0x00000069`
+    - `0x00000082`
+- breakpoint `0x41f180` (`+0xc0`)
+  - owner `+0xf88` first dword read back as `0x00000130`
+  - owner `+0x13f4` dword read back as `0x00010029`
+    - low word length `0x0029`
+    - paired gate byte still set in the same dword
+- breakpoint `0x41aec0` (`+0xc4`)
+  - owner `+0x13f0` was non-null
+  - owner `+0x13f4` low word again read back as `0x0029`
+
+Practical consequence:
+- the currently logged replacement `+0xbc/+0xc0/+0xc4` header/body/overflow values are now much
+  less suspicious as the primary remaining source of the late render crash
+- keep this family as a baseline reference, but the next highest-value launcher-side suspicion now
+  shifts further toward ordering / timing / lifetime rather than these raw persisted bytes alone
+
 And the replacement now also shows the later client-side save chain concretely enough to close the
 mcd-content parity question:
 - event `0x0b` is dispatched through the observer bridge

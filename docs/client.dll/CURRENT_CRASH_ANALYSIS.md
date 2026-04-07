@@ -238,8 +238,14 @@ These are no longer the best primary crash explanations:
       active path really does reach `+0x80 == 1` with `+0xac -> null` / length `0`
     - original `matrix.exe` breakpointing at `0x41f110 / 0x41ae40` also matches replacement `bl.cfg`
       shape: length `0x000e`, first dword `0x00006dd0`, string tail `"Nicodemus"`
-    - so neither the odd empty-`il.cfg` live contract nor the small live `bl.cfg` payload is a
-      replacement-only invention
+    - original `matrix.exe` breakpointing at `0x41f170 / 0x41f180 / 0x41aec0` also matches the
+      current replacement state8 persistence family closely enough on the active route:
+      - header `+0xf48` lead values
+      - body first dword `0x00000130`
+      - overflow low-word length `0x0029`
+    - so neither the odd empty-`il.cfg` live contract, nor the small live `bl.cfg` payload, nor the
+      current raw `+0xbc/+0xc0/+0xc4` persisted bytes are good replacement-only explanations by
+      themselves
     - the replacement-side attempt to suppress the `il.cfg` flag on zero-byte section-2 payloads was
       a fidelity regression and has already been reverted
     - current launcher-side suspicion should therefore move one layer deeper than the raw section
