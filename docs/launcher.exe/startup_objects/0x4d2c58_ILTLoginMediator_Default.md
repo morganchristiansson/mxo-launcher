@@ -277,8 +277,18 @@ concretely:
   - registers observer callback `0x4091d0` through sibling slot `+0x170`
   - then calls sibling slot `+0x30` with that stack block
 - callback `0x4091d0`
-  - handles success/error through sibling slots `+0x34/+0x58/+0x5c/+0x60/+0x174/+0x178`
-  - on success dispatches launcher dialog command `7`
+  - only acts when the rich-edit host has byte `+0x5c` set and `promptState == 3`
+  - success path = `callbackFailureFlag == 0 && callbackCode == 5`
+    - touches sibling slots `+0x58/+0x5c/+0x60`
+    - dispatches launcher dialog command `7`
+    - unregisters through sibling `+0x174`
+    - resets the prompt flow to state `0`
+  - failure path
+    - reads sibling `+0x178 = GetLastStatus80`
+    - maps status codes to launcher string resources
+    - appends the resulting text into the rich-edit host
+    - calls sibling `+0x34 = CLTLoginMediator_RequestAuthCloseAndSwitchToState0`
+    - resets the prompt flow to state `1`
 
 Direct raw-vtable clarification:
 - this dialog-side producer corridor is now concrete
@@ -286,8 +296,8 @@ Direct raw-vtable clarification:
 - so sibling slot `0x4d2734 + 0x30` is the same recovered raw virtual for
   `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest`
 - current source should still keep the trusted implementation boundary on owner `0x41ecd0`, but
-  the remaining open work is now the page-`6` observer/prompt lifecycle rather than the last submit
-  call bridge itself
+  the remaining open work is now the exact original observer-object layout / resource-text meaning
+  rather than the last submit call bridge or the broad success/error callback split itself
 
 ## Early method surface observed so far
 
