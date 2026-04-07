@@ -1,7 +1,7 @@
 #include "diagnostics.h"
 #include "launcher_mediator_abi_shared.h"
 #include "launcher_network_object_abi.h"
-#include "loginmediator.h"
+#include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 
 #include <cstddef>
 #include <cstdint>

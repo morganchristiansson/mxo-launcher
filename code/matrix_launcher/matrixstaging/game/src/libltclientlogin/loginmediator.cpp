@@ -29,7 +29,7 @@
 #include "loginmediator.h"
 
 #include "loginstate.h"
-#include "launcher_mediator_abi_shared.h"
+#include "../../../../src/launcher_mediator_abi_shared.h"
 #include "authbootstrap680_internal.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
 #include "../../../runtime/src/libltnet/sys/pc/pcsocket.h"

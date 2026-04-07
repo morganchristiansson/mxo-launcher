@@ -8,6 +8,7 @@
  * - do NOT treat ad-hoc NULL-heavy InitClientDLL calls as the canonical path
  */
 
+#include <winsock2.h>
 #include <windows.h>
 #include <winver.h>
 #include <cstdio>

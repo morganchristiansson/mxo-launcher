@@ -89,13 +89,16 @@ LAUNCHER_ARGS = -nopatch -noeula $(if $(MXO_USER),-user $(MXO_USER)) $(if $(MXO_
 
 all: $(TARGET)
 
-CXXFLAGS = -Wall -Wextra -O0 -g -fno-omit-frame-pointer -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include -Imatrixstaging/game/src/libltclientlogin -Imatrixstaging/runtime/src/liblttcp -Isrc/liblttcp -Isrc
+CPPFLAGS = -I$(CRYPTOPP_DIR) -I$(SPDLOG_DIR)/include
+CXXFLAGS = -Wall -Wextra -O0 -g -fno-omit-frame-pointer
+LDFLAGS = -L$(BUILD_DIR)
+LDLIBS = -lversion -lws2_32 -lcryptopp
 
 # MinGW arg5 native-vptr mode:
 # - enabled by default on __MINGW32__ builds
 # - opt out with: make MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR=1
 ifeq ($(MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR),1)
-CXXFLAGS += -DMXO_DISABLE_MINGW_NATIVE_ARG5_VPTR
+CPPFLAGS += -DMXO_DISABLE_MINGW_NATIVE_ARG5_VPTR
 endif
 
 CXXFLAGS += -MMD -MP
@@ -105,17 +108,17 @@ CXXFLAGS += -MMD -MP
 # Object file for each source - pattern rule handles all src/*.cpp files
 $(BUILD_DIR)/src/%.o: src/%.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
 # Object file for matrixstaging/ sources - pattern rule handles all matrixstaging/*.cpp files
 $(BUILD_DIR)/matrixstaging/%.o: matrixstaging/%.cpp
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c -o $@ $<
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
 
 # Target depends on launcher objects and cryptopp (spdlog is order-only prerequisite)
 $(TARGET): $(LAUNCHER_OBJS) | $(SPDLOG_DIR) $(CRYPTOPP_LIB)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -o $@ $^ -lversion -lws2_32 -lcryptopp -Lbuild
+	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 # Download cryptopp and spdlog if they don't exist
 $(CRYPTOPP_DIR):
@@ -137,7 +140,7 @@ $(CRYPTOPP_LIB): $(CRYPTOPP_DIR)
 	$(MAKE) -C $(CRYPTOPP_DIR) CXX="$(CXX)" AR="$(AR)" RANLIB="$(RANLIB)" static
 	cp $(CRYPTOPP_DIR)/libcryptopp.a $@
 
-# spdlog is header-only, included via CXXFLAGS. No build step needed.
+# spdlog is header-only, included via CPPFLAGS. No build step needed.
 
 $(CRASHREPORTER_STUB): $(CRASHREPORTER_STUB_SRC)
 	$(CXX) -Wall -Wextra -O2 -mwindows -o $@ $^
