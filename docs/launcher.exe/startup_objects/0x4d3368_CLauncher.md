@@ -321,14 +321,18 @@ Practical consequence:
   - keep the later direct owner `+0xec` call on the proven client-side producer path at
     `client.dll:0x62170f48`
 - current bounded source consequence:
-  - the no-GUI launcher bridge now mirrors launcher-side page-`7` command-`8` writeback into
+  - the no-GUI launcher bridge now enters auth through the faithful page-`6` submit boundary
+    `0x408400 -> sibling +0x30 -> 0x41ecd0`
+  - after auth succeeds, it mirrors launcher-side page-`7` command-`8` writeback into
     `CLauncher+0xa8/+0xac` plus `Last_WorldName`
   - newer tightening now also mirrors the packed row-item split more closely there:
     - low word = matched world / descriptor index
     - high word = selected active entry index (current tighter auth-valid read: slot-record /
-      character-entry index)
-  - it seeds the later wrapper-facing `+0x120` character source block and current slot route index
+      character-entry index) or `0xffff` for the `"- - -"` create-character placeholder row
   - replacement cleanup note: the current launcher now uses the live `ILTLoginMediator.Default` pointer directly for this writeback path instead of carrying a separate sibling pointer at runtime.
+  - newer source cleanup also removes the old pre-client mirror-only `+0x120` character-source
+    seed from the active launcher path; current best split is now launcher writeback first, then the
+    later client-owned create-character continuation through `+0x120`
   - `LoadLastWorldNameFromRegistry()` is now consulted only on the character-selection side as a fallback seed; it is no longer part of the early startup-context build
   - but it no longer claims a pre-client direct `+0xf0/+0xec` owner commit
   - newer direct-producer tightening from `client.dll:0x6211d3e0 + 0x62170e2a..0x62170f48` narrows

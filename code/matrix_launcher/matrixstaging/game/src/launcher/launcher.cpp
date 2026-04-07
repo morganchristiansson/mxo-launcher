@@ -14,6 +14,7 @@
 #include "autodetectdialog.h"
 #include "../../../../src/diagnostics.h"
 #include "../../../../src/launcher_network_object_abi.h"
+#include "../libltclientlogin/loginmediator_base.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
 
 // anchor: launcher.exe:0x40a55c..0x40a5a4 / caller-clean 8-argument export frame
@@ -158,6 +159,62 @@ bool PromptForMissingLauncherCredentialsIfNeeded() {
         "DIAGNOSTIC: replacement pre-client auth prompted for missing launcher credentials username={} password={}",
         MaskedArgValue(g_LauncherCommandLine.AuthUsername()),
         MaskedArgValue(g_LauncherCommandLine.AuthPassword()));
+    return true;
+}
+
+void TrimAsciiWhitespaceInPlace(char* text) {
+    if (!text) {
+        return;
+    }
+
+    char* begin = text;
+    while (*begin == ' ' || *begin == '\t' || *begin == '\r' || *begin == '\n') {
+        ++begin;
+    }
+    if (begin != text) {
+        std::memmove(text, begin, std::strlen(begin) + 1u);
+    }
+
+    size_t length = std::strlen(text);
+    while (length != 0u) {
+        const char trailing = text[length - 1u];
+        if (trailing != ' ' && trailing != '\t' && trailing != '\r' && trailing != '\n') {
+            break;
+        }
+        text[--length] = '\0';
+    }
+}
+
+// anchor: launcher.exe:0x408400
+// anchor: launcher.exe:0x41ecd0
+// No-GUI launcher bridge over the original page-6 submit helper contract:
+// - trim username
+// - copy password
+// - zero block40/block50
+// - leave the small-string session-token field empty on the interactive username/password path
+bool BuildNoGuiProcessLoginRequestInput(
+    const char* username,
+    const char* password,
+    mxo::ltlogin::ProcessLoginRequestInputSketch* outInput) {
+    if (!username || !password || !outInput) {
+        return false;
+    }
+
+    *outInput = {};
+
+    char trimmedUsername[sizeof(outInput->inlineString00)] = {};
+    std::strncpy(trimmedUsername, username, sizeof(trimmedUsername) - 1u);
+    trimmedUsername[sizeof(trimmedUsername) - 1u] = '\0';
+    TrimAsciiWhitespaceInPlace(trimmedUsername);
+
+    std::strncpy(outInput->inlineString00.data(), trimmedUsername, outInput->inlineString00.size() - 1u);
+    outInput->inlineString00[outInput->inlineString00.size() - 1u] = '\0';
+    std::strncpy(outInput->inlineString20.data(), password, outInput->inlineString20.size() - 1u);
+    outInput->inlineString20[outInput->inlineString20.size() - 1u] = '\0';
+    outInput->string60.begin = nullptr;
+    outInput->string60.current = nullptr;
+    outInput->string60.capacity = nullptr;
+    outInput->flag6C = 0u;
     return true;
 }
 
@@ -633,10 +690,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         selectedHighByte,
         selectedSelectionGateByte100,
         selectedVariantState);
-    DiagnosticConfigureLoginControllerCharacterSeed(
-        g_LauncherCommandLine.LauncherCharacter()[0] ? g_LauncherCommandLine.LauncherCharacter() : NULL,
-        g_LauncherCommandLine.LauncherSession()[0] ? g_LauncherCommandLine.LauncherSession() : NULL,
-        selectionPackedLow24);
     DiagnosticApplyDefaultNopatchMediatorConfig(
         g_pILTLoginMediatorDefault,
         nopatchLauncherVersionValue,
@@ -744,49 +797,66 @@ bool CLauncher::RunRecoveredPreClientBringupStage() const {
     return true;
 }
 
-// UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
-// Fidelity direction tightened by the newer `0x402ec0` read:
-// - original `InitInstance` does not fall through to `0x40a780/0x40a420` until the pre-client UI
-//   gate has finished
-// - so launcher auth + selection belong on the pre-client side of that fallthrough, not after the
-//   later DLL loads
-// This replacement stage therefore stays before client.dll load and should stay before the later
-// `LoadCresDLL` / `LoadClientDLL` corridor unless newer static evidence disproves that ordering.
+// UNANCHORED: replacement-owned text-mode pre-client auth/selection bridge.
+// Fidelity correction from newer launcher/client recovery:
+// - auth should enter through the faithful page-6 submit boundary (`0x408400 -> +0x30 -> 0x41ecd0`),
+//   not the older source-owned BeginAuthConnection shortcut
+// - existing-character selection should stop at launcher-style `0x40d6f0` writeback into
+//   `CLauncher+0xa8/+0xac` plus `Last_WorldName`, not seed the later create-character `+0x120`
+//   source block preemptively
+// - create-character remains a client-owned continuation after the launcher writes the sentinel
+//   row high word `0xffff`
 bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
     g_PreClientAuthAndCharacterSelectionCompleted = false;
-    if (!DiagnosticCanBeginAuthConnection()) {
-        spdlog::error("ERROR: pre-client auth cannot begin because the launcher-mediated auth bridge is unavailable");
+    if (!DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface()) {
+        spdlog::error("ERROR: pre-client auth cannot begin because the faithful mediator +0x30 submit surface is unavailable");
         return false;
     }
 
-    // Replacement console-host timing:
-    // - original launcher gathers credentials later through the page-6 rich-edit prompt while
-    //   `InitInstance` is still blocked inside the 0x402ec0-owned UI interval
-    // - so the current no-GUI host should not require `-user` / `-pwd` during
-    //   ParseCommandLineStage; prompt on demand only when the pre-client auth bridge is about to
-    //   use them
     if (!PromptForMissingLauncherCredentialsIfNeeded()) {
         return false;
     }
 
     for (uint32_t attempt = 1u;; ++attempt) {
-        DiagnosticConfigureMediatorProfileName(
-            g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
-        DiagnosticConfigureMediatorAuthName(
-            g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
-        DiagnosticConfigureMediatorAuthPassword(
-            g_LauncherCommandLine.AuthPassword()[0] ? g_LauncherCommandLine.AuthPassword() : NULL);
-        DiagnosticResetPostedLoginResult();
+        mxo::ltlogin::ProcessLoginRequestInputSketch submitLoginRequestInput = {};
+        if (!BuildNoGuiProcessLoginRequestInput(
+                g_LauncherCommandLine.AuthUsername(),
+                g_LauncherCommandLine.AuthPassword(),
+                &submitLoginRequestInput)) {
+            spdlog::error("ERROR: failed to build no-GUI ProcessLoginRequest input");
+            return false;
+        }
 
-        const uint32_t authBeginResult = DiagnosticBeginAuthConnection();
+        DiagnosticResetPostedLoginResult();
+        const uint32_t submitResult =
+            DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(submitLoginRequestInput);
         spdlog::info(
-            "DIAGNOSTIC: pre-client launcher auth attempt={} beginResult=0x{:08x}",
+            "DIAGNOSTIC: pre-client launcher auth attempt={} submitResult=0x{:08x}",
             static_cast<unsigned>(attempt),
-            static_cast<unsigned>(authBeginResult));
+            static_cast<unsigned>(submitResult));
+
+        // Replacement-only continuation shim over the still-missing GUI timer/observer pump:
+        // - original launcher keeps running inside the `0x402ec0` UI interval after page-6 submit
+        // - that live dialog path continues through `0x4071e0` / page timer+observer work
+        // - current no-GUI host still lacks that exact launcher-owned prompt/timer lifecycle
+        // - so after the faithful `+0x30` submit we still allow the older owner-side auth begin
+        //   continuation to nudge the replacement back onto the observed auth request path
+        if (submitResult == 0u && DiagnosticCanBeginAuthConnection()) {
+            const uint32_t authContinuationResult = DiagnosticBeginAuthConnection();
+            spdlog::info(
+                "DIAGNOSTIC: pre-client launcher auth attempt={} post-submit continuation result=0x{:08x}",
+                static_cast<unsigned>(attempt),
+                static_cast<unsigned>(authContinuationResult));
+        }
 
         const DWORD startTick = GetTickCount();
         bool authSucceeded = false;
-        while ((GetTickCount() - startTick) < 30000u) {
+        // Replacement text-mode pre-client gate:
+        // - faithful submit now enters through `0x408400 -> +0x30 -> 0x41ecd0`
+        // - current auth reply adoption on the active path can land slightly later than the older
+        //   source-owned BeginAuthConnection shortcut did, so keep the wait budget comfortably above
+        //   the earlier 30s replacement timeout while the launcher still blocks pre-client.
+        while ((GetTickCount() - startTick) < 60000u) {
             DiagnosticPumpLauncherNetwork(/*nonBlocking=*/true);
             if (DiagnosticHasSuccessfulPreClientAuthState()) {
                 authSucceeded = true;
@@ -819,9 +889,6 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             spdlog::info(
                 "DIAGNOSTIC: pre-client launcher auth failure will re-prompt credentials error=0x{:02x}",
                 static_cast<unsigned>(loginError));
-            if (!PromptForMissingLauncherCredentialsIfNeeded()) {
-                return false;
-            }
             char inputBuffer[256] = {};
             if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
                 spdlog::error("ERROR: interactive username re-prompt failed or was left empty");
@@ -836,14 +903,10 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             continue;
         }
 
-        const uint32_t characterCount = DiagnosticRecoveredCharacterCount();
-        if (characterCount == 0u) {
-            spdlog::warn("WARNING: pre-client auth reported success but no recovered characters were available; falling back to later post-InitClientDLL auth path");
-            return true;
-        }
-
+        const uint32_t recoveredCharacterCount = DiagnosticRecoveredCharacterCount();
+        const bool createCharacterPlaceholderAvailable = (recoveredCharacterCount < 3u);
         std::fprintf(stderr, "Available characters:\n");
-        for (uint32_t i = 0; i < characterCount; ++i) {
+        for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
             char characterName[256] = {};
             const bool haveCharacterName =
                 DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName));
@@ -853,25 +916,34 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 static_cast<unsigned>(i),
                 haveCharacterName ? characterName : "<unresolved>");
         }
+        if (createCharacterPlaceholderAvailable) {
+            std::fprintf(stderr, "  [%u] - - - (Create Character)\n", static_cast<unsigned>(recoveredCharacterCount));
+        }
 
-        uint32_t selectedCharacterIndex = 0u;
-        bool selectedCharacterResolvedFromCommandLine = false;
+        uint32_t selectedMenuIndex = 0u;
+        bool selectedFromCommandLine = false;
+        bool createCharacterPlaceholderSelected = false;
         if (g_LauncherCommandLine.LauncherCharacter()[0] != '\0') {
-            for (uint32_t i = 0; i < characterCount; ++i) {
+            for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
                 char characterName[256] = {};
                 if (DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName)) &&
                     std::strcmp(characterName, g_LauncherCommandLine.LauncherCharacter()) == 0) {
-                    selectedCharacterIndex = i;
-                    selectedCharacterResolvedFromCommandLine = true;
+                    selectedMenuIndex = i;
+                    selectedFromCommandLine = true;
                     break;
                 }
             }
         }
-        if (characterCount != 1u && !selectedCharacterResolvedFromCommandLine) {
-            while (!ReadInteractiveLauncherIndex("Character index: ", characterCount, &selectedCharacterIndex)) {
-                std::fprintf(stderr, "Invalid character index.\n");
+        if (!selectedFromCommandLine) {
+            const uint32_t menuCount = recoveredCharacterCount + (createCharacterPlaceholderAvailable ? 1u : 0u);
+            if (menuCount > 1u) {
+                while (!ReadInteractiveLauncherIndex("Character index: ", menuCount, &selectedMenuIndex)) {
+                    std::fprintf(stderr, "Invalid character index.\n");
+                }
             }
         }
+        createCharacterPlaceholderSelected =
+            createCharacterPlaceholderAvailable && (selectedMenuIndex == recoveredCharacterCount);
 
         char persistedSelectionName[256] = {};
         if (LoadLastWorldNameFromRegistry(persistedSelectionName, sizeof(persistedSelectionName))) {
@@ -882,42 +954,38 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
 
         char selectedCharacterName[256] = {};
         char selectedSelectionName[256] = {};
-        uint32_t selectedDescriptorIndex = 0u;
-        spdlog::info(
-            "ROUTE CHECKPOINT: pre-client no-GUI selection mirroring LauncherLoginDialog page11 Enter/command10 -> page7, then page7 list activation command8 (not page7 primary-button command11); world selection is finalized here after the character index is read");
-        if (!DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
-                selectedCharacterIndex,
-                selectedCharacterName,
-                sizeof(selectedCharacterName),
-                selectedSelectionName,
-                sizeof(selectedSelectionName),
-                &selectedDescriptorIndex)) {
-            // anchor: launcher.exe:0x4047d0 / case 7
-            // anchor: launcher.exe:0x40d820
-            // anchor: launcher.exe:0x405a20 / command 8
-            // anchor: launcher.exe:0x40d6f0
-            // Bounded no-GUI bridge:
-            // - auth success page flow is now tighter:
-            //   - command `7` leads to page `11`
-            //   - page `11` Enter / command `10` returns to page `7`
-            //   - page-`7` list activation posts command `8`
-            //   - command `8` resolves launcher selection through `0x40d6f0`
-            // - keep the ownership split narrower than a launcher-local `+0xec` caller:
-            //   - launcher success writes `CLauncher+0xa8/+0xac` plus `Last_WorldName`
-            //   - the direct `+0xec` call is then best read later from
-            //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
-            // - current no-GUI host therefore treats recovered character choice as:
-            //   - launcher-side page-`7` command-`8` writeback mirror
-            //   - plus mediator-side current-slot / `+0x120` source-block seeding
-            //   - but not as proof that original launcher directly called `+0xf0/+0xec` here
-            spdlog::error(
-                "ERROR: failed to adopt pre-client recovered character selection index={} into launcher-side selection seed state",
-                static_cast<unsigned>(selectedCharacterIndex));
-            return false;
-        }
+        uint32_t selectedDescriptorIndex = m_FieldAC & 0x00ffffffu;
+        uint32_t selectedRowHighWordSelectionIndex = 0xffffu;
 
-        if (selectedCharacterName[0]) {
+        if (!createCharacterPlaceholderSelected) {
+            if (!DiagnosticResolveRecoveredCharacterSelectionForLauncher(
+                    selectedMenuIndex,
+                    selectedCharacterName,
+                    sizeof(selectedCharacterName),
+                    selectedSelectionName,
+                    sizeof(selectedSelectionName),
+                    &selectedDescriptorIndex)) {
+                spdlog::error(
+                    "ERROR: failed to resolve recovered character-selection metadata index={} through mediator-owned slot/world tables",
+                    static_cast<unsigned>(selectedMenuIndex));
+                return false;
+            }
+            selectedRowHighWordSelectionIndex = selectedMenuIndex & 0xffffu;
             g_LauncherCommandLine.SetLauncherCharacter(selectedCharacterName);
+        } else {
+            if (g_LastWorldName[0] != '\0') {
+                std::strncpy(selectedSelectionName, g_LastWorldName, sizeof(selectedSelectionName) - 1u);
+                selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
+            } else if (persistedSelectionName[0] != '\0') {
+                std::strncpy(selectedSelectionName, persistedSelectionName, sizeof(selectedSelectionName) - 1u);
+                selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
+            } else if (sizeof(kRecoveredLauncherSelectionRecords) / sizeof(kRecoveredLauncherSelectionRecords[0]) > 0u) {
+                std::strncpy(selectedSelectionName, kRecoveredLauncherSelectionRecords[0].selectionName, sizeof(selectedSelectionName) - 1u);
+                selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
+            }
+            selectedCharacterName[0] = '\0';
+            selectedRowHighWordSelectionIndex = 0xffffu;
+            g_LauncherCommandLine.SetLauncherCharacter("");
         }
 
         if (!selectedSelectionName[0] && persistedSelectionName[0]) {
@@ -928,101 +996,69 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 selectedSelectionName);
         }
 
-        if (selectedSelectionName[0]) {
-            if (const RecoveredLauncherSelectionRecord* recoveredSelection =
-                    FindRecoveredLauncherSelectionRecord(selectedSelectionName)) {
-                const uint32_t selectedRowLowWordSelectionIndex = selectedDescriptorIndex & 0x00ffffffu;
-                const uint32_t selectedRowHighWordSelectionIndex = selectedCharacterIndex & 0xffffu;
-                const uint32_t worldUpperBoundExclusive =
-                    (selectedDescriptorIndex < 0xffu) ? (selectedDescriptorIndex + 1u) : 1u;
-                const uint32_t selectionUpperBoundExclusive =
-                    (characterCount != 0u && characterCount < 0x100u)
-                        ? characterCount
-                        : ((selectedCharacterIndex < 0xffu) ? (selectedCharacterIndex + 1u) : 1u);
+        if (!selectedSelectionName[0]) {
+            spdlog::error("ERROR: no launcher world-selection name was available for page-7 style writeback");
+            return false;
+        }
 
-                DiagnosticConfigureMediatorSelection(
-                    worldUpperBoundExclusive,
-                    selectionUpperBoundExclusive,
-                    selectedSelectionName,
-                    selectedCharacterName[0] ? selectedCharacterName : selectedSelectionName,
-                    selectedRowLowWordSelectionIndex,
-                    selectedRowHighWordSelectionIndex,
-                    recoveredSelection->selectionGateByte100,
-                    recoveredSelection->variantState);
+        // anchor: launcher.exe:0x4047d0 / case 7
+        // anchor: launcher.exe:0x40d530
+        // anchor: launcher.exe:0x40d820
+        // anchor: launcher.exe:0x405a20 / command 8
+        // anchor: launcher.exe:0x40d6f0
+        // No-GUI faithful bridge:
+        // - existing-character selection stops at launcher-style command-8 writeback
+        // - create-character uses the same writeback helper with row high word `0xffff`
+        // - the later create-character arg6 `+0x120` submit stays on the client-owned continuation
+        uint32_t resolvedA8 = m_FieldA8;
+        uint32_t resolvedAC = m_FieldAC;
+        char resolvedSelectionName[sizeof(g_LastWorldName)] = {};
+        const bool resolvedViaCommand8 =
+            g_pILTLoginMediatorDefault != nullptr &&
+            DiagnosticResolveLauncherSelectionFromMediator(
+                g_pILTLoginMediatorDefault,
+                selectedDescriptorIndex & 0x00ffffffu,
+                selectedRowHighWordSelectionIndex,
+                &resolvedA8,
+                &resolvedAC,
+                resolvedSelectionName,
+                sizeof(resolvedSelectionName));
 
-                spdlog::info(
-                    "ROUTE CHECKPOINT: pre-client no-GUI page7 row mirror lowWord(worldIndex)=0x{:04x} highWord(selectionIndex)=0x{:04x} world='{}' character='{}'",
-                    static_cast<unsigned>(selectedRowLowWordSelectionIndex & 0xffffu),
-                    static_cast<unsigned>(selectedRowHighWordSelectionIndex & 0xffffu),
-                    selectedSelectionName,
-                    selectedCharacterName[0] ? selectedCharacterName : "<unresolved>");
-
-                uint32_t resolvedA8 = m_FieldA8;
-                uint32_t resolvedAC = m_FieldAC;
-                char resolvedSelectionName[sizeof(g_LastWorldName)] = {};
-                const bool resolvedViaCommand8 =
-                    g_pILTLoginMediatorDefault != nullptr &&
-                    DiagnosticResolveLauncherSelectionFromMediator(
-                        g_pILTLoginMediatorDefault,
-                        selectedRowLowWordSelectionIndex,
-                        selectedRowHighWordSelectionIndex,
-                        &resolvedA8,
-                        &resolvedAC,
-                        resolvedSelectionName,
-                        sizeof(resolvedSelectionName));
-
-                if (resolvedViaCommand8) {
-                    m_FieldA8 = resolvedA8;
-                    m_FieldAC = resolvedAC;
-                    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-                    const char* persistedSelectionName = resolvedSelectionName[0]
-                        ? resolvedSelectionName
-                        : recoveredSelection->selectionName;
-                    std::strncpy(g_LastWorldName, persistedSelectionName, sizeof(g_LastWorldName) - 1u);
-                    g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
-                    StoreLastWorldNameInRegistry(g_LastWorldName);
-                    spdlog::info(
-                        "DIAGNOSTIC: pre-client no-GUI selection mirrored page7 command8 / 0x40d6f0 world='{}' descriptorIndex={} selectionIndex={} a8=0x{:08x} ac=0x{:08x} packed=0x{:08x}",
-                        g_LastWorldName,
-                        static_cast<unsigned>(selectedDescriptorIndex),
-                        static_cast<unsigned>(selectedCharacterIndex),
-                        m_FieldA8,
-                        m_FieldAC,
-                        packedArg7Selection);
-                } else {
-                    m_FieldA8 = 0u;
-                    m_FieldAC = selectedRowLowWordSelectionIndex;
-                    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-                    std::strncpy(g_LastWorldName, recoveredSelection->selectionName, sizeof(g_LastWorldName) - 1u);
-                    g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
-                    StoreLastWorldNameInRegistry(g_LastWorldName);
-                    spdlog::warn(
-                        "WARNING: pre-client no-GUI selection could not mirror page7 command8 / 0x40d6f0 via descriptorIndex={} selectionIndex={}; using bounded recovered writeback world='{}' fallbackA8=0x{:08x} fallbackAC=0x{:08x} packed=0x{:08x}",
-                        static_cast<unsigned>(selectedDescriptorIndex),
-                        static_cast<unsigned>(selectedCharacterIndex),
-                        g_LastWorldName,
-                        m_FieldA8,
-                        m_FieldAC,
-                        packedArg7Selection);
-                }
-            } else {
-                std::strncpy(g_LastWorldName, selectedSelectionName, sizeof(g_LastWorldName) - 1u);
-                g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
-                StoreLastWorldNameInRegistry(g_LastWorldName);
-                spdlog::warn(
-                    "WARNING: selected world '{}' has no recovered launcher selection record; persisting Last_WorldName without changing a8/ac",
-                    selectedSelectionName);
-            }
+        if (resolvedViaCommand8) {
+            m_FieldA8 = resolvedA8;
+            m_FieldAC = resolvedAC;
+            const char* finalWorldName = resolvedSelectionName[0] ? resolvedSelectionName : selectedSelectionName;
+            std::strncpy(g_LastWorldName, finalWorldName, sizeof(g_LastWorldName) - 1u);
+            g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
+            StoreLastWorldNameInRegistry(g_LastWorldName);
+        } else {
+            m_FieldA8 = createCharacterPlaceholderSelected
+                ? 0xffffffffu
+                : (selectedMenuIndex & 0xffffu);
+            m_FieldAC = selectedDescriptorIndex & 0x00ffffffu;
+            std::strncpy(g_LastWorldName, selectedSelectionName, sizeof(g_LastWorldName) - 1u);
+            g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
+            StoreLastWorldNameInRegistry(g_LastWorldName);
+            spdlog::warn(
+                "WARNING: pre-client no-GUI selection could not mirror page7 command8 / 0x40d6f0 via descriptorIndex={} selectionHighWord=0x{:04x}; using bounded launcher writeback fallback world='{}' fallbackA8=0x{:08x} fallbackAC=0x{:08x}",
+                static_cast<unsigned>(selectedDescriptorIndex),
+                static_cast<unsigned>(selectedRowHighWordSelectionIndex & 0xffffu),
+                g_LastWorldName,
+                m_FieldA8,
+                m_FieldAC);
         }
 
         g_PreClientAuthAndCharacterSelectionCompleted = true;
         spdlog::info(
-            "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} characterCount={} selectedIndex={} character='{}' world='{}'",
+            "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} createPlaceholder={} recoveredCharacterCount={} selectedMenuIndex={} character='{}' world='{}' a8=0x{:08x} ac=0x{:08x}",
             static_cast<unsigned>(DiagnosticLastLoginEvent()),
-            static_cast<unsigned>(characterCount),
-            static_cast<unsigned>(selectedCharacterIndex),
-            selectedCharacterName[0] ? selectedCharacterName : "<unresolved>",
-            selectedSelectionName[0] ? selectedSelectionName : "<unresolved>");
+            createCharacterPlaceholderSelected ? 1u : 0u,
+            static_cast<unsigned>(recoveredCharacterCount),
+            static_cast<unsigned>(selectedMenuIndex),
+            selectedCharacterName[0] ? selectedCharacterName : "- - -",
+            selectedSelectionName[0] ? selectedSelectionName : "<unresolved>",
+            m_FieldA8,
+            m_FieldAC);
         return true;
     }
 }
@@ -1160,7 +1196,7 @@ bool CLauncher::InitInstance() {
     }
     spdlog::info("");
 
-    spdlog::info("DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher-owned arg5 ABI shell + InitClientDLL/RunClientDLL + launcher-owned auth begin");
+    spdlog::info("DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher-owned arg5 ABI shell + InitClientDLL/RunClientDLL + faithful launcher-style auth submit (+0x30)");
 
     // UNANCHORED within 0x40b430: replacement-only synthesis that seeds launcher-owned selection
     // and nopatch state before the later pre-client continuation corridor.

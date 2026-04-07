@@ -25,10 +25,6 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     uint32_t* outFieldAC,
     char* outWorldName,
     uint32_t outWorldNameCapacity);
-void DiagnosticConfigureMediatorProfileName(const char* profileName);
-void DiagnosticConfigureMediatorAuthName(const char* authName);
-void DiagnosticConfigureMediatorAuthPassword(const char* authPassword);
-void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* authPassword);
 void DiagnosticApplyDefaultNopatchMediatorConfig(void* mediatorPtr, uint32_t parsedNoPatchValue, uint32_t clientVersionValue);
 void DiagnosticConfigureLoginControllerNetwork(
     const char* authDnsName,
@@ -39,10 +35,6 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
-void DiagnosticConfigureLoginControllerCharacterSeed(
-    const char* characterName,
-    const char* gameSessionId,
-    uint32_t selectedWorldIndexLow24);
 bool DiagnosticCanBeginAuthConnection();
 bool DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
 uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
@@ -56,8 +48,7 @@ uint32_t DiagnosticLastLoginEvent();
 uint32_t DiagnosticLastLoginError();
 uint32_t DiagnosticRecoveredCharacterCount();
 bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_t outNameCapacity);
-bool DiagnosticSelectRecoveredCharacter(uint32_t slotIndex);
-bool DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
+bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
     uint32_t slotIndex,
     char* outCharacterName,
     uint32_t outCharacterNameCapacity,

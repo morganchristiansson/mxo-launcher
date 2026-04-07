@@ -1035,14 +1035,15 @@ Representative non-zero arg7 result from that same run:
   - the still-missing success path is no longer best framed as a hidden direct launcher callsite to
     `0x41c1f0`
   - it is a launcher selection-writeback corridor followed by a client-owned `0xb4` producer
-- newer source tightening also improves the neighboring `+0x120` bridge:
-  - the replacement pre-client path now seeds the later owner `+0x108/+0x12c/+0x134..+0x1b8`
-    family through the same wrapper-facing `arg6 +0x120` capture surface client.dll uses at
-    `0x62054d1d`
-  - owner semantics stay intentionally disabled there, so this remains a mirror-only pre-client
-    bridge rather than a false claim that original `0x41c3c0` already dispatched at that point
-  - that bridge now also preserves any already-known recovered appearance/customization ids from the
-    source `+0x134..+0x177` family instead of zeroing `+0x2c..+0x6f`
+- newer source tightening now keeps the neighboring `+0x120` split narrower:
+  - the active no-GUI launcher path no longer pre-seeds a mirror-only `+0x120` source block before
+    client load
+  - current best split is now:
+    - launcher side = faithful `+0x30` auth submit plus page-`7` command-`8` writeback into
+      `CLauncher+0xa8/+0xac` / `Last_WorldName`
+    - client side = later create-character continuation `0x620547c0..0x62054d1d -> arg6 +0x120`
+  - practical consequence: active launcher-side fidelity no longer depends on a synthetic pre-client
+    `+0x120` character-source seed while the real create-character submit remains client-owned
 
 So the current `+0xec` object is not just "some paths blob":
 - its first dword now looks like the launcher-selected / arg7-derived high-8 selector,

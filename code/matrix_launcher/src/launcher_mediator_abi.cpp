@@ -1648,16 +1648,6 @@ bool DiagnosticResolveLauncherSelectionFromMediator(
     return true;
 }
 
-void DiagnosticAuthSetMediatorCredentials(const char* authName, const char* authPassword) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (!mediator) {
-        spdlog::info("DIAGNOSTIC: auth credential configure skipped (no installed CLTLoginMediator)");
-        return;
-    }
-
-    mediator->SetAuthCredentials(authName, authPassword);
-}
-
 void DiagnosticConfigureLoginControllerNetwork(
     const char* authDnsName,
     uint16_t authPortHostOrder,
@@ -1693,31 +1683,6 @@ void DiagnosticConfigureLoginControllerNetwork(
         exactMarginHostName && exactMarginHostName[0] ? exactMarginHostName : "<empty>",
         ignoreHostsFileForAuth ? 1u : 0u,
         ignoreHostsFileForMargin ? 1u : 0u);
-}
-
-void DiagnosticConfigureLoginControllerCharacterSeed(
-    const char* characterName,
-    const char* gameSessionId,
-    uint32_t selectedWorldIndexLow24) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (!mediator) {
-        spdlog::info("DIAGNOSTIC: login-controller character seed configure skipped (no installed CLTLoginMediator)");
-        return;
-    }
-
-    const uint32_t normalizedWorldIndex = selectedWorldIndexLow24 & 0x00ffffffu;
-    const uint32_t seedResult =
-        mediator->MirrorCharacterSeedIntoCreateCharacterInput120Scaffold(characterName, normalizedWorldIndex);
-    if (gameSessionId && gameSessionId[0]) {
-        mediator->SetGameSessionId664(gameSessionId);
-    }
-
-    spdlog::info(
-        "DIAGNOSTIC: login-controller character seed configured character='{}' session='{}' selectedWorldIndexLow24=0x{:06x} mirrorResult=0x{:08x} (mirror-only source-block seed; original upstream producer still unresolved)",
-        (characterName && characterName[0]) ? characterName : "<empty>",
-        (gameSessionId && gameSessionId[0]) ? gameSessionId : "<empty>",
-        static_cast<unsigned>(normalizedWorldIndex),
-        static_cast<unsigned>(seedResult));
 }
 
 bool DiagnosticCanBeginAuthConnection() {
@@ -1810,12 +1775,7 @@ bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_
     return true;
 }
 
-bool DiagnosticSelectRecoveredCharacter(uint32_t slotIndex) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->SelectRecoveredCharacterByIndexScaffold(slotIndex) : false;
-}
-
-bool DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
+bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
     uint32_t slotIndex,
     char* outCharacterName,
     uint32_t outCharacterNameCapacity,
@@ -1823,48 +1783,38 @@ bool DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
     uint32_t outWorldNameCapacity,
     uint32_t* outDescriptorIndex) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->AdoptRecoveredCharacterSelectionForLauncherScaffold(
-                          slotIndex,
-                          outCharacterName,
-                          outCharacterNameCapacity,
-                          outWorldName,
-                          outWorldNameCapacity,
-                          outDescriptorIndex)
-                    : false;
-}
-
-// UNANCHORED: diagnostic profile/session-name configurator for arg6.
-void DiagnosticConfigureMediatorProfileName(const char* profileName) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (mediator) {
-        mediator->SetArg6ProfileName(profileName);
+    if (!mediator) {
+        return false;
     }
 
-    spdlog::info("DIAGNOSTIC: mediator profile/session name configured as '{}'", DiagnosticMediatorProfileName());
-}
-
-// UNANCHORED: diagnostic auth-name configurator for arg6 +0x5c.
-void DiagnosticConfigureMediatorAuthName(const char* authName) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (mediator) {
-        mediator->SetArg6AuthName(authName);
+    const mxo::ltlogin::SlotRecordState004b5328* slotRecord = nullptr;
+    uint32_t descriptorIndex = 0u;
+    if (!mediator->BuildPartialSelectionContextForRecoveredCharacterScaffold(
+            slotIndex,
+            nullptr,
+            &descriptorIndex,
+            &slotRecord) ||
+        slotRecord == nullptr) {
+        return false;
     }
 
-    spdlog::info("DIAGNOSTIC: mediator auth-name chain (+0x5c) configured as '{}'", DiagnosticMediatorAuthName());
-    DiagnosticAuthSetMediatorCredentials(DiagnosticMediatorAuthName(), DiagnosticMediatorAuthPassword());
-}
-
-// UNANCHORED: diagnostic auth-password configurator for arg6 +0x60.
-void DiagnosticConfigureMediatorAuthPassword(const char* authPassword) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    if (mediator) {
-        mediator->SetArg6AuthPassword(authPassword);
+    if (outCharacterName && outCharacterNameCapacity != 0u) {
+        outCharacterName[0] = '\0';
+        std::strncpy(outCharacterName, slotRecord->heapString14.c_str(), outCharacterNameCapacity - 1u);
+        outCharacterName[outCharacterNameCapacity - 1u] = '\0';
     }
-
-    spdlog::info(
-        "DIAGNOSTIC: mediator auth-password chain (+0x60) configured as {}",
-        MaskedSensitiveValue(DiagnosticMediatorAuthPassword()));
-    DiagnosticAuthSetMediatorCredentials(DiagnosticMediatorAuthName(), DiagnosticMediatorAuthPassword());
+    if (outWorldName && outWorldNameCapacity != 0u) {
+        outWorldName[0] = '\0';
+        const char* worldName = mediator->GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
+        if (worldName && worldName[0]) {
+            std::strncpy(outWorldName, worldName, outWorldNameCapacity - 1u);
+            outWorldName[outWorldNameCapacity - 1u] = '\0';
+        }
+    }
+    if (outDescriptorIndex) {
+        *outDescriptorIndex = descriptorIndex;
+    }
+    return true;
 }
 
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures ILTLoginMediator.Default before InitClientDLL

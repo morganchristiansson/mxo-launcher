@@ -1321,41 +1321,13 @@ public:
     // +0x120
     // anchor: launcher.exe:0x41c3c0
     uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
-    // Narrow mirror-only seed helper for the still-unrecovered upstream producer that eventually
-    // feeds `0x41c3c0`. This builds the same source block family (`+0x108/+0x12c/+0x134..+0x1b8`)
-    // without claiming the original state-3-gated owner dispatch happened.
-    bool BuildCreateCharacterInput120ForRecoveredCharacterScaffold(
-        const char* characterName,
-        uint32_t descriptorIndex,
-        ProcessCreateCharacterInput120Sketch* outInput) const;
-    // descriptorIndex here matches owner `+0x12c`, i.e. the selected world-descriptor index read
-    // by `0x41c3c0`, not the lower-level slot/world id.
-    uint32_t MirrorCharacterSeedIntoCreateCharacterInput120Scaffold(
-        const char* characterName,
-        uint32_t descriptorIndex);
     uint32_t RecoveredCharacterCountScaffold() const;
     const SlotRecordState004b5328* RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const;
-    bool SelectRecoveredCharacterByIndexScaffold(uint32_t slotIndex);
     bool BuildPartialSelectionContextForRecoveredCharacterScaffold(
         uint32_t slotIndex,
         State3SelectionContextInputSketch* outInput,
         uint32_t* outDescriptorIndex,
         const SlotRecordState004b5328** outSlotRecord);
-    // Pre-client launcher-side recovered character adoption helper.
-    // Current bounded fidelity read:
-    // - mirrors the selected character slot into the later wrapper-facing `+0x120` source block
-    //   and current-slot route index
-    // - does **not** claim to be the original success-side `+0xf0/+0xec` producer
-    // - launcher-side selection success is currently better modeled as page-`7`
-    //   list-activate -> command `8` -> `0x40d6f0` writeback, with the direct `+0xec` call later
-    //   coming from `client.dll:0x62170f48`
-    bool AdoptRecoveredCharacterSelectionForLauncherScaffold(
-        uint32_t slotIndex,
-        char* outCharacterName,
-        uint32_t outCharacterNameCapacity,
-        char* outWorldName,
-        uint32_t outWorldNameCapacity,
-        uint32_t* outDescriptorIndex);
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
     // Keep the instance-role split explicit in source:
     // - the wrapper-facing `ILTLoginMediator.Default` mirror should capture the source block even
