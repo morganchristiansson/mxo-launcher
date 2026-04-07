@@ -421,8 +421,14 @@ Implication for the replacement source:
       - it writes `0x4d3410 = 0xffffffff` / selected slot-record index `-1`
       - while `0x4d3414` still carries the selected world-descriptor index
       - current practical read: launcher exits with a sentinel “no existing character selected for
-        this world” pair, and the later create-character continuation happens after that handoff,
-        not through a separate direct launcher-side `+0x120` call we have yet found
+        this world” pair, and the later create-character continuation happens after that handoff
+      - newer client-side tightening now makes that later continuation more concrete:
+        - `client.dll:0x620547c0..0x62054d1d` builds the arg6 `+0x120` input block on the stack
+        - it copies `CreateCharacterWorldIndex` current value (`0x629e1cb0`) into block field `+0x24`
+        - then calls arg6 `+0x120`
+      - so the current best split is:
+        - launcher side = sentinel row selection / writeback (`slotIndex=-1`, `worldIndex=chosen world`)
+        - client side = actual create-character source-block submit through `+0x120`
   - the direct success-side `+0xec` call is then best read later from
     `client.dll:0x62170e2a..0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
     - zero-inits a stack-local `0xb4` object
