@@ -134,6 +134,8 @@ static std::set<std::string> g_DumpedShaderSourcePaths;
 
 static bool g_ClientLoadingTextHookEnvChecked = false;
 static bool g_ClientLoadingTextHookRequested = false;
+static bool g_ClientLoadingTextOverrideEnvChecked = false;
+static bool g_ClientLoadingTextOverrideRequested = false;
 static bool g_ClientLoadingTextHookInstalled = false;
 static HMODULE g_ClientLoadingTextHookModule = NULL;
 static uint8_t* g_ClientLoadingTextHookTarget = nullptr;
@@ -1780,6 +1782,19 @@ static bool DiagnosticEnvFlagEnabled(const char* variableName) {
         _stricmp(value, "on") == 0;
 }
 
+static bool DiagnosticClientLoadingTextOverrideRequestedViaEnv() {
+    if (!g_ClientLoadingTextOverrideEnvChecked) {
+        g_ClientLoadingTextOverrideRequested =
+            DiagnosticEnvFlagEnabled("MXO_DIAGNOSTIC_OVERRIDE_CLIENT_LOADING_TEXT");
+        g_ClientLoadingTextOverrideEnvChecked = true;
+        if (g_ClientLoadingTextOverrideRequested) {
+            spdlog::info(
+                "DIAGNOSTIC: MXO_DIAGNOSTIC_OVERRIDE_CLIENT_LOADING_TEXT enabled client loading-text replacements");
+        }
+    }
+    return g_ClientLoadingTextOverrideRequested;
+}
+
 static bool DiagnosticClientLoadingTextHookRequestedViaEnv() {
     if (!g_ClientLoadingTextHookEnvChecked) {
         g_ClientLoadingTextHookRequested =
@@ -1790,7 +1805,7 @@ static bool DiagnosticClientLoadingTextHookRequestedViaEnv() {
                 "DIAGNOSTIC: MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT enabled exact client loading-text hook");
         }
     }
-    return g_ClientLoadingTextHookRequested;
+    return g_ClientLoadingTextHookRequested || DiagnosticClientLoadingTextOverrideRequestedViaEnv();
 }
 
 static void DiagnosticWriteRelativeJump(uint8_t* patchLocation, const void* destination) {
@@ -1801,13 +1816,69 @@ static void DiagnosticWriteRelativeJump(uint8_t* patchLocation, const void* dest
     std::memcpy(patchLocation + 1u, &relativeDisplacement, sizeof(relativeDisplacement));
 }
 
-static void DiagnosticClientLoadingTextHookOnText(const char* text, void* statusSink) {
-    if (!statusSink) {
-        return;
+struct DiagnosticClientLoadingTextReplacement {
+    const char* original;
+    const char* replacement;
+};
+
+static const char* DiagnosticFindClientLoadingTextReplacement(const char* text) {
+    if (!text || !text[0]) {
+        return text;
     }
+
+    static const DiagnosticClientLoadingTextReplacement kReplacements[] = {
+        {"Initializing Client Data Cache", "Recovering Lost Fragments"},
+        {"Initializing Inventory Manager", "Reclaiming Possessions"},
+        {"Initializing Shortcut Manager", "Restoring Muscle Memory"},
+        {"Initializing Game Object Manager", "Reforming Physical Constructs"},
+        {"Initializing Character Animations", "Teaching the Body to Move Again"},
+        {"Initializing Rules Subsystem", "Rewriting the Rules of This World"},
+        {"Initializing Animation Tables", "Reconnecting Motion Memory"},
+        {"Initializing Chat Manager", "Opening Lines of Communication"},
+        {"Initializing Abilities", "Remembering What You Can Do"},
+        {"Initializing FX", "Reigniting Sensory Echoes"},
+        {"Initializing Metro World", "Rebuilding the City Around You"},
+        {"Initializing World Render Data", "Pulling Reality Into Shape"},
+        {"Initializing Interlock Database", "Accessing Locked Memories"},
+        {"Initializing RichWorld", "Recreating the World Layer"},
+        {"Initializing Water", "Letting Water Flow Again"},
+        {"Initializing Projected Textures", "Painting the Surface of Things"},
+        {"Loading Character", "Resurrecting You"},
+        {"Waiting for Regionserver", "Waiting for the World to Notice"},
+    };
+
+    for (const DiagnosticClientLoadingTextReplacement& entry : kReplacements) {
+        if (std::strcmp(text, entry.original) == 0) {
+            return entry.replacement;
+        }
+    }
+    return text;
+}
+
+static const char* DiagnosticClientLoadingTextHookOnText(const char* text, void* statusSink) {
+    if (!statusSink) {
+        return text;
+    }
+
+    const char* visibleText = text ? text : "<empty>";
+    if (DiagnosticClientLoadingTextOverrideRequestedViaEnv()) {
+        const char* replacement = DiagnosticFindClientLoadingTextReplacement(visibleText);
+        if (replacement && std::strcmp(replacement, visibleText) != 0) {
+            spdlog::info(
+                "DIAGNOSTIC: overriding client loading text original='{}' replacement='{}'",
+                visibleText,
+                replacement);
+            DiagnosticLogClientLoadingStateText(
+                replacement,
+                "client.dll:FUN_6215b930 visible override");
+            return replacement;
+        }
+    }
+
     DiagnosticLogClientLoadingStateText(
-        text,
+        visibleText,
         "client.dll:FUN_6215b930 exact hook");
+    return visibleText;
 }
 
 static uint8_t* DiagnosticAllocateExecutableBlockNearAddress(
@@ -1904,7 +1975,7 @@ static bool DiagnosticBuildClientLoadingTextHookStub(
         0x8b, 0x44, 0x24, 0x28, // mov eax, [esp+0x28] ; original param_1 text
         0x8b, 0x54, 0x24, 0x04, // mov edx, [esp+0x04] ; saved ESI from pushad
         0x85, 0xd2,             // test edx, edx
-        0x74, 0x0c,             // jz skip_helper_call
+        0x74, 0x10,             // jz skip_helper_call_and_keep_original_text
         0x52,                   // push edx
         0x50,                   // push eax
         0xb8,                   // mov eax, imm32(helper)
@@ -1920,6 +1991,7 @@ static bool DiagnosticBuildClientLoadingTextHookStub(
     const uint8_t callHelperAndRestore[] = {
         0xff, 0xd0,             // call eax
         0x83, 0xc4, 0x08,       // add esp, 8
+        0x89, 0x44, 0x24, 0x28, // mov [esp+0x28], eax ; replace original text pointer when needed
         0x61,                   // popad
         0x9d,                   // popfd
         0xb8,                   // mov eax, imm32(trampoline)

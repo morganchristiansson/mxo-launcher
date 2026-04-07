@@ -481,8 +481,10 @@ Current stronger validation result:
   - `Initializing FX`
   - `Initializing Metro World`
 - default replacement-side spdlog still mirrors that earlier engine-init text family retrospectively once the path reaches arg6 `+0xec`, and still mirrors the exact visible `"Loading Character"` text at the wrapper-facing `+0xec` consume point; this keeps the default path launcher-owned and avoids patching client.dll
-- a newer diagnostic-only opt-in runtime detour now exists for `client.dll:0x6215b930 = FUN_6215b930`, gated behind `MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT=1`
-  - the detour preserves the latent `ESI` status-sink register, trampoline-calls the original body unchanged, and logs the exact client-visible text through spdlog
+- a newer diagnostic-only opt-in runtime detour now exists for `client.dll:0x6215b930 = FUN_6215b930`, gated behind:
+  - `MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT=1` for exact logging
+  - `MXO_DIAGNOSTIC_OVERRIDE_CLIENT_LOADING_TEXT=1` for visible text replacement (this also installs the same hook)
+  - the detour preserves the latent `ESI` status-sink register, trampoline-calls the original body unchanged, and can either log the exact client-visible text or substitute a replacement string before tail-calling the original body
   - exact hook-derived texts now include the earlier engine-init family plus additional direct client strings beyond the old retrospective list:
     - `Initializing World Render Data`
     - `Initializing Interlock Database`
