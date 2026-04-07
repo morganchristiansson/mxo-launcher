@@ -84,6 +84,13 @@ A fresh pass on the shared refcount helpers tightened one concrete source mismat
   body
 - source now mirrors the original more closely there by always doing the interlocked decrement and
   only branching on the resulting zero-count final-release case
+- source also no longer keeps the receive-side outer message-ref as a stack-local object inside
+  `CMessageConnection::OnOperationCompleted`
+  - it now materializes that outer object on the heap and lets the refcounted `FinalRelease()` path
+    release inner storage and delete the outer object
+  - this is still not the original pool implementation, but it is materially closer to the original
+    lifetime model than a stack-local scaffold whose address could only be valid for the current
+    callback frame
 
 ## Related docs
 

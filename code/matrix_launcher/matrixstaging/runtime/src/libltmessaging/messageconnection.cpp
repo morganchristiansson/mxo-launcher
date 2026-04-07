@@ -6,6 +6,7 @@
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
 
 #ifdef DispatchMessage
@@ -240,9 +241,16 @@ uint16_t CMessageConnectionMessageRefBase::PayloadByteCountScaffold() const {
 
 void CMessageConnectionMessageRef::FinalRelease() {
     // anchor: launcher.exe:0x455b80 / vtable `0x004ba23c +0x0c`
-    // The original live outer object returns to its pool here after releasing the inner storage.
-    // Our local mirror remains stack/inline owned, so the final-release path intentionally does
-    // not delete.
+    // Original live outer objects release the inner payload-storage object at `+0x0c`, collapse,
+    // and return to the outer-object pool. Source still lacks the real pool, but a heap-backed
+    // delete after releasing the inner storage is closer to the original lifetime than keeping the
+    // receive-side outer message-ref on the stack.
+    if (messageStorage0c) {
+        CMessageConnectionMessageStorage* const storage = messageStorage0c;
+        messageStorage0c = nullptr;
+        storage->Release();
+    }
+    delete this;
 }
 
 void CMessageConnectionMessageRef::ResetForPacketBuilderScaffold(
@@ -262,6 +270,14 @@ void CMessageConnectionMessageRef::ResetForPacketBuilderScaffold(
 }
 
 namespace {
+
+struct CMessageConnectionMessageRefReleaseDeleter {
+    void operator()(CMessageConnectionMessageRef* messageRef) const {
+        if (messageRef) {
+            messageRef->Release();
+        }
+    }
+};
 
 static bool CMessageConnection_ResolveTransformInputSpan(
     const CMessageConnectionMessageRef& inputMessageRef,
@@ -1525,11 +1541,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     bool hadUnusedBuffers = false;
-    CMessageConnectionMessageRef copiedMessageRef = {};
-    copiedMessageRef.ResetForPacketBuilderScaffold(!packetizedMessagesEnabled_);
+    std::unique_ptr<CMessageConnectionMessageRef, CMessageConnectionMessageRefReleaseDeleter>
+        ownedCopiedMessageRef(new CMessageConnectionMessageRef());
+    CMessageConnectionMessageRef* const copiedMessageRef = ownedCopiedMessageRef.get();
+    copiedMessageRef->ResetForPacketBuilderScaffold(!packetizedMessagesEnabled_);
     const bool copied = CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
         parsedPacketWorkItem,
-        &copiedMessageRef,
+        copiedMessageRef,
         &hadUnusedBuffers);
     if (!copied) {
         spdlog::info(
@@ -1555,7 +1573,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     lastReceivedPacketBodyBytesScaffold_.clear();
-    if (const CMessageConnectionMessageStorage* const messageStorage = copiedMessageRef.messageStorage0c) {
+    if (const CMessageConnectionMessageStorage* const messageStorage = copiedMessageRef->messageStorage0c) {
         const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
         if (const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
             payloadBytes && payloadByteCount != 0u) {
@@ -1564,13 +1582,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
                 payloadBytes + payloadByteCount);
         }
     }
-    lastReceivedPacketHeaderlessScaffold_ = (copiedMessageRef.headerless10 != 0u);
+    lastReceivedPacketHeaderlessScaffold_ = (copiedMessageRef->headerless10 != 0u);
 
     if (lastReceivedPacketHeaderlessScaffold_) {
         uint8_t targetLocatorType = 0u;
         uint8_t senderLocatorType = 0u;
         if (!CMessageConnection_ResolveMessageCodePointerScaffold(
-                copiedMessageRef,
+                *copiedMessageRef,
                 /*outMessageCodePointer=*/nullptr,
                 &targetLocatorType,
                 &senderLocatorType,
@@ -1587,13 +1605,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
-    CMessageConnectionMessageRef* messageRefForDispatch = &copiedMessageRef;
+    CMessageConnectionMessageRef* messageRefForDispatch = copiedMessageRef;
     bool agendaTouched = false;
     if (CMessageConnectionPacketAgenda* agenda = packetAgenda_.get();
         agenda && agenda->created) {
         messageRefForDispatch = CMessageConnection_ApplyReceivePacketAgendaScaffold(
             agenda,
-            &copiedMessageRef,
+            copiedMessageRef,
             &agendaTouched);
         if (!messageRefForDispatch) {
             spdlog::info(

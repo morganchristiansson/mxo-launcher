@@ -255,6 +255,12 @@ These are no longer the best primary crash explanations:
         original interlocked decrement helper
       - source now removes that lower-fidelity precheck so the message-storage / outer-message-ref
         families behave more like the original `0x42f860` leaf helper
+      - source also now heap-materializes the receive-side outer message-ref in
+        `CMessageConnection::OnOperationCompleted` instead of keeping it on the stack for the
+        current callback only
+      - practical current result: this is a fidelity improvement to lifetime semantics, but the
+        ordinary replacement run still reproduces the late graphics corruption / crash, so another
+        ordering/lifetime mismatch likely remains further downstream
     - current launcher-side suspicion should therefore move one layer deeper than the raw section
       bytes themselves, e.g. toward ordering / timing / client-side object-materialization effects
       downstream of those launcher-provided contracts
