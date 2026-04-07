@@ -48,13 +48,17 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 - **Rename functions**: Sync method names with source code. When log message strings contain method names, use it. Otherwise use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - **Rename variables**: Sync variable names with source code. Use descriptive names to improve long term clarity, improve existing names when our understanding improves.
 - **Rename fields / struct members**: When class layouts become clearer, update OOAnalyzer / recovered structs in Ghidra so decompilation uses field names instead of raw offsets.
-  - `ghidra_data_types update` currently replaces the **entire** struct `members` array; there is no partial member-patch helper yet.
+  - `ghidra_data_types update` supports `member_update_mode:"patch"` for single-member struct edits by offset.
+  - use full `members` replacement only when you need to grow/reflow overlapping regions.
   - always `list`/`get` the exact current struct name first (OOAnalyzer names may include the vtable/address suffix, e.g. `CLTLoginMediator_0x4b01c8`).
-  - when renaming one member, preserve every member/offset you care about in the replacement payload.
+  - OOAnalyzer class cleanup often needs both sides updated:
+    - rename/move the class namespace with `ghidra_symbols`
+    - update the matching class data type under `/ClassDataTypes/...` with `ghidra_data_types`
 - retype parameters / locals / globals in Ghidra when evidence supports it
-  - current MCP surface exposes `ghidra_functions update_prototype` for parameters / return types, but does **not** currently expose local-variable type edits; if a task needs local retyping, note the limitation and follow up upstream / use the UI manually.
+  - use `ghidra_functions update_prototype` for parameter / return-type edits
+  - use `ghidra_functions rename_variable` with `new_data_type` for local-variable retyping
 - when renaming many decompiler locals in one function, prefer small batches and re-run `list_variables` / `decompile` between batches; Ghidra can renumber synthetic locals after a rename
-- when renaming numbered stack locals like `local_1cc`, work from the highest stack offset / highest numbered local downward; this minimizes fill-gap renumbering churn
+- when renaming numbered stack locals like `local_1cc`, work from the highest stack offset / highest local number downward; this minimizes fill-gap renumbering churn
 - `ghidra_batch_operations` works well for descending stack-local rename batches, but mixed batches of decompiler temps (`uVar*`, `bVar*`, `extraout_*`) can still fail even when the same renames succeed one-by-one
 - renaming decompiler temps through MCP can leave the old synthetic name visible in `list_variables` while the decompiler switches to the new user-defined alias; treat `decompile` as the source of truth for whether the new name actually stuck
 - mirror confirmed names/types/anchors back into source comments and canonical docs in the same task
@@ -83,42 +87,30 @@ mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"get
 mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"decompile","name":"CLauncher_InitInstance"}' })
 mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"listing","address":"0x40b430","end_address":"0x40b4d0"}' })
 mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"references_to","address":"0x004d2c69"}' })
-mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"references_from","address":"0x0040a5a4"}' })
 
-// Locals / functions
+// Functions / locals
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"Launcher_ParseCommandLine"}' })
-mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"Launcher_ParseCommandLine","current_name":"pcVar6","new_name":"stringCursor"}' })
-// numbered stack locals: list, then rename from highest offset / highest local number downward
-mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"CMessageConnection_OnOperationCompleted","cursor":"v1:..."}' })
-mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"functions","arguments":{"action":"rename_variable","name":"CMessageConnection_OnOperationCompleted","current_name":"local_1cc","new_name":"headerlessDispatchLogEndpointKeyCopyD"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"CMessageConnection_OnOperationCompleted","current_name":"local_1c8","new_name":"headerlessDispatchLogIpv4ByteD"}}]}' })
-// decompiler temps: rename one-at-a-time, then re-decompile because names can renumber (`uVar*`, `bVar*`, `extraout_*`)
-mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"CMessageConnection_OnOperationCompleted","current_name":"uVar1","new_name":"currentFragmentCopyByteCount"}' })
-mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"decompile","name":"CMessageConnection_OnOperationCompleted"}' })
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"Launcher_ParseCommandLine","variable_symbol_id":12345,"new_name":"stringCursor","new_data_type":"char *"}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"update_prototype","name":"CMessageConnection_OnOperationCompleted","return_type":"uint","parameters":[{"name":"operationWorkItem","data_type":"void *"}]}' })
-mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"update_prototype","name":"CMessageConnectionMessage_CreateRef","return_type":"cls_0x4489d0 *","parameters":[{"name":"outMessageRef","data_type":"cls_0x4489d0 *"},{"name":"messageContext","data_type":"int"}]}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"create","address":"0x4472f0","function_name":"AuthBootstrap680ReplyAuthDataValidator_CreateTemporaryWorker"}' })
 
-// Globals / symbols
-mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"get","address":"0x004d2c69"}' })
+// Symbols / classes
 mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}' })
-mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"OOAnalyzer::cls_0x4b7928::~cls_0x4b7928","new_name":"CMessageConnection_dtor"}' })
+mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"create","symbol_type":"namespace","name":"SubmitLoginRequestInput_0x407d50","namespace":"OOAnalyzer"}' })
+mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"convert_to_class","name":"SubmitLoginRequestInput_0x407d50","namespace":"OOAnalyzer"}' })
+mcp({ tool: "ghidra_symbols", args: '{"file_name":"launcher.exe","action":"update","current_name":"OOAnalyzer::cls_0x407d50::ReleaseSubmitSessionTokenStringStorage","new_name":"ReleaseSubmitSessionTokenStringStorage","namespace":"OOAnalyzer::SubmitLoginRequestInput_0x407d50"}' })
 
-// Data types / field renames
-mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"list","name_pattern":".*LauncherLoginDialog.*","category_path":"/OOAnalyzer"}' })
-mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"get","data_type_kind":"struct","name":"LauncherLoginDialog_0x4aae28","category_path":"/OOAnalyzer"}' })
+// Data types
 mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"get","data_type_kind":"struct","name":"CLTLoginMediator_0x4b01c8","category_path":"/OOAnalyzer"}' })
-mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"update","data_type_kind":"struct","name":"LauncherLoginDialog_0x4aae28","category_path":"/OOAnalyzer","members":[{"name":"vftptr_0x0","data_type_path":"/OOAnalyzer/LauncherLoginDialog_0x4aae28::vftable_4aae28 *","offset":0},{"name":"currentPageState","data_type_path":"int","offset":116},{"name":"selectionList","data_type_path":"/OOAnalyzer/cls_0x4acd98","offset":2572},{"name":"hostedBrowserControl","data_type_path":"/Demangler/Browser/IControl *","offset":2792}]}' })
-// note: data_types update replaces the full struct member list; preserve every member you care about and keep explicit offsets
+mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"update","data_type_kind":"struct","name":"CLTLoginMediator_0x4b01c8","category_path":"/OOAnalyzer","member_update_mode":"patch","members":[{"offset":148,"name":"ownerAuthBootstrapSource94"}]}' })
+mcp({ tool: "ghidra_data_types", args: '{"file_name":"launcher.exe","action":"update","data_type_kind":"struct","name":"SubmitLoginRequestInput_0x407d50","category_path":"/ClassDataTypes/OOAnalyzer","members":[{"name":"submitUsername","data_type_path":"char[32]","offset":0},{"name":"submitPassword","data_type_path":"char[32]","offset":32},{"name":"submitSessionTokenString","data_type_path":"/OOAnalyzer/cls_0x403f90","offset":96},{"name":"submitRequestFlag6c","data_type_path":"byte","offset":108}]}' })
 
 // Comments / bookmarks
 mcp({ tool: "ghidra_annotate", args: '{"file_name":"launcher.exe","action":"set_comment","address":"0x40ec70","comment_type":"EOL","text":"selection command helper"}' })
 mcp({ tool: "ghidra_annotate", args: '{"file_name":"launcher.exe","action":"create_bookmark","address":"0x40ec70","bookmark_type":"Analysis","bookmark_category":"RENOTE","comment":"selection command helper"}' })
 
-// Memory / tables
-mcp({ tool: "ghidra_memory", args: '{"file_name":"launcher.exe","action":"read","address":"0x4b51e0","length":64}' })
-
 // Batch related edits in one transaction
-mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"symbols","arguments":{"action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"Launcher_ParseCommandLine","current_name":"pcVar6","new_name":"stringCursor"}}]}' })
+mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"symbols","arguments":{"action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"Launcher_ParseCommandLine","variable_symbol_id":12345,"new_name":"stringCursor","new_data_type":"char *"}}]}' })
 
 // Oversized output
 mcp({ tool: "ghidra_read_tool_output", args: '{"action":"read","session_id":"ses_...","output_id":"out_...","offset":0,"max_chars":12000}' })
