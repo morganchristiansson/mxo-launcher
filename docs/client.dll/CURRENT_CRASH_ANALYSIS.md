@@ -231,12 +231,14 @@ These are no longer the best primary crash explanations:
 - practical consequence:
   - the current best read is now “client keeps presenting corrupted frames while issuing malformed
     or poisoned draw batches for dozens of frames”, not “no layout state was bound at all”
-  - because user explicitly believes the root still leads back into launcher reimplementation, the
-    strongest remaining launcher-side structural anomaly on the active path is now the `il.cfg`
-    contract bug:
-    - replacement advertised `+0x80 == 1` while `+0xac` returned null / length 0
-    - client helper `0x62198c60` treats that as live-data-present and skips file fallback
-    - newer source now corrects that producer-side contract so empty section-2 payload no longer
-      falsely suppresses fallback/adoption
+  - because user explicitly believes the root still leads back into launcher reimplementation, keep
+    checking launcher-side state8/live-corpus contracts — but one formerly suspicious anomaly has
+    now been demoted by original-live proof:
+    - original `matrix.exe` breakpointing at launcher getters `0x41f120 / 0x41ae60` shows the
+      active path really does reach `+0x80 == 1` with `+0xac -> null` / length `0`
+    - so the odd `il.cfg` contract is **not** a replacement-only invention and should not be used
+      as the primary explanation for the remaining graphics crash
+    - the replacement-side attempt to suppress that flag on zero-byte section-2 payloads was a
+      fidelity regression and has already been reverted
 
 Use those logs on the next rerun before widening scope.

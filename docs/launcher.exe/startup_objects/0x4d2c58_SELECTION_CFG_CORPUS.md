@@ -211,8 +211,13 @@ Static proof now closes ten exact corpus pairs end-to-end:
    - replacement state8 producer:
      - section selector `1`
      - owner `allocatedBuffer13f8/13fc/flag13fe`
+   - newer original live breakpoint proof now also closes the active-path shape here:
+     - at real original `matrix.exe` stop `0x41f110`, owner `+0x13fe == 1`
+     - owner `+0x13f8` was non-null
+     - owner `+0x13fc/+0x13fe` read back as dword `0x0001000e`
+       - i.e. length word `0x000e` (`14`), flag byte `0x01`
    - active current-path runtime note:
-     - rerun logs now show a small live payload length `0x000e` (`14`)
+     - replacement rerun logs now show the same small live payload length `0x000e` (`14`)
 
 9. `il.cfg`
    - client helper `0x62198c60`
@@ -223,19 +228,19 @@ Static proof now closes ten exact corpus pairs end-to-end:
    - replacement state8 producer:
      - section selector `2`
      - owner `allocatedBuffer1400/1404/flag1406`
-   - active current-path runtime note before the newest source correction:
-     - rerun logs showed `flag=1` with `ptr=null length=0`
-     - that is a launcher-side contract bug on the replacement path, because client helper
-       `0x62198c60` treats `+0x80 != 0` as "live il.cfg exists, so skip file fallback", then only
-       adopts live bytes when `+0xac` returns non-null
-     - newer source now tightens the state8 producer side so the section-presence flag is derived
-       from actual materialized bytes (`buffer != null && length != 0`) instead of being set
-       unconditionally on a zero-byte section fragment
+   - newer original live breakpoint proof now closes the odd contract more tightly:
+     - at real original `matrix.exe` stop `0x41f120`, owner `+0x1406 == 1`
+     - at the same stop, owner `+0x1400 == 0`
+     - and owner `+0x1404/+0x1406` read back as dword `0x00010000`
+       - i.e. length word `0x0000`, flag byte `0x01`
      - practical consequence:
-       - section `2` now reports absent rather than falsely advertising a live `il.cfg` with no
-         payload
-       - this is a concrete launcher-side correction that can plausibly affect downstream client
-         state because the old replacement contract skipped both live adopt and file fallback
+       - the seemingly strange replacement shape `HasLiveIlCfg80 -> 1` with `GetLiveIlCfgAc -> null`
+         is actually faithful to the original active path
+       - the earlier replacement change that suppressed the flag when section-2 bytes were zero was
+         therefore a **fidelity regression** and has been reverted
+       - current best read is that original client helper `0x62198c60` intentionally treats this as
+         a distinct "live il.cfg path with empty payload/default object state" rather than as an
+         ordinary file-fallback case
 
 10. `cui.cfg`
    - client helper `0x621993d0`
