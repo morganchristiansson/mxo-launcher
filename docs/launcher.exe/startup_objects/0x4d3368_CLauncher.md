@@ -327,6 +327,7 @@ Practical consequence:
     - high word = selected active entry index (current tighter auth-valid read: slot-record /
       character-entry index)
   - it seeds the later wrapper-facing `+0x120` character source block and current slot route index
+  - `LoadLastWorldNameFromRegistry()` is now consulted only on the character-selection side as a fallback seed; it is no longer part of the early startup-context build
   - but it no longer claims a pre-client direct `+0xf0/+0xec` owner commit
   - newer direct-producer tightening from `client.dll:0x6211d3e0 + 0x62170e2a..0x62170f48` narrows
     the `0xb4` snapshot more than before:

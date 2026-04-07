@@ -538,10 +538,8 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     std::memset(startupContext, 0, sizeof(*startupContext));
 
     // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
-    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. The actual world writeback stays
-    // deferred to the later pre-client character-selection stage after the character index is
-    // read.
-    LoadLastWorldNameFromRegistry(g_LastWorldName, sizeof(g_LastWorldName));
+    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. Final world writeback is deferred to
+    // the later pre-client character-selection stage after the character index is read.
 
     if (g_LastWorldName[0]) {
         lstrcpynA(startupContext->mediatorSelectionName, g_LastWorldName, sizeof(startupContext->mediatorSelectionName));
@@ -908,6 +906,13 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             }
         }
 
+        char persistedWorldName[256] = {};
+        if (LoadLastWorldNameFromRegistry(persistedWorldName, sizeof(persistedWorldName))) {
+            spdlog::info(
+                "DIAGNOSTIC: loaded HKLM Last_WorldName fallback='{}' on character-selection path",
+                persistedWorldName);
+        }
+
         char selectedCharacterName[256] = {};
         char selectedWorldName[256] = {};
         uint32_t selectedDescriptorIndex = 0u;
@@ -946,6 +951,14 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
 
         if (selectedCharacterName[0]) {
             g_LauncherCommandLine.SetLauncherCharacter(selectedCharacterName);
+        }
+
+        if (!selectedWorldName[0] && persistedWorldName[0]) {
+            std::strncpy(selectedWorldName, persistedWorldName, sizeof(selectedWorldName) - 1u);
+            selectedWorldName[sizeof(selectedWorldName) - 1u] = '\0';
+            spdlog::info(
+                "DIAGNOSTIC: falling back to persisted Last_WorldName='{}' on character-selection path",
+                selectedWorldName);
         }
 
         if (selectedWorldName[0]) {
