@@ -35,33 +35,9 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
-bool DiagnosticCanBeginAuthConnection();
 bool DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
 uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
     const mxo::ltlogin::ProcessLoginRequestInputSketch& input);
-void DiagnosticRequestAuthCloseAndSwitchToState0();
-uint32_t DiagnosticBeginAuthConnection();
-uint32_t DiagnosticBeginMarginConnection();
-void DiagnosticPumpLauncherNetwork(bool nonBlocking);
-void DiagnosticResetPostedLoginResult();
-bool DiagnosticIsAuthConnectionQuiescentForRetry();
-bool DiagnosticHasSuccessfulPreClientAuthState();
-uint32_t DiagnosticLastLoginEvent();
-uint32_t DiagnosticLastLoginError();
-uint32_t DiagnosticRecoveredCharacterCount();
-bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_t outNameCapacity);
-void DiagnosticSetLauncherSelectedCharacterIndex(uint32_t slotIndex);
-bool DiagnosticFindRecoveredWorldDescriptorIndexByName(const char* worldName, uint32_t* outDescriptorIndex);
-bool DiagnosticGetDeleteCharacterProfileRootName(char* outName, uint32_t outNameCapacity);
-uint32_t DiagnosticBeginDeleteRecoveredCharacter(uint32_t slotIndex);
-uint32_t DiagnosticFinalizeDeleteRecoveredCharacter(uint32_t slotIndex);
-bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
-    uint32_t slotIndex,
-    char* outCharacterName,
-    uint32_t outCharacterNameCapacity,
-    char* outWorldName,
-    uint32_t outWorldNameCapacity,
-    uint32_t* outDescriptorIndex);
 bool DiagnosticInstallR3d9D3DCompileHook(HMODULE r3d9Module);
 bool DiagnosticInstallR3d9Direct3DCreate9Hook(HMODULE r3d9Module);
 void DiagnosticLogLastD3DDeviceActivity();

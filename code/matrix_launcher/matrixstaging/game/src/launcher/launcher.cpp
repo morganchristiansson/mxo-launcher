@@ -18,6 +18,7 @@
 #include "../../../../src/diagnostics.h"
 #include "../../../../src/launcher_network_object_abi.h"
 #include "../libltclientlogin/loginmediator_base.h"
+#include "../libltclientlogin/loginmediator.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
 
 // anchor: launcher.exe:0x40a55c..0x40a5a4 / caller-clean 8-argument export frame
@@ -93,6 +94,162 @@ void LowercaseAsciiCopy(char* destination, size_t destinationSize, const char* s
 const char* MaskedArgValue(const char* value) {
     if (!value || !value[0]) return "<empty>";
     return "<provided>";
+}
+
+static mxo::ltlogin::CLTLoginMediator* InstalledLauncherMediatorModel() {
+    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
+}
+
+static mxo::ltlogin::CLTLoginMediator* ActiveLauncherMediatorModel() {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
+        return const_cast<mxo::ltlogin::CLTLoginMediator*>(mediator->ResolveActiveStateSourceScaffold());
+    }
+    return mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+}
+
+static void ResetLauncherPostedLoginResultIfPresent() {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
+        mediator->ResetPostedLoginResultScaffold();
+    }
+}
+
+static uint32_t LauncherLastLoginEventOrZero() {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
+        return mediator->LastPostedEventScaffold();
+    }
+    return 0u;
+}
+
+static uint32_t LauncherLastLoginErrorOrZero() {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
+        return mediator->LastPostedErrorScaffold();
+    }
+    return 0u;
+}
+
+static bool LauncherHasSuccessfulPreClientAuthState() {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
+        return mediator->LastPostedEventScaffold() == 5u && mediator->RecoveredCharacterCountScaffold() != 0u;
+    }
+    return false;
+}
+
+static uint32_t LauncherRecoveredCharacterCount() {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        return mediator->RecoveredCharacterCountScaffold();
+    }
+    return 0u;
+}
+
+static bool LauncherRecoveredCharacterName(uint32_t slotIndex, char* outName, size_t outNameCapacity) {
+    if (!outName || outNameCapacity == 0u) {
+        return false;
+    }
+    outName[0] = '\0';
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        if (const auto* slotRecord = mediator->RecoveredCharacterByIndexScaffold(slotIndex);
+            slotRecord != nullptr && !slotRecord->heapString14.empty()) {
+            std::strncpy(outName, slotRecord->heapString14.c_str(), outNameCapacity - 1u);
+            outName[outNameCapacity - 1u] = '\0';
+            return true;
+        }
+    }
+    return false;
+}
+
+static void LauncherSetSelectedCharacterIndex(uint32_t slotIndex) {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        mediator->CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
+        spdlog::info(
+            "DIAGNOSTIC: launcher selected character route index cc8 set to 0x{:02x}",
+            static_cast<unsigned>(mediator->CharacterRouteIndexCc8()));
+    }
+}
+
+static bool LauncherFindRecoveredWorldDescriptorIndexByName(const char* worldName, uint32_t* outDescriptorIndex) {
+    if (!worldName || !worldName[0] || !outDescriptorIndex) {
+        return false;
+    }
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        const uint32_t worldCount = mediator->GetWorldCount();
+        for (uint32_t i = 0; i < worldCount; ++i) {
+            const char* candidate = mediator->GetWorldNameByIndex(i);
+            if (candidate && std::strcmp(candidate, worldName) == 0) {
+                *outDescriptorIndex = i;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static bool LauncherGetDeleteCharacterProfileRootName(char* outName, size_t outNameCapacity) {
+    if (!outName || outNameCapacity == 0u) {
+        return false;
+    }
+    outName[0] = '\0';
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        const char* profileRootName = mediator->GetCrashReporterUsername5c(nullptr);
+        if (profileRootName && profileRootName[0]) {
+            std::strncpy(outName, profileRootName, outNameCapacity - 1u);
+            outName[outNameCapacity - 1u] = '\0';
+            return true;
+        }
+    }
+    return false;
+}
+
+static uint32_t LauncherBeginDeleteRecoveredCharacter(uint32_t slotIndex) {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        return mediator->BeginDeleteCharacterBySlotIndexScaffold(slotIndex);
+    }
+    return 1u;
+}
+
+static uint32_t LauncherFinalizeDeleteRecoveredCharacter(uint32_t slotIndex) {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        return mediator->RemoveSlotRecordAndCompactRouteStateByIndex(slotIndex);
+    }
+    return 1u;
+}
+
+static bool LauncherResolveRecoveredCharacterSelectionForWriteback(
+    uint32_t slotIndex,
+    char* outCharacterName,
+    size_t outCharacterNameCapacity,
+    char* outWorldName,
+    size_t outWorldNameCapacity,
+    uint32_t* outDescriptorIndex) {
+    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
+        const mxo::ltlogin::SlotRecordState004b5328* slotRecord = nullptr;
+        uint32_t descriptorIndex = 0u;
+        if (!mediator->BuildPartialSelectionContextForRecoveredCharacterScaffold(
+                slotIndex,
+                nullptr,
+                &descriptorIndex,
+                &slotRecord) ||
+            slotRecord == nullptr) {
+            return false;
+        }
+        if (outCharacterName && outCharacterNameCapacity != 0u) {
+            outCharacterName[0] = '\0';
+            std::strncpy(outCharacterName, slotRecord->heapString14.c_str(), outCharacterNameCapacity - 1u);
+            outCharacterName[outCharacterNameCapacity - 1u] = '\0';
+        }
+        if (outWorldName && outWorldNameCapacity != 0u) {
+            outWorldName[0] = '\0';
+            const char* worldName = mediator->GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
+            if (worldName && worldName[0]) {
+                std::strncpy(outWorldName, worldName, outWorldNameCapacity - 1u);
+                outWorldName[outWorldNameCapacity - 1u] = '\0';
+            }
+        }
+        if (outDescriptorIndex) {
+            *outDescriptorIndex = descriptorIndex;
+        }
+        return true;
+    }
+    return false;
 }
 
 constexpr WORD kMatrixConsoleGreen = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
@@ -965,7 +1122,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             return false;
         }
 
-        DiagnosticResetPostedLoginResult();
+        ResetLauncherPostedLoginResultIfPresent();
         const uint32_t submitResult =
             DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(submitLoginRequestInput);
         spdlog::info(
@@ -981,18 +1138,13 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         //   successful `+0x30` submit; doing so is less faithful and perturbs retry behavior
         const DWORD startTick = GetTickCount();
         bool authSucceeded = false;
-        // Replacement text-mode pre-client gate:
-        // - faithful submit now enters through `0x408400 -> +0x30 -> 0x41ecd0`
-        // - current auth reply adoption on the active path can land slightly later than the older
-        //   source-owned BeginAuthConnection shortcut did, so keep the wait budget comfortably above
-        //   the earlier 30s replacement timeout while the launcher still blocks pre-client.
         while ((GetTickCount() - startTick) < 60000u) {
-            DiagnosticPumpLauncherNetwork(/*nonBlocking=*/true);
-            if (DiagnosticHasSuccessfulPreClientAuthState()) {
+            LauncherPumpNetworkEngineAbiShell(g_pLauncherObject6304, /*nonBlocking=*/true);
+            if (LauncherHasSuccessfulPreClientAuthState()) {
                 authSucceeded = true;
                 break;
             }
-            const uint32_t loginError = DiagnosticLastLoginError();
+            const uint32_t loginError = LauncherLastLoginErrorOrZero();
             if (loginError != 0u) {
                 spdlog::info(
                     "DIAGNOSTIC: pre-client launcher auth attempt={} terminated with loginError=0x{:02x}",
@@ -1004,7 +1156,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         }
 
         if (!authSucceeded) {
-            const uint32_t loginError = DiagnosticLastLoginError();
+            const uint32_t loginError = LauncherLastLoginErrorOrZero();
             if (loginError == 0u) {
                 spdlog::warn(
                     "WARNING: pre-client launcher auth timed out before success/error resolution; re-prompting credentials instead of falling through into client load");
@@ -1023,12 +1175,16 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             // anchor: launcher.exe:0x4091d0 -> sibling +0x34 -> launcher.exe:0x41c0d0
             // Rich-edit observer failure path in the original launcher closes the current auth
             // connection and restores helper state0 before the user retries credentials.
-            DiagnosticResetPostedLoginResult();
-            DiagnosticRequestAuthCloseAndSwitchToState0();
+            ResetLauncherPostedLoginResultIfPresent();
+            if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
+                mediator->RequestAuthCloseAndSwitchToState0();
+            }
             const DWORD authRetryResetStartTick = GetTickCount();
             while ((GetTickCount() - authRetryResetStartTick) < 5000u) {
-                DiagnosticPumpLauncherNetwork(/*nonBlocking=*/true);
-                if (DiagnosticLastLoginEvent() == 1u || DiagnosticIsAuthConnectionQuiescentForRetry()) {
+                LauncherPumpNetworkEngineAbiShell(g_pLauncherObject6304, /*nonBlocking=*/true);
+                if (LauncherLastLoginEventOrZero() == 1u ||
+                    (InstalledLauncherMediatorModel() != nullptr &&
+                     InstalledLauncherMediatorModel()->IsAuthConnectionQuiescentForRetryScaffold())) {
                     break;
                 }
                 Sleep(10u);
@@ -1051,7 +1207,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
 character_selection_menu:
         WriteMatrixConsoleText("The Matrix has you...", true);
 
-        const uint32_t recoveredCharacterCount = DiagnosticRecoveredCharacterCount();
+        const uint32_t recoveredCharacterCount = LauncherRecoveredCharacterCount();
         const bool createCharacterPlaceholderAvailable =
             (recoveredCharacterCount < kTextModeCreateCharacterSoftLimit);
         const bool deleteCharacterOptionAvailable = (recoveredCharacterCount != 0u);
@@ -1063,7 +1219,7 @@ character_selection_menu:
         for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
             char characterName[256] = {};
             const bool haveCharacterName =
-                DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName));
+                LauncherRecoveredCharacterName(i, characterName, sizeof(characterName));
             WriteMatrixConsoleFormattedLine(
                 "  [%u] %s",
                 static_cast<unsigned>(i + 1u),
@@ -1087,7 +1243,7 @@ character_selection_menu:
         if (g_LauncherCommandLine.LauncherCharacter()[0] != '\0') {
             for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
                 char characterName[256] = {};
-                if (DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName)) &&
+                if (LauncherRecoveredCharacterName(i, characterName, sizeof(characterName)) &&
                     std::strcmp(characterName, g_LauncherCommandLine.LauncherCharacter()) == 0) {
                     selectedMenuIndex = i;
                     selectedFromCommandLine = true;
@@ -1127,7 +1283,7 @@ character_selection_menu:
             for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
                 char characterName[256] = {};
                 const bool haveCharacterName =
-                    DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName));
+                    LauncherRecoveredCharacterName(i, characterName, sizeof(characterName));
                 WriteMatrixConsoleFormattedLine(
                     "  [%u] %s",
                     static_cast<unsigned>(i + 1u),
@@ -1145,7 +1301,7 @@ character_selection_menu:
             const uint32_t deleteSlotIndex = deleteOneBasedIndex - 1u;
 
             char deleteCharacterName[256] = {};
-            if (!DiagnosticRecoveredCharacterName(deleteSlotIndex, deleteCharacterName, sizeof(deleteCharacterName))) {
+            if (!LauncherRecoveredCharacterName(deleteSlotIndex, deleteCharacterName, sizeof(deleteCharacterName))) {
                 WriteMatrixConsoleText("Failed to resolve character name for deletion.", true);
                 goto character_selection_menu;
             }
@@ -1160,8 +1316,8 @@ character_selection_menu:
                 goto character_selection_menu;
             }
 
-            DiagnosticResetPostedLoginResult();
-            (void)DiagnosticBeginDeleteRecoveredCharacter(deleteSlotIndex);
+            ResetLauncherPostedLoginResultIfPresent();
+            (void)LauncherBeginDeleteRecoveredCharacter(deleteSlotIndex);
 
             // anchor: launcher.exe:0x40ec70
             // The original launcher calls sibling `+0xf0 = 0x41c390` and immediately enters the
@@ -1169,12 +1325,12 @@ character_selection_menu:
             const DWORD deleteStartTick = GetTickCount();
             bool deleteSucceeded = false;
             while ((GetTickCount() - deleteStartTick) < 30000u) {
-                DiagnosticPumpLauncherNetwork(/*nonBlocking=*/true);
-                if (DiagnosticLastLoginEvent() == 8u) {
+                LauncherPumpNetworkEngineAbiShell(g_pLauncherObject6304, /*nonBlocking=*/true);
+                if (LauncherLastLoginEventOrZero() == 8u) {
                     deleteSucceeded = true;
                     break;
                 }
-                if (DiagnosticLastLoginError() != 0u) {
+                if (LauncherLastLoginErrorOrZero() != 0u) {
                     break;
                 }
                 Sleep(10u);
@@ -1183,13 +1339,13 @@ character_selection_menu:
             if (!deleteSucceeded) {
                 WriteMatrixConsoleFormattedLine(
                     "Delete failed (error=0x%08x).",
-                    static_cast<unsigned>(DiagnosticLastLoginError()));
+                    static_cast<unsigned>(LauncherLastLoginErrorOrZero()));
                 goto character_selection_menu;
             }
 
             char deleteProfileRootName[256] = {};
             const char* deleteProfileRootNameToUse = g_LauncherCommandLine.AuthUsername();
-            if (DiagnosticGetDeleteCharacterProfileRootName(
+            if (LauncherGetDeleteCharacterProfileRootName(
                     deleteProfileRootName,
                     sizeof(deleteProfileRootName)) &&
                 deleteProfileRootName[0] != '\0') {
@@ -1200,7 +1356,7 @@ character_selection_menu:
                 deleteProfileRootNameToUse,
                 deleteCharacterName);
 
-            (void)DiagnosticFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
+            (void)LauncherFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
 
             WriteMatrixConsoleFormattedLine("Deleted character '%s'.", deleteCharacterName);
             goto character_selection_menu;
@@ -1219,7 +1375,7 @@ character_selection_menu:
         uint32_t selectedRowHighWordSelectionIndex = 0xffffu;
 
         if (!createCharacterPlaceholderSelected) {
-            if (!DiagnosticResolveRecoveredCharacterSelectionForLauncher(
+            if (!LauncherResolveRecoveredCharacterSelectionForWriteback(
                     selectedMenuIndex,
                     selectedCharacterName,
                     sizeof(selectedCharacterName),
@@ -1232,7 +1388,7 @@ character_selection_menu:
                 return false;
             }
             selectedRowHighWordSelectionIndex = selectedMenuIndex & 0xffffu;
-            DiagnosticSetLauncherSelectedCharacterIndex(selectedMenuIndex);
+            LauncherSetSelectedCharacterIndex(selectedMenuIndex);
             g_LauncherCommandLine.SetLauncherCharacter(selectedCharacterName);
         } else {
             if (g_LastWorldName[0] != '\0') {
@@ -1250,7 +1406,7 @@ character_selection_menu:
             g_LauncherCommandLine.SetLauncherCharacter("");
             if (selectedSelectionName[0] != '\0') {
                 uint32_t resolvedDescriptorIndex = 0u;
-                if (DiagnosticFindRecoveredWorldDescriptorIndexByName(selectedSelectionName, &resolvedDescriptorIndex)) {
+                if (LauncherFindRecoveredWorldDescriptorIndexByName(selectedSelectionName, &resolvedDescriptorIndex)) {
                     selectedDescriptorIndex = resolvedDescriptorIndex;
                 }
             }
@@ -1320,7 +1476,7 @@ character_selection_menu:
         WriteMatrixConsoleText("Follow the white rabbit. Knock, Knock, Neo.", true);
         spdlog::info(
             "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} createPlaceholder={} recoveredCharacterCount={} selectedMenuIndex={} character='{}' world='{}' a8=0x{:08x} ac=0x{:08x}",
-            static_cast<unsigned>(DiagnosticLastLoginEvent()),
+            static_cast<unsigned>(LauncherLastLoginEventOrZero()),
             createCharacterPlaceholderSelected ? 1u : 0u,
             static_cast<unsigned>(recoveredCharacterCount),
             static_cast<unsigned>(selectedMenuIndex),
@@ -1425,12 +1581,15 @@ bool CLauncher::RunClientDllLifecycle() const {
     //   helper2 immediately after `InitClientDLL`
     // - keep the old post-init auth auto-begin only for the paths that still arrive without that
     //   earlier pre-client completion
-    if (!g_PreClientAuthAndCharacterSelectionCompleted && DiagnosticCanBeginAuthConnection()) {
-        const uint32_t authConnectResult = DiagnosticBeginAuthConnection();
-        spdlog::info(
-            "DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x} preClientAuthComplete={}",
-            static_cast<unsigned>(authConnectResult),
-            g_PreClientAuthAndCharacterSelectionCompleted ? 1u : 0u);
+    if (!g_PreClientAuthAndCharacterSelectionCompleted) {
+        if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel();
+            mediator != nullptr && mediator->CanBeginLauncherAuthConnectionScaffold()) {
+            const uint32_t authConnectResult = mediator->BeginLauncherAuthConnectionScaffold();
+            spdlog::info(
+                "DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x} preClientAuthComplete={}",
+                static_cast<unsigned>(authConnectResult),
+                g_PreClientAuthAndCharacterSelectionCompleted ? 1u : 0u);
+        }
     }
 
     spdlog::info("=== Calling RunClientDLL on the active launcher path ===");
