@@ -326,6 +326,9 @@ static const char* DiagnosticDescribeModuleForAddress(const void* address) {
     if (allocationBase == GetModuleHandleA("d3d9.dll")) {
         return "d3d9.dll";
     }
+    if (allocationBase == GetModuleHandleA(nullptr)) {
+        return "resurrections.exe";
+    }
     return "<other-module>";
 }
 
@@ -703,8 +706,10 @@ static HRESULT WINAPI DiagnosticD3DCompile(
     return result;
 }
 
-static void DiagnosticLogSuspiciousD3D9DrawState(const char* drawKind, bool indexedDraw) {
-    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+static void DiagnosticLogSuspiciousD3D9DrawState(
+    const char* drawKind,
+    bool indexedDraw,
+    void* returnAddress) {
     const uintptr_t clientAbsolute = DiagnosticPointerToClientAbsolute(returnAddress);
     const std::string siteKey = std::string(drawKind ? drawKind : "<null>") + "|" +
         std::to_string(reinterpret_cast<uintptr_t>(returnAddress));
@@ -849,7 +854,10 @@ static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawPrimitive(
     g_D3D9ActivityState.lastNumVertices = 0;
     g_D3D9ActivityState.lastStartIndex = 0;
     g_D3D9ActivityState.lastIndexDataFormat = D3DFMT_UNKNOWN;
-    DiagnosticLogSuspiciousD3D9DrawState("DrawPrimitive", false);
+    DiagnosticLogSuspiciousD3D9DrawState(
+        "DrawPrimitive",
+        false,
+        __builtin_extract_return_addr(__builtin_return_address(0)));
     return g_OriginalIDirect3DDevice9DrawPrimitive
         ? g_OriginalIDirect3DDevice9DrawPrimitive(device, primitiveType, startVertex, primitiveCount)
         : E_FAIL;
@@ -873,7 +881,10 @@ static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawIndexedPrimitive(
     g_D3D9ActivityState.lastPrimitiveCount = primitiveCount;
     g_D3D9ActivityState.lastStartVertex = 0;
     g_D3D9ActivityState.lastIndexDataFormat = D3DFMT_UNKNOWN;
-    DiagnosticLogSuspiciousD3D9DrawState("DrawIndexedPrimitive", true);
+    DiagnosticLogSuspiciousD3D9DrawState(
+        "DrawIndexedPrimitive",
+        true,
+        __builtin_extract_return_addr(__builtin_return_address(0)));
     return g_OriginalIDirect3DDevice9DrawIndexedPrimitive
         ? g_OriginalIDirect3DDevice9DrawIndexedPrimitive(
             device,
@@ -906,7 +917,10 @@ static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawPrimitiveUP(
     g_D3D9ActivityState.currentStream0Offset = 0u;
     g_D3D9ActivityState.currentStream0Stride = vertexStreamZeroStride;
     g_D3D9ActivityState.lastIndexDataFormat = D3DFMT_UNKNOWN;
-    DiagnosticLogSuspiciousD3D9DrawState("DrawPrimitiveUP", false);
+    DiagnosticLogSuspiciousD3D9DrawState(
+        "DrawPrimitiveUP",
+        false,
+        __builtin_extract_return_addr(__builtin_return_address(0)));
     return g_OriginalIDirect3DDevice9DrawPrimitiveUP
         ? g_OriginalIDirect3DDevice9DrawPrimitiveUP(device, primitiveType, primitiveCount, vertexStreamZeroData, vertexStreamZeroStride)
         : E_FAIL;
@@ -936,7 +950,10 @@ static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawIndexedPrimitiveU
     g_D3D9ActivityState.currentStream0Buffer = const_cast<void*>(vertexStreamZeroData);
     g_D3D9ActivityState.currentStream0Offset = 0u;
     g_D3D9ActivityState.currentStream0Stride = vertexStreamZeroStride;
-    DiagnosticLogSuspiciousD3D9DrawState("DrawIndexedPrimitiveUP", true);
+    DiagnosticLogSuspiciousD3D9DrawState(
+        "DrawIndexedPrimitiveUP",
+        true,
+        __builtin_extract_return_addr(__builtin_return_address(0)));
     return g_OriginalIDirect3DDevice9DrawIndexedPrimitiveUP
         ? g_OriginalIDirect3DDevice9DrawIndexedPrimitiveUP(
             device,
