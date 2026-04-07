@@ -66,6 +66,8 @@ Use Ghidra as the primary static-analysis tool for launcher/client control flow,
 - when a callsite is high-value, write down the concrete argument mapping from the assembly, not just the decompiler's guessed prototype
 - push confirmed Ghidra findings into source and canonical docs in the same task so knowledge does not live only in Ghidra
 - record negative results too, especially when Ghidra proves a suspected path is **not** the caller / producer / first-send origin
+- pay extra attention to LauncherLogin world-selection / character-selection / create-character / delete-character flows
+  - when discovering them in Ghidra, prioritize the exact LoginMediator interaction: concrete vtable slot, caller/callee relation, argument mapping, and resulting mediator state/owner-field effects
 - Create function in ghidra when you have high confidence that it should be a function. You have done this before.
 
 ## Ghidra usage
