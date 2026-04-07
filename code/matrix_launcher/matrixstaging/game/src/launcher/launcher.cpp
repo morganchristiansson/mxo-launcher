@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <winver.h>
 #include <cstdio>
+#include <cstdarg>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -92,13 +93,57 @@ const char* MaskedArgValue(const char* value) {
     return "<provided>";
 }
 
+constexpr WORD kMatrixConsoleGreen = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+
+void WriteMatrixConsoleText(const char* text, bool appendNewline) {
+    const char* safeText = text ? text : "<null>";
+    HANDLE errorHandle = GetStdHandle(STD_ERROR_HANDLE);
+
+    CONSOLE_SCREEN_BUFFER_INFO consoleInfo = {};
+    const bool haveConsoleInfo =
+        errorHandle != INVALID_HANDLE_VALUE &&
+        errorHandle != nullptr &&
+        GetConsoleScreenBufferInfo(errorHandle, &consoleInfo) != 0;
+
+    if (haveConsoleInfo) {
+        SetConsoleTextAttribute(errorHandle, kMatrixConsoleGreen);
+        std::fputs(safeText, stderr);
+        if (appendNewline) {
+            std::fputc('\n', stderr);
+        }
+        std::fflush(stderr);
+        SetConsoleTextAttribute(errorHandle, consoleInfo.wAttributes);
+        return;
+    }
+
+    std::fputs("\x1b[1;32m", stderr);
+    std::fputs(safeText, stderr);
+    if (appendNewline) {
+        std::fputc('\n', stderr);
+    }
+    std::fputs("\x1b[0m", stderr);
+    std::fflush(stderr);
+}
+
+void WriteMatrixConsoleFormattedLine(const char* format, ...) {
+    if (!format) {
+        return;
+    }
+
+    char buffer[1024] = {};
+    va_list args;
+    va_start(args, format);
+    std::vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+    WriteMatrixConsoleText(buffer, true);
+}
+
 bool ReadInteractiveLauncherField(const char* prompt, char* buffer, size_t bufferSize) {
     if (!prompt || !buffer || bufferSize < 2u) {
         return false;
     }
 
-    std::fprintf(stderr, "%s", prompt);
-    std::fflush(stderr);
+    WriteMatrixConsoleText(prompt, false);
 
     if (!std::fgets(buffer, static_cast<int>(bufferSize), stdin)) {
         buffer[0] = '\0';
@@ -878,9 +923,15 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             if (loginError == 0u) {
                 spdlog::warn(
                     "WARNING: pre-client launcher auth timed out before success/error resolution; re-prompting credentials instead of falling through into client load");
+                WriteMatrixConsoleText(
+                    "Login timed out before the launcher received a success/error result. Please re-enter your username and password.",
+                    true);
             } else {
                 spdlog::warn(
                     "WARNING: pre-client launcher auth ended with error=0x{:02x}; re-prompting credentials instead of falling through into client load",
+                    static_cast<unsigned>(loginError));
+                WriteMatrixConsoleFormattedLine(
+                    "Login failed (0x%08x). Please re-enter your username and password.",
                     static_cast<unsigned>(loginError));
             }
 
@@ -900,19 +951,20 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
 
         const uint32_t recoveredCharacterCount = DiagnosticRecoveredCharacterCount();
         const bool createCharacterPlaceholderAvailable = (recoveredCharacterCount < 3u);
-        std::fprintf(stderr, "Available characters:\n");
+        WriteMatrixConsoleText("Available characters:", true);
         for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
             char characterName[256] = {};
             const bool haveCharacterName =
                 DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName));
-            std::fprintf(
-                stderr,
-                "  [%u] %s\n",
-                static_cast<unsigned>(i),
+            WriteMatrixConsoleFormattedLine(
+                "  [%u] %s",
+                static_cast<unsigned>(i + 1u),
                 haveCharacterName ? characterName : "<unresolved>");
         }
         if (createCharacterPlaceholderAvailable) {
-            std::fprintf(stderr, "  [%u] - - - (Create Character)\n", static_cast<unsigned>(recoveredCharacterCount));
+            WriteMatrixConsoleFormattedLine(
+                "  [%u] - - - (Create Character)",
+                static_cast<unsigned>(recoveredCharacterCount + 1u));
         }
 
         uint32_t selectedMenuIndex = 0u;
@@ -932,8 +984,14 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         if (!selectedFromCommandLine) {
             const uint32_t menuCount = recoveredCharacterCount + (createCharacterPlaceholderAvailable ? 1u : 0u);
             if (menuCount > 1u) {
-                while (!ReadInteractiveLauncherIndex("Character index: ", menuCount, &selectedMenuIndex)) {
-                    std::fprintf(stderr, "Invalid character index.\n");
+                while (true) {
+                    uint32_t oneBasedSelection = 0u;
+                    if (ReadInteractiveLauncherIndex("Character index: ", menuCount + 1u, &oneBasedSelection) &&
+                        oneBasedSelection > 0u) {
+                        selectedMenuIndex = oneBasedSelection - 1u;
+                        break;
+                    }
+                    WriteMatrixConsoleText("Invalid character index.", true);
                 }
             }
         }
