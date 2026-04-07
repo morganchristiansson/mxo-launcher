@@ -537,9 +537,10 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
 
     std::memset(startupContext, 0, sizeof(*startupContext));
 
-    // Replacement-only stand-in for launcher-owned world-selection state that must already exist
-    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. No separate 0x40b430 helper is
-    // claimed here; this only groups the current recovery work.
+    // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
+    // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. The actual world writeback stays
+    // deferred to the later pre-client character-selection stage after the character index is
+    // read.
     LoadLastWorldNameFromRegistry(g_LastWorldName, sizeof(g_LastWorldName));
 
     if (g_LastWorldName[0]) {
@@ -585,9 +586,6 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     if ((m_FieldA8 | m_FieldAC) != 0) {
         spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", packedArg7Selection);
     }
-
-    startupContext->mediatorSelectedSelectionGateByte100 = recoveredSelection ? recoveredSelection->selectionGateByte100 : 1u;
-    startupContext->mediatorSelectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
 
     // Replacement-only nopatch bookkeeping used by the recovered mediator scaffold later in the
     // active 0x40b430 path. This is intentionally documented as a grouped source convenience, not
@@ -642,6 +640,10 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 
     spdlog::info("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
 
+    const RecoveredLauncherSelectionRecord* recoveredSelection = AsRecoveredSelection(startupContext.recoveredSelection);
+    const uint32_t selectedSelectionGateByte100 = recoveredSelection ? recoveredSelection->selectionGateByte100 : 1u;
+    const uint32_t selectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
+
     const uint32_t packedArg7Selection = BuildPackedArg7Selection();
     const uint32_t selectedHighByte = (packedArg7Selection >> 24) & 0xffu;
     const uint32_t selectionPackedLow24 = packedArg7Selection & 0x00ffffffu;
@@ -654,8 +656,8 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
         startupContext.mediatorSelectionName,
         selectionPackedLow24,
         selectedHighByte,
-        startupContext.mediatorSelectedSelectionGateByte100,
-        startupContext.mediatorSelectedVariantState);
+        selectedSelectionGateByte100,
+        selectedVariantState);
     DiagnosticConfigureMediatorProfileName(g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
     DiagnosticConfigureMediatorAuthName(g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
     DiagnosticConfigureMediatorAuthPassword(g_LauncherCommandLine.AuthPassword()[0] ? g_LauncherCommandLine.AuthPassword() : NULL);
@@ -710,7 +712,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
     const uint16_t marginServerPort = 10000;
 
     char marginRoutePrefix[256] = {0};
-    const RecoveredLauncherSelectionRecord* recoveredSelection = AsRecoveredSelection(startupContext.recoveredSelection);
     if (recoveredSelection && recoveredSelection->routeHostPrefix && recoveredSelection->routeHostPrefix[0]) {
         std::strncpy(marginRoutePrefix, recoveredSelection->routeHostPrefix, sizeof(marginRoutePrefix) - 1);
         marginRoutePrefix[sizeof(marginRoutePrefix) - 1] = '\0';
@@ -911,7 +912,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         char selectedWorldName[256] = {};
         uint32_t selectedDescriptorIndex = 0u;
         spdlog::info(
-            "ROUTE CHECKPOINT: pre-client no-GUI selection mirroring LauncherLoginDialog page11 Enter/command10 -> page7, then page7 list activation command8 (not page7 primary-button command11)");
+            "ROUTE CHECKPOINT: pre-client no-GUI selection mirroring LauncherLoginDialog page11 Enter/command10 -> page7, then page7 list activation command8 (not page7 primary-button command11); world selection is finalized here after the character index is read");
         if (!DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
                 selectedCharacterIndex,
                 selectedCharacterName,

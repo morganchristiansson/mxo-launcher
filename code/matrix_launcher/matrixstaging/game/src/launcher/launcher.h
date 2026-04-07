@@ -12,8 +12,6 @@ namespace launcher {
 struct RecoveredLauncherStartupContext {
     char mediatorSelectionName[64];
     const void* recoveredSelection;
-    uint32_t mediatorSelectedSelectionGateByte100;
-    uint32_t mediatorSelectedVariantState;
     uint32_t nopatchLauncherVersionValue;
     uint32_t nopatchClientVersionValue;
 };
