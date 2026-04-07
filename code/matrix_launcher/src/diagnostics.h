@@ -45,7 +45,6 @@ void DiagnosticLogLastD3DDeviceActivity();
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
-void DiagnosticLogKnownClientEngineInitStatusTextsOnce(const char* source);
 
 // Diagnostic-only, disabled-by-default runtime detour for client.dll loading/status text updates.
 // Opt in with:

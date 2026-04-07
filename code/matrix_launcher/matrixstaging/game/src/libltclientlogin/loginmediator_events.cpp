@@ -541,13 +541,8 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     //   it is not specialized only to `0x0b/0x18/0x0f`
     // - now that the std::_Tree-like owner `+0x674` scaffold is source-owned enough, event
     //   dispatch here follows that broader original behavior again
-    // - only event-specific extra side effects stay narrow, e.g. the diagnostic text mirror below
-    //   for the now-proved `0x0b` / "Waiting for Regionserver" path
-    if (eventId == 0x0bu) {
-        DiagnosticLogClientLoadingStateText(
-            "Waiting for Regionserver",
-            "client.dll:ClientShell_LoginMediatorObserver_OnEvent event 0x0b");
-    }
+    // - launcher-owned progress-text mirrors were removed; exact client-visible loading text now
+    //   comes only from the opt-in `client.dll:0x6215b930` hook
 
     LoginObserverTreeNode674* node = ObserverTreeBegin674();
     const LoginObserverTreeNode674* const end = ObserverTreeEnd674();

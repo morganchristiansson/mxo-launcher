@@ -480,7 +480,7 @@ Current stronger validation result:
   - `Initializing Abilities`
   - `Initializing FX`
   - `Initializing Metro World`
-- default replacement-side spdlog still mirrors that earlier engine-init text family retrospectively once the path reaches arg6 `+0xec`, and still mirrors the exact visible `"Loading Character"` text at the wrapper-facing `+0xec` consume point; this keeps the default path launcher-owned and avoids patching client.dll
+- the older launcher-owned progress-text mirrors were removed because they were not a trustworthy source of exact client-visible loading text
 - a newer diagnostic-only opt-in runtime detour now exists for `client.dll:0x6215b930 = FUN_6215b930`, gated behind:
   - `MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT=1` for exact logging
   - `MXO_DIAGNOSTIC_OVERRIDE_CLIENT_LOADING_TEXT=1` for visible text replacement (this also installs the same hook)

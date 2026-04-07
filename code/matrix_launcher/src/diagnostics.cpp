@@ -107,7 +107,6 @@ static int g_WindowTraceEntryCount = 0;
 static int g_LastWindowTraceCount = -1;
 static std::string g_LastClientLoadingStateText;
 static std::string g_LastClientLoadingStateSource;
-static bool g_KnownClientEngineInitStatusTextsLogged = false;
 static HWND g_LastLoggedD3DErrorDialog = NULL;
 static const void* g_LastClientShellObserved = nullptr;
 static uint32_t g_LastClientShellState20 = 0xffffffffu;
@@ -1736,31 +1735,6 @@ void DiagnosticLogClientLoadingStateText(const char* text, const char* source) {
         "ClientLoadingState text='{}' source={} (client-visible loading/status text boundary)",
         nextText,
         nextSource);
-}
-
-void DiagnosticLogKnownClientEngineInitStatusTextsOnce(const char* source) {
-    if (g_ClientLoadingTextHookInstalled || g_KnownClientEngineInitStatusTextsLogged) {
-        return;
-    }
-    g_KnownClientEngineInitStatusTextsLogged = true;
-
-    static const char* kKnownTexts[] = {
-        "Initializing Client Data Cache",
-        "Initializing Inventory Manager",
-        "Initializing Shortcut Manager",
-        "Initializing Game Object Manager",
-        "Initializing Character Animations",
-        "Initializing Rules Subsystem",
-        "Initializing Animation Tables",
-        "Initializing Chat Manager",
-        "Initializing Abilities",
-        "Initializing FX",
-        "Initializing Metro World",
-    };
-
-    for (const char* text : kKnownTexts) {
-        DiagnosticLogClientLoadingStateText(text, source);
-    }
 }
 
 static bool DiagnosticEnvFlagEnabled(const char* variableName) {
