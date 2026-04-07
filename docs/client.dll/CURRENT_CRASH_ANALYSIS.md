@@ -164,6 +164,19 @@ The current crash investigation should stay focused on:
          or whether later client code expects a richer per-entry third dword before the render/fx
          path becomes stable
 
+## Intermittent secondary crash family
+
+A separate intermittent replacement-only failure still appears from time to time:
+- process termination through `std::bad_alloc` / C++ termination rather than the ordinary late d3d9
+  access-violation family
+- user reports this secondary failure was easier to trigger around commit `ab28b26`, but the newer
+  queue-context producer ablation showed no meaningful change in the main late render corruption /
+  crash path
+- current practical treatment:
+  - keep it tracked as a **secondary** issue until it becomes the dominant repro again
+  - source now installs diagnostic `std::new_handler` / `std::terminate` hooks so the next hit will
+    log whether termination really comes from `std::bad_alloc` or some other uncaught C++ exception
+
 ## Non-root-cause notes
 
 These are no longer the best primary crash explanations:

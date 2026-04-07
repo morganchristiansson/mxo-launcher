@@ -17,7 +17,9 @@
 #include <cstdarg>
 #include <cstdlib>
 #include <ctime>
+#include <exception>
 #include <memory>
+#include <new>
 #include <string>
 #include <sys/stat.h>
 
@@ -92,6 +94,54 @@ static const char* DiagnosticExceptionClassification(DWORD exceptionCode);
 static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTERS* exceptionInfo);
 static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
 static LONG WINAPI DiagnosticUnhandledExceptionFilter(EXCEPTION_POINTERS* exceptionInfo);
+static void DiagnosticEmergencyWrite(const char* text);
+static void DiagnosticBadAllocNewHandler();
+static void DiagnosticTerminateHandler();
+
+static void DiagnosticEmergencyWrite(const char* text) {
+    const char* const message = text ? text : "<null>";
+    OutputDebugStringA(message);
+    OutputDebugStringA("\n");
+
+    HANDLE stderrHandle = GetStdHandle(STD_ERROR_HANDLE);
+    if (stderrHandle != INVALID_HANDLE_VALUE && stderrHandle != nullptr) {
+        DWORD written = 0;
+        const DWORD length = static_cast<DWORD>(std::strlen(message));
+        if (length != 0u) {
+            WriteFile(stderrHandle, message, length, &written, nullptr);
+        }
+        WriteFile(stderrHandle, "\n", 1, &written, nullptr);
+    }
+}
+
+static void DiagnosticBadAllocNewHandler() {
+    DiagnosticEmergencyWrite("DiagnosticBadAllocNewHandler: operator new allocation failure");
+    throw std::bad_alloc();
+}
+
+static void DiagnosticTerminateHandler() {
+    DiagnosticEmergencyWrite("DiagnosticTerminateHandler: std::terminate invoked");
+    try {
+        std::exception_ptr current = std::current_exception();
+        if (current) {
+            try {
+                std::rethrow_exception(current);
+            } catch (const std::bad_alloc&) {
+                DiagnosticEmergencyWrite("DiagnosticTerminateHandler: current exception is std::bad_alloc");
+            } catch (const std::exception& exception) {
+                DiagnosticEmergencyWrite("DiagnosticTerminateHandler: current exception is std::exception");
+                DiagnosticEmergencyWrite(exception.what());
+            } catch (...) {
+                DiagnosticEmergencyWrite("DiagnosticTerminateHandler: current exception is non-std");
+            }
+        } else {
+            DiagnosticEmergencyWrite("DiagnosticTerminateHandler: no current exception");
+        }
+    } catch (...) {
+        DiagnosticEmergencyWrite("DiagnosticTerminateHandler: failed while classifying termination exception");
+    }
+    std::abort();
+}
 
 static void LogWordSpan(const char* label, const void* base, size_t wordCount) {
     const uint32_t* words = static_cast<const uint32_t*>(base);
@@ -560,6 +610,8 @@ static void InitializeLogging() {
 
 int main(int argc, char* argv[]) {
     InitializeLogging();
+    std::set_new_handler(DiagnosticBadAllocNewHandler);
+    std::set_terminate(DiagnosticTerminateHandler);
     AddVectoredExceptionHandler(1, DiagnosticVectoredExceptionHandler);
     SetUnhandledExceptionFilter(DiagnosticUnhandledExceptionFilter);
 
@@ -568,6 +620,7 @@ int main(int argc, char* argv[]) {
 
     spdlog::info("Mode: original startup order, no client-memory injection");
     spdlog::info("Default branch target: nopatch path");
+    spdlog::info("Installed diagnostic std::new_handler/std::terminate hooks");
 
     if (!PatchClientDllMxowrapImportToDbghelp()) {
         return FinishAndReturn(1);
