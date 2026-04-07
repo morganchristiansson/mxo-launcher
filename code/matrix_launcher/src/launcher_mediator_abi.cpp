@@ -1068,9 +1068,9 @@ __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
 // - client.dll:0x62054d1d builds a larger stack-local input object during the loading-character /
 //   create-character transition
 // - the populated offsets line up with owner `+0x120 / 0x41c3c0`
-// - keep the slot meaning unified as `ProcessLoginCredentials`, but preserve the instance-role
+// - current best read is create-character source-block submit, but preserve the instance-role
 //   split between the wrapper mirror and whichever mediator currently owns the active state source
-extern "C" uint32_t Mediator_ProcessLoginCredentials120_Impl(
+extern "C" uint32_t Mediator_ProcessCreateCharacterInput120_Impl(
     MinimalLoginMediatorStub* self,
     void* input120,
     void* returnAddress) {
@@ -1083,14 +1083,14 @@ extern "C" uint32_t Mediator_ProcessLoginCredentials120_Impl(
 
     if (mediator) {
         const bool applyOwnerSemantics = (activeStateSource == nullptr || activeStateSource == mediator);
-        result = mediator->CaptureProcessLoginCredentialsArg6Slot120(
+        result = mediator->CaptureCreateCharacterInputArg6Slot120(
             input120,
             returnAddress,
             applyOwnerSemantics);
     }
 
     if (activeStateSource && activeStateSource != mediator) {
-        result = activeStateSource->CaptureProcessLoginCredentialsArg6Slot120(
+        result = activeStateSource->CaptureCreateCharacterInputArg6Slot120(
             input120,
             returnAddress,
             true);
@@ -1100,9 +1100,9 @@ extern "C" uint32_t Mediator_ProcessLoginCredentials120_Impl(
 }
 
 // anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes the
-// post-auth character-data source block to arg6 +0x120
+// post-auth create-character source block to arg6 +0x120
 // vtable: ILTLoginMediator.Default slot +0x120
-__attribute__((naked)) static void Mediator_ProcessLoginCredentials120() {
+__attribute__((naked)) static void Mediator_ProcessCreateCharacterInput120() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
         "mov 0(%%esp), %%edx\n\t"
@@ -1114,7 +1114,7 @@ __attribute__((naked)) static void Mediator_ProcessLoginCredentials120() {
         "add $12, %%esp\n\t"
         "ret $4\n\t"
         :
-        : "i"(Mediator_ProcessLoginCredentials120_Impl)
+        : "i"(Mediator_ProcessCreateCharacterInput120_Impl)
         : "eax", "edx");
 }
 
@@ -1407,7 +1407,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldPopulationNibbleByIndex; // +0x108
     g_LoginMediatorVtable[67] = (void*)Mediator_GetRouteDescriptor10c; // +0x10c
     g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
-    g_LoginMediatorVtable[72] = (void*)Mediator_ProcessLoginCredentials120; // +0x120
+    g_LoginMediatorVtable[72] = (void*)Mediator_ProcessCreateCharacterInput120; // +0x120
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
     g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
     g_LoginMediatorVtable[82] = (void*)Mediator_GetGameSessionId; // +0x148
@@ -1707,7 +1707,7 @@ void DiagnosticConfigureLoginControllerCharacterSeed(
 
     const uint32_t normalizedWorldIndex = selectedWorldIndexLow24 & 0x00ffffffu;
     const uint32_t seedResult =
-        mediator->MirrorCharacterSeedIntoSourceBlock120Scaffold(characterName, normalizedWorldIndex);
+        mediator->MirrorCharacterSeedIntoCreateCharacterInput120Scaffold(characterName, normalizedWorldIndex);
     if (gameSessionId && gameSessionId[0]) {
         mediator->SetGameSessionId664(gameSessionId);
     }

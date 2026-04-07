@@ -2046,7 +2046,7 @@ const void* CLTLoginMediator::GetState8PersistenceF1c() const {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::MirrorProcessLoginCredentialsSourceBlock120(const ProcessLoginCredentialsInputSketch& input) {
+void CLTLoginMediator::MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input) {
     std::copy(input.string00.begin(), input.string00.end(), postAuthMarginLoadingState_.sourceLeadString108.begin());
     postAuthMarginLoadingState_.sourceField12c = input.field24;
 
@@ -2064,10 +2064,10 @@ void CLTLoginMediator::MirrorProcessLoginCredentialsSourceBlock120(const Process
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTLoginMediator::BuildProcessLoginCredentialsForRecoveredCharacterScaffold(
+bool CLTLoginMediator::BuildCreateCharacterInput120ForRecoveredCharacterScaffold(
     const char* characterName,
     uint32_t descriptorIndex,
-    ProcessLoginCredentialsInputSketch* outInput) const {
+    ProcessCreateCharacterInput120Sketch* outInput) const {
     auto copyCStringIntoFixed = [](auto& dest, const char* src) {
         std::fill(dest.begin(), dest.end(), 0);
         if (!src || !src[0]) {
@@ -2106,27 +2106,27 @@ bool CLTLoginMediator::BuildProcessLoginCredentialsForRecoveredCharacterScaffold
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold(
+uint32_t CLTLoginMediator::MirrorCharacterSeedIntoCreateCharacterInput120Scaffold(
     const char* characterName,
     uint32_t descriptorIndex) {
-    ProcessLoginCredentialsInputSketch input = {};
-    if (!BuildProcessLoginCredentialsForRecoveredCharacterScaffold(
+    ProcessCreateCharacterInput120Sketch input = {};
+    if (!BuildCreateCharacterInput120ForRecoveredCharacterScaffold(
             characterName,
             descriptorIndex,
             &input)) {
         spdlog::info(
-            "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold skipped (empty characterName)");
+            "CLTLoginMediator::MirrorCharacterSeedIntoCreateCharacterInput120Scaffold skipped (empty characterName)");
         return 1u;
     }
 
     // Prefer the same wrapper-facing capture surface that client.dll later uses at arg6 `+0x120`,
     // but keep owner semantics disabled on this pre-client bridge so this remains mirror-only.
-    const uint32_t result = CaptureProcessLoginCredentialsArg6Slot120(
+    const uint32_t result = CaptureCreateCharacterInputArg6Slot120(
         &input,
         nullptr,
         /*applyOwnerSemantics=*/false);
     spdlog::info(
-        "CLTLoginMediator::MirrorCharacterSeedIntoSourceBlock120Scaffold name='{}' field12c=0x{:08x} appearance0=0x{:08x} appearance16=0x{:08x} realFirst='{}' realLast='{}' background='{}' currentState={} captureResult=0x{:08x} (mirror-only; no 0x41c3c0 state-3 gate claim)",
+        "CLTLoginMediator::MirrorCharacterSeedIntoCreateCharacterInput120Scaffold name='{}' field12c=0x{:08x} appearance0=0x{:08x} appearance16=0x{:08x} realFirst='{}' realLast='{}' background='{}' currentState={} captureResult=0x{:08x} (mirror-only; no 0x41c3c0 state-3 gate claim)",
         postAuthMarginLoadingState_.sourceLeadString108[0]
             ? postAuthMarginLoadingState_.sourceLeadString108.data()
             : "<empty>",
@@ -2302,7 +2302,7 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
     //   index plus the later wrapper-facing `+0x120` character source block
     // - keep owner semantics disabled on that `+0x120` capture so this remains a launcher-side seed
     //   helper rather than a claim that original `0x41c3c0` already ran here
-    const uint32_t seedResult = MirrorCharacterSeedIntoSourceBlock120Scaffold(
+    const uint32_t seedResult = MirrorCharacterSeedIntoCreateCharacterInput120Scaffold(
         slotRecord->heapString14.c_str(),
         descriptorIndex);
 
@@ -2319,30 +2319,30 @@ bool CLTLoginMediator::AdoptRecoveredCharacterSelectionForLauncherScaffold(
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(
+uint32_t CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(
     const void* input120,
     void* returnAddress,
     bool applyOwnerSemantics) {
-    arg6ProcessLoginCredentialsInput120_ = input120;
-    ++arg6ProcessLoginCredentialsCount120_;
+    arg6CreateCharacterInput120_ = input120;
+    ++arg6CreateCharacterInputCount120_;
 
     if (!input120) {
         spdlog::info(
-            "CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(+0x120) input=<null> caller={} [count={}] applyOwnerSemantics={}",
+            "CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(+0x120) input=<null> caller={} [count={}] applyOwnerSemantics={}",
             fmt::ptr(returnAddress),
-            arg6ProcessLoginCredentialsCount120_,
+            arg6CreateCharacterInputCount120_,
             applyOwnerSemantics ? 1u : 0u);
         return 1u;
     }
 
-    const auto& input = *static_cast<const ProcessLoginCredentialsInputSketch*>(input120);
+    const auto& input = *static_cast<const ProcessCreateCharacterInput120Sketch*>(input120);
     if (!applyOwnerSemantics) {
-        MirrorProcessLoginCredentialsSourceBlock120(input);
+        MirrorCreateCharacterInput120SourceBlock(input);
         spdlog::info(
-            "CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(+0x120 mirror-only input={} caller={} [count={}] field12c=0x{:08x} name='{}')",
+            "CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(+0x120 mirror-only input={} caller={} [count={}] field12c=0x{:08x} name='{}')",
             fmt::ptr(input120),
             fmt::ptr(returnAddress),
-            arg6ProcessLoginCredentialsCount120_,
+            arg6CreateCharacterInputCount120_,
             static_cast<unsigned>(postAuthMarginLoadingState_.sourceField12c),
             postAuthMarginLoadingState_.sourceLeadString108[0]
                 ? postAuthMarginLoadingState_.sourceLeadString108.data()
@@ -2351,15 +2351,15 @@ uint32_t CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(
     }
 
     spdlog::debug(
-        "CLTLoginMediator::CaptureProcessLoginCredentialsArg6Slot120(+0x120 owner-dispatch input={} caller={} [count={}])",
+        "CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(+0x120 owner-dispatch input={} caller={} [count={}])",
         fmt::ptr(input120),
         fmt::ptr(returnAddress),
-        arg6ProcessLoginCredentialsCount120_);
-    return ProcessLoginCredentials(input);
+        arg6CreateCharacterInputCount120_);
+    return ProcessCreateCharacterInput120(input);
 }
 
 // anchor: launcher.exe:0x41c3c0
-uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) {
+uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) {
     // anchor: launcher.exe:0x41c3c0
     // Later post-auth writer for owner `+0x108/+0x12c/+0x134..+0x1b8`.
     // Current wrapper-slot decision from `client.dll:0x62054d1d` + owner `0x41c3c0` disassembly:
@@ -2374,7 +2374,7 @@ uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentials
         case 1u:
         case 2u:
             spdlog::info(
-                "CLTLoginMediator::ProcessLoginCredentials(+0x120) rejected currentState={} stateCode={} -> 0x12000006",
+                "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120) rejected currentState={} stateCode={} -> 0x12000006",
                 currentState_ ? currentState_->DebugName() : "<null>",
                 stateCode);
             return 0x12000006u;
@@ -2388,19 +2388,19 @@ uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentials
         case 10u:
         case 11u:
             spdlog::info(
-                "CLTLoginMediator::ProcessLoginCredentials(+0x120) rejected currentState={} stateCode={} -> 0x12000000",
+                "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120) rejected currentState={} stateCode={} -> 0x12000000",
                 currentState_ ? currentState_->DebugName() : "<null>",
                 stateCode);
             return 0x12000000u;
         case 12u:
             spdlog::info(
-                "CLTLoginMediator::ProcessLoginCredentials(+0x120) rejected currentState={} stateCode={} -> 0x12000007",
+                "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120) rejected currentState={} stateCode={} -> 0x12000007",
                 currentState_ ? currentState_->DebugName() : "<null>",
                 stateCode);
             return 0x12000007u;
         default:
             spdlog::info(
-                "CLTLoginMediator::ProcessLoginCredentials(+0x120) rejected currentState={} stateCode={} -> 0x00000001",
+                "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120) rejected currentState={} stateCode={} -> 0x00000001",
                 currentState_ ? currentState_->DebugName() : "<null>",
                 stateCode);
             return 1u;
@@ -2408,20 +2408,20 @@ uint32_t CLTLoginMediator::ProcessLoginCredentials(const ProcessLoginCredentials
 
     if (static_cast<uint32_t>(worldDescriptorCountD80_) < input.field24) {
         spdlog::info(
-            "CLTLoginMediator::ProcessLoginCredentials(+0x120) rejected selector field12c=0x{:08x} upperBoundF8=0x{:02x}",
+            "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120) rejected selector field12c=0x{:08x} upperBoundF8=0x{:02x}",
             static_cast<unsigned>(input.field24),
             static_cast<unsigned>(worldDescriptorCountD80_));
         return 4u;
     }
 
-    MirrorProcessLoginCredentialsSourceBlock120(input);
+    MirrorCreateCharacterInput120SourceBlock(input);
 
     if (scaffoldState10_ != nullptr) {
         SwitchHelperStateScaffold(10u, scaffoldState10_);
     }
 
     spdlog::info(
-        "CLTLoginMediator::ProcessLoginCredentials(+0x120 owner) name='{}' field12c=0x{:08x} firstDword134=0x{:08x} backgroundPreview='{}' -> currentState={}",
+        "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120 owner) name='{}' field12c=0x{:08x} firstDword134=0x{:08x} backgroundPreview='{}' -> currentState={}",
         postAuthMarginLoadingState_.sourceLeadString108[0]
             ? postAuthMarginLoadingState_.sourceLeadString108.data()
             : "<empty>",

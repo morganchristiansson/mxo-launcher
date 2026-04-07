@@ -301,9 +301,10 @@ struct State3SelectionContextInputSketch {
     std::array<uint32_t, 4> blockA4{};             // input `+0xa4 .. +0xb3`
 };
 
-struct ProcessLoginCredentialsInputSketch {
+struct ProcessCreateCharacterInput120Sketch {
     // owner vtable `+0x120` / `0x41c3c0`
-    // Same semantic slot reached from the wrapper-facing arg6 `+0x120` client call at
+    // Current best read: create-character source-block submit.
+    // Same semantic slot is reached from the wrapper-facing arg6 `+0x120` client call at
     // `client.dll:0x62054d1d`, even though that caller builds a larger stack-local object during
     // the loading-character/create-character transition.
     // Current concrete alignment between the client writer and owner reader:
@@ -515,10 +516,10 @@ public:
     void UnknownSlot73();
     // +0x120
     // Current best slot decision: keep wrapper-facing arg6 `+0x120` and owner `+0x120`
-    // unified under `ProcessLoginCredentials`.
+    // unified under `ProcessCreateCharacterInput120`.
     // The client-side wrapper call builds a larger stack-local object, but the populated offsets
     // line up with the owner-side `0x41c3c0` reader instead of describing a separate slot family.
-    virtual uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) = 0;
+    virtual uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) = 0;
     // +0x124
     // Wrapper-facing capture of the deeper-init startup triple; owner-side mirroring stays
     // explicit in `CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c`.

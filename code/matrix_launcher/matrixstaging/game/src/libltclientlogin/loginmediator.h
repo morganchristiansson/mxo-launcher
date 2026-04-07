@@ -1320,17 +1320,17 @@ public:
 
     // +0x120
     // anchor: launcher.exe:0x41c3c0
-    uint32_t ProcessLoginCredentials(const ProcessLoginCredentialsInputSketch& input) override;
+    uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
     // Narrow mirror-only seed helper for the still-unrecovered upstream producer that eventually
     // feeds `0x41c3c0`. This builds the same source block family (`+0x108/+0x12c/+0x134..+0x1b8`)
     // without claiming the original state-3-gated owner dispatch happened.
-    bool BuildProcessLoginCredentialsForRecoveredCharacterScaffold(
+    bool BuildCreateCharacterInput120ForRecoveredCharacterScaffold(
         const char* characterName,
         uint32_t descriptorIndex,
-        ProcessLoginCredentialsInputSketch* outInput) const;
+        ProcessCreateCharacterInput120Sketch* outInput) const;
     // descriptorIndex here matches owner `+0x12c`, i.e. the selected world-descriptor index read
     // by `0x41c3c0`, not the lower-level slot/world id.
-    uint32_t MirrorCharacterSeedIntoSourceBlock120Scaffold(
+    uint32_t MirrorCharacterSeedIntoCreateCharacterInput120Scaffold(
         const char* characterName,
         uint32_t descriptorIndex);
     uint32_t RecoveredCharacterCountScaffold() const;
@@ -1362,7 +1362,7 @@ public:
     //   when it is not the live owner/controller instance
     // - the live owner/controller still applies the real `0x41c3c0` state gate and helper-state
     //   transition to `10`
-    uint32_t CaptureProcessLoginCredentialsArg6Slot120(
+    uint32_t CaptureCreateCharacterInputArg6Slot120(
         const void* input120,
         void* returnAddress,
         bool applyOwnerSemantics);
@@ -1541,7 +1541,7 @@ private:
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
     void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
-    void MirrorProcessLoginCredentialsSourceBlock120(const ProcessLoginCredentialsInputSketch& input);
+    void MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input);
     void PersistCharactersIniFromRecoveredAuthStateScaffold() const;
 
     void InitializeObserverTree674();
@@ -1733,8 +1733,8 @@ private:
     void* provideStartupTripleNetMgr_ = nullptr;           // +0x124 netMgr
     void* provideStartupTripleDistrObjExecutive_ = nullptr; // +0x124 distrObjExecutive
     uint32_t provideStartupTripleCount_ = 0u;              // +0x124 call count
-    const void* arg6ProcessLoginCredentialsInput120_ = nullptr; // wrapper-facing `+0x120` last raw input pointer
-    uint32_t arg6ProcessLoginCredentialsCount120_ = 0u;         // wrapper-facing `+0x120` call count
+    const void* arg6CreateCharacterInput120_ = nullptr; // wrapper-facing `+0x120` last raw input pointer
+    uint32_t arg6CreateCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
