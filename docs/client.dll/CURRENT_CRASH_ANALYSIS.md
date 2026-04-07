@@ -208,5 +208,20 @@ These are no longer the best primary crash explanations:
   - last seen FVF / vertex declaration / stream0 / indices state
   - last draw-call shape (`DrawPrimitive*` / `DrawIndexedPrimitive*`) at crash time
   - one-time warnings when draws happen with missing vertex layout / missing stream0 / missing indices
+- newest replacement rerun with those hooks materially tightened the render symptom:
+  - this is **not** literally a one-present/one-frame path
+  - the crashing run reached at least `51` successful `Present` calls before the late d3d9 crash
+  - early frames were dominated by `DrawPrimitiveUP` triangle-fan quads with stride `28`
+  - later by crash time the device had seen both:
+    - `DrawPrimitiveUPCount = 1358`
+    - `DrawIndexedPrimitiveCount = 68`
+  - but the tracked device layout state still read:
+    - `currentFVF = 0`
+    - `currentVertexDeclaration = NULL`
+  - and the first suspicious draw warning fired on `DrawPrimitiveUP` with no vertex layout bound
+- practical consequence:
+  - the current best render-side suspect is shifting from “only first frame renders” toward
+    “client keeps presenting corrupted frames while issuing at least some draws with missing / wrong
+    vertex-layout state before the eventual d3d9 null-read”
 
 Use those logs on the next rerun before widening scope.

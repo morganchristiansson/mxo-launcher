@@ -163,6 +163,7 @@ struct DiagnosticD3D9ActivityState {
 };
 
 static DiagnosticD3D9ActivityState g_D3D9ActivityState = {};
+static std::set<std::string> g_LoggedSuspiciousD3D9DrawSites;
 
 static constexpr size_t kIDirect3D9VtableEntryCount = 17;
 static constexpr size_t kIDirect3D9CreateDeviceVtableIndex = 16;
@@ -295,6 +296,37 @@ static void LogWordSpanIfReadable(const char* label, const void* base, size_t wo
             static_cast<unsigned>((i + 3) * 4),
             (i + 3 < wordCount) ? words[i + 3] : 0);
     }
+}
+
+static uintptr_t DiagnosticPointerToClientAbsolute(const void* address) {
+    const uint8_t* clientBase =
+        reinterpret_cast<const uint8_t*>(g_hClient ? g_hClient : GetModuleHandleA("client.dll"));
+    const uint8_t* pointerBytes = static_cast<const uint8_t*>(address);
+    if (!clientBase || !pointerBytes || pointerBytes < clientBase) {
+        return 0u;
+    }
+    return 0x62000000u + static_cast<uintptr_t>(pointerBytes - clientBase);
+}
+
+static const char* DiagnosticDescribeModuleForAddress(const void* address) {
+    if (!address) {
+        return "<null>";
+    }
+    MEMORY_BASIC_INFORMATION mbi = {};
+    if (VirtualQuery(address, &mbi, sizeof(mbi)) != sizeof(mbi)) {
+        return "<unknown>";
+    }
+    const HMODULE allocationBase = static_cast<HMODULE>(mbi.AllocationBase);
+    if (allocationBase == g_hClient || allocationBase == GetModuleHandleA("client.dll")) {
+        return "client.dll";
+    }
+    if (allocationBase == GetModuleHandleA("r3d9.dll")) {
+        return "r3d9.dll";
+    }
+    if (allocationBase == GetModuleHandleA("d3d9.dll")) {
+        return "d3d9.dll";
+    }
+    return "<other-module>";
 }
 
 static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) {
@@ -672,6 +704,25 @@ static HRESULT WINAPI DiagnosticD3DCompile(
 }
 
 static void DiagnosticLogSuspiciousD3D9DrawState(const char* drawKind, bool indexedDraw) {
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    const uintptr_t clientAbsolute = DiagnosticPointerToClientAbsolute(returnAddress);
+    const std::string siteKey = std::string(drawKind ? drawKind : "<null>") + "|" +
+        std::to_string(reinterpret_cast<uintptr_t>(returnAddress));
+    if (g_LoggedSuspiciousD3D9DrawSites.insert(siteKey).second) {
+        spdlog::warn(
+            "D3D9 suspicious draw caller={} module={} clientAbsolute={} kind={} primitiveType={} primitiveCount={} stream0={} stride={} indices={} fvf=0x{:08x} vertexDecl={}",
+            fmt::ptr(returnAddress),
+            DiagnosticDescribeModuleForAddress(returnAddress),
+            clientAbsolute ? fmt::format("0x{:08x}", static_cast<unsigned>(clientAbsolute)) : std::string("<non-client>"),
+            drawKind ? drawKind : "<null>",
+            DiagnosticDescribePrimitiveType(g_D3D9ActivityState.lastPrimitiveType),
+            g_D3D9ActivityState.lastPrimitiveCount,
+            fmt::ptr(g_D3D9ActivityState.currentStream0Buffer),
+            g_D3D9ActivityState.currentStream0Stride,
+            fmt::ptr(g_D3D9ActivityState.currentIndices),
+            static_cast<unsigned>(g_D3D9ActivityState.currentFVF),
+            fmt::ptr(g_D3D9ActivityState.currentVertexDeclaration));
+    }
     if (!g_D3D9ActivityState.warnedMissingVertexLayout &&
         g_D3D9ActivityState.currentVertexDeclaration == nullptr &&
         g_D3D9ActivityState.currentFVF == 0u) {
