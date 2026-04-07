@@ -21,13 +21,7 @@ SPDLOG_DIR = third_party/spdlog-1.17.0
 #   - matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp
 # - launcher/login/runtime class scaffolds now start moving under recovered source-style paths
 #   rooted at matrixstaging/
-# Shared object dependencies for launcher auth/runtime sources
-COMMON_AUTH_OBJS = \
-	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.o \
-	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/filters.o \
-	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.o
-
-# Launcher object dependencies (includes COMMON_AUTH_OBJS)
+# Launcher object dependencies
 LAUNCHER_OBJS = \
 	$(BUILD_DIR)/src/resurrections.o \
 	$(BUILD_DIR)/src/diagnostics.o \
@@ -77,7 +71,9 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state18.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/loginstate_state19.o \
 	$(BUILD_DIR)/matrixstaging/game/src/libltclientlogin/launchpad.o \
-	$(COMMON_AUTH_OBJS)
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/filters.o \
+	$(BUILD_DIR)/matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.o
 
 BUILD_DIR = build
 CRYPTOPP_LIB = $(BUILD_DIR)/libcryptopp.a
