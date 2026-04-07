@@ -117,6 +117,9 @@ in commit `ab28b26`:
   source-owned queue-context bridge
 - this is intended only for A/B late-render/crash testing; it is **not** itself a conclusion that
   the older bridge mode is more faithful
+- latest user A/B result: this producer-side ablation made **no meaningful difference** to the main
+  graphics corruption / first-few-frames / late-render crash behavior, so the primary remaining bug
+  is no longer best explained by the `ab28b26` context shape itself
 
 The current crash investigation should stay focused on:
 1. how client-shell field `+0xd0` is populated on the late runtime path
@@ -199,5 +202,11 @@ These are no longer the best primary crash explanations:
   - `DAT_629f1748`
   - `DAT_62a01e5c`
   - `DAT_62a333a4`
+- newest direct D3D9-device hooks now also log:
+  - `Direct3DCreate9` / `IDirect3D9::CreateDevice`
+  - per-frame `Present` counts
+  - last seen FVF / vertex declaration / stream0 / indices state
+  - last draw-call shape (`DrawPrimitive*` / `DrawIndexedPrimitive*`) at crash time
+  - one-time warnings when draws happen with missing vertex layout / missing stream0 / missing indices
 
 Use those logs on the next rerun before widening scope.

@@ -65,6 +65,8 @@ bool DiagnosticAdoptRecoveredCharacterSelectionForLauncher(
     uint32_t outWorldNameCapacity,
     uint32_t* outDescriptorIndex);
 bool DiagnosticInstallR3d9D3DCompileHook(HMODULE r3d9Module);
+bool DiagnosticInstallR3d9Direct3DCreate9Hook(HMODULE r3d9Module);
+void DiagnosticLogLastD3DDeviceActivity();
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);

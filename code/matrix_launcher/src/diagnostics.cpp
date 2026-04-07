@@ -2,6 +2,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <d3d9.h>
+
 #include <cctype>
 #include <cstdio>
 #include <cstring>
@@ -25,6 +27,65 @@ struct DiagnosticD3DShaderMacro {
     LPCSTR Definition;
 };
 
+using DiagnosticDirect3DCreate9Func = IDirect3D9* (WINAPI*)(UINT);
+using DiagnosticIDirect3D9CreateDeviceFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3D9*,
+    UINT,
+    D3DDEVTYPE,
+    HWND,
+    DWORD,
+    D3DPRESENT_PARAMETERS*,
+    IDirect3DDevice9**);
+using DiagnosticIDirect3DDevice9PresentFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    const RECT*,
+    const RECT*,
+    HWND,
+    const RGNDATA*);
+using DiagnosticIDirect3DDevice9BeginSceneFunc = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*);
+using DiagnosticIDirect3DDevice9EndSceneFunc = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*);
+using DiagnosticIDirect3DDevice9SetVertexDeclarationFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    IDirect3DVertexDeclaration9*);
+using DiagnosticIDirect3DDevice9SetFVFFunc = HRESULT (STDMETHODCALLTYPE*)(IDirect3DDevice9*, DWORD);
+using DiagnosticIDirect3DDevice9SetStreamSourceFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    UINT,
+    IDirect3DVertexBuffer9*,
+    UINT,
+    UINT);
+using DiagnosticIDirect3DDevice9SetIndicesFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    IDirect3DIndexBuffer9*);
+using DiagnosticIDirect3DDevice9DrawPrimitiveFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    D3DPRIMITIVETYPE,
+    UINT,
+    UINT);
+using DiagnosticIDirect3DDevice9DrawIndexedPrimitiveFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    D3DPRIMITIVETYPE,
+    INT,
+    UINT,
+    UINT,
+    UINT,
+    UINT);
+using DiagnosticIDirect3DDevice9DrawPrimitiveUPFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    D3DPRIMITIVETYPE,
+    UINT,
+    const void*,
+    UINT);
+using DiagnosticIDirect3DDevice9DrawIndexedPrimitiveUPFunc = HRESULT (STDMETHODCALLTYPE*)(
+    IDirect3DDevice9*,
+    D3DPRIMITIVETYPE,
+    UINT,
+    UINT,
+    UINT,
+    const void*,
+    D3DFORMAT,
+    const void*,
+    UINT);
 using DiagnosticD3DCompileFunc = HRESULT(WINAPI*)(
     LPCVOID,
     SIZE_T,
@@ -55,8 +116,114 @@ static uint32_t g_LastLoggedState20StallQuarterSeconds = 0;
 static const void* g_LastClientShellRuntimeObjectD0 = nullptr;
 static const void* g_LastClientShellRuntimeVftableD0 = nullptr;
 static bool g_DumpedClientPiTableAtRuntime = false;
+static DiagnosticDirect3DCreate9Func g_OriginalDirect3DCreate9 = nullptr;
+static DiagnosticIDirect3D9CreateDeviceFunc g_OriginalIDirect3D9CreateDevice = nullptr;
+static DiagnosticIDirect3DDevice9PresentFunc g_OriginalIDirect3DDevice9Present = nullptr;
+static DiagnosticIDirect3DDevice9BeginSceneFunc g_OriginalIDirect3DDevice9BeginScene = nullptr;
+static DiagnosticIDirect3DDevice9EndSceneFunc g_OriginalIDirect3DDevice9EndScene = nullptr;
+static DiagnosticIDirect3DDevice9SetVertexDeclarationFunc g_OriginalIDirect3DDevice9SetVertexDeclaration = nullptr;
+static DiagnosticIDirect3DDevice9SetFVFFunc g_OriginalIDirect3DDevice9SetFVF = nullptr;
+static DiagnosticIDirect3DDevice9SetStreamSourceFunc g_OriginalIDirect3DDevice9SetStreamSource = nullptr;
+static DiagnosticIDirect3DDevice9SetIndicesFunc g_OriginalIDirect3DDevice9SetIndices = nullptr;
+static DiagnosticIDirect3DDevice9DrawPrimitiveFunc g_OriginalIDirect3DDevice9DrawPrimitive = nullptr;
+static DiagnosticIDirect3DDevice9DrawIndexedPrimitiveFunc g_OriginalIDirect3DDevice9DrawIndexedPrimitive = nullptr;
+static DiagnosticIDirect3DDevice9DrawPrimitiveUPFunc g_OriginalIDirect3DDevice9DrawPrimitiveUP = nullptr;
+static DiagnosticIDirect3DDevice9DrawIndexedPrimitiveUPFunc g_OriginalIDirect3DDevice9DrawIndexedPrimitiveUP = nullptr;
 static DiagnosticD3DCompileFunc g_OriginalD3DCompile = nullptr;
 static std::set<std::string> g_DumpedShaderSourcePaths;
+
+struct DiagnosticD3D9ActivityState {
+    unsigned long long presentCount = 0;
+    unsigned long long beginSceneCount = 0;
+    unsigned long long endSceneCount = 0;
+    unsigned long long drawPrimitiveCount = 0;
+    unsigned long long drawIndexedPrimitiveCount = 0;
+    unsigned long long drawPrimitiveUPCount = 0;
+    unsigned long long drawIndexedPrimitiveUPCount = 0;
+    unsigned long long lastPresentedDrawCallTotal = 0;
+    DWORD currentFVF = 0;
+    void* currentVertexDeclaration = nullptr;
+    void* currentStream0Buffer = nullptr;
+    UINT currentStream0Offset = 0;
+    UINT currentStream0Stride = 0;
+    void* currentIndices = nullptr;
+    const char* lastDrawKind = "<none>";
+    D3DPRIMITIVETYPE lastPrimitiveType = D3DPT_FORCE_DWORD;
+    INT lastBaseVertexIndex = 0;
+    UINT lastMinVertexIndex = 0;
+    UINT lastNumVertices = 0;
+    UINT lastStartIndex = 0;
+    UINT lastPrimitiveCount = 0;
+    UINT lastStartVertex = 0;
+    UINT lastVertexStreamZeroStride = 0;
+    D3DFORMAT lastIndexDataFormat = D3DFMT_UNKNOWN;
+    bool warnedMissingVertexLayout = false;
+    bool warnedMissingStream0 = false;
+    bool warnedMissingIndices = false;
+};
+
+static DiagnosticD3D9ActivityState g_D3D9ActivityState = {};
+
+static constexpr size_t kIDirect3D9VtableEntryCount = 17;
+static constexpr size_t kIDirect3D9CreateDeviceVtableIndex = 16;
+static constexpr size_t kIDirect3DDevice9VtableEntryCount = 119;
+static constexpr size_t kIDirect3DDevice9PresentVtableIndex = 17;
+static constexpr size_t kIDirect3DDevice9BeginSceneVtableIndex = 41;
+static constexpr size_t kIDirect3DDevice9EndSceneVtableIndex = 42;
+static constexpr size_t kIDirect3DDevice9DrawPrimitiveVtableIndex = 81;
+static constexpr size_t kIDirect3DDevice9DrawIndexedPrimitiveVtableIndex = 82;
+static constexpr size_t kIDirect3DDevice9DrawPrimitiveUPVtableIndex = 83;
+static constexpr size_t kIDirect3DDevice9DrawIndexedPrimitiveUPVtableIndex = 84;
+static constexpr size_t kIDirect3DDevice9SetVertexDeclarationVtableIndex = 88;
+static constexpr size_t kIDirect3DDevice9SetFVFVtableIndex = 90;
+static constexpr size_t kIDirect3DDevice9SetStreamSourceVtableIndex = 100;
+static constexpr size_t kIDirect3DDevice9SetIndicesVtableIndex = 104;
+
+static bool DiagnosticShouldLogFrameOrdinal(unsigned long long frameOrdinal) {
+    return frameOrdinal <= 8ull || ((frameOrdinal & (frameOrdinal - 1ull)) == 0ull) || (frameOrdinal % 60ull) == 0ull;
+}
+
+static const char* DiagnosticDescribePrimitiveType(D3DPRIMITIVETYPE primitiveType) {
+    switch (primitiveType) {
+        case D3DPT_POINTLIST: return "POINTLIST";
+        case D3DPT_LINELIST: return "LINELIST";
+        case D3DPT_LINESTRIP: return "LINESTRIP";
+        case D3DPT_TRIANGLELIST: return "TRIANGLELIST";
+        case D3DPT_TRIANGLESTRIP: return "TRIANGLESTRIP";
+        case D3DPT_TRIANGLEFAN: return "TRIANGLEFAN";
+        default: return "<unknown>";
+    }
+}
+
+void DiagnosticLogLastD3DDeviceActivity() {
+    spdlog::info(
+        "D3D9 activity presentCount={} beginSceneCount={} endSceneCount={} drawPrimitiveCount={} drawIndexedPrimitiveCount={} drawPrimitiveUPCount={} drawIndexedPrimitiveUPCount={} lastPresentedDrawCallTotal={}",
+        g_D3D9ActivityState.presentCount,
+        g_D3D9ActivityState.beginSceneCount,
+        g_D3D9ActivityState.endSceneCount,
+        g_D3D9ActivityState.drawPrimitiveCount,
+        g_D3D9ActivityState.drawIndexedPrimitiveCount,
+        g_D3D9ActivityState.drawPrimitiveUPCount,
+        g_D3D9ActivityState.drawIndexedPrimitiveUPCount,
+        g_D3D9ActivityState.lastPresentedDrawCallTotal);
+    spdlog::info(
+        "D3D9 activity layout currentFVF=0x{:08x} currentVertexDeclaration={} stream0Buffer={} stream0Offset={} stream0Stride={} indices={} lastDrawKind={} lastPrimitiveType={} lastPrimitiveCount={} lastStartVertex={} lastBaseVertexIndex={} lastMinVertexIndex={} lastNumVertices={} lastStartIndex={} lastIndexFormat={}",
+        static_cast<unsigned>(g_D3D9ActivityState.currentFVF),
+        fmt::ptr(g_D3D9ActivityState.currentVertexDeclaration),
+        fmt::ptr(g_D3D9ActivityState.currentStream0Buffer),
+        g_D3D9ActivityState.currentStream0Offset,
+        g_D3D9ActivityState.currentStream0Stride,
+        fmt::ptr(g_D3D9ActivityState.currentIndices),
+        g_D3D9ActivityState.lastDrawKind,
+        DiagnosticDescribePrimitiveType(g_D3D9ActivityState.lastPrimitiveType),
+        g_D3D9ActivityState.lastPrimitiveCount,
+        g_D3D9ActivityState.lastStartVertex,
+        g_D3D9ActivityState.lastBaseVertexIndex,
+        g_D3D9ActivityState.lastMinVertexIndex,
+        g_D3D9ActivityState.lastNumVertices,
+        g_D3D9ActivityState.lastStartIndex,
+        static_cast<unsigned>(g_D3D9ActivityState.lastIndexDataFormat));
+}
 
 static bool DiagnosticReadableMemoryRange(const void* base, size_t byteCount) {
     if (!base || byteCount == 0) {
@@ -502,6 +669,423 @@ static HRESULT WINAPI DiagnosticD3DCompile(
         }
     }
     return result;
+}
+
+static void DiagnosticLogSuspiciousD3D9DrawState(const char* drawKind, bool indexedDraw) {
+    if (!g_D3D9ActivityState.warnedMissingVertexLayout &&
+        g_D3D9ActivityState.currentVertexDeclaration == nullptr &&
+        g_D3D9ActivityState.currentFVF == 0u) {
+        g_D3D9ActivityState.warnedMissingVertexLayout = true;
+        spdlog::warn(
+            "D3D9 suspicious draw state kind={} vertexDecl=<null> fvf=0x00000000",
+            drawKind ? drawKind : "<null>");
+    }
+    if (!g_D3D9ActivityState.warnedMissingStream0 &&
+        g_D3D9ActivityState.currentStream0Buffer == nullptr) {
+        g_D3D9ActivityState.warnedMissingStream0 = true;
+        spdlog::warn(
+            "D3D9 suspicious draw state kind={} stream0Buffer=<null> stride={} offset={}",
+            drawKind ? drawKind : "<null>",
+            g_D3D9ActivityState.currentStream0Stride,
+            g_D3D9ActivityState.currentStream0Offset);
+    }
+    if (indexedDraw && !g_D3D9ActivityState.warnedMissingIndices &&
+        g_D3D9ActivityState.currentIndices == nullptr) {
+        g_D3D9ActivityState.warnedMissingIndices = true;
+        spdlog::warn(
+            "D3D9 suspicious draw state kind={} indices=<null>",
+            drawKind ? drawKind : "<null>");
+    }
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9Present(
+    IDirect3DDevice9* device,
+    const RECT* sourceRect,
+    const RECT* destRect,
+    HWND destWindowOverride,
+    const RGNDATA* dirtyRegion) {
+    const HRESULT hr = g_OriginalIDirect3DDevice9Present
+        ? g_OriginalIDirect3DDevice9Present(device, sourceRect, destRect, destWindowOverride, dirtyRegion)
+        : E_FAIL;
+    ++g_D3D9ActivityState.presentCount;
+    g_D3D9ActivityState.lastPresentedDrawCallTotal =
+        g_D3D9ActivityState.drawPrimitiveCount +
+        g_D3D9ActivityState.drawIndexedPrimitiveCount +
+        g_D3D9ActivityState.drawPrimitiveUPCount +
+        g_D3D9ActivityState.drawIndexedPrimitiveUPCount;
+    if (DiagnosticShouldLogFrameOrdinal(g_D3D9ActivityState.presentCount)) {
+        spdlog::info(
+            "D3D9 Present frame={} hr=0x{:08x} totalDraws={} beginSceneCount={} endSceneCount={} lastDrawKind={} lastPrimitiveType={} lastPrimitiveCount={}",
+            g_D3D9ActivityState.presentCount,
+            static_cast<unsigned>(hr),
+            g_D3D9ActivityState.lastPresentedDrawCallTotal,
+            g_D3D9ActivityState.beginSceneCount,
+            g_D3D9ActivityState.endSceneCount,
+            g_D3D9ActivityState.lastDrawKind,
+            DiagnosticDescribePrimitiveType(g_D3D9ActivityState.lastPrimitiveType),
+            g_D3D9ActivityState.lastPrimitiveCount);
+    }
+    return hr;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9BeginScene(IDirect3DDevice9* device) {
+    ++g_D3D9ActivityState.beginSceneCount;
+    return g_OriginalIDirect3DDevice9BeginScene
+        ? g_OriginalIDirect3DDevice9BeginScene(device)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9EndScene(IDirect3DDevice9* device) {
+    ++g_D3D9ActivityState.endSceneCount;
+    return g_OriginalIDirect3DDevice9EndScene
+        ? g_OriginalIDirect3DDevice9EndScene(device)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9SetVertexDeclaration(
+    IDirect3DDevice9* device,
+    IDirect3DVertexDeclaration9* declaration) {
+    g_D3D9ActivityState.currentVertexDeclaration = declaration;
+    return g_OriginalIDirect3DDevice9SetVertexDeclaration
+        ? g_OriginalIDirect3DDevice9SetVertexDeclaration(device, declaration)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9SetFVF(IDirect3DDevice9* device, DWORD fvf) {
+    g_D3D9ActivityState.currentFVF = fvf;
+    return g_OriginalIDirect3DDevice9SetFVF
+        ? g_OriginalIDirect3DDevice9SetFVF(device, fvf)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9SetStreamSource(
+    IDirect3DDevice9* device,
+    UINT streamNumber,
+    IDirect3DVertexBuffer9* streamData,
+    UINT offsetInBytes,
+    UINT stride) {
+    if (streamNumber == 0u) {
+        g_D3D9ActivityState.currentStream0Buffer = streamData;
+        g_D3D9ActivityState.currentStream0Offset = offsetInBytes;
+        g_D3D9ActivityState.currentStream0Stride = stride;
+    }
+    return g_OriginalIDirect3DDevice9SetStreamSource
+        ? g_OriginalIDirect3DDevice9SetStreamSource(device, streamNumber, streamData, offsetInBytes, stride)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9SetIndices(
+    IDirect3DDevice9* device,
+    IDirect3DIndexBuffer9* indexData) {
+    g_D3D9ActivityState.currentIndices = indexData;
+    return g_OriginalIDirect3DDevice9SetIndices
+        ? g_OriginalIDirect3DDevice9SetIndices(device, indexData)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawPrimitive(
+    IDirect3DDevice9* device,
+    D3DPRIMITIVETYPE primitiveType,
+    UINT startVertex,
+    UINT primitiveCount) {
+    ++g_D3D9ActivityState.drawPrimitiveCount;
+    g_D3D9ActivityState.lastDrawKind = "DrawPrimitive";
+    g_D3D9ActivityState.lastPrimitiveType = primitiveType;
+    g_D3D9ActivityState.lastStartVertex = startVertex;
+    g_D3D9ActivityState.lastPrimitiveCount = primitiveCount;
+    g_D3D9ActivityState.lastBaseVertexIndex = 0;
+    g_D3D9ActivityState.lastMinVertexIndex = 0;
+    g_D3D9ActivityState.lastNumVertices = 0;
+    g_D3D9ActivityState.lastStartIndex = 0;
+    g_D3D9ActivityState.lastIndexDataFormat = D3DFMT_UNKNOWN;
+    DiagnosticLogSuspiciousD3D9DrawState("DrawPrimitive", false);
+    return g_OriginalIDirect3DDevice9DrawPrimitive
+        ? g_OriginalIDirect3DDevice9DrawPrimitive(device, primitiveType, startVertex, primitiveCount)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawIndexedPrimitive(
+    IDirect3DDevice9* device,
+    D3DPRIMITIVETYPE primitiveType,
+    INT baseVertexIndex,
+    UINT minVertexIndex,
+    UINT numVertices,
+    UINT startIndex,
+    UINT primitiveCount) {
+    ++g_D3D9ActivityState.drawIndexedPrimitiveCount;
+    g_D3D9ActivityState.lastDrawKind = "DrawIndexedPrimitive";
+    g_D3D9ActivityState.lastPrimitiveType = primitiveType;
+    g_D3D9ActivityState.lastBaseVertexIndex = baseVertexIndex;
+    g_D3D9ActivityState.lastMinVertexIndex = minVertexIndex;
+    g_D3D9ActivityState.lastNumVertices = numVertices;
+    g_D3D9ActivityState.lastStartIndex = startIndex;
+    g_D3D9ActivityState.lastPrimitiveCount = primitiveCount;
+    g_D3D9ActivityState.lastStartVertex = 0;
+    g_D3D9ActivityState.lastIndexDataFormat = D3DFMT_UNKNOWN;
+    DiagnosticLogSuspiciousD3D9DrawState("DrawIndexedPrimitive", true);
+    return g_OriginalIDirect3DDevice9DrawIndexedPrimitive
+        ? g_OriginalIDirect3DDevice9DrawIndexedPrimitive(
+            device,
+            primitiveType,
+            baseVertexIndex,
+            minVertexIndex,
+            numVertices,
+            startIndex,
+            primitiveCount)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawPrimitiveUP(
+    IDirect3DDevice9* device,
+    D3DPRIMITIVETYPE primitiveType,
+    UINT primitiveCount,
+    const void* vertexStreamZeroData,
+    UINT vertexStreamZeroStride) {
+    ++g_D3D9ActivityState.drawPrimitiveUPCount;
+    g_D3D9ActivityState.lastDrawKind = "DrawPrimitiveUP";
+    g_D3D9ActivityState.lastPrimitiveType = primitiveType;
+    g_D3D9ActivityState.lastPrimitiveCount = primitiveCount;
+    g_D3D9ActivityState.lastStartVertex = 0;
+    g_D3D9ActivityState.lastBaseVertexIndex = 0;
+    g_D3D9ActivityState.lastMinVertexIndex = 0;
+    g_D3D9ActivityState.lastNumVertices = 0;
+    g_D3D9ActivityState.lastStartIndex = 0;
+    g_D3D9ActivityState.lastVertexStreamZeroStride = vertexStreamZeroStride;
+    g_D3D9ActivityState.currentStream0Buffer = const_cast<void*>(vertexStreamZeroData);
+    g_D3D9ActivityState.currentStream0Offset = 0u;
+    g_D3D9ActivityState.currentStream0Stride = vertexStreamZeroStride;
+    g_D3D9ActivityState.lastIndexDataFormat = D3DFMT_UNKNOWN;
+    DiagnosticLogSuspiciousD3D9DrawState("DrawPrimitiveUP", false);
+    return g_OriginalIDirect3DDevice9DrawPrimitiveUP
+        ? g_OriginalIDirect3DDevice9DrawPrimitiveUP(device, primitiveType, primitiveCount, vertexStreamZeroData, vertexStreamZeroStride)
+        : E_FAIL;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9DrawIndexedPrimitiveUP(
+    IDirect3DDevice9* device,
+    D3DPRIMITIVETYPE primitiveType,
+    UINT minVertexIndex,
+    UINT numVertices,
+    UINT primitiveCount,
+    const void* indexData,
+    D3DFORMAT indexDataFormat,
+    const void* vertexStreamZeroData,
+    UINT vertexStreamZeroStride) {
+    ++g_D3D9ActivityState.drawIndexedPrimitiveUPCount;
+    g_D3D9ActivityState.lastDrawKind = "DrawIndexedPrimitiveUP";
+    g_D3D9ActivityState.lastPrimitiveType = primitiveType;
+    g_D3D9ActivityState.lastMinVertexIndex = minVertexIndex;
+    g_D3D9ActivityState.lastNumVertices = numVertices;
+    g_D3D9ActivityState.lastPrimitiveCount = primitiveCount;
+    g_D3D9ActivityState.lastStartIndex = 0;
+    g_D3D9ActivityState.lastStartVertex = 0;
+    g_D3D9ActivityState.lastBaseVertexIndex = 0;
+    g_D3D9ActivityState.lastIndexDataFormat = indexDataFormat;
+    g_D3D9ActivityState.currentIndices = const_cast<void*>(indexData);
+    g_D3D9ActivityState.currentStream0Buffer = const_cast<void*>(vertexStreamZeroData);
+    g_D3D9ActivityState.currentStream0Offset = 0u;
+    g_D3D9ActivityState.currentStream0Stride = vertexStreamZeroStride;
+    DiagnosticLogSuspiciousD3D9DrawState("DrawIndexedPrimitiveUP", true);
+    return g_OriginalIDirect3DDevice9DrawIndexedPrimitiveUP
+        ? g_OriginalIDirect3DDevice9DrawIndexedPrimitiveUP(
+            device,
+            primitiveType,
+            minVertexIndex,
+            numVertices,
+            primitiveCount,
+            indexData,
+            indexDataFormat,
+            vertexStreamZeroData,
+            vertexStreamZeroStride)
+        : E_FAIL;
+}
+
+static bool DiagnosticInstallIDirect3DDevice9Hooks(IDirect3DDevice9* device) {
+    if (!device) {
+        return false;
+    }
+    void*** const vtableSlot = reinterpret_cast<void***>(device);
+    if (!vtableSlot || !*vtableSlot) {
+        return false;
+    }
+    void** const originalVtable = *vtableSlot;
+    if (originalVtable[kIDirect3DDevice9PresentVtableIndex] == reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9Present)) {
+        return true;
+    }
+
+    void** shadowVtable = static_cast<void**>(std::calloc(kIDirect3DDevice9VtableEntryCount, sizeof(void*)));
+    if (!shadowVtable) {
+        return false;
+    }
+    std::memcpy(shadowVtable, originalVtable, kIDirect3DDevice9VtableEntryCount * sizeof(void*));
+
+    g_OriginalIDirect3DDevice9Present = reinterpret_cast<DiagnosticIDirect3DDevice9PresentFunc>(originalVtable[kIDirect3DDevice9PresentVtableIndex]);
+    g_OriginalIDirect3DDevice9BeginScene = reinterpret_cast<DiagnosticIDirect3DDevice9BeginSceneFunc>(originalVtable[kIDirect3DDevice9BeginSceneVtableIndex]);
+    g_OriginalIDirect3DDevice9EndScene = reinterpret_cast<DiagnosticIDirect3DDevice9EndSceneFunc>(originalVtable[kIDirect3DDevice9EndSceneVtableIndex]);
+    g_OriginalIDirect3DDevice9SetVertexDeclaration = reinterpret_cast<DiagnosticIDirect3DDevice9SetVertexDeclarationFunc>(originalVtable[kIDirect3DDevice9SetVertexDeclarationVtableIndex]);
+    g_OriginalIDirect3DDevice9SetFVF = reinterpret_cast<DiagnosticIDirect3DDevice9SetFVFFunc>(originalVtable[kIDirect3DDevice9SetFVFVtableIndex]);
+    g_OriginalIDirect3DDevice9SetStreamSource = reinterpret_cast<DiagnosticIDirect3DDevice9SetStreamSourceFunc>(originalVtable[kIDirect3DDevice9SetStreamSourceVtableIndex]);
+    g_OriginalIDirect3DDevice9SetIndices = reinterpret_cast<DiagnosticIDirect3DDevice9SetIndicesFunc>(originalVtable[kIDirect3DDevice9SetIndicesVtableIndex]);
+    g_OriginalIDirect3DDevice9DrawPrimitive = reinterpret_cast<DiagnosticIDirect3DDevice9DrawPrimitiveFunc>(originalVtable[kIDirect3DDevice9DrawPrimitiveVtableIndex]);
+    g_OriginalIDirect3DDevice9DrawIndexedPrimitive = reinterpret_cast<DiagnosticIDirect3DDevice9DrawIndexedPrimitiveFunc>(originalVtable[kIDirect3DDevice9DrawIndexedPrimitiveVtableIndex]);
+    g_OriginalIDirect3DDevice9DrawPrimitiveUP = reinterpret_cast<DiagnosticIDirect3DDevice9DrawPrimitiveUPFunc>(originalVtable[kIDirect3DDevice9DrawPrimitiveUPVtableIndex]);
+    g_OriginalIDirect3DDevice9DrawIndexedPrimitiveUP = reinterpret_cast<DiagnosticIDirect3DDevice9DrawIndexedPrimitiveUPFunc>(originalVtable[kIDirect3DDevice9DrawIndexedPrimitiveUPVtableIndex]);
+
+    shadowVtable[kIDirect3DDevice9PresentVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9Present);
+    shadowVtable[kIDirect3DDevice9BeginSceneVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9BeginScene);
+    shadowVtable[kIDirect3DDevice9EndSceneVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9EndScene);
+    shadowVtable[kIDirect3DDevice9SetVertexDeclarationVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9SetVertexDeclaration);
+    shadowVtable[kIDirect3DDevice9SetFVFVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9SetFVF);
+    shadowVtable[kIDirect3DDevice9SetStreamSourceVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9SetStreamSource);
+    shadowVtable[kIDirect3DDevice9SetIndicesVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9SetIndices);
+    shadowVtable[kIDirect3DDevice9DrawPrimitiveVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9DrawPrimitive);
+    shadowVtable[kIDirect3DDevice9DrawIndexedPrimitiveVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9DrawIndexedPrimitive);
+    shadowVtable[kIDirect3DDevice9DrawPrimitiveUPVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9DrawPrimitiveUP);
+    shadowVtable[kIDirect3DDevice9DrawIndexedPrimitiveUPVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3DDevice9DrawIndexedPrimitiveUP);
+    *vtableSlot = shadowVtable;
+
+    spdlog::info(
+        "DiagnosticInstallIDirect3DDevice9Hooks device={} originalVtable={} shadowVtable={}",
+        fmt::ptr(device),
+        fmt::ptr(originalVtable),
+        fmt::ptr(shadowVtable));
+    return true;
+}
+
+static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3D9CreateDevice(
+    IDirect3D9* direct3D,
+    UINT adapter,
+    D3DDEVTYPE deviceType,
+    HWND focusWindow,
+    DWORD behaviorFlags,
+    D3DPRESENT_PARAMETERS* presentationParameters,
+    IDirect3DDevice9** returnedDeviceInterface) {
+    const HRESULT hr = g_OriginalIDirect3D9CreateDevice
+        ? g_OriginalIDirect3D9CreateDevice(
+            direct3D,
+            adapter,
+            deviceType,
+            focusWindow,
+            behaviorFlags,
+            presentationParameters,
+            returnedDeviceInterface)
+        : E_FAIL;
+    spdlog::info(
+        "DiagnosticIDirect3D9CreateDevice hr=0x{:08x} adapter={} deviceType={} hwnd={} behaviorFlags=0x{:08x} backBuffer={}x{} format={} windowed={} returnedDevice={}",
+        static_cast<unsigned>(hr),
+        adapter,
+        static_cast<unsigned>(deviceType),
+        fmt::ptr(focusWindow),
+        static_cast<unsigned>(behaviorFlags),
+        presentationParameters ? presentationParameters->BackBufferWidth : 0u,
+        presentationParameters ? presentationParameters->BackBufferHeight : 0u,
+        presentationParameters ? static_cast<unsigned>(presentationParameters->BackBufferFormat) : 0u,
+        presentationParameters ? static_cast<unsigned>(presentationParameters->Windowed) : 0u,
+        (returnedDeviceInterface && *returnedDeviceInterface)
+            ? fmt::ptr(*returnedDeviceInterface)
+            : fmt::ptr(static_cast<void*>(nullptr)));
+    if (SUCCEEDED(hr) && returnedDeviceInterface && *returnedDeviceInterface) {
+        (void)DiagnosticInstallIDirect3DDevice9Hooks(*returnedDeviceInterface);
+    }
+    return hr;
+}
+
+static bool DiagnosticInstallIDirect3D9Hooks(IDirect3D9* direct3D) {
+    if (!direct3D) {
+        return false;
+    }
+    void*** const vtableSlot = reinterpret_cast<void***>(direct3D);
+    if (!vtableSlot || !*vtableSlot) {
+        return false;
+    }
+    void** const originalVtable = *vtableSlot;
+    if (originalVtable[kIDirect3D9CreateDeviceVtableIndex] == reinterpret_cast<void*>(&DiagnosticIDirect3D9CreateDevice)) {
+        return true;
+    }
+    void** shadowVtable = static_cast<void**>(std::calloc(kIDirect3D9VtableEntryCount, sizeof(void*)));
+    if (!shadowVtable) {
+        return false;
+    }
+    std::memcpy(shadowVtable, originalVtable, kIDirect3D9VtableEntryCount * sizeof(void*));
+    g_OriginalIDirect3D9CreateDevice = reinterpret_cast<DiagnosticIDirect3D9CreateDeviceFunc>(originalVtable[kIDirect3D9CreateDeviceVtableIndex]);
+    shadowVtable[kIDirect3D9CreateDeviceVtableIndex] = reinterpret_cast<void*>(&DiagnosticIDirect3D9CreateDevice);
+    *vtableSlot = shadowVtable;
+    spdlog::info(
+        "DiagnosticInstallIDirect3D9Hooks direct3D={} originalVtable={} shadowVtable={}",
+        fmt::ptr(direct3D),
+        fmt::ptr(originalVtable),
+        fmt::ptr(shadowVtable));
+    return true;
+}
+
+static IDirect3D9* WINAPI DiagnosticDirect3DCreate9(UINT sdkVersion) {
+    IDirect3D9* const direct3D = g_OriginalDirect3DCreate9
+        ? g_OriginalDirect3DCreate9(sdkVersion)
+        : nullptr;
+    spdlog::info(
+        "DiagnosticDirect3DCreate9 sdkVersion={} result={}",
+        sdkVersion,
+        fmt::ptr(direct3D));
+    if (direct3D) {
+        (void)DiagnosticInstallIDirect3D9Hooks(direct3D);
+    }
+    return direct3D;
+}
+
+bool DiagnosticInstallR3d9Direct3DCreate9Hook(HMODULE r3d9Module) {
+    if (!r3d9Module) {
+        return false;
+    }
+
+    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(r3d9Module);
+    if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
+        return false;
+    }
+    auto* nt = reinterpret_cast<IMAGE_NT_HEADERS*>(reinterpret_cast<uint8_t*>(r3d9Module) + dos->e_lfanew);
+    if (nt->Signature != IMAGE_NT_SIGNATURE) {
+        return false;
+    }
+    const auto& importDir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
+    if (importDir.VirtualAddress == 0 || importDir.Size == 0) {
+        return false;
+    }
+
+    auto* importDesc = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDir.VirtualAddress);
+    for (; importDesc->Name != 0; ++importDesc) {
+        const char* dllName = reinterpret_cast<const char*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDesc->Name);
+        if (_stricmp(dllName, "d3d9.dll") != 0) {
+            continue;
+        }
+
+        auto* thunk = reinterpret_cast<IMAGE_THUNK_DATA*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDesc->FirstThunk);
+        auto* origThunk = reinterpret_cast<IMAGE_THUNK_DATA*>(reinterpret_cast<uint8_t*>(r3d9Module) + importDesc->OriginalFirstThunk);
+        for (; origThunk->u1.AddressOfData != 0; ++origThunk, ++thunk) {
+            if (IMAGE_SNAP_BY_ORDINAL(origThunk->u1.Ordinal)) {
+                continue;
+            }
+            auto* importByName = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(reinterpret_cast<uint8_t*>(r3d9Module) + origThunk->u1.AddressOfData);
+            if (std::strcmp(reinterpret_cast<const char*>(importByName->Name), "Direct3DCreate9") != 0) {
+                continue;
+            }
+
+            DWORD oldProtect = 0;
+            if (!VirtualProtect(&thunk->u1.Function, sizeof(thunk->u1.Function), PAGE_READWRITE, &oldProtect)) {
+                return false;
+            }
+            g_OriginalDirect3DCreate9 = reinterpret_cast<DiagnosticDirect3DCreate9Func>(static_cast<uintptr_t>(thunk->u1.Function));
+            thunk->u1.Function = reinterpret_cast<ULONG_PTR>(&DiagnosticDirect3DCreate9);
+            DWORD restoreProtect = 0;
+            (void)VirtualProtect(&thunk->u1.Function, sizeof(thunk->u1.Function), oldProtect, &restoreProtect);
+            spdlog::info(
+                "DiagnosticInstallR3d9Direct3DCreate9Hook installed module={} original={} replacement={}",
+                fmt::ptr(r3d9Module),
+                fmt::ptr(reinterpret_cast<void*>(g_OriginalDirect3DCreate9)),
+                fmt::ptr(reinterpret_cast<void*>(&DiagnosticDirect3DCreate9)));
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool DiagnosticInstallR3d9D3DCompileHook(HMODULE r3d9Module) {

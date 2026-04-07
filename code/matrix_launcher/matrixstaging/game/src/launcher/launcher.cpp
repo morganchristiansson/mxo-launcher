@@ -213,6 +213,12 @@ bool PreloadDependencies() {
                 dlls[i],
                 installedD3DCompileHook ? 1 : 0,
                 fmt::ptr(h));
+            const bool installedDirect3DCreate9Hook = DiagnosticInstallR3d9Direct3DCreate9Hook(h);
+            spdlog::info(
+                "preload {:12s} : DiagnosticInstallR3d9Direct3DCreate9Hook={} ({})",
+                dlls[i],
+                installedDirect3DCreate9Hook ? 1 : 0,
+                fmt::ptr(h));
         }
     }
     return true;
