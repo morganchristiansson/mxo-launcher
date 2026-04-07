@@ -158,7 +158,7 @@ bool PromptForMissingLauncherCredentialsIfNeeded() {
     }
 
     spdlog::info(
-        "DIAGNOSTIC: replacement startup prompted for missing launcher credentials username={} password={}",
+        "DIAGNOSTIC: replacement pre-client auth prompted for missing launcher credentials username={} password={}",
         MaskedArgValue(g_LauncherCommandLine.AuthUsername()),
         MaskedArgValue(g_LauncherCommandLine.AuthPassword()));
     return true;
@@ -434,21 +434,14 @@ bool CLauncher::ParseCommandLineStage() const {
     //     `0x41ecd0 = ProcessLoginRequest` at that same displacement
     // - when `-user` / `-pwd` are supplied, the original launcher still behaves like prefill +
     //   auto-submit for the same launcher flow rather than as a bypass
-    // - replacement startup therefore keeps the same owner boundary on `0x41ecd0`, but now prefers
+    // - replacement parse handling therefore keeps those switches only as optional prefill; any
+    //   console-host prompt is deferred until the later pre-client auth stage so this parse/config
+    //   stage stays closer to the original ownership split
+    // - replacement startup still keeps the same owner boundary on `0x41ecd0`, but now prefers
     //   mirroring the launcher submit through the binder-backed raw `+0x30` surface before falling
     //   back to the direct owner call
     // - character choice is no longer required up front on the CLI path; after successful auth the
     //   replacement now chooses from the recovered launcher-owned character list before client load
-    if (!PromptForMissingLauncherCredentialsIfNeeded()) {
-        return false;
-    }
-
-    const bool hasUser = (g_LauncherCommandLine.AuthUsername()[0] != '\0');
-    const bool hasPwd = (g_LauncherCommandLine.AuthPassword()[0] != '\0');
-    if (!hasUser || !hasPwd) {
-        spdlog::error("ERROR: replacement launcher currently requires prompted/provided user+pwd for the launcher-owned login flow");
-        return false;
-    }
 
     if (!g_LauncherCommandLine.SwitchNoPatch()) {
         g_LauncherCommandLine.ApplyReplacementDefaultNoPatchPolicy();
@@ -766,6 +759,16 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         return false;
     }
 
+    // Replacement console-host timing:
+    // - original launcher gathers credentials later through the page-6 rich-edit prompt while
+    //   `InitInstance` is still blocked inside the 0x402ec0-owned UI interval
+    // - so the current no-GUI host should not require `-user` / `-pwd` during
+    //   ParseCommandLineStage; prompt on demand only when the pre-client auth bridge is about to
+    //   use them
+    if (!PromptForMissingLauncherCredentialsIfNeeded()) {
+        return false;
+    }
+
     for (uint32_t attempt = 1u;; ++attempt) {
         DiagnosticConfigureMediatorProfileName(
             g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
@@ -1045,6 +1048,9 @@ void CLauncher::CleanupRecoveredInitClientState() const {
     if (g_pLauncherObject6304) {
         LauncherReleaseNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
     }
+    g_pILTLoginMediatorSelection3584 = NULL;
+    g_pILTLoginMediatorDefault = NULL;
+    g_PreClientAuthAndCharacterSelectionCompleted = false;
 }
 
 // anchor: launcher.exe:0x40a4d0
@@ -1135,31 +1141,37 @@ bool CLauncher::RunClientDllLifecycle() const {
 
 // anchor: launcher.exe:0x40b430
 bool CLauncher::InitInstance() {
+    bool operationSucceeded = false;
+    RecoveredLauncherStartupContext startupContext = {};
+
     spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
     spdlog::info("NOTE: this replacement intentionally supports only the effective nopatch branch; patch/update support remains out of scope even while startup behavior is kept close to launcher.exe.");
     spdlog::info("NOTE: launcher-owned arg5 now enters through a dedicated 0x4d6304 ABI shell, but arg5/arg6/arg7/arg8 fidelity is still incomplete.");
     if (!ParseCommandLineStage()) {
-        return false;
+        goto cleanup;
     }
     spdlog::info("");
 
     spdlog::info("DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher-owned arg5 ABI shell + InitClientDLL/RunClientDLL + launcher-owned auth begin");
 
-    RecoveredLauncherStartupContext startupContext = {};
-
     // UNANCHORED within 0x40b430: replacement-only synthesis that seeds launcher-owned selection
     // and nopatch state before the later pre-client continuation corridor.
     if (!BuildStartupContextFromRecoveredSelection(&startupContext)) {
-        return false;
+        goto cleanup;
     }
 
     // UNANCHORED within 0x40b430: replacement-only arg5/arg6/arg7 startup-state materialization
     // that feeds the later anchored 0x40a4d0 InitClientDLL call shape.
+    // Source-mapping note: the original binary still has a distinct `0x40b740 -> 0x40a380`
+    // call here, but the current replacement does not preserve that as a separate helper/call
+    // boundary and instead materializes the equivalent arg5/arg6/arg7 state earlier in-source.
     if (!MaterializeRecoveredInitClientStateFromStartupContext(startupContext)) {
-        return false;
+        goto cleanup;
     }
 
     // Original corridor in 0x40b430:
+    // - 0x40b739: `AfxInitRichEdit()`
+    // - 0x40b740: original `Launcher_InitializeThreadPerClientTCPEngine` call
     // - 0x40b74d..0x40b752: `0x402ec0` pre-client UI-thread/message gate
     //   - starts `CLauncherThread`, waits for `thread+0x48` provisional `LauncherLoginDialog`
     //     object + dialog `+0x68` ready, then
@@ -1174,23 +1186,38 @@ bool CLauncher::InitInstance() {
     // - 0x40b75a..0x40b790: optional autodetect dialog path when 0x4d2c64 is set
     // - 0x40b790..0x40b7af: file/access gate remains explicitly unmodeled here
     if (!RunRecoveredPreClientBringupStage()) {
-        return false;
+        goto cleanup;
     }
 
     LogInitInstanceFaithfulnessGaps();
 
     if (!RunPreClientAuthAndCharacterSelectionStage()) {
-        return false;
+        goto cleanup;
     }
     if (!LoadCresDLL()) {
         spdlog::info("ERROR: failed to load cres.dll");
-        return false;
+        goto cleanup;
     }
     if (!LoadClientDLL()) {
         spdlog::info("ERROR: failed to load client.dll");
-        return false;
+        goto cleanup;
     }
-    return RunClientDllLifecycle();
+
+    operationSucceeded = RunClientDllLifecycle();
+
+cleanup:
+    // Original tail ownership inside `launcher.exe:0x40b430` stays explicit here even though the
+    // current replacement routes all exits through one cleanup label so replacement-owned startup
+    // scaffolds do not leak across earlier failures:
+    // - 0x40a760: `CLauncher_UnloadClientDLL`
+    // - 0x40a7a0: `CLauncher_UnloadCresDLL`
+    // - 0x40b360: `Launcher_TeardownThreadPerClientEngineAndMediator`
+    // - 0x40a000: `Launcher_FreeFilteredCommandLineStorage`
+    UnloadClientDLL();
+    UnloadCresDLL();
+    CleanupRecoveredInitClientState();
+    g_LauncherCommandLine.Reset();
+    return operationSucceeded;
 }
 
 } // namespace launcher

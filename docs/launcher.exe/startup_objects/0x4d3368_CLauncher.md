@@ -352,6 +352,17 @@ Implication for the replacement source:
   replacement-only groupings inside the broader `0x40b430` path
 - do **not** present those source helpers as proven original subroutine boundaries unless new static
   evidence appears
+- current source-mapping consequence from that rule:
+  - original `0x40b740 -> 0x40a380` remains a real binary call site, but the current replacement
+    does **not** preserve it as a distinct source helper/call boundary there; equivalent arg5/arg6
+    startup materialization is still grouped earlier inside `CLauncher::InitInstance`
+  - current no-GUI host should not require `-user` / `-pwd` during the earlier
+    `ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig` stage; interactive prompting, when
+    needed, belongs later in the pre-client auth stage so that parse/config ownership stays closer
+    to the original launcher UI split
+  - outer cleanup ownership should stay with `CLauncher::InitInstance` itself
+    (`UnloadClientDLL` / `UnloadCresDLL` / arg5 teardown / filtered-argv cleanup), not be deferred
+    to a post-`InitInstance` top-level host wrapper
 
 ## Open questions
 

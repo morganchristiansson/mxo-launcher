@@ -509,17 +509,9 @@ bool IsRecoveredPreclientEnvironmentActive() {
     return g_PreclientEnvironment.threadHandle != NULL;
 }
 
-static void UnloadClientLibraries() {
-    g_Launcher.UnloadClientDLL();
-    g_Launcher.UnloadCresDLL();
-}
-
 static int FinishAndReturn(int code) {
     DiagnosticStopWindowTrace();
     DiagnosticShutdownPreclientEnvironment();
-    g_Launcher.CleanupRecoveredInitClientState();
-    UnloadClientLibraries();
-    g_LauncherCommandLine.Reset();
     return code;
 }
 
