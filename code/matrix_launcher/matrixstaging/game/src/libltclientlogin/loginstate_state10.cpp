@@ -5,8 +5,81 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <string>
 
 namespace mxo::ltlogin {
+namespace {
+
+static uint16_t ReadU16LE(const uint8_t* p) {
+    return static_cast<uint16_t>(p[0]) |
+           (static_cast<uint16_t>(p[1]) << 8);
+}
+
+static uint32_t ReadU32LE(const uint8_t* p) {
+    return static_cast<uint32_t>(p[0]) |
+           (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) |
+           (static_cast<uint32_t>(p[3]) << 24);
+}
+
+struct ParsedState10ClaimCharacterNameReplyScaffold {
+    bool valid = false;
+    uint32_t status = 0;
+    uint32_t globalCharacterIdLow03 = 0;
+    uint32_t globalCharacterIdHigh07 = 0;
+    uint16_t optionalTextOffset01 = 0;
+    const char* optionalText = nullptr;
+    uint16_t optionalTextLength = 0;
+};
+
+static ParsedState10ClaimCharacterNameReplyScaffold ParseState10ClaimCharacterNameReplyScaffold(
+    const std::vector<uint8_t>& bytes) {
+    ParsedState10ClaimCharacterNameReplyScaffold out = {};
+    if (bytes.size() < 0x0fu || bytes[0] != 0x0bu) {
+        return out;
+    }
+
+    out.valid = true;
+    out.optionalTextOffset01 = ReadU16LE(bytes.data() + 1u);
+    out.status = ReadU32LE(bytes.data() + 3u);
+    out.globalCharacterIdLow03 = ReadU32LE(bytes.data() + 7u);
+    out.globalCharacterIdHigh07 = ReadU32LE(bytes.data() + 0x0bu);
+
+    if (out.optionalTextOffset01 != 0u) {
+        const size_t stringLengthFieldOffset = static_cast<size_t>(out.optionalTextOffset01);
+        if (stringLengthFieldOffset + 2u <= bytes.size()) {
+            out.optionalTextLength = ReadU16LE(bytes.data() + stringLengthFieldOffset);
+            const size_t stringBytesOffset = stringLengthFieldOffset + 2u;
+            const size_t availableTextBytes = bytes.size() - stringBytesOffset;
+            if (out.optionalTextLength > availableTextBytes) {
+                out.optionalTextLength = static_cast<uint16_t>(availableTextBytes);
+            }
+            if (out.optionalTextLength != 0u) {
+                out.optionalText = reinterpret_cast<const char*>(bytes.data() + stringBytesOffset);
+            }
+        }
+    }
+
+    return out;
+}
+
+static std::string DescribeOptionalState10ClaimReplyText(
+    const ParsedState10ClaimCharacterNameReplyScaffold& parsed) {
+    if (!parsed.optionalText || parsed.optionalTextLength == 0u) {
+        return "<empty>";
+    }
+
+    const size_t boundedLength = std::min<size_t>(parsed.optionalTextLength, 96u);
+    std::string text(parsed.optionalText, parsed.optionalText + boundedLength);
+    for (char& ch : text) {
+        if (ch == '\0') {
+            ch = ' ';
+        }
+    }
+    return text;
+}
+
+}  // namespace
 
 void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator) {
     if (!mediator) {
@@ -14,17 +87,15 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
     }
 
     // Address anchors:
-    // - launcher.exe:0x4401a0 slot-6 success branch
-    // - launcher.exe:0x43f300 slot-record initializer
-    // Direct `0x4401a0` tightening now makes the original success-side writeback more concrete:
-    // - allocate a new slot record into owner `+0x688[currentCount]`
-    // - copy the selected world-descriptor inline name into owner `+0x818[currentCount]`
-    // - write owner `+0xcc8 = currentCount`, then increment owner `+0x684`
-    // - copy current `CharacterName` (`+0x108`) plus parsed reply ids into that new slot record
-    // - then switch helper state to `11` and post event `0x14`
-    // Current source still rebuilds the broader recovered auth-reply tables rather than mirroring
-    // that one slot-record append byte-for-byte, but keep the success-side ownership on state10
-    // slot6 instead of inventing a mediator shortcut.
+    // - launcher.exe:0x43f300 broader auth-reply writer
+    // - launcher.exe:0x441260 / 0x441330 narrower auth-reply adoption helpers nearby in the same
+    //   broader early-auth corridor
+    // Keep this helper scoped to the broader auth-reply adoption used by state2/current existing-
+    // character auth bridges.
+    // Important create/delete correction from the latest static pass:
+    // - `0x4401a0` is not an auth-reply adopter
+    // - it is the later margin-side `MS_ClaimCharacterNameReply` append helper for state10 slot 6
+    // - so do not treat this broader auth-table rebuild as the owner-side body for `0x4401a0`
     mediator->worldSlots_.fill(nullptr);
     mediator->worldPayloadSlots_.fill(nullptr);
     mediator->slotRecordValid688_.fill(false);
@@ -114,8 +185,8 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         currentDescriptorName);
 }
 
-// UNANCHORED: source-owned shared raw-0x0b parse/adopt helper used by state10 slot 6 and the
-// current existing-character state8 auth bridge.
+// UNANCHORED: source-owned shared raw-0x0b auth parse/adopt helper reused by the broader state2
+// auth-reply success path and the current existing-character state8 auth bridge.
 uint32_t CLTLoginState_State10::HandleStagedAuthReplyScaffold(CLTLoginMediator* mediator) {
     if (!mediator || mediator->stagedIncomingAuthPacketBytes_.empty()) {
         return 0u;
@@ -149,6 +220,85 @@ uint32_t CLTLoginState_State10::HandleStagedAuthReplyScaffold(CLTLoginMediator* 
     AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
     AuthBootstrap680LogParsedAuthReply(*mediator, reply);
     mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
+    return 1u;
+}
+
+// UNANCHORED: source-owned raw-0x0b margin claim-name reply helper for state10 slot 6.
+uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTLoginMediator* mediator) {
+    if (!mediator || mediator->stagedIncomingMarginPacketBytes_.empty()) {
+        return 0u;
+    }
+
+    const ParsedState10ClaimCharacterNameReplyScaffold parsed =
+        ParseState10ClaimCharacterNameReplyScaffold(mediator->stagedIncomingMarginPacketBytes_);
+    if (!parsed.valid) {
+        spdlog::warn(
+            "DIAGNOSTIC: state10 raw-0x0b claim-name reply parse rejected staged margin bytes={} (expected >= 0x0f-byte MS_ClaimCharacterNameReply layout)",
+            static_cast<unsigned>(mediator->stagedIncomingMarginPacketBytes_.size()));
+        return 0u;
+    }
+
+    mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 = parsed.status;
+    if (parsed.status >= 1u) {
+        spdlog::info(
+            "DIAGNOSTIC: state10 raw-0x0b claim-name reply failure status=0x{:08x} optionalTextOffset=0x{:04x} optionalTextLen=0x{:04x} optionalText='{}'",
+            static_cast<unsigned>(parsed.status),
+            static_cast<unsigned>(parsed.optionalTextOffset01),
+            static_cast<unsigned>(parsed.optionalTextLength),
+            DescribeOptionalState10ClaimReplyText(parsed));
+        return 1u;
+    }
+
+    const uint8_t appendedSlotIndex = mediator->slotRecordCount684_;
+    const uint32_t selectedWorldDescriptorIndex = mediator->postAuthMarginLoadingState_.sourceField12c;
+    if (appendedSlotIndex >= mediator->slotRecords688_.size() ||
+        appendedSlotIndex >= mediator->routeHostStrings818_.size() ||
+        selectedWorldDescriptorIndex >= mediator->worldDescriptorCountD80_ ||
+        selectedWorldDescriptorIndex >= mediator->worldDescriptorsD84_.size() ||
+        !mediator->worldDescriptorValidD84_[selectedWorldDescriptorIndex]) {
+        spdlog::warn(
+            "DIAGNOSTIC: state10 raw-0x0b claim-name reply success could not append slot record appendedSlotIndex={} selectedWorldDescriptorIndex={} worldDescriptorCount=0x{:02x}",
+            static_cast<unsigned>(appendedSlotIndex),
+            static_cast<unsigned>(selectedWorldDescriptorIndex),
+            static_cast<unsigned>(mediator->worldDescriptorCountD80_));
+        return 0u;
+    }
+
+    const CLTLoginMediator::WorldDescriptorState004b533c& selectedWorldDescriptor =
+        mediator->worldDescriptorsD84_[selectedWorldDescriptorIndex];
+    SlotRecordState004b5328& appendedSlotRecord = mediator->slotRecords688_[appendedSlotIndex];
+    appendedSlotRecord = {};
+    appendedSlotRecord.heapString14 =
+        reinterpret_cast<const char*>(mediator->postAuthMarginLoadingState_.sourceLeadString108.data());
+    appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
+    appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
+    appendedSlotRecord.status0b = 0u;
+    appendedSlotRecord.worldId0c = selectedWorldDescriptor.worldId01;
+    mediator->slotRecordValid688_[appendedSlotIndex] = true;
+    mediator->routeHostStrings818_[appendedSlotIndex].text = selectedWorldDescriptor.inlineNamePlus03;
+    mediator->postAuthMarginLoadingState_.characterRouteIndexCc8 = appendedSlotIndex;
+    mediator->marginRouteState_.currentCharacterOrRouteIndex = appendedSlotIndex;
+    mediator->marginRouteState_.pendingWorldId = selectedWorldDescriptor.worldId01;
+    mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(selectedWorldDescriptor.worldId01);
+    if (const char* routeHostPrefix = mediator->LookupRouteHostPrefixBySlot(appendedSlotIndex)) {
+        mediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
+    } else {
+        mediator->marginRouteState_.routeHostPrefix.clear();
+    }
+    mediator->slotRecordCount684_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
+
+    spdlog::info(
+        "DIAGNOSTIC: state10 raw-0x0b claim-name reply appended slot={} status=0x{:08x} globalCharacterIdLow=0x{:08x} globalCharacterIdHigh=0x{:08x} selectedWorldDescriptorIndex=0x{:08x} routeText='{}' characterName='{}' optionalText='{}'",
+        static_cast<unsigned>(appendedSlotIndex),
+        static_cast<unsigned>(parsed.status),
+        static_cast<unsigned>(parsed.globalCharacterIdLow03),
+        static_cast<unsigned>(parsed.globalCharacterIdHigh07),
+        static_cast<unsigned>(selectedWorldDescriptorIndex),
+        mediator->routeHostStrings818_[appendedSlotIndex].text.empty()
+            ? "<empty>"
+            : mediator->routeHostStrings818_[appendedSlotIndex].text.c_str(),
+        appendedSlotRecord.heapString14.empty() ? "<empty>" : appendedSlotRecord.heapString14.c_str(),
+        DescribeOptionalState10ClaimReplyText(parsed));
     return 1u;
 }
 
@@ -232,41 +382,39 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         return 0u;
     }
 
-    const std::vector<uint8_t>& stagedBytes = mediator->stagedIncomingAuthPacketBytes_;
+    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
     const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
 
-    // Ownership correction from the vtable docs + direct `0x4401a0` review:
-    // - `0x4401a0` belongs to `CLTLoginState_State10` slot 6, not to the mediator vtable
-    // - non-`0x0b` packets are rejected here with owner `+0x80 = 0x12000005`
-    // - parsed error replies switch helper state to `3` and post error `0x0b`
-    // - parsed success replies perform the owner-side slot-record/route-name writeback, switch
-    //   helper state to `11`, and post event `0x14`
-    // - immediate continuation after that success is now tighter too:
+    // Fidelity correction from direct `0x43bf90 / 0x4401a0 / 0x41bf70` review:
+    // - state10 slot 3 sends raw margin opcode `0x0a = MS_ClaimCharacterNameRequest`
+    // - state10 slot 6 therefore consumes the matching raw margin opcode
+    //   `0x0b = MS_ClaimCharacterNameReply`, not an auth-channel `AS_AuthReply`
+    // - success appends exactly one new slot record under owner `+0x688/+0x818`, sets owner
+    //   `+0xcc8 = currentCount`, then switches to helper11 and posts event `0x14`
+    // - immediate continuation after that success is:
     //   `state11 slot3 / 0x43c020 -> state11 slot6 / 0x440320 -> helper9 slot3 / 0x439780
     //    -> owner 0x41de40`
-    // - mediator now keeps only the staged auth bytes; the shared parse/adopt plus owner-state
-    //   writeback helpers live here
     if (rawCode != 0x0bu) {
         mediator->WorldListCountOrStatus80() = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected staged auth bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
+            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
             static_cast<unsigned>(stagedBytes.size()),
             static_cast<unsigned>(rawCode));
         return 0u;
     }
 
-    const uint32_t handled = HandleStagedAuthReplyScaffold(mediator);
+    const uint32_t handled = HandleStagedClaimCharacterNameReplyScaffold(mediator);
     if (handled == 0u) {
         return 0u;
     }
 
-    if (mediator->lastAuthReply_.valid && mediator->lastAuthReply_.isErrorReply) {
+    if (mediator->WorldListCountOrStatus80() >= 1u) {
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
             mediator->SwitchHelperStateScaffold(3u, failureState);
         }
         mediator->PostErrorScaffold(0x0bu);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error AS_AuthReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
+            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
             static_cast<unsigned>(mediator->WorldListCountOrStatus80()));
         return 1u;
     }
@@ -277,14 +425,15 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
             0x0bu,
             nextState,
             this,
-            "State10 slot6 successful AS_AuthReply -> helper11 immediate slot3 continuation");
+            "State10 slot6 successful MS_ClaimCharacterNameReply -> helper11 immediate slot3 continuation");
+        mediator->expectedMarginRequestName_ = CLTLoginMediator::kMessageMsLoadCharacterReply;
     } else {
         spdlog::warn(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed successful AS_AuthReply but has no registered helper11 state");
+            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed successful MS_ClaimCharacterNameReply but has no registered helper11 state");
     }
     mediator->PostEventScaffold(0x14u);
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage successful AS_AuthReply -> helper11 entry result=0x{:08x} then PostEvent(0x14)",
+        "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage successful MS_ClaimCharacterNameReply -> helper11 entry result=0x{:08x} then PostEvent(0x14)",
         static_cast<unsigned>(helper11EntryResult));
     return 1u;
 }

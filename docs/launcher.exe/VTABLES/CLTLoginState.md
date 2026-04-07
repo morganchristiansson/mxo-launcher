@@ -153,8 +153,8 @@ Do not mass-rename the source classes yet; several are still behavior-backed rat
 | `CLTLoginState_State7` | `CLTLoginState_MarginRouteProbePending` | low-medium | sends a smaller current-selection/current-character margin packet and expects reply opcode `0x0e` |
 | `CLTLoginState_State8` | `CLTLoginState_MarginLoadCharacterPending` | medium | sends a large structured margin packet, handles chunked opcode `0x10`, then advances to state `9` |
 | `CLTLoginState_State9` | `CLTLoginState_LoadCharacterFollowupPending` | low-medium | consumes the post-`0x10` follow-up path, handles opcode `0x11`, and advances to state `0x0c` |
-| `CLTLoginState_State10` | `CLTLoginState_AuthReplyPending` | high | slot 6 is the best-anchored `AS_AuthReply` handler at `0x4401a0` |
-| `CLTLoginState_State11` | `CLTLoginState_PostAuthMarginLoadPending` | high | immediate post-auth state; sends raw `0x4d`, then handles load-character reply fragments |
+| `CLTLoginState_State10` | `CLTLoginState_ClaimCharacterNamePending` | high | slot 3 sends `MS_ClaimCharacterNameRequest` (`0x0a`) and slot 6 handles the matching `MS_ClaimCharacterNameReply` (`0x0b`) at `0x4401a0` |
+| `CLTLoginState_State11` | `CLTLoginState_CreateCharacterLoadPending` | high | create-character helper11 stage; sends `MS_CreateCharacterRequest`, then handles `MS_LoadCharacterReply` fragments |
 | `CLTLoginState_State12` | `CLTLoginState_FinalMarginLeaf12` | low | only final-leaf evidence so far; stronger semantic name still missing |
 | `CLTLoginState_State13` | `CLTLoginState_LateMarginRouteProbePending` | low | later branch-specific request/reply pair that feeds state `9` via opcode `0x16` |
 

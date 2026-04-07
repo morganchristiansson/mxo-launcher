@@ -1806,6 +1806,30 @@ bool DiagnosticFindRecoveredWorldDescriptorIndexByName(const char* worldName, ui
     return false;
 }
 
+bool DiagnosticGetDeleteCharacterProfileRootName(char* outName, uint32_t outNameCapacity) {
+    if (!outName || outNameCapacity == 0u) {
+        return false;
+    }
+    outName[0] = '\0';
+
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        return false;
+    }
+
+    // anchor: launcher.exe:0x40ec70 success tail
+    // The launcher delete-character corridor threads the selected slot-record name through sibling
+    // `+0xdc`, then calls sibling `+0x5c(chainedToken)` before deleting `Profiles\\%s\\%s`.
+    const char* profileRootName = mediator->GetCrashReporterUsername5c(nullptr);
+    if (!profileRootName || !profileRootName[0]) {
+        return false;
+    }
+
+    std::strncpy(outName, profileRootName, outNameCapacity - 1u);
+    outName[outNameCapacity - 1u] = '\0';
+    return true;
+}
+
 uint32_t DiagnosticBeginDeleteRecoveredCharacter(uint32_t slotIndex) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     return mediator ? mediator->BeginDeleteCharacterBySlotIndexScaffold(slotIndex) : 1u;

@@ -3996,8 +3996,9 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
     // - current source therefore keeps only a staged-payload demux boundary here, routing the
     //   early semantic handling into state2 / the owner+0x680 child instead of claiming mediator
     //   ownership
-    // - later/narrower selected-slot raw `0x0b` handling still belongs to state10 slot 6
-    //   (`0x4401a0`)
+    // - important create/delete correction from `0x41bf70 / 0x43bf90 / 0x4401a0`:
+    //   later raw `0x0b` handling for helper10 is margin-side
+    //   `MS_ClaimCharacterNameReply`, not auth-side `AS_AuthReply`
     // - one deliberate current-source exception remains: the replacement's existing-character
     //   state8 branch still bypasses the natural state10/state11 claim/create transition
     if (!packetBytes || packetSize == 0u) {
@@ -4050,7 +4051,9 @@ uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, siz
                 return handled;
             }
             if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 10u) {
-                return currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
+                spdlog::info(
+                    "CLTLoginMediator::HandleAuthPacketBytes received AS_AuthReply while helper10 is active; state10 slot6 is margin-side MS_ClaimCharacterNameReply, so this auth packet has no faithful helper10 consumer currentState={}",
+                    currentState_->DebugName());
             }
             if (scaffoldState2_ != nullptr) {
                 return scaffoldState2_->AuthMessageDispatch(nullptr, this);

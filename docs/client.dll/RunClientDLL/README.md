@@ -401,10 +401,11 @@ Current best reading remains:
       - importantly, the auth/margin startup path currently builds derived connections through `0x4417e0 -> 0x448b40(flag=0)`, so both `+0x7c` and `+0x80` remain **NULL** on that startup path
       - that means the current auth/margin type-2 connect-status path does **not** get resolved by those helper objects alone; it falls through `0x449a70 / 0x44af60` into the owner callback / fallback chain instead
     - important correction from newer message-code review:
-      - later auth helper body `0x4401a0` handles raw auth message code `0x0b`
-      - auth message-name mapping at `0x41bd10` uses `code - 6`, so raw `0x0b` resolves to **`AS_AuthReply`**, not `AS_GetPublicKeyReply`
-      - margin/loading helper body `0x440320` similarly handles raw code `0x10`, which resolves through `0x41bf70` to **`MS_LoadCharacterReply`**, not an initial connect request
-      - so those callbacks are currently best treated as later **incoming packet handlers** on the type-3 receive path, not direct proof of the first outbound request after connect
+      - helper10 body `0x4401a0` should no longer be read through the auth name table
+      - its paired sender is `0x43bf90`, which emits raw margin opcode `0x0a = MS_ClaimCharacterNameRequest`
+      - so `0x4401a0` is the matching margin-side raw `0x0b = MS_ClaimCharacterNameReply` handler on the later create-character branch, not auth-side `AS_AuthReply`
+      - margin/loading helper body `0x440320` still handles raw code `0x10 = MS_LoadCharacterReply`
+      - so these callbacks are later **incoming packet handlers** on the create-character / margin-loading receive path, not direct proof of the first outbound auth request after connect
     - newer auth-side fallback-chain review now gives the strongest corrected answer yet for the auth half:
       - auth wrapper `0x449a70` runs in this order:
         - base `0x4490c0`
@@ -418,7 +419,7 @@ Current best reading remains:
         `0x4f7868` family managed by `0x41b450(...)`
       - later helper body `0x4401a0` remains important, but now in the corrected role:
         - it is helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
-        - it only has a real handling path for raw code `0x0b` / **`AS_AuthReply`**
+        - it only has a real handling path for raw margin code `0x0b = MS_ClaimCharacterNameReply`
         - on the successful branch (`[reply+3] < 1`), it parses via `0x43a330`, stores reply/result state back into owner `+0x80`, appends a small owner record under `+0x684`, mirrors the current record index to owner byte `+0xcc8`, then calls:
           - `0x41b450(0x0b)`
           - string-backed `CLTLoginMediator::PostEvent(0x14)` via `0x41cfb0`
@@ -571,21 +572,13 @@ Current best reading remains:
   - newer bounded source correction also moves that proxy one step closer to the original anchored
     destination by routing it back through the connection-family queue callback path before the
     remaining source-owned mediator drain step
-  - the next missing state is later launcher-owned progression **after** successful `AS_AuthReply`, not proof that the arg5 queue consumer itself is still dead
-- newer original-launcher helper follow-up now makes that post-auth gap more concrete:
-  - `launcher.exe:0x4401a0` (`CLTLoginMediator_Helper10_HandleAuthReply`) performs the auth-reply writeback
-  - then success reaches `0x41b450(0x0b)` and selects helper `0x4f7894` / vtable `0x4b5154`
-  - helper11 enter path `0x43c020`
-    (`CLTLoginMediator_Helper11_SendPostAuthMarginPacket0x4d`) then builds a larger
-    margin-side packet whose first payload byte is raw `0x4d`, sends it through
-    `CLTLoginMediator_SendCurrentMarginPacket`, and posts event `0x15`
-  - later helper11 incoming path `0x440320`
-    (`CLTLoginMediator_Helper11_HandleLoadCharacterReply`) handles raw `0x10`
-    / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
-    completion switches helper state to `9` then posts event `0x16`
-  - so the immediate original continuation after auth success now looks like helper11-driven
-    **margin/loading progression**, not an immediate fall-through to the later auth-side
-    `0x43b830 / AS_GetWorldListRequest` helper
+  - the next missing state is still later launcher-owned progression after successful `AS_AuthReply`, but `0x4401a0` should no longer be used as that immediate auth-side continuation anchor
+- newer create-character/static review instead places `0x4401a0 -> 0x43c020 -> 0x440320` on the
+  separate create-character claim-name/create branch rooted at owner `+0x120 / 0x41c3c0`
+- practical consequence for the active auth/runtime analysis here:
+  - keep helper10/helper11 as a later create-character branch
+  - keep the auth-valid existing-character continuation anchored on the already recovered
+    state8/state9 margin-load corridor
 - current user-observed runtime impression after these queue/connect milestones is that the in-game `Loading Character` phase now appears to remain visible/useful longer than before; current logs still do **not** prove a later faithful transition there yet, but this is now consistent with the stronger runtime markers that the path is doing more than the old totally empty loop
 
 ## Launcher-owned auth integration milestone inside `RunClientDLL`
@@ -598,8 +591,9 @@ For packet-level auth details and the canonical auth loop write-up, prefer:
 What matters here for `RunClientDLL` is narrower:
 - the auth connect-status queue item is now feeding a real launcher-owned auth progression instead of the older dead-end shortcut path
 - auth therefore remains launcher-owned in practice as well as in static analysis
-- newer live-runtime validation now also shows the post-`AS_AuthReply` State4/`0x41e500` margin begin succeeding on the active runtime path, with helper11/state11 slot 3 (`0x43c020`) becoming live and sending the raw `0x4d` packet there
-- the next auth-side/runtime question therefore shifts one step forward again: what launcher-owned state or incoming margin traffic is still missing so later helper11/state11 slot 6 (`0x440320` / `MS_LoadCharacterReply`) becomes live on that same active runtime path
+- newer live-runtime validation still shows the post-`AS_AuthReply` State4/`0x41e500` margin begin succeeding on the active runtime path
+- but helper11/state11 `0x43c020 / 0x440320` should now be treated as the separate create-character branch, not the default existing-character auth continuation
+- the next auth-side/runtime question therefore shifts back to the missing existing-character post-auth margin/load continuation rather than to helper11 itself
 - newer practical rerun note after the arg5 ctor/ABI-shell cleanup pass:
   - one active-path run stalled at visible `Loading Character`
   - a second retry then entered game successfully

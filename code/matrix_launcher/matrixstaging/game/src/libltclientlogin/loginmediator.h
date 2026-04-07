@@ -1139,8 +1139,9 @@ public:
     //   inbound raw `0x07/0x09/0x0b` semantics are dispatched into state2
     //   `AuthMessageDispatch` (`0x43f300`) and its owner `+0x680` child helper
     //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
-    // - later/narrower selected-slot raw `0x0b` handling belongs to state10 slot 6 (`0x4401a0`)
-    //   and the source-owned shared auth-reply helpers kept in `loginstate_state10.cpp`
+    // - later raw `0x0b` helper10 handling does **not** belong on this auth-side path:
+    //   `0x4401a0` is the margin-side `MS_ClaimCharacterNameReply` consumer after helper10 slot-3
+    //   `MS_ClaimCharacterNameRequest`
     // - keep this mediator method only as the current staging/demux wrapper, not as proof that
     //   the original packet semantics were mediator-owned
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);

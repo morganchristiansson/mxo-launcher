@@ -398,6 +398,11 @@ Implication for the replacement source:
         character-name column is literal `"- - -"`
       - that row carries packed item-data high word `0xffff`
       - current best practical read: launcher-side create-character placeholder / empty-slot row
+      - replacement-only text-mode host note:
+        - current source intentionally keeps its console create-character option visible until
+          fewer than 10 recovered characters instead of fewer than 3
+        - this is a deliberate testing/operability divergence; it does **not** change the static
+          RE of `0x40e480`
     - `0x40d530` then treats that negative high word specially:
       - high word `>= 0` -> command `0x11`
       - high word `< 0` (`0xffff`) -> command `0x10`

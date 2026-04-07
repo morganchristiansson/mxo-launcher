@@ -41,8 +41,8 @@ narrow auth regression specifically requires it.
   - `matrixstaging/runtime/src/libltcrypto/filters.cpp`
     - opcode/text helpers and packet parse helpers
     - current address anchors:
-      - `0x4401a0` later auth-reply owner handler
-      - `0x43a330 = State10AuthReplyParseObject_InitFromIncomingPacket`
+      - `0x4401a0` later create-character claim-name reply handler (`MS_ClaimCharacterNameReply`)
+      - `0x43a330 = State10ClaimCharacterNameReplyParseObject_InitFromIncomingPacket`
       - `0x41bc20` opcode read helper
   - `matrixstaging/runtime/src/libltcrypto/sessionkeyencryption.cpp`
     - auth/session-key crypto and outbound packet builders
@@ -270,32 +270,30 @@ Important interpretation:
 - the packet logic is now materially migrated into the launcher path instead of relying on a separate standalone probe harness
 - newer launcher-side state-writeback scaffolding now also begins to adopt parsed `AS_AuthReply` data into recovered mediator-owned tables/state instead of leaving it only in transient parse storage
 
-## Immediate post-`AS_AuthReply` original continuation
+## Earlier auth-side `0x4401a0` interpretation retired
 
-Newer Ghidra-backed follow-up now tightens what the original launcher does **after** a successful
-`AS_AuthReply`.
+Newer create-character/static review moves `launcher.exe:0x4401a0` out of the immediate
+post-`AS_AuthReply` auth chain.
 
-Current best read:
-- `launcher.exe:0x4401a0`
-  - `CLTLoginMediator_Helper10_HandleAuthReply`
-  - performs the important owner-side writeback under `+0x80`, `+0x684 / +0x688 / +0x818 / +0xd84`, and `+0xcc8`
-- then the original launcher does **not** immediately fall into the later auth-side
-  `0x43b830 / AS_GetWorldListRequest` helper
-- instead `0x4401a0` success reaches `0x41b450(0x0b)`, which selects helper `0x4f7894`
-  (vtable `0x4b5154`)
-- that helper/state11 enter path `launcher.exe:0x43c020`
-  - now renamed in Ghidra as `CLTLoginState_State11_SendPostAuthMarginPacket0x4d`
-  - builds a larger margin-side packet whose first payload byte is raw `0x4d`
-  - sends it through `CLTLoginMediator_SendCurrentMarginPacket`
-  - then posts event `0x15`
-- the same helper/state11 incoming handler `launcher.exe:0x440320`
-  - now renamed in Ghidra as `CLTLoginState_State11_HandleLoadCharacterReply`
-  - handles raw margin code `0x10` / `MS_LoadCharacterReply`
-  - accumulates reply fragments into owner `+0xf1c`
-  - and on completion switches helper state to `9` then posts event `0x16`
+Current corrected read:
+- `0x43bf90` sends raw margin opcode `0x0a = MS_ClaimCharacterNameRequest`
+- `0x4401a0` is the matching helper10/state10 slot-6 consumer for raw margin
+  `0x0b = MS_ClaimCharacterNameReply`
+- its success-side tail still matters, but only on the later create-character branch rooted at
+  owner `+0x120 / 0x41c3c0`
+  - append one new slot record under owner `+0x688/+0x818`
+  - write owner `+0xcc8 = currentCount`
+  - switch to helper11/state11 (`0x43c020 / 0x440320`)
+  - then continue into helper9/state9 (`0x439780 / 0x41de40`)
 
-So the current post-auth blocker is now more specific than “what comes after auth?” in the broad
-sense. The immediate original continuation is helper11-driven **margin/loading progression**.
+Practical auth-side consequence:
+- do **not** use `0x4401a0 -> 0x43c020 -> 0x440320` as the immediate post-`AS_AuthReply`
+  existing-character continuation
+- the auth-valid existing-character continuation remains the earlier state8/state9 margin-load
+  corridor
+
+So the current auth blocker is again the broader post-auth existing-character continuation rather
+than the separate create-character claim-name/create subchain.
 
 Important current restraint:
 - auth auto-begin on the active launcher path is now the default when the login-controller sidecar exists

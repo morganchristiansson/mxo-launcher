@@ -97,6 +97,13 @@ const char* MaskedArgValue(const char* value) {
 
 constexpr WORD kMatrixConsoleGreen = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 
+// Replacement-only text-mode launcher divergence:
+// - original page-7 list builder `0x40e480` inserts the `"- - -"` create-character sentinel only
+//   while fewer than 3 active entries match the selected world
+// - current text-mode host deliberately raises that soft cap so manual create-character testing is
+//   still reachable on accounts that already have more than 3 characters
+static constexpr uint32_t kTextModeCreateCharacterSoftLimit = 10u;
+
 void WriteMatrixConsoleText(const char* text, bool appendNewline) {
     const char* safeText = text ? text : "<null>";
     HANDLE errorHandle = GetStdHandle(STD_ERROR_HANDLE);
@@ -1039,7 +1046,8 @@ character_selection_menu:
         WriteMatrixConsoleText("The Matrix has you...", true);
 
         const uint32_t recoveredCharacterCount = DiagnosticRecoveredCharacterCount();
-        const bool createCharacterPlaceholderAvailable = (recoveredCharacterCount < 3u);
+        const bool createCharacterPlaceholderAvailable =
+            (recoveredCharacterCount < kTextModeCreateCharacterSoftLimit);
         const bool deleteCharacterOptionAvailable = (recoveredCharacterCount != 0u);
         const uint32_t createCharacterMenuIndex = recoveredCharacterCount;
         const uint32_t deleteCharacterMenuIndex =
@@ -1176,8 +1184,17 @@ character_selection_menu:
                 goto character_selection_menu;
             }
 
+            char deleteProfileRootName[256] = {};
+            const char* deleteProfileRootNameToUse = g_LauncherCommandLine.AuthUsername();
+            if (DiagnosticGetDeleteCharacterProfileRootName(
+                    deleteProfileRootName,
+                    sizeof(deleteProfileRootName)) &&
+                deleteProfileRootName[0] != '\0') {
+                deleteProfileRootNameToUse = deleteProfileRootName;
+            }
+
             (void)DeleteLauncherProfileDirectoryForCharacter(
-                g_LauncherCommandLine.AuthUsername(),
+                deleteProfileRootNameToUse,
                 deleteCharacterName);
             (void)DiagnosticFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
             WriteMatrixConsoleFormattedLine("Deleted character '%s'.", deleteCharacterName);

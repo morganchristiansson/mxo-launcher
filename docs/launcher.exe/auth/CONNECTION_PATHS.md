@@ -224,46 +224,28 @@ Current concrete later auth-channel send path:
 This is strong evidence for a real launcher-owned auth-channel send path.
 Current best reading is that it is a **later** auth request, not automatically the first send after connect.
 
-## Immediate post-`AS_AuthReply` continuation now identified more concretely
+## Earlier auth-side `0x4401a0` interpretation retired
 
-Current highest-value original-launcher follow-up after successful auth reply is now:
-- `launcher.exe:0x4401a0`
-  - `CLTLoginMediator_Helper10_HandleAuthReply`
-- `launcher.exe:0x41b450(0x0b)`
-  - switches current helper to `0x4f7894` / vtable `0x4b5154`
-- helper11 / state11 enter path:
-  - `launcher.exe:0x43c020`
-  - renamed in Ghidra as `CLTLoginState_State11_SendPostAuthMarginPacket0x4d`
-- helper11 / state11 incoming path:
-  - `launcher.exe:0x440320`
-  - renamed in Ghidra as `CLTLoginState_State11_HandleLoadCharacterReply`
+Newer create-character/static review moves `launcher.exe:0x4401a0` out of the auth continuation
+chain.
 
-Current best static read of that chain:
-- `0x4401a0` success still performs the important owner writeback under:
-  - `+0x80`
-  - `+0x684 / +0x688 / +0x818 / +0xd84`
-  - `+0xcc8`
-- but its immediate next helper transition is **not** the later auth-side
-  `0x43b830 / AS_GetWorldListRequest` sender
-- instead helper11 `+0x8` (`0x43c020`) first reserves a fixed `0x4d`-byte payload span,
-  then `0x43a470` initializes payload byte `0x00 = 0x0c`, and that completed packet-envelope is
-  forwarded through `CLTLoginMediator_SendCurrentMarginPacket` (`0x41af70`) before event `0x15`
-  - newer tightening there now says:
-    - `0x41af70` is only a tiny forwarder
-    - it jumps into current margin connection vtable `+0x24`
-    - current best target is inherited `0x448cf0 = CMessageConnection::SendPacket`
-    - that send path performs packet-agenda filtering before the lower submit helper
-      `0x448a00` reaches the engine-facing byte send
-- later helper11 `+0x14` (`0x440320`) handles raw margin code `0x10`
-  / `MS_LoadCharacterReply`, accumulates reply fragments into owner `+0xf1c`, and on
-  completion switches helper state to `9` then posts event `0x16`
+Current corrected read:
+- `0x43bf90` sends raw margin opcode `0x0a = MS_ClaimCharacterNameRequest`
+- `0x4401a0` is the matching helper10/state10 slot-6 consumer for raw margin
+  `0x0b = MS_ClaimCharacterNameReply`
+- its success-side tail still matters, but only on the later create-character branch rooted at
+  owner `+0x120 / 0x41c3c0`
+  - append one new slot record under owner `+0x688/+0x818`
+  - write owner `+0xcc8 = currentCount`
+  - switch to helper11/state11 (`0x43c020 / 0x440320`)
+  - then continue into helper9/state9 (`0x439780 / 0x41de40`)
 
-So the current post-auth blocker is now narrower than a generic “later world-list request” gap:
-- the immediate original continuation after `AS_AuthReply` is helper11-driven
-  margin/loading progression
-- that makes post-auth owner-state writeback and later margin/loading activation the
-  highest-value active targets before treating `0x43b830` as the next practical milestone on
-  this startup path
+Negative result now worth keeping explicit in the auth doc:
+- do **not** treat `0x4401a0 -> 0x43c020 -> 0x440320` as the immediate post-`AS_AuthReply`
+  existing-character continuation
+- that subchain is create-character specific
+- the auth-valid existing-character continuation remains the earlier state8/state9 margin-load
+  corridor documented elsewhere in this file and in the state-vtable docs
 
 ## Earlier bootstrap/auth send narrowing
 

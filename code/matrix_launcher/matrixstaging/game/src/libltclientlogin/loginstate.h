@@ -397,20 +397,28 @@ public:
 
 // anchor: launcher.exe vtable 0x004b512c
 // docs: ../../docs/launcher.exe/VTABLES/0x004b512c.md
-// Provisional better-name suggestion: `CLTLoginState_AuthReplyPending`
+// Provisional better-name suggestion: `CLTLoginState_ClaimCharacterNamePending`
 class CLTLoginState_State10 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x004396f0 (vtable 0x004b512c slot 10 initializer)
     CLTLoginState_State10() = default;
 
-    // UNANCHORED: source-owned shared owner-state writeback helper used by the narrower state10
-    // slot-6 auth-reply path (`0x4401a0`) and the broader state2 slot-5 auth-reply success path
-    // (`0x43f300`).
+    // UNANCHORED: source-owned shared owner-state writeback helper used by the broader state2
+    // slot-5 auth-reply success path (`0x43f300`) and by the current existing-character auth
+    // bridge. Keep this separate from the later state10 margin-side claim-name reply append at
+    // `0x4401a0`.
     static void AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator);
 
-    // UNANCHORED: source-owned shared raw-0x0b parse/adopt helper used by state10 slot 6 and the
-    // current existing-character state8 auth bridge.
+    // UNANCHORED: source-owned shared raw-0x0b auth parse/adopt helper reused by the broader
+    // state2 auth-reply success path and the current existing-character state8 auth bridge.
     static uint32_t HandleStagedAuthReplyScaffold(CLTLoginMediator* mediator);
+
+    // UNANCHORED: source-owned raw-0x0b margin claim-name reply helper for state10 slot 6.
+    // Faithful recovered packet family:
+    // - slot 3 sends `MS_ClaimCharacterNameRequest` (`0x0a`) through the current margin connection
+    // - slot 6 then consumes `MS_ClaimCharacterNameReply` (`0x0b`) and appends one new slot record
+    //   under owner `+0x688/+0x818/+0xcc8`
+    static uint32_t HandleStagedClaimCharacterNameReplyScaffold(CLTLoginMediator* mediator);
 
     // anchor: launcher.exe vtable 0x004b512c
     const char* DebugName() const override;
@@ -427,7 +435,7 @@ public:
 
 // anchor: launcher.exe vtable 0x004b5154
 // docs: ../../docs/launcher.exe/VTABLES/0x004b5154.md
-// Provisional better-name suggestion: `CLTLoginState_PostAuthMarginLoadPending`
+// Provisional better-name suggestion: `CLTLoginState_CreateCharacterLoadPending`
 class CLTLoginState_State11 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x00439720 (vtable 0x004b5154 slot 10 initializer)
