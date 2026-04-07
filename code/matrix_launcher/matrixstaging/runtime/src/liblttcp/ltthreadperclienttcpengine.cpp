@@ -1422,7 +1422,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
     const char* closeStatusLabel =
         (launcherContext && launcherContext->isMarginConnection) ? "MarginPeerClosed"
                                                                  : "AuthPeerClosed";
-    spdlog::info(
+    spdlog::debug(
         "CLTThreadPerClientTCPEngine::WorkerThread Run connection={} ownerContext={} launcherContext={} isMargin={} wakeupSocket=0x{:08x} initialState={} connectCompletionPending={} remoteHost='{}'",
         fmt::ptr(connection),
         fmt::ptr(connection->OwnerContext()),

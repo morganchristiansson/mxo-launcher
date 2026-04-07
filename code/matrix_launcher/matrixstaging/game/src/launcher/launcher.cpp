@@ -1161,11 +1161,7 @@ character_selection_menu:
             }
 
             DiagnosticResetPostedLoginResult();
-            const uint32_t deleteBeginResult = DiagnosticBeginDeleteRecoveredCharacter(deleteSlotIndex);
-            spdlog::info(
-                "DIAGNOSTIC: text-mode delete-character begin slotIndex={} beginResult=0x{:08x}",
-                static_cast<unsigned>(deleteSlotIndex),
-                static_cast<unsigned>(deleteBeginResult));
+            (void)DiagnosticBeginDeleteRecoveredCharacter(deleteSlotIndex);
 
             // anchor: launcher.exe:0x40ec70
             // The original launcher calls sibling `+0xf0 = 0x41c390` and immediately enters the
@@ -1204,15 +1200,7 @@ character_selection_menu:
                 deleteProfileRootNameToUse,
                 deleteCharacterName);
 
-            const uint32_t deleteCountBeforeFinalize = DiagnosticRecoveredCharacterCount();
-            const uint32_t deleteFinalizeResult = DiagnosticFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
-            const uint32_t deleteCountAfterFinalize = DiagnosticRecoveredCharacterCount();
-            spdlog::info(
-                "DIAGNOSTIC: text-mode delete-character finalize slotIndex={} countBefore={} countAfter={} finalizeResult=0x{:08x}",
-                static_cast<unsigned>(deleteSlotIndex),
-                static_cast<unsigned>(deleteCountBeforeFinalize),
-                static_cast<unsigned>(deleteCountAfterFinalize),
-                static_cast<unsigned>(deleteFinalizeResult));
+            (void)DiagnosticFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
 
             WriteMatrixConsoleFormattedLine("Deleted character '%s'.", deleteCharacterName);
             goto character_selection_menu;
