@@ -196,6 +196,11 @@ That is important because the current arg7-selection writer is now closed to the
     - high 16 bits = matching active selection-entry index, else `0xffff`
   - tighter auth-valid read from the paired `+0xe4 = 0x41b2a0` consumer now makes that high word
     better fit the slot-record / character-entry index on page `7`
+  - and the unmatched-row builder at `0x40e95d` is now meaningful too:
+    - when fewer than 3 active entries match a world descriptor, the launcher inserts a row whose
+      character-name column is literal `"- - -"`
+    - that row keeps high word `0xffff`
+    - current practical read: create-character / empty-slot placeholder row
 - replacement-side fidelity consequence from that tightening:
   - anchored startup getters `+0xf8/+0xd8/+0xe4/+0xfc/+0x100/+0xdc/+0xe0` should prefer the
     same table family the original launcher-side world-list code actually walks
@@ -268,8 +273,8 @@ interface string:
 - output slot: `0x4d2734`
 - service string: `"ILTLoginMediator.Default"`
 
-That slot is now important because the manual nopatch credential page on the launcher dialog uses it
-concretely:
+That slot is now important because the launcher uses sibling `ILTLoginMediator.Default`-style
+surfaces concretely in more than one place:
 
 - page `6` rich-edit key handler `0x408840`
   - collects the first input string, then the second input string

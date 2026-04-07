@@ -389,6 +389,16 @@ Implication for the replacement source:
   - the successful selection corridor on that dialog is now tighter too:
     - state-7 page setup `0x4047d0` shows the selection list, registers observer `0x40f070`, and
       posts UI command `0x0f`
+    - `0x40e480` builds one important sentinel row too:
+      - when fewer than 3 active entries match a world descriptor, it inserts a row whose
+        character-name column is literal `"- - -"`
+      - that row carries packed item-data high word `0xffff`
+      - current best practical read: launcher-side create-character placeholder / empty-slot row
+    - `0x40d530` then treats that negative high word specially:
+      - high word `>= 0` -> command `0x11`
+      - high word `< 0` (`0xffff`) -> command `0x10`
+      - current best practical read: command `0x10` flips the primary button into the Create-style
+        art/state for the placeholder row
     - page-`7` primary button / Enter post command `11`, which is a page-transition path
     - list double-click `0x40d820` posts command `8` into `0x405a20`
     - `0x405a20` case `8` calls `0x40d6f0`
@@ -406,6 +416,13 @@ Implication for the replacement source:
   - launcher-side success path now closes concretely through
     `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`
   - that helper writes `CLauncher+0xa8/+0xac` (`0x4d3410/0x4d3414`) and persists `Last_WorldName`
+    - tighter create-row consequence from `0x40e480/0x40d530/0x40d6f0`:
+      - the placeholder `"- - -"` row still resolves through the same writeback helper
+      - it writes `0x4d3410 = 0xffffffff` / selected slot-record index `-1`
+      - while `0x4d3414` still carries the selected world-descriptor index
+      - current practical read: launcher exits with a sentinel “no existing character selected for
+        this world” pair, and the later create-character continuation happens after that handoff,
+        not through a separate direct launcher-side `+0x120` call we have yet found
   - the direct success-side `+0xec` call is then best read later from
     `client.dll:0x62170e2a..0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
     - zero-inits a stack-local `0xb4` object
