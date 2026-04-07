@@ -828,6 +828,7 @@ public:
     void RegisterScaffoldState4(CLTLoginState* state);
     void RegisterScaffoldState5(CLTLoginState* state);
     void RegisterScaffoldState6(CLTLoginState* state);
+    void RegisterScaffoldState7(CLTLoginState* state);
     void RegisterScaffoldState8(CLTLoginState* state);
     void RegisterScaffoldState9(CLTLoginState* state);
     void RegisterScaffoldState10(CLTLoginState* state);
@@ -1301,10 +1302,14 @@ public:
     // anchor: launcher.exe:0x41ecd0
     uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input);
 
+    // +0xe8
+    // anchor: launcher.exe:0x41ec00
+    uint32_t RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) override;
+
     // +0xf0
     // anchor: launcher.exe:0x41c390
     // Owner-side narrower state3-wait advance: stores selection index and switches to state7.
-    uint32_t SetSelectionIndexAndSwitchToState7(uint32_t selectionIndex);
+    uint32_t SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) override;
 
     // +0xec
     // anchor: launcher.exe:0x41c1f0
@@ -1323,6 +1328,7 @@ public:
     uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
     uint32_t RecoveredCharacterCountScaffold() const;
     const SlotRecordState004b5328* RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const;
+    uint32_t BeginDeleteCharacterBySlotIndexScaffold(uint32_t slotIndex);
     bool BuildPartialSelectionContextForRecoveredCharacterScaffold(
         uint32_t slotIndex,
         State3SelectionContextInputSketch* outInput,
@@ -1601,6 +1607,7 @@ private:
     CLTLoginState* scaffoldState4_;
     CLTLoginState* scaffoldState5_;
     CLTLoginState* scaffoldState6_;
+    CLTLoginState* scaffoldState7_;
     CLTLoginState* scaffoldState8_;
     CLTLoginState* scaffoldState9_;
     CLTLoginState* scaffoldState10_;

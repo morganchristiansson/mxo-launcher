@@ -1,6 +1,7 @@
 #include "launcher.h"
 
 #include <windows.h>
+#include <shellapi.h>
 #include <winver.h>
 #include <cstdio>
 #include <cstdarg>
@@ -226,6 +227,38 @@ bool ReadInteractiveLauncherIndex(const char* prompt, uint32_t upperBoundExclusi
 
     *outIndex = static_cast<uint32_t>(parsed);
     return true;
+}
+
+bool DeleteLauncherProfileDirectoryForCharacter(const char* profileRootName, const char* characterName) {
+    if (!profileRootName || !profileRootName[0] || !characterName || !characterName[0]) {
+        return false;
+    }
+
+    char cwdBuffer[MAX_PATH] = {};
+    if (!_getcwd(cwdBuffer, sizeof(cwdBuffer))) {
+        return false;
+    }
+
+    const size_t cwdLength = std::strlen(cwdBuffer);
+    std::snprintf(
+        cwdBuffer + cwdLength,
+        sizeof(cwdBuffer) - cwdLength,
+        "\\Profiles\\%s\\%s",
+        profileRootName,
+        characterName);
+
+    if (_access(cwdBuffer, 0) != 0) {
+        return true;
+    }
+
+    SHFILEOPSTRUCTA deleteProfileDirectoryFileOp = {};
+    deleteProfileDirectoryFileOp.wFunc = FO_DELETE;
+    deleteProfileDirectoryFileOp.fFlags = FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
+    deleteProfileDirectoryFileOp.pFrom = cwdBuffer;
+
+    const size_t pathLength = std::strlen(cwdBuffer);
+    cwdBuffer[pathLength + 1u] = '\0';
+    return SHFileOperationA(&deleteProfileDirectoryFileOp) == 0;
 }
 
 bool PromptForMissingLauncherCredentialsIfNeeded() {
@@ -1002,10 +1035,16 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             continue;
         }
 
+character_selection_menu:
         WriteMatrixConsoleText("The Matrix has you...", true);
 
         const uint32_t recoveredCharacterCount = DiagnosticRecoveredCharacterCount();
         const bool createCharacterPlaceholderAvailable = (recoveredCharacterCount < 3u);
+        const bool deleteCharacterOptionAvailable = (recoveredCharacterCount != 0u);
+        const uint32_t createCharacterMenuIndex = recoveredCharacterCount;
+        const uint32_t deleteCharacterMenuIndex =
+            recoveredCharacterCount + (createCharacterPlaceholderAvailable ? 1u : 0u);
+
         WriteMatrixConsoleText("Available characters:", true);
         for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
             char characterName[256] = {};
@@ -1019,12 +1058,18 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         if (createCharacterPlaceholderAvailable) {
             WriteMatrixConsoleFormattedLine(
                 "  [%u] - - - (Create Character)",
-                static_cast<unsigned>(recoveredCharacterCount + 1u));
+                static_cast<unsigned>(createCharacterMenuIndex + 1u));
+        }
+        if (deleteCharacterOptionAvailable) {
+            WriteMatrixConsoleFormattedLine(
+                "  [%u] Delete existing character",
+                static_cast<unsigned>(deleteCharacterMenuIndex + 1u));
         }
 
         uint32_t selectedMenuIndex = 0u;
         bool selectedFromCommandLine = false;
         bool createCharacterPlaceholderSelected = false;
+        bool deleteCharacterOptionSelected = false;
         if (g_LauncherCommandLine.LauncherCharacter()[0] != '\0') {
             for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
                 char characterName[256] = {};
@@ -1037,7 +1082,10 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             }
         }
         if (!selectedFromCommandLine) {
-            const uint32_t menuCount = recoveredCharacterCount + (createCharacterPlaceholderAvailable ? 1u : 0u);
+            const uint32_t menuCount =
+                recoveredCharacterCount +
+                (createCharacterPlaceholderAvailable ? 1u : 0u) +
+                (deleteCharacterOptionAvailable ? 1u : 0u);
             if (menuCount > 1u) {
                 while (true) {
                     uint32_t oneBasedSelection = 0u;
@@ -1051,7 +1099,90 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             }
         }
         createCharacterPlaceholderSelected =
-            createCharacterPlaceholderAvailable && (selectedMenuIndex == recoveredCharacterCount);
+            createCharacterPlaceholderAvailable && (selectedMenuIndex == createCharacterMenuIndex);
+        deleteCharacterOptionSelected =
+            deleteCharacterOptionAvailable && (selectedMenuIndex == deleteCharacterMenuIndex);
+
+        // anchor: launcher.exe:0x40ec70
+        // Text-mode delete bridge over the original page-7 delete-character corridor:
+        // - choose a concrete recovered slot-record index
+        // - require explicit typed-name confirmation so we do not delete the wrong character
+        // - then call the anchored mediator primitives `+0xf0` / wait event `8` / `+0xe8`
+        if (deleteCharacterOptionSelected) {
+            WriteMatrixConsoleText("Delete which character?", true);
+            for (uint32_t i = 0; i < recoveredCharacterCount; ++i) {
+                char characterName[256] = {};
+                const bool haveCharacterName =
+                    DiagnosticRecoveredCharacterName(i, characterName, sizeof(characterName));
+                WriteMatrixConsoleFormattedLine(
+                    "  [%u] %s",
+                    static_cast<unsigned>(i + 1u),
+                    haveCharacterName ? characterName : "<unresolved>");
+            }
+
+            uint32_t deleteOneBasedIndex = 0u;
+            while (!ReadInteractiveLauncherIndex(
+                "Delete character index: ",
+                recoveredCharacterCount + 1u,
+                &deleteOneBasedIndex) ||
+                deleteOneBasedIndex == 0u) {
+                WriteMatrixConsoleText("Invalid character index.", true);
+            }
+            const uint32_t deleteSlotIndex = deleteOneBasedIndex - 1u;
+
+            char deleteCharacterName[256] = {};
+            if (!DiagnosticRecoveredCharacterName(deleteSlotIndex, deleteCharacterName, sizeof(deleteCharacterName))) {
+                WriteMatrixConsoleText("Failed to resolve character name for deletion.", true);
+                goto character_selection_menu;
+            }
+
+            WriteMatrixConsoleFormattedLine(
+                "Type '%s' to confirm deletion:",
+                deleteCharacterName);
+            char confirmBuffer[256] = {};
+            if (!ReadInteractiveLauncherField("Confirm: ", confirmBuffer, sizeof(confirmBuffer)) ||
+                std::strcmp(confirmBuffer, deleteCharacterName) != 0) {
+                WriteMatrixConsoleText("Deletion cancelled.", true);
+                goto character_selection_menu;
+            }
+
+            DiagnosticResetPostedLoginResult();
+            const uint32_t deleteBeginResult = DiagnosticBeginDeleteRecoveredCharacter(deleteSlotIndex);
+            if (deleteBeginResult != 0u) {
+                WriteMatrixConsoleFormattedLine(
+                    "Delete request failed to start (0x%08x).",
+                    static_cast<unsigned>(deleteBeginResult));
+                goto character_selection_menu;
+            }
+
+            const DWORD deleteStartTick = GetTickCount();
+            bool deleteSucceeded = false;
+            while ((GetTickCount() - deleteStartTick) < 30000u) {
+                DiagnosticPumpLauncherNetwork(/*nonBlocking=*/true);
+                if (DiagnosticLastLoginEvent() == 8u) {
+                    deleteSucceeded = true;
+                    break;
+                }
+                if (DiagnosticLastLoginError() != 0u) {
+                    break;
+                }
+                Sleep(10u);
+            }
+
+            if (!deleteSucceeded) {
+                WriteMatrixConsoleFormattedLine(
+                    "Delete failed (error=0x%08x).",
+                    static_cast<unsigned>(DiagnosticLastLoginError()));
+                goto character_selection_menu;
+            }
+
+            (void)DeleteLauncherProfileDirectoryForCharacter(
+                g_LauncherCommandLine.AuthUsername(),
+                deleteCharacterName);
+            (void)DiagnosticFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
+            WriteMatrixConsoleFormattedLine("Deleted character '%s'.", deleteCharacterName);
+            goto character_selection_menu;
+        }
 
         char persistedSelectionName[256] = {};
         if (LoadLastWorldNameFromRegistry(persistedSelectionName, sizeof(persistedSelectionName))) {
@@ -1095,6 +1226,12 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             selectedCharacterName[0] = '\0';
             selectedRowHighWordSelectionIndex = 0xffffu;
             g_LauncherCommandLine.SetLauncherCharacter("");
+            if (selectedSelectionName[0] != '\0') {
+                uint32_t resolvedDescriptorIndex = 0u;
+                if (DiagnosticFindRecoveredWorldDescriptorIndexByName(selectedSelectionName, &resolvedDescriptorIndex)) {
+                    selectedDescriptorIndex = resolvedDescriptorIndex;
+                }
+            }
         }
 
         if (!selectedSelectionName[0] && persistedSelectionName[0]) {

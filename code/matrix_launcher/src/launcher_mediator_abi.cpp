@@ -1786,6 +1786,36 @@ void DiagnosticSetLauncherSelectedCharacterIndex(uint32_t slotIndex) {
         static_cast<unsigned>(mediator->CharacterRouteIndexCc8()));
 }
 
+bool DiagnosticFindRecoveredWorldDescriptorIndexByName(const char* worldName, uint32_t* outDescriptorIndex) {
+    if (!worldName || !worldName[0] || !outDescriptorIndex) {
+        return false;
+    }
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        return false;
+    }
+
+    const uint32_t worldCount = mediator->GetWorldCount();
+    for (uint32_t i = 0; i < worldCount; ++i) {
+        const char* candidate = mediator->GetWorldNameByIndex(i);
+        if (candidate && std::strcmp(candidate, worldName) == 0) {
+            *outDescriptorIndex = i;
+            return true;
+        }
+    }
+    return false;
+}
+
+uint32_t DiagnosticBeginDeleteRecoveredCharacter(uint32_t slotIndex) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->BeginDeleteCharacterBySlotIndexScaffold(slotIndex) : 1u;
+}
+
+uint32_t DiagnosticFinalizeDeleteRecoveredCharacter(uint32_t slotIndex) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    return mediator ? mediator->RemoveSlotRecordAndCompactRouteStateByIndex(slotIndex) : 1u;
+}
+
 bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
     uint32_t slotIndex,
     char* outCharacterName,

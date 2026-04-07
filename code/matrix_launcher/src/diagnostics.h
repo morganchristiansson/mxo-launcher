@@ -49,6 +49,9 @@ uint32_t DiagnosticLastLoginError();
 uint32_t DiagnosticRecoveredCharacterCount();
 bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_t outNameCapacity);
 void DiagnosticSetLauncherSelectedCharacterIndex(uint32_t slotIndex);
+bool DiagnosticFindRecoveredWorldDescriptorIndexByName(const char* worldName, uint32_t* outDescriptorIndex);
+uint32_t DiagnosticBeginDeleteRecoveredCharacter(uint32_t slotIndex);
+uint32_t DiagnosticFinalizeDeleteRecoveredCharacter(uint32_t slotIndex);
 bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
     uint32_t slotIndex,
     char* outCharacterName,

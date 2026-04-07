@@ -487,11 +487,11 @@ public:
     // slot-record status byte `+0x0b` indexed by the selected row high word.
     virtual uint8_t GetVariantState(int32_t variantIndex) const = 0;
     // +0xe8
-    void UnknownSlot59();
+    virtual uint32_t RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) = 0;
     // +0xec
     virtual uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) = 0;
     // +0xf0
-    // virtual void SetSelectionIndexAndSwitchToState7(uint8_t selectionIndex) = 0;
+    virtual uint32_t SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) = 0;
     // +0xf4
     virtual const void* GetState8PersistenceF1c() const = 0;
     // +0xf8

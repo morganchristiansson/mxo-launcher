@@ -370,6 +370,7 @@ CLTLoginMediator::CLTLoginMediator()
       scaffoldState4_(nullptr),
       scaffoldState5_(nullptr),
       scaffoldState6_(nullptr),
+      scaffoldState7_(nullptr),
       scaffoldState8_(nullptr),
       scaffoldState9_(nullptr),
       scaffoldState10_(nullptr),
@@ -1819,11 +1820,52 @@ void CLTLoginMediator::ResetSelectionContext0ecMirror() {
         selection0ecCount_);
 }
 
+// +0xe8
+// anchor: launcher.exe:0x41ec00
+uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) {
+    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
+    if (stateCode <= 2u || selectedSlotRecordIndex >= 100u || slotRecordCount684_ == 0u) {
+        return 0u;
+    }
+
+    const size_t slotIndex = static_cast<size_t>(selectedSlotRecordIndex);
+    if (slotIndex >= slotRecords688_.size() || !slotRecordValid688_[slotIndex]) {
+        return 0u;
+    }
+
+    if (slotRecordCount684_ != 0u) {
+        --slotRecordCount684_;
+    }
+
+    for (size_t i = slotIndex; i + 1u < slotRecords688_.size(); ++i) {
+        slotRecords688_[i] = slotRecords688_[i + 1u];
+        slotRecordValid688_[i] = slotRecordValid688_[i + 1u];
+        routeHostStrings818_[i] = routeHostStrings818_[i + 1u];
+    }
+    slotRecords688_.back() = {};
+    slotRecordValid688_.back() = false;
+    routeHostStrings818_.back().text.clear();
+
+    if (CharacterRouteIndexCc8() >= slotRecordCount684_) {
+        CharacterRouteIndexCc8() = 0u;
+    }
+    if (state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 >= slotRecordCount684_) {
+        state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = 0u;
+    }
+
+    PersistCharactersIniFromRecoveredAuthStateScaffold();
+    return 0u;
+}
+
 // +0xf0
 // anchor: launcher.exe:0x41c390
-uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectionIndex) {
-    if (currentState_ && currentState_->DispatchPhaseCode() > 2u && selectionIndex < 100u) {
-        state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = static_cast<uint8_t>(selectionIndex & 0xffu);
+uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) {
+    if (currentState_ && currentState_->DispatchPhaseCode() > 2u && selectedSlotRecordIndex < 100u) {
+        state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu);
+        postAuthMarginLoadingState_.characterRouteIndexCc8 = static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu);
+        if (scaffoldState7_ != nullptr) {
+            SwitchHelperStateScaffold(7u, scaffoldState7_);
+        }
         // Bounded source note:
         // - original `0x41c390` switches helper state to `7`
         // - one concrete launcher-side upstream caller now visible in static RE is
@@ -1836,20 +1878,6 @@ uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selection
         //   - waits for event `8` through `0x41b6c0`
         //   - on success (`WaitForEvent` returns `0`) deletes `Profiles\%s\%s`, calls sibling
         //     `+0xe8 = 0x41ec00`, and rebuilds the list
-        // - practical consequence: the current concrete `0x40ec70 -> +0xf0 -> event 8` corridor is
-        //   now better read as the launcher's delete-character/removal action, not as the hidden
-        //   success-side producer for the later `+0xec / 0x41c1f0` `0xb4` commit
-        // - newer launcher/client bridge tightening narrows that missing producer path:
-        //   - launcher selection UI closes through `0x40d6f0`, which writes
-        //     `CLauncher+0xa8/+0xac` and persists `Last_WorldName`
-        //   - the concrete direct `+0xec` call then appears later on the client side at
-        //     `client.dll:0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`, after that client
-        //     branch zero-initializes and fills a stack-local `0xb4` object
-        // - negative result from the launcher-side helper family itself: it still does not expose a
-        //   direct launcher virtual-call site for `+0xec / 0x41c1f0`
-        // - current active replacement route does not yet model a dedicated state7 scaffold here
-        // - keep the exact owner byte write anchored now, and let the later `0x41c1f0` state8
-        //   transition remain the concrete source-owned continuation on the no-GUI path
     }
     return 0u;
 }
@@ -2074,6 +2102,25 @@ const SlotRecordState004b5328* CLTLoginMediator::RecoveredCharacterByIndexScaffo
         return nullptr;
     }
     return GetSlotRecordByIndex(static_cast<uint8_t>(slotIndex));
+}
+
+uint32_t CLTLoginMediator::BeginDeleteCharacterBySlotIndexScaffold(uint32_t slotIndex) {
+    const SlotRecordState004b5328* slotRecord = RecoveredCharacterByIndexScaffold(slotIndex);
+    if (!slotRecord || slotRecord->heapString14.empty()) {
+        return 1u;
+    }
+
+    const CLTLoginState* const oldState = currentState_;
+    SetSelectionIndexAndSwitchToState7(slotIndex);
+    if (scaffoldState7_ == nullptr) {
+        return 1u;
+    }
+
+    return SwitchHelperStateAndDispatchSlot3Scaffold(
+        7u,
+        scaffoldState7_,
+        const_cast<CLTLoginState*>(oldState),
+        "text-mode delete-character bridge (launcher 0x40ec70 / +0xf0 -> state7 slot3)");
 }
 
 bool CLTLoginMediator::BuildPartialSelectionContextForRecoveredCharacterScaffold(
