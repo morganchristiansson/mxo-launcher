@@ -53,15 +53,16 @@ const char* kLauncherRegistryKeyPath = "Software\\Monolith Productions\\The Matr
 bool g_PreClientAuthAndCharacterSelectionCompleted = false;
 
 struct RecoveredLauncherSelectionRecord {
-    const char* selectionWorldName;
+    const char* selectionName;
     const char* routeHostPrefix;
-    uint32_t worldIndexLow24;
     uint32_t selectionGateByte100;
     uint32_t variantState;
 };
 
+constexpr uint32_t kRecoveredSelectionWorldIndexLow24 = 0x00002au;
+
 const RecoveredLauncherSelectionRecord kRecoveredLauncherSelectionRecords[] = {
-    {"Reality", "reality", 0x00002au, 1u, 0u},
+    {"Reality", "reality", 1u, 0u},
 };
 
 template <typename T>
@@ -256,8 +257,8 @@ bool LoadLastWorldNameFromRegistry(char* out, DWORD outSize) {
     return out[0] != '\0';
 }
 
-bool StoreLastWorldNameInRegistry(const char* selectionWorldName) {
-    if (!selectionWorldName || !selectionWorldName[0]) return false;
+bool StoreLastWorldNameInRegistry(const char* selectionName) {
+    if (!selectionName || !selectionName[0]) return false;
 
     HKEY key = NULL;
     DWORD disposition = 0;
@@ -276,13 +277,13 @@ bool StoreLastWorldNameInRegistry(const char* selectionWorldName) {
         return false;
     }
 
-    const size_t byteCount = std::strlen(selectionWorldName) + 1;
+    const size_t byteCount = std::strlen(selectionName) + 1;
     LONG setResult = RegSetValueExA(
         key,
         "Last_WorldName",
         0,
         REG_SZ,
-        reinterpret_cast<const BYTE*>(selectionWorldName),
+        reinterpret_cast<const BYTE*>(selectionName),
         static_cast<DWORD>(byteCount));
     RegCloseKey(key);
     if (setResult != ERROR_SUCCESS) {
@@ -292,7 +293,7 @@ bool StoreLastWorldNameInRegistry(const char* selectionWorldName) {
 
     spdlog::info(
         "DIAGNOSTIC: persisted HKLM Last_WorldName='{}'{}",
-        selectionWorldName,
+        selectionName,
         (disposition == REG_CREATED_NEW_KEY) ? " (created key)" : "");
     return true;
 }
@@ -322,18 +323,18 @@ void CanonicalizeLauncherSelectionLookupName(char* destination, size_t destinati
     LowercaseAsciiCopy(destination, destinationSize, trimmed);
 }
 
-const RecoveredLauncherSelectionRecord* FindRecoveredLauncherSelectionRecord(const char* selectionWorldName) {
-    if (!selectionWorldName || !selectionWorldName[0]) return NULL;
+const RecoveredLauncherSelectionRecord* FindRecoveredLauncherSelectionRecord(const char* selectionName) {
+    if (!selectionName || !selectionName[0]) return NULL;
 
     char normalizedInput[128] = {0};
-    CanonicalizeLauncherSelectionLookupName(normalizedInput, sizeof(normalizedInput), selectionWorldName);
+    CanonicalizeLauncherSelectionLookupName(normalizedInput, sizeof(normalizedInput), selectionName);
     if (!normalizedInput[0]) return NULL;
 
     for (size_t i = 0; i < sizeof(kRecoveredLauncherSelectionRecords) / sizeof(kRecoveredLauncherSelectionRecords[0]); ++i) {
         const RecoveredLauncherSelectionRecord& record = kRecoveredLauncherSelectionRecords[i];
 
         char normalizedRecordWorld[128] = {0};
-        CanonicalizeLauncherSelectionLookupName(normalizedRecordWorld, sizeof(normalizedRecordWorld), record.selectionWorldName);
+        CanonicalizeLauncherSelectionLookupName(normalizedRecordWorld, sizeof(normalizedRecordWorld), record.selectionName);
         if (normalizedRecordWorld[0] && std::strcmp(normalizedRecordWorld, normalizedInput) == 0) {
             return &record;
         }
@@ -348,31 +349,10 @@ const RecoveredLauncherSelectionRecord* FindRecoveredLauncherSelectionRecord(con
     return NULL;
 }
 
-void LogArgvContentsAsBytes(const char* label, char** argv, uint32_t count) {
-    if (!argv || count == 0) return;
-    spdlog::info("{} pointer array @ {}:", label, fmt::ptr(argv));
-    for (uint32_t i = 0; i < count && i < 8; ++i) {
-        spdlog::info("  argv[{}] = {}", i, fmt::ptr(argv[i]));
-    }
-    if (argv[0]) {
-        const uint8_t* bytes = reinterpret_cast<const uint8_t*>(argv[0]);
-        spdlog::info(
-            "{} argv[0] data @ {}: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            label,
-            fmt::ptr(argv[0]),
-            bytes[0], bytes[1], bytes[2], bytes[3],
-            bytes[4], bytes[5], bytes[6], bytes[7]);
-        spdlog::info("{} argv[0] as string: '{}'", label, argv[0]);
-    }
-}
-
 void LogKnownStartupState(const mxo::launcher::CLauncher& launcher) {
     spdlog::info("=== Known startup frame ===");
     spdlog::info("arg1 filteredArgCount        = 0x{:08x}", g_LauncherFilteredArgCount);
     spdlog::info("arg2 filteredArgv            = {}", fmt::ptr(g_LauncherFilteredArgv));
-    if (g_LauncherFilteredArgv) {
-        LogArgvContentsAsBytes("arg2", g_LauncherFilteredArgv, g_LauncherFilteredArgCount);
-    }
     spdlog::info("arg3 hClientDll              = {}", fmt::ptr(g_hClient));
     spdlog::info("arg4 hCresDll                = {}", fmt::ptr(g_hCres));
     spdlog::info("arg5 launcherNetworkObject   = {}", fmt::ptr(g_pLauncherObject6304));
@@ -542,7 +522,7 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     if (sizeof(kRecoveredLauncherSelectionRecords) / sizeof(kRecoveredLauncherSelectionRecords[0]) > 0) {
         std::strncpy(
             startupContext->mediatorSelectionName,
-            kRecoveredLauncherSelectionRecords[0].selectionWorldName,
+            kRecoveredLauncherSelectionRecords[0].selectionName,
             sizeof(startupContext->mediatorSelectionName) - 1);
         startupContext->mediatorSelectionName[sizeof(startupContext->mediatorSelectionName) - 1] = '\0';
         spdlog::info(
@@ -558,14 +538,14 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     startupContext->recoveredSelection = FindRecoveredLauncherSelectionRecord(startupContext->mediatorSelectionName);
     const RecoveredLauncherSelectionRecord* recoveredSelection = AsRecoveredSelection(startupContext->recoveredSelection);
     if (recoveredSelection) {
-        std::strncpy(startupContext->mediatorSelectionName, recoveredSelection->selectionWorldName, sizeof(startupContext->mediatorSelectionName) - 1);
+        std::strncpy(startupContext->mediatorSelectionName, recoveredSelection->selectionName, sizeof(startupContext->mediatorSelectionName) - 1);
         startupContext->mediatorSelectionName[sizeof(startupContext->mediatorSelectionName) - 1] = '\0';
         m_FieldA8 = 0u;
-        m_FieldAC = recoveredSelection->worldIndexLow24;
+        m_FieldAC = kRecoveredSelectionWorldIndexLow24;
         const uint32_t packedArg7Selection = BuildPackedArg7Selection();
         spdlog::info(
             "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
-            recoveredSelection->selectionWorldName,
+            recoveredSelection->selectionName,
             m_FieldA8,
             m_FieldAC,
             packedArg7Selection,
@@ -676,20 +656,20 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 
         uint32_t resolvedA8 = m_FieldA8;
         uint32_t resolvedAC = m_FieldAC;
-        char resolvedWorldName[sizeof(g_LastWorldName)] = {0};
+        char resolvedSelectionName[sizeof(g_LastWorldName)] = {0};
         if (DiagnosticResolveLauncherSelectionFromMediator(
                 g_pILTLoginMediatorSelection3584,
                 m_FieldAC,
                 m_FieldA8,
                 &resolvedA8,
                 &resolvedAC,
-                resolvedWorldName,
-                sizeof(resolvedWorldName))) {
+                resolvedSelectionName,
+                sizeof(resolvedSelectionName))) {
             m_FieldA8 = resolvedA8;
             m_FieldAC = resolvedAC;
             const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-            if (resolvedWorldName[0]) {
-                std::strncpy(g_LastWorldName, resolvedWorldName, sizeof(g_LastWorldName) - 1);
+            if (resolvedSelectionName[0]) {
+                std::strncpy(g_LastWorldName, resolvedSelectionName, sizeof(g_LastWorldName) - 1);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
                 StoreLastWorldNameInRegistry(g_LastWorldName);
             }
@@ -711,7 +691,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
     if (recoveredSelection && recoveredSelection->routeHostPrefix && recoveredSelection->routeHostPrefix[0]) {
         std::strncpy(marginRoutePrefix, recoveredSelection->routeHostPrefix, sizeof(marginRoutePrefix) - 1);
         marginRoutePrefix[sizeof(marginRoutePrefix) - 1] = '\0';
-        spdlog::info("DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'", marginRoutePrefix, recoveredSelection->selectionWorldName);
+        spdlog::info("DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'", marginRoutePrefix, recoveredSelection->selectionName);
     } else {
         LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), startupContext.mediatorSelectionName);
     }
@@ -904,15 +884,15 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             }
         }
 
-        char persistedWorldName[256] = {};
-        if (LoadLastWorldNameFromRegistry(persistedWorldName, sizeof(persistedWorldName))) {
+        char persistedSelectionName[256] = {};
+        if (LoadLastWorldNameFromRegistry(persistedSelectionName, sizeof(persistedSelectionName))) {
             spdlog::info(
                 "DIAGNOSTIC: loaded HKLM Last_WorldName fallback='{}' on character-selection path",
-                persistedWorldName);
+                persistedSelectionName);
         }
 
         char selectedCharacterName[256] = {};
-        char selectedWorldName[256] = {};
+        char selectedSelectionName[256] = {};
         uint32_t selectedDescriptorIndex = 0u;
         spdlog::info(
             "ROUTE CHECKPOINT: pre-client no-GUI selection mirroring LauncherLoginDialog page11 Enter/command10 -> page7, then page7 list activation command8 (not page7 primary-button command11); world selection is finalized here after the character index is read");
@@ -920,8 +900,8 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 selectedCharacterIndex,
                 selectedCharacterName,
                 sizeof(selectedCharacterName),
-                selectedWorldName,
-                sizeof(selectedWorldName),
+                selectedSelectionName,
+                sizeof(selectedSelectionName),
                 &selectedDescriptorIndex)) {
             // anchor: launcher.exe:0x4047d0 / case 7
             // anchor: launcher.exe:0x40d820
@@ -951,18 +931,18 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             g_LauncherCommandLine.SetLauncherCharacter(selectedCharacterName);
         }
 
-        if (!selectedWorldName[0] && persistedWorldName[0]) {
-            std::strncpy(selectedWorldName, persistedWorldName, sizeof(selectedWorldName) - 1u);
-            selectedWorldName[sizeof(selectedWorldName) - 1u] = '\0';
+        if (!selectedSelectionName[0] && persistedSelectionName[0]) {
+            std::strncpy(selectedSelectionName, persistedSelectionName, sizeof(selectedSelectionName) - 1u);
+            selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
             spdlog::info(
                 "DIAGNOSTIC: falling back to persisted Last_WorldName='{}' on character-selection path",
-                selectedWorldName);
+                selectedSelectionName);
         }
 
-        if (selectedWorldName[0]) {
+        if (selectedSelectionName[0]) {
             if (const RecoveredLauncherSelectionRecord* recoveredSelection =
-                    FindRecoveredLauncherSelectionRecord(selectedWorldName)) {
-                const uint32_t selectedRowLowWordWorldIndex = selectedDescriptorIndex & 0x00ffffffu;
+                    FindRecoveredLauncherSelectionRecord(selectedSelectionName)) {
+                const uint32_t selectedRowLowWordSelectionIndex = selectedDescriptorIndex & 0x00ffffffu;
                 const uint32_t selectedRowHighWordSelectionIndex = selectedCharacterIndex & 0xffffu;
                 const uint32_t worldUpperBoundExclusive =
                     (selectedDescriptorIndex < 0xffu) ? (selectedDescriptorIndex + 1u) : 1u;
@@ -974,44 +954,44 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 DiagnosticConfigureMediatorSelection(
                     worldUpperBoundExclusive,
                     selectionUpperBoundExclusive,
-                    selectedWorldName,
-                    selectedCharacterName[0] ? selectedCharacterName : selectedWorldName,
-                    selectedRowLowWordWorldIndex,
+                    selectedSelectionName,
+                    selectedCharacterName[0] ? selectedCharacterName : selectedSelectionName,
+                    selectedRowLowWordSelectionIndex,
                     selectedRowHighWordSelectionIndex,
                     recoveredSelection->selectionGateByte100,
                     recoveredSelection->variantState);
 
                 spdlog::info(
                     "ROUTE CHECKPOINT: pre-client no-GUI page7 row mirror lowWord(worldIndex)=0x{:04x} highWord(selectionIndex)=0x{:04x} world='{}' character='{}'",
-                    static_cast<unsigned>(selectedRowLowWordWorldIndex & 0xffffu),
+                    static_cast<unsigned>(selectedRowLowWordSelectionIndex & 0xffffu),
                     static_cast<unsigned>(selectedRowHighWordSelectionIndex & 0xffffu),
-                    selectedWorldName,
+                    selectedSelectionName,
                     selectedCharacterName[0] ? selectedCharacterName : "<unresolved>");
 
                 void* selectionMediatorSlot =
                     g_pILTLoginMediatorSelection3584 ? g_pILTLoginMediatorSelection3584 : g_pILTLoginMediatorDefault;
                 uint32_t resolvedA8 = m_FieldA8;
                 uint32_t resolvedAC = m_FieldAC;
-                char resolvedWorldName[sizeof(g_LastWorldName)] = {};
+                char resolvedSelectionName[sizeof(g_LastWorldName)] = {};
                 const bool resolvedViaCommand8 =
                     selectionMediatorSlot != nullptr &&
                     DiagnosticResolveLauncherSelectionFromMediator(
                         selectionMediatorSlot,
-                        selectedRowLowWordWorldIndex,
+                        selectedRowLowWordSelectionIndex,
                         selectedRowHighWordSelectionIndex,
                         &resolvedA8,
                         &resolvedAC,
-                        resolvedWorldName,
-                        sizeof(resolvedWorldName));
+                        resolvedSelectionName,
+                        sizeof(resolvedSelectionName));
 
                 if (resolvedViaCommand8) {
                     m_FieldA8 = resolvedA8;
                     m_FieldAC = resolvedAC;
                     const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-                    const char* persistedWorldName = resolvedWorldName[0]
-                        ? resolvedWorldName
-                        : recoveredSelection->selectionWorldName;
-                    std::strncpy(g_LastWorldName, persistedWorldName, sizeof(g_LastWorldName) - 1u);
+                    const char* persistedSelectionName = resolvedSelectionName[0]
+                        ? resolvedSelectionName
+                        : recoveredSelection->selectionName;
+                    std::strncpy(g_LastWorldName, persistedSelectionName, sizeof(g_LastWorldName) - 1u);
                     g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
                     StoreLastWorldNameInRegistry(g_LastWorldName);
                     spdlog::info(
@@ -1024,9 +1004,9 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                         packedArg7Selection);
                 } else {
                     m_FieldA8 = 0u;
-                    m_FieldAC = recoveredSelection->worldIndexLow24;
+                    m_FieldAC = selectedRowLowWordSelectionIndex;
                     const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-                    std::strncpy(g_LastWorldName, recoveredSelection->selectionWorldName, sizeof(g_LastWorldName) - 1u);
+                    std::strncpy(g_LastWorldName, recoveredSelection->selectionName, sizeof(g_LastWorldName) - 1u);
                     g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
                     StoreLastWorldNameInRegistry(g_LastWorldName);
                     spdlog::warn(
@@ -1039,12 +1019,12 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                         packedArg7Selection);
                 }
             } else {
-                std::strncpy(g_LastWorldName, selectedWorldName, sizeof(g_LastWorldName) - 1u);
+                std::strncpy(g_LastWorldName, selectedSelectionName, sizeof(g_LastWorldName) - 1u);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
                 StoreLastWorldNameInRegistry(g_LastWorldName);
                 spdlog::warn(
                     "WARNING: selected world '{}' has no recovered launcher selection record; persisting Last_WorldName without changing a8/ac",
-                    selectedWorldName);
+                    selectedSelectionName);
             }
         }
 
@@ -1055,7 +1035,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             static_cast<unsigned>(characterCount),
             static_cast<unsigned>(selectedCharacterIndex),
             selectedCharacterName[0] ? selectedCharacterName : "<unresolved>",
-            selectedWorldName[0] ? selectedWorldName : "<unresolved>");
+            selectedSelectionName[0] ? selectedSelectionName : "<unresolved>");
         return true;
     }
 }
