@@ -437,13 +437,13 @@ CLTLoginMediator::CLTLoginMediator()
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::~CLTLoginMediator() {
     FreeLateEntryList1470StorageScaffold();
-    ResetLauncherConnectionBridgeScaffold();
+    ResetLauncherConnectionsScaffold();
     ClearObserverTree674();
     EraseMarginBootstrapState(this);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
+void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     if (authConnection_) {
         authConnection_->SetOwnerContext(nullptr);
     }
@@ -469,7 +469,7 @@ void CLTLoginMediator::ResetLauncherConnectionBridgeScaffold() {
     authPeerCloseQueuedScaffold_ = false;
     marginPeerCloseQueuedScaffold_ = false;
 
-    spdlog::info("CLTLoginMediator::ResetLauncherConnectionBridgeScaffold completed");
+    spdlog::info("CLTLoginMediator::ResetLauncherConnectionsScaffold completed");
 }
 
 // +0x00

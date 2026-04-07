@@ -59,7 +59,7 @@ static void AssignOwnedSmallStringForAuthEntry(
 //   - zeroed `block40/block50`
 //   - small-string at `+0x60`
 // - that helper then submits through sibling resolved slot `0x4d2734` vtable `+0x30`
-// - newer raw-vtable clarification closes that bridge directly:
+// - newer raw-vtable clarification closes that submit path directly:
 //   - raw mediator vtable memory at `0x004b01f8` stores `0x41ecd0`
 //   - so the launcher page-`6` helper's `call [eax+0x30]` is the same recovered
 //     `CLTLoginMediator::ProcessLoginRequest` boundary
@@ -396,7 +396,7 @@ void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
+void CLTLoginMediator::BindLauncherConnectionsScaffold(
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
     if (!engine) {
         return;
@@ -406,7 +406,7 @@ void CLTLoginMediator::BindLauncherConnectionBridgeScaffold(
     EnsureBuiltinScaffoldStatesRegistered();
     RegisterActiveStateSourceScaffold(this);
     spdlog::info(
-        "CLTLoginMediator::BindLauncherConnectionBridgeScaffold engine={} currentState={}",
+        "CLTLoginMediator::BindLauncherConnectionsScaffold engine={} currentState={}",
         fmt::ptr(engine),
         currentState_ ? currentState_->DebugName() : "<null>");
 }
@@ -461,7 +461,7 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         const bool haveResolvedSubmitSurface =
             DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
         spdlog::info(
-            "ROUTE CHECKPOINT: launcher bridge auto-begin auth via {} currentState={} usernameSource={} passwordSource={} ownerSource94Empty={}",
+            "ROUTE CHECKPOINT: launcher auto-begin auth via {} currentState={} usernameSource={} passwordSource={} ownerSource94Empty={}",
             haveResolvedSubmitSurface
                 ? "resolved ILTLoginMediator.Default-style raw +0x30 ProcessLoginRequest surface"
                 : "direct owner ProcessLoginRequest fallback",
@@ -476,7 +476,7 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         CLTLoginState* const upstreamState = currentState_;
         CLTLoginState* const state2 = scaffoldState2_;
         spdlog::info(
-            "ROUTE CHECKPOINT: launcher bridge auto-begin auth via state2 fallback currentState={} upstreamState={} state2Registered={} currentPhaseCode={} haveConfiguredSubmitInput={}",
+            "ROUTE CHECKPOINT: launcher auto-begin auth via state2 fallback currentState={} upstreamState={} state2Registered={} currentPhaseCode={} haveConfiguredSubmitInput={}",
             currentState_ ? currentState_->DebugName() : "<null>",
             upstreamState ? upstreamState->DebugName() : "<null>",
             state2 ? 1u : 0u,
@@ -1079,7 +1079,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     return connection->EnsureConnected();
 }
 
-// UNANCHORED: source-owned early-auth bridge that stages state1 then dispatches slot 3.
+// UNANCHORED: source-owned early-auth helper that stages state1 then dispatches slot 3.
 uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
     CLTLoginState* const state1 = scaffoldState1_;
     if (state1 == nullptr) {
@@ -1137,7 +1137,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
     return result;
 }
 
-// UNANCHORED: source-owned status replay bridge that re-enters the active helper after caching type-2 auth connect status.
+// UNANCHORED: source-owned status replay helper that re-enters the active helper after caching type-2 auth connect status.
 uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
     // Keep the status-recording contract explicit:
     // - `HandleAuthConnectStatus` must cache the type-2 payload on the mediator first

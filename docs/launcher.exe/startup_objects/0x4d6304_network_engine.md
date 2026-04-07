@@ -1450,7 +1450,7 @@ Important limitation:
   - current diagnostic list-head emptiness for arg5 `+0x80` / `+0x8c` is also synchronized from that sidecar engine state so later stub logs track the new class-backed state more directly
   - newer arg5-helper seam cleanup now also moves the current nonblocking launcher-bridge pump closer to the recovered engine ownership:
     - `LauncherObject_Subobject60_Slot0(...)` no longer calls a mediator polling helper directly
-    - arg5 helper `+0x60` slot `0` now resolves the sidecar `CLTThreadPerClientTCPEngine` and calls an engine-owned `PumpLauncherConnectionBridgeFromArg5HelperScaffold()` helper
+    - arg5 helper `+0x60` slot `0` now resolves the sidecar `CLTThreadPerClientTCPEngine` and calls an engine-owned `PumpLauncherConnectionsFromArg5HelperScaffold()` helper
     - the queue push shaped after original `0x436820` and the synthetic launcher-bridge work-item allocation now also live on the liblttcp engine side rather than in `loginmediator.cpp` or the ABI shell
     - `CLTLoginMediator` still owns only the queued context callback surface and the narrow auth/margin begin wrappers that seed those contexts into the engine
 - they are therefore now best treated as **partially wired starter structure**, still far from faithful semantics but no longer only dormant future placeholders

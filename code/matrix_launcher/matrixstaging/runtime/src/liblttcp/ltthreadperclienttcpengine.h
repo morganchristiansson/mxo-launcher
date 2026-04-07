@@ -462,7 +462,7 @@ public:
     // target class side; launcher ABI wrappers only route raw helper entrypoints here.
     // Faithfulness split after the current helper pass:
     // - these class methods now mirror only the original helper bodies themselves
-    // - the extra launcher-bridge pump side effect remains on the arg5 `+0x60` shell slot-0
+    // - the extra launcher-side no-worker pump side effect remains on the arg5 `+0x60` shell slot-0
     //   wrapper, not in the pure enter-helper body
     // anchor: launcher.exe:0x435f90
     uint32_t SignalQueueEventHelper();
@@ -488,7 +488,7 @@ public:
         CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
         CLTTCPConnection* connection,
         const char* label = nullptr);
-    void PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+    void PumpLauncherConnectionsFromArg5HelperScaffold();
 
     // anchor: launcher.exe:0x436b10
     // Current bounded source mirror:

@@ -1047,12 +1047,12 @@ public:
     // - preserves the state4-owned `0x439300` case split instead of open-coding it in diagnostics
     // - dispatches the registered state4 slot 3 against the current helper as upstream input
     uint32_t BeginMarginConnectionViaState4Scaffold();
-    // Launcher-owned arg5/auth bridge migration:
-    // - keep the queued context callbacks on `CLTLoginMediator`
-    // - let `CLTThreadPerClientTCPEngine` own the current queue push / nonblocking pump seam
+    // Launcher-owned arg5/auth connection migration:
+    // - keep the direct auth/margin child ownership on `CLTLoginMediator`
+    // - let `CLTThreadPerClientTCPEngine` own the current queue push / no-worker pump seam
     // - keep the launcher-object ABI shell thin and arg5-shaped
-    void ResetLauncherConnectionBridgeScaffold();
-    void BindLauncherConnectionBridgeScaffold(
+    void ResetLauncherConnectionsScaffold();
+    void BindLauncherConnectionsScaffold(
         mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
     bool CanBeginLauncherAuthConnectionScaffold() const;
     uint32_t BeginLauncherAuthConnectionScaffold();

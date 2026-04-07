@@ -32,7 +32,7 @@ const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const
         return routeHost;
     }
 
-    // Current bounded bridge for the still-unrecovered earlier producer of owner
+    // Current bounded stand-in for the still-unrecovered earlier producer of owner
     // `+0x30/+0x3c/+0x6c` on the existing-character path:
     // when the per-slot route table is not populated yet, reuse the launcher-selected route host
     // prefix already mirrored on the owner.

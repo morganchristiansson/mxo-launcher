@@ -56,8 +56,8 @@ static bool ResolveIpv4Address(const char* hostName, uint32_t* outIpv4NetworkOrd
 
 // Per-logger SPDLOG_LEVEL overrides only apply on call sites that explicitly fetch a named logger.
 // Keep the receive hot-path seam narrow by only routing labels with registered logger names through
-// spdlog::get(...); all other bridge labels fall back to the default logger.
-static spdlog::logger* LoggerForBridgeLabel(const char* label) {
+// spdlog::get(...); all other queue labels fall back to the default logger.
+static spdlog::logger* LoggerForQueueLabel(const char* label) {
     if (label && label[0]) {
         if (std::shared_ptr<spdlog::logger> logger = spdlog::get(label)) {
             return logger.get();
@@ -105,7 +105,7 @@ static std::unordered_map<CLTThreadPerClientTCPEngine_Queue*, std::vector<uint32
 // - the real `0xb4` engine object is already fully accounted for by the recovered in-object fields
 //   at `+0x04/+0x08/+0x0c/+0x34/+0x5c/+0x60/+0x7c/+0x80/+0x84/+0x8c/+0x90/+0x98`
 // - so none of the source-owned maps below should be mistaken for hidden original class fields
-// - recovered runtime payload families are tracked separately from source-only launcher bridge
+// - recovered runtime payload families are tracked separately from source-only launcher ABI-shell
 //   baggage using node shapes that match the launcher tree families rather than source vectors
 
 static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "launcher tree node-base size mismatch");
@@ -606,7 +606,7 @@ static CBaseConnection* ResolveEngineQueueContextOwnerScaffold(void* contextKey)
     return CBaseConnection_FromQueueContextScaffold(contextKey);
 }
 
-static const char* LauncherBridgeWorkTypeName(uint32_t workType) {
+static const char* EngineWorkTypeName(uint32_t workType) {
     switch (workType) {
         case CLTThreadPerClientTCPEngine::kWorkTypeClose:
             return "Close";
@@ -2787,7 +2787,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
         (void)SignalQueueEventHelper();
     }
 
-    LoggerForBridgeLabel(label)->info(
+    LoggerForQueueLabel(label)->info(
         "CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold label={} queue=[{}] workItem=0x{:08x} context={} pairWasEmpty={:08x} lockHeld={:08x}",
         label ? label : "<null>",
         useQueue34 ? "queue34" : "queue0C",
@@ -2816,7 +2816,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
             static_cast<CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*>(
                 std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold)));
         if (!statusWorkItem) {
-            LoggerForBridgeLabel(label)->info(
+            LoggerForQueueLabel(label)->info(
                 "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
                 label ? label : "<null>");
             return false;
@@ -2830,7 +2830,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
             static_cast<CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*>(
                 std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold)));
         if (!closeWorkItem) {
-            LoggerForBridgeLabel(label)->info(
+            LoggerForQueueLabel(label)->info(
                 "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
                 label ? label : "<null>");
             return false;
@@ -2840,10 +2840,10 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
         closeWorkItem->header.statusOrPayloadDword08 = 0u;
         workItem = &closeWorkItem->header;
     } else {
-        LoggerForBridgeLabel(label)->warn(
+        LoggerForQueueLabel(label)->warn(
             "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold unsupported workType=0x{:08x} ({}) connection={} label='{}'",
             workType,
-            LauncherBridgeWorkTypeName(workType),
+            EngineWorkTypeName(workType),
             fmt::ptr(connection),
             label ? label : "<null>");
         return false;
@@ -2861,13 +2861,13 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
         return false;
     }
 
-    LoggerForBridgeLabel(label)->info(
+    LoggerForQueueLabel(label)->info(
         "CLTThreadPerClientTCPEngine direct queued work label='{}' workItem={} context={} type=0x{:08x} ({}) payload=0x{:08x}",
         label ? label : "<null>",
         fmt::ptr(workItem),
         fmt::ptr(queuedContext),
         workType,
-        LauncherBridgeWorkTypeName(workType),
+        EngineWorkTypeName(workType),
         workPayload);
 
     bool shouldImmediateDrain = (workType == kWorkTypeConnectionStatus || workType == kWorkTypeClose);
@@ -2965,7 +2965,7 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaffold() {
+void CLTThreadPerClientTCPEngine::PumpLauncherConnectionsFromArg5HelperScaffold() {
     mxo::ltlogin::CLTLoginMediator* mediator =
         mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
     if (mediator == nullptr) {

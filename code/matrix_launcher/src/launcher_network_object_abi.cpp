@@ -188,11 +188,11 @@ static void ResetLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner) {
     // Current fidelity correction from the latest queue/worker/context RE pass:
     // - original engine evidence stays connection-centric (`0x431ff0`, `0x4316a0`, `0x436820`,
     //   `0x436b10`, `0x449d40`)
-    // - there is still no positive Ghidra evidence that mediator bridge bind/reset belongs to the
-    //   engine object itself
-    // So keep mediator bridge teardown in the outer launcher/login seam, not in liblttcp binding.
+    // - there is still no positive Ghidra evidence that mediator bind/reset belongs to the engine
+    //   object itself
+    // So keep mediator-side connection reset in the outer launcher/login seam, not in liblttcp binding.
     if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-        mediator->ResetLauncherConnectionBridgeScaffold();
+        mediator->ResetLauncherConnectionsScaffold();
     }
     binding.Reset();
 }
@@ -206,14 +206,14 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
     if (binding.Owner() != owner) {
         mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
         if (binding.Engine() && mediator) {
-            mediator->ResetLauncherConnectionBridgeScaffold();
+            mediator->ResetLauncherConnectionsScaffold();
         }
         if (!binding.Bind(owner)) {
             spdlog::warn("launcher arg5 ABI shell failed to bind CLTThreadPerClientTCPEngine sidecar for {}", fmt::ptr(owner));
             return NULL;
         }
         if (binding.Engine() && mediator) {
-            mediator->BindLauncherConnectionBridgeScaffold(binding.Engine());
+            mediator->BindLauncherConnectionsScaffold(binding.Engine());
         }
     }
 
@@ -585,13 +585,13 @@ static uint32_t __thiscall LauncherObject_Subobject5C_Slot1(void* self, int reas
 // vtable: launcher.exe:0x4add70-family helper slot +0x00 (arg5+0x60)
 // Faithfulness note:
 // - the original helper body itself is just the `EnterCriticalSection` wrapper from `0x4147b0`
-// - the extra launcher-bridge pump remains a current shell-owned side effect layered on top of
-//   that pure enter-helper body for the arg5 `+0x60` slot-0 path only
+// - the extra launcher-side no-worker pump remains a current shell-owned side effect layered on
+//   top of that pure enter-helper body for the arg5 `+0x60` slot-0 path only
 static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
             const uint32_t result = engine->EnterQueueLockHelper();
-            engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+            engine->PumpLauncherConnectionsFromArg5HelperScaffold();
             return result;
         }
     }
@@ -599,7 +599,7 @@ static uint32_t __thiscall LauncherObject_Subobject60_Slot0(void* self) {
     LauncherObject_LockHelper_Slot0(self);
     if (LauncherObjectAbiShell* owner = LauncherObjectShellFromHelper(self, 0x60)) {
         if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(owner)) {
-            engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+            engine->PumpLauncherConnectionsFromArg5HelperScaffold();
         }
     }
     return 0u;
@@ -828,9 +828,9 @@ void LauncherLogNetworkEngineAbiShellDispatchState(void* launcherObjectPtr, cons
 // UNANCHORED: launcher-owned poll helper for pre-client auth/selection sequencing.
 void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking) {
     if (mxo::liblttcp::CLTThreadPerClientTCPEngine* engine = LauncherNetworkEngineFromAbiShell(launcherObjectPtr)) {
-        engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+        engine->PumpLauncherConnectionsFromArg5HelperScaffold();
         engine->RunCompletedOperationQueue(nonBlocking);
-        engine->PumpLauncherConnectionBridgeFromArg5HelperScaffold();
+        engine->PumpLauncherConnectionsFromArg5HelperScaffold();
     }
 }
 
