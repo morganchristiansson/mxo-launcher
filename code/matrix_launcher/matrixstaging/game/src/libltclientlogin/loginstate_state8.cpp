@@ -82,6 +82,14 @@ static void ResetOwnedSectionBytes(void*& buffer, uint32_t& length, uint8_t& fla
     flag = 0u;
 }
 
+static void RefreshOwnedSectionFlag(void* buffer, uint16_t length, uint8_t& flag) {
+    flag = (buffer != nullptr && length != 0u) ? 1u : 0u;
+}
+
+static void RefreshOwnedSectionFlag(void* buffer, uint32_t length, uint8_t& flag) {
+    flag = (buffer != nullptr && length != 0u) ? 1u : 0u;
+}
+
 static void CopyBoundedRawBytes(uint8_t* dest, size_t destSize, const uint8_t* src, size_t srcSize) {
     if (!dest || destSize == 0u) {
         return;
@@ -281,39 +289,39 @@ static void HandleState8ReplySection(
             break;
         case 1u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag13fe = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
             break;
         case 2u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag1406 = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
             break;
         case 3u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag141e = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, ownerState.allocatedBufferFlag141e);
             break;
         case 4u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag1426 = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, ownerState.allocatedBufferFlag1426);
             break;
         case 5u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag142e = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, ownerState.allocatedBufferFlag142e);
             break;
         case 6u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag140e = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
             break;
         case 7u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag1416 = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, ownerState.flag1416);
             break;
         case 8u:
             AppendOwnedSectionBytesU32(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag1448 = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, ownerState.flag1448);
             break;
         case 9u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag1452 = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, ownerState.flag1452);
             LogState8PersistenceFamilySnapshot(ownerState, "section9_clcfg1452", parsed.sectionSelectorMinus2, parsed.sectionByteCount, false);
             break;
         case 10u:
@@ -348,11 +356,11 @@ static void HandleState8ReplySection(
             break;
         case 12u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag1436 = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, ownerState.flag1436);
             break;
         case 13u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, parsed.sectionData, parsed.sectionByteCount);
-            ownerState.flag143e = 1u;
+            RefreshOwnedSectionFlag(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, ownerState.flag143e);
             break;
         default:
             break;

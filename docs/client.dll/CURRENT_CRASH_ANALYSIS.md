@@ -222,14 +222,21 @@ These are no longer the best primary crash explanations:
     - `0x6235e309` inside `0x6235e2e0`
 - important instrumentation correction:
   - the first D3D9 device-hook pass had `SetVertexDeclaration` / `SetFVF` vtable indices off by one
-  - so the earlier exact `currentFVF = 0` / `currentVertexDeclaration = NULL` read is not yet final
-  - current source now corrects those hook indices and logs caller sites for later `SetFVF` /
-    `SetVertexDeclaration` calls too
+  - the corrected pass now shows replacement **does** bind vertex declarations before the suspicious
+    draws; the raw draw sites are no longer best explained by a literal missing-declaration state
+- newest corrected suspicious draw sites now isolate concrete client render helpers:
+  - `0x6233755e` inside `RenderDevice_DrawPrimitiveBatchPositionColored`
+  - `0x6233821a` / `0x623382cf` / `0x62337f29` inside neighboring batch helper `0x62337d70`
+  - `0x6235e309` inside `0x6235e2e0`
 - practical consequence:
-  - the current best render-side suspect is shifting from “only first frame renders” toward
-    “client keeps presenting corrupted frames while issuing bad draw batches for dozens of frames,
-    and we now need the corrected `SetFVF` / vertex-declaration traces on those same caller paths
-    before deciding whether the fault is truly missing layout state or a different downstream draw
-    corruption”
+  - the current best read is now “client keeps presenting corrupted frames while issuing malformed
+    or poisoned draw batches for dozens of frames”, not “no layout state was bound at all”
+  - because user explicitly believes the root still leads back into launcher reimplementation, the
+    strongest remaining launcher-side structural anomaly on the active path is now the `il.cfg`
+    contract bug:
+    - replacement advertised `+0x80 == 1` while `+0xac` returned null / length 0
+    - client helper `0x62198c60` treats that as live-data-present and skips file fallback
+    - newer source now corrects that producer-side contract so empty section-2 payload no longer
+      falsely suppresses fallback/adoption
 
 Use those logs on the next rerun before widening scope.

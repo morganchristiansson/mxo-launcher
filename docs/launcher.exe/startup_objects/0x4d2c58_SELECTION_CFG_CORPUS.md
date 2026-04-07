@@ -223,8 +223,19 @@ Static proof now closes ten exact corpus pairs end-to-end:
    - replacement state8 producer:
      - section selector `2`
      - owner `allocatedBuffer1400/1404/flag1406`
-   - active current-path runtime note:
-     - rerun logs currently show `flag=1` with `ptr=null length=0`
+   - active current-path runtime note before the newest source correction:
+     - rerun logs showed `flag=1` with `ptr=null length=0`
+     - that is a launcher-side contract bug on the replacement path, because client helper
+       `0x62198c60` treats `+0x80 != 0` as "live il.cfg exists, so skip file fallback", then only
+       adopts live bytes when `+0xac` returns non-null
+     - newer source now tightens the state8 producer side so the section-presence flag is derived
+       from actual materialized bytes (`buffer != null && length != 0`) instead of being set
+       unconditionally on a zero-byte section fragment
+     - practical consequence:
+       - section `2` now reports absent rather than falsely advertising a live `il.cfg` with no
+         payload
+       - this is a concrete launcher-side correction that can plausibly affect downstream client
+         state because the old replacement contract skipped both live adopt and file fallback
 
 10. `cui.cfg`
    - client helper `0x621993d0`
