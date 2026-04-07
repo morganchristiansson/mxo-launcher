@@ -243,6 +243,13 @@ New queue-thread clarification from the current focused pass:
     - newer bounded correction: queue selection/pop now happens while the attached arg5 queue lock
       is held, and the blocking empty-queue path releases that lock before the wait and reacquires
       it on the next loop iteration
+    - newer runtime-ablation helper in source now keeps the producer-side `ab28b26` correction
+      isolated for A/B late-render testing:
+      - default remains the higher-fidelity/original-backed mode where parsed-packet / status /
+        close producers queue the direct connection object as `context`
+      - setting environment variable `MXO_USE_QUEUE_CONTEXT_BRIDGE=1` reverts only those producer
+        call sites back to the older source-owned `CBaseConnection_QueueContextScaffold` bridge
+        without rolling back the later state8/state9/close-tail fidelity fixes
     - newer bounded correction: the shutdown-sentinel cascade now re-enters the normal enqueue
       helper path instead of open-coding a raw `Queue_PushPair(0,0)` write
     - newer bounded correction: source now also keeps the recovered `0x4816f0(workItem)`-style

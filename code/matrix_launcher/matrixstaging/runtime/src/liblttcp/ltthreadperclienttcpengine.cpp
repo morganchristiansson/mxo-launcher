@@ -66,6 +66,35 @@ static spdlog::logger* LoggerForBridgeLabel(const char* label) {
     return spdlog::default_logger_raw();
 }
 
+// Runtime ablation toggle for the `ab28b26` producer-side direct-context correction.
+// Default remains the current higher-fidelity/original-backed mode:
+// - queue parsed-packet / status / close work with the direct connection object as `context`
+// Setting `MXO_USE_QUEUE_CONTEXT_BRIDGE=1` reverts just those producers back to the older
+// source-owned `CBaseConnection_QueueContextScaffold` bridge so we can A/B late render/crash
+// behavior without rolling back the later state-machine / close-tail fidelity work.
+static bool UseLegacyQueueContextBridgeProducerAblation() {
+    static int cached = -1;
+    if (cached < 0) {
+        const char* raw = std::getenv("MXO_USE_QUEUE_CONTEXT_BRIDGE");
+        cached = (raw && raw[0] && !(raw[0] == '0' && raw[1] == '\0')) ? 1 : 0;
+        spdlog::info(
+            "CLTThreadPerClientTCPEngine queue-context producer mode={} [MXO_USE_QUEUE_CONTEXT_BRIDGE={}]",
+            cached ? "legacy-bridge-ablation" : "direct-connection-original-default",
+            (raw && raw[0]) ? raw : "<unset>");
+    }
+    return cached != 0;
+}
+
+static void* ResolveQueuedConnectionContextForProducerAblation(CLTTCPConnection* connection) {
+    if (!connection) {
+        return nullptr;
+    }
+    if (UseLegacyQueueContextBridgeProducerAblation()) {
+        return connection->QueueContextScaffold();
+    }
+    return static_cast<void*>(connection);
+}
+
 struct CLTThreadPerClientTCPEngine_QueuePair {
     uint32_t value0;
     uint32_t value1;
@@ -2909,7 +2938,8 @@ bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInterna
         return false;
     }
 
-    void* queuedContext = static_cast<void*>(context->sidecarConnection);
+    void* queuedContext = ResolveQueuedConnectionContextForProducerAblation(
+        context->sidecarConnection);
     const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
         queuedContext,
@@ -2974,7 +3004,7 @@ void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffol
     //   transferred to the queue/consumer boundary when this helper is entered
     const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
-        static_cast<void*>(connection),
+        ResolveQueuedConnectionContextForProducerAblation(connection),
         /*useQueue34=*/false,
         label,
         /*queueLockAlreadyHeld=*/false);

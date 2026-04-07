@@ -109,6 +109,15 @@ Current best read:
 
 ## Practical consequence
 
+A new narrow runtime ablation now exists for the producer-side queue-context correction that landed
+in commit `ab28b26`:
+- default behavior remains the current higher-fidelity/original-backed direct-connection queue
+  context on parsed-packet / status / close producers
+- setting `MXO_USE_QUEUE_CONTEXT_BRIDGE=1` reverts only those producer contexts back to the older
+  source-owned queue-context bridge
+- this is intended only for A/B late-render/crash testing; it is **not** itself a conclusion that
+  the older bridge mode is more faithful
+
 The current crash investigation should stay focused on:
 1. how client-shell field `+0xd0` is populated on the late runtime path
 2. which later render/fx path reaches the eventual d3d9 crash
