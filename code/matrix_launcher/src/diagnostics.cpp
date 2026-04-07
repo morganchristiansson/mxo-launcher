@@ -342,6 +342,21 @@ static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) 
     return clientBase + (absoluteAddress - 0x62000000u);
 }
 
+static void DiagnosticLogClientBlIlCorpusObject() {
+    const void* const object = DiagnosticClientAbsoluteToPointer(0x629ee290u);
+    const void* const flagBl = DiagnosticClientAbsoluteToPointer(0x629e95b0u);
+    const void* const flagIl = DiagnosticClientAbsoluteToPointer(0x629e95b1u);
+    if (flagBl && DiagnosticReadableMemoryRange(flagBl, 2)) {
+        const uint8_t blLoaded = *static_cast<const uint8_t*>(flagBl);
+        const uint8_t ilLoaded = *static_cast<const uint8_t*>(flagIl);
+        spdlog::info(
+            "ClientBlIlCorpus flags blLoaded=0x{:02x} ilLoaded=0x{:02x}",
+            static_cast<unsigned>(blLoaded),
+            static_cast<unsigned>(ilLoaded));
+    }
+    LogWordSpanIfReadable("ClientBlIlCorpus DAT_629ee290", object, 24);
+}
+
 static void DiagnosticLogClientPiTable() {
     // client.dll:0x621c9d70 (`AdoptLiveSelectionPiCfgCompactRecords`) only materializes compact live
     // `pi.cfg` tuples into the first two dwords of each 12-byte slot. Track the third dword too,
@@ -496,6 +511,7 @@ static void DiagnosticLogClientShellRuntimeTransitionState() {
     }
 
     if (!g_DumpedClientPiTableAtRuntime && (state20 == 2u || state20 == 3u)) {
+        DiagnosticLogClientBlIlCorpusObject();
         DiagnosticLogClientPiTable();
         g_DumpedClientPiTableAtRuntime = true;
     }

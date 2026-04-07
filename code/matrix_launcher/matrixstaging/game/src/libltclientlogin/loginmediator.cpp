@@ -228,8 +228,34 @@ static uint32_t g_LastLoggedSelectionDescriptor40SelectionIndex = 0xffffffffu;
 static uint32_t g_LastLoggedSelectionDescriptor40Field03 = 0u;
 static uint32_t g_LastLoggedSelectionDescriptor40Field07 = 0u;
 static bool g_LastLoggedSelectionDescriptor40WasNull = false;
+static const void* g_LastLoggedLiveBlCfgBuffer = nullptr;
+static uint32_t g_LastLoggedLiveBlCfgLength = 0u;
 static const void* g_LastLoggedLivePiCfgBuffer = nullptr;
 static uint32_t g_LastLoggedLivePiCfgLength = 0u;
+
+static void MaybeLogLiveBlCfgPayload(const LiveSelectionCfgCorpusView& view) {
+    if (view.buffer == nullptr || view.length == 0u) {
+        return;
+    }
+    if (view.buffer == g_LastLoggedLiveBlCfgBuffer && view.length == g_LastLoggedLiveBlCfgLength) {
+        return;
+    }
+    g_LastLoggedLiveBlCfgBuffer = view.buffer;
+    g_LastLoggedLiveBlCfgLength = view.length;
+
+    const uint8_t* bytes = static_cast<const uint8_t*>(view.buffer);
+    const uint32_t firstDword = (view.length >= 4u) ? ReadU32LE(bytes) : 0u;
+    const char* textTail = (view.length > 4u && bytes[4] != 0u)
+        ? reinterpret_cast<const char*>(bytes + 4u)
+        : "<empty>";
+    spdlog::info(
+        "CLTLoginMediator::GetLiveBlCfgA8(+0xa8) payloadBytes={} firstDword=0x{:08x} textTail='{}' preview={}"
+        ,
+        static_cast<unsigned>(view.length),
+        static_cast<unsigned>(firstDword),
+        textTail,
+        BuildHexPreview(bytes, view.length, 32u));
+}
 
 // UNANCHORED: client.dll:0x62198870 / 0x621c9d70 consume compact live `pi.cfg` records as
 // 9-byte tuples: `u8 id + u32 value0 + u32 value1`. Keep the log bounded to one pass per live
@@ -1182,6 +1208,7 @@ void* CLTLoginMediator::GetLiveBlCfgA8(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer13f8;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength13fc);
     }
+    MaybeLogLiveBlCfgPayload(view);
     return LogLiveSelectionCfgCorpusGetter(
         "CLTLoginMediator::GetLiveBlCfgA8(+0xa8)",
         "bl.cfg / state8 section1",

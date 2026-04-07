@@ -216,8 +216,14 @@ Static proof now closes ten exact corpus pairs end-to-end:
      - owner `+0x13f8` was non-null
      - owner `+0x13fc/+0x13fe` read back as dword `0x0001000e`
        - i.e. length word `0x000e` (`14`), flag byte `0x01`
+     - direct memory read of that original live payload at owner `+0x13f8` produced:
+       - first dword `0x00006dd0`
+       - trailing string bytes `"Nicodemus\0"`
    - active current-path runtime note:
      - replacement rerun logs now show the same small live payload length `0x000e` (`14`)
+     - replacement payload preview now also matches that recovered original shape:
+       - first dword `0x00006dd0`
+       - trailing string `"Nicodemus"`
 
 9. `il.cfg`
    - client helper `0x62198c60`
