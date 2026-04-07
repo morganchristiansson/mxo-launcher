@@ -25,42 +25,11 @@ class CLTLoginState_AuthenticatePending;
 class CLTLoginState_WorldListPending;
 class CLTLoginMediator;
 
-// Launcher-owned arg5/auth bridge scaffolds now live with the mediator source.
-struct CLTLoginMediatorQueuedWorkItemScaffold {
-    mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader header;
-    uint32_t workPayload;
-    const char* debugLabel;
-};
-
-struct CLTLoginMediatorConnectionContextScaffold {
-    void** vtable;
-    unsigned char autoReleaseFlag; // stand-in for the original queued connection object's byte `+0x04`, initialized to 0 by `CBaseConnection_ctor` (`launcher.exe:0x44a9f0`)
-    unsigned char padding05[3];
-    mxo::liblttcp::CMessageConnection* sidecarConnection;
-    const char* debugLabel;
-    CLTLoginMediator* mediator;
-    bool isMarginConnection;
-    bool peerCloseQueued;
-};
-
-// Source-owned outer-seam callback bodies for the current launcher bridge context.
-// Current static-RE direction:
-// - original queue/context traffic is connection-centric, not mediator-class-centric
-// - `CLTTCPConnection::OnReceive` (`launcher.exe:0x449d40`) queues the direct connection object as
-//   `context=this`
-// - auth/margin connection ctors (`launcher.exe:0x41d170` / `0x41e500`) store the owning
-//   `CLTLoginMediator*` directly at connection `+0xa4`
-// - `CLTBaseThreadPerClientTCPEngine_RunCompletedOperationQueue` (`launcher.exe:0x436b10`) then
-//   consumes that object through context slot `+0x10(workItem)` and only conditionally touches
-//   context `+0x04` when the low byte of `[context+4]` is non-zero
-// - current source therefore keeps this mediator-owned bridge record only as a separate sidecar for
-//   the nonblocking arg5 helper pump / synthetic work-item path; it is no longer the connection's
-//   stand-in owner pointer
-uint32_t __thiscall LauncherConnectionBridgeContext_ReleaseScaffold(
-    CLTLoginMediatorConnectionContextScaffold* self);
-uint32_t __thiscall LauncherConnectionBridgeContext_OnOperationCompletedScaffold(
-    CLTLoginMediatorConnectionContextScaffold* self,
-    CLTLoginMediatorQueuedWorkItemScaffold* workItem);
+// Fidelity note:
+// - active launcher.exe worker/queue paths are now modeled as direct-connection flows
+// - auth/margin connection ctors still store the owning `CLTLoginMediator*` directly at
+//   connection `+0xa4`
+// - the earlier mediator-owned bridge-context scaffolds have been retired from the active path
 
 // owner `+0x674` listener tree sketch tightened from `0x41ddb0 / 0x41dde0 / 0x41cfb0 / 0x41d090`:
 // - container object is an 8-byte pair `{ headerPtr, count }`
@@ -929,8 +898,10 @@ public:
 
     mxo::liblttcp::CMessageConnection* AuthConnection() const;
     mxo::liblttcp::CMessageConnection* MarginConnection() const;
-    CLTLoginMediatorConnectionContextScaffold* ResolveConnectionBridgeContextScaffold(
-        const mxo::liblttcp::CMessageConnection* connection) const;
+    bool AuthPeerCloseQueuedScaffold() const { return authPeerCloseQueuedScaffold_; }
+    bool MarginPeerCloseQueuedScaffold() const { return marginPeerCloseQueuedScaffold_; }
+    void SetAuthPeerCloseQueuedScaffold(bool value) { authPeerCloseQueuedScaffold_ = value; }
+    void SetMarginPeerCloseQueuedScaffold(bool value) { marginPeerCloseQueuedScaffold_ = value; }
 
     void SetMarginRouteHostPrefix(const char* routeHostPrefix);
     void SetExactMarginHostName(const char* exactMarginHostName);
@@ -1647,10 +1618,8 @@ private:
     mxo::liblttcp::CMessageConnection* marginConnection_;
     bool authConnectionOwnedByMediator_ = false;
     bool marginConnectionOwnedByMediator_ = false;
-    // Source-owned launcher-bridge sidecars kept separate from the original connection `+0xa4`
-    // owner pointer, which current static RE now ties directly to the mediator object itself.
-    CLTLoginMediatorConnectionContextScaffold* authConnectionContextScaffold_ = nullptr;
-    CLTLoginMediatorConnectionContextScaffold* marginConnectionContextScaffold_ = nullptr;
+    bool authPeerCloseQueuedScaffold_ = false;
+    bool marginPeerCloseQueuedScaffold_ = false;
 
     ConnectionHelperFamily helpers_;
     MarginRouteState marginRouteState_;

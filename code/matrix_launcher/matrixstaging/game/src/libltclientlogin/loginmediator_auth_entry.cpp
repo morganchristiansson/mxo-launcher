@@ -425,16 +425,7 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
         return 0u;
     }
 
-    CLTLoginMediatorConnectionContextScaffold* context =
-        engine_->EnsureLauncherConnectionContextScaffold(
-            &authConnectionContextScaffold_,
-            this,
-            "AuthConnection",
-            /*isMarginConnection=*/false);
-    if (context) {
-        context->peerCloseQueued = false;
-        context->sidecarConnection = EnsureAuthConnectionObject();
-    }
+    authPeerCloseQueuedScaffold_ = false;
 
     // Current replacement-side fidelity correction:
     // - original launcher password submit does not jump straight into `0x439210` with an
@@ -499,10 +490,6 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
                   "BeginLauncherAuthConnectionScaffold -> helper2/auth-bootstrap continuation")
             : BeginAuthConnectionViaState1Scaffold();
     }
-    if (context) {
-        context->sidecarConnection = AuthConnection();
-    }
-
     engine_->SyncAttachedLauncherObjectStateScaffold();
 
     spdlog::info(
@@ -513,31 +500,29 @@ uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold() const {
-    mxo::liblttcp::CMessageConnection* connection = authConnection_;
-    if (connection == nullptr && authConnectionContextScaffold_ != nullptr) {
-        connection = authConnectionContextScaffold_->sidecarConnection;
-    }
-
-    auto* authConnection = dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(connection);
-    const bool quiescent = (authConnection == nullptr) || (authConnection->WorkerThreadScaffold() == nullptr);
-    if (quiescent && authConnection != nullptr && authConnectionContextScaffold_ != nullptr &&
-        authConnectionContextScaffold_->sidecarConnection == authConnection) {
+    auto* authConnection =
+        dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
+    const bool quiescent =
+        (authConnection == nullptr) || (authConnection->WorkerThreadScaffold() == nullptr);
+    if (quiescent && authConnection != nullptr &&
+        authConnection->State() == mxo::liblttcp::LTTCPEngineConnectionState::kClosed) {
         // Fidelity improvement for launcher retry:
         // - original auth-close/reset path `0x41c0d0` clears owner `+0x18`
         // - later auth begin `0x41d170` then materializes a fresh auth-side child again
-        // Keep the old closed connection only until its worker becomes quiescent, then discard the
-        // sidecar so the next retry allocates a new auth connection object instead of reusing a
-        // stale closed child.
-        authConnectionContextScaffold_->sidecarConnection = nullptr;
-        authConnectionContextScaffold_->peerCloseQueued = false;
-        if (authConnectionOwnedByMediator_ && authConnection_ == nullptr) {
+        // Keep the old closed connection only until its worker becomes quiescent, then discard it
+        // so the next retry allocates a new auth connection object instead of reusing a stale
+        // closed child.
+        const_cast<CLTLoginMediator*>(this)->authPeerCloseQueuedScaffold_ = false;
+        if (authConnectionOwnedByMediator_) {
             delete authConnection;
         }
+        const_cast<CLTLoginMediator*>(this)->authConnection_ = nullptr;
+        const_cast<CLTLoginMediator*>(this)->authConnectionOwnedByMediator_ = false;
+        authConnection = nullptr;
     }
     spdlog::info(
-        "CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold authConnection={} sidecarConnection={} worker={} state={} -> {}",
+        "CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold authConnection={} worker={} state={} -> {}",
         fmt::ptr(authConnection_),
-        fmt::ptr(authConnectionContextScaffold_ ? authConnectionContextScaffold_->sidecarConnection : nullptr),
         fmt::ptr(authConnection ? authConnection->WorkerThreadScaffold() : nullptr),
         authConnection ? static_cast<unsigned>(authConnection->State()) : 0xffffffffu,
         quiescent ? 1u : 0u);
@@ -552,22 +537,10 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
         return 0u;
     }
 
-    CLTLoginMediatorConnectionContextScaffold* context =
-        engine_->EnsureLauncherConnectionContextScaffold(
-            &marginConnectionContextScaffold_,
-            this,
-            "MarginConnection",
-            /*isMarginConnection=*/true);
-    if (context) {
-        context->peerCloseQueued = false;
-        context->sidecarConnection = EnsureMarginConnectionObject();
-    }
+    marginPeerCloseQueuedScaffold_ = false;
 
     const uint32_t result = BeginMarginConnectionViaState4Scaffold();
     const std::string marginHost = ResolvedMarginHostName();
-    if (context) {
-        context->sidecarConnection = MarginConnection();
-    }
 
     engine_->SyncAttachedLauncherObjectStateScaffold();
 
@@ -720,42 +693,6 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::AuthConnection() const {
 // UNANCHORED: source-owned accessor for the margin `CMessageConnection` child mirrored from owner `+0x1c`.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::MarginConnection() const {
     return marginConnection_;
-}
-
-// UNANCHORED: source-owned launcher-bridge sidecar resolver.
-// Current static-RE split:
-// - auth/margin connection constructors store the owning mediator directly at connection `+0xa4`
-// - the extra bridge record remains only as source-owned helper-pump state keyed by the mediator's
-//   auth/margin child pointers rather than as the connection's actual owner field
-CLTLoginMediatorConnectionContextScaffold* CLTLoginMediator::ResolveConnectionBridgeContextScaffold(
-    const mxo::liblttcp::CMessageConnection* connection) const {
-    if (connection == nullptr) {
-        return nullptr;
-    }
-
-    if (authConnectionContextScaffold_ != nullptr && !authConnectionContextScaffold_->isMarginConnection) {
-        if (connection == authConnection_ ||
-            authConnectionContextScaffold_->sidecarConnection == connection ||
-            connection->OwnerContext() == this) {
-            if (authConnectionContextScaffold_->sidecarConnection == nullptr) {
-                const_cast<CLTLoginMediatorConnectionContextScaffold*>(authConnectionContextScaffold_)->sidecarConnection =
-                    const_cast<mxo::liblttcp::CMessageConnection*>(connection);
-            }
-            return authConnectionContextScaffold_;
-        }
-    }
-    if (marginConnectionContextScaffold_ != nullptr && marginConnectionContextScaffold_->isMarginConnection) {
-        if (connection == marginConnection_ ||
-            marginConnectionContextScaffold_->sidecarConnection == connection ||
-            connection->OwnerContext() == this) {
-            if (marginConnectionContextScaffold_->sidecarConnection == nullptr) {
-                const_cast<CLTLoginMediatorConnectionContextScaffold*>(marginConnectionContextScaffold_)->sidecarConnection =
-                    const_cast<mxo::liblttcp::CMessageConnection*>(connection);
-            }
-            return marginConnectionContextScaffold_;
-        }
-    }
-    return nullptr;
 }
 
 // UNANCHORED: source-owned setter for the reconstructed margin route-host prefix.
@@ -1208,11 +1145,10 @@ uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
     // - this replay helper therefore synthesizes only the same narrow type-2 work-item shape when
     //   state1 is still active, while non-state1 callers retain the older live-success fallback
     if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 1u) {
-        CLTLoginMediatorQueuedWorkItemScaffold statusWorkItem = {};
+        mxo::liblttcp::CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold statusWorkItem = {};
         statusWorkItem.header.workType =
             mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus;
-        statusWorkItem.workPayload = lastAuthConnectStatus_;
-        statusWorkItem.debugLabel = "Synthetic auth connect-status replay";
+        statusWorkItem.header.statusOrPayloadDword08 = lastAuthConnectStatus_;
         return DispatchCurrentHelperPrimaryGateScaffold(&statusWorkItem);
     }
 
@@ -1278,9 +1214,6 @@ mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject(
 
     authConnection->SetEngine(engine_);
     authConnection->SetOwnerContext(this);
-    if (authConnectionContextScaffold_ != nullptr) {
-        authConnectionContextScaffold_->sidecarConnection = authConnection;
-    }
 
     // anchor: launcher.exe:0x41d170 / vtable `0x004afef0`
     // Current bounded source correction:

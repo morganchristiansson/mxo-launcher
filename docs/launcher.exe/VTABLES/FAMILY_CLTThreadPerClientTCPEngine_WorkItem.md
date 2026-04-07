@@ -10,6 +10,8 @@ On the active `CMessageConnection::OnOperationCompleted` path, the important con
 
 ```text
 0x004b2134  CLTThreadPerClientTCPEngine_WorkItemHeader
+├── 0x004b3df8  type-2 connection-status work item
+├── 0x004b3e00  type-1 close work item
 └── 0x004b3e08  CParsedPacketWorkItem
 ```
 
@@ -36,6 +38,14 @@ Current active-path use inside `0x4490c0`:
 - type `1` = close completion
 - type `2` = connect completion
 - type `3` = parsed packet
+
+### `0x004b3df8 = type-2 connection-status work item`
+
+Small concrete `0x0c` queued item used for worker connect-status submission.
+
+### `0x004b3e00 = type-1 close work item`
+
+Small concrete `0x0c` queued item used for worker close / peer-closed submission.
 
 ### `0x004b3e08 = CParsedPacketWorkItem`
 
@@ -68,6 +78,8 @@ not a work-item-root-derived queued object.
 - `CMessageConnection_OnOperationCompleted_families.md`
 - `FAMILY_CLTTCPReadOperation.md`
 - `0x004b2134.md`
+- `0x004b3df8.md`
+- `0x004b3e00.md`
 - `0x004b3e08.md`
 - `0x004b7928.md`
 - `0x004baf84.md`

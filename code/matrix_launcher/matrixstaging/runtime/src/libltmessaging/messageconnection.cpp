@@ -972,7 +972,7 @@ static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
 }
 
 // UNANCHORED: source-owned typed owner-context view used by the current `0x4490c0/0x449a70/0x44af60`
-// reconstruction when the launcher-owned connection owner at `+0xa4` is the active login
+// reconstruction when the launcher-owned connection owner at `+0xa4` is the direct login
 // mediator. Current static-RE anchor for that ownership write is `0x41d170 / 0x41e500`.
 static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaffold(
     CMessageConnection* self) {
@@ -981,7 +981,13 @@ static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaf
     }
 
     mxo::ltlogin::CLTLoginMediator* mediator =
-        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+        static_cast<mxo::ltlogin::CLTLoginMediator*>(self->OwnerContext());
+    if (mediator != nullptr &&
+        (self == mediator->AuthConnection() || self == mediator->MarginConnection())) {
+        return mediator;
+    }
+
+    mediator = mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
     return (mediator != nullptr && self->OwnerContext() == mediator) ? mediator : nullptr;
 }
 

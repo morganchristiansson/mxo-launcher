@@ -103,28 +103,14 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     // - increment owner dword `+0x24`
     // - clear owner `+0x7c`
     // - call `connection->+0x1c(owner+0x6c)`
-    // Current bounded bridge correction:
-    // - the active existing-character state8 -> state4 path reaches here directly, not through the
-    //   outer `BeginLauncherMarginConnectionScaffold()` wrapper
-    // - so this helper itself must ensure the launcher bridge context/sidecar connection is
-    //   present before `EnsureConnected()` re-enters the engine connect slot with the connection
-    //   object as context key
-    if (engine_ != nullptr) {
-        CLTLoginMediatorConnectionContextScaffold* context =
-            engine_->EnsureLauncherConnectionContextScaffold(
-                &marginConnectionContextScaffold_,
-                this,
-                "MarginConnection",
-                /*isMarginConnection=*/true);
-        if (context) {
-            context->peerCloseQueued = false;
-        }
-    }
+    // Current bounded active-path correction:
+    // - the existing-character state8 -> state4 path reaches here directly, not through the outer
+    //   `BeginLauncherMarginConnectionScaffold()` wrapper
+    // - keep that path connection-centric: `EnsureConnected()` re-enters the engine connect slot
+    //   with the direct margin connection object as the context key
+    marginPeerCloseQueuedScaffold_ = false;
 
     mxo::liblttcp::CMessageConnection* connection = EnsureMarginConnectionObject();
-    if (marginConnectionContextScaffold_ != nullptr) {
-        marginConnectionContextScaffold_->sidecarConnection = connection;
-    }
     if (!connection) {
         spdlog::warn("CLTLoginMediator::BeginMarginConnectionScaffold failed to allocate margin connection");
         return 0u;

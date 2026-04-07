@@ -15,7 +15,6 @@
 
 namespace mxo::ltlogin {
 class CLTLoginMediator;
-struct CLTLoginMediatorConnectionContextScaffold;
 }
 
 namespace mxo::liblttcp {
@@ -68,6 +67,22 @@ struct CLTThreadPerClientTCPEngine_WorkItemHeader {
 static_assert(sizeof(CLTThreadPerClientTCPEngine_WorkItemHeader) == 0x0c, "work-item header size mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_WorkItemHeader, workType) == 0x04, "work-item header workType offset mismatch");
 static_assert(offsetof(CLTThreadPerClientTCPEngine_WorkItemHeader, statusOrPayloadDword08) == 0x08, "work-item header status/payload offset mismatch");
+
+struct CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold {
+    // anchor: launcher.exe:0x435050 / vtable `0x004b3df8`
+    // Small queued type-2 work item used by the worker-thread connect-completion path.
+    CLTThreadPerClientTCPEngine_WorkItemHeader header{};
+};
+
+static_assert(sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold) == 0x0c, "connection-status work-item size mismatch");
+
+struct CLTThreadPerClientTCPEngine_CloseWorkItemScaffold {
+    // anchor: launcher.exe:0x435070 / vtable `0x004b3e00`
+    // Small queued type-1 work item used by the worker-thread close/peer-closed path.
+    CLTThreadPerClientTCPEngine_WorkItemHeader header{};
+};
+
+static_assert(sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold) == 0x0c, "close work-item size mismatch");
 
 // Recovered launcher-visible arg5 helper root at +0x5c.
 // Current source note:
@@ -341,7 +356,7 @@ public:
     static constexpr size_t OffsetCleanupLockHelper98();
 
     // Current best queue work-type split from `0x4490c0`, `0x436d31..0x436ee7`, and the current
-    // launcher bridge:
+    // arg5 helper fallback:
     // - `1` = original close / cleanup family that reaches arg5 slot 12 before context callback
     // - `2` = original connect/status family
     // - `3` = original parsed-packet work item emitted by `CLTTCPConnection::OnReceive`
@@ -462,20 +477,6 @@ public:
     // anchor family: launcher.exe:0x4147c0
     uint32_t LeaveCleanupLockHelper();
 
-    // UNANCHORED: current replacement seam still keeps loginmediator-owned high-level auth/margin
-    // handlers, but the arg5-side queue-context allocation/vtable, nonblocking producer/push path,
-    // and helper-owned pump now live on the engine side instead of inside loginmediator.cpp or
-    // launcher_network_object_abi.cpp.
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* EnsureLauncherConnectionContextScaffold(
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold** slot,
-        mxo::ltlogin::CLTLoginMediator* mediator,
-        const char* label,
-        bool isMarginConnection);
-    bool EnqueueLauncherConnectionStatusWorkItemScaffold(
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
-        uint32_t workType,
-        uint32_t workPayload,
-        const char* label);
     // UNANCHORED: connection-owned bridge for the recovered `0x449d8a -> 0x436820` handoff.
     // Current best original read for this specific receive path:
     // - argument order after engine `this` is `(workItem, connection, useQueue34)`
@@ -506,7 +507,7 @@ public:
 
     // Source-owned connection resolver. Current faithful preference order is:
     // - queue-context owner
-    // - launcher bridge sidecar resolved from the connection's direct mediator owner at `+0xa4`
+    // - direct connection object / direct owner-context identities
     // - active worker/context-tree payloads keyed by the direct connection object
     // - no generic synthetic fallback allocation
     CMessageConnection* FindMessageConnection(void* contextKey);
@@ -537,8 +538,8 @@ private:
     void StopWorkerThreadScaffold(CLTThreadPerClientTCPEngine_WorkerThread* workerThread);
     // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape
     // while still returning `false` to synthetic callers when no attached target queue exists.
-    // Unlike original `0x436820`, this source-owned helper exposes queue availability to the
-    // synthetic launcher-bridge allocation path; once a target queue exists, it follows the
+    // Unlike original `0x436820`, this source-owned helper exposes queue availability to bounded
+    // synthetic callers; once a target queue exists, it follows the
     // original enter-lock -> empty-snapshot -> push -> leave-lock -> signal ordering and does not
     // surface a push-success result.
     bool EnqueueCompletedOperationScaffold(
@@ -547,43 +548,23 @@ private:
         bool useQueue34,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: engine-owned launcher-bridge work-item builder used by both direct enqueue sites
-    // and the arg5 helper-owned nonblocking pump.
-    // Current work-type split:
-    // - original connection-status items still use type `2`
-    // - source-owned receive-drain proxies use `kWorkTypeSyntheticReceiveDrain`
-    //   because original type `3` is already consumed by the parsed-packet queue items emitted from
-    //   `CLTTCPConnection::OnReceive`
-    // Current tighter destination correction:
-    // - once a sidecar connection exists, launcher-bridge work items queue through the
-    //   connection-family queue context for type-1/type-2/synthetic paths alike
-    // - that keeps the queued `context` closer to the original direct-connection identity while
-    //   still landing callback dispatch on the nearer `CMessageConnection`/leaf callback path
-    bool EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
-        uint32_t workType,
-        uint32_t workPayload,
-        const char* label,
-        bool queueLockAlreadyHeld);
     bool EnqueueDirectConnectionStatusWorkItemScaffold(
         CLTTCPConnection* connection,
         uint32_t workType,
         uint32_t workPayload,
         const char* label,
         bool queueLockAlreadyHeld);
-    // UNANCHORED: narrow per-context nonblocking receive pump used by the current arg5 helper seam.
+    // UNANCHORED: narrow nonblocking receive pump used only by the current arg5 helper fallback.
     // Current source-owned pacing split:
     // - `CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold()` stays the narrow
     //   one-fragment recv->fragment->OnReceive seam
-    // - this bridge pump may re-enter that helper repeatedly within one arg5 helper poll so the
-    //   current source-owned `AuthReceivePacket` / `MarginReceivePacket` receive-drain proxies can
-    //   stay aligned once per successful recv fragment instead of once per whole pump
-    // - those proxies are intentionally not queued as original type `3`; original parsed-packet
-    //   type `3` work is already in queue0C before this helper enqueues the later drain proxy
-    // - when the sidecar connection is present, that later drain proxy now targets the
-    //   connection-family queue callback path first rather than the mediator bridge context
+    // - active worker-thread paths no longer go through a mediator-owned bridge context here
+    // - any remaining arg5-helper polling is therefore connection-centric and only used when a
+    //   direct auth/margin connection exists without an attached worker thread
     void PumpLauncherConnectionContextScaffold(
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+        CMessageConnection* connection,
+        mxo::ltlogin::CLTLoginMediator* mediator,
+        bool isMarginConnection,
         const char* receiveLabel);
     // UNANCHORED: launcher-visible mirror refresh for the recovered +0x80/+0x8c sentinel heads and
     // count dwords.

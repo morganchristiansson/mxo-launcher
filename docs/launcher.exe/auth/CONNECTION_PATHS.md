@@ -26,6 +26,9 @@ Current best answer:
 - connection init is **not** best modeled as a trivial raw `0x4d6304->Connect(...)` launcher-mainline call
 - the original launcher appears to initiate auth/margin connection work from a higher-level owner rooted at `0x4f78b8`
 - that owner creates `CMessageConnection`-family children, builds endpoint/config state, then drives their connect wrapper
+- active source now follows that direct-owner model more closely too:
+  - auth/margin queue/worker paths stay on the direct connection object as `context`
+  - source no longer depends on a mediator-owned bridge-context stand-in for the live auth/margin path
 
 High-value anchors:
 - `launcher.exe:0x41d170`

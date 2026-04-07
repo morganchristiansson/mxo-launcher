@@ -990,11 +990,14 @@ The queued first-dword object families currently evidenced are:
 - `0x435d90 -> 0x435050`
   - allocation size `0x0c`
   - constructor sets vtable `0x4b3df8`
-  - stores an immediate payload/code in `[obj+0x08]`
+  - seeds `[obj+0x04] = 2`
+  - stores the connect-status / payload dword in `[obj+0x08]`
+  - current best family name: **type-2 connection-status work item**
 - `0x435da0 -> 0x435070`
   - allocation size `0x0c`
   - constructor sets vtable `0x4b3e00`
   - seeds `[obj+0x04] = 1`, `[obj+0x08] = 0`
+  - current best family name: **type-1 close work item**
 
 Those constructors all belong to the same nearby vtable family around `0x4b3df0..0x4b3e10`, which is strong evidence that the queue is carrying a small launcher-defined work-item class family rather than arbitrary raw integers.
 
@@ -1507,34 +1510,23 @@ Build-validated update:
       path
   - this narrower bridge-level batching remains the current compromise because the earlier fuller
     same-poll recv-drain restoration regressed live runs into the later `Loading Character` stall
-- `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-bridge queue-context vtable / allocation helper used by that seam
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now also owns the current launcher-ABI surface attachment / mirror rules used after engine-side connect work reached through connection wrappers
 - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now drives owner-visible arg5 state refresh after `MonitorPort`, `UDPMonitorPort`, `Connect`, `Close`, and `CleanupConnection` sidecar mutations instead of leaving those refresh calls open-coded in the ABI shell wrappers
 - later cleanup moved one more mediator-specific coupling point back out of `liblttcp`:
   - `CLTThreadPerClientTCPEngineBinding` now owns only owner<->engine pairing
   - outer launcher/login seam code in `src/launcher_network_object_abi.cpp` again owns the current mediator bind/reset handshake around that binding
   - this is the current better source match for the negative RE result that the original engine object itself is not evidenced to own mediator lifecycle
-- `matrixstaging/game/src/libltclientlogin/loginmediator.cpp` no longer contains the old direct `PollLauncherConnectionBridgeScaffold()` producer loop
-  - and now also owns the current source-only launcher-bridge context callback bodies that were previously sitting in `ltthreadperclienttcpengine.cpp`
-  - newer `2026-04-01` bridge tightening now narrows those callbacks further to the original queue/connection shape seen in `0x436b10`
-    - the bridge first resolves the current sidecar auth/margin connection
-    - then forwards queued-context `+0x10(workItem)` traffic into the connection-family completion path instead of open-coding mediator-specific type-2 / synthetic-receive handling there
-    - practical anchored targets are the already-recovered connection callbacks `0x4490c0`, `0x449a70`, and `0x44af60`
-    - a fresh `0x449d40` / `0x44a9f0` / `0x41d170` / `0x41e500` re-check tightened the stand-in one step further:
-      - original parsed-packet producers queue the **direct connection object** as `context=this`
-      - auth/margin connection ctors store the owning mediator directly at connection `+0xa4`
-      - `CBaseConnection_ctor` seeds byte `+0x04 = 0`, which is the same low byte `0x436b10` later tests before any conditional `context->+0x04()` type-1 release tail
-      - current mediator bridge records now mirror that by leaving `autoReleaseFlag` at zero, keeping the real connection owner pointer as the mediator, and using bridge slot `+0x10` only as the sidecar re-entry path into the connection-family completion callbacks
-    - producer-side tightening now closes that one step further on the recovered active path:
-      - launcher-bridge type-1/type-2 submissions now also queue the sidecar connection object itself
-      - parsed-packet type-3 submissions likewise queue the direct connection object from `OnReceive`
-      - the older queue-context bridge survives only as an unexpected-path / consumer-compatibility guard
-  - newer successful launcher-into-game runtime logs now line up with that read on the active path too:
-    - no `pendingCopiedPackets=` logs
-    - no synthetic receive-drain handling logs
-    - copied auth/margin packets log as consumed directly on the in-callback post-copy leaf path instead
-  - that callback move does **not** prove the bridge is original; it only narrows liblttcp's mediator knowledge while the bridge still exists as source-owned debt
-- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` now routes the synthetic connect-status queue submissions through the engine helper, no longer owns the bridge-context vtable/allocation body, no longer calls the launcher-network ABI sidecar-sync helper directly, and no longer keeps a launcher-owner pointer just to gate/auth-start this seam
+- newer `2026-04-08` fidelity pass retires the mediator-owned bridge context/work-item scaffolds from the active worker/queue path
+  - `CLTThreadPerClientTCPEngine::WorkerThread_Run` now decides auth-vs-margin from the direct connection family and queues only the direct connection object as `context`
+  - the worker now allocates the original small `0x0c` queued families for type `2` / connect-status (`0x435050`, vtable `0x004b3df8`) and type `1` / close (`0x435070`, vtable `0x004b3e00`) instead of a source-owned mediator work-item
+  - the queue consumer stays on the original connection-family callback route (`0x4490c0`, `0x449a70`, `0x44af60`) rather than re-entering through a mediator-owned bridge context
+  - `FindMessageConnection` / engine slot resolution now stop accepting mediator bridge-context identities on the active path; only direct connection objects plus older queue-context unwrapping remain
+  - arg5 helper polling now looks at the mediator's direct auth/margin child connections only as a no-worker fallback, and no longer routes through a separate bridge-context record
+- `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` correspondingly no longer creates/maintains those bridge-context sidecars on auth/margin begin; the live owner link stays the direct mediator pointer at connection `+0xa4`
+- newer successful launcher-into-game runtime logs still line up with that tighter read on the active path:
+  - no `pendingCopiedPackets=` logs
+  - no synthetic receive-drain handling logs
+  - copied auth/margin packets log as consumed directly on the in-callback post-copy leaf path instead
 - `src/launcher_network_object_abi.cpp` is correspondingly thinner on this seam:
   - the file is now best read as a **raw arg5 ABI shell** rather than as the real engine implementation
     - current source names that shell explicitly as `LauncherObjectAbiShell`

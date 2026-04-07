@@ -66,32 +66,12 @@ static spdlog::logger* LoggerForBridgeLabel(const char* label) {
     return spdlog::default_logger_raw();
 }
 
-// Runtime ablation toggle for the `ab28b26` producer-side direct-context correction.
-// Default remains the current higher-fidelity/original-backed mode:
-// - queue parsed-packet / status / close work with the direct connection object as `context`
-// Setting `MXO_USE_QUEUE_CONTEXT_BRIDGE=1` reverts just those producers back to the older
-// source-owned `CBaseConnection_QueueContextScaffold` bridge so we can A/B late render/crash
-// behavior without rolling back the later state-machine / close-tail fidelity work.
-static bool UseLegacyQueueContextBridgeProducerAblation() {
-    static int cached = -1;
-    if (cached < 0) {
-        const char* raw = std::getenv("MXO_USE_QUEUE_CONTEXT_BRIDGE");
-        cached = (raw && raw[0] && !(raw[0] == '0' && raw[1] == '\0')) ? 1 : 0;
-        spdlog::info(
-            "CLTThreadPerClientTCPEngine queue-context producer mode={} [MXO_USE_QUEUE_CONTEXT_BRIDGE={}]",
-            cached ? "legacy-bridge-ablation" : "direct-connection-original-default",
-            (raw && raw[0]) ? raw : "<unset>");
-    }
-    return cached != 0;
-}
-
 static void* ResolveQueuedConnectionContextForProducerAblation(CLTTCPConnection* connection) {
-    if (!connection) {
-        return nullptr;
-    }
-    if (UseLegacyQueueContextBridgeProducerAblation()) {
-        return connection->QueueContextScaffold();
-    }
+    // Fidelity note:
+    // - current active producer paths stay on the launcher.exe shape where queued `context` is the
+    //   direct connection object itself
+    // - keep the older queue-context bridge accepted only on the consumer/cleanup side for any
+    //   unexpected fallback traffic that still reaches it
     return static_cast<void*>(connection);
 }
 
@@ -101,8 +81,8 @@ struct CLTThreadPerClientTCPEngine_QueuePair {
 };
 
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
-static void* g_LauncherConnectionBridgeWorkItemVtable[2] = {0};
-static void* g_LauncherConnectionBridgeContextVtable[5] = {0};
+static void* g_ConnectionStatusWorkItemVtable[2] = {0};
+static void* g_CloseWorkItemVtable[2] = {0};
 static constexpr uint8_t kSocketFactoryFlagSkipDisableNagle = 0x01u;
 static constexpr uint8_t kSocketFactoryFlagKeepBlocking = 0x02u;
 
@@ -207,51 +187,6 @@ static CLTThreadPerClientTCPEngine_ContextPayloadBacking* FindEngineContextPaylo
 static CLTThreadPerClientTCPEngine_ContextPayloadBacking& EnsureEngineContextPayloadBacking(
     CLTThreadPerClientTCPEngine* self) {
     return g_CLTThreadPerClientTCPEngineContextPayloadBackings[self];
-}
-
-static bool IsLauncherBridgeContextScaffold(
-    const mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context) {
-    return context != nullptr && context->vtable == g_LauncherConnectionBridgeContextVtable;
-}
-
-// Static-RE note for the current bridge seam:
-// - original `0x4325d0/0x4328a0 -> 0x431ff0` and `0x449d40 -> 0x436820` paths are connection-keyed
-// - auth/margin connection ctors (`0x41d170` / `0x41e500`) store the owning mediator directly at
-//   connection `+0xa4`
-// - current source therefore keeps the extra launcher-bridge context only as a mediator-owned
-//   sidecar resolved from that direct owner pointer, not as the connection's actual owner/context
-static mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*
-ResolveLauncherBridgeContextForConnectionScaffold(
-    const CMessageConnection* connection) {
-    if (!connection) {
-        return nullptr;
-    }
-
-    void* const ownerContext = connection->OwnerContext();
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* directContext =
-        static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(ownerContext);
-    if (IsLauncherBridgeContextScaffold(directContext) &&
-        directContext->sidecarConnection == connection) {
-        return directContext;
-    }
-
-    // Fidelity improvement:
-    // - static RE for auth/margin connection construction says connection `+0xa4` stores the
-    //   owning mediator directly
-    // - prefer that concrete owner-context pointer over the replacement-only active-state global
-    //   when resolving the launcher bridge sidecar
-    // - fall back to the global only if owner-context is null
-    mxo::ltlogin::CLTLoginMediator* mediator =
-        ownerContext != nullptr
-            ? static_cast<mxo::ltlogin::CLTLoginMediator*>(ownerContext)
-            : mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
-    if (mediator == nullptr) {
-        return nullptr;
-    }
-
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-        mediator->ResolveConnectionBridgeContextScaffold(connection);
-    return (context != nullptr && context->sidecarConnection == connection) ? context : nullptr;
 }
 
 template <typename Head>
@@ -686,44 +621,28 @@ static const char* LauncherBridgeWorkTypeName(uint32_t workType) {
     }
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall LauncherConnectionBridgeWorkItem_Release(
-    mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* self) {
-    if (self) {
-        LoggerForBridgeLabel(self->debugLabel)->info(
-            "CLTThreadPerClientTCPEngine launcher bridge releasing queued work item {} type=0x{:08x} ({}) payload=0x{:08x} label='{}'",
-            fmt::ptr(self),
-            self->header.workType,
-            LauncherBridgeWorkTypeName(self->header.workType),
-            self->workPayload,
-            self->debugLabel ? self->debugLabel : "<null>");
-        std::free(self);
-    }
+// anchor: launcher.exe:0x435c30 / vtable `0x004b3df8`
+static uint32_t __thiscall ConnectionStatusWorkItem_ReleaseScaffold(
+    CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* self) {
+    std::free(self);
     return 1u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void EnsureLauncherConnectionBridgeWorkItemVtableInitialized() {
-    if (!g_LauncherConnectionBridgeWorkItemVtable[1]) {
-        g_LauncherConnectionBridgeWorkItemVtable[1] =
-            reinterpret_cast<void*>(LauncherConnectionBridgeWorkItem_Release);
-    }
+// anchor: launcher.exe:0x435c80 / vtable `0x004b3e00`
+static uint32_t __thiscall CloseWorkItem_ReleaseScaffold(
+    CLTThreadPerClientTCPEngine_CloseWorkItemScaffold* self) {
+    std::free(self);
+    return 1u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void EnsureLauncherConnectionBridgeContextVtableInitialized() {
-    if (!g_LauncherConnectionBridgeContextVtable[1]) {
-        // Fidelity correction from the current RE pass:
-        // - original queue/context traffic is still connection-centric
-        // - launcher-bridge work items are now queued only through the sidecar connection's own
-        //   queue-context object, not through this mediator-owned bridge record
-        // - auth/margin connection ctors store the mediator directly at connection `+0xa4`, so this
-        //   bridge vtable remains only as an unexpected-path guard / identity marker on the
-        //   separate mediator-owned sidecar record
-        g_LauncherConnectionBridgeContextVtable[1] =
-            reinterpret_cast<void*>(mxo::ltlogin::LauncherConnectionBridgeContext_ReleaseScaffold);
-        g_LauncherConnectionBridgeContextVtable[4] =
-            reinterpret_cast<void*>(mxo::ltlogin::LauncherConnectionBridgeContext_OnOperationCompletedScaffold);
+static void EnsureSmallConnectionWorkItemVtablesInitialized() {
+    if (!g_ConnectionStatusWorkItemVtable[1]) {
+        g_ConnectionStatusWorkItemVtable[1] =
+            reinterpret_cast<void*>(ConnectionStatusWorkItem_ReleaseScaffold);
+    }
+    if (!g_CloseWorkItemVtable[1]) {
+        g_CloseWorkItemVtable[1] =
+            reinterpret_cast<void*>(CloseWorkItem_ReleaseScaffold);
     }
 }
 
@@ -1414,20 +1333,16 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
         return;
     }
 
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* launcherContext =
-        ResolveLauncherBridgeContextForConnectionScaffold(connection);
+    const bool isMarginConnection = dynamic_cast<CMarginConnection*>(connection) != nullptr;
     const char* connectStatusLabel =
-        (launcherContext && launcherContext->isMarginConnection) ? "MarginConnectStatus"
-                                                                 : "AuthConnectStatus";
+        isMarginConnection ? "MarginConnectStatus" : "AuthConnectStatus";
     const char* closeStatusLabel =
-        (launcherContext && launcherContext->isMarginConnection) ? "MarginPeerClosed"
-                                                                 : "AuthPeerClosed";
+        isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed";
     spdlog::debug(
-        "CLTThreadPerClientTCPEngine::WorkerThread Run connection={} ownerContext={} launcherContext={} isMargin={} wakeupSocket=0x{:08x} initialState={} connectCompletionPending={} remoteHost='{}'",
+        "CLTThreadPerClientTCPEngine::WorkerThread Run connection={} ownerContext={} isMargin={} wakeupSocket=0x{:08x} initialState={} connectCompletionPending={} remoteHost='{}'",
         fmt::ptr(connection),
         fmt::ptr(connection->OwnerContext()),
-        fmt::ptr(launcherContext),
-        (launcherContext && launcherContext->isMarginConnection) ? 1u : 0u,
+        isMarginConnection ? 1u : 0u,
         wakeupSocketHandle_,
         static_cast<unsigned>(connection->State()),
         !datagramMode_ ? 1u : 0u,
@@ -1457,19 +1372,13 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
             if (connectStatusQueued) {
                 return;
             }
-            const bool queued = launcherContext != nullptr
-                ? engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
-                      launcherContext,
-                      CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-                      workPayload,
-                      connectStatusLabel)
-                : engine->EnqueueDirectConnectionStatusWorkItemScaffold(
-                      connection,
-                      CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
-                      workPayload,
-                      connectStatusLabel,
-                      /*queueLockAlreadyHeld=*/false);
-            if (!queued && launcherContext == nullptr) {
+            const bool queued = engine->EnqueueDirectConnectionStatusWorkItemScaffold(
+                connection,
+                CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus,
+                workPayload,
+                connectStatusLabel,
+                /*queueLockAlreadyHeld=*/false);
+            if (!queued) {
                 spdlog::warn(
                     "CLTThreadPerClientTCPEngine::WorkerThread direct queue connect status failed connection={} ownerContext={} payload=0x{:08x}",
                     fmt::ptr(connection),
@@ -1483,22 +1392,13 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
         if (closeQueued) {
             return;
         }
-        if (launcherContext != nullptr) {
-            launcherContext->peerCloseQueued = true;
-        }
-        const bool queued = launcherContext != nullptr
-            ? engine->EnqueueLauncherConnectionStatusWorkItemScaffold(
-                  launcherContext,
-                  CLTThreadPerClientTCPEngine::kWorkTypeClose,
-                  0u,
-                  closeStatusLabel)
-            : engine->EnqueueDirectConnectionStatusWorkItemScaffold(
-                  connection,
-                  CLTThreadPerClientTCPEngine::kWorkTypeClose,
-                  0u,
-                  closeStatusLabel,
-                  /*queueLockAlreadyHeld=*/false);
-        if (!queued && launcherContext == nullptr) {
+        const bool queued = engine->EnqueueDirectConnectionStatusWorkItemScaffold(
+            connection,
+            CLTThreadPerClientTCPEngine::kWorkTypeClose,
+            0u,
+            closeStatusLabel,
+            /*queueLockAlreadyHeld=*/false);
+        if (!queued) {
             spdlog::warn(
                 "CLTThreadPerClientTCPEngine::WorkerThread direct queue close failed connection={} ownerContext={} state={}",
                 fmt::ptr(connection),
@@ -1550,7 +1450,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
 
         const uint32_t socketHandle = connection->SocketHandle();
         if (socketHandle == kInvalidSocketHandle) {
-            if (launcherContext && (closeQueued || connectStatusQueued || connection->State() == LTTCPEngineConnectionState::kClosed)) {
+            if (closeQueued || connectStatusQueued || connection->State() == LTTCPEngineConnectionState::kClosed) {
                 waitWakeupOnly = true;
                 continue;
             }
@@ -1598,10 +1498,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
         if (readyCount == SOCKET_ERROR) {
             const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
             if (wsaError == WSAENOTSOCK || wsaError == WSAEBADF) {
-                waitWakeupOnly = launcherContext != nullptr;
-                if (!waitWakeupOnly) {
-                    break;
-                }
+                waitWakeupOnly = true;
                 continue;
             }
 
@@ -1627,10 +1524,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
             connection->SetState(LTTCPEngineConnectionState::kClosed);
             queueConnectStatus(static_cast<uint32_t>(soError != 0 ? soError : 1u));
             queueClose();
-            waitWakeupOnly = launcherContext != nullptr;
-            if (!waitWakeupOnly) {
-                break;
-            }
+            waitWakeupOnly = true;
             continue;
         }
 
@@ -1658,10 +1552,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
                 closeAndInvalidateSocket();
                 connection->SetState(LTTCPEngineConnectionState::kClosed);
                 queueClose();
-                waitWakeupOnly = launcherContext != nullptr;
-                if (!waitWakeupOnly) {
-                    goto worker_exit;
-                }
+                waitWakeupOnly = true;
                 goto worker_continue;
             }
         }
@@ -1684,10 +1575,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
                     connection->SetState(LTTCPEngineConnectionState::kClosed);
                     queueConnectStatus(static_cast<uint32_t>(soError != 0 ? soError : 1u));
                     queueClose();
-                    waitWakeupOnly = launcherContext != nullptr;
-                    if (!waitWakeupOnly) {
-                        break;
-                    }
+                    waitWakeupOnly = true;
                     continue;
                 }
             } else if (currentSendOffset < currentSend.ownedBytes.size()) {
@@ -1731,7 +1619,6 @@ worker_continue:
         continue;
     }
 
-worker_exit:
     connection->SetWorkerThreadScaffold(nullptr);
 }
 
@@ -2068,8 +1955,8 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
     // - keep the real recovered arg5 fields on the object body itself
     // - keep only source-only launcher-shell attachment + generic direct-connection bookkeeping in
     //   discrete engine-keyed maps instead of a synthetic per-engine side-state record
-    // - keep launcher bridge contexts as mediator-owned sidecars resolved from the connection's
-    //   direct owner pointer rather than inventing auth/margin-specific engine maps
+    // - active auth/margin worker/queue flow now stays on the direct connection object and its
+    //   direct mediator owner pointer at `+0xa4`, not a mediator-owned bridge context
     // - keep recovered payload families (`+0x08`, `+0x80/+0x84`, `+0x8c/+0x90`) in dedicated
     //   source backings keyed by `this`, not as pretend hidden object fields
     ownedQueueLockHelper60_.vtable = nullptr;
@@ -2861,36 +2748,6 @@ uint32_t CLTThreadPerClientTCPEngine::LeaveCleanupLockHelper() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* CLTThreadPerClientTCPEngine::EnsureLauncherConnectionContextScaffold(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold** slot,
-    mxo::ltlogin::CLTLoginMediator* mediator,
-    const char* label,
-    bool isMarginConnection) {
-    if (!slot) {
-        return nullptr;
-    }
-
-    EnsureLauncherConnectionBridgeContextVtableInitialized();
-    if (!*slot) {
-        *slot = static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(
-            std::calloc(1, sizeof(mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold)));
-        if (!*slot) {
-            spdlog::info(
-                "CLTThreadPerClientTCPEngine::EnsureLauncherConnectionContextScaffold failed label='{}'",
-                label ? label : "<null>");
-            return nullptr;
-        }
-        (*slot)->vtable = g_LauncherConnectionBridgeContextVtable;
-        (*slot)->autoReleaseFlag = 0;
-    }
-
-    (*slot)->debugLabel = label;
-    (*slot)->mediator = mediator;
-    (*slot)->isMarginConnection = isMarginConnection;
-    return *slot;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTThreadPerClientTCPEngine::EnqueueCompletedOperationScaffold(
     void* workItem,
     void* context,
@@ -2951,21 +2808,46 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
         return false;
     }
 
-    EnsureLauncherConnectionBridgeWorkItemVtableInitialized();
-    mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold* workItem =
-        static_cast<mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold*>(
-            std::calloc(1, sizeof(mxo::ltlogin::CLTLoginMediatorQueuedWorkItemScaffold)));
-    if (!workItem) {
-        LoggerForBridgeLabel(label)->info(
-            "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
+    EnsureSmallConnectionWorkItemVtablesInitialized();
+
+    CLTThreadPerClientTCPEngine_WorkItemHeader* workItem = nullptr;
+    if (workType == kWorkTypeConnectionStatus) {
+        auto* statusWorkItem =
+            static_cast<CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*>(
+                std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold)));
+        if (!statusWorkItem) {
+            LoggerForBridgeLabel(label)->info(
+                "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
+                label ? label : "<null>");
+            return false;
+        }
+        statusWorkItem->header.vtable = g_ConnectionStatusWorkItemVtable;
+        statusWorkItem->header.workType = kWorkTypeConnectionStatus;
+        statusWorkItem->header.statusOrPayloadDword08 = workPayload;
+        workItem = &statusWorkItem->header;
+    } else if (workType == kWorkTypeClose) {
+        auto* closeWorkItem =
+            static_cast<CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*>(
+                std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold)));
+        if (!closeWorkItem) {
+            LoggerForBridgeLabel(label)->info(
+                "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
+                label ? label : "<null>");
+            return false;
+        }
+        closeWorkItem->header.vtable = g_CloseWorkItemVtable;
+        closeWorkItem->header.workType = kWorkTypeClose;
+        closeWorkItem->header.statusOrPayloadDword08 = 0u;
+        workItem = &closeWorkItem->header;
+    } else {
+        LoggerForBridgeLabel(label)->warn(
+            "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold unsupported workType=0x{:08x} ({}) connection={} label='{}'",
+            workType,
+            LauncherBridgeWorkTypeName(workType),
+            fmt::ptr(connection),
             label ? label : "<null>");
         return false;
     }
-
-    workItem->header.vtable = g_LauncherConnectionBridgeWorkItemVtable;
-    workItem->header.workType = workType;
-    workItem->workPayload = workPayload;
-    workItem->debugLabel = label;
 
     void* queuedContext = ResolveQueuedConnectionContextForProducerAblation(connection);
     const bool queued = EnqueueCompletedOperationScaffold(
@@ -3002,86 +2884,6 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
     return true;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
-    uint32_t workType,
-    uint32_t workPayload,
-    const char* label,
-    bool queueLockAlreadyHeld) {
-    if (!context) {
-        return false;
-    }
-
-    // Fidelity note:
-    // - original worker-thread producers queue the direct connection object as `context` for
-    //   type-1 close and type-2 status work too
-    // - when the replacement-only launcher bridge context is available, use its sidecar
-    //   connection only as the route back to that same direct connection object
-    if (context->sidecarConnection == nullptr) {
-        LoggerForBridgeLabel(label)->warn(
-            "CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemInternalScaffold missing sidecarConnection label='{}' context={} type=0x{:08x} ({}) payload=0x{:08x}",
-            label ? label : "<null>",
-            fmt::ptr(context),
-            workType,
-            LauncherBridgeWorkTypeName(workType),
-            workPayload);
-        return false;
-    }
-
-    const bool queued = EnqueueDirectConnectionStatusWorkItemScaffold(
-        context->sidecarConnection,
-        workType,
-        workPayload,
-        label,
-        queueLockAlreadyHeld);
-    if (!queued) {
-        return false;
-    }
-
-    // Source-owned active-path tightening for the current launcher/client single-process bridge:
-    // some late startup consumers expect queued status/close work to become visible with less
-    // latency than the current queue-thread/poll cadence always guarantees.
-    // In particular, the post-state9 healthy original tail eventually reaches the queued margin
-    // peer-close -> `0x41afc0 -> 0x438df0 -> 0x41cfb0(0x0f)` path, while the replacement can crash
-    // in late rendering before the next outer pump drains that close work.
-    // Fidelity/retry correction:
-    // - draining a type-1 close immediately on the same socket worker thread that produced it can
-    //   hit the source-owned self-dispatch cleanup path in `RunCompletedOperationQueue`
-    // - that path is still not faithful enough to tear down the worker without leaving retry-hostile
-    //   state behind
-    // - original queued close consumption belongs to the later shared queue-consumer family, so keep
-    //   same-worker type-1 auth close work queued for the next outer pump instead of forcing an
-    //   immediate local drain here
-    bool shouldImmediateDrain = (workType == kWorkTypeConnectionStatus || workType == kWorkTypeClose);
-    if (shouldImmediateDrain && workType == kWorkTypeClose && context->sidecarConnection != nullptr) {
-        auto* worker = context->sidecarConnection->WorkerThreadScaffold();
-        if (worker != nullptr && worker->IsCurrentThread()) {
-            shouldImmediateDrain = false;
-        }
-    }
-    if (shouldImmediateDrain) {
-        RunCompletedOperationQueue(
-            /*nonBlocking=*/true,
-            /*preferType1CallbackBeforeCleanup=*/workType == kWorkTypeClose);
-    }
-    return true;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTThreadPerClientTCPEngine::EnqueueLauncherConnectionStatusWorkItemScaffold(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
-    uint32_t workType,
-    uint32_t workPayload,
-    const char* label) {
-    return EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-        context,
-        workType,
-        workPayload,
-        label,
-        /*queueLockAlreadyHeld=*/false);
-}
-
 // UNANCHORED: connection-owned bridge for the recovered `0x449d8a -> 0x436820` handoff.
 void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
@@ -3108,86 +2910,55 @@ void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffol
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context,
+    CMessageConnection* connection,
+    mxo::ltlogin::CLTLoginMediator* mediator,
+    bool isMarginConnection,
     const char* receiveLabel) {
-    if (!context || !context->sidecarConnection) {
+    (void)receiveLabel;
+    if (!connection) {
         return;
     }
 
     // Current active-path tightening after the `0x42fe50` worker-loop pass:
     // - once the direct connection already has its recovered worker object in `[connection+0x08]`,
     //   that worker owns the blocking select/read/write/wakeup loop
-    // - keep this helper only as a legacy fallback for source-owned no-worker paths instead of
+    // - keep this helper only as a no-worker fallback on the direct connection object instead of
     //   racing the live worker on the same socket from the arg5 helper poll
-    if (context->sidecarConnection->WorkerThreadScaffold() != nullptr) {
+    if (connection->WorkerThreadScaffold() != nullptr) {
         return;
     }
 
-    // Keep the connection seam itself on the faithful one-fragment
-    // `0x42fe50 -> 0x449d40 -> 0x469bf0` receive handoff, but let the launcher bridge re-enter
-    // that helper repeatedly within one arg5 helper poll.
-    //
-    // Why this is currently bounded here instead of inside `CLTTCPConnection`:
-    // - a previous full same-poll recv-drain restoration on the bridge path regressed live runs
-    //   into a later "Loading Character" stall
-    // - original queue type `3` already belongs to the parsed-packet work items that
-    //   `CLTTCPConnection::OnReceive` enqueues before control returns here
-    // - the extra `AuthReceivePacket` / `MarginReceivePacket` submission below is therefore only a
-    //   source-owned receive-drain proxy for the later original `0x4490c0` dispatch tail that
-    //   source still does not execute on that same callback
-    // - newer bounded leaf-side corrections now source-own two later destinations from that tail:
-    //   - handled auth copied packets can re-enter
-    //     `0x449a30 -> owner+0x180 / 0x41f250`
-    //   - handled margin copied packets can re-enter
-    //     `0x44af20 -> 0x442d00 -> owner+0x184 / 0x41f260`
-    // - so the later synthetic receive-drain item is increasingly a fallback/no-op path rather
-    //   than the primary live consumer on those handled branches
-    // - newer bounded active-path proof now narrows it further:
-    //   successful launcher-into-game runs show the active auth/margin path no longer logging any
-    //   `pendingCopiedPackets=` or synthetic receive-drain handling; copied packets are consumed on
-    //   the in-callback post-copy tail instead
-    // - tighter `2026-04-02` tail read now matches that runtime shape better:
-    //   once `0x4490c0` reaches its post-copy virtual dispatch family, the packet is already
-    //   consumed locally inside the same callback
-    // - so the synthetic proxy below is now expected to stay dormant and only survives as
-    //   compatibility scaffolding for unexpected source-owned paths
-    // - current source queue order on one helper poll is therefore:
-    //   - `OnReceive` first queues all parsed-packet work items emitted from the current fragment
-    //   - only if some unexpected path still leaves copied packets pending would this helper queue a
-    //     synthetic receive-drain proxy for the same fragment
-    //   - if a later recv in the same poll returns peer-close/error, the type-1 close item queues
-    //     after those successful-fragment submissions
-    // - later peer-close notification still queues after any successful fragment notifications from
-    //   the same helper poll, matching the original `0x42fe50` ordering more closely than the old
-    //   once-per-fragment unconditional synthetic receive path
     while (true) {
-        const int received =
-            context->sidecarConnection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
+        const int received = connection->PollReceiveAndDeliverReadOperationFragmentsScaffold();
         if (received > 0) {
-            if (context->sidecarConnection->HasPendingReceivedPacketsScaffold()) {
-                (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-                    context,
-                    /*workType=*/kWorkTypeSyntheticReceiveDrain,
-                    /*workPayload=*/static_cast<uint32_t>(received),
-                    receiveLabel,
-                    /*queueLockAlreadyHeld=*/true);
-            }
             continue;
         }
 
-        if (received < 0 && !context->peerCloseQueued) {
-            context->peerCloseQueued = true;
-            spdlog::info(
-                "CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold queued peer-close label='{}' context={} connection={}",
-                (context->debugLabel && context->debugLabel[0]) ? context->debugLabel : "<null>",
-                fmt::ptr(context),
-                fmt::ptr(context->sidecarConnection));
-            (void)EnqueueLauncherConnectionStatusWorkItemInternalScaffold(
-                context,
-                /*workType=*/kWorkTypeClose,
-                /*workPayload=*/0u,
-                context->isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed",
-                /*queueLockAlreadyHeld=*/true);
+        if (received < 0) {
+            const bool peerCloseQueued = mediator != nullptr
+                ? (isMarginConnection ? mediator->MarginPeerCloseQueuedScaffold()
+                                      : mediator->AuthPeerCloseQueuedScaffold())
+                : false;
+            if (!peerCloseQueued) {
+                if (mediator != nullptr) {
+                    if (isMarginConnection) {
+                        mediator->SetMarginPeerCloseQueuedScaffold(true);
+                    } else {
+                        mediator->SetAuthPeerCloseQueuedScaffold(true);
+                    }
+                }
+                spdlog::info(
+                    "CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold queued peer-close connection={} isMargin={} ownerContext={}",
+                    fmt::ptr(connection),
+                    isMarginConnection ? 1u : 0u,
+                    fmt::ptr(connection->OwnerContext()));
+                (void)EnqueueDirectConnectionStatusWorkItemScaffold(
+                    static_cast<CLTTCPConnection*>(connection),
+                    /*workType=*/kWorkTypeClose,
+                    /*workPayload=*/0u,
+                    isMarginConnection ? "MarginPeerClosed" : "AuthPeerClosed",
+                    /*queueLockAlreadyHeld=*/true);
+            }
         }
         return;
     }
@@ -3195,31 +2966,22 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::PumpLauncherConnectionBridgeFromArg5HelperScaffold() {
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* authContext = nullptr;
-    mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* marginContext = nullptr;
-
-    if (CLTThreadPerClientTCPEngine_ContextPayloadBacking* contextBacking =
-            FindEngineContextPayloadBacking(this)) {
-        for (const auto& it : contextBacking->entries) {
-            const CLTThreadPerClientTCPEngine_WorkerThread* worker = it.second->payload.get();
-            CMessageConnection* connection = worker
-                ? static_cast<CMessageConnection*>(worker->ContextKey())
-                : nullptr;
-            mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-                ResolveLauncherBridgeContextForConnectionScaffold(connection);
-            if (!context) {
-                continue;
-            }
-            if (context->isMarginConnection) {
-                marginContext = context;
-            } else {
-                authContext = context;
-            }
-        }
+    mxo::ltlogin::CLTLoginMediator* mediator =
+        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+    if (mediator == nullptr) {
+        return;
     }
 
-    PumpLauncherConnectionContextScaffold(authContext, "AuthReceivePacket");
-    PumpLauncherConnectionContextScaffold(marginContext, "MarginReceivePacket");
+    PumpLauncherConnectionContextScaffold(
+        mediator->AuthConnection(),
+        mediator,
+        /*isMarginConnection=*/false,
+        "AuthReceivePacket");
+    PumpLauncherConnectionContextScaffold(
+        mediator->MarginConnection(),
+        mediator,
+        /*isMarginConnection=*/true,
+        "MarginReceivePacket");
 }
 
 // anchor: launcher.exe:0x436b10
@@ -3429,39 +3191,17 @@ CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* con
             return false;
         }
 
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* bridgeContext =
-            ResolveLauncherBridgeContextForConnectionScaffold(connection);
         return connection == contextKey ||
             connection == resolvedContextKey ||
             connection == queueContextOwner ||
             connection->OwnerContext() == contextKey ||
-            connection->OwnerContext() == resolvedContextKey ||
-            bridgeContext == contextKey ||
-            bridgeContext == resolvedContextKey;
+            connection->OwnerContext() == resolvedContextKey;
     };
 
     if (CMessageConnection* queuedConnection =
             dynamic_cast<CMessageConnection*>(queueContextOwner);
         queuedConnection && matchesConnectionKey(queuedConnection)) {
         return queuedConnection;
-    }
-
-    auto bridgeContextConnection =
-        [](void* candidate) -> CMessageConnection* {
-            mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* context =
-                static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(candidate);
-            return IsLauncherBridgeContextScaffold(context) ? context->sidecarConnection : nullptr;
-        };
-
-    if (CMessageConnection* bridgedConnection = bridgeContextConnection(contextKey);
-        bridgedConnection && matchesConnectionKey(bridgedConnection)) {
-        return bridgedConnection;
-    }
-    if (resolvedContextKey != contextKey) {
-        if (CMessageConnection* bridgedConnection = bridgeContextConnection(resolvedContextKey);
-            bridgedConnection && matchesConnectionKey(bridgedConnection)) {
-            return bridgedConnection;
-        }
     }
 
     if (CLTThreadPerClientTCPEngine_ContextPayloadBacking* contextBacking =
@@ -3524,16 +3264,10 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
     }
 
     // Static RE of `0x449cd0`, `0x449d20`, and `0x449d40` keeps the public engine slot family on
-    // the direct connection object itself. After queue-context unwrapping and bridge-sidecar
-    // handling above, remaining callers are expected to already be passing that connection object.
+    // the direct connection object itself. After queue-context unwrapping above, remaining callers
+    // are expected to already be passing that connection object.
     if (!connection) {
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* bridgeContext =
-            static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(normalizedContextKey);
-        if (IsLauncherBridgeContextScaffold(bridgeContext)) {
-            connection = bridgeContext->sidecarConnection;
-        } else {
-            connection = static_cast<CMessageConnection*>(normalizedContextKey);
-        }
+        connection = static_cast<CMessageConnection*>(normalizedContextKey);
     }
     if (!connection) {
         return nullptr;
@@ -3541,12 +3275,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
 
     connection->SetEngine(this);
     if (connection->OwnerContext() == nullptr && normalizedContextKey != connection) {
-        mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold* bridgeContext =
-            static_cast<mxo::ltlogin::CLTLoginMediatorConnectionContextScaffold*>(normalizedContextKey);
-        connection->SetOwnerContext(
-            IsLauncherBridgeContextScaffold(bridgeContext) && bridgeContext->mediator != nullptr
-                ? static_cast<void*>(bridgeContext->mediator)
-                : normalizedContextKey);
+        connection->SetOwnerContext(normalizedContextKey);
     }
     return connection;
 }
