@@ -96,6 +96,10 @@ A fresh pass on the shared refcount helpers tightened one concrete source mismat
     AddRef/Release semantics (`0x4489d0`-like) instead of a raw pointer overwrite
   - helper-local transformed output objects are now heap-backed too, so that retained-handle store
     no longer points at a stack/local outer message-ref scaffold
+- practical current result from reruns after those lifetime fixes:
+  - the ordinary replacement path still reaches game, shows graphics corruption, and later crashes
+  - so these message-ref / agenda ownership improvements are real fidelity gains but do not by
+    themselves close the remaining late render bug
 
 ## Related docs
 

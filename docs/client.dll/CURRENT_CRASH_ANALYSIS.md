@@ -263,6 +263,14 @@ These are no longer the best primary crash explanations:
       - practical current result: these are real fidelity improvements to lifetime semantics, but
         the ordinary replacement run still reproduces the late graphics corruption / crash, so
         another ordering/lifetime mismatch likely remains further downstream
+      - newer reruns after those fixes still show the same render-family bad draws from:
+        - `0x623382cf`
+        - `0x6233821a`
+        - `0x62337f29`
+        - `0x6233755e`
+        - `0x6235e309`
+        and still crash later in d3d9, so the remaining bug has survived multiple message-ref /
+        agenda lifetime corrections
     - current launcher-side suspicion should therefore move one layer deeper than the raw section
       bytes themselves, e.g. toward ordering / timing / client-side object-materialization effects
       downstream of those launcher-provided contracts
