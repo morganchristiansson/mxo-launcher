@@ -341,12 +341,38 @@ static std::vector<uint8_t> CStreamPacketEncryptionWorker_KeyBytes(
     return std::vector<uint8_t>(seedBytes.begin(), seedBytes.end());
 }
 
+static CMessageConnectionMessageRef* CMessageConnectionMessageRefHandle_AssignRetained(
+    CMessageConnectionMessageRef** slot,
+    CMessageConnectionMessageRef* newMessageRef) {
+    if (!slot) {
+        return nullptr;
+    }
+    CMessageConnectionMessageRef* const oldMessageRef = *slot;
+    if (oldMessageRef != newMessageRef) {
+        if (oldMessageRef) {
+            oldMessageRef->Release();
+        }
+        *slot = newMessageRef;
+        if (newMessageRef) {
+            newMessageRef->AddRef();
+        }
+    }
+    return *slot;
+}
+
 }  // namespace
+
+CMessageConnectionMessageRefOutputBuffer::~CMessageConnectionMessageRefOutputBuffer() {
+    Reset();
+}
 
 // anchor: launcher.exe:0x44d390 / 0x44d500
 void CMessageConnectionMessageRefOutputBuffer::Reset() {
     hasValue = false;
-    messageRef.ResetForPacketBuilderScaffold(false, 0u);
+    if (messageRef) {
+        messageRef->Release();
+        messageRef = nullptr;
+    }
 }
 
 // anchor: launcher.exe:0x44c8b0
@@ -359,14 +385,18 @@ bool CMessageConnectionMessageRefOutputBuffer::SetPayloadBytes(
         return false;
     }
 
-    uint8_t* const appendPointer = messageRef.PayloadAppendPointerScaffold();
+    messageRef = new CMessageConnectionMessageRef();
+    messageRef->ResetForPacketBuilderScaffold(false, 0u);
+    uint8_t* const appendPointer = messageRef->PayloadAppendPointerScaffold();
     if (!appendPointer) {
+        Reset();
         return false;
     }
 
     std::copy_n(payloadBytes, payloadByteCount, appendPointer);
-    if (messageRef.GrowPayloadByteCountScaffold(static_cast<uint16_t>(payloadByteCount)) !=
+    if (messageRef->GrowPayloadByteCountScaffold(static_cast<uint16_t>(payloadByteCount)) !=
         payloadByteCount) {
+        Reset();
         return false;
     }
 
@@ -376,7 +406,7 @@ bool CMessageConnectionMessageRefOutputBuffer::SetPayloadBytes(
 
 // anchor: launcher.exe:0x44d390 / 0x44d500
 CMessageConnectionMessageRef* CMessageConnectionMessageRefOutputBuffer::MessageRef() {
-    return hasValue ? &messageRef : nullptr;
+    return hasValue ? messageRef : nullptr;
 }
 
 // anchor: launcher.exe:0x44d910 / 0x44daf0
@@ -550,13 +580,15 @@ void CStreamPacketEncryptionModuleWriteHelper::ResetForSeed(
 // anchor: launcher.exe:0x469980
 void CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
-    // Original `0x469980` (`CMessageConnectionPacketAgendaHelper_StoreOpaqueMessageRef`) performs
-    // a refcounted replace/store through helper `+0x10`. Source keeps the narrower raw-pointer
-    // slot effect because these agenda-local message-ref scaffolds are source-owned stack/local
-    // objects rather than launcher heap objects with shared AddRef/Release tails.
-    if (outputSlotAddress10) {
-        *outputSlotAddress10 = opaqueMessageRef;
+    // Original helper stores/replaces a retained outer message-ref through helper field `+0x10`.
+    // Now that both receive-side and transform-output message-ref objects are heap-backed, source
+    // can keep the nearer AddRef/Release handle semantics instead of a raw pointer overwrite.
+    if (!outputSlotAddress10) {
+        return;
     }
+    CMessageConnectionMessageRefHandle_AssignRetained(
+        reinterpret_cast<CMessageConnectionMessageRef**>(outputSlotAddress10),
+        static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef));
 }
 
 // anchor: launcher.exe:0x469850

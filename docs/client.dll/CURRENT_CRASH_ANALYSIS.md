@@ -258,9 +258,11 @@ These are no longer the best primary crash explanations:
       - source also now heap-materializes the receive-side outer message-ref in
         `CMessageConnection::OnOperationCompleted` instead of keeping it on the stack for the
         current callback only
-      - practical current result: this is a fidelity improvement to lifetime semantics, but the
-        ordinary replacement run still reproduces the late graphics corruption / crash, so another
-        ordering/lifetime mismatch likely remains further downstream
+      - source now also applies retained-handle semantics at the packet-agenda embedded helper
+        (`0x469980`-like store path) and heap-backs helper-local transformed output message-refs
+      - practical current result: these are real fidelity improvements to lifetime semantics, but
+        the ordinary replacement run still reproduces the late graphics corruption / crash, so
+        another ordering/lifetime mismatch likely remains further downstream
     - current launcher-side suspicion should therefore move one layer deeper than the raw section
       bytes themselves, e.g. toward ordering / timing / client-side object-materialization effects
       downstream of those launcher-provided contracts

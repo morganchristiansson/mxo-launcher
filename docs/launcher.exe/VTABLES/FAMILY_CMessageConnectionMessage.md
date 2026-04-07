@@ -91,6 +91,11 @@ A fresh pass on the shared refcount helpers tightened one concrete source mismat
   - this is still not the original pool implementation, but it is materially closer to the original
     lifetime model than a stack-local scaffold whose address could only be valid for the current
     callback frame
+- source now also tightens the packet-agenda embedded helper at `0x469980` one step further:
+  - `CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef` now uses retained-handle
+    AddRef/Release semantics (`0x4489d0`-like) instead of a raw pointer overwrite
+  - helper-local transformed output objects are now heap-backed too, so that retained-handle store
+    no longer points at a stack/local outer message-ref scaffold
 
 ## Related docs
 

@@ -385,9 +385,10 @@ public:
     // Canonical original sink vtables remain documented under:
     // - `0x004b8438`
     // - `0x004b84f0`
-    CMessageConnectionMessageRef messageRef{};
+    CMessageConnectionMessageRef* messageRef = nullptr;
     bool hasValue = false;
 
+    ~CMessageConnectionMessageRefOutputBuffer();
     void Reset();
     bool SetPayloadBytes(const uint8_t* payloadBytes, size_t payloadByteCount);
     CMessageConnectionMessageRef* MessageRef();
