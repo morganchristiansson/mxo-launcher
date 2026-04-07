@@ -210,18 +210,26 @@ These are no longer the best primary crash explanations:
   - one-time warnings when draws happen with missing vertex layout / missing stream0 / missing indices
 - newest replacement rerun with those hooks materially tightened the render symptom:
   - this is **not** literally a one-present/one-frame path
-  - the crashing run reached at least `51` successful `Present` calls before the late d3d9 crash
+  - the crashing run reached at least `50+` successful `Present` calls before the late d3d9 crash
   - early frames were dominated by `DrawPrimitiveUP` triangle-fan quads with stride `28`
   - later by crash time the device had seen both:
-    - `DrawPrimitiveUPCount = 1358`
-    - `DrawIndexedPrimitiveCount = 68`
-  - but the tracked device layout state still read:
-    - `currentFVF = 0`
-    - `currentVertexDeclaration = NULL`
-  - and the first suspicious draw warning fired on `DrawPrimitiveUP` with no vertex layout bound
+    - many `DrawPrimitiveUP`
+    - and a smaller number of `DrawIndexedPrimitive`
+  - suspicious raw draw caller addresses are now concrete too:
+    - `0x6233755e` inside `RenderDevice_DrawPrimitiveBatchPositionColored`
+    - `0x6233821a` / `0x623382cf` inside neighboring unnamed batch-draw helper `0x62337d70`
+    - `0x62337f29` inside that same `0x62337d70` helper
+    - `0x6235e309` inside `0x6235e2e0`
+- important instrumentation correction:
+  - the first D3D9 device-hook pass had `SetVertexDeclaration` / `SetFVF` vtable indices off by one
+  - so the earlier exact `currentFVF = 0` / `currentVertexDeclaration = NULL` read is not yet final
+  - current source now corrects those hook indices and logs caller sites for later `SetFVF` /
+    `SetVertexDeclaration` calls too
 - practical consequence:
   - the current best render-side suspect is shifting from “only first frame renders” toward
-    “client keeps presenting corrupted frames while issuing at least some draws with missing / wrong
-    vertex-layout state before the eventual d3d9 null-read”
+    “client keeps presenting corrupted frames while issuing bad draw batches for dozens of frames,
+    and we now need the corrected `SetFVF` / vertex-declaration traces on those same caller paths
+    before deciding whether the fault is truly missing layout state or a different downstream draw
+    corruption”
 
 Use those logs on the next rerun before widening scope.

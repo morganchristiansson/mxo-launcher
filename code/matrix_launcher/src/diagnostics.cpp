@@ -164,6 +164,7 @@ struct DiagnosticD3D9ActivityState {
 
 static DiagnosticD3D9ActivityState g_D3D9ActivityState = {};
 static std::set<std::string> g_LoggedSuspiciousD3D9DrawSites;
+static std::set<std::string> g_LoggedD3D9VertexLayoutSetSites;
 
 static constexpr size_t kIDirect3D9VtableEntryCount = 17;
 static constexpr size_t kIDirect3D9CreateDeviceVtableIndex = 16;
@@ -175,8 +176,8 @@ static constexpr size_t kIDirect3DDevice9DrawPrimitiveVtableIndex = 81;
 static constexpr size_t kIDirect3DDevice9DrawIndexedPrimitiveVtableIndex = 82;
 static constexpr size_t kIDirect3DDevice9DrawPrimitiveUPVtableIndex = 83;
 static constexpr size_t kIDirect3DDevice9DrawIndexedPrimitiveUPVtableIndex = 84;
-static constexpr size_t kIDirect3DDevice9SetVertexDeclarationVtableIndex = 88;
-static constexpr size_t kIDirect3DDevice9SetFVFVtableIndex = 90;
+static constexpr size_t kIDirect3DDevice9SetVertexDeclarationVtableIndex = 87;
+static constexpr size_t kIDirect3DDevice9SetFVFVtableIndex = 89;
 static constexpr size_t kIDirect3DDevice9SetStreamSourceVtableIndex = 100;
 static constexpr size_t kIDirect3DDevice9SetIndicesVtableIndex = 104;
 
@@ -802,6 +803,19 @@ static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9SetVertexDeclaration(
     IDirect3DDevice9* device,
     IDirect3DVertexDeclaration9* declaration) {
     g_D3D9ActivityState.currentVertexDeclaration = declaration;
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    const std::string siteKey = std::string("SetVertexDeclaration|") +
+        std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" +
+        std::to_string(reinterpret_cast<uintptr_t>(declaration));
+    if (g_LoggedD3D9VertexLayoutSetSites.insert(siteKey).second) {
+        const uintptr_t clientAbsolute = DiagnosticPointerToClientAbsolute(returnAddress);
+        spdlog::info(
+            "D3D9 SetVertexDeclaration caller={} module={} clientAbsolute={} declaration={}",
+            fmt::ptr(returnAddress),
+            DiagnosticDescribeModuleForAddress(returnAddress),
+            clientAbsolute ? fmt::format("0x{:08x}", static_cast<unsigned>(clientAbsolute)) : std::string("<non-client>"),
+            fmt::ptr(declaration));
+    }
     return g_OriginalIDirect3DDevice9SetVertexDeclaration
         ? g_OriginalIDirect3DDevice9SetVertexDeclaration(device, declaration)
         : E_FAIL;
@@ -809,6 +823,19 @@ static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9SetVertexDeclaration(
 
 static HRESULT STDMETHODCALLTYPE DiagnosticIDirect3DDevice9SetFVF(IDirect3DDevice9* device, DWORD fvf) {
     g_D3D9ActivityState.currentFVF = fvf;
+    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
+    const std::string siteKey = std::string("SetFVF|") +
+        std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" +
+        std::to_string(static_cast<unsigned long long>(fvf));
+    if (g_LoggedD3D9VertexLayoutSetSites.insert(siteKey).second) {
+        const uintptr_t clientAbsolute = DiagnosticPointerToClientAbsolute(returnAddress);
+        spdlog::info(
+            "D3D9 SetFVF caller={} module={} clientAbsolute={} fvf=0x{:08x}",
+            fmt::ptr(returnAddress),
+            DiagnosticDescribeModuleForAddress(returnAddress),
+            clientAbsolute ? fmt::format("0x{:08x}", static_cast<unsigned>(clientAbsolute)) : std::string("<non-client>"),
+            static_cast<unsigned>(fvf));
+    }
     return g_OriginalIDirect3DDevice9SetFVF
         ? g_OriginalIDirect3DDevice9SetFVF(device, fvf)
         : E_FAIL;

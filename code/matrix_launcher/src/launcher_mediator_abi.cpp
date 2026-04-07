@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <set>
 #include <string>
 
 #include <spdlog/spdlog.h>
@@ -172,9 +173,9 @@ struct LateMediatorAbiCallLogState {
     bool valid = false;
 };
 
-static LateMediatorAbiCallLogState g_GetProfileRootName38LogState = {};
-static LateMediatorAbiCallLogState g_GetDefaultSelectionIndex3cLogState = {};
-static LateMediatorAbiCallLogState g_GetSelectionDescriptor40LogState = {};
+static std::set<std::string> g_GetProfileRootName38SeenSites;
+static std::set<std::string> g_GetDefaultSelectionIndex3cSeenSites;
+static std::set<std::string> g_GetSelectionDescriptor40SeenSites;
 
 static const char* DescribeKnownMediatorObserver(void* observer) {
     switch (reinterpret_cast<uintptr_t>(observer)) {
@@ -390,14 +391,8 @@ static const char* __thiscall Mediator_GetProfileRootName38(MinimalLoginMediator
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
     const char* const result = mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
     const char* const normalizedResult = NonEmptyOrPlaceholder(result);
-    const bool shouldLog =
-        !g_GetProfileRootName38LogState.valid ||
-        g_GetProfileRootName38LogState.caller != returnAddress ||
-        g_GetProfileRootName38LogState.resultText != normalizedResult;
-    g_GetProfileRootName38LogState.valid = true;
-    g_GetProfileRootName38LogState.caller = returnAddress;
-    g_GetProfileRootName38LogState.resultText = normalizedResult;
-    if (shouldLog) {
+    const std::string siteKey = std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" + normalizedResult;
+    if (g_GetProfileRootName38SeenSites.insert(siteKey).second) {
         spdlog::info(
             "MediatorStub::GetProfileRootName38 caller={} [{}] result='{}'",
             fmt::ptr(returnAddress),
@@ -413,14 +408,8 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
     const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
-    const bool shouldLog =
-        !g_GetDefaultSelectionIndex3cLogState.valid ||
-        g_GetDefaultSelectionIndex3cLogState.caller != returnAddress ||
-        g_GetDefaultSelectionIndex3cLogState.result32 != result;
-    g_GetDefaultSelectionIndex3cLogState.valid = true;
-    g_GetDefaultSelectionIndex3cLogState.caller = returnAddress;
-    g_GetDefaultSelectionIndex3cLogState.result32 = result;
-    if (shouldLog) {
+    const std::string siteKey = std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" + std::to_string(result);
+    if (g_GetDefaultSelectionIndex3cSeenSites.insert(siteKey).second) {
         spdlog::info(
             "MediatorStub::GetDefaultSelectionIndex3c caller={} [{}] result=0x{:08x}",
             fmt::ptr(returnAddress),
@@ -438,16 +427,11 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     (void)self;
     void* const result = mxo::ltlogin::ILTLoginMediator::Default->GetArg6SelectionDescriptorObject40(
         selectionIndex);
-    const bool shouldLog =
-        !g_GetSelectionDescriptor40LogState.valid ||
-        g_GetSelectionDescriptor40LogState.caller != returnAddress ||
-        g_GetSelectionDescriptor40LogState.selectionIndex != selectionIndex ||
-        g_GetSelectionDescriptor40LogState.resultPtr != result;
-    g_GetSelectionDescriptor40LogState.valid = true;
-    g_GetSelectionDescriptor40LogState.caller = returnAddress;
-    g_GetSelectionDescriptor40LogState.selectionIndex = selectionIndex;
-    g_GetSelectionDescriptor40LogState.resultPtr = result;
-    if (shouldLog) {
+    const std::string siteKey =
+        std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" +
+        std::to_string(selectionIndex) + "|" +
+        std::to_string(reinterpret_cast<uintptr_t>(result));
+    if (g_GetSelectionDescriptor40SeenSites.insert(siteKey).second) {
         spdlog::info(
             "MediatorStub::GetSelectionDescriptor40 caller={} [{}] selectionIndex=0x{:08x} result={}",
             fmt::ptr(returnAddress),
