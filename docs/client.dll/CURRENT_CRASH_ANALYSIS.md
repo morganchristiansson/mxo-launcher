@@ -260,6 +260,8 @@ These are no longer the best primary crash explanations:
         current callback only
       - source now also applies retained-handle semantics at the packet-agenda embedded helper
         (`0x469980`-like store path) and heap-backs helper-local transformed output message-refs
+      - source now also mirrors `0x434fa0` more directly by treating the parser current-cursor field
+        as a retained-fragment handle helper instead of a naked fragment pointer
       - practical current result: these are real fidelity improvements to lifetime semantics, but
         the ordinary replacement run still reproduces the late graphics corruption / crash, so
         another ordering/lifetime mismatch likely remains further downstream
