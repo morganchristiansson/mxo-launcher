@@ -175,6 +175,7 @@ At `0x40b360..0x40b409` the launcher uses the same interface during cleanup, inc
 Fresh static review of `launcher.exe:0x496480..0x496491` shows that the launcher also registers **another output slot** through the same wrapper ctor `0x4030d0` with the same interface string `"ILTLoginMediator.Default"`:
 
 - output slot: `0x4d3584`
+  - current working RE name: `g_pLauncherSelectionLoginMediatorDefaultSibling`
 - replacement cleanup note: the current launcher collapses that lookup onto the live `ILTLoginMediator.Default` pointer instead of keeping a second runtime pointer; `0x4d3584` remains original-path evidence only.
 
 That is important because the current arg7-selection writer is now closed to the surrounding helper:
@@ -231,8 +232,14 @@ That is important because the current arg7-selection writer is now closed to the
     launcher-side `+0xf0` site, while still finding no equally direct launcher callsite to `+0xec`
     or `+0x120`
   - success-side follow-on is now materially tighter too:
-    - when `WaitForEvent(8)` returns `0`, `0x40ec70` deletes `Profiles\%s\%s` via sibling `+0xdc`
-      then `+0x5c`, calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`, and rebuilds the world list through `0x40e480 -> 0x40e1c0`
+    - when `WaitForEvent(8)` returns `0`, `0x40ec70`:
+      - calls sibling `+0xdc(selectedSlotRecordIndex)` first to recover the slot-record heap string
+      - then calls sibling `+0x5c(chainedToken)` with that returned value before building `Profiles\%s\%s`
+      - then calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`
+      - then rebuilds the world list through `0x40e480 -> 0x40e1c0`
+    - practical nuance from the assembly: this sibling `+0x5c` path is caller-clean / chained on
+      `0x4d3584`, so do not over-merge it with the no-extra-arg `+0x5c` submit-observer path seen
+      through sibling slot `0x4d2734`
   - practical consequence: this concrete `+0xf0` callsite is now best read as a
     **delete-character / removal corridor**, not as the hidden success-side producer for
     `+0xec = 0x41c1f0`

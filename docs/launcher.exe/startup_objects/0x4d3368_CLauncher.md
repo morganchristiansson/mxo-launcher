@@ -256,7 +256,8 @@ New surrounding launcher-UI tightening now narrows the upstream caller path too:
       - calls sibling mediator slot `+0xf0 = 0x41c390` with that selected row high word
       - waits through `0x41b6c0` for event `8`
       - on **success** (`WaitForEvent` result `0`) it:
-        - builds `Profiles\%s\%s` from sibling mediator `+0xdc` then `+0x5c`
+        - calls sibling `+0xdc(selectedSlotRecordIndex)` first to recover the slot-record heap string
+        - then calls sibling `+0x5c(chainedToken)` with that returned value before building `Profiles\%s\%s`
         - deletes that profile directory with `SHFileOperationA(FO_DELETE)` when present
         - calls sibling slot `+0xe8 = 0x41ec00 = CLTLoginMediator_RemoveSlotRecordAndCompactRouteStateByIndex`
         - rebuilds the list through `0x40e480 -> 0x40e1c0`
