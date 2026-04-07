@@ -91,7 +91,12 @@ Also important from `.data` initialization:
 
 - `g_LauncherEulaFlowEnabled` (`0x4c8b1c`) starts as `1`
 - `g_LauncherPatchFlowEnabled` (`0x4c8b1d`) starts as `1`
-- `g_LauncherNoPatchFlowFlagByte` (`0x4d2c69`) starts as `0`
+- `g_LauncherInitClientFlagByte` (`0x4d2c69`, older over-specific name: `g_LauncherNoPatchFlowFlagByte`) starts as `0`
+
+Current bounded read for `0x4d2c69` is now narrower and less speculative:
+- launcher-side `0x409950` still only proves an explicit clear-to-zero on one parse corridor
+- client-side `InitClientDLL` forwards it as arg8 into `InitClientDLL_BeginLoadingCharacterFlow`
+- that later helper treats it as a byte-sized flow flag, not as a logging context pointer
 
 This is useful because it lets the replacement launcher reconstruct bigger chunks of original preprocessing state at once instead of only mirroring "stripped vs forwarded argv" behavior.
 

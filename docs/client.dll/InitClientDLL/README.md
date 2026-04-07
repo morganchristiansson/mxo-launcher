@@ -46,16 +46,18 @@ add esp, 0x20
 int InitClientDLL(
     uint32_t filteredArgCount,         // from g_LauncherFilteredArgCount (0x4d2c5c)
     char**   filteredArgv,             // from g_LauncherFilteredArgv (0x4d2c60)
-    HMODULE  hClientDll,               // from 0x4d2c50
-    HMODULE  hCresDll,                 // from 0x4d2c4c
+    HMODULE  hClientDll,               // from g_hClient (0x4d2c50)
+    HMODULE  hCresDll,                 // from g_hCres (0x4d2c4c)
     void*    launcherNetworkObject,    // from 0x4d6304
     void*    pILTLoginMediatorDefault, // from g_pILTLoginMediatorDefault (0x4d2c58)
     uint32_t packedArg7Selection,      // [this+0xa8]/[this+0xac]
-    uint32_t noPatchFlowFlagByte       // from g_LauncherNoPatchFlowFlagByte (0x4d2c69)
+    uint32_t launcherInitClientFlagByte // zero-extended byte from 0x4d2c69
 );
 ```
 
 Names after arg4 are still provisional, but the sources and order are not.
+Current bounded rename note: arg8 is now better treated as a generic launcher init/client-flow byte
+than as a specifically "nopatch" byte.
 
 ## Known launcher-side prerequisites
 
@@ -66,7 +68,46 @@ Before the call, the original launcher has already:
 3. loaded `cres.dll` into `0x4d2c4c`
 4. loaded `client.dll` into `0x4d2c50`
 5. resolved the runtime interface pointer at `g_pILTLoginMediatorDefault` (`0x4d2c58`, `ILTLoginMediator.Default`)
-6. selected nopatch-related state reflected in `g_LauncherNoPatchFlowFlagByte` (`0x4d2c69`)
+6. prepared a launcher byte at `0x4d2c69` that is later zero-extended into arg8
+
+### New clarification: arg8 is a byte flow flag, not a logging context
+
+Bounded client-side static analysis now closes the first concrete use of arg8.
+
+At `client.dll:0x620015e2..0x620015f8`, after earlier engine/window setup succeeds, `InitClientDLL`
+forwards the late arguments into `InitClientDLL_BeginLoadingCharacterFlow (0x62170b00)` as:
+
+```asm
+mov ecx, [ebp+0x24]   ; arg8 from launcher.exe 0x4d2c69
+mov edx, [ebp+0x20]   ; arg7
+mov eax, [ebp+0x14]   ; arg4 hCresDll
+push ecx              ; helper arg5 = arg8
+mov ecx, [ebp+0x10]   ; arg3 hClientDll
+push edx              ; helper arg4 = arg7
+push edi              ; helper arg3 = hWnd
+push eax              ; helper arg2 = hCresDll
+push ecx              ; helper arg1 = hClientDll
+mov ecx, 0x629ddfc8   ; this
+call 0x62170b00
+```
+
+Inside `0x62170b00`, that helper arg5/arg8-derived byte is then:
+- tested immediately at `0x62170b1d..0x62170b2f`
+- combined with arg7 high-8 and arg6 vtable `+0xd8` on the selection-gating path
+- later checked again at `0x62170f1d..0x62170f24`
+- and when non-zero, it sets client-shell byte `*(DAT_629e68a8 + 0x29) = 1` before the
+  `"Loading Character"` / arg6 `+0xec` handoff
+
+Negative result:
+- this path does **not** use arg8 as a trace-router/log-context pointer or source-location handle
+- the earlier `logContext`-style decompiler naming in `client.dll!InitClientDLL` came from an
+  incorrect 6-parameter prototype, not from confirmed behavior
+
+So the least-speculative current name is:
+- `launcherInitClientFlagByte` for the call argument
+- launcher global `0x4d2c69` as `g_LauncherInitClientFlagByte`
+
+Exact launcher-side semantics are still open.
 
 ### New clarification: arg1/arg2 are filtered launcher-owned argv storage
 

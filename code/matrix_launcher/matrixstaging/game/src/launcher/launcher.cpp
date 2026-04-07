@@ -16,6 +16,7 @@
 #include "../../../../src/launcher_network_object_abi.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
 
+// anchor: launcher.exe:0x40a55c..0x40a5a4 / caller-clean 8-argument export frame
 using InitClientDLLFunc = int (*)(
     uint32_t filteredArgCount,
     char** filteredArgv,
@@ -24,22 +25,24 @@ using InitClientDLLFunc = int (*)(
     void* launcherNetworkObject,
     void* pILTLoginMediatorDefault,
     uint32_t packedArg7Selection,
-    uint32_t flagByte);
+    uint32_t launcherInitClientFlagByte);
 using RunClientDLLFunc = int (*)();
 using TermClientDLLFunc = int (*)();
 using ErrorClientDLLFunc = const char* (*)();
 
-HMODULE g_hCres = NULL;
-HMODULE g_hClient = NULL;
+HMODULE g_hCres = NULL;                     // original: [0x4d2c4c]
+HMODULE g_hClient = NULL;                   // original: [0x4d2c50]
 int g_CrtArgc = 0;
 char** g_CrtArgv = NULL;
+uint32_t g_LauncherFilteredArgCount = 0;    // original: [0x4d2c5c]
+char** g_LauncherFilteredArgv = NULL;       // original: [0x4d2c60]
 mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 mxo::launcher::CLauncher g_Launcher;
 void* g_pLauncherObject6304 = NULL;
 void* g_pILTLoginMediatorDefault = NULL;
 void* g_pILTLoginMediatorSelection3584 = NULL;
 uint32_t g_PackedArg7Selection = 0;
-uint32_t g_FlagByte = 0;
+uint8_t g_LauncherInitClientFlagByte = 0;   // original byte: [0x4d2c69]
 char g_LastWorldName[256] = {0};
 
 extern bool DiagnosticInitializePreclientEnvironmentLike402EC0();
@@ -367,10 +370,10 @@ void LogArgvContentsAsBytes(const char* label, char** argv, uint32_t count) {
 
 void LogKnownStartupState(const mxo::launcher::CLauncher& launcher) {
     spdlog::info("=== Known startup frame ===");
-    spdlog::info("arg1 filteredArgCount        = 0x{:08x}", g_LauncherCommandLine.FilteredArgCount());
-    spdlog::info("arg2 filteredArgv            = {}", fmt::ptr(g_LauncherCommandLine.FilteredArgv()));
-    if (g_LauncherCommandLine.FilteredArgv()) {
-        LogArgvContentsAsBytes("arg2", g_LauncherCommandLine.FilteredArgv(), g_LauncherCommandLine.FilteredArgCount());
+    spdlog::info("arg1 filteredArgCount        = 0x{:08x}", g_LauncherFilteredArgCount);
+    spdlog::info("arg2 filteredArgv            = {}", fmt::ptr(g_LauncherFilteredArgv));
+    if (g_LauncherFilteredArgv) {
+        LogArgvContentsAsBytes("arg2", g_LauncherFilteredArgv, g_LauncherFilteredArgCount);
     }
     spdlog::info("arg3 hClientDll              = {}", fmt::ptr(g_hClient));
     spdlog::info("arg4 hCresDll                = {}", fmt::ptr(g_hCres));
@@ -381,7 +384,9 @@ void LogKnownStartupState(const mxo::launcher::CLauncher& launcher) {
     spdlog::info("CLauncher+0xac placeholder   = 0x{:08x}", launcher.m_FieldAC);
     spdlog::info("Last_WorldName               = {}", g_LastWorldName[0] ? g_LastWorldName : "<unavailable>");
     spdlog::info("arg7 packedArg7Selection     = 0x{:08x}", g_PackedArg7Selection);
-    spdlog::info("arg8 flagByte                = 0x{:08x}", g_FlagByte);
+    spdlog::info(
+        "arg8 launcherInitClientFlagByte = 0x{:02x}",
+        static_cast<unsigned>(g_LauncherInitClientFlagByte));
 }
 
 void LogClientLifecycleFailure(const char* phase, ErrorClientDLLFunc errorClientDLL) {
@@ -409,10 +414,16 @@ bool CLauncher::ParseCommandLineStage() const {
         "DIAGNOSTIC: launcher.exe uses ParseCommandLine(0x409950) followed by "
         "CConsoleVar_ParseCommandLineAndConfig(0x4173d0)");
 
+    g_LauncherFilteredArgCount = 0;
+    g_LauncherFilteredArgv = NULL;
+
     if (!g_LauncherCommandLine.ParseCommandLine(g_CrtArgc, g_CrtArgv)) {
         spdlog::error("ERROR: launcher ParseCommandLine stage failed");
         return false;
     }
+
+    g_LauncherFilteredArgCount = g_LauncherCommandLine.FilteredArgCount();
+    g_LauncherFilteredArgv = g_LauncherCommandLine.FilteredArgv();
 
     if (!g_LauncherCommandLine.ParseRuntimeConsoleVariables()) {
         for (const std::string& errorLine : g_LauncherCommandLine.RuntimeConsoleErrors().lines) {
@@ -457,7 +468,7 @@ bool CLauncher::ParseCommandLineStage() const {
     }
 
     LogLauncherPreprocessingState();
-    spdlog::info("DIAGNOSTIC: filtered argv final count = {}", g_LauncherCommandLine.FilteredArgCount());
+    spdlog::info("DIAGNOSTIC: filtered argv final count = {}", g_LauncherFilteredArgCount);
     return true;
 }
 
@@ -1112,15 +1123,18 @@ bool CLauncher::RunClientDllLifecycle() const {
     g_PackedArg7Selection = packedArg7Selection;
 
     spdlog::info("=== Calling InitClientDLL with current launcher startup state ===");
+    // anchor: launcher.exe:0x40a55c..0x40a5a4
+    // - arg1/arg2 come from launcher globals `0x4d2c5c/0x4d2c60`, not from a helper object call
+    // - arg8 is a byte global at `0x4d2c69` zero-extended through `EDX` before the push
     const int initResult = initClientDLL(
-        g_LauncherCommandLine.FilteredArgCount(),
-        g_LauncherCommandLine.FilteredArgv(),
+        g_LauncherFilteredArgCount,
+        g_LauncherFilteredArgv,
         g_hClient,
         g_hCres,
         g_pLauncherObject6304,
         g_pILTLoginMediatorDefault,
         packedArg7Selection,
-        g_FlagByte);
+        g_LauncherInitClientFlagByte);
     spdlog::info("InitClientDLL returned: {}", initResult);
     if (initResult <= 0) {
         LogClientLifecycleFailure("InitClientDLL", errorClientDLL);
@@ -1240,6 +1254,9 @@ cleanup:
     UnloadCresDLL();
     CleanupRecoveredInitClientState();
     g_LauncherCommandLine.Reset();
+    g_LauncherFilteredArgCount = 0;
+    g_LauncherFilteredArgv = NULL;
+    g_LauncherInitClientFlagByte = 0;
     return operationSucceeded;
 }
 

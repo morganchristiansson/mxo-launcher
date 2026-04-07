@@ -17,6 +17,6 @@ The original launcher passes an 8-argument frame into `client.dll!InitClientDLL`
 - `cres.dll` handle (`0x4d2c4c`)
 - launcher-owned objects (`0x4d6304`, `g_pILTLoginMediatorDefault` / `0x4d2c58`)
 - packed launcher selection / saved-world state from `CLauncher+0xa8/+0xac`
-- nopatch-flow flag byte (`g_LauncherNoPatchFlowFlagByte` / `0x4d2c69`)
+- launcher init/client-flow flag byte (`g_LauncherInitClientFlagByte` / `0x4d2c69`, older over-specific name: `g_LauncherNoPatchFlowFlagByte`)
 
 The older sprawling version of this document was archived to `../slopdocs/launcher.exe/data_passing_mechanisms.md`.

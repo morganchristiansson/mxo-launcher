@@ -27,7 +27,6 @@
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include "diagnostics.h"
-#include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
 #include "../matrixstaging/game/src/launcher/launcher.h"
 
 // Include the login mediator header for world list builder access
@@ -47,9 +46,7 @@ extern HMODULE g_hCres;
 extern HMODULE g_hClient;
 extern int g_CrtArgc;
 extern char** g_CrtArgv;
-
-// Launcher-owned command-line preprocessing now lives in a dedicated recovered model.
-extern mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
+extern char** g_LauncherFilteredArgv;          // original: [0x4d2c60]
 
 // Launcher-owned startup/auth state outside the command-line parser.
 extern CLauncher g_Launcher;                    // original global object: [0x4d3368]
@@ -57,7 +54,6 @@ extern void* g_pLauncherObject6304;            // original: [0x4d6304]
 extern void* g_pILTLoginMediatorDefault;       // original: [0x4d2c58]
 extern void* g_pILTLoginMediatorSelection3584; // original sibling slot: [0x4d3584]
 extern uint32_t g_PackedArg7Selection;         // packed from [CLauncher+0xa8]/[CLauncher+0xac]
-extern uint32_t g_FlagByte;                    // original: [0x4d2c69]
 extern char g_LastWorldName[256];              // original registry value: Last_WorldName
 
 struct DiagnosticPreclientEnvironmentState {
@@ -382,8 +378,8 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
     }
 
     LogWordSpan("exception stack", reinterpret_cast<const void*>(context->Esp), 16);
-    if (g_LauncherCommandLine.FilteredArgv()) {
-        LogWordSpan("current arg2 filteredArgv", g_LauncherCommandLine.FilteredArgv(), 4);
+    if (g_LauncherFilteredArgv) {
+        LogWordSpan("current arg2 filteredArgv", g_LauncherFilteredArgv, 4);
     }
     if (g_pLauncherObject6304) {
         LogWordSpan("current arg5 launcherObject", g_pLauncherObject6304, 8);
