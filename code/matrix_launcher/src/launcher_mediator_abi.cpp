@@ -324,12 +324,16 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 
 // anchor: launcher.exe:0x40a3e9..0x40a3fe hands the freshly built 0x4d6304 object into arg6 before InitClientDLL
 // vtable: ILTLoginMediator.Default slot +0x08
+// Return-shape note from launcher.exe:0x40a380:
+// - the caller turns the raw slot result into `result < 1`
+// - so this scaffold returns `0` for the non-null success case and `1` when the arg5 object
+//   failed to materialize, which preserves the original success/failure sense more closely
 static int __thiscall Mediator_SetNetworkEngine(MinimalLoginMediatorStub* self, void* object) {
     (void)self;
 
     mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(
         LauncherNetworkEngineFromAbiShell(object));
-    return 1;
+    return object ? 0 : 1;
 }
 
 // anchor: client.dll early InitClientDLL readiness gate on arg6 +0x10

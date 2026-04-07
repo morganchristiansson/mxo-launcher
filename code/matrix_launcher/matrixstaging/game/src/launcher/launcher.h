@@ -76,6 +76,9 @@ public:
     // anchor: launcher.exe:0x409950 / 0x4173d0
     bool ParseCommandLineStage() const;
 
+    // anchor: launcher.exe:0x40a380
+    bool InitializeThreadPerClientTCPEngine() const;
+
     // anchor: launcher.exe:0x40a780
     bool LoadCresDLL() const;
 
@@ -92,8 +95,8 @@ public:
     // launcher-owned selection / nopatch inputs consumed later by the active nopatch path.
     bool BuildStartupContextFromRecoveredSelection(RecoveredLauncherStartupContext* startupContext);
 
-    // UNANCHORED: replacement-only synthesis that materializes arg5/arg6/arg7-owned InitClientDLL
-    // state before the later 0x40b739..0x40b7af pre-client continuation corridor.
+    // UNANCHORED: replacement-only synthesis that materializes arg6/arg7-owned InitClientDLL
+    // state before the later 0x40a380 / 0x40b74d..0x40b7af pre-client continuation corridor.
     bool MaterializeRecoveredInitClientStateFromStartupContext(
         const RecoveredLauncherStartupContext& startupContext);
 

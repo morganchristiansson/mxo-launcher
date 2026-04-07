@@ -461,6 +461,28 @@ bool CLauncher::ParseCommandLineStage() const {
     return true;
 }
 
+// anchor: launcher.exe:0x40a380
+bool CLauncher::InitializeThreadPerClientTCPEngine() const {
+    // Call-shape note:
+    // - `CLauncher::InitInstance` reaches this through `mov ecx, ebx; call 0x40a380`
+    // - current Ghidra still decompiles the body as if `this` were unused, but keeping the source
+    //   as a `CLauncher` method preserves the original `InitInstance` ownership/call boundary
+    if (!g_pILTLoginMediatorDefault) {
+        spdlog::error("launcher.exe:0x40a380 requires ILTLoginMediator.Default before arg5 build/register");
+        return false;
+    }
+
+    const int registerResult =
+        LauncherInstallNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
+    const bool operationSucceeded = (registerResult < 1);
+    spdlog::info(
+        "DIAGNOSTIC: 0x40a380-style arg5 build/register mediatorResult={} object={} success={}",
+        registerResult,
+        fmt::ptr(g_pLauncherObject6304),
+        operationSucceeded ? 1 : 0);
+    return operationSucceeded;
+}
+
 // anchor: launcher.exe:0x40a780
 bool CLauncher::LoadCresDLL() const {
     spdlog::info("=== Load cres.dll ===");
@@ -593,9 +615,10 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
     return true;
 }
 
-// UNANCHORED: replacement-only synthesis that feeds the later 0x40b739..0x40b7af corridor by
-// materializing current arg5/arg6/arg7 startup state. This is more honest than treating the entire
-// pre-client stretch as one faux method, but it still does not claim an exact original boundary.
+// UNANCHORED: replacement-only synthesis that feeds the later 0x40a380 / 0x40b74d..0x40b7af
+// corridor by materializing current arg6/arg7 startup state. This is more honest than treating the
+// entire pre-client stretch as one faux method, but it still does not claim an exact original
+// boundary.
 bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
     const RecoveredLauncherStartupContext& startupContext) {
     if (!PreloadDependencies()) {
@@ -667,8 +690,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
                 g_LastWorldName[0] ? g_LastWorldName : startupContext.mediatorSelectionName);
         }
     }
-
-    LauncherInstallNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
 
     const char authServerDnsName[] = "auth.lith.thematrixonline.net";
     const uint16_t authServerPort = 11000;
@@ -1160,18 +1181,20 @@ bool CLauncher::InitInstance() {
         goto cleanup;
     }
 
-    // UNANCHORED within 0x40b430: replacement-only arg5/arg6/arg7 startup-state materialization
-    // that feeds the later anchored 0x40a4d0 InitClientDLL call shape.
-    // Source-mapping note: the original binary still has a distinct `0x40b740 -> 0x40a380`
-    // call here, but the current replacement does not preserve that as a separate helper/call
-    // boundary and instead materializes the equivalent arg5/arg6/arg7 state earlier in-source.
+    // UNANCHORED within 0x40b430: replacement-only arg6/arg7 startup-state materialization that
+    // feeds the later anchored 0x40a380 / 0x40a4d0 call shape.
     if (!MaterializeRecoveredInitClientStateFromStartupContext(startupContext)) {
+        goto cleanup;
+    }
+
+    // anchor: launcher.exe:0x40b740 -> 0x40a380
+    if (!InitializeThreadPerClientTCPEngine()) {
         goto cleanup;
     }
 
     // Original corridor in 0x40b430:
     // - 0x40b739: `AfxInitRichEdit()`
-    // - 0x40b740: original `Launcher_InitializeThreadPerClientTCPEngine` call
+    // - 0x40b740: `Launcher_InitializeThreadPerClientTCPEngine()`
     // - 0x40b74d..0x40b752: `0x402ec0` pre-client UI-thread/message gate
     //   - starts `CLauncherThread`, waits for `thread+0x48` provisional `LauncherLoginDialog`
     //     object + dialog `+0x68` ready, then

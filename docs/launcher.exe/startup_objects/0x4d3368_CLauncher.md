@@ -353,9 +353,12 @@ Implication for the replacement source:
 - do **not** present those source helpers as proven original subroutine boundaries unless new static
   evidence appears
 - current source-mapping consequence from that rule:
-  - original `0x40b740 -> 0x40a380` remains a real binary call site, but the current replacement
-    does **not** preserve it as a distinct source helper/call boundary there; equivalent arg5/arg6
-    startup materialization is still grouped earlier inside `CLauncher::InitInstance`
+  - replacement source now preserves a distinct anchored `0x40b740 -> 0x40a380` call boundary in
+    `CLauncher::InitInstance` through `CLauncher::InitializeThreadPerClientTCPEngine()`
+  - current `0x40a380` body is still only partially faithful internally:
+    - the anchored method now owns the create/register boundary and raw `result < 1` success test
+    - but the concrete object build/register still routes through the replacement arg5 ABI-shell
+      helper instead of a direct recovered `malloc(0xb4) -> 0x431c30 -> mediator +0x08` body
   - current no-GUI host should not require `-user` / `-pwd` during the earlier
     `ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig` stage; interactive prompting, when
     needed, belongs later in the pre-client auth stage so that parse/config ownership stays closer

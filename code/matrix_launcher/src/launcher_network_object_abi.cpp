@@ -782,11 +782,11 @@ static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
 
 // UNANCHORED: replacement helper that mirrors the mediator +0x08 handoff used after launcher.exe:0x40a380.
 static int RegisterLauncherNetworkEngineWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
-    if (!launcherObjectPtr || !mediatorPtr) return 0;
+    if (!mediatorPtr) return 1;
 
     void** vtable = *(void***)mediatorPtr;
     if (!vtable || !vtable[2]) {
-        return 0;
+        return 1;
     }
 
     typedef int (__thiscall *RegisterEngineFn)(void*, void*);
@@ -835,7 +835,7 @@ void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking
 }
 
 // UNANCHORED: public replacement-launcher entrypoint that installs the arg5 ABI shell.
-void LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr) {
+int LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr) {
     if (outLauncherObjectPtr && *outLauncherObjectPtr) {
         LauncherReleaseNetworkEngineAbiShell(outLauncherObjectPtr, mediatorPtr);
     }
@@ -853,15 +853,14 @@ void LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* med
         LauncherLogNetworkEngineAbiShellDispatchState(object, "post-create");
     }
 
-    if (mediatorPtr && object) {
-        const int registerResult = RegisterLauncherNetworkEngineWithMediator(mediatorPtr, object);
-        if (registerResult < 1) {
-            spdlog::warn(
-                "launcher arg5 ABI shell mediator registration returned {} for {}",
-                registerResult,
-                fmt::ptr(object));
-        }
+    const int registerResult = RegisterLauncherNetworkEngineWithMediator(mediatorPtr, object);
+    if (registerResult >= 1) {
+        spdlog::warn(
+            "launcher arg5 ABI shell mediator registration returned {} for {}",
+            registerResult,
+            fmt::ptr(object));
     }
+    return registerResult;
 }
 
 // UNANCHORED: public replacement-launcher entrypoint that releases the arg5 ABI shell.
