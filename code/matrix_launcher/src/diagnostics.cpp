@@ -133,8 +133,6 @@ static std::set<std::string> g_DumpedShaderSourcePaths;
 
 static bool g_ClientLoadingTextHookEnvChecked = false;
 static bool g_ClientLoadingTextHookRequested = false;
-static bool g_ClientLoadingTextOverrideEnvChecked = false;
-static bool g_ClientLoadingTextOverrideRequested = false;
 static bool g_ClientLoadingTextHookInstalled = false;
 static HMODULE g_ClientLoadingTextHookModule = NULL;
 static uint8_t* g_ClientLoadingTextHookTarget = nullptr;
@@ -1756,30 +1754,21 @@ static bool DiagnosticEnvFlagEnabled(const char* variableName) {
         _stricmp(value, "on") == 0;
 }
 
-static bool DiagnosticClientLoadingTextOverrideRequestedViaEnv() {
-    if (!g_ClientLoadingTextOverrideEnvChecked) {
-        g_ClientLoadingTextOverrideRequested =
-            DiagnosticEnvFlagEnabled("MXO_DIAGNOSTIC_OVERRIDE_CLIENT_LOADING_TEXT");
-        g_ClientLoadingTextOverrideEnvChecked = true;
-        if (g_ClientLoadingTextOverrideRequested) {
-            spdlog::info(
-                "DIAGNOSTIC: MXO_DIAGNOSTIC_OVERRIDE_CLIENT_LOADING_TEXT enabled client loading-text replacements");
-        }
-    }
-    return g_ClientLoadingTextOverrideRequested;
-}
-
 static bool DiagnosticClientLoadingTextHookRequestedViaEnv() {
     if (!g_ClientLoadingTextHookEnvChecked) {
-        g_ClientLoadingTextHookRequested =
-            DiagnosticEnvFlagEnabled("MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT");
+        const bool hookDisabled =
+            DiagnosticEnvFlagEnabled("MXO_DISABLE_DIAGNOSTIC_CLIENT_LOADING_TEXT_HOOK");
+        g_ClientLoadingTextHookRequested = !hookDisabled;
         g_ClientLoadingTextHookEnvChecked = true;
-        if (g_ClientLoadingTextHookRequested) {
+        if (hookDisabled) {
             spdlog::info(
-                "DIAGNOSTIC: MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT enabled exact client loading-text hook");
+                "DIAGNOSTIC: MXO_DISABLE_DIAGNOSTIC_CLIENT_LOADING_TEXT_HOOK disabled exact client loading-text hook");
+        } else {
+            spdlog::info(
+                "DIAGNOSTIC: exact client loading-text hook enabled by default");
         }
     }
-    return g_ClientLoadingTextHookRequested || DiagnosticClientLoadingTextOverrideRequestedViaEnv();
+    return g_ClientLoadingTextHookRequested;
 }
 
 static void DiagnosticWriteRelativeJump(uint8_t* patchLocation, const void* destination) {
@@ -1835,18 +1824,16 @@ static const char* DiagnosticClientLoadingTextHookOnText(const char* text, void*
     }
 
     const char* visibleText = text ? text : "<empty>";
-    if (DiagnosticClientLoadingTextOverrideRequestedViaEnv()) {
-        const char* replacement = DiagnosticFindClientLoadingTextReplacement(visibleText);
-        if (replacement && std::strcmp(replacement, visibleText) != 0) {
-            spdlog::info(
-                "DIAGNOSTIC: overriding client loading text original='{}' replacement='{}'",
-                visibleText,
-                replacement);
-            DiagnosticLogClientLoadingStateText(
-                replacement,
-                "client.dll:FUN_6215b930 visible override");
-            return replacement;
-        }
+    const char* replacement = DiagnosticFindClientLoadingTextReplacement(visibleText);
+    if (replacement && std::strcmp(replacement, visibleText) != 0) {
+        spdlog::info(
+            "DIAGNOSTIC: replacing client loading text original='{}' replacement='{}'",
+            visibleText,
+            replacement);
+        DiagnosticLogClientLoadingStateText(
+            replacement,
+            "client.dll:FUN_6215b930 visible replacement");
+        return replacement;
     }
 
     DiagnosticLogClientLoadingStateText(

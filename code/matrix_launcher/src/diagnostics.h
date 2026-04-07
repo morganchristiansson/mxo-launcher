@@ -46,9 +46,10 @@ void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
 
-// Diagnostic-only, disabled-by-default runtime detour for client.dll loading/status text updates.
-// Opt in with:
-// - MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT=1     (exact logging)
-// - MXO_DIAGNOSTIC_OVERRIDE_CLIENT_LOADING_TEXT=1 (visible text replacement; also installs hook)
+// Diagnostic-only runtime detour for client.dll loading/status text updates.
+// Default: enabled, with the recovered replacement text mapping applied at the real client text
+// boundary.
+// Opt out with:
+// - MXO_DISABLE_DIAGNOSTIC_CLIENT_LOADING_TEXT_HOOK=1
 bool DiagnosticMaybeInstallClientLoadingTextHook(HMODULE clientModule);
 void DiagnosticRemoveClientLoadingTextHook();
