@@ -140,6 +140,20 @@ The current crash investigation should stay focused on:
      - an intermittent `Noobish` crash can still happen, but the sampled run used the sparse 5-entry
        live table and landed in an older/deeper d3d9 family instead of proving the same
        `Morg4n`-style rich-table corruption path
+   - newest non-crash rerun adds a third late symptom family worth keeping separate from both crash
+     stacks:
+     - replacement can now launch into game, keep music alive, show corrupted graphics, and appear
+       to stop after an initial frame without immediately crashing
+     - on that rerun the late diagnostic thread only observed client-shell `state20 = 2` and did
+       **not** later see the earlier crash-family `state20 = 3` transition before the user stopped
+       the session
+     - the same rerun also showed that every `DAT_629ea4e8` 12-byte slot retained the same third
+       dword `0x627d7b00` while the compact live `pi.cfg` adopter only populated the first two
+       dwords for the active 30 ids
+     - practical consequence:
+       - the next narrow question is whether that common retained slot-tail value is original/benign
+         or whether later client code expects a richer per-entry third dword before the render/fx
+         path becomes stable
 
 ## Non-root-cause notes
 

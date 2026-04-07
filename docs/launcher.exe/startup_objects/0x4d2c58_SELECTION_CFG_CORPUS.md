@@ -116,6 +116,18 @@ Static proof now closes ten exact corpus pairs end-to-end:
        - the remaining fidelity question is narrower: whether the compact live bytes are still
          original-faithful, and/or how the client later consumes the richer `Morg4n` table into the
          render/fx path
+     - newest replacement runtime observation also tightened the client-side slot shape without yet
+       proving correctness:
+       - at the first late client-shell transition, the active 30 ids were present with the expected
+         `value0/value1` pairs
+       - but every one of the full 107 in-memory 12-byte slots also retained the same third dword
+         `0x627d7b00`
+       - because `AdoptLiveSelectionPiCfgCompactRecords (0x621c9d70)` only writes the first two
+         dwords, that common third-dword tail is inherited from prior object state rather than from
+         launcher live bytes
+       - this is now a concrete downstream fidelity question on the active path: whether that common
+         retained tail is the original live compact-path default, or whether later render/fx code
+         expects a different per-entry third field that only the alternate/full path materializes
 
 4. `ai.cfg`
    - client helper `0x62198970`

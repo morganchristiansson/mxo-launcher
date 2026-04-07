@@ -50,6 +50,8 @@ static bool g_KnownClientEngineInitStatusTextsLogged = false;
 static HWND g_LastLoggedD3DErrorDialog = NULL;
 static const void* g_LastClientShellObserved = nullptr;
 static uint32_t g_LastClientShellState20 = 0xffffffffu;
+static ULONGLONG g_LastClientShellState20ChangeTick = 0;
+static uint32_t g_LastLoggedState20StallQuarterSeconds = 0;
 static const void* g_LastClientShellRuntimeObjectD0 = nullptr;
 static const void* g_LastClientShellRuntimeVftableD0 = nullptr;
 static bool g_DumpedClientPiTableAtRuntime = false;
@@ -139,14 +141,18 @@ static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) 
 
 static void DiagnosticLogClientPiTable() {
     // client.dll:0x621c9d70 (`AdoptLiveSelectionPiCfgCompactRecords`) only materializes compact live
-    // `pi.cfg` tuples into the first two dwords of each 12-byte slot. Log the third dword too so
-    // replacement runs can prove whether that tail stays zero/defaulted or is being poisoned later.
+    // `pi.cfg` tuples into the first two dwords of each 12-byte slot. Track the third dword too,
+    // but count active entries from `value0/value1` only so the log distinguishes payload-bearing
+    // slots from slots that merely retain a common default tail value.
     const uint8_t* piTableBase = static_cast<const uint8_t*>(DiagnosticClientAbsoluteToPointer(0x629ea4e8u));
     if (!piTableBase) {
         return;
     }
-    std::vector<unsigned> ids;
+    std::vector<unsigned> activeIds;
     unsigned nonZeroValue2Count = 0;
+    bool haveCommonValue2 = false;
+    bool allValue2Same = true;
+    uint32_t commonValue2 = 0u;
     for (unsigned index = 0; index < 0x6bu; ++index) {
         const uint8_t* entry = piTableBase + 0x1d8u + index * 0x0cu;
         if (!DiagnosticReadableMemoryRange(entry, 12)) {
@@ -155,31 +161,39 @@ static void DiagnosticLogClientPiTable() {
         const uint32_t value0 = *reinterpret_cast<const uint32_t*>(entry + 0x0);
         const uint32_t value1 = *reinterpret_cast<const uint32_t*>(entry + 0x4);
         const uint32_t value2 = *reinterpret_cast<const uint32_t*>(entry + 0x8);
-        if (value0 == 0u && value1 == 0u && value2 == 0u) {
-            continue;
-        }
         if (value2 != 0u) {
             ++nonZeroValue2Count;
         }
-        ids.push_back(index);
+        if (!haveCommonValue2) {
+            commonValue2 = value2;
+            haveCommonValue2 = true;
+        } else if (value2 != commonValue2) {
+            allValue2Same = false;
+        }
+        if (value0 == 0u && value1 == 0u) {
+            continue;
+        }
+        activeIds.push_back(index);
         spdlog::info(
-            "ClientPiTable entry id={} value0=0x{:08x} value1=0x{:08x} value2=0x{:08x}",
+            "ClientPiTable active entry id={} value0=0x{:08x} value1=0x{:08x} value2=0x{:08x}",
             index,
             value0,
             value1,
             value2);
     }
     std::string idsText;
-    for (size_t i = 0; i < ids.size(); ++i) {
+    for (size_t i = 0; i < activeIds.size(); ++i) {
         if (i != 0) {
             idsText += ",";
         }
-        idsText += std::to_string(ids[i]);
+        idsText += std::to_string(activeIds[i]);
     }
     spdlog::info(
-        "ClientPiTable nonZeroEntryCount={} nonZeroValue2Count={} ids={}",
-        ids.size(),
+        "ClientPiTable activeEntryCount={} nonZeroValue2Count={} allValue2Same={} commonValue2=0x{:08x} activeIds={}",
+        activeIds.size(),
         nonZeroValue2Count,
+        allValue2Same ? 1 : 0,
+        commonValue2,
         idsText);
 }
 
@@ -215,10 +229,29 @@ static void DiagnosticLogClientShellRuntimeTransitionState() {
         runtimeVftableD0 = *static_cast<const void* const*>(runtimeObjectD0);
     }
 
+    const ULONGLONG nowTick = GetTickCount64();
+    if (g_LastClientShellState20 == 0xffffffffu || state20 != g_LastClientShellState20) {
+        g_LastClientShellState20ChangeTick = nowTick;
+        g_LastLoggedState20StallQuarterSeconds = 0;
+    }
+
     if (clientShell == g_LastClientShellObserved &&
         state20 == g_LastClientShellState20 &&
         runtimeObjectD0 == g_LastClientShellRuntimeObjectD0 &&
         runtimeVftableD0 == g_LastClientShellRuntimeVftableD0) {
+        if (state20 == 2u && g_LastClientShellState20ChangeTick != 0) {
+            const uint32_t stalledQuarterSeconds =
+                static_cast<uint32_t>((nowTick - g_LastClientShellState20ChangeTick) / 250u);
+            if (stalledQuarterSeconds >= 2u && stalledQuarterSeconds > g_LastLoggedState20StallQuarterSeconds) {
+                g_LastLoggedState20StallQuarterSeconds = stalledQuarterSeconds;
+                spdlog::info(
+                    "ClientShell runtime state20=0x00000002 unchanged for {} ms shell={} d0Object={} d0Vftable={}",
+                    static_cast<unsigned long long>(nowTick - g_LastClientShellState20ChangeTick),
+                    fmt::ptr(clientShell),
+                    fmt::ptr(runtimeObjectD0),
+                    fmt::ptr(runtimeVftableD0));
+            }
+        }
         return;
     }
 
