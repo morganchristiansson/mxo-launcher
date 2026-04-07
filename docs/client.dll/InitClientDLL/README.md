@@ -480,7 +480,17 @@ Current stronger validation result:
   - `Initializing Abilities`
   - `Initializing FX`
   - `Initializing Metro World`
-- replacement-side spdlog now mirrors that earlier engine-init text family retrospectively once the path reaches arg6 `+0xec`, and still mirrors the exact visible `"Loading Character"` text at the wrapper-facing `+0xec` consume point; this keeps the logging launcher-owned and avoids patching client.dll
+- default replacement-side spdlog still mirrors that earlier engine-init text family retrospectively once the path reaches arg6 `+0xec`, and still mirrors the exact visible `"Loading Character"` text at the wrapper-facing `+0xec` consume point; this keeps the default path launcher-owned and avoids patching client.dll
+- a newer diagnostic-only opt-in runtime detour now exists for `client.dll:0x6215b930 = FUN_6215b930`, gated behind `MXO_DIAGNOSTIC_HOOK_CLIENT_LOADING_TEXT=1`
+  - the detour preserves the latent `ESI` status-sink register, trampoline-calls the original body unchanged, and logs the exact client-visible text through spdlog
+  - exact hook-derived texts now include the earlier engine-init family plus additional direct client strings beyond the old retrospective list:
+    - `Initializing World Render Data`
+    - `Initializing Interlock Database`
+    - `Initializing RichWorld`
+    - `Initializing Water`
+    - `Initializing Projected Textures`
+  - the same exact hook also confirms later direct client-visible `Loading Character` and `Waiting for Regionserver`
+  - the hook remains disabled by default so the project stance is still "do NOT inject into client.dll memory" unless that diagnostic env flag is explicitly set
 - so the visible loading-bar/status phase is consistent with the current `+0xec` evidence, but does **not** yet prove that the later direct `CreateCharacterWorldIndex` consumer at `0x62054cbd` has been reached
 - to avoid missing the next loading-path transition, the diagnostic mediator now also exposes/logs slot `+0x120`
 - a follow-up rerun after adding that slot still did **not** show any `+0x120` traffic before the same late crash (`crash_62`, still `EIP=0x003e5e8a`)

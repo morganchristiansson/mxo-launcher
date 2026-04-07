@@ -280,11 +280,17 @@ bool CLauncher::LoadClientDLL() const {
     spdlog::info("=== Load client.dll ===");
     g_hClient = LoadLibraryA("client.dll");
     spdlog::info("client.dll handle: {}", fmt::ptr(g_hClient));
+    if (g_hClient) {
+        // Diagnostic-only, disabled-by-default client-memory detour for the exact
+        // `client.dll:0x6215b930` loading/status-text boundary.
+        (void)DiagnosticMaybeInstallClientLoadingTextHook(g_hClient);
+    }
     return g_hClient != NULL;
 }
 
 // anchor: launcher.exe:0x40a760
 void CLauncher::UnloadClientDLL() const {
+    DiagnosticRemoveClientLoadingTextHook();
     if (g_hClient) {
         FreeLibrary(g_hClient);
         g_hClient = NULL;
