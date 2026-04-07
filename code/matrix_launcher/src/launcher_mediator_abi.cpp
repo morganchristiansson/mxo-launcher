@@ -163,6 +163,19 @@ static const char* DescribeLateMediatorAbiCaller(void* returnAddress) {
     return DescribeMediatorCaller(returnAddress);
 }
 
+struct LateMediatorAbiCallLogState {
+    void* caller = nullptr;
+    uint32_t selectionIndex = 0xffffffffu;
+    uint32_t result32 = 0xffffffffu;
+    void* resultPtr = nullptr;
+    std::string resultText;
+    bool valid = false;
+};
+
+static LateMediatorAbiCallLogState g_GetProfileRootName38LogState = {};
+static LateMediatorAbiCallLogState g_GetDefaultSelectionIndex3cLogState = {};
+static LateMediatorAbiCallLogState g_GetSelectionDescriptor40LogState = {};
+
 static const char* DescribeKnownMediatorObserver(void* observer) {
     switch (reinterpret_cast<uintptr_t>(observer)) {
         case 0x629ddfc8u:
@@ -376,11 +389,21 @@ static const char* __thiscall Mediator_GetProfileRootName38(MinimalLoginMediator
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
     const char* const result = mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
-    spdlog::info(
-        "MediatorStub::GetProfileRootName38 caller={} [{}] result='{}'",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        NonEmptyOrPlaceholder(result));
+    const char* const normalizedResult = NonEmptyOrPlaceholder(result);
+    const bool shouldLog =
+        !g_GetProfileRootName38LogState.valid ||
+        g_GetProfileRootName38LogState.caller != returnAddress ||
+        g_GetProfileRootName38LogState.resultText != normalizedResult;
+    g_GetProfileRootName38LogState.valid = true;
+    g_GetProfileRootName38LogState.caller = returnAddress;
+    g_GetProfileRootName38LogState.resultText = normalizedResult;
+    if (shouldLog) {
+        spdlog::info(
+            "MediatorStub::GetProfileRootName38 caller={} [{}] result='{}'",
+            fmt::ptr(returnAddress),
+            DescribeLateMediatorAbiCaller(returnAddress),
+            normalizedResult);
+    }
     return result;
 }
 
@@ -390,11 +413,20 @@ static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediato
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
     const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
-    spdlog::info(
-        "MediatorStub::GetDefaultSelectionIndex3c caller={} [{}] result=0x{:08x}",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        static_cast<unsigned>(result));
+    const bool shouldLog =
+        !g_GetDefaultSelectionIndex3cLogState.valid ||
+        g_GetDefaultSelectionIndex3cLogState.caller != returnAddress ||
+        g_GetDefaultSelectionIndex3cLogState.result32 != result;
+    g_GetDefaultSelectionIndex3cLogState.valid = true;
+    g_GetDefaultSelectionIndex3cLogState.caller = returnAddress;
+    g_GetDefaultSelectionIndex3cLogState.result32 = result;
+    if (shouldLog) {
+        spdlog::info(
+            "MediatorStub::GetDefaultSelectionIndex3c caller={} [{}] result=0x{:08x}",
+            fmt::ptr(returnAddress),
+            DescribeLateMediatorAbiCaller(returnAddress),
+            static_cast<unsigned>(result));
+    }
     return result;
 }
 
@@ -406,12 +438,23 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     (void)self;
     void* const result = mxo::ltlogin::ILTLoginMediator::Default->GetArg6SelectionDescriptorObject40(
         selectionIndex);
-    spdlog::info(
-        "MediatorStub::GetSelectionDescriptor40 caller={} [{}] selectionIndex=0x{:08x} result={}",
-        fmt::ptr(returnAddress),
-        DescribeLateMediatorAbiCaller(returnAddress),
-        static_cast<unsigned>(selectionIndex),
-        fmt::ptr(result));
+    const bool shouldLog =
+        !g_GetSelectionDescriptor40LogState.valid ||
+        g_GetSelectionDescriptor40LogState.caller != returnAddress ||
+        g_GetSelectionDescriptor40LogState.selectionIndex != selectionIndex ||
+        g_GetSelectionDescriptor40LogState.resultPtr != result;
+    g_GetSelectionDescriptor40LogState.valid = true;
+    g_GetSelectionDescriptor40LogState.caller = returnAddress;
+    g_GetSelectionDescriptor40LogState.selectionIndex = selectionIndex;
+    g_GetSelectionDescriptor40LogState.resultPtr = result;
+    if (shouldLog) {
+        spdlog::info(
+            "MediatorStub::GetSelectionDescriptor40 caller={} [{}] selectionIndex=0x{:08x} result={}",
+            fmt::ptr(returnAddress),
+            DescribeLateMediatorAbiCaller(returnAddress),
+            static_cast<unsigned>(selectionIndex),
+            fmt::ptr(result));
+    }
     return result;
 }
 

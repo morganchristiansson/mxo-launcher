@@ -221,6 +221,13 @@ struct LiveSelectionCfgCorpusView {
     uint32_t length = 0u;
 };
 
+static std::string g_LastLoggedProfileRootName38;
+static uint32_t g_LastLoggedDefaultSelectionIndex3c = 0xffffffffu;
+static bool g_LastLoggedSelectionDescriptor40Valid = false;
+static uint32_t g_LastLoggedSelectionDescriptor40SelectionIndex = 0xffffffffu;
+static uint32_t g_LastLoggedSelectionDescriptor40Field03 = 0u;
+static uint32_t g_LastLoggedSelectionDescriptor40Field07 = 0u;
+static bool g_LastLoggedSelectionDescriptor40WasNull = false;
 static const void* g_LastLoggedLivePiCfgBuffer = nullptr;
 static uint32_t g_LastLoggedLivePiCfgLength = 0u;
 
@@ -578,9 +585,13 @@ uint32_t CLTLoginMediator::IsConnected() {
 // anchor: launcher.exe:0x41f0a0 / owner vtable +0x38
 const char* CLTLoginMediator::GetProfileRootName() const {
     const char* profileRootName = authBootstrapSource38_.inlineString00.data();
-    spdlog::debug(
-        "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}' [source=owner+0x94.inlineString00]",
-        NonEmptyTextOrPlaceholder(profileRootName));
+    const char* normalizedProfileRootName = NonEmptyTextOrPlaceholder(profileRootName);
+    if (g_LastLoggedProfileRootName38 != normalizedProfileRootName) {
+        g_LastLoggedProfileRootName38 = normalizedProfileRootName;
+        spdlog::debug(
+            "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}' [source=owner+0x94.inlineString00]",
+            normalizedProfileRootName);
+    }
     return profileRootName;
 }
 
@@ -675,16 +686,27 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
     }
 
     if (!descriptorName) {
-        spdlog::debug(
-            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
-            static_cast<unsigned>(selectionIndex),
-            static_cast<unsigned>(low24),
-            static_cast<unsigned>(high8),
-            static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
-            static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
-            static_cast<unsigned>(CurrentCharacterRouteIndexCc8Scaffold()),
-            static_cast<unsigned>(expectedScratchRequest),
-            static_cast<unsigned>(Arg6WorldUpperBoundExclusive()));
+        const bool shouldLogNull =
+            !g_LastLoggedSelectionDescriptor40Valid ||
+            !g_LastLoggedSelectionDescriptor40WasNull ||
+            g_LastLoggedSelectionDescriptor40SelectionIndex != selectionIndex;
+        g_LastLoggedSelectionDescriptor40Valid = true;
+        g_LastLoggedSelectionDescriptor40WasNull = true;
+        g_LastLoggedSelectionDescriptor40SelectionIndex = selectionIndex;
+        g_LastLoggedSelectionDescriptor40Field03 = 0u;
+        g_LastLoggedSelectionDescriptor40Field07 = 0u;
+        if (shouldLogNull) {
+            spdlog::debug(
+                "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (configuredWorld=0x{:06x} configuredVariant=0x{:02x} currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} worldUpperBoundExclusive={})",
+                static_cast<unsigned>(selectionIndex),
+                static_cast<unsigned>(low24),
+                static_cast<unsigned>(high8),
+                static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
+                static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
+                static_cast<unsigned>(CurrentCharacterRouteIndexCc8Scaffold()),
+                static_cast<unsigned>(expectedScratchRequest),
+                static_cast<unsigned>(Arg6WorldUpperBoundExclusive()));
+        }
         return nullptr;
     }
 
@@ -711,21 +733,34 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         (matchedCurrentSlotIndexRequest ? "current-slot-index" :
          ((low24 == Arg6SelectedWorldIndexLow24()) ? "low24-world-match" : "other-match"));
-    spdlog::debug(
-        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} descriptorSource={} mappedName='{}' vtable={} field03=0x{:08x} field07=0x{:08x} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
-        static_cast<unsigned>(selectionIndex),
-        static_cast<unsigned>(low24),
-        static_cast<unsigned>(high8),
-        fmt::ptr(&arg6SelectionDescriptor40_),
-        matchMode,
-        descriptorSource,
-        descriptorName,
-        fmt::ptr(arg6SelectionDescriptor40_.vtable00),
-        static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field03),
-        static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field07),
-        static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
-        static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
-        static_cast<unsigned>(expectedScratchRequest));
+    const bool shouldLogDescriptor =
+        !g_LastLoggedSelectionDescriptor40Valid ||
+        g_LastLoggedSelectionDescriptor40WasNull ||
+        g_LastLoggedSelectionDescriptor40SelectionIndex != selectionIndex ||
+        g_LastLoggedSelectionDescriptor40Field03 != arg6SelectionDescriptor40Packed_.field03 ||
+        g_LastLoggedSelectionDescriptor40Field07 != arg6SelectionDescriptor40Packed_.field07;
+    g_LastLoggedSelectionDescriptor40Valid = true;
+    g_LastLoggedSelectionDescriptor40WasNull = false;
+    g_LastLoggedSelectionDescriptor40SelectionIndex = selectionIndex;
+    g_LastLoggedSelectionDescriptor40Field03 = arg6SelectionDescriptor40Packed_.field03;
+    g_LastLoggedSelectionDescriptor40Field07 = arg6SelectionDescriptor40Packed_.field07;
+    if (shouldLogDescriptor) {
+        spdlog::debug(
+            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} descriptorSource={} mappedName='{}' vtable={} field03=0x{:08x} field07=0x{:08x} configuredWorld=0x{:06x} configuredVariant=0x{:02x} expectedScratchRequest=0x{:08x})",
+            static_cast<unsigned>(selectionIndex),
+            static_cast<unsigned>(low24),
+            static_cast<unsigned>(high8),
+            fmt::ptr(&arg6SelectionDescriptor40_),
+            matchMode,
+            descriptorSource,
+            descriptorName,
+            fmt::ptr(arg6SelectionDescriptor40_.vtable00),
+            static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field03),
+            static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field07),
+            static_cast<unsigned>(Arg6SelectedWorldIndexLow24()),
+            static_cast<unsigned>(Arg6SelectedVariantIndexHigh8()),
+            static_cast<unsigned>(expectedScratchRequest));
+    }
     return &arg6SelectionDescriptor40_;
 }
 
@@ -3135,9 +3170,12 @@ bool CLTLoginMediator::Arg6SelectionDescriptorMatchesRequest(uint32_t selectionI
 // anchor: launcher.exe:0x41f2d0 / owner vtable +0x3c
 uint32_t CLTLoginMediator::GetDefaultSelectionIndex() const {
     const uint32_t selectionIndex = static_cast<uint32_t>(CurrentCharacterRouteIndexCc8Scaffold());
-    spdlog::debug(
-        "CLTLoginMediator::GetDefaultSelectionIndex(+0x3c) -> 0x{:02x} [source=owner+0xcc8]",
-        static_cast<unsigned>(selectionIndex & 0xffu));
+    if (g_LastLoggedDefaultSelectionIndex3c != selectionIndex) {
+        g_LastLoggedDefaultSelectionIndex3c = selectionIndex;
+        spdlog::debug(
+            "CLTLoginMediator::GetDefaultSelectionIndex(+0x3c) -> 0x{:02x} [source=owner+0xcc8]",
+            static_cast<unsigned>(selectionIndex & 0xffu));
+    }
     return selectionIndex;
 }
 
