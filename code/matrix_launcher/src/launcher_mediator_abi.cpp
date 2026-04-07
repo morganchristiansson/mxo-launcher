@@ -1775,6 +1775,17 @@ bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_
     return true;
 }
 
+void DiagnosticSetLauncherSelectedCharacterIndex(uint32_t slotIndex) {
+    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
+    if (!mediator) {
+        return;
+    }
+    mediator->CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
+    spdlog::info(
+        "DIAGNOSTIC: launcher selected character route index cc8 set to 0x{:02x}",
+        static_cast<unsigned>(mediator->CharacterRouteIndexCc8()));
+}
+
 bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
     uint32_t slotIndex,
     char* outCharacterName,

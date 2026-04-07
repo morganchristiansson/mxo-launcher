@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <sys/stat.h>
+#include <conio.h>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/cfg/env.h>
@@ -116,7 +117,7 @@ void WriteMatrixConsoleText(const char* text, bool appendNewline) {
         return;
     }
 
-    std::fputs("\x1b[1;32m", stderr);
+    std::fputs("\x1b[92m", stderr);
     std::fputs(safeText, stderr);
     if (appendNewline) {
         std::fputc('\n', stderr);
@@ -157,6 +158,56 @@ bool ReadInteractiveLauncherField(const char* prompt, char* buffer, size_t buffe
     return true;
 }
 
+bool ReadInteractiveLauncherPasswordField(const char* prompt, char* buffer, size_t bufferSize) {
+    if (!prompt || !buffer || bufferSize < 2u) {
+        return false;
+    }
+
+    buffer[0] = '\0';
+    WriteMatrixConsoleText(prompt, false);
+
+    HANDLE inputHandle = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD consoleMode = 0;
+    const bool haveConsoleInput =
+        inputHandle != INVALID_HANDLE_VALUE &&
+        inputHandle != nullptr &&
+        GetConsoleMode(inputHandle, &consoleMode) != 0;
+
+    if (!haveConsoleInput) {
+        if (!std::fgets(buffer, static_cast<int>(bufferSize), stdin)) {
+            buffer[0] = '\0';
+            return false;
+        }
+        size_t length = std::strlen(buffer);
+        while (length != 0u && (buffer[length - 1u] == '\n' || buffer[length - 1u] == '\r')) {
+            buffer[--length] = '\0';
+        }
+        return true;
+    }
+
+    size_t write = 0;
+    while (true) {
+        const int ch = _getch();
+        if (ch == '\r' || ch == '\n') {
+            std::fputc('\n', stderr);
+            std::fflush(stderr);
+            buffer[write] = '\0';
+            return true;
+        }
+        if ((ch == '\b' || ch == 127) && write != 0u) {
+            --write;
+            continue;
+        }
+        if (ch == 0 || ch == 0xe0) {
+            (void)_getch();
+            continue;
+        }
+        if (write + 1u < bufferSize) {
+            buffer[write++] = static_cast<char>(ch);
+        }
+    }
+}
+
 bool ReadInteractiveLauncherIndex(const char* prompt, uint32_t upperBoundExclusive, uint32_t* outIndex) {
     if (!prompt || !outIndex || upperBoundExclusive == 0u) {
         return false;
@@ -184,6 +235,8 @@ bool PromptForMissingLauncherCredentialsIfNeeded() {
         return true;
     }
 
+    WriteMatrixConsoleText("Wake up, Neo...", true);
+
     char inputBuffer[256] = {};
     if (missingUser) {
         if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
@@ -193,7 +246,7 @@ bool PromptForMissingLauncherCredentialsIfNeeded() {
         g_LauncherCommandLine.SetAuthUsername(inputBuffer);
     }
     if (missingPwd) {
-        if (!ReadInteractiveLauncherField("Password: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
+        if (!ReadInteractiveLauncherPasswordField("Password: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
             spdlog::error("ERROR: interactive password prompt failed or was left empty");
             return false;
         }
@@ -941,13 +994,15 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 return false;
             }
             g_LauncherCommandLine.SetAuthUsername(inputBuffer);
-            if (!ReadInteractiveLauncherField("Password: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
+            if (!ReadInteractiveLauncherPasswordField("Password: ", inputBuffer, sizeof(inputBuffer)) || inputBuffer[0] == '\0') {
                 spdlog::error("ERROR: interactive password re-prompt failed or was left empty");
                 return false;
             }
             g_LauncherCommandLine.SetAuthPassword(inputBuffer);
             continue;
         }
+
+        WriteMatrixConsoleText("The Matrix has you...", true);
 
         const uint32_t recoveredCharacterCount = DiagnosticRecoveredCharacterCount();
         const bool createCharacterPlaceholderAvailable = (recoveredCharacterCount < 3u);
@@ -1024,6 +1079,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 return false;
             }
             selectedRowHighWordSelectionIndex = selectedMenuIndex & 0xffffu;
+            DiagnosticSetLauncherSelectedCharacterIndex(selectedMenuIndex);
             g_LauncherCommandLine.SetLauncherCharacter(selectedCharacterName);
         } else {
             if (g_LastWorldName[0] != '\0') {
@@ -1102,6 +1158,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         }
 
         g_PreClientAuthAndCharacterSelectionCompleted = true;
+        WriteMatrixConsoleText("Follow the white rabbit. Knock, Knock, Neo.", true);
         spdlog::info(
             "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} createPlaceholder={} recoveredCharacterCount={} selectedMenuIndex={} character='{}' world='{}' a8=0x{:08x} ac=0x{:08x}",
             static_cast<unsigned>(DiagnosticLastLoginEvent()),

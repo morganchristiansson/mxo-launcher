@@ -48,6 +48,7 @@ uint32_t DiagnosticLastLoginEvent();
 uint32_t DiagnosticLastLoginError();
 uint32_t DiagnosticRecoveredCharacterCount();
 bool DiagnosticRecoveredCharacterName(uint32_t slotIndex, char* outName, uint32_t outNameCapacity);
+void DiagnosticSetLauncherSelectedCharacterIndex(uint32_t slotIndex);
 bool DiagnosticResolveRecoveredCharacterSelectionForLauncher(
     uint32_t slotIndex,
     char* outCharacterName,
