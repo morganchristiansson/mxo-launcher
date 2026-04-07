@@ -74,10 +74,6 @@ T ResolveProc(HMODULE module, const char* name) {
     return typed;
 }
 
-const RecoveredLauncherSelectionRecord* AsRecoveredSelection(const void* opaqueSelection) {
-    return static_cast<const RecoveredLauncherSelectionRecord*>(opaqueSelection);
-}
-
 void LowercaseAsciiCopy(char* destination, size_t destinationSize, const char* source) {
     if (!destination || destinationSize == 0) return;
     destination[0] = '\0';
@@ -509,37 +505,37 @@ void CLauncher::UnloadCresDLL() const {
 // 0x40b739..0x40b7af continuation corridor. This groups state that the replacement must recover
 // in order to feed arg5/arg6/arg7 on the active nopatch path, without claiming a real original
 // helper boundary.
-bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStartupContext* startupContext) {
-    if (!startupContext) {
+bool CLauncher::BuildStartupContextFromRecoveredSelection(char* startupSelectionName, size_t startupSelectionNameCapacity) {
+    if (!startupSelectionName) {
         return false;
     }
 
-    std::memset(startupContext, 0, sizeof(*startupContext));
+    std::memset(startupSelectionName, 0, startupSelectionNameCapacity);
 
     // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
     // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. Final world writeback is deferred to
     // the later pre-client character-selection stage after the character index is read.
     if (sizeof(kRecoveredLauncherSelectionRecords) / sizeof(kRecoveredLauncherSelectionRecords[0]) > 0) {
         std::strncpy(
-            startupContext->mediatorSelectionName,
+            startupSelectionName,
             kRecoveredLauncherSelectionRecords[0].selectionName,
-            sizeof(startupContext->mediatorSelectionName) - 1);
-        startupContext->mediatorSelectionName[sizeof(startupContext->mediatorSelectionName) - 1] = '\0';
+            startupSelectionNameCapacity - 1);
+        startupSelectionName[startupSelectionNameCapacity - 1] = '\0';
         spdlog::info(
             "DIAGNOSTIC: defaulting launcher selection name to first recovered world '{}'",
-            startupContext->mediatorSelectionName);
+            startupSelectionName);
     } else {
-        std::strcpy(startupContext->mediatorSelectionName, "standalone");
+        std::strcpy(startupSelectionName, "standalone");
         spdlog::warn(
             "DIAGNOSTIC: no recovered launcher selection records are available; falling back to '{}'",
-            startupContext->mediatorSelectionName);
+            startupSelectionName);
     }
 
-    startupContext->recoveredSelection = FindRecoveredLauncherSelectionRecord(startupContext->mediatorSelectionName);
-    const RecoveredLauncherSelectionRecord* recoveredSelection = AsRecoveredSelection(startupContext->recoveredSelection);
+    const RecoveredLauncherSelectionRecord* recoveredSelection =
+        FindRecoveredLauncherSelectionRecord(startupSelectionName);
     if (recoveredSelection) {
-        std::strncpy(startupContext->mediatorSelectionName, recoveredSelection->selectionName, sizeof(startupContext->mediatorSelectionName) - 1);
-        startupContext->mediatorSelectionName[sizeof(startupContext->mediatorSelectionName) - 1] = '\0';
+        std::strncpy(startupSelectionName, recoveredSelection->selectionName, startupSelectionNameCapacity - 1);
+        startupSelectionName[startupSelectionNameCapacity - 1] = '\0';
         m_FieldA8 = 0u;
         m_FieldAC = kRecoveredSelectionWorldIndexLow24;
         const uint32_t packedArg7Selection = BuildPackedArg7Selection();
@@ -552,10 +548,10 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
             (unsigned)recoveredSelection->selectionGateByte100,
             (unsigned)recoveredSelection->variantState,
             recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
-    } else if (startupContext->mediatorSelectionName[0] && lstrcmpiA(startupContext->mediatorSelectionName, "standalone") != 0) {
+    } else if (startupSelectionName[0] && lstrcmpiA(startupSelectionName, "standalone") != 0) {
         spdlog::warn(
             "DIAGNOSTIC: no recovered launcher selection defaults for world '{}'; keeping zeroed launcher arg7 fields until that world has a recovered launcher-owned selection record",
-            startupContext->mediatorSelectionName);
+            startupSelectionName);
     }
 
     const uint32_t packedArg7Selection = BuildPackedArg7Selection();
@@ -563,39 +559,38 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
         spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", packedArg7Selection);
     }
 
-    // Replacement-only nopatch bookkeeping used by the recovered mediator scaffold later in the
-    // active 0x40b430 path. This is intentionally documented as a grouped source convenience, not
-    // as a proven original subroutine boundary.
-    startupContext->nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
-    startupContext->nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
+    // Replacement-only nopatch bookkeeping now stays local to this stage instead of crossing the
+    // selection-name handoff.
+    const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
+    const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
 
     if (g_LauncherCommandLine.NoPatchLauncherVersionString()[0]) {
         spdlog::info(
             "DIAGNOSTIC: explicit -nopatch rebuilt packed launcher-version dword from launcher.exe version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchLauncherVersionString(),
-            startupContext->nopatchLauncherVersionValue);
+            nopatchLauncherVersionValue);
     } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
         spdlog::info(
             "UNANCHORED: replacement default nopatch policy is using fallback packed launcher-version dword 0.1 (0x{:08x})",
-            startupContext->nopatchLauncherVersionValue);
+            nopatchLauncherVersionValue);
     } else {
         spdlog::info(
             "DIAGNOSTIC: nopatch launcher-version dword is using fallback 0.1 (0x{:08x})",
-            startupContext->nopatchLauncherVersionValue);
+            nopatchLauncherVersionValue);
     }
     if (g_LauncherCommandLine.NoPatchClientVersionString()[0]) {
         spdlog::info(
             "DIAGNOSTIC: explicit -nopatch rebuilt packed client-version dword from client.dll version info = '{}' (0x{:08x})",
             g_LauncherCommandLine.NoPatchClientVersionString(),
-            startupContext->nopatchClientVersionValue);
+            nopatchClientVersionValue);
     } else if (g_LauncherCommandLine.ReplacementDefaultNoPatchPolicyActive()) {
         spdlog::info(
             "UNANCHORED: replacement default nopatch policy is using fallback packed client-version dword 0.1 (0x{:08x})",
-            startupContext->nopatchClientVersionValue);
+            nopatchClientVersionValue);
     } else {
         spdlog::info(
             "DIAGNOSTIC: nopatch client-version dword is using fallback 0.1 (0x{:08x})",
-            startupContext->nopatchClientVersionValue);
+            nopatchClientVersionValue);
     }
 
     return true;
@@ -605,8 +600,7 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
 // corridor by materializing current arg6/arg7 startup state. This is more honest than treating the
 // entire pre-client stretch as one faux method, but it still does not claim an exact original
 // boundary.
-bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
-    const RecoveredLauncherStartupContext& startupContext) {
+bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(const char* startupSelectionName) {
     if (!PreloadDependencies()) {
         spdlog::info("ERROR: preload failed");
         return false;
@@ -616,9 +610,12 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 
     spdlog::info("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
 
-    const RecoveredLauncherSelectionRecord* recoveredSelection = AsRecoveredSelection(startupContext.recoveredSelection);
+    const RecoveredLauncherSelectionRecord* recoveredSelection =
+        FindRecoveredLauncherSelectionRecord(startupSelectionName);
     const uint32_t selectedSelectionGateByte100 = recoveredSelection ? recoveredSelection->selectionGateByte100 : 1u;
     const uint32_t selectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
+    const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
+    const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
 
     const uint32_t packedArg7Selection = BuildPackedArg7Selection();
     const uint32_t selectedHighByte = (packedArg7Selection >> 24) & 0xffu;
@@ -628,25 +625,20 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
     DiagnosticConfigureMediatorSelection(
         worldUpperBoundExclusive,
         variantUpperBoundExclusive,
-        startupContext.mediatorSelectionName,
-        startupContext.mediatorSelectionName,
+        startupSelectionName,
+        startupSelectionName,
         selectionPackedLow24,
         selectedHighByte,
         selectedSelectionGateByte100,
         selectedVariantState);
-    DiagnosticConfigureMediatorProfileName(g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
-    DiagnosticConfigureMediatorAuthName(g_LauncherCommandLine.AuthUsername()[0] ? g_LauncherCommandLine.AuthUsername() : NULL);
-    DiagnosticConfigureMediatorAuthPassword(g_LauncherCommandLine.AuthPassword()[0] ? g_LauncherCommandLine.AuthPassword() : NULL);
     DiagnosticConfigureLoginControllerCharacterSeed(
         g_LauncherCommandLine.LauncherCharacter()[0] ? g_LauncherCommandLine.LauncherCharacter() : NULL,
         g_LauncherCommandLine.LauncherSession()[0] ? g_LauncherCommandLine.LauncherSession() : NULL,
         selectionPackedLow24);
     DiagnosticApplyDefaultNopatchMediatorConfig(
         g_pILTLoginMediatorDefault,
-        startupContext.nopatchLauncherVersionValue,
-        startupContext.nopatchClientVersionValue);
-
-    spdlog::info("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
+        nopatchLauncherVersionValue,
+        nopatchClientVersionValue);
 
     if (g_pILTLoginMediatorDefault) {
         g_pILTLoginMediatorSelection3584 = g_pILTLoginMediatorDefault;
@@ -678,7 +670,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
                 m_FieldA8,
                 m_FieldAC,
                 packedArg7Selection,
-                g_LastWorldName[0] ? g_LastWorldName : startupContext.mediatorSelectionName);
+                g_LastWorldName[0] ? g_LastWorldName : startupSelectionName);
         }
     }
 
@@ -693,7 +685,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
         marginRoutePrefix[sizeof(marginRoutePrefix) - 1] = '\0';
         spdlog::info("DIAGNOSTIC: using recovered route host prefix '{}' for world '{}'", marginRoutePrefix, recoveredSelection->selectionName);
     } else {
-        LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), startupContext.mediatorSelectionName);
+        LowercaseAsciiCopy(marginRoutePrefix, sizeof(marginRoutePrefix), startupSelectionName);
     }
 
     const char exactMarginHostName[] = "";
@@ -1168,7 +1160,7 @@ bool CLauncher::RunClientDllLifecycle() const {
 // anchor: launcher.exe:0x40b430
 bool CLauncher::InitInstance() {
     bool operationSucceeded = false;
-    RecoveredLauncherStartupContext startupContext = {};
+    char startupSelectionName[64] = {};
 
     spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
     spdlog::info("NOTE: this replacement intentionally supports only the effective nopatch branch; patch/update support remains out of scope even while startup behavior is kept close to launcher.exe.");
@@ -1182,13 +1174,13 @@ bool CLauncher::InitInstance() {
 
     // UNANCHORED within 0x40b430: replacement-only synthesis that seeds launcher-owned selection
     // and nopatch state before the later pre-client continuation corridor.
-    if (!BuildStartupContextFromRecoveredSelection(&startupContext)) {
+    if (!BuildStartupContextFromRecoveredSelection(startupSelectionName, sizeof(startupSelectionName))) {
         goto cleanup;
     }
 
     // UNANCHORED within 0x40b430: replacement-only arg6/arg7 startup-state materialization that
     // feeds the later anchored 0x40a380 / 0x40a4d0 call shape.
-    if (!MaterializeRecoveredInitClientStateFromStartupContext(startupContext)) {
+    if (!MaterializeRecoveredInitClientStateFromStartupContext(startupSelectionName)) {
         goto cleanup;
     }
 
