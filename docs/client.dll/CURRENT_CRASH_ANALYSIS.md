@@ -248,6 +248,13 @@ These are no longer the best primary crash explanations:
       themselves
     - the replacement-side attempt to suppress the `il.cfg` flag on zero-byte section-2 payloads was
       a fidelity regression and has already been reverted
+    - a newer refcount-fidelity pass also tightened one concrete replacement difference on the
+      active path:
+      - shared base refcount contract `0x004b211c` is correctly non-interlocked
+      - but message-object `Release()` on the replacement path had extra guard logic before the
+        original interlocked decrement helper
+      - source now removes that lower-fidelity precheck so the message-storage / outer-message-ref
+        families behave more like the original `0x42f860` leaf helper
     - current launcher-side suspicion should therefore move one layer deeper than the raw section
       bytes themselves, e.g. toward ordering / timing / client-side object-materialization effects
       downstream of those launcher-provided contracts

@@ -72,6 +72,19 @@ It is reused by both:
 So the most helpful tree is the semantic one above, with the explicit note that the low-level base
 contract is shared.
 
+## Current source-fidelity note
+
+A fresh pass on the shared refcount helpers tightened one concrete source mismatch:
+- the shared base contract `0x004b211c` is indeed **non-interlocked** and source was already
+  matching that correctly
+- but the derived message-storage / outer-message-ref families anchored to
+  `0x004ba208/0x004ba220/0x004ba23c` reuse the interlocked `0x42f850/0x42f860` pair
+- source had added extra safety guards before `InterlockedDecrement` on those message-object
+  `Release()` methods (`if current<=0 return 0`), which is lower fidelity than the original helper
+  body
+- source now mirrors the original more closely there by always doing the interlocked decrement and
+  only branching on the resulting zero-count final-release case
+
 ## Related docs
 
 - `CMessageConnection_OnOperationCompleted_families.md`

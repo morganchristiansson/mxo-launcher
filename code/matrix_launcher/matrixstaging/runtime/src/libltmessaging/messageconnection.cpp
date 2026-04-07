@@ -70,15 +70,9 @@ uint32_t CMessageConnectionMessageStorage::AddRef() {
 
 // anchor: launcher.exe:0x42f860 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x08`
 uint32_t CMessageConnectionMessageStorage::Release() {
-    LONG current = referenceCount04;
-    if (current <= 0) {
-        return 0u;
-    }
-
-    current = InterlockedDecrement(&referenceCount04);
+    const LONG current = InterlockedDecrement(&referenceCount04);
     if (current == 0) {
         FinalRelease();
-        return 0u;
     }
     return static_cast<uint32_t>(current);
 }
@@ -183,15 +177,9 @@ uint32_t CMessageConnectionMessageRefBase::AddRef() {
 
 // anchor: launcher.exe:0x42f860 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x08`
 uint32_t CMessageConnectionMessageRefBase::Release() {
-    LONG current = referenceCount04;
-    if (current <= 0) {
-        return 0u;
-    }
-
-    current = InterlockedDecrement(&referenceCount04);
+    const LONG current = InterlockedDecrement(&referenceCount04);
     if (current == 0) {
         FinalRelease();
-        return 0u;
     }
     return static_cast<uint32_t>(current);
 }
