@@ -41,7 +41,6 @@ mxo::launcher::CLauncher g_Launcher;
 void* g_pLauncherObject6304 = NULL;
 void* g_pILTLoginMediatorDefault = NULL;
 void* g_pILTLoginMediatorSelection3584 = NULL;
-uint32_t g_PackedArg7Selection = 0;
 uint8_t g_LauncherInitClientFlagByte = 0;   // original byte: [0x4d2c69]
 char g_LastWorldName[256] = {0};
 
@@ -383,7 +382,8 @@ void LogKnownStartupState(const mxo::launcher::CLauncher& launcher) {
     spdlog::info("CLauncher+0xa8 placeholder   = 0x{:08x}", launcher.m_FieldA8);
     spdlog::info("CLauncher+0xac placeholder   = 0x{:08x}", launcher.m_FieldAC);
     spdlog::info("Last_WorldName               = {}", g_LastWorldName[0] ? g_LastWorldName : "<unavailable>");
-    spdlog::info("arg7 packedArg7Selection     = 0x{:08x}", g_PackedArg7Selection);
+    const uint32_t packedArg7Selection = launcher.BuildPackedArg7Selection();
+    spdlog::info("arg7 packedArg7Selection     = 0x{:08x}", packedArg7Selection);
     spdlog::info(
         "arg8 launcherInitClientFlagByte = 0x{:02x}",
         static_cast<unsigned>(g_LauncherInitClientFlagByte));
@@ -565,12 +565,13 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
         startupContext->mediatorSelectionName[sizeof(startupContext->mediatorSelectionName) - 1] = '\0';
         m_FieldA8 = recoveredSelection->variantIndexHigh8;
         m_FieldAC = recoveredSelection->worldIndexLow24;
+        const uint32_t packedArg7Selection = BuildPackedArg7Selection();
         spdlog::info(
             "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
             recoveredSelection->worldName,
             m_FieldA8,
             m_FieldAC,
-            BuildPackedArg7Selection(),
+            packedArg7Selection,
             (unsigned)recoveredSelection->selectionGateByte100,
             (unsigned)recoveredSelection->variantState,
             recoveredSelection->routeHostPrefix ? recoveredSelection->routeHostPrefix : "");
@@ -580,9 +581,9 @@ bool CLauncher::BuildStartupContextFromRecoveredSelection(RecoveredLauncherStart
             startupContext->mediatorSelectionName);
     }
 
-    g_PackedArg7Selection = BuildPackedArg7Selection();
+    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
     if ((m_FieldA8 | m_FieldAC) != 0) {
-        spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", g_PackedArg7Selection);
+        spdlog::info("DIAGNOSTIC: packed arg7 rebuilt from launcher fields = 0x{:08x}", packedArg7Selection);
     }
 
     startupContext->mediatorSelectedSelectionGateByte100 = recoveredSelection ? recoveredSelection->selectionGateByte100 : 1u;
@@ -641,8 +642,9 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
 
     spdlog::info("=== configuring arg6 / sibling mediator state for InitClientDLL ===");
 
-    const uint32_t selectedHighByte = (g_PackedArg7Selection >> 24) & 0xffu;
-    const uint32_t selectionPackedLow24 = g_PackedArg7Selection & 0x00ffffffu;
+    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
+    const uint32_t selectedHighByte = (packedArg7Selection >> 24) & 0xffu;
+    const uint32_t selectionPackedLow24 = packedArg7Selection & 0x00ffffffu;
     const uint32_t worldUpperBoundExclusive = (selectionPackedLow24 < 0xffu) ? (selectionPackedLow24 + 1u) : 1u;
     const uint32_t variantUpperBoundExclusive = (selectedHighByte < 0xffu) ? (selectedHighByte + 1u) : 1u;
     DiagnosticConfigureMediatorSelection(
@@ -687,7 +689,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
                 sizeof(resolvedWorldName))) {
             m_FieldA8 = resolvedA8;
             m_FieldAC = resolvedAC;
-            g_PackedArg7Selection = BuildPackedArg7Selection();
+            const uint32_t packedArg7Selection = BuildPackedArg7Selection();
             if (resolvedWorldName[0]) {
                 std::strncpy(g_LastWorldName, resolvedWorldName, sizeof(g_LastWorldName) - 1);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
@@ -697,7 +699,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromStartupContext(
                 "DIAGNOSTIC: arg7 rebuilt through sibling 0x4d3584-style mediator selection slot -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
                 m_FieldA8,
                 m_FieldAC,
-                g_PackedArg7Selection,
+                packedArg7Selection,
                 g_LastWorldName[0] ? g_LastWorldName : startupContext.mediatorSelectionName);
         }
     }
@@ -993,7 +995,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                 if (resolvedViaCommand8) {
                     m_FieldA8 = resolvedA8;
                     m_FieldAC = resolvedAC;
-                    g_PackedArg7Selection = BuildPackedArg7Selection();
+                    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
                     const char* persistedWorldName = resolvedWorldName[0]
                         ? resolvedWorldName
                         : recoveredSelection->worldName;
@@ -1007,11 +1009,11 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                         static_cast<unsigned>(selectedCharacterIndex),
                         m_FieldA8,
                         m_FieldAC,
-                        g_PackedArg7Selection);
+                        packedArg7Selection);
                 } else {
                     m_FieldA8 = recoveredSelection->variantIndexHigh8;
                     m_FieldAC = recoveredSelection->worldIndexLow24;
-                    g_PackedArg7Selection = BuildPackedArg7Selection();
+                    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
                     std::strncpy(g_LastWorldName, recoveredSelection->worldName, sizeof(g_LastWorldName) - 1u);
                     g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
                     StoreLastWorldNameInRegistry(g_LastWorldName);
@@ -1022,7 +1024,7 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
                         g_LastWorldName,
                         m_FieldA8,
                         m_FieldAC,
-                        g_PackedArg7Selection);
+                        packedArg7Selection);
                 }
             } else {
                 std::strncpy(g_LastWorldName, selectedWorldName, sizeof(g_LastWorldName) - 1u);
@@ -1119,9 +1121,6 @@ bool CLauncher::RunClientDllLifecycle() const {
     LogKnownStartupState(*this);
     spdlog::info("");
 
-    const uint32_t packedArg7Selection = BuildPackedArg7Selection();
-    g_PackedArg7Selection = packedArg7Selection;
-
     spdlog::info("=== Calling InitClientDLL with current launcher startup state ===");
     // anchor: launcher.exe:0x40a55c..0x40a5a4
     // - arg1/arg2 come from launcher globals `0x4d2c5c/0x4d2c60`, not from a helper object call
@@ -1133,7 +1132,7 @@ bool CLauncher::RunClientDllLifecycle() const {
         g_hCres,
         g_pLauncherObject6304,
         g_pILTLoginMediatorDefault,
-        packedArg7Selection,
+        (m_FieldAC & 0x00ffffffu) | ((m_FieldA8 & 0xffu) << 24),
         g_LauncherInitClientFlagByte);
     spdlog::info("InitClientDLL returned: {}", initResult);
     if (initResult <= 0) {

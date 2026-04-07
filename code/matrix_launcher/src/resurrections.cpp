@@ -53,7 +53,6 @@ extern CLauncher g_Launcher;                    // original global object: [0x4d
 extern void* g_pLauncherObject6304;            // original: [0x4d6304]
 extern void* g_pILTLoginMediatorDefault;       // original: [0x4d2c58]
 extern void* g_pILTLoginMediatorSelection3584; // original sibling slot: [0x4d3584]
-extern uint32_t g_PackedArg7Selection;         // packed from [CLauncher+0xa8]/[CLauncher+0xac]
 extern char g_LastWorldName[256];              // original registry value: Last_WorldName
 
 struct DiagnosticPreclientEnvironmentState {

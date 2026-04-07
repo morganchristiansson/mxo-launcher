@@ -2958,7 +2958,7 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 // +0xdc = active-world display-name getter used for list column 1 on the matched-row path
 //
 // ARG7 PACKING FORMAT:
-// g_PackedArg7Selection = (high8bits << 24) | low24bits
+// packedArg7Selection = (high8bits << 24) | low24bits
 //   high8bits = variant state from launcher selection data
 //   low24bits = world index from GetItemData low bits
 // =============================================================================
