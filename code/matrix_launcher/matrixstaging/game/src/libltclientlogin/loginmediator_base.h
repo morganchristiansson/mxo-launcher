@@ -379,9 +379,6 @@ public:
     // +0x30
     virtual const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t index) const = 0;
     // +0x34
-    // anchor: launcher.exe:0x41c0d0
-    // owner-side auth-close/state-reset helper used by the page-6 rich-edit observer failure path
-    // before launcher retry/re-prompt.
     virtual void RequestAuthCloseAndSwitchToState0() = 0;
     // +0x38
     virtual const char* GetProfileRootName() const = 0;
@@ -401,19 +398,10 @@ public:
     // launcher.exe:0x41f0b0 is a tiny bool wrapper over `+0x50`.
     virtual bool HasBootstrapRaw08AuxHandle54() const = 0;
     // +0x58
-    // Keep the split explicit:
-    // - owner `0x41f390` returns bootstrap child byte `+0x680 + 0x104`
-    // - launcher/client wrapper-facing consumers use that low byte as crashreporter
-    //   `PromptForSecurId`
     virtual uint8_t GetCrashReporterPromptForSecurId58() const = 0;
     // +0x5c
-    // Wrapper-facing launcher/client chains currently consume this as the crashreporter username
-    // getter. Keep the incoming chained token opaque because launcher no-arg and client
-    // caller-clean uses do not prove one stable higher-level arg semantic.
     virtual const char* GetCrashReporterUsername5c(const void* chainedValueToken) = 0;
     // +0x60
-    // Wrapper-facing launcher/client chains currently consume this as the crashreporter password
-    // getter. Keep the incoming chained token opaque for the same reason as `+0x5c`.
     virtual const char* GetCrashReporterPassword60(const void* chainedValueToken) = 0;
     // +0x64
     void UnknownSlot24();
@@ -474,20 +462,12 @@ public:
     // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
     // +0xd8
-    // Launcher page-`7` active-entry count used by `0x40e480` while correlating active selection
-    // entries against total worlds before row item-data high words are written.
     virtual uint32_t GetArg7SelectionUpperBoundExclusive() const = 0;
     // +0xdc
-    // Launcher page-`7` active-entry display text getter; current tighter auth-valid read is the
-    // slot-record / character-entry name for the selected row high-word index.
     virtual const char* MapSelectionName(uint32_t selectionHighByte) const = 0;
     // +0xe0
-    // Launcher page-`7` active-entry world-match string getter; current tighter auth-valid read is
-    // the world-descriptor inline name reached from the slot-record's `worldId0c`.
     virtual const char* GetVariantWorldName(uint32_t variantIndex) = 0;
     // +0xe4
-    // Launcher page-`7` active-entry status getter; current tighter auth-valid read is owner
-    // slot-record status byte `+0x0b` indexed by the selected row high word.
     virtual uint8_t GetVariantState(int32_t variantIndex) const = 0;
     // +0xe8
     virtual uint32_t RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) = 0;
@@ -518,14 +498,8 @@ public:
     // +0x11c
     void UnknownSlot73();
     // +0x120
-    // Current best slot decision: keep wrapper-facing arg6 `+0x120` and owner `+0x120`
-    // unified under `ProcessCreateCharacterInput120`.
-    // The client-side wrapper call builds a larger stack-local object, but the populated offsets
-    // line up with the owner-side `0x41c3c0` reader instead of describing a separate slot family.
     virtual uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) = 0;
     // +0x124
-    // Wrapper-facing capture of the deeper-init startup triple; owner-side mirroring stays
-    // explicit in `CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c`.
     virtual void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) = 0;
     // +0x128
     void UnknownSlot76();
