@@ -1670,24 +1670,6 @@ void DiagnosticConfigureLoginControllerNetwork(
         ignoreHostsFileForMargin ? 1u : 0u);
 }
 
-bool DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface() {
-    return g_LoginMediatorStub.vtable != nullptr && g_LoginMediatorStub.vtable[12] != nullptr;
-}
-
-uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
-    const mxo::ltlogin::ProcessLoginRequestInputSketch& input) {
-    using SubmitFn = uint32_t (__thiscall*)(
-        MinimalLoginMediatorStub*,
-        const mxo::ltlogin::ProcessLoginRequestInputSketch*);
-
-    if (!DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface()) {
-        return 0u;
-    }
-
-    SubmitFn submitFn = reinterpret_cast<SubmitFn>(g_LoginMediatorStub.vtable[12]);
-    return submitFn(&g_LoginMediatorStub, &input);
-}
-
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures ILTLoginMediator.Default before InitClientDLL
 // vtable: ILTLoginMediator.Default slots +0x1c and +0x24
 void DiagnosticApplyDefaultNopatchMediatorConfig(

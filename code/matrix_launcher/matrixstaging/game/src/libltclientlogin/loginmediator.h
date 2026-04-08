@@ -776,11 +776,6 @@ public:
             : nullptr;
     }
     void* LatestObserver() const { return latestObserver170_; }
-    uint32_t LastPostedEventScaffold() const { return lastPostedEventScaffold_; }
-    uint32_t LastPostedErrorScaffold() const { return lastPostedErrorScaffold_; }
-    const std::array<uint32_t, 8>& RecentPostedEventsScaffold() const { return recentPostedEventsScaffold_; }
-    uint32_t RecentPostedEventCountScaffold() const { return recentPostedEventCountScaffold_; }
-    void ResetPostedLoginResultScaffold();
 
     // Narrow post-auth receive-boundary counters used only for short runtime discrimination:
     // - no packet arrived yet
@@ -1054,8 +1049,6 @@ public:
     void ResetLauncherConnectionsScaffold();
     void BindLauncherConnectionsScaffold(
         mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
-    bool CanBeginLauncherAuthConnectionScaffold() const;
-    uint32_t BeginLauncherAuthConnectionScaffold();
     uint32_t BeginLauncherMarginConnectionScaffold();
     bool IsAuthConnectionQuiescentForRetryScaffold() const;
     // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
@@ -1319,14 +1312,6 @@ public:
     // +0x120
     // anchor: launcher.exe:0x41c3c0
     uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
-    uint32_t RecoveredCharacterCountScaffold() const;
-    const SlotRecordState004b5328* RecoveredCharacterByIndexScaffold(uint32_t slotIndex) const;
-    uint32_t BeginDeleteCharacterBySlotIndexScaffold(uint32_t slotIndex);
-    bool BuildPartialSelectionContextForRecoveredCharacterScaffold(
-        uint32_t slotIndex,
-        State3SelectionContextInputSketch* outInput,
-        uint32_t* outDescriptorIndex,
-        const SlotRecordState004b5328** outSlotRecord);
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
     // Keep the instance-role split explicit in source:
     // - the wrapper-facing `ILTLoginMediator.Default` mirror should capture the source block even

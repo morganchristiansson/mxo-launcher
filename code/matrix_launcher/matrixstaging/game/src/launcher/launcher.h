@@ -92,6 +92,16 @@ public:
     // original method boundary.
     bool RunRecoveredPreClientBringupStage() const;
 
+    // UNANCHORED: text-mode analogue of the launcher page-6 rich-edit submit corridor
+    // (`0x408ee0 / 0x408840 / 0x408400 / 0x4091d0`) that feeds owner
+    // `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest` through the resolved mediator surface.
+    bool RunTextModeLoginRichEditSubmitCredentialsStage();
+
+    // UNANCHORED: text-mode analogue of the launcher page-7 selection-list corridor
+    // (`0x4047d0 / 0x40e480 / 0x40d530 / 0x40d820 / 0x405a20 / 0x40d6f0`) that writes
+    // `CLauncher+0xa8/+0xac` plus `Last_WorldName` before client load.
+    bool RunTextModeSelectionListStage();
+
     // UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
     // Implementation intentionally lives in `src/textmode_launcher_flow.cpp` so recovered
     // launcher.cpp stays focused on launcher-owned startup coordination.

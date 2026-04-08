@@ -1,5 +1,3 @@
-#include "textmode_launcher_flow.h"
-
 #include <winsock2.h>
 #include <windows.h>
 #include <shellapi.h>
@@ -10,10 +8,10 @@
 #include <conio.h>
 #include <direct.h>
 #include <io.h>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 
-#include "diagnostics.h"
 #include "launcher_network_object_abi.h"
 #include "launcher_replacement_support.h"
 #include "../matrixstaging/game/src/launcher/launcher.h"
@@ -22,12 +20,9 @@
 
 extern mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 extern void* g_pLauncherObject6304;
-extern void* g_pILTLoginMediatorDefault;
 extern char g_LastWorldName[256];
 
 namespace {
-
-bool g_TextModePreClientFlowCompleted = false;
 
 const char* MaskedArgValue(const char* value) {
     if (!value || !value[0]) {
@@ -36,174 +31,219 @@ const char* MaskedArgValue(const char* value) {
     return "<provided>";
 }
 
-static mxo::ltlogin::CLTLoginMediator* InstalledLauncherMediatorModel() {
-    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
-}
+// anchor: launcher.exe:0x41b520
+// anchor: launcher.exe:0x41b620
+// anchor: launcher.exe:0x41b6c0
+// Text-mode blocking wait analogue over the proven `ILTLoginMediator` observer contract.
+// Keep the method semantics close to `CLTEvilBlockingLoginObserver`, while keeping one important
+// negative result explicit: the original page-6 rich-edit auth path is still driven by callback
+// `0x4091d0`, not by a proven `WaitForEvent(5)` caller.
+class TextModeBlockingLoginObserver {
+public:
+    void* launcherNetworkObject04 = nullptr; // original blocking observer also keeps arg5 at +0x04
+    float timeoutSeconds08 = 0.0f;           // original stores timeout seconds at +0x08
+    uint32_t expectedEvent0c = 0u;           // original stores expected event at +0x0c
+    uint8_t waiting10 = 0u;                  // original clears this to unblock the wait loop
+    uint8_t padding11[3] = {};
+    uint32_t result14 = 0u;                  // original writes `0` on success, status80 on error
+    uint32_t error18 = 0u;                   // original stores OnLoginError(errorNumber) here
+    bool registered1c = false;
 
-static mxo::ltlogin::CLTLoginMediator* ActiveLauncherMediatorModel() {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
-        return const_cast<mxo::ltlogin::CLTLoginMediator*>(mediator->ResolveActiveStateSourceScaffold());
-    }
-    return mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
-}
-
-static void ResetLauncherPostedLoginResultIfPresent() {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
-        mediator->ResetPostedLoginResultScaffold();
-    }
-}
-
-static uint32_t LauncherLastLoginEventOrZero() {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
-        return mediator->LastPostedEventScaffold();
-    }
-    return 0u;
-}
-
-static uint32_t LauncherLastLoginErrorOrZero() {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
-        return mediator->LastPostedErrorScaffold();
-    }
-    return 0u;
-}
-
-static bool LauncherHasSuccessfulPreClientAuthState() {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
-        return mediator->LastPostedEventScaffold() == 5u &&
-               mediator->RecoveredCharacterCountScaffold() != 0u;
-    }
-    return false;
-}
-
-static uint32_t LauncherRecoveredCharacterCount() {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        return mediator->RecoveredCharacterCountScaffold();
-    }
-    return 0u;
-}
-
-static bool LauncherRecoveredCharacterName(uint32_t slotIndex, char* outName, size_t outNameCapacity) {
-    if (!outName || outNameCapacity == 0u) {
-        return false;
-    }
-    outName[0] = '\0';
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        if (const auto* slotRecord = mediator->RecoveredCharacterByIndexScaffold(slotIndex);
-            slotRecord != nullptr && !slotRecord->heapString14.empty()) {
-            std::strncpy(outName, slotRecord->heapString14.c_str(), outNameCapacity - 1u);
-            outName[outNameCapacity - 1u] = '\0';
-            return true;
+    virtual void OnLoginEvent(uint32_t eventId) {
+        if (eventId == expectedEvent0c) {
+            result14 = 0u;
+            waiting10 = 0u;
         }
     }
-    return false;
-}
 
-static void LauncherSetSelectedCharacterIndex(uint32_t slotIndex) {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        mediator->CharacterRouteIndexCc8() = static_cast<uint8_t>(slotIndex & 0xffu);
-        spdlog::info(
-            "DIAGNOSTIC: launcher selected character route index cc8 set to 0x{:02x}",
-            static_cast<unsigned>(mediator->CharacterRouteIndexCc8()));
+    virtual void OnLoginError(uint32_t errorId) {
+        error18 = errorId;
+        result14 = mxo::ltlogin::ILTLoginMediator::Default->GetLastLoginStatus();
+        waiting10 = 0u;
     }
-}
 
-static bool LauncherFindRecoveredWorldDescriptorIndexByName(
-    const char* worldName,
-    uint32_t* outDescriptorIndex) {
-    if (!worldName || !worldName[0] || !outDescriptorIndex) {
-        return false;
-    }
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        const uint32_t worldCount = mediator->GetWorldCount();
-        for (uint32_t i = 0u; i < worldCount; ++i) {
-            const char* candidate = mediator->GetWorldNameByIndex(i);
-            if (candidate && std::strcmp(candidate, worldName) == 0) {
-                *outDescriptorIndex = i;
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
-static bool LauncherGetDeleteCharacterProfileRootName(char* outName, size_t outNameCapacity) {
-    if (!outName || outNameCapacity == 0u) {
-        return false;
-    }
-    outName[0] = '\0';
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        const char* profileRootName = mediator->GetCrashReporterUsername5c(nullptr);
-        if (profileRootName && profileRootName[0]) {
-            std::strncpy(outName, profileRootName, outNameCapacity - 1u);
-            outName[outNameCapacity - 1u] = '\0';
-            return true;
-        }
-    }
-    return false;
-}
-
-static uint32_t LauncherBeginDeleteRecoveredCharacter(uint32_t slotIndex) {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        return mediator->BeginDeleteCharacterBySlotIndexScaffold(slotIndex);
-    }
-    return 1u;
-}
-
-static uint32_t LauncherFinalizeDeleteRecoveredCharacter(uint32_t slotIndex) {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        return mediator->RemoveSlotRecordAndCompactRouteStateByIndex(slotIndex);
-    }
-    return 1u;
-}
-
-static bool LauncherResolveRecoveredCharacterSelectionForWriteback(
-    uint32_t slotIndex,
-    char* outCharacterName,
-    size_t outCharacterNameCapacity,
-    char* outWorldName,
-    size_t outWorldNameCapacity,
-    uint32_t* outDescriptorIndex) {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = ActiveLauncherMediatorModel()) {
-        const mxo::ltlogin::SlotRecordState004b5328* slotRecord = nullptr;
-        uint32_t descriptorIndex = 0u;
-        if (!mediator->BuildPartialSelectionContextForRecoveredCharacterScaffold(
-                slotIndex,
-                nullptr,
-                &descriptorIndex,
-                &slotRecord) ||
-            slotRecord == nullptr) {
-            return false;
-        }
-        if (outCharacterName && outCharacterNameCapacity != 0u) {
-            outCharacterName[0] = '\0';
-            std::strncpy(outCharacterName, slotRecord->heapString14.c_str(), outCharacterNameCapacity - 1u);
-            outCharacterName[outCharacterNameCapacity - 1u] = '\0';
-        }
-        if (outWorldName && outWorldNameCapacity != 0u) {
-            outWorldName[0] = '\0';
-            const char* worldName =
-                mediator->GetDescriptorInlineNameByIndex(static_cast<uint8_t>(descriptorIndex));
-            if (worldName && worldName[0]) {
-                std::strncpy(outWorldName, worldName, outWorldNameCapacity - 1u);
-                outWorldName[outWorldNameCapacity - 1u] = '\0';
-            }
-        }
-        if (outDescriptorIndex) {
-            *outDescriptorIndex = descriptorIndex;
-        }
+    bool RegisterForExpectedEvent(void* launcherNetworkObject, uint32_t expectedEvent) {
+        launcherNetworkObject04 = launcherNetworkObject;
+        expectedEvent0c = expectedEvent;
+        waiting10 = 1u;
+        result14 = 0u;
+        error18 = 0u;
+        registered1c = true;
+        (void)mxo::ltlogin::ILTLoginMediator::Default->RegisterLoginObserver(this);
         return true;
     }
+
+    void Unregister() {
+        if (!registered1c) {
+            return;
+        }
+        registered1c = false;
+        (void)mxo::ltlogin::ILTLoginMediator::Default->UnregisterLoginObserver(this);
+    }
+
+    uint32_t WaitUntilDone(DWORD timeoutMs) {
+        timeoutSeconds08 = static_cast<float>(timeoutMs) / 1000.0f;
+        const DWORD startTick = GetTickCount();
+        while (waiting10 != 0u) {
+            if ((GetTickCount() - startTick) >= timeoutMs) {
+                result14 = 0x12000003u;
+                waiting10 = 0u;
+                break;
+            }
+            mxo::ltlogin::ILTLoginMediator::Default->HelperSlot13c_InvokeSessionHelperVtable4();
+            LauncherPumpNetworkEngineAbiShell(launcherNetworkObject04, /*nonBlocking=*/true);
+            Sleep(10u);
+        }
+        Unregister();
+        return result14;
+    }
+
+    bool SawError() const {
+        return error18 != 0u;
+    }
+};
+
+struct TextModeLauncherSelectionRow {
+    uint32_t descriptorIndexLowWord = 0u;   // `0x40e480` packed item-data low word
+    uint32_t selectionIndexHighWord = 0xffffu; // `0x40e480` packed item-data high word
+    uint32_t descriptorStatus = 0u;         // `+0x100` consumer in `0x40d530/0x40d6f0`
+    uint32_t slotRecordStatus = 7u;         // `+0xe4` consumer in `0x40d530/0x40d6f0`
+    char worldName[256] = {};
+    char selectionName[256] = {};
+
+    bool IsCreatePlaceholder() const {
+        return (selectionIndexHighWord & 0xffffu) == 0xffffu;
+    }
+};
+
+constexpr WORD kMatrixConsoleGreen = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+static constexpr uint32_t kLauncherSelectionCreatePlaceholderThreshold = 3u;
+static constexpr uint32_t kLauncherSelectionCreateHighWord = 0xffffu;
+
+static void CopyTextModeBuffer(char* outText, size_t outCapacity, const char* sourceText) {
+    if (!outText || outCapacity == 0u) {
+        return;
+    }
+    outText[0] = '\0';
+    if (!sourceText || !sourceText[0]) {
+        return;
+    }
+    std::strncpy(outText, sourceText, outCapacity - 1u);
+    outText[outCapacity - 1u] = '\0';
+}
+
+// anchor: launcher.exe:0x40d530
+static bool LauncherSelectionList_RowAllowsPrimaryAction(uint32_t descriptorStatus) {
+    if (descriptorStatus == 1u) {
+        return true;
+    }
+    if (descriptorStatus == 2u || descriptorStatus == 5u) {
+        return mxo::ltlogin::ILTLoginMediator::Default->HasBootstrapRaw08AuxHandle54();
+    }
     return false;
 }
 
-constexpr WORD kMatrixConsoleGreen = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+// anchor: launcher.exe:0x40d530
+static bool LauncherSelectionList_RowResolvesThroughCommand8(const TextModeLauncherSelectionRow& row) {
+    return LauncherSelectionList_RowAllowsPrimaryAction(row.descriptorStatus) &&
+           (row.slotRecordStatus == 0u || row.slotRecordStatus == 7u);
+}
 
-// Replacement-only text-mode launcher divergence:
-// - original page-7 list builder `0x40e480` inserts the `"- - -"` create-character sentinel only
-//   while fewer than 3 active entries match the selected world
-// - current text-mode host deliberately raises that soft cap so manual create-character testing is
-//   still reachable on accounts that already have more than 3 characters
-static constexpr uint32_t kTextModeCreateCharacterSoftLimit = 10u;
+// anchor: launcher.exe:0x40e480
+// Text-mode page-7 list builder over the same `ILTLoginMediator.Default` slot family used by the
+// original launcher selection list:
+// - `+0xf8/+0xfc` enumerate total world descriptors
+// - `+0xd8/+0xdc/+0xe0/+0xe4` enumerate active selection entries / slot records
+// - matching rows pack low word = descriptor index, high word = active entry / slot-record index
+// - when fewer than 3 active entries match a world, insert `"- - -"` with high word `0xffff`
+static bool BuildTextModeSelectionRows(std::vector<TextModeLauncherSelectionRow>* outRows) {
+    if (!outRows) {
+        return false;
+    }
+    outRows->clear();
+
+    const uint32_t totalWorldDescriptorCount = mxo::ltlogin::ILTLoginMediator::Default->GetWorldCount();
+    const uint32_t activeSelectionEntryCount =
+        mxo::ltlogin::ILTLoginMediator::Default->GetArg7SelectionUpperBoundExclusive();
+
+    for (uint32_t descriptorIndex = 0u; descriptorIndex < totalWorldDescriptorCount; ++descriptorIndex) {
+        const char* worldName = mxo::ltlogin::ILTLoginMediator::Default->GetWorldNameByIndex(descriptorIndex);
+        if (!worldName || !worldName[0]) {
+            continue;
+        }
+
+        const uint32_t descriptorStatus =
+            mxo::ltlogin::ILTLoginMediator::Default->GetWorldSelectionGateByteByIndex(descriptorIndex);
+        uint32_t matchingActiveEntryCount = 0u;
+
+        for (uint32_t activeEntryIndex = 0u; activeEntryIndex < activeSelectionEntryCount; ++activeEntryIndex) {
+            const char* activeWorldName =
+                mxo::ltlogin::ILTLoginMediator::Default->GetVariantWorldName(activeEntryIndex);
+            if (!activeWorldName || _stricmp(worldName, activeWorldName) != 0) {
+                continue;
+            }
+
+            TextModeLauncherSelectionRow row = {};
+            row.descriptorIndexLowWord = descriptorIndex & 0xffffu;
+            row.selectionIndexHighWord = activeEntryIndex & 0xffffu;
+            row.descriptorStatus = descriptorStatus;
+            row.slotRecordStatus =
+                mxo::ltlogin::ILTLoginMediator::Default->GetVariantState(static_cast<int32_t>(activeEntryIndex));
+            CopyTextModeBuffer(row.worldName, sizeof(row.worldName), worldName);
+            CopyTextModeBuffer(
+                row.selectionName,
+                sizeof(row.selectionName),
+                mxo::ltlogin::ILTLoginMediator::Default->MapSelectionName(activeEntryIndex));
+            outRows->push_back(row);
+            ++matchingActiveEntryCount;
+        }
+
+        if (matchingActiveEntryCount < kLauncherSelectionCreatePlaceholderThreshold) {
+            TextModeLauncherSelectionRow row = {};
+            row.descriptorIndexLowWord = descriptorIndex & 0xffffu;
+            row.selectionIndexHighWord = kLauncherSelectionCreateHighWord;
+            row.descriptorStatus = descriptorStatus;
+            row.slotRecordStatus =
+                mxo::ltlogin::ILTLoginMediator::Default->GetVariantState(-1);
+            CopyTextModeBuffer(row.worldName, sizeof(row.worldName), worldName);
+            CopyTextModeBuffer(row.selectionName, sizeof(row.selectionName), "- - -");
+            outRows->push_back(row);
+        }
+    }
+
+    return true;
+}
+
+// anchor: launcher.exe:0x40d6f0
+static bool LauncherSelectionList_ResolveSelectionFromRow(
+    const TextModeLauncherSelectionRow& row,
+    uint32_t* outFieldA8,
+    uint32_t* outFieldAC,
+    char* outWorldName,
+    size_t outWorldNameCapacity) {
+    if (!outFieldA8 || !outFieldAC) {
+        return false;
+    }
+
+    const uint32_t descriptorIndex = row.descriptorIndexLowWord & 0xffffu;
+    const uint32_t selectionIndexHighWord = row.selectionIndexHighWord & 0xffffu;
+    const int32_t signedSelectionIndex = static_cast<int16_t>(selectionIndexHighWord);
+    const uint32_t descriptorStatus =
+        mxo::ltlogin::ILTLoginMediator::Default->GetWorldSelectionGateByteByIndex(descriptorIndex);
+    const uint32_t slotRecordStatus =
+        mxo::ltlogin::ILTLoginMediator::Default->GetVariantState(signedSelectionIndex);
+    const char* worldName = mxo::ltlogin::ILTLoginMediator::Default->GetWorldNameByIndex(descriptorIndex);
+
+    if (!worldName || !LauncherSelectionList_RowAllowsPrimaryAction(descriptorStatus) ||
+        (slotRecordStatus != 0u && slotRecordStatus != 7u)) {
+        return false;
+    }
+
+    *outFieldA8 = static_cast<uint32_t>(signedSelectionIndex);
+    *outFieldAC = descriptorIndex & 0x00ffffffu;
+    CopyTextModeBuffer(outWorldName, outWorldNameCapacity, worldName);
+    return true;
+}
 
 void WriteMatrixConsoleText(const char* text, bool appendNewline) {
     const char* safeText = text ? text : "<null>";
@@ -461,40 +501,23 @@ bool BuildNoGuiProcessLoginRequestInput(
 
 } // namespace
 
-namespace mxo::launcher::replacement {
-
-bool TextModePreClientFlowCompleted() {
-    return g_TextModePreClientFlowCompleted;
-}
-
-void ResetTextModePreClientFlowCompleted() {
-    g_TextModePreClientFlowCompleted = false;
-}
-
-} // namespace mxo::launcher::replacement
-
 namespace mxo::launcher {
 
-// UNANCHORED: replacement-owned text-mode pre-client auth/selection bridge.
-// Fidelity correction from newer launcher/client recovery:
-// - auth should enter through the faithful page-6 submit boundary (`0x408400 -> +0x30 -> 0x41ecd0`),
-//   not the older source-owned BeginAuthConnection shortcut
-// - existing-character selection should stop at launcher-style `0x40d6f0` writeback into
-//   `CLauncher+0xa8/+0xac` plus `Last_WorldName`, not seed the later create-character `+0x120`
-//   source block preemptively
-// - create-character remains a client-owned continuation after the launcher writes the sentinel
-//   row high word `0xffff`
-// Replacement-only ownership note:
-// - this implementation intentionally lives under src/ so launcher.cpp can stay focused on
-//   recovered launcher-owned startup coordination and anchored method bodies.
-bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
-    replacement::ResetTextModePreClientFlowCompleted();
-    if (!DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface()) {
-        spdlog::error(
-            "ERROR: pre-client auth cannot begin because the faithful mediator +0x30 submit surface is unavailable");
+// UNANCHORED: text-mode analogue of the launcher page-6 rich-edit prompt/submit corridor.
+// anchor: launcher.exe:0x408ee0
+// anchor: launcher.exe:0x408840
+// anchor: launcher.exe:0x408400
+// anchor: launcher.exe:0x4091d0
+// anchor: launcher.exe:0x41ecd0
+bool CLauncher::RunTextModeLoginRichEditSubmitCredentialsStage() {
+    if (!mxo::ltlogin::ILTLoginMediator::Default) {
+        spdlog::error("ERROR: ILTLoginMediator::Default is unavailable before text-mode auth submit");
         return false;
     }
-
+    if (!g_pLauncherObject6304) {
+        spdlog::error("ERROR: arg5 launcher network object is unavailable before text-mode auth submit");
+        return false;
+    }
     if (!PromptForMissingLauncherCredentialsIfNeeded()) {
         return false;
     }
@@ -509,391 +532,283 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
             return false;
         }
 
-        ResetLauncherPostedLoginResultIfPresent();
+        TextModeBlockingLoginObserver authObserver = {};
+        authObserver.RegisterForExpectedEvent(g_pLauncherObject6304, 5u);
         const uint32_t submitResult =
-            DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(submitLoginRequestInput);
+            mxo::ltlogin::ILTLoginMediator::Default->ProcessLoginRequest(submitLoginRequestInput);
+        const uint32_t waitResult = authObserver.WaitUntilDone(60000u);
         spdlog::info(
-            "DIAGNOSTIC: pre-client launcher auth attempt={} submitResult=0x{:08x}",
+            "DIAGNOSTIC: pre-client launcher page6 auth attempt={} submitResult=0x{:08x} waitResult=0x{:08x} errorEvent=0x{:02x}",
             static_cast<unsigned>(attempt),
-            static_cast<unsigned>(submitResult));
+            static_cast<unsigned>(submitResult),
+            static_cast<unsigned>(waitResult),
+            static_cast<unsigned>(authObserver.error18 & 0xffu));
 
-        // Fidelity correction:
-        // - original launcher page-6 submit enters through `0x408400 -> +0x30 -> 0x41ecd0`
-        // - `ProcessLoginRequest` itself already performs the happy-path `state0 -> state2`
-        //   handoff, and state2/state1 own the later auth-connect/bootstrap continuation
-        // - so the text-mode host should not issue an extra out-of-band auth begin after a
-        //   successful `+0x30` submit; doing so is less faithful and perturbs retry behavior
-        const DWORD startTick = GetTickCount();
-        bool authSucceeded = false;
-        while ((GetTickCount() - startTick) < 60000u) {
-            LauncherPumpNetworkEngineAbiShell(g_pLauncherObject6304, /*nonBlocking=*/true);
-            if (LauncherHasSuccessfulPreClientAuthState()) {
-                authSucceeded = true;
-                break;
-            }
-            const uint32_t loginError = LauncherLastLoginErrorOrZero();
-            if (loginError != 0u) {
-                spdlog::info(
-                    "DIAGNOSTIC: pre-client launcher auth attempt={} terminated with loginError=0x{:02x}",
-                    static_cast<unsigned>(attempt),
-                    static_cast<unsigned>(loginError));
-                break;
-            }
-            Sleep(10u);
+        if (!authObserver.SawError() && waitResult == 0u) {
+            return true;
         }
 
-        if (!authSucceeded) {
-            const uint32_t loginError = LauncherLastLoginErrorOrZero();
-            if (loginError == 0u) {
-                spdlog::warn(
-                    "WARNING: pre-client launcher auth timed out before success/error resolution; re-prompting credentials instead of falling through into client load");
-                WriteMatrixConsoleText(
-                    "Login timed out before the launcher received a success/error result. Please re-enter your username and password.",
-                    true);
-            } else {
-                spdlog::warn(
-                    "WARNING: pre-client launcher auth ended with error=0x{:02x}; re-prompting credentials instead of falling through into client load",
-                    static_cast<unsigned>(loginError));
-                WriteMatrixConsoleFormattedLine(
-                    "Login failed (0x%08x). Please re-enter your username and password.",
-                    static_cast<unsigned>(loginError));
-            }
-
-            // anchor: launcher.exe:0x4091d0 -> sibling +0x34 -> launcher.exe:0x41c0d0
-            // Rich-edit observer failure path in the original launcher closes the current auth
-            // connection and restores helper state0 before the user retries credentials.
-            ResetLauncherPostedLoginResultIfPresent();
-            if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel()) {
-                mediator->RequestAuthCloseAndSwitchToState0();
-            }
-            const DWORD authRetryResetStartTick = GetTickCount();
-            while ((GetTickCount() - authRetryResetStartTick) < 5000u) {
-                LauncherPumpNetworkEngineAbiShell(g_pLauncherObject6304, /*nonBlocking=*/true);
-                if (LauncherLastLoginEventOrZero() == 1u ||
-                    (InstalledLauncherMediatorModel() != nullptr &&
-                     InstalledLauncherMediatorModel()->IsAuthConnectionQuiescentForRetryScaffold())) {
-                    break;
-                }
-                Sleep(10u);
-            }
-
-            char inputBuffer[256] = {};
-            if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) ||
-                inputBuffer[0] == '\0') {
-                spdlog::error("ERROR: interactive username re-prompt failed or was left empty");
-                return false;
-            }
-            g_LauncherCommandLine.SetAuthUsername(inputBuffer);
-            if (!ReadInteractiveLauncherPasswordField("Password: ", inputBuffer, sizeof(inputBuffer)) ||
-                inputBuffer[0] == '\0') {
-                spdlog::error("ERROR: interactive password re-prompt failed or was left empty");
-                return false;
-            }
-            g_LauncherCommandLine.SetAuthPassword(inputBuffer);
-            continue;
+        if (!authObserver.SawError() && waitResult == 0x12000003u) {
+            spdlog::warn(
+                "WARNING: pre-client launcher auth timed out before success/error resolution; re-prompting credentials instead of falling through into client load");
+            WriteMatrixConsoleText(
+                "Login timed out before the launcher received a success/error result. Please re-enter your username and password.",
+                true);
+        } else {
+            spdlog::warn(
+                "WARNING: pre-client launcher auth ended with errorEvent=0x{:02x} status80=0x{:08x}; re-prompting credentials instead of falling through into client load",
+                static_cast<unsigned>(authObserver.error18 & 0xffu),
+                static_cast<unsigned>(waitResult));
+            WriteMatrixConsoleFormattedLine(
+                "Login failed (0x%08x). Please re-enter your username and password.",
+                static_cast<unsigned>(waitResult));
         }
 
+        // anchor: launcher.exe:0x4091d0 -> sibling +0x34 -> launcher.exe:0x41c0d0
+        // The original rich-edit failure path resets auth through mediator `+0x34` before retry.
+        TextModeBlockingLoginObserver closeObserver = {};
+        closeObserver.RegisterForExpectedEvent(g_pLauncherObject6304, 1u);
+        mxo::ltlogin::ILTLoginMediator::Default->RequestAuthCloseAndSwitchToState0();
+        const uint32_t closeWaitResult = closeObserver.WaitUntilDone(5000u);
+        spdlog::info(
+            "DIAGNOSTIC: auth retry reset wait result=0x{:08x} errorEvent=0x{:02x}",
+            static_cast<unsigned>(closeWaitResult),
+            static_cast<unsigned>(closeObserver.error18 & 0xffu));
+
+        char inputBuffer[256] = {};
+        if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) ||
+            inputBuffer[0] == '\0') {
+            spdlog::error("ERROR: interactive username re-prompt failed or was left empty");
+            return false;
+        }
+        g_LauncherCommandLine.SetAuthUsername(inputBuffer);
+        if (!ReadInteractiveLauncherPasswordField("Password: ", inputBuffer, sizeof(inputBuffer)) ||
+            inputBuffer[0] == '\0') {
+            spdlog::error("ERROR: interactive password re-prompt failed or was left empty");
+            return false;
+        }
+        g_LauncherCommandLine.SetAuthPassword(inputBuffer);
+    }
+}
+
+// UNANCHORED: text-mode analogue of the launcher page-7 selection-list corridor.
+// anchor: launcher.exe:0x4047d0 / case 7
+// anchor: launcher.exe:0x40e480
+// anchor: launcher.exe:0x40d530
+// anchor: launcher.exe:0x40d820
+// anchor: launcher.exe:0x405a20 / command 8
+// anchor: launcher.exe:0x40d6f0
+bool CLauncher::RunTextModeSelectionListStage() {
 character_selection_menu:
-        WriteMatrixConsoleText("The Matrix has you...", true);
+    if (!mxo::ltlogin::ILTLoginMediator::Default) {
+        spdlog::error("ERROR: ILTLoginMediator::Default is unavailable before text-mode selection");
+        return false;
+    }
+    if (!g_pLauncherObject6304) {
+        spdlog::error("ERROR: arg5 launcher network object is unavailable before text-mode selection");
+        return false;
+    }
 
-        const uint32_t recoveredCharacterCount = LauncherRecoveredCharacterCount();
-        const bool createCharacterPlaceholderAvailable =
-            (recoveredCharacterCount < kTextModeCreateCharacterSoftLimit);
-        const bool deleteCharacterOptionAvailable = (recoveredCharacterCount != 0u);
-        const uint32_t createCharacterMenuIndex = recoveredCharacterCount;
-        const uint32_t deleteCharacterMenuIndex =
-            recoveredCharacterCount + (createCharacterPlaceholderAvailable ? 1u : 0u);
+    std::vector<TextModeLauncherSelectionRow> selectionRows;
+    if (!BuildTextModeSelectionRows(&selectionRows) || selectionRows.empty()) {
+        spdlog::error(
+            "ERROR: launcher page-7 selection rows could not be rebuilt from ILTLoginMediator.Default");
+        return false;
+    }
 
-        WriteMatrixConsoleText("Available characters:", true);
-        for (uint32_t i = 0u; i < recoveredCharacterCount; ++i) {
-            char characterName[256] = {};
-            const bool haveCharacterName =
-                LauncherRecoveredCharacterName(i, characterName, sizeof(characterName));
+    std::vector<size_t> existingRowIndices;
+    existingRowIndices.reserve(selectionRows.size());
+    for (size_t i = 0; i < selectionRows.size(); ++i) {
+        if (!selectionRows[i].IsCreatePlaceholder() && selectionRows[i].selectionName[0] != '\0') {
+            existingRowIndices.push_back(i);
+        }
+    }
+
+    WriteMatrixConsoleText("The Matrix has you...", true);
+    WriteMatrixConsoleText("Available world / character rows:", true);
+    for (size_t i = 0; i < selectionRows.size(); ++i) {
+        const TextModeLauncherSelectionRow& row = selectionRows[i];
+        WriteMatrixConsoleFormattedLine(
+            "  [%u] %s / %s%s",
+            static_cast<unsigned>(i + 1u),
+            row.worldName[0] ? row.worldName : "<unresolved world>",
+            row.selectionName[0] ? row.selectionName : "<unresolved selection>",
+            LauncherSelectionList_RowResolvesThroughCommand8(row) ? "" : " [unavailable]");
+    }
+
+    const bool deleteCharacterOptionAvailable = !existingRowIndices.empty();
+    const uint32_t deleteCharacterMenuIndex = static_cast<uint32_t>(selectionRows.size());
+    if (deleteCharacterOptionAvailable) {
+        WriteMatrixConsoleFormattedLine(
+            "  [%u] Delete existing character",
+            static_cast<unsigned>(deleteCharacterMenuIndex + 1u));
+    }
+
+    uint32_t selectedMenuIndex = 0u;
+    bool selectedFromCommandLine = false;
+    if (g_LauncherCommandLine.LauncherCharacter()[0] != '\0') {
+        for (size_t i = 0; i < selectionRows.size(); ++i) {
+            const TextModeLauncherSelectionRow& row = selectionRows[i];
+            if (!row.IsCreatePlaceholder() &&
+                std::strcmp(row.selectionName, g_LauncherCommandLine.LauncherCharacter()) == 0) {
+                selectedMenuIndex = static_cast<uint32_t>(i);
+                selectedFromCommandLine = true;
+                break;
+            }
+        }
+    }
+    if (!selectedFromCommandLine) {
+        const uint32_t menuCount =
+            static_cast<uint32_t>(selectionRows.size()) + (deleteCharacterOptionAvailable ? 1u : 0u);
+        if (menuCount > 1u) {
+            while (true) {
+                uint32_t oneBasedSelection = 0u;
+                if (ReadInteractiveLauncherIndex(
+                        "Selection index: ",
+                        menuCount + 1u,
+                        &oneBasedSelection) &&
+                    oneBasedSelection > 0u) {
+                    selectedMenuIndex = oneBasedSelection - 1u;
+                    break;
+                }
+                WriteMatrixConsoleText("Invalid selection index.", true);
+            }
+        }
+    }
+
+    if (deleteCharacterOptionAvailable && selectedMenuIndex == deleteCharacterMenuIndex) {
+        WriteMatrixConsoleText("Delete which character?", true);
+        for (size_t i = 0; i < existingRowIndices.size(); ++i) {
+            const TextModeLauncherSelectionRow& row = selectionRows[existingRowIndices[i]];
             WriteMatrixConsoleFormattedLine(
-                "  [%u] %s",
+                "  [%u] %s / %s",
                 static_cast<unsigned>(i + 1u),
-                haveCharacterName ? characterName : "<unresolved>");
-        }
-        if (createCharacterPlaceholderAvailable) {
-            WriteMatrixConsoleFormattedLine(
-                "  [%u] - - - (Create Character)",
-                static_cast<unsigned>(createCharacterMenuIndex + 1u));
-        }
-        if (deleteCharacterOptionAvailable) {
-            WriteMatrixConsoleFormattedLine(
-                "  [%u] Delete existing character",
-                static_cast<unsigned>(deleteCharacterMenuIndex + 1u));
+                row.worldName[0] ? row.worldName : "<unresolved world>",
+                row.selectionName[0] ? row.selectionName : "<unresolved selection>");
         }
 
-        uint32_t selectedMenuIndex = 0u;
-        bool selectedFromCommandLine = false;
-        bool createCharacterPlaceholderSelected = false;
-        bool deleteCharacterOptionSelected = false;
-        if (g_LauncherCommandLine.LauncherCharacter()[0] != '\0') {
-            for (uint32_t i = 0u; i < recoveredCharacterCount; ++i) {
-                char characterName[256] = {};
-                if (LauncherRecoveredCharacterName(i, characterName, sizeof(characterName)) &&
-                    std::strcmp(characterName, g_LauncherCommandLine.LauncherCharacter()) == 0) {
-                    selectedMenuIndex = i;
-                    selectedFromCommandLine = true;
-                    break;
-                }
-            }
+        uint32_t deleteOneBasedIndex = 0u;
+        while (!ReadInteractiveLauncherIndex(
+            "Delete character index: ",
+            static_cast<uint32_t>(existingRowIndices.size()) + 1u,
+            &deleteOneBasedIndex) ||
+            deleteOneBasedIndex == 0u) {
+            WriteMatrixConsoleText("Invalid character index.", true);
         }
-        if (!selectedFromCommandLine) {
-            const uint32_t menuCount =
-                recoveredCharacterCount +
-                (createCharacterPlaceholderAvailable ? 1u : 0u) +
-                (deleteCharacterOptionAvailable ? 1u : 0u);
-            if (menuCount > 1u) {
-                while (true) {
-                    uint32_t oneBasedSelection = 0u;
-                    if (ReadInteractiveLauncherIndex(
-                            "Character index: ",
-                            menuCount + 1u,
-                            &oneBasedSelection) &&
-                        oneBasedSelection > 0u) {
-                        selectedMenuIndex = oneBasedSelection - 1u;
-                        break;
-                    }
-                    WriteMatrixConsoleText("Invalid character index.", true);
-                }
-            }
-        }
-        createCharacterPlaceholderSelected =
-            createCharacterPlaceholderAvailable && (selectedMenuIndex == createCharacterMenuIndex);
-        deleteCharacterOptionSelected =
-            deleteCharacterOptionAvailable && (selectedMenuIndex == deleteCharacterMenuIndex);
 
-        // anchor: launcher.exe:0x40ec70
-        // Text-mode delete bridge over the original page-7 delete-character corridor:
-        // - choose a concrete recovered slot-record index
-        // - require explicit typed-name confirmation so we do not delete the wrong character
-        // - then call the anchored mediator primitives `+0xf0` / wait event `8` / `+0xe8`
-        if (deleteCharacterOptionSelected) {
-            WriteMatrixConsoleText("Delete which character?", true);
-            for (uint32_t i = 0u; i < recoveredCharacterCount; ++i) {
-                char characterName[256] = {};
-                const bool haveCharacterName =
-                    LauncherRecoveredCharacterName(i, characterName, sizeof(characterName));
-                WriteMatrixConsoleFormattedLine(
-                    "  [%u] %s",
-                    static_cast<unsigned>(i + 1u),
-                    haveCharacterName ? characterName : "<unresolved>");
-            }
-
-            uint32_t deleteOneBasedIndex = 0u;
-            while (!ReadInteractiveLauncherIndex(
-                "Delete character index: ",
-                recoveredCharacterCount + 1u,
-                &deleteOneBasedIndex) ||
-                deleteOneBasedIndex == 0u) {
-                WriteMatrixConsoleText("Invalid character index.", true);
-            }
-            const uint32_t deleteSlotIndex = deleteOneBasedIndex - 1u;
-
-            char deleteCharacterName[256] = {};
-            if (!LauncherRecoveredCharacterName(
-                    deleteSlotIndex,
-                    deleteCharacterName,
-                    sizeof(deleteCharacterName))) {
-                WriteMatrixConsoleText("Failed to resolve character name for deletion.", true);
-                goto character_selection_menu;
-            }
-
-            WriteMatrixConsoleFormattedLine(
-                "Type '%s' to confirm deletion:",
-                deleteCharacterName);
-            char confirmBuffer[256] = {};
-            if (!ReadInteractiveLauncherField("Confirm: ", confirmBuffer, sizeof(confirmBuffer)) ||
-                std::strcmp(confirmBuffer, deleteCharacterName) != 0) {
-                WriteMatrixConsoleText("Deletion cancelled.", true);
-                goto character_selection_menu;
-            }
-
-            ResetLauncherPostedLoginResultIfPresent();
-            (void)LauncherBeginDeleteRecoveredCharacter(deleteSlotIndex);
-
-            // anchor: launcher.exe:0x40ec70
-            // The original launcher calls sibling `+0xf0 = 0x41c390` and immediately enters the
-            // event-8 wait; it does not gate the flow on the return value from `+0xf0`.
-            const DWORD deleteStartTick = GetTickCount();
-            bool deleteSucceeded = false;
-            while ((GetTickCount() - deleteStartTick) < 30000u) {
-                LauncherPumpNetworkEngineAbiShell(g_pLauncherObject6304, /*nonBlocking=*/true);
-                if (LauncherLastLoginEventOrZero() == 8u) {
-                    deleteSucceeded = true;
-                    break;
-                }
-                if (LauncherLastLoginErrorOrZero() != 0u) {
-                    break;
-                }
-                Sleep(10u);
-            }
-
-            if (!deleteSucceeded) {
-                WriteMatrixConsoleFormattedLine(
-                    "Delete failed (error=0x%08x).",
-                    static_cast<unsigned>(LauncherLastLoginErrorOrZero()));
-                goto character_selection_menu;
-            }
-
-            char deleteProfileRootName[256] = {};
-            const char* deleteProfileRootNameToUse = g_LauncherCommandLine.AuthUsername();
-            if (LauncherGetDeleteCharacterProfileRootName(
-                    deleteProfileRootName,
-                    sizeof(deleteProfileRootName)) &&
-                deleteProfileRootName[0] != '\0') {
-                deleteProfileRootNameToUse = deleteProfileRootName;
-            }
-
-            (void)DeleteLauncherProfileDirectoryForCharacter(
-                deleteProfileRootNameToUse,
-                deleteCharacterName);
-
-            (void)LauncherFinalizeDeleteRecoveredCharacter(deleteSlotIndex);
-
-            WriteMatrixConsoleFormattedLine("Deleted character '%s'.", deleteCharacterName);
+        const TextModeLauncherSelectionRow& deleteRow =
+            selectionRows[existingRowIndices[deleteOneBasedIndex - 1u]];
+        WriteMatrixConsoleFormattedLine(
+            "Type '%s' to confirm deletion:",
+            deleteRow.selectionName);
+        char confirmBuffer[256] = {};
+        if (!ReadInteractiveLauncherField("Confirm: ", confirmBuffer, sizeof(confirmBuffer)) ||
+            std::strcmp(confirmBuffer, deleteRow.selectionName) != 0) {
+            WriteMatrixConsoleText("Deletion cancelled.", true);
             goto character_selection_menu;
         }
 
-        char persistedSelectionName[256] = {};
-        if (replacement::LoadLastWorldNameFromRegistry(
-                persistedSelectionName,
-                sizeof(persistedSelectionName))) {
-            spdlog::info(
-                "DIAGNOSTIC: loaded HKLM Last_WorldName fallback='{}' on character-selection path",
-                persistedSelectionName);
+        // anchor: launcher.exe:0x40ec70
+        // Text-mode delete bridge over the original page-7 delete-character corridor:
+        // - call sibling `+0xf0 = 0x41c390` with the selected row high word
+        // - block on event `8`
+        // - on success, delete `Profiles\%s\%s` then call sibling `+0xe8`
+        TextModeBlockingLoginObserver deleteObserver = {};
+        deleteObserver.RegisterForExpectedEvent(g_pLauncherObject6304, 8u);
+        (void)mxo::ltlogin::ILTLoginMediator::Default->SetSelectionIndexAndSwitchToState7(
+            deleteRow.selectionIndexHighWord & 0xffffu);
+        const uint32_t deleteWaitResult = deleteObserver.WaitUntilDone(30000u);
+        if (deleteObserver.SawError() || deleteWaitResult != 0u) {
+            WriteMatrixConsoleFormattedLine(
+                "Delete failed (error=0x%08x).",
+                static_cast<unsigned>(deleteWaitResult));
+            goto character_selection_menu;
         }
 
-        char selectedCharacterName[256] = {};
-        char selectedSelectionName[256] = {};
-        uint32_t selectedDescriptorIndex = m_FieldAC & 0x00ffffffu;
-        uint32_t selectedRowHighWordSelectionIndex = 0xffffu;
-
-        if (!createCharacterPlaceholderSelected) {
-            if (!LauncherResolveRecoveredCharacterSelectionForWriteback(
-                    selectedMenuIndex,
-                    selectedCharacterName,
-                    sizeof(selectedCharacterName),
-                    selectedSelectionName,
-                    sizeof(selectedSelectionName),
-                    &selectedDescriptorIndex)) {
-                spdlog::error(
-                    "ERROR: failed to resolve recovered character-selection metadata index={} through mediator-owned slot/world tables",
-                    static_cast<unsigned>(selectedMenuIndex));
-                return false;
-            }
-            selectedRowHighWordSelectionIndex = selectedMenuIndex & 0xffffu;
-            LauncherSetSelectedCharacterIndex(selectedMenuIndex);
-            g_LauncherCommandLine.SetLauncherCharacter(selectedCharacterName);
-        } else {
-            if (g_LastWorldName[0] != '\0') {
-                std::strncpy(selectedSelectionName, g_LastWorldName, sizeof(selectedSelectionName) - 1u);
-                selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
-            } else if (persistedSelectionName[0] != '\0') {
-                std::strncpy(
-                    selectedSelectionName,
-                    persistedSelectionName,
-                    sizeof(selectedSelectionName) - 1u);
-                selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
-            } else if (
-                const replacement::RecoveredLauncherSelectionRecord* defaultSelection =
-                    replacement::DefaultRecoveredLauncherSelectionRecord();
-                defaultSelection != nullptr && defaultSelection->selectionName != nullptr) {
-                std::strncpy(
-                    selectedSelectionName,
-                    defaultSelection->selectionName,
-                    sizeof(selectedSelectionName) - 1u);
-                selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
-            }
-            selectedCharacterName[0] = '\0';
-            selectedRowHighWordSelectionIndex = 0xffffu;
-            g_LauncherCommandLine.SetLauncherCharacter("");
-            if (selectedSelectionName[0] != '\0') {
-                uint32_t resolvedDescriptorIndex = 0u;
-                if (LauncherFindRecoveredWorldDescriptorIndexByName(
-                        selectedSelectionName,
-                        &resolvedDescriptorIndex)) {
-                    selectedDescriptorIndex = resolvedDescriptorIndex;
-                }
-            }
+        const char* deleteProfileRootNameToUse =
+            mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
+        if (!deleteProfileRootNameToUse || !deleteProfileRootNameToUse[0]) {
+            deleteProfileRootNameToUse = g_LauncherCommandLine.AuthUsername();
         }
+        (void)DeleteLauncherProfileDirectoryForCharacter(
+            deleteProfileRootNameToUse,
+            deleteRow.selectionName);
+        (void)mxo::ltlogin::ILTLoginMediator::Default->RemoveSlotRecordAndCompactRouteStateByIndex(
+            deleteRow.selectionIndexHighWord & 0xffffu);
 
-        if (!selectedSelectionName[0] && persistedSelectionName[0]) {
-            std::strncpy(selectedSelectionName, persistedSelectionName, sizeof(selectedSelectionName) - 1u);
-            selectedSelectionName[sizeof(selectedSelectionName) - 1u] = '\0';
-            spdlog::info(
-                "DIAGNOSTIC: falling back to persisted Last_WorldName='{}' on character-selection path",
-                selectedSelectionName);
-        }
-
-        if (!selectedSelectionName[0]) {
-            spdlog::error(
-                "ERROR: no launcher world-selection name was available for page-7 style writeback");
-            return false;
-        }
-
-        // anchor: launcher.exe:0x4047d0 / case 7
-        // anchor: launcher.exe:0x40d530
-        // anchor: launcher.exe:0x40d820
-        // anchor: launcher.exe:0x405a20 / command 8
-        // anchor: launcher.exe:0x40d6f0
-        // No-GUI faithful bridge:
-        // - existing-character selection stops at launcher-style command-8 writeback
-        // - create-character uses the same writeback helper with row high word `0xffff`
-        // - the later create-character arg6 `+0x120` submit stays on the client-owned continuation
-        uint32_t resolvedA8 = m_FieldA8;
-        uint32_t resolvedAC = m_FieldAC;
-        char resolvedSelectionName[sizeof(g_LastWorldName)] = {};
-        const bool resolvedViaCommand8 =
-            g_pILTLoginMediatorDefault != nullptr &&
-            DiagnosticResolveLauncherSelectionFromMediator(
-                g_pILTLoginMediatorDefault,
-                selectedDescriptorIndex & 0x00ffffffu,
-                selectedRowHighWordSelectionIndex,
-                &resolvedA8,
-                &resolvedAC,
-                resolvedSelectionName,
-                sizeof(resolvedSelectionName));
-
-        if (resolvedViaCommand8) {
-            m_FieldA8 = resolvedA8;
-            m_FieldAC = resolvedAC;
-            const char* finalWorldName =
-                resolvedSelectionName[0] ? resolvedSelectionName : selectedSelectionName;
-            std::strncpy(g_LastWorldName, finalWorldName, sizeof(g_LastWorldName) - 1u);
-            g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
-            replacement::StoreLastWorldNameInRegistry(g_LastWorldName);
-        } else {
-            m_FieldA8 = createCharacterPlaceholderSelected ? 0xffffffffu : (selectedMenuIndex & 0xffffu);
-            m_FieldAC = selectedDescriptorIndex & 0x00ffffffu;
-            std::strncpy(g_LastWorldName, selectedSelectionName, sizeof(g_LastWorldName) - 1u);
-            g_LastWorldName[sizeof(g_LastWorldName) - 1u] = '\0';
-            replacement::StoreLastWorldNameInRegistry(g_LastWorldName);
-            spdlog::warn(
-                "WARNING: pre-client no-GUI selection could not mirror page7 command8 / 0x40d6f0 via descriptorIndex={} selectionHighWord=0x{:04x}; using bounded launcher writeback fallback world='{}' fallbackA8=0x{:08x} fallbackAC=0x{:08x}",
-                static_cast<unsigned>(selectedDescriptorIndex),
-                static_cast<unsigned>(selectedRowHighWordSelectionIndex & 0xffffu),
-                g_LastWorldName,
-                m_FieldA8,
-                m_FieldAC);
-        }
-
-        g_TextModePreClientFlowCompleted = true;
-        WriteMatrixConsoleText("Follow the white rabbit. Knock, Knock, Neo.", true);
-        spdlog::info(
-            "DIAGNOSTIC: pre-client launcher auth/selection complete event=0x{:02x} createPlaceholder={} recoveredCharacterCount={} selectedMenuIndex={} character='{}' world='{}' a8=0x{:08x} ac=0x{:08x}",
-            static_cast<unsigned>(LauncherLastLoginEventOrZero()),
-            createCharacterPlaceholderSelected ? 1u : 0u,
-            static_cast<unsigned>(recoveredCharacterCount),
-            static_cast<unsigned>(selectedMenuIndex),
-            selectedCharacterName[0] ? selectedCharacterName : "- - -",
-            selectedSelectionName[0] ? selectedSelectionName : "<unresolved>",
-            m_FieldA8,
-            m_FieldAC);
-        return true;
+        WriteMatrixConsoleFormattedLine("Deleted character '%s'.", deleteRow.selectionName);
+        goto character_selection_menu;
     }
+
+    if (selectedMenuIndex >= selectionRows.size()) {
+        spdlog::error(
+            "ERROR: text-mode selection index {} was out of range for {} rows",
+            static_cast<unsigned>(selectedMenuIndex),
+            static_cast<unsigned>(selectionRows.size()));
+        return false;
+    }
+
+    const TextModeLauncherSelectionRow& selectedRow = selectionRows[selectedMenuIndex];
+    if (!LauncherSelectionList_RowResolvesThroughCommand8(selectedRow)) {
+        WriteMatrixConsoleText("That row is not currently selectable from the launcher list.", true);
+        goto character_selection_menu;
+    }
+
+    uint32_t resolvedA8 = 0u;
+    uint32_t resolvedAC = 0u;
+    char resolvedWorldName[sizeof(g_LastWorldName)] = {};
+    if (!LauncherSelectionList_ResolveSelectionFromRow(
+            selectedRow,
+            &resolvedA8,
+            &resolvedAC,
+            resolvedWorldName,
+            sizeof(resolvedWorldName))) {
+        spdlog::error(
+            "ERROR: launcher page-7 command-8 style writeback failed descriptorIndex=0x{:04x} selectionHighWord=0x{:04x}",
+            static_cast<unsigned>(selectedRow.descriptorIndexLowWord & 0xffffu),
+            static_cast<unsigned>(selectedRow.selectionIndexHighWord & 0xffffu));
+        return false;
+    }
+
+    m_FieldA8 = resolvedA8;
+    m_FieldAC = resolvedAC;
+    CopyTextModeBuffer(g_LastWorldName, sizeof(g_LastWorldName), resolvedWorldName);
+    replacement::StoreLastWorldNameInRegistry(g_LastWorldName);
+    g_LauncherCommandLine.SetLauncherCharacter(
+        selectedRow.IsCreatePlaceholder() ? "" : selectedRow.selectionName);
+
+    WriteMatrixConsoleText("Follow the white rabbit. Knock, Knock, Neo.", true);
+    spdlog::info(
+        "DIAGNOSTIC: pre-client launcher auth/selection complete rowCount={} createPlaceholder={} selectedMenuIndex={} character='{}' world='{}' a8=0x{:08x} ac=0x{:08x}",
+        static_cast<unsigned>(selectionRows.size()),
+        selectedRow.IsCreatePlaceholder() ? 1u : 0u,
+        static_cast<unsigned>(selectedMenuIndex),
+        selectedRow.IsCreatePlaceholder() ? "- - -" : selectedRow.selectionName,
+        g_LastWorldName,
+        m_FieldA8,
+        m_FieldAC);
+    return true;
+}
+
+// UNANCHORED: replacement-owned pre-client auth/character-selection bridge.
+// Fidelity correction from newer launcher/client recovery:
+// - auth enters through the faithful page-6 submit boundary rooted at `0x408400 / 0x41ecd0`
+// - blocking waits now use the proven `ILTLoginMediator` observer contract instead of synthetic
+//   posted-event / posted-error latches
+// - selection rows now come from the launcher page-7 `0x40e480` slot family instead of from a
+//   flat recovered-character-count helper
+// - existing-character selection stops at launcher-style `0x40d6f0` writeback into
+//   `CLauncher+0xa8/+0xac` plus `Last_WorldName`
+// - create-character remains a client-owned continuation after the launcher writes the sentinel
+//   row high word `0xffff`
+// Replacement-only ownership note:
+// - this implementation intentionally lives under src/ so launcher.cpp can stay focused on
+//   recovered launcher-owned startup coordination and anchored method bodies.
+bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
+    if (!RunTextModeLoginRichEditSubmitCredentialsStage()) {
+        return false;
+    }
+    return RunTextModeSelectionListStage();
 }
 
 } // namespace mxo::launcher

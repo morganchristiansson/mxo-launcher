@@ -323,9 +323,16 @@ Practical consequence:
     `client.dll:0x62170f48`
 - current bounded source consequence:
   - the no-GUI launcher bridge now enters auth through the faithful page-`6` submit boundary
-    `0x408400 -> sibling +0x30 -> 0x41ecd0`
+    rooted at `0x408400 / 0x41ecd0`
+  - current source no longer waits on synthetic posted-event / posted-error latches there; it now
+    blocks through a source-owned observer analogue shaped after
+    `CLTEvilBlockingLoginObserver_0x4ac4c0` while keeping the original page-`6` callback family
+    (`0x4091d0`) as the canonical producer doc
   - after auth succeeds, it mirrors launcher-side page-`7` command-`8` writeback into
     `CLauncher+0xa8/+0xac` plus `Last_WorldName`
+  - the current text-mode selection menu is now rebuilt from the same launcher row-builder slot
+    family used by `0x40e480` (`+0xf8/+0xfc/+0xd8/+0xdc/+0xe0/+0xe4`) instead of from a synthetic
+    flat recovered-character-count helper
   - newer tightening now also mirrors the packed row-item split more closely there:
     - low word = matched world / descriptor index
     - high word = selected active entry index (current tighter auth-valid read: slot-record /
@@ -399,11 +406,8 @@ Implication for the replacement source:
         character-name column is literal `"- - -"`
       - that row carries packed item-data high word `0xffff`
       - current best practical read: launcher-side create-character placeholder / empty-slot row
-      - replacement-only text-mode host note:
-        - current source intentionally keeps its console create-character option visible until
-          fewer than 10 recovered characters instead of fewer than 3
-        - this is a deliberate testing/operability divergence; it does **not** change the static
-          RE of `0x40e480`
+      - current text-mode host now rebuilds its selection menu from the same `0x40e480`
+        descriptor/active-entry slot family and keeps this original fewer-than-3 sentinel rule
     - `0x40d530` then treats that negative high word specially:
       - high word `>= 0` -> command `0x11`
       - high word `< 0` (`0xffff`) -> command `0x10`

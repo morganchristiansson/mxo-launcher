@@ -36,9 +36,6 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
-bool DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
-uint32_t DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(
-    const mxo::ltlogin::ProcessLoginRequestInputSketch& input);
 bool DiagnosticInstallR3d9D3DCompileHook(HMODULE r3d9Module);
 bool DiagnosticInstallR3d9Direct3DCreate9Hook(HMODULE r3d9Module);
 void DiagnosticLogLastD3DDeviceActivity();

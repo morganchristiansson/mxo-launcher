@@ -16,7 +16,6 @@
 #include "../../../../src/diagnostics.h"
 #include "../../../../src/launcher_network_object_abi.h"
 #include "../../../../src/launcher_replacement_support.h"
-#include "../../../../src/textmode_launcher_flow.h"
 #include "../libltclientlogin/loginmediator.h"
 #include "../../../runtime/src/libltbase/launchercommandline.h"
 
@@ -77,10 +76,6 @@ void LowercaseAsciiCopy(char* destination, size_t destinationSize, const char* s
 const char* MaskedArgValue(const char* value) {
     if (!value || !value[0]) return "<empty>";
     return "<provided>";
-}
-
-static mxo::ltlogin::CLTLoginMediator* InstalledLauncherMediatorModel() {
-    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
 }
 
 void LogLauncherPreprocessingState() {
@@ -563,7 +558,7 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     } else {
         spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
-    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented and the no-GUI host now mirrors the recovered raw +0x30 submit surface into 0x41ecd0, but it still does not recreate the original rich-edit observer/prompt lifecycle");
+    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented; the text-mode host now submits through ILTLoginMediator::Default->ProcessLoginRequest and waits through a blocking observer analogue instead of synthetic posted-event/error latches, but it still does not recreate the original rich-edit observer/prompt lifecycle exactly");
     spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
     spdlog::info("file/access gate status: original 0x40b790..0x40b7af _access(DAT_004d4cbc,0) / 0x41ab10(0) side path is still not modeled on the replacement path");
     spdlog::info("");
@@ -575,7 +570,6 @@ void CLauncher::CleanupRecoveredInitClientState() const {
         LauncherReleaseNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
     }
     g_pILTLoginMediatorDefault = NULL;
-    mxo::launcher::replacement::ResetTextModePreClientFlowCompleted();
 }
 
 // anchor: launcher.exe:0x40a4d0
@@ -631,23 +625,10 @@ bool CLauncher::RunClientDllLifecycle() const {
         return false;
     }
 
-    // Current bounded guard after the tighter `0x4490c0` auth tail work:
-    // - when the no-GUI launcher path already completed pre-client auth + character selection, the
-    //   client should enter with that recovered state intact instead of restarting auth from
-    //   helper2 immediately after `InitClientDLL`
-    // - keep the old post-init auth auto-begin only for the paths that still arrive without that
-    //   earlier pre-client completion
-    if (!mxo::launcher::replacement::TextModePreClientFlowCompleted()) {
-        if (mxo::ltlogin::CLTLoginMediator* mediator = InstalledLauncherMediatorModel();
-            mediator != nullptr && mediator->CanBeginLauncherAuthConnectionScaffold()) {
-            const uint32_t authConnectResult = mediator->BeginLauncherAuthConnectionScaffold();
-            spdlog::info(
-                "DIAGNOSTIC: post-init auth auto-begin result = 0x{:08x} preClientAuthComplete={}",
-                static_cast<unsigned>(authConnectResult),
-                mxo::launcher::replacement::TextModePreClientFlowCompleted() ? 1u : 0u);
-        }
-    }
-
+    // Original startup shape after `0x402ec0` returns:
+    // - launcher-owned login / selection have already completed on the pre-client gate path
+    // - `InitClientDLL` should therefore inherit that state directly instead of restarting auth
+    //   through a synthetic post-init helper
     spdlog::info("=== Calling RunClientDLL on the active launcher path ===");
     const int runResult = runClientDLL();
     spdlog::info("RunClientDLL returned: {}", runResult);

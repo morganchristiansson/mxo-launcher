@@ -15,7 +15,6 @@
 
 #include "loginstate.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
-#include "../../../../src/diagnostics.h"
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
@@ -46,71 +45,6 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.begin = dest.string60Owned.c_str();
     dest.string60.current = dest.string60.begin + dest.string60Owned.size();
     dest.string60.capacity = dest.string60.current;
-}
-
-// anchor: launcher.exe:0x41ecd0 / raw owner vtable +0x30
-// Current upstream launcher dialog tightening around the same input shape:
-// - manual nopatch login on page state `6` routes keystrokes through
-//   `0x408840 = LauncherLoginRichEdit_HandlePromptInputCharacter`
-// - its submit helper `0x408400 = LauncherLoginRichEdit_SubmitCredentialsViaResolvedLoginService`
-//   builds the same stack block layout now used here:
-//   - `+0x00` username
-//   - `+0x20` password
-//   - zeroed `block40/block50`
-//   - small-string at `+0x60`
-// - that helper then submits through sibling resolved slot `0x4d2734` vtable `+0x30`
-// - newer raw-vtable clarification closes that submit path directly:
-//   - raw mediator vtable memory at `0x004b01f8` stores `0x41ecd0`
-//   - so the launcher page-`6` helper's `call [eax+0x30]` is the same recovered
-//     `CLTLoginMediator::ProcessLoginRequest` boundary
-// - current replacement keeps that same owner boundary but can now mirror the launcher submit
-//   surface through the binder-backed raw `+0x30` slot instead of only by calling the owner method
-//   directly
-static bool BuildConfiguredProcessLoginRequestInput(
-    const CLTLoginMediator& mediator,
-    ProcessLoginRequestInputSketch* outInput,
-    const char** outUsernameSource,
-    const char** outPasswordSource) {
-    if (!outInput) {
-        return false;
-    }
-
-    *outInput = {};
-    if (outUsernameSource) {
-        *outUsernameSource = "<none>";
-    }
-    if (outPasswordSource) {
-        *outPasswordSource = "<none>";
-    }
-
-    const char* username = mediator.Arg6AuthName();
-    const char* password = mediator.Arg6AuthPassword();
-    if (outUsernameSource) {
-        *outUsernameSource = "arg6 +0x5c";
-    }
-    if (outPasswordSource) {
-        *outPasswordSource = "arg6 +0x60";
-    }
-
-    if (!username || username[0] == '\0' || !password || password[0] == '\0') {
-        return false;
-    }
-
-    const auto copyBoundedString = [](auto& dest, const char* src) {
-        std::fill(dest.begin(), dest.end(), '\0');
-        if (!src || src[0] == '\0') {
-            return;
-        }
-        const size_t copyCount = std::min(
-            std::char_traits<char>::length(src),
-            dest.size() - 1u);
-        std::copy_n(src, copyCount, dest.begin());
-        dest[copyCount] = '\0';
-    };
-
-    copyBoundedString(outInput->inlineString00, username);
-    copyBoundedString(outInput->inlineString20, password);
-    return true;
 }
 
 struct BuiltinScaffoldStates {
@@ -409,93 +343,6 @@ void CLTLoginMediator::BindLauncherConnectionsScaffold(
         "CLTLoginMediator::BindLauncherConnectionsScaffold engine={} currentState={}",
         fmt::ptr(engine),
         currentState_ ? currentState_->DebugName() : "<null>");
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTLoginMediator::CanBeginLauncherAuthConnectionScaffold() const {
-    return engine_ != nullptr;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::BeginLauncherAuthConnectionScaffold() {
-    if (!CanBeginLauncherAuthConnectionScaffold()) {
-        spdlog::info(
-            "CLTLoginMediator::BeginLauncherAuthConnectionScaffold skipped engine={}",
-            fmt::ptr(engine_));
-        return 0u;
-    }
-
-    authPeerCloseQueuedScaffold_ = false;
-
-    // Current replacement-side fidelity correction:
-    // - original launcher password submit does not jump straight into `0x439210` with an
-    //   out-of-band username/password store
-    // - upstream dialog tightening now shows the manual nopatch page-`6` rich-edit host collecting
-    //   username then password and building the exact `0x41ecd0`-style stack block before handing
-    //   it to sibling resolved slot `0x4d2734` vtable `+0x30`
-    // - raw mediator-vtable clarification now closes that callsite more tightly:
-    //   `0x41ecd0` lives at raw vtable entry `0x004b01f8`, so the launcher helper's
-    //   `call [eax+0x30]` reaches `CLTLoginMediator::ProcessLoginRequest`
-    // - current replacement mirrors that same submit surface when the binder-backed raw `+0x30`
-    //   slot is available, then falls back to the direct owner call only when the raw surface is
-    //   unavailable
-    // - keep the exact trusted owner boundary on `0x41ecd0` anyway: it is the earlier anchored API
-    //   that accepts the username/password block, copies it into owner `+0x94`, clears owner
-    //   `+0xf4` on the happy path, and then performs the observed
-    //   `state0 -> state2 -> state1 -> state2` chain feeding the owner `+0x680` bootstrap child
-    // - preserve the older direct state2 fallback only when we are no longer in the initial idle
-    //   helper or when no launcher-configured auth block is available to mirror through
-    //   `ProcessLoginRequest`
-    const uint32_t currentPhaseCode = currentState_ ? currentState_->DispatchPhaseCode() : 0xffu;
-    ProcessLoginRequestInputSketch submitInput = {};
-    const char* usernameSource = "<none>";
-    const char* passwordSource = "<none>";
-    const bool haveConfiguredSubmitInput = BuildConfiguredProcessLoginRequestInput(
-        *this,
-        &submitInput,
-        &usernameSource,
-        &passwordSource);
-
-    uint32_t result = 0u;
-    if (currentPhaseCode == 0u && haveConfiguredSubmitInput) {
-        const bool haveResolvedSubmitSurface =
-            DiagnosticCanSubmitLoginRequestViaResolvedMediatorSurface();
-        spdlog::info(
-            "ROUTE CHECKPOINT: launcher auto-begin auth via {} currentState={} usernameSource={} passwordSource={} ownerSource94Empty={}",
-            haveResolvedSubmitSurface
-                ? "resolved ILTLoginMediator.Default-style raw +0x30 ProcessLoginRequest surface"
-                : "direct owner ProcessLoginRequest fallback",
-            currentState_ ? currentState_->DebugName() : "<null>",
-            usernameSource,
-            passwordSource,
-            (authBootstrapSource38_.inlineString00[0] == '\0' && authBootstrapSource38_.inlineString20[0] == '\0') ? 1u : 0u);
-        result = haveResolvedSubmitSurface
-            ? DiagnosticSubmitLoginRequestViaResolvedMediatorSurface(submitInput)
-            : ProcessLoginRequest(submitInput);
-    } else {
-        CLTLoginState* const upstreamState = currentState_;
-        CLTLoginState* const state2 = scaffoldState2_;
-        spdlog::info(
-            "ROUTE CHECKPOINT: launcher auto-begin auth via state2 fallback currentState={} upstreamState={} state2Registered={} currentPhaseCode={} haveConfiguredSubmitInput={}",
-            currentState_ ? currentState_->DebugName() : "<null>",
-            upstreamState ? upstreamState->DebugName() : "<null>",
-            state2 ? 1u : 0u,
-            static_cast<unsigned>(currentPhaseCode),
-            haveConfiguredSubmitInput ? 1u : 0u);
-        result = state2 != nullptr
-            ? SwitchHelperStateAndDispatchSlot3Scaffold(
-                  2u,
-                  state2,
-                  upstreamState,
-                  "BeginLauncherAuthConnectionScaffold -> helper2/auth-bootstrap continuation")
-            : BeginAuthConnectionViaState1Scaffold();
-    }
-    engine_->SyncAttachedLauncherObjectStateScaffold();
-
-    spdlog::info(
-        "CLTLoginMediator::BeginLauncherAuthConnectionScaffold -> 0x{:08x}",
-        static_cast<unsigned>(result));
-    return result;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

@@ -201,11 +201,8 @@ That is important because the current arg7-selection writer is now closed to the
       character-name column is literal `"- - -"`
     - that row keeps high word `0xffff`
     - current practical read: create-character / empty-slot placeholder row
-    - replacement-only text-mode host note:
-      - current source intentionally keeps its console create-character option visible until fewer
-        than 10 recovered characters instead of fewer than 3
-      - this is a deliberate replacement divergence for current create-flow operability; the
-        original launcher static RE remains the 3-character sentinel rule above
+    - current text-mode host now rebuilds its selection menu from the same launcher row-builder
+      slot family and keeps this original fewer-than-3 sentinel rule
 - replacement-side fidelity consequence from that tightening:
   - anchored startup getters `+0xf8/+0xd8/+0xe4/+0xfc/+0x100/+0xdc/+0xe0` should prefer the
     same table family the original launcher-side world-list code actually walks
