@@ -409,17 +409,19 @@ bool DeleteLauncherProfileDirectoryForCharacter(const char* profileRootName, con
     return SHFileOperationA(&deleteProfileDirectoryFileOp) == 0;
 }
 
-bool PromptForMissingLauncherCredentialsIfNeeded() {
+bool PromptForLauncherCredentialsForSubmitAttempt(bool forceRepromptAllFields) {
     const bool missingUser = (g_LauncherCommandLine.AuthUsername()[0] == '\0');
     const bool missingPwd = (g_LauncherCommandLine.AuthPassword()[0] == '\0');
-    if (!missingUser && !missingPwd) {
+    const bool promptUser = forceRepromptAllFields || missingUser;
+    const bool promptPwd = forceRepromptAllFields || missingPwd;
+    if (!promptUser && !promptPwd) {
         return true;
     }
 
     WriteMatrixConsoleText("Wake up, Neo...", true);
 
     char inputBuffer[256] = {};
-    if (missingUser) {
+    if (promptUser) {
         if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) ||
             inputBuffer[0] == '\0') {
             spdlog::error("ERROR: interactive username prompt failed or was left empty");
@@ -427,7 +429,7 @@ bool PromptForMissingLauncherCredentialsIfNeeded() {
         }
         g_LauncherCommandLine.SetAuthUsername(inputBuffer);
     }
-    if (missingPwd) {
+    if (promptPwd) {
         if (!ReadInteractiveLauncherPasswordField("Password: ", inputBuffer, sizeof(inputBuffer)) ||
             inputBuffer[0] == '\0') {
             spdlog::error("ERROR: interactive password prompt failed or was left empty");
@@ -437,7 +439,8 @@ bool PromptForMissingLauncherCredentialsIfNeeded() {
     }
 
     spdlog::info(
-        "DIAGNOSTIC: replacement pre-client auth prompted for missing launcher credentials username={} password={}",
+        "DIAGNOSTIC: text-mode launcher credential acquisition forceRepromptAllFields={} username={} password={}",
+        forceRepromptAllFields ? 1u : 0u,
         MaskedArgValue(g_LauncherCommandLine.AuthUsername()),
         MaskedArgValue(g_LauncherCommandLine.AuthPassword()));
     return true;
@@ -518,11 +521,11 @@ bool CLauncher::RunTextModeLoginRichEditSubmitCredentialsStage() {
         spdlog::error("ERROR: arg5 launcher network object is unavailable before text-mode auth submit");
         return false;
     }
-    if (!PromptForMissingLauncherCredentialsIfNeeded()) {
-        return false;
-    }
-
+    bool forceRepromptAllFields = false;
     for (uint32_t attempt = 1u;; ++attempt) {
+        if (!PromptForLauncherCredentialsForSubmitAttempt(forceRepromptAllFields)) {
+            return false;
+        }
         mxo::ltlogin::ProcessLoginRequestInputSketch submitLoginRequestInput = {};
         if (!BuildNoGuiProcessLoginRequestInput(
                 g_LauncherCommandLine.AuthUsername(),
@@ -575,19 +578,7 @@ bool CLauncher::RunTextModeLoginRichEditSubmitCredentialsStage() {
             static_cast<unsigned>(closeWaitResult),
             static_cast<unsigned>(closeObserver.error18 & 0xffu));
 
-        char inputBuffer[256] = {};
-        if (!ReadInteractiveLauncherField("Username: ", inputBuffer, sizeof(inputBuffer)) ||
-            inputBuffer[0] == '\0') {
-            spdlog::error("ERROR: interactive username re-prompt failed or was left empty");
-            return false;
-        }
-        g_LauncherCommandLine.SetAuthUsername(inputBuffer);
-        if (!ReadInteractiveLauncherPasswordField("Password: ", inputBuffer, sizeof(inputBuffer)) ||
-            inputBuffer[0] == '\0') {
-            spdlog::error("ERROR: interactive password re-prompt failed or was left empty");
-            return false;
-        }
-        g_LauncherCommandLine.SetAuthPassword(inputBuffer);
+        forceRepromptAllFields = true;
     }
 }
 
