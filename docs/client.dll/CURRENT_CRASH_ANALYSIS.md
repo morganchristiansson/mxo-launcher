@@ -109,17 +109,25 @@ Current best read:
 
 ## Practical consequence
 
-A new narrow runtime ablation now exists for the producer-side queue-context correction that landed
-in commit `ab28b26`:
-- default behavior remains the current higher-fidelity/original-backed direct-connection queue
-  context on parsed-packet / status / close producers
-- setting `MXO_USE_QUEUE_CONTEXT_BRIDGE=1` reverts only those producer contexts back to the older
-  source-owned queue-context bridge
-- this is intended only for A/B late-render/crash testing; it is **not** itself a conclusion that
-  the older bridge mode is more faithful
-- latest user A/B result: this producer-side ablation made **no meaningful difference** to the main
-  graphics corruption / first-few-frames / late-render crash behavior, so the primary remaining bug
-  is no longer best explained by the `ab28b26` context shape itself
+The earlier A/B note on the producer-side queue-context correction from commit `ab28b26` is now
+superseded:
+- user confirmation now pins `ab28b26` itself as the regression point for the late launcher-into-
+  game instability family
+- the last commit before `ab28b26` is currently confirmed good, while `ab28b26` and descendants on
+  that path show intermittent `std::bad_alloc`, shader corruption, and crash behavior after
+  successful game entry
+- source is therefore being rolled back from the higher-fidelity/original-backed direct-connection
+  queue context to the older source-owned queue-context bridge on parsed-packet / status / close
+  producers until the remaining direct-`context=this` ABI/layout gaps are recovered
+- newer queue-hardening on top of that rollback now also removes the source-owned immediate drain of
+  queued type `1/2/3` work items on the producer thread
+  - the replacement again leaves those completions for the normal queue-consumer path instead of
+    synchronously re-entering auth/margin completion logic from the worker/connect thread
+  - current focused suspicion there is the margin type-2 connect-status path used on game-entry
+    bringup, because that is exactly where replacement-only synchronous re-entry can diverge from
+    the original queued timing while still looking superficially “working” up to visible game entry
+- this rollback is a runtime-stability measure, not a claim that launcher.exe did **not** queue the
+  direct connection object
 
 The current crash investigation should stay focused on:
 1. how client-shell field `+0xd0` is populated on the late runtime path
@@ -134,8 +142,14 @@ The current crash investigation should stay focused on:
      `C:\users\morgan\AppData\Local\The Matrix Online\Shaders\a7f16968.fx`
    - current failing source proves the generated `VS_INPUT` struct is empty while `vs_main` still
      uses `input.pos`, which explains the popup compiler error directly
-   - a bounded diagnostic retry that synthesizes `float3 pos : POSITION;` can suppress the popup,
-     but the run can still continue into later graphics corruption + deeper render crash, so the
+   - however, that shader-retry path turned out not to be passive diagnostics: it can mutate the
+     compiled shader source fed to D3DCompile
+   - current recovery pass therefore disables the D3D diagnostic hooks and shader-retry mutation by
+     default; they now require explicit env opt-in for future triage
+   - the same pass also fixes one concrete late diagnostic overread in the live `bl.cfg` logger,
+     which had been treating bounded binary tail bytes as an unbounded C string
+   - if crashes persist even with those diagnostics defanged, the underlying late runtime mismatch
+     still remains outside those helpers
      empty-`VS_INPUT` compile failure is a real bug but not obviously the final root cause
 5. current named no-popup crash chain is now narrower too:
    - `ClientFxManager_RenderAll` (`0x6219af00`)
@@ -172,9 +186,9 @@ The current crash investigation should stay focused on:
 A separate intermittent replacement-only failure still appears from time to time:
 - process termination through `std::bad_alloc` / C++ termination rather than the ordinary late d3d9
   access-violation family
-- user reports this secondary failure was easier to trigger around commit `ab28b26`, but the newer
-  queue-context producer ablation showed no meaningful change in the main late render corruption /
-  crash path
+- newer confirmation strengthens that link: commit `ab28b26` is now the confirmed regression point
+  for both the intermittent `std::bad_alloc` family and the broader late render corruption/crash
+  behavior seen after successful game entry
 - current practical treatment:
   - keep it tracked as a **secondary** issue until it becomes the dominant repro again
   - source now installs diagnostic `std::new_handler` / `std::terminate` hooks so the next hit will

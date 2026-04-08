@@ -243,13 +243,12 @@ New queue-thread clarification from the current focused pass:
     - newer bounded correction: queue selection/pop now happens while the attached arg5 queue lock
       is held, and the blocking empty-queue path releases that lock before the wait and reacquires
       it on the next loop iteration
-    - newer runtime-ablation helper in source now keeps the producer-side `ab28b26` correction
-      isolated for A/B late-render testing:
-      - default remains the higher-fidelity/original-backed mode where parsed-packet / status /
-        close producers queue the direct connection object as `context`
-      - setting environment variable `MXO_USE_QUEUE_CONTEXT_BRIDGE=1` reverts only those producer
-        call sites back to the older source-owned `CBaseConnection_QueueContextScaffold` bridge
-        without rolling back the later state8/state9/close-tail fidelity fixes
+    - later runtime confirmation overturned that earlier A/B note:
+      - commit `ab28b26` itself is now the confirmed regression point for the late launcher-into-
+        game corruption/crash family
+      - current source therefore no longer keeps a runtime toggle here; the active producer path is
+        rolled back to the older source-owned `CBaseConnection_QueueContextScaffold` bridge until
+        the remaining direct-`context=this` ABI/layout gaps are recovered
     - newer bounded correction: the shutdown-sentinel cascade now re-enters the normal enqueue
       helper path instead of open-coding a raw `Queue_PushPair(0,0)` write
     - newer bounded correction: source now also keeps the recovered `0x4816f0(workItem)`-style
@@ -1516,12 +1515,20 @@ Build-validated update:
   - `CLTThreadPerClientTCPEngineBinding` now owns only owner<->engine pairing
   - outer launcher/login seam code in `src/launcher_network_object_abi.cpp` again owns the current mediator bind/reset handshake around that binding
   - this is the current better source match for the negative RE result that the original engine object itself is not evidenced to own mediator lifecycle
-- newer `2026-04-08` fidelity pass retires the mediator-owned bridge context/work-item scaffolds from the active worker/queue path
-  - `CLTThreadPerClientTCPEngine::WorkerThread_Run` now decides auth-vs-margin from the direct connection family and queues only the direct connection object as `context`
-  - the worker now allocates the original small `0x0c` queued families for type `2` / connect-status (`0x435050`, vtable `0x004b3df8`) and type `1` / close (`0x435070`, vtable `0x004b3e00`) instead of a source-owned mediator work-item
-  - the queue consumer stays on the original connection-family callback route (`0x4490c0`, `0x449a70`, `0x44af60`) rather than re-entering through a mediator-owned bridge context
-  - `FindMessageConnection` / engine slot resolution now stop accepting mediator bridge-context identities on the active path; only direct connection objects plus older queue-context unwrapping remain
-  - arg5 helper polling now looks at the mediator's direct auth/margin child connections only as a no-worker fallback, and no longer routes through a separate bridge-context record
+- newer `2026-04-08` fidelity pass retired the mediator-owned bridge context/work-item scaffolds from the active worker path, but the later runtime regression analysis also produced an important rollback note
+  - `CLTThreadPerClientTCPEngine::WorkerThread_Run` still decides auth-vs-margin from the direct connection family and still allocates the original small `0x0c` queued families for type `2` / connect-status (`0x435050`, vtable `0x004b3df8`) and type `1` / close (`0x435070`, vtable `0x004b3e00`)
+  - static RE still says the original producer shape queues the direct connection object as `context`
+  - however, source commit `ab28b26` proved the current replacement C++ layout/vtable surface is not yet stable enough for that direct queued-context shape: late launcher-into-game runs regressed into intermittent `std::bad_alloc`, shader corruption, and crashes
+  - current source therefore keeps the mediator-owned bridge context retired, but rolls the active queued callback context back to the connection-owned queue-context bridge until the remaining direct-`context=this` ABI/layout gaps are recovered
+  - newer 2026-04-08 queue-hardening pass also backed out another replacement-only timing change on top of that ABI rollback:
+    - source no longer immediately drains type `1/2/3` work items on the producing worker/connect thread
+    - it now leaves margin/auth completions for the normal completed-operation consumer path instead (`0x436fc0 -> 0x436b10` queue thread or client arg5 helper `+0x60` poll family)
+    - practical current reason: the live late instability family is now suspected to involve replacement-only synchronous re-entry of margin type-2 connect-status / later queue callbacks during game-entry bringup, not only the raw queued-context identity itself
+  - the queue consumer now again follows the original generic `context->vtable[4](workItem)` shape instead of reinterpreting every direct queued context as a `CBaseConnection*`
+    - this keeps the connection-owned queue-context bridge working through its own slot `+0x10` forwarder
+    - and it also preserves compatibility with original non-connection direct-context producers like the accept-thread family when those paths come back into scope
+  - `FindMessageConnection` / engine slot resolution still stop accepting mediator bridge-context identities on the active path; the remaining accepted shapes are direct connection identities plus connection-owned queue-context unwrapping
+  - arg5 helper polling still looks at the mediator's direct auth/margin child connections only as a no-worker fallback, and no longer routes through a separate mediator bridge-context record
 - `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` correspondingly no longer creates/maintains those bridge-context sidecars on auth/margin begin; the live owner link stays the direct mediator pointer at connection `+0xa4`
 - newer successful launcher-into-game runtime logs still line up with that tighter read on the active path:
   - no `pendingCopiedPackets=` logs
@@ -1788,14 +1795,18 @@ So the blocker moved one step further and the experiment now crossed it:
 - the embedded helper dispatch surface remains wrapper-owned, which is acceptable for this narrow
   primary-dispatch change
 
-Current conclusion:
-- the restructuring pass was the right faithful move
-- the MinGW native-vptr primary-dispatch path is now the default on MinGW builds
-- there is an explicit compile-time opt-out for rollback:
+Current conclusion after the later late-runtime crash/corruption regression work:
+- the restructuring pass was still the right faithful move for the recovered `0xb4` body/layout
+- but the earlier launch-only validation was not enough to prove the MinGW native-vptr path safe on
+  the full late launcher-into-game route
+- current source therefore puts the arg5 **wrapper-table** primary-dispatch path back as the
+  default, even on MinGW builds
+- the MinGW native-vptr path survives only as an explicit compile-time experiment:
+  - `make MXO_ENABLE_MINGW_NATIVE_ARG5_VPTR=1`
+- optional hard rollback remains available too:
   - `make MXO_DISABLE_MINGW_NATIVE_ARG5_VPTR=1`
-- user validation confirmed the default MinGW-native-vptr build still **launched into game
-  successfully**
-- non-MinGW / opt-out builds still preserve the wrapper-table path
+- practical reason for the rollback: arg5 is passed straight into `InitClientDLL`, so this is one
+  of the few places where MSVC2003-vs-MinGW virtual-dispatch ABI differences can directly matter
 
 ## ABI boundary note
 
