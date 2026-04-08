@@ -104,10 +104,23 @@ A newer fidelity pass also tightened the tiny retained-fragment handle seam reco
 - parser / connection call sites still use the same recovered helper seam, so this fidelity change
   tightened the class modeling without widening the active receive-path behavior
 
+## Family boundary note
+
+Do not merge the unrelated abstract helper cluster rooted at `0x004c0540` into this family.
+
+Current best split is:
+- `FAMILY_CLTTCPReadOperation.md`
+  - the real receive-fragment family rooted at `0x004b211c -> 0x004b2300`
+- `FAMILY_0x004c0540_refcounted_buffer_cluster.md`
+  - a separate abstract non-interlocked refcounted buffer/helper cluster
+
+The confusion came from tiny helper-body reuse only, not from a proven inheritance link.
+
 ## Related docs
 
 - `CMessageConnection_OnOperationCompleted_families.md`
 - `FAMILY_CLTThreadPerClientTCPEngine_WorkItem.md`
+- `FAMILY_0x004c0540_refcounted_buffer_cluster.md`
 - `0x004b211c.md`
 - `0x004b2300.md`
 - `0x004baf84.md`
