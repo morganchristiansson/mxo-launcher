@@ -67,6 +67,11 @@ static_assert(sizeof(LTTCPEndpointKey) == 0x10, "endpoint key size mismatch");
 // - base `0x004b211c` owns the shared low-level refcount contract at `+0x00..+0x07`
 // - derived `CLTTCPReadOperation` adds `+0x08 = byte count`
 // - `+0x0c` = first payload byte in the variable-length inline tail allocation
+// Important Ghidra/OOAnalyzer caution from the current RE pass:
+// - tiny helpers `0x42f7e0`, `0x42f800`, and `0x42f810` are shared field-`+0x04` bodies reused by
+//   the unrelated abstract helper cluster rooted at vtable `0x004c0540`
+// - so the stray OOAnalyzer namespace around those helpers is not evidence that `0x004c0540`
+//   itself is the read-operation base
 // Source lockstep note:
 // - this family is now modeled here as a real C++ class hierarchy instead of a manual struct plus
 //   hand-built vtable record
@@ -87,7 +92,7 @@ public:
     // anchor: launcher.exe:0x42f810 / vtable 0x004b211c +0x14
     virtual void SetRefCountFromPtr(const long* value);
 
-    volatile long referenceCount04; // +0x04
+    long referenceCount04; // +0x04 plain dword in the non-interlocked base contract
 
     explicit CRefCountedReadOperationBaseScaffold(long initialReferenceCount = 0);
 };

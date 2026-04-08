@@ -39,6 +39,9 @@ Shared low-level base contract with:
 Caution:
 - this base contract is reused outside the read-fragment family too
 - it also reappears under the `CMessageConnectionMessage` family
+- tiny helper-body reuse also leaks into the unrelated `0x004c0540` abstract helper cluster
+  - `0x42f7e0` is reused there as slot `+0x00`
+  - that OOAnalyzer namespace collision does **not** mean `0x004c0540` is the read-operation base
 
 ### `0x004b2300 = CLTTCPReadOperation`
 

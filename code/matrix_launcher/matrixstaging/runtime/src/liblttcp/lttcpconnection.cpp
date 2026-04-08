@@ -68,9 +68,6 @@ void CRefCountedReadOperationBaseScaffold::ResetRefCount() {
 
 // anchor: launcher.exe:0x42f810 / vtable 0x004b211c +0x14
 void CRefCountedReadOperationBaseScaffold::SetRefCountFromPtr(const long* value) {
-    if (!value) {
-        return;
-    }
     referenceCount04 = *value;
 }
 
@@ -115,9 +112,6 @@ void CLTTCPReadOperationFragmentScaffold::ResetRefCount() {
 
 // anchor: launcher.exe:0x42f890 / vtable 0x004b2300 +0x14
 void CLTTCPReadOperationFragmentScaffold::SetRefCountFromPtr(const long* value) {
-    if (!value) {
-        return;
-    }
     (void)InterlockedExchange(
         reinterpret_cast<volatile LONG*>(&referenceCount04),
         static_cast<LONG>(*value));
