@@ -15,6 +15,119 @@
 
 namespace mxo::liblttcp {
 
+namespace {
+
+struct CLTTCPReadOperationPoolBackingBlock {
+    CLTTCPReadOperationPoolBackingBlock* next;
+};
+
+struct CLTTCPReadOperationFreeListNode {
+    CLTTCPReadOperationFreeListNode* next;
+};
+
+constexpr size_t kCLTTCPReadOperationStorageSize =
+    sizeof(CLTTCPReadOperation) + CLTTCPReadOperation::kPayloadCapacity;
+
+// Source now mirrors the original `0x452400/0x452520/0x452560` shape more closely:
+// - fixed-size object allocator for `0x100c` read-operation storage
+// - backing-block list rooted separately from the free-list head
+// - free returns storage to the pool instead of calling `free(this)` directly
+// Remaining source-owned gap from static RE:
+// - `0x452400` also updates tracked-allocation counters and uses a memory-probe helper when sizing
+//   the first backing block; current source keeps the same pool topology but not those global
+//   tracking side effects yet.
+class CLTTCPReadOperationFixedAllocator {
+public:
+    // anchor: launcher.exe:0x452400
+    void* AllocateStorage(size_t requestedObjectBytes) noexcept {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const size_t objectStride = extraObjectBytes_ + requestedObjectBytes;
+        if (!freeListHead_) {
+            if (!backingBlockListHead_) {
+                if (objectCountPerBackingBlock_ == 0u) {
+                    objectCountPerBackingBlock_ = 1u;
+                }
+                backingBlockBytes_ =
+                    sizeof(CLTTCPReadOperationPoolBackingBlock) +
+                    (static_cast<size_t>(objectCountPerBackingBlock_) * objectStride);
+            }
+
+            CLTTCPReadOperationPoolBackingBlock* const backingBlock =
+                static_cast<CLTTCPReadOperationPoolBackingBlock*>(std::malloc(backingBlockBytes_));
+            if (!backingBlock) {
+                return nullptr;
+            }
+
+            backingBlock->next = backingBlockListHead_;
+            backingBlockListHead_ = backingBlock;
+            ++backingBlockCount_;
+
+            CLTTCPReadOperationFreeListNode* previousFreeListHead = freeListHead_;
+            uint8_t* objectStorage = reinterpret_cast<uint8_t*>(backingBlock + 1);
+            for (uint32_t remaining = objectCountPerBackingBlock_; remaining != 0u; --remaining) {
+                CLTTCPReadOperationFreeListNode* freeListNode =
+                    reinterpret_cast<CLTTCPReadOperationFreeListNode*>(objectStorage);
+                freeListNode->next = previousFreeListHead;
+                previousFreeListHead = freeListNode;
+                objectStorage += objectStride;
+            }
+            freeListHead_ = previousFreeListHead;
+        }
+
+        CLTTCPReadOperationFreeListNode* const storage = freeListHead_;
+        freeListHead_ = storage->next;
+        return storage;
+    }
+
+    // anchor: launcher.exe:0x452520
+    void FreeStorage(void* storage) noexcept {
+        if (!storage) {
+            return;
+        }
+
+        std::lock_guard<std::mutex> lock(mutex_);
+        CLTTCPReadOperationFreeListNode* freeListNode =
+            static_cast<CLTTCPReadOperationFreeListNode*>(storage);
+        freeListNode->next = freeListHead_;
+        freeListHead_ = freeListNode;
+    }
+
+    // anchor: launcher.exe:0x452370
+    void ClearPool() noexcept {
+        std::lock_guard<std::mutex> lock(mutex_);
+        CLTTCPReadOperationPoolBackingBlock* backingBlock = backingBlockListHead_;
+        while (backingBlock) {
+            CLTTCPReadOperationPoolBackingBlock* nextBackingBlock = backingBlock->next;
+            std::free(backingBlock);
+            backingBlock = nextBackingBlock;
+        }
+        backingBlockListHead_ = nullptr;
+        freeListHead_ = nullptr;
+        backingBlockCount_ = 0u;
+    }
+
+private:
+    std::mutex mutex_;
+    uint32_t objectCountPerBackingBlock_ = 0u;
+    uint32_t backingBlockCount_ = 0u;
+    size_t backingBlockBytes_ = 0u;
+    CLTTCPReadOperationPoolBackingBlock* backingBlockListHead_ = nullptr;
+    CLTTCPReadOperationFreeListNode* freeListHead_ = nullptr;
+    size_t extraObjectBytes_ = 0u;
+};
+
+CLTTCPReadOperationFixedAllocator g_CLTTCPReadOperationFixedAllocator;
+
+struct CLTTCPReadOperationFixedAllocatorShutdown {
+    ~CLTTCPReadOperationFixedAllocatorShutdown() {
+        g_CLTTCPReadOperationFixedAllocator.ClearPool();
+    }
+};
+
+CLTTCPReadOperationFixedAllocatorShutdown g_CLTTCPReadOperationFixedAllocatorShutdown;
+
+}  // namespace
+
 // anchor: launcher.exe:0x44b070
 LTTCPEndpointKey::LTTCPEndpointKey()
     : family(0),
@@ -71,22 +184,15 @@ void CRefCountedReadOperationBase::SetRefCountFromPtr(const long* value) {
     referenceCount04 = *value;
 }
 
-CRefCountedReadOperationBase::CRefCountedReadOperationBase(
-    long initialReferenceCount)
-    : referenceCount04(initialReferenceCount) {}
-
-CLTTCPReadOperation::CLTTCPReadOperation()
-    : CRefCountedReadOperationBase(0),
-      byteCount08(0u) {}
-
 // anchor: launcher.exe:0x42fd50 / vtable 0x004b2300 +0x00
 CRefCountedReadOperationBase* CLTTCPReadOperation::DeletingDtor(
     uint8_t deleteFlag) {
     const long referenceCountCopy = referenceCount04;
     (void)new (static_cast<CRefCountedReadOperationBase*>(this))
-        CRefCountedReadOperationBase(referenceCountCopy);
+        CRefCountedReadOperationBase;
+    referenceCount04 = referenceCountCopy;
     if ((deleteFlag & 1u) != 0u) {
-        std::free(this);
+        CLTTCPReadOperation::operator delete(this);
     }
     return reinterpret_cast<CRefCountedReadOperationBase*>(this);
 }
@@ -115,6 +221,25 @@ void CLTTCPReadOperation::SetRefCountFromPtr(const long* value) {
     (void)InterlockedExchange(
         reinterpret_cast<volatile LONG*>(&referenceCount04),
         static_cast<LONG>(*value));
+}
+
+// anchor: launcher.exe:0x452560
+void* CLTTCPReadOperation::operator new(
+    std::size_t /*requestedSize*/,
+    const std::nothrow_t&) noexcept {
+    return g_CLTTCPReadOperationFixedAllocator.AllocateStorage(kCLTTCPReadOperationStorageSize);
+}
+
+// anchor: launcher.exe:0x452520
+void CLTTCPReadOperation::operator delete(void* storage) noexcept {
+    g_CLTTCPReadOperationFixedAllocator.FreeStorage(storage);
+}
+
+// anchor: launcher.exe:0x452520
+void CLTTCPReadOperation::operator delete(
+    void* storage,
+    const std::nothrow_t&) noexcept {
+    CLTTCPReadOperation::operator delete(storage);
 }
 
 // anchor: launcher.exe:0x452350
@@ -386,11 +511,8 @@ int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
         return -1;
     }
 
-    constexpr size_t kReadOperationAllocationSize =
-        sizeof(CLTTCPReadOperation) + CLTTCPReadOperation::kPayloadCapacity;
-    void* const readOperationStorage = std::calloc(1, kReadOperationAllocationSize);
     CLTTCPReadOperation* readOperationFragment =
-        readOperationStorage ? new (readOperationStorage) CLTTCPReadOperation() : nullptr;
+        new (std::nothrow) CLTTCPReadOperation;
     if (!readOperationFragment) {
         spdlog::warn(
             "CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold failed fragment allocation this={} remoteHost='{}'",
@@ -400,6 +522,17 @@ int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
     }
 
     // anchor: launcher.exe:0x42fe50 TCP receive success path
+    // `0x42fe50` does not call a read-operation ctor here.
+    // After the fixed-size `0x100c` allocator returns, the worker writes the live leaf layout
+    // explicitly as:
+    // - `vtable = 0x004b2300`
+    // - `referenceCount04 = 0`
+    // - `byteCount08 = 0`
+    // The C++ `new (std::nothrow) CLTTCPReadOperation` above is only used to materialize that
+    // same live leaf vptr in source before these explicit field writes.
+    readOperationFragment->referenceCount04 = 0;
+    readOperationFragment->byteCount08 = 0u;
+
     // Keep the same two worker-side fragment refs explicit here:
     // - one outer worker-owned ref immediately after allocation/setup
     // - one delivery-temp ref immediately before `OnReceive(fragment)`

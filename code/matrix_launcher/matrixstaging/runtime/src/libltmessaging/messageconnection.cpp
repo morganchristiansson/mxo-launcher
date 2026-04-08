@@ -1067,58 +1067,6 @@ static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const vo
     return statusWorkItem->statusOrPayloadDword08;
 }
 
-// anchor: launcher.exe:0x4490c0 type-3 first-fragment copy setup
-// Source-owned decomposition of the narrowed type-3 packet-copy path, which begins from the
-// first retained fragment returned by the `CParsedPacketWorkItem` traversal state.
-static const CLTTCPReadOperation* CMessageConnection_FirstRetainedFragmentScaffold(
-    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
-    return (workItem && workItem->retainedFragmentCount0C != 0u)
-        ? workItem->firstRetainedFragment10
-        : nullptr;
-}
-
-// anchor: launcher.exe:0x4490c0 type-3 later-fragment copy loop
-// Source-owned decomposition of the later-fragment walk performed after the first copy span.
-static const CLTTCPReadOperation* CMessageConnection_NextRetainedFragmentScaffold(
-    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
-    const CLTTCPReadOperation* fragment) {
-    if (!workItem || !fragment || workItem->retainedFragmentCount0C == 0u) {
-        return nullptr;
-    }
-
-    if (fragment == workItem->firstRetainedFragment10) {
-        if (!workItem->retainedFragmentListOwner14 ||
-            !workItem->retainedFragmentListOwner14->sentinel) {
-            return nullptr;
-        }
-
-        const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* firstNode =
-            workItem->retainedFragmentListOwner14->sentinel->next;
-        return (firstNode && firstNode != workItem->retainedFragmentListOwner14->sentinel)
-            ? firstNode->retainedFragment08
-            : nullptr;
-    }
-
-    if (!workItem->retainedFragmentListOwner14 ||
-        !workItem->retainedFragmentListOwner14->sentinel) {
-        return nullptr;
-    }
-
-    const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* sentinel =
-        workItem->retainedFragmentListOwner14->sentinel;
-    for (const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* node = sentinel->next;
-         node && node != sentinel;
-         node = node->next) {
-        if (node->retainedFragment08 != fragment) {
-            continue;
-        }
-
-        const CParsedPacketWorkItem_RetainedFragmentNodeScaffold* nextNode = node->next;
-        return (nextNode && nextNode != sentinel) ? nextNode->retainedFragment08 : nullptr;
-    }
-    return nullptr;
-}
-
 // anchor: launcher.exe:0x455cd0 / 0x455c60
 // Source-owned creation/reset of the local outer message-ref scaffold that `0x4490c0`
 // materializes before later `0x41bc20/0x41bbb0`-style message-code reads.
@@ -1164,8 +1112,12 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
 // Source-owned decomposition of the packet-body extraction that copies from
 // `CParsedPacketWorkItem.currentCursor24` / `assembledByteCount28` into the later outer
 // receive/message-ref scaffold.
+// Current source now follows the original retained-fragment walk more closely:
+// - `0x4350c0 = CParsedPacketWorkItem_BeginFragmentTraversal`
+// - `0x435510 = CParsedPacketWorkItem_GetNextFragment`
+// - `0x434fa0 = CLTTCPReadOperationRefHandle_AssignRetained`
 static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
-    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
     CMessageConnectionMessageRef* outMessageRef,
     bool* outHadUnusedBuffers) {
     if (outHadUnusedBuffers) {
@@ -1180,9 +1132,16 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
         return true;
     }
 
-    const CLTTCPReadOperation* currentFragment =
-        CMessageConnection_FirstRetainedFragmentScaffold(workItem);
+    CLTTCPReadOperationRefHandle currentFragmentRef{};
+    CLTTCPReadOperation* currentFragment =
+        CParsedPacketWorkItem_BeginFragmentTraversal(
+            workItem,
+            &currentFragmentRef)->retainedFragment00;
     if (!currentFragment || !workItem->currentCursor24) {
+        CLTTCPReadOperation* clearedFragment = nullptr;
+        (void)CLTTCPReadOperationRefHandle_AssignRetained(
+            &currentFragmentRef,
+            &clearedFragment);
         return false;
     }
 
@@ -1191,6 +1150,10 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
     const uint8_t* fragmentEnd = fragmentBegin + currentFragment->byteCount08;
     const uint8_t* currentCursor = workItem->currentCursor24;
     if (currentCursor < fragmentBegin || currentCursor > fragmentEnd) {
+        CLTTCPReadOperation* clearedFragment = nullptr;
+        (void)CLTTCPReadOperationRefHandle_AssignRetained(
+            &currentFragmentRef,
+            &clearedFragment);
         return false;
     }
 
@@ -1201,11 +1164,24 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
             outMessageRef,
             currentCursor,
             firstCopyByteCount)) {
+        CLTTCPReadOperation* clearedFragment = nullptr;
+        (void)CLTTCPReadOperationRefHandle_AssignRetained(
+            &currentFragmentRef,
+            &clearedFragment);
         return false;
     }
 
     uint32_t remainingPacketBodyByteCount = packetBodyByteCount - firstCopyByteCount;
-    currentFragment = CMessageConnection_NextRetainedFragmentScaffold(workItem, currentFragment);
+    CLTTCPReadOperationRefHandle nextFragmentRef{};
+    CLTTCPReadOperation* nextFragment =
+        CParsedPacketWorkItem_GetNextFragment(
+            workItem,
+            &nextFragmentRef)->retainedFragment00;
+    (void)CLTTCPReadOperationRefHandle_AssignRetained(&currentFragmentRef, &nextFragment);
+    if (nextFragment) {
+        nextFragment->Release();
+    }
+    currentFragment = currentFragmentRef.retainedFragment00;
     while (currentFragment) {
         if (remainingPacketBodyByteCount == 0u) {
             if (outHadUnusedBuffers) {
@@ -1220,12 +1196,30 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
                 outMessageRef,
                 reinterpret_cast<const uint8_t*>(currentFragment + 1),
                 copyByteCount)) {
+            CLTTCPReadOperation* clearedFragment = nullptr;
+            (void)CLTTCPReadOperationRefHandle_AssignRetained(
+                &currentFragmentRef,
+                &clearedFragment);
             return false;
         }
         remainingPacketBodyByteCount -= copyByteCount;
-        currentFragment = CMessageConnection_NextRetainedFragmentScaffold(workItem, currentFragment);
+
+        CLTTCPReadOperationRefHandle laterFragmentRef{};
+        CLTTCPReadOperation* laterFragment =
+            CParsedPacketWorkItem_GetNextFragment(
+                workItem,
+                &laterFragmentRef)->retainedFragment00;
+        (void)CLTTCPReadOperationRefHandle_AssignRetained(&currentFragmentRef, &laterFragment);
+        if (laterFragment) {
+            laterFragment->Release();
+        }
+        currentFragment = currentFragmentRef.retainedFragment00;
     }
 
+    CLTTCPReadOperation* clearedFragment = nullptr;
+    (void)CLTTCPReadOperationRefHandle_AssignRetained(
+        &currentFragmentRef,
+        &clearedFragment);
     return remainingPacketBodyByteCount == 0u;
 }
 
@@ -1563,8 +1557,8 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         return 1u;
     }
 
-    const CLTTCPConnection_ParsedPacketWorkItemScaffold* parsedPacketWorkItem =
-        static_cast<const CLTTCPConnection_ParsedPacketWorkItemScaffold*>(workItem);
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* parsedPacketWorkItem =
+        static_cast<CLTTCPConnection_ParsedPacketWorkItemScaffold*>(workItem);
     if (parsedPacketWorkItem->assembledByteCount28 > 0x1000u) {
         spdlog::info(
             "CMessageConnection::OnOperationCompleted received illegally large packet payloadBytes={} this={} ownerContext={} remoteHost='{}' -> closing",

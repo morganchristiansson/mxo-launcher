@@ -105,6 +105,29 @@ bool ParseVariableLengthPacket(
 
 namespace mxo::liblttcp {
 
+// anchor: launcher.exe:0x434fa0
+CLTTCPReadOperation* CLTTCPReadOperationRefHandle_AssignRetained(
+    CLTTCPReadOperationRefHandle* handle,
+    CLTTCPReadOperation* const* newRetainedFragmentSlot) {
+    if (!handle) {
+        return nullptr;
+    }
+
+    CLTTCPReadOperation* const newRetainedFragment =
+        newRetainedFragmentSlot ? *newRetainedFragmentSlot : nullptr;
+    CLTTCPReadOperation* const oldRetainedFragment = handle->retainedFragment00;
+    if (oldRetainedFragment != newRetainedFragment) {
+        if (oldRetainedFragment) {
+            oldRetainedFragment->Release();
+        }
+        handle->retainedFragment00 = newRetainedFragment;
+        if (newRetainedFragment) {
+            newRetainedFragment->AddRef();
+        }
+    }
+    return handle->retainedFragment00;
+}
+
 namespace {
 
 static void* g_ParsedPacketWorkItemVtable[2] = {nullptr, nullptr};
@@ -114,36 +137,6 @@ static void EnsureParsedPacketWorkItemVtableInitialized() {
         g_ParsedPacketWorkItemVtable[1] =
             reinterpret_cast<void*>(CParsedPacketWorkItem_ReleaseScaffold);
     }
-}
-
-static CLTTCPReadOperation* CLTTCPReadOperationRefHandle_AssignRetained(
-    CLTTCPReadOperationRefHandle* handle,
-    CLTTCPReadOperation* newRetainedFragment) {
-    if (!handle) {
-        return nullptr;
-    }
-    CLTTCPReadOperation* const oldRetainedFragment = handle->retainedFragment00;
-    if (oldRetainedFragment != newRetainedFragment) {
-        if (oldRetainedFragment) {
-            if (oldRetainedFragment) { oldRetainedFragment->Release(); }
-        }
-        handle->retainedFragment00 = newRetainedFragment;
-        if (newRetainedFragment) {
-            if (newRetainedFragment) { newRetainedFragment->AddRef(); }
-        }
-    }
-    return handle->retainedFragment00;
-}
-
-static void CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(
-    CVariableLengthPrefixedTCPStreamParser* parser,
-    CLTTCPReadOperation* fragment) {
-    if (!parser) {
-        return;
-    }
-    (void)CLTTCPReadOperationRefHandle_AssignRetained(
-        &parser->currentCursorFragmentRef04,
-        fragment);
 }
 
 static void CParsedPacketWorkItem_ClearFragmentListScaffold(
@@ -286,24 +279,6 @@ static bool CParsedPacketWorkItem_AppendFragmentScaffold(
     return appended;
 }
 
-static CLTTCPReadOperation* CParsedPacketWorkItem_GetTailFragmentScaffold(
-    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
-    if (!workItem || workItem->retainedFragmentCount0C == 0u) {
-        return nullptr;
-    }
-    if (workItem->retainedFragmentCount0C == 1u || !workItem->retainedFragmentListOwner14 ||
-        !workItem->retainedFragmentListOwner14->sentinel) {
-        return workItem->firstRetainedFragment10;
-    }
-
-    CParsedPacketWorkItem_RetainedFragmentNodeScaffold* tailNode =
-        workItem->retainedFragmentListOwner14->sentinel->prev;
-    if (!tailNode || tailNode == workItem->retainedFragmentListOwner14->sentinel) {
-        return workItem->firstRetainedFragment10;
-    }
-    return tailNode->retainedFragment08;
-}
-
 // UNANCHORED: source-owned work-item rebase helper used after prefix consume whenever the parser
 // cursor has advanced into a later retained fragment.
 static bool CParsedPacketWorkItem_RebaseFirstFragmentToScaffold(
@@ -315,21 +290,23 @@ static bool CParsedPacketWorkItem_RebaseFirstFragmentToScaffold(
     }
 
     std::vector<CLTTCPReadOperation*> retainedFragmentsToKeep;
+    CLTTCPReadOperationRefHandle fragmentRef{};
     CLTTCPReadOperation* fragment =
-        CParsedPacketWorkItem_BeginFragmentTraversalScaffold(workItem);
+        CParsedPacketWorkItem_BeginFragmentTraversal(workItem, &fragmentRef)->retainedFragment00;
     bool keepFragment = false;
     while (fragment) {
         if (fragment == firstFragmentToKeep) {
             keepFragment = true;
         }
         if (keepFragment) {
-            if (fragment) { fragment->AddRef(); }
+            fragment->AddRef();
             retainedFragmentsToKeep.push_back(fragment);
         }
 
+        CLTTCPReadOperationRefHandle nextFragmentRef{};
         CLTTCPReadOperation* nextFragment =
-            CParsedPacketWorkItem_GetNextFragmentScaffold(workItem);
-        if (fragment) { fragment->Release(); }
+            CParsedPacketWorkItem_GetNextFragment(workItem, &nextFragmentRef)->retainedFragment00;
+        fragment->Release();
         fragment = nextFragment;
     }
 
@@ -342,7 +319,9 @@ static bool CParsedPacketWorkItem_RebaseFirstFragmentToScaffold(
         CLTTCPReadOperation* retainedFragmentTempRef = retainedFragmentsToKeep[index];
         if (!CParsedPacketWorkItem_AppendFragmentScaffold(workItem, retainedFragmentTempRef)) {
             for (size_t remaining = index + 1; remaining < retainedFragmentsToKeep.size(); ++remaining) {
-                if (retainedFragmentsToKeep[remaining]) { retainedFragmentsToKeep[remaining]->Release(); }
+                if (retainedFragmentsToKeep[remaining]) {
+                    retainedFragmentsToKeep[remaining]->Release();
+                }
             }
             return false;
         }
@@ -358,7 +337,9 @@ static bool CVariableLengthPrefixedTCPStreamParser_NormalizeCursorFragmentScaffo
     if (parser->unreadBufferedByteCount0C == 0u) {
         return true;
     }
-    if (!parser->currentPacketWorkItem14 || !parser->currentCursorFragmentRef04.retainedFragment00 || !parser->currentCursor08) {
+    if (!parser->currentPacketWorkItem14 ||
+        !parser->currentCursorFragmentRef04.retainedFragment00 ||
+        !parser->currentCursor08) {
         return false;
     }
 
@@ -366,7 +347,8 @@ static bool CVariableLengthPrefixedTCPStreamParser_NormalizeCursorFragmentScaffo
         reinterpret_cast<const uint8_t*>(parser->currentCursorFragmentRef04.retainedFragment00 + 1);
     const uint8_t* const currentFragmentEnd =
         currentFragmentBegin + parser->currentCursorFragmentRef04.retainedFragment00->byteCount08;
-    if (parser->currentCursor08 < currentFragmentBegin || parser->currentCursor08 > currentFragmentEnd) {
+    if (parser->currentCursor08 < currentFragmentBegin ||
+        parser->currentCursor08 > currentFragmentEnd) {
         return false;
     }
     const uint32_t remainingInCurrentFragment =
@@ -375,24 +357,32 @@ static bool CVariableLengthPrefixedTCPStreamParser_NormalizeCursorFragmentScaffo
         return true;
     }
 
+    CLTTCPReadOperationRefHandle fragmentRef{};
     CLTTCPReadOperation* fragment =
-        CParsedPacketWorkItem_BeginFragmentTraversalScaffold(parser->currentPacketWorkItem14);
+        CParsedPacketWorkItem_BeginFragmentTraversal(
+            parser->currentPacketWorkItem14,
+            &fragmentRef)->retainedFragment00;
     while (fragment) {
+        CLTTCPReadOperationRefHandle nextFragmentRef{};
         CLTTCPReadOperation* nextFragment =
-            CParsedPacketWorkItem_GetNextFragmentScaffold(parser->currentPacketWorkItem14);
+            CParsedPacketWorkItem_GetNextFragment(
+                parser->currentPacketWorkItem14,
+                &nextFragmentRef)->retainedFragment00;
         if (fragment == parser->currentCursorFragmentRef04.retainedFragment00) {
-            if (fragment) { fragment->Release(); }
+            fragment->Release();
             if (!nextFragment) {
                 return false;
             }
-            CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(parser, nextFragment);
+            (void)CLTTCPReadOperationRefHandle_AssignRetained(
+                &parser->currentCursorFragmentRef04,
+                &nextFragment);
             parser->currentCursor08 =
                 reinterpret_cast<uint8_t*>(parser->currentCursorFragmentRef04.retainedFragment00 + 1);
-            if (nextFragment) { nextFragment->Release(); }
+            nextFragment->Release();
             return true;
         }
 
-        if (fragment) { fragment->Release(); }
+        fragment->Release();
         fragment = nextFragment;
     }
     return false;
@@ -415,7 +405,9 @@ static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold
     if (!parser || byteCountToConsume == 0u) {
         return true;
     }
-    if (!parser->currentPacketWorkItem14 || !parser->currentCursorFragmentRef04.retainedFragment00 || !parser->currentCursor08 ||
+    if (!parser->currentPacketWorkItem14 ||
+        !parser->currentCursorFragmentRef04.retainedFragment00 ||
+        !parser->currentCursor08 ||
         parser->unreadBufferedByteCount0C < byteCountToConsume) {
         return false;
     }
@@ -425,7 +417,8 @@ static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold
         reinterpret_cast<const uint8_t*>(parser->currentCursorFragmentRef04.retainedFragment00 + 1);
     const uint8_t* const currentFragmentEnd =
         currentFragmentBegin + parser->currentCursorFragmentRef04.retainedFragment00->byteCount08;
-    if (parser->currentCursor08 < currentFragmentBegin || parser->currentCursor08 > currentFragmentEnd) {
+    if (parser->currentCursor08 < currentFragmentBegin ||
+        parser->currentCursor08 > currentFragmentEnd) {
         return false;
     }
     const uint32_t bytesRemainingInCurrentFragment =
@@ -448,26 +441,32 @@ static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold
             newCursorBase = parser->currentCursor08;
             cursorByteOffsetWithinFragment = byteCountToConsume;
         } else {
+            CLTTCPReadOperationRefHandle traversedFragmentRef{};
             CLTTCPReadOperation* traversedFragment =
-                CParsedPacketWorkItem_BeginFragmentTraversalScaffold(parser->currentPacketWorkItem14);
+                CParsedPacketWorkItem_BeginFragmentTraversal(
+                    parser->currentPacketWorkItem14,
+                    &traversedFragmentRef)->retainedFragment00;
             while (traversedFragment) {
+                CLTTCPReadOperationRefHandle nextFragmentRef{};
                 CLTTCPReadOperation* nextFragment =
-                    CParsedPacketWorkItem_GetNextFragmentScaffold(parser->currentPacketWorkItem14);
+                    CParsedPacketWorkItem_GetNextFragment(
+                        parser->currentPacketWorkItem14,
+                        &nextFragmentRef)->retainedFragment00;
                 if (traversedFragment == parser->currentCursorFragmentRef04.retainedFragment00) {
-                    if (traversedFragment) { traversedFragment->Release(); }
+                    traversedFragment->Release();
                     if (!nextFragment) {
                         return false;
                     }
-                    CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(
-                        parser,
-                        nextFragment);
+                    (void)CLTTCPReadOperationRefHandle_AssignRetained(
+                        &parser->currentCursorFragmentRef04,
+                        &nextFragment);
                     newCursorBase =
                         reinterpret_cast<uint8_t*>(parser->currentCursorFragmentRef04.retainedFragment00 + 1);
                     cursorByteOffsetWithinFragment = 0u;
-                    if (nextFragment) { nextFragment->Release(); }
+                    nextFragment->Release();
                     break;
                 }
-                if (traversedFragment) { traversedFragment->Release(); }
+                traversedFragment->Release();
                 traversedFragment = nextFragment;
             }
             if (!newCursorBase) {
@@ -475,8 +474,11 @@ static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold
             }
         }
     } else {
+        CLTTCPReadOperationRefHandle traversedFragmentRef{};
         CLTTCPReadOperation* traversedFragment =
-            CParsedPacketWorkItem_BeginFragmentTraversalScaffold(parser->currentPacketWorkItem14);
+            CParsedPacketWorkItem_BeginFragmentTraversal(
+                parser->currentPacketWorkItem14,
+                &traversedFragmentRef)->retainedFragment00;
         bool passedCurrentCursorFragment = false;
         while (traversedFragment) {
             if (!passedCurrentCursorFragment) {
@@ -486,27 +488,30 @@ static bool CVariableLengthPrefixedTCPStreamParser_AdvanceBufferedCursorScaffold
             } else {
                 if (remainingToConsume <= traversedFragment->byteCount08) {
                     if (traversedFragment != parser->currentCursorFragmentRef04.retainedFragment00) {
-                        CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(
-                            parser,
-                            traversedFragment);
+                        (void)CLTTCPReadOperationRefHandle_AssignRetained(
+                            &parser->currentCursorFragmentRef04,
+                            &traversedFragment);
                     }
                     newCursorBase =
                         reinterpret_cast<uint8_t*>(parser->currentCursorFragmentRef04.retainedFragment00 + 1);
                     cursorByteOffsetWithinFragment = remainingToConsume - boundaryBias;
-                    if (traversedFragment) { traversedFragment->Release(); }
+                    traversedFragment->Release();
                     traversedFragment = nullptr;
                     break;
                 }
                 remainingToConsume -= traversedFragment->byteCount08;
             }
 
+            CLTTCPReadOperationRefHandle nextFragmentRef{};
             CLTTCPReadOperation* nextFragment =
-                CParsedPacketWorkItem_GetNextFragmentScaffold(parser->currentPacketWorkItem14);
-            if (traversedFragment) { traversedFragment->Release(); }
+                CParsedPacketWorkItem_GetNextFragment(
+                    parser->currentPacketWorkItem14,
+                    &nextFragmentRef)->retainedFragment00;
+            traversedFragment->Release();
             traversedFragment = nextFragment;
         }
         if (traversedFragment) {
-            if (traversedFragment) { traversedFragment->Release(); }
+            traversedFragment->Release();
         }
         if (!newCursorBase) {
             return false;
@@ -543,25 +548,38 @@ uint32_t __thiscall CParsedPacketWorkItem_ReleaseScaffold(
 }
 
 // anchor: launcher.exe:0x4350c0
-CLTTCPReadOperation* CParsedPacketWorkItem_BeginFragmentTraversalScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
-    if (!workItem || workItem->retainedFragmentCount0C == 0u) {
+CLTTCPReadOperationRefHandle* CParsedPacketWorkItem_BeginFragmentTraversal(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationRefHandle* outFragmentRef) {
+    if (!outFragmentRef) {
         return nullptr;
+    }
+    outFragmentRef->retainedFragment00 = nullptr;
+    if (!workItem || workItem->retainedFragmentCount0C == 0u) {
+        return outFragmentRef;
     }
 
     workItem->directFragmentTraversalPhase18 = 1u;
     workItem->fragmentTraversalIndex1C = 0u;
     workItem->fragmentTraversalNode20 = nullptr;
     CLTTCPReadOperation* fragment = workItem->firstRetainedFragment10;
-    if (fragment) { fragment->AddRef(); }
-    return fragment;
+    outFragmentRef->retainedFragment00 = fragment;
+    if (fragment) {
+        fragment->AddRef();
+    }
+    return outFragmentRef;
 }
 
 // anchor: launcher.exe:0x435510
-CLTTCPReadOperation* CParsedPacketWorkItem_GetNextFragmentScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
-    if (!workItem) {
+CLTTCPReadOperationRefHandle* CParsedPacketWorkItem_GetNextFragment(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationRefHandle* outFragmentRef) {
+    if (!outFragmentRef) {
         return nullptr;
+    }
+    outFragmentRef->retainedFragment00 = nullptr;
+    if (!workItem) {
+        return outFragmentRef;
     }
 
     CParsedPacketWorkItem_RetainedFragmentNodeScaffold* traversalNode = nullptr;
@@ -572,11 +590,14 @@ CLTTCPReadOperation* CParsedPacketWorkItem_GetNextFragmentScaffold(
         workItem->fragmentTraversalIndex1C = traversalIndex;
         if (traversalIndex == 0u) {
             CLTTCPReadOperation* fragment = workItem->firstRetainedFragment10;
-            if (fragment) { fragment->AddRef(); }
-            return fragment;
+            outFragmentRef->retainedFragment00 = fragment;
+            if (fragment) {
+                fragment->AddRef();
+            }
+            return outFragmentRef;
         }
         if (!workItem->retainedFragmentListOwner14 || !workItem->retainedFragmentListOwner14->sentinel) {
-            return nullptr;
+            return outFragmentRef;
         }
         workItem->directFragmentTraversalPhase18 = 0u;
         traversalNode = workItem->retainedFragmentListOwner14->sentinel;
@@ -584,37 +605,62 @@ CLTTCPReadOperation* CParsedPacketWorkItem_GetNextFragmentScaffold(
 
     if (!traversalNode || !workItem->retainedFragmentListOwner14 ||
         !workItem->retainedFragmentListOwner14->sentinel) {
-        return nullptr;
+        return outFragmentRef;
     }
 
     CParsedPacketWorkItem_RetainedFragmentNodeScaffold* nextNode = traversalNode->next;
     workItem->fragmentTraversalNode20 = nextNode;
     if (nextNode == workItem->retainedFragmentListOwner14->sentinel) {
-        return nullptr;
+        return outFragmentRef;
     }
 
     CLTTCPReadOperation* fragment = nextNode->retainedFragment08;
-    if (fragment) { fragment->AddRef(); }
-    return fragment;
+    outFragmentRef->retainedFragment00 = fragment;
+    if (fragment) {
+        fragment->AddRef();
+    }
+    return outFragmentRef;
 }
 
 // anchor: launcher.exe:0x4355c0
-CLTTCPReadOperation* CParsedPacketWorkItem_GetTailFragmentTempRefScaffold(
-    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
-    CLTTCPReadOperation* tailFragment =
-        CParsedPacketWorkItem_GetTailFragmentScaffold(workItem);
-    if (tailFragment) { tailFragment->AddRef(); }
-    return tailFragment;
+CLTTCPReadOperationRefHandle* CParsedPacketWorkItem_GetTailFragment(
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationRefHandle* outFragmentRef) {
+    if (!outFragmentRef) {
+        return nullptr;
+    }
+    outFragmentRef->retainedFragment00 = nullptr;
+    if (!workItem || workItem->retainedFragmentCount0C == 0u) {
+        return outFragmentRef;
+    }
+
+    CLTTCPReadOperation* tailFragment = nullptr;
+    if (!workItem->retainedFragmentListOwner14 || !workItem->retainedFragmentListOwner14->sentinel) {
+        tailFragment = workItem->firstRetainedFragment10;
+    } else {
+        CParsedPacketWorkItem_RetainedFragmentNodeScaffold* tailNode =
+            workItem->retainedFragmentListOwner14->sentinel->prev;
+        tailFragment =
+            (!tailNode || tailNode == workItem->retainedFragmentListOwner14->sentinel)
+            ? workItem->firstRetainedFragment10
+            : tailNode->retainedFragment08;
+    }
+
+    outFragmentRef->retainedFragment00 = tailFragment;
+    if (tailFragment) {
+        tailFragment->AddRef();
+    }
+    return outFragmentRef;
 }
 
 // anchor: launcher.exe:0x434f80
-uint8_t* CParsedPacketWorkItem_GetCurrentCursorScaffold(
+uint8_t* CParsedPacketWorkItem_GetCurrentCursor(
     const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
     return workItem ? workItem->currentCursor24 : nullptr;
 }
 
 // anchor: launcher.exe:0x434f60
-uint32_t CParsedPacketWorkItem_GetAssembledByteCountScaffold(
+uint32_t CParsedPacketWorkItem_GetAssembledByteCount(
     const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
     return workItem ? workItem->assembledByteCount28 : 0u;
 }
@@ -666,7 +712,10 @@ void CVariableLengthPrefixedTCPStreamParser::ClearState() {
         CParsedPacketWorkItem_ReleaseScaffold(currentPacketWorkItem14);
         currentPacketWorkItem14 = nullptr;
     }
-    CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(this, nullptr);
+    CLTTCPReadOperation* clearedCursorFragment = nullptr;
+    (void)CLTTCPReadOperationRefHandle_AssignRetained(
+        &currentCursorFragmentRef04,
+        &clearedCursorFragment);
 }
 
 // anchor: launcher.exe:0x4725c0 / vtable 0x004baf90
@@ -674,21 +723,29 @@ void CVariableLengthPrefixedTCPStreamParser::ResetAfterPacket() {
     CLTTCPConnection_ParsedPacketWorkItemScaffold* emittedWorkItem = currentPacketWorkItem14;
     CLTTCPConnection_ParsedPacketWorkItemScaffold* replacementWorkItem = AllocatePacketBuffer();
     currentPacketWorkItem14 = replacementWorkItem;
-    CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(this, nullptr);
+    CLTTCPReadOperation* clearedCursorFragment = nullptr;
+    (void)CLTTCPReadOperationRefHandle_AssignRetained(
+        &currentCursorFragmentRef04,
+        &clearedCursorFragment);
     advancedBufferedByteCount10 = 0u;
 
     if (unreadBufferedByteCount0C == 0u || !replacementWorkItem || !emittedWorkItem) {
         return;
     }
 
-    CLTTCPReadOperation* tailFragmentTempRef =
-        CParsedPacketWorkItem_GetTailFragmentTempRefScaffold(emittedWorkItem);
-    if (tailFragmentTempRef != currentCursorFragmentRef04.retainedFragment00) {
-        CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(
-            this,
-            tailFragmentTempRef);
+    CLTTCPReadOperationRefHandle tailFragmentTempRef{};
+    CLTTCPReadOperation* const tailFragment =
+        CParsedPacketWorkItem_GetTailFragment(
+            emittedWorkItem,
+            &tailFragmentTempRef)->retainedFragment00;
+    if (tailFragment != currentCursorFragmentRef04.retainedFragment00) {
+        (void)CLTTCPReadOperationRefHandle_AssignRetained(
+            &currentCursorFragmentRef04,
+            &tailFragment);
     }
-    if (tailFragmentTempRef) { tailFragmentTempRef->Release(); }
+    if (tailFragment) {
+        tailFragment->Release();
+    }
     CLTTCPReadOperation* parserCurrentCursorFragment = currentCursorFragmentRef04.retainedFragment00;
     if (parserCurrentCursorFragment) {
         // `0x4725c0` takes one transient ref on parser `+0x04` immediately before `0x435e60`.
@@ -734,9 +791,9 @@ uint32_t CVariableLengthPrefixedTCPStreamParser::Parse(
         const bool appended =
             CParsedPacketWorkItem_AppendFragmentScaffold(currentWorkItem, readOperationFragment);
         if (currentCursorFragmentRef04.retainedFragment00 == nullptr) {
-            CVariableLengthPrefixedTCPStreamParser_AssignCurrentCursorFragmentScaffold(
-                this,
-                readOperationFragment);
+            (void)CLTTCPReadOperationRefHandle_AssignRetained(
+                &currentCursorFragmentRef04,
+                &readOperationFragment);
         }
         if (unreadBufferedByteCount0C == 0u) {
             currentCursor08 =
@@ -753,7 +810,7 @@ uint32_t CVariableLengthPrefixedTCPStreamParser::Parse(
 
     if (unreadBufferedByteCount0C != 0u) {
         uint32_t packetBodyByteCount =
-            CParsedPacketWorkItem_GetAssembledByteCountScaffold(currentWorkItem);
+            CParsedPacketWorkItem_GetAssembledByteCount(currentWorkItem);
         if (packetBodyByteCount == 0u) {
             if (unreadBufferedByteCount0C < 2u) {
                 if (inputFragment) {
@@ -834,7 +891,7 @@ uint32_t CVariableLengthPrefixedTCPStreamParser::Parse(
             }
         }
 
-        packetBodyByteCount = CParsedPacketWorkItem_GetAssembledByteCountScaffold(currentWorkItem);
+        packetBodyByteCount = CParsedPacketWorkItem_GetAssembledByteCount(currentWorkItem);
         if (packetBodyByteCount <= unreadBufferedByteCount0C) {
             if (!CVariableLengthPrefixedTCPStreamParser_NormalizeCursorFragmentScaffold(this)) {
                 if (inputFragment) {

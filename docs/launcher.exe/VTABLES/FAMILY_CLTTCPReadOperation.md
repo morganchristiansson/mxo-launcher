@@ -58,6 +58,7 @@ Key behavior:
 
 - `0x42fd50 = CLTTCPReadOperation_dtor`
   - collapses back to `0x004b211c`
+  - delete-flag free path goes through `0x452520`, not a raw `free(this)` call
 - `0x42f850 = CLTTCPReadOperation_AddRef`
   - interlocked increment of `+0x04`
 - `0x42f860 = CLTTCPReadOperation_Release`
@@ -65,6 +66,17 @@ Key behavior:
   - zero -> vtable `+0x0c`
 - `0x452350 = CLTTCPReadOperation_SetByteCount`
   - clamps/writes `+0x08`
+
+Allocator/free helpers tied to the live receive path:
+
+- `0x452560 = CLTTCPReadOperation_AllocateStorage`
+  - fixed-size wrapper that always requests `0x100c`
+- `0x452400 = CLTTCPReadOperationFixedAllocator_AllocateStorage`
+  - lock-protected fixed-size pool
+  - backing-block list head = `0x004f817c`
+  - free-list head = `0x004f8180`
+- `0x452520 = CLTTCPReadOperation_FreeStorage`
+  - returns one fragment allocation back to that same free-list
 
 ## Receive-path role
 
@@ -92,6 +104,9 @@ A newer fidelity pass also tightened the tiny retained-fragment handle seam reco
   - Release old fragment
   - store new fragment
   - AddRef new fragment
+- the static RE now also narrows the second arg more accurately:
+  - it is any one-pointer fragment slot (parser field or stack local), not only a dedicated helper
+    object instance
 - this is a better match for the original parser/current-cursor lifetime model and removes another
   raw-pointer shortcut from the active receive path
 
@@ -101,11 +116,21 @@ A newer fidelity pass also tightened the tiny retained-fragment handle seam reco
     explicit (`sizeof(...) == 0x0c`)
   - payload bytes are represented directly as the variable-length tail beginning immediately after
     that prefix, not as a fake inline field or wrapper-accessor layer
+  - source no longer uses `calloc/free` on this seam
+    - `operator new(std::nothrow)` now mirrors the fixed-size `0x452560 -> 0x452400` allocator path
+    - deleting dtor / `operator delete` now return storage through the same `0x452520`-style
+      free-list path
+    - current source also mirrors the original backing-block-list vs free-list split, even though
+      the tracked-allocation counters and first-block sizing heuristic from `0x452400` are still a
+      narrower follow-up gap
 - `matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp`
   and `messageconnection.cpp`
   - parser / consumer code now uses the recovered class layout directly
   - source-only AddRef/Release/payload wrapper helpers over the read-operation family have been
     removed from this seam
+  - parsed-packet consumer copy now also walks retained fragments through the recovered
+    `0x4350c0 / 0x435510 / 0x434fa0` traversal/handle chain instead of source-owned raw first/next
+    fragment shortcuts
 
 ## Family boundary note
 

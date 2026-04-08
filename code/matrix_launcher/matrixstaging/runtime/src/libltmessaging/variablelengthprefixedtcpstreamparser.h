@@ -6,20 +6,29 @@
 
 namespace mxo::liblttcp {
 
+// anchor: launcher.exe:0x434fa0
+// The second argument is any one-pointer fragment slot (e.g. another ref handle or the stack
+// parameter slot for `Parse(readOperationFragment, ...)`), not only a concrete handle object.
+CLTTCPReadOperation* CLTTCPReadOperationRefHandle_AssignRetained(
+    CLTTCPReadOperationRefHandle* handle,
+    CLTTCPReadOperation* const* newRetainedFragmentSlot);
 // anchor: launcher.exe:0x4350c0
-CLTTCPReadOperation* CParsedPacketWorkItem_BeginFragmentTraversalScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
+CLTTCPReadOperationRefHandle* CParsedPacketWorkItem_BeginFragmentTraversal(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationRefHandle* outFragmentRef);
 // anchor: launcher.exe:0x435510
-CLTTCPReadOperation* CParsedPacketWorkItem_GetNextFragmentScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
+CLTTCPReadOperationRefHandle* CParsedPacketWorkItem_GetNextFragment(
+    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationRefHandle* outFragmentRef);
 // anchor: launcher.exe:0x4355c0
-CLTTCPReadOperation* CParsedPacketWorkItem_GetTailFragmentTempRefScaffold(
-    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
+CLTTCPReadOperationRefHandle* CParsedPacketWorkItem_GetTailFragment(
+    const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPReadOperationRefHandle* outFragmentRef);
 // anchor: launcher.exe:0x434f80
-uint8_t* CParsedPacketWorkItem_GetCurrentCursorScaffold(
+uint8_t* CParsedPacketWorkItem_GetCurrentCursor(
     const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 // anchor: launcher.exe:0x434f60
-uint32_t CParsedPacketWorkItem_GetAssembledByteCountScaffold(
+uint32_t CParsedPacketWorkItem_GetAssembledByteCount(
     const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 
 // UNANCHORED: source-owned release entry installed in the local parsed-packet work-item vtable.

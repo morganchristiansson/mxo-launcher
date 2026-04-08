@@ -11,7 +11,7 @@ The detailed family trees live in separate docs.
     +-- read-fragment family
     |      0x004b211c  CRefCountedReadOperationBase   (shared low-level base contract)
     |      └── 0x004b2300  CLTTCPReadOperation
-    |          helper: 0x434fa0  CLTTCPReadOperationFragmentRef_AssignRetained
+    |          helper: 0x434fa0  CLTTCPReadOperationRefHandle_AssignRetained
     |
     +-- parser bridge object
     |      0x004baf84  CVariableLengthPrefixedTCPStreamParser
@@ -50,7 +50,7 @@ Current best named families are now:
 
 with these important helper names now in use too:
 
-- `CLTTCPReadOperationFragmentRef_AssignRetained`
+- `CLTTCPReadOperationRefHandle_AssignRetained`
 - `CMessageConnectionMessageRefHandle_AssignRetained`
 
 ## Important caution

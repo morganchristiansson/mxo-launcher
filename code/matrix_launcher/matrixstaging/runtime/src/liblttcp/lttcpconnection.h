@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <deque>
 #include <mutex>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -59,11 +60,12 @@ static_assert(sizeof(LTTCPEndpointKey) == 0x10, "endpoint key size mismatch");
 // ("Unused buffers were attached to CLTTCPReadOperation ...") plus the worker-thread receive path.
 // This is a refcounted read-buffer fragment object, not a completed-packet work item.
 // High-confidence fields / methods from `0x42fe50`, `0x42f820`, `0x42f850`, `0x42f860`,
-// `0x42f880`, `0x42f890`, `0x452350`, `0x469bf0`, `0x435e60`, `0x4350c0`, and `0x435510`:
+// `0x42f880`, `0x42f890`, `0x452350`, `0x452400`, `0x452520`, `0x452560`, `0x469bf0`,
+// `0x435e60`, `0x4350c0`, and `0x435510`:
 // - worker-thread receive path installs live leaf vtable `0x004b2300` and allocates `0x100c`
 //   bytes for this family
 // - deleting dtor `0x42fd50` collapses that live leaf back to shared low-level refcounted base
-//   `0x004b211c` before final free
+//   `0x004b211c` before returning storage through `0x452520`
 // - base `0x004b211c` owns the shared low-level refcount contract at `+0x00..+0x07`
 // - derived `CLTTCPReadOperation` adds `+0x08 = byte count`
 // - `+0x0c` = first payload byte in the variable-length inline tail allocation
@@ -93,8 +95,6 @@ public:
     virtual void SetRefCountFromPtr(const long* value);
 
     long referenceCount04; // +0x04 plain dword in the non-interlocked base contract
-
-    explicit CRefCountedReadOperationBase(long initialReferenceCount = 0);
 };
 
 static_assert(sizeof(CRefCountedReadOperationBase) == 0x08, "refcounted read-operation base size mismatch");
@@ -114,9 +114,15 @@ public:
     // anchor: launcher.exe:0x42f890 / vtable 0x004b2300 +0x14
     void SetRefCountFromPtr(const long* value) override;
 
-    // Source-owned ctor that mirrors the worker receive-path field initialization for the concrete
-    // `CLTTCPReadOperation` leaf.
-    CLTTCPReadOperation();
+    // anchor: launcher.exe:0x452560
+    // Fixed-size `0x100c` class allocator used on the worker-thread receive path before the
+    // caller manually writes `vtable/refcount/byteCount`.
+    // The wrapped pool object/body lives at `0x452400`.
+    static void* operator new(std::size_t requestedSize, const std::nothrow_t&) noexcept;
+    // anchor: launcher.exe:0x452520
+    static void operator delete(void* storage) noexcept;
+    // anchor: launcher.exe:0x452520
+    static void operator delete(void* storage, const std::nothrow_t&) noexcept;
 
     // anchor: launcher.exe:0x452350
     void SetByteCount(uint32_t byteCount);
