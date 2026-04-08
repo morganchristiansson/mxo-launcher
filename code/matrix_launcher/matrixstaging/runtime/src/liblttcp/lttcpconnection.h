@@ -114,14 +114,10 @@ public:
     // anchor: launcher.exe:0x42f890 / vtable 0x004b2300 +0x14
     void SetRefCountFromPtr(const long* value) override;
 
-    // anchor: launcher.exe:0x452560
-    // Fixed-size `0x100c` class allocator used on the worker-thread receive path before the
-    // caller manually writes `vtable/refcount/byteCount`.
-    // The wrapped pool object/body lives at `0x452400`.
+    // UNANCHORED: source-side operator wrappers over the recovered fixed-size fragment allocator
+    // helpers `0x452560` / `0x452520`.
     static void* operator new(std::size_t requestedSize, const std::nothrow_t&) noexcept;
-    // anchor: launcher.exe:0x452520
     static void operator delete(void* storage) noexcept;
-    // anchor: launcher.exe:0x452520
     static void operator delete(void* storage, const std::nothrow_t&) noexcept;
 
     // anchor: launcher.exe:0x452350

@@ -77,6 +77,16 @@ Allocator/free helpers tied to the live receive path:
   - free-list head = `0x004f8180`
 - `0x452520 = CLTTCPReadOperation_FreeStorage`
   - returns one fragment allocation back to that same free-list
+- `0x452370 = CLTTCPReadOperationFixedAllocator_ClearPool`
+  - frees every backing block on the allocator's backing-block list
+  - subtracts `_msize(block)` from tracked bytes and decrements tracked allocation count
+- `0x4a27e0 = CLTTCPReadOperationFixedAllocator_Init`
+  - initializes the allocator critical section
+  - zeros `g_CLTTCPReadOperationFixedAllocatorExtraObjectBytes`
+  - registers `0x4a7660` with `atexit`
+- `0x4a7660 = CLTTCPReadOperationFixedAllocator_Shutdown`
+  - if backing blocks remain, clears the pool
+  - then deletes the allocator critical section
 
 ## Receive-path role
 
@@ -120,9 +130,11 @@ A newer fidelity pass also tightened the tiny retained-fragment handle seam reco
     - `operator new(std::nothrow)` now mirrors the fixed-size `0x452560 -> 0x452400` allocator path
     - deleting dtor / `operator delete` now return storage through the same `0x452520`-style
       free-list path
-    - current source also mirrors the original backing-block-list vs free-list split, even though
-      the tracked-allocation counters and first-block sizing heuristic from `0x452400` are still a
-      narrower follow-up gap
+    - current source also mirrors the original tracked-allocation counter updates and first-block
+      sizing heuristic from `0x452400`
+    - one smaller allocator gap remains:
+      - source still uses a source-owned lazy-init bridge to reach the `0x4a27e0` init behavior
+        because the full original startup call tree is not yet reified on this seam
 - `matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp`
   and `messageconnection.cpp`
   - parser / consumer code now uses the recovered class layout directly
