@@ -1070,7 +1070,7 @@ static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const vo
 // anchor: launcher.exe:0x4490c0 type-3 first-fragment copy setup
 // Source-owned decomposition of the narrowed type-3 packet-copy path, which begins from the
 // first retained fragment returned by the `CParsedPacketWorkItem` traversal state.
-static const CLTTCPReadOperationFragmentScaffold* CMessageConnection_FirstRetainedFragmentScaffold(
+static const CLTTCPReadOperation* CMessageConnection_FirstRetainedFragmentScaffold(
     const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
     return (workItem && workItem->retainedFragmentCount0C != 0u)
         ? workItem->firstRetainedFragment10
@@ -1079,9 +1079,9 @@ static const CLTTCPReadOperationFragmentScaffold* CMessageConnection_FirstRetain
 
 // anchor: launcher.exe:0x4490c0 type-3 later-fragment copy loop
 // Source-owned decomposition of the later-fragment walk performed after the first copy span.
-static const CLTTCPReadOperationFragmentScaffold* CMessageConnection_NextRetainedFragmentScaffold(
+static const CLTTCPReadOperation* CMessageConnection_NextRetainedFragmentScaffold(
     const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
-    const CLTTCPReadOperationFragmentScaffold* fragment) {
+    const CLTTCPReadOperation* fragment) {
     if (!workItem || !fragment || workItem->retainedFragmentCount0C == 0u) {
         return nullptr;
     }
@@ -1180,15 +1180,15 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
         return true;
     }
 
-    const CLTTCPReadOperationFragmentScaffold* currentFragment =
+    const CLTTCPReadOperation* currentFragment =
         CMessageConnection_FirstRetainedFragmentScaffold(workItem);
     if (!currentFragment || !workItem->currentCursor24) {
         return false;
     }
 
     const uint8_t* fragmentBegin =
-        CLTTCPReadOperationFragment_PayloadBeginScaffold(currentFragment);
-    const uint8_t* fragmentEnd = CLTTCPReadOperationFragment_PayloadEndScaffold(currentFragment);
+        reinterpret_cast<const uint8_t*>(currentFragment + 1);
+    const uint8_t* fragmentEnd = fragmentBegin + currentFragment->byteCount08;
     const uint8_t* currentCursor = workItem->currentCursor24;
     if (currentCursor < fragmentBegin || currentCursor > fragmentEnd) {
         return false;
@@ -1218,7 +1218,7 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
             std::min<uint32_t>(remainingPacketBodyByteCount, currentFragment->byteCount08);
         if (!CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
                 outMessageRef,
-                CLTTCPReadOperationFragment_PayloadBeginScaffold(currentFragment),
+                reinterpret_cast<const uint8_t*>(currentFragment + 1),
                 copyByteCount)) {
             return false;
         }

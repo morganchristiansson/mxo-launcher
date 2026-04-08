@@ -36,7 +36,7 @@ void LTTCPEndpointKey::CopyTo(LTTCPEndpointKey* outEndpointKey) const {
 }
 
 // anchor: launcher.exe:0x42f820 / vtable 0x004b211c +0x00
-CRefCountedReadOperationBaseScaffold* CRefCountedReadOperationBaseScaffold::DeletingDtor(
+CRefCountedReadOperationBase* CRefCountedReadOperationBase::DeletingDtor(
     uint8_t deleteFlag) {
     if ((deleteFlag & 1u) != 0u) {
         std::free(this);
@@ -45,59 +45,59 @@ CRefCountedReadOperationBaseScaffold* CRefCountedReadOperationBaseScaffold::Dele
 }
 
 // anchor: launcher.exe:0x42f7e0 / vtable 0x004b211c +0x04
-void CRefCountedReadOperationBaseScaffold::AddRef() {
+void CRefCountedReadOperationBase::AddRef() {
     ++referenceCount04;
 }
 
 // anchor: launcher.exe:0x42f7f0 / vtable 0x004b211c +0x08
-void CRefCountedReadOperationBaseScaffold::Release() {
+void CRefCountedReadOperationBase::Release() {
     if (--referenceCount04 == 0) {
         DeleteIfNonNull();
     }
 }
 
 // anchor: launcher.exe:0x004199b0 / vtable 0x004b211c +0x0c
-void CRefCountedReadOperationBaseScaffold::DeleteIfNonNull() {
+void CRefCountedReadOperationBase::DeleteIfNonNull() {
     (void)DeletingDtor(1u);
 }
 
 // anchor: launcher.exe:0x42f800 / vtable 0x004b211c +0x10
-void CRefCountedReadOperationBaseScaffold::ResetRefCount() {
+void CRefCountedReadOperationBase::ResetRefCount() {
     referenceCount04 = 0;
 }
 
 // anchor: launcher.exe:0x42f810 / vtable 0x004b211c +0x14
-void CRefCountedReadOperationBaseScaffold::SetRefCountFromPtr(const long* value) {
+void CRefCountedReadOperationBase::SetRefCountFromPtr(const long* value) {
     referenceCount04 = *value;
 }
 
-CRefCountedReadOperationBaseScaffold::CRefCountedReadOperationBaseScaffold(
+CRefCountedReadOperationBase::CRefCountedReadOperationBase(
     long initialReferenceCount)
     : referenceCount04(initialReferenceCount) {}
 
-CLTTCPReadOperationFragmentScaffold::CLTTCPReadOperationFragmentScaffold()
-    : CRefCountedReadOperationBaseScaffold(0),
+CLTTCPReadOperation::CLTTCPReadOperation()
+    : CRefCountedReadOperationBase(0),
       byteCount08(0u) {}
 
 // anchor: launcher.exe:0x42fd50 / vtable 0x004b2300 +0x00
-CRefCountedReadOperationBaseScaffold* CLTTCPReadOperationFragmentScaffold::DeletingDtor(
+CRefCountedReadOperationBase* CLTTCPReadOperation::DeletingDtor(
     uint8_t deleteFlag) {
     const long referenceCountCopy = referenceCount04;
-    (void)new (static_cast<CRefCountedReadOperationBaseScaffold*>(this))
-        CRefCountedReadOperationBaseScaffold(referenceCountCopy);
+    (void)new (static_cast<CRefCountedReadOperationBase*>(this))
+        CRefCountedReadOperationBase(referenceCountCopy);
     if ((deleteFlag & 1u) != 0u) {
         std::free(this);
     }
-    return reinterpret_cast<CRefCountedReadOperationBaseScaffold*>(this);
+    return reinterpret_cast<CRefCountedReadOperationBase*>(this);
 }
 
 // anchor: launcher.exe:0x42f850 / vtable 0x004b2300 +0x04
-void CLTTCPReadOperationFragmentScaffold::AddRef() {
+void CLTTCPReadOperation::AddRef() {
     (void)InterlockedIncrement(reinterpret_cast<volatile LONG*>(&referenceCount04));
 }
 
 // anchor: launcher.exe:0x42f860 / vtable 0x004b2300 +0x08
-void CLTTCPReadOperationFragmentScaffold::Release() {
+void CLTTCPReadOperation::Release() {
     const LONG remaining =
         InterlockedDecrement(reinterpret_cast<volatile LONG*>(&referenceCount04));
     if (remaining == 0) {
@@ -106,56 +106,23 @@ void CLTTCPReadOperationFragmentScaffold::Release() {
 }
 
 // anchor: launcher.exe:0x42f880 / vtable 0x004b2300 +0x10
-void CLTTCPReadOperationFragmentScaffold::ResetRefCount() {
+void CLTTCPReadOperation::ResetRefCount() {
     (void)InterlockedExchange(reinterpret_cast<volatile LONG*>(&referenceCount04), 0);
 }
 
 // anchor: launcher.exe:0x42f890 / vtable 0x004b2300 +0x14
-void CLTTCPReadOperationFragmentScaffold::SetRefCountFromPtr(const long* value) {
+void CLTTCPReadOperation::SetRefCountFromPtr(const long* value) {
     (void)InterlockedExchange(
         reinterpret_cast<volatile LONG*>(&referenceCount04),
         static_cast<LONG>(*value));
 }
 
-// anchor: launcher.exe:0x42fe50 TCP receive-path `CLTTCPReadOperation` allocation/setup
-CLTTCPReadOperationFragmentScaffold* CLTTCPReadOperationFragmentScaffold::AllocateScaffold() {
-    constexpr size_t kAllocationSize =
-        sizeof(CLTTCPReadOperationFragmentScaffold) + kPayloadCapacity;
-    void* const storage = std::calloc(1, kAllocationSize);
-    return storage ? new (storage) CLTTCPReadOperationFragmentScaffold() : nullptr;
-}
-
 // anchor: launcher.exe:0x452350
-void CLTTCPReadOperationFragmentScaffold::SetByteCount(uint32_t byteCount) {
+void CLTTCPReadOperation::SetByteCount(uint32_t byteCount) {
     if (kPayloadCapacity < byteCount) {
         byteCount = kPayloadCapacity;
     }
     byteCount08 = byteCount;
-}
-
-uint8_t* CLTTCPReadOperationFragmentScaffold::PayloadBegin() {
-    return reinterpret_cast<uint8_t*>(this) + sizeof(CLTTCPReadOperationFragmentScaffold);
-}
-
-const uint8_t* CLTTCPReadOperationFragmentScaffold::PayloadBegin() const {
-    return reinterpret_cast<const uint8_t*>(this) + sizeof(CLTTCPReadOperationFragmentScaffold);
-}
-
-const uint8_t* CLTTCPReadOperationFragmentScaffold::PayloadEnd() const {
-    return PayloadBegin() + byteCount08;
-}
-
-uint32_t CLTTCPReadOperationFragmentScaffold::BytesRemainingFromCursor(const uint8_t* cursor) const {
-    if (!cursor) {
-        return 0u;
-    }
-
-    const uint8_t* const begin = PayloadBegin();
-    const uint8_t* const end = PayloadEnd();
-    if (cursor < begin || cursor > end) {
-        return 0u;
-    }
-    return static_cast<uint32_t>(end - cursor);
 }
 
 namespace {
@@ -183,21 +150,6 @@ static void EnsureBaseConnectionQueueContextVtableInitialized() {
         g_BaseConnectionQueueContextVtable[4] =
             reinterpret_cast<void*>(BaseConnectionQueueContext_OnOperationCompletedScaffold);
     }
-}
-
-// anchor: launcher.exe:0x42fe50 TCP receive-path `CLTTCPReadOperation` allocation/setup
-static CLTTCPReadOperationFragmentScaffold* AllocateReadOperationFragmentSourceScaffold() {
-    return CLTTCPReadOperationFragmentScaffold::AllocateScaffold();
-}
-
-// anchor: launcher.exe:0x452350
-static void ReadOperationFragmentSource_SetByteCountScaffold(
-    CLTTCPReadOperationFragmentScaffold* fragment,
-    uint32_t byteCount) {
-    if (!fragment) {
-        return;
-    }
-    fragment->SetByteCount(byteCount);
 }
 
 // UNANCHORED: source-owned endpoint formatting helper that mirrors the byte/port extraction shape
@@ -434,8 +386,11 @@ int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
         return -1;
     }
 
-    CLTTCPReadOperationFragmentScaffold* readOperationFragment =
-        AllocateReadOperationFragmentSourceScaffold();
+    constexpr size_t kReadOperationAllocationSize =
+        sizeof(CLTTCPReadOperation) + CLTTCPReadOperation::kPayloadCapacity;
+    void* const readOperationStorage = std::calloc(1, kReadOperationAllocationSize);
+    CLTTCPReadOperation* readOperationFragment =
+        readOperationStorage ? new (readOperationStorage) CLTTCPReadOperation() : nullptr;
     if (!readOperationFragment) {
         spdlog::warn(
             "CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold failed fragment allocation this={} remoteHost='{}'",
@@ -448,14 +403,14 @@ int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
     // Keep the same two worker-side fragment refs explicit here:
     // - one outer worker-owned ref immediately after allocation/setup
     // - one delivery-temp ref immediately before `OnReceive(fragment)`
-    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
+    readOperationFragment->AddRef();
     const int received = recv(
         static_cast<SOCKET>(socketHandle_),
-        reinterpret_cast<char*>(readOperationFragment->PayloadBegin()),
+        reinterpret_cast<char*>(readOperationFragment + 1),
         0x1000,
         0);
     if (received <= 0) {
-        CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
+        readOperationFragment->Release();
         if (received == 0) {
             if (outPeerClosed) {
                 *outPeerClosed = true;
@@ -470,12 +425,10 @@ int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
         return (wsaError == WSAEWOULDBLOCK) ? 0 : -1;
     }
 
-    ReadOperationFragmentSource_SetByteCountScaffold(
-        readOperationFragment,
-        static_cast<uint32_t>(received));
-    CLTTCPReadOperationFragment_AddRefScaffold(readOperationFragment);
+    readOperationFragment->SetByteCount(static_cast<uint32_t>(received));
+    readOperationFragment->AddRef();
     OnReceive(readOperationFragment);
-    CLTTCPReadOperationFragment_ReleaseScaffold(readOperationFragment);
+    readOperationFragment->Release();
     return received;
 }
 
@@ -571,7 +524,7 @@ uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, vo
 
 // anchor: launcher.exe:0x449fd0
 void CLTTCPConnection::OnClose(
-    CLTTCPReadOperationFragmentScaffold* readOperationFragment,
+    CLTTCPReadOperation* readOperationFragment,
     void* /*opaqueArg08*/,
     void* /*opaqueArg0c*/) {
     if (readOperationFragment) {
@@ -580,7 +533,7 @@ void CLTTCPConnection::OnClose(
 }
 
 // anchor: launcher.exe:0x449d40
-void CLTTCPConnection::OnReceive(CLTTCPReadOperationFragmentScaffold* readOperationFragment) {
+void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
     // Current best static read of `0x449d40`:
     // - the explicit arg is a typed, refcounted `CLTTCPReadOperation`-family buffer fragment
     // - the early fragment `+0x04` call is a no-arg AddRef / retain on that fragment only

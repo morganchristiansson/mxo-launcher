@@ -75,12 +75,12 @@ static_assert(sizeof(LTTCPEndpointKey) == 0x10, "endpoint key size mismatch");
 // Source lockstep note:
 // - this family is now modeled here as a real C++ class hierarchy instead of a manual struct plus
 //   hand-built vtable record
-// - the active source still exposes wrapper helpers because the parser / connection seam passes
-//   this family around by the recovered original shape
-class CRefCountedReadOperationBaseScaffold {
+// - the current pass also removes source-only payload/refcount wrapper helpers so parser and
+//   consumer code operate on the recovered class layout directly
+class CRefCountedReadOperationBase {
 public:
     // anchor: launcher.exe:0x42f820 / vtable 0x004b211c +0x00
-    virtual CRefCountedReadOperationBaseScaffold* DeletingDtor(uint8_t deleteFlag);
+    virtual CRefCountedReadOperationBase* DeletingDtor(uint8_t deleteFlag);
     // anchor: launcher.exe:0x42f7e0 / vtable 0x004b211c +0x04
     virtual void AddRef();
     // anchor: launcher.exe:0x42f7f0 / vtable 0x004b211c +0x08
@@ -94,17 +94,17 @@ public:
 
     long referenceCount04; // +0x04 plain dword in the non-interlocked base contract
 
-    explicit CRefCountedReadOperationBaseScaffold(long initialReferenceCount = 0);
+    explicit CRefCountedReadOperationBase(long initialReferenceCount = 0);
 };
 
-static_assert(sizeof(CRefCountedReadOperationBaseScaffold) == 0x08, "refcounted read-operation base size mismatch");
+static_assert(sizeof(CRefCountedReadOperationBase) == 0x08, "refcounted read-operation base size mismatch");
 
-class CLTTCPReadOperationFragmentScaffold final : public CRefCountedReadOperationBaseScaffold {
+class CLTTCPReadOperation final : public CRefCountedReadOperationBase {
 public:
     static constexpr uint32_t kPayloadCapacity = 0x1000u;
 
     // anchor: launcher.exe:0x42fd50 / vtable 0x004b2300 +0x00
-    CRefCountedReadOperationBaseScaffold* DeletingDtor(uint8_t deleteFlag) override;
+    CRefCountedReadOperationBase* DeletingDtor(uint8_t deleteFlag) override;
     // anchor: launcher.exe:0x42f850 / vtable 0x004b2300 +0x04
     void AddRef() override;
     // anchor: launcher.exe:0x42f860 / vtable 0x004b2300 +0x08
@@ -114,31 +114,26 @@ public:
     // anchor: launcher.exe:0x42f890 / vtable 0x004b2300 +0x14
     void SetRefCountFromPtr(const long* value) override;
 
-    static CLTTCPReadOperationFragmentScaffold* AllocateScaffold();
+    // Source-owned ctor that mirrors the worker receive-path field initialization for the concrete
+    // `CLTTCPReadOperation` leaf.
+    CLTTCPReadOperation();
 
     // anchor: launcher.exe:0x452350
     void SetByteCount(uint32_t byteCount);
-    uint8_t* PayloadBegin();
-    const uint8_t* PayloadBegin() const;
-    const uint8_t* PayloadEnd() const;
-    uint32_t BytesRemainingFromCursor(const uint8_t* cursor) const;
 
     uint32_t byteCount08; // +0x08
-
-private:
-    CLTTCPReadOperationFragmentScaffold();
 };
 
-static_assert(sizeof(CLTTCPReadOperationFragmentScaffold) == 0x0c, "read-operation fragment prefix size mismatch");
+static_assert(sizeof(CLTTCPReadOperation) == 0x0c, "read-operation fragment prefix size mismatch");
 
-struct CLTTCPReadOperationFragmentRefScaffold {
+struct CLTTCPReadOperationRefHandle {
     // anchor: launcher.exe:0x434fa0
     // Tiny retained-fragment handle helper used by parser state (`0x469bf0` / `0x4725c0`) and by
     // `CMessageConnection::OnOperationCompleted` stack locals.
-    CLTTCPReadOperationFragmentScaffold* retainedFragment00 = nullptr; // +0x00
+    CLTTCPReadOperation* retainedFragment00 = nullptr; // +0x00
 };
 
-static_assert(sizeof(CLTTCPReadOperationFragmentRefScaffold) == 0x04, "fragment ref handle size mismatch");
+static_assert(sizeof(CLTTCPReadOperationRefHandle) == 0x04, "fragment ref handle size mismatch");
 
 // Recovered `0x2c` parsed-packet work-item family built via
 // `CVariableLengthPrefixedTCPStreamParser_AllocatePacketBuffer -> CParsedPacketWorkItem_ctor`.
@@ -151,7 +146,7 @@ static_assert(sizeof(CLTTCPReadOperationFragmentRefScaffold) == 0x04, "fragment 
 // - `+0x04` = work type `3`
 // - `+0x08` = shared status/payload dword; parser-produced packets zero it
 // - utility child/helper objects directly touched on this path now also include:
-//   - `0x434fa0` = retained-fragment ref helper over a single `CLTTCPReadOperationFragment*`
+//   - `0x434fa0` = retained-fragment ref helper over a single `CLTTCPReadOperation*`
 //   - shared work-item root prefix `CLTThreadPerClientTCPEngine_WorkItemHeader`
 // - this same object family is used in two phases:
 //   - parser-owned assembly state while stream bytes are being accumulated
@@ -162,7 +157,7 @@ static_assert(sizeof(CLTTCPReadOperationFragmentRefScaffold) == 0x04, "fragment 
 struct CParsedPacketWorkItem_RetainedFragmentNodeScaffold {
     CParsedPacketWorkItem_RetainedFragmentNodeScaffold* next;   // +0x00
     CParsedPacketWorkItem_RetainedFragmentNodeScaffold* prev;   // +0x04
-    CLTTCPReadOperationFragmentScaffold* retainedFragment08;    // +0x08 retained fragment reference
+    CLTTCPReadOperation* retainedFragment08;    // +0x08 retained fragment reference
 };
 
 struct CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold {
@@ -177,7 +172,7 @@ struct CLTTCPConnection_ParsedPacketWorkItemScaffold {
     uint32_t workType; // +0x04 = 3
     uint32_t statusOrPayloadDword08; // +0x08 shared work-item-root status/payload dword; zero on parser-produced packets
     uint32_t retainedFragmentCount0C; // +0x0c retained fragment count (`AppendFragment` / `GetTailFragment`)
-    CLTTCPReadOperationFragmentScaffold* firstRetainedFragment10; // +0x10 first retained fragment
+    CLTTCPReadOperation* firstRetainedFragment10; // +0x10 first retained fragment
     CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold* retainedFragmentListOwner14; // +0x14 optional wrapper for additional retained fragments beyond `+0x10`
     uint8_t directFragmentTraversalPhase18; // +0x18 traversal flag used by `BeginFragmentTraversal` / `GetNextFragment`
     uint8_t unknown19_1b[3]; // +0x19..+0x1b
@@ -244,7 +239,7 @@ class CBaseConnection {
   virtual ~CBaseConnection() = default;
 
   // UNANCHORED: source-owned abstraction over the recovered receive entry surface.
-  virtual void OnReceive(CLTTCPReadOperationFragmentScaffold* readOperationFragment) = 0;
+  virtual void OnReceive(CLTTCPReadOperation* readOperationFragment) = 0;
   // UNANCHORED: source-owned abstraction over the recovered completion callback surface.
   virtual uint32_t OnOperationCompleted(void* workItem) = 0;
   // UNANCHORED: source-owned abstraction over the recovered send callback surface.
@@ -372,7 +367,7 @@ public:
     // Current recovered semantic effect is still only:
     // - if `readOperationFragment != nullptr`, call `readOperationFragment->+0x08()`
     void OnClose(
-        CLTTCPReadOperationFragmentScaffold* readOperationFragment,
+        CLTTCPReadOperation* readOperationFragment,
         void* opaqueArg08 = nullptr,
         void* opaqueArg0c = nullptr);
 
@@ -383,7 +378,7 @@ public:
     // parser-emitted completed packet work item as the exact `0x449d8a -> 0x436820` handoff
     // `(engine+0x10, completedPacketWorkItem, this, false)`, then branch through the original
     // endpoint-based terminal-error log split before releasing the outer fragment reference.
-    void OnReceive(CLTTCPReadOperationFragmentScaffold* readOperationFragment) override;
+    void OnReceive(CLTTCPReadOperation* readOperationFragment) override;
 
     // Recovered send-queue seam beneath slot `8` / `0x42fbd0`.
     // Current bounded source mirror keeps the active `0x448a00 -> vtable +0x20(...,1)` copied-byte

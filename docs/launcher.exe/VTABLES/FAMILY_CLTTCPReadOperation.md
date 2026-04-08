@@ -16,7 +16,7 @@ shared low-level refcounted base contract
 ## Utility helper tied to this family
 
 ```text
-0x434fa0  CLTTCPReadOperationFragmentRef_AssignRetained
+0x434fa0  CLTTCPReadOperationRefHandle_AssignRetained
 ```
 
 That helper is not a vtable family member itself.
@@ -86,7 +86,7 @@ Current source now models this family as an actual class hierarchy instead of a 
 plus manual vtable record:
 
 A newer fidelity pass also tightened the tiny retained-fragment handle seam recovered at
-`0x434fa0 = CLTTCPReadOperationFragmentRef_AssignRetained`:
+`0x434fa0 = CLTTCPReadOperationRefHandle_AssignRetained`:
 - parser field `+0x04` is no longer treated in source as just a naked fragment pointer slot
 - source now models it as a one-pointer retained-fragment handle helper that does:
   - Release old fragment
@@ -96,13 +96,16 @@ A newer fidelity pass also tightened the tiny retained-fragment handle seam reco
   raw-pointer shortcut from the active receive path
 
 - `matrixstaging/runtime/src/liblttcp/lttcpconnection.h/.cpp`
-  - `CRefCountedReadOperationBaseScaffold` mirrors the shared `0x004b211c` base contract
-  - `CLTTCPReadOperationFragmentScaffold` mirrors the live `0x004b2300` leaf and keeps the exact
-    12-byte prefix explicit (`sizeof(...) == 0x0c`)
-  - payload bytes are now represented as the variable-length tail beginning immediately after that
-    prefix rather than as a fake inline `bytes0C[1]` field with a hand-built vtable object
-- parser / connection call sites still use the same recovered helper seam, so this fidelity change
-  tightened the class modeling without widening the active receive-path behavior
+  - `CRefCountedReadOperationBase` mirrors the shared `0x004b211c` base contract
+  - `CLTTCPReadOperation` mirrors the live `0x004b2300` leaf and keeps the exact 12-byte prefix
+    explicit (`sizeof(...) == 0x0c`)
+  - payload bytes are represented directly as the variable-length tail beginning immediately after
+    that prefix, not as a fake inline field or wrapper-accessor layer
+- `matrixstaging/runtime/src/libltmessaging/variablelengthprefixedtcpstreamparser.cpp`
+  and `messageconnection.cpp`
+  - parser / consumer code now uses the recovered class layout directly
+  - source-only AddRef/Release/payload wrapper helpers over the read-operation family have been
+    removed from this seam
 
 ## Family boundary note
 

@@ -1,40 +1,19 @@
 #pragma once
 
+#include "../liblttcp/lttcpconnection.h"
+
 #include <cstdint>
 
 namespace mxo::liblttcp {
 
-class CLTTCPReadOperationFragmentScaffold;
-struct CLTTCPConnection_ParsedPacketWorkItemScaffold;
-
-// anchor: launcher.exe:0x42f850 / vtable 0x004b2300 +0x04
-void CLTTCPReadOperationFragment_AddRefScaffold(CLTTCPReadOperationFragmentScaffold* fragment);
-// anchor: launcher.exe:0x42f860 / vtable 0x004b2300 +0x08
-void CLTTCPReadOperationFragment_ReleaseScaffold(CLTTCPReadOperationFragmentScaffold* fragment);
-
-struct CLTTCPReadOperationFragmentRefHandleScaffold {
-    CLTTCPReadOperationFragmentScaffold* retainedFragment00 = nullptr;
-};
-
-// UNANCHORED: source-owned helpers over the recovered `CLTTCPReadOperation` fragment layout.
-uint8_t* CLTTCPReadOperationFragment_PayloadBeginScaffold(
-    CLTTCPReadOperationFragmentScaffold* fragment);
-const uint8_t* CLTTCPReadOperationFragment_PayloadBeginScaffold(
-    const CLTTCPReadOperationFragmentScaffold* fragment);
-const uint8_t* CLTTCPReadOperationFragment_PayloadEndScaffold(
-    const CLTTCPReadOperationFragmentScaffold* fragment);
-uint32_t CLTTCPReadOperationFragment_BytesRemainingFromCursorScaffold(
-    const CLTTCPReadOperationFragmentScaffold* fragment,
-    const uint8_t* cursor);
-
 // anchor: launcher.exe:0x4350c0
-CLTTCPReadOperationFragmentScaffold* CParsedPacketWorkItem_BeginFragmentTraversalScaffold(
+CLTTCPReadOperation* CParsedPacketWorkItem_BeginFragmentTraversalScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 // anchor: launcher.exe:0x435510
-CLTTCPReadOperationFragmentScaffold* CParsedPacketWorkItem_GetNextFragmentScaffold(
+CLTTCPReadOperation* CParsedPacketWorkItem_GetNextFragmentScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 // anchor: launcher.exe:0x4355c0
-CLTTCPReadOperationFragmentScaffold* CParsedPacketWorkItem_GetTailFragmentTempRefScaffold(
+CLTTCPReadOperation* CParsedPacketWorkItem_GetTailFragmentTempRefScaffold(
     const CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 // anchor: launcher.exe:0x434f80
 uint8_t* CParsedPacketWorkItem_GetCurrentCursorScaffold(
@@ -59,7 +38,7 @@ public:
 
     // anchor: launcher.exe:0x469bf0 / vtable 0x004baf88
     virtual uint32_t Parse(
-        CLTTCPReadOperationFragmentScaffold* readOperationFragment,
+        CLTTCPReadOperation* readOperationFragment,
         CLTTCPConnection_ParsedPacketWorkItemScaffold** outCompletedPacketWorkItem);
     // anchor: launcher.exe:0x4415c0 / vtable 0x004baf8c
     // Exact original name/role still unsettled; keep the row explicit without inventing behavior.
@@ -78,7 +57,7 @@ public:
     // - `+0x0c` = unread buffered byte count across retained fragments
     // - `+0x10` = byte-count state incremented by `0x472660`, zeroed by `0x4725c0`
     // - `+0x14` = current parser-owned `CParsedPacketWorkItem`
-    CLTTCPReadOperationFragmentRefHandleScaffold currentCursorFragmentRef04{};
+    CLTTCPReadOperationRefHandle currentCursorFragmentRef04{};
     uint8_t* currentCursor08 = nullptr;
     uint32_t unreadBufferedByteCount0C = 0u;
     uint32_t advancedBufferedByteCount10 = 0u;
