@@ -1109,7 +1109,6 @@ public:
     uint32_t AuthConnectCandidateCountScaffold() const;
     bool HasAuthConnectRetryCandidateRemainingScaffold() const;
 
-    void SetAuthCredentials(const char* username, const char* password);
     void SetAuthBootstrapConfig(
         uint32_t launcherVersion,
         uint32_t currentPublicKeyId,

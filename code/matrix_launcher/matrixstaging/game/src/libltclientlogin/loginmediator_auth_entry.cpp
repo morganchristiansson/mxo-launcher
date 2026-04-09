@@ -25,11 +25,6 @@ namespace {
 // Keep the early auth-entry split self-contained so loginmediator.cpp no longer needs the
 // auth-credential logging helper just for state1/connect-status bringup.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-static const char* MaskedAuthValue(const std::string& value) {
-    return value.empty() ? "<empty>" : "<provided>";
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void AssignOwnedSmallStringForAuthEntry(
     AuthBootstrapSelectedSource38Sketch& dest,
     const char* begin,
@@ -396,30 +391,6 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
         marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
         static_cast<unsigned>(result));
     return result;
-}
-
-// UNANCHORED: replacement-owned reset/config shim.
-// Keep this separate from the recovered password-submit API at `0x41ecd0`:
-// - launcher.exe feeds submitted username/password through `ProcessLoginRequest`
-// - this shim now only preserves diagnostic mirrors and resets transient auth/bootstrap state
-void CLTLoginMediator::SetAuthCredentials(const char* username, const char* password) {
-    authUsername_ = username ? username : "";
-    authPassword_ = password ? password : "";
-    authGetPublicKeyRequestSent_ = false;
-    authRequestSent_ = false;
-    authChallengeResponseSent_ = false;
-    lastAuthPublicKeyReply_ = mxo::auth::GetPublicKeyReply();
-    lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
-    lastAuthChallenge_ = mxo::auth::AuthChallenge();
-    lastAuthReply_ = mxo::auth::AuthReply();
-    postAuthMarginAutoBeginAttemptedScaffold_ = false;
-    ResetMarginBootstrapState();
-    authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
-
-    spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator auth reset/config shim updated username='{}' password={} (live submit path should still enter through 0x41ecd0 / ProcessLoginRequest)",
-        authUsername_.empty() ? "<empty>" : authUsername_.c_str(),
-        MaskedAuthValue(authPassword_));
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
