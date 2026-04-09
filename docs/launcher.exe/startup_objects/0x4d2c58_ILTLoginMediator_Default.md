@@ -13,6 +13,13 @@ So the current canonical name is:
 
 - **`ILTLoginMediator.Default` runtime interface pointer**
 
+Newer base-vtable clarification from the current destructor/raw-table pass:
+- `0x004af2b8` is now best read as the abstract base/interface behind this runtime slot
+- that table is almost entirely `purecall` across the exposed arg6 surface through `+0x18c`
+- concrete `0x004b01c8 = CLTLoginMediator` fills that same surface and adds owner-only `+0x190`
+- practical consequence: source naming `ILTLoginMediator` is now backed by a real static-RE base
+  shape, not just by the registration string
+
 Relevant recovered source-file anchors nearby in the same launcher/login area:
 - `\matrixstaging\game\src\libltclientlogin\loginmediator.cpp`
 - `\matrixstaging\game\src\libltclientlogin\loginstate.cpp`

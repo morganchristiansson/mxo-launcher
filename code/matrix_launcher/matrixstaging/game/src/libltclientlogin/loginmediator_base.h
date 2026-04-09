@@ -341,14 +341,18 @@ struct ProcessCreateCharacterInput120Sketch {
 // Important fidelity note:
 // - this header models the launcher-resolved `ILTLoginMediator.Default` surface consumed through
 //   the runtime pointer slot at `0x4d2c58`
-// - many slots align with the owner object documented under vtable `0x004b01c8`, but they should
-//   not be treated as a one-to-one synonym
+// - many slots align with the concrete owner object documented under vtable `0x004b01c8`, but they
+//   should not be treated as a one-to-one synonym
+// - newer destructor/raw-vtable RE now gives the abstraction itself a better static anchor too:
+//   `0x004af2b8` is a purecall-backed abstract base candidate immediately above
+//   `0x004b01c8 = CLTLoginMediator`, which strongly fits the source-side `ILTLoginMediator` role
 // - in particular, launcher startup `0x40a380` calls the resolved arg6 slot `+0x08`, while owner
 //   vtable `0x004b01c8 +0x08` is currently recovered as `0x41f510` reset/clear logic rather than a
 //   simple engine setter
 //
 // Canonical references:
 // - ../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md
+// - ../../../../docs/launcher.exe/VTABLES/0x004af2b8.md
 // - ../../../../docs/launcher.exe/VTABLES/0x004b01c8.md
 // =============================================================================
 
