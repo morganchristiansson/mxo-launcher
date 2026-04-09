@@ -371,9 +371,10 @@ Implication for the replacement source:
   - replacement source now preserves a distinct anchored `0x40b740 -> 0x40a380` call boundary in
     `CLauncher::InitInstance` through `CLauncher::InitializeThreadPerClientTCPEngine()`
   - current `0x40a380` body is still only partially faithful internally:
-    - the anchored method now owns the create/register boundary and raw `result < 1` success test
-    - but the concrete object build/register still routes through the replacement arg5 ABI-shell
-      helper instead of a direct recovered `malloc(0xb4) -> 0x431c30 -> mediator +0x08` body
+    - the anchored method now owns the create/store/register boundary and raw `result < 1` success
+      test directly
+    - but the concrete object allocation + ctor step still routes through the replacement arg5
+      ABI-shell helper instead of a fully direct recovered `malloc(0xb4) -> 0x431c30` body
   - current no-GUI host should not require `-user` / `-pwd` during the earlier
     `ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig` stage; interactive prompting, when
     needed, belongs later in the pre-client auth stage so that parse/config ownership stays closer

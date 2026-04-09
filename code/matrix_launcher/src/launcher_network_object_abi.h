@@ -10,10 +10,10 @@ class CLTThreadPerClientTCPEngine;
 // a `CLTThreadPerClientTCPEngine*`.
 mxo::liblttcp::CLTThreadPerClientTCPEngine* LauncherNetworkEngineFromAbiShell(void* ownerPtr);
 
-// UNANCHORED: launcher-owned replacement for the original 0x40a380 allocation/registration path.
-// Returns the raw arg6 slot-+0x08 registration result so the caller can preserve the original
-// `result < 1` success test from launcher.exe.
-int LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr);
+// UNANCHORED: launcher-owned replacement for the original 0x40a380 allocation + ctor path.
+// This returns the raw arg5 launcher object so `CLauncher::InitializeThreadPerClientTCPEngine()`
+// can preserve the original store-to-`0x4d6304` then call-arg6-`+0x08` ordering itself.
+void* LauncherCreateNetworkEngineAbiShell();
 
 // UNANCHORED: launcher-owned replacement for the original 0x40b389..0x40b404 release/clear path.
 void LauncherReleaseNetworkEngineAbiShell(void** launcherObjectPtr, void* mediatorPtr);

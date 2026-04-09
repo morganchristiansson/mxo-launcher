@@ -774,20 +774,6 @@ static LauncherObjectAbiShell* CreateLauncherNetworkEngineAbiShellLike40A380() {
     return object;
 }
 
-// UNANCHORED: replacement helper that mirrors the mediator +0x08 handoff used after launcher.exe:0x40a380.
-static int RegisterLauncherNetworkEngineWithMediator(void* mediatorPtr, void* launcherObjectPtr) {
-    if (!mediatorPtr) return 1;
-
-    void** vtable = *(void***)mediatorPtr;
-    if (!vtable || !vtable[2]) {
-        return 1;
-    }
-
-    typedef int (__thiscall *RegisterEngineFn)(void*, void*);
-    RegisterEngineFn fn = (RegisterEngineFn)vtable[2];
-    return fn(mediatorPtr, launcherObjectPtr);
-}
-
 // UNANCHORED: replacement helper that mirrors the mediator +0x0c clear handoff used during
 // launcher.exe cleanup after the arg5 release.
 static void ClearLauncherNetworkEngineFromMediator(void* mediatorPtr) {
@@ -828,33 +814,18 @@ void LauncherPumpNetworkEngineAbiShell(void* launcherObjectPtr, bool nonBlocking
     }
 }
 
-// UNANCHORED: public replacement-launcher entrypoint that installs the arg5 ABI shell.
-int LauncherInstallNetworkEngineAbiShell(void** outLauncherObjectPtr, void* mediatorPtr) {
-    if (outLauncherObjectPtr && *outLauncherObjectPtr) {
-        LauncherReleaseNetworkEngineAbiShell(outLauncherObjectPtr, mediatorPtr);
-    }
-    if (outLauncherObjectPtr) {
-        *outLauncherObjectPtr = NULL;
-    }
-
+// UNANCHORED: public replacement-launcher entrypoint for the original 0x40a380 allocation + ctor
+// step only. Keep the later store-to-`0x4d6304` and arg6 wrapper `+0x08` call in
+// `CLauncher::InitializeThreadPerClientTCPEngine()` so the anchored launcher method owns that
+// sequence directly.
+void* LauncherCreateNetworkEngineAbiShell() {
     LogLauncherObjectPrimaryDispatchConfigOnce();
 
     LauncherObjectAbiShell* object = CreateLauncherNetworkEngineAbiShellLike40A380();
-    if (outLauncherObjectPtr) {
-        *outLauncherObjectPtr = object;
-    }
     if (object) {
         LauncherLogNetworkEngineAbiShellDispatchState(object, "post-create");
     }
-
-    const int registerResult = RegisterLauncherNetworkEngineWithMediator(mediatorPtr, object);
-    if (registerResult >= 1) {
-        spdlog::warn(
-            "launcher arg5 ABI shell mediator registration returned {} for {}",
-            registerResult,
-            fmt::ptr(object));
-    }
-    return registerResult;
+    return object;
 }
 
 // UNANCHORED: public replacement-launcher entrypoint that releases the arg5 ABI shell.

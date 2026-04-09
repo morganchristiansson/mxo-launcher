@@ -323,7 +323,7 @@ CLTLoginMediator::CLTLoginMediator()
       marginRouteState_{},
       marginAddressList3c_{},
       authBootstrapSource38_{},
-      authBootstrapChild680_(std::make_unique<AuthBootstrap680Child>()),
+      authBootstrapChild680_(nullptr),
       sessionCallbackHelper65c_(nullptr),
       state8SelectionContextSnapshotState_{},
       selectionContext0ecCopy_{},
@@ -373,6 +373,13 @@ CLTLoginMediator::~CLTLoginMediator() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+AuthBootstrap680Child& CLTLoginMediator::EnsureAuthBootstrapChild680Scaffold() {
+    if (!authBootstrapChild680_) {
+        authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
+    }
+    return *authBootstrapChild680_;
+}
+
 void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     if (authConnection_) {
         authConnection_->SetOwnerContext(nullptr);
@@ -415,6 +422,7 @@ void ILTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* ne
     SetNetworkEngine(networkEngineOverride);
 
     if (auto* mediator = dynamic_cast<CLTLoginMediator*>(this)) {
+        mediator->EnsureAuthBootstrapChild680Scaffold();
         mediator->EnsureBuiltinScaffoldStatesRegistered();
         CLTLoginMediator::RegisterActiveStateSourceScaffold(mediator);
         if (mediator->CurrentState() == nullptr) {
@@ -458,16 +466,13 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 // - owner vtable `0x004b01c8 +0x08 / 0x41f510` now reads as reset/clear-owned-runtime-state logic
 // - keep this wrapper slot distinct from the owner vtable numbering, but mirror the highest-
 //   confidence reset effects here instead of only nulling the engine pointer
-// Remaining known gap kept explicit:
-// - original `0x41f510` frees owner `+0x680` outright, while current source reconstructs a fresh
-//   `AuthBootstrap680Child` immediately so later source paths do not dereference a null child
 // UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
 // nopatch launcher-version setter instead.
 void CLTLoginMediator::ClearEngine() {
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
     sessionCallbackHelper65c_ = nullptr;
-    authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
+    authBootstrapChild680_.reset();
     spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold");
 }
 // +0x10

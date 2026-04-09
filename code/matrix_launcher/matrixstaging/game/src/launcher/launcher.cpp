@@ -233,15 +233,30 @@ bool CLauncher::InitializeThreadPerClientTCPEngine() const {
     // - current Ghidra still decompiles the body as if `this` were unused, but keeping the source
     //   as a `CLauncher` method preserves the original `InitInstance` ownership/call boundary
     if (!g_pILTLoginMediatorDefault) {
-        spdlog::error("launcher.exe:0x40a380 requires ILTLoginMediator.Default before arg5 build/register");
+        spdlog::error("launcher.exe:0x40a380 requires ILTLoginMediator.Default before arg5 create/store/register");
         return false;
     }
 
-    const int registerResult =
-        LauncherInstallNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
+    // anchor: launcher.exe:0x40a3c0..0x40a3e9
+    // - allocate/construct arg5 launcher object
+    // - store it to global `0x4d6304`
+    // anchor: launcher.exe:0x40a3e9..0x40a406
+    // - call resolved arg6 wrapper slot `+0x08` with that freshly built object
+    // - preserve the original `result < 1` success test
+    g_pLauncherObject6304 = LauncherCreateNetworkEngineAbiShell();
+
+    void** vtable = *reinterpret_cast<void***>(g_pILTLoginMediatorDefault);
+    typedef int (__thiscall *RegisterEngineFn)(void*, void*);
+    RegisterEngineFn registerEngine = (vtable && vtable[2])
+        ? reinterpret_cast<RegisterEngineFn>(vtable[2])
+        : nullptr;
+    const int registerResult = registerEngine
+        ? registerEngine(g_pILTLoginMediatorDefault, g_pLauncherObject6304)
+        : 1;
+
     const bool operationSucceeded = (registerResult < 1);
     spdlog::info(
-        "DIAGNOSTIC: 0x40a380-style arg5 build/register mediatorResult={} object={} success={}",
+        "DIAGNOSTIC: 0x40a380-style arg5 create/store/register mediatorResult={} object={} success={}",
         registerResult,
         fmt::ptr(g_pLauncherObject6304),
         operationSucceeded ? 1 : 0);

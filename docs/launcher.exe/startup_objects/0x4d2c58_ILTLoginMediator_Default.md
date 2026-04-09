@@ -102,7 +102,7 @@ It needs the original launcher-side acquisition / registration behavior.
 ## Current implementation milestone (2026-03-18)
 
 Focused early-path result from current replacement-launcher work:
-- the default `make run` path now auto-enables the current binder-backed `ILTLoginMediator.Default` scaffold together with the current `0x40a380`-style arg5 build/register step instead of requiring manual diagnostic env flags just to reach `InitClientDLL`
+- the default `make run` path now auto-enables the current binder-backed `ILTLoginMediator.Default` scaffold together with the current `0x40a380`-style arg5 create/store/register step instead of requiring manual diagnostic env flags just to reach `InitClientDLL`
 - this change is intentionally narrow: it promotes the original launcher control-flow obligation
   - build `0x4d6304`
   - hand it into `ILTLoginMediator.Default` via `+0x08`
@@ -154,7 +154,8 @@ Important current clarification:
 - practical source consequence: launcher startup `0x40a380` should own the arg5 -> arg6 handoff, while later arbitrary arg5 method traffic should not lazily recreate mediator bind/reset side effects
 - current source now mirrors that startup handoff by routing resolved wrapper `+0x08` through a
   narrow `ILTLoginMediator::Initialize(networkEngineOverride)` helper that installs the engine,
-  active mediator source, initial state0 helper, and auth-side address-list refresh in one place
+  active mediator source, initial state0 helper, auth-side address-list refresh, and owner `+0x680`
+  child allocation in one place
 
 ### Client startup receives it as InitClientDLL arg6
 At `0x40a587`:

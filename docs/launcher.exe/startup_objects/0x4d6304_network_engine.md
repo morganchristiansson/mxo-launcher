@@ -73,6 +73,8 @@ Current startup-ownership clarification:
 - current source now routes the resolved arg6 wrapper handoff through a narrow
   `ILTLoginMediator::Initialize(networkEngineOverride)` helper so the startup-owned effects stay
   concentrated on this path rather than leaking back into lazy arg5 accessors
+- that startup-owned helper now also aligns the source-owned owner `+0x680` child lifecycle a bit
+  more closely with `0x41b160/0x41f510`: allocate on initialize, drop on clear/reset
 
 ## Constructor evidence
 
@@ -1604,13 +1606,15 @@ Newer source-ownership cleanup on the launcher entry side:
   - current source now exposes them through `src/launcher_network_object_abi.h` as launcher-owned ABI helpers instead
 - `matrixstaging/game/src/launcher/launcher.cpp` now preserves a dedicated anchored
   `CLauncher::InitializeThreadPerClientTCPEngine()` call for the `0x40b740 -> 0x40a380` boundary,
-  and that method currently routes the concrete arg5 object build/register through the dedicated
-  launcher ABI helper
-- the install helper itself is now slightly closer to original `0x40a380` ordering too:
+  and that method now owns the explicit launcher-side sequence more directly:
   - build raw `0xb4` ABI shell
-  - store/pass it to the launcher
-  - immediately hand it to arg6 / mediator registration
-  - and let the liblttcp sidecar bind lazily from that mediator handoff or the first later arg5 use
+  - store it in `g_pLauncherObject6304`
+  - call resolved arg6 wrapper slot `+0x08`
+  - preserve the raw `result < 1` success test
+- the remaining launcher ABI helper on this path is now narrowed to the allocation + ctor step only,
+  instead of a broader synthetic install helper that also hid the store/register sequence
+- the liblttcp sidecar may still bind later from that startup handoff or the first later arg5 use,
+  but arbitrary arg5 accessors no longer own mediator install/reset side effects
 - a follow-up cleanup pass also tightened the teardown side toward original `0x40b389..0x40b404`:
   - launcher-owned shutdown now explicitly releases arg5 through primary slot `0` with flag `1`
   - clears the launcher-side arg5 pointer
