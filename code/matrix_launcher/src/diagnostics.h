@@ -36,12 +36,12 @@ void DiagnosticConfigureLoginControllerNetwork(
     bool ignoreHostsFileForMargin,
     const char* marginRouteHostPrefix,
     const char* exactMarginHostName);
-bool DiagnosticInstallR3d9D3DCompileHook(HMODULE r3d9Module);
-bool DiagnosticInstallR3d9Direct3DCreate9Hook(HMODULE r3d9Module);
-void DiagnosticLogLastD3DDeviceActivity();
 void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
+
+// Stub for removed D3D diagnostics
+void DiagnosticLogLastD3DDeviceActivity();
 
 // Diagnostic-only runtime detour for client.dll loading/status text updates.
 // Default: enabled, with the recovered replacement text mapping applied at the real client text

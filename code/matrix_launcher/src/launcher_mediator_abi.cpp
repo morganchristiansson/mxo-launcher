@@ -173,9 +173,7 @@ struct LateMediatorAbiCallLogState {
     bool valid = false;
 };
 
-static std::set<std::string> g_GetProfileRootName38SeenSites;
-static std::set<std::string> g_GetDefaultSelectionIndex3cSeenSites;
-static std::set<std::string> g_GetSelectionDescriptor40SeenSites;
+
 
 static const char* DescribeKnownMediatorObserver(void* observer) {
     switch (reinterpret_cast<uintptr_t>(observer)) {
@@ -392,35 +390,14 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 // vtable: ILTLoginMediator.Default slot +0x38
 static const char* __thiscall Mediator_GetProfileRootName38(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    const char* const result = mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
-    const char* const normalizedResult = NonEmptyOrPlaceholder(result);
-    const std::string siteKey = std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" + normalizedResult;
-    if (g_GetProfileRootName38SeenSites.insert(siteKey).second) {
-        spdlog::info(
-            "MediatorStub::GetProfileRootName38 caller={} [{}] result='{}'",
-            fmt::ptr(returnAddress),
-            DescribeLateMediatorAbiCaller(returnAddress),
-            normalizedResult);
-    }
-    return result;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
 }
 
 // anchor: client.dll fallback-selection path asks arg6 +0x3c for the default selection index when given 0xff
 // vtable: ILTLoginMediator.Default slot +0x3c
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
     (void)self;
-    void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
-    const std::string siteKey = std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" + std::to_string(result);
-    if (g_GetDefaultSelectionIndex3cSeenSites.insert(siteKey).second) {
-        spdlog::info(
-            "MediatorStub::GetDefaultSelectionIndex3c caller={} [{}] result=0x{:08x}",
-            fmt::ptr(returnAddress),
-            DescribeLateMediatorAbiCaller(returnAddress),
-            static_cast<unsigned>(result));
-    }
-    return result;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
 }
 
 // UNANCHORED: C helper behind the recovered +0x40 ABI wrapper.
@@ -429,21 +406,9 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     uint32_t selectionIndex,
     void* returnAddress) {
     (void)self;
-    void* const result = mxo::ltlogin::ILTLoginMediator::Default->GetArg6SelectionDescriptorObject40(
+    (void)returnAddress;
+    return mxo::ltlogin::ILTLoginMediator::Default->GetArg6SelectionDescriptorObject40(
         selectionIndex);
-    const std::string siteKey =
-        std::to_string(reinterpret_cast<uintptr_t>(returnAddress)) + "|" +
-        std::to_string(selectionIndex) + "|" +
-        std::to_string(reinterpret_cast<uintptr_t>(result));
-    if (g_GetSelectionDescriptor40SeenSites.insert(siteKey).second) {
-        spdlog::info(
-            "MediatorStub::GetSelectionDescriptor40 caller={} [{}] selectionIndex=0x{:08x} result={}",
-            fmt::ptr(returnAddress),
-            DescribeLateMediatorAbiCaller(returnAddress),
-            static_cast<unsigned>(selectionIndex),
-            fmt::ptr(result));
-    }
-    return result;
 }
 
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request

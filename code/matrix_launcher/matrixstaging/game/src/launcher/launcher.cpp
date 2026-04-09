@@ -121,18 +121,7 @@ bool PreloadDependencies() {
         spdlog::info("preload {:12s} : {} ({})", dlls[i], h ? "OK" : "FAIL", fmt::ptr(h));
         if (!h) return false;
         if (std::strcmp(dlls[i], "r3d9.dll") == 0) {
-            const bool installedD3DCompileHook = DiagnosticInstallR3d9D3DCompileHook(h);
-            spdlog::info(
-                "preload {:12s} : DiagnosticInstallR3d9D3DCompileHook={} ({})",
-                dlls[i],
-                installedD3DCompileHook ? 1 : 0,
-                fmt::ptr(h));
-            const bool installedDirect3DCreate9Hook = DiagnosticInstallR3d9Direct3DCreate9Hook(h);
-            spdlog::info(
-                "preload {:12s} : DiagnosticInstallR3d9Direct3DCreate9Hook={} ({})",
-                dlls[i],
-                installedDirect3DCreate9Hook ? 1 : 0,
-                fmt::ptr(h));
+            // D3D hooks removed
         }
     }
     return true;
