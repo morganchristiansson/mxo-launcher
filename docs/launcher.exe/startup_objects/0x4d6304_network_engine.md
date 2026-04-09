@@ -1087,6 +1087,7 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
     - current decompile also shows the connect-success branch covers both:
       - `connect(...) == 0`
       - `connect(...) == SOCKET_ERROR` with `WSAGetLastError() == 0x2733` / `WSAEWOULDBLOCK`
+    - immediate non-`WSAEWOULDBLOCK` failure instead closes the socket, queues a type-1 close work item, then queues a type-2 status work item with payload `1`
   - successful connect then creates/inserts a `WorkerThread` payload into arg5 `+0x8c` and marks it with `[worker+0x34] = 1`
   - the later connect-status item should therefore be treated as an **async completion from the
     worker/connect loop**, not as a mediator-side immediate success alias
@@ -1339,6 +1340,7 @@ That newer read also narrows the real engine-call signatures more than the earli
   - it compares/copies the requested endpoint into `self+0x24`
   - then calls engine `+0x18` with **`self`**
   - so current best original read is that arg5 slot `6` / `Connect` is importantly a **connection-object-based** entrypoint
+  - source lockstep update: `matrixstaging/runtime/src/liblttcp/lttcpconnection.cpp` now calls `engine_->Connect(this)` directly instead of detouring through a synthetic `ConnectConnectionScaffold(...)` adapter
 - `0x449ca0` similarly forwards **`self`** into engine `+0x1c`
   - so arg5 slot `7` / `Close` is likewise connection-object-based on this path
 - `0x449d20` forwards packet/buffer args together with **`self`** into engine `+0x20`

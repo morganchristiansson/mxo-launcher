@@ -407,14 +407,6 @@ public:
     // anchor: launcher.exe:0x4316a0
     uint32_t CleanupConnection(void* contextKey) override;
 
-    // UNANCHORED: source-side helper used by the current connection scaffolding.
-    uint32_t ConnectResolvedEndpointScaffold(
-        uint16_t portHostOrder,
-        uint32_t ipv4NetworkOrder,
-        void* contextKey,
-        void* unusedArg3 = nullptr);
-    // UNANCHORED: source-side connection-object bridge into ConnectResolvedEndpointScaffold.
-    uint32_t ConnectConnectionScaffold(CLTTCPConnection* connection);
     // UNANCHORED: source-side connection-object bridge into the recovered Close slot family.
     uint32_t CloseConnectionScaffold(CLTTCPConnection* connection, bool graceful);
     // UNANCHORED: source-side connection-object bridge into the recovered SendBuffer slot family.

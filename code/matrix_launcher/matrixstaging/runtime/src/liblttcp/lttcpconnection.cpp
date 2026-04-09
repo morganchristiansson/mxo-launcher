@@ -721,7 +721,9 @@ uint32_t CLTTCPConnection::Connect(const LTTCPEndpointKey& endpoint) {
         endpoint.CopyTo(&remoteEndpoint_);
     }
 
-    return engine_ ? engine_->ConnectConnectionScaffold(this) : 0u;
+    // `0x449cd0` forwards the direct connection object into engine slot `+0x18`; it does not
+    // rebuild a synthetic `(port, ip, context)` helper call.
+    return engine_ ? engine_->Connect(this) : 0u;
 }
 
 // anchor: launcher.exe:0x449d20
