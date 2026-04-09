@@ -233,7 +233,7 @@ const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) con
         return nullptr;
     }
     const RouteHostStringTripleState& slot = selectionRouteState684_.routeHostStringTriples194_[slotIndex];
-    return slot.text.empty() ? nullptr : slot.text.c_str();
+    return slot.BeginOrNull();
 }
 
 // anchor: launcher.exe:0x41b2a0

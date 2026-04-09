@@ -294,14 +294,14 @@ static void* LogLiveSelectionCfgCorpusGetter(
 CLTLoginMediator::CLTLoginMediatorSelectionRouteState::CLTLoginMediatorSelectionRouteState() {
     slotRecordCount00_ = 0;
     for (size_t i = 0; i < routeHostStringTriples194_.size(); ++i) {
-        routeHostStringTriples194_[i].text.clear();
+        routeHostStringTriples194_[i].Clear();
     }
     for (size_t i = 0; i < slotRecordTable04_.size(); ++i) {
         slotRecordTable04_[i] = {};
         slotRecordValid04_[i] = false;
     }
+    currentSlotOrSelectionIndex644_ = 0xffu;
     persistedSelectionContext64c_ = {};
-    persistedSelectionContext64c_.slotOrSelectionIndexCc8 = 0xffu;
 }
 
 // anchor: launcher.exe:0x41d270 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState
@@ -310,18 +310,17 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::ResetSelectionRouteS
     for (size_t i = 0; i < activeCount; ++i) {
         slotRecordTable04_[i] = {};
         slotRecordValid04_[i] = false;
-        routeHostStringTriples194_[i].text.clear();
+        routeHostStringTriples194_[i].Clear();
     }
     slotRecordCount00_ = 0;
-    persistedSelectionContext64c_.slotOrSelectionIndexCc8 = 0xffu;
+    currentSlotOrSelectionIndex644_ = 0xffu;
 }
 
 // anchor: launcher.exe:0x41dd00 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState
 void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRouteState() {
     ResetSelectionRouteState();
     for (size_t i = 0; i < routeHostStringTriples194_.size(); ++i) {
-        routeHostStringTriples194_[i].text.clear();
-        routeHostStringTriples194_[i].text.shrink_to_fit();
+        routeHostStringTriples194_[i].ReleaseStorage();
         slotRecordTable04_[i] = {};
         slotRecordValid04_[i] = false;
     }
@@ -1851,6 +1850,16 @@ void CLTLoginMediator::ResetSelectionContext0ecMirror() {
 
 // +0xe8
 // anchor: launcher.exe:0x41ec00
+// Original body is narrower than the current replacement-side bookkeeping:
+// - gate on current helper/state code `> 2`
+// - require selection-route count `!= 0` and input `< 100`
+// - decrement selection-route slot count
+// - release/remove owner `+0x688[index]`
+// - shift later `+0x688` pointers and `+0x818` string-triples down
+// - clear the final pointer/string tail
+// Current source still keeps extra replacement-side mirrors like `lastAuthReply_` and
+// `PersistCharactersIniFromRecoveredAuthStateScaffold()` coherent around that narrower original
+// mutation.
 uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) {
     const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
     if (stateCode <= 2u || selectedSlotRecordIndex >= 100u ||
@@ -1897,9 +1906,12 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
     }
     selectionRouteState684_.slotRecordTable04_.back() = {};
     selectionRouteState684_.slotRecordValid04_.back() = false;
-    selectionRouteState684_.routeHostStringTriples194_.back().text.clear();
+    selectionRouteState684_.routeHostStringTriples194_.back().Clear();
 
     if (CurrentCharacterRouteIndexCc8Scaffold() >= selectionRouteState684_.slotRecordCount00_) {
+        // Replacement-side mirror maintenance only:
+        // the bounded original `0x41ec00` body does not show a direct `+0xcc8` rewrite here, but
+        // current source keeps the exposed current-slot mirrors in-range after removal.
         SetCurrentCharacterRouteIndexCc8Scaffold(0u);
     }
 
@@ -2045,7 +2057,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
 
     spdlog::info(
         "CLTLoginMediator::PersistSelectionContextForState8 mirrored owner-advanced state3(wait)->state8 selection snapshot slot=0x{:02x} blockCd0_0=0x{:08x} blockD70_3=0x{:08x} oldState={} currentState={} state8EntryResult=0x{:08x}",
-        selectionRouteState684_.persistedSelectionContext64c_.slotOrSelectionIndexCc8,
+        selectionRouteState684_.CurrentSlotOrSelectionIndex644(),
         selectionRouteState684_.persistedSelectionContext64c_.blockCd0[0],
         selectionRouteState684_.persistedSelectionContext64c_.blockD70[3],
         oldState ? oldState->DebugName() : "<null>",
@@ -3803,11 +3815,31 @@ void CLTLoginMediator::SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIn
         return;
     }
 
+    const uint8_t rawStatus = static_cast<uint8_t>(world.status & 0xffu);
+    const uint8_t rawType = static_cast<uint8_t>(world.type & 0xffu);
+    const uint8_t normalizedStatus = (rawStatus != 0u && rawStatus < 6u) ? rawStatus : 0u;
+    const uint8_t normalizedType = (rawType != 0u && rawType < 4u) ? rawType : 0u;
+
+    if (normalizedStatus != rawStatus) {
+        spdlog::info(
+            CLTLoginState_AuthenticatePending::kLogInvalidWorldStatus,
+            world.worldName.c_str(),
+            static_cast<unsigned>(world.worldId),
+            static_cast<unsigned>(rawStatus));
+    }
+    if (normalizedType != rawType) {
+        spdlog::info(
+            CLTLoginState_AuthenticatePending::kLogInvalidWorldType,
+            world.worldName.c_str(),
+            static_cast<unsigned>(world.worldId),
+            static_cast<unsigned>(rawType));
+    }
+
     WorldDescriptorState004b533c& descriptor = worldDescriptorsD84_[worldIndex];
     descriptor.worldId01 = world.worldId;
     descriptor.inlineNamePlus03 = world.worldName;
-    descriptor.status17 = static_cast<uint8_t>(world.status & 0xffu);
-    descriptor.type18 = static_cast<uint8_t>(world.type & 0xffu);
+    descriptor.status17 = normalizedStatus;
+    descriptor.type18 = normalizedType;
     descriptor.serverVersion19 = world.clientVersion;
     descriptor.serverLanguage1d = static_cast<uint8_t>(world.unknown4 & 0xffu);
     descriptor.privateFlag1e = static_cast<uint8_t>((world.unknown4 >> 8) & 0xffu);
@@ -3823,11 +3855,21 @@ void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
         return;
     }
 
+    const uint8_t rawStatus = static_cast<uint8_t>(character.status & 0xffu);
+    const uint8_t normalizedStatus = (rawStatus <= 6u) ? rawStatus : 7u;
+    if (normalizedStatus != rawStatus) {
+        spdlog::info(
+            CLTLoginState_AuthenticatePending::kLogInvalidCharacterStatus,
+            character.handle.text.c_str(),
+            static_cast<unsigned long long>(character.characterId),
+            static_cast<unsigned>(rawStatus));
+    }
+
     SlotRecordState004b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[characterIndex];
     slotRecord.heapString14 = character.handle.text;
     slotRecord.globalCharacterIdLow03 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
     slotRecord.globalCharacterIdHigh07 = static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
-    slotRecord.status0b = static_cast<uint8_t>(character.status & 0xffu);
+    slotRecord.status0b = normalizedStatus;
     slotRecord.worldId0c = character.worldId;
     selectionRouteState684_.slotRecordValid04_[characterIndex] = true;
 }
@@ -3910,7 +3952,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         const SlotRecordState004b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
         const RouteHostStringTripleState& route = selectionRouteState684_.routeHostStringTriples194_[i];
         const char* characterName = slotRecord.heapString14.empty() ? "" : slotRecord.heapString14.c_str();
-        const char* routeText = route.text.empty() ? "" : route.text.c_str();
+        const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";
         std::fprintf(file, "Character%u:=%s,%s\n", static_cast<unsigned>(i), characterName, routeText);
         ++persistedCount;
     }

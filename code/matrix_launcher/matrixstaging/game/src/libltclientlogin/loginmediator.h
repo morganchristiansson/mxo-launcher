@@ -463,16 +463,100 @@ public:
     struct RouteHostStringTripleState {
         // Source-owned mirror of owner `+0x818`.
         // Faithful current read from `0x43f300 / 0x4401a0 / 0x41b260`:
+        // - original storage is the common 3-dword string-triple family (`begin/current/capacity`)
         // - `+0x818` stores the copied world-descriptor inline-name string (`payload + 0x03`)
         // - wrapper-facing arg6 `+0xe0` returns that same begin pointer when the slot is live
         // - state-7/8/0x0d margin-route consumers then reuse that copied descriptor text as their
         //   route/world string input instead of a replacement-only lowercase host-prefix variant
         // - `+0x1470` remains a separate later late-entry string-triple vector
-        std::string text;
+        std::string owned;
+        const char* begin = nullptr;
+        const char* current = nullptr;
+        const char* capacity = nullptr;
+
+        RouteHostStringTripleState() { SyncFromOwned(); }
+
+        RouteHostStringTripleState(const RouteHostStringTripleState& other)
+            : owned(other.owned) {
+            SyncFromOwned();
+        }
+
+        RouteHostStringTripleState& operator=(const RouteHostStringTripleState& other) {
+            if (this != &other) {
+                owned = other.owned;
+                SyncFromOwned();
+            }
+            return *this;
+        }
+
+        RouteHostStringTripleState(RouteHostStringTripleState&& other) noexcept
+            : owned(std::move(other.owned)) {
+            SyncFromOwned();
+            other.SyncFromOwned();
+        }
+
+        RouteHostStringTripleState& operator=(RouteHostStringTripleState&& other) noexcept {
+            if (this != &other) {
+                owned = std::move(other.owned);
+                SyncFromOwned();
+                other.SyncFromOwned();
+            }
+            return *this;
+        }
+
+        void Assign(const char* value) {
+            owned = value ? value : "";
+            SyncFromOwned();
+        }
+
+        void Assign(const std::string& value) {
+            owned = value;
+            SyncFromOwned();
+        }
+
+        void Clear() {
+            if (!owned.empty()) {
+                owned.clear();
+            }
+            SyncFromOwned();
+        }
+
+        void ReleaseStorage() {
+            owned.clear();
+            owned.shrink_to_fit();
+            SyncFromOwned();
+        }
+
+        const char* BeginOrNull() const {
+            return (begin != nullptr && begin != current) ? begin : nullptr;
+        }
+
+    private:
+        void SyncFromOwned() {
+            begin = owned.c_str();
+            current = begin + owned.size();
+            capacity = current;
+        }
     };
 
     class CLTLoginMediatorSelectionRouteState {
     public:
+        struct PersistedSelectionContext64c {
+            // owner `+0x64c .. +0x6fb` inside `CLTLoginMediatorSelectionRouteState_0x41dba0`
+            // which corresponds to mediator owner `+0xcd0 .. +0xd7f`
+            std::array<uint32_t, 4> blockCd0{};
+            std::array<uint32_t, 4> blockCe0{};
+            std::array<uint32_t, 4> blockCf0{};
+            std::array<uint32_t, 4> blockD00{};
+            std::array<uint32_t, 4> blockD10{};
+            std::array<uint32_t, 4> blockD20{};
+            std::array<uint32_t, 4> blockD30{};
+            std::array<uint32_t, 4> blockD40{};
+            std::array<uint32_t, 4> blockD50{};
+            std::array<uint32_t, 4> blockD60{};
+            std::array<uint32_t, 4> blockD70{};
+        };
+
         // anchor: launcher.exe:0x41dba0 / embedded owner subobject ctor
         CLTLoginMediatorSelectionRouteState();
 
@@ -486,11 +570,11 @@ public:
         SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex);
 
         uint8_t CurrentSlotOrSelectionIndex644() const {
-            return persistedSelectionContext64c_.slotOrSelectionIndexCc8;
+            return currentSlotOrSelectionIndex644_;
         }
 
         void SetCurrentSlotOrSelectionIndex644(uint8_t slotIndex) {
-            persistedSelectionContext64c_.slotOrSelectionIndexCc8 = slotIndex;
+            currentSlotOrSelectionIndex644_ = slotIndex;
         }
 
         // Source-owned mirrors of the original embedded helper layout:
@@ -503,7 +587,8 @@ public:
         std::array<SlotRecordState004b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
         std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid04_{};
         std::array<RouteHostStringTripleState, kRecoveredWorldSlotCapacity> routeHostStringTriples194_{};
-        State8SelectionContextSnapshotState persistedSelectionContext64c_{};
+        uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
+        PersistedSelectionContext64c persistedSelectionContext64c_{};
     };
 
     struct WorldDescriptorState004b533c {
@@ -1289,7 +1374,8 @@ public:
     // Current Ghidra class name is `CLTLoginMediatorSelectionRouteState_0x41dba0`, and the
     // recovered role is tighter now:
     // this is the mediator-owned selection/slot/route state island behind owner `+0x40/+0x44`
-    // and the persisted state3(wait)->state8 snapshot at `+0xcd0..+0xd7f`.
+    // with current slot byte at `+0xcc8` and the persisted state3(wait)->state8 snapshot body at
+    // `+0xcd0..+0xd7f`.
     // Current best read of its three methods:
     // - `0x41dba0` ctor: initializes slot-count / slot-table / route-string entries and sets the
     //   shared current-slot byte to `0xff`
@@ -1299,7 +1385,7 @@ public:
     //   entries
     // Source ownership note:
     // - original keeps this as one embedded helper spanning count + `+0x688` slot table + `+0x818`
-    //   route strings + `+0xcc8/+0xcd0..+0xd7f` selection state
+    //   route strings + current-slot byte `+0xcc8` + snapshot body `+0xcd0..+0xd7f`
     // - replacement now models that ownership island as the nested
     //   `CLTLoginMediatorSelectionRouteState` class and keeps the anchored method boundaries there
     void ResetSelectionRouteState684Scaffold();
@@ -1423,11 +1509,11 @@ public:
     // =============================================================================
 
     // State-3(wait) -> state-8 owner-side selection/config snapshot block (`0x41c1f0`):
-    uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return selectionRouteState684_.persistedSelectionContext64c_.slotOrSelectionIndexCc8; }
+    uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return selectionRouteState684_.CurrentSlotOrSelectionIndex644(); }
     // Source-owned bridge over original owner byte `+0xcc8`.
     // Fidelity tightening from `0x41f300`:
     // - owner vtable `+0x44` directly reads the embedded selection-route helper byte
-    // - current source now treats `selectionRouteState684_.persistedSelectionContext64c_.slotOrSelectionIndexCc8`
+    // - current source now treats `selectionRouteState684_.currentSlotOrSelectionIndex644_`
     //   as the canonical mirror of that owner byte and keeps the later post-auth fields synced
     //   through `SetCurrentCharacterRouteIndexCc8Scaffold`
     uint8_t CurrentCharacterRouteIndexCc8Scaffold() const;
