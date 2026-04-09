@@ -1607,8 +1607,11 @@ Current tightened worker-loop read after the latest `0x42fe50 / 0x42f970 / 0x42f
 - connection-side send/close state is also tighter now:
   - `0x431ff0` writes the direct worker pointer back to `[connection+0x08]`
   - `0x44a9f0` seeds connection byte `+0x38 = 1`
-  - `0x42fbd0 -> 0x44ad80` pushes copied send buffers through the connection-owned queue rooted at
-    `+0x3c`, clears `+0x38`, and signals the worker wakeup socket
+  - `0x42fbd0 -> 0x44ad80 = CLTTCPConnection::QueueSendBuffer` pushes copied send buffers through
+    the connection-owned queue rooted at `+0x3c`, clears `+0x38`, and signals the worker wakeup
+    socket
+    - sibling helper `0x44ac90 = CLTTCPConnection::QueueSendBufferWithEndpoint` is the explicit
+      endpoint-taking variant reached from slot `9` / `0x42fd10`
     - active-state guard there is exactly connection state `1` or `2`
     - outside those states the original path does not silently return; it emits the string-backed
       `Send failed! ... not connected/connecting ...` warning using endpoint bytes from
