@@ -56,40 +56,6 @@ static bool U32x4BlockHasAnyNonZero(const std::array<uint32_t, 4>& block) {
     return block[0] != 0u || block[1] != 0u || block[2] != 0u || block[3] != 0u;
 }
 
-static void AppendOwnedSectionBytesU16(void*& buffer, uint16_t& length, const uint8_t* src, uint16_t appendLen) {
-    if (!src || appendLen == 0u) {
-        return;
-    }
-
-    const size_t oldLength = length;
-    const size_t newLength = oldLength + appendLen;
-    void* newBuffer = buffer ? std::realloc(buffer, newLength) : std::malloc(newLength);
-    if (!newBuffer) {
-        return;
-    }
-
-    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, src, appendLen);
-    buffer = newBuffer;
-    length = static_cast<uint16_t>(newLength & 0xffffu);
-}
-
-static void AppendOwnedSectionBytesU32(void*& buffer, uint32_t& length, const uint8_t* src, uint16_t appendLen) {
-    if (!src || appendLen == 0u) {
-        return;
-    }
-
-    const size_t oldLength = length;
-    const size_t newLength = oldLength + appendLen;
-    void* newBuffer = buffer ? std::realloc(buffer, newLength) : std::malloc(newLength);
-    if (!newBuffer) {
-        return;
-    }
-
-    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, src, appendLen);
-    buffer = newBuffer;
-    length = static_cast<uint32_t>(newLength);
-}
-
 static void ResetOwnedSectionBytes(void*& buffer, uint16_t& length, uint8_t& flag) {
     if (buffer) {
         std::free(buffer);
@@ -568,11 +534,18 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
                     loadCharacterReplyEnvelope.sectionByteCount > 0x44u ? (loadCharacterReplyEnvelope.sectionData + 0x44u) : nullptr,
                     loadCharacterReplyEnvelope.sectionByteCount > 0x44u ? loadCharacterReplyEnvelope.sectionByteCount - 0x44u : 0u);
                 if (loadCharacterReplyEnvelope.sectionByteCount > 0x485u && ownerState.state8Section0OverflowBuffer13f0 == nullptr) {
-                    AppendOwnedSectionBytesU16(
-                        ownerState.state8Section0OverflowBuffer13f0,
-                        ownerState.state8Section0OverflowLength13f4,
-                        loadCharacterReplyEnvelope.sectionData + 0x485u,
-                        static_cast<uint16_t>(loadCharacterReplyEnvelope.sectionByteCount - 0x485u));
+                    const uint16_t overflowAppendLen =
+                        static_cast<uint16_t>(loadCharacterReplyEnvelope.sectionByteCount - 0x485u);
+                    const size_t newLength = overflowAppendLen;
+                    void* newBuffer = std::malloc(newLength);
+                    if (newBuffer != nullptr) {
+                        std::memcpy(
+                            newBuffer,
+                            loadCharacterReplyEnvelope.sectionData + 0x485u,
+                            overflowAppendLen);
+                        ownerState.state8Section0OverflowBuffer13f0 = newBuffer;
+                        ownerState.state8Section0OverflowLength13f4 = overflowAppendLen;
+                    }
                 }
                 persistence.section0OverflowBuffer4d4 = ownerState.state8Section0OverflowBuffer13f0;
                 persistence.section0OverflowLength4d8 = ownerState.state8Section0OverflowLength13f4;
@@ -591,63 +564,162 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             }
             break;
         case 1u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength13fc;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer13f8
+                    ? std::realloc(ownerState.allocatedBuffer13f8, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer13f8 = newBuffer;
+                    ownerState.allocatedBufferLength13fc = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.flag13fe = 1u;
             persistence.section01Buffer4dc = ownerState.allocatedBuffer13f8;
             persistence.section01Length4e0 = ownerState.allocatedBufferLength13fc;
             persistence.section01PresentFlag4e2 = 1u;
             break;
         case 2u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength1404;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1400
+                    ? std::realloc(ownerState.allocatedBuffer1400, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1400 = newBuffer;
+                    ownerState.allocatedBufferLength1404 = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.flag1406 = 1u;
             persistence.section02Buffer4e4 = ownerState.allocatedBuffer1400;
             persistence.section02Length4e8 = ownerState.allocatedBufferLength1404;
             persistence.section02PresentFlag4ea = 1u;
             break;
         case 3u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength141c;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1418
+                    ? std::realloc(ownerState.allocatedBuffer1418, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1418 = newBuffer;
+                    ownerState.allocatedBufferLength141c = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.allocatedBufferFlag141e = 1u;
             persistence.section03Buffer4fc = ownerState.allocatedBuffer1418;
             persistence.section03Length500 = ownerState.allocatedBufferLength141c;
             persistence.section03PresentFlag502 = 1u;
             break;
         case 4u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength1424;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1420
+                    ? std::realloc(ownerState.allocatedBuffer1420, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1420 = newBuffer;
+                    ownerState.allocatedBufferLength1424 = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.allocatedBufferFlag1426 = 1u;
             persistence.section04Buffer504 = ownerState.allocatedBuffer1420;
             persistence.section04Length508 = ownerState.allocatedBufferLength1424;
             persistence.section04PresentFlag50a = 1u;
             break;
         case 5u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength142c;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1428
+                    ? std::realloc(ownerState.allocatedBuffer1428, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1428 = newBuffer;
+                    ownerState.allocatedBufferLength142c = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.allocatedBufferFlag142e = 1u;
             persistence.section05Buffer50c = ownerState.allocatedBuffer1428;
             persistence.section05Length510 = ownerState.allocatedBufferLength142c;
             persistence.section05PresentFlag512 = 1u;
             break;
         case 6u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength140c;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1408
+                    ? std::realloc(ownerState.allocatedBuffer1408, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1408 = newBuffer;
+                    ownerState.allocatedBufferLength140c = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.allocatedBufferFlag140e = 1u;
             persistence.section06Buffer4ec = ownerState.allocatedBuffer1408;
             persistence.section06Length4f0 = ownerState.allocatedBufferLength140c;
             persistence.section06PresentFlag4f2 = 1u;
             break;
         case 7u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength1414;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1410
+                    ? std::realloc(ownerState.allocatedBuffer1410, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1410 = newBuffer;
+                    ownerState.allocatedBufferLength1414 = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.flag1416 = 1u;
             persistence.section07Buffer4f4 = ownerState.allocatedBuffer1410;
             persistence.section07Length4f8 = ownerState.allocatedBufferLength1414;
             persistence.section07PresentFlag4fa = 1u;
             break;
         case 8u:
-            AppendOwnedSectionBytesU32(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength1444;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1440
+                    ? std::realloc(ownerState.allocatedBuffer1440, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1440 = newBuffer;
+                    ownerState.allocatedBufferLength1444 = static_cast<uint32_t>(newLength);
+                }
+            }
             ownerState.flag1448 = 1u;
             persistence.section08Buffer524 = ownerState.allocatedBuffer1440;
             persistence.section08Length528 = ownerState.allocatedBufferLength1444;
             persistence.section08PresentFlag52c = 1u;
             break;
         case 9u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength1450;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer144c
+                    ? std::realloc(ownerState.allocatedBuffer144c, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer144c = newBuffer;
+                    ownerState.allocatedBufferLength1450 = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.flag1452 = 1u;
             persistence.section09Buffer530 = ownerState.allocatedBuffer144c;
             persistence.section09Length534 = ownerState.allocatedBufferLength1450;
@@ -707,14 +779,36 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
                 static_cast<unsigned>(ownerState.state8Section11String1460.size()));
             break;
         case 12u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength1434;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1430
+                    ? std::realloc(ownerState.allocatedBuffer1430, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1430 = newBuffer;
+                    ownerState.allocatedBufferLength1434 = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.flag1436 = 1u;
             persistence.section0cBuffer514 = ownerState.allocatedBuffer1430;
             persistence.section0cLength518 = ownerState.allocatedBufferLength1434;
             persistence.section0cPresentFlag51a = 1u;
             break;
         case 13u:
-            AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount != 0u) {
+                const size_t oldLength = ownerState.allocatedBufferLength143c;
+                const size_t newLength = oldLength + loadCharacterReplyEnvelope.sectionByteCount;
+                void* newBuffer = ownerState.allocatedBuffer1438
+                    ? std::realloc(ownerState.allocatedBuffer1438, newLength)
+                    : std::malloc(newLength);
+                if (newBuffer != nullptr) {
+                    std::memcpy(static_cast<uint8_t*>(newBuffer) + oldLength, loadCharacterReplyEnvelope.sectionData, loadCharacterReplyEnvelope.sectionByteCount);
+                    ownerState.allocatedBuffer1438 = newBuffer;
+                    ownerState.allocatedBufferLength143c = static_cast<uint16_t>(newLength & 0xffffu);
+                }
+            }
             ownerState.flag143e = 1u;
             persistence.section0dBuffer51c = ownerState.allocatedBuffer1438;
             persistence.section0dLength520 = ownerState.allocatedBufferLength143c;
