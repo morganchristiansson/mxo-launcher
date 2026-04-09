@@ -66,17 +66,6 @@ static spdlog::logger* LoggerForQueueLabel(const char* label) {
     return spdlog::default_logger_raw();
 }
 
-static void* ResolveQueuedConnectionContextForProducerAblation(CLTTCPConnection* connection) {
-    // Runtime-stability rollback note:
-    // - static RE still says the original producer shape is queued `context=this`
-    // - but commit `ab28b26` proved that our current C++ class/vtable surface is not yet stable
-    //   enough to survive that direct queued-context path without intermittent corruption/crashes
-    // - keep using the explicit queue-context bridge on the active source path until the remaining
-    //   layout/ABI gaps are recovered; consumer/cleanup code still accepts direct connection inputs
-    //   as a compatibility/future-fidelity path
-    return connection ? connection->QueueContextScaffold() : nullptr;
-}
-
 struct CLTThreadPerClientTCPEngine_QueuePair {
     uint32_t value0;
     uint32_t value1;
@@ -593,19 +582,6 @@ static void EraseEngineBackings(CLTThreadPerClientTCPEngine* self) {
     g_CLTThreadPerClientTCPEngineLauncherAbiAttachments.erase(self);
     g_CLTThreadPerClientTCPEngineEndpointPayloadBackings.erase(self);
     g_CLTThreadPerClientTCPEngineContextPayloadBackings.erase(self);
-}
-
-// UNANCHORED: source-owned helper for the current queue-context unwrapping seam.
-// Current narrowed read:
-// - when the queued context is the bridge object, worker-tree and slot-12 paths need the owning
-//   connection object key instead
-static void* ResolveEngineContextKeyScaffold(void* contextKey) {
-    return CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
-}
-
-// UNANCHORED: source-owned helper for the current queue-context bridge lookup seams.
-static CBaseConnection* ResolveEngineQueueContextOwnerScaffold(void* contextKey) {
-    return CBaseConnection_FromQueueContextScaffold(contextKey);
 }
 
 static const char* EngineWorkTypeName(uint32_t workType) {
@@ -1804,58 +1780,74 @@ static void QueueWorkItem_Release(void* workItem) {
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
 // Current best consumer anchor is context->+0x10(workItem) in 0x436d31..0x436ee7.
-static void QueueContext_OnOperationCompleted(void* context, void* workItem) {
-    if (!context) {
+// Active source may dequeue either the direct connection object or the explicit queue-dispatch ABI
+// adapter used when raw client.dll consumers are still on the path.
+static void QueuedConnection_OnOperationCompleted(
+    void* queuedContext,
+    CBaseConnection* queuedConnection,
+    void* workItem) {
+    if (queuedConnection) {
+        (void)queuedConnection->OnOperationCompleted(workItem);
         return;
     }
 
-    // Queue-context stability note:
-    // - original `0x436d31..0x436ee7` dispatches through the queued object's own vtable slot `+0x10`
-    //   (`vtable[4]`), not through a source-level `CBaseConnection*` cast
-    // - that matters for the currently rolled-back `CBaseConnection_QueueContextScaffold` bridge,
-    //   because the bridge object's slot `+0x10` already forwards into the owning connection
-    // - it also keeps future/latent direct-context producers like the accept-thread family from
-    //   being reinterpreted as `CBaseConnection`-derived objects
-    void** vtable = *reinterpret_cast<void***>(context);
+    if (!queuedContext) {
+        return;
+    }
+
+    void** vtable = *reinterpret_cast<void***>(queuedContext);
     if (!vtable || !vtable[4]) {
         return;
     }
 
     typedef uint32_t (__thiscall *OnOperationCompletedFn)(void*, void*);
     OnOperationCompletedFn fn = reinterpret_cast<OnOperationCompletedFn>(vtable[4]);
-    (void)fn(context, workItem);
+    (void)fn(queuedContext, workItem);
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
-// Current best consumer anchor is the conditional context->+0x04 release after type-1 work.
-// Only the explicit source-owned queue-context bridge participates in that compatibility release.
-static void QueueContext_Release(void* context) {
-    CBaseConnection_QueueContextScaffold* queueContext =
-        static_cast<CBaseConnection_QueueContextScaffold*>(context);
-    if (!queueContext || CBaseConnection_FromQueueContextScaffold(queueContext) == nullptr) {
-        return;
+// Current best consumer anchor is the `(char)context[1]` test in 0x436d31..0x436ee7`.
+static bool QueuedConnection_ShouldAutoReleaseAfterType1(
+    void* queuedContext,
+    const CBaseConnection* queuedConnection) {
+    if (CBaseConnection_QueueContextScaffold* queueContext =
+            static_cast<CBaseConnection_QueueContextScaffold*>(queuedContext);
+        queueContext != nullptr &&
+        CBaseConnection_FromQueueContextScaffold(queuedContext) != nullptr) {
+        return queueContext->autoReleaseFlag != 0u;
     }
-
-    void** vtable = *reinterpret_cast<void***>(queueContext);
-    if (!vtable || !vtable[1]) {
-        return;
-    }
-
-    typedef uint32_t (__thiscall *ReleaseFn)(void*);
-    ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
-    (void)fn(queueContext);
+    return queuedConnection != nullptr && queuedConnection->AutoReleaseFlag04() != 0u;
 }
 
 // UNANCHORED internal helper for the current source-side consumer scaffold.
-// Current best consumer anchor is the `(char)context[1]` test in 0x436d31..0x436ee7.
-// The direct connection object path now reaches the queue consumer directly, so only the explicit
-// queue-context bridge keeps a source-owned `autoReleaseFlag` here.
-static bool QueueContext_ShouldAutoReleaseAfterType1(void* context) {
-    CBaseConnection_QueueContextScaffold* queueContext =
-        static_cast<CBaseConnection_QueueContextScaffold*>(context);
-    return queueContext != nullptr &&
-        CBaseConnection_FromQueueContextScaffold(context) != nullptr &&
-        queueContext->autoReleaseFlag != 0u;
+// Adapter contexts still expose a source-owned release bridge at slot `+0x04`; direct connection
+// objects keep the recovered base `+0x04` flag modeled but do not yet have a recovered release
+// target on an active path.
+static void QueuedConnection_ReleaseAfterType1(
+    void* queuedContext,
+    CBaseConnection* queuedConnection) {
+    if (CBaseConnection_QueueContextScaffold* queueContext =
+            static_cast<CBaseConnection_QueueContextScaffold*>(queuedContext);
+        queueContext != nullptr &&
+        CBaseConnection_FromQueueContextScaffold(queuedContext) != nullptr) {
+        void** vtable = *reinterpret_cast<void***>(queueContext);
+        if (!vtable || !vtable[1]) {
+            return;
+        }
+
+        typedef uint32_t (__thiscall *ReleaseFn)(void*);
+        ReleaseFn fn = reinterpret_cast<ReleaseFn>(vtable[1]);
+        (void)fn(queueContext);
+        return;
+    }
+
+    if (!queuedConnection || queuedConnection->AutoReleaseFlag04() == 0u) {
+        return;
+    }
+
+    spdlog::warn(
+        "QueuedConnection_ReleaseAfterType1 encountered unimplemented direct-connection auto-release queuedConnection={}",
+        fmt::ptr(queuedConnection));
 }
 
 // Keep the implementation intentionally conservative.
@@ -1941,8 +1933,10 @@ CLTThreadPerClientTCPEngine::CLTThreadPerClientTCPEngine()
     //   discrete engine-keyed maps instead of a synthetic per-engine side-state record
     // - active auth/margin worker flow now stays on the direct connection object and its direct
     //   mediator owner pointer at `+0xa4`, not a mediator-owned bridge context
-    // - queued callback context is still the connection-owned queue-context bridge for runtime
-    //   stability until the remaining direct-`context=this` ABI/layout gaps are closed
+    // - queued completed-operation identity is still the direct connection object in launcher.exe,
+    //   but the active replacement may wrap that object in a tiny queue-dispatch ABI adapter before
+    //   it crosses into raw client.dll queue consumers compiled against the original MSVC vtable
+    //   layout
     // - keep recovered payload families (`+0x08`, `+0x80/+0x84`, `+0x8c/+0x90`) in dedicated
     //   source backings keyed by `this`, not as pretend hidden object fields
     ownedQueueLockHelper60_.vtable = nullptr;
@@ -2310,9 +2304,8 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
     CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
     if (!connection) {
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine::Connect couldn't resolve connection context={} normalizedContext={}",
-            fmt::ptr(contextKey),
-            fmt::ptr(ResolveEngineContextKeyScaffold(contextKey)));
+            "CLTThreadPerClientTCPEngine::Connect couldn't resolve connection context={}",
+            fmt::ptr(contextKey));
         return 0u;
     }
     return connection->EnsureConnected();
@@ -2369,9 +2362,8 @@ uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
     CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
     if (!connection) {
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine::Close couldn't resolve existing connection context={} normalizedContext={}",
-            fmt::ptr(contextKey),
-            fmt::ptr(ResolveEngineContextKeyScaffold(contextKey)));
+            "CLTThreadPerClientTCPEngine::Close couldn't resolve existing connection context={}",
+            fmt::ptr(contextKey));
         return 0u;
     }
     return CloseConnectionScaffold(static_cast<CLTTCPConnection*>(connection), graceful);
@@ -2415,9 +2407,8 @@ uint32_t CLTThreadPerClientTCPEngine::SendBuffer(void* contextKey, const void* b
     CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
     if (!connection) {
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine::SendBuffer couldn't resolve existing connection context={} normalizedContext={} byteCount={}",
+            "CLTThreadPerClientTCPEngine::SendBuffer couldn't resolve existing connection context={} byteCount={}",
             fmt::ptr(contextKey),
-            fmt::ptr(ResolveEngineContextKeyScaffold(contextKey)),
             byteCount);
         return 0u;
     }
@@ -2461,13 +2452,9 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     // Current bounded fidelity correction:
     // - original queue consumers dequeue a real connection-family object as `context` before
     //   calling arg5 slot 12 / CleanupConnection
-    // - current source intentionally keeps the `CBaseConnection_QueueContextScaffold` bridge on
-    //   the active type-1/type-2/type-3 producer path after the `ab28b26` runtime regression
-    // - but cleanup still accepts direct connection inputs too because static RE says those are
-    //   the original launcher.exe queue contexts and future fidelity work may restore them
-    // - slot-12-style worker lookup/teardown therefore normalizes bridge inputs back to the
-    //   owning connection object instead of searching worker/message tables with the bridge
-    //   pointer itself
+    // - active source accepts both that direct connection identity and the explicit queue-dispatch
+    //   ABI adapter still needed on client-facing paths, then searches worker/message tables by the
+    //   unwrapped owning connection object
     // - original `0x4316a0` also acquires arg5 helper `+0x98`; after the current ownership move,
     //   that lock behavior now lives here on the target class side and the shell wrapper only
     //   forwards the primary slot call
@@ -2477,19 +2464,10 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     // - this keeps new auth-connect worker creation from blocking on the same lock during retry
     (void)EnterCleanupLockHelper();
 
-    CBaseConnection* queuedConnectionOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
     void* cleanupContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
     bool touchedConnectionState = false;
     uint32_t result = 0u;
     std::unique_ptr<CLTThreadPerClientTCPEngine_WorkerThread> workerPayload;
-
-    if (CLTTCPConnection* queuedTcpConnection =
-            dynamic_cast<CLTTCPConnection*>(queuedConnectionOwner)) {
-        queuedTcpConnection->SetState(LTTCPEngineConnectionState::kClosed);
-        queuedTcpConnection->SetSocketHandle(kInvalidSocketHandle);
-        queuedTcpConnection->SetWorkerThreadScaffold(nullptr);
-        touchedConnectionState = true;
-    }
 
     if (CMessageConnection* connection = FindMessageConnection(cleanupContextKey)) {
         connection->SetState(LTTCPEngineConnectionState::kClosed);
@@ -2510,10 +2488,9 @@ uint32_t CLTThreadPerClientTCPEngine::CleanupConnection(void* contextKey) {
     } else {
         if (!touchedConnectionState) {
             spdlog::debug(
-                "CLTThreadPerClientTCPEngine::CleanupConnection couldn't find socket/context key={} normalizedKey={} owner={}",
+                "CLTThreadPerClientTCPEngine::CleanupConnection couldn't find socket/context key={} normalizedKey={}",
                 fmt::ptr(contextKey),
-                fmt::ptr(cleanupContextKey),
-                fmt::ptr(queuedConnectionOwner));
+                fmt::ptr(cleanupContextKey));
         }
         result = touchedConnectionState ? kResultSuccess : 0u;
     }
@@ -2836,7 +2813,7 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
         return false;
     }
 
-    void* queuedContext = ResolveQueuedConnectionContextForProducerAblation(connection);
+    void* queuedContext = connection ? connection->QueueContextScaffold() : nullptr;
     const bool queued = EnqueueCompletedOperationScaffold(
         workItem,
         queuedContext,
@@ -2862,29 +2839,29 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
     //   (`0x436fc0 -> 0x436b10` queue thread or client arg5 helper `+0x60`) drain later
     // - the earlier source-owned immediate drain let worker/connect threads re-enter margin/auth
     //   completion logic synchronously, which is a stronger replacement-only timing change than the
-    //   already-rolled-back direct-`context=this` producer ABI tweak
+    //   now-restored direct-`context=this` producer shape
     // - keep type-1/type-2 completion ordering on the real queue-consumer path instead of
     //   short-circuiting it on the producer thread
     return true;
 }
 
-// UNANCHORED: connection-owned bridge for the recovered `0x449d8a -> 0x436820` handoff.
+// UNANCHORED: connection-owned helper for the recovered `0x449d8a -> 0x436820` handoff.
 void CLTThreadPerClientTCPEngine::EnqueueCompletedOperationFromConnectionScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
     CLTTCPConnection* connection,
     const char* label) {
     // Current best original read for this receive path:
     // - `CLTTCPConnection::OnReceive` always calls `0x436820(engine+0x10, workItem, self, false)`
-    // - launcher.exe queues the direct connection object there, but current source intentionally
-    //   routes through the connection-owned queue-context bridge after the `ab28b26` regression
-    // - queue selection is therefore still fixed to queue0C here
+    // - queue selection is therefore fixed to queue0C here
     // - current parser read does not support an intentional `Parse(...) == 0` / `workItem == NULL`
     //   emit on this path; null work items belong to later lifecycle/shutdown producers instead
     // - original caller does not test a success result or reclaim `workItem`; ownership is already
     //   transferred to the queue/consumer boundary when this helper is entered
+    // - active replacement still routes the direct connection object through its queue-dispatch ABI
+    //   adapter so raw client.dll consumers do not misinterpret the MinGW virtual table layout
     (void)EnqueueCompletedOperationScaffold(
         workItem,
-        ResolveQueuedConnectionContextForProducerAblation(connection),
+        connection ? connection->QueueContextScaffold() : nullptr,
         /*useQueue34=*/false,
         label,
         /*queueLockAlreadyHeld=*/false);
@@ -3043,17 +3020,20 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(
 
         const uint32_t workType = QueueWorkItem_GetType(workItem);
         const bool isType1 = (workType == kWorkTypeClose);
-        const bool shouldAutoReleaseContext =
-            context && isType1 && QueueContext_ShouldAutoReleaseAfterType1(context);
 
+        CBaseConnection* queuedBaseConnection = nullptr;
         CLTTCPConnection* queuedConnection = nullptr;
         if (context) {
             if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
+                queuedBaseConnection = completionTarget;
                 queuedConnection = dynamic_cast<CLTTCPConnection*>(completionTarget);
             } else if (CMessageConnection* directConnection = FindMessageConnection(context)) {
+                queuedBaseConnection = directConnection;
                 queuedConnection = dynamic_cast<CLTTCPConnection*>(directConnection);
             }
         }
+        const bool shouldAutoReleaseContext =
+            isType1 && QueuedConnection_ShouldAutoReleaseAfterType1(context, queuedBaseConnection);
         const bool detectedSameWorkerThreadCloseSelfDispatch =
             isType1 && queuedConnection != nullptr && queuedConnection->WorkerThreadScaffold() != nullptr &&
             queuedConnection->WorkerThreadScaffold()->IsCurrentThread();
@@ -3080,10 +3060,10 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(
             // - keep the normal original order everywhere else, but on this one self-dispatch seam
             //   let the callback run before worker teardown
             if (context) {
-                QueueContext_OnOperationCompleted(context, workItem);
+                QueuedConnection_OnOperationCompleted(context, queuedBaseConnection, workItem);
             }
             if (shouldAutoReleaseContext) {
-                QueueContext_Release(context);
+                QueuedConnection_ReleaseAfterType1(context, queuedBaseConnection);
             }
             QueueWorkItem_Release(workItem);
             if (context) {
@@ -3097,11 +3077,11 @@ void CLTThreadPerClientTCPEngine::RunCompletedOperationQueue(
         }
 
         if (context) {
-            QueueContext_OnOperationCompleted(context, workItem);
+            QueuedConnection_OnOperationCompleted(context, queuedBaseConnection, workItem);
         }
 
         if (shouldAutoReleaseContext) {
-            QueueContext_Release(context);
+            QueuedConnection_ReleaseAfterType1(context, queuedBaseConnection);
         }
         QueueWorkItem_Release(workItem);
     }
@@ -3165,8 +3145,8 @@ size_t CLTThreadPerClientTCPEngine::QueueThreadCount() const {
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
 CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* contextKey) {
-    CBaseConnection* queueContextOwner = ResolveEngineQueueContextOwnerScaffold(contextKey);
-    void* resolvedContextKey = ResolveEngineContextKeyScaffold(contextKey);
+    CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
+    void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
     auto matchesConnectionKey =
         [contextKey, resolvedContextKey, queueContextOwner](CMessageConnection* connection) -> bool {
         if (!connection) {
@@ -3239,7 +3219,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
         return nullptr;
     }
 
-    void* normalizedContextKey = ResolveEngineContextKeyScaffold(contextKey);
+    void* normalizedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
     CMessageConnection* connection = FindMessageConnection(contextKey);
     if (!connection && normalizedContextKey != contextKey) {
         connection = FindMessageConnection(normalizedContextKey);

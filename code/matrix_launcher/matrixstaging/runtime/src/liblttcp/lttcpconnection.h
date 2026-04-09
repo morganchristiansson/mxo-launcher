@@ -210,19 +210,17 @@ struct CLTTCPConnection_SendQueueItemScaffold {
     std::vector<uint8_t> ownedBytes;
 };
 
-// UNANCHORED: source-owned helper that recognizes the current queue-context bridge object and
-// returns its owning `CBaseConnection` when present.
+// UNANCHORED: source-owned helper that recognizes the current queue-dispatch ABI adapter object
+// and returns its owning `CBaseConnection` when present.
 CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext);
 // UNANCHORED: source-owned helper for queue-consumer slot-12-style cleanup.
-// Original queue consumers dequeue a real connection-family object as `context`; current source may
-// instead carry the queue-context bridge object that dispatches back into `vtable[4]`.
-// This helper narrows that gap by resolving the cleanup/search key back to the owning connection
-// object when the bridge object is what was actually queued.
+// The active replacement still needs the explicit adapter object whenever queued contexts may cross
+// into raw client.dll queue consumers compiled against the original MSVC object ABI.
 void* CBaseConnection_ResolveQueueCleanupContextKeyScaffold(void* maybeQueueContext);
 
-// Source-owned queue-context bridge compensating for the current non-byte-faithful C++ vtable
-// layout of `CBaseConnection` / `CLTTCPConnection` while queue consumers still dispatch through
-// original-style slot `+0x10` (`vtable[4]`).
+// Source-owned queue-dispatch ABI adapter compensating for the current MinGW-vs-MSVC C++ vtable
+// mismatch when client.dll consumes queued connection contexts through raw slot `+0x10`
+// (`vtable[4]`) and the optional type-1 auto-release slot `+0x04`.
 struct CBaseConnection_QueueContextScaffold {
     void** vtable;           // +0x00
     uint8_t autoReleaseFlag; // +0x04
@@ -231,6 +229,11 @@ struct CBaseConnection_QueueContextScaffold {
 };
 
 // Source-owned abstraction over the recovered connection family.
+// Current fidelity tightening from `0x44a9f0` and `0x436d31..0x436ee7`:
+// - base field `+0x04` is modeled explicitly as the type-1 auto-release flag byte read by the
+//   queue consumer
+// - but the active replacement still keeps a tiny queue-dispatch ABI adapter beside the object so
+//   raw client.dll consumers do not call into MinGW virtual tables with MSVC slot assumptions
 // Important current limitation:
 // - this C++ base keeps the recovered state/virtual relationships useful to the replacement
 //   launcher, but it is not yet a byte-faithful class-layout reconstruction of the original
@@ -254,8 +257,17 @@ class CBaseConnection {
   // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
   virtual bool IsConnected() const;
 
-  // UNANCHORED: source-owned queue-context bridge accessor used where queue consumers still expect
-  // original-style context vtable slot `+0x10`.
+  // UNANCHORED: source-owned accessor over the recovered base `+0x04` auto-release byte tested by
+  // `0x436d31..0x436ee7` before the later queued-context `+0x04` release call on type-1 work.
+  uint8_t AutoReleaseFlag04() const { return autoReleaseFlag04_; }
+  // UNANCHORED: source-owned setter for the same recovered base `+0x04` byte.
+  void SetAutoReleaseFlag04(uint8_t autoReleaseFlag) {
+    autoReleaseFlag04_ = autoReleaseFlag;
+    queueContextScaffold_.autoReleaseFlag = autoReleaseFlag;
+  }
+
+  // UNANCHORED: source-owned queue-dispatch ABI adapter accessor used where queued contexts may be
+  // consumed by raw client.dll code that expects original MSVC vtable slot numbering.
   void* QueueContextScaffold() { return &queueContextScaffold_; }
 
   // UNANCHORED: source-owned accessor over the recovered `+0x34` state field.
@@ -269,6 +281,8 @@ class CBaseConnection {
   CBaseConnection(LTTCPEngineConnectionState initialState = LTTCPEngineConnectionState::kClosed);
 
  protected:
+  uint8_t autoReleaseFlag04_;
+  uint8_t padding05_07_[3];
   LTTCPEngineConnectionState state_;
   CBaseConnection_QueueContextScaffold queueContextScaffold_;
 };
@@ -397,9 +411,10 @@ public:
     // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
     // Current best original read:
     // - argument order after engine `this` is `(workItem, connection, useQueue34)`
-    // - this `OnReceive` path always uses `(completedPacketWorkItem, this, false)`
-    // - the queued context is the direct connection object itself, not the source-owned
-    //   queue-context bridge that remains only as a consumer-side compatibility fallback
+    // - this `OnReceive` path always uses `(completedPacketWorkItem, this, false)` in launcher.exe
+    // - active source still treats that direct connection object as the queued identity, but may
+    //   project it through `QueueContextScaffold()` before it reaches raw client.dll queue
+    //   consumers so MSVC slot assumptions do not hit the MinGW object vtable directly
     // - ownership transfers to the engine queue here; caller-side lifetime does not branch on an
     //   enqueue success result because original `0x436820` returns `void`
     void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);

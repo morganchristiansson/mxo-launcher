@@ -328,13 +328,15 @@ namespace {
 static constexpr uint32_t kInvalidSocketHandle = 0xffffffffu;
 static void* g_BaseConnectionQueueContextVtable[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
 
-// UNANCHORED: source-owned queue-context release bridge for current non-byte-faithful C++ objects.
+// UNANCHORED: source-owned queue-dispatch ABI adapter release bridge for current non-byte-faithful
+// C++ objects.
 static uint32_t __thiscall BaseConnectionQueueContext_ReleaseScaffold(
     CBaseConnection_QueueContextScaffold* /*self*/) {
     return 1u;
 }
 
-// UNANCHORED: source-owned queue-context completion bridge for current non-byte-faithful C++ objects.
+// UNANCHORED: source-owned queue-dispatch ABI adapter completion bridge for raw client.dll queue
+// consumers expecting original slot `+0x10` / `vtable[4]`.
 static uint32_t __thiscall BaseConnectionQueueContext_OnOperationCompletedScaffold(
     CBaseConnection_QueueContextScaffold* self,
     void* workItem) {
@@ -412,11 +414,16 @@ bool CBaseConnection::IsConnected() const {
 
 // UNANCHORED: source-owned narrow mirror of the `0x44a9f0` base-ctor state write.
 CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
-    : state_(initialState),
+    : autoReleaseFlag04_(0u),
+      padding05_07_{0u, 0u, 0u},
+      state_(initialState),
       queueContextScaffold_() {
     EnsureBaseConnectionQueueContextVtableInitialized();
     queueContextScaffold_.vtable = g_BaseConnectionQueueContextVtable;
-    queueContextScaffold_.autoReleaseFlag = 0u;
+    queueContextScaffold_.autoReleaseFlag = autoReleaseFlag04_;
+    queueContextScaffold_.padding05[0] = 0u;
+    queueContextScaffold_.padding05[1] = 0u;
+    queueContextScaffold_.padding05[2] = 0u;
     queueContextScaffold_.owner = this;
 }
 
@@ -440,8 +447,8 @@ void* CLTTCPConnection::OwnerContext() const {
     return ownerContext_;
 }
 
-// UNANCHORED: source-owned helper that recognizes the current queue-context bridge object and
-// returns its owning `CBaseConnection` when present.
+// UNANCHORED: source-owned helper that recognizes the current queue-dispatch ABI adapter object
+// and returns its owning `CBaseConnection` when present.
 CBaseConnection* CBaseConnection_FromQueueContextScaffold(void* maybeQueueContext) {
     CBaseConnection_QueueContextScaffold* queueContext =
         static_cast<CBaseConnection_QueueContextScaffold*>(maybeQueueContext);
@@ -901,8 +908,9 @@ void CLTTCPConnection::EnqueueCompletedPacketWorkItemScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
     // Current best static read of `0x449d40` / `0x469bf0`:
     // - the queue handoff is exactly `(engine+0x10, completedPacketWorkItem, this, false)`
-    // - the queued context on that path is the direct connection object (`this`), not the
-    //   source-owned queue-context bridge kept around for consumer-side compatibility fallback
+    // - launcher.exe queues the direct connection object there, but the active replacement may
+    //   project that identity through `QueueContextScaffold()` before raw client.dll consumers see
+    //   it so MSVC slot assumptions do not hit the MinGW object vtable directly
     // - this receive path therefore always targets queue0C through `0x436820`
     // - original caller-side lifetime does not depend on enqueue success because `0x436820`
     //   returns `void`; once we reach this seam the completed parsed-packet work item is

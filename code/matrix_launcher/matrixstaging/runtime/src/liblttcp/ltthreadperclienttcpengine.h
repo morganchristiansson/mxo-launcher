@@ -506,7 +506,6 @@ public:
     size_t QueueThreadCount() const;
 
     // Source-owned connection resolver. Current faithful preference order is:
-    // - queue-context owner
     // - direct connection object / direct owner-context identities
     // - active worker/context-tree payloads keyed by the direct connection object
     // - no generic synthetic fallback allocation

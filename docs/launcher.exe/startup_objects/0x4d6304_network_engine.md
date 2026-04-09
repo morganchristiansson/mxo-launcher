@@ -159,7 +159,7 @@ New non-original-state audit from the current constructor / destructor / worker-
     - current source consequence:
       - the old auth/margin-specific engine maps were removed
       - source connection resolution is now limited to RE-backed identities only:
-        - queue-context owner
+        - direct connection object pointer
         - direct mediator owner stored at connection `+0xa4`, with any extra bridge record kept as a
           mediator-owned sidecar resolved from that owner/child pair
         - active worker/context-tree payloads keyed by the direct connection pointer
@@ -245,9 +245,10 @@ New queue-thread clarification from the current focused pass:
     - prefer queue34 when non-empty, else queue0C
     - null work item means shutdown-style sentinel
     - cleanup/slot-12-style connection teardown logically precedes later context callback
-    - newer bounded correction: when source queued the explicit `CBaseConnection_QueueContextScaffold`
-      bridge instead of the original connection-family object, slot-12-style cleanup now unwraps
-      that bridge back to the owning connection object before worker/message-table teardown
+    - newer bounded correction: active source now keeps the recovered direct connection identity on
+      that path, but wraps it in a tiny queue-dispatch ABI adapter when raw client.dll consumers are
+      still involved; slot-12-style cleanup therefore unwraps back to the owning connection object
+      before worker/message-table teardown
     - newer bounded correction: the blocking `RunCompletedOperationQueue(false)` path no longer
       returns immediately on empty queues; when an attached arg5 queue-signal event exists it now
       waits on that event and re-enters the dequeue loop, matching the recovered `+0x5c`
@@ -258,9 +259,10 @@ New queue-thread clarification from the current focused pass:
     - later runtime confirmation overturned that earlier A/B note:
       - commit `ab28b26` itself is now the confirmed regression point for the late launcher-into-
         game corruption/crash family
-      - current source therefore no longer keeps a runtime toggle here; the active producer path is
-        rolled back to the older source-owned `CBaseConnection_QueueContextScaffold` bridge until
-        the remaining direct-`context=this` ABI/layout gaps are recovered
+      - current source therefore no longer keeps a runtime toggle here; the active producer path
+        keeps the recovered direct-connection identity but now projects it through a tiny
+        queue-dispatch ABI adapter while the remaining late instability investigation stays focused
+        on replacement-only callback timing / release gaps
     - newer bounded correction: the shutdown-sentinel cascade now re-enters the normal enqueue
       helper path instead of open-coding a raw `Queue_PushPair(0,0)` write
     - newer bounded correction: source now also keeps the recovered `0x4816f0(workItem)`-style
@@ -277,8 +279,8 @@ New queue-thread clarification from the current focused pass:
     - newer bounded correction: slot-12 cleanup now also drops any generic engine-owned fallback
       `CMessageConnection` entry for that context key after worker teardown or on later miss/tail
       cleanup, which keeps source closer to the original pointer-keyed unique-owner model
-    - newer bounded correction: worker lookup itself now also recognizes queue-context bridge /
-      owning-connection forms instead of only the raw stored key
+    - newer bounded correction: worker lookup itself now again keys off the recovered direct
+      connection identity and direct owner-context forms instead of only one raw stored key
     - newer bounded correction: worker-teardown now makes the intermediate closing state explicit
       before the later wakeup/stop/remove steps instead of jumping straight from active to closed
       only at the tail
@@ -811,6 +813,8 @@ On the non-empty dequeue branch it:
 - then calls `context->+0x10(workItem)`
 - on that same type-1 path, conditionally calls `context->+0x04()` when the low byte of
   `context[1]` is non-zero
+  - current best connection-layout read ties that low byte to base connection field `+0x04`, which
+    `0x44a9f0` explicitly zeroes during construction
 - and only after that runs the final `workItem->+0x04()` release
 
 That ties several earlier partial observations together:
@@ -1435,21 +1439,17 @@ Important limitation:
   - `Connect`, `Close`, and `SendBuffer` are now routed through liblttcp-side context wrappers (`ConnectContext()` / `CloseContext()` / `SendPacketContext()`) instead of keeping those connection-oriented paths entirely inside `diagnostics.cpp`
   - newer bounded fidelity correction there now keeps slot `6` / `Connect` as the sidecar creation / ensure-connected seam, while slot `7` / `Close` and slot `8` / `SendBuffer` require an already-existing sidecar connection instead of implicitly materializing a new one on demand
   - newer bounded lookup correction also lets the engine resolve those connection-oriented slots by only the tighter RE-backed identities now left in source:
-    - the direct connection object pointer,
-    - the explicit queue-context bridge object that wraps the owning connection, or
+    - the direct connection object pointer, or
     - the connection's direct mediator owner at `+0xa4`, with any extra launcher-bridge record kept only as a mediator-owned sidecar keyed by that auth/margin child pointer
   - the earlier generic engine-keyed known-connection registry is gone; current source falls back only through the active pointer-keyed worker/context tree payloads
-  - newer bounded correction then normalizes queue-context bridge inputs back to the owning
-    connection/context key instead of inventing a second synthetic connection record keyed only by
-    the bridge object
-  - newer bounded slot-6 correction now makes that normalization explicit on `Connect(...)` and
+  - newer bounded slot-6 correction now makes that direct-connection preference explicit on `Connect(...)` and
     the lower resolved-endpoint helper too:
     - prefer an already-known direct connection-family object first
     - worker insertion on the connect path now also stores the direct connection object and mirrors
       the resulting socket/state back onto the matched connection-family object immediately
-  - newer source pruning there also collapsed repeated queue-context normalization into shared local
-    engine helpers and moved repeated worker->connection state/socket mirroring behind one helper
-    instead of open-coding that logic at each call site
+  - newer source pruning there also collapsed repeated direct-connection resolution into shared
+    local engine helpers and moved repeated worker->connection state/socket mirroring behind one
+    helper instead of open-coding that logic at each call site
   - sidecar owner/engine binding state is now also kept by `CLTThreadPerClientTCPEngineBinding` on the liblttcp side rather than by diagnostics-local owner/engine globals
   - sidecar `CMessageConnection` ownership/lookup/drop is now also managed by `CLTThreadPerClientTCPEngine` itself rather than by a diagnostics-local connection table
   - newer class-side cleanup tightening now keeps the pointer-keyed `+0x8c` model closer to the recovered direct-payload read:
@@ -1527,19 +1527,18 @@ Build-validated update:
   - `CLTThreadPerClientTCPEngineBinding` now owns only owner<->engine pairing
   - outer launcher/login seam code in `src/launcher_network_object_abi.cpp` again owns the current mediator bind/reset handshake around that binding
   - this is the current better source match for the negative RE result that the original engine object itself is not evidenced to own mediator lifecycle
-- newer `2026-04-08` fidelity pass retired the mediator-owned bridge context/work-item scaffolds from the active worker path, but the later runtime regression analysis also produced an important rollback note
+- newer `2026-04-09` fidelity pass finished the direct queued-context identity restoration on the active worker path while keeping a narrow ABI adapter for raw client.dll consumers
   - `CLTThreadPerClientTCPEngine::WorkerThread_Run` still decides auth-vs-margin from the direct connection family and still allocates the original small `0x0c` queued families for type `2` / connect-status (`0x435050`, vtable `0x004b3df8`) and type `1` / close (`0x435070`, vtable `0x004b3e00`)
-  - static RE still says the original producer shape queues the direct connection object as `context`
-  - however, source commit `ab28b26` proved the current replacement C++ layout/vtable surface is not yet stable enough for that direct queued-context shape: late launcher-into-game runs regressed into intermittent `std::bad_alloc`, shader corruption, and crashes
-  - current source therefore keeps the mediator-owned bridge context retired, but rolls the active queued callback context back to the connection-owned queue-context bridge until the remaining direct-`context=this` ABI/layout gaps are recovered
-  - newer 2026-04-08 queue-hardening pass also backed out another replacement-only timing change on top of that ABI rollback:
+  - static RE for both `0x449d40` and `0x436d31..0x436ee7` is now mirrored more directly in source:
+    - launcher.exe still establishes the direct connection object as the queued identity
+    - active source wraps that identity in a tiny queue-dispatch ABI adapter only where raw client.dll queue consumers would otherwise misinterpret MinGW virtual-table slot numbering
+    - `CleanupConnection` searches/tears down by that same unwrapped direct connection identity
+    - the consumer still models `context->+0x10(workItem)` and the conditional type-1 `context->+0x04()` release gate, with adapter slot `+0x10` forwarding into the owning connection and adapter byte `+0x04` mirroring the recovered base-connection auto-release flag
+  - queue timing remains on the normal completed-operation consumer path rather than the earlier immediate producer-thread drain:
     - source no longer immediately drains type `1/2/3` work items on the producing worker/connect thread
-    - it now leaves margin/auth completions for the normal completed-operation consumer path instead (`0x436fc0 -> 0x436b10` queue thread or client arg5 helper `+0x60` poll family)
-    - practical current reason: the live late instability family is now suspected to involve replacement-only synchronous re-entry of margin type-2 connect-status / later queue callbacks during game-entry bringup, not only the raw queued-context identity itself
-  - the queue consumer now again follows the original generic `context->vtable[4](workItem)` shape instead of reinterpreting every direct queued context as a `CBaseConnection*`
-    - this keeps the connection-owned queue-context bridge working through its own slot `+0x10` forwarder
-    - and it also preserves compatibility with original non-connection direct-context producers like the accept-thread family when those paths come back into scope
-  - `FindMessageConnection` / engine slot resolution still stop accepting mediator bridge-context identities on the active path; the remaining accepted shapes are direct connection identities plus connection-owned queue-context unwrapping
+    - it leaves margin/auth completions for the normal completed-operation consumer path instead (`0x436fc0 -> 0x436b10` queue thread or client arg5 helper `+0x60` poll family)
+    - practical current reason remains unchanged: the live late instability family is better explained by replacement-only synchronous re-entry of margin type-2 connect-status / later queue callbacks during game-entry bringup than by the recovered direct queued-context identity itself
+  - `FindMessageConnection` / engine slot resolution still stop accepting mediator bridge-context identities on the active path; the remaining accepted shapes are direct connection identities plus direct owner-context lookup
   - arg5 helper polling still looks at the mediator's direct auth/margin child connections only as a no-worker fallback, and no longer routes through a separate mediator bridge-context record
 - `matrixstaging/game/src/libltclientlogin/loginmediator_auth_entry.cpp` correspondingly no longer creates/maintains those bridge-context sidecars on auth/margin begin; the live owner link stays the direct mediator pointer at connection `+0xa4`
 - newer successful launcher-into-game runtime logs still line up with that tighter read on the active path:
