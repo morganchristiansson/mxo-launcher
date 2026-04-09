@@ -397,7 +397,8 @@ public:
     // anchor: launcher.exe:0x42f970
     uint32_t Close(void* contextKey, bool graceful) override;
     // anchor: launcher.exe:0x42fbd0
-    uint32_t SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext = nullptr) override;
+    // Original slot argument order is `(buffer, byteCount, connection, ownershipMode)`.
+    uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* contextKey, void* completionContext = nullptr) override;
     // anchor: launcher.exe:0x42fd10
     uint32_t Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) override;
     // anchor: launcher.exe:0x443810
@@ -407,15 +408,6 @@ public:
     // anchor: launcher.exe:0x4316a0
     uint32_t CleanupConnection(void* contextKey) override;
 
-    // UNANCHORED: source-side connection-object bridge into the recovered SendBuffer slot family.
-    // Active `0x448a00 -> vtable +0x20` callers currently pass ownership-mode `1` in the fourth
-    // slot; keep the older `completionContext` name only as a source-compatibility parameter name
-    // until wider send-family prototypes are fully retyped.
-    uint32_t SendBufferConnectionScaffold(
-        CLTTCPConnection* connection,
-        const void* buffer,
-        uint32_t byteCount,
-        void* completionContext = nullptr);
 
     // anchor: launcher.exe:0x436340
     static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);

@@ -898,8 +898,7 @@ uint32_t CMessageConnection::SubmitMessageRefBytes(
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return Engine()->SendBufferConnectionScaffold(
-        static_cast<CLTTCPConnection*>(this),
+    return CLTTCPConnection::SendBuffer(
         submittedBytes,
         submittedByteCount,
         reinterpret_cast<void*>(1u));
@@ -1785,9 +1784,10 @@ uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetB
         return 0;
     }
 
-    // Current starter path deliberately routes through the recovered connection-object-based
-    // engine surface instead of pretending this is already a faithful packet serializer.
-    return Engine()->SendBufferConnectionScaffold(static_cast<CLTTCPConnection*>(this), packetData, packetByteCount, completionContext);
+    // Current starter path deliberately routes through the inherited recovered
+    // `CLTTCPConnection::SendBuffer` wrapper instead of pretending this is already a faithful
+    // packet serializer.
+    return CLTTCPConnection::SendBuffer(packetData, packetByteCount, completionContext);
 }
 
 // anchor family: launcher.exe:0x449cd0

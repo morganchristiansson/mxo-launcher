@@ -412,9 +412,9 @@ static uint32_t __thiscall LauncherObject_Close(
 // vtable: launcher.exe:0x004b2768 slot +0x20
 static uint32_t __thiscall LauncherObject_SendBuffer(
     LauncherObjectAbiShell* self,
-    void* contextKey,
     void* buffer,
     void* byteCount,
+    void* contextKey,
     void* completionContext) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
     if (!engine) {
@@ -422,9 +422,9 @@ static uint32_t __thiscall LauncherObject_SendBuffer(
     }
 
     return engine->SendBuffer(
-        contextKey,
         buffer,
         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
+        contextKey,
         completionContext);
 }
 

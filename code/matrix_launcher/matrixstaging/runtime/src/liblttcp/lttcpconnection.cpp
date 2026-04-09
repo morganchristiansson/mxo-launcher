@@ -737,7 +737,9 @@ uint32_t CLTTCPConnection::SendBuffer(const void* buffer, uint32_t byteCount, vo
     }
 
     return engine_
-        ? engine_->SendBufferConnectionScaffold(this, buffer, byteCount, completionContext)
+        // `0x449d20` forwards `(buffer, byteCount, this, completionContext)` into engine slot
+        // `+0x20`; the current C++ interface now uses that recovered argument order directly.
+        ? engine_->SendBuffer(buffer, byteCount, this, completionContext)
         : SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
 }
 

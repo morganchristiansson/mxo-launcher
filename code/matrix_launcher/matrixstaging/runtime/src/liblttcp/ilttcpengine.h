@@ -38,7 +38,9 @@ public:
     // +0x1c
     virtual uint32_t Close(void* contextKey, bool graceful) = 0;
     // +0x20
-    virtual uint32_t SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext) = 0;
+    // Recovered original argument order from `0x449d20`:
+    // `(buffer, byteCount, connection, completionContext)`.
+    virtual uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* contextKey, void* completionContext) = 0;
     // +0x24
     virtual uint32_t Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) = 0;
     // +0x28

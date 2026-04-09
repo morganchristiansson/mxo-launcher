@@ -641,6 +641,10 @@ Newer string-backed naming now tightens several of those slots substantially:
 - slot 8 / `0x42fbd0` = **`SendBuffer`**
   - proven by in-function log string:
     - `CLTThreadPerClientTCPEngine::SendBuffer: Send failed ...`
+  - caller shape is now tighter too:
+    - `0x449d20` pushes `(buffer, byteCount, connection, completionContext)` into this slot
+    - current source therefore now mirrors `0x42fbd0` as a direct connection-object consumer rather
+      than resolving a synthetic owner/context record through engine scaffolds
 - slot 12 / `0x4316a0` = **`CleanupConnection`**
   - proven by in-function log string:
     - `CLTThreadPerClientTCPEngine::CleanupConnection: Couldn't find socket ...`
@@ -1363,8 +1367,11 @@ That newer read also narrows the real engine-call signatures more than the earli
   - source lockstep update: `matrixstaging/runtime/src/liblttcp/lttcpconnection.cpp` now calls `engine_->Connect(this)` directly instead of detouring through a synthetic `ConnectConnectionScaffold(...)` adapter
 - `0x449ca0` similarly forwards **`self`** into engine `+0x1c`
   - so arg5 slot `7` / `Close` is likewise connection-object-based on this path
-- `0x449d20` forwards packet/buffer args together with **`self`** into engine `+0x20`
+- `0x449d20` forwards `(buffer, byteCount, self, completionContext)` into engine `+0x20`
   - so arg5 slot `8` / `SendBuffer` is also reached through the connection object, not as a free-standing raw socket helper alone
+  - source lockstep update: the current C++ `ILTTCPEngine` slot-8 signature now uses that recovered
+    argument order directly instead of detouring through a source-only helper with a mismatched
+    `(contextKey, buffer, byteCount, completionContext)` shape
 
 Current best reading from that combination:
 - the queued second dword currently described as generic `context/owner` is now more specifically likely a **`CMessageConnection`-family object pointer** on at least important producer/consumer paths
@@ -1602,6 +1609,10 @@ Current tightened worker-loop read after the latest `0x42fe50 / 0x42f970 / 0x42f
   - `0x44a9f0` seeds connection byte `+0x38 = 1`
   - `0x42fbd0 -> 0x44ad80` pushes copied send buffers through the connection-owned queue rooted at
     `+0x3c`, clears `+0x38`, and signals the worker wakeup socket
+    - active-state guard there is exactly connection state `1` or `2`
+    - outside those states the original path does not silently return; it emits the string-backed
+      `Send failed! ... not connected/connecting ...` warning using endpoint bytes from
+      connection `+0x24`
   - `0x42f970` writes state `4` first, then:
     - graceful close uses `shutdown(socket, 1)` immediately only when the send queue is already
       empty

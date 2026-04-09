@@ -2684,22 +2684,27 @@ uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
     return 1u;
 }
 
-// UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
-uint32_t CLTThreadPerClientTCPEngine::SendBufferConnectionScaffold(CLTTCPConnection* connection, const void* buffer, uint32_t byteCount, void* completionContext) {
+// anchor: launcher.exe:0x42fbd0
+// vtable: launcher.exe:0x004b2768 slot +0x20
+uint32_t CLTThreadPerClientTCPEngine::SendBuffer(
+    const void* buffer,
+    uint32_t byteCount,
+    void* contextKey,
+    void* completionContext) {
+    // `0x449d20` forwards `(buffer, byteCount, this, completionContext)` into this engine slot.
+    // `0x42fbd0` then works on that direct connection object rather than resolving a synthetic
+    // owner/context record through engine-managed lookup scaffolds.
+    CLTTCPConnection* connection = static_cast<CLTTCPConnection*>(contextKey);
     if (!connection || !buffer || byteCount == 0u) {
-        return 0;
-    }
-
-    if (connection->State() != LTTCPEngineConnectionState::kConnectActive &&
-        connection->State() != LTTCPEngineConnectionState::kUdpMonitorActive) {
         return 0u;
     }
 
-    if (CLTThreadPerClientTCPEngine_WorkerThread* worker = connection->WorkerThreadScaffold()) {
-        // Tightened slot `8` / `0x42fbd0` read:
-        // - enqueue through the connection-owned `+0x3c` send queue first
-        // - clear the recovered `+0x38` empty flag on push
-        // - then signal the direct worker pointer kept at connection `+0x08`
+    const LTTCPEngineConnectionState state = connection->State();
+    if (state == LTTCPEngineConnectionState::kConnectActive ||
+        state == LTTCPEngineConnectionState::kUdpMonitorActive) {
+        // anchor: launcher.exe:0x42fce8..0x42fcf6
+        // - queue through the connection-owned `+0x3c` pending-send root via `0x44ad80`
+        // - then signal the direct worker-thread wakeup handle at `[connection+0x08] + 0x40`
         const bool queued = connection->QueueSendBufferScaffold(
             buffer,
             byteCount,
@@ -2707,27 +2712,37 @@ uint32_t CLTThreadPerClientTCPEngine::SendBufferConnectionScaffold(CLTTCPConnect
         if (!queued) {
             return 0u;
         }
-        worker->SignalWakeup();
-        return 1u;
+
+        if (CLTThreadPerClientTCPEngine_WorkerThread* worker = connection->WorkerThreadScaffold()) {
+            worker->SignalWakeup();
+            return 1u;
+        }
+
+        // Source-only fallback for unexpected detached-worker paths; active RE-backed slot `8`
+        // users are expected to have `[connection+0x08]` populated by `0x431ff0` already.
+        return connection->SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
     }
 
-    // Source-only fallback for unexpected no-worker paths; active RE-backed paths are expected to
-    // have `[connection+0x08]` populated by `0x431ff0` before slot `8` is used.
-    return connection->SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
-}
+    const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
+    const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
+    const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
+    const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
+    const unsigned ipv4Byte3 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 24u) & 0xffu);
+    const unsigned portHostOrder = static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder));
 
-// anchor: launcher.exe:0x42fbd0
-// vtable: launcher.exe:0x004b2768 slot +0x20
-uint32_t CLTThreadPerClientTCPEngine::SendBuffer(void* contextKey, const void* buffer, uint32_t byteCount, void* completionContext) {
-    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
-    if (!connection) {
-        spdlog::debug(
-            "CLTThreadPerClientTCPEngine::SendBuffer couldn't resolve existing connection context={} byteCount={}",
-            fmt::ptr(contextKey),
-            byteCount);
-        return 0u;
-    }
-    return connection->SendPacket(buffer, byteCount, completionContext);
+    // anchor: launcher.exe:0x42fbef..0x42fcdc
+    // Original source-location bookkeeping points at
+    // `matrixstaging\runtime\src\liblttcp\ltthreadperclienttcpengine.cpp:0x181` before this
+    // exact warning text.
+    spdlog::warn(
+        "CLTThreadPerClientTCPEngine::SendBuffer: Send failed!  Connection obj associated with address {}.{}.{}.{}:{} is not connected/connecting (connstatus = {}).",
+        ipv4Byte0,
+        ipv4Byte1,
+        ipv4Byte2,
+        ipv4Byte3,
+        portHostOrder,
+        static_cast<unsigned>(state));
+    return 0u;
 }
 
 // anchor: launcher.exe:0x42fd10
