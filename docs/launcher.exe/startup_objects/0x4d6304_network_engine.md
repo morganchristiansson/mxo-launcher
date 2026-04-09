@@ -625,6 +625,10 @@ Newer string-backed naming now tightens several of those slots substantially:
 - slot 6 / `0x4328a0` = **`Connect`**
   - proven by in-function log strings:
     - `CLTThreadPerClientTCPEngine::Connect: ...`
+  - current source lockstep:
+    - `CLTTCPConnection::Connect` now forwards the direct connection object here
+    - `CLTThreadPerClientTCPEngine::Connect` now mirrors the same direct-object entry shape instead
+      of detouring through a synthetic endpoint-repacking helper
 - slot 7 / `0x42f970` = **`Close`**
   - proven by in-function log strings:
     - `CLTThreadPerClientTCPEngine::Close: shutdown() failed ...`
@@ -1094,6 +1098,17 @@ Those constructors all belong to the same nearby vtable family around `0x4b3df0.
   - current source now also moved closer to that read:
     - connect no longer fabricates an immediate launcher-bridge success work item from the mediator
       begin wrapper
+    - `matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.cpp` now keeps the primary
+      `0x4328a0` body on the direct connection object pointer instead of re-resolving a synthetic
+      context key first
+    - the same source pass also replaced several generic connect-side scaffolds with nearer
+      original-name bodies:
+      - `CLTIPSocket_StaticAllocateSocket` for `0x449b40`
+      - `CLTThreadPerClientTCPEngine_CreateAndInsertWorkerThread` for `0x431ff0`
+      - explicit `0x435d90/0x435050` and `0x435da0/0x435070` work-item allocation/ctor sequences
+        on the connect failure paths
+    - allocation-failure queue submissions on this path now also follow the original nearer read by
+      enqueuing a `NULL` work-item sentinel instead of silently dropping the queue event
     - the worker-thread slot `0x42fe50` now owns the nearer blocking select/connect-completion path
       instead of a mediator-side synthetic completion
       - read set = connection socket + wakeup socket

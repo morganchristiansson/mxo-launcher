@@ -591,6 +591,51 @@ static void EnsureSmallConnectionWorkItemVtablesInitialized() {
     }
 }
 
+// anchor: launcher.exe:0x435d90
+static CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*
+CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_Allocate() {
+    return static_cast<CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*>(
+        std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold)));
+}
+
+// anchor: launcher.exe:0x435050
+static CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*
+CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_ctor_withPayload(
+    CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* self,
+    uint32_t statusOrPayloadDword08) {
+    if (!self) {
+        return nullptr;
+    }
+
+    EnsureSmallConnectionWorkItemVtablesInitialized();
+    self->header.workType = CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus;
+    self->header.vtable = g_ConnectionStatusWorkItemVtable;
+    self->header.statusOrPayloadDword08 = statusOrPayloadDword08;
+    return self;
+}
+
+// anchor: launcher.exe:0x435da0
+static CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*
+CLTThreadPerClientTCPEngine_CloseWorkItem_Allocate() {
+    return static_cast<CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*>(
+        std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold)));
+}
+
+// anchor: launcher.exe:0x435070
+static CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*
+CLTThreadPerClientTCPEngine_CloseWorkItem_ctor(
+    CLTThreadPerClientTCPEngine_CloseWorkItemScaffold* self) {
+    if (!self) {
+        return nullptr;
+    }
+
+    EnsureSmallConnectionWorkItemVtablesInitialized();
+    self->header.workType = CLTThreadPerClientTCPEngine::kWorkTypeClose;
+    self->header.statusOrPayloadDword08 = 0u;
+    self->header.vtable = g_CloseWorkItemVtable;
+    return self;
+}
+
 // UNANCHORED internal helper used by the current thread-object scaffolds.
 static void CloseSocketHandle(uint32_t* socketHandle) {
     if (!socketHandle || *socketHandle == kInvalidSocketHandle) {
@@ -706,8 +751,8 @@ static void DrainWakeupSocketHandleScaffold(uint32_t socketHandle) {
     (void)recv(static_cast<SOCKET>(socketHandle), dummy, sizeof(dummy), 0);
 }
 
-// anchor: launcher.exe:0x449b40 helper shape
-static uint32_t CreateSocketHandleWithOriginalSetupScaffold(
+// anchor: launcher.exe:0x449b40
+static uint32_t CLTIPSocket_StaticAllocateSocket(
     int socketType,
     int protocol,
     uint8_t flags) {
@@ -746,7 +791,7 @@ static uint32_t CreateSocketHandleWithOriginalSetupScaffold(
 
 // UNANCHORED internal helper used by the current MonitorPort scaffold.
 static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    const uint32_t listenSocketHandle = CreateSocketHandleWithOriginalSetupScaffold(
+    const uint32_t listenSocketHandle = CLTIPSocket_StaticAllocateSocket(
         SOCK_STREAM,
         IPPROTO_TCP,
         /*flags=*/0u);
@@ -776,7 +821,7 @@ static uint32_t OpenTcpListenSocket(uint16_t portHostOrder, uint32_t ipv4Network
 
 // UNANCHORED internal helper used by the current UDPMonitorPort scaffold.
 static uint32_t OpenUdpMonitorSocket(uint16_t portHostOrder, uint32_t ipv4NetworkOrder) {
-    const uint32_t udpSocketHandle = CreateSocketHandleWithOriginalSetupScaffold(
+    const uint32_t udpSocketHandle = CLTIPSocket_StaticAllocateSocket(
         SOCK_DGRAM,
         IPPROTO_UDP,
         /*flags=*/0u);
@@ -2057,7 +2102,7 @@ uint32_t CLTThreadPerClientTCPEngine::UDPMonitorPort(uint16_t portHostOrder, voi
     }
 
     connection->SetSocketHandle(socketHandle);
-    CLTThreadPerClientTCPEngine_WorkerThread* worker = CreateAndInsertWorkerThreadScaffold(
+    CLTThreadPerClientTCPEngine_WorkerThread* worker = CreateAndInsertWorkerThread(
         connection,
         /*datagramMode=*/true,
         /*startThread=*/false);
@@ -2133,38 +2178,48 @@ uint32_t CLTThreadPerClientTCPEngine::UnmonitorPort(uint16_t portHostOrder, void
 // anchor: launcher.exe:0x4328a0
 // vtable: launcher.exe:0x004b2768 slot +0x18
 uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
-    // `0x4328a0` queues type-2 status payload `0x7000001` when the connection object is not in
-    // state `8` / CLOSED, and queues payload `1` after the immediate socket/setup failure family.
+    // Current best static read of `0x4328a0`:
+    // - public caller `0x449cd0` passes the direct connection object, not a synthetic resolver key
+    // - rejected non-CLOSED state queues type-2 payload `0x7000001`
+    // - immediate socket/bind failure flows share the later type-2 payload `1` producer tail
+    // - immediate non-`WSAEWOULDBLOCK` connect failure first queues a type-1 close work item, then
+    //   reaches that same type-2 payload `1` tail
     static constexpr uint32_t kConnectRejectedNotClosedPayload = 0x7000001u;
     static constexpr uint32_t kConnectImmediateFailurePayload = 1u;
 
-    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
+    CMessageConnection* connection = static_cast<CMessageConnection*>(contextKey);
     if (!connection) {
         spdlog::debug(
-            "CLTThreadPerClientTCPEngine::Connect couldn't resolve connection context={}",
+            "CLTThreadPerClientTCPEngine::Connect rejected null connection context={}",
             fmt::ptr(contextKey));
         return 0u;
     }
 
-    const LTTCPEndpointKey& endpoint = connection->RemoteEndpoint();
+    void* queuedConnectionContext = connection->QueueContextScaffold();
+    const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
             "CLTThreadPerClientTCPEngine::Connect rejected connection={} state={} remoteHost='{}' port={} ip=0x{:08x}",
             fmt::ptr(connection),
             static_cast<unsigned>(connection->State()),
             connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-            static_cast<unsigned>(ntohs(endpoint.portNetworkOrder)),
-            static_cast<unsigned>(endpoint.ipv4NetworkOrder));
-        (void)EnqueueDirectConnectionStatusWorkItemScaffold(
-            connection,
-            kWorkTypeConnectionStatus,
-            kConnectRejectedNotClosedPayload,
+            static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
+            static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder));
+
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+            CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_ctor_withPayload(
+                CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_Allocate(),
+                kConnectRejectedNotClosedPayload);
+        (void)EnqueueCompletedOperationScaffold(
+            connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+            queuedConnectionContext,
+            /*useQueue34=*/false,
             "connect:not-closed",
             /*queueLockAlreadyHeld=*/false);
         return 0u;
     }
 
-    uint32_t socketHandle = CreateSocketHandleWithOriginalSetupScaffold(
+    uint32_t socketHandle = CLTIPSocket_StaticAllocateSocket(
         SOCK_STREAM,
         IPPROTO_TCP,
         /*flags=*/0u);
@@ -2175,22 +2230,30 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
             "CLTThreadPerClientTCPEngine::Connect socket allocation failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
             fmt::ptr(connection),
             connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-            static_cast<unsigned>(ntohs(endpoint.portNetworkOrder)),
-            static_cast<unsigned>(endpoint.ipv4NetworkOrder),
+            static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
+            static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
             static_cast<unsigned>(wsaError));
-        (void)EnqueueDirectConnectionStatusWorkItemScaffold(
-            connection,
-            kWorkTypeConnectionStatus,
-            kConnectImmediateFailurePayload,
+
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+            CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_ctor_withPayload(
+                CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_Allocate(),
+                kConnectImmediateFailurePayload);
+        (void)EnqueueCompletedOperationScaffold(
+            connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+            queuedConnectionContext,
+            /*useQueue34=*/false,
             "connect:socket-failed",
             /*queueLockAlreadyHeld=*/false);
         return 0u;
     }
 
-    SOCKET sock = static_cast<SOCKET>(socketHandle);
-    sockaddr_in bindAddr = {};
-    bindAddr.sin_family = AF_INET;
-    if (bind(sock, reinterpret_cast<const sockaddr*>(&bindAddr), sizeof(bindAddr)) == SOCKET_ERROR) {
+    SOCKET connectSocket = static_cast<SOCKET>(socketHandle);
+    sockaddr_in localBindAddress = {};
+    localBindAddress.sin_family = AF_INET;
+    if (bind(
+            connectSocket,
+            reinterpret_cast<const sockaddr*>(&localBindAddress),
+            sizeof(localBindAddress)) == SOCKET_ERROR) {
         const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
         CloseSocketHandle(&socketHandle);
         connection->SetSocketHandle(socketHandle);
@@ -2198,24 +2261,31 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
             "CLTThreadPerClientTCPEngine::Connect bind failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
             fmt::ptr(connection),
             connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-            static_cast<unsigned>(ntohs(endpoint.portNetworkOrder)),
-            static_cast<unsigned>(endpoint.ipv4NetworkOrder),
+            static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
+            static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
             static_cast<unsigned>(wsaError));
-        (void)EnqueueDirectConnectionStatusWorkItemScaffold(
-            connection,
-            kWorkTypeConnectionStatus,
-            kConnectImmediateFailurePayload,
+
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+            CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_ctor_withPayload(
+                CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_Allocate(),
+                kConnectImmediateFailurePayload);
+        (void)EnqueueCompletedOperationScaffold(
+            connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+            queuedConnectionContext,
+            /*useQueue34=*/false,
             "connect:bind-failed",
             /*queueLockAlreadyHeld=*/false);
         return 0u;
     }
 
-    sockaddr_in remoteAddr = {};
-    remoteAddr.sin_family = endpoint.family;
-    remoteAddr.sin_port = endpoint.portNetworkOrder;
-    remoteAddr.sin_addr.s_addr = endpoint.ipv4NetworkOrder;
-    if (connect(sock, reinterpret_cast<const sockaddr*>(&remoteAddr), sizeof(remoteAddr)) ==
-        SOCKET_ERROR) {
+    sockaddr_in remoteSocketAddress = {};
+    remoteSocketAddress.sin_family = remoteEndpoint.family;
+    remoteSocketAddress.sin_port = remoteEndpoint.portNetworkOrder;
+    remoteSocketAddress.sin_addr.s_addr = remoteEndpoint.ipv4NetworkOrder;
+    if (connect(
+            connectSocket,
+            reinterpret_cast<const sockaddr*>(&remoteSocketAddress),
+            sizeof(remoteSocketAddress)) == SOCKET_ERROR) {
         const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
         if (wsaError != WSAEWOULDBLOCK) {
             CloseSocketHandle(&socketHandle);
@@ -2224,30 +2294,39 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
                 "CLTThreadPerClientTCPEngine::Connect connect failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
                 fmt::ptr(connection),
                 connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-                static_cast<unsigned>(ntohs(endpoint.portNetworkOrder)),
-                static_cast<unsigned>(endpoint.ipv4NetworkOrder),
+                static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
+                static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
                 static_cast<unsigned>(wsaError));
-            (void)EnqueueDirectConnectionStatusWorkItemScaffold(
-                connection,
-                kWorkTypeClose,
-                0u,
+
+            CLTThreadPerClientTCPEngine_CloseWorkItemScaffold* closeWorkItem =
+                CLTThreadPerClientTCPEngine_CloseWorkItem_ctor(
+                    CLTThreadPerClientTCPEngine_CloseWorkItem_Allocate());
+            (void)EnqueueCompletedOperationScaffold(
+                closeWorkItem ? &closeWorkItem->header : nullptr,
+                queuedConnectionContext,
+                /*useQueue34=*/false,
                 "connect:immediate-close",
                 /*queueLockAlreadyHeld=*/false);
-            (void)EnqueueDirectConnectionStatusWorkItemScaffold(
-                connection,
-                kWorkTypeConnectionStatus,
-                kConnectImmediateFailurePayload,
+
+            CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
+                CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_ctor_withPayload(
+                    CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_Allocate(),
+                    kConnectImmediateFailurePayload);
+            (void)EnqueueCompletedOperationScaffold(
+                connectionStatusWorkItem ? &connectionStatusWorkItem->header : nullptr,
+                queuedConnectionContext,
+                /*useQueue34=*/false,
                 "connect:immediate-status",
                 /*queueLockAlreadyHeld=*/false);
             return 0u;
         }
     }
 
-    CLTThreadPerClientTCPEngine_WorkerThread* worker = CreateAndInsertWorkerThreadScaffold(
+    CLTThreadPerClientTCPEngine_WorkerThread* workerThread = CreateAndInsertWorkerThread(
         connection,
         /*datagramMode=*/false,
         /*startThread=*/false);
-    if (!worker) {
+    if (!workerThread) {
         // UNANCHORED bounded source-side guard: current `0x431ff0` mirror can still fail or
         // deduplicate, while launcher.exe `0x4328a0` uses the returned worker directly.
         CloseSocketHandle(&socketHandle);
@@ -2256,20 +2335,20 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
             "CLTThreadPerClientTCPEngine::Connect worker creation failed connection={} remoteHost='{}' port={} ip=0x{:08x}",
             fmt::ptr(connection),
             connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-            static_cast<unsigned>(ntohs(endpoint.portNetworkOrder)),
-            static_cast<unsigned>(endpoint.ipv4NetworkOrder));
+            static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
+            static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder));
         return 0u;
     }
 
     connection->SetState(LTTCPEngineConnectionState::kConnectActive);
-    (void)worker->Start(/*startPriority=*/3);
+    (void)workerThread->Start(/*startPriority=*/3);
     spdlog::info(
         "CLTThreadPerClientTCPEngine::Connect started worker connection={} worker={} remoteHost='{}' port={} ip=0x{:08x} state={} ownerContext={}",
         fmt::ptr(connection),
-        fmt::ptr(worker),
+        fmt::ptr(workerThread),
         connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-        static_cast<unsigned>(ntohs(endpoint.portNetworkOrder)),
-        static_cast<unsigned>(endpoint.ipv4NetworkOrder),
+        static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
+        static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
         static_cast<unsigned>(connection->State()),
         fmt::ptr(connection->OwnerContext()));
     SyncAttachedLauncherObjectStateScaffold();
@@ -2737,36 +2816,29 @@ bool CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold(
         return false;
     }
 
-    EnsureSmallConnectionWorkItemVtablesInitialized();
-
     CLTThreadPerClientTCPEngine_WorkItemHeader* workItem = nullptr;
     if (workType == kWorkTypeConnectionStatus) {
-        auto* statusWorkItem =
-            static_cast<CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*>(
-                std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold)));
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* statusWorkItem =
+            CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_ctor_withPayload(
+                CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_Allocate(),
+                workPayload);
         if (!statusWorkItem) {
             LoggerForQueueLabel(label)->info(
                 "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
                 label ? label : "<null>");
             return false;
         }
-        statusWorkItem->header.vtable = g_ConnectionStatusWorkItemVtable;
-        statusWorkItem->header.workType = kWorkTypeConnectionStatus;
-        statusWorkItem->header.statusOrPayloadDword08 = workPayload;
         workItem = &statusWorkItem->header;
     } else if (workType == kWorkTypeClose) {
-        auto* closeWorkItem =
-            static_cast<CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*>(
-                std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold)));
+        CLTThreadPerClientTCPEngine_CloseWorkItemScaffold* closeWorkItem =
+            CLTThreadPerClientTCPEngine_CloseWorkItem_ctor(
+                CLTThreadPerClientTCPEngine_CloseWorkItem_Allocate());
         if (!closeWorkItem) {
             LoggerForQueueLabel(label)->info(
                 "CLTThreadPerClientTCPEngine::EnqueueDirectConnectionStatusWorkItemScaffold failed label='{}'",
                 label ? label : "<null>");
             return false;
         }
-        closeWorkItem->header.vtable = g_CloseWorkItemVtable;
-        closeWorkItem->header.workType = kWorkTypeClose;
-        closeWorkItem->header.statusOrPayloadDword08 = 0u;
         workItem = &closeWorkItem->header;
     } else {
         LoggerForQueueLabel(label)->warn(
@@ -3207,8 +3279,8 @@ CMessageConnection* CLTThreadPerClientTCPEngine::ResolveConnectionForEngineSlotS
     return connection;
 }
 
-// UNANCHORED: source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
-CLTThreadPerClientTCPEngine_WorkerThread* CLTThreadPerClientTCPEngine::CreateAndInsertWorkerThreadScaffold(
+// anchor: launcher.exe:0x431ff0
+CLTThreadPerClientTCPEngine_WorkerThread* CLTThreadPerClientTCPEngine::CreateAndInsertWorkerThread(
     CMessageConnection* connection,
     bool datagramMode,
     bool startThread) {

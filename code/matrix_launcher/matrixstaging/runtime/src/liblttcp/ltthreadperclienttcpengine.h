@@ -516,8 +516,8 @@ private:
     // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection`
     // objects when original caller/object evidence is missing.
     CMessageConnection* ResolveConnectionForEngineSlotScaffold(void* contextKey);
-    // UNANCHORED: source-owned helper shaped after launcher.exe:0x431ff0 worker creation/insertion.
-    CLTThreadPerClientTCPEngine_WorkerThread* CreateAndInsertWorkerThreadScaffold(
+    // anchor: launcher.exe:0x431ff0 worker creation/insertion helper.
+    CLTThreadPerClientTCPEngine_WorkerThread* CreateAndInsertWorkerThread(
         CMessageConnection* connection,
         bool datagramMode,
         bool startThread = false);
