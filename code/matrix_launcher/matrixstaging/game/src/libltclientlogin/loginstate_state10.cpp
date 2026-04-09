@@ -220,7 +220,8 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
     }
 
     const uint8_t appendedSlotIndex = mediator->selectionRouteState684_.slotRecordCount00_;
-    const uint32_t selectedWorldDescriptorIndex = mediator->postAuthMarginLoadingState_.sourceField12c;
+    const uint32_t selectedWorldDescriptorIndex =
+        mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24;
     if (appendedSlotIndex >= mediator->selectionRouteState684_.slotRecordTable04_.size() ||
         appendedSlotIndex >= mediator->selectionRouteState684_.routeHostStringTriples194_.size() ||
         selectedWorldDescriptorIndex >= mediator->worldDescriptorCountD80_ ||
@@ -255,7 +256,7 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
     SlotRecordState004b5328& appendedSlotRecord =
         mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
     appendedSlotRecord.heapString14 =
-        reinterpret_cast<const char*>(mediator->postAuthMarginLoadingState_.sourceLeadString108.data());
+        mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data();
     appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
     appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
     appendedSlotRecord.status0b = 0u;

@@ -382,7 +382,6 @@ CLTLoginMediator::CLTLoginMediator()
       selectionContext0ecCopy_{},
       selectionContext0ecCopyValid_(false),
       selection0ecCount_(0),
-      state8PersistenceF1c_{},
       profile0f4Count_(0),
       postAuthMarginLoadingState_{},
       authServerPortHostOrder_(11000),
@@ -823,8 +822,8 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     } else if (ownerState.characterNameBufferF1c[0]) {
         worldOrSelectionName = ownerState.characterNameBufferF1c;
         source = "owner+0xf1c";
-    } else if (ownerState.sourceLeadString108[0]) {
-        worldOrSelectionName = ownerState.sourceLeadString108.data();
+    } else if (ownerState.createCharacterData108.characterName00[0]) {
+        worldOrSelectionName = ownerState.createCharacterData108.characterName00.data();
         source = "owner+0x108";
     } else if (characterState.characterName && characterState.characterName[0]) {
         worldOrSelectionName = characterState.characterName;
@@ -1287,12 +1286,15 @@ void* CLTLoginMediator::GetLiveCuiCfgB8(uint32_t* outLength) const {
         outLength);
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41f170 / owner vtable +0xbc
 const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
+    // Keep this wrapper-facing body close to the original tiny getter:
+    // - original `0x41f170` returns owner `+0xf48`
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const State8PersistenceF1cSnapshot* snapshot =
-        mediator ? &mediator->State8PersistenceF1cView() : nullptr;
-    const void* header = snapshot ? static_cast<const void*>(snapshot->header2c.data()) : nullptr;
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const CLTLoginMediatorCharacterPersistenceData* snapshot =
+        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
+    const void* header = snapshot ? static_cast<const void*>(&snapshot->header2c[0]) : nullptr;
     spdlog::info(
         "CLTLoginMediator::GetState8PersistenceHeaderBc(+0xbc) -> {} [owner={} first=0x{:08x} bytes=0x{:02x}]",
         fmt::ptr(header),
@@ -1302,32 +1304,36 @@ const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
     return header;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41f180 / owner vtable +0xc0
 const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
+    // Keep this wrapper-facing body close to the original tiny getter:
+    // - original `0x41f180` returns owner `+0xf88`
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const State8PersistenceF1cSnapshot* snapshot =
-        mediator ? &mediator->State8PersistenceF1cView() : nullptr;
-    const void* body = snapshot ? static_cast<const void*>(snapshot->body6c.data()) : nullptr;
-    const uint32_t bodyWord00 =
-        snapshot ? ReadU32LE(snapshot->body6c.data()) : 0u;
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const CLTLoginMediatorCharacterPersistenceData* snapshot =
+        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
+    const void* body = snapshot ? static_cast<const void*>(&snapshot->bodyWord6c) : nullptr;
+    const uint32_t bodyWord00 = snapshot ? snapshot->bodyWord6c : 0u;
     spdlog::info(
         "CLTLoginMediator::GetState8PersistenceBodyC0(+0xc0) -> {} [owner={} body00=0x{:08x} bytes=0x{:04x}]",
         fmt::ptr(body),
         fmt::ptr(mediator),
         bodyWord00,
-        snapshot ? static_cast<unsigned>(snapshot->body6c.size()) : 0u);
+        snapshot ? static_cast<unsigned>(CLTLoginMediatorCharacterPersistenceData::kBodySize) : 0u);
     return body;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x41aec0 / owner vtable +0xc4
 void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) const {
+    // Keep this wrapper-facing body close to the original tiny getter:
+    // - original `0x41aec0` returns owner `+0x13f0`
+    // - when the caller supplies an out pointer, it also writes owner `+0x13f4`
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint16_t length = ownerState ? ownerState->state8Section0OverflowLength13f4 : 0u;
-    void* buffer =
-        (ownerState && ownerState->state8Section0OverflowLength13f4 != 0u)
-            ? ownerState->state8Section0OverflowBuffer13f0
-            : nullptr;
+    const CLTLoginMediatorCharacterPersistenceData* snapshot =
+        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
+    const uint16_t length = snapshot ? snapshot->section0OverflowLength4d8 : 0u;
+    void* buffer = snapshot ? snapshot->section0OverflowBuffer4d4 : nullptr;
     if (outLength) {
         *outLength = length;
     }
@@ -1343,13 +1349,14 @@ void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) cons
 uint32_t CLTLoginMediator::HasState8Section11Dword145c() const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t ready =
-        (ownerState && ownerState->state8Section11Dword145c != 0u) ? 1u : 0u;
+    const CLTLoginMediatorCharacterPersistenceData* snapshot =
+        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
+    const uint32_t ready = (snapshot && snapshot->section11Dword540 != 0u) ? 1u : 0u;
     spdlog::info(
         "CLTLoginMediator::HasState8Section11Dword145c(+0xc8) -> {} [owner={} value=0x{:08x}]",
         ready,
         fmt::ptr(mediator),
-        ownerState ? ownerState->state8Section11Dword145c : 0u);
+        snapshot ? snapshot->section11Dword540 : 0u);
     return ready;
 }
 
@@ -1357,7 +1364,9 @@ uint32_t CLTLoginMediator::HasState8Section11Dword145c() const {
 uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
     const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
     const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const uint32_t value = ownerState ? ownerState->state8Section11Dword145c : 0u;
+    const CLTLoginMediatorCharacterPersistenceData* snapshot =
+        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
+    const uint32_t value = snapshot ? snapshot->section11Dword540 : 0u;
     spdlog::info(
         "CLTLoginMediator::GetState8Section11Dword145c(+0xcc) -> 0x{:08x} [owner={}]",
         value,
@@ -2017,129 +2026,50 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     return 0u;
 }
 
-// replacement materializer over the original producer-owned state8/load-character family:
-// - producer boundary remains `launcher.exe:0x43f930`
-// - getter boundary remains `launcher.exe:0x41f1c0`
-// Keep this limited to stitching the already-recovered owner `+0xf1c/+0xf48/+0xf88/+0x13f0`
-// state back into one contiguous `+0xf4` client view.
-const CLTLoginMediator::State8PersistenceF1cSnapshot& CLTLoginMediator::State8PersistenceF1cView() const {
-    auto copyCStringIntoFixed = [](std::array<char, 0x20>& dest, const char* src) {
-        std::fill(dest.begin(), dest.end(), '\0');
-        if (!src || !src[0]) {
-            return;
-        }
-        const size_t copyCount = std::min(std::char_traits<char>::length(src), dest.size() - 1u);
-        std::memcpy(dest.data(), src, copyCount);
-        dest[copyCount] = '\0';
-    };
-    auto copyCStringIntoByteSpan = [](uint8_t* dest, size_t destSize, const char* src) {
-        if (!dest || destSize == 0u) {
-            return;
-        }
-        std::memset(dest, 0, destSize);
-        if (!src || !src[0]) {
-            return;
-        }
-        const size_t copyCount = std::min(std::char_traits<char>::length(src), destSize - 1u);
-        std::memcpy(dest, src, copyCount);
-        dest[copyCount] = '\0';
-    };
-    auto preferNonEmpty = [](const char* primary, const char* fallback) {
-        return (primary && primary[0]) ? primary : fallback;
-    };
-
-    state8PersistenceF1c_ = {};
-
-    const ActiveCharacterStateViewScaffold characterState = DescribeOwnCharacterStateScaffold();
-    const auto& ownerState = PostAuthMarginLoadingStateView();
-    const char* characterName = characterState.characterName;
-    const char* realFirstName = characterState.realFirstName;
-    const char* realLastName = characterState.realLastName;
-    const char* background = characterState.background;
-
-    state8PersistenceF1c_.field24 = SourceField12c();
-    if (state8PersistenceF1c_.field24 == 0u) {
-        state8PersistenceF1c_.field24 = Arg6SelectedWorldIndexLow24();
-    }
-
-    characterName = preferNonEmpty(characterName, ownerState.characterNameBufferF1c);
-    // Keep ancillary +0xf4 strings as the already-recovered first/last/background view instead of
-    // fabricating character-name fallbacks here.
-    // Current original-vs-replacement `Morg4n_6DCE/mcd.cfg` comparison shows the original leaves
-    // the background slot empty while the lower-fidelity replacement injected `Morg4n` there.
-
-    copyCStringIntoFixed(state8PersistenceF1c_.string00, characterName);
-    state8PersistenceF1c_.field20 = ownerState.characterReplyFieldF3c;
-    state8PersistenceF1c_.field24 =
-        ownerState.characterReplyFieldF40 ? ownerState.characterReplyFieldF40 : state8PersistenceF1c_.field24;
-    state8PersistenceF1c_.field28 = ownerState.characterReplyFieldF44;
-    std::copy(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), state8PersistenceF1c_.header2c.begin());
-    std::copy(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), state8PersistenceF1c_.secondary4c.begin());
-    std::memcpy(state8PersistenceF1c_.body6c.data(), ownerState.state8Section0RawF88.data(), state8PersistenceF1c_.body6c.size());
-
-    copyCStringIntoByteSpan(state8PersistenceF1c_.body6c.data() + 0x04, 0x20, realFirstName);
-    copyCStringIntoByteSpan(state8PersistenceF1c_.body6c.data() + 0x24, 0x20, realLastName);
-    copyCStringIntoByteSpan(state8PersistenceF1c_.body6c.data() + 0x44, 0x400, background);
-
-    if (ownerState.replySectionData13cc != 0u) {
-        std::memcpy(
-            state8PersistenceF1c_.body6c.data() + 0x444,
-            &ownerState.replySectionData13cc,
-            sizeof(uint32_t));
-    }
-    if (ownerState.replySectionData13d0 != 0u) {
-        std::memcpy(
-            state8PersistenceF1c_.body6c.data() + 0x448,
-            &ownerState.replySectionData13d0,
-            sizeof(uint32_t));
-    }
-
-    return state8PersistenceF1c_;
-}
-
 // anchor: launcher.exe:0x41f1c0 / owner vtable +0xf4
 const void* CLTLoginMediator::GetState8PersistenceF1c() const {
     // Keep the wrapper-facing body close to the original tiny getter:
     // - original `0x41f1c0` returns owner `+0xf1c`
-    // - current replacement still synthesizes that contiguous view from the already-recovered
-    //   state8/load-character producer family instead of re-parsing anything at getter time
-    const State8PersistenceF1cSnapshot& snapshot = State8PersistenceF1cView();
+    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
+    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const CLTLoginMediatorCharacterPersistenceData* snapshot =
+        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
     ++profile0f4Count_;
-    const auto& ownerState = PostAuthMarginLoadingStateView();
-    const char* firstName = reinterpret_cast<const char*>(snapshot.body6c.data() + 0x04);
-    const char* lastName = reinterpret_cast<const char*>(snapshot.body6c.data() + 0x24);
-    const char* background = reinterpret_cast<const char*>(snapshot.body6c.data() + 0x44);
+    const char* firstName = snapshot ? snapshot->realFirstName70.data() : nullptr;
+    const char* lastName = snapshot ? snapshot->realLastName90.data() : nullptr;
+    const char* background = snapshot ? snapshot->backgroundB0.data() : nullptr;
     spdlog::debug(
         "CLTLoginMediator::GetState8PersistenceF1c(+0xf4) -> {} [count={} copiedFrom0ec={} valid0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x} overflow13f4=0x{:04x}]",
-        fmt::ptr(&snapshot),
+        fmt::ptr(snapshot),
         profile0f4Count_,
         selection0ecCount_,
         selectionContext0ecCopyValid_ ? 1u : 0u,
-        snapshot.string00[0] ? snapshot.string00.data() : "<empty>",
+        (snapshot && snapshot->characterName00[0]) ? snapshot->characterName00.data() : "<empty>",
         firstName && firstName[0] ? firstName : "<empty>",
         lastName && lastName[0] ? lastName : "<empty>",
         background && background[0] ? background : "<empty>",
-        static_cast<unsigned>(snapshot.field24),
-        static_cast<unsigned>(ownerState.state8Section0OverflowLength13f4));
-    return &snapshot;
+        snapshot ? static_cast<unsigned>(snapshot->selectedWorldField24) : 0u,
+        snapshot ? static_cast<unsigned>(snapshot->section0OverflowLength4d8) : 0u);
+    return snapshot;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input) {
-    std::copy(input.string00.begin(), input.string00.end(), postAuthMarginLoadingState_.sourceLeadString108.begin());
-    postAuthMarginLoadingState_.sourceField12c = input.field24;
+    auto& createCharacterData108 = postAuthMarginLoadingState_.createCharacterData108;
+    std::copy(input.string00.begin(), input.string00.end(), createCharacterData108.characterName00.begin());
+    createCharacterData108.selectedWorldField24 = input.field24;
 
-    std::copy(input.dwords2c.begin(), input.dwords2c.end(), postAuthMarginLoadingState_.sourceDwords134.begin());
-    std::copy(input.dwords4c.begin(), input.dwords4c.end(), postAuthMarginLoadingState_.sourceDwords134.begin() + 8);
-    postAuthMarginLoadingState_.sourceDwords134[16] =
+    std::copy(input.dwords2c.begin(), input.dwords2c.end(), createCharacterData108.header2c.begin());
+    std::copy(input.dwords4c.begin(), input.dwords4c.end(), createCharacterData108.secondary4c.begin());
+    createCharacterData108.bodyWord6c =
         static_cast<uint32_t>(input.bytes6c[0]) |
         (static_cast<uint32_t>(input.bytes6c[1]) << 8) |
         (static_cast<uint32_t>(input.bytes6c[2]) << 16) |
         (static_cast<uint32_t>(input.bytes6c[3]) << 24);
 
-    std::copy(input.string70.begin(), input.string70.end(), postAuthMarginLoadingState_.sourceBlock178.begin());
-    std::copy(input.string90.begin(), input.string90.end(), postAuthMarginLoadingState_.sourceBlock198.begin());
-    std::copy(input.stringB0.begin(), input.stringB0.end(), postAuthMarginLoadingState_.sourceBlock1b8.begin());
+    std::copy(input.string70.begin(), input.string70.end(), createCharacterData108.realFirstName70.begin());
+    std::copy(input.string90.begin(), input.string90.end(), createCharacterData108.realLastName90.begin());
+    std::copy(input.stringB0.begin(), input.stringB0.end(), createCharacterData108.backgroundB0.begin());
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2167,9 +2097,9 @@ uint32_t CLTLoginMediator::CaptureCreateCharacterInputArg6Slot120(
             fmt::ptr(input120),
             fmt::ptr(returnAddress),
             arg6CreateCharacterInputCount120_,
-            static_cast<unsigned>(postAuthMarginLoadingState_.sourceField12c),
-            postAuthMarginLoadingState_.sourceLeadString108[0]
-                ? postAuthMarginLoadingState_.sourceLeadString108.data()
+            static_cast<unsigned>(postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24),
+            postAuthMarginLoadingState_.createCharacterData108.characterName00[0]
+                ? postAuthMarginLoadingState_.createCharacterData108.characterName00.data()
                 : "<empty>");
         return 0u;
     }
@@ -2256,13 +2186,13 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
 
     spdlog::info(
         "CLTLoginMediator::ProcessCreateCharacterInput120(+0x120 owner) name='{}' field12c=0x{:08x} firstDword134=0x{:08x} backgroundPreview='{}' oldState={} currentState={} state10EntryResult=0x{:08x}",
-        postAuthMarginLoadingState_.sourceLeadString108[0]
-            ? postAuthMarginLoadingState_.sourceLeadString108.data()
+        postAuthMarginLoadingState_.createCharacterData108.characterName00[0]
+            ? postAuthMarginLoadingState_.createCharacterData108.characterName00.data()
             : "<empty>",
-        static_cast<unsigned>(postAuthMarginLoadingState_.sourceField12c),
-        static_cast<unsigned>(postAuthMarginLoadingState_.sourceDwords134[0]),
-        postAuthMarginLoadingState_.sourceBlock1b8[0]
-            ? reinterpret_cast<const char*>(postAuthMarginLoadingState_.sourceBlock1b8.data())
+        static_cast<unsigned>(postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24),
+        static_cast<unsigned>(postAuthMarginLoadingState_.createCharacterData108.header2c[0]),
+        postAuthMarginLoadingState_.createCharacterData108.backgroundB0[0]
+            ? postAuthMarginLoadingState_.createCharacterData108.backgroundB0.data()
             : "<empty>",
         oldState ? oldState->DebugName() : "<null>",
         currentState_ ? currentState_->DebugName() : "<null>",
@@ -3651,22 +3581,26 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
     // - the active branch uses `+0x12c` as a world-descriptor index/selector
     const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (currentSlotRecord != nullptr) {
-        if (postAuthMarginLoadingState_.sourceLeadString108[0] == '\0' && !currentSlotRecord->heapString14.empty()) {
+        if (postAuthMarginLoadingState_.createCharacterData108.characterName00[0] == '\0' &&
+            !currentSlotRecord->heapString14.empty()) {
             const size_t copyCount = std::min(
                 currentSlotRecord->heapString14.size(),
-                postAuthMarginLoadingState_.sourceLeadString108.size() - 1);
+                postAuthMarginLoadingState_.createCharacterData108.characterName00.size() - 1);
             std::copy_n(
                 currentSlotRecord->heapString14.data(),
                 copyCount,
-                postAuthMarginLoadingState_.sourceLeadString108.begin());
-            postAuthMarginLoadingState_.sourceLeadString108[copyCount] = '\0';
+                postAuthMarginLoadingState_.createCharacterData108.characterName00.begin());
+            postAuthMarginLoadingState_.createCharacterData108.characterName00[copyCount] = '\0';
         }
 
         const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(currentSlotRecord->worldId0c);
         if (matchedWorldIndex >= 0 &&
-            (postAuthMarginLoadingState_.sourceField12c >= static_cast<uint32_t>(worldDescriptorCountD80_) ||
-             (postAuthMarginLoadingState_.sourceField12c == 0u && matchedWorldIndex != 0))) {
-            postAuthMarginLoadingState_.sourceField12c = static_cast<uint32_t>(matchedWorldIndex);
+            (postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24 >=
+                 static_cast<uint32_t>(worldDescriptorCountD80_) ||
+             (postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24 == 0u &&
+              matchedWorldIndex != 0))) {
+            postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24 =
+                static_cast<uint32_t>(matchedWorldIndex);
         }
     }
 }

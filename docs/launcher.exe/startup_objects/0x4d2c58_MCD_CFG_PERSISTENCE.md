@@ -95,6 +95,11 @@ Original live + static tightening now proves this getter family on the active `m
   - optional out-length from owner `+0x13f4`
 - `+0xf4 -> 0x41f1c0 = CLTLoginMediator_GetState8PersistenceF1c`
   - tiny getter returning owner `+0xf1c`
+  - current Ghidra tightening now names the returned owner block
+    `CLTLoginMediatorCharacterPersistenceData_0x41d900`
+  - same shared owner layout is also reused earlier at owner `+0x108` on the helper11
+    create/load-character path, which is why the same recovered class carries both the later
+    `mcd.cfg`/character-info view and the earlier create-character source fields
 
 Sibling late getters in the same cluster:
 - `+0xc8 -> 0x41f190 = CLTLoginMediator_HasState8Section11Dword145c`

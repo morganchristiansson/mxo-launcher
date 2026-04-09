@@ -192,8 +192,8 @@ void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress
         (currentSlotRecord && !currentSlotRecord->heapString14.empty())
             ? currentSlotRecord->heapString14.c_str()
             : "<empty>";
-    const char* sourceLeadString108 = ownerState.sourceLeadString108[0]
-        ? ownerState.sourceLeadString108.data()
+    const char* sourceLeadString108 = ownerState.createCharacterData108.characterName00[0]
+        ? ownerState.createCharacterData108.characterName00.data()
         : "<empty>";
     const char* characterNameBufferF1c = ownerState.characterNameBufferF1c[0]
         ? ownerState.characterNameBufferF1c

@@ -115,7 +115,9 @@ static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src
 
 static void ResetState8ReplyOwnerState(PostAuthMarginLoadingState& ownerState) {
     // anchor: launcher.exe:0x438a50
-    // Shared `+0xf1c` reset helper used by both state8 (`0x43f930`) and state11 (`0x440320`).
+    // Shared `CLTLoginMediatorCharacterPersistenceData_ResetReplyState` helper used by both
+    // state8 (`0x43f930`) and state11 (`0x440320`).
+    ownerState.state8PersistenceDataF1c = {};
     std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
     ownerState.characterReplyFieldF3c = 0u;
     ownerState.characterReplyFieldF40 = 0u;
@@ -157,6 +159,7 @@ static bool SeedState8FirstFragment(
     uint32_t parsedField05) {
     ResetState8ReplyOwnerState(ownerState);
     ownerState.characterReplyFieldF3c = parsedField05;
+    ownerState.state8PersistenceDataF1c.replyField20 = parsedField05;
 
     const SlotRecordState* currentSlotRecord = mediator ? mediator->GetCurrentSlotRecord() : nullptr;
     if (currentSlotRecord != nullptr) {
@@ -169,19 +172,32 @@ static bool SeedState8FirstFragment(
                 copyCount,
                 ownerState.characterNameBufferF1c);
             ownerState.characterNameBufferF1c[copyCount] = '\0';
+            std::copy(
+                ownerState.characterNameBufferF1c,
+                ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
+                ownerState.state8PersistenceDataF1c.characterName00.begin());
         }
         ownerState.characterReplyFieldF40 = currentSlotRecord->worldId0c;
         ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
         ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
+        ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId0c;
+        ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId0c;
+        ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status0b;
         return true;
     }
 
     std::copy(
-        ownerState.sourceLeadString108.begin(),
-        ownerState.sourceLeadString108.end(),
+        ownerState.createCharacterData108.characterName00.begin(),
+        ownerState.createCharacterData108.characterName00.end(),
         ownerState.characterNameBufferF1c);
     ownerState.characterNameBufferF1c[sizeof(ownerState.characterNameBufferF1c) - 1u] = '\0';
-    ownerState.characterReplyFieldF40 = ownerState.sourceField12c;
+    std::copy(
+        ownerState.createCharacterData108.characterName00.begin(),
+        ownerState.createCharacterData108.characterName00.end(),
+        ownerState.state8PersistenceDataF1c.characterName00.begin());
+    ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
+    ownerState.state8PersistenceDataF1c.selectedWorldField24 =
+        ownerState.createCharacterData108.selectedWorldField24;
     return false;
 }
 
@@ -196,6 +212,7 @@ static void ApplyState8Section11SideEffect(
     PostAuthMarginLoadingState& ownerState,
     const ParsedState11LoadCharacterReplyScaffold& parsed) {
     // anchor: launcher.exe:0x43f8c0
+    // Shared `CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect` helper.
     // Current best read from disassembly:
     // - if section byteCount > 4, copy the leading dword into owner `+0x145c`
     // - then copy the remaining bytes into the small-string-like family at owner `+0x1460`
@@ -211,11 +228,21 @@ static void ApplyState8Section11SideEffect(
     ownerState.state8Section11String1460.assign(
         reinterpret_cast<const char*>(parsed.sectionData + 4u),
         reinterpret_cast<const char*>(parsed.sectionData + parsed.sectionByteCount));
+    ownerState.state8PersistenceDataF1c.section11Dword540 = ownerState.state8Section11Dword145c;
+    if (!ownerState.state8Section11String1460.empty()) {
+        char* const section11Begin = ownerState.state8Section11String1460.data();
+        ownerState.state8PersistenceDataF1c.section11StringBegin544 = section11Begin;
+        ownerState.state8PersistenceDataF1c.section11StringCurrent548 =
+            section11Begin + ownerState.state8Section11String1460.size();
+        ownerState.state8PersistenceDataF1c.section11StringCapacity54c =
+            section11Begin + ownerState.state8Section11String1460.capacity();
+    }
 }
 
 static void HandleState8ReplySection(
     PostAuthMarginLoadingState& ownerState,
     const ParsedState11LoadCharacterReplyScaffold& parsed) {
+    auto& persistence = ownerState.state8PersistenceDataF1c;
     switch (parsed.sectionSelectorMinus2) {
         case 0u:
             if (!parsed.sectionData) {
@@ -227,11 +254,24 @@ static void HandleState8ReplySection(
                     ownerState.characterFlagsF48.size() * sizeof(uint32_t));
                 if (fixedPrefixBytes != 0u) {
                     std::memcpy(ownerState.characterFlagsF48.data(), parsed.sectionData, fixedPrefixBytes);
+                    std::memcpy(persistence.header2c.data(), parsed.sectionData, fixedPrefixBytes);
                 }
                 if (parsed.sectionByteCount > 0x20u) {
                     CopyBoundedRawBytes(
                         ownerState.state8Section0RawF88.data(),
                         ownerState.state8Section0RawF88.size(),
+                        parsed.sectionData + 0x20u,
+                        parsed.sectionByteCount - 0x20u);
+                    persistence.bodyWord6c = 0x1000u;
+                    std::fill(persistence.realFirstName70.begin(), persistence.realFirstName70.end(), '\0');
+                    std::fill(persistence.realLastName90.begin(), persistence.realLastName90.end(), '\0');
+                    std::fill(persistence.backgroundB0.begin(), persistence.backgroundB0.end(), '\0');
+                    persistence.replySectionData4b0 = 0u;
+                    persistence.replySectionData4b4 = 0u;
+                    persistence.tail4b8 = {1u};
+                    CopyBoundedRawBytes(
+                        reinterpret_cast<uint8_t*>(&persistence.bodyWord6c),
+                        CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData::kBodySize,
                         parsed.sectionData + 0x20u,
                         parsed.sectionByteCount - 0x20u);
                 }
@@ -266,7 +306,10 @@ static void HandleState8ReplySection(
                         parsed.sectionData + 0x485u,
                         static_cast<uint16_t>(parsed.sectionByteCount - 0x485u));
                 }
+                persistence.section0OverflowBuffer4d4 = ownerState.state8Section0OverflowBuffer13f0;
+                persistence.section0OverflowLength4d8 = ownerState.state8Section0OverflowLength13f4;
                 ownerState.section0Flag13f6 = 1u;
+                persistence.section0PresentFlag4da = 1u;
                 spdlog::info(
                     "CLTLoginState_State8 section0 parsed name='{}' first='{}' last='{}' background='{}' ptr0=0x{:08x} extra13cc=0x{:08x} extra13d0=0x{:08x}",
                     ownerState.characterNameBufferF1c[0] ? std::string(ownerState.characterNameBufferF1c) : std::string("<empty>"),
@@ -282,38 +325,65 @@ static void HandleState8ReplySection(
         case 1u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag13fe = 1u;
+            persistence.section01Buffer4dc = ownerState.allocatedBuffer13f8;
+            persistence.section01Length4e0 = ownerState.allocatedBufferLength13fc;
+            persistence.section01PresentFlag4e2 = 1u;
             break;
         case 2u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag1406 = 1u;
+            persistence.section02Buffer4e4 = ownerState.allocatedBuffer1400;
+            persistence.section02Length4e8 = ownerState.allocatedBufferLength1404;
+            persistence.section02PresentFlag4ea = 1u;
             break;
         case 3u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, parsed.sectionData, parsed.sectionByteCount);
             ownerState.allocatedBufferFlag141e = 1u;
+            persistence.section03Buffer4fc = ownerState.allocatedBuffer1418;
+            persistence.section03Length500 = ownerState.allocatedBufferLength141c;
+            persistence.section03PresentFlag502 = 1u;
             break;
         case 4u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, parsed.sectionData, parsed.sectionByteCount);
             ownerState.allocatedBufferFlag1426 = 1u;
+            persistence.section04Buffer504 = ownerState.allocatedBuffer1420;
+            persistence.section04Length508 = ownerState.allocatedBufferLength1424;
+            persistence.section04PresentFlag50a = 1u;
             break;
         case 5u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, parsed.sectionData, parsed.sectionByteCount);
             ownerState.allocatedBufferFlag142e = 1u;
+            persistence.section05Buffer50c = ownerState.allocatedBuffer1428;
+            persistence.section05Length510 = ownerState.allocatedBufferLength142c;
+            persistence.section05PresentFlag512 = 1u;
             break;
         case 6u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, parsed.sectionData, parsed.sectionByteCount);
             ownerState.allocatedBufferFlag140e = 1u;
+            persistence.section06Buffer4ec = ownerState.allocatedBuffer1408;
+            persistence.section06Length4f0 = ownerState.allocatedBufferLength140c;
+            persistence.section06PresentFlag4f2 = 1u;
             break;
         case 7u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag1416 = 1u;
+            persistence.section07Buffer4f4 = ownerState.allocatedBuffer1410;
+            persistence.section07Length4f8 = ownerState.allocatedBufferLength1414;
+            persistence.section07PresentFlag4fa = 1u;
             break;
         case 8u:
             AppendOwnedSectionBytesU32(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag1448 = 1u;
+            persistence.section08Buffer524 = ownerState.allocatedBuffer1440;
+            persistence.section08Length528 = ownerState.allocatedBufferLength1444;
+            persistence.section08PresentFlag52c = 1u;
             break;
         case 9u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag1452 = 1u;
+            persistence.section09Buffer530 = ownerState.allocatedBuffer144c;
+            persistence.section09Length534 = ownerState.allocatedBufferLength1450;
+            persistence.section09PresentFlag536 = 1u;
             LogState8PersistenceFamilySnapshot(ownerState, "section9_clcfg1452", parsed.sectionSelectorMinus2, parsed.sectionByteCount, false);
             break;
         case 10u:
@@ -336,6 +406,9 @@ static void HandleState8ReplySection(
                     ownerState.allocatedBufferLength1458 = static_cast<uint16_t>(
                         ownerState.allocatedBufferLength1458 + parsed.sectionByteCount);
                     ownerState.flag145a = 1u;
+                    persistence.section0aChunkedBuffer538 = ownerState.allocatedBuffer1454;
+                    persistence.section0aChunkedLength53c = ownerState.allocatedBufferLength1458;
+                    persistence.section0aPresentFlag53e = 1u;
                 }
             }
             break;
@@ -349,10 +422,16 @@ static void HandleState8ReplySection(
         case 12u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag1436 = 1u;
+            persistence.section0cBuffer514 = ownerState.allocatedBuffer1430;
+            persistence.section0cLength518 = ownerState.allocatedBufferLength1434;
+            persistence.section0cPresentFlag51a = 1u;
             break;
         case 13u:
             AppendOwnedSectionBytesU16(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, parsed.sectionData, parsed.sectionByteCount);
             ownerState.flag143e = 1u;
+            persistence.section0dBuffer51c = ownerState.allocatedBuffer1438;
+            persistence.section0dLength520 = ownerState.allocatedBufferLength143c;
+            persistence.section0dPresentFlag522 = 1u;
             break;
         default:
             break;
