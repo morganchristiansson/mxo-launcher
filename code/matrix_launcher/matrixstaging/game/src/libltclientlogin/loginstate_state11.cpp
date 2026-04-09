@@ -184,9 +184,9 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
 
     const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
     const uint16_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
-    const ParsedState11LoadCharacterReplyScaffold parsed =
-        ParseState11LoadCharacterReplyScaffold(stagedBytes);
-    if (!parsed.valid) {
+    // anchor: launcher.exe:0x43ae50
+    LoadCharacterReplyEnvelope loadCharacterReplyEnvelope(stagedBytes, true);
+    if (!loadCharacterReplyEnvelope.valid) {
         mediator->WorldListCountOrStatus80() = 0x12000005u;
         spdlog::info(
             "CLTLoginState_State11::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
@@ -196,8 +196,8 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
     }
 
     auto& ownerState = mediator->postAuthMarginLoadingState_;
-    ownerState.worldListCountOrStatus80 = parsed.status;
-    if (parsed.status >= 1u) {
+    ownerState.worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
+    if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
         mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
@@ -206,13 +206,13 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
         mediator->PostErrorScaffold(12u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage observed failure status=0x{:08x} handoffWord=0x{:04x}; mirrored original owner+0x108 clear, owner+0xcc8=0xff, state3 switch, and error=12",
-            static_cast<unsigned>(parsed.status),
-            static_cast<unsigned>(parsed.handoffWord09));
+            static_cast<unsigned>(loadCharacterReplyEnvelope.status),
+            static_cast<unsigned>(loadCharacterReplyEnvelope.handoffWord09));
         return 1u;
     }
 
-    if (parsed.shouldSeedExpectedSectionCount) {
-        replySectionsExpected_ = parsed.expectedSectionCount0b;
+    if (loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount) {
+        replySectionsExpected_ = loadCharacterReplyEnvelope.expectedSectionCount0b;
     }
 
     const bool firstFragment = (replySectionsSeen_ == 0u);
@@ -252,9 +252,9 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
         ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
 
         // anchor: launcher.exe:0x440320 first-fragment seed
-        ownerState.characterReplyFieldF3c = parsed.field05;
+        ownerState.characterReplyFieldF3c = loadCharacterReplyEnvelope.field05;
         ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
-        ownerState.state8PersistenceDataF1c.replyField20 = parsed.field05;
+        ownerState.state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
         ownerState.state8PersistenceDataF1c.selectedWorldField24 =
             ownerState.createCharacterData108.selectedWorldField24;
         std::copy(
@@ -287,12 +287,12 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
     }
 
     auto& persistence = ownerState.state8PersistenceDataF1c;
-    switch (parsed.sectionSelectorMinus2) {
+    switch (loadCharacterReplyEnvelope.sectionSelectorMinus2) {
         case 0u:
-            if (parsed.sectionData && parsed.sectionByteCount >= 0x44cu) {
-                ownerState.characterRecordPointersF88[0] = ReadU32LE(parsed.sectionData + 0x00u);
-                ownerState.replySectionData13cc = ReadU32LE(parsed.sectionData + 0x444u);
-                ownerState.replySectionData13d0 = ReadU32LE(parsed.sectionData + 0x448u);
+            if (loadCharacterReplyEnvelope.sectionData && loadCharacterReplyEnvelope.sectionByteCount >= 0x44cu) {
+                ownerState.characterRecordPointersF88[0] = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x00u);
+                ownerState.replySectionData13cc = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x444u);
+                ownerState.replySectionData13d0 = ReadU32LE(loadCharacterReplyEnvelope.sectionData + 0x448u);
                 persistence.bodyWord6c = 0x1000u;
                 std::fill(persistence.realFirstName70.begin(), persistence.realFirstName70.end(), '\0');
                 std::fill(persistence.realLastName90.begin(), persistence.realLastName90.end(), '\0');
@@ -301,26 +301,26 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
                 persistence.replySectionData4b4 = 0u;
                 persistence.tail4b8 = {1u};
                 const size_t bodyCopyBytes = std::min<size_t>(
-                    parsed.sectionByteCount,
+                    loadCharacterReplyEnvelope.sectionByteCount,
                     CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData::kBodySize);
                 if (bodyCopyBytes != 0u) {
-                    std::memcpy(&persistence.bodyWord6c, parsed.sectionData, bodyCopyBytes);
+                    std::memcpy(&persistence.bodyWord6c, loadCharacterReplyEnvelope.sectionData, bodyCopyBytes);
                 }
                 CopyCStringIntoFixed(
                     ownerState.section0StringF8c.data(),
                     ownerState.section0StringF8c.size(),
-                    parsed.sectionData + 0x04u,
-                    parsed.sectionByteCount - 0x04u);
+                    loadCharacterReplyEnvelope.sectionData + 0x04u,
+                    loadCharacterReplyEnvelope.sectionByteCount - 0x04u);
                 CopyCStringIntoFixed(
                     ownerState.section0StringFac.data(),
                     ownerState.section0StringFac.size(),
-                    parsed.sectionData + 0x24u,
-                    parsed.sectionByteCount > 0x24u ? parsed.sectionByteCount - 0x24u : 0u);
+                    loadCharacterReplyEnvelope.sectionData + 0x24u,
+                    loadCharacterReplyEnvelope.sectionByteCount > 0x24u ? loadCharacterReplyEnvelope.sectionByteCount - 0x24u : 0u);
                 CopyCStringIntoFixed(
                     ownerState.section0StringFcc.data(),
                     ownerState.section0StringFcc.size(),
-                    parsed.sectionData + 0x44u,
-                    parsed.sectionByteCount > 0x44u ? parsed.sectionByteCount - 0x44u : 0u);
+                    loadCharacterReplyEnvelope.sectionData + 0x44u,
+                    loadCharacterReplyEnvelope.sectionByteCount > 0x44u ? loadCharacterReplyEnvelope.sectionByteCount - 0x44u : 0u);
                 ownerState.section0Flag13f6 = 1u;
                 persistence.section0PresentFlag4da = 1u;
             }
@@ -329,8 +329,8 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             AppendOwnedSectionBytesU16(
                 ownerState.allocatedBuffer1418,
                 ownerState.allocatedBufferLength141c,
-                parsed.sectionData,
-                parsed.sectionByteCount);
+                loadCharacterReplyEnvelope.sectionData,
+                loadCharacterReplyEnvelope.sectionByteCount);
             ownerState.allocatedBufferFlag141e = 1u;
             persistence.section03Buffer4fc = ownerState.allocatedBuffer1418;
             persistence.section03Length500 = ownerState.allocatedBufferLength141c;
@@ -340,8 +340,8 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             AppendOwnedSectionBytesU16(
                 ownerState.allocatedBuffer1420,
                 ownerState.allocatedBufferLength1424,
-                parsed.sectionData,
-                parsed.sectionByteCount);
+                loadCharacterReplyEnvelope.sectionData,
+                loadCharacterReplyEnvelope.sectionByteCount);
             ownerState.allocatedBufferFlag1426 = 1u;
             persistence.section04Buffer504 = ownerState.allocatedBuffer1420;
             persistence.section04Length508 = ownerState.allocatedBufferLength1424;
@@ -351,8 +351,8 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             AppendOwnedSectionBytesU16(
                 ownerState.allocatedBuffer1428,
                 ownerState.allocatedBufferLength142c,
-                parsed.sectionData,
-                parsed.sectionByteCount);
+                loadCharacterReplyEnvelope.sectionData,
+                loadCharacterReplyEnvelope.sectionByteCount);
             ownerState.allocatedBufferFlag142e = 1u;
             persistence.section05Buffer50c = ownerState.allocatedBuffer1428;
             persistence.section05Length510 = ownerState.allocatedBufferLength142c;
@@ -362,8 +362,8 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             AppendOwnedSectionBytesU16(
                 ownerState.allocatedBuffer1408,
                 ownerState.allocatedBufferLength140c,
-                parsed.sectionData,
-                parsed.sectionByteCount);
+                loadCharacterReplyEnvelope.sectionData,
+                loadCharacterReplyEnvelope.sectionByteCount);
             ownerState.allocatedBufferFlag140e = 1u;
             persistence.section06Buffer4ec = ownerState.allocatedBuffer1408;
             persistence.section06Length4f0 = ownerState.allocatedBufferLength140c;
@@ -373,11 +373,11 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             // anchor: launcher.exe:0x43f8c0
             ownerState.state8Section11Dword145c = 0u;
             ownerState.state8Section11String1460.clear();
-            if (parsed.sectionData != nullptr && parsed.sectionByteCount > 4u) {
-                ownerState.state8Section11Dword145c = ReadU32LE(parsed.sectionData);
+            if (loadCharacterReplyEnvelope.sectionData != nullptr && loadCharacterReplyEnvelope.sectionByteCount > 4u) {
+                ownerState.state8Section11Dword145c = ReadU32LE(loadCharacterReplyEnvelope.sectionData);
                 ownerState.state8Section11String1460.assign(
-                    reinterpret_cast<const char*>(parsed.sectionData + 4u),
-                    reinterpret_cast<const char*>(parsed.sectionData + parsed.sectionByteCount));
+                    reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + 4u),
+                    reinterpret_cast<const char*>(loadCharacterReplyEnvelope.sectionData + loadCharacterReplyEnvelope.sectionByteCount));
                 persistence.section11Dword540 = ownerState.state8Section11Dword145c;
                 char* const section11Begin = ownerState.state8Section11String1460.data();
                 persistence.section11StringBegin544 = section11Begin;
@@ -405,14 +405,14 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
             if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
                 // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
                 // Current source-owned mirror keeps that on the concrete state9 object.
-                nextState->SetPendingPayload(/*byte4=*/0, parsed.handoffWord09);
+                nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
             }
             mediator->SwitchHelperStateScaffold(9u, nextBase);
             if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
                 const uint32_t slot3Result = nextState->Slot3_BeginOrContinue(this, mediator);
                 spdlog::info(
                     "CLTLoginState_State11::Slot6_HandleSecondaryMessage mirrored 0x41b450 new-helper slot3 notification into helper9 before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
-                    parsed.handoffWord09,
+                    loadCharacterReplyEnvelope.handoffWord09,
                     static_cast<unsigned>(slot3Result));
             }
         }
@@ -425,10 +425,10 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
 
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} name='{}' -> currentState=helper9 event=0x16",
-            parsed.status,
-            parsed.sectionSelectorMinus2,
-            parsed.sectionByteCount,
-            parsed.handoffWord09,
+            loadCharacterReplyEnvelope.status,
+            loadCharacterReplyEnvelope.sectionSelectorMinus2,
+            loadCharacterReplyEnvelope.sectionByteCount,
+            loadCharacterReplyEnvelope.handoffWord09,
             replySectionsSeen_,
             replySectionsExpected_,
             firstFragment ? 1u : 0u,
@@ -438,14 +438,14 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
     } else {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage routed helper11 reply status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} section={} bytes={} seen={} expected={} seedCount={} firstFragment={} name='{}'",
-            parsed.status,
-            parsed.field05,
-            parsed.handoffWord09,
-            parsed.sectionSelectorMinus2,
-            parsed.sectionByteCount,
+            loadCharacterReplyEnvelope.status,
+            loadCharacterReplyEnvelope.field05,
+            loadCharacterReplyEnvelope.handoffWord09,
+            loadCharacterReplyEnvelope.sectionSelectorMinus2,
+            loadCharacterReplyEnvelope.sectionByteCount,
             replySectionsSeen_,
             replySectionsExpected_,
-            parsed.shouldSeedExpectedSectionCount ? 1u : 0u,
+            loadCharacterReplyEnvelope.shouldSeedExpectedSectionCount ? 1u : 0u,
             firstFragment ? 1u : 0u,
             ownerState.characterNameBufferF1c[0] ? ownerState.characterNameBufferF1c : "<empty>");
     }
