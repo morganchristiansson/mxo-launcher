@@ -402,6 +402,34 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     spdlog::info("CLTLoginMediator::ResetLauncherConnectionsScaffold completed");
 }
 
+// anchor: launcher.exe:0x41b160 / owner vtable +0x04
+// Current source-owned startup helper mirrors the highest-confidence init effects recovered so far:
+// - store/install the arg5-derived engine
+// - register the active mediator source
+// - install initial helper state0 when no helper is active yet
+// - rebuild the auth-side `CLTIPAddressList` from the already-seeded launcher auth host config
+// Current known gap kept explicit:
+// - original `0x41b160` allocates owner `+0x680` here, while current source still materializes the
+//   `AuthBootstrap680Child` earlier in the C++ constructor
+void ILTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) {
+    SetNetworkEngine(networkEngineOverride);
+
+    if (auto* mediator = dynamic_cast<CLTLoginMediator*>(this)) {
+        mediator->EnsureBuiltinScaffoldStatesRegistered();
+        CLTLoginMediator::RegisterActiveStateSourceScaffold(mediator);
+        if (mediator->CurrentState() == nullptr) {
+            mediator->InstallInitialState0Scaffold();
+        }
+        mediator->ResetAuthConnectRetryStateScaffold();
+        mediator->RefreshAuthAddressListForCurrentHostScaffold();
+        spdlog::info(
+            "ILTLoginMediator::Initialize engine={} currentState={} authCandidates={}",
+            fmt::ptr(networkEngineOverride),
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+            mediator->AuthConnectCandidateCountScaffold());
+    }
+}
+
 // +0x00
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetName() {
@@ -426,11 +454,21 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 }
 
 // Wrapper-facing arg6 clear helper reached from launcher teardown after arg5 release.
+// Current fidelity direction:
+// - owner vtable `0x004b01c8 +0x08 / 0x41f510` now reads as reset/clear-owned-runtime-state logic
+// - keep this wrapper slot distinct from the owner vtable numbering, but mirror the highest-
+//   confidence reset effects here instead of only nulling the engine pointer
+// Remaining known gap kept explicit:
+// - original `0x41f510` frees owner `+0x680` outright, while current source reconstructs a fresh
+//   `AuthBootstrap680Child` immediately so later source paths do not dereference a null child
 // UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
 // nopatch launcher-version setter instead.
 void CLTLoginMediator::ClearEngine() {
-    SetNetworkEngine(nullptr);
-    spdlog::info("MediatorStub::ClearEngine()");
+    FreeLateEntryList1470StorageScaffold();
+    ResetLauncherConnectionsScaffold();
+    sessionCallbackHelper65c_ = nullptr;
+    authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
+    spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold");
 }
 // +0x10
 // UNANCHORED: no original launcher.exe anchor assigned yet.

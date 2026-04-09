@@ -1094,6 +1094,9 @@ public:
     uint32_t LastAuthConnectStatus() const { return lastAuthConnectStatus_; }
     uint32_t AuthConnectStatusCount() const { return authConnectStatusCount_; }
     void ResetAuthConnectRetryStateScaffold();
+    // Current source-owned mirror of owner `+0x4c` auth address-list reinit used by startup
+    // helper `0x41b160` after launcher config has already seeded the auth host name.
+    void RefreshAuthAddressListForCurrentHostScaffold();
     uint32_t AuthConnectAttemptCountScaffold() const;
     uint32_t AuthConnectCandidateCountScaffold() const;
     bool HasAuthConnectRetryCandidateRemainingScaffold() const;
@@ -1506,7 +1509,6 @@ private:
     void FreeLateEntryList1470StorageScaffold();
 
     void BuildAuthEndpoint();
-    void RefreshAuthAddressListForCurrentHostScaffold();
     void PrepareNextAuthEndpointForConnectAttemptScaffold();
     void BuildMarginEndpoint();
     bool RebuildMarginAddressList();

@@ -152,6 +152,9 @@ Important current clarification:
 - do **not** identify it blindly with owner vtable `0x004b01c8 +0x08`
 - current owner-body recovery now puts `0x41f510` at owner `+0x08`, and that body looks like reset/clear-owned-runtime-state logic rather than the startup handoff itself
 - practical source consequence: launcher startup `0x40a380` should own the arg5 -> arg6 handoff, while later arbitrary arg5 method traffic should not lazily recreate mediator bind/reset side effects
+- current source now mirrors that startup handoff by routing resolved wrapper `+0x08` through a
+  narrow `ILTLoginMediator::Initialize(networkEngineOverride)` helper that installs the engine,
+  active mediator source, initial state0 helper, and auth-side address-list refresh in one place
 
 ### Client startup receives it as InitClientDLL arg6
 At `0x40a587`:

@@ -360,6 +360,10 @@ public:
     // +0x00
     virtual const char* GetName() = 0;
     // +0x04
+    // anchor: launcher.exe:0x41b160 / owner vtable +0x04
+    // Current source-owned wrapper helper mirrors the highest-confidence startup effects of owner
+    // initialize while keeping the resolved arg6 wrapper handoff distinct from owner vtable slot
+    // numbering.
     void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride);
     // +0x08
     // Wrapper-facing startup handoff from `launcher.exe:0x40a380`; keep this distinct from owner
