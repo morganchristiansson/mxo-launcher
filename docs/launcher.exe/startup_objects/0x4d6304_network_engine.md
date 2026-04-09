@@ -1613,8 +1613,10 @@ Newer source-ownership cleanup on the launcher entry side:
   - preserve the raw `result < 1` success test
 - the remaining launcher ABI helper on this path is now narrowed to the allocation + ctor step only,
   instead of a broader synthetic install helper that also hid the store/register sequence
-- the liblttcp sidecar may still bind later from that startup handoff or the first later arg5 use,
-  but arbitrary arg5 accessors no longer own mediator install/reset side effects
+- the liblttcp sidecar may still be materialized from the startup handoff helper, but later arg5
+  vtable/helper dispatch now prefers the single registered launcher binding instead of calling a
+  broad `GetOrCreate...` path on every use
+- arbitrary arg5 accessors no longer own mediator install/reset side effects
 - a follow-up cleanup pass also tightened the teardown side toward original `0x40b389..0x40b404`:
   - launcher-owned shutdown now explicitly releases arg5 through primary slot `0` with flag `1`
   - clears the launcher-side arg5 pointer
