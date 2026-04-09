@@ -1607,6 +1607,8 @@ Current tightened worker-loop read after the latest `0x42fe50 / 0x42f970 / 0x42f
 - connection-side send/close state is also tighter now:
   - `0x431ff0` writes the direct worker pointer back to `[connection+0x08]`
   - `0x44a9f0` seeds connection byte `+0x38 = 1`
+  - worker-side pop helper `0x44aa70 = TryPopQueuedSendBufferWithEndpoint` drains one queued item
+    and restores `+0x38 = 1` when the queue is empty
   - `0x42fbd0 -> 0x44ad80 = CLTTCPConnection::QueueSendBuffer` pushes copied send buffers through
     the connection-owned queue rooted at `+0x3c`, clears `+0x38`, and signals the worker wakeup
     socket

@@ -194,7 +194,8 @@ static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold) == 0x2c, "pa
 class CVariableLengthPrefixedTCPStreamParser;
 class CBaseConnection;
 
-// Recovered worker/send family tightening from `0x44a9f0`, `0x44aa70`,
+// Recovered worker/send family tightening from `0x44a9f0`,
+// `TryPopQueuedSendBufferWithEndpoint (0x44aa70)`,
 // `CLTTCPConnection::QueueSendBufferWithEndpoint (0x44ac90)`,
 // `CLTTCPConnection::QueueSendBuffer (0x44ad80)`, and `0x42fe50`:
 // - connection `+0x08` stores the direct worker-thread object pointer
@@ -410,6 +411,9 @@ public:
     // Current bounded source mirror keeps the active `0x448a00 -> vtable +0x20(...,1)` copied-byte
     // path explicit while still using source-owned `std::deque` storage under the hood.
     bool QueueSendBufferScaffold(const void* buffer, uint32_t byteCount, uintptr_t ownershipMode = 1u);
+    // anchor family: launcher.exe:0x44aa70
+    // Current best original helper meaning: try pop one queued send-buffer item and mirror the
+    // `+0x38 = 1` empty-queue write when nothing remains.
     bool TryPopQueuedSendBufferScaffold(CLTTCPConnection_SendQueueItemScaffold* outItem);
     bool SendQueueEmptyFlagScaffold() const;
 
