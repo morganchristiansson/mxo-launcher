@@ -80,27 +80,6 @@ static const char* DiagnosticMediatorProfileName() {
     return mediator ? mediator->Arg6ProfileName() : g_MediatorStringA;
 }
 
-// Observer state accessors (moved from g_MediatorRuntimeState to CLTLoginMediator):
-uint32_t DiagnosticMediatorObserverRegisterCount() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->ObserverRegisterCount() : 0u;
-}
-
-uint32_t DiagnosticMediatorObserverUnregisterCount() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->ObserverUnregisterCount() : 0u;
-}
-
-const char* DiagnosticMediatorAuthName() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6AuthName() : DiagnosticMediatorProfileName();
-}
-
-const char* DiagnosticMediatorAuthPassword() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6AuthPassword() : g_MediatorEmptyString;
-}
-
 static const char* NonEmptyOrPlaceholder(const char* value) {
     return (value && value[0]) ? value : "<empty>";
 }
@@ -252,57 +231,6 @@ void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress
         fmt::ptr(currentState),
         currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->worldId0c) : 0u,
         currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->status0b) : 0u);
-}
-
-
-// UNANCHORED: generic pointer-word dumper used by mediator diagnostics.
-void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount) {
-    if (!ptr || !wordCount) {
-        spdlog::info("{}: <null>", label ? label : "PointerWords");
-        return;
-    }
-
-    const uint32_t* words = static_cast<const uint32_t*>(ptr);
-    spdlog::info("{} @ {} [+0x00]=0x{:08x} [+0x04]=0x{:08x} [+0x08]=0x{:08x} [+0x0c]=0x{:08x}",
-        label,
-        fmt::ptr(ptr),
-        words[0],
-        (wordCount > 1) ? words[1] : 0,
-        (wordCount > 2) ? words[2] : 0,
-        (wordCount > 3) ? words[3] : 0);
-    if (wordCount > 4) {
-        spdlog::info("{} @ {} [+0x10]=0x{:08x} [+0x14]=0x{:08x} [+0x18]=0x{:08x} [+0x1c]=0x{:08x}",
-            label,
-            fmt::ptr(ptr),
-            words[4],
-            (wordCount > 5) ? words[5] : 0,
-            (wordCount > 6) ? words[6] : 0,
-            (wordCount > 7) ? words[7] : 0);
-    }
-}
-
-// UNANCHORED: generic dword-buffer logger for copied mediator state blobs.
-void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount) {
-    if (!label || !ptr || byteCount == 0) {
-        return;
-    }
-
-    const uint32_t* words = static_cast<const uint32_t*>(ptr);
-    const uint32_t wordCount = byteCount / 4;
-    for (uint32_t i = 0; i < wordCount; i += 4) {
-        spdlog::info(
-            "{} @ {} [+0x{:02x}]={:08x} [+0x{:02x}]={:08x} [+0x{:02x}]={:08x} [+0x{:02x}]={:08x}",
-            label,
-            fmt::ptr(ptr),
-            i * 4,
-            words[i + 0],
-            (i + 1) * 4,
-            (i + 1 < wordCount) ? words[i + 1] : 0,
-            ((i + 2) * 4),
-            (i + 2 < wordCount) ? words[i + 2] : 0,
-            ((i + 3) * 4),
-            (i + 3 < wordCount) ? words[i + 3] : 0);
-    }
 }
 
 // UNANCHORED: resets the replacement mediator stub and clears stale active-state registration.

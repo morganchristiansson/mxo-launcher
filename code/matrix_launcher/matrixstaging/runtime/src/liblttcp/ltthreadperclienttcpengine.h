@@ -254,8 +254,6 @@ public:
 
     // UNANCHORED: scaffold accessor for recovered child +0x38 owner/context field
     void* OwnerContext() const;
-    // UNANCHORED: scaffold accessor for recovered child +0x3c listening socket field
-    uint32_t ListenSocketHandle() const;
     // UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
     uint32_t WakeupSocketHandle() const;
     // UNANCHORED: source-owned bridge for the original external closesocket([payload+0x3c]) seam.
@@ -289,12 +287,6 @@ public:
 
     // UNANCHORED: scaffold accessor for recovered child +0x38 context/connection key field
     void* ContextKey() const;
-    // UNANCHORED: scaffold accessor for recovered child +0x3c datagram-mode byte
-    bool DatagramMode() const;
-    // UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
-    uint32_t WakeupSocketHandle() const;
-    // UNANCHORED: scaffold accessor for recovered child +0x44 exit-request byte
-    bool ExitRequested() const;
     // UNANCHORED: source-owned bridge for the recovered child +0x44 exit-request byte
     void RequestExit();
     // anchor: launcher.exe:0x452320 helper family use via child +0x40 wakeup socket
@@ -491,8 +483,6 @@ public:
     // Current source helper owns the real `+0x04/+0x08` queue-thread array/count fields directly
     // and mirrors the constructor/stop-thread family without pretending to be one exact body.
     void RebuildQueueThreadsForCtorCount(uint32_t queueThreadCount);
-    // Recovered field-backed accessor over real object `+0x04`.
-    size_t QueueThreadCount() const;
 
     // Source-owned connection resolver. Current faithful preference order is:
     // - direct connection object / direct owner-context identities
@@ -645,8 +635,6 @@ public:
     void* Owner() const;
     // UNANCHORED: starter binding helper.
     CLTThreadPerClientTCPEngine* Engine() const;
-    // UNANCHORED: starter binding helper.
-    bool HasEngine() const;
 
 private:
     void* owner_;

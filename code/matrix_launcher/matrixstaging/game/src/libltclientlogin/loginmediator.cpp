@@ -2808,28 +2808,6 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 //   - late-login arg6 slots `+0xd4/+0x124/+0x18c` live separately under:
 //     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
-// Address anchor: launcher.exe:0x4d2c58 = ILTLoginMediator_Default object (arg6)
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void* CLTLoginMediator::WorldSlot(uint32_t index) const {
-    // Faithful implementation should call:
-    // - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds(index)
-    // - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback)
-
-    // Transitional stub preserves the slot structure for later completion.
-    return worldSlots_[index];
-}
-
-// Address anchor: launcher.exe:0x4d2c58 = ILTLoginMediator_Default object (arg6)
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void* CLTLoginMediator::WorldPayloadSlot(uint32_t index) const {
-    // Faithful implementation should call:
-    // - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList / available-world list population
-    // - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl
-
-    // Transitional stub preserves the payload structure for later completion.
-    return worldPayloadSlots_[index];
-}
-
 // anchor: launcher.exe:0x40e480
 // sibling slot/vtable family: launcher.exe:0x4d3584
 void CLTLoginMediator::InitializeArg6DefaultObject() {
@@ -2901,30 +2879,6 @@ void CLTLoginMediator::ConfigureArg6Selection(
 // These are replacement-side scaffolds, not recovered launcher.exe vtable methods. They seed the
 // startup-side arg6/arg7 bridge while the anchored wrapper-facing readers below stay tied to the
 // recovered owner fields.
-void CLTLoginMediator::SetArg6ProfileName(const char* profileName) {
-    arg6Selection_.profileName_ = (profileName && profileName[0]) ? profileName : "resurrections";
-    SetLaunchPadSourceBlock94FirstString(arg6Selection_.profileName_.c_str());
-}
-
-void CLTLoginMediator::SetArg6AuthName(const char* authName) {
-    arg6Selection_.authName_ = (authName && authName[0]) ? authName : arg6Selection_.profileName_;
-    SetLaunchPadSourceBlock94FirstString(arg6Selection_.authName_.c_str());
-}
-
-void CLTLoginMediator::SetArg6AuthPassword(const char* authPassword) {
-    arg6Selection_.authPassword_ = authPassword ? authPassword : "";
-
-    std::fill(authBootstrapSource38_.inlineString20.begin(), authBootstrapSource38_.inlineString20.end(), '\0');
-    const size_t copyCount = std::min(
-        arg6Selection_.authPassword_.size(),
-        authBootstrapSource38_.inlineString20.size() - 1);
-    std::copy_n(
-        arg6Selection_.authPassword_.data(),
-        copyCount,
-        authBootstrapSource38_.inlineString20.begin());
-    authBootstrapSource38_.inlineString20[copyCount] = '\0';
-}
-
 uint32_t CLTLoginMediator::Arg6WorldUpperBoundExclusive() const {
     const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
     if (stateCode >= 3u && worldDescriptorCountD80_ != 0u) {
@@ -3006,10 +2960,6 @@ const char* CLTLoginMediator::Arg6AuthName() const {
 const char* CLTLoginMediator::Arg6AuthPassword() const {
     const char* authPassword = authBootstrapSource38_.inlineString20.data();
     return (authPassword && authPassword[0] != '\0') ? authPassword : arg6Selection_.authPassword_.c_str();
-}
-
-bool CLTLoginMediator::Arg6WorldIndexMatchesSelection(uint32_t worldIndex) const {
-    return worldIndex == arg6Selection_.selectedWorldIndexLow24_;
 }
 
 bool CLTLoginMediator::Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const {
@@ -3237,79 +3187,6 @@ uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const 
         static_cast<unsigned>(populationNibble),
         useRecoveredDescriptorTable ? "owner+0xd84.population+0x1f.low4" : "no-startup-fallback");
     return populationNibble;
-}
-
-// anchor: launcher.exe:0x4d3584 +0xe4
-// vtable: launcher.exe:0x4d3584 +0xe4
-uint8_t CLTLoginMediator::Arg6ValidateWorldSelection(uint8_t variant) {
-    // Keep this anchored startup validator table-backed instead of routing through the separate
-    // unanchored selected-variant-state helper on the active startup path.
-    return (variant < arg6WorldList_.activeVariantStatesE4_.size())
-        ? arg6WorldList_.activeVariantStatesE4_[variant]
-        : 3u;
-}
-
-// anchor: launcher.exe:0x40e5b0
-// vtable: launcher.exe:0x4d3584 +0xf8
-uint32_t CLTLoginMediator::Arg6GetWorldListCount() const {
-    return Arg6WorldUpperBoundExclusive();
-}
-
-// anchor: launcher.exe:0x40e560
-// vtable: launcher.exe:0x4d3584 +0xd8
-uint32_t CLTLoginMediator::Arg6GetActiveWorldListCount() const {
-    return arg6WorldList_.activeCount_;
-}
-
-// anchor: launcher.exe:0x40e670
-// vtable: launcher.exe:0x4d3584 +0xe0
-const char* CLTLoginMediator::Arg6GetAvailableWorldMatchName(uint32_t index) const {
-    // anchor: launcher.exe:0x40e670 / launcher.exe:0x40e480
-    // `0x40e480` calls sibling slot `+0xe0` twice and compares the returned text against the
-    // total-world name from `+0xfc`; this is therefore a string producer, not a bool gate.
-    return (index < arg6WorldList_.activeWorldMatchNamesE0_.size())
-        ? arg6WorldList_.activeWorldMatchNamesE0_[index].c_str()
-        : nullptr;
-}
-
-// anchor: launcher.exe:0x40cd60
-// vtable: launcher.exe:0x4d3584 +0xdc
-const char* CLTLoginMediator::Arg6GetAvailableWorldName(uint32_t index) {
-    // `0x40e480` inserts this text into list column 1 on the matched-row path.
-    return (index < arg6WorldList_.activeWorldDisplayNamesDc_.size())
-        ? arg6WorldList_.activeWorldDisplayNamesDc_[index].c_str()
-        : nullptr;
-}
-
-// =============================================================================
-// Private helper: Populate client.dll's world list view for InitClientDLL
-// Address anchor: launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject
-// =============================================================================
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::PopulateClientWorldView() {
-    // Populate the client's world list view with launcher-provided data
-    // This ensures client.dll receives populated world data when InitClientDLL passes arg6
-    spdlog::info("launcher-owned PopulateClientWorldView called");
-
-    // Copy launcher-owned world list into the mediator's client-facing view
-    for (uint32_t i = 0; i < kRecoveredWorldSlotCapacity && i < arg6WorldList_.totalCount_; ++i) {
-        worldSlots_[i] = const_cast<void*>(reinterpret_cast<const void*>(arg6WorldList_.worldNames_[i].c_str()));
-        worldPayloadSlots_[i] = const_cast<void*>(
-            reinterpret_cast<const void*>(&arg6WorldList_.worldSelectionGateBytes100_[i]));
-        if (arg6WorldList_.activeVariantStatesE4_[i] == 3u && i < arg6WorldList_.activeCount_) {
-            arg6WorldList_.activeVariantStatesE4_[i] = 0u;
-        }
-        if (arg6WorldList_.activeWorldMatchNamesE0_[i].empty()) {
-            arg6WorldList_.activeWorldMatchNamesE0_[i] = arg6WorldList_.worldNames_[i];
-        }
-        if (arg6WorldList_.activeWorldDisplayNamesDc_[i].empty()) {
-            arg6WorldList_.activeWorldDisplayNamesDc_[i] = arg6WorldList_.worldNames_[i];
-        }
-    }
-
-    spdlog::info(
-        "launcher-owned PopulateClientWorldView populated {} world slots and seeded activeWorldMatchNamesE0 where empty",
-        std::min<uint32_t>(kRecoveredWorldSlotCapacity, arg6WorldList_.totalCount_));
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -3918,141 +3795,6 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         static_cast<unsigned>(postAuthMarginLoadingState_.characterRouteIndexCc8));
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::HandleAuthConnectionReceiveScaffold() {
-    mxo::liblttcp::CMessageConnection* connection = AuthConnection();
-    if (connection == nullptr) {
-        return kReceiveActionNone;
-    }
-
-    uint32_t actions = kReceiveActionNone;
-    std::vector<uint8_t> queuedPacketBodyBytes;
-    bool queuedPacketHeaderless = false;
-    while (connection->TakeNextReceivedPacketScaffold(
-        &queuedPacketBodyBytes,
-        &queuedPacketHeaderless)) {
-        const uint8_t rawCode = queuedPacketBodyBytes.empty() ? 0u : queuedPacketBodyBytes[0];
-        spdlog::info(
-            "CLTLoginMediator::HandleAuthConnectionReceiveScaffold queuedParsedPacket payloadBytes={} headerless={} rawCode=0x{:02x} likelyMessage='{}'",
-            static_cast<unsigned>(queuedPacketBodyBytes.size()),
-            queuedPacketHeaderless ? 1u : 0u,
-            static_cast<unsigned>(rawCode),
-            mxo::auth::AuthOpcodeName(rawCode));
-
-        const uint32_t handled = HandleAuthPacketBytes(
-            queuedPacketBodyBytes.empty() ? nullptr : queuedPacketBodyBytes.data(),
-            queuedPacketBodyBytes.size());
-        spdlog::info(
-            "CLTLoginMediator::HandleAuthConnectionReceiveScaffold handledQueuedPacket={} rawCode=0x{:02x}",
-            static_cast<unsigned>(handled),
-            static_cast<unsigned>(rawCode));
-
-        if (handled != 0u && rawCode == 0x0bu && !postAuthMarginAutoBeginAttemptedScaffold_) {
-            postAuthMarginAutoBeginAttemptedScaffold_ = true;
-            actions |= kReceiveActionBeginMarginAfterAuthReply;
-            spdlog::info(
-                "CLTLoginMediator::HandleAuthConnectionReceiveScaffold requested one-shot post-AS_AuthReply margin auto-begin currentState={}",
-                currentState_ ? currentState_->DebugName() : "<null>");
-        }
-    }
-
-    return actions;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize) {
-    // Receive-side note:
-    // - the current replacement receive scaffolds strip the variable-length frame header before
-    //   calling this wrapper entry point
-    // - so this function operates on logical auth payload bytes beginning at raw opcode, not on a
-    //   second frame layer
-    // Ownership note:
-    // - this mediator entry is only the current staging/demux wrapper
-    // - original `0x43f300/0x448140` consume a higher-level incoming auth-message object, not raw
-    //   payload bytes directly
-    // - current source therefore keeps only a staged-payload demux boundary here, routing the
-    //   early semantic handling into state2 / the owner+0x680 child instead of claiming mediator
-    //   ownership
-    // - important create/delete correction from `0x41bf70 / 0x43bf90 / 0x4401a0`:
-    //   later raw `0x0b` handling for helper10 is margin-side
-    //   `MS_ClaimCharacterNameReply`, not auth-side `AS_AuthReply`
-    // - one deliberate current-source exception remains: the replacement's existing-character
-    //   state8 branch still bypasses the natural state10/state11 claim/create transition
-    if (!packetBytes || packetSize == 0u) {
-        return 0u;
-    }
-
-    const uint8_t rawCode = packetBytes[0];
-    const auto dispatchStagedEarlyAuthViaState2 = [this, packetBytes, packetSize, rawCode]() -> uint32_t {
-        stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-        if (scaffoldState2_ == nullptr) {
-            spdlog::info(
-                "CLTLoginMediator::HandleAuthPacketBytes received early auth rawCode=0x{:02x} with no registered state2/AuthMessageDispatch receiver",
-                static_cast<unsigned>(rawCode));
-            return 0u;
-        }
-        return scaffoldState2_->AuthMessageDispatch(nullptr, this);
-    };
-
-    switch (rawCode) {
-        case kAuthRawCodeGetPublicKeyReply:
-            return dispatchStagedEarlyAuthViaState2();
-
-        case 0x09u: {
-            const uint32_t handled = dispatchStagedEarlyAuthViaState2();
-            const bool preserveExistingCharacterState8Path =
-                currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u;
-            if (handled != 0u && scaffoldState10_ != nullptr && !preserveExistingCharacterState8Path) {
-                SwitchHelperStateScaffold(0x0au, scaffoldState10_);
-            } else if (handled != 0u && preserveExistingCharacterState8Path) {
-                spdlog::info(
-                    "CLTLoginMediator::HandleAuthPacketBytes preserving current state8 through AS_AuthChallengeResponse for the existing-character path instead of forcing helperState=0x0a claim/create flow");
-            }
-            return handled;
-        }
-
-        case 0x0bu: {
-            // Address anchors:
-            // - launcher.exe:0x41bc20 = later auth opcode read helper
-            // - launcher.exe:0x43f300 = state2 broader inbound auth dispatcher
-            // - launcher.exe:0x4401a0 = state10 slot 6 / later narrower selected-slot auth-reply handler
-            stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-            if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 8u) {
-                spdlog::info(
-                    "CLTLoginMediator::HandleAuthPacketBytes routing AS_AuthReply onto the existing-character state8 path; keeping currentState={} and skipping the later natural state10/state11 claim/create transition",
-                    currentState_->DebugName());
-                const uint32_t handled = CLTLoginState_State10::HandleStagedAuthReplyScaffold(this);
-                if (handled != 0u && lastAuthReply_.valid && !lastAuthReply_.isErrorReply) {
-                    expectedMarginRequestName_ = "existing-character state8 raw-0x0f margin packet";
-                }
-                return handled;
-            }
-            if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 10u) {
-                spdlog::info(
-                    "CLTLoginMediator::HandleAuthPacketBytes received AS_AuthReply while helper10 is active; state10 slot6 is margin-side MS_ClaimCharacterNameReply, so this auth packet has no faithful helper10 consumer currentState={}",
-                    currentState_->DebugName());
-            }
-            if (scaffoldState2_ != nullptr) {
-                return scaffoldState2_->AuthMessageDispatch(nullptr, this);
-            }
-            spdlog::info(
-                "CLTLoginMediator::HandleAuthPacketBytes received AS_AuthReply with no faithful state2/state10 receiver available currentState={}",
-                currentState_ ? currentState_->DebugName() : "<null>");
-            return 0u;
-        }
-
-        default:
-            spdlog::info(
-                "DIAGNOSTIC: launcher-owned auth received unhandled packet rawCode=0x{:02x} message='{}' payloadLen={}",
-                rawCode,
-                mxo::auth::AuthOpcodeName(rawCode),
-                packetSize);
-            break;
-    }
-
-    return 0u;
-}
-
 // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441a30 / 0x4429b0
 uint32_t CLTLoginMediator::HandleMarginConsumedCode2AtConnectionSeamScaffold(
     const uint8_t* packetBytes,
@@ -4124,40 +3866,6 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
     const uint32_t bootstrapHandled =
         ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
     return (bootstrapHandled != 0u) ? bootstrapHandled : localWorkItemHandled;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::HandleMarginConnectionReceiveScaffold() {
-    mxo::liblttcp::CMessageConnection* connection = MarginConnection();
-    if (connection == nullptr) {
-        return kReceiveActionNone;
-    }
-
-    std::vector<uint8_t> queuedPacketBodyBytes;
-    bool queuedPacketHeaderless = false;
-    while (connection->TakeNextReceivedPacketScaffold(
-        &queuedPacketBodyBytes,
-        &queuedPacketHeaderless)) {
-        const uint8_t rawCode = queuedPacketBodyBytes.empty() ? 0u : queuedPacketBodyBytes[0];
-        const bool looksLikePlainBootstrapReply =
-            rawCode == 0x02u || rawCode == 0x04u || rawCode == 0x07u || rawCode == 0x09u;
-        spdlog::info(
-            "CLTLoginMediator::HandleMarginConnectionReceiveScaffold queuedParsedPacket payloadBytes={} headerless={} outerByte0=0x{:02x} framingHint={}",
-            static_cast<unsigned>(queuedPacketBodyBytes.size()),
-            queuedPacketHeaderless ? 1u : 0u,
-            static_cast<unsigned>(rawCode),
-            looksLikePlainBootstrapReply ? "plaintext-bootstrap-reply" : "possibly-encrypted-post-bootstrap-payload");
-
-        const uint32_t handled = HandleMarginPacketBytes(
-            queuedPacketBodyBytes.empty() ? nullptr : queuedPacketBodyBytes.data(),
-            queuedPacketBodyBytes.size());
-        spdlog::info(
-            "CLTLoginMediator::HandleMarginConnectionReceiveScaffold handledQueuedPacket={} outerByte0=0x{:02x}",
-            static_cast<unsigned>(handled),
-            static_cast<unsigned>(rawCode));
-    }
-
-    return kReceiveActionNone;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

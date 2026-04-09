@@ -273,48 +273,6 @@ static Node* LauncherTreeFindNode(const Head* head, const Key& key, Compare comp
         : nullptr;
 }
 
-template <typename Node, typename Head, typename Backing, typename Entry, typename Key, typename Record, typename Compare>
-static Record* LauncherTreeInsertUniqueOwnedNode(
-    Backing& backing,
-    Head* head,
-    std::unique_ptr<Entry> entry,
-    const Key& key,
-    Record* payload,
-    Compare compare) {
-    if (!head || !entry || !payload) {
-        return nullptr;
-    }
-
-    entry->node._M_valptr()->first = key;
-    entry->node._M_valptr()->second = payload;
-
-    std::_Rb_tree_node_base* header = TreeHeaderBase(head);
-    std::_Rb_tree_node_base* parent = header;
-    Node* current = TreeRootNode<Node>(head);
-    bool insertLeft = true;
-    while (current) {
-        parent = current;
-        const int cmp = compare(entry->node._M_valptr()->first, current->_M_valptr()->first);
-        if (cmp == 0) {
-            return current->_M_valptr()->second;
-        }
-        insertLeft = (cmp < 0);
-        current = insertLeft ? static_cast<Node*>(current->_M_left)
-                             : static_cast<Node*>(current->_M_right);
-    }
-
-    Node* insertedNode = &entry->node;
-    insertedNode->_M_parent = nullptr;
-    insertedNode->_M_left = nullptr;
-    insertedNode->_M_right = nullptr;
-    insertedNode->_M_color = std::_S_red;
-
-    std::_Rb_tree_insert_and_rebalance(insertLeft, insertedNode, parent, *header);
-    Record* insertedPayload = insertedNode->_M_valptr()->second;
-    backing.entries.emplace(insertedNode, std::move(entry));
-    return insertedPayload;
-}
-
 template <typename Node, typename Head, typename Backing>
 static bool LauncherTreeEraseOwnedNode(Backing* backing, Head* head, Node* node) {
     if (!backing || !head || !node) {
@@ -1490,11 +1448,6 @@ void* CLTThreadPerClientTCPEngine_AcceptThread::OwnerContext() const {
     return ownerContext_;
 }
 
-// UNANCHORED: scaffold accessor for recovered child +0x3c listening socket field
-uint32_t CLTThreadPerClientTCPEngine_AcceptThread::ListenSocketHandle() const {
-    return listenSocketHandle_;
-}
-
 // UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
 uint32_t CLTThreadPerClientTCPEngine_AcceptThread::WakeupSocketHandle() const {
     return wakeupSocketHandle_;
@@ -1534,21 +1487,6 @@ CLTThreadPerClientTCPEngine_WorkerThread::~CLTThreadPerClientTCPEngine_WorkerThr
 // UNANCHORED: scaffold accessor for recovered child +0x38 context/connection key field
 void* CLTThreadPerClientTCPEngine_WorkerThread::ContextKey() const {
     return contextKey_;
-}
-
-// UNANCHORED: scaffold accessor for recovered child +0x3c datagram-mode byte
-bool CLTThreadPerClientTCPEngine_WorkerThread::DatagramMode() const {
-    return datagramMode_;
-}
-
-// UNANCHORED: scaffold accessor for recovered child +0x40 wakeup socket helper field
-uint32_t CLTThreadPerClientTCPEngine_WorkerThread::WakeupSocketHandle() const {
-    return wakeupSocketHandle_;
-}
-
-// UNANCHORED: scaffold accessor for recovered child +0x44 exit-request byte
-bool CLTThreadPerClientTCPEngine_WorkerThread::ExitRequested() const {
-    return exitRequested_;
 }
 
 // UNANCHORED: source-owned bridge for the recovered child +0x44 exit-request byte
@@ -3492,11 +3430,6 @@ void CLTThreadPerClientTCPEngine::RebuildQueueThreadsForCtorCount(uint32_t queue
     SyncAttachedLauncherObjectStateScaffold();
 }
 
-// UNANCHORED scaffold accessor for source-side queue-thread child tracking.
-size_t CLTThreadPerClientTCPEngine::QueueThreadCount() const {
-    return static_cast<size_t>(ctorFlagsField04_);
-}
-
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
 CMessageConnection* CLTThreadPerClientTCPEngine::FindMessageConnection(void* contextKey) {
@@ -3703,11 +3636,6 @@ void* CLTThreadPerClientTCPEngineBinding::Owner() const {
 // UNANCHORED starter binding helper.
 CLTThreadPerClientTCPEngine* CLTThreadPerClientTCPEngineBinding::Engine() const {
     return engine_.get();
-}
-
-// UNANCHORED starter binding helper.
-bool CLTThreadPerClientTCPEngineBinding::HasEngine() const {
-    return static_cast<bool>(engine_);
 }
 
 }  // namespace mxo::liblttcp

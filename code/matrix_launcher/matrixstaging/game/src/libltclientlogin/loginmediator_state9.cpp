@@ -65,20 +65,6 @@ void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, v
         fmt::ptr(ownerObject8c_));
 }
 
-void CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold(
-    void* callback84,
-    void* object88,
-    void* object8c) {
-    const bool anyCaptured =
-        callback84 != nullptr || object88 != nullptr || object8c != nullptr;
-    spdlog::info(
-        "CLTLoginMediator::CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold callback84={} object88={} object8c={} valid={} (captured from owner/arg6 vtable +0x124 without touching live state yet)",
-        fmt::ptr(callback84),
-        fmt::ptr(object88),
-        fmt::ptr(object8c),
-        anyCaptured ? 1u : 0u);
-}
-
 // anchor: launcher.exe:0x41c5c0
 uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workItem) {
     // Current best read from `0x41c5c0`:

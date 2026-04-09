@@ -876,7 +876,6 @@ public:
     // Active post-state9 consequence: the state9 -> state12 pair maps both of those to tiny stubs,
     // so the immediate continuation stays the later explicit PostEvent/listener work.
     void SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state);
-    uint32_t LastSwitchedHelperStateScaffold() const { return lastSwitchedHelperStateScaffold_; }
 
     // Narrow source-owned scaffolds for the launcher.exe logging/event side effects at
     // `0x41cfb0` / `0x41d090`.
@@ -890,12 +889,6 @@ public:
     // Observer count getters for wrapper diagnostics (moved from g_MediatorRuntimeState):
     uint32_t ObserverRegisterCount() const { return observerRegister170Count_; }
     uint32_t ObserverUnregisterCount() const { return observerUnregister174Count_; }
-    void* FirstObserver() const {
-        return (observerTree674_.count04 != 0u && observerTreeHeader674_.left08 != nullptr)
-            ? observerTreeHeader674_.left08->observer10
-            : nullptr;
-    }
-    void* LatestObserver() const { return latestObserver170_; }
 
     // Narrow post-auth receive-boundary counters used only for short runtime discrimination:
     // - no packet arrived yet
@@ -904,8 +897,6 @@ public:
     uint32_t MarginPacketReceiveCountScaffold() const { return marginPacketReceiveCountScaffold_; }
     uint32_t MarginPacketFilteredBeforeSlot6CountScaffold() const { return marginPacketFilteredBeforeSlot6CountScaffold_; }
     uint32_t MarginPacketSlot6DispatchCountScaffold() const { return marginPacketSlot6DispatchCountScaffold_; }
-    uint16_t LastMarginPacketOpcodeScaffold() const { return lastMarginPacketOpcodeScaffold_; }
-    uint32_t LastMarginPacketSizeScaffold() const { return lastMarginPacketSizeScaffold_; }
 
     // Focused source home for this early auth/state-entry wiring:
     // - `loginmediator_auth_entry.cpp`
@@ -965,10 +956,6 @@ public:
     // Wrapper-facing `+0x124` capture remains separate from the owner-side triple mirror.
     void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) override;
     void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
-    static void CaptureDeferredState9CallbackObjectTriple84_88_8c_Scaffold(
-        void* callback84,
-        void* object88,
-        void* object8c);
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
@@ -1069,12 +1056,6 @@ public:
     // launcher.exe:0x4f78b4 = slot 19 (`CLTLoginState_State19`, vtable `0x4b0c28`)
     // ==============================================================================
 
-    // Minimal placeholder accessors for recovered world/selection storage families.
-    // These are not yet faithful data structures; they only preserve the currently recovered
-    // slot-count / owner-shape in source instead of re-describing it in markdown.
-    void* WorldSlot(uint32_t index) const;
-    void* WorldPayloadSlot(uint32_t index) const;
-
     // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
     // Faithful implementation of arg6 world list provider for InitClientDLL
     // Vtable at offset +0xc from object pointer at 0x4d2c58
@@ -1092,9 +1073,6 @@ public:
         uint32_t selectedVariantState);
     // Source-owned arg6 bootstrap seed helpers.
     // These are replacement-side setup helpers, not recovered launcher.exe vtable slots.
-    void SetArg6ProfileName(const char* profileName);
-    void SetArg6AuthName(const char* authName);
-    void SetArg6AuthPassword(const char* authPassword);
     uint32_t Arg6WorldUpperBoundExclusive() const;
     uint32_t Arg6VariantUpperBoundExclusive() const;
     uint32_t Arg6SelectedWorldIndexLow24() const;
@@ -1107,7 +1085,6 @@ public:
     const char* Arg6ProfileName() const;
     const char* Arg6AuthName() const;
     const char* Arg6AuthPassword() const;
-    bool Arg6WorldIndexMatchesSelection(uint32_t worldIndex) const;
     bool Arg6VariantIndexMatchesSelection(uint32_t variantIndex) const;
     uint32_t Arg6ExpectedSelectionDescriptorScratchRequest() const;
     bool Arg6SelectionDescriptorMatchesRequest(uint32_t selectionIndex) const;
@@ -1128,18 +1105,6 @@ public:
     uint8_t GetWorldSelectionGateByteByIndex(uint32_t index) const override;
     uint8_t GetWorldTypeByteByIndex(uint32_t index) const override;
     uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const override;
-
-    // Startup-only arg6 selection/world-list helpers.
-    // Current tighter launcher page-`7` read from `0x40e480/0x40d530/0x40d6f0`:
-    // - the low row-item word indexes world descriptors (`+0xfc/+0x100/+0x104/+0x108`)
-    // - the high row-item word indexes the active selection-entry list (`+0xd8/+0xdc/+0xe0/+0xe4`)
-    // - once auth reply state is live, that active-entry list is currently better modeled through
-    //   the owner slot-record table (`+0x688`) than through a separate free-floating variant-only
-    //   abstraction
-    uint8_t Arg6ValidateWorldSelection(uint8_t variant);
-    uint32_t Arg6GetWorldListCount() const;
-    uint32_t Arg6GetActiveWorldListCount() const;
-    const char* Arg6GetAvailableWorldMatchName(uint32_t index) const;
 
     // Focused source home for auth-entry/connect-status scaffolding:
     // - `loginmediator_auth_entry.cpp`
@@ -1168,7 +1133,6 @@ public:
     // - keep the launcher-object ABI shell thin and arg5-shaped
     void ResetLauncherConnectionsScaffold();
     uint32_t BeginLauncherMarginConnectionScaffold();
-    bool IsAuthConnectionQuiescentForRetryScaffold() const;
     // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
     // `0x41b450` on the early auth path. Keep this narrow instead of changing the generic
     // switch scaffold until more of the broader helper transition surface is source-owned.
@@ -1219,8 +1183,6 @@ public:
     const AuthBootstrap680Child& AuthBootstrapChild680() const {
         return const_cast<CLTLoginMediator*>(this)->EnsureAuthBootstrapChild680Scaffold();
     }
-    uint32_t LastAuthConnectStatus() const { return lastAuthConnectStatus_; }
-    uint32_t AuthConnectStatusCount() const { return authConnectStatusCount_; }
     void ResetAuthConnectRetryStateScaffold();
     // Current source-owned mirror of owner `+0x4c` auth address-list reinit used by startup
     // helper `0x41b160` after launcher config has already seeded the auth host name.
@@ -1230,18 +1192,6 @@ public:
     bool HasAuthConnectRetryCandidateRemainingScaffold() const;
 
 
-    uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
-    // Current receive handling drains parsed packets from the faithful transport/parser seam.
-    // Current entry shape is still one bounded source-owned step later than original, but one
-    // auth-side destination is now tighter than before:
-    // - original type-3 parsed-packet queue work already reaches `CMessageConnection::OnOperationCompleted`
-    // - handled auth copied packets can now continue one step later through
-    //   `0x449a30 -> owner+0x180 / 0x41f250 -> current helper slot5`
-    // - this mediator method now remains only as a legacy/dormant drain target for unexpected
-    //   paths that still bypass the nearer connection-side handling
-    // - the one-shot post-AS_AuthReply margin auto-begin side effect now lives on the handled auth
-    //   in-callback path itself instead of waiting for this later fallback drain
-    uint32_t HandleAuthConnectionReceiveScaffold();
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch
@@ -1273,12 +1223,6 @@ public:
         const uint8_t* packetBytes,
         size_t packetSize,
         bool transportEncrypted);
-    // Current margin receive handling is now split like auth:
-    // - handled copied packets can already re-enter the nearer connection/leaf path
-    //   `0x44af20 -> 0x442d00 -> 0x41f260`
-    // - this drain helper remains the later fallback consumer for packets/branches not yet handled
-    //   there directly
-    uint32_t HandleMarginConnectionReceiveScaffold();
 
     // Narrow staged-packet access kept on the mediator for the concrete CLTLoginState slot-6
     // bodies.
@@ -1427,9 +1371,6 @@ public:
     const State8PersistenceF1cSnapshot& State8PersistenceF1cView() const;
     const void* GetState8PersistenceF1c() const override;
     const State3SelectionContextInputSketch& SelectionContext0ecCopy() const { return selectionContext0ecCopy_; }
-    bool SelectionContext0ecCopyValid() const { return selectionContext0ecCopyValid_; }
-    uint32_t SelectionContext0ecCount() const { return selection0ecCount_; }
-    uint32_t Profile0f4Count() const { return profile0f4Count_; }
     void ResetSelectionContext0ecMirror();
 
     // +0x120
@@ -1499,7 +1440,6 @@ public:
     // - arg1 = route/prefix text used to refresh owner `+0x30`
     // - arg2 = cached non-zero selector that skips the route-refresh / address-list rebuild path
     uint32_t BeginMarginConnectionScaffold(const char* routeHostText, uint8_t cachedRouteSelector);
-    const char* Arg6GetAvailableWorldName(uint32_t index);
 
     // Post-Auth Margin/Loading State Accessors (launcher.exe:0x4f78b8)
     // =============================================================================
@@ -1508,8 +1448,6 @@ public:
     // and load character reply handling logic.
     // =============================================================================
 
-    // State-3(wait) -> state-8 owner-side selection/config snapshot block (`0x41c1f0`):
-    uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return selectionRouteState684_.CurrentSlotOrSelectionIndex644(); }
     // Source-owned bridge over original owner byte `+0xcc8`.
     // Fidelity tightening from `0x41f300`:
     // - owner vtable `+0x44` directly reads the embedded selection-route helper byte
@@ -1528,25 +1466,6 @@ public:
     const std::array<uint32_t, 4>& SelectionContextBlockD50() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD50; }
     const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD60; }
     const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
-    // New client-layout aliases from `client.dll:0x62170e2a..0x62170f48`:
-    // - `+0x24` = il.cfg
-    // - `+0x34` = hl.cfg
-    // - `+0x44` = an.cfg
-    // - `+0x54` = rl.cfg
-    // - `+0x64` = cl.cfg
-    // - `+0x74` = pi.cfg
-    // - `+0x84` = ai.cfg
-    // - `+0x94` = shared temp reused by cs.cfg then bl.cfg on the proven path
-    // - `+0xa4` = cui.cfg
-    const std::array<uint32_t, 4>& SelectionContextBlockIlCfg24() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCf0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockHlCfg34() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD00; }
-    const std::array<uint32_t, 4>& SelectionContextBlockAnCfg44() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD10; }
-    const std::array<uint32_t, 4>& SelectionContextBlockRlCfg54() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD20; }
-    const std::array<uint32_t, 4>& SelectionContextBlockClCfg64() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD30; }
-    const std::array<uint32_t, 4>& SelectionContextBlockPiCfg74() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD40; }
-    const std::array<uint32_t, 4>& SelectionContextBlockAiCfg84() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD50; }
-    const std::array<uint32_t, 4>& SelectionContextBlockBlOrCsCfg94() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD60; }
-    const std::array<uint32_t, 4>& SelectionContextBlockCuiCfgA4() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
 
     // Later post-auth source block (`0x43c020`, `0x440320`):
     const std::array<char, 0x20>& SourceLeadString108() const { return postAuthMarginLoadingState_.sourceLeadString108; }
@@ -1582,31 +1501,7 @@ public:
     // so current source leaves this accessor on the original child `+0xa8` worker slot instead of
     // inventing a pointer semantic inside the copied `0x136` blob.
     void* BootstrapRaw08AuxHandle50() const override;
-    const char* CharacterNameBufferF1c() { return postAuthMarginLoadingState_.characterNameBufferF1c; }
-    const std::array<uint32_t, 8>& CharacterFlagsF48() { return postAuthMarginLoadingState_.characterFlagsF48; }
-    const std::array<uint32_t, 8>& SecondaryCharacterDataF68() { return postAuthMarginLoadingState_.secondaryCharacterDataF68; }
-    const std::array<uint32_t, 10>& CharacterRecordPointersF88() { return postAuthMarginLoadingState_.characterRecordPointersF88; }
 
-    void* AllocatedBuffer1418() { return postAuthMarginLoadingState_.allocatedBuffer1418; }
-    uint16_t& AllocatedBufferLength141c() { return postAuthMarginLoadingState_.allocatedBufferLength141c; }
-    uint8_t& AllocatedBufferFlag141e() { return postAuthMarginLoadingState_.allocatedBufferFlag141e; }
-
-    void* AllocatedBuffer1420() { return postAuthMarginLoadingState_.allocatedBuffer1420; }
-    uint16_t& AllocatedBufferLength1424() { return postAuthMarginLoadingState_.allocatedBufferLength1424; }
-    uint8_t& AllocatedBufferFlag1426() { return postAuthMarginLoadingState_.allocatedBufferFlag1426; }
-
-    void* AllocatedBuffer1428() { return postAuthMarginLoadingState_.allocatedBuffer1428; }
-    uint16_t& AllocatedBufferLength142c() { return postAuthMarginLoadingState_.allocatedBufferLength142c; }
-    uint8_t& AllocatedBufferFlag142e() { return postAuthMarginLoadingState_.allocatedBufferFlag142e; }
-
-    void* AllocatedBuffer1408() { return postAuthMarginLoadingState_.allocatedBuffer1408; }
-    uint16_t& AllocatedBufferLength140c() { return postAuthMarginLoadingState_.allocatedBufferLength140c; }
-    uint8_t& AllocatedBufferFlag140e() { return postAuthMarginLoadingState_.allocatedBufferFlag140e; }
-
-    const std::array<uint8_t, 8>& ReplyParseBuffer() { return postAuthMarginLoadingState_.replyParseBuffer; }
-    uint32_t& ReplySectionData13cc() { return postAuthMarginLoadingState_.replySectionData13cc; }
-    uint32_t& ReplySectionData13d0() { return postAuthMarginLoadingState_.replySectionData13d0; }
-    uint8_t& CharacterRouteIndexCc8() { return postAuthMarginLoadingState_.characterRouteIndexCc8; }
     bool PrepareState5MarginConnectionCopySendScaffold(mxo::liblttcp::CMarginConnection* marginConnection);
     const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
     // anchor: launcher.exe:0x004433c0 / 0x0044add0
@@ -1975,18 +1870,6 @@ private:
     Arg6WorldListData arg6WorldList_;
     Arg6SelectionConfig arg6Selection_;
     uint32_t arg6VariantWorldNameQueryCountE0_ = 0u; // wrapper-facing arg6 `+0xe0` query count
-
-    // launcher.dll export that populates the client.dll's world list view for InitClientDLL
-    // This should be called before InitClientDLL so client.dll receives populated world data
-    // Address anchor: launcher.exe:0x4d3584 +0xc = vtable (ILTLoginMediator)
-    // Note: The original launcher initializes arg6WorldList_ inline when the object is created,
-    // not through a separate method call. We keep these methods for future reference/testing.
-public:
-    // void BuildWorldList();  // Removed - original launcher doesn't use separate method
-
-private:
-    // Populates the client's world list view with launcher-provided data
-    void PopulateClientWorldView();  // Kept for reference/testing
 };
 
 }  // namespace mxo::ltlogin

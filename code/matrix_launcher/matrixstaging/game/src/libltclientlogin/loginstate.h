@@ -409,10 +409,6 @@ public:
     // `0x4401a0`.
     static void AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator);
 
-    // UNANCHORED: source-owned shared raw-0x0b auth parse/adopt helper reused by the broader
-    // state2 auth-reply success path and the current existing-character state8 auth bridge.
-    static uint32_t HandleStagedAuthReplyScaffold(CLTLoginMediator* mediator);
-
     // UNANCHORED: source-owned raw-0x0b margin claim-name reply helper for state10 slot 6.
     // Faithful recovered packet family:
     // - slot 3 sends `MS_ClaimCharacterNameRequest` (`0x0a`) through the current margin connection

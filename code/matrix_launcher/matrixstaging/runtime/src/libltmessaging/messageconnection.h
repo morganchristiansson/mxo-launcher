@@ -361,9 +361,6 @@ public:
     // - module write helper `0x004b8690`
     // - embedded agenda helper `0x004baf48`
     virtual ~CStreamPacketEncryptionHelperBase() = default;
-    virtual const void* Descriptor() const {
-        return reinterpret_cast<const void*>(0x004aafbbu);
-    }
     virtual void HandleOpaqueMessageRef(void* opaqueMessageRef) = 0;
 
     // Current best role for original helper `+0x04`:
@@ -691,22 +688,6 @@ public:
     //     scaffolding
     uint32_t OnOperationCompleted(void* workItem);
 
-    // UNANCHORED: source-owned accessor exposing the current copied packet-body bytes from the
-    // narrowed `0x4490c0` type-3 path.
-    const std::vector<uint8_t>& LastReceivedPacketBodyBytesScaffold() const;
-    // UNANCHORED: source-owned accessor exposing the current headerless/packetized split narrowed
-    // from the `0x4490c0` message-ref flag write.
-    bool LastReceivedPacketHeaderlessScaffold() const;
-    // UNANCHORED: legacy source-owned fallback queue-drain helper over copied parsed-packet
-    // bodies. After the tighter `0x4490c0` tail correction this is expected to stay empty on the
-    // normal auth/margin startup path and remains only as dormant compatibility scaffolding.
-    bool TakeNextReceivedPacketScaffold(
-        std::vector<uint8_t>* outPayloadBytes,
-        bool* outHeaderless = nullptr);
-    // UNANCHORED: source-owned probe for whether that dormant copied-packet fallback queue is
-    // non-empty.
-    bool HasPendingReceivedPacketsScaffold() const;
-
     // UNANCHORED: source-owned helper mirroring the current queue producer context-key shape.
     // Current best reading: queue0C often receives (workItem, this, 0) from this class.
     void* ContextKey() { return this; }
@@ -779,7 +760,6 @@ private:
     bool lastReceivedPacketHeaderlessScaffold_ = false;
     // Legacy fallback queue retained only as dormant compatibility scaffolding now that the
     // tightened `0x4490c0` receive tail consumes the auth/margin packet path locally.
-    std::vector<CMessageConnectionReceivedPacketScaffold> pendingReceivedPacketsScaffold_;
 };
 
 // ============================================================

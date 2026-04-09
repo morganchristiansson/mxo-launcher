@@ -263,21 +263,6 @@ static bool BuildAuthBootstrap680RsaPublicKeyPairSubobjectFromReplyPublicKey(
     return true;
 }
 
-static void ResetAuthBootstrap680LazyPubkeyDatValidatorA4(
-    AuthBootstrap680LazyPubkeyDatValidatorA4Sketch* outValidator,
-    AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {
-    if (!outValidator || !ownedState) {
-        return;
-    }
-
-    outValidator->vtable00 = 0x004b7580u;
-    outValidator->helperVtable04 = 0x004b75ccu;
-    outValidator->helperVtable08 = 0x004b7440u;
-    ResetAuthBootstrap680RsaPublicKeyPairSubobject(&outValidator->publicKeyPair0c, ownedState);
-    outValidator->helperThunk4c = 0x004b73c0u;
-    outValidator->helperThunk50 = 0x004b6c44u;
-}
-
 static void ResetAuthBootstrap680Raw08PublicKeyWorkerA8(
     AuthBootstrap680Raw08PublicKeyWorkerA8Sketch* outWorker,
     AuthBootstrap680RsaPublicKeyPairOwnedState* ownedState) {

@@ -24,14 +24,6 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel();
 bool IsProfilePathBuilderCaller(void* returnAddress);
 const char* DescribeMediatorCaller(void* returnAddress);
 void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress);
-void LogPointerWords(const char* label, const void* ptr, uint32_t wordCount);
-void LogWordBuffer(const char* label, const void* ptr, uint32_t byteCount);
-
-// Observer state accessors (moved from g_MediatorRuntimeState to CLTLoginMediator):
-uint32_t DiagnosticMediatorObserverRegisterCount();
-uint32_t DiagnosticMediatorObserverUnregisterCount();
 
 const char g_MediatorName[] = "ILTLoginMediator.Default";
-const char* DiagnosticMediatorAuthName();
-const char* DiagnosticMediatorAuthPassword();
 const char* MaskedSensitiveValue(const char* value);

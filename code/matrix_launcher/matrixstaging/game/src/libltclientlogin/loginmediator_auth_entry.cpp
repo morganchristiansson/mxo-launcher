@@ -324,37 +324,6 @@ void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
     }
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold() const {
-    auto* authConnection =
-        dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
-    const bool quiescent =
-        (authConnection == nullptr) || (authConnection->WorkerThreadScaffold() == nullptr);
-    if (quiescent && authConnection != nullptr &&
-        authConnection->State() == mxo::liblttcp::LTTCPEngineConnectionState::kClosed) {
-        // Fidelity improvement for launcher retry:
-        // - original auth-close/reset path `0x41c0d0` clears owner `+0x18`
-        // - later auth begin `0x41d170` then materializes a fresh auth-side child again
-        // Keep the old closed connection only until its worker becomes quiescent, then discard it
-        // so the next retry allocates a new auth connection object instead of reusing a stale
-        // closed child.
-        const_cast<CLTLoginMediator*>(this)->authPeerCloseQueuedScaffold_ = false;
-        if (authConnectionOwnedByMediator_) {
-            delete authConnection;
-        }
-        const_cast<CLTLoginMediator*>(this)->authConnection_ = nullptr;
-        const_cast<CLTLoginMediator*>(this)->authConnectionOwnedByMediator_ = false;
-        authConnection = nullptr;
-    }
-    spdlog::info(
-        "CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold authConnection={} worker={} state={} -> {}",
-        fmt::ptr(authConnection_),
-        fmt::ptr(authConnection ? authConnection->WorkerThreadScaffold() : nullptr),
-        authConnection ? static_cast<unsigned>(authConnection->State()) : 0xffffffffu,
-        quiescent ? 1u : 0u);
-    return quiescent;
-}
-
 uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     if (engine_ == nullptr) {
         spdlog::info(

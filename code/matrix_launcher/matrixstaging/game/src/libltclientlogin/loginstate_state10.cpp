@@ -192,43 +192,6 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         currentDescriptorName);
 }
 
-// UNANCHORED: source-owned shared raw-0x0b auth parse/adopt helper reused by the broader state2
-// auth-reply success path and the current existing-character state8 auth bridge.
-uint32_t CLTLoginState_State10::HandleStagedAuthReplyScaffold(CLTLoginMediator* mediator) {
-    if (!mediator || mediator->stagedIncomingAuthPacketBytes_.empty()) {
-        return 0u;
-    }
-
-    mxo::auth::AuthReply reply;
-    if (!mxo::auth::ParseAuthReplyPayload(
-            mediator->stagedIncomingAuthPacketBytes_.data(),
-            mediator->stagedIncomingAuthPacketBytes_.size(),
-            &reply)) {
-        spdlog::warn("DIAGNOSTIC: launcher-owned auth failed to parse AS_AuthReply");
-        return 0u;
-    }
-
-    mediator->lastAuthReply_ = reply;
-    mediator->expectedAuthRequestName_ = nullptr;
-
-    if (reply.isErrorReply) {
-        mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 = reply.errorCode;
-        mediator->expectedMarginRequestName_ = nullptr;
-        AuthBootstrap680LogParsedAuthReply(*mediator, reply);
-        return 1u;
-    }
-
-    AuthBootstrap680MaterializeReplyCopyShadowScaffold(
-        mediator->AuthBootstrapChild680(),
-        *mediator,
-        reply);
-    mediator->ResetMarginBootstrapState();
-    mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(reply);
-    AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
-    AuthBootstrap680LogParsedAuthReply(*mediator, reply);
-    mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
-    return 1u;
-}
 
 // UNANCHORED: source-owned raw-0x0b margin claim-name reply helper for state10 slot 6.
 uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTLoginMediator* mediator) {

@@ -226,6 +226,7 @@ uint8_t* CMessageConnectionMessageRefBase::PayloadAppendPointerScaffold() {
         : nullptr;
 }
 
+// anchor: launcher.exe:0x41bb60
 bool CMessageConnectionMessageRefBase::SetPayloadByteCountScaffold(
     uint32_t payloadByteCount) {
     if (!messageStorage0c || payloadByteCount > CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
@@ -1730,49 +1731,6 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     return 1u;
-}
-
-// UNANCHORED: source-owned accessor exposing the copied packet body staged from the current
-// bounded `launcher.exe:0x4490c0` reconstruction.
-const std::vector<uint8_t>& CMessageConnection::LastReceivedPacketBodyBytesScaffold() const {
-    return lastReceivedPacketBodyBytesScaffold_;
-}
-
-// UNANCHORED: source-owned accessor exposing the current headerless flag staged from the bounded
-// `launcher.exe:0x4490c0` reconstruction.
-bool CMessageConnection::LastReceivedPacketHeaderlessScaffold() const {
-    return lastReceivedPacketHeaderlessScaffold_;
-}
-
-bool CMessageConnection::HasPendingReceivedPacketsScaffold() const {
-    return !pendingReceivedPacketsScaffold_.empty();
-}
-
-// UNANCHORED: source-owned queue-drain helper used only for copied packets that were not consumed
-// on the in-callback post-copy dispatch path.
-bool CMessageConnection::TakeNextReceivedPacketScaffold(
-    std::vector<uint8_t>* outPayloadBytes,
-    bool* outHeaderless) {
-    if (outPayloadBytes) {
-        outPayloadBytes->clear();
-    }
-    if (outHeaderless) {
-        *outHeaderless = false;
-    }
-    if (pendingReceivedPacketsScaffold_.empty()) {
-        return false;
-    }
-
-    CMessageConnectionReceivedPacketScaffold pendingPacket =
-        std::move(pendingReceivedPacketsScaffold_.front());
-    pendingReceivedPacketsScaffold_.erase(pendingReceivedPacketsScaffold_.begin());
-    if (outPayloadBytes) {
-        *outPayloadBytes = std::move(pendingPacket.payloadBytes);
-    }
-    if (outHeaderless) {
-        *outHeaderless = pendingPacket.headerless;
-    }
-    return true;
 }
 
 // anchor family: launcher.exe:0x449d20
