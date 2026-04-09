@@ -36,9 +36,6 @@ static const void* g_LastClientShellRuntimeObjectD0 = nullptr;
 static const void* g_LastClientShellRuntimeVftableD0 = nullptr;
 static bool g_DumpedClientPiTableAtRuntime = false;
 
-// Stub for removed D3D diagnostics
-void DiagnosticLogLastD3DDeviceActivity() {
-}
 
 static bool g_ClientLoadingTextHookEnvChecked = false;
 static bool g_ClientLoadingTextHookRequested = false;

@@ -388,7 +388,6 @@ static void LogDiagnosticExceptionSnapshot(const char* heading, EXCEPTION_POINTE
         LogWordSpan("current arg6 mediator", g_pILTLoginMediatorDefault, 8);
     }
     LogClientCrashContext();
-    DiagnosticLogLastD3DDeviceActivity();
 }
 
 static LONG CALLBACK DiagnosticVectoredExceptionHandler(EXCEPTION_POINTERS* exceptionInfo) {
