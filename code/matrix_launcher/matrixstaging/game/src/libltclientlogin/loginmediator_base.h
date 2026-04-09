@@ -48,10 +48,16 @@ struct __attribute__((packed)) Arg6SelectionDescriptor40PackedSketch {
 };
 
 struct Arg6SelectionDescriptor40ObjectSketch {
-    void** vtable00;                           // +0x00 wrapper-owned tiny virtual surface
-    void* bufferBase04;                        // +0x04 conservative object-local helper slot
-    void* backingObject08;                     // +0x08 conservative object-local helper slot
-    uint8_t flag0c;                            // +0x0c conservative presence/helper byte
+    // Wrapper-facing arg6 `+0x40` outer object.
+    // Current Ghidra tightening:
+    // - client code only proves reads of payload dwords at `+0x10 +0x03/+0x07`
+    // - the outer `0x14` header still best matches the common descriptor-style base used by
+    //   launcher classes such as `0x004b533c` (vtable / `+0x04` / `+0x08` / flag / `+0x10` payload)
+    // - do not collapse this wrapper object onto owner vtable `+0x40 = GetSlotRecordByIndex`
+    void** vtable00;
+    void* bufferBase04;
+    void* backingObject08;
+    uint8_t flag0c;
     uint8_t padding0d[3];
     Arg6SelectionDescriptor40PackedSketch* packed; // +0x10
 };
@@ -74,6 +80,11 @@ struct __attribute__((packed)) Arg6CurrentSlotRecord44PayloadSketch {
 };
 
 struct Arg6CurrentSlotRecord44ObjectSketch {
+    // Wrapper-facing arg6 `+0x44` current-slot object.
+    // Current Ghidra tightening:
+    // - this outer `0x1c` layout matches the concrete `0x004b5328` slot-record class layout
+    //   closely (`+0x10 payload`, `+0x14 heapString`, `+0x18 heapStringLen`)
+    // - but wrapper slot `+0x44` is still distinct from owner vtable `+0x44 = GetCurrentSlotRecord`
     void** vtable;
     void* bufferBase04;
     void* backingObject08;

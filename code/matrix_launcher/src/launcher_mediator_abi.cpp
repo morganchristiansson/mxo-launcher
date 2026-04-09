@@ -447,11 +447,13 @@ extern "C" void* Mediator_GetCurrentSlotRecordObject44_Impl(MinimalLoginMediator
     return mxo::ltlogin::ILTLoginMediator::Default->GetArg6CurrentSlotRecordObject44();
 }
 
-// anchor: launcher.exe:0x41f300
 // vtable: ILTLoginMediator.Default slot +0x44
 // Current wrapper-facing read from `0x4d2c58_ILTLoginMediator_Default.md`:
 // - returns a current-slot record object on the later profile/save path
-// - keep that split explicit from the owner-side `0x004b01c8 +0x44` family
+// - that wrapper-facing object shape now best matches the concrete `0x004b5328` slot-record outer
+//   layout
+// - keep that split explicit from the owner-side `0x004b01c8 +0x44 = 0x41f300`
+//   `CLTLoginMediator_GetCurrentSlotRecord` thunk
 __attribute__((naked)) static void Mediator_GetCurrentSlotRecordObject44() {
     __asm__ volatile(
         "push %%ecx\n\t"

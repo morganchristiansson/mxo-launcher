@@ -129,25 +129,27 @@ static uint32_t ReadU32LE(const uint8_t* p) {
            (static_cast<uint32_t>(p[3]) << 24);
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// Wrapper-facing arg6 `+0x40` outer object currently only needs the common 5-slot virtual
+// surface shape shared by the launcher descriptor/slot-record families.
+// Current fidelity tightening from Ghidra:
+// - slot `+0x04` is the shared tiny getter at `0x437b50` and returns `0`
+// - slot `+0x10` is the shared tiny getter at `0x481760` and returns the `+0x10` payload pointer
+// - keep `+0x08/+0x0c` conservative until the concrete wrapper object class is recovered
 static uint32_t __thiscall Arg6SelectionDescriptor40_Destroy(Arg6SelectionDescriptor40ObjectSketch* self) {
+    return self ? 1u : 0u;
+}
+
+static uint32_t __thiscall Arg6SelectionDescriptor40_GetStateId(Arg6SelectionDescriptor40ObjectSketch* self) {
+    (void)self;
+    return 0u;
+}
+
+static uint32_t __thiscall Arg6SelectionDescriptor40_AppendDebugString(Arg6SelectionDescriptor40ObjectSketch* self) {
     (void)self;
     return 1u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall Arg6SelectionDescriptor40_TinyGetter(Arg6SelectionDescriptor40ObjectSketch* self) {
-    return (self && self->packed) ? 1u : 0u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall Arg6SelectionDescriptor40_ReleaseLike(Arg6SelectionDescriptor40ObjectSketch* self) {
-    (void)self;
-    return 1u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall Arg6SelectionDescriptor40_ResetForCaller(Arg6SelectionDescriptor40ObjectSketch* self) {
+static uint32_t __thiscall Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor(Arg6SelectionDescriptor40ObjectSketch* self) {
     if (!self) {
         return 0u;
     }
@@ -156,61 +158,60 @@ static uint32_t __thiscall Arg6SelectionDescriptor40_ResetForCaller(Arg6Selectio
     return 1u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall Arg6SelectionDescriptor40_TinyHelper(Arg6SelectionDescriptor40ObjectSketch* self) {
-    return (self && self->bufferBase04) ? 1u : 0u;
+static uint32_t __thiscall Arg6SelectionDescriptor40_GetPayload10(Arg6SelectionDescriptor40ObjectSketch* self) {
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->packed : nullptr));
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void** Arg6SelectionDescriptor40Vtable() {
     static void* vtable[5] = {
         reinterpret_cast<void*>(Arg6SelectionDescriptor40_Destroy),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_TinyGetter),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ReleaseLike),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ResetForCaller),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_TinyHelper),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetStateId),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_AppendDebugString),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetPayload10),
     };
     return vtable;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// Wrapper-facing arg6 `+0x44` object now mirrors the concrete `0x004b5328` slot-record outer
+// layout more closely:
+// - same 5-slot vtable surface
+// - same shared `+0x04 = 0x437b50 -> 0` tiny getter
+// - same shared `+0x10 = 0x481760 -> payload10` tiny getter
 static uint32_t __thiscall Arg6CurrentSlotRecord44_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 1u;
+    return self ? 1u : 0u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall Arg6CurrentSlotRecord44_TinyGetter(Arg6CurrentSlotRecord44ObjectSketch* self) {
+static uint32_t __thiscall Arg6CurrentSlotRecord44_GetStateId(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 0u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_AppendDebugString(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t __thiscall Arg6CurrentSlotRecord44_ResetPayloadForSourceDescriptor(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
+    if (!self) {
+        return 0u;
+    }
+    self->backingObject08 = nullptr;
+    self->flag0c = (self->payload10 != nullptr) ? 1u : 0u;
     return 1u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t __thiscall Arg6CurrentSlotRecord44_TinyHelper(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 0u;
+static uint32_t __thiscall Arg6CurrentSlotRecord44_GetPayload10(Arg6CurrentSlotRecord44ObjectSketch* self) {
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 static void** Arg6CurrentSlotRecord44Vtable() {
     static void* vtable[5] = {
         reinterpret_cast<void*>(Arg6CurrentSlotRecord44_Destroy),
-        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_TinyGetter),
+        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_GetStateId),
         reinterpret_cast<void*>(Arg6CurrentSlotRecord44_AppendDebugString),
         reinterpret_cast<void*>(Arg6CurrentSlotRecord44_ResetPayloadForSourceDescriptor),
-        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_TinyHelper),
+        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_GetPayload10),
     };
     return vtable;
 }
@@ -558,8 +559,12 @@ const SlotRecordState004b5328* CLTLoginMediator::ResolveArg6CurrentSlotRecord44S
 bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
     arg6CurrentSlotRecord44Payload_ = {};
     arg6CurrentSlotRecord44_ = {};
+    // Wrapper-facing arg6 `+0x44` remains a separate ABI slot, but the returned scratch object
+    // should still look like the concrete `0x004b5328` slot-record outer layout as closely as our
+    // source-owned mirror allows.
     arg6CurrentSlotRecord44_.vtable = Arg6CurrentSlotRecord44Vtable();
     arg6CurrentSlotRecord44_.payload10 = &arg6CurrentSlotRecord44Payload_;
+    arg6CurrentSlotRecord44_.flag0c = 1u;
     arg6CurrentSlotRecord44NameOwned_.clear();
 
     if (const SlotRecordState004b5328* currentSlotRecord = ResolveArg6CurrentSlotRecord44Source()) {
