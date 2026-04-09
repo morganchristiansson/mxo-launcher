@@ -375,7 +375,6 @@ static unsigned EndpointIpv4OctetForOnReceiveLogScaffold(
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family.
 CLTTCPConnection::CLTTCPConnection()
     : CBaseConnection(LTTCPEngineConnectionState::kClosed),
-      engine_(nullptr),
       ownerContext_(nullptr),
       socketHandle_(kInvalidSocketHandle),
       workerThread08_(nullptr),
@@ -390,7 +389,6 @@ CLTTCPConnection::CLTTCPConnection()
 // replacement-side owner-context scaffold.
 CLTTCPConnection::CLTTCPConnection(void* ownerContext)
     : CBaseConnection(LTTCPEngineConnectionState::kClosed),
-      engine_(nullptr),
       ownerContext_(ownerContext),
       socketHandle_(kInvalidSocketHandle),
       workerThread08_(nullptr),
@@ -416,6 +414,7 @@ bool CBaseConnection::IsConnected() const {
 CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
     : autoReleaseFlag04_(0u),
       padding05_07_{0u, 0u, 0u},
+      engine_(nullptr),
       state_(initialState),
       queueContextScaffold_() {
     EnsureBaseConnectionQueueContextVtableInitialized();
@@ -704,14 +703,19 @@ int CLTTCPConnection::PollReceiveAndDeliverReadOperationFragmentsScaffold() {
 }
 
 // anchor: launcher.exe:0x449ca0
-uint32_t CLTTCPConnection::Close(bool graceful) {
+uint32_t CBaseConnection::Close(bool graceful) {
     if (state_ == LTTCPEngineConnectionState::kClosed) {
         return 0u;
     }
 
-    return engine_
-        ? engine_->CloseConnectionScaffold(this, graceful)
-        : CloseSocketTransportScaffold(graceful);
+    if (engine_) {
+        // `0x449ca0` forwards the base connection object itself into engine vtable slot `+0x1c`.
+        return engine_->Close(this, graceful);
+    }
+
+    // Source-owned null-engine fallback kept only because the current C++ layout still permits
+    // detached connection objects while the wider base-field reconstruction remains incomplete.
+    return static_cast<CLTTCPConnection*>(this)->CloseSocketTransportScaffold(graceful);
 }
 
 // anchor: launcher.exe:0x449cd0

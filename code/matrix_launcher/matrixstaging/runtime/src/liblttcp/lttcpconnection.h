@@ -249,10 +249,12 @@ class CBaseConnection {
   virtual uint32_t OnOperationCompleted(void* workItem) = 0;
   // UNANCHORED: source-owned abstraction over the recovered send callback surface.
   virtual uint32_t SendPacket(const void*, uint32_t, void*) = 0;
-  // UNANCHORED: source-owned abstraction over the recovered shared close wrapper.
-  // Original `0x449ca0` lives in the base connection slot family and `0x449d40` reaches it
-  // through the inherited virtual dispatch at `this->+0x0c(false)`.
-  virtual uint32_t Close(bool graceful) = 0;
+  // anchor: launcher.exe:0x449ca0
+  // vtable: launcher.exe:0x004b8024
+  // Shared inherited close wrapper body also reused by the derived `CLTTCPConnection` slot at
+  // `0x004b8040`. Current source still keeps a null-engine fallback because this C++ hierarchy is
+  // not yet a byte-faithful reconstruction of the original connection layout.
+  virtual uint32_t Close(bool graceful);
 
   // UNANCHORED: source-owned utility accessor over the recovered `+0x34` state field.
   virtual bool IsConnected() const;
@@ -283,6 +285,8 @@ class CBaseConnection {
  protected:
   uint8_t autoReleaseFlag04_;
   uint8_t padding05_07_[3];
+  // Source-owned compatibility mirror of the recovered base connection `+0x10` engine field.
+  CLTThreadPerClientTCPEngine* engine_;
   LTTCPEngineConnectionState state_;
   CBaseConnection_QueueContextScaffold queueContextScaffold_;
 };
@@ -360,11 +364,13 @@ public:
 
     // anchor: launcher.exe:0x449ca0
     // vtable: launcher.exe:0x004b8040
-    // Shared inherited close wrapper body also present in `CBaseConnection` vtable `0x004b8018`.
-    uint32_t Close(bool graceful) override;
+    // Inherited shared `CBaseConnection::Close(bool)` body; this table does not add a distinct
+    // `CLTTCPConnection::Close` override.
 
     // anchor: launcher.exe:0x449cd0
     // vtable: launcher.exe:0x004b8050
+    // This wrapper is first introduced on the concrete `CLTTCPConnection` table, not on
+    // `CBaseConnection`.
     uint32_t Connect(const LTTCPEndpointKey& endpoint);
 
     // anchor: launcher.exe:0x449d20
@@ -420,7 +426,6 @@ public:
     void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 
 private:
-    CLTThreadPerClientTCPEngine* engine_;
     void* ownerContext_;
     uint32_t socketHandle_;
     CLTThreadPerClientTCPEngine_WorkerThread* workerThread08_;
