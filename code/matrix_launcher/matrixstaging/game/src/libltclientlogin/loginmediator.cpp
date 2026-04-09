@@ -1874,29 +1874,18 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
     }
 
     const size_t slotIndex = static_cast<size_t>(selectedSlotRecordIndex);
-    if (slotIndex >= selectionRouteState684_.slotRecordTable04_.size() ||
-        !selectionRouteState684_.slotRecordValid04_[slotIndex]) {
-        spdlog::info(
-            "CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex rejected invalid slotIndex={} count={} valid={} currentState={}",
-            static_cast<unsigned>(selectedSlotRecordIndex),
-            static_cast<unsigned>(selectionRouteState684_.slotRecordCount00_),
-            (slotIndex < selectionRouteState684_.slotRecordValid04_.size() &&
-             selectionRouteState684_.slotRecordValid04_[slotIndex])
-                ? 1u
-                : 0u,
-            currentState_ ? currentState_->DebugName() : "<null>");
-        return 0u;
-    }
-
+    const uint8_t oldCount = selectionRouteState684_.slotRecordCount00_;
     const std::string removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].heapString14;
-    const uint32_t oldCount = selectionRouteState684_.slotRecordCount00_;
-    if (slotIndex < lastAuthReply_.characters.size()) {
-        lastAuthReply_.characters.erase(lastAuthReply_.characters.begin() + static_cast<std::ptrdiff_t>(slotIndex));
-    }
 
-    if (selectionRouteState684_.slotRecordCount00_ != 0u) {
-        --selectionRouteState684_.slotRecordCount00_;
-    }
+    // anchor: launcher.exe:0x41ec00
+    // Original order:
+    // - decrement `+0x684`
+    // - release/remove `+0x688[index]`
+    // - shift later `+0x688` pointers and `+0x818` string-triples down
+    // - clear the final pointer/string tail
+    selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(oldCount - 1u);
+    selectionRouteState684_.slotRecordTable04_[slotIndex] = {};
+    selectionRouteState684_.slotRecordValid04_[slotIndex] = false;
 
     for (size_t i = slotIndex; i + 1u < selectionRouteState684_.slotRecordTable04_.size(); ++i) {
         selectionRouteState684_.slotRecordTable04_[i] = selectionRouteState684_.slotRecordTable04_[i + 1u];
@@ -1908,14 +1897,14 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
     selectionRouteState684_.slotRecordValid04_.back() = false;
     selectionRouteState684_.routeHostStringTriples194_.back().Clear();
 
-    if (CurrentCharacterRouteIndexCc8Scaffold() >= selectionRouteState684_.slotRecordCount00_) {
-        // Replacement-side mirror maintenance only:
-        // the bounded original `0x41ec00` body does not show a direct `+0xcc8` rewrite here, but
-        // current source keeps the exposed current-slot mirrors in-range after removal.
-        SetCurrentCharacterRouteIndexCc8Scaffold(0u);
+    // Replacement-only mirror maintenance kept explicit after the narrower original mutation.
+    postAuthMarginLoadingState_.characterRouteIndexCc8 = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
+    marginRouteState_.currentCharacterOrRouteIndex = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
+    if (slotIndex < lastAuthReply_.characters.size()) {
+        lastAuthReply_.characters.erase(lastAuthReply_.characters.begin() + static_cast<std::ptrdiff_t>(slotIndex));
     }
-
     PersistCharactersIniFromRecoveredAuthStateScaffold();
+
     spdlog::info(
         "CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex removed slotIndex={} oldCount={} newCount={} removedName='{}' currentState={}",
         static_cast<unsigned>(selectedSlotRecordIndex),
@@ -1991,50 +1980,13 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
     }
 
     SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(input.slotOrSelectionIndex00));
-    std::copy(
-        input.block04.begin(),
-        input.block04.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockCd0.begin());
-    std::copy(
-        input.block14.begin(),
-        input.block14.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockCe0.begin());
-    std::copy(
-        input.block24.begin(),
-        input.block24.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockCf0.begin());
-    std::copy(
-        input.block34.begin(),
-        input.block34.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD00.begin());
-    std::copy(
-        input.block44.begin(),
-        input.block44.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD10.begin());
-    std::copy(
-        input.block54.begin(),
-        input.block54.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD20.begin());
-    std::copy(
-        input.block64.begin(),
-        input.block64.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD30.begin());
-    std::copy(
-        input.block74.begin(),
-        input.block74.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD40.begin());
-    std::copy(
-        input.block84.begin(),
-        input.block84.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD50.begin());
-    std::copy(
-        input.block94.begin(),
-        input.block94.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD60.begin());
-    std::copy(
-        input.blockA4.begin(),
-        input.blockA4.end(),
-        selectionRouteState684_.persistedSelectionContext64c_.blockD70.begin());
+    static_assert(
+        sizeof(selectionRouteState684_.persistedSelectionContext64c_) == sizeof(input) - sizeof(input.slotOrSelectionIndex00),
+        "0x41c1f0 should copy the contiguous state3 snapshot body after the leading slot dword");
+    std::copy_n(
+        reinterpret_cast<const uint32_t*>(&input.block04),
+        sizeof(selectionRouteState684_.persistedSelectionContext64c_) / sizeof(uint32_t),
+        reinterpret_cast<uint32_t*>(&selectionRouteState684_.persistedSelectionContext64c_));
 
     const CLTLoginState* const oldState = currentState_;
     uint32_t state8EntryResult = 0u;
@@ -3866,6 +3818,7 @@ void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
     }
 
     SlotRecordState004b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[characterIndex];
+    slotRecord = {};
     slotRecord.heapString14 = character.handle.text;
     slotRecord.globalCharacterIdLow03 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
     slotRecord.globalCharacterIdHigh07 = static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);

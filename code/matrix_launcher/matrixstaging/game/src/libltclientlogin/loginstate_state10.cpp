@@ -98,8 +98,6 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
     // - so do not treat this broader auth-table rebuild as the owner-side body for `0x4401a0`
     mediator->worldSlots_.fill(nullptr);
     mediator->worldPayloadSlots_.fill(nullptr);
-    mediator->ResetSelectionRouteState684Scaffold();
-    mediator->selectionRouteState684_.slotRecordValid04_.fill(false);
     mediator->worldDescriptorValidD84_.fill(false);
     mediator->worldDescriptorCountD80_ = 0;
 
@@ -108,33 +106,40 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         mediator->worldSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&mediator->lastAuthReply_.worlds[i]);
         mediator->worldPayloadSlots_[i] = const_cast<mxo::auth::AuthWorldEntry*>(&mediator->lastAuthReply_.worlds[i]);
         mediator->SeedRecoveredWorldDescriptorFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.worlds[i]);
+        ++mediator->worldDescriptorCountD80_;
     }
-    mediator->worldDescriptorCountD80_ = static_cast<uint8_t>(worldCount);
+
+    mediator->ResetSelectionRouteState684Scaffold();
 
     const size_t characterCount = std::min(
         mediator->selectionRouteState684_.slotRecordTable04_.size(),
         mediator->lastAuthReply_.characters.size());
+    mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(characterCount);
     for (size_t i = 0; i < characterCount; ++i) {
         mediator->SeedRecoveredCharacterSlotRecordFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.characters[i]);
         const SlotRecordState004b5328& slotRecord = mediator->selectionRouteState684_.slotRecordTable04_[i];
         const int matchedWorldIndex = mediator->FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId0c);
         if (matchedWorldIndex >= 0) {
-            // Faithful to launcher.exe `0x43f300 / 0x4401a0`:
-            // - owner `+0x818[currentSlot]` stores the copied descriptor inline-name string
-            // - preserve that exact descriptor text here instead of lowercasing it into a
-            //   replacement-only host-prefix variant
+            // anchor: launcher.exe:0x43f74a
+            // Original joins the just-built slot-record world id against the earlier +0xd84 table,
+            // then copies the descriptor inline name into +0x818[currentCharacterIndex].
             mediator->selectionRouteState684_.routeHostStringTriples194_[i].Assign(
                 mediator->worldDescriptorsD84_[static_cast<size_t>(matchedWorldIndex)].inlineNamePlus03);
         }
     }
-    mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(characterCount);
 
     // Writeback to owner +0x80 (world list count/status family)
     mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 =
         static_cast<uint32_t>(mediator->lastAuthReply_.worlds.size());
 
-    // Writeback to owner +0xcc8 (current character/route index byte)
-    mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0u);
+    if (characterCount != 0) {
+        // Replacement-side mirror only:
+        // - broader `0x43f300` resets `+0xcc8` through `0x41d270` and does not show a direct
+        //   rewrite of the current-slot byte during the one-time auth adoption body
+        // - current source still seeds slot 0 here so the non-GUI launcher path keeps a concrete
+        //   current-slot mirror after the original table rebuild
+        mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0u);
+    }
 
     if (characterCount != 0) {
         const SlotRecordState004b5328& currentSlotRecord =
@@ -268,19 +273,31 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
 
     const CLTLoginMediator::WorldDescriptorState004b533c& selectedWorldDescriptor =
         mediator->worldDescriptorsD84_[selectedWorldDescriptorIndex];
+
+    // anchor: launcher.exe:0x4401a0
+    // Exact success-side write order recovered from the listing:
+    // - allocate/init new slot-record object
+    // - store it at +0x688[currentCount]
+    // - copy selected descriptor inline name into +0x818[currentCount]
+    // - set +0xcc8 = currentCount
+    // - increment +0x684
+    // - then fill the slot-record payload/name fields
+    mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
+    mediator->selectionRouteState684_.slotRecordValid04_[appendedSlotIndex] = true;
+    mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].Assign(
+        selectedWorldDescriptor.inlineNamePlus03);
+    mediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
+    mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
+
     SlotRecordState004b5328& appendedSlotRecord =
         mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
-    appendedSlotRecord = {};
     appendedSlotRecord.heapString14 =
         reinterpret_cast<const char*>(mediator->postAuthMarginLoadingState_.sourceLeadString108.data());
     appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
     appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
     appendedSlotRecord.status0b = 0u;
     appendedSlotRecord.worldId0c = selectedWorldDescriptor.worldId01;
-    mediator->selectionRouteState684_.slotRecordValid04_[appendedSlotIndex] = true;
-    mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].Assign(
-        selectedWorldDescriptor.inlineNamePlus03);
-    mediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
+
     mediator->marginRouteState_.pendingWorldId = selectedWorldDescriptor.worldId01;
     mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(selectedWorldDescriptor.worldId01);
     if (const char* routeHostPrefix = mediator->LookupRouteHostPrefixBySlot(appendedSlotIndex)) {
@@ -288,7 +305,6 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
     } else {
         mediator->marginRouteState_.routeHostPrefix.clear();
     }
-    mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
 
     spdlog::info(
         "DIAGNOSTIC: state10 raw-0x0b claim-name reply appended slot={} status=0x{:08x} globalCharacterIdLow=0x{:08x} globalCharacterIdHigh=0x{:08x} selectedWorldDescriptorIndex=0x{:08x} routeText='{}' characterName='{}' optionalText='{}'",
