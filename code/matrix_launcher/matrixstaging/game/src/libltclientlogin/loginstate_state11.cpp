@@ -65,213 +65,6 @@ static void ResetOwnedSectionBytes(void*& buffer, uint32_t& length, uint8_t& fla
     flag = 0u;
 }
 
-static void ResetState11ReplyOwnerState(CLTLoginMediator::PostAuthMarginLoadingState& ownerState) {
-    // anchor: launcher.exe:0x438a50
-    // Shared `+0xf1c` reset helper used by both state8 (`0x43f930`) and state11 (`0x440320`).
-    ownerState.state8PersistenceDataF1c = {};
-    std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
-    ownerState.characterReplyFieldF3c = 0u;
-    ownerState.characterReplyFieldF40 = 0u;
-    ownerState.characterReplyFieldF44 = 0x1000u;
-    std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
-    std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
-    std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
-    std::fill(ownerState.section0StringF8c.begin(), ownerState.section0StringF8c.end(), '\0');
-    std::fill(ownerState.section0StringFac.begin(), ownerState.section0StringFac.end(), '\0');
-    std::fill(ownerState.section0StringFcc.begin(), ownerState.section0StringFcc.end(), '\0');
-    std::fill(ownerState.state8Section0RawF88.begin(), ownerState.state8Section0RawF88.end(), 0u);
-    ownerState.replySectionData13cc = 0u;
-    ownerState.replySectionData13d0 = 0u;
-    ResetOwnedSectionBytes(
-        ownerState.state8Section0OverflowBuffer13f0,
-        ownerState.state8Section0OverflowLength13f4,
-        ownerState.section0Flag13f6);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, ownerState.flag1416);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, ownerState.allocatedBufferFlag141e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, ownerState.allocatedBufferFlag1426);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, ownerState.allocatedBufferFlag142e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, ownerState.flag1436);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, ownerState.flag143e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, ownerState.flag1448);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, ownerState.flag1452);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
-}
-
-static void SeedState11FirstFragment(
-    CLTLoginMediator::PostAuthMarginLoadingState& ownerState,
-    uint32_t parsedField05) {
-    // anchor: launcher.exe:0x440320 first-fragment seed
-    // Tightened from direct disassembly over the shared
-    // `CLTLoginMediatorCharacterPersistenceData_0x41d900` owner block:
-    // - seed source is owner `+0x108/+0x12c/+0x134`, not the later current-slot record table
-    // - `0x438a50` already reset the broader buffer/flag family and seeded `+0xf44 = 0x1000`
-    ResetState11ReplyOwnerState(ownerState);
-    ownerState.characterReplyFieldF3c = parsedField05;
-    ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
-    ownerState.state8PersistenceDataF1c.replyField20 = parsedField05;
-    ownerState.state8PersistenceDataF1c.selectedWorldField24 =
-        ownerState.createCharacterData108.selectedWorldField24;
-    std::copy(
-        ownerState.createCharacterData108.characterName00.begin(),
-        ownerState.createCharacterData108.characterName00.end(),
-        ownerState.characterNameBufferF1c);
-    ownerState.characterNameBufferF1c[sizeof(ownerState.characterNameBufferF1c) - 1u] = '\0';
-    std::copy(
-        ownerState.createCharacterData108.characterName00.begin(),
-        ownerState.createCharacterData108.characterName00.end(),
-        ownerState.state8PersistenceDataF1c.characterName00.begin());
-    std::copy_n(
-        ownerState.createCharacterData108.header2c.begin(),
-        ownerState.characterFlagsF48.size(),
-        ownerState.characterFlagsF48.begin());
-    std::copy_n(
-        ownerState.createCharacterData108.header2c.begin(),
-        ownerState.state8PersistenceDataF1c.header2c.size(),
-        ownerState.state8PersistenceDataF1c.header2c.begin());
-    ownerState.flag13fe = 1u;
-    ownerState.flag1406 = 1u;
-    ownerState.flag1416 = 1u;
-    ownerState.flag1448 = 1u;
-    ownerState.flag1452 = 1u;
-    ownerState.state8PersistenceDataF1c.section01PresentFlag4e2 = 1u;
-    ownerState.state8PersistenceDataF1c.section02PresentFlag4ea = 1u;
-    ownerState.state8PersistenceDataF1c.section07PresentFlag4fa = 1u;
-    ownerState.state8PersistenceDataF1c.section08PresentFlag52c = 1u;
-    ownerState.state8PersistenceDataF1c.section09PresentFlag536 = 1u;
-}
-
-static void ApplyState11Section11SideEffect(
-    CLTLoginMediator::PostAuthMarginLoadingState& ownerState,
-    const ParsedState11LoadCharacterReplyScaffold& parsed) {
-    // anchor: launcher.exe:0x43f8c0
-    // Shared `CLTLoginMediatorCharacterPersistenceData_ApplySection11SideEffect` helper used by
-    // both state8 and state11:
-    // - if byteCount > 4, copy the leading dword into owner `+0x145c`
-    // - copy the remaining bytes into the small-string-like family at owner `+0x1460`
-    // - otherwise clear both fields
-    ownerState.state8Section11Dword145c = 0u;
-    ownerState.state8Section11String1460.clear();
-
-    if (!parsed.sectionData || parsed.sectionByteCount <= 4u) {
-        return;
-    }
-
-    ownerState.state8Section11Dword145c = ReadU32LE(parsed.sectionData);
-    ownerState.state8Section11String1460.assign(
-        reinterpret_cast<const char*>(parsed.sectionData + 4u),
-        reinterpret_cast<const char*>(parsed.sectionData + parsed.sectionByteCount));
-    ownerState.state8PersistenceDataF1c.section11Dword540 = ownerState.state8Section11Dword145c;
-    if (!ownerState.state8Section11String1460.empty()) {
-        char* const section11Begin = ownerState.state8Section11String1460.data();
-        ownerState.state8PersistenceDataF1c.section11StringBegin544 = section11Begin;
-        ownerState.state8PersistenceDataF1c.section11StringCurrent548 =
-            section11Begin + ownerState.state8Section11String1460.size();
-        ownerState.state8PersistenceDataF1c.section11StringCapacity54c =
-            section11Begin + ownerState.state8Section11String1460.capacity();
-    }
-}
-
-static void HandleState11ReplySection(
-    CLTLoginMediator::PostAuthMarginLoadingState& ownerState,
-    const ParsedState11LoadCharacterReplyScaffold& parsed) {
-    auto& persistence = ownerState.state8PersistenceDataF1c;
-    switch (parsed.sectionSelectorMinus2) {
-        case 0u:
-            if (parsed.sectionData && parsed.sectionByteCount >= 0x44cu) {
-                ownerState.characterRecordPointersF88[0] = ReadU32LE(parsed.sectionData + 0x00u);
-                ownerState.replySectionData13cc = ReadU32LE(parsed.sectionData + 0x444u);
-                ownerState.replySectionData13d0 = ReadU32LE(parsed.sectionData + 0x448u);
-                persistence.bodyWord6c = 0x1000u;
-                std::fill(persistence.realFirstName70.begin(), persistence.realFirstName70.end(), '\0');
-                std::fill(persistence.realLastName90.begin(), persistence.realLastName90.end(), '\0');
-                std::fill(persistence.backgroundB0.begin(), persistence.backgroundB0.end(), '\0');
-                persistence.replySectionData4b0 = 0u;
-                persistence.replySectionData4b4 = 0u;
-                persistence.tail4b8 = {1u};
-                const size_t bodyCopyBytes = std::min<size_t>(
-                    parsed.sectionByteCount,
-                    CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData::kBodySize);
-                if (bodyCopyBytes != 0u) {
-                    std::memcpy(&persistence.bodyWord6c, parsed.sectionData, bodyCopyBytes);
-                }
-                CopyCStringIntoFixed(
-                    ownerState.section0StringF8c.data(),
-                    ownerState.section0StringF8c.size(),
-                    parsed.sectionData + 0x04u,
-                    parsed.sectionByteCount - 0x04u);
-                CopyCStringIntoFixed(
-                    ownerState.section0StringFac.data(),
-                    ownerState.section0StringFac.size(),
-                    parsed.sectionData + 0x24u,
-                    parsed.sectionByteCount > 0x24u ? parsed.sectionByteCount - 0x24u : 0u);
-                CopyCStringIntoFixed(
-                    ownerState.section0StringFcc.data(),
-                    ownerState.section0StringFcc.size(),
-                    parsed.sectionData + 0x44u,
-                    parsed.sectionByteCount > 0x44u ? parsed.sectionByteCount - 0x44u : 0u);
-                ownerState.section0Flag13f6 = 1u;
-                persistence.section0PresentFlag4da = 1u;
-            }
-            break;
-        case 3u:
-            AppendOwnedSectionBytesU16(
-                ownerState.allocatedBuffer1418,
-                ownerState.allocatedBufferLength141c,
-                parsed.sectionData,
-                parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag141e = 1u;
-            persistence.section03Buffer4fc = ownerState.allocatedBuffer1418;
-            persistence.section03Length500 = ownerState.allocatedBufferLength141c;
-            persistence.section03PresentFlag502 = 1u;
-            break;
-        case 4u:
-            AppendOwnedSectionBytesU16(
-                ownerState.allocatedBuffer1420,
-                ownerState.allocatedBufferLength1424,
-                parsed.sectionData,
-                parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag1426 = 1u;
-            persistence.section04Buffer504 = ownerState.allocatedBuffer1420;
-            persistence.section04Length508 = ownerState.allocatedBufferLength1424;
-            persistence.section04PresentFlag50a = 1u;
-            break;
-        case 5u:
-            AppendOwnedSectionBytesU16(
-                ownerState.allocatedBuffer1428,
-                ownerState.allocatedBufferLength142c,
-                parsed.sectionData,
-                parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag142e = 1u;
-            persistence.section05Buffer50c = ownerState.allocatedBuffer1428;
-            persistence.section05Length510 = ownerState.allocatedBufferLength142c;
-            persistence.section05PresentFlag512 = 1u;
-            break;
-        case 6u:
-            AppendOwnedSectionBytesU16(
-                ownerState.allocatedBuffer1408,
-                ownerState.allocatedBufferLength140c,
-                parsed.sectionData,
-                parsed.sectionByteCount);
-            ownerState.allocatedBufferFlag140e = 1u;
-            persistence.section06Buffer4ec = ownerState.allocatedBuffer1408;
-            persistence.section06Length4f0 = ownerState.allocatedBufferLength140c;
-            persistence.section06PresentFlag4f2 = 1u;
-            break;
-        case 0x0bu:
-            ApplyState11Section11SideEffect(ownerState, parsed);
-            spdlog::info(
-                "CLTLoginState_State11::Slot6_HandleSecondaryMessage applied shared section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
-                static_cast<unsigned>(ownerState.state8Section11Dword145c),
-                static_cast<unsigned>(ownerState.state8Section11String1460.size()));
-            break;
-        default:
-            break;
-    }
-}
-
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b5154
@@ -424,10 +217,183 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
 
     const bool firstFragment = (replySectionsSeen_ == 0u);
     if (firstFragment) {
-        SeedState11FirstFragment(ownerState, parsed.field05);
+        // anchor: launcher.exe:0x438a50 first-fragment reset inside `0x440320`
+        // Keep this inlined here instead of routing through replacement-only helper methods:
+        // current static-RE shows this work as part of the original slot6 body.
+        ownerState.state8PersistenceDataF1c = {};
+        std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
+        ownerState.characterReplyFieldF3c = 0u;
+        ownerState.characterReplyFieldF40 = 0u;
+        ownerState.characterReplyFieldF44 = 0x1000u;
+        std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
+        std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
+        std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
+        std::fill(ownerState.section0StringF8c.begin(), ownerState.section0StringF8c.end(), '\0');
+        std::fill(ownerState.section0StringFac.begin(), ownerState.section0StringFac.end(), '\0');
+        std::fill(ownerState.section0StringFcc.begin(), ownerState.section0StringFcc.end(), '\0');
+        std::fill(ownerState.state8Section0RawF88.begin(), ownerState.state8Section0RawF88.end(), 0u);
+        ownerState.replySectionData13cc = 0u;
+        ownerState.replySectionData13d0 = 0u;
+        ResetOwnedSectionBytes(
+            ownerState.state8Section0OverflowBuffer13f0,
+            ownerState.state8Section0OverflowLength13f4,
+            ownerState.section0Flag13f6);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, ownerState.flag1416);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, ownerState.allocatedBufferFlag141e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, ownerState.allocatedBufferFlag1426);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, ownerState.allocatedBufferFlag142e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, ownerState.flag1436);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, ownerState.flag143e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, ownerState.flag1448);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, ownerState.flag1452);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
+
+        // anchor: launcher.exe:0x440320 first-fragment seed
+        ownerState.characterReplyFieldF3c = parsed.field05;
+        ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
+        ownerState.state8PersistenceDataF1c.replyField20 = parsed.field05;
+        ownerState.state8PersistenceDataF1c.selectedWorldField24 =
+            ownerState.createCharacterData108.selectedWorldField24;
+        std::copy(
+            ownerState.createCharacterData108.characterName00.begin(),
+            ownerState.createCharacterData108.characterName00.end(),
+            ownerState.characterNameBufferF1c);
+        ownerState.characterNameBufferF1c[sizeof(ownerState.characterNameBufferF1c) - 1u] = '\0';
+        std::copy(
+            ownerState.createCharacterData108.characterName00.begin(),
+            ownerState.createCharacterData108.characterName00.end(),
+            ownerState.state8PersistenceDataF1c.characterName00.begin());
+        std::copy_n(
+            ownerState.createCharacterData108.header2c.begin(),
+            ownerState.characterFlagsF48.size(),
+            ownerState.characterFlagsF48.begin());
+        std::copy_n(
+            ownerState.createCharacterData108.header2c.begin(),
+            ownerState.state8PersistenceDataF1c.header2c.size(),
+            ownerState.state8PersistenceDataF1c.header2c.begin());
+        ownerState.flag13fe = 1u;
+        ownerState.flag1406 = 1u;
+        ownerState.flag1416 = 1u;
+        ownerState.flag1448 = 1u;
+        ownerState.flag1452 = 1u;
+        ownerState.state8PersistenceDataF1c.section01PresentFlag4e2 = 1u;
+        ownerState.state8PersistenceDataF1c.section02PresentFlag4ea = 1u;
+        ownerState.state8PersistenceDataF1c.section07PresentFlag4fa = 1u;
+        ownerState.state8PersistenceDataF1c.section08PresentFlag52c = 1u;
+        ownerState.state8PersistenceDataF1c.section09PresentFlag536 = 1u;
     }
 
-    HandleState11ReplySection(ownerState, parsed);
+    auto& persistence = ownerState.state8PersistenceDataF1c;
+    switch (parsed.sectionSelectorMinus2) {
+        case 0u:
+            if (parsed.sectionData && parsed.sectionByteCount >= 0x44cu) {
+                ownerState.characterRecordPointersF88[0] = ReadU32LE(parsed.sectionData + 0x00u);
+                ownerState.replySectionData13cc = ReadU32LE(parsed.sectionData + 0x444u);
+                ownerState.replySectionData13d0 = ReadU32LE(parsed.sectionData + 0x448u);
+                persistence.bodyWord6c = 0x1000u;
+                std::fill(persistence.realFirstName70.begin(), persistence.realFirstName70.end(), '\0');
+                std::fill(persistence.realLastName90.begin(), persistence.realLastName90.end(), '\0');
+                std::fill(persistence.backgroundB0.begin(), persistence.backgroundB0.end(), '\0');
+                persistence.replySectionData4b0 = 0u;
+                persistence.replySectionData4b4 = 0u;
+                persistence.tail4b8 = {1u};
+                const size_t bodyCopyBytes = std::min<size_t>(
+                    parsed.sectionByteCount,
+                    CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData::kBodySize);
+                if (bodyCopyBytes != 0u) {
+                    std::memcpy(&persistence.bodyWord6c, parsed.sectionData, bodyCopyBytes);
+                }
+                CopyCStringIntoFixed(
+                    ownerState.section0StringF8c.data(),
+                    ownerState.section0StringF8c.size(),
+                    parsed.sectionData + 0x04u,
+                    parsed.sectionByteCount - 0x04u);
+                CopyCStringIntoFixed(
+                    ownerState.section0StringFac.data(),
+                    ownerState.section0StringFac.size(),
+                    parsed.sectionData + 0x24u,
+                    parsed.sectionByteCount > 0x24u ? parsed.sectionByteCount - 0x24u : 0u);
+                CopyCStringIntoFixed(
+                    ownerState.section0StringFcc.data(),
+                    ownerState.section0StringFcc.size(),
+                    parsed.sectionData + 0x44u,
+                    parsed.sectionByteCount > 0x44u ? parsed.sectionByteCount - 0x44u : 0u);
+                ownerState.section0Flag13f6 = 1u;
+                persistence.section0PresentFlag4da = 1u;
+            }
+            break;
+        case 3u:
+            AppendOwnedSectionBytesU16(
+                ownerState.allocatedBuffer1418,
+                ownerState.allocatedBufferLength141c,
+                parsed.sectionData,
+                parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag141e = 1u;
+            persistence.section03Buffer4fc = ownerState.allocatedBuffer1418;
+            persistence.section03Length500 = ownerState.allocatedBufferLength141c;
+            persistence.section03PresentFlag502 = 1u;
+            break;
+        case 4u:
+            AppendOwnedSectionBytesU16(
+                ownerState.allocatedBuffer1420,
+                ownerState.allocatedBufferLength1424,
+                parsed.sectionData,
+                parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag1426 = 1u;
+            persistence.section04Buffer504 = ownerState.allocatedBuffer1420;
+            persistence.section04Length508 = ownerState.allocatedBufferLength1424;
+            persistence.section04PresentFlag50a = 1u;
+            break;
+        case 5u:
+            AppendOwnedSectionBytesU16(
+                ownerState.allocatedBuffer1428,
+                ownerState.allocatedBufferLength142c,
+                parsed.sectionData,
+                parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag142e = 1u;
+            persistence.section05Buffer50c = ownerState.allocatedBuffer1428;
+            persistence.section05Length510 = ownerState.allocatedBufferLength142c;
+            persistence.section05PresentFlag512 = 1u;
+            break;
+        case 6u:
+            AppendOwnedSectionBytesU16(
+                ownerState.allocatedBuffer1408,
+                ownerState.allocatedBufferLength140c,
+                parsed.sectionData,
+                parsed.sectionByteCount);
+            ownerState.allocatedBufferFlag140e = 1u;
+            persistence.section06Buffer4ec = ownerState.allocatedBuffer1408;
+            persistence.section06Length4f0 = ownerState.allocatedBufferLength140c;
+            persistence.section06PresentFlag4f2 = 1u;
+            break;
+        case 0x0bu:
+            // anchor: launcher.exe:0x43f8c0
+            ownerState.state8Section11Dword145c = 0u;
+            ownerState.state8Section11String1460.clear();
+            if (parsed.sectionData != nullptr && parsed.sectionByteCount > 4u) {
+                ownerState.state8Section11Dword145c = ReadU32LE(parsed.sectionData);
+                ownerState.state8Section11String1460.assign(
+                    reinterpret_cast<const char*>(parsed.sectionData + 4u),
+                    reinterpret_cast<const char*>(parsed.sectionData + parsed.sectionByteCount));
+                persistence.section11Dword540 = ownerState.state8Section11Dword145c;
+                char* const section11Begin = ownerState.state8Section11String1460.data();
+                persistence.section11StringBegin544 = section11Begin;
+                persistence.section11StringCurrent548 =
+                    section11Begin + ownerState.state8Section11String1460.size();
+                persistence.section11StringCapacity54c =
+                    section11Begin + ownerState.state8Section11String1460.capacity();
+            }
+            spdlog::info(
+                "CLTLoginState_State11::Slot6_HandleSecondaryMessage applied shared section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
+                static_cast<unsigned>(ownerState.state8Section11Dword145c),
+                static_cast<unsigned>(ownerState.state8Section11String1460.size()));
+            break;
+        default:
+            break;
+    }
 
     if (replySectionsSeen_ < 0xffu) {
         ++replySectionsSeen_;
