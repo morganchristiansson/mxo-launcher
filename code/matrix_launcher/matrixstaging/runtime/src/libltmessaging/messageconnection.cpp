@@ -2337,10 +2337,61 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
         return 1u;
     }
 
-    const uint32_t handled = mediator->StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
-        payloadBytes,
-        payloadByteCount,
-        &messageRef);
+    // anchor: launcher.exe:0x44af20 -> 0x442d00 -> owner vtable +0x184 / 0x41f260
+    // Keep this receive-side seam close to the original thin bridge:
+    // - base margin dispatch already consumed decoded codes 2/4/5 above
+    // - the surviving path stages the copied payload bytes on the mediator-owned owner object,
+    //   lets the launcher-owned CERT/MS bootstrap path consume any still-relevant packets, and
+    //   then re-enters current helper slot 6 directly through owner vtable `+0x184`
+    mediator->stagedIncomingMarginPacketBytes_.assign(payloadBytes, payloadBytes + payloadByteCount);
+    ++mediator->marginPacketReceiveCountScaffold_;
+    mediator->lastMarginPacketOpcodeScaffold_ = rawCode;
+    mediator->lastMarginPacketSizeScaffold_ = static_cast<uint32_t>(payloadByteCount);
+
+    const uint32_t bootstrapHandled =
+        mediator->ContinueMarginBootstrapHandshake(payloadBytes, payloadByteCount, /*transportEncrypted=*/false);
+    if (bootstrapHandled != 0u) {
+        spdlog::info(
+            "CMarginConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} messageRef={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+            static_cast<unsigned>(rawCode),
+            static_cast<unsigned>(decodedMessageCode),
+            hadValidMessageCode ? 1u : 0u,
+            headerless ? 1u : 0u,
+            usedHeaderlessLocatorDecode ? 1u : 0u,
+            static_cast<unsigned>(payloadByteCount),
+            fmt::ptr(&messageRef),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            fmt::ptr(mediator->CurrentState()),
+            bootstrapHandled,
+            remoteHostForLog);
+        return bootstrapHandled;
+    }
+
+    if (rawCode == 2u || rawCode == 4u || rawCode == 5u) {
+        ++mediator->marginPacketFilteredBeforeSlot6CountScaffold_;
+        spdlog::info(
+            "CMarginConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} messageRef={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+            static_cast<unsigned>(rawCode),
+            static_cast<unsigned>(decodedMessageCode),
+            hadValidMessageCode ? 1u : 0u,
+            headerless ? 1u : 0u,
+            usedHeaderlessLocatorDecode ? 1u : 0u,
+            static_cast<unsigned>(payloadByteCount),
+            fmt::ptr(&messageRef),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()),
+            fmt::ptr(mediator->CurrentState()),
+            1u,
+            remoteHostForLog);
+        return 1u;
+    }
+
+    uint32_t handled = 0u;
+    if (mediator->CurrentState() != nullptr) {
+        ++mediator->marginPacketSlot6DispatchCountScaffold_;
+        handled = mediator->DispatchCurrentHelperSlot6(&messageRef);
+    }
     spdlog::info(
         "CMarginConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} messageRef={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
         static_cast<unsigned>(rawCode),

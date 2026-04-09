@@ -120,6 +120,7 @@ class CLTLoginMediator : public ILTLoginMediator {
     friend class CLTLoginState_State8;
     friend class CLTLoginState_State10;
     friend class CLTLoginState_State11;
+    friend class mxo::liblttcp::CMarginConnection;
 
 public:
     static constexpr uint32_t kRecoveredWorldSlotCapacity = 100;
@@ -885,15 +886,6 @@ public:
         const uint8_t* packetBytes,
         size_t packetSize,
         void* workItem = nullptr);
-    // UNANCHORED: source-owned staging wrapper for the narrowed margin-side
-    // `0x4490c0 -> 0x44af20 -> 0x442d00 -> 0x41f260` post-copy receive seam.
-    // Current scope is now narrower on consumed branches too:
-    // - decoded code `2` and decoded code `4` can be handled earlier at the connection/leaf seam
-    // - this helper remains the fallback/remaining consumer for the other margin receive paths
-    uint32_t StageMarginPacketBytesAndDispatchCurrentHelperScaffold(
-        const uint8_t* packetBytes,
-        size_t packetSize,
-        void* workItem = nullptr);
     // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
     uint32_t HandleAuthConnectionCompletionFallback(void* connection, void* workItem) override;
     uint32_t HandleAuthConnectionCompletionFallbackScaffold(
@@ -1259,10 +1251,6 @@ public:
     // - only other codes survive into owner `+0x184` / current helper slot 6
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
-    uint32_t HandleMarginPacketBytes(
-        const uint8_t* packetBytes,
-        size_t packetSize,
-        void* workItem = nullptr);
     // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441a30 / 0x4429b0
     // Narrow source-owned mirror of one consumed decoded-code-2 branch moved closer to the
     // connection/leaf dispatch seam.
