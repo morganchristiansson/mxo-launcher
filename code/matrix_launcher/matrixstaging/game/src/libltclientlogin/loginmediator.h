@@ -1063,15 +1063,6 @@ public:
     // Tiny auth transport-ready test used by state2 slot 3 before it reaches the bootstrap
     // dispatcher. Current best concrete read: auth connection exists and connection `+0x34 == 2`.
     bool HasReadyAuthConnectionState2() const;
-    // Source-owned branch selector for the later `0x41ecd0`
-    // `g_LaunchPadGateState16State18` / state16/state18 family.
-    // Keep it default-off so the proven happy path stays on the observed
-    // `g_LaunchPadGateState16State18 == 0` route, but make the alternate transition scaffold
-    // explicit for future non-happy work.
-    void SetProcessLoginRequestAlternateState16BranchScaffold(bool enabled);
-    bool ProcessLoginRequestAlternateState16BranchScaffold() const {
-        return processLoginRequestAlternateState16BranchScaffold_;
-    }
 
     // Post-connect status handling is still owner/helper-state driven.
     // Current high-value summary:
@@ -1709,10 +1700,6 @@ private:
     void* latestObserver174_ = nullptr;         // most recent unregister call observer
     uint32_t observerRegister170Count_ = 0;     // register call count
     uint32_t observerUnregister174Count_ = 0;   // unregister call count
-
-    // Source-owned default-off mirror for the alternate
-    // `g_LaunchPadGateState16State18 != 0` state16/state18 family.
-    bool processLoginRequestAlternateState16BranchScaffold_ = false;
 
     std::string authServerDnsName_;
     uint16_t authServerPortHostOrder_;

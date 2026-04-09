@@ -554,14 +554,6 @@ bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
            authConnection_->State() == mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive;
 }
 
-// UNANCHORED: source-owned switch for the default-off `g_LaunchPadGateState16State18 != 0` branch scaffold.
-void CLTLoginMediator::SetProcessLoginRequestAlternateState16BranchScaffold(bool enabled) {
-    processLoginRequestAlternateState16BranchScaffold_ = enabled;
-    spdlog::info(
-        "CLTLoginMediator::SetProcessLoginRequestAlternateState16BranchScaffold enabled={} (default-off scaffold mirroring g_LaunchPadGateState16State18!=0 alternate state16/state18 family; proven happy path remains g_LaunchPadGateState16State18==0)",
-        enabled ? 1u : 0u);
-}
-
 // anchor: launcher.exe:0x41ecd0
 uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) {
     const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
@@ -618,7 +610,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         static_cast<unsigned>(authBootstrapSource38_.string60Owned.size()),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(stateCode),
-        processLoginRequestAlternateState16BranchScaffold_ ? 1u : 0u,
+        0u,
         sessionCallbackHelper65c_ ? 1u : 0u);
 
     CLTLoginState* const upstreamState = currentState_;
@@ -627,10 +619,10 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
             "ROUTE CHECKPOINT: early-auth ProcessLoginRequest from state0 currentState={} string60Empty={} launchPadGateState16State18Scaffold={} helper65cPresent={}",
             upstreamState ? upstreamState->DebugName() : "<null>",
             string60Empty ? 1u : 0u,
-            processLoginRequestAlternateState16BranchScaffold_ ? 1u : 0u,
+            0u,
             sessionCallbackHelper65c_ ? 1u : 0u);
     }
-    if (!processLoginRequestAlternateState16BranchScaffold_) {
+    if (true) {
         // Static + runtime now line up on the default happy path at `0x41ecd0`:
         // - after copying the input block into owner `+0x94`, the code tests
         //   `g_LaunchPadGateState16State18`
