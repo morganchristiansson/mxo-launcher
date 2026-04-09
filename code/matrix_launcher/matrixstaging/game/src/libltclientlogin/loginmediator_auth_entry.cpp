@@ -393,27 +393,7 @@ uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
     return result;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::SetAuthBootstrapConfig(
-    uint32_t launcherVersion,
-    uint32_t currentPublicKeyId,
-    uint8_t loginType,
-    const std::vector<uint8_t>& keyConfigMd5,
-    const std::vector<uint8_t>& uiConfigMd5) {
-    authLauncherVersion_ = launcherVersion;
-    authCurrentPublicKeyId_ = currentPublicKeyId;
-    authLoginType_ = loginType;
-    authKeyConfigMd5_ = keyConfigMd5;
-    authUiConfigMd5_ = uiConfigMd5;
 
-    spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator auth bootstrap configured launcherVersion={} currentPublicKeyId={} loginType={} keyConfigMd5Len={} uiConfigMd5Len={}",
-        static_cast<unsigned>(authLauncherVersion_),
-        static_cast<unsigned>(authCurrentPublicKeyId_),
-        static_cast<unsigned>(authLoginType_),
-        static_cast<unsigned>(authKeyConfigMd5_.size()),
-        static_cast<unsigned>(authUiConfigMd5_.size()));
-}
 
 // UNANCHORED: source-owned config setter for the auth host/port scaffold feeding owner `+0x4c/+0x5c`.
 void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile) {

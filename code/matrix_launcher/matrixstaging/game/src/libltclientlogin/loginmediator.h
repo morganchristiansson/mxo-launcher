@@ -1109,25 +1109,7 @@ public:
     uint32_t AuthConnectCandidateCountScaffold() const;
     bool HasAuthConnectRetryCandidateRemainingScaffold() const;
 
-    void SetAuthBootstrapConfig(
-        uint32_t launcherVersion,
-        uint32_t currentPublicKeyId,
-        uint8_t loginType,
-        const std::vector<uint8_t>& keyConfigMd5,
-        const std::vector<uint8_t>& uiConfigMd5);
-    // Source-owned wrapper/demux entry used by the current staged-payload handoff.
-    // Important ownership split:
-    // - original `0x43f300/0x448140` consume a higher-level incoming auth-message object, not raw
-    //   payload bytes directly
-    // - current replacement therefore keeps only the staged-payload handoff here, while early
-    //   inbound raw `0x07/0x09/0x0b` semantics are dispatched into state2
-    //   `AuthMessageDispatch` (`0x43f300`) and its owner `+0x680` child helper
-    //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
-    // - later raw `0x0b` helper10 handling does **not** belong on this auth-side path:
-    //   `0x4401a0` is the margin-side `MS_ClaimCharacterNameReply` consumer after helper10 slot-3
-    //   `MS_ClaimCharacterNameRequest`
-    // - keep this mediator method only as the current staging/demux wrapper, not as proof that
-    //   the original packet semantics were mediator-owned
+
     uint32_t HandleAuthPacketBytes(const uint8_t* packetBytes, size_t packetSize);
     // Current receive handling drains parsed packets from the faithful transport/parser seam.
     // Current entry shape is still one bounded source-owned step later than original, but one
