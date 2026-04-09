@@ -44,6 +44,53 @@ static void* g_CloseWorkItemVtable[2] = {0};
 static constexpr uint8_t kSocketFactoryFlagSkipDisableNagle = 0x01u;
 static constexpr uint8_t kSocketFactoryFlagKeepBlocking = 0x02u;
 
+struct CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock {
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock* next;
+};
+
+struct CLTThreadPerClientTCPEngine_SmallWorkItemPoolFreeListNode {
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolFreeListNode* next;
+};
+
+struct CLTThreadPerClientTCPEngine_SmallWorkItemPoolState {
+    uint32_t objectCountPerBackingBlock = 0u;
+    uint32_t backingBlockCount = 0u;
+    size_t backingBlockBytes = 0u;
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock* backingBlockListHead = nullptr;
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolFreeListNode* freeListHead = nullptr;
+    uint32_t extraObjectBytes = 0u;
+    CRITICAL_SECTION criticalSection = {};
+    std::once_flag initOnce;
+    bool initialized = false;
+};
+
+// Source-owned aggregate over the original connection-status work-item pool globals.
+// This is not one byte-faithful launcher.exe global by itself; it groups the recovered pieces:
+// - anchor: launcher.exe:0x004cb410 = g_ConnectionStatusWorkItemPoolLockHelper
+// - anchor: launcher.exe:0x004f76c0 = g_ConnectionStatusWorkItemPoolObjectCountPerBackingBlock
+// - anchor: launcher.exe:0x004f76c4 = g_ConnectionStatusWorkItemPoolBackingBlockCount
+// - anchor: launcher.exe:0x004f76c8 = g_ConnectionStatusWorkItemPoolBackingBlockBytes
+// - anchor: launcher.exe:0x004f76cc = g_ConnectionStatusWorkItemPoolBackingBlockListHead
+// - anchor: launcher.exe:0x004f76d0 = g_ConnectionStatusWorkItemPoolFreeListHead
+// - anchor: launcher.exe:0x004f76d4 = g_ConnectionStatusWorkItemPoolExtraObjectBytes
+static CLTThreadPerClientTCPEngine_SmallWorkItemPoolState g_ConnectionStatusWorkItemPoolState;
+// Source-owned aggregate over the original close-work-item pool globals.
+// This is not one byte-faithful launcher.exe global by itself; it groups the recovered pieces:
+// - anchor: launcher.exe:0x004cb42c = g_CloseWorkItemPoolLockHelper
+// - anchor: launcher.exe:0x004f76d8 = g_CloseWorkItemPoolObjectCountPerBackingBlock
+// - anchor: launcher.exe:0x004f76dc = g_CloseWorkItemPoolBackingBlockCount
+// - anchor: launcher.exe:0x004f76e0 = g_CloseWorkItemPoolBackingBlockBytes
+// - anchor: launcher.exe:0x004f76e4 = g_CloseWorkItemPoolBackingBlockListHead
+// - anchor: launcher.exe:0x004f76e8 = g_CloseWorkItemPoolFreeListHead
+// - anchor: launcher.exe:0x004f76ec = g_CloseWorkItemPoolExtraObjectBytes
+static CLTThreadPerClientTCPEngine_SmallWorkItemPoolState g_CloseWorkItemPoolState;
+
+static void SmallWorkItemPool_FreeStorageScaffold(
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolState* poolState,
+    void* storage);
+static void CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemPool_Clear();
+static void CLTThreadPerClientTCPEngine_CloseWorkItemPool_Clear();
+
 // UNANCHORED: source-owned narrow mirror of the original queue block free-list behavior.
 // Static RE already shows that the consumer path recycles exhausted blocks instead of treating the
 // transition as a simple free-and-forget step. Current source keeps that narrower behavior in a
@@ -569,14 +616,24 @@ static const char* EngineWorkTypeName(uint32_t workType) {
 // anchor: launcher.exe:0x435c30 / vtable `0x004b3df8`
 static uint32_t __thiscall ConnectionStatusWorkItem_ReleaseScaffold(
     CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold* self) {
-    std::free(self);
+    if (!self) {
+        return 1u;
+    }
+
+    // Source-owned narrowed stand-in for the deleting-dtor free-list return path in `0x435c30`.
+    SmallWorkItemPool_FreeStorageScaffold(&g_ConnectionStatusWorkItemPoolState, self);
     return 1u;
 }
 
 // anchor: launcher.exe:0x435c80 / vtable `0x004b3e00`
 static uint32_t __thiscall CloseWorkItem_ReleaseScaffold(
     CLTThreadPerClientTCPEngine_CloseWorkItemScaffold* self) {
-    std::free(self);
+    if (!self) {
+        return 1u;
+    }
+
+    // Source-owned narrowed stand-in for the deleting-dtor free-list return path in `0x435c80`.
+    SmallWorkItemPool_FreeStorageScaffold(&g_CloseWorkItemPoolState, self);
     return 1u;
 }
 
@@ -591,11 +648,194 @@ static void EnsureSmallConnectionWorkItemVtablesInitialized() {
     }
 }
 
+// UNANCHORED source-owned helper shared by the small fixed allocators rooted at `0x435720`
+// and `0x435840`.
+static uint32_t SmallWorkItemPool_SystemPageSizeScaffold() {
+    SYSTEM_INFO systemInfo = {};
+    GetSystemInfo(&systemInfo);
+    return static_cast<uint32_t>(systemInfo.dwPageSize);
+}
+
+// UNANCHORED source-owned helper shared by the small fixed allocators rooted at `0x435720`
+// and `0x435840`.
+static void SmallWorkItemPool_InitScaffold(
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolState* poolState) {
+    if (!poolState) {
+        return;
+    }
+
+    InitializeCriticalSection(&poolState->criticalSection);
+    poolState->extraObjectBytes = 0u;
+    poolState->initialized = true;
+}
+
+// UNANCHORED source-owned helper shared by the small fixed allocators rooted at `0x4351b0`
+// and `0x435240`.
+static void SmallWorkItemPool_ClearScaffold(
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolState* poolState) {
+    if (!poolState || !poolState->initialized) {
+        return;
+    }
+
+    EnterCriticalSection(&poolState->criticalSection);
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock* backingBlock =
+        poolState->backingBlockListHead;
+    while (backingBlock) {
+        CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock* nextBackingBlock =
+            backingBlock->next;
+        std::free(backingBlock);
+        backingBlock = nextBackingBlock;
+    }
+    poolState->backingBlockListHead = nullptr;
+    poolState->freeListHead = nullptr;
+    poolState->backingBlockCount = 0u;
+    LeaveCriticalSection(&poolState->criticalSection);
+}
+
+// UNANCHORED source-owned helper shared by the small fixed allocators rooted at `0x435720`
+// and `0x435840`.
+static void* SmallWorkItemPool_AllocateStorageScaffold(
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolState* poolState,
+    uint32_t objectBaseBytes) {
+    if (!poolState) {
+        return nullptr;
+    }
+
+    const size_t objectStride =
+        static_cast<size_t>(poolState->extraObjectBytes) + objectBaseBytes;
+    EnterCriticalSection(&poolState->criticalSection);
+
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolFreeListNode* storage = poolState->freeListHead;
+    if (!storage) {
+        if (!poolState->backingBlockListHead) {
+            if (poolState->objectCountPerBackingBlock == 0u) {
+                poolState->objectCountPerBackingBlock = 1u;
+            }
+
+            size_t backingPayloadBytes =
+                static_cast<size_t>(poolState->objectCountPerBackingBlock) * objectStride;
+            const size_t preferredBackingPayloadBytes =
+                (static_cast<size_t>(SmallWorkItemPool_SystemPageSizeScaffold()) >> 1u) -
+                sizeof(CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock);
+            if (backingPayloadBytes < preferredBackingPayloadBytes) {
+                poolState->objectCountPerBackingBlock =
+                    static_cast<uint32_t>(preferredBackingPayloadBytes / objectStride);
+                backingPayloadBytes =
+                    static_cast<size_t>(poolState->objectCountPerBackingBlock) * objectStride;
+            }
+            poolState->backingBlockBytes =
+                backingPayloadBytes +
+                sizeof(CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock);
+        }
+
+        CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock* backingBlock =
+            static_cast<CLTThreadPerClientTCPEngine_SmallWorkItemPoolBackingBlock*>(
+                std::malloc(poolState->backingBlockBytes));
+        if (!backingBlock) {
+            LeaveCriticalSection(&poolState->criticalSection);
+            return nullptr;
+        }
+
+        backingBlock->next = poolState->backingBlockListHead;
+        ++poolState->backingBlockCount;
+        uint8_t* objectStorage = reinterpret_cast<uint8_t*>(backingBlock + 1);
+        CLTThreadPerClientTCPEngine_SmallWorkItemPoolFreeListNode* previousFreeListHead =
+            poolState->freeListHead;
+        poolState->backingBlockListHead = backingBlock;
+        for (uint32_t remaining = poolState->objectCountPerBackingBlock;
+             remaining != 0u;
+             --remaining) {
+            auto* freeListNode =
+                reinterpret_cast<CLTThreadPerClientTCPEngine_SmallWorkItemPoolFreeListNode*>(
+                    objectStorage);
+            freeListNode->next = previousFreeListHead;
+            previousFreeListHead = freeListNode;
+            objectStorage += objectStride;
+        }
+        storage = previousFreeListHead;
+    }
+
+    poolState->freeListHead = storage ? storage->next : nullptr;
+    LeaveCriticalSection(&poolState->criticalSection);
+    return storage;
+}
+
+// UNANCHORED source-owned helper shared by the small fixed allocators rooted at `0x435c30`
+// and `0x435c80`.
+static void SmallWorkItemPool_FreeStorageScaffold(
+    CLTThreadPerClientTCPEngine_SmallWorkItemPoolState* poolState,
+    void* storage) {
+    if (!poolState || !storage || !poolState->initialized) {
+        return;
+    }
+
+    EnterCriticalSection(&poolState->criticalSection);
+    auto* freeListNode =
+        static_cast<CLTThreadPerClientTCPEngine_SmallWorkItemPoolFreeListNode*>(storage);
+    freeListNode->next = poolState->freeListHead;
+    poolState->freeListHead = freeListNode;
+    LeaveCriticalSection(&poolState->criticalSection);
+}
+
+static void ConnectionStatusWorkItemPool_ShutdownScaffold() {
+    CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemPool_Clear();
+    if (g_ConnectionStatusWorkItemPoolState.initialized) {
+        DeleteCriticalSection(&g_ConnectionStatusWorkItemPoolState.criticalSection);
+        g_ConnectionStatusWorkItemPoolState.initialized = false;
+    }
+}
+
+static void CloseWorkItemPool_ShutdownScaffold() {
+    CLTThreadPerClientTCPEngine_CloseWorkItemPool_Clear();
+    if (g_CloseWorkItemPoolState.initialized) {
+        DeleteCriticalSection(&g_CloseWorkItemPoolState.criticalSection);
+        g_CloseWorkItemPoolState.initialized = false;
+    }
+}
+
+static void EnsureConnectionStatusWorkItemPoolInitializedScaffold() {
+    std::call_once(
+        g_ConnectionStatusWorkItemPoolState.initOnce,
+        []() {
+            SmallWorkItemPool_InitScaffold(&g_ConnectionStatusWorkItemPoolState);
+            std::atexit(ConnectionStatusWorkItemPool_ShutdownScaffold);
+        });
+}
+
+static void EnsureCloseWorkItemPoolInitializedScaffold() {
+    std::call_once(
+        g_CloseWorkItemPoolState.initOnce,
+        []() {
+            SmallWorkItemPool_InitScaffold(&g_CloseWorkItemPoolState);
+            std::atexit(CloseWorkItemPool_ShutdownScaffold);
+        });
+}
+
+// anchor: launcher.exe:0x4351b0
+static void CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemPool_Clear() {
+    SmallWorkItemPool_ClearScaffold(&g_ConnectionStatusWorkItemPoolState);
+}
+
+// anchor: launcher.exe:0x435240
+static void CLTThreadPerClientTCPEngine_CloseWorkItemPool_Clear() {
+    SmallWorkItemPool_ClearScaffold(&g_CloseWorkItemPoolState);
+}
+
+// anchor: launcher.exe:0x435720
+static void* CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemPool_AllocateStorage(
+    uint32_t objectBaseBytes) {
+    EnsureConnectionStatusWorkItemPoolInitializedScaffold();
+    return SmallWorkItemPool_AllocateStorageScaffold(
+        &g_ConnectionStatusWorkItemPoolState,
+        objectBaseBytes);
+}
+
 // anchor: launcher.exe:0x435d90
 static CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*
 CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_Allocate() {
     return static_cast<CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold*>(
-        std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold)));
+        CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemPool_AllocateStorage(
+            sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold)));
 }
 
 // anchor: launcher.exe:0x435050
@@ -614,11 +854,21 @@ CLTThreadPerClientTCPEngine_ConnectionStatusWorkItem_ctor_withPayload(
     return self;
 }
 
+// anchor: launcher.exe:0x435840
+static void* CLTThreadPerClientTCPEngine_CloseWorkItemPool_AllocateStorage(
+    uint32_t objectBaseBytes) {
+    EnsureCloseWorkItemPoolInitializedScaffold();
+    return SmallWorkItemPool_AllocateStorageScaffold(
+        &g_CloseWorkItemPoolState,
+        objectBaseBytes);
+}
+
 // anchor: launcher.exe:0x435da0
 static CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*
 CLTThreadPerClientTCPEngine_CloseWorkItem_Allocate() {
     return static_cast<CLTThreadPerClientTCPEngine_CloseWorkItemScaffold*>(
-        std::calloc(1, sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold)));
+        CLTThreadPerClientTCPEngine_CloseWorkItemPool_AllocateStorage(
+            sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold)));
 }
 
 // anchor: launcher.exe:0x435070
