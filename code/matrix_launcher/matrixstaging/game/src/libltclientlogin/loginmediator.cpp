@@ -367,10 +367,38 @@ CLTLoginMediator::CLTLoginMediator()
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::~CLTLoginMediator() {
+    DestroySelectionRouteState684Scaffold();
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
     ClearObserverTree674();
     EraseMarginBootstrapState(this);
+}
+
+// anchor: launcher.exe:0x41d270 / embedded cls_0x41dba0::meth_0x41d270
+void CLTLoginMediator::ResetSelectionRouteState684Scaffold() {
+    const size_t activeCount =
+        std::min(static_cast<size_t>(slotRecordCount684_), slotRecords688_.size());
+    for (size_t i = 0; i < activeCount; ++i) {
+        slotRecords688_[i] = {};
+        slotRecordValid688_[i] = false;
+        routeHostStrings818_[i].text.clear();
+    }
+
+    slotRecordCount684_ = 0;
+    state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = 0xffu;
+    postAuthMarginLoadingState_.characterRouteIndexCc8 = 0xffu;
+    marginRouteState_.currentCharacterOrRouteIndex = 0xffu;
+}
+
+// anchor: launcher.exe:0x41dd00 / embedded cls_0x41dba0::meth_0x41dd00
+void CLTLoginMediator::DestroySelectionRouteState684Scaffold() {
+    ResetSelectionRouteState684Scaffold();
+    for (size_t i = 0; i < routeHostStrings818_.size(); ++i) {
+        routeHostStrings818_[i].text.clear();
+        routeHostStrings818_[i].text.shrink_to_fit();
+        slotRecords688_[i] = {};
+        slotRecordValid688_[i] = false;
+    }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -470,6 +498,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 // UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
 // nopatch launcher-version setter instead.
 void CLTLoginMediator::ClearEngine() {
+    ResetSelectionRouteState684Scaffold();
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
     sessionCallbackHelper65c_ = nullptr;

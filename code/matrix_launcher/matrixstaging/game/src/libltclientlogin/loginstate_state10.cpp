@@ -98,13 +98,10 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
     // - so do not treat this broader auth-table rebuild as the owner-side body for `0x4401a0`
     mediator->worldSlots_.fill(nullptr);
     mediator->worldPayloadSlots_.fill(nullptr);
+    mediator->ResetSelectionRouteState684Scaffold();
     mediator->slotRecordValid688_.fill(false);
     mediator->worldDescriptorValidD84_.fill(false);
-    mediator->slotRecordCount684_ = 0;
     mediator->worldDescriptorCountD80_ = 0;
-    for (CLTLoginMediator::RouteHostStringTripleState& routeString : mediator->routeHostStrings818_) {
-        routeString.text.clear();
-    }
 
     const size_t worldCount = std::min(mediator->worldSlots_.size(), mediator->lastAuthReply_.worlds.size());
     for (size_t i = 0; i < worldCount; ++i) {

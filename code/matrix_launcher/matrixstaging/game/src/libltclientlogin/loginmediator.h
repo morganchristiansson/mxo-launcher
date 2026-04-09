@@ -1250,6 +1250,22 @@ public:
     // anchor: launcher.exe:0x41b3a0 / owner vtable +0x108
     uint8_t GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const;
 
+    // Embedded owner `+0x684 .. +0xd7f` helper (`cls_0x41dba0`) recovered from Ghidra.
+    // Current best read of its three methods:
+    // - `0x41dba0` ctor: initializes slot-count / slot-table / route-string entries and sets the
+    //   shared current-slot byte to `0xff`
+    // - `0x41d270`: releases active slot records, clears active route strings, zeroes count, sets
+    //   current-slot byte to `0xff`
+    // - `0x41dd00`: calls `0x41d270`, then releases the backing storage for all 100 route-string
+    //   entries
+    // Source split note:
+    // - original keeps this as one embedded helper spanning count + `+0x688` slot table + `+0x818`
+    //   route strings + `+0xcc8/+0xcd0..+0xd7f` selection state
+    // - replacement still stores those regions in split source fields, so these methods are the
+    //   fidelity bridge back onto the original boundaries
+    void ResetSelectionRouteState684Scaffold();
+    void DestroySelectionRouteState684Scaffold();
+
     // Wrapper-facing arg6 `+0x44` source picker / scratch builder.
     const SlotRecordState004b5328* ResolveArg6CurrentSlotRecord44Source() const;
     bool RefreshArg6CurrentSlotRecordObject44();
@@ -1672,6 +1688,15 @@ private:
     uint32_t arg6CreateCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
+    // launcher.exe owner `+0x684 .. +0xd7f` embedded helper `cls_0x41dba0`.
+    // Current recovered layout grouping:
+    // - `+0x684` = active slot-record count
+    // - `+0x688` = slot-record table
+    // - `+0x818` = per-slot copied descriptor/route string triples
+    // - `+0xcc8` = current slot / selection byte
+    // - `+0xcd0 .. +0xd7f` = persisted state3(wait)->state8 selection snapshot body
+    // Keep the split source fields below, but treat them as one original ownership island when
+    // tightening reset/destroy behavior.
     // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
     // This is filled by the owner-side advance out of state3-wait, not by a state3-local body.
     State8SelectionContextSnapshotState state8SelectionContextSnapshotState_;
