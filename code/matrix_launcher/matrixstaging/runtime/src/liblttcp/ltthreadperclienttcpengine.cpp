@@ -2605,10 +2605,15 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
     return kResultSuccess;
 }
 
-// UNANCHORED source-side helper used by the current CMessageConnection scaffolding.
-uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* connection, bool graceful) {
+// anchor: launcher.exe:0x42f970
+// vtable: launcher.exe:0x004b2768 slot +0x1c
+uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
+    // `0x449ca0` forwards the direct connection object itself into this engine slot.
+    // `0x42f970` then works on that connection payload directly; it does not resolve a synthetic
+    // owner/context record through the engine's source-owned lookup scaffolds.
+    CLTTCPConnection* connection = static_cast<CLTTCPConnection*>(contextKey);
     if (!connection) {
-        return 0;
+        return 0u;
     }
 
     const LTTCPEngineConnectionState state = connection->State();
@@ -2619,48 +2624,64 @@ uint32_t CLTThreadPerClientTCPEngine::CloseConnectionScaffold(CLTTCPConnection* 
 
     connection->SetState(LTTCPEngineConnectionState::kClosing);
     if (graceful) {
-        // Tightened slot `7` / `0x42f970` read:
-        // - Close first writes connection state `4`
-        // - if the recovered connection `+0x38` send-queue-empty byte is non-zero, it immediately
-        //   issues `shutdown(socket, 1)`
-        // - otherwise the worker-thread write loop defers that same half-close until the queued
-        //   send backlog drains
-        if (connection->SendQueueEmptyFlagScaffold() &&
-            connection->SocketHandle() != kInvalidSocketHandle) {
-            (void)shutdown(static_cast<SOCKET>(connection->SocketHandle()), SD_SEND);
+        // anchor: launcher.exe:0x42f997 / connection +0x34 = 4 before any graceful-close branch
+        // anchor: launcher.exe:0x42f9a4 / connection +0x38 send-queue-empty byte gate
+        // If queued sends are still pending, `0x42f970` returns success immediately and lets the
+        // worker-thread write side issue the later half-close once the queue drains.
+        if (!connection->SendQueueEmptyFlagScaffold()) {
+            return 1u;
         }
-        SyncAttachedLauncherObjectStateScaffold();
+
+        // anchor: launcher.exe:0x42f9af / shutdown(socket, 1)
+        const int shutdownResult = shutdown(static_cast<SOCKET>(connection->SocketHandle()), SD_SEND);
+        if (shutdownResult == SOCKET_ERROR) {
+            const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
+            const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
+            const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
+            const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
+            const unsigned ipv4Byte3 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 24u) & 0xffu);
+            const unsigned portHostOrder = static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder));
+
+            // anchor: launcher.exe:0x42f9c4..0x42fab2
+            // Original source-location bookkeeping points at
+            // `matrixstaging\runtime\src\liblttcp\ltthreadperclienttcpengine.cpp:0x16e` before
+            // this exact warning text.
+            spdlog::warn(
+                "CLTThreadPerClientTCPEngine::Close: shutdown() failed on connection to {}.{}.{}.{}:{} with error = {}.",
+                ipv4Byte0,
+                ipv4Byte1,
+                ipv4Byte2,
+                ipv4Byte3,
+                portHostOrder,
+                WSAGetLastError());
+        }
         return 1u;
     }
 
-    if (connection->SocketHandle() != kInvalidSocketHandle) {
-        const int closeResult = closesocket(static_cast<SOCKET>(connection->SocketHandle()));
-        if (closeResult == SOCKET_ERROR) {
-            spdlog::debug(
-                "CLTThreadPerClientTCPEngine::CloseConnectionScaffold closesocket failed connection={} socket=0x{:08x} remoteHost='{}' wsaError={}",
-                fmt::ptr(connection),
-                connection->SocketHandle(),
-                connection->RemoteHostName().empty() ? std::string("<empty>")
-                                                     : connection->RemoteHostName(),
-                WSAGetLastError());
-        }
-    }
+    // anchor: launcher.exe:0x42fac0 / closesocket(socket)
+    const int closeResult = closesocket(static_cast<SOCKET>(connection->SocketHandle()));
+    if (closeResult == SOCKET_ERROR) {
+        const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
+        const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
+        const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
+        const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
+        const unsigned ipv4Byte3 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 24u) & 0xffu);
+        const unsigned portHostOrder = static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder));
 
-    SyncAttachedLauncherObjectStateScaffold();
+        // anchor: launcher.exe:0x42fad3..0x42fbc0
+        // Original source-location bookkeeping points at
+        // `matrixstaging\runtime\src\liblttcp\ltthreadperclienttcpengine.cpp:0x175` before
+        // this exact warning text.
+        spdlog::warn(
+            "CLTThreadPerClientTCPEngine::Close: closesocket() failed on connection to {}.{}.{}.{}:{} with error = {}.",
+            ipv4Byte0,
+            ipv4Byte1,
+            ipv4Byte2,
+            ipv4Byte3,
+            portHostOrder,
+            WSAGetLastError());
+    }
     return 1u;
-}
-
-// anchor: launcher.exe:0x42f970
-// vtable: launcher.exe:0x004b2768 slot +0x1c
-uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
-    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
-    if (!connection) {
-        spdlog::debug(
-            "CLTThreadPerClientTCPEngine::Close couldn't resolve existing connection context={}",
-            fmt::ptr(contextKey));
-        return 0u;
-    }
-    return CloseConnectionScaffold(static_cast<CLTTCPConnection*>(connection), graceful);
 }
 
 // UNANCHORED source-side helper used by the current CMessageConnection scaffolding.

@@ -407,8 +407,6 @@ public:
     // anchor: launcher.exe:0x4316a0
     uint32_t CleanupConnection(void* contextKey) override;
 
-    // UNANCHORED: source-side connection-object bridge into the recovered Close slot family.
-    uint32_t CloseConnectionScaffold(CLTTCPConnection* connection, bool graceful);
     // UNANCHORED: source-side connection-object bridge into the recovered SendBuffer slot family.
     // Active `0x448a00 -> vtable +0x20` callers currently pass ownership-mode `1` in the fourth
     // slot; keep the older `completionContext` name only as a source-compatibility parameter name

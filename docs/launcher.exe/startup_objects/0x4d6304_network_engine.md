@@ -633,6 +633,11 @@ Newer string-backed naming now tightens several of those slots substantially:
   - proven by in-function log strings:
     - `CLTThreadPerClientTCPEngine::Close: shutdown() failed ...`
     - `CLTThreadPerClientTCPEngine::Close: closesocket() failed ...`
+  - caller shape is now tighter too:
+    - `0x449ca0` pushes the direct connection object into this slot
+    - the destructor loop at `0x43157e` does the same
+    - current source therefore now mirrors `0x42f970` as a direct connection-object consumer rather
+      than resolving a synthetic owner/context record through engine scaffolds
 - slot 8 / `0x42fbd0` = **`SendBuffer`**
   - proven by in-function log string:
     - `CLTThreadPerClientTCPEngine::SendBuffer: Send failed ...`
@@ -1600,8 +1605,12 @@ Current tightened worker-loop read after the latest `0x42fe50 / 0x42f970 / 0x42f
   - `0x42f970` writes state `4` first, then:
     - graceful close uses `shutdown(socket, 1)` immediately only when the send queue is already
       empty
+      - there is no source-side invalid-socket precheck on the original path; the call simply logs
+        the exact shutdown-failed warning on `SOCKET_ERROR`
     - otherwise the worker-thread write side issues that same half-close after queued sends drain
     - hard close uses `closesocket(socket)` directly
+      - likewise without a preceding invalid-socket guard; failure flows into the exact
+        closesocket-failed warning text
 - active receive ownership is tighter too:
   - worker-backed connections now use the direct worker-thread recv -> `OnReceive` path on the live
     socket
