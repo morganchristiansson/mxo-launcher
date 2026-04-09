@@ -5,19 +5,16 @@
 namespace mxo::ltlogin {
 
 uint8_t CLTLoginMediator::CurrentCharacterRouteIndexCc8Scaffold() const {
-    // The current source still carries two bounded mirrors for original owner byte `+0xcc8`:
-    // - `state8SelectionContextSnapshotState_` for the earlier state3(wait)->state8 path
-    // - `postAuthMarginLoadingState_` for the later post-AS_AuthReply path
-    // Fidelity correction:
-    // - startup defaults already populate world/variant-selection tables before auth reply
-    // - so world/descriptor count alone is not a safe discriminator here
-    // - on the live existing-character path, state4/state6/state8 margin work before
-    //   `AS_AuthReply` still needs the earlier selection-context snapshot index (slot `0x05` in the
-    //   current log family), not the later post-auth mirror defaulting to `0`
-    if ((!lastAuthReply_.valid || lastAuthReply_.isErrorReply) && selectionContext0ecCopyValid_) {
-        return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8;
-    }
-    return postAuthMarginLoadingState_.characterRouteIndexCc8;
+    // anchor relation: launcher.exe:0x41f300 / owner vtable +0x44
+    // Owner `+0x44` reads the embedded selection-route helper byte directly and forwards it into
+    // owner `+0x40`, so keep one canonical source mirror for original owner `+0xcc8` here.
+    return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8;
+}
+
+void CLTLoginMediator::SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex) {
+    state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = slotIndex;
+    postAuthMarginLoadingState_.characterRouteIndexCc8 = slotIndex;
+    marginRouteState_.currentCharacterOrRouteIndex = slotIndex;
 }
 
 const char* CLTLoginMediator::ResolveMarginRouteFromCurrentCharacterSlot() const {
@@ -191,17 +188,22 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     return result;
 }
 
-// anchor: launcher.exe:0x41f2e0
+// anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
 const SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
-    if (slotIndex >= slotRecordValid688_.size() || !slotRecordValid688_[slotIndex]) {
+    // Original body is the tiny embedded-helper table read:
+    // - if `slotIndex != 0xff`, return `owner + 0x688[slotIndex]`
+    // - else return `0`
+    // Current source keeps value objects plus a parallel valid-bit mirror instead of the original
+    // nullable pointer table, so `!slotRecordValid688_[slotIndex]` is the source-side null test.
+    if (slotIndex == 0xffu || slotIndex >= slotRecordValid688_.size() || !slotRecordValid688_[slotIndex]) {
         return nullptr;
     }
     return &slotRecords688_[slotIndex];
 }
 
-// anchor: launcher.exe:0x41f300
+// anchor: launcher.exe:0x41f300 / owner vtable +0x44
 const SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
-    return GetSlotRecordByIndex(CurrentCharacterRouteIndexCc8Scaffold());
+    return GetSlotRecordByIndex(state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8);
 }
 
 // anchor: launcher.exe:0x41b220

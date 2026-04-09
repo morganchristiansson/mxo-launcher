@@ -132,8 +132,7 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         static_cast<uint32_t>(mediator->lastAuthReply_.worlds.size());
 
     // Writeback to owner +0xcc8 (current character/route index byte)
-    mediator->postAuthMarginLoadingState_.characterRouteIndexCc8 = 0;
-    mediator->marginRouteState_.currentCharacterOrRouteIndex = 0;
+    mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0u);
 
     if (characterCount != 0) {
         const SlotRecordState004b5328& currentSlotRecord = mediator->slotRecords688_[0];
@@ -273,8 +272,7 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
     appendedSlotRecord.worldId0c = selectedWorldDescriptor.worldId01;
     mediator->slotRecordValid688_[appendedSlotIndex] = true;
     mediator->routeHostStrings818_[appendedSlotIndex].text = selectedWorldDescriptor.inlineNamePlus03;
-    mediator->postAuthMarginLoadingState_.characterRouteIndexCc8 = appendedSlotIndex;
-    mediator->marginRouteState_.currentCharacterOrRouteIndex = appendedSlotIndex;
+    mediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
     mediator->marginRouteState_.pendingWorldId = selectedWorldDescriptor.worldId01;
     mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(selectedWorldDescriptor.worldId01);
     if (const char* routeHostPrefix = mediator->LookupRouteHostPrefixBySlot(appendedSlotIndex)) {

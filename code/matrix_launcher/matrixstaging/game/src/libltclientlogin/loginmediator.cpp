@@ -385,9 +385,7 @@ void CLTLoginMediator::ResetSelectionRouteState684Scaffold() {
     }
 
     slotRecordCount684_ = 0;
-    state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = 0xffu;
-    postAuthMarginLoadingState_.characterRouteIndexCc8 = 0xffu;
-    marginRouteState_.currentCharacterOrRouteIndex = 0xffu;
+    SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
 }
 
 // anchor: launcher.exe:0x41dd00 / embedded cls_0x41dba0::meth_0x41dd00
@@ -625,6 +623,8 @@ bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
     return arg6CurrentSlotRecord44Present_;
 }
 
+// Wrapper-facing arg6 `+0x40` selection-descriptor object builder.
+// Keep this naming split explicit from owner `+0x40 = GetSlotRecordByIndex`.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
     uint32_t selectionIndex) {
@@ -745,7 +745,8 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
     return &arg6SelectionDescriptor40_;
 }
 
-// +0x44
+// Wrapper-facing arg6 `+0x44` current-slot-record wrapper builder.
+// Keep this naming split explicit from owner `+0x44 = GetCurrentSlotRecord`.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44() {
     const bool hasCurrentSlot = RefreshArg6CurrentSlotRecordObject44();
@@ -1850,11 +1851,8 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
     slotRecordValid688_.back() = false;
     routeHostStrings818_.back().text.clear();
 
-    if (CharacterRouteIndexCc8() >= slotRecordCount684_) {
-        CharacterRouteIndexCc8() = 0u;
-    }
-    if (state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 >= slotRecordCount684_) {
-        state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = 0u;
+    if (CurrentCharacterRouteIndexCc8Scaffold() >= slotRecordCount684_) {
+        SetCurrentCharacterRouteIndexCc8Scaffold(0u);
     }
 
     PersistCharactersIniFromRecoveredAuthStateScaffold();
@@ -1872,8 +1870,7 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 // anchor: launcher.exe:0x41c390
 uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) {
     if (currentState_ && currentState_->DispatchPhaseCode() > 2u && selectedSlotRecordIndex < 100u) {
-        state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu);
-        postAuthMarginLoadingState_.characterRouteIndexCc8 = static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu);
+        SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu));
         if (scaffoldState7_ != nullptr) {
             SwitchHelperStateScaffold(7u, scaffoldState7_);
         }
@@ -1933,8 +1930,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
         return 0u;
     }
 
-    state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 =
-        static_cast<uint8_t>(input.slotOrSelectionIndex00);
+    SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(input.slotOrSelectionIndex00));
     std::copy(input.block04.begin(), input.block04.end(), state8SelectionContextSnapshotState_.blockCd0.begin());
     std::copy(input.block14.begin(), input.block14.end(), state8SelectionContextSnapshotState_.blockCe0.begin());
     std::copy(input.block24.begin(), input.block24.end(), state8SelectionContextSnapshotState_.blockCf0.begin());

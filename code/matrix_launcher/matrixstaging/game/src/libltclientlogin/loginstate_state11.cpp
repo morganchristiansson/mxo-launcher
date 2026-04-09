@@ -336,7 +336,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
     ownerState.worldListCountOrStatus80 = parsed.status;
     if (parsed.status >= 1u) {
         ownerState.sourceLeadString108[0] = '\0';
-        ownerState.characterRouteIndexCc8 = 0xffu;
+        mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
             mediator->SwitchHelperStateScaffold(3u, failureState);
         }

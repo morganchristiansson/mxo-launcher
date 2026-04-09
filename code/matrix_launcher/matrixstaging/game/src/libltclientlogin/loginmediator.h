@@ -1250,7 +1250,10 @@ public:
     // anchor: launcher.exe:0x41b3a0 / owner vtable +0x108
     uint8_t GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const;
 
-    // Embedded owner `+0x684 .. +0xd7f` helper (`cls_0x41dba0`) recovered from Ghidra.
+    // Embedded owner `+0x684 .. +0xd7f` selection-route helper.
+    // Current Ghidra class name is still `cls_0x41dba0`, but the recovered role is tighter now:
+    // this is the mediator-owned selection/slot/route state island behind owner `+0x40/+0x44`
+    // and the persisted state3(wait)->state8 snapshot at `+0xcd0..+0xd7f`.
     // Current best read of its three methods:
     // - `0x41dba0` ctor: initializes slot-count / slot-table / route-string entries and sets the
     //   shared current-slot byte to `0xff`
@@ -1265,6 +1268,7 @@ public:
     //   fidelity bridge back onto the original boundaries
     void ResetSelectionRouteState684Scaffold();
     void DestroySelectionRouteState684Scaffold();
+    void SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex);
 
     // Wrapper-facing arg6 `+0x44` source picker / scratch builder.
     const SlotRecordState004b5328* ResolveArg6CurrentSlotRecord44Source() const;
@@ -1384,12 +1388,12 @@ public:
 
     // State-3(wait) -> state-8 owner-side selection/config snapshot block (`0x41c1f0`):
     uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8; }
-    // Source-owned bridge over the still-duplicated `+0xcc8` mirrors.
-    // Current best recovered split:
-    // - pre-auth / existing-character state8 path still uses the earlier selection-context snapshot
-    // - post-AS_AuthReply state10/state11 path uses the later adopted post-auth mirror
-    // So callers that want original owner `+0xcc8` behavior should prefer this selector helper
-    // over reading one backing field directly.
+    // Source-owned bridge over original owner byte `+0xcc8`.
+    // Fidelity tightening from `0x41f300`:
+    // - owner vtable `+0x44` directly reads the embedded selection-route helper byte
+    // - current source now treats `state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8`
+    //   as the canonical mirror of that owner byte and keeps the later post-auth fields synced
+    //   through `SetCurrentCharacterRouteIndexCc8Scaffold`
     uint8_t CurrentCharacterRouteIndexCc8Scaffold() const;
     const std::array<uint32_t, 4>& SelectionContextBlockCd0() const { return state8SelectionContextSnapshotState_.blockCd0; }
     const std::array<uint32_t, 4>& SelectionContextBlockCe0() const { return state8SelectionContextSnapshotState_.blockCe0; }
@@ -1688,7 +1692,7 @@ private:
     uint32_t arg6CreateCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
-    // launcher.exe owner `+0x684 .. +0xd7f` embedded helper `cls_0x41dba0`.
+    // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper (`cls_0x41dba0`).
     // Current recovered layout grouping:
     // - `+0x684` = active slot-record count
     // - `+0x688` = slot-record table
