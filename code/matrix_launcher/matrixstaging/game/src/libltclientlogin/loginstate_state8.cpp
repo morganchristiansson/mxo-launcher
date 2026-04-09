@@ -573,7 +573,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
         return fallbackResult;
     }
-    if (mediator->State10SendGateFlagF14() == 0) {
+    if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
         CLTLoginState* fallbackState = mediator->ScaffoldState6();
         const uint32_t fallbackResult = fallbackState
             ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
@@ -591,7 +591,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
     spdlog::info(
         "ROUTE CHECKPOINT: state8 slot3 entered past the 0x43bd48 owner+0xf14 gate ownerF14={} ownerF18=0x{:08x} currentState={}",
-        static_cast<unsigned>(mediator->State10SendGateFlagF14()),
+        static_cast<unsigned>(mediator->postAuthMarginLoadingState_.state10SendGateFlagF14),
         static_cast<unsigned>(mediator->State6UdpSessionSecretF18()),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
 
@@ -724,7 +724,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         static_cast<unsigned>(parsed.sectionByteCount),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
 
-    auto& ownerState = mediator->MutablePostAuthMarginLoadingState();
+    auto& ownerState = mediator->postAuthMarginLoadingState_;
     ownerState.worldListCountOrStatus80 = parsed.status;
     if (parsed.status >= 1u) {
         if (CLTLoginState* failureState = mediator->ScaffoldState3()) {

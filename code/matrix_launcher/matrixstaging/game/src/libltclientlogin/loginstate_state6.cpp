@@ -445,7 +445,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             static_cast<unsigned>(metricId));
     }
 
-    mediator->State10SendGateFlagF14() = 1u;
+    mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 = 1u;
     mediator->SetState6UdpSessionSecretF18(parsed.udpSessionSecret09);
 
     if (cachedUpstreamOrArg_ == nullptr) {

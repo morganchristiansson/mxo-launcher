@@ -114,7 +114,12 @@ class CLTLoginMediator : public ILTLoginMediator {
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
     friend class CLTLoginState_AuthenticatePending;
+    friend class CLTLoginState_State4;
+    friend class CLTLoginState_State6;
+    friend class CLTLoginState_State7;
+    friend class CLTLoginState_State8;
     friend class CLTLoginState_State10;
+    friend class CLTLoginState_State11;
 
 public:
     static constexpr uint32_t kRecoveredWorldSlotCapacity = 100;
@@ -1519,40 +1524,7 @@ public:
     const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD60; }
     const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
 
-    // Later post-auth source block (`0x43c020`, `0x440320`):
-    const std::array<char, 0x20>& SourceLeadString108() const {
-        return postAuthMarginLoadingState_.createCharacterData108.characterName00;
-    }
-    uint32_t SourceField12c() const {
-        return postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24;
-    }
-    std::array<uint32_t, 17> SourceDwords134() const {
-        std::array<uint32_t, 17> result{};
-        std::copy(
-            postAuthMarginLoadingState_.createCharacterData108.header2c.begin(),
-            postAuthMarginLoadingState_.createCharacterData108.header2c.end(),
-            result.begin());
-        std::copy(
-            postAuthMarginLoadingState_.createCharacterData108.secondary4c.begin(),
-            postAuthMarginLoadingState_.createCharacterData108.secondary4c.end(),
-            result.begin() + 8);
-        result[16] = postAuthMarginLoadingState_.createCharacterData108.bodyWord6c;
-        return result;
-    }
-    const std::array<char, 0x20>& SourceBlock178() const {
-        return postAuthMarginLoadingState_.createCharacterData108.realFirstName70;
-    }
-    const std::array<char, 0x20>& SourceBlock198() const {
-        return postAuthMarginLoadingState_.createCharacterData108.realLastName90;
-    }
-    const std::array<char, 0x400>& SourceBlock1b8() const {
-        return postAuthMarginLoadingState_.createCharacterData108.backgroundB0;
-    }
-
-    // State-owned slot-6 bodies keep class ownership, but mutate this mediator-owned owner-state
-    // block through a narrow explicit accessor instead of duplicating the storage elsewhere.
-    PostAuthMarginLoadingState& MutablePostAuthMarginLoadingState() { return postAuthMarginLoadingState_; }
-    const PostAuthMarginLoadingState& PostAuthMarginLoadingStateView() const { return postAuthMarginLoadingState_; }
+    // State-owned slot-6 bodies mutate this mediator-owned owner-state block directly.
 
     // Post-auth load-character reply outputs (0x440320) plus neighboring auth/margin send flags:
     uint32_t& WorldListCountOrStatus80() { return postAuthMarginLoadingState_.worldListCountOrStatus80; }
@@ -1561,8 +1533,6 @@ public:
     // happy path. Keep the storage stable, but do not overstate the exact original semantic yet.
     uint8_t AuthConnectionFlag2c() const { return authConnectionFlag2c_; }
     uint8_t& AuthConnectionFlag2c() { return authConnectionFlag2c_; }
-    uint8_t State10SendGateFlagF14() const { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
-    uint8_t& State10SendGateFlagF14() { return postAuthMarginLoadingState_.state10SendGateFlagF14; }
     bool MarginConnectionCloseWaitEvent0fGateArmedScaffold() const { return marginConnectionFlag2d_ != 0u; }
     void SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(bool armed) {
         marginConnectionFlag2d_ = armed ? 1u : 0u;

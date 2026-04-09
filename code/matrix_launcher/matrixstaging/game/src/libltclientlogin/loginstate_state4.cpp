@@ -181,8 +181,10 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         case 10:
             return BeginMarginConnectionForState4Case(
                 mediator,
-                mediator->ResolveMarginRouteFromDescriptorIndex(mediator->SourceField12c()),
-                static_cast<uint8_t>(mediator->SourceField12c() & 0xffu));
+                mediator->ResolveMarginRouteFromDescriptorIndex(
+                    mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24),
+                static_cast<uint8_t>(
+                    mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24 & 0xffu));
 
         default: {
             // Current source-owned mirror for the default branch's owner `+0x104` dword remains

@@ -78,7 +78,7 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             static_cast<unsigned>(fallbackResult));
         return fallbackResult;
     }
-    if (mediator->State10SendGateFlagF14() == 0u) {
+    if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0u) {
         CLTLoginState* fallbackState = mediator->ScaffoldState6();
         const uint32_t fallbackResult = fallbackState
             ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(

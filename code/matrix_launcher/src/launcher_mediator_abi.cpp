@@ -184,29 +184,24 @@ void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress
         return;
     }
 
-    const auto& ownerState = mediator->PostAuthMarginLoadingStateView();
     const auto characterState = mediator->DescribeOwnCharacterStateScaffold();
     const auto* currentState = mediator->CurrentState();
     const auto* currentSlotRecord = mediator->GetCurrentSlotRecord();
+    const auto* persistence = static_cast<const mxo::ltlogin::CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData*>(
+        mediator->GetState8PersistenceF1c());
     const char* currentSlotName =
         (currentSlotRecord && !currentSlotRecord->heapString14.empty())
             ? currentSlotRecord->heapString14.c_str()
             : "<empty>";
-    const char* sourceLeadString108 = ownerState.createCharacterData108.characterName00[0]
-        ? ownerState.createCharacterData108.characterName00.data()
-        : "<empty>";
-    const char* characterNameBufferF1c = ownerState.characterNameBufferF1c[0]
-        ? ownerState.characterNameBufferF1c
-        : "<empty>";
-    const char* section0StringF8c = ownerState.section0StringF8c[0]
-        ? ownerState.section0StringF8c.data()
-        : "<empty>";
-    const char* section0StringFac = ownerState.section0StringFac[0]
-        ? ownerState.section0StringFac.data()
-        : "<empty>";
-    const char* section0StringFcc = ownerState.section0StringFcc[0]
-        ? ownerState.section0StringFcc.data()
-        : "<empty>";
+    const char* sourceLeadString108 = "<direct-field-unavailable>";
+    const char* characterNameBufferF1c =
+        (persistence && persistence->characterName00[0]) ? persistence->characterName00.data() : "<empty>";
+    const char* section0StringF8c =
+        (persistence && persistence->realFirstName70[0]) ? persistence->realFirstName70.data() : "<empty>";
+    const char* section0StringFac =
+        (persistence && persistence->realLastName90[0]) ? persistence->realLastName90.data() : "<empty>";
+    const char* section0StringFcc =
+        (persistence && persistence->backgroundB0[0]) ? persistence->backgroundB0.data() : "<empty>";
     const char* activeCharacterName = NonEmptyOrPlaceholder(characterState.characterName);
     const uint32_t activeCharacterIdLow = characterState.characterIdLow;
     const uint32_t activeCharacterIdHigh = characterState.characterIdHigh;

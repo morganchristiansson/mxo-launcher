@@ -78,13 +78,15 @@ CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
         view.characterName = slotZeroRecord->heapString14.c_str();
     }
 
-    const auto& ownerState = PostAuthMarginLoadingStateView();
+    const auto& ownerState = postAuthMarginLoadingState_;
     view.characterName = PreferNonEmpty(view.characterName, ownerState.characterNameBufferF1c);
-    view.characterName = PreferNonEmpty(view.characterName, SourceLeadString108().data());
+    view.characterName = PreferNonEmpty(
+        view.characterName,
+        ownerState.createCharacterData108.characterName00.data());
 
-    const char* sourceBlock178 = NonEmptyOrNull(reinterpret_cast<const char*>(SourceBlock178().data()));
-    const char* sourceBlock198 = NonEmptyOrNull(reinterpret_cast<const char*>(SourceBlock198().data()));
-    const char* sourceBlock1b8 = NonEmptyOrNull(reinterpret_cast<const char*>(SourceBlock1b8().data()));
+    const char* sourceBlock178 = NonEmptyOrNull(ownerState.createCharacterData108.realFirstName70.data());
+    const char* sourceBlock198 = NonEmptyOrNull(ownerState.createCharacterData108.realLastName90.data());
+    const char* sourceBlock1b8 = NonEmptyOrNull(ownerState.createCharacterData108.backgroundB0.data());
     const char* section0F8c = NonEmptyOrNull(ownerState.section0StringF8c.data());
     const char* section0Fac = NonEmptyOrNull(ownerState.section0StringFac.data());
     const char* section0Fcc = NonEmptyOrNull(ownerState.section0StringFcc.data());

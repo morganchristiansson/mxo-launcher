@@ -325,7 +325,7 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
             static_cast<unsigned>(fallbackResult));
         return fallbackResult;
     }
-    if (mediator->State10SendGateFlagF14() == 0) {
+    if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
         CLTLoginState* fallbackState = mediator->ScaffoldState6();
         const uint32_t fallbackResult = fallbackState
             ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
@@ -342,7 +342,8 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
 
     State10Packet0x0aBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();
-    packetBuilder.SetCharacterName(mediator->SourceLeadString108().data());
+    packetBuilder.SetCharacterName(
+        mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data());
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
     mediator->PostEventScaffold(0x13u);
@@ -351,7 +352,7 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
         "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> sendResult=0x{:08x} then posts event=0x13",
         State10Packet0x0aFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
-        std::string(reinterpret_cast<const char*>(mediator->SourceLeadString108().data())),
+        std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data()),
         sendResult);
     return sendResult;
 }
