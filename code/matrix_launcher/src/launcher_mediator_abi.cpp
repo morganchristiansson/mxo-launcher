@@ -322,15 +322,31 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 
 // anchor: launcher.exe:0x40a3e9..0x40a3fe hands the freshly built 0x4d6304 object into arg6 before InitClientDLL
 // vtable: ILTLoginMediator.Default slot +0x08
+// Fidelity note:
+// - this resolved arg6 wrapper slot is the launcher-owned startup handoff used from `0x40a380`
+// - do not conflate it with owner vtable `0x004b01c8 +0x08`; current Ghidra now assigns that owner
+//   slot to `0x41f510`, which looks like reset/clear logic rather than a simple engine setter
+// - current source therefore keeps the wrapper handoff explicit here and limits arg5 sidecar
+//   accessors to owner<->engine pairing only, without lazy mediator bind/reset
 // Return-shape note from launcher.exe:0x40a380:
 // - the caller turns the raw slot result into `result < 1`
 // - so this scaffold returns `0` for the non-null success case and `1` when the arg5 object
 //   failed to materialize, which preserves the original success/failure sense more closely
-static int __thiscall Mediator_SetNetworkEngine(MinimalLoginMediatorStub* self, void* object) {
+static int __thiscall Mediator_RegisterLauncherNetworkEngineObject08(
+    MinimalLoginMediatorStub* self,
+    void* object) {
     (void)self;
 
-    mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(
-        LauncherNetworkEngineFromAbiShell(object));
+    mxo::liblttcp::CLTThreadPerClientTCPEngine* const engine =
+        LauncherNetworkEngineFromAbiShell(object);
+    if (mxo::ltlogin::CLTLoginMediator* mediator =
+            dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default)) {
+        mediator->SetNetworkEngine(engine);
+        mediator->EnsureBuiltinScaffoldStatesRegistered();
+        mxo::ltlogin::CLTLoginMediator::RegisterActiveStateSourceScaffold(mediator);
+    } else {
+        mxo::ltlogin::ILTLoginMediator::Default->SetNetworkEngine(engine);
+    }
     return object ? 0 : 1;
 }
 
@@ -1298,7 +1314,7 @@ static void InitializeMediatorStub() {
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
     // Forward to ILTLoginMediator::Default vtable slot 0 (original Mediator_GetName)
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
-    g_LoginMediatorVtable[2] = (void*)Mediator_SetNetworkEngine; // +0x08
+    g_LoginMediatorVtable[2] = (void*)Mediator_RegisterLauncherNetworkEngineObject08; // +0x08
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
     g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c

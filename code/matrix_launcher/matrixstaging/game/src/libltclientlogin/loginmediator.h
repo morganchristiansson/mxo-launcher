@@ -1047,8 +1047,6 @@ public:
     // - let `CLTThreadPerClientTCPEngine` own the current queue push / no-worker pump seam
     // - keep the launcher-object ABI shell thin and arg5-shaped
     void ResetLauncherConnectionsScaffold();
-    void BindLauncherConnectionsScaffold(
-        mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
     uint32_t BeginLauncherMarginConnectionScaffold();
     bool IsAuthConnectionQuiescentForRetryScaffold() const;
     // Focused source-owned wrapper for the missing new-helper slot-3 callback side of

@@ -64,6 +64,13 @@ push eax
 call [edx+0x08]
 ```
 
+Current startup-ownership clarification:
+- this is the faithful launcher-owned arg5 -> arg6 handoff corridor
+- current replacement work should therefore keep mediator/network-engine install here rather than
+  inside lazy arg5-side sidecar accessors
+- later arbitrary arg5 virtual dispatch may resolve the liblttcp sidecar, but it should not be the
+  first place that performs mediator bind/reset side effects
+
 ## Constructor evidence
 
 Ctor `0x431c30` / `CLTThreadPerClientTCPEngine_ctor`:

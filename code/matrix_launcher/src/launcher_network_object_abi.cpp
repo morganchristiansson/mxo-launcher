@@ -1,6 +1,4 @@
 #include "launcher_network_object_abi.h"
-#include "launcher_mediator_abi_shared.h"
-#include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 #include "../matrixstaging/runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 #include <cstddef>
@@ -188,12 +186,11 @@ static void ResetLauncherObjectEngineSidecar(LauncherObjectAbiShell* owner) {
     // Current fidelity correction from the latest queue/worker/context RE pass:
     // - original engine evidence stays connection-centric (`0x431ff0`, `0x4316a0`, `0x436820`,
     //   `0x436b10`, `0x449d40`)
+    // - launcher startup `0x40a380` owns the arg5 -> arg6 handoff
     // - there is still no positive Ghidra evidence that mediator bind/reset belongs to the engine
-    //   object itself
-    // So keep mediator-side connection reset in the outer launcher/login seam, not in liblttcp binding.
-    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-        mediator->ResetLauncherConnectionsScaffold();
-    }
+    //   object itself or to arbitrary later arg5 virtual dispatch
+    // So keep mediator-side install/clear in the outer launcher/login seam instead of doing lazy
+    // bind/reset here inside the arg5 sidecar accessor.
     binding.Reset();
 }
 
@@ -204,16 +201,9 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
 
     mxo::liblttcp::CLTThreadPerClientTCPEngineBinding& binding = LauncherObjectEngineBinding();
     if (binding.Owner() != owner) {
-        mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-        if (binding.Engine() && mediator) {
-            mediator->ResetLauncherConnectionsScaffold();
-        }
         if (!binding.Bind(owner)) {
             spdlog::warn("launcher arg5 ABI shell failed to bind CLTThreadPerClientTCPEngine sidecar for {}", fmt::ptr(owner));
             return NULL;
-        }
-        if (binding.Engine() && mediator) {
-            mediator->BindLauncherConnectionsScaffold(binding.Engine());
         }
     }
 
@@ -247,6 +237,10 @@ static mxo::liblttcp::CLTThreadPerClientTCPEngine* GetOrCreateLauncherObjectEngi
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+// Faithfulness note:
+// - this resolves only the arg5 shell -> liblttcp sidecar pairing
+// - it must not lazily perform the launcher startup arg5 -> arg6 handoff; that ownership stays at
+//   `launcher.exe:0x40a380`
 mxo::liblttcp::CLTThreadPerClientTCPEngine* LauncherNetworkEngineFromAbiShell(void* ownerPtr) {
     return GetOrCreateLauncherObjectEngineSidecar(static_cast<LauncherObjectAbiShell*>(ownerPtr));
 }

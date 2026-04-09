@@ -408,7 +408,9 @@ const char* CLTLoginMediator::GetName() {
     return g_MediatorName;
 }
 
-// +0x08
+// Wrapper-facing arg6 startup handoff helper used by the current `0x4d2c58` scaffold.
+// Do not sync this directly to owner vtable `0x004b01c8 +0x08`; current Ghidra now assigns that
+// owner slot to `launcher.exe:0x41f510`, which looks like reset/clear logic instead.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
     engine_ = engine;
@@ -423,7 +425,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
     }
 }
 
-// +0x0c
+// Wrapper-facing arg6 clear helper reached from launcher teardown after arg5 release.
 // UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
 // nopatch launcher-version setter instead.
 void CLTLoginMediator::ClearEngine() {

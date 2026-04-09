@@ -336,14 +336,19 @@ struct ProcessCreateCharacterInput120Sketch {
 };
 
 // =============================================================================
-// ILTLoginMediator - VTable 0x004b01c8 pure virtual interface
+// ILTLoginMediator - current source-owned arg6 surface
 // =============================================================================
-// This class provides a clean interface to the recovered launcher-side mediator
-// structure based on vtable 0x004b01c8. It mirrors the original launcher behavior
-// while keeping field names stable where they are string-backed or strongly implied
-// by surrounding code.
+// Important fidelity note:
+// - this header models the launcher-resolved `ILTLoginMediator.Default` surface consumed through
+//   the runtime pointer slot at `0x4d2c58`
+// - many slots align with the owner object documented under vtable `0x004b01c8`, but they should
+//   not be treated as a one-to-one synonym
+// - in particular, launcher startup `0x40a380` calls the resolved arg6 slot `+0x08`, while owner
+//   vtable `0x004b01c8 +0x08` is currently recovered as `0x41f510` reset/clear logic rather than a
+//   simple engine setter
 //
 // Canonical references:
+// - ../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md
 // - ../../../../docs/launcher.exe/VTABLES/0x004b01c8.md
 // =============================================================================
 
@@ -357,6 +362,8 @@ public:
     // +0x04
     void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride);
     // +0x08
+    // Wrapper-facing startup handoff from `launcher.exe:0x40a380`; keep this distinct from owner
+    // vtable `0x004b01c8 +0x08` while the wrapper/owner relation is still being tightened.
     virtual void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) = 0;
     // +0x0c
     virtual void ClearEngine() = 0;

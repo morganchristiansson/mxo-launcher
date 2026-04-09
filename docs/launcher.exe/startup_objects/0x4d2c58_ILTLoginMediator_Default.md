@@ -145,7 +145,13 @@ push eax            ; eax = object just built for 0x4d6304
 call [edx+0x08]
 ```
 
-So one of the interface methods consumes the newly built launcher object from `0x4d6304`.
+So one of the resolved arg6 wrapper methods consumes the newly built launcher object from `0x4d6304`.
+
+Important current clarification:
+- this call is on the **resolved wrapper pointer** loaded from `0x4d2c58`
+- do **not** identify it blindly with owner vtable `0x004b01c8 +0x08`
+- current owner-body recovery now puts `0x41f510` at owner `+0x08`, and that body looks like reset/clear-owned-runtime-state logic rather than the startup handoff itself
+- practical source consequence: launcher startup `0x40a380` should own the arg5 -> arg6 handoff, while later arbitrary arg5 method traffic should not lazily recreate mediator bind/reset side effects
 
 ### Client startup receives it as InitClientDLL arg6
 At `0x40a587`:

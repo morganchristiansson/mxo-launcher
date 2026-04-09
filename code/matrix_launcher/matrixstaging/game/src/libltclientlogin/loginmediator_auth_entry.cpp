@@ -325,22 +325,6 @@ void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::BindLauncherConnectionsScaffold(
-    mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
-    if (!engine) {
-        return;
-    }
-
-    SetNetworkEngine(engine);
-    EnsureBuiltinScaffoldStatesRegistered();
-    RegisterActiveStateSourceScaffold(this);
-    spdlog::info(
-        "CLTLoginMediator::BindLauncherConnectionsScaffold engine={} currentState={}",
-        fmt::ptr(engine),
-        currentState_ ? currentState_->DebugName() : "<null>");
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 bool CLTLoginMediator::IsAuthConnectionQuiescentForRetryScaffold() const {
     auto* authConnection =
         dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
