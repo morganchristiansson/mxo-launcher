@@ -6,13 +6,13 @@ namespace mxo::ltlogin {
 
 uint8_t CLTLoginMediator::CurrentCharacterRouteIndexCc8Scaffold() const {
     // anchor relation: launcher.exe:0x41f300 / owner vtable +0x44
-    // Owner `+0x44` reads the embedded selection-route helper byte directly and forwards it into
-    // owner `+0x40`, so keep one canonical source mirror for original owner `+0xcc8` here.
-    return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8;
+    // Owner `+0x44` reads the embedded selection-route subobject byte directly and forwards it
+    // into owner `+0x40`.
+    return selectionRouteState684_.CurrentSlotOrSelectionIndex644();
 }
 
 void CLTLoginMediator::SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex) {
-    state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8 = slotIndex;
+    selectionRouteState684_.SetCurrentSlotOrSelectionIndex644(slotIndex);
     postAuthMarginLoadingState_.characterRouteIndexCc8 = slotIndex;
     marginRouteState_.currentCharacterOrRouteIndex = slotIndex;
 }
@@ -190,20 +190,14 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
 const SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
-    // Original body is the tiny embedded-helper table read:
-    // - if `slotIndex != 0xff`, return `owner + 0x688[slotIndex]`
-    // - else return `0`
-    // Current source keeps value objects plus a parallel valid-bit mirror instead of the original
-    // nullable pointer table, so `!slotRecordValid688_[slotIndex]` is the source-side null test.
-    if (slotIndex == 0xffu || slotIndex >= slotRecordValid688_.size() || !slotRecordValid688_[slotIndex]) {
-        return nullptr;
-    }
-    return &slotRecords688_[slotIndex];
+    // Original body is a tiny read over the embedded selection-route subobject table.
+    return selectionRouteState684_.GetSlotRecordByIndex(slotIndex);
 }
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
 const SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
-    return GetSlotRecordByIndex(state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8);
+    return selectionRouteState684_.GetSlotRecordByIndex(
+        selectionRouteState684_.CurrentSlotOrSelectionIndex644());
 }
 
 // anchor: launcher.exe:0x41b220

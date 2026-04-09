@@ -471,6 +471,41 @@ public:
         std::string text;
     };
 
+    class CLTLoginMediatorSelectionRouteState {
+    public:
+        // anchor: launcher.exe:0x41dba0 / embedded owner subobject ctor
+        CLTLoginMediatorSelectionRouteState();
+
+        // anchor: launcher.exe:0x41d270 / embedded owner subobject reset
+        void ResetSelectionRouteState();
+
+        // anchor: launcher.exe:0x41dd00 / embedded owner subobject destroy/final release
+        void DestroySelectionRouteState();
+
+        const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
+        SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex);
+
+        uint8_t CurrentSlotOrSelectionIndex644() const {
+            return persistedSelectionContext64c_.slotOrSelectionIndexCc8;
+        }
+
+        void SetCurrentSlotOrSelectionIndex644(uint8_t slotIndex) {
+            persistedSelectionContext64c_.slotOrSelectionIndexCc8 = slotIndex;
+        }
+
+        // Source-owned mirrors of the original embedded helper layout:
+        // - `+0x00`  = active slot-record count
+        // - `+0x04`  = slot-record pointer table (mirrored here as value objects plus validity bits)
+        // - `+0x194` = route-string triples
+        // - `+0x644` = current slot / selection byte
+        // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
+        uint8_t slotRecordCount00_ = 0;
+        std::array<SlotRecordState004b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
+        std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid04_{};
+        std::array<RouteHostStringTripleState, kRecoveredWorldSlotCapacity> routeHostStringTriples194_{};
+        State8SelectionContextSnapshotState persistedSelectionContext64c_{};
+    };
+
     struct WorldDescriptorState004b533c {
         // Current best source-owned mirror of the `0x14`-byte heap object allocated by the
         // broader auth writer `0x43f300` and stored under owner `+0xd84[index]`.
@@ -1250,8 +1285,9 @@ public:
     // anchor: launcher.exe:0x41b3a0 / owner vtable +0x108
     uint8_t GetDescriptorPopulationNibbleByIndex(uint8_t slotIndex) const;
 
-    // Embedded owner `+0x684 .. +0xd7f` selection-route helper.
-    // Current Ghidra class name is still `cls_0x41dba0`, but the recovered role is tighter now:
+    // Embedded owner `+0x684 .. +0xd7f` selection-route helper/class.
+    // Current Ghidra class name is `CLTLoginMediatorSelectionRouteState_0x41dba0`, and the
+    // recovered role is tighter now:
     // this is the mediator-owned selection/slot/route state island behind owner `+0x40/+0x44`
     // and the persisted state3(wait)->state8 snapshot at `+0xcd0..+0xd7f`.
     // Current best read of its three methods:
@@ -1692,18 +1728,17 @@ private:
     uint32_t arg6CreateCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
-    // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper (`cls_0x41dba0`).
-    // Current recovered layout grouping:
-    // - `+0x684` = active slot-record count
-    // - `+0x688` = slot-record table
-    // - `+0x818` = per-slot copied descriptor/route string triples
-    // - `+0xcc8` = current slot / selection byte
-    // - `+0xcd0 .. +0xd7f` = persisted state3(wait)->state8 selection snapshot body
-    // Keep the split source fields below, but treat them as one original ownership island when
-    // tightening reset/destroy behavior.
-    // launcher.exe:0x4f78b8 owner-side persisted selection/config snapshot (`0x41c1f0`).
-    // This is filled by the owner-side advance out of state3-wait, not by a state3-local body.
-    State8SelectionContextSnapshotState state8SelectionContextSnapshotState_;
+    // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper/class
+    // (`CLTLoginMediatorSelectionRouteState_0x41dba0` in current Ghidra).
+    CLTLoginMediatorSelectionRouteState selectionRouteState684_{};
+    // Compatibility aliases over the embedded helper above.
+    // Keep these old source names stable while active files are still being tightened around the
+    // recovered original subobject boundary.
+    State8SelectionContextSnapshotState& state8SelectionContextSnapshotState_;
+    std::array<SlotRecordState004b5328, kRecoveredWorldSlotCapacity>& slotRecords688_;
+    std::array<bool, kRecoveredWorldSlotCapacity>& slotRecordValid688_;
+    uint8_t& slotRecordCount684_;
+    std::array<RouteHostStringTripleState, kRecoveredWorldSlotCapacity>& routeHostStrings818_;
     // +0xec / +0xf4 wrapper-owned mirrors now live on the mediator instance instead of in the
     // launcher ABI shell.
     State3SelectionContextInputSketch selectionContext0ecCopy_{};
@@ -1714,13 +1749,6 @@ private:
     mutable uint32_t profile0f4Count_ = 0;
     // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.
     PostAuthMarginLoadingState postAuthMarginLoadingState_;
-    // launcher.exe:0x4f78b8 owner-side current-slot character record table (`+0x688`).
-    // Seeded from auth character data; later joined against `+0xd84` to populate `+0x818`.
-    std::array<SlotRecordState004b5328, kRecoveredWorldSlotCapacity> slotRecords688_;
-    std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid688_{};
-    uint8_t slotRecordCount684_ = 0;
-    // launcher.exe:0x4f78b8 owner-side per-slot route/host string family (`+0x818`).
-    std::array<RouteHostStringTripleState, kRecoveredWorldSlotCapacity> routeHostStrings818_;
     // launcher.exe:0x4f78b8 owner-side world-descriptor table (`+0xd84`).
     std::array<WorldDescriptorState004b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
     std::array<bool, kRecoveredWorldSlotCapacity> worldDescriptorValidD84_{};

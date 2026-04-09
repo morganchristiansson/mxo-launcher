@@ -290,6 +290,59 @@ static void* LogLiveSelectionCfgCorpusGetter(
 
 }  // namespace
 
+// anchor: launcher.exe:0x41dba0 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0 ctor
+CLTLoginMediator::CLTLoginMediatorSelectionRouteState::CLTLoginMediatorSelectionRouteState() {
+    slotRecordCount00_ = 0;
+    for (size_t i = 0; i < routeHostStringTriples194_.size(); ++i) {
+        routeHostStringTriples194_[i].text.clear();
+    }
+    for (size_t i = 0; i < slotRecordTable04_.size(); ++i) {
+        slotRecordTable04_[i] = {};
+        slotRecordValid04_[i] = false;
+    }
+    persistedSelectionContext64c_ = {};
+    persistedSelectionContext64c_.slotOrSelectionIndexCc8 = 0xffu;
+}
+
+// anchor: launcher.exe:0x41d270 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState
+void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::ResetSelectionRouteState() {
+    const size_t activeCount = std::min(static_cast<size_t>(slotRecordCount00_), slotRecordTable04_.size());
+    for (size_t i = 0; i < activeCount; ++i) {
+        slotRecordTable04_[i] = {};
+        slotRecordValid04_[i] = false;
+        routeHostStringTriples194_[i].text.clear();
+    }
+    slotRecordCount00_ = 0;
+    persistedSelectionContext64c_.slotOrSelectionIndexCc8 = 0xffu;
+}
+
+// anchor: launcher.exe:0x41dd00 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState
+void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRouteState() {
+    ResetSelectionRouteState();
+    for (size_t i = 0; i < routeHostStringTriples194_.size(); ++i) {
+        routeHostStringTriples194_[i].text.clear();
+        routeHostStringTriples194_[i].text.shrink_to_fit();
+        slotRecordTable04_[i] = {};
+        slotRecordValid04_[i] = false;
+    }
+}
+
+const SlotRecordState004b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
+    uint8_t slotIndex) const {
+    if (slotIndex == 0xffu || slotIndex >= slotRecordValid04_.size() || !slotRecordValid04_[slotIndex]) {
+        return nullptr;
+    }
+    return &slotRecordTable04_[slotIndex];
+}
+
+SlotRecordState004b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
+    uint8_t slotIndex) {
+    if (slotIndex == 0xffu || slotIndex >= slotRecordValid04_.size() || !slotRecordValid04_[slotIndex]) {
+        return nullptr;
+    }
+    return &slotRecordTable04_[slotIndex];
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
@@ -326,7 +379,12 @@ CLTLoginMediator::CLTLoginMediator()
       authBootstrapSource38_{},
       authBootstrapChild680_(nullptr),
       sessionCallbackHelper65c_(nullptr),
-      state8SelectionContextSnapshotState_{},
+      selectionRouteState684_{},
+      state8SelectionContextSnapshotState_(selectionRouteState684_.persistedSelectionContext64c_),
+      slotRecords688_(selectionRouteState684_.slotRecordTable04_),
+      slotRecordValid688_(selectionRouteState684_.slotRecordValid04_),
+      slotRecordCount684_(selectionRouteState684_.slotRecordCount00_),
+      routeHostStrings818_(selectionRouteState684_.routeHostStringTriples194_),
       selectionContext0ecCopy_{},
       selectionContext0ecCopyValid_(false),
       selection0ecCount_(0),
@@ -374,29 +432,18 @@ CLTLoginMediator::~CLTLoginMediator() {
     EraseMarginBootstrapState(this);
 }
 
-// anchor: launcher.exe:0x41d270 / embedded cls_0x41dba0::meth_0x41d270
+// anchor: launcher.exe:0x41d270 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState
 void CLTLoginMediator::ResetSelectionRouteState684Scaffold() {
-    const size_t activeCount =
-        std::min(static_cast<size_t>(slotRecordCount684_), slotRecords688_.size());
-    for (size_t i = 0; i < activeCount; ++i) {
-        slotRecords688_[i] = {};
-        slotRecordValid688_[i] = false;
-        routeHostStrings818_[i].text.clear();
-    }
-
-    slotRecordCount684_ = 0;
-    SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
+    selectionRouteState684_.ResetSelectionRouteState();
+    postAuthMarginLoadingState_.characterRouteIndexCc8 = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
+    marginRouteState_.currentCharacterOrRouteIndex = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
 }
 
-// anchor: launcher.exe:0x41dd00 / embedded cls_0x41dba0::meth_0x41dd00
+// anchor: launcher.exe:0x41dd00 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState
 void CLTLoginMediator::DestroySelectionRouteState684Scaffold() {
-    ResetSelectionRouteState684Scaffold();
-    for (size_t i = 0; i < routeHostStrings818_.size(); ++i) {
-        routeHostStrings818_[i].text.clear();
-        routeHostStrings818_[i].text.shrink_to_fit();
-        slotRecords688_[i] = {};
-        slotRecordValid688_[i] = false;
-    }
+    selectionRouteState684_.DestroySelectionRouteState();
+    postAuthMarginLoadingState_.characterRouteIndexCc8 = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
+    marginRouteState_.currentCharacterOrRouteIndex = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
