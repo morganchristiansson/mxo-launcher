@@ -40,8 +40,6 @@ void DiagnosticStartWindowTrace();
 void DiagnosticStopWindowTrace();
 void DiagnosticLogClientLoadingStateText(const char* text, const char* source);
 
-// Stub for removed D3D diagnostics
-
 // Diagnostic-only runtime detour for client.dll loading/status text updates.
 // Default: enabled, with the recovered replacement text mapping applied at the real client text
 // boundary.

@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-extern HMODULE g_hClient;
-
 struct WindowTraceEntry {
     HWND hwnd;
     LONG style;
@@ -28,13 +26,6 @@ static int g_WindowTraceEntryCount = 0;
 static int g_LastWindowTraceCount = -1;
 static std::string g_LastClientLoadingStateText;
 static std::string g_LastClientLoadingStateSource;
-static const void* g_LastClientShellObserved = nullptr;
-static uint32_t g_LastClientShellState20 = 0xffffffffu;
-static ULONGLONG g_LastClientShellState20ChangeTick = 0;
-static uint32_t g_LastLoggedState20StallQuarterSeconds = 0;
-static const void* g_LastClientShellRuntimeObjectD0 = nullptr;
-static const void* g_LastClientShellRuntimeVftableD0 = nullptr;
-static bool g_DumpedClientPiTableAtRuntime = false;
 
 
 static bool g_ClientLoadingTextHookEnvChecked = false;
@@ -56,257 +47,6 @@ static constexpr uint8_t kExpectedClientLoadingTextHookPrologue[kClientLoadingTe
 
 static_assert(sizeof(void*) == 4, "client loading-text diagnostic hook assumes x86/32-bit build");
 
-
-static bool DiagnosticReadableMemoryRange(const void* base, size_t byteCount) {
-    if (!base || byteCount == 0) {
-        return false;
-    }
-
-    const uint8_t* cursor = static_cast<const uint8_t*>(base);
-    size_t remaining = byteCount;
-    while (remaining != 0) {
-        MEMORY_BASIC_INFORMATION mbi = {};
-        if (VirtualQuery(cursor, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-            return false;
-        }
-        if (mbi.State != MEM_COMMIT) {
-            return false;
-        }
-        if ((mbi.Protect & PAGE_GUARD) != 0 || (mbi.Protect & PAGE_NOACCESS) != 0) {
-            return false;
-        }
-
-        const bool readable =
-            (mbi.Protect & PAGE_READONLY) != 0 ||
-            (mbi.Protect & PAGE_READWRITE) != 0 ||
-            (mbi.Protect & PAGE_WRITECOPY) != 0 ||
-            (mbi.Protect & PAGE_EXECUTE_READ) != 0 ||
-            (mbi.Protect & PAGE_EXECUTE_READWRITE) != 0 ||
-            (mbi.Protect & PAGE_EXECUTE_WRITECOPY) != 0;
-        if (!readable) {
-            return false;
-        }
-
-        const uintptr_t regionEnd =
-            reinterpret_cast<uintptr_t>(mbi.BaseAddress) + static_cast<uintptr_t>(mbi.RegionSize);
-        const uintptr_t current = reinterpret_cast<uintptr_t>(cursor);
-        if (regionEnd <= current) {
-            return false;
-        }
-        const size_t covered = static_cast<size_t>(regionEnd - current);
-        if (covered >= remaining) {
-            return true;
-        }
-        cursor += covered;
-        remaining -= covered;
-    }
-    return true;
-}
-
-static void LogWordSpanIfReadable(const char* label, const void* base, size_t wordCount) {
-    if (!label || !base || wordCount == 0) {
-        return;
-    }
-    if (!DiagnosticReadableMemoryRange(base, wordCount * sizeof(uint32_t))) {
-        spdlog::info("{} @ {} <unreadable>", label, fmt::ptr(base));
-        return;
-    }
-
-    const uint32_t* words = static_cast<const uint32_t*>(base);
-    for (size_t i = 0; i < wordCount; i += 4) {
-        spdlog::info(
-            "{} @ {} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x} [+0x{:02x}]=0x{:08x}",
-            label,
-            fmt::ptr(base),
-            static_cast<unsigned>(i * 4),
-            words[i + 0],
-            static_cast<unsigned>((i + 1) * 4),
-            (i + 1 < wordCount) ? words[i + 1] : 0,
-            static_cast<unsigned>((i + 2) * 4),
-            (i + 2 < wordCount) ? words[i + 2] : 0,
-            static_cast<unsigned>((i + 3) * 4),
-            (i + 3 < wordCount) ? words[i + 3] : 0);
-    }
-}
-
-static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) {
-    const uint8_t* clientBase =
-        reinterpret_cast<const uint8_t*>(g_hClient ? g_hClient : GetModuleHandleA("client.dll"));
-    if (!clientBase || absoluteAddress < 0x62000000u) {
-        return nullptr;
-    }
-    return clientBase + (absoluteAddress - 0x62000000u);
-}
-
-static void DiagnosticLogClientPiTable() {
-    // client.dll:0x621c9d70 (`AdoptLiveSelectionPiCfgCompactRecords`) only materializes compact live
-    // `pi.cfg` tuples into the first two dwords of each 12-byte slot. Track the third dword too,
-    // but count active entries from `value0/value1` only so the log distinguishes payload-bearing
-    // slots from slots that merely retain a common default tail value.
-    const uint8_t* piTableBase = static_cast<const uint8_t*>(DiagnosticClientAbsoluteToPointer(0x629ea4e8u));
-    if (!piTableBase) {
-        return;
-    }
-    std::vector<unsigned> activeIds;
-    unsigned nonZeroValue2Count = 0;
-    bool haveCommonValue2 = false;
-    bool allValue2Same = true;
-    uint32_t commonValue2 = 0u;
-    for (unsigned index = 0; index < 0x6bu; ++index) {
-        const uint8_t* entry = piTableBase + 0x1d8u + index * 0x0cu;
-        if (!DiagnosticReadableMemoryRange(entry, 12)) {
-            return;
-        }
-        const uint32_t value0 = *reinterpret_cast<const uint32_t*>(entry + 0x0);
-        const uint32_t value1 = *reinterpret_cast<const uint32_t*>(entry + 0x4);
-        const uint32_t value2 = *reinterpret_cast<const uint32_t*>(entry + 0x8);
-        if (value2 != 0u) {
-            ++nonZeroValue2Count;
-        }
-        if (!haveCommonValue2) {
-            commonValue2 = value2;
-            haveCommonValue2 = true;
-        } else if (value2 != commonValue2) {
-            allValue2Same = false;
-        }
-        if (value0 == 0u && value1 == 0u) {
-            continue;
-        }
-        activeIds.push_back(index);
-        spdlog::info(
-            "ClientPiTable active entry id={} value0=0x{:08x} value1=0x{:08x} value2=0x{:08x}",
-            index,
-            value0,
-            value1,
-            value2);
-    }
-    std::string idsText;
-    for (size_t i = 0; i < activeIds.size(); ++i) {
-        if (i != 0) {
-            idsText += ",";
-        }
-        idsText += std::to_string(activeIds[i]);
-    }
-    spdlog::info(
-        "ClientPiTable activeEntryCount={} nonZeroValue2Count={} allValue2Same={} commonValue2=0x{:08x} activeIds={}",
-        activeIds.size(),
-        nonZeroValue2Count,
-        allValue2Same ? 1 : 0,
-        commonValue2,
-        idsText);
-}
-
-static const char* DiagnosticDescribeClientRuntimeVftable(const void* vftable) {
-    if (!vftable) {
-        return "<null>";
-    }
-    if (vftable == DiagnosticClientAbsoluteToPointer(0x628b1638u)) {
-        return "CLTRemoteCommCtx-like";
-    }
-    return "<unclassified>";
-}
-
-static void DiagnosticLogClientShellRuntimeTransitionState() {
-    // anchor: client.dll:0x62172552 writes client-shell `+0xd0`; client.dll:0x62173bcd later reads
-    // that same field before the alternate null-vcall family at `0x62173bd9`.
-    const void* const clientShellSlot = DiagnosticClientAbsoluteToPointer(0x629e68a8u);
-    if (!clientShellSlot || !DiagnosticReadableMemoryRange(clientShellSlot, sizeof(void*))) {
-        return;
-    }
-
-    const void* const clientShell = *static_cast<const void* const*>(clientShellSlot);
-    uint32_t state20 = 0xffffffffu;
-    const void* runtimeObjectD0 = nullptr;
-    const void* runtimeVftableD0 = nullptr;
-    if (clientShell && DiagnosticReadableMemoryRange(static_cast<const uint8_t*>(clientShell) + 0x20, sizeof(uint32_t))) {
-        state20 = *reinterpret_cast<const uint32_t*>(static_cast<const uint8_t*>(clientShell) + 0x20);
-    }
-    if (clientShell && DiagnosticReadableMemoryRange(static_cast<const uint8_t*>(clientShell) + 0xd0, sizeof(void*))) {
-        runtimeObjectD0 = *reinterpret_cast<const void* const*>(static_cast<const uint8_t*>(clientShell) + 0xd0);
-    }
-    if (runtimeObjectD0 && DiagnosticReadableMemoryRange(runtimeObjectD0, sizeof(void*))) {
-        runtimeVftableD0 = *static_cast<const void* const*>(runtimeObjectD0);
-    }
-
-    const ULONGLONG nowTick = GetTickCount64();
-    if (g_LastClientShellState20 == 0xffffffffu || state20 != g_LastClientShellState20) {
-        g_LastClientShellState20ChangeTick = nowTick;
-        g_LastLoggedState20StallQuarterSeconds = 0;
-    }
-
-    if (clientShell == g_LastClientShellObserved &&
-        state20 == g_LastClientShellState20 &&
-        runtimeObjectD0 == g_LastClientShellRuntimeObjectD0 &&
-        runtimeVftableD0 == g_LastClientShellRuntimeVftableD0) {
-        if (state20 == 2u && g_LastClientShellState20ChangeTick != 0) {
-            const uint32_t stalledQuarterSeconds =
-                static_cast<uint32_t>((nowTick - g_LastClientShellState20ChangeTick) / 250u);
-            if (stalledQuarterSeconds >= 2u && stalledQuarterSeconds > g_LastLoggedState20StallQuarterSeconds) {
-                g_LastLoggedState20StallQuarterSeconds = stalledQuarterSeconds;
-                spdlog::info(
-                    "ClientShell runtime state20=0x00000002 unchanged for {} ms shell={} d0Object={} d0Vftable={}",
-                    static_cast<unsigned long long>(nowTick - g_LastClientShellState20ChangeTick),
-                    fmt::ptr(clientShell),
-                    fmt::ptr(runtimeObjectD0),
-                    fmt::ptr(runtimeVftableD0));
-            }
-        }
-        return;
-    }
-
-    spdlog::info(
-        "ClientShell runtime transition shell={} state20=0x{:08x} d0Object={} d0Vftable={} [{}]",
-        fmt::ptr(clientShell),
-        state20,
-        fmt::ptr(runtimeObjectD0),
-        fmt::ptr(runtimeVftableD0),
-        DiagnosticDescribeClientRuntimeVftable(runtimeVftableD0));
-
-    if (runtimeObjectD0 != nullptr) {
-        LogWordSpanIfReadable("ClientShell runtime d0 object", runtimeObjectD0, 8);
-        if (runtimeVftableD0 == DiagnosticClientAbsoluteToPointer(0x628b1638u)) {
-            // Current tightened static read on this vftable family:
-            // - `0x623baf60 = CLTRemoteCommCtx_ResetIO`
-            // - `0x623bc640 = CLTRemoteCommCtx_IsIdle`
-            // - `0x623bdd60` (`vftable +0x68`) checks object `+0x0c` and low bits of `+0x154`
-            // - `0x623bdd40` reads bit 2 from byte `+0x2da`
-            // - `0x623bdd10` returns dword `+0x2e4`
-            const uint8_t* objectBytes = static_cast<const uint8_t*>(runtimeObjectD0);
-            if (DiagnosticReadableMemoryRange(objectBytes + 0x2e4, sizeof(uint32_t))) {
-                const uint32_t field0c = *reinterpret_cast<const uint32_t*>(objectBytes + 0x0c);
-                const uint8_t flags154 = *(objectBytes + 0x154);
-                const uint8_t flag2d8 = *(objectBytes + 0x2d8);
-                const uint8_t flag2d9 = *(objectBytes + 0x2d9);
-                const uint8_t flag2da = *(objectBytes + 0x2da);
-                const uint32_t field2e4 = *reinterpret_cast<const uint32_t*>(objectBytes + 0x2e4);
-                spdlog::info(
-                    "ClientShell runtime d0 CLTRemoteCommCtx fields field0c=0x{:08x} flags154=0x{:02x} flag2d8={} flag2d9={} flag2da=0x{:02x} field2e4=0x{:08x}",
-                    field0c,
-                    static_cast<unsigned>(flags154),
-                    static_cast<unsigned>(flag2d8),
-                    static_cast<unsigned>(flag2d9),
-                    static_cast<unsigned>(flag2da),
-                    field2e4);
-            }
-        }
-    }
-
-    if (!g_DumpedClientPiTableAtRuntime && (state20 == 2u || state20 == 3u)) {
-        DiagnosticLogClientPiTable();
-        g_DumpedClientPiTableAtRuntime = true;
-    }
-
-    g_LastClientShellObserved = clientShell;
-    g_LastClientShellState20 = state20;
-    g_LastClientShellRuntimeObjectD0 = runtimeObjectD0;
-    g_LastClientShellRuntimeVftableD0 = runtimeVftableD0;
-}
-
-
-// Stub for removed D3D diagnostics
-static void LogCurrentDisplayMode(const char* prefix) {
-    (void)prefix;
-}
 
 // UNANCHORED: diagnostic-only window-state cache/update helper.
 static void UpsertWindowTraceEntry(
@@ -355,9 +95,6 @@ static void UpsertWindowTraceEntry(
             (long)rect.top,
             (long)rect.right,
             (long)rect.bottom);
-        if (std::strcmp(title, "D3D Error") == 0) {
-            // Removed D3D error logging
-        }
     }
 
     if (isNew) {
@@ -414,7 +151,6 @@ static DWORD WINAPI WindowTraceThreadProc(LPVOID) {
     DWORD lastHz = 0;
 
     spdlog::info("WindowTrace: started for pid {}", (unsigned long)g_MainProcessId);
-    LogCurrentDisplayMode("WindowTrace display mode");
 
     while (InterlockedCompareExchange(&g_WindowTraceRunning, 0, 0) != 0) {
         DEVMODEA mode = {};
@@ -428,7 +164,6 @@ static DWORD WINAPI WindowTraceThreadProc(LPVOID) {
                 lastHeight = mode.dmPelsHeight;
                 lastBpp = mode.dmBitsPerPel;
                 lastHz = mode.dmDisplayFrequency;
-                LogCurrentDisplayMode("WindowTrace display mode");
             }
         }
 
@@ -438,7 +173,6 @@ static DWORD WINAPI WindowTraceThreadProc(LPVOID) {
             g_LastWindowTraceCount = count;
             spdlog::info("WindowTrace top-level window count: {}", count);
         }
-        DiagnosticLogClientShellRuntimeTransitionState();
 
         Sleep(250);
     }

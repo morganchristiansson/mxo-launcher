@@ -120,9 +120,6 @@ bool PreloadDependencies() {
         HMODULE h = LoadLibraryA(dlls[i]);
         spdlog::info("preload {:12s} : {} ({})", dlls[i], h ? "OK" : "FAIL", fmt::ptr(h));
         if (!h) return false;
-        if (std::strcmp(dlls[i], "r3d9.dll") == 0) {
-            // D3D hooks removed
-        }
     }
     return true;
 }
