@@ -129,40 +129,6 @@ static void LogWordSpanIfReadable(const char* label, const void* base, size_t wo
     }
 }
 
-static uintptr_t DiagnosticPointerToClientAbsolute(const void* address) {
-    const uint8_t* clientBase =
-        reinterpret_cast<const uint8_t*>(g_hClient ? g_hClient : GetModuleHandleA("client.dll"));
-    const uint8_t* pointerBytes = static_cast<const uint8_t*>(address);
-    if (!clientBase || !pointerBytes || pointerBytes < clientBase) {
-        return 0u;
-    }
-    return 0x62000000u + static_cast<uintptr_t>(pointerBytes - clientBase);
-}
-
-static const char* DiagnosticDescribeModuleForAddress(const void* address) {
-    if (!address) {
-        return "<null>";
-    }
-    MEMORY_BASIC_INFORMATION mbi = {};
-    if (VirtualQuery(address, &mbi, sizeof(mbi)) != sizeof(mbi)) {
-        return "<unknown>";
-    }
-    const HMODULE allocationBase = static_cast<HMODULE>(mbi.AllocationBase);
-    if (allocationBase == g_hClient || allocationBase == GetModuleHandleA("client.dll")) {
-        return "client.dll";
-    }
-    if (allocationBase == GetModuleHandleA("r3d9.dll")) {
-        return "r3d9.dll";
-    }
-    if (allocationBase == GetModuleHandleA("d3d9.dll")) {
-        return "d3d9.dll";
-    }
-    if (allocationBase == GetModuleHandleA(nullptr)) {
-        return "resurrections.exe";
-    }
-    return "<other-module>";
-}
-
 static const void* DiagnosticClientAbsoluteToPointer(uintptr_t absoluteAddress) {
     const uint8_t* clientBase =
         reinterpret_cast<const uint8_t*>(g_hClient ? g_hClient : GetModuleHandleA("client.dll"));
