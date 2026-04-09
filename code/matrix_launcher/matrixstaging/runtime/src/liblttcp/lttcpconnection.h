@@ -196,20 +196,66 @@ class CBaseConnection;
 
 // Recovered worker/send family tightening from `0x44a9f0`,
 // `TryPopQueuedSendBufferWithEndpoint (0x44aa70)`,
-// `CLTTCPConnection::QueueSendBufferWithEndpoint (0x44ac90)`,
-// `CLTTCPConnection::QueueSendBuffer (0x44ad80)`, and `0x42fe50`:
+// `cls_0x44ac90::QueueSendBufferWithEndpoint (0x44ac90)`,
+// `cls_0x44ac90::QueueSendBuffer (0x44ad80)`, and `0x42fe50`:
 // - connection `+0x08` stores the direct worker-thread object pointer
 // - connection `+0x38` is a byte flag flipped by send-queue push/pop helpers
 //   - ctor seeds it to `1`
 //   - send-buffer queue push clears it to `0`
 //   - worker pop helper restores it to `1` when the queue empties
 // - connection `+0x3c` roots the pending-send queue consumed by the worker-thread write path
-// Current source-owned queue item keeps only the active send-path facts explicit:
-// - queued byte storage
-// - remote endpoint snapshot used by the datagram sendto path
-struct CLTTCPConnection_SendQueueItemScaffold {
-    LTTCPEndpointKey remoteEndpoint;
-    std::vector<uint8_t> ownedBytes;
+//
+// Faithfulness note:
+// - the earlier source reduced this family to a bare scaffold struct plus `std::deque`
+// - current source now lifts the recovered send-queue helpers into explicit classes so the
+//   `0x44aa70 / 0x44ac90 / 0x44ad80` object seams remain visible in code instead of being flattened
+//   into anonymous container plumbing
+class CLTTCPConnection_QueuedSendBufferStorage {
+public:
+    CLTTCPConnection_QueuedSendBufferStorage();
+
+    // anchor family: launcher.exe:0x44ac90 ownership-mode branch / launcher.exe:0x44a7c0 release
+    // Current active path is ownership mode `1` (copied bytes).
+    bool InitializeFromSendBuffer(const void* sendBuffer, uint32_t byteCount, uintptr_t ownershipMode);
+    void Reset();
+
+    const uint8_t* BufferBytes() const;
+    uint32_t BufferByteCount() const;
+
+private:
+    uint8_t usesPooledBuffer00_;
+    uint8_t padding01_03_[3];
+    std::vector<uint8_t> bufferBytes04_;
+    uint32_t bufferByteCount08_;
+};
+
+class CLTTCPConnection_QueuedSendBufferWithEndpoint {
+public:
+    CLTTCPConnection_QueuedSendBufferStorage sendBufferStorage00;
+    LTTCPEndpointKey remoteEndpoint04;
+};
+
+class CLTTCPConnection_PendingSendQueue {
+public:
+    CLTTCPConnection_PendingSendQueue();
+
+    // anchor: launcher.exe:0x44ac90
+    bool QueueSendBufferWithEndpoint(
+        const void* sendBuffer,
+        uint32_t byteCount,
+        const LTTCPEndpointKey& remoteEndpoint,
+        uintptr_t ownershipMode);
+    // anchor: launcher.exe:0x44ad80
+    bool QueueSendBuffer(const void* sendBuffer, uint32_t byteCount, uintptr_t ownershipMode);
+    // anchor: launcher.exe:0x44aa70
+    bool TryPopQueuedSendBufferWithEndpoint(CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem);
+    bool SendQueueEmptyFlag() const;
+
+private:
+    uint8_t sendQueueEmptyFlag38_;
+    uint8_t padding39_3b_[3];
+    mutable std::mutex pendingSendQueueMutex_;
+    std::deque<CLTTCPConnection_QueuedSendBufferWithEndpoint> pendingSendQueue3c_;
 };
 
 // UNANCHORED: source-owned helper that recognizes the current queue-dispatch ABI adapter object
@@ -406,16 +452,20 @@ public:
 
     // Recovered send-queue seam beneath slot `8` / `0x42fbd0`.
     // Current best helper names from Ghidra/source lockstep:
-    // - `0x44ad80 = CLTTCPConnection::QueueSendBuffer`
-    // - `0x44ac90 = CLTTCPConnection::QueueSendBufferWithEndpoint`
-    // Current bounded source mirror keeps the active `0x448a00 -> vtable +0x20(...,1)` copied-byte
-    // path explicit while still using source-owned `std::deque` storage under the hood.
-    bool QueueSendBufferScaffold(const void* buffer, uint32_t byteCount, uintptr_t ownershipMode = 1u);
-    // anchor family: launcher.exe:0x44aa70
-    // Current best original helper meaning: try pop one queued send-buffer item and mirror the
-    // `+0x38 = 1` empty-queue write when nothing remains.
-    bool TryPopQueuedSendBufferScaffold(CLTTCPConnection_SendQueueItemScaffold* outItem);
-    bool SendQueueEmptyFlagScaffold() const;
+    // - `0x44ad80 = cls_0x44ac90::QueueSendBuffer`
+    // - `0x44ac90 = cls_0x44ac90::QueueSendBufferWithEndpoint`
+    // - `0x44aa70 = cls_0x449ad0::TryPopQueuedSendBufferWithEndpoint`
+    // anchor: launcher.exe:0x44ad80
+    bool QueueSendBuffer(const void* buffer, uint32_t byteCount, uintptr_t ownershipMode = 1u);
+    // anchor: launcher.exe:0x44ac90
+    bool QueueSendBufferWithEndpoint(
+        const void* buffer,
+        uint32_t byteCount,
+        const LTTCPEndpointKey& remoteEndpoint,
+        uintptr_t ownershipMode);
+    // anchor: launcher.exe:0x44aa70
+    bool TryPopQueuedSendBufferWithEndpoint(CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem);
+    bool SendQueueEmptyFlag() const;
 
     // UNANCHORED: low-level socket close helper used beneath the anchored Close wrapper.
     uint32_t CloseSocketTransportScaffold(bool graceful);
@@ -439,9 +489,7 @@ private:
     CLTThreadPerClientTCPEngine_WorkerThread* workerThread08_;
     LTTCPEndpointKey remoteEndpoint_;
     std::string remoteHostName_;
-    bool sendQueueEmptyFlag38_;
-    mutable std::mutex sendQueueMutex_;
-    std::deque<CLTTCPConnection_SendQueueItemScaffold> sendQueue3c_;
+    CLTTCPConnection_PendingSendQueue pendingSendQueueState38_;
     // High-confidence original seam: `CLTTCPConnection_ctor` stores a concrete
     // `CVariableLengthPrefixedTCPStreamParser` object pointer at connection `+0x6c`.
     CVariableLengthPrefixedTCPStreamParser* parser06c_;

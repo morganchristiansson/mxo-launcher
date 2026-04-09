@@ -380,9 +380,7 @@ CLTTCPConnection::CLTTCPConnection()
       workerThread08_(nullptr),
       remoteEndpoint_(),
       remoteHostName_(),
-      sendQueueEmptyFlag38_(true),
-      sendQueueMutex_(),
-      sendQueue3c_(),
+      pendingSendQueueState38_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
 // UNANCHORED: source-owned narrow subset of the `0x44aad0` ctor family that also seeds the
@@ -394,9 +392,7 @@ CLTTCPConnection::CLTTCPConnection(void* ownerContext)
       workerThread08_(nullptr),
       remoteEndpoint_(),
       remoteHostName_(),
-      sendQueueEmptyFlag38_(true),
-      sendQueueMutex_(),
-      sendQueue3c_(),
+      pendingSendQueueState38_(),
       parser06c_(new CVariableLengthPrefixedTCPStreamParser()) {}
 
 // anchor: launcher.exe:0x44ac40
@@ -512,36 +508,126 @@ const std::string& CLTTCPConnection::RemoteHostName() const {
     return remoteHostName_;
 }
 
-bool CLTTCPConnection::QueueSendBufferScaffold(
-    const void* buffer,
+CLTTCPConnection_QueuedSendBufferStorage::CLTTCPConnection_QueuedSendBufferStorage()
+    : usesPooledBuffer00_(0u),
+      padding01_03_{0u, 0u, 0u},
+      bufferBytes04_(),
+      bufferByteCount08_(0u) {}
+
+bool CLTTCPConnection_QueuedSendBufferStorage::InitializeFromSendBuffer(
+    const void* sendBuffer,
     uint32_t byteCount,
     uintptr_t ownershipMode) {
-    if (!buffer || byteCount == 0u) {
+    Reset();
+    if (!sendBuffer || byteCount == 0u) {
         return false;
     }
 
-    // Tightened worker/send-path read from `0x448a00 -> vtable +0x20(..., 1)` and
-    // `0x42fbd0 -> 0x44ad80`:
-    // - the active message-envelope send path reaches slot `8` with ownership mode `1`, i.e. the
-    //   copied-byte queue path
-    // - current source therefore keeps the active path faithful and safe by copying queued bytes
-    //   into owned storage before the worker-thread write loop drains them
-    // - other historical queue modes (`0` borrowed / `2` caller-owned pointer`) remain a later
-    //   fidelity target if a live source path starts proving them
-    CLTTCPConnection_SendQueueItemScaffold item = {};
-    remoteEndpoint_.CopyTo(&item.remoteEndpoint);
-    item.ownedBytes.assign(
-        static_cast<const uint8_t*>(buffer),
-        static_cast<const uint8_t*>(buffer) + byteCount);
+    // Current active static-RE-backed path is ownership mode `1`, i.e. copied bytes routed
+    // through the queue helper family `0x44ad80 -> 0x44ac90`.
+    // Keep other ownership modes explicit as a later fidelity target instead of pretending they are
+    // already byte-faithful pool/borrow semantics here.
+    (void)ownershipMode;
+    usesPooledBuffer00_ = 1u;
+    bufferBytes04_.assign(
+        static_cast<const uint8_t*>(sendBuffer),
+        static_cast<const uint8_t*>(sendBuffer) + byteCount);
+    bufferByteCount08_ = byteCount;
+    return true;
+}
 
+void CLTTCPConnection_QueuedSendBufferStorage::Reset() {
+    usesPooledBuffer00_ = 0u;
+    bufferBytes04_.clear();
+    bufferByteCount08_ = 0u;
+}
+
+const uint8_t* CLTTCPConnection_QueuedSendBufferStorage::BufferBytes() const {
+    return bufferBytes04_.empty() ? nullptr : bufferBytes04_.data();
+}
+
+uint32_t CLTTCPConnection_QueuedSendBufferStorage::BufferByteCount() const {
+    return bufferByteCount08_;
+}
+
+CLTTCPConnection_PendingSendQueue::CLTTCPConnection_PendingSendQueue()
+    : sendQueueEmptyFlag38_(1u),
+      padding39_3b_{0u, 0u, 0u},
+      pendingSendQueueMutex_(),
+      pendingSendQueue3c_() {}
+
+// anchor: launcher.exe:0x44ac90
+bool CLTTCPConnection_PendingSendQueue::QueueSendBufferWithEndpoint(
+    const void* sendBuffer,
+    uint32_t byteCount,
+    const LTTCPEndpointKey& remoteEndpoint,
+    uintptr_t ownershipMode) {
+    CLTTCPConnection_QueuedSendBufferWithEndpoint queuedSendBuffer = {};
+    if (!queuedSendBuffer.sendBufferStorage00.InitializeFromSendBuffer(
+            sendBuffer,
+            byteCount,
+            ownershipMode)) {
+        return false;
+    }
+
+    remoteEndpoint.CopyTo(&queuedSendBuffer.remoteEndpoint04);
     {
-        std::lock_guard<std::mutex> lock(sendQueueMutex_);
-        sendQueue3c_.push_back(std::move(item));
-        sendQueueEmptyFlag38_ = false;
+        std::lock_guard<std::mutex> lock(pendingSendQueueMutex_);
+        pendingSendQueue3c_.push_back(std::move(queuedSendBuffer));
+        sendQueueEmptyFlag38_ = 0u;
+    }
+    return true;
+}
+
+// anchor: launcher.exe:0x44ad80
+bool CLTTCPConnection_PendingSendQueue::QueueSendBuffer(
+    const void* sendBuffer,
+    uint32_t byteCount,
+    uintptr_t ownershipMode) {
+    LTTCPEndpointKey defaultEndpoint;
+    return QueueSendBufferWithEndpoint(sendBuffer, byteCount, defaultEndpoint, ownershipMode);
+}
+
+// anchor: launcher.exe:0x44aa70
+bool CLTTCPConnection_PendingSendQueue::TryPopQueuedSendBufferWithEndpoint(
+    CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem) {
+    if (!outItem) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(pendingSendQueueMutex_);
+    if (pendingSendQueue3c_.empty()) {
+        sendQueueEmptyFlag38_ = 1u;
+        return false;
+    }
+
+    *outItem = std::move(pendingSendQueue3c_.front());
+    pendingSendQueue3c_.pop_front();
+    sendQueueEmptyFlag38_ = pendingSendQueue3c_.empty() ? 1u : 0u;
+    return true;
+}
+
+bool CLTTCPConnection_PendingSendQueue::SendQueueEmptyFlag() const {
+    std::lock_guard<std::mutex> lock(pendingSendQueueMutex_);
+    return sendQueueEmptyFlag38_ != 0u;
+}
+
+// anchor: launcher.exe:0x44ad80
+bool CLTTCPConnection::QueueSendBuffer(
+    const void* buffer,
+    uint32_t byteCount,
+    uintptr_t ownershipMode) {
+    const bool queued = pendingSendQueueState38_.QueueSendBufferWithEndpoint(
+        buffer,
+        byteCount,
+        remoteEndpoint_,
+        ownershipMode);
+    if (!queued) {
+        return false;
     }
 
     spdlog::debug(
-        "CLTTCPConnection::QueueSendBufferScaffold queued copied send bytes ownershipMode={} this={} worker={} byteCount={} remoteHost='{}'",
+        "CLTTCPConnection::QueueSendBuffer queued copied send bytes ownershipMode={} this={} worker={} byteCount={} remoteHost='{}'",
         static_cast<unsigned>(ownershipMode),
         fmt::ptr(this),
         fmt::ptr(workerThread08_),
@@ -550,27 +636,27 @@ bool CLTTCPConnection::QueueSendBufferScaffold(
     return true;
 }
 
-bool CLTTCPConnection::TryPopQueuedSendBufferScaffold(
-    CLTTCPConnection_SendQueueItemScaffold* outItem) {
-    if (!outItem) {
-        return false;
-    }
-
-    std::lock_guard<std::mutex> lock(sendQueueMutex_);
-    if (sendQueue3c_.empty()) {
-        sendQueueEmptyFlag38_ = true;
-        return false;
-    }
-
-    *outItem = std::move(sendQueue3c_.front());
-    sendQueue3c_.pop_front();
-    sendQueueEmptyFlag38_ = sendQueue3c_.empty();
-    return true;
+// anchor: launcher.exe:0x44ac90
+bool CLTTCPConnection::QueueSendBufferWithEndpoint(
+    const void* buffer,
+    uint32_t byteCount,
+    const LTTCPEndpointKey& remoteEndpoint,
+    uintptr_t ownershipMode) {
+    return pendingSendQueueState38_.QueueSendBufferWithEndpoint(
+        buffer,
+        byteCount,
+        remoteEndpoint,
+        ownershipMode);
 }
 
-bool CLTTCPConnection::SendQueueEmptyFlagScaffold() const {
-    std::lock_guard<std::mutex> lock(sendQueueMutex_);
-    return sendQueueEmptyFlag38_;
+// anchor: launcher.exe:0x44aa70
+bool CLTTCPConnection::TryPopQueuedSendBufferWithEndpoint(
+    CLTTCPConnection_QueuedSendBufferWithEndpoint* outItem) {
+    return pendingSendQueueState38_.TryPopQueuedSendBufferWithEndpoint(outItem);
+}
+
+bool CLTTCPConnection::SendQueueEmptyFlag() const {
+    return pendingSendQueueState38_.SendQueueEmptyFlag();
 }
 
 int CLTTCPConnection::ReceiveReadyReadOperationFragmentScaffold(
