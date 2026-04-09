@@ -1756,7 +1756,6 @@ private:
     Arg6CurrentSlotRecord44ObjectSketch arg6CurrentSlotRecord44_{};
     std::string arg6CurrentSlotRecord44NameOwned_;
     bool arg6CurrentSlotRecord44Present_ = false;
-    std::string state8Section11String1460Owned_;
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};
     std::string routeDescriptor30Owned_;
     RouteDescriptor30SmallStringLikeSketch routeDescriptor30_{};

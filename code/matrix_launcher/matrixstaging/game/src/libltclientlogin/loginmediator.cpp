@@ -1290,17 +1290,13 @@ void* CLTLoginMediator::GetLiveCuiCfgB8(uint32_t* outLength) const {
 const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
     // Keep this wrapper-facing body close to the original tiny getter:
     // - original `0x41f170` returns owner `+0xf48`
-    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const CLTLoginMediatorCharacterPersistenceData* snapshot =
-        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
-    const void* header = snapshot ? static_cast<const void*>(&snapshot->header2c[0]) : nullptr;
+    const void* header = static_cast<const void*>(&postAuthMarginLoadingState_.state8PersistenceDataF1c.header2c[0]);
     spdlog::info(
         "CLTLoginMediator::GetState8PersistenceHeaderBc(+0xbc) -> {} [owner={} first=0x{:08x} bytes=0x{:02x}]",
         fmt::ptr(header),
-        fmt::ptr(mediator),
-        snapshot ? static_cast<unsigned>(snapshot->header2c[0]) : 0u,
-        snapshot ? static_cast<unsigned>(snapshot->header2c.size() * sizeof(uint32_t)) : 0u);
+        fmt::ptr(this),
+        static_cast<unsigned>(postAuthMarginLoadingState_.state8PersistenceDataF1c.header2c[0]),
+        static_cast<unsigned>(postAuthMarginLoadingState_.state8PersistenceDataF1c.header2c.size() * sizeof(uint32_t)));
     return header;
 }
 
@@ -1308,18 +1304,13 @@ const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
 const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
     // Keep this wrapper-facing body close to the original tiny getter:
     // - original `0x41f180` returns owner `+0xf88`
-    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const CLTLoginMediatorCharacterPersistenceData* snapshot =
-        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
-    const void* body = snapshot ? static_cast<const void*>(&snapshot->bodyWord6c) : nullptr;
-    const uint32_t bodyWord00 = snapshot ? snapshot->bodyWord6c : 0u;
+    const void* body = static_cast<const void*>(&postAuthMarginLoadingState_.state8PersistenceDataF1c.bodyWord6c);
     spdlog::info(
         "CLTLoginMediator::GetState8PersistenceBodyC0(+0xc0) -> {} [owner={} body00=0x{:08x} bytes=0x{:04x}]",
         fmt::ptr(body),
-        fmt::ptr(mediator),
-        bodyWord00,
-        snapshot ? static_cast<unsigned>(CLTLoginMediatorCharacterPersistenceData::kBodySize) : 0u);
+        fmt::ptr(this),
+        postAuthMarginLoadingState_.state8PersistenceDataF1c.bodyWord6c,
+        static_cast<unsigned>(CLTLoginMediatorCharacterPersistenceData::kBodySize));
     return body;
 }
 
@@ -1328,73 +1319,59 @@ void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) cons
     // Keep this wrapper-facing body close to the original tiny getter:
     // - original `0x41aec0` returns owner `+0x13f0`
     // - when the caller supplies an out pointer, it also writes owner `+0x13f4`
-    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const CLTLoginMediatorCharacterPersistenceData* snapshot =
-        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
-    const uint16_t length = snapshot ? snapshot->section0OverflowLength4d8 : 0u;
-    void* buffer = snapshot ? snapshot->section0OverflowBuffer4d4 : nullptr;
     if (outLength) {
-        *outLength = length;
+        *outLength = postAuthMarginLoadingState_.state8PersistenceDataF1c.section0OverflowLength4d8;
     }
+    void* const buffer = postAuthMarginLoadingState_.state8PersistenceDataF1c.section0OverflowBuffer4d4;
     spdlog::info(
         "CLTLoginMediator::GetState8PersistenceOverflowC4(+0xc4) -> {} [owner={} length=0x{:04x}]",
         fmt::ptr(buffer),
-        fmt::ptr(mediator),
-        static_cast<unsigned>(length));
+        fmt::ptr(this),
+        static_cast<unsigned>(postAuthMarginLoadingState_.state8PersistenceDataF1c.section0OverflowLength4d8));
     return buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::HasState8Section11Dword145c() const {
-    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const CLTLoginMediatorCharacterPersistenceData* snapshot =
-        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
-    const uint32_t ready = (snapshot && snapshot->section11Dword540 != 0u) ? 1u : 0u;
+    const uint32_t value = postAuthMarginLoadingState_.state8PersistenceDataF1c.section11Dword540;
+    const uint32_t ready = value != 0u ? 1u : 0u;
     spdlog::info(
         "CLTLoginMediator::HasState8Section11Dword145c(+0xc8) -> {} [owner={} value=0x{:08x}]",
         ready,
-        fmt::ptr(mediator),
-        snapshot ? snapshot->section11Dword540 : 0u);
+        fmt::ptr(this),
+        value);
     return ready;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::GetState8Section11Dword145c() const {
-    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const CLTLoginMediatorCharacterPersistenceData* snapshot =
-        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
-    const uint32_t value = snapshot ? snapshot->section11Dword540 : 0u;
+    const uint32_t value = postAuthMarginLoadingState_.state8PersistenceDataF1c.section11Dword540;
     spdlog::info(
         "CLTLoginMediator::GetState8Section11Dword145c(+0xcc) -> 0x{:08x} [owner={}]",
         value,
-        fmt::ptr(mediator));
+        fmt::ptr(this));
     return value;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11String1460() {
-    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
+    const CLTLoginMediatorCharacterPersistenceData& snapshot =
+        postAuthMarginLoadingState_.state8PersistenceDataF1c;
+    state8Section11String1460_.begin = snapshot.section11StringBegin544;
+    state8Section11String1460_.current = snapshot.section11StringCurrent548;
+    state8Section11String1460_.capacity = snapshot.section11StringCapacity54c;
 
-    state8Section11String1460Owned_ = ownerState ? ownerState->state8Section11String1460 : std::string();
-    if (!state8Section11String1460Owned_.empty()) {
-        state8Section11String1460_.begin = state8Section11String1460Owned_.c_str();
-        state8Section11String1460_.current =
-            state8Section11String1460_.begin + state8Section11String1460Owned_.size();
-        state8Section11String1460_.capacity = state8Section11String1460_.current;
-    } else {
-        state8Section11String1460_ = {};
-    }
-
+    const char* text =
+        (snapshot.section11StringBegin544 &&
+         snapshot.section11StringBegin544 != snapshot.section11StringCurrent548)
+            ? snapshot.section11StringBegin544
+            : "<empty>";
     spdlog::info(
         "CLTLoginMediator::GetState8Section11String1460(+0xd0) -> begin={} current={} owner={} text='{}'",
         fmt::ptr(state8Section11String1460_.begin),
         fmt::ptr(state8Section11String1460_.current),
-        fmt::ptr(mediator),
-        state8Section11String1460Owned_.empty() ? "<empty>" : state8Section11String1460Owned_.c_str());
+        fmt::ptr(this),
+        text);
     return &state8Section11String1460_;
 }
 
@@ -2030,26 +2007,21 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
 const void* CLTLoginMediator::GetState8PersistenceF1c() const {
     // Keep the wrapper-facing body close to the original tiny getter:
     // - original `0x41f1c0` returns owner `+0xf1c`
-    const CLTLoginMediator* mediator = ResolveActiveState8PersistenceOwner(this);
-    const auto* ownerState = mediator ? &mediator->PostAuthMarginLoadingStateView() : nullptr;
-    const CLTLoginMediatorCharacterPersistenceData* snapshot =
-        ownerState ? &ownerState->state8PersistenceDataF1c : nullptr;
+    const CLTLoginMediatorCharacterPersistenceData* const snapshot =
+        &postAuthMarginLoadingState_.state8PersistenceDataF1c;
     ++profile0f4Count_;
-    const char* firstName = snapshot ? snapshot->realFirstName70.data() : nullptr;
-    const char* lastName = snapshot ? snapshot->realLastName90.data() : nullptr;
-    const char* background = snapshot ? snapshot->backgroundB0.data() : nullptr;
     spdlog::debug(
         "CLTLoginMediator::GetState8PersistenceF1c(+0xf4) -> {} [count={} copiedFrom0ec={} valid0ec={} char='{}' first='{}' last='{}' background='{}' field24=0x{:08x} overflow13f4=0x{:04x}]",
         fmt::ptr(snapshot),
         profile0f4Count_,
         selection0ecCount_,
         selectionContext0ecCopyValid_ ? 1u : 0u,
-        (snapshot && snapshot->characterName00[0]) ? snapshot->characterName00.data() : "<empty>",
-        firstName && firstName[0] ? firstName : "<empty>",
-        lastName && lastName[0] ? lastName : "<empty>",
-        background && background[0] ? background : "<empty>",
-        snapshot ? static_cast<unsigned>(snapshot->selectedWorldField24) : 0u,
-        snapshot ? static_cast<unsigned>(snapshot->section0OverflowLength4d8) : 0u);
+        snapshot->characterName00[0] ? snapshot->characterName00.data() : "<empty>",
+        snapshot->realFirstName70[0] ? snapshot->realFirstName70.data() : "<empty>",
+        snapshot->realLastName90[0] ? snapshot->realLastName90.data() : "<empty>",
+        snapshot->backgroundB0[0] ? snapshot->backgroundB0.data() : "<empty>",
+        static_cast<unsigned>(snapshot->selectedWorldField24),
+        static_cast<unsigned>(snapshot->section0OverflowLength4d8));
     return snapshot;
 }
 
