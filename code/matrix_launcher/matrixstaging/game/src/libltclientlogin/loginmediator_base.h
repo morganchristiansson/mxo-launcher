@@ -347,7 +347,7 @@ struct ProcessCreateCharacterInput120Sketch {
 //   `0x004af2b8` is a purecall-backed abstract base candidate immediately above
 //   `0x004b01c8 = CLTLoginMediator`, which strongly fits the source-side `ILTLoginMediator` role
 // - in particular, launcher startup `0x40a380` calls the resolved arg6 slot `+0x08`, while owner
-//   vtable `0x004b01c8 +0x08` is currently recovered as `0x41f510` reset/clear logic rather than a
+//   vtable `0x004b01c8 +0x0c` is currently recovered as `0x41f510` reset/clear logic rather than a
 //   simple engine setter
 //
 // Canonical references:
@@ -364,14 +364,14 @@ public:
     // +0x00
     virtual const char* GetName() = 0;
     // +0x04
-    // anchor: launcher.exe:0x41b160 / owner vtable +0x04
+    // anchor: launcher.exe:0x41b160 / owner vtable +0x08
     // Current source-owned wrapper helper mirrors the highest-confidence startup effects of owner
     // initialize while keeping the resolved arg6 wrapper handoff distinct from owner vtable slot
     // numbering.
     void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride);
     // +0x08
     // Wrapper-facing startup handoff from `launcher.exe:0x40a380`; keep this distinct from owner
-    // vtable `0x004b01c8 +0x08` while the wrapper/owner relation is still being tightened.
+    // vtable `0x004b01c8 +0x0c` while the wrapper/owner relation is still being tightened.
     virtual void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) = 0;
     // +0x0c
     virtual void ClearEngine() = 0;
@@ -404,6 +404,12 @@ public:
     // +0x44
     virtual Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() = 0;
     // +0x48
+    // Raw concrete-owner clarification from `docs/launcher.exe/VTABLES/0x004b01c8.md`:
+    // owner rows near this part of `0x004b01c8` were previously over-collapsed onto the wrapper
+    // surface. Newer direct raw-vtable review makes the split explicit:
+    // - owner `0x41f350/0x41f360` are bootstrap-child opaque-blob getters over `+0x680+0x108/+0x10c`
+    // - these wrapper-facing string getters remain part of the separate resolved
+    //   `ILTLoginMediator.Default` arg6 surface
     virtual const char* GetWorldOrSelectionName() const = 0;
     // +0x4c
     virtual const char* GetProfileOrSessionName() const = 0;

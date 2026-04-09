@@ -1208,9 +1208,9 @@ public:
     // state-8 margin dispatcher (`0x439300`).
     // Source home for the focused route/descriptor/getter cluster:
     // - `matrixstaging/game/src/libltclientlogin/loginmediator_margin_route.cpp`
-    // anchor: launcher.exe:0x41f2e0 / owner vtable +0x30
+    // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
     const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
-    // anchor: launcher.exe:0x41f300 / owner vtable +0x40
+    // anchor: launcher.exe:0x41f300 / owner vtable +0x44
     const SlotRecordState004b5328* GetCurrentSlotRecord() const;
     // anchor: launcher.exe:0x41b220
     // Source-owned helper over the recovered slot-record table; do not treat this as the current

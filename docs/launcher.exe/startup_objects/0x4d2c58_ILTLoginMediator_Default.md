@@ -156,8 +156,8 @@ So one of the resolved arg6 wrapper methods consumes the newly built launcher ob
 
 Important current clarification:
 - this call is on the **resolved wrapper pointer** loaded from `0x4d2c58`
-- do **not** identify it blindly with owner vtable `0x004b01c8 +0x08`
-- current owner-body recovery now puts `0x41f510` at owner `+0x08`, and that body looks like reset/clear-owned-runtime-state logic rather than the startup handoff itself
+- do **not** identify it blindly with owner vtable `0x004b01c8 +0x0c`
+- current owner-body recovery now puts `0x41f510` at owner `+0x0c`, and that body looks like reset/clear-owned-runtime-state logic rather than the startup handoff itself
 - practical source consequence: launcher startup `0x40a380` should own the arg5 -> arg6 handoff, while later arbitrary arg5 method traffic should not lazily recreate mediator bind/reset side effects
 - current source now mirrors that startup handoff by routing resolved wrapper `+0x08` through a
   narrow `ILTLoginMediator::Initialize(networkEngineOverride)` helper that installs the engine,

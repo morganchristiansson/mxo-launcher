@@ -324,7 +324,7 @@ static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
 // vtable: ILTLoginMediator.Default slot +0x08
 // Fidelity note:
 // - this resolved arg6 wrapper slot is the launcher-owned startup handoff used from `0x40a380`
-// - do not conflate it with owner vtable `0x004b01c8 +0x08`; current Ghidra now assigns that owner
+// - do not conflate it with owner vtable `0x004b01c8 +0x0c`; current Ghidra now assigns that owner
 //   slot to `0x41f510`, which looks like reset/clear logic rather than a simple engine setter
 // - current source therefore keeps the wrapper handoff explicit here, routes it through the
 //   source-owned `ILTLoginMediator::Initialize(...)` helper, and limits arg5 sidecar accessors to

@@ -409,7 +409,7 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     spdlog::info("CLTLoginMediator::ResetLauncherConnectionsScaffold completed");
 }
 
-// anchor: launcher.exe:0x41b160 / owner vtable +0x04
+// anchor: launcher.exe:0x41b160 / owner vtable +0x08
 // Current source-owned startup helper mirrors the highest-confidence init effects recovered so far:
 // - store/install the arg5-derived engine
 // - register the active mediator source
@@ -445,7 +445,7 @@ const char* CLTLoginMediator::GetName() {
 }
 
 // Wrapper-facing arg6 startup handoff helper used by the current `0x4d2c58` scaffold.
-// Do not sync this directly to owner vtable `0x004b01c8 +0x08`; current Ghidra now assigns that
+// Do not sync this directly to owner vtable `0x004b01c8 +0x0c`; current Ghidra now assigns that
 // owner slot to `launcher.exe:0x41f510`, which looks like reset/clear logic instead.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
@@ -463,7 +463,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 
 // Wrapper-facing arg6 clear helper reached from launcher teardown after arg5 release.
 // Current fidelity direction:
-// - owner vtable `0x004b01c8 +0x08 / 0x41f510` now reads as reset/clear-owned-runtime-state logic
+// - owner vtable `0x004b01c8 +0x0c / 0x41f510` now reads as reset/clear-owned-runtime-state logic
 // - keep this wrapper slot distinct from the owner vtable numbering, but mirror the highest-
 //   confidence reset effects here instead of only nulling the engine pointer
 // UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
