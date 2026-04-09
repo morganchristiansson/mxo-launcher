@@ -392,7 +392,8 @@ public:
     static_assert(sizeof(CLTLoginMediatorCharacterPersistenceData) == 0x550);
 #pragma pack(pop)
 
-    struct PostAuthMarginLoadingState {
+    class PostAuthMarginLoadingState {
+    public:
         // Source-owned owner layout projection over the original shared
         // `CLTLoginMediatorCharacterPersistenceData_0x41d900` family.
         // owner post-auth margin/loading block shared by the active state8 path and the later
