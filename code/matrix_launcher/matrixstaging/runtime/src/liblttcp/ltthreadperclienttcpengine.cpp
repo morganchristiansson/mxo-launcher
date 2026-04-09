@@ -2750,13 +2750,42 @@ uint32_t CLTThreadPerClientTCPEngine::SendBuffer(
 
 // anchor: launcher.exe:0x42fd10
 // vtable: launcher.exe:0x004b2768 slot +0x24
-uint32_t CLTThreadPerClientTCPEngine::Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) {
-    (void)arg1;
-    (void)arg2;
-    (void)arg3;
-    (void)arg4;
-    (void)arg5;
-    return 0;
+uint32_t CLTThreadPerClientTCPEngine::SendBufferWithEndpoint(
+    void* buffer,
+    uint32_t byteCount,
+    LTTCPEndpointKey* remoteEndpoint,
+    void* contextKey,
+    void* ownershipMode) {
+    // Current best static read of `0x42fd10`:
+    // - active-state guard is identical to slot `8` / `0x42fbd0` (`state == 1 || state == 2`)
+    // - callee is `0x44ac90 = QueueSendBufferWithEndpoint`
+    // - wakeup target is the direct worker handle at `[connection+0x08] + 0x40`
+    // - original return register is not yet evidenced as a meaningful public result, but the
+    //   bounded source mirror keeps the same slot-8-style `0/1` success convention for launcher
+    //   stability
+    CLTTCPConnection* connection = static_cast<CLTTCPConnection*>(contextKey);
+    if (!connection || !remoteEndpoint || !buffer || byteCount == 0u) {
+        return 0u;
+    }
+
+    const LTTCPEngineConnectionState state = connection->State();
+    if (state != LTTCPEngineConnectionState::kConnectActive &&
+        state != LTTCPEngineConnectionState::kUdpMonitorActive) {
+        return 0u;
+    }
+
+    if (!connection->QueueSendBufferWithEndpoint(
+            buffer,
+            byteCount,
+            *remoteEndpoint,
+            reinterpret_cast<uintptr_t>(ownershipMode))) {
+        return 0u;
+    }
+
+    if (CLTThreadPerClientTCPEngine_WorkerThread* worker = connection->WorkerThreadScaffold()) {
+        worker->SignalWakeup();
+    }
+    return 1u;
 }
 
 // anchor: launcher.exe:0x443810

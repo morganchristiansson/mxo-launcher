@@ -230,7 +230,7 @@ This is the current best answer to the experiment question:
 - slot `10` / `0x443810`
 - slot `4` / `0x42f7c0`
 - slot `11` / `0x431670`
-- slot `9` / `0x42fd10`
+- slot `9` / `0x42fd10 = SendBufferWithEndpoint`
 
 ### Slots that should stay wrapper-owned
 - slot `0` / deleting dtor
@@ -245,7 +245,7 @@ This is the current best answer to the experiment question:
 - slot `6` / `Connect`
 - slot `7` / `Close`
 - slot `8` / `SendBuffer`
-- slot `9` / `0x42fd10`
+- slot `9` / `0x42fd10 = SendBufferWithEndpoint`
 - slot `10` / `0x443810`
 - slot `11` / `0x431670`
 - slot `12` / `CleanupConnection`

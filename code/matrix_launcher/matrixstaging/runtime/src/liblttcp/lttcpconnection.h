@@ -210,12 +210,24 @@ class CBaseConnection;
 // - current source now lifts the recovered send-queue helpers into explicit classes so the
 //   `0x44aa70 / 0x44ac90 / 0x44ad80` object seams remain visible in code instead of being flattened
 //   into anonymous container plumbing
+// - launcher.exe is still sharper than the current source container:
+//   - queued item wrapper `0x44a500` allocates a `0x14` record
+//     `{sendBufferStorageDescriptor*, endpointKey16}`
+//   - queue node `0x44a310` allocates a separate `0x14` lock-free node whose payload lives at
+//     node `+0x10`
+//   - queue core `0x44a830 / 0x44a900 / 0x449ff0` is a versioned Michael-Scott-style enqueue /
+//     dequeue family with queue-local retired-head cleanup, not a native `std::deque`
 class CLTTCPConnection_QueuedSendBufferStorage {
 public:
     CLTTCPConnection_QueuedSendBufferStorage();
 
     // anchor family: launcher.exe:0x44ac90 ownership-mode branch / launcher.exe:0x44a7c0 release
-    // Current active path is ownership mode `1` (copied bytes).
+    // Current best ownership-mode read from launcher.exe:
+    // - `0` = transfer caller-owned tracked heap buffer; release path uses tracked free
+    // - `1` = copy bytes into a pooled `0x1000` send buffer block
+    // - `2` = transfer an already-pooled `0x1000` send buffer block back to the same pool
+    // Active launcher path still reaches mode `1`; current source keeps the storage flattened and
+    // copied even when static RE proves the original mode-`0/2` ownership split.
     bool InitializeFromSendBuffer(const void* sendBuffer, uint32_t byteCount, uintptr_t ownershipMode);
     void Reset();
 
@@ -231,6 +243,11 @@ private:
 
 class CLTTCPConnection_QueuedSendBufferWithEndpoint {
 public:
+    // Source-owned flattened stand-in for the original two-object wrapper/storage split:
+    // - launcher.exe queues a `0x14` wrapper that points at a separate `0x0c`
+    //   `CLTTCPConnection_QueuedSendBufferStorage`-style descriptor
+    // - current source embeds the storage descriptor directly to keep the active worker-send path
+    //   simple while the helper-family meaning stays visible in comments/docs
     CLTTCPConnection_QueuedSendBufferStorage sendBufferStorage00;
     LTTCPEndpointKey remoteEndpoint04;
 };
@@ -255,6 +272,8 @@ private:
     uint8_t sendQueueEmptyFlag38_;
     uint8_t padding39_3b_[3];
     mutable std::mutex pendingSendQueueMutex_;
+    // Source-owned bounded stand-in for the original versioned lock-free queue rooted at
+    // connection `+0x3c`.
     std::deque<CLTTCPConnection_QueuedSendBufferWithEndpoint> pendingSendQueue3c_;
 };
 

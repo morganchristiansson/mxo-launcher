@@ -430,15 +430,22 @@ static uint32_t __thiscall LauncherObject_SendBuffer(
 
 // anchor: launcher.exe:0x42fd10
 // vtable: launcher.exe:0x004b2768 slot +0x24
-static uint32_t __thiscall LauncherObject_Slot9_42FD10(
+static uint32_t __thiscall LauncherObject_SendBufferWithEndpoint(
     LauncherObjectAbiShell* self,
-    void* arg1,
-    void* arg2,
-    void* arg3,
-    void* arg4,
-    void* arg5) {
+    void* buffer,
+    void* byteCount,
+    void* remoteEndpoint,
+    void* contextKey,
+    void* ownershipMode) {
     mxo::liblttcp::ILTTCPEngine* engine = ResolveLauncherObjectEngineSidecar(self);
-    return engine ? engine->Slot9_42FD10(arg1, arg2, arg3, arg4, arg5) : 0u;
+    return engine
+        ? engine->SendBufferWithEndpoint(
+            buffer,
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(byteCount)),
+            static_cast<mxo::liblttcp::LTTCPEndpointKey*>(remoteEndpoint),
+            contextKey,
+            ownershipMode)
+        : 0u;
 }
 
 // anchor: launcher.exe:0x443810
@@ -638,7 +645,7 @@ static void** LauncherObjectPrimaryVtable() {
         (void*)LauncherObject_Connect,                 // 0x4328a0
         (void*)LauncherObject_Close,                   // 0x42f970
         (void*)LauncherObject_SendBuffer,              // 0x42fbd0
-        (void*)LauncherObject_Slot9_42FD10,            // 0x42fd10
+        (void*)LauncherObject_SendBufferWithEndpoint,  // 0x42fd10
         (void*)LauncherObject_Slot10_443810,          // 0x443810
         (void*)LauncherObject_Slot11_431670,          // 0x431670
         (void*)LauncherObject_CleanupConnection,      // 0x4316a0

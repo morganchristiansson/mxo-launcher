@@ -400,7 +400,14 @@ public:
     // Original slot argument order is `(buffer, byteCount, connection, ownershipMode)`.
     uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* contextKey, void* completionContext = nullptr) override;
     // anchor: launcher.exe:0x42fd10
-    uint32_t Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) override;
+    // Recovered slot-9 argument order is `(buffer, byteCount, remoteEndpoint, connection,
+    // ownershipMode)`; this is the explicit-endpoint sibling of slot `8` / `0x42fbd0`.
+    uint32_t SendBufferWithEndpoint(
+        void* buffer,
+        uint32_t byteCount,
+        LTTCPEndpointKey* remoteEndpoint,
+        void* contextKey,
+        void* ownershipMode) override;
     // anchor: launcher.exe:0x443810
     uint32_t Slot10_443810(void* arg1) override;
     // anchor: launcher.exe:0x431670

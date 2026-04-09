@@ -1613,11 +1613,37 @@ Current tightened worker-loop read after the latest `0x42fe50 / 0x42f970 / 0x42f
     the connection-owned queue rooted at `+0x3c`, clears `+0x38`, and signals the worker wakeup
     socket
     - sibling helper `0x44ac90 = CLTTCPConnection::QueueSendBufferWithEndpoint` is the explicit
-      endpoint-taking variant reached from slot `9` / `0x42fd10`
+      endpoint-taking variant reached from slot `9` / `0x42fd10 = SendBufferWithEndpoint`
     - active-state guard there is exactly connection state `1` or `2`
     - outside those states the original path does not silently return; it emits the string-backed
       `Send failed! ... not connected/connecting ...` warning using endpoint bytes from
       connection `+0x24`
+    - send-queue helper family now narrows further too:
+      - `0x44a500 = AllocateQueuedSendBufferWithEndpointItem`
+        - allocates the `0x14` queued wrapper `{sendBufferStorageDescriptor*, endpointKey16}`
+      - `0x44a3e0 = AllocateQueuedSendBufferStorageDescriptor`
+        - allocates the `0x0c` send-buffer descriptor `{usesPooledBuffer00, bufferStorage04, bufferByteCount08}`
+      - `0x44a830 = EnqueuePendingSendQueueItemWrapper`
+        - lock-free enqueue helper over connection `+0x3c`
+        - allocates a separate `0x14` queue node whose payload pointer lives at node `+0x10`
+        - if tail-node `next` is already non-null, it first helps advance the versioned tail state
+      - `0x44a900 = TryDequeuePendingSendQueueItemWrapper`
+        - not just a raw unlink helper: it performs one Michael-Scott-style dequeue step
+        - when dequeue succeeds, it returns the queued wrapper pointer from `headNext + 0x10`
+        - then retires the old dummy head node onto the queue-local retired-node stack at queue `+0x28`
+      - `0x449ff0 = TryCompareExchangeVersionedPointerPair`
+        - generic `cmpxchg8b` helper used by the queue family to publish `{pointer, version}` pairs
+        - negative result: current pass does **not** support reading it as an arbitrary container-wide commit helper; it is the narrow compare/publish primitive beneath enqueue/dequeue retries
+      - `0x44a7c0 = ReleaseSendBufferStorage`
+        - `usesPooledBuffer00 == 0` frees `bufferStorage04` through tracked free
+        - `usesPooledBuffer00 == 1` zeros a full `0x1000` byte block and returns it to the pooled-send-buffer freelist
+        - that means the currently recovered ownership modes are:
+          - `0` = transfer tracked heap buffer
+          - `1` = copy bytes into pooled `0x1000` storage
+          - `2` = transfer an already-pooled `0x1000` block
+      - `0x44a620 = AllocatePooledSendBufferStorage`
+        - fixed-size pooled allocator for raw `0x1000` send-buffer blocks
+        - backing blocks grow toward roughly half a page (`(pageSize >> 1) - 4`) on first sizing, just like the other launcher fixed allocators
   - `0x42f970` writes state `4` first, then:
     - graceful close uses `shutdown(socket, 1)` immediately only when the send queue is already
       empty

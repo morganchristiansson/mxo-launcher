@@ -523,10 +523,13 @@ bool CLTTCPConnection_QueuedSendBufferStorage::InitializeFromSendBuffer(
         return false;
     }
 
-    // Current active static-RE-backed path is ownership mode `1`, i.e. copied bytes routed
-    // through the queue helper family `0x44ad80 -> 0x44ac90`.
-    // Keep other ownership modes explicit as a later fidelity target instead of pretending they are
-    // already byte-faithful pool/borrow semantics here.
+    // Current launcher.exe ownership-mode split recovered from `0x44ac90` / `0x44a7c0`:
+    // - `0` => transfer caller-owned tracked heap buffer; release path uses tracked free
+    // - `1` => copy into a pooled `0x1000` send buffer block
+    // - `2` => transfer an already-pooled `0x1000` send buffer block back to that pool
+    // The active launcher path still reaches mode `1`. Current source keeps a bounded copied-byte
+    // stand-in for every mode because the original tracked allocators / pooled raw-buffer transfer
+    // contracts are not fully reconstructed here yet.
     (void)ownershipMode;
     usesPooledBuffer00_ = 1u;
     bufferBytes04_.assign(

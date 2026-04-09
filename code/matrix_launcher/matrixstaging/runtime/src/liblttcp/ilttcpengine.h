@@ -4,6 +4,8 @@
 
 namespace mxo::liblttcp {
 
+class LTTCPEndpointKey;
+
 // =============================================================================
 // ILTTCPEngine - VTable 0x004b2768 pure virtual interface
 // =============================================================================
@@ -42,7 +44,14 @@ public:
     // `(buffer, byteCount, connection, completionContext)`.
     virtual uint32_t SendBuffer(const void* buffer, uint32_t byteCount, void* contextKey, void* completionContext) = 0;
     // +0x24
-    virtual uint32_t Slot9_42FD10(void* arg1, void* arg2, void* arg3, void* arg4, void* arg5) = 0;
+    // Recovered slot-9 argument order from `0x42fd10`:
+    // `(buffer, byteCount, remoteEndpoint, connection, ownershipMode)`.
+    virtual uint32_t SendBufferWithEndpoint(
+        void* buffer,
+        uint32_t byteCount,
+        LTTCPEndpointKey* remoteEndpoint,
+        void* contextKey,
+        void* ownershipMode) = 0;
     // +0x28
     virtual uint32_t Slot10_443810(void* arg1) = 0;
     // +0x2c
