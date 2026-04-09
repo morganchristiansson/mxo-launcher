@@ -16,7 +16,6 @@ void DiagnosticConfigureMediatorSelection(
     const char* mappedVariantName,
     uint32_t selectedWorldIndexLow24,
     uint32_t selectedVariantIndexHigh8,
-    uint32_t selectedSelectionGateByte100,
     uint32_t selectedVariantState);
 bool DiagnosticResolveLauncherSelectionFromMediator(
     void* mediatorPtr,

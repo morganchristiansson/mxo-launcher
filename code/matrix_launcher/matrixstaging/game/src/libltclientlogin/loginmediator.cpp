@@ -414,7 +414,6 @@ CLTLoginMediator::CLTLoginMediator()
       worldSlots_{},
       worldPayloadSlots_{} {
     InitializeObserverTree674();
-    InitializeArg6DefaultObject();
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -2785,8 +2784,8 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 //
 // VTABLE METHODS (at offset +0xc from object pointer):
 // +0xfc = GetWorldNameByIndex(index) -> char* world name string
-// +0x100 = startup-only synthetic selection-gate byte used by the launcher arg7 path before the
-//          recovered owner `+0xd84` descriptor table exists
+// +0x100 = wrapper-facing selection gate byte; on the current active replacement path this now
+//          comes directly from owner descriptor Status byte `+0x17`
 // +0xe4 = ValidateWorldSelection(variant) -> 0 or 7 on valid
 // +0xf8 = GetWorldListCount() -> uint total count
 // +0xd8 = GetActiveWorldCount() -> uint active count
@@ -2808,29 +2807,6 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
 //   - late-login arg6 slots `+0xd4/+0x124/+0x18c` live separately under:
 //     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
-// anchor: launcher.exe:0x40e480
-// sibling slot/vtable family: launcher.exe:0x4d3584
-void CLTLoginMediator::InitializeArg6DefaultObject() {
-    arg6WorldList_.worldNames_ = {
-        "Default", "Starter", "Classic", "Advanced", "Extreme"
-    };
-    arg6WorldList_.worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
-    arg6WorldList_.activeVariantStatesE4_ = {3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
-    arg6WorldList_.activeWorldDisplayNamesDc_ = {"", "", "", "", "", "", "", "", "", ""};
-    arg6WorldList_.activeWorldMatchNamesE0_ = {"", "", "", "", "", "", "", "", "", ""};
-    arg6WorldList_.totalCount_ = 5;
-    arg6WorldList_.activeCount_ = 5;
-
-    arg6Selection_ = Arg6SelectionConfig();
-
-    spdlog::info(
-        "DIAGNOSTIC: InitializeArg6DefaultObject populated arg6 defaults worlds={} active={} selectedWorld=0x{:06x} selectedVariant=0x{:02x}",
-        arg6WorldList_.totalCount_,
-        arg6WorldList_.activeCount_,
-        arg6Selection_.selectedWorldIndexLow24_,
-        arg6Selection_.selectedVariantIndexHigh8_);
-}
-
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::ConfigureArg6Selection(
     uint32_t worldUpperBoundExclusive,
@@ -2839,40 +2815,17 @@ void CLTLoginMediator::ConfigureArg6Selection(
     const char* mappedVariantName,
     uint32_t selectedWorldIndexLow24,
     uint32_t selectedVariantIndexHigh8,
-    uint32_t selectedSelectionGateByte100,
     uint32_t selectedVariantState) {
     arg6Selection_.worldUpperBoundExclusive_ = worldUpperBoundExclusive ? worldUpperBoundExclusive : 1u;
     arg6Selection_.variantUpperBoundExclusive_ = variantUpperBoundExclusive ? variantUpperBoundExclusive : 1u;
     arg6Selection_.selectedWorldIndexLow24_ = selectedWorldIndexLow24 & 0x00ffffffu;
     arg6Selection_.selectedVariantIndexHigh8_ = selectedVariantIndexHigh8 & 0xffu;
-    arg6Selection_.selectedSelectionGateByte100_ = selectedSelectionGateByte100;
     arg6Selection_.selectedVariantState_ = selectedVariantState;
     arg6Selection_.mappedSelectionId_ = arg6Selection_.selectedWorldIndexLow24_;
     arg6Selection_.mappedSelectionName_ =
         (mappedSelectionName && mappedSelectionName[0]) ? mappedSelectionName : "standalone";
     arg6Selection_.mappedVariantName_ =
         (mappedVariantName && mappedVariantName[0]) ? mappedVariantName : arg6Selection_.mappedSelectionName_;
-
-    // anchor: launcher.exe:0x40e480 / sibling slot `0x4d3584`
-    // Bounded startup-side world-list mirror:
-    // - total-world rows come from `+0xfc`
-    // - active rows use `+0xe0` text to match against those world names before the row's packed
-    //   item-data high word is written from the active selection-entry index
-    // - tighter auth-valid read now makes that active-entry index better fit the slot-record /
-    //   character-entry index than a free-standing world-variant id
-    arg6WorldList_.totalCount_ = std::min<uint32_t>(arg6Selection_.worldUpperBoundExclusive_, arg6WorldList_.worldNames_.size());
-    arg6WorldList_.activeCount_ = std::min<uint32_t>(arg6Selection_.variantUpperBoundExclusive_, arg6WorldList_.activeWorldMatchNamesE0_.size());
-    if (arg6Selection_.selectedWorldIndexLow24_ < arg6WorldList_.worldNames_.size()) {
-        arg6WorldList_.worldNames_[arg6Selection_.selectedWorldIndexLow24_] = arg6Selection_.mappedSelectionName_;
-        arg6WorldList_.worldSelectionGateBytes100_[arg6Selection_.selectedWorldIndexLow24_] =
-            static_cast<uint8_t>(arg6Selection_.selectedSelectionGateByte100_ & 0xffu);
-    }
-    if (arg6Selection_.selectedVariantIndexHigh8_ < arg6WorldList_.activeWorldMatchNamesE0_.size()) {
-        arg6WorldList_.activeWorldMatchNamesE0_[arg6Selection_.selectedVariantIndexHigh8_] = arg6Selection_.mappedSelectionName_;
-        arg6WorldList_.activeWorldDisplayNamesDc_[arg6Selection_.selectedVariantIndexHigh8_] = arg6Selection_.mappedVariantName_;
-        arg6WorldList_.activeVariantStatesE4_[arg6Selection_.selectedVariantIndexHigh8_] =
-            static_cast<uint8_t>(arg6Selection_.selectedVariantState_ & 0xffu);
-    }
 }
 
 // Source-owned arg6 bootstrap-selection seed helpers.
@@ -2901,15 +2854,6 @@ uint32_t CLTLoginMediator::Arg6SelectedWorldIndexLow24() const {
 
 uint32_t CLTLoginMediator::Arg6SelectedVariantIndexHigh8() const {
     return arg6Selection_.selectedVariantIndexHigh8_;
-}
-
-uint32_t CLTLoginMediator::Arg6SelectedSelectionGateByte100() const {
-    const uint32_t stateCode = CurrentHelperStateCodeOrZero(this);
-    const uint32_t worldIndex = arg6Selection_.selectedWorldIndexLow24_;
-    if (stateCode >= 3u && worldIndex < 100u) {
-        return static_cast<uint32_t>(GetWorldSelectionGateByteByIndex(worldIndex));
-    }
-    return arg6Selection_.selectedSelectionGateByte100_;
 }
 
 uint32_t CLTLoginMediator::Arg6SelectedVariantState() const {
@@ -3083,75 +3027,53 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
 // anchor: launcher.exe:0x41af30 / launcher.exe:0x40e5b0
 // vtable: ILTLoginMediator.Default slot +0xf8
 uint32_t CLTLoginMediator::GetWorldCount() const {
-    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-    const uint32_t worldCount = useRecoveredDescriptorTable
+    const uint32_t worldCount = lastAuthReply_.valid && !lastAuthReply_.isErrorReply
         ? static_cast<uint32_t>(worldDescriptorCountD80_)
-        : arg6WorldList_.totalCount_;
+        : 0u;
 
     spdlog::info(
         "CLTLoginMediator::GetWorldCount(+0xf8) -> {} [source={}]",
         worldCount,
-        useRecoveredDescriptorTable ? "owner+0xd84" : "arg6-selection-fallback");
+        (worldCount != 0u) ? "owner+0xd84" : "no-active-descriptor-table");
     return worldCount;
 }
 
 // anchor: launcher.exe:0x41b2e0 / launcher.exe:0x40cd10
 // vtable: ILTLoginMediator.Default slot +0xfc
-// Fidelity tightening:
-// - keep this anchored getter table-backed on the startup path
-// - do not route it through the unanchored `Arg6MappedSelectionName()` helper when the same
-//   selection name has already been seeded into `arg6WorldList_.worldNames_`
+// Active replacement path note:
+// - the text-mode launcher selection stage now runs only after auth success
+// - so this wrapper-facing getter can stay owner-table-backed without the older synthetic
+//   startup world-list sidecar
 const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
-    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-
-    const char* worldName = nullptr;
-    const char* source = "arg6-world-list";
-    if (useRecoveredDescriptorTable) {
-        worldName = (index <= 0xffu)
+    const char* worldName =
+        (lastAuthReply_.valid && !lastAuthReply_.isErrorReply && index <= 0xffu)
             ? GetDescriptorInlineNameByIndex(static_cast<uint8_t>(index))
             : nullptr;
-        source = "owner+0xd84.inlineName+0x03";
-    } else if (index < arg6WorldList_.totalCount_) {
-        worldName = arg6WorldList_.worldNames_[index].c_str();
-        source = "arg6-world-list.table";
-    }
 
     spdlog::info(
         "CLTLoginMediator::GetWorldNameByIndex(+0xfc index=0x{:06x}) -> '{}' [source={}]",
         static_cast<unsigned>(index & 0x00ffffffu),
         worldName ? worldName : "<null>",
-        source);
+        worldName ? "owner+0xd84.inlineName+0x03" : "no-active-descriptor-table");
     return worldName;
 }
 
 // anchor: launcher.exe:0x41b320 / launcher.exe:0x4d3584 +0x100
 // vtable: ILTLoginMediator.Default slot +0x100
-// Keep the wrapper/owner split explicit:
-// - like `+0xfc`, keep the startup fallback table-backed instead of routing through the separate
-//   unanchored selected-gate helper once `ConfigureArg6Selection()` has seeded the startup table
-// - once auth-reply world descriptors exist, this slot reads owner descriptor Status byte `+0x17`
-// - before that, startup selection still needs the older synthetic gate byte path
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// Active replacement path note:
+// - the current text-mode selection menu only reaches this after auth success
+// - so the wrapper-facing gate byte now comes only from the recovered owner descriptor Status byte
 uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const {
-    const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
-
-    uint8_t selectionGateByte100 = 0u;
-    const char* source = "no-startup-fallback";
-    if (useRecoveredDescriptorTable) {
-        selectionGateByte100 = (index <= 0xffu)
+    const uint8_t selectionGateByte100 =
+        (lastAuthReply_.valid && !lastAuthReply_.isErrorReply && index <= 0xffu)
             ? GetDescriptorStatusByIndex(static_cast<uint8_t>(index))
             : 0u;
-        source = "owner+0xd84.status+0x17";
-    } else if (index < arg6WorldList_.totalCount_) {
-        selectionGateByte100 = arg6WorldList_.worldSelectionGateBytes100_[index];
-        source = "arg6-world-list-gate-byte100";
-    }
 
     spdlog::info(
         "CLTLoginMediator::GetWorldSelectionGateByteByIndex(+0x100 index=0x{:06x}) -> {} [source={}]",
         static_cast<unsigned>(index & 0x00ffffffu),
         static_cast<unsigned>(selectionGateByte100),
-        source);
+        (selectionGateByte100 != 0u) ? "owner+0xd84.status+0x17" : "no-active-descriptor-table");
     return selectionGateByte100;
 }
 

@@ -1411,7 +1411,6 @@ void DiagnosticConfigureMediatorSelection(
     const char* mappedVariantName,
     uint32_t selectedWorldIndexLow24,
     uint32_t selectedVariantIndexHigh8,
-    uint32_t selectedSelectionGateByte100,
     uint32_t selectedVariantState) {
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     if (!mediator) {
@@ -1426,18 +1425,16 @@ void DiagnosticConfigureMediatorSelection(
         mappedVariantName,
         selectedWorldIndexLow24,
         selectedVariantIndexHigh8,
-        selectedSelectionGateByte100,
         selectedVariantState);
 
     spdlog::info(
-        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive={} variantUpperBoundExclusive={} worldName='{}' variantName='{}' selectedWorldLow24=0x{:06x} selectedVariantHigh8=0x{:02x} selectedSelectionGateByte100={} selectedVariantState={}",
+        "DIAGNOSTIC: mediator selection configured worldUpperBoundExclusive={} variantUpperBoundExclusive={} worldName='{}' variantName='{}' selectedWorldLow24=0x{:06x} selectedVariantHigh8=0x{:02x} selectedVariantState={}",
         mediator->Arg6WorldUpperBoundExclusive(),
         mediator->Arg6VariantUpperBoundExclusive(),
         mediator->Arg6MappedSelectionName(),
         mediator->Arg6MappedVariantName(),
         mediator->Arg6SelectedWorldIndexLow24(),
         mediator->Arg6SelectedVariantIndexHigh8(),
-        mediator->Arg6SelectedSelectionGateByte100(),
         mediator->Arg6SelectedVariantState());
 }
 

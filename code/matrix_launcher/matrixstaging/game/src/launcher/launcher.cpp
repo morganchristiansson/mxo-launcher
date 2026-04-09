@@ -414,7 +414,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
 
     const mxo::launcher::replacement::RecoveredLauncherSelectionRecord* recoveredSelection =
         mxo::launcher::replacement::FindRecoveredLauncherSelectionRecord(selectionName);
-    const uint32_t selectedSelectionGateByte100 = recoveredSelection ? recoveredSelection->selectionGateByte100 : 1u;
     const uint32_t selectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
     const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
     const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
@@ -431,7 +430,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         selectionName,
         selectionPackedLow24,
         selectedHighByte,
-        selectedSelectionGateByte100,
         selectedVariantState);
     DiagnosticApplyDefaultNopatchMediatorConfig(
         g_pILTLoginMediatorDefault,

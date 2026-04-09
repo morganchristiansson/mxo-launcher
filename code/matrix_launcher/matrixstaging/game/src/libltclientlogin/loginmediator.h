@@ -1057,11 +1057,11 @@ public:
     // ==============================================================================
 
     // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
-    // Faithful implementation of arg6 world list provider for InitClientDLL
-    // Vtable at offset +0xc from object pointer at 0x4d2c58
-    // Focused source home for this surface:
-    // - `loginmediator_arg6.cpp`
-    void InitializeArg6DefaultObject();
+    // Active replacement note:
+    // - the current no-GUI launcher path no longer keeps a synthetic pre-auth world-list sidecar
+    // - selection now runs after auth success and consumes the recovered owner tables directly
+    // - the narrower configured arg6 selection scratch below remains only for wrapper-facing
+    //   descriptor/profile bridges still reached from launcher/client scaffolding
     void ConfigureArg6Selection(
         uint32_t worldUpperBoundExclusive,
         uint32_t variantUpperBoundExclusive,
@@ -1069,7 +1069,6 @@ public:
         const char* mappedVariantName,
         uint32_t selectedWorldIndexLow24,
         uint32_t selectedVariantIndexHigh8,
-        uint32_t selectedSelectionGateByte100,
         uint32_t selectedVariantState);
     // Source-owned arg6 bootstrap seed helpers.
     // These are replacement-side setup helpers, not recovered launcher.exe vtable slots.
@@ -1077,7 +1076,6 @@ public:
     uint32_t Arg6VariantUpperBoundExclusive() const;
     uint32_t Arg6SelectedWorldIndexLow24() const;
     uint32_t Arg6SelectedVariantIndexHigh8() const;
-    uint32_t Arg6SelectedSelectionGateByte100() const;
     uint32_t Arg6SelectedVariantState() const;
     uint32_t Arg6MappedSelectionId() const;
     const char* Arg6MappedSelectionName() const;
@@ -1091,15 +1089,11 @@ public:
 
     // Wrapper-facing world-descriptor family (`+0xf8 .. +0x108`).
     // Keep the wrapper/owner split explicit:
-    // - once the post-auth owner `+0xd84` table exists, these slots read that concrete
-    //   world-descriptor state
-    // - owner `+0x100 / 0x41b320` now reads descriptor byte `+0x17` (Status), but the earlier
-    //   startup/arg7 path still only has a legacy synthetic gate byte for the same wrapper slot,
-    //   so keep `+0x100` named as a wrapper-facing selection-gate byte instead of forcing a
-    //   false owner/wrapper unification
+    // - on the current active path these slots now read the recovered post-auth owner
+    //   descriptor table directly
+    // - owner `+0x100 / 0x41b320` reads descriptor byte `+0x17` (Status)
     // - owner `+0x104 / 0x41b360` reads descriptor byte `+0x18` (Type)
-    // - `+0x104/+0x108` do not have a proved startup-side synthetic answer, so they stay `0`
-    //   until the real descriptor table is present
+    // - `+0x104/+0x108` still stay `0` until the real descriptor table is present
     uint32_t GetWorldCount() const override;
     const char* GetWorldNameByIndex(uint32_t index) override;
     uint8_t GetWorldSelectionGateByteByIndex(uint32_t index) const override;
@@ -1801,51 +1795,11 @@ private:
     std::string authAddressListResolvedHostName4c_;
     uint32_t authConnectAttemptCount28_ = 0;
 
-    // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
-    // Faithful implementation of arg6 world list provider for InitClientDLL
-    // Vtable at offset +0xc from object pointer at 0x4d2c58
-    // =============================================================================
-    // Address anchors for arg6 world list provider:
-    // launcher.exe:0x4d3584 +0xc = vtable (ILTLoginMediator)
-    // launcher.exe:0x4d3584 +0x10 = ILTLoginMediator_BuildWorldList()
-    // launcher.exe:0x4d3584 +0x14 = GetWorldNameByIndex(char*)
-    // launcher.exe:0x4d3584 +0x18 = startup-only gate-byte fallback feeding wrapper slot +0x100
-    // launcher.exe:0x4d3584 +0x1c = Arg6ValidateWorldSelection(uint -> 0 or 7)
-    // launcher.exe:0x4d3584 +0x20 = Arg6GetWorldListCount(uint)
-    // launcher.exe:0x4d3584 +0x24 = Arg6GetActiveWorldListCount(uint)
-    // launcher.exe:0x4d3584 +0x28 = Arg6GetAvailableWorldMatchName(char*)
-    // =============================================================================
-    struct Arg6WorldListData {
-        // launcher.exe:0x4d3584 +0xfc = GetWorldNameByIndex(index) -> char*
-        std::array<std::string, 10> worldNames_ = {"Default", "Starter", "Classic", "Advanced", "Extreme"};
-
-        // launcher.exe:0x4d3584 +0x100 = startup-only synthetic gate byte used before the
-        // recovered owner `+0xd84` descriptor table exists
-        std::array<uint8_t, 10> worldSelectionGateBytes100_ = {1, 2, 3, 5, 1};
-
-        // launcher.exe:0x4d3584 +0xe4 = ValidateWorldSelection(variant) -> startup-side state code
-        // per active selection-entry index (current tighter auth-valid read: slot-record index /
-        // selected row high word). Startup fallback still keeps one configured selected entry here
-        // and leaves non-selected entries at `3`.
-        std::array<uint8_t, 10> activeVariantStatesE4_ = {3, 3, 3, 3, 3, 3, 3, 3, 3, 3};
-
-        // launcher.exe:0x4d3584 +0xf8 = GetWorldListCount() -> uint total count
-        uint32_t totalCount_ = 5;
-
-        // launcher.exe:0x4d3584 +0xd8 = GetActiveWorldCount() -> uint active count
-        uint32_t activeCount_ = 5;
-
-        // launcher.exe:0x4d3584 +0xdc = active-world display text used for list column 1 on the
-        // matched-row path in `0x40e480`
-        std::array<std::string, 10> activeWorldDisplayNamesDc_ = {"", "", "", "", "", "", "", "", "", ""};
-
-        // launcher.exe:0x4d3584 +0xe0 = active-world/world-match string used by `0x40e480`
-        // while correlating total worlds (`+0xfc`) against the active-world list before building
-        // the packed list-row item-data high word.
-        // Negative result from the newer decompilation: this slot is not a bool gate.
-        std::array<std::string, 10> activeWorldMatchNamesE0_ = {"", "", "", "", "", "", "", "", "", ""};
-    };
-
+    // Current active replacement path no longer uses a synthetic startup world-list sidecar.
+    // The launcher selection menu in `src/textmode_launcher_flow.cpp` now runs after auth success
+    // and consumes the recovered owner tables (`+0xd84/+0x688/+0x818`) directly.
+    // Keep only the narrower configured arg6 selection scratch that is still used by the
+    // wrapper-facing descriptor/profile bridges.
     struct Arg6SelectionConfig {
         uint32_t worldUpperBoundExclusive_ = 1;
         uint32_t variantUpperBoundExclusive_ = 1;
@@ -1854,10 +1808,6 @@ private:
         // entry index. On the auth-valid launcher selection path that is currently better modeled
         // as the slot-record / character-entry index rather than a free-standing world variant id.
         uint32_t selectedVariantIndexHigh8_ = 0;
-        // Startup-only synthetic fallback for wrapper slot `+0x100` before the owner-side
-        // descriptor table exists. Keep the split explicit: this is not yet a proved direct alias
-        // for the later owner descriptor Status/Type bytes.
-        uint32_t selectedSelectionGateByte100_ = 1;
         uint32_t selectedVariantState_ = 0;
         uint32_t mappedSelectionId_ = 0;
         std::string mappedSelectionName_ = "standalone";
@@ -1867,7 +1817,6 @@ private:
         std::string authPassword_;
     };
 
-    Arg6WorldListData arg6WorldList_;
     Arg6SelectionConfig arg6Selection_;
     uint32_t arg6VariantWorldNameQueryCountE0_ = 0u; // wrapper-facing arg6 `+0xe0` query count
 };
