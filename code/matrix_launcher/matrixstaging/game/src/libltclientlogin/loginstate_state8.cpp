@@ -17,6 +17,32 @@ namespace {
 using PostAuthMarginLoadingState = CLTLoginMediator::PostAuthMarginLoadingState;
 using SlotRecordState = SlotRecordState004b5328;
 
+// Shared chunk-seen helper used by state8 slot6 section-0x0a handling.
+// anchor: launcher.exe:0x43c240 = StateReplyChunkBitset_SetSeen
+// anchor: launcher.exe:0x43c280 = StateReplyChunkBitset_HasSeen
+class StateReplyChunkBitset {
+public:
+    explicit StateReplyChunkBitset(uint32_t& bits)
+        : bits_(bits) {}
+
+    void SetSeen(uint32_t chunkIndex) {
+        if (chunkIndex >= 32u) {
+            std::abort();
+        }
+        bits_ |= (1u << chunkIndex);
+    }
+
+    bool HasSeen(uint32_t chunkIndex) const {
+        if (chunkIndex >= 32u) {
+            std::abort();
+        }
+        return (bits_ & (1u << chunkIndex)) != 0u;
+    }
+
+private:
+    uint32_t& bits_;
+};
+
 static std::string FormatU32x4Block(const std::array<uint32_t, 4>& block) {
     return fmt::format(
         "[{:#010x} {:#010x} {:#010x} {:#010x}]",
@@ -111,94 +137,6 @@ static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src
         ++copyLen;
     }
     dest[copyLen] = '\0';
-}
-
-static void ResetState8ReplyOwnerState(PostAuthMarginLoadingState& ownerState) {
-    // anchor: launcher.exe:0x438a50
-    // Shared `CLTLoginMediatorCharacterPersistenceData_ResetReplyState` helper used by both
-    // state8 (`0x43f930`) and state11 (`0x440320`).
-    ownerState.state8PersistenceDataF1c = {};
-    std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
-    ownerState.characterReplyFieldF3c = 0u;
-    ownerState.characterReplyFieldF40 = 0u;
-    ownerState.characterReplyFieldF44 = 0x1000u;
-    std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
-    std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
-    std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
-    std::fill(ownerState.section0StringF8c.begin(), ownerState.section0StringF8c.end(), '\0');
-    std::fill(ownerState.section0StringFac.begin(), ownerState.section0StringFac.end(), '\0');
-    std::fill(ownerState.section0StringFcc.begin(), ownerState.section0StringFcc.end(), '\0');
-    std::fill(ownerState.state8Section0RawF88.begin(), ownerState.state8Section0RawF88.end(), 0u);
-    ownerState.replySectionData13cc = 0u;
-    ownerState.replySectionData13d0 = 0u;
-    ownerState.section0Flag13f6 = 0u;
-    ResetOwnedSectionBytes(
-        ownerState.state8Section0OverflowBuffer13f0,
-        ownerState.state8Section0OverflowLength13f4,
-        ownerState.section0Flag13f6);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, ownerState.flag1416);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, ownerState.allocatedBufferFlag141e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, ownerState.allocatedBufferFlag1426);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, ownerState.allocatedBufferFlag142e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, ownerState.flag1436);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, ownerState.flag143e);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, ownerState.flag1448);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, ownerState.flag1452);
-    ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
-    ownerState.state8Section10ChunkBitmap = 0u;
-    ownerState.state8Section11Dword145c = 0u;
-    ownerState.state8Section11String1460.clear();
-}
-
-static bool SeedState8FirstFragment(
-    PostAuthMarginLoadingState& ownerState,
-    CLTLoginMediator* mediator,
-    uint32_t parsedField05) {
-    ResetState8ReplyOwnerState(ownerState);
-    ownerState.characterReplyFieldF3c = parsedField05;
-    ownerState.state8PersistenceDataF1c.replyField20 = parsedField05;
-
-    const SlotRecordState* currentSlotRecord = mediator ? mediator->GetCurrentSlotRecord() : nullptr;
-    if (currentSlotRecord != nullptr) {
-        if (!currentSlotRecord->heapString14.empty()) {
-            const size_t copyCount = std::min(
-                currentSlotRecord->heapString14.size(),
-                sizeof(ownerState.characterNameBufferF1c) - 1u);
-            std::copy_n(
-                currentSlotRecord->heapString14.data(),
-                copyCount,
-                ownerState.characterNameBufferF1c);
-            ownerState.characterNameBufferF1c[copyCount] = '\0';
-            std::copy(
-                ownerState.characterNameBufferF1c,
-                ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
-                ownerState.state8PersistenceDataF1c.characterName00.begin());
-        }
-        ownerState.characterReplyFieldF40 = currentSlotRecord->worldId0c;
-        ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
-        ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
-        ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId0c;
-        ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId0c;
-        ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status0b;
-        return true;
-    }
-
-    std::copy(
-        ownerState.createCharacterData108.characterName00.begin(),
-        ownerState.createCharacterData108.characterName00.end(),
-        ownerState.characterNameBufferF1c);
-    ownerState.characterNameBufferF1c[sizeof(ownerState.characterNameBufferF1c) - 1u] = '\0';
-    std::copy(
-        ownerState.createCharacterData108.characterName00.begin(),
-        ownerState.createCharacterData108.characterName00.end(),
-        ownerState.state8PersistenceDataF1c.characterName00.begin());
-    ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
-    ownerState.state8PersistenceDataF1c.selectedWorldField24 =
-        ownerState.createCharacterData108.selectedWorldField24;
-    return false;
 }
 
 static void LogState8PersistenceFamilySnapshot(
@@ -401,7 +339,7 @@ static void HandleState8ReplySection(
                         parsed.sectionData,
                         parsed.sectionByteCount);
                     if (chunkIndex < 32u) {
-                        ownerState.state8Section10ChunkBitmap |= (1u << chunkIndex);
+                        StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).SetSeen(chunkIndex);
                     }
                     ownerState.allocatedBufferLength1458 = static_cast<uint16_t>(
                         ownerState.allocatedBufferLength1458 + parsed.sectionByteCount);
@@ -444,7 +382,8 @@ static void FinalizeState8ChunkedSection10Buffer(PostAuthMarginLoadingState& own
     }
 
     size_t firstChunkIndex = 0u;
-    while (firstChunkIndex < 32u && ((ownerState.state8Section10ChunkBitmap >> firstChunkIndex) & 1u) == 0u) {
+    while (firstChunkIndex < 32u &&
+           !StateReplyChunkBitset(ownerState.state8Section10ChunkBitmap).HasSeen(firstChunkIndex)) {
         ++firstChunkIndex;
     }
     if (firstChunkIndex < 32u) {
@@ -739,9 +678,87 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     }
 
     const bool firstFragment = (replySectionsSeen_ == 0u);
-    const bool usedCurrentSlotRecord = firstFragment
-        ? SeedState8FirstFragment(ownerState, mediator, parsed.field05)
-        : false;
+    bool usedCurrentSlotRecord = false;
+    if (firstFragment) {
+        // anchor: launcher.exe:0x438a50 first-fragment reset inside `0x43f930`
+        // Keep this inlined here instead of routing through replacement-only helper methods:
+        // current static-RE shows this work as part of the original slot6 body.
+        ownerState.state8PersistenceDataF1c = {};
+        std::fill(std::begin(ownerState.characterNameBufferF1c), std::end(ownerState.characterNameBufferF1c), '\0');
+        ownerState.characterReplyFieldF3c = 0u;
+        ownerState.characterReplyFieldF40 = 0u;
+        ownerState.characterReplyFieldF44 = 0x1000u;
+        std::fill(ownerState.characterFlagsF48.begin(), ownerState.characterFlagsF48.end(), 0u);
+        std::fill(ownerState.secondaryCharacterDataF68.begin(), ownerState.secondaryCharacterDataF68.end(), 0u);
+        std::fill(ownerState.characterRecordPointersF88.begin(), ownerState.characterRecordPointersF88.end(), 0u);
+        std::fill(ownerState.section0StringF8c.begin(), ownerState.section0StringF8c.end(), '\0');
+        std::fill(ownerState.section0StringFac.begin(), ownerState.section0StringFac.end(), '\0');
+        std::fill(ownerState.section0StringFcc.begin(), ownerState.section0StringFcc.end(), '\0');
+        std::fill(ownerState.state8Section0RawF88.begin(), ownerState.state8Section0RawF88.end(), 0u);
+        ownerState.replySectionData13cc = 0u;
+        ownerState.replySectionData13d0 = 0u;
+        ownerState.section0Flag13f6 = 0u;
+        ResetOwnedSectionBytes(
+            ownerState.state8Section0OverflowBuffer13f0,
+            ownerState.state8Section0OverflowLength13f4,
+            ownerState.section0Flag13f6);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer13f8, ownerState.allocatedBufferLength13fc, ownerState.flag13fe);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1400, ownerState.allocatedBufferLength1404, ownerState.flag1406);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1408, ownerState.allocatedBufferLength140c, ownerState.allocatedBufferFlag140e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1410, ownerState.allocatedBufferLength1414, ownerState.flag1416);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1418, ownerState.allocatedBufferLength141c, ownerState.allocatedBufferFlag141e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1420, ownerState.allocatedBufferLength1424, ownerState.allocatedBufferFlag1426);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1428, ownerState.allocatedBufferLength142c, ownerState.allocatedBufferFlag142e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1430, ownerState.allocatedBufferLength1434, ownerState.flag1436);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1438, ownerState.allocatedBufferLength143c, ownerState.flag143e);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1440, ownerState.allocatedBufferLength1444, ownerState.flag1448);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer144c, ownerState.allocatedBufferLength1450, ownerState.flag1452);
+        ResetOwnedSectionBytes(ownerState.allocatedBuffer1454, ownerState.allocatedBufferLength1458, ownerState.flag145a);
+        ownerState.state8Section10ChunkBitmap = 0u;
+        ownerState.state8Section11Dword145c = 0u;
+        ownerState.state8Section11String1460.clear();
+
+        ownerState.characterReplyFieldF3c = parsed.field05;
+        ownerState.state8PersistenceDataF1c.replyField20 = parsed.field05;
+
+        const SlotRecordState* currentSlotRecord = mediator->GetCurrentSlotRecord();
+        if (currentSlotRecord != nullptr) {
+            if (!currentSlotRecord->heapString14.empty()) {
+                const size_t copyCount = std::min(
+                    currentSlotRecord->heapString14.size(),
+                    sizeof(ownerState.characterNameBufferF1c) - 1u);
+                std::copy_n(
+                    currentSlotRecord->heapString14.data(),
+                    copyCount,
+                    ownerState.characterNameBufferF1c);
+                ownerState.characterNameBufferF1c[copyCount] = '\0';
+                std::copy(
+                    ownerState.characterNameBufferF1c,
+                    ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
+                    ownerState.state8PersistenceDataF1c.characterName00.begin());
+            }
+            ownerState.characterReplyFieldF40 = currentSlotRecord->worldId0c;
+            ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
+            ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
+            ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId0c;
+            ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId0c;
+            ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status0b;
+            usedCurrentSlotRecord = true;
+        } else {
+            std::copy(
+                ownerState.createCharacterData108.characterName00.begin(),
+                ownerState.createCharacterData108.characterName00.end(),
+                ownerState.characterNameBufferF1c);
+            ownerState.characterNameBufferF1c[sizeof(ownerState.characterNameBufferF1c) - 1u] = '\0';
+            std::copy(
+                ownerState.createCharacterData108.characterName00.begin(),
+                ownerState.createCharacterData108.characterName00.end(),
+                ownerState.state8PersistenceDataF1c.characterName00.begin());
+            ownerState.characterReplyFieldF40 = ownerState.createCharacterData108.selectedWorldField24;
+            ownerState.state8PersistenceDataF1c.selectedWorldField24 =
+                ownerState.createCharacterData108.selectedWorldField24;
+        }
+    }
 
     if (parsed.shouldSeedExpectedSectionCount) {
         replySectionsExpected_ = parsed.expectedSectionCount0b;
