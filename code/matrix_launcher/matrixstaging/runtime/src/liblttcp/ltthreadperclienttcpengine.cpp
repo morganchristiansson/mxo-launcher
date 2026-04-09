@@ -1604,7 +1604,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
     bool connectStatusQueued = false;
     bool closeQueued = false;
     bool waitWakeupOnly = false;
-    CLTTCPConnection_SendQueueItemScaffold currentSend = {};
+    CLTTCPConnection_QueuedSendBufferWithEndpoint currentSend = {};
     size_t currentSendOffset = 0u;
 
     const auto queueConnectStatus =
@@ -1658,7 +1658,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
 
     const auto issueDeferredShutdownIfClosing = [&](SOCKET socket) {
         if (connection->State() == LTTCPEngineConnectionState::kClosing &&
-            connection->SendQueueEmptyFlagScaffold()) {
+            connection->SendQueueEmptyFlag()) {
             (void)shutdown(socket, SD_SEND);
         }
     };
@@ -1711,16 +1711,16 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
         FD_SET(socket, &exceptSet);
 
         const bool hasCurrentSend =
-            currentSendOffset < currentSend.ownedBytes.size();
+            currentSendOffset < static_cast<size_t>(currentSend.sendBufferStorage00.BufferByteCount());
         bool monitorWrite = false;
         if (connectCompletionPending) {
             monitorWrite = true;
         } else if (hasCurrentSend) {
             monitorWrite = true;
         } else {
-            if (connection->TryPopQueuedSendBufferScaffold(&currentSend)) {
+            if (connection->TryPopQueuedSendBufferWithEndpoint(&currentSend)) {
                 currentSendOffset = 0u;
-                monitorWrite = !currentSend.ownedBytes.empty();
+                monitorWrite = currentSend.sendBufferStorage00.BufferByteCount() != 0u;
             } else {
                 issueDeferredShutdownIfClosing(socket);
             }
@@ -1818,17 +1818,20 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
                     waitWakeupOnly = true;
                     continue;
                 }
-            } else if (currentSendOffset < currentSend.ownedBytes.size()) {
-                const int remainingByteCount =
-                    static_cast<int>(currentSend.ownedBytes.size() - currentSendOffset);
+            } else if (currentSendOffset <
+                       static_cast<size_t>(currentSend.sendBufferStorage00.BufferByteCount())) {
+                const int remainingByteCount = static_cast<int>(
+                    currentSend.sendBufferStorage00.BufferByteCount() - currentSendOffset);
                 const int sentByteCount = send(
                     socket,
-                    reinterpret_cast<const char*>(currentSend.ownedBytes.data() + currentSendOffset),
+                    reinterpret_cast<const char*>(
+                        currentSend.sendBufferStorage00.BufferBytes() + currentSendOffset),
                     remainingByteCount,
                     0);
                 if (sentByteCount != SOCKET_ERROR) {
                     currentSendOffset += static_cast<size_t>(sentByteCount);
-                    if (currentSendOffset >= currentSend.ownedBytes.size()) {
+                    if (currentSendOffset >=
+                        static_cast<size_t>(currentSend.sendBufferStorage00.BufferByteCount())) {
                         currentSend = {};
                         currentSendOffset = 0u;
                     }
@@ -2628,7 +2631,7 @@ uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
         // anchor: launcher.exe:0x42f9a4 / connection +0x38 send-queue-empty byte gate
         // If queued sends are still pending, `0x42f970` returns success immediately and lets the
         // worker-thread write side issue the later half-close once the queue drains.
-        if (!connection->SendQueueEmptyFlagScaffold()) {
+        if (!connection->SendQueueEmptyFlag()) {
             return 1u;
         }
 
@@ -2705,7 +2708,7 @@ uint32_t CLTThreadPerClientTCPEngine::SendBuffer(
         // anchor: launcher.exe:0x42fce8..0x42fcf6
         // - queue through the connection-owned `+0x3c` pending-send root via `0x44ad80`
         // - then signal the direct worker-thread wakeup handle at `[connection+0x08] + 0x40`
-        const bool queued = connection->QueueSendBufferScaffold(
+        const bool queued = connection->QueueSendBuffer(
             buffer,
             byteCount,
             reinterpret_cast<uintptr_t>(completionContext));
