@@ -229,10 +229,10 @@ RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetRouteDescriptor30()
 
 // anchor: launcher.exe:0x41b260
 const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) const {
-    if (slotIndex >= routeHostStrings818_.size()) {
+    if (slotIndex >= selectionRouteState684_.routeHostStringTriples194_.size()) {
         return nullptr;
     }
-    const RouteHostStringTripleState& slot = routeHostStrings818_[slotIndex];
+    const RouteHostStringTripleState& slot = selectionRouteState684_.routeHostStringTriples194_[slotIndex];
     return slot.text.empty() ? nullptr : slot.text.c_str();
 }
 

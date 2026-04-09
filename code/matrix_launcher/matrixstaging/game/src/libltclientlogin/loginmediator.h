@@ -1297,11 +1297,11 @@ public:
     //   current-slot byte to `0xff`
     // - `0x41dd00`: calls `0x41d270`, then releases the backing storage for all 100 route-string
     //   entries
-    // Source split note:
+    // Source ownership note:
     // - original keeps this as one embedded helper spanning count + `+0x688` slot table + `+0x818`
     //   route strings + `+0xcc8/+0xcd0..+0xd7f` selection state
-    // - replacement still stores those regions in split source fields, so these methods are the
-    //   fidelity bridge back onto the original boundaries
+    // - replacement now models that ownership island as the nested
+    //   `CLTLoginMediatorSelectionRouteState` class and keeps the anchored method boundaries there
     void ResetSelectionRouteState684Scaffold();
     void DestroySelectionRouteState684Scaffold();
     void SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex);
@@ -1423,25 +1423,25 @@ public:
     // =============================================================================
 
     // State-3(wait) -> state-8 owner-side selection/config snapshot block (`0x41c1f0`):
-    uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8; }
+    uint8_t SelectionContextSlotOrSelectionIndexCc8() const { return selectionRouteState684_.persistedSelectionContext64c_.slotOrSelectionIndexCc8; }
     // Source-owned bridge over original owner byte `+0xcc8`.
     // Fidelity tightening from `0x41f300`:
     // - owner vtable `+0x44` directly reads the embedded selection-route helper byte
-    // - current source now treats `state8SelectionContextSnapshotState_.slotOrSelectionIndexCc8`
+    // - current source now treats `selectionRouteState684_.persistedSelectionContext64c_.slotOrSelectionIndexCc8`
     //   as the canonical mirror of that owner byte and keeps the later post-auth fields synced
     //   through `SetCurrentCharacterRouteIndexCc8Scaffold`
     uint8_t CurrentCharacterRouteIndexCc8Scaffold() const;
-    const std::array<uint32_t, 4>& SelectionContextBlockCd0() const { return state8SelectionContextSnapshotState_.blockCd0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockCe0() const { return state8SelectionContextSnapshotState_.blockCe0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockCf0() const { return state8SelectionContextSnapshotState_.blockCf0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD00() const { return state8SelectionContextSnapshotState_.blockD00; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD10() const { return state8SelectionContextSnapshotState_.blockD10; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD20() const { return state8SelectionContextSnapshotState_.blockD20; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD30() const { return state8SelectionContextSnapshotState_.blockD30; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD40() const { return state8SelectionContextSnapshotState_.blockD40; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD50() const { return state8SelectionContextSnapshotState_.blockD50; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return state8SelectionContextSnapshotState_.blockD60; }
-    const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return state8SelectionContextSnapshotState_.blockD70; }
+    const std::array<uint32_t, 4>& SelectionContextBlockCd0() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCd0; }
+    const std::array<uint32_t, 4>& SelectionContextBlockCe0() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCe0; }
+    const std::array<uint32_t, 4>& SelectionContextBlockCf0() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCf0; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD00() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD00; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD10() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD10; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD20() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD20; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD30() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD30; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD40() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD40; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD50() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD50; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD60() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD60; }
+    const std::array<uint32_t, 4>& SelectionContextBlockD70() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
     // New client-layout aliases from `client.dll:0x62170e2a..0x62170f48`:
     // - `+0x24` = il.cfg
     // - `+0x34` = hl.cfg
@@ -1452,15 +1452,15 @@ public:
     // - `+0x84` = ai.cfg
     // - `+0x94` = shared temp reused by cs.cfg then bl.cfg on the proven path
     // - `+0xa4` = cui.cfg
-    const std::array<uint32_t, 4>& SelectionContextBlockIlCfg24() const { return state8SelectionContextSnapshotState_.blockCf0; }
-    const std::array<uint32_t, 4>& SelectionContextBlockHlCfg34() const { return state8SelectionContextSnapshotState_.blockD00; }
-    const std::array<uint32_t, 4>& SelectionContextBlockAnCfg44() const { return state8SelectionContextSnapshotState_.blockD10; }
-    const std::array<uint32_t, 4>& SelectionContextBlockRlCfg54() const { return state8SelectionContextSnapshotState_.blockD20; }
-    const std::array<uint32_t, 4>& SelectionContextBlockClCfg64() const { return state8SelectionContextSnapshotState_.blockD30; }
-    const std::array<uint32_t, 4>& SelectionContextBlockPiCfg74() const { return state8SelectionContextSnapshotState_.blockD40; }
-    const std::array<uint32_t, 4>& SelectionContextBlockAiCfg84() const { return state8SelectionContextSnapshotState_.blockD50; }
-    const std::array<uint32_t, 4>& SelectionContextBlockBlOrCsCfg94() const { return state8SelectionContextSnapshotState_.blockD60; }
-    const std::array<uint32_t, 4>& SelectionContextBlockCuiCfgA4() const { return state8SelectionContextSnapshotState_.blockD70; }
+    const std::array<uint32_t, 4>& SelectionContextBlockIlCfg24() const { return selectionRouteState684_.persistedSelectionContext64c_.blockCf0; }
+    const std::array<uint32_t, 4>& SelectionContextBlockHlCfg34() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD00; }
+    const std::array<uint32_t, 4>& SelectionContextBlockAnCfg44() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD10; }
+    const std::array<uint32_t, 4>& SelectionContextBlockRlCfg54() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD20; }
+    const std::array<uint32_t, 4>& SelectionContextBlockClCfg64() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD30; }
+    const std::array<uint32_t, 4>& SelectionContextBlockPiCfg74() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD40; }
+    const std::array<uint32_t, 4>& SelectionContextBlockAiCfg84() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD50; }
+    const std::array<uint32_t, 4>& SelectionContextBlockBlOrCsCfg94() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD60; }
+    const std::array<uint32_t, 4>& SelectionContextBlockCuiCfgA4() const { return selectionRouteState684_.persistedSelectionContext64c_.blockD70; }
 
     // Later post-auth source block (`0x43c020`, `0x440320`):
     const std::array<char, 0x20>& SourceLeadString108() const { return postAuthMarginLoadingState_.sourceLeadString108; }
@@ -1731,14 +1731,6 @@ private:
     // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper/class
     // (`CLTLoginMediatorSelectionRouteState_0x41dba0` in current Ghidra).
     CLTLoginMediatorSelectionRouteState selectionRouteState684_{};
-    // Compatibility aliases over the embedded helper above.
-    // Keep these old source names stable while active files are still being tightened around the
-    // recovered original subobject boundary.
-    State8SelectionContextSnapshotState& state8SelectionContextSnapshotState_;
-    std::array<SlotRecordState004b5328, kRecoveredWorldSlotCapacity>& slotRecords688_;
-    std::array<bool, kRecoveredWorldSlotCapacity>& slotRecordValid688_;
-    uint8_t& slotRecordCount684_;
-    std::array<RouteHostStringTripleState, kRecoveredWorldSlotCapacity>& routeHostStrings818_;
     // +0xec / +0xf4 wrapper-owned mirrors now live on the mediator instance instead of in the
     // launcher ABI shell.
     State3SelectionContextInputSketch selectionContext0ecCopy_{};
