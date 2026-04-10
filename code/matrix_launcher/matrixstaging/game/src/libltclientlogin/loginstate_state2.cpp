@@ -6,41 +6,6 @@
 namespace mxo::ltlogin {
 namespace {
 
-// UNANCHORED: source-owned registered-state lookup helper used by the current state2 auth-result
-// switch mirror. Original `0x43f300` resolves helper transitions by calling back into the owner
-// instead of using a local phase-code table like this.
-CLTLoginState* LookupRegisteredScaffoldStateByPhaseCode(CLTLoginMediator* mediator, uint32_t phaseCode) {
-    if (!mediator) {
-        return nullptr;
-    }
-
-    switch (phaseCode) {
-        case 0u: return mediator->ScaffoldState0();
-        case 1u: return mediator->ScaffoldState1();
-        case 2u: return mediator->ScaffoldState2();
-        case 3u: return mediator->ScaffoldState3();
-        case 4u: return mediator->ScaffoldState4();
-        case 5u: return mediator->ScaffoldState5();
-        case 6u: return mediator->ScaffoldState6();
-        case 8u: return mediator->ScaffoldState8();
-        case 9u: return mediator->ScaffoldState9();
-        case 10u: return mediator->ScaffoldState10();
-        case 11u: return mediator->ScaffoldState11();
-        case 12u: return mediator->ScaffoldState12();
-        case 13u: return mediator->ScaffoldState13();
-        case 14u: return mediator->ScaffoldState14();
-        case 15u: return mediator->ScaffoldState15();
-        case 16u: return mediator->ScaffoldState16();
-        case 17u: return mediator->ScaffoldState17();
-        case 18u: return mediator->ScaffoldState18();
-        case 19u: return mediator->ScaffoldState19();
-        default:
-            break;
-    }
-
-    return nullptr;
-}
-
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b5014
@@ -182,7 +147,8 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
                 nextHelperStateId = 3u;
             }
 
-            CLTLoginState* nextState = LookupRegisteredScaffoldStateByPhaseCode(mediator, nextHelperStateId);
+            CLTLoginState* nextState =
+                mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId);
             uint32_t switchDispatchResult = 0u;
             if (nextState != nullptr) {
                 if (nextHelperStateId == 8u) {

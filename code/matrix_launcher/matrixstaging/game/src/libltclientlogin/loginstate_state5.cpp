@@ -25,35 +25,6 @@ static uint32_t LoginState5WorkItemPayloadScaffold(const void* workItem) {
     return payload[2];
 }
 
-static CLTLoginState* LookupRegisteredScaffoldStateById(CLTLoginMediator* mediator, uint32_t stateId) {
-    if (!mediator) {
-        return nullptr;
-    }
-
-    switch (stateId) {
-        case 0u: return mediator->ScaffoldState0();
-        case 1u: return mediator->ScaffoldState1();
-        case 2u: return mediator->ScaffoldState2();
-        case 3u: return mediator->ScaffoldState3();
-        case 4u: return mediator->ScaffoldState4();
-        case 6u: return mediator->ScaffoldState6();
-        case 8u: return mediator->ScaffoldState8();
-        case 9u: return mediator->ScaffoldState9();
-        case 10u: return mediator->ScaffoldState10();
-        case 11u: return mediator->ScaffoldState11();
-        case 12u: return mediator->ScaffoldState12();
-        case 13u: return mediator->ScaffoldState13();
-        case 14u: return mediator->ScaffoldState14();
-        case 15u: return mediator->ScaffoldState15();
-        case 16u: return mediator->ScaffoldState16();
-        case 17u: return mediator->ScaffoldState17();
-        case 18u: return mediator->ScaffoldState18();
-        case 19u: return mediator->ScaffoldState19();
-        default:
-            return nullptr;
-    }
-}
-
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b5064
@@ -82,7 +53,8 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
     // - calls cached upstream vtable `+0x18`
     // - passes that state id to `0x41b450`
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
-    CLTLoginState* nextState = LookupRegisteredScaffoldStateById(mediator, nextHelperStateId);
+    CLTLoginState* nextState =
+        mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId);
     const uint32_t switchDispatchResult = nextState != nullptr
         ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
               nextHelperStateId,

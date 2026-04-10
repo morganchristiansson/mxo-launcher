@@ -222,39 +222,6 @@ static ParsedState6Opcode9ReplyScaffold ParseState6Opcode9ReplyScaffold(
     return out;
 }
 
-static CLTLoginState* LookupRegisteredScaffoldStateById(CLTLoginMediator* mediator, uint32_t stateId) {
-    if (!mediator) {
-        return nullptr;
-    }
-
-    switch (stateId) {
-        case 3u:
-            return mediator->ScaffoldState3();
-        case 4u:
-            return mediator->ScaffoldState4();
-        case 5u:
-            return mediator->ScaffoldState5();
-        case 6u:
-            return mediator->ScaffoldState6();
-        case 7u:
-            return mediator->ScaffoldState7();
-        case 8u:
-            return mediator->ScaffoldState8();
-        case 9u:
-            return mediator->ScaffoldState9();
-        case 10u:
-            return mediator->ScaffoldState10();
-        case 11u:
-            return mediator->ScaffoldState11();
-        case 12u:
-            return mediator->ScaffoldState12();
-        case 13u:
-            return mediator->ScaffoldState13();
-        default:
-            return nullptr;
-    }
-}
-
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b508c
@@ -461,7 +428,8 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     }
 
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
-    if (CLTLoginState* nextState = LookupRegisteredScaffoldStateById(mediator, nextHelperStateId)) {
+    if (CLTLoginState* nextState =
+            mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId)) {
         const uint32_t switchDispatchResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
             nextHelperStateId,
             nextState,

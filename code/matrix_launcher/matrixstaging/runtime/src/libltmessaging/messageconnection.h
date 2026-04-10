@@ -276,6 +276,12 @@ struct CMessageConnectionCompletionHelperScaffold {
     void** vtable00 = nullptr; // +0x00
     CLTThreadPerClientTCPEngine_LockHelperScaffold embeddedLockHelper04{}; // +0x04
     HANDLE eventHandle20 = nullptr; // +0x20
+
+    CMessageConnectionCompletionHelperScaffold();
+    ~CMessageConnectionCompletionHelperScaffold();
+
+    void Signal();
+    DWORD Wait(uint32_t timeoutMs) const;
 };
 
 static_assert(offsetof(CMessageConnectionCompletionHelperScaffold, embeddedLockHelper04) == 0x04, "completion helper lock offset mismatch");
@@ -568,9 +574,11 @@ public:
     // optional `+0x7c/+0x80` completion-helper allocation path.
     CMessageConnection();
     // UNANCHORED: source-owned narrow subset of `0x448b40(engine, createCompletionHelpers)`.
-    // Current source body only seeds the recovered base `+0x10` engine field and does not model
-    // the original parser allocation or optional completion-helper ownership.
-    explicit CMessageConnection(CLTThreadPerClientTCPEngine* engine);
+    // Current source now also mirrors the optional `+0x7c/+0x80` completion-helper allocation
+    // branch when explicitly requested.
+    explicit CMessageConnection(
+        CLTThreadPerClientTCPEngine* engine,
+        bool allocateCompletionHelpers = false);
     // UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
     ~CMessageConnection();
 
@@ -653,9 +661,11 @@ public:
     // - the initial dispatch on `workItem+0x04` only directly handles work types `1`, `2`, and `3`
     //   - type `1` = optional close-completion helper `+0x80`
     //   - type `2` = optional connect-completion helper `+0x7c`
-    //   - source now carries the raw helper layout explicitly, but still does not allocate live
-    //     helper instances on the current auth/margin startup path; it therefore preserves only
-    //     the original false-ish return boundary seen there when both helper pointers are null
+    //   - source now carries the raw helper layout explicitly and mirrors the original signal
+    //     branch when those helpers exist
+    //   - current auth/margin startup construction still passes `allocateCompletionHelpers=0`, so
+    //     both helper pointers remain null on the active path and the original false-ish return
+    //     boundary is preserved there
     //   - every other non-type-3 work item falls straight back to the later leaf wrappers instead
     //     of being consumed or generically logged by base `0x4490c0`
     // - work type `3` first checks the shared `workItem+0x08` status/payload dword (`0x434d00`)
@@ -757,6 +767,8 @@ private:
 
     uintptr_t packetNameCallback_ = 0;
     bool packetizedMessagesEnabled_ = false;
+    std::unique_ptr<CMessageConnectionCompletionHelperScaffold> connectCompletionHelper7c_;
+    std::unique_ptr<CMessageConnectionCompletionHelperScaffold> closeCompletionHelper80_;
     std::unique_ptr<CMessageConnectionPacketAgenda> packetAgenda_;
     std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
     bool lastReceivedPacketHeaderlessScaffold_ = false;
@@ -821,6 +833,11 @@ public:
 
     // anchor: launcher.exe:0x442d00
     // Intermediate base dispatch router shared by the auth and margin startup leaf families.
+    // Current source now keeps the nearer helper-wrapper step explicit too:
+    // - resolve the logical payload span from the incoming message object through the
+    //   `0x41bc20/0x41bbb0`-style seam first
+    // - then route decoded code `2/4/5` through the recovered direct helper families before the
+    //   later connection/owner continuations
     virtual uint32_t DispatchMessage(void* messageRef);
 
 protected:

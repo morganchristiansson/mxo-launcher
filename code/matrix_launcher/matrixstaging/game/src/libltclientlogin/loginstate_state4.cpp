@@ -25,31 +25,6 @@ static uint32_t LoginState4WorkItemPayloadScaffold(const void* workItem) {
     return payload[2];
 }
 
-static CLTLoginState* LookupRegisteredScaffoldStateById(CLTLoginMediator* mediator, uint32_t stateId) {
-    if (!mediator) {
-        return nullptr;
-    }
-
-    switch (stateId) {
-        case 0u: return mediator->ScaffoldState0();
-        case 1u: return mediator->ScaffoldState1();
-        case 2u: return mediator->ScaffoldState2();
-        case 3u: return mediator->ScaffoldState3();
-        case 4u: return mediator->ScaffoldState4();
-        case 5u: return mediator->ScaffoldState5();
-        case 6u: return mediator->ScaffoldState6();
-        case 7u: return mediator->ScaffoldState7();
-        case 8u: return mediator->ScaffoldState8();
-        case 9u: return mediator->ScaffoldState9();
-        case 10u: return mediator->ScaffoldState10();
-        case 11u: return mediator->ScaffoldState11();
-        case 12u: return mediator->ScaffoldState12();
-        case 13u: return mediator->ScaffoldState13();
-        default:
-            return nullptr;
-    }
-}
-
 static uint32_t BeginMarginConnectionForState4Case(
     CLTLoginMediator* mediator,
     const char* routeHostText,
@@ -122,7 +97,8 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     cachedUpstreamOrArg_ = nullptr;
     mediator->MutableMarginRouteState().currentWorldId = -1;
-    CLTLoginState* nextState = LookupRegisteredScaffoldStateById(mediator, nextHelperStateId);
+    CLTLoginState* nextState =
+        mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId);
     const uint32_t switchDispatchResult = nextState
         ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
               nextHelperStateId,

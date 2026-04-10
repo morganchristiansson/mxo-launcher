@@ -1031,6 +1031,9 @@ public:
     CLTLoginState* ScaffoldState17() const;
     CLTLoginState* ScaffoldState18() const;
     CLTLoginState* ScaffoldState19() const;
+    // Current owner-side registered-state lookup bridge used by state transitions that already know
+    // the helper/state id but should not own a local phase-code table.
+    CLTLoginState* ResolveRegisteredScaffoldStateByIdScaffold(uint32_t stateId) const;
     // Installs the source-owned initial idle/start helper convention (`state0`) after
     // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
     // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.

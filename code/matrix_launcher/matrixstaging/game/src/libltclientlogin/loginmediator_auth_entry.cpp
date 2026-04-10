@@ -273,6 +273,35 @@ CLTLoginState* CLTLoginMediator::ScaffoldState19() const {
     return scaffoldState19_;
 }
 
+// UNANCHORED: owner-side registered-state lookup bridge for state-transition callers that already
+// know the helper/state id.
+CLTLoginState* CLTLoginMediator::ResolveRegisteredScaffoldStateByIdScaffold(uint32_t stateId) const {
+    switch (stateId) {
+        case 0u: return scaffoldState0_;
+        case 1u: return scaffoldState1_;
+        case 2u: return scaffoldState2_;
+        case 3u: return scaffoldState3_;
+        case 4u: return scaffoldState4_;
+        case 5u: return scaffoldState5_;
+        case 6u: return scaffoldState6_;
+        case 7u: return scaffoldState7_;
+        case 8u: return scaffoldState8_;
+        case 9u: return scaffoldState9_;
+        case 10u: return scaffoldState10_;
+        case 11u: return scaffoldState11_;
+        case 12u: return scaffoldState12_;
+        case 13u: return scaffoldState13_;
+        case 14u: return scaffoldState14_;
+        case 15u: return scaffoldState15_;
+        case 16u: return scaffoldState16_;
+        case 17u: return scaffoldState17_;
+        case 18u: return scaffoldState18_;
+        case 19u: return scaffoldState19_;
+        default:
+            return nullptr;
+    }
+}
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InstallInitialState0Scaffold() {
     if (scaffoldState0_ == nullptr) {
