@@ -114,13 +114,9 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
 
 // anchor: launcher.exe:0x0043f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())
 uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
-    (void)workItem;
     if (!mediator) {
         return 0u;
     }
-
-    const std::vector<uint8_t>& stagedBytes = mediator->stagedIncomingAuthPacketBytes_;
-    const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
 
     // Current best recovered role from `0x43f300`:
     // - it does not parse raw auth bytes directly
@@ -128,11 +124,16 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
     //   `0x448140 = AuthBootstrap680_HandleInboundAuthMessage`
     // - then it interprets that child helper's return code to decide owner `+0x80`,
     //   helper-switch, and event/error flow
-    // Current source-owned boundary keeps the original object split explicit:
-    // - the mediator wrapper only stages/demuxes the raw payload bytes
-    // - this state2 body owns the early inbound auth return-code switch
-    // - the separate owner+0x680 child owns the child-side parse/adopt work
-    const uint32_t childResult = mediator->AuthBootstrapChild680().HandleInboundAuthMessage(*mediator);
+    // Current source-owned boundary now keeps the original object split closer:
+    // - this state2 body forwards the local receive/message-ref object straight into the
+    //   owner+0x680 child
+    // - any replacement-only raw-payload sidecar copy now happens inside that child after it
+    //   resolves the `0x41bc20`-style logical payload span from the incoming message object
+    // - this state2 body still owns the early inbound auth return-code switch
+    const uint32_t childResult =
+        mediator->AuthBootstrapChild680().HandleInboundAuthMessage(workItem, *mediator);
+    const std::vector<uint8_t>& stagedBytes = mediator->stagedIncomingAuthPacketBytes_;
+    const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
     if (childResult == kAuthBootstrap680InboundUnhandled) {
         mediator->WorldListCountOrStatus80() = 0x12000004u;
         spdlog::info(

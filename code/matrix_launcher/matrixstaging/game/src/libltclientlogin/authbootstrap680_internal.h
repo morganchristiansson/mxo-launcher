@@ -498,7 +498,8 @@ struct AuthBootstrap680Child {
     // anchor: launcher.exe:0x448050
     uint32_t PrepareAndDispatch(CLTLoginMediator& owner);
     // anchor: launcher.exe:0x448140
-    uint32_t HandleInboundAuthMessage(CLTLoginMediator& owner);
+    // Original call shape consumes the incoming auth-message object directly.
+    uint32_t HandleInboundAuthMessage(void* incomingAuthMessage, CLTLoginMediator& owner);
 
     void* BootstrapRaw08AuxHandle50() const;
     bool HasBootstrapRaw08AuxHandle54() const;

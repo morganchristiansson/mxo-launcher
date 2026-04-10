@@ -764,6 +764,88 @@ private:
     // tightened `0x4490c0` receive tail consumes the auth/margin packet path locally.
 };
 
+struct CMarginConnectionLocalCompletionWorkItemScaffold;
+struct CMarginConnectionBootstrapPrepStateA0Scaffold;
+
+// ============================================================
+// CBaseMarginConnection class declaration
+// ============================================================
+// Current recovered intermediate base between `CMessageConnection` and the auth/margin startup
+// leaf families.
+class CBaseMarginConnection : public CMessageConnection {
+public:
+    // UNANCHORED: source-owned narrow intermediate-base ctor.
+    CBaseMarginConnection();
+    // UNANCHORED: source-owned narrow intermediate-base ctor that only seeds the recovered engine.
+    explicit CBaseMarginConnection(CLTThreadPerClientTCPEngine* connectionEngine);
+    // UNANCHORED: source-owned default intermediate-base destructor.
+    ~CBaseMarginConnection() override;
+
+    // anchor: launcher.exe:0x441850
+    // Narrow source-owned mirror of the consumed decoded-code-4 side effect that sets connection
+    // byte `+0x84` when the inner status dword is zero.
+    void SetMessageCode4SuccessFlag84(bool value);
+    // anchor family: launcher.exe:0x441850 / 0x44af20 -> connection `+0x84`
+    // Source-owned readback of the same recovered success-side connection byte.
+    bool MessageCode4SuccessFlag84() const;
+    // anchor: launcher.exe:0x441850
+    // Source-owned local type-`0x0b` continuation scaffold routed back through connection vtable
+    // `+0x10` / `OnOperationCompleted(workItem)`.
+    uint32_t DispatchMessageCode4LocalCompletionWorkItem(uint32_t workPayloadStatus);
+    // anchor: launcher.exe:0x41ce80 -> connection `+0x98`
+    // Source-owned mirror of the connection helper that stores a copied `0x136` auth-reply shadow
+    // block for the later raw type-1 state5/state6 send path.
+    bool StoreBootstrapReplyCopy98(const void* bytes, size_t byteCount);
+    // anchor: launcher.exe:0x443340 -> helper object stored at connection `+0xa0`
+    // Source-owned mirror of the owner `+0x680` prep-object adoption from child
+    // `+0xb0/+0xc4/+0xd8` before the later raw type-1 state5 send.
+    bool StoreBootstrapPrepStateA0(
+        const void* blockB0,
+        const void* blockC4,
+        const void* blockD8,
+        size_t blockByteCount);
+    // anchor: launcher.exe:0x41f30
+    // Source-owned mirror of the later raw type-1 send that now keeps the nearer original local
+    // builder shape explicit too.
+    uint32_t SendStoredBootstrapReplyCopy98();
+    // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
+    // Source-owned mirror of the consumed decoded-code-2 CERT challenge-response send.
+    uint32_t SendCertChallengeResponseFromChallengeBytes(
+        const std::array<uint8_t, 16>& challengeBytes);
+    // anchor: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
+    // Narrow source-owned mirror of the consumed decoded-code-2/5 seed-byte writeback.
+    void SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value);
+    // anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
+    // Source-owned raw-pointer readback of the same recovered seed-byte block.
+    const uint8_t* MessageCode5SeedBytes85Pointer() const;
+
+    // anchor: launcher.exe:0x442d00
+    // Intermediate base dispatch router shared by the auth and margin startup leaf families.
+    virtual uint32_t DispatchMessage(void* messageRef);
+
+protected:
+    // anchor: launcher.exe:0x442d00 -> vtable `+0x2c`
+    // The recovered intermediate-base table still owns the `+0x2c(messageRef)` row. Keep the
+    // post-copy seam thin here by forwarding the local message-ref scaffold straight into the
+    // concrete base/leaf `DispatchMessage` body.
+    uint32_t DispatchCopiedParsedPacketTailScaffold(
+        CMessageConnectionMessageRef& messageRef) override;
+
+private:
+    // anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
+    // Source-owned mirror of the lazy connection `+0x9c` packet-agenda module install/refresh
+    // reached from the consumed code-2 challenge path after `+0x85..+0x94` is available.
+    void EnsureStreamPacketEncryptionModuleFromSeed85();
+
+    bool messageCode4SuccessFlag84_ = false;
+    bool hasBootstrapReplyCopy98_ = false;
+    std::array<uint8_t, 0x136> bootstrapReplyCopy98_{};
+    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_;
+    bool hasMessageCode5SeedBytes85_ = false;
+    std::array<uint8_t, 16> messageCode5SeedBytes85_{};
+    std::unique_ptr<CStreamPacketEncryptionModule> streamPacketEncryptionModule9c_;
+};
+
 // ============================================================
 // CAuthStartupConnection class declaration
 // ============================================================
@@ -776,7 +858,7 @@ private:
 // - the surrounding canonical docs still carry older naming on `0x004afef0`
 // - but current static RE is strong that this is the auth-side leaf completion wrapper reached
 //   through `0x449a70`, not just a generic base `CMessageConnection`
-class CAuthStartupConnection : public CMessageConnection {
+class CAuthStartupConnection : public CBaseMarginConnection {
 public:
     // UNANCHORED: source-owned narrow leaf ctor.
     CAuthStartupConnection();
@@ -794,18 +876,13 @@ public:
     // - no leaf-local type-2 split; connect-status also flows through owner `+0x17c`
     uint32_t OnOperationCompleted(void* workItem) override;
 
-protected:
-    // anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
-    // Current bounded auth-side correction:
-    // - after base `0x4490c0` finishes the parsed-packet copy, the auth leaf now receives the
-    //   nearer local receive/message-ref scaffold
-    // - it then mirrors the direct `0x442d00` consumed-code gate closely enough to preserve the
-    //   thin original shape: consumed-code test first, then owner `+0x180(messageRef)`
-    // - source still stages raw auth payload bytes on the owner before that owner call because the
-    //   active auth-state handlers consume staged bytes instead of the original auth-message object
-    // - source still does not materialize the full original refcounted message object / agenda tail
-    uint32_t DispatchCopiedParsedPacketTailScaffold(
-        CMessageConnectionMessageRef& messageRef) override;
+    // anchor: launcher.exe:0x449a30
+    // Thin auth-side leaf override on top of `CBaseMarginConnection::DispatchMessage`:
+    // - call base `0x442d00` first
+    // - if that returns 0, call owner `+0x180(messageRef)`
+    // Replacement-only auth payload staging, when still needed by deeper state2/`0x448140`
+    // helpers, no longer belongs here.
+    uint32_t DispatchMessage(void* messageRef) override;
 };
 
 // ============================================================
@@ -830,7 +907,7 @@ struct CMarginConnectionBootstrapPrepStateA0Scaffold {
     std::array<uint8_t, 0x14> blockD8{};
 };
 
-class CMarginConnection : public CMessageConnection {
+class CMarginConnection : public CBaseMarginConnection {
 public:
     // UNANCHORED: source-owned narrow leaf ctor.
     CMarginConnection();
@@ -841,62 +918,6 @@ public:
     // - live leaf teardown is through scalar-deleting-dtor wrappers at `0x41cf50/0x41cf80`
     // - `0x41ce80` is the separate connection `+0x98` reply-copy helper
     ~CMarginConnection();
-
-    // anchor: launcher.exe:0x441850
-    // Narrow source-owned mirror of the consumed decoded-code-4 side effect that sets connection
-    // byte `+0x84` when the inner status dword is zero.
-    void SetMessageCode4SuccessFlag84(bool value);
-    // anchor family: launcher.exe:0x441850 / 0x44af20 -> connection `+0x84`
-    // Source-owned readback of the same recovered success-side connection byte.
-    bool MessageCode4SuccessFlag84() const;
-    // anchor: launcher.exe:0x441850
-    // Source-owned local type-`0x0b` continuation scaffold routed back through connection vtable
-    // `+0x10` / `OnOperationCompleted(workItem)`.
-    uint32_t DispatchMessageCode4LocalCompletionWorkItem(uint32_t workPayloadStatus);
-    // anchor: launcher.exe:0x41ce80 -> connection `+0x98`
-    // Source-owned mirror of the margin connection helper that stores a copied `0x136` auth-reply
-    // shadow block for the later state5/state6 raw type-1 send path.
-    bool StoreBootstrapReplyCopy98(const void* bytes, size_t byteCount);
-    // anchor: launcher.exe:0x443340 -> connection `+0xa0`
-    // Source-owned mirror of the owner `+0x680` prep-object adoption from child
-    // `+0xb0/+0xc4/+0xd8` that `0x41b500` performs before the later raw type-1 send.
-    bool StoreBootstrapPrepStateA0(
-        const void* blockB0,
-        const void* blockC4,
-        const void* blockD8,
-        size_t blockByteCount);
-    // anchor: launcher.exe:0x41f30
-    // Source-owned mirror of the later raw type-1 send that now keeps the nearer original local
-    // builder shape explicit too:
-    // - local builder vtable `0x004b6524`
-    // - builder `+0x10` = packet payload base
-    // - builder `+0x14/+0x18` = reserved reply-copy write pointer / byte count
-    // - writes prefix bytes `01 00 00`
-    // - then reserves the copied reply span through the same `0x43a230(0x136)` helper shape used
-    //   by the original local envelope builder
-    // - then copies the stored `+0x98` reply-derived `0x136` block into that returned tail span
-    // - then forwards the completed envelope through connection vtable `+0x24`
-    uint32_t SendStoredBootstrapReplyCopy98();
-    // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
-    // Source-owned mirror of the consumed decoded-code-2 CERT challenge-response send that now
-    // keeps the original local builder surface tighter too:
-    // - requires the earlier code-2/5 seed mirror at `+0x85 .. +0x94`
-    // - re-runs the lazy `+0x9c` packet-agenda module ensure/refresh before send
-    // - local builder vtable `0x004b6560`
-    // - builder `+0x10` = packet payload base
-    // - builds payload `0x03 + 16 challenge bytes` in that retained message-ref-backed builder
-    // - then forwards the completed local packet-builder envelope through connection vtable `+0x24`
-    uint32_t SendCertChallengeResponseFromChallengeBytes(
-        const std::array<uint8_t, 16>& challengeBytes);
-    // anchor: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-    // Narrow source-owned mirror of the consumed decoded-code-2/5 seed-byte writeback.
-    // Current tighter integration now also mirrors the neighboring lazy `+0x9c`
-    // `CStreamPacketEncryptionModule` install/refresh trigger that the original code reaches from
-    // the earlier code-2 path (`0x4429b0 -> 0x441470`).
-    void SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value);
-    // anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-    // Source-owned raw-pointer readback of the same recovered seed-byte block.
-    const uint8_t* MessageCode5SeedBytes85Pointer() const;
 
     // anchor: launcher.exe:0x44af60
     // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
@@ -910,41 +931,11 @@ public:
     uint32_t OnOperationCompleted(void* workItem) override;
 
     // anchor: launcher.exe:0x44af20
-    // Later leaf dispatch override on top of the unmodeled `CBaseMarginConnection` dispatch family.
+    // Later leaf dispatch override on top of `CBaseMarginConnection::DispatchMessage`.
     // Current best original order:
     // - call `CBaseMarginConnection::DispatchMessage(this, messageRef)` (`0x442d00`)
     // - if that returns 0, call owner `+0x184(messageRef)`
-    uint32_t DispatchMessage(void* messageRef);
-
-protected:
-    // anchor: launcher.exe:0x44af20 -> 0x442d00 -> owner vtable `+0x184` / `0x41f260`
-    // Current bounded margin-side correction:
-    // - after base `0x4490c0` finishes the parsed-packet copy, the margin leaf can now re-enter
-    //   the nearer base-dispatch/current-helper-slot6 path directly from the connection callback
-    // - consumed `0x442d00` branches are now pulled one step closer too:
-    //   - decoded code `2` can now re-enter the launcher-owned bootstrap continuation directly at
-    //     the connection/leaf seam
-    //   - decoded code `4` mirrors the narrower `0x441850` side effect locally before that same
-    //     continuation
-    // - current source still does not materialize the full original message-ref object / agenda
-    //   tail, but this seam now receives the nearer local outer-ref/inner-storage scaffold instead
-    //   of a naked payload vector before mirroring `0x44af20`
-    uint32_t DispatchCopiedParsedPacketTailScaffold(
-        CMessageConnectionMessageRef& messageRef) override;
-
-private:
-    // anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
-    // Source-owned mirror of the lazy connection `+0x9c` packet-agenda module install/refresh
-    // reached from the consumed code-2 challenge path after `+0x85..+0x94` is available.
-    void EnsureStreamPacketEncryptionModuleFromSeed85();
-
-    bool messageCode4SuccessFlag84_ = false;
-    bool hasBootstrapReplyCopy98_ = false;
-    std::array<uint8_t, 0x136> bootstrapReplyCopy98_{};
-    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_;
-    bool hasMessageCode5SeedBytes85_ = false;
-    std::array<uint8_t, 16> messageCode5SeedBytes85_{};
-    std::unique_ptr<CStreamPacketEncryptionModule> streamPacketEncryptionModule9c_;
+    uint32_t DispatchMessage(void* messageRef) override;
 };
 
 }  // namespace mxo::liblttcp

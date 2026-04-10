@@ -1789,10 +1789,12 @@ private:
     mxo::auth::AuthRequestBuildResult lastAuthRequestBuildResult_;
     mxo::auth::AuthChallenge lastAuthChallenge_;
     mxo::auth::AuthReply lastAuthReply_;
-    // Keep staged auth bytes mediator-owned for the current staged-payload handoff:
-    // - early inbound auth now demuxes through state2 / owner+0x680 child helpers
-    // - later raw-`0x0b` selected-slot handling still uses state10 slot 6
-    // - loginmediator_state9.cpp callback84 opcode fallback also still consults this storage
+    // Replacement-only compatibility auth payload copy:
+    // - auth leaf/base dispatch now keeps `0x449a30` thin again
+    // - when current source still needs raw auth payload bytes, state2 / owner+0x680 child copies
+    //   the logical payload span there after resolving the incoming auth-message object
+    // - later raw-`0x0b` selected-slot handling and state9 callback84 opcode fallback still
+    //   consult this storage
     std::vector<uint8_t> stagedIncomingAuthPacketBytes_;
     std::vector<uint8_t> stagedIncomingMarginPacketBytes_;
     // ABI-safety note:

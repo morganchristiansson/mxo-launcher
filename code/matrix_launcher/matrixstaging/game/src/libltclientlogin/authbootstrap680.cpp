@@ -75,6 +75,128 @@ struct AuthBootstrap680ChildOwnedState {
     std::vector<uint8_t> opaqueReplyBlob10COwned;
 };
 
+constexpr uint32_t kIncomingAuthMessageLocatorPayloadOffsetTable[7] = {
+    0x11u,
+    0x04u,
+    0x10u,
+    0x0bu,
+    0x10u,
+    0x11u,
+    0x10u,
+};
+
+struct IncomingAuthPayloadViewScaffold {
+    const uint8_t* payloadBytes = nullptr;
+    size_t payloadByteCount = 0u;
+    uint8_t rawCode = 0u;
+    bool headerless = false;
+    bool usedHeaderlessLocatorDecode = false;
+};
+
+// anchor family: launcher.exe:0x41bc20 / 0x41bbb0
+static bool ResolveIncomingAuthMessageCodePointerScaffold(
+    const mxo::liblttcp::CMessageConnectionMessageRef& incomingMessageRef,
+    const uint8_t** outMessageCodePointer,
+    bool* outUsedHeaderlessLocatorDecode) {
+    if (outMessageCodePointer) {
+        *outMessageCodePointer = nullptr;
+    }
+    if (outUsedHeaderlessLocatorDecode) {
+        *outUsedHeaderlessLocatorDecode = false;
+    }
+
+    const auto* messageStorage = incomingMessageRef.messageStorage0c;
+    if (!messageStorage) {
+        return false;
+    }
+
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    if (!payloadBytes || payloadByteCount == 0u) {
+        return false;
+    }
+
+    if (incomingMessageRef.headerless10 == 0u) {
+        if (outMessageCodePointer) {
+            *outMessageCodePointer = payloadBytes;
+        }
+        return true;
+    }
+
+    if (outUsedHeaderlessLocatorDecode) {
+        *outUsedHeaderlessLocatorDecode = true;
+    }
+    if (payloadByteCount < 2u) {
+        return false;
+    }
+
+    const uint8_t locatorByte0d = payloadBytes[1];
+    const uint8_t targetLocatorType = static_cast<uint8_t>(locatorByte0d & 0x07u);
+    const uint8_t senderLocatorType = static_cast<uint8_t>((locatorByte0d >> 4) & 0x07u);
+    if (targetLocatorType == 0u || targetLocatorType > 6u ||
+        senderLocatorType == 0u || senderLocatorType > 6u) {
+        return false;
+    }
+
+    const size_t payloadOffset =
+        0x12u +
+        static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[targetLocatorType - 1u]) +
+        static_cast<size_t>(kIncomingAuthMessageLocatorPayloadOffsetTable[senderLocatorType - 1u]);
+    if (payloadOffset >= payloadByteCount) {
+        return false;
+    }
+
+    if (outMessageCodePointer) {
+        *outMessageCodePointer = payloadBytes + payloadOffset;
+    }
+    return true;
+}
+
+static bool BuildIncomingAuthPayloadViewScaffold(
+    const mxo::liblttcp::CMessageConnectionMessageRef* incomingAuthMessageRef,
+    IncomingAuthPayloadViewScaffold* outView) {
+    if (outView) {
+        *outView = {};
+    }
+    if (!incomingAuthMessageRef || !outView) {
+        return false;
+    }
+
+    const auto* messageStorage = incomingAuthMessageRef->messageStorage0c;
+    if (!messageStorage) {
+        return false;
+    }
+
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    if (!payloadBytes || payloadByteCount == 0u) {
+        return false;
+    }
+
+    const uint8_t* logicalPayloadBytes = nullptr;
+    bool usedHeaderlessLocatorDecode = false;
+    if (!ResolveIncomingAuthMessageCodePointerScaffold(
+            *incomingAuthMessageRef,
+            &logicalPayloadBytes,
+            &usedHeaderlessLocatorDecode) ||
+        !logicalPayloadBytes) {
+        return false;
+    }
+
+    const size_t logicalPayloadOffset =
+        static_cast<size_t>(logicalPayloadBytes - payloadBytes);
+    if (logicalPayloadOffset >= payloadByteCount) {
+        return false;
+    }
+
+    outView->payloadBytes = logicalPayloadBytes;
+    outView->payloadByteCount = static_cast<size_t>(payloadByteCount) - logicalPayloadOffset;
+    outView->rawCode = logicalPayloadBytes[0];
+    outView->headerless = (incomingAuthMessageRef->headerless10 != 0u);
+    outView->usedHeaderlessLocatorDecode = usedHeaderlessLocatorDecode;
+    return true;
+}
+
 // anchor: launcher.exe:DAT_004b6b38
 static constexpr std::array<uint8_t, 0x100u> kAuthBootstrap680PubkeyDatFallbackModulus = {
     0xc7u, 0x48u, 0x18u, 0xfdu, 0x48u, 0xdcu, 0x8fu, 0x4eu, 0xecu, 0x35u, 0xe1u, 0xcfu,
@@ -1268,14 +1390,24 @@ uint32_t AuthBootstrap680Child::PrepareAndDispatch(CLTLoginMediator& mediator) {
 }
 
 // anchor: launcher.exe:0x448140
-uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(CLTLoginMediator& mediator) {
-    const std::vector<uint8_t>& stagedBytes = mediator.stagedIncomingAuthPacketBytes_;
-    if (stagedBytes.empty()) {
+uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(
+    void* incomingAuthMessage,
+    CLTLoginMediator& mediator) {
+    IncomingAuthPayloadViewScaffold incomingPayload = {};
+    if (!BuildIncomingAuthPayloadViewScaffold(
+            static_cast<const mxo::liblttcp::CMessageConnectionMessageRef*>(incomingAuthMessage),
+            &incomingPayload)) {
+        mediator.stagedIncomingAuthPacketBytes_.clear();
         return kAuthBootstrap680InboundUnhandled;
     }
 
+    mediator.stagedIncomingAuthPacketBytes_.assign(
+        incomingPayload.payloadBytes,
+        incomingPayload.payloadBytes + incomingPayload.payloadByteCount);
+    const std::vector<uint8_t>& stagedBytes = mediator.stagedIncomingAuthPacketBytes_;
+
     AuthBootstrap680Child& child = *this;
-    const uint8_t rawCode = stagedBytes[0];
+    const uint8_t rawCode = incomingPayload.rawCode;
     switch (rawCode) {
         case CLTLoginMediator::kAuthRawCodeGetPublicKeyReply: {
             mxo::auth::GetPublicKeyReply reply;
