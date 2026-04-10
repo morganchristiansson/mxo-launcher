@@ -1525,69 +1525,6 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperSecondaryGateScaffold(void* work
     return currentState_->Slot2_HandleSecondaryGate(workItem, this);
 }
 
-// UNANCHORED: source-owned staging wrapper for the narrowed auth-side
-// `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
-// Current role is narrower than the earlier raw-byte bridge:
-// - the auth leaf now source-owns the nearer receive/message-ref pre-owner step
-// - this mediator helper is therefore only the surviving owner-slot-5 consumer on that branch
-uint32_t CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    void* workItem) {
-    if (!packetBytes || packetSize == 0u) {
-        return 0u;
-    }
-
-    stagedIncomingAuthPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-    const uint8_t rawCode = stagedIncomingAuthPacketBytes_[0];
-    const uint32_t handled = DispatchCurrentHelperAuthMessageScaffold(workItem);
-
-    // Current bounded replacement for the old synthetic receive-drain-only post-AS_AuthReply side
-    // effect:
-    // - the tighter `0x4490c0` tail now consumes handled auth packets inside the same callback
-    // - so the one-shot margin auto-begin that previously piggybacked on the later fallback queue
-    //   must move up to the handled auth-reply path itself
-    // - keep the same practical gate: only successful handled AS_AuthReply should arm the margin
-    //   connect, and only once per auth cycle
-    uint32_t marginAutoBeginResult = 0u;
-    bool triggeredMarginAutoBegin = false;
-    bool deferredMarginAutoBeginToState8 = false;
-    if (handled != 0u && rawCode == 0x0bu && lastAuthReply_.valid && !lastAuthReply_.isErrorReply &&
-        !postAuthMarginAutoBeginAttemptedScaffold_) {
-        const uint32_t currentHelperPhaseCode =
-            currentState_ ? currentState_->DispatchPhaseCode() : 0u;
-
-        // Existing-character continuation correction:
-        // - the earlier replacement moved margin auto-begin up to the handled AS_AuthReply seam
-        // - that starts helper/state4 too early and leaves its cached upstream pointer set to the
-        //   old state3 wait leaf
-        // - on the natural existing-character path the first meaningful state4 margin-connect
-        //   entry for this continuation is the later `+0xec -> state8 slot3 -> helper4` handoff
-        //   during "Loading Character"
-        // - deferring the connect begin while we are still sitting in state3 keeps state4's cached
-        //   upstream aligned with state8, which in turn lets the later type-2 connect completion
-        //   restore into state8/state6/state5 instead of falling back to state3 and stalling
-        if (currentHelperPhaseCode == 3u) {
-            deferredMarginAutoBeginToState8 = true;
-        } else {
-            postAuthMarginAutoBeginAttemptedScaffold_ = true;
-            triggeredMarginAutoBegin = true;
-            marginAutoBeginResult = BeginLauncherMarginConnectionScaffold();
-        }
-    }
-
-    spdlog::info(
-        "CLTLoginMediator::StageAuthPacketBytesAndDispatchCurrentHelperScaffold rawCode=0x{:02x} packetSize={} currentState={} handled={} triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x}",
-        static_cast<unsigned>(rawCode),
-        static_cast<unsigned>(packetSize),
-        currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(handled),
-        triggeredMarginAutoBegin ? 1u : 0u,
-        deferredMarginAutoBeginToState8 ? 1u : 0u,
-        static_cast<unsigned>(marginAutoBeginResult));
-    return handled;
-}
-
 // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
 uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connection, void* workItem) {
     return HandleAuthConnectionCompletionFallbackScaffold(

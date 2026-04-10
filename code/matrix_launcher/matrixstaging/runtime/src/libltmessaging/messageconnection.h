@@ -115,10 +115,10 @@ namespace mxo::liblttcp {
 //     └── CBaseMarginConnection (0x004b64a8)
 //         └── CBasicMarginConnection (0x004afef0)
 // Key leaf-only rows now relevant here:
-// - 0x004afef0 = 0x0041cf50 ctor / leaf init
+// - 0x004afef0 = 0x0041cf50 scalar-deleting-dtor wrapper
 // - 0x004aff00 = 0x00449a70 leaf `OnOperationCompleted` override
 // - 0x004aff1c = 0x00449a30 leaf `DispatchMessage` override
-// - 0x004aff34 = 0x0041ce80 deleting-dtor / cleanup family
+// - 0x004aff34 = 0x0041ce80 connection `+0x98` reply-copy helper
 // The source file does not yet model `CBasicMarginConnection` as its own class, so do not treat
 // those leaf rows as base `CMessageConnection` methods.
 
@@ -131,7 +131,7 @@ namespace mxo::liblttcp {
 //     └── CBaseMarginConnection (0x004b64a8)
 //         └── CMarginConnection (0x004aff38)
 // Key leaf-only rows:
-// - 0x004aff38 = 0x0041cf80 ctor / leaf init
+// - 0x004aff38 = 0x0041cf80 scalar-deleting-dtor wrapper
 // - 0x004aff48 = 0x0044af60 `OnOperationCompleted` override
 // - 0x004aff64 = 0x0044af20 `DispatchMessage` override
 
@@ -778,7 +778,7 @@ private:
 //   through `0x449a70`, not just a generic base `CMessageConnection`
 class CAuthStartupConnection : public CMessageConnection {
 public:
-    // anchor: launcher.exe:0x41cf50
+    // UNANCHORED: source-owned narrow leaf ctor.
     CAuthStartupConnection();
     // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
     explicit CAuthStartupConnection(CLTThreadPerClientTCPEngine* authEngine);
@@ -831,12 +831,14 @@ struct CMarginConnectionBootstrapPrepStateA0Scaffold {
 
 class CMarginConnection : public CMessageConnection {
 public:
-    // UNANCHORED: source-owned narrow leaf ctor over the `0x41cf80 -> 0x448b40` family.
+    // UNANCHORED: source-owned narrow leaf ctor.
     CMarginConnection();
     // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
     explicit CMarginConnection(CLTThreadPerClientTCPEngine* marginEngine);
-    // UNANCHORED: source-owned default destructor; the original family uses `0x41ce80` cleanup
-    // after restoring the shared base-margin vtable.
+    // UNANCHORED: source-owned default destructor.
+    // Current tighter static-RE split:
+    // - live leaf teardown is through scalar-deleting-dtor wrappers at `0x41cf50/0x41cf80`
+    // - `0x41ce80` is the separate connection `+0x98` reply-copy helper
     ~CMarginConnection();
 
     // anchor: launcher.exe:0x441850

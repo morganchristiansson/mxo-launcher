@@ -1,6 +1,8 @@
 #include "messageconnection.h"
 
 #include "../../../game/src/libltclientlogin/loginmediator.h"
+#include "../../../game/src/libltclientlogin/loginstate.h"
+#include "../libltbase/ltresult.h"
 #include "../libltcrypto/auth_crypto.h"
 #include "variablelengthprefixedtcpstreamparser.h"
 #include "spdlog/spdlog.h"
@@ -962,13 +964,18 @@ uint32_t CMessageConnection::SendPacketMessageRef(
 }
 
 // anchor: launcher.exe:0x448a60
-// UNANCHORED: source-owned narrow fallback helper for the generic unhandled-operation log branch
-// reached from the later leaf wrappers (for example `0x449a70` / `0x44af60`) after base
-// `0x4490c0` returns false-ish.
+// Current tighter source mirror of the generic unhandled-operation log branch reached from later
+// leaf wrappers (for example `0x449a70` / `0x44af60`) after base `0x4490c0` returns false-ish.
 static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
-    spdlog::debug(
-        "CMessageConnection_LogUnhandledOperationScaffold workItem={}",
-        fmt::ptr(workItem));
+    const auto* header =
+        static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    const uint32_t workType = header ? header->workType : 0u;
+    const uint32_t resultCode = header ? header->statusOrPayloadDword08 : 0u;
+    const char* resultName = mxo::libltbase::CResultNameArrayItem_GetResultName(resultCode);
+    spdlog::info(
+        "Got unhandled op of type {} with status {}",
+        static_cast<unsigned>(workType),
+        resultName ? resultName : "UNKNOWN_LTRESULT");
 }
 
 // UNANCHORED: source-owned typed owner-context view used by the current `0x4490c0/0x449a70/0x44af60`
@@ -1801,12 +1808,45 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
         return 1u;
     }
 
-    const uint32_t handled = mediator->StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
-        payloadBytes,
-        payloadByteCount,
-        &messageRef);
+    mediator->stagedIncomingAuthPacketBytes_.assign(payloadBytes, payloadBytes + payloadByteCount);
+    const uint32_t handled = mediator->DispatchCurrentHelperAuthMessage(&messageRef);
+
+    // Current bounded replacement for the old synthetic receive-drain-only post-AS_AuthReply side
+    // effect now lives directly at the narrowed auth leaf seam instead of a broader mediator-only
+    // staging helper:
+    // - the tighter `0x449a30` bridge should stay as close as possible to base-filter -> owner+0x180
+    // - the replacement-only one-shot margin auto-begin therefore remains local to this same seam
+    //   after the direct owner dispatch call instead of hiding behind another helper boundary
+    uint32_t marginAutoBeginResult = 0u;
+    bool triggeredMarginAutoBegin = false;
+    bool deferredMarginAutoBeginToState8 = false;
+    if (handled != 0u && rawCode == 0x0bu && mediator->lastAuthReply_.valid &&
+        !mediator->lastAuthReply_.isErrorReply &&
+        !mediator->postAuthMarginAutoBeginAttemptedScaffold_) {
+        const uint32_t currentHelperPhaseCode =
+            mediator->currentState_ ? mediator->currentState_->DispatchPhaseCode() : 0u;
+
+        // Existing-character continuation correction:
+        // - the earlier replacement moved margin auto-begin up to the handled AS_AuthReply seam
+        // - that starts helper/state4 too early and leaves its cached upstream pointer set to the
+        //   old state3 wait leaf
+        // - on the natural existing-character path the first meaningful state4 margin-connect
+        //   entry for this continuation is the later `+0xec -> state8 slot3 -> helper4` handoff
+        //   during "Loading Character"
+        // - deferring the connect begin while we are still sitting in state3 keeps state4's cached
+        //   upstream aligned with state8, which in turn lets the later type-2 connect completion
+        //   restore into state8/state6/state5 instead of falling back to state3 and stalling
+        if (currentHelperPhaseCode == 3u) {
+            deferredMarginAutoBeginToState8 = true;
+        } else {
+            mediator->postAuthMarginAutoBeginAttemptedScaffold_ = true;
+            triggeredMarginAutoBegin = true;
+            marginAutoBeginResult = mediator->BeginLauncherMarginConnectionScaffold();
+        }
+    }
+
     spdlog::info(
-        "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
+        "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} this={} ownerContext={} currentState={} handled={} triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x} remoteHost='{}'",
         static_cast<unsigned>(rawCode),
         static_cast<unsigned>(decodedMessageCode),
         hadValidMessageCode ? 1u : 0u,
@@ -1817,6 +1857,9 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
         fmt::ptr(OwnerContext()),
         fmt::ptr(mediator->CurrentState()),
         handled,
+        triggeredMarginAutoBegin ? 1u : 0u,
+        deferredMarginAutoBeginToState8 ? 1u : 0u,
+        static_cast<unsigned>(marginAutoBeginResult),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     return handled;
 }
@@ -1867,7 +1910,7 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
 //     └── CBaseMarginConnection (0x004b64a8)
 //         └── CMarginConnection (0x004aff38)
 
-// UNANCHORED: source-owned narrow leaf ctor over the `0x41cf80 -> 0x448b40` family.
+// UNANCHORED: source-owned narrow leaf ctor.
 CMarginConnection::CMarginConnection()
     : CMessageConnection() {}
 
@@ -1875,8 +1918,10 @@ CMarginConnection::CMarginConnection()
 CMarginConnection::CMarginConnection(CLTThreadPerClientTCPEngine* marginEngine)
     : CMessageConnection(marginEngine) {}
 
-// UNANCHORED: source-owned default destructor; original cleanup runs through `0x41ce80` after
-// restoring the shared base-margin vtable.
+// UNANCHORED: source-owned default destructor.
+// Current tighter static-RE split:
+// - live leaf teardown is through the scalar-deleting-dtor wrappers at `0x41cf50/0x41cf80`
+// - `0x41ce80` is the separate connection `+0x98` reply-copy helper, not this C++ destructor body
 CMarginConnection::~CMarginConnection() = default;
 
 namespace {

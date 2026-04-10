@@ -120,6 +120,7 @@ class CLTLoginMediator : public ILTLoginMediator {
     friend class CLTLoginState_State8;
     friend class CLTLoginState_State10;
     friend class CLTLoginState_State11;
+    friend class mxo::liblttcp::CAuthStartupConnection;
     friend class mxo::liblttcp::CMarginConnection;
 
 public:
@@ -880,13 +881,6 @@ public:
     // Margin-side completion-fallback re-entry used by `0x44af60` and the local type-`0x0b`
     // margin completion seam.
     uint32_t DispatchCurrentHelperSecondaryGateScaffold(void* workItem);
-    // UNANCHORED: source-owned staging wrapper for the narrowed auth-side
-    // `0x4490c0 -> local message-ref/base-filter -> 0x449a30 -> owner+0x180` receive seam.
-    // Current scope is only the surviving owner-slot-5 dispatch after that new leaf-local step.
-    uint32_t StageAuthPacketBytesAndDispatchCurrentHelperScaffold(
-        const uint8_t* packetBytes,
-        size_t packetSize,
-        void* workItem = nullptr);
     // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
     uint32_t HandleAuthConnectionCompletionFallback(void* connection, void* workItem) override;
     uint32_t HandleAuthConnectionCompletionFallbackScaffold(
