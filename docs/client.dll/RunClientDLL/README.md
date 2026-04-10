@@ -412,11 +412,13 @@ Current best reading remains:
         - owner callback `[self+0xa4]->+0x17c`
         - fallback `0x448a60` if that callback also returns `0`
       - crucial correction: owner `+0x17c` is not fixed body `0x4401a0`
-        - owner `+0x17c` = thunk `0x41f260`
-        - `0x41f260` forwards to the owner's current helper/state object at `+0x10`
-        - then jumps to helper vtable `+0x14`
-      - so the concrete auth-side body depends on the currently selected helper from the
-        `0x4f7868` family managed by `0x41b450(...)`
+        - owner `+0x17c` = `0x41af80 = CLTLoginMediator_HandleAuthConnectionCompletionFallback`
+        - `0x41af80` compares the incoming connection against owner `+0x18`
+        - on work type `1` it clears only owner `+0x18`
+        - then it re-enters the owner's current helper/state object at `+0x10` through raw helper
+          vtable entry `+0x00` / slot 1
+      - so the concrete auth-side handling body still depends on the currently selected helper from
+        the `0x4f7868` family managed by `0x41b450(...)`
       - later helper body `0x4401a0` remains important, but now in the corrected role:
         - it is helper `0x4f7890` (vtable `0x4b512c`) slot `+0x14`
         - it only has a real handling path for raw margin code `0x0b = MS_ClaimCharacterNameReply`

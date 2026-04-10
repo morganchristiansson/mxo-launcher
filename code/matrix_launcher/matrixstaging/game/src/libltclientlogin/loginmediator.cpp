@@ -1533,37 +1533,21 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperSecondaryGateScaffold(void* work
 
 // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
 uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connection, void* workItem) {
-    return HandleAuthConnectionCompletionFallbackScaffold(
-        static_cast<mxo::liblttcp::CMessageConnection*>(connection),
-        workItem);
-}
-
-// anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
-uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold(
-    mxo::liblttcp::CMessageConnection* connection,
-    void* workItem) {
-    if (!connection || !workItem || connection != authConnection_) {
+    // anchor: launcher.exe:0x41af89
+    // Reject anything except the live owner `+0x18` auth connection.
+    if (connection != authConnection_) {
         return 0u;
     }
 
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
-    const uint32_t workType = workHeader ? workHeader->workType : 0u;
-    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        // anchor: launcher.exe:0x41afa5
         authConnection_ = nullptr;
-        authPeerCloseQueuedScaffold_ = false;
     }
 
-    const uint32_t handled = DispatchCurrentHelperPrimaryGateScaffold(workItem);
-    spdlog::info(
-        "CLTLoginMediator::HandleAuthConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerAuthConnection={} authPeerCloseQueued={}",
-        static_cast<unsigned>(workType),
-        fmt::ptr(connection),
-        currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(handled),
-        fmt::ptr(authConnection_),
-        authPeerCloseQueuedScaffold_ ? 1u : 0u);
-    return handled;
+    // anchor: launcher.exe:0x41afac / current helper vtable `+0x00`
+    return currentState_->Slot1_HandlePrimaryGate(workItem, this);
 }
 
 // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
@@ -1578,37 +1562,22 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperSlot6(void* workItem) {
 
 // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
 uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallback(void* connection, void* workItem) {
-    return HandleMarginConnectionCompletionFallbackScaffold(
-        static_cast<mxo::liblttcp::CMessageConnection*>(connection),
-        workItem);
-}
-
-// anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
-uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold(
-    mxo::liblttcp::CMessageConnection* connection,
-    void* workItem) {
-    if (!connection || !workItem || connection != marginConnection_) {
+    // anchor: launcher.exe:0x41afc9
+    if (connection != marginConnection_) {
         return 0u;
     }
 
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
-    const uint32_t workType = workHeader ? workHeader->workType : 0u;
-    if (workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        // anchor: launcher.exe:0x41afe7
+        // launcher.exe also zeroes owner `+0x20` here; keep that discrepancy documented until the
+        // source layout grows a proven home for it.
         marginConnection_ = nullptr;
-        marginPeerCloseQueuedScaffold_ = false;
     }
 
-    const uint32_t handled = DispatchCurrentHelperSecondaryGateScaffold(workItem);
-    spdlog::info(
-        "CLTLoginMediator::HandleMarginConnectionCompletionFallbackScaffold workType=0x{:08x} thisConnection={} currentState={} handled={} ownerMarginConnection={} marginPeerCloseQueued={}",
-        static_cast<unsigned>(workType),
-        fmt::ptr(connection),
-        currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(handled),
-        fmt::ptr(marginConnection_),
-        marginPeerCloseQueuedScaffold_ ? 1u : 0u);
-    return handled;
+    // anchor: launcher.exe:0x41afed / current helper vtable `+0x04`
+    return currentState_->Slot2_HandleSecondaryGate(workItem, this);
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

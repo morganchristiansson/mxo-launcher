@@ -2019,7 +2019,7 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
     } else {
         mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
         if (mediator && CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator) &&
-            mediator->HandleAuthConnectionCompletionFallbackScaffold(this, workItem) != 0u) {
+            mediator->HandleAuthConnectionCompletionFallback(this, workItem) != 0u) {
             handled = 1u;
         } else {
             CMessageConnection_LogUnhandledOperationScaffold(workItem);
@@ -2776,7 +2776,7 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
     } else {
         mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
         if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator) &&
-            mediator->HandleMarginConnectionCompletionFallbackScaffold(this, workItem) != 0u) {
+            mediator->HandleMarginConnectionCompletionFallback(this, workItem) != 0u) {
             handled = 1u;
         } else {
             CMessageConnection_LogUnhandledOperationScaffold(workItem);

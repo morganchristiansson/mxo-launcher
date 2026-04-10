@@ -879,27 +879,28 @@ public:
     // - current best read is helper slot 5 / `AuthMessageDispatch`
     uint32_t DispatchCurrentHelperAuthMessageScaffold(void* workItem);
     // anchor: launcher.exe:0x41af80 -> current helper vtable `+0x00`
-    // Auth-side completion-fallback re-entry used by `0x449a70` after base `0x4490c0` leaves a
-    // work item unconsumed.
+    // Tail-only source convenience mirror of the final helper re-entry inside
+    // `CLTLoginMediator_HandleAuthConnectionCompletionFallback`; not a separate owner-body anchor.
     uint32_t DispatchCurrentHelperPrimaryGateScaffold(void* workItem);
     // anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
-    // Margin-side completion-fallback re-entry used by `0x44af60` and the local type-`0x0b`
-    // margin completion seam.
+    // Tail-only source convenience mirror of the final helper re-entry inside
+    // `CLTLoginMediator_HandleMarginConnectionCompletionFallback`; not a separate owner-body
+    // anchor.
     uint32_t DispatchCurrentHelperSecondaryGateScaffold(void* workItem);
     // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
+    // Exact owner-body mirror: compare against owner `+0x18`, clear only that field on type-1
+    // close, then jump straight back through current helper slot 1.
     uint32_t HandleAuthConnectionCompletionFallback(void* connection, void* workItem) override;
-    uint32_t HandleAuthConnectionCompletionFallbackScaffold(
-        mxo::liblttcp::CMessageConnection* connection,
-        void* workItem);
     // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
     uint32_t DispatchCurrentHelperAuthMessage(void* workItem) override;
     // anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
     uint32_t DispatchCurrentHelperSlot6(void* workItem) override;
     // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
+    // Thin owner-body mirror: compare against owner `+0x1c`, clear the live margin-connection
+    // field on type-1 close, then jump straight back through current helper slot 2.
+    // launcher.exe also clears owner `+0x20` here; source still lacks a proven field home for
+    // that word, so keep that discrepancy explicit instead of inventing one.
     uint32_t HandleMarginConnectionCompletionFallback(void* connection, void* workItem) override;
-    uint32_t HandleMarginConnectionCompletionFallbackScaffold(
-        mxo::liblttcp::CMessageConnection* connection,
-        void* workItem);
 
     struct ActiveCharacterStateViewScaffold {
         const char* characterName = nullptr;
