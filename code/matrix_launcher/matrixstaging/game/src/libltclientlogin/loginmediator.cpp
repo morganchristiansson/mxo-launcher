@@ -505,9 +505,9 @@ void ILTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* ne
 }
 
 // +0x00
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x0041f020
 const char* CLTLoginMediator::GetName() {
-    return g_MediatorName;
+    return "CLTLoginMediator";
 }
 
 // Wrapper-facing arg6 startup handoff helper used by the current `0x4d2c58` scaffold.
