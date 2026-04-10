@@ -1822,32 +1822,40 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
 }
 
 // anchor: launcher.exe:0x449a70
+// Current tighter read from the direct `0x449a70` decompile/listing:
+// - call base `0x4490c0`
+// - if base returns 0, call owner `+0x17c / 0x41af80`
+// - if that also returns 0, fall through to `0x448a60`
+// - only after that handled/unhandled decision, read `workItem+0x04`
+// - if work type == 1, tear down through the connection object
+// - there is no leaf-local type-2 split here; auth connect-status also flows through owner `+0x17c`
 uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
     if (!workItem) {
         return 0u;
     }
 
-    const uint32_t baseResult = CMessageConnection::OnOperationCompleted(workItem);
-    if (baseResult != 0u) {
-        return 1u;
-    }
-
-    // Tightened `0x449a70 -> 0x41af80` read:
-    // - after base `0x4490c0` returns 0, the auth leaf does not split type-2 status work away to
-    //   a different owner helper
-    // - it always falls through owner `+0x17c`, and that owner callback then re-enters current
-    //   helper slot 1 / vtable `+0x00`
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    if (mediator && CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator)) {
-        const uint32_t handled =
-            mediator->HandleAuthConnectionCompletionFallbackScaffold(this, workItem);
-        if (handled != 0u) {
-            return 1u;
+    uint32_t handled = 0u;
+    if (CMessageConnection::OnOperationCompleted(workItem) != 0u) {
+        handled = 1u;
+    } else {
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+        if (mediator && CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator) &&
+            mediator->HandleAuthConnectionCompletionFallbackScaffold(this, workItem) != 0u) {
+            handled = 1u;
+        } else {
+            CMessageConnection_LogUnhandledOperationScaffold(workItem);
         }
     }
 
-    CMessageConnection_LogUnhandledOperationScaffold(workItem);
-    return 0u;
+    if (CMessageConnection_WorkItemTypeScaffold(workItem) ==
+        CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        // anchor: launcher.exe:0x449a70 tail
+        // The original tail calls vtable[0](1), i.e. the deleting-dtor-style teardown path,
+        // not the ordinary `Close(bool)` wrapper.
+        delete this;
+    }
+
+    return handled;
 }
 
 // ============================================================

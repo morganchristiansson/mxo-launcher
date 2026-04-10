@@ -183,6 +183,9 @@ Important nuance:
 - practical state1 consequence:
   - auth type-`2` connect status reaches state1 slot 1 (`0x4390b0`)
   - non-type-`2` auth completion work falls through the same slot-1 body into shared auth close gate `0x438d80`
+- later `0x449a70` tail ordering also matters:
+  - only after the base/owner/log handled decision does the leaf test work type `1`
+  - on type `1` it tears down through the connection deleting path (`vtable[0](1)`), not the shared `Close(bool)` wrapper
 
 ### `launcher.exe:0x4390b0` exact current read
 - if `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType(workItem) != 2`

@@ -71,6 +71,8 @@ namespace mxo::liblttcp {
 //       `0x4f7868` family and `0x41b450(...)`, not on one fixed owner-body function alone
 //     - if that helper re-entry returns 0, `0x449a70` falls through to `0x448a60`, which is
 //       string-backed only as a generic `Got unhandled op of type %d with status %s` logger
+//     - only after that handled/unhandled decision does `0x449a70` test work type `1` and call
+//       the deleting teardown path through vtable[0](1)
 //   - important nuance: that owner/helper/fallback chain is therefore a later derived-leaf
 //     incoming packet/owner-handling anchor, not direct proof of the first outbound request
 //     after connect
@@ -787,7 +789,9 @@ public:
     // - call base `0x4490c0`
     // - if base returns 0, call owner `+0x17c(this, workItem)`
     // - if that also returns 0, fall through to `0x448a60`
+    // - only then read `workItem+0x04`
     // - if work type == 1, tears down through the connection object
+    // - no leaf-local type-2 split; connect-status also flows through owner `+0x17c`
     uint32_t OnOperationCompleted(void* workItem) override;
 
 protected:
