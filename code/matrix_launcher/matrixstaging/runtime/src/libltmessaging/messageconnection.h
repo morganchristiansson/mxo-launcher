@@ -798,10 +798,11 @@ protected:
     // anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
     // Current bounded auth-side correction:
     // - after base `0x4490c0` finishes the parsed-packet copy, the auth leaf now receives the
-    //   nearer local receive/message-ref scaffold and runs the narrow `0x442d00` consumed-code
-    //   filter through the same `0x41bc20/0x41bbb0`-style object read path
-    // - only the surviving auth path then re-enters the current helper's slot-5
-    //   `AuthMessageDispatch` path through owner `+0x180`
+    //   nearer local receive/message-ref scaffold
+    // - it then mirrors the direct `0x442d00` consumed-code gate closely enough to preserve the
+    //   thin original shape: consumed-code test first, then owner `+0x180(messageRef)`
+    // - source still stages raw auth payload bytes on the owner before that owner call because the
+    //   active auth-state handlers consume staged bytes instead of the original auth-message object
     // - source still does not materialize the full original refcounted message object / agenda tail
     uint32_t DispatchCopiedParsedPacketTailScaffold(
         CMessageConnectionMessageRef& messageRef) override;

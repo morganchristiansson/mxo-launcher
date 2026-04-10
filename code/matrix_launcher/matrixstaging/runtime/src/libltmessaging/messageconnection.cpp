@@ -1,7 +1,6 @@
 #include "messageconnection.h"
 
 #include "../../../game/src/libltclientlogin/loginmediator.h"
-#include "../../../game/src/libltclientlogin/loginstate.h"
 #include "../libltbase/ltresult.h"
 #include "../libltcrypto/auth_crypto.h"
 #include "variablelengthprefixedtcpstreamparser.h"
@@ -1808,45 +1807,16 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
         return 1u;
     }
 
+    // Current source still stages raw auth payload bytes on the owner because the active auth
+    // state handlers consume that staged span instead of the original launcher auth-message object
+    // ABI. Keep that source-owned sidecar separate from the otherwise thin `0x449a30` bridge:
+    // - `0x442d00`-style consumed-code gate first
+    // - then owner `+0x180(messageRef)`
     mediator->stagedIncomingAuthPacketBytes_.assign(payloadBytes, payloadBytes + payloadByteCount);
     const uint32_t handled = mediator->DispatchCurrentHelperAuthMessage(&messageRef);
 
-    // Current bounded replacement for the old synthetic receive-drain-only post-AS_AuthReply side
-    // effect now lives directly at the narrowed auth leaf seam instead of a broader mediator-only
-    // staging helper:
-    // - the tighter `0x449a30` bridge should stay as close as possible to base-filter -> owner+0x180
-    // - the replacement-only one-shot margin auto-begin therefore remains local to this same seam
-    //   after the direct owner dispatch call instead of hiding behind another helper boundary
-    uint32_t marginAutoBeginResult = 0u;
-    bool triggeredMarginAutoBegin = false;
-    bool deferredMarginAutoBeginToState8 = false;
-    if (handled != 0u && rawCode == 0x0bu && mediator->lastAuthReply_.valid &&
-        !mediator->lastAuthReply_.isErrorReply &&
-        !mediator->postAuthMarginAutoBeginAttemptedScaffold_) {
-        const uint32_t currentHelperPhaseCode =
-            mediator->currentState_ ? mediator->currentState_->DispatchPhaseCode() : 0u;
-
-        // Existing-character continuation correction:
-        // - the earlier replacement moved margin auto-begin up to the handled AS_AuthReply seam
-        // - that starts helper/state4 too early and leaves its cached upstream pointer set to the
-        //   old state3 wait leaf
-        // - on the natural existing-character path the first meaningful state4 margin-connect
-        //   entry for this continuation is the later `+0xec -> state8 slot3 -> helper4` handoff
-        //   during "Loading Character"
-        // - deferring the connect begin while we are still sitting in state3 keeps state4's cached
-        //   upstream aligned with state8, which in turn lets the later type-2 connect completion
-        //   restore into state8/state6/state5 instead of falling back to state3 and stalling
-        if (currentHelperPhaseCode == 3u) {
-            deferredMarginAutoBeginToState8 = true;
-        } else {
-            mediator->postAuthMarginAutoBeginAttemptedScaffold_ = true;
-            triggeredMarginAutoBegin = true;
-            marginAutoBeginResult = mediator->BeginLauncherMarginConnectionScaffold();
-        }
-    }
-
     spdlog::info(
-        "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} this={} ownerContext={} currentState={} handled={} triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x} remoteHost='{}'",
+        "CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
         static_cast<unsigned>(rawCode),
         static_cast<unsigned>(decodedMessageCode),
         hadValidMessageCode ? 1u : 0u,
@@ -1857,9 +1827,6 @@ uint32_t CAuthStartupConnection::DispatchCopiedParsedPacketTailScaffold(
         fmt::ptr(OwnerContext()),
         fmt::ptr(mediator->CurrentState()),
         handled,
-        triggeredMarginAutoBegin ? 1u : 0u,
-        deferredMarginAutoBeginToState8 ? 1u : 0u,
-        static_cast<unsigned>(marginAutoBeginResult),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     return handled;
 }

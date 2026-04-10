@@ -206,14 +206,42 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
                     mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
             }
             mediator->PostEventScaffold(5u);
+
+            // Replacement-only post-AS_AuthReply margin auto-begin now stays on the concrete
+            // auth-reply handler path instead of broadening the thinner `0x449a30` bridge.
+            uint32_t marginAutoBeginResult = 0u;
+            bool triggeredMarginAutoBegin = false;
+            bool deferredMarginAutoBeginToState8 = false;
+            if (!mediator->postAuthMarginAutoBeginAttemptedScaffold_) {
+                const uint32_t currentHelperPhaseCode =
+                    mediator->CurrentState() ? mediator->CurrentState()->DispatchPhaseCode() : 0u;
+
+                // Existing-character continuation correction:
+                // - starting the margin connect while we are still on state3 leaves helper4's
+                //   cached upstream aligned to the old state3 wait leaf
+                // - on the natural existing-character path the first meaningful state4
+                //   margin-connect entry for this continuation is the later
+                //   `+0xec -> state8 slot3 -> helper4` handoff during "Loading Character"
+                if (currentHelperPhaseCode == 3u) {
+                    deferredMarginAutoBeginToState8 = true;
+                } else {
+                    mediator->postAuthMarginAutoBeginAttemptedScaffold_ = true;
+                    triggeredMarginAutoBegin = true;
+                    marginAutoBeginResult = mediator->BeginLauncherMarginConnectionScaffold();
+                }
+            }
+
             spdlog::info(
-                "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05",
+                "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05 triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x}",
                 static_cast<unsigned>(rawCode),
                 static_cast<unsigned>(mediator->WorldListCountOrStatus80()),
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(nextHelperStateId),
                 mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
-                static_cast<unsigned>(switchDispatchResult));
+                static_cast<unsigned>(switchDispatchResult),
+                triggeredMarginAutoBegin ? 1u : 0u,
+                deferredMarginAutoBeginToState8 ? 1u : 0u,
+                static_cast<unsigned>(marginAutoBeginResult));
             return 1u;
         }
 
