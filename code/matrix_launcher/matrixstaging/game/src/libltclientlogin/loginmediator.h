@@ -724,19 +724,18 @@ public:
 
     // +0x00
     const char* GetName() override;
-    // +0x04
-    // void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) override;
     // +0x08
-    void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) override;
-    // +0x14
-    // void UnknownSlot5();
-    // +0x18
-    // void UnknownSlot6();
+    void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) override;
     // +0x0c
-    void ClearEngine() override;
+    void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) override;
     // +0x10
+    void ClearEngine() override;
+    // +0x14
     uint32_t IsReady() override;
+    // +0x18
+    // void UnknownSlot5();
     // +0x1c
+    // void UnknownSlot6();
     void SetValue1(void* value) override;
     // +0x20
     void SetValue2(void* value) override;

@@ -70,8 +70,8 @@ Current startup-ownership clarification:
   inside lazy arg5-side sidecar accessors
 - later arbitrary arg5 virtual dispatch may resolve the liblttcp sidecar, but it should not be the
   first place that performs mediator bind/reset side effects
-- current source now routes the resolved arg6 wrapper handoff through a narrow
-  `ILTLoginMediator::Initialize(networkEngineOverride)` helper so the startup-owned effects stay
+- current source now routes the resolved arg6 wrapper handoff into
+  `CLTLoginMediator::Initialize(networkEngineOverride)` so the startup-owned effects stay
   concentrated on this path rather than leaking back into lazy arg5 accessors
 - that startup-owned helper now also aligns the source-owned owner `+0x680` child lifecycle a bit
   more closely with `0x41b160/0x41f510`: allocate on initialize, drop on clear/reset
