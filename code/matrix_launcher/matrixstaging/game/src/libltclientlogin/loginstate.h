@@ -48,23 +48,27 @@ public:
     // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
     virtual uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator);
 
-    // anchor: launcher.exe:0x00441790 (shared slot 3 no-op stub on multiple vtables)
+    // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-3 rows)
+    // Valid as a reused stub address, but not the canonical meaning of slot 3 across the family:
+    // most live states override slot 3 with their real begin/continue body.
     virtual uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator);
 
-    // anchor: launcher.exe:0x00441790 (shared slot 4 no-op stub on multiple vtables)
+    // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by many slot-4 rows)
     virtual uint32_t Slot4_NoOp();
 
-    // anchor: launcher.exe:0x004397c0 (shared slot 5 failure stub on multiple vtables)
+    // anchor: launcher.exe:0x004397c0 (shared slot-5 failure stub on many vtables)
     // Naming correction: slot 5 should stay `AuthMessageDispatch` across the family.
     virtual uint32_t AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator);
 
-    // anchor: launcher.exe:0x004397c0 (default shared slot 6 failure stub on selected vtables)
+    // anchor: launcher.exe:0x004397c0 (shared slot-6 failure stub on selected vtables only)
+    // Valid as a reused default body, but many live states override slot 6 with concrete receive /
+    // completion handlers.
     virtual uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator);
 
     // anchor: reconstructed shared slot 7 state-id surface
     virtual uint32_t Slot7_GetStateId() const = 0;
 
-    // anchor: launcher.exe:0x00441790 (shared slot 8 no-op stub on multiple vtables)
+    // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-8 rows)
     virtual uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator);
 
     // anchor: launcher.exe:0x00437860 (shared slot 9 getter stub returning 1 on most live states)

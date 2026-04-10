@@ -121,38 +121,50 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediat
     return 1u;
 }
 
-// anchor: launcher.exe:0x00441790 (shared slot 3 no-op stub on multiple vtables)
+// anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-3 rows)
 uint32_t CLTLoginState::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
     (void)upstreamOrArg;
     (void)mediator;
-    return 1;
+    // The original body is a prototype-agnostic bare `ret`. Source keeps a truthy no-op return
+    // here only as a C++ placeholder for states that still inherit that stub.
+    return 1u;
 }
 
-// anchor: launcher.exe:0x00441790 (shared slot 4 no-op stub on multiple vtables)
+// anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by many slot-4 rows)
 uint32_t CLTLoginState::Slot4_NoOp() {
-    return 1;
+    // Same caveat as slot 3: the original body is only `ret`.
+    return 1u;
 }
 
-// anchor: launcher.exe:0x004397c0 (shared slot 5 failure stub on multiple vtables)
+// anchor: launcher.exe:0x004397c0 (shared slot-5 failure stub on many vtables)
 uint32_t CLTLoginState::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
     (void)workItem;
-    (void)mediator;
-    return 0;
+    // Exact recovered side effect from `0x004397c0`:
+    // - write owner `+0x80 = 0x12000004`
+    // - return false-like
+    // launcher.exe reaches owner `+0x80` through the global current-mediator singleton; source
+    // mirrors the same state through the already-threaded mediator pointer instead of inventing a
+    // second global owner handle.
+    if (mediator != nullptr) {
+        mediator->WorldListCountOrStatus80() = 0x12000004u;
+    }
+    return 0u;
 }
 
-// anchor: launcher.exe:0x004397c0 (default shared slot 6 failure stub on selected vtables)
+// anchor: launcher.exe:0x004397c0 (shared slot-6 failure stub on selected vtables only)
 uint32_t CLTLoginState::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
     (void)workItem;
     (void)mediator;
-    return 0;
+    return 0u;
 }
 
-// anchor: launcher.exe:0x00441790 (shared slot 8 no-op stub on multiple vtables)
+// anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-8 rows)
 uint32_t CLTLoginState::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) {
     (void)param1;
     (void)context;
     (void)mediator;
-    return 1;
+    // Same caveat as slot 3/4: the original body is only `ret`.
+    return 1u;
 }
 
 // anchor: launcher.exe:0x00437860 (shared slot 9 getter stub returning 1 on most live states)

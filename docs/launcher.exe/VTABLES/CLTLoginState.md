@@ -47,9 +47,15 @@ Two important source notes:
 ### Strongly shared slots
 - slot 1 = usually `0x00438d80`
 - slot 2 = usually `0x00438df0`
+- slot 3 is **not** globally `0x00441790`
+  - some wait/final-leaf-style tables still reuse `0x00441790` there as a raw bare-`ret` stub
+  - many live states override slot 3 with their real begin/continue body
 - slot 4 = usually `0x00441790`
 - slot 5 = often `0x004397c0`
   - writes `DAT_004f78b8+0x80 = 0x12000004`, returns false
+- slot 6 is **not** globally `0x004397c0`
+  - selected tables still reuse that same failure stub there
+  - many live states override slot 6 with their real receive/completion body
 - slot 9 = usually `0x00437860`
   - tiny true-return stub
 
