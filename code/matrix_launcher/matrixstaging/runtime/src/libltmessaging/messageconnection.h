@@ -910,23 +910,82 @@ struct CMarginConnectionLocalCompletionWorkItemScaffold {
 
 static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
 
-struct CMarginConnectionBootstrapPrepStateA0Scaffold {
-    // anchor: launcher.exe:0x443220 / object size `0xe0`
-    // Source-owned mirror of the heap object allocated by `0x443340` and stored at connection
-    // `+0xa0`. Current bounded fidelity keeps the copied child payload region explicit at
-    // `+0x0c/+0x20/+0x34`; the constructor's prelude/tail remain opaque here.
-    std::array<uint8_t, 0x0c> opaquePrelude00{};
-    std::array<uint8_t, 0x14> blockB0At0c{};
-    std::array<uint8_t, 0x14> blockC4At20{};
-    std::array<uint8_t, 0x14> blockD8At34{};
-    std::array<uint8_t, 0x98> opaqueTail48{};
+class CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c {
+public:
+    // anchor family: launcher.exe:0x45de10 / 0x45d000 / data type `cls_0x4ba50c`
+    uint32_t vftptr_0x0 = 0u;
+    uint32_t mbr_0x4 = 0u;
+    uint32_t mbr_0x8 = 0u;
+    void* mbr_0xc = nullptr;
+    uint32_t mbr_0x10 = 0u;
+};
+static_assert(sizeof(CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
 
-    CMarginConnectionBootstrapPrepStateA0Scaffold(
-        const void* blockB0,
-        const void* blockC4,
-        const void* blockD8);
+class CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70 {
+public:
+    // anchor: launcher.exe:0x465d70
+    void InitializeFromBootstrapBlocks(
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3);
+
+    uint32_t vftptr_0x0 = 0u;
+    uint32_t field_0x4 = 0u;
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x8{};
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x1c{};
+    std::array<uint8_t, 0x0c> gap_0x30{};
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x3c{};
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x50{};
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c field_0x64{};
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c mbr_0x78{};
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c mbr_0x8c{};
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c mbr_0xa0{};
+    uint32_t field_0xb4 = 0u;
+    uint32_t field_0xb8 = 0u;
+    std::array<uint8_t, 0x08> gap_0xbc{};
 };
 
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x8) == 0x08);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x1c) == 0x1c);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x3c) == 0x3c);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x50) == 0x50);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0x64) == 0x64);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, mbr_0x78) == 0x78);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, mbr_0x8c) == 0x8c);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, mbr_0xa0) == 0xa0);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0xb4) == 0xb4);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0xb8) == 0xb8);
+static_assert(sizeof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70) == 0xc4, "bootstrap prep state subobject +0x0c size mismatch");
+
+class CMarginConnectionBootstrapPrepStateA0Scaffold {
+public:
+    // anchor: launcher.exe:0x443220 / object size `0xe0`
+    CMarginConnectionBootstrapPrepStateA0Scaffold(
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
+        const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+        int param_4);
+    // anchor: launcher.exe:0x443390
+    ~CMarginConnectionBootstrapPrepStateA0Scaffold();
+
+    uint32_t vftptr_0x0 = 0u;
+    uint32_t mbr_0x4 = 0u;
+    uint32_t mbr_0x8 = 0u;
+    CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70 field_0xc{};
+    uint32_t field_0xd0 = 0u;
+    uint32_t field_0xd4 = 0u;
+    uint32_t cls_0x4b3e18 = 0u;
+    uint32_t field_0xdc = 0u;
+
+    CMarginConnectionBootstrapPrepStateA0Scaffold(const CMarginConnectionBootstrapPrepStateA0Scaffold&) = delete;
+    CMarginConnectionBootstrapPrepStateA0Scaffold& operator=(const CMarginConnectionBootstrapPrepStateA0Scaffold&) = delete;
+};
+
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xc) == 0x0c);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xd0) == 0xd0);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xd4) == 0xd4);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, cls_0x4b3e18) == 0xd8);
+static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xdc) == 0xdc);
 static_assert(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold) == 0xe0, "bootstrap prep state +0xa0 object size mismatch");
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {

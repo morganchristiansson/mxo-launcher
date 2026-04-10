@@ -3,6 +3,7 @@
 #include "../../../game/src/libltclientlogin/loginmediator.h"
 #include "../libltbase/ltresult.h"
 #include "../libltcrypto/auth_crypto.h"
+#include "../libltcrypto/auth_internal.h"
 #include "variablelengthprefixedtcpstreamparser.h"
 #include "spdlog/spdlog.h"
 
@@ -10,6 +11,7 @@
 #include <cstring>
 #include <memory>
 #include <new>
+#include <unordered_map>
 #include <utility>
 
 #ifdef DispatchMessage
@@ -2122,20 +2124,247 @@ bool CBaseMarginConnection::StoreBootstrapReplyCopy98(const void* bytes, size_t 
     return true;
 }
 
+namespace {
+
+struct CMarginConnectionBootstrapPrepStateA0OwnedState {
+    std::vector<uint32_t> field_0x8OwnedDigits;
+    std::vector<uint32_t> field_0x1cOwnedDigits;
+    std::vector<uint32_t> field_0x3cOwnedDigits;
+    std::vector<uint32_t> field_0x50OwnedDigits;
+    std::vector<uint32_t> field_0x64OwnedDigits;
+    std::vector<uint32_t> mbr_0x78OwnedDigits;
+    std::vector<uint32_t> mbr_0x8cOwnedDigits;
+    std::vector<uint32_t> mbr_0xa0OwnedDigits;
+};
+
+static std::unordered_map<const CMarginConnectionBootstrapPrepStateA0Scaffold*, CMarginConnectionBootstrapPrepStateA0OwnedState>
+    g_marginConnectionBootstrapPrepStateA0OwnedStateByObject;
+
+static CMarginConnectionBootstrapPrepStateA0OwnedState& MutableCMarginConnectionBootstrapPrepStateA0OwnedState(
+    const CMarginConnectionBootstrapPrepStateA0Scaffold* object) {
+    return g_marginConnectionBootstrapPrepStateA0OwnedStateByObject[object];
+}
+
+static void ReleaseCMarginConnectionBootstrapPrepStateA0OwnedState(
+    const CMarginConnectionBootstrapPrepStateA0Scaffold* object) {
+    g_marginConnectionBootstrapPrepStateA0OwnedStateByObject.erase(object);
+}
+
+static uint32_t RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(size_t requiredWordCount) {
+    if (requiredWordCount == 0u) {
+        return 2u;
+    }
+    if (requiredWordCount < 3u) {
+        return 2u;
+    }
+    if (requiredWordCount < 5u) {
+        return 4u;
+    }
+    if (requiredWordCount < 9u) {
+        return 8u;
+    }
+    if (requiredWordCount < 0x11u) {
+        return 0x10u;
+    }
+    if (requiredWordCount < 0x21u) {
+        return 0x20u;
+    }
+    if (requiredWordCount < 0x41u) {
+        return 0x40u;
+    }
+
+    uint32_t rounded = 1u;
+    while (rounded < requiredWordCount && rounded < 0x80000000u) {
+        rounded <<= 1u;
+    }
+    return rounded;
+}
+
+static void ResetCMarginConnectionBootstrapPrepBigIntObject(
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* outObject,
+    std::vector<uint32_t>* ownedDigits,
+    uint32_t mbr_0x4 = 0u,
+    uint32_t mbr_0x10 = 0u) {
+    if (!outObject || !ownedDigits) {
+        return;
+    }
+
+    ownedDigits->assign(2u, 0u);
+    outObject->vftptr_0x0 = 0x004ba50cu;
+    outObject->mbr_0x4 = mbr_0x4;
+    outObject->mbr_0x8 = 2u;
+    outObject->mbr_0xc = ownedDigits->data();
+    outObject->mbr_0x10 = mbr_0x10;
+}
+
+static bool CopyCMarginConnectionBootstrapPrepBigIntObject(
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* outObject,
+    std::vector<uint32_t>* ownedDigits,
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* sourceObject) {
+    if (!outObject || !ownedDigits || !sourceObject) {
+        return false;
+    }
+
+    const uint32_t wordCapacity = sourceObject->mbr_0x8;
+    const auto* sourceDigits = static_cast<const uint32_t*>(sourceObject->mbr_0xc);
+    ownedDigits->assign(static_cast<size_t>(std::max<uint32_t>(wordCapacity, 2u)), 0u);
+    if (wordCapacity != 0u && sourceDigits != nullptr) {
+        std::copy_n(sourceDigits, wordCapacity, ownedDigits->data());
+    }
+
+    outObject->vftptr_0x0 = sourceObject->vftptr_0x0 != 0u ? sourceObject->vftptr_0x0 : 0x004ba50cu;
+    outObject->mbr_0x4 = sourceObject->mbr_0x4;
+    outObject->mbr_0x8 = static_cast<uint32_t>(ownedDigits->size());
+    outObject->mbr_0xc = ownedDigits->data();
+    outObject->mbr_0x10 = sourceObject->mbr_0x10;
+    return true;
+}
+
+static CryptoPP::Integer CMarginConnectionBootstrapPrepBigIntObjectToInteger(
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c& object) {
+    const auto* digits = static_cast<const uint32_t*>(object.mbr_0xc);
+    if (!digits || object.mbr_0x8 == 0u) {
+        return CryptoPP::Integer::Zero();
+    }
+
+    size_t usedWordCount = object.mbr_0x8;
+    while (usedWordCount != 0u && digits[usedWordCount - 1u] == 0u) {
+        --usedWordCount;
+    }
+
+    CryptoPP::Integer value = CryptoPP::Integer::Zero();
+    for (size_t i = usedWordCount; i != 0u; --i) {
+        value <<= 32u;
+        value += digits[i - 1u];
+    }
+    return value;
+}
+
+static bool BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
+    CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* outObject,
+    std::vector<uint32_t>* ownedDigits,
+    const CryptoPP::Integer& value) {
+    if (!outObject || !ownedDigits) {
+        return false;
+    }
+
+    const size_t encodedByteCount = static_cast<size_t>(value.MinEncodedSize());
+    std::vector<uint8_t> encodedBytes(std::max<size_t>(encodedByteCount, 1u), 0u);
+    value.Encode(encodedBytes.data(), encodedBytes.size());
+
+    const size_t requiredWordCount = (encodedBytes.size() + 3u) / 4u;
+    const uint32_t roundedWordCapacity =
+        RoundCMarginConnectionBootstrapPrepBigIntCapacityWords(requiredWordCount);
+    ownedDigits->assign(static_cast<size_t>(roundedWordCapacity), 0u);
+    for (size_t i = 0; i < encodedBytes.size(); ++i) {
+        const size_t reversedIndex = encodedBytes.size() - 1u - i;
+        const size_t wordIndex = reversedIndex / 4u;
+        const size_t byteShift = (reversedIndex & 3u) * 8u;
+        (*ownedDigits)[wordIndex] |= static_cast<uint32_t>(encodedBytes[i]) << byteShift;
+    }
+
+    outObject->vftptr_0x0 = 0x004ba50cu;
+    outObject->mbr_0x4 = 0u;
+    outObject->mbr_0x8 = roundedWordCapacity;
+    outObject->mbr_0xc = ownedDigits->empty() ? nullptr : ownedDigits->data();
+    outObject->mbr_0x10 = 0u;
+    return true;
+}
+
+}  // namespace
+
+// anchor: launcher.exe:0x465d70
+void CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70::InitializeFromBootstrapBlocks(
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3) {
+    auto* owner = reinterpret_cast<CMarginConnectionBootstrapPrepStateA0Scaffold*>(
+        reinterpret_cast<uint8_t*>(this) - offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xc));
+    auto& ownedState = MutableCMarginConnectionBootstrapPrepStateA0OwnedState(owner);
+
+    field_0xb4 = 0x004b630cu;
+    field_0xb8 = 0x004af294u;
+
+    CopyCMarginConnectionBootstrapPrepBigIntObject(&field_0x8, &ownedState.field_0x8OwnedDigits, param_1);
+    CopyCMarginConnectionBootstrapPrepBigIntObject(&field_0x1c, &ownedState.field_0x1cOwnedDigits, param_2);
+    CopyCMarginConnectionBootstrapPrepBigIntObject(&field_0x3c, &ownedState.field_0x3cOwnedDigits, param_3);
+    ResetCMarginConnectionBootstrapPrepBigIntObject(&field_0x50, &ownedState.field_0x50OwnedDigits);
+    ResetCMarginConnectionBootstrapPrepBigIntObject(&field_0x64, &ownedState.field_0x64OwnedDigits);
+    ResetCMarginConnectionBootstrapPrepBigIntObject(&mbr_0x78, &ownedState.mbr_0x78OwnedDigits);
+    ResetCMarginConnectionBootstrapPrepBigIntObject(&mbr_0x8c, &ownedState.mbr_0x8cOwnedDigits);
+    ResetCMarginConnectionBootstrapPrepBigIntObject(&mbr_0xa0, &ownedState.mbr_0xa0OwnedDigits);
+
+    if (!param_1 || !param_2 || !param_3) {
+        return;
+    }
+
+    try {
+        const CryptoPP::Integer modulus = CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0x8);
+        const CryptoPP::Integer publicExponent =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0x1c);
+        const CryptoPP::Integer privateExponent =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(field_0x3c);
+        if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
+            return;
+        }
+
+        CryptoPP::RSA::PrivateKey privateKey;
+        privateKey.Initialize(modulus, publicExponent, privateExponent);
+        BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
+            &field_0x50,
+            &ownedState.field_0x50OwnedDigits,
+            privateKey.GetPrime1());
+        BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
+            &field_0x64,
+            &ownedState.field_0x64OwnedDigits,
+            privateKey.GetPrime2());
+        BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
+            &mbr_0x78,
+            &ownedState.mbr_0x78OwnedDigits,
+            privateKey.GetModPrime1PrivateExponent());
+        BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
+            &mbr_0x8c,
+            &ownedState.mbr_0x8cOwnedDigits,
+            privateKey.GetModPrime2PrivateExponent());
+        BuildCMarginConnectionBootstrapPrepBigIntObjectFromInteger(
+            &mbr_0xa0,
+            &ownedState.mbr_0xa0OwnedDigits,
+            privateKey.GetMultiplicativeInverseOfPrime2ModPrime1());
+    } catch (const CryptoPP::Exception& exception) {
+        spdlog::warn(
+            "CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70::InitializeFromBootstrapBlocks CryptoPP key reconstruction failed: {}",
+            exception.what());
+    }
+}
+
 // anchor: launcher.exe:0x443220 / constructor reached from `0x443340`
 CMarginConnectionBootstrapPrepStateA0Scaffold::CMarginConnectionBootstrapPrepStateA0Scaffold(
-    const void* blockB0,
-    const void* blockC4,
-    const void* blockD8) {
-    if (blockB0 != nullptr) {
-        std::copy_n(static_cast<const uint8_t*>(blockB0), blockB0At0c.size(), blockB0At0c.begin());
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
+    const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
+    int param_4) {
+    if (param_4 != 0) {
+        mbr_0x4 = 0x004b6b10u;
+        field_0xd4 = 0x004b6300u;
+        cls_0x4b3e18 = 0x004b3e18u;
+        field_0xdc = 0x004b67a0u;
     }
-    if (blockC4 != nullptr) {
-        std::copy_n(static_cast<const uint8_t*>(blockC4), blockC4At20.size(), blockC4At20.begin());
-    }
-    if (blockD8 != nullptr) {
-        std::copy_n(static_cast<const uint8_t*>(blockD8), blockD8At34.size(), blockD8At34.begin());
-    }
+
+    vftptr_0x0 = 0x004b6ae0u;
+    mbr_0x8 = 0x004b6ad4u;
+    field_0xd0 = 0x004b6accu;
+    field_0xc.field_0xb4 = 0x004b630cu;
+    field_0xc.field_0xb8 = 0x004af294u;
+    field_0xc.InitializeFromBootstrapBlocks(param_1, param_2, param_3);
+}
+
+// anchor: launcher.exe:0x443390
+CMarginConnectionBootstrapPrepStateA0Scaffold::~CMarginConnectionBootstrapPrepStateA0Scaffold() {
+    ReleaseCMarginConnectionBootstrapPrepStateA0OwnedState(this);
+    vftptr_0x0 = 0x004af29cu;
+    field_0xc.field_0xb4 = 0x004b630cu;
+    field_0xc.field_0xb8 = 0x004af294u;
+    field_0xd4 = 0x004b6300u;
 }
 
 // anchor: launcher.exe:0x443340 -> connection `+0xa0`
@@ -2143,8 +2372,15 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
     const void* blockB0,
     const void* blockC4,
     const void* blockD8) {
-    connection_.bootstrapPrepStateA0_.reset(
-        new (std::nothrow) CMarginConnectionBootstrapPrepStateA0Scaffold(blockB0, blockC4, blockD8));
+    const auto* param_1 =
+        static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockB0);
+    const auto* param_2 =
+        static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockC4);
+    const auto* param_3 =
+        static_cast<const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c*>(blockD8);
+
+    connection_.bootstrapPrepStateA0_.reset(new (std::nothrow)
+        CMarginConnectionBootstrapPrepStateA0Scaffold(param_1, param_2, param_3, 1));
     if (!connection_.bootstrapPrepStateA0_) {
         spdlog::warn(
             "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 allocation failed this={} ownerContext={} remoteHost='{}'",
@@ -2154,19 +2390,18 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
         return;
     }
 
-    const auto readFirstDword = [](const std::array<uint8_t, 0x14>& bytes) -> uint32_t {
-        return static_cast<uint32_t>(bytes[0]) |
-               (static_cast<uint32_t>(bytes[1]) << 8u) |
-               (static_cast<uint32_t>(bytes[2]) << 16u) |
-               (static_cast<uint32_t>(bytes[3]) << 24u);
-    };
-
+    const auto* prepState = connection_.bootstrapPrepStateA0_.get();
     spdlog::info(
-        "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored connection+0xa0 prep object size=0x{:02x} blockB0@0x0c=0x{:08x} blockC4@0x20=0x{:08x} blockD8@0x34=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored connection+0xa0 prep object size=0x{:02x} modulusCap=0x{:02x} exponentCap=0x{:02x} privateExponentCap=0x{:02x} prime1Cap=0x{:02x} prime2Cap=0x{:02x} crtExp1Cap=0x{:02x} crtExp2Cap=0x{:02x} crtInverseCap=0x{:02x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold)),
-        static_cast<unsigned>(readFirstDword(connection_.bootstrapPrepStateA0_->blockB0At0c)),
-        static_cast<unsigned>(readFirstDword(connection_.bootstrapPrepStateA0_->blockC4At20)),
-        static_cast<unsigned>(readFirstDword(connection_.bootstrapPrepStateA0_->blockD8At34)),
+        static_cast<unsigned>(prepState->field_0xc.field_0x8.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.field_0x1c.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.field_0x3c.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.field_0x50.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.field_0x64.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.mbr_0x78.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.mbr_0x8c.mbr_0x8),
+        static_cast<unsigned>(prepState->field_0xc.mbr_0xa0.mbr_0x8),
         fmt::ptr(&connection_),
         fmt::ptr(connection_.OwnerContext()),
         connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());

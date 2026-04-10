@@ -293,6 +293,14 @@ Current bounded follow-up consequence:
   - that same `0x4435f0` body then calls standalone helper `0x443340`
   - `0x443340` allocates a fresh `0xe0` prep object, seeds it from child
     `+0xb0/+0xc4/+0xd8`, and stores the resulting pointer at margin connection `+0xa0`
+    - newer constructor-side tightening now keeps that object as its own class again instead of an
+      opaque byte sidecar:
+      - `0x443220 = CMarginConnectionBootstrapPrepStateA0_ctor`
+      - `0x443390 = ~CMarginConnectionBootstrapPrepStateA0`
+      - inner subobject method `0x465d70 = InitializeFromBootstrapBlocks`
+      - current field map carried in source now mirrors the Ghidra field names at
+        `+0x00/+0x04/+0x08/+0x0c/+0xd0/+0xd4/+0xd8/+0xdc`, with the `+0x0c` subobject exposing
+        the copied/derived big-int family at `+0x08/+0x1c/+0x3c/+0x50/+0x64/+0x78/+0x8c/+0xa0`
   - `0x41f30` then sends the raw type-`1` prefix with bytes `01 00 00`, then the copied `0x136`
     block
 - live replacement log on `2026-04-10` now shows:
