@@ -1003,44 +1003,6 @@ static bool CMessageConnection_IsMediatorMarginConnectionScaffold(
     return self != nullptr && mediator != nullptr && self == mediator->MarginConnection();
 }
 
-// anchor family: launcher.exe:0x449a70 / 0x44af60 type-2 owner-fallback tail
-static uint32_t CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
-    CMessageConnection* self,
-    uint32_t workPayload,
-    bool isMarginConnection,
-    const char* ownerSlotLabel) {
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(self);
-    const bool liveIsAuthConnection =
-        CMessageConnection_IsMediatorAuthConnectionScaffold(self, mediator);
-    const bool liveIsMarginConnection =
-        CMessageConnection_IsMediatorMarginConnectionScaffold(self, mediator);
-    if (!self || !mediator || (!liveIsAuthConnection && !liveIsMarginConnection) ||
-        liveIsMarginConnection != isMarginConnection) {
-        spdlog::debug(
-            "CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold missing mediator owner this={} ownerContext={} payload=0x{:08x} ownerSlot={} expectedMargin={}",
-            fmt::ptr(self),
-            fmt::ptr(self ? self->OwnerContext() : nullptr),
-            workPayload,
-            ownerSlotLabel ? ownerSlotLabel : "<null>",
-            isMarginConnection ? 1u : 0u);
-        return 0u;
-    }
-
-    const uint32_t handled = isMarginConnection
-        ? mediator->HandleMarginConnectStatus(workPayload)
-        : mediator->HandleAuthConnectStatus(workPayload);
-    spdlog::info(
-        "CMessageConnection::OnOperationCompleted routed type-2 connect-status through owner fallback payload=0x{:08x} this={} ownerContext={} ownerSlot={} isMargin={} handled={} remoteHost='{}'",
-        workPayload,
-        fmt::ptr(self),
-        fmt::ptr(self->OwnerContext()),
-        ownerSlotLabel ? ownerSlotLabel : "<null>",
-        isMarginConnection ? 1u : 0u,
-        handled,
-        self->RemoteHostName().empty() ? std::string("<empty>") : self->RemoteHostName());
-    return handled;
-}
-
 // anchor: launcher.exe:0x4490c0 first dispatch on `workItem+0x04`
 // Source-owned decomposition of the initial work-type test inside
 // `CMessageConnection::OnOperationCompleted`.
@@ -2223,83 +2185,46 @@ uint32_t CMarginConnection::DispatchCopiedParsedPacketTailScaffold(
 
 // anchor: launcher.exe:0x44af60
 // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
-// Current source body keeps only the proven base-first order explicit; the owner `+0x188` fallback
-// chain remains unmodeled in this class scaffold.
+// Current tighter read from the direct `0x44af60` decompile/listing:
+// - call base `0x4490c0`
+// - if base returns 0, call owner `+0x188 / 0x41afc0`
+// - if that also returns 0, fall through to `0x448a60`
+// - only after that handled/unhandled decision, read `workItem+0x04`
+// - if work type == 1, clear owner byte `+0xf14` and tear down through the connection object
+// - there is no separate type-2 connect-status split in this leaf; that work still flows through
+//   the same owner `+0x188` fallback path
 uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
     if (!workItem) {
         return 0u;
     }
 
-    const uint32_t baseResult = CMessageConnection::OnOperationCompleted(workItem);
-    if (baseResult != 0u) {
-        return 1u;
-    }
-
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    const bool isMarginConnection =
-        CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator);
-
-    const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
-    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeClose) {
-        spdlog::info(
-            "CMarginConnection::OnOperationCompleted close work this={} ownerContext={} mediator={} isMarginConnection={} currentState={} connectionState={} remoteHost='{}'",
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            fmt::ptr(mediator),
-            isMarginConnection ? 1u : 0u,
-            fmt::ptr(mediator ? mediator->CurrentState() : nullptr),
-            static_cast<unsigned>(State()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    }
-    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        const uint32_t workPayload =
-            CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem);
-
-        // Bounded fidelity correction for the active state4 existing-character margin path:
-        // - original margin type-2 completion re-enters the current helper slot-2 chain
-        // - state4 slot-2 then restores the cached upstream helper and lets that continuation
-        //   progress through `0x41b450` semantics
-        // - the active sender gates also require owner `+0x1c` state `== 2`, so keep the
-        //   connect-status success promotion immediately before that slot-2 re-entry
-        if (workPayload == 0u && State() == LTTCPEngineConnectionState::kConnectActive) {
-            SetState(LTTCPEngineConnectionState::kUdpMonitorActive);
-            spdlog::info(
-                "CMarginConnection::OnOperationCompleted promoted margin connection to ready state=2 on type-2 zero-status completion this={} ownerContext={} remoteHost='{}'",
-                fmt::ptr(this),
-                fmt::ptr(OwnerContext()),
-                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-        }
-
-        if (isMarginConnection && mediator) {
-            const uint32_t handled = mediator->DispatchCurrentHelperSecondaryGateScaffold(workItem);
-            spdlog::info(
-                "CMarginConnection::OnOperationCompleted routed type-2 connect-status through current helper slot2 payload=0x{:08x} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
-                workPayload,
-                fmt::ptr(this),
-                fmt::ptr(OwnerContext()),
-                fmt::ptr(mediator->CurrentState()),
-                handled,
-                RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-            return handled;
-        }
-
-        return CMessageConnection_HandleConnectionStatusOwnerCallbackScaffold(
-            this,
-            workPayload,
-            /*isMarginConnection=*/true,
-            "+0x188");
-    }
-
-    if (isMarginConnection && mediator) {
-        const uint32_t handled =
-            mediator->HandleMarginConnectionCompletionFallbackScaffold(this, workItem);
-        if (handled != 0u) {
-            return 1u;
+    uint32_t handled = 0u;
+    if (CMessageConnection::OnOperationCompleted(workItem) != 0u) {
+        handled = 1u;
+    } else {
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+        if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator) &&
+            mediator->HandleMarginConnectionCompletionFallbackScaffold(this, workItem) != 0u) {
+            handled = 1u;
+        } else {
+            CMessageConnection_LogUnhandledOperationScaffold(workItem);
         }
     }
 
-    CMessageConnection_LogUnhandledOperationScaffold(workItem);
-    return 0u;
+    if (CMessageConnection_WorkItemTypeScaffold(workItem) ==
+        CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+        if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator)) {
+            mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 = 0u;
+        }
+
+        // anchor: launcher.exe:0x44af60 tail
+        // The original tail calls vtable[0](1), i.e. the deleting-dtor-style teardown path,
+        // not the ordinary `Close(bool)` wrapper.
+        delete this;
+    }
+
+    return handled;
 }
 
 // anchor: launcher.exe:0x44af20

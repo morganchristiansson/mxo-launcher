@@ -897,7 +897,9 @@ public:
     // - call base `0x4490c0`
     // - if base returns 0, call owner `+0x188(this, workItem)`
     // - if that also returns 0, fall through to `0x448a60`
+    // - only then read `workItem+0x04`
     // - if work type == 1, clear owner byte `+0xf14` then tear down through the connection object
+    // - no leaf-local type-2 split; connect-status also flows through owner `+0x188`
     uint32_t OnOperationCompleted(void* workItem) override;
 
     // anchor: launcher.exe:0x44af20

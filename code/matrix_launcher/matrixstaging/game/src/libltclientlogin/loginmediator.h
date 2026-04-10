@@ -421,8 +421,9 @@ public:
 
         // owner byte `+0xf14`; shared send gate used by the active state8 path and later state10.
         // Strongest current writer is state6 opcode-`9` success, which sets it alongside owner
-        // `+0xf18 = parsed opcode-9 UDPSessionSecret / session-id dword`; later state9 success
-        // clears it again at `0x41b420`.
+        // `+0xf18 = parsed opcode-9 UDPSessionSecret / session-id dword`; later clears are now
+        // anchored both at state9 success `0x41b420` and margin-completion work-type-1 tail
+        // `0x44af60`.
         uint8_t state10SendGateFlagF14 = 0;             // `+0xf14`
 
         // Canonical owner `+0xf1c` object returned by the original `+0xf4/+0xbc/+0xc0/+0xc4`
