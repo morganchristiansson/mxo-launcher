@@ -301,18 +301,14 @@ Current bounded follow-up consequence:
       - current field map carried in source now mirrors the Ghidra field names at
         `+0x00/+0x04/+0x08/+0x0c/+0xd0/+0xd4/+0xd8/+0xdc`, with the `+0x0c` subobject exposing
         the copied/derived big-int family at `+0x08/+0x1c/+0x3c/+0x50/+0x64/+0x78/+0x8c/+0xa0`
+    - that immediate state5 path only constructs/stores the object
+    - first later original consumption of connection `+0xa0` is the decoded-code-2 margin branch
+      `0x442d00 -> 0x4429b0`, which calls prep-object vtable `+0x1c / 0x437810` and then reaches
+      `+0x24 / 0x468130`
+    - sibling family rows `0x4430b0 (+0x08)` and `0x4383d0 (+0x20)` are still only family
+      membership from the current evidence set
   - `0x41f30` then sends the raw type-`1` prefix with bytes `01 00 00`, then the copied `0x136`
     block
-- live replacement log on `2026-04-10` now shows:
-  - state5 slot3 `replyCopyShadowStillValid=1`
-  - non-null child `+0xf4`
-  - `AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0`
-  - `CMarginConnectionBootstrapPrepStateOwner_0x443340`
-  - `CMarginConnection::SendStoredBootstrapReplyCopy98` with `payloadBytes=0x139`
-- immediate current limitation after that milestone:
-  - the margin socket then returns EOF, so the next fidelity blocker has moved from
-    “materialize child `+0xf4`” to “make the raw type-1 state5 packet acceptable enough for the
-    server/original continuation”
 
 ## Reimplementation guidance
 

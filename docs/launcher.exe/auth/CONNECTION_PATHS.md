@@ -382,6 +382,12 @@ Current replacement milestone on that exact blocker (`2026-03-30`, later same-da
     - `0x4435f0` then calls standalone helper `0x443340`
     - `0x443340` allocates/stores the separate `0xe0` prep object at connection `+0xa0` from
       child `+0xb0/+0xc4/+0xd8`
+    - that immediate state5 step only constructs/stores the object
+    - first later original consumption of connection `+0xa0` is the decoded-code-2 base-margin
+      branch `0x442d00 -> 0x4429b0`, which calls prep-object vtable `+0x1c / 0x437810` and then
+      reaches `+0x24 / 0x468130`
+    - sibling family rows `0x4430b0 (+0x08)` and `0x4383d0 (+0x20)` are still only family
+      membership from the current evidence set
   - raw type-1 send then continues through preserved `0x441f30`
     - newer local-builder tightening now keeps that sender on vtable `0x004b6524`
     - builder `+0x10` = payload base

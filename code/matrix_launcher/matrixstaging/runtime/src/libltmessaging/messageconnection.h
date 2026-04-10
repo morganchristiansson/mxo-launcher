@@ -852,7 +852,7 @@ private:
     bool messageCode4SuccessFlag84_ = false;
     bool hasBootstrapReplyCopy98_ = false;
     std::array<uint8_t, 0x136> bootstrapReplyCopy98_{};
-    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here
+    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here, and the first later original consumer is `0x4429b0 -> +0x1c / 0x437810`
     bool hasMessageCode5SeedBytes85_ = false;
     std::array<uint8_t, 16> messageCode5SeedBytes85_{};
     std::unique_ptr<CStreamPacketEncryptionModule> streamPacketEncryptionModule9c_;
@@ -967,6 +967,10 @@ public:
         int param_4);
     // anchor: launcher.exe:0x443390
     ~CMarginConnectionBootstrapPrepStateA0Scaffold();
+    // Later original use of the stored connection `+0xa0` object starts at
+    // `0x4429b0`, which loads that pointer and calls prep-object vtable `+0x1c /
+    // 0x437810`; current source deliberately stops at ctor/dtor/materialization
+    // until that later consumer path is reimplemented from static-RE.
 
     uint32_t vftptr_0x0 = 0u;
     uint32_t mbr_0x4 = 0u;

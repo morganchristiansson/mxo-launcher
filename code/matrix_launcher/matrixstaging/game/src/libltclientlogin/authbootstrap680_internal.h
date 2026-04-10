@@ -527,7 +527,8 @@ public:
     // anchor: launcher.exe:0x4435f0
     // Direct-call bridge over the owner `+0x680` child that first forwards child `+0xf4` into
     // connection vtable `+0x44 / 0x41ce80`, then materializes the separate connection `+0xa0`
-    // prep object through standalone helper `0x443340`.
+    // prep object through standalone helper `0x443340`. The immediate state5 path stops there;
+    // the first later original consumer of that stored `+0xa0` object is `0x4429b0`.
     void PrepareState5MarginConnectionCopySend(mxo::liblttcp::CMarginConnection& marginConnection);
 
 private:

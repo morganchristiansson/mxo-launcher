@@ -2368,6 +2368,9 @@ CMarginConnectionBootstrapPrepStateA0Scaffold::~CMarginConnectionBootstrapPrepSt
 }
 
 // anchor: launcher.exe:0x443340 -> connection `+0xa0`
+// State5 only constructs/stores this object. The first later original consumer is
+// `0x4429b0`, which loads connection `+0xa0` and calls prep-object vtable
+// `+0x1c / 0x437810`.
 void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0(
     const void* blockB0,
     const void* blockC4,
