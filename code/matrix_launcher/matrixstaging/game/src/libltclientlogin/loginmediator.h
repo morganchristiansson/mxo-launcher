@@ -872,28 +872,17 @@ public:
     void SetCurrentState(CLTLoginState* state);
     CLTLoginState* CurrentState() const;
 
-    // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
-    // Tiny auth-side receive wrapper:
-    // - loads current helper from owner `+0x10`
-    // - tail-jumps to helper vtable `+0x10`
-    // - current best read is helper slot 5 / `AuthMessageDispatch`
-    uint32_t DispatchCurrentHelperAuthMessageScaffold(void* workItem);
-    // anchor: launcher.exe:0x41af80 -> current helper vtable `+0x00`
-    // Tail-only source convenience mirror of the final helper re-entry inside
-    // `CLTLoginMediator_HandleAuthConnectionCompletionFallback`; not a separate owner-body anchor.
-    uint32_t DispatchCurrentHelperPrimaryGateScaffold(void* workItem);
-    // anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
-    // Tail-only source convenience mirror of the final helper re-entry inside
-    // `CLTLoginMediator_HandleMarginConnectionCompletionFallback`; not a separate owner-body
-    // anchor.
-    uint32_t DispatchCurrentHelperSecondaryGateScaffold(void* workItem);
     // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
     // Exact owner-body mirror: compare against owner `+0x18`, clear only that field on type-1
     // close, then jump straight back through current helper slot 1.
     uint32_t HandleAuthConnectionCompletionFallback(void* connection, void* workItem) override;
     // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
+    // Exact tiny wrapper: reload current helper from owner `+0x10` and tail-jump to helper
+    // vtable `+0x10` / current best read slot 5 (`AuthMessageDispatch`). No synthetic guard.
     uint32_t DispatchCurrentHelperAuthMessage(void* workItem) override;
     // anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
+    // Exact tiny wrapper: reload current helper from owner `+0x10` and tail-jump to helper
+    // vtable `+0x14` / current best read slot 6. No synthetic guard.
     uint32_t DispatchCurrentHelperSlot6(void* workItem) override;
     // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
     // Thin owner-body mirror: compare against owner `+0x1c`, clear the live margin-connection

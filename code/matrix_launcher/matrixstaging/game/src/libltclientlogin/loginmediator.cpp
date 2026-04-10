@@ -1495,42 +1495,6 @@ CLTLoginState* CLTLoginMediator::CurrentState() const {
     return currentState_;
 }
 
-// anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
-uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessageScaffold(void* workItem) {
-    if (!currentState_) {
-        spdlog::info(
-            "CLTLoginMediator::DispatchCurrentHelperAuthMessageScaffold skipped because currentState is null workItem={}",
-            fmt::ptr(workItem));
-        return 0u;
-    }
-
-    return currentState_->AuthMessageDispatch(workItem, this);
-}
-
-// anchor: launcher.exe:0x41af80 -> current helper vtable `+0x00`
-uint32_t CLTLoginMediator::DispatchCurrentHelperPrimaryGateScaffold(void* workItem) {
-    if (!currentState_) {
-        spdlog::info(
-            "CLTLoginMediator::DispatchCurrentHelperPrimaryGateScaffold skipped because currentState is null workItem={}",
-            fmt::ptr(workItem));
-        return 0u;
-    }
-
-    return currentState_->Slot1_HandlePrimaryGate(workItem, this);
-}
-
-// anchor: launcher.exe:0x41afc0 -> current helper vtable `+0x04`
-uint32_t CLTLoginMediator::DispatchCurrentHelperSecondaryGateScaffold(void* workItem) {
-    if (!currentState_) {
-        spdlog::info(
-            "CLTLoginMediator::DispatchCurrentHelperSecondaryGateScaffold skipped because currentState is null workItem={}",
-            fmt::ptr(workItem));
-        return 0u;
-    }
-
-    return currentState_->Slot2_HandleSecondaryGate(workItem, this);
-}
-
 // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
 uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connection, void* workItem) {
     // anchor: launcher.exe:0x41af89
@@ -1552,12 +1516,20 @@ uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connecti
 
 // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
 uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessage(void* workItem) {
-    return DispatchCurrentHelperAuthMessageScaffold(workItem);
+    // Exact launcher wrapper body:
+    // - mov ecx, [ecx+0x10]
+    // - mov eax, [ecx]
+    // - jmp [eax+0x10]
+    return currentState_->AuthMessageDispatch(workItem, this);
 }
 
 // anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
 uint32_t CLTLoginMediator::DispatchCurrentHelperSlot6(void* workItem) {
-    return currentState_ ? currentState_->Slot6_HandleSecondaryMessage(workItem, this) : 0u;
+    // Exact launcher wrapper body:
+    // - mov ecx, [ecx+0x10]
+    // - mov eax, [ecx]
+    // - jmp [eax+0x14]
+    return currentState_->Slot6_HandleSecondaryMessage(workItem, this);
 }
 
 // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`

@@ -919,7 +919,10 @@ uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
         statusWorkItem.header.workType =
             mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus;
         statusWorkItem.header.statusOrPayloadDword08 = lastAuthConnectStatus_;
-        return DispatchCurrentHelperPrimaryGateScaffold(&statusWorkItem);
+        // There is no separate launcher owner wrapper for this tail re-entry beyond
+        // `0x41af80`; this source-only replay intentionally mirrors only the final current-helper
+        // slot-1 dispatch on the synthesized type-2 work-item shape.
+        return currentState_->Slot1_HandlePrimaryGate(&statusWorkItem, this);
     }
 
     return (lastAuthConnectStatus_ == kConnectStatusSuccess)
