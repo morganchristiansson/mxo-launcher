@@ -375,9 +375,14 @@ Current replacement milestone on that exact blocker (`2026-03-30`, later same-da
 - source state5 slot3 still materializes the runtime-backed owner `+0x680 +0xf4` copy/send path:
   - non-null `authReplyCopyShadowF4`
   - `replyCopyShadowStillValid=1`
-  - copy into margin connection `+0x98`
-  - bounded mirror of owner child `+0xb0/+0xc4/+0xd8` into connection-side `+0xa0`
-  - raw type-1 send through the preserved `0x41ce80 -> 0x441f30` route
+  - mediator helper `0x41b500` is treated as a direct owner body, not a vtable slot
+  - `0x41b500` calls standalone child helper `0x4435f0`
+    - `0x4435f0` first forwards child `+0xf4` into margin connection `+0x98` through connection
+      vtable `+0x44 / 0x41ce80`
+    - `0x4435f0` then calls standalone helper `0x443340`
+    - `0x443340` allocates/stores the separate `0xe0` prep object at connection `+0xa0` from
+      child `+0xb0/+0xc4/+0xd8`
+  - raw type-1 send then continues through preserved `0x441f30`
     - newer local-builder tightening now keeps that sender on vtable `0x004b6524`
     - builder `+0x10` = payload base
     - builder `+0x14/+0x18` = reserved reply-copy write pointer / byte count after `0x43a230`

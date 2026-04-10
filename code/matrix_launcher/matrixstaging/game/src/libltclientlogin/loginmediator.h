@@ -1539,7 +1539,8 @@ public:
     // inventing a pointer semantic inside the copied `0x136` blob.
     void* BootstrapRaw08AuxHandle50() const override;
 
-    bool PrepareState5MarginConnectionCopySendScaffold(mxo::liblttcp::CMarginConnection* marginConnection);
+    // anchor: launcher.exe:0x41b500 -> 0x4435f0 / 0x441f30
+    uint32_t PrepareState5MarginConnectionCopySendScaffold();
     const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
     // anchor: launcher.exe:0x004433c0 / 0x0044add0
     // Returns whether the owner `+0x680 +0xf4` auth-reply-derived `0x136` copy block is present

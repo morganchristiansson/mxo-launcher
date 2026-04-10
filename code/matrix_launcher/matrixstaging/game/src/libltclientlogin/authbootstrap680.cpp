@@ -2037,40 +2037,35 @@ uint32_t AuthBootstrap680Child::HandleGetPublicKeyReply(
     return 0u;
 }
 
-// anchor: launcher.exe:0x41b500 -> 0x4435f0 -> 0x41ce80 / 0x443340
-bool AuthBootstrap680Child::PrepareState5MarginConnectionCopySendScaffold(
-    CLTLoginMediator& /*mediator*/,
+// anchor: launcher.exe:0x4435f0
+void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend(
     mxo::liblttcp::CMarginConnection& marginConnection) {
-    AuthBootstrap680Child& child = *this;
+    AuthBootstrap680Child& child = child_;
     const auto* copyShadow =
         static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(child.authReplyCopyShadowF4);
     if (copyShadow == nullptr) {
-        return false;
+        spdlog::warn(
+            "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend missing child+0xf4 copy shadow marginConnection={}",
+            fmt::ptr(&marginConnection));
+        return;
     }
 
-    constexpr size_t kBootstrapPrepBlockByteCount = sizeof(AuthBootstrap680BigIntObject20Scaffold);
     const uint8_t* blockB0Bytes = AuthBootstrap680BigIntObjectBytes(child.modulusBigIntB0);
     const uint8_t* blockC4Bytes = AuthBootstrap680BigIntObjectBytes(child.publicExponentBigIntC4);
     const uint8_t* blockD8Bytes = AuthBootstrap680BigIntObjectBytes(child.privateExponentBigIntD8);
 
     const bool storedReplyCopy =
         marginConnection.StoreBootstrapReplyCopy98(copyShadow, sizeof(*copyShadow));
-    const bool storedPrepState =
-        marginConnection.StoreBootstrapPrepStateA0(
-            blockB0Bytes,
-            blockC4Bytes,
-            blockD8Bytes,
-            kBootstrapPrepBlockByteCount);
+    mxo::liblttcp::CMarginConnectionBootstrapPrepStateOwner_0x443340(marginConnection)
+        .StoreBootstrapPrepStateA0(blockB0Bytes, blockC4Bytes, blockD8Bytes);
 
     spdlog::info(
-        "AuthBootstrap680Child::PrepareState5MarginConnectionCopySendScaffold staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} storedPrepStateA0={} childBlockB0FirstDword=0x{:08x} childBlockC4FirstDword=0x{:08x} childBlockD8FirstDword=0x{:08x}",
+        "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} childBlockB0FirstDword=0x{:08x} childBlockC4FirstDword=0x{:08x} childBlockD8FirstDword=0x{:08x}",
         fmt::ptr(copyShadow),
         storedReplyCopy ? 1u : 0u,
-        storedPrepState ? 1u : 0u,
         static_cast<unsigned>(ReadU32LE(blockB0Bytes)),
         static_cast<unsigned>(ReadU32LE(blockC4Bytes)),
         static_cast<unsigned>(ReadU32LE(blockD8Bytes)));
-    return storedReplyCopy && storedPrepState;
 }
 
 // Source-owned shared auth-reply materialization bridge for later child `+0xf4` consumers such as

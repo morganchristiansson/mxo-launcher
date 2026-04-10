@@ -514,14 +514,24 @@ struct AuthBootstrap680Child {
     // anchor: launcher.exe:0x44831c..0x448467
     uint32_t SendAuthChallengeResponse(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
 
-    // anchor: launcher.exe:0x41b500 -> 0x4435f0 -> 0x41ce80 / 0x443340
-    bool PrepareState5MarginConnectionCopySendScaffold(
-        CLTLoginMediator& owner,
-        mxo::liblttcp::CMarginConnection& marginConnection);
-
 private:
     // anchor: launcher.exe:0x445610
     void ReleaseOwnedState();
+};
+
+class AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0 {
+public:
+    explicit AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0(AuthBootstrap680Child& child)
+        : child_(child) {}
+
+    // anchor: launcher.exe:0x4435f0
+    // Direct-call bridge over the owner `+0x680` child that first forwards child `+0xf4` into
+    // connection vtable `+0x44 / 0x41ce80`, then materializes the separate connection `+0xa0`
+    // prep object through standalone helper `0x443340`.
+    void PrepareState5MarginConnectionCopySend(mxo::liblttcp::CMarginConnection& marginConnection);
+
+private:
+    AuthBootstrap680Child& child_;
 };
 
 enum AuthBootstrap680InboundAuthResult : uint32_t {

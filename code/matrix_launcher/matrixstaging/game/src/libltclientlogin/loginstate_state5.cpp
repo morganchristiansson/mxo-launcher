@@ -114,21 +114,13 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         return switchDispatchResult;
     }
 
-    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(mediator->MarginConnection());
-    const bool preparedCopySendState =
-        marginConnection != nullptr &&
-        mediator->PrepareState5MarginConnectionCopySendScaffold(marginConnection);
-    const uint32_t sendResult =
-        (marginConnection != nullptr && preparedCopySendState)
-            ? marginConnection->SendStoredBootstrapReplyCopy98()
-            : 0u;
+    const uint32_t sendResult = mediator->PrepareState5MarginConnectionCopySendScaffold();
     mediator->PostEventScaffold(0x10u);
     spdlog::info(
-        "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} preparedCopySendState={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
+        "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
         fmt::ptr(cachedUpstreamOrArg_),
         fmt::ptr(upstreamOrArg),
         fmt::ptr(authReplyCopyShadowF4),
-        preparedCopySendState ? 1u : 0u,
         static_cast<unsigned>(sendResult),
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
     return sendResult;

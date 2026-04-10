@@ -778,6 +778,7 @@ private:
 
 struct CMarginConnectionLocalCompletionWorkItemScaffold;
 struct CMarginConnectionBootstrapPrepStateA0Scaffold;
+class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 
 // ============================================================
 // CBaseMarginConnection class declaration
@@ -808,14 +809,6 @@ public:
     // Source-owned mirror of the connection helper that stores a copied `0x136` auth-reply shadow
     // block for the later raw type-1 state5/state6 send path.
     bool StoreBootstrapReplyCopy98(const void* bytes, size_t byteCount);
-    // anchor: launcher.exe:0x443340 -> helper object stored at connection `+0xa0`
-    // Source-owned mirror of the owner `+0x680` prep-object adoption from child
-    // `+0xb0/+0xc4/+0xd8` before the later raw type-1 state5 send.
-    bool StoreBootstrapPrepStateA0(
-        const void* blockB0,
-        const void* blockC4,
-        const void* blockD8,
-        size_t blockByteCount);
     // anchor: launcher.exe:0x41f30
     // Source-owned mirror of the later raw type-1 send that now keeps the nearer original local
     // builder shape explicit too.
@@ -849,6 +842,8 @@ protected:
         CMessageConnectionMessageRef& messageRef) override;
 
 private:
+    friend class CMarginConnectionBootstrapPrepStateOwner_0x443340;
+
     // anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
     // Source-owned mirror of the lazy connection `+0x9c` packet-agenda module install/refresh
     // reached from the consumed code-2 challenge path after `+0x85..+0x94` is available.
@@ -857,7 +852,7 @@ private:
     bool messageCode4SuccessFlag84_ = false;
     bool hasBootstrapReplyCopy98_ = false;
     std::array<uint8_t, 0x136> bootstrapReplyCopy98_{};
-    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_;
+    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here
     bool hasMessageCode5SeedBytes85_ = false;
     std::array<uint8_t, 16> messageCode5SeedBytes85_{};
     std::unique_ptr<CStreamPacketEncryptionModule> streamPacketEncryptionModule9c_;
@@ -916,12 +911,39 @@ struct CMarginConnectionLocalCompletionWorkItemScaffold {
 static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
 
 struct CMarginConnectionBootstrapPrepStateA0Scaffold {
-    // anchor: launcher.exe:0x443340 -> helper object stored at connection `+0xa0`
-    // Bounded source-owned mirror of the owner `+0x680` prep object payload seeded from child
-    // `+0xb0/+0xc4/+0xd8` before the later raw type-1 state5 send.
-    std::array<uint8_t, 0x14> blockB0{};
-    std::array<uint8_t, 0x14> blockC4{};
-    std::array<uint8_t, 0x14> blockD8{};
+    // anchor: launcher.exe:0x443220 / object size `0xe0`
+    // Source-owned mirror of the heap object allocated by `0x443340` and stored at connection
+    // `+0xa0`. Current bounded fidelity keeps the copied child payload region explicit at
+    // `+0x0c/+0x20/+0x34`; the constructor's prelude/tail remain opaque here.
+    std::array<uint8_t, 0x0c> opaquePrelude00{};
+    std::array<uint8_t, 0x14> blockB0At0c{};
+    std::array<uint8_t, 0x14> blockC4At20{};
+    std::array<uint8_t, 0x14> blockD8At34{};
+    std::array<uint8_t, 0x98> opaqueTail48{};
+
+    CMarginConnectionBootstrapPrepStateA0Scaffold(
+        const void* blockB0,
+        const void* blockC4,
+        const void* blockD8);
+};
+
+static_assert(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold) == 0xe0, "bootstrap prep state +0xa0 object size mismatch");
+
+class CMarginConnectionBootstrapPrepStateOwner_0x443340 {
+public:
+    explicit CMarginConnectionBootstrapPrepStateOwner_0x443340(CBaseMarginConnection& connection)
+        : connection_(connection) {}
+
+    // anchor: launcher.exe:0x443340
+    // Direct-call helper that allocates a fresh `0xe0` prep object from three child-side `0x14`
+    // byte blocks and stores it at connection `+0xa0`.
+    void StoreBootstrapPrepStateA0(
+        const void* blockB0,
+        const void* blockC4,
+        const void* blockD8);
+
+private:
+    CBaseMarginConnection& connection_;
 };
 
 class CMarginConnection : public CBaseMarginConnection {

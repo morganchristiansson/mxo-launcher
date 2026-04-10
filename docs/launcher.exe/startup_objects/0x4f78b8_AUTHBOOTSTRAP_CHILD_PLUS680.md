@@ -286,16 +286,20 @@ already fully typed in source.
 
 Current bounded follow-up consequence:
 - this mirror is now enough to source-own the neighboring state5 helper chain directly on the live
-  existing-character path:
-  - `0x41ce80` copy into margin connection `+0x98`
-  - `0x443340`-shaped prep mirror from child `+0xb0/+0xc4/+0xd8` into a bounded connection-side
-    `+0xa0` sidecar
-  - `0x41f30` raw-type-`1` prefix send with bytes `01 00 00`, then the copied `0x136` block
-- live replacement log on `2026-03-30` now shows:
+  existing-character path, with the newer static-RE split kept explicit:
+  - mediator helper `0x41b500` is a direct body, not a login-mediator vtable method
+  - child helper `0x4435f0` first forwards child `+0xf4` into margin connection vtable `+0x44 /
+    0x41ce80`, rebuilding connection `+0x98`
+  - that same `0x4435f0` body then calls standalone helper `0x443340`
+  - `0x443340` allocates a fresh `0xe0` prep object, seeds it from child
+    `+0xb0/+0xc4/+0xd8`, and stores the resulting pointer at margin connection `+0xa0`
+  - `0x41f30` then sends the raw type-`1` prefix with bytes `01 00 00`, then the copied `0x136`
+    block
+- live replacement log on `2026-04-10` now shows:
   - state5 slot3 `replyCopyShadowStillValid=1`
   - non-null child `+0xf4`
-  - `CMarginConnection::StoreBootstrapReplyCopy98`
-  - `CMarginConnection::StoreBootstrapPrepStateA0`
+  - `AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0`
+  - `CMarginConnectionBootstrapPrepStateOwner_0x443340`
   - `CMarginConnection::SendStoredBootstrapReplyCopy98` with `payloadBytes=0x139`
 - immediate current limitation after that milestone:
   - the margin socket then returns EOF, so the next fidelity blocker has moved from

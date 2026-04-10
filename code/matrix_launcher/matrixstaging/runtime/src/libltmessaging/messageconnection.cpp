@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <utility>
 
 #ifdef DispatchMessage
@@ -2121,36 +2122,37 @@ bool CBaseMarginConnection::StoreBootstrapReplyCopy98(const void* bytes, size_t 
     return true;
 }
 
-// anchor: launcher.exe:0x443340 -> connection `+0xa0`
-bool CBaseMarginConnection::StoreBootstrapPrepStateA0(
+// anchor: launcher.exe:0x443220 / constructor reached from `0x443340`
+CMarginConnectionBootstrapPrepStateA0Scaffold::CMarginConnectionBootstrapPrepStateA0Scaffold(
     const void* blockB0,
     const void* blockC4,
-    const void* blockD8,
-    size_t blockByteCount) {
-    constexpr size_t kExpectedBlockByteCount = 0x14u;
-    if (!blockB0 || !blockC4 || !blockD8 || blockByteCount != kExpectedBlockByteCount) {
-        return false;
+    const void* blockD8) {
+    if (blockB0 != nullptr) {
+        std::copy_n(static_cast<const uint8_t*>(blockB0), blockB0At0c.size(), blockB0At0c.begin());
     }
+    if (blockC4 != nullptr) {
+        std::copy_n(static_cast<const uint8_t*>(blockC4), blockC4At20.size(), blockC4At20.begin());
+    }
+    if (blockD8 != nullptr) {
+        std::copy_n(static_cast<const uint8_t*>(blockD8), blockD8At34.size(), blockD8At34.begin());
+    }
+}
 
-    if (!bootstrapPrepStateA0_) {
-        bootstrapPrepStateA0_ = std::make_unique<CMarginConnectionBootstrapPrepStateA0Scaffold>();
+// anchor: launcher.exe:0x443340 -> connection `+0xa0`
+void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0(
+    const void* blockB0,
+    const void* blockC4,
+    const void* blockD8) {
+    connection_.bootstrapPrepStateA0_.reset(
+        new (std::nothrow) CMarginConnectionBootstrapPrepStateA0Scaffold(blockB0, blockC4, blockD8));
+    if (!connection_.bootstrapPrepStateA0_) {
+        spdlog::warn(
+            "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 allocation failed this={} ownerContext={} remoteHost='{}'",
+            fmt::ptr(&connection_),
+            fmt::ptr(connection_.OwnerContext()),
+            connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
+        return;
     }
-    if (!bootstrapPrepStateA0_) {
-        return false;
-    }
-
-    std::copy_n(
-        static_cast<const uint8_t*>(blockB0),
-        kExpectedBlockByteCount,
-        bootstrapPrepStateA0_->blockB0.begin());
-    std::copy_n(
-        static_cast<const uint8_t*>(blockC4),
-        kExpectedBlockByteCount,
-        bootstrapPrepStateA0_->blockC4.begin());
-    std::copy_n(
-        static_cast<const uint8_t*>(blockD8),
-        kExpectedBlockByteCount,
-        bootstrapPrepStateA0_->blockD8.begin());
 
     const auto readFirstDword = [](const std::array<uint8_t, 0x14>& bytes) -> uint32_t {
         return static_cast<uint32_t>(bytes[0]) |
@@ -2160,15 +2162,14 @@ bool CBaseMarginConnection::StoreBootstrapPrepStateA0(
     };
 
     spdlog::info(
-        "CBaseMarginConnection::StoreBootstrapPrepStateA0 staged owner+0x680 child blocks +0xb0/+0xc4/+0xd8 into connection-side +0xa0 mirror blockBytes=0x{:02x} firstDwordB0=0x{:08x} firstDwordC4=0x{:08x} firstDwordD8=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(kExpectedBlockByteCount),
-        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0_->blockB0)),
-        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0_->blockC4)),
-        static_cast<unsigned>(readFirstDword(bootstrapPrepStateA0_->blockD8)),
-        fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    return true;
+        "CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA0 stored connection+0xa0 prep object size=0x{:02x} blockB0@0x0c=0x{:08x} blockC4@0x20=0x{:08x} blockD8@0x34=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold)),
+        static_cast<unsigned>(readFirstDword(connection_.bootstrapPrepStateA0_->blockB0At0c)),
+        static_cast<unsigned>(readFirstDword(connection_.bootstrapPrepStateA0_->blockC4At20)),
+        static_cast<unsigned>(readFirstDword(connection_.bootstrapPrepStateA0_->blockD8At34)),
+        fmt::ptr(&connection_),
+        fmt::ptr(connection_.OwnerContext()),
+        connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
 }
 
 // anchor: launcher.exe:0x41f30
