@@ -728,9 +728,11 @@ public:
     const char* GetName() override;
     // +0x08
     void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) override;
+    // UNANCHORED helper kept explicit from the real wrapper/owner vtable rows:
+    // - wrapper `ILTLoginMediator.Default +0x08` currently forwards into `Initialize(...)`
+    // - owner `CLTLoginMediator +0x0c` is `0x41f510 = ResetOwnedRuntimeState`, not a direct engine setter
+    void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
     // +0x0c
-    void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) override;
-    // +0x10
     void ClearEngine() override;
     // +0x14
     uint32_t IsReady() override;
@@ -739,7 +741,7 @@ public:
     // +0x1c
     // void UnknownSlot6();
     void SetValue1(void* value) override;
-    // +0x20
+    // +0x24
     void SetValue2(void* value) override;
     // +0x2c
     uint32_t IsConnected() override;
@@ -1267,6 +1269,9 @@ public:
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
     // slot-record helpers onto the wrapper-facing `ILTLoginMediator.Default +0x40/+0x44` object
     // shapes.
+    // - arg6 `+0x40` = selection-descriptor object family
+    // - arg6 `+0x44` = current-slot-record object family
+    // - owner `+0x40 = 0x41f2e0` remains the separate `GetSlotRecordByIndex` accessor
     Arg6SelectionDescriptor40ObjectSketch* GetArg6SelectionDescriptorObject40(
         uint32_t selectionIndex) override;
     Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() override;

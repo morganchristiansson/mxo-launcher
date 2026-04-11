@@ -648,8 +648,9 @@ bool CLTLoginMediator::RefreshArg6CurrentSlotRecordObject44() {
 }
 
 // Wrapper-facing arg6 `+0x40` selection-descriptor object builder.
-// Keep this naming split explicit from owner `+0x40 = GetSlotRecordByIndex`.
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// Keep this naming split explicit from owner `+0x40 = 0x41f2e0 = GetSlotRecordByIndex`.
+// UNANCHORED: this wrapper-facing slot is still a separate ABI/object family with no recovered
+// owner-side concrete body to anchor directly.
 Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
     uint32_t selectionIndex) {
     const uint32_t low24 = selectionIndex & 0x00ffffffu;

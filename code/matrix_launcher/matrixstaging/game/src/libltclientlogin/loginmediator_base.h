@@ -370,6 +370,14 @@ struct ProcessCreateCharacterInput120Sketch {
 class ILTLoginMediator {
 public:
     static ILTLoginMediator* Default;
+    // Important wrapper/owner split correction:
+    // - this abstract base models the resolved `ILTLoginMediator.Default` arg6 surface
+    // - do not project owner-only `CLTLoginMediator` slots back onto this interface just because
+    //   nearby concrete rows share related data
+    // - in particular, owner `+0x40 = 0x41f2e0 = GetSlotRecordByIndex` is **not** the abstract
+    //   arg6 `+0x40` row; the wrapper-facing arg6 `+0x40` slot remains the separate
+    //   selection-descriptor object family consumed by the client profile-path builder
+
     // +0x00
     virtual const char* GetName() = 0;
     // +0x04
@@ -377,202 +385,200 @@ public:
     // +0x08
     virtual void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) = 0;
     // +0x0c
-    virtual void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) = 0;
-    // +0x10
     virtual void ClearEngine() = 0;
-    // +0x14
+    // +0x10
     virtual uint32_t IsReady() = 0;
-    // +0x18
+    // +0x14
     void UnknownSlot5();
-    // +0x1c
+    // +0x18
     void UnknownSlot6();
-    // +0x20
+    // +0x1c
     virtual void SetValue1(void* value) = 0;
+    // +0x20
+    void UnknownSlot8();
     // +0x24
     virtual void SetValue2(void* value) = 0;
     // +0x28
-    virtual uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) = 0;
+    void UnknownSlot10();
     // +0x2c
-    void UnknownSlot9();
-    // +0x30
     virtual uint32_t IsConnected() = 0;
+    // +0x30
+    virtual uint32_t ProcessLoginRequest(const ProcessLoginRequestInputSketch& input) = 0;
     // +0x34
-    virtual const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t index) const = 0;
-    // +0x38
     virtual void RequestAuthCloseAndSwitchToState0() = 0;
-    // +0x3c
+    // +0x38
     virtual const char* GetProfileRootName() const = 0;
-    // +0x40
+    // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
-    // +0x44
+    // +0x40
     virtual Arg6SelectionDescriptor40ObjectSketch* GetArg6SelectionDescriptorObject40(uint32_t selectionIndex) = 0;
-    // +0x48
+    // +0x44
     virtual Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() = 0;
-    // +0x4c
+    // +0x48
     virtual const char* GetWorldOrSelectionName() const = 0;
-    // +0x50
+    // +0x4c
     virtual const char* GetProfileOrSessionName() const = 0;
-    // +0x54
+    // +0x50
     virtual void* BootstrapRaw08AuxHandle50() const = 0;
-    // +0x58
+    // +0x54
     virtual bool HasBootstrapRaw08AuxHandle54() const = 0;
-    // +0x5c
+    // +0x58
     virtual uint8_t GetCrashReporterPromptForSecurId58() const = 0;
-    // +0x60
+    // +0x5c
     virtual const char* GetCrashReporterUsername5c(const void* chainedValueToken) = 0;
-    // +0x64
+    // +0x60
     virtual const char* GetCrashReporterPassword60(const void* chainedValueToken) = 0;
+    // +0x64
+    void UnknownSlot25();
     // +0x68
-    void UnknownSlot24();
-    // +0x6c
     virtual uint32_t HasLiveHlCfg68() const = 0;
-    // +0x70
+    // +0x6c
     virtual uint32_t HasLiveAnCfg6c() const = 0;
-    // +0x74
+    // +0x70
     virtual uint32_t HasLivePiCfg70() const = 0;
-    // +0x78
+    // +0x74
     virtual uint32_t HasLiveAiCfg74() const = 0;
-    // +0x7c
+    // +0x78
     virtual uint32_t HasLiveCsCfg78() const = 0;
-    // +0x80
+    // +0x7c
     virtual uint32_t HasLiveBlCfg7c() const = 0;
-    // +0x84
+    // +0x80
     virtual uint32_t HasLiveIlCfg80() const = 0;
-    // +0x88
+    // +0x84
     virtual uint32_t HasLiveRlCfg84() const = 0;
-    // +0x8c
+    // +0x88
     virtual uint32_t HasLiveClCfg88() const = 0;
-    // +0x90
+    // +0x8c
     virtual uint32_t HasState8PersistenceData8c() const = 0;
-    // +0x94
+    // +0x90
     virtual uint32_t HasLiveCuiCfg90() const = 0;
-    // +0x98
+    // +0x94
     virtual void* GetLiveHlCfg94(uint32_t* outLength) const = 0;
-    // +0x9c
+    // +0x98
     virtual void* GetLiveAnCfg98(uint32_t* outLength) const = 0;
-    // +0xa0
+    // +0x9c
     virtual void* GetLivePiCfg9c(uint32_t* outLength) const = 0;
-    // +0xa4
+    // +0xa0
     virtual void* GetLiveAiCfgA0(uint32_t* outLength) const = 0;
-    // +0xa8
+    // +0xa4
     virtual void* GetLiveCsCfgA4(uint32_t* outLength) const = 0;
-    // +0xac
+    // +0xa8
     virtual void* GetLiveBlCfgA8(uint32_t* outLength) const = 0;
-    // +0xb0
+    // +0xac
     virtual void* GetLiveIlCfgAc(uint32_t* outLength) const = 0;
-    // +0xb4
+    // +0xb0
     virtual void* GetLiveRlCfgB0(uint32_t* outLength) const = 0;
-    // +0xb8
+    // +0xb4
     virtual void* GetLiveClCfgB4(uint32_t* outLength) const = 0;
-    // +0xbc
+    // +0xb8
     virtual void* GetLiveCuiCfgB8(uint32_t* outLength) const = 0;
-    // +0xc0
+    // +0xbc
     virtual const void* GetState8PersistenceHeaderBc() const = 0;
-    // +0xc4
+    // +0xc0
     virtual const void* GetState8PersistenceBodyC0() const = 0;
-    // +0xc8
+    // +0xc4
     virtual void* GetState8PersistenceOverflowC4(uint16_t* outLength) const = 0;
-    // +0xcc
+    // +0xc8
     virtual uint32_t HasState8Section11Dword145c() const = 0;
-    // +0xd0
+    // +0xcc
     virtual uint32_t GetState8Section11Dword145c() const = 0;
-    // +0xd4
+    // +0xd0
     virtual RouteDescriptor30SmallStringLikeSketch* GetState8Section11String1460() = 0;
-    // +0xd8
+    // +0xd4
     virtual const void* GetState9CallbackSeedPointer85D4() const = 0;
-    // +0xdc
+    // +0xd8
     virtual uint32_t GetArg7SelectionUpperBoundExclusive() const = 0;
-    // +0xe0
+    // +0xdc
     virtual const char* MapSelectionName(uint32_t selectionHighByte) const = 0;
-    // +0xe4
+    // +0xe0
     virtual const char* GetVariantWorldName(uint32_t variantIndex) = 0;
-    // +0xe8
+    // +0xe4
     virtual uint8_t GetVariantState(int32_t variantIndex) const = 0;
-    // +0xec
+    // +0xe8
     virtual uint32_t RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t selectedSlotRecordIndex) = 0;
-    // +0xf0
+    // +0xec
     virtual uint32_t PersistSelectionContextForState8(const State3SelectionContextInputSketch& input) = 0;
-    // +0xf4
+    // +0xf0
     virtual uint32_t SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) = 0;
-    // +0xf8
+    // +0xf4
     virtual const void* GetState8PersistenceF1c() const = 0;
-    // +0xfc
+    // +0xf8
     virtual uint32_t GetWorldCount() const = 0;
-    // +0x100
+    // +0xfc
     virtual const char* GetWorldNameByIndex(uint32_t index) = 0;
-    // +0x104
+    // +0x100
     virtual uint8_t GetWorldSelectionGateByteByIndex(uint32_t index) const = 0;
-    // +0x108
+    // +0x104
     virtual uint8_t GetWorldTypeByteByIndex(uint32_t index) const = 0;
-    // +0x10c
+    // +0x108
     virtual uint8_t GetWorldPopulationNibbleByIndex(uint32_t index) const = 0;
-    // +0x110
+    // +0x10c
     virtual RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() = 0;
+    // +0x110
+    void UnknownSlot68();
     // +0x114
-    void UnknownSlot70();
+    void UnknownSlot69();
     // +0x118
-    void UnknownSlot71();
-    // +0x11c
     virtual LateEntryList1470VectorLikeSketch* GetLateEntryList1470() = 0;
+    // +0x11c
+    void UnknownSlot71();
     // +0x120
-    void UnknownSlot73();
-    // +0x124
     virtual uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) = 0;
-    // +0x128
+    // +0x124
     virtual void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) = 0;
+    // +0x128
+    void UnknownSlot74();
     // +0x12c
-    void UnknownSlot76();
+    void UnknownSlot75();
     // +0x130
-    virtual void SetState9CallbackObjectTriple84_88_8c(void* callback, void* object, void* object2) = 0;
-    // +0x134
     virtual SessionCallbackHelper65cSketch* GetSessionCallbackHelper65c() const = 0;
-    // +0x138
+    // +0x134
     virtual SessionCallbackHelper65cSketch* EnsureSessionCallbackHelper65c() = 0;
+    // +0x138
+    void UnknownSlot78();
     // +0x13c
-    // virtual void SwitchToState18IfLaunchPadGateState16State18Set() = 0;
-    // +0x140
     virtual void HelperSlot13c_InvokeSessionHelperVtable4() = 0;
-    // +0x144
-    // virtual void HelperSlot140_CreateStationLoginSideEffect() = 0;
-    // +0x148
+    // +0x140
     void UnknownSlot80();
-    // +0x14c
+    // +0x144
+    void UnknownSlot81();
+    // +0x148
     virtual const char* GetGameSessionId() const = 0;
-    // +0x150
+    // +0x14c
     virtual void SetSharedMarginPacketField660(uint32_t value) = 0;
-    // +0x154
-    // virtual void ProcessCallbackData(const char* data) = 0;
-    // +0x158
+    // +0x150
     void UnknownSlot84();
-    // +0x15c
+    // +0x154
+    void UnknownSlot85();
+    // +0x158
     virtual uint32_t SetState9OptionalField90AndSwitchToState13(uint32_t value) = 0;
+    // +0x15c
+    void UnknownSlot87();
     // +0x160
-    void UnknownSlot86();
+    void UnknownSlot88();
     // +0x164
-    // virtual void ForwardThroughReadyMarginConnection24(void* workItem) = 0;
-    // +0x168
     virtual bool RequestAuthConnectionCloseWaitEvent1() = 0;
+    // +0x168
+    void UnknownSlot90();
     // +0x16c
-    void UnknownSlot89();
-    // +0x170
     virtual bool RequestMarginConnectionCloseWaitEvent0f() = 0;
-    // +0x174
+    // +0x170
     virtual bool RegisterLoginObserver(void* observer) = 0;
-    // +0x178
+    // +0x174
     virtual bool UnregisterLoginObserver(void* observer) = 0;
-    // +0x17c
+    // +0x178
     virtual uint32_t GetLastLoginStatus() = 0;
-    // +0x180
+    // +0x17c
     virtual uint32_t HandleAuthConnectionCompletionFallback(void* connection, void* workItem) = 0;
-    // +0x184
+    // +0x180
     virtual uint32_t DispatchCurrentHelperAuthMessage(void* workItem) = 0;
-    // +0x188
+    // +0x184
     virtual uint32_t DispatchCurrentHelperSlot6(void* workItem) = 0;
-    // +0x18c
+    // +0x188
     virtual uint32_t HandleMarginConnectionCompletionFallback(void* connection, void* workItem) = 0;
-    // +0x190
+    // +0x18c
     virtual uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) = 0;
-    // virtual void AppendLateEntryStringTriple1470(const LateEntryList1470EntrySketch* entry) = 0;
+    // concrete owner-only `CLTLoginMediator` continues with `+0x190`
 };
 
 }  // namespace ltlogin
