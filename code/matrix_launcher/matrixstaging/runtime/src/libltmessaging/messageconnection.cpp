@@ -467,16 +467,22 @@ CMessageConnectionMessageRef* CMessageConnectionMessageRefOutputBuffer::MessageR
 void CStreamPacketEncryptionModuleReadTransformWorker::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
+    hasConfiguredFeedbackTransform =
+        feedbackTransform.FeedbackSizeTransformAdapter_ConstructLarge(
+            associatedSeedBytes.data(),
+            static_cast<uint32_t>(associatedSeedBytes.size()),
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u);
 }
 
 // anchor: launcher.exe:0x44d500
 bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
     const CMessageConnectionMessageRef& inputMessageRef,
-    CMessageConnectionMessageRefOutputBuffer* outputBuffer) const {
-    // Source collapses the original large FeedbackSize worker + StreamTransformationFilter +
-    // CPacketDecryptor chain down to the confirmed packet semantic: decrypt the current payload
-    // span with the associated 16-byte seed and materialize a replacement message-ref on success.
-    if (!outputBuffer) {
+    CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
+    // Source still keeps the confirmed packet semantic at the worker boundary here, but the
+    // recovered large/decrypting `FeedbackSize` adapter constructed by `0x44d910` is now held as a
+    // real object alongside that packet-level behavior instead of being collapsed away entirely.
+    if (!outputBuffer || !hasConfiguredFeedbackTransform) {
         return false;
     }
 
@@ -506,16 +512,22 @@ bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
 void CStreamPacketEncryptionModuleWriteTransformWorker::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
+    hasConfiguredFeedbackTransform =
+        feedbackTransform.FeedbackSizeTransformAdapter_ConstructSmall(
+            associatedSeedBytes.data(),
+            static_cast<uint32_t>(associatedSeedBytes.size()),
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u);
 }
 
 // anchor: launcher.exe:0x44d390
 bool CStreamPacketEncryptionModuleWriteTransformWorker::TryTransform(
     const CMessageConnectionMessageRef& inputMessageRef,
-    CMessageConnectionMessageRefOutputBuffer* outputBuffer) const {
-    // Source collapses the original small FeedbackSize worker + CPacketEncryptor chain down to the
-    // confirmed packet semantic: encrypt the current payload span with the associated 16-byte seed
-    // and materialize a replacement message-ref on success.
-    if (!outputBuffer) {
+    CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
+    // Source still keeps the confirmed packet semantic at the worker boundary here, but the
+    // recovered small/encrypting `FeedbackSize` adapter constructed by `0x44d820` is now held as a
+    // real object alongside that packet-level behavior instead of being collapsed away entirely.
+    if (!outputBuffer || !hasConfiguredFeedbackTransform) {
         return false;
     }
 

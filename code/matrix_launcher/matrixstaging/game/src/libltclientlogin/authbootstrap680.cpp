@@ -65,6 +65,8 @@ struct AuthBootstrap680ChildOwnedState {
     AuthBootstrap680LazyPubkeyDatValidatorOwnedState lazyPubkeyDatValidatorA4;
     AuthBootstrap680Raw08PublicKeyWorkerOwnedState raw08PublicKeyWorkerA8;
     AuthBootstrap680ReplyAuthDataValidatorOwnedState replyAuthDataValidatorAC;
+    std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterLarge> feedbackTransformLarge94;
+    std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterSmall> feedbackTransformSmall98;
     std::unique_ptr<AuthBootstrap680AuthReplyParseObjectF0Sketch> authReplyParseObjectF0;
     std::vector<uint8_t> authReplyParsePacketBodyBytes;
     std::unique_ptr<AuthBootstrapReplyCopyShadowF4Sketch> authReplyCopyShadowF4;
@@ -477,6 +479,15 @@ static void ResetAuthBootstrap680ReplyPublicKeyWorkers(
     ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.raw08PublicKeyWorkerA8.publicKeyPair0c);
     ownedState.replyAuthDataValidatorAC.object.reset();
     ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.replyAuthDataValidatorAC.publicKeyPair0c);
+}
+
+static void ResetAuthBootstrap680FeedbackTransforms(
+    AuthBootstrap680Child& child,
+    AuthBootstrap680ChildOwnedState& ownedState) {
+    child.feedbackTransformLarge94 = nullptr;
+    child.feedbackTransformSmall98 = nullptr;
+    ownedState.feedbackTransformLarge94.reset();
+    ownedState.feedbackTransformSmall98.reset();
 }
 
 // anchor: launcher.exe:0x447260 / 0x447c10
@@ -1304,6 +1315,7 @@ AuthBootstrap680Child::AuthBootstrap680Child() {
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
     ResetAuthBootstrap680Field54Helper(&feedbackSeedHelper54, &ownedState.field54Helper);
     ResetAuthBootstrap680ReplyPublicKeyWorkers(*this, ownedState);
+    ResetAuthBootstrap680FeedbackTransforms(*this, ownedState);
     ownedState.lazyPubkeyDatValidatorA4.object.reset();
     ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c);
     ResetAuthBootstrap680ReplyParseObject(*this, ownedState);
@@ -1687,6 +1699,29 @@ uint32_t AuthBootstrap680Child::SendAuthRequest(
     child.currentPublicKeyId9C = reply.publicKeyId;
 
     FillAuthBootstrap680Field54SeedBytesScaffold(child.feedbackSeedHelper54, child.feedbackSeed84);
+    ResetAuthBootstrap680FeedbackTransforms(child, ownedState);
+
+    auto feedbackTransformLarge94 =
+        std::make_unique<mxo::auth::internal::FeedbackSizeTransformAdapterLarge>();
+    if (feedbackTransformLarge94->FeedbackSizeTransformAdapter_ConstructLarge(
+            child.feedbackSeed84.data(),
+            static_cast<uint32_t>(child.feedbackSeed84.size()),
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u)) {
+        child.feedbackTransformLarge94 = feedbackTransformLarge94.get();
+        ownedState.feedbackTransformLarge94 = std::move(feedbackTransformLarge94);
+    }
+
+    auto feedbackTransformSmall98 =
+        std::make_unique<mxo::auth::internal::FeedbackSizeTransformAdapterSmall>();
+    if (feedbackTransformSmall98->FeedbackSizeTransformAdapter_ConstructSmall(
+            child.feedbackSeed84.data(),
+            static_cast<uint32_t>(child.feedbackSeed84.size()),
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u)) {
+        child.feedbackTransformSmall98 = feedbackTransformSmall98.get();
+        ownedState.feedbackTransformSmall98 = std::move(feedbackTransformSmall98);
+    }
 
     mxo::auth::AuthBlobLayout blobLayout;
     blobLayout.embeddedTime = static_cast<uint32_t>(std::time(nullptr));

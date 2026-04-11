@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 
+#include "../libltcrypto/auth_internal.h"
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
 #ifdef DispatchMessage
@@ -404,15 +405,18 @@ public:
     // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
     // by `0x44d910`.
     // Original shape is the larger `FeedbackSizeTransformAdapter_ConstructLarge` branch reused by
-    // the auth-bootstrap transform family. `0x44d500` wraps each stored worker in a
-    // `StreamTransformationFilter` and passes a copied `LTTCPEndpointKey` peer block into
-    // `0x44bca0 = CPacketDecryptor_DecryptPacket`.
+    // the auth-bootstrap transform family. Source now keeps that recovered large/decrypting
+    // `AssemblyTwofish` adapter object explicit instead of collapsing this worker down to raw seed
+    // bytes only. `0x44d500` then wraps each stored worker in a `StreamTransformationFilter` and
+    // passes a copied `LTTCPEndpointKey` peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`.
     std::array<uint8_t, 16> associatedSeedBytes{};
+    mxo::auth::internal::FeedbackSizeTransformAdapterLarge feedbackTransform;
+    bool hasConfiguredFeedbackTransform = false;
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
     bool TryTransform(
         const CMessageConnectionMessageRef& inputMessageRef,
-        CMessageConnectionMessageRefOutputBuffer* outputBuffer) const;
+        CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
 class CStreamPacketEncryptionModuleWriteTransformWorker {
@@ -420,15 +424,18 @@ public:
     // Source-owned real C++ mirror of the embedded write-side transform worker rooted at helper
     // `+0x0c` by `0x44d820` / worker vtable `0x004b86a8`.
     // Original shape is the smaller `FeedbackSizeTransformAdapter_ConstructSmall` branch.
-    // `0x44d250` then resolves the parameter block fed into
-    // `0x44c750 = CPacketEncryptor_EncryptPacket`, while the helper also snapshots
+    // Source now keeps that recovered small/encrypting `AssemblyTwofish` adapter object explicit
+    // instead of only caching the 16-byte seed. `0x44d250` then resolves the parameter block fed
+    // into `0x44c750 = CPacketEncryptor_EncryptPacket`, while the helper also snapshots
     // `configuredConnection10->+0x24 = LTTCPEndpointKey` for the same packet-crypto family.
     std::array<uint8_t, 16> associatedSeedBytes{};
+    mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransform;
+    bool hasConfiguredFeedbackTransform = false;
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
     bool TryTransform(
         const CMessageConnectionMessageRef& inputMessageRef,
-        CMessageConnectionMessageRefOutputBuffer* outputBuffer) const;
+        CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
 class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase {

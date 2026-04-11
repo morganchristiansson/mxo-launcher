@@ -8,7 +8,6 @@
 #include <array>
 #include <cstring>
 #include <string>
-#include <vector>
 
 namespace mxo::ltlogin {
 namespace state9submit = mxo::ltlogin::state9submit_scaffold;
@@ -193,21 +192,22 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
     std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
     const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(marginTwofishKey.data());
 
-    std::vector<uint8_t> ciphertext;
-    if (!mxo::auth::internal::TwofishCbcProcessNoPadding(
-            std::vector<uint8_t>(transformInput.begin(), transformInput.end()),
-            std::vector<uint8_t>(marginTwofishKey.begin(), marginTwofishKey.end()),
-            /*encrypt=*/true,
-            &ciphertext) ||
-        ciphertext.size() != 16u) {
+    mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransformAdapter;
+    if (!feedbackTransformAdapter.FeedbackSizeTransformAdapter_ConstructSmall(
+            marginTwofishKey.data(),
+            static_cast<uint32_t>(marginTwofishKey.size()),
+            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
+            0u) ||
+        !feedbackTransformAdapter.FeedbackSizeTransformAdapter_TransformBuffer(
+            outDwords + 4,
+            transformInput.data(),
+            16u)) {
         std::memset(outDwords + 4, 0, 16u);
         spdlog::info(
             "CLTLoginMediator::FillState9CallbackBlob18c Twofish block transform failed ownerF18=0x{:08x}",
             static_cast<unsigned>(ownerF18));
         return 1u;
     }
-
-    std::memcpy(outDwords + 4, ciphertext.data(), 16u);
     spdlog::info(
         "CLTLoginMediator::FillState9CallbackBlob18c built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource=mediator+0xd4 seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
         static_cast<unsigned>(outDwords[0]),

@@ -11,6 +11,11 @@ namespace mxo::liblttcp {
 class CMarginConnection;
 }
 
+namespace mxo::auth::internal {
+class FeedbackSizeTransformAdapterLarge;
+class FeedbackSizeTransformAdapterSmall;
+}
+
 namespace mxo::ltlogin {
 
 class CLTLoginMediator;
@@ -459,8 +464,8 @@ struct AuthBootstrap680Child {
 
     uint32_t authServerTimeBias80 = 0;           // original child `+0x80`; `0x448140` stores `time(NULL) - GetPublicKeyReply.currentTime`, and later `0x4474f0` / `AuthBootstrapReplyCopyShadowF4_IsFresh` / `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` use it to reconstruct current auth-server time
     std::array<uint8_t, 16> feedbackSeed84{}; // original child `+0x84 .. +0x93`; helper-generated seed block from child `+0x54`, later reused by the `0x4474f0` transform-worker setup
-    void* feedbackTransformLarge94 = nullptr;    // original child `+0x94`; allocated in `0x4474f0`
-    void* feedbackTransformSmall98 = nullptr;    // original child `+0x98`; allocated in `0x4474f0`
+    mxo::auth::internal::FeedbackSizeTransformAdapterLarge* feedbackTransformLarge94 = nullptr; // original child `+0x94`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructLarge`
+    mxo::auth::internal::FeedbackSizeTransformAdapterSmall* feedbackTransformSmall98 = nullptr; // original child `+0x98`; allocated in `0x4474f0` through `FeedbackSizeTransformAdapter_ConstructSmall`
     uint32_t currentPublicKeyId9C = 0;           // original child `+0x9c`
     uint8_t authRequestReadyA0 = 0;              // original child `+0xa0`; `0x447f50` sets this byte and `0x448050` branches on it before choosing raw `0x06` vs raw `0x08`
     std::array<uint8_t, 3> paddingA1ToA3{};      // original child `+0xa1 .. +0xa3`
