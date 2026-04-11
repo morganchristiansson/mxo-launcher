@@ -213,14 +213,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     //   the base type-4/MS wrapper path can synthesize a local type-`0x0b` completion object and
     //   fall into mediator fallback `0x41afc0`, which re-enters helper slot 2 instead of slot 6
     if (!mediator->State10HasReadyConnectionState2()) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState4();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  4u,
-                  fallbackState,
-                  this,
-                  "State8 slot3 owner+0x1c state!=2 -> helper4 margin-connect continuation")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(4u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
@@ -228,14 +221,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         return fallbackResult;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState6();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  6u,
-                  fallbackState,
-                  this,
-                  "State8 slot3 owner+0xf14==0 -> helper6 (matches 0x43bd52 -> 0x41b450(6))")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
             static_cast<unsigned>(fallbackResult),
@@ -381,9 +367,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     auto& ownerState = mediator->postAuthMarginLoadingState_;
     ownerState.worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
-        if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
-            mediator->SwitchHelperStateScaffold(3u, failureState);
-        }
+        (void)mediator->SwitchHelperStateByIdScaffold(3u);
         mediator->PostErrorScaffold(10u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would latch owner+0x80 to that raw server code, switch helper state to 3, and post generic OnLoginError error=10 currentState={}",
@@ -842,19 +826,14 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         }
         LogState8PersistenceFamilySnapshot(ownerState, "completed", loadCharacterReplyEnvelope.sectionSelectorMinus2, loadCharacterReplyEnvelope.sectionByteCount, true);
 
-        if (CLTLoginState* nextBase = mediator->ScaffoldState9()) {
-            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
-                nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
-            }
-            mediator->SwitchHelperStateScaffold(9u, nextBase);
-            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
-                const uint32_t slot3Result = nextState->Slot3_BeginOrContinue(this, mediator);
-                spdlog::info(
-                    "CLTLoginState_State8::Slot6_HandleSecondaryMessage mirrored 0x41b450 new-helper slot3 notification into helper9 before event=0x0b handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
-                    loadCharacterReplyEnvelope.handoffWord09,
-                    static_cast<unsigned>(slot3Result));
-            }
+        if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(mediator->LoginHelperStateByIdScaffold(9u))) {
+            nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
         }
+        const uint32_t slot3Result = mediator->SwitchHelperStateByIdScaffold(9u);
+        spdlog::info(
+            "CLTLoginState_State8::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x0b handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
+            loadCharacterReplyEnvelope.handoffWord09,
+            static_cast<unsigned>(slot3Result));
         spdlog::info(
             "ROUTE CHECKPOINT: late-login state8 complete -> state9 handoffWord=0x{:04x} currentState={}",
             loadCharacterReplyEnvelope.handoffWord09,

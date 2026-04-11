@@ -312,28 +312,14 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
     // - send through `0x41af70`
     // - post event `0x13`
     if (!mediator->State10HasReadyConnectionState2()) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState4();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  4u,
-                  fallbackState,
-                  this,
-                  "State10 slot3 owner+0x1c state!=2 -> helper4 margin-connect continuation")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(4u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return fallbackResult;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState6();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  6u,
-                  fallbackState,
-                  this,
-                  "State10 slot3 owner+0xf14==0 -> helper6 margin-bootstrap continuation")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
@@ -393,9 +379,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     }
 
     if (mediator->WorldListCountOrStatus80() >= 1u) {
-        if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
-            mediator->SwitchHelperStateScaffold(3u, failureState);
-        }
+        (void)mediator->SwitchHelperStateByIdScaffold(3u);
         mediator->PostErrorScaffold(0x0bu);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
@@ -404,12 +388,11 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     }
 
     uint32_t helper11EntryResult = 0u;
-    if (CLTLoginState* nextState = mediator->ScaffoldState11()) {
-        helper11EntryResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-            0x0bu,
-            nextState,
-            this,
-            "State10 slot6 successful MS_ClaimCharacterNameReply -> helper11 immediate slot3 continuation");
+    if (mediator->LoginHelperStateByIdScaffold(0x0bu) != nullptr) {
+        // anchor: launcher.exe:0x4401a0 success tail
+        // Original ends with `0x41b450(0x0b)`, so keep the immediate helper11 slot-3 continuation
+        // inside the central switch helper instead of restaging it through a source-only wrapper.
+        helper11EntryResult = mediator->SwitchHelperStateByIdScaffold(0x0bu);
         mediator->expectedMarginRequestName_ = CLTLoginMediator::kMessageMsLoadCharacterReply;
     } else {
         spdlog::warn(

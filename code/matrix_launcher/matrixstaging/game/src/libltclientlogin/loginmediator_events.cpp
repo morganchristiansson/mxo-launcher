@@ -402,37 +402,6 @@ uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId)
     return slot3Result;
 }
 
-void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
-    // anchor: launcher.exe:0x41b450
-    // Narrow source wrapper for call sites that still want only the install side without relying on
-    // this helper to own the immediate slot-3 continuation. Even here, resolve the helper from the
-    // global dispatch-table mirror first so storage stays faithful to `[id*4 + 0x4f7868]`.
-    CLTLoginState* const resolvedState =
-        (helperStateId < 20u)
-            ? static_cast<CLTLoginState*>(reinterpret_cast<void* const*>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId])
-            : nullptr;
-    if (resolvedState != nullptr) {
-        state = resolvedState;
-    }
-
-    lastSwitchedHelperStateScaffold_ = helperStateId;
-    CLTLoginState* oldState = currentState_;
-    if (!state) {
-        spdlog::info(
-            "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState=<null> (dispatch-table miss leaves currentState unchanged)",
-            static_cast<unsigned>(helperStateId),
-            oldState ? oldState->DebugName() : "<null>");
-        return;
-    }
-
-    currentState_ = state;
-    spdlog::info(
-        "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState={} dispatchTableBase=&g_LoginHelperDispatchTableScaffold.helper7868",
-        static_cast<unsigned>(helperStateId),
-        oldState ? oldState->DebugName() : "<null>",
-        state->DebugName());
-}
-
 bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
     // anchor: launcher.exe:0x41ddb0
     // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now

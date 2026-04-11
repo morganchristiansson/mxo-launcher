@@ -250,14 +250,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     }
 
     if (!mediator->State10HasReadyConnectionState2()) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState4();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  4u,
-                  fallbackState,
-                  this,
-                  "State6 slot3 owner+0x1c state!=2 -> helper4 margin-connect continuation")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(4u);
         spdlog::info(
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on owner+0x1c state!=2 -> helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
@@ -269,14 +262,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     const bool marginConnectionReady84 =
         marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84();
     if (!marginConnectionReady84) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState5();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  5u,
-                  fallbackState,
-                  this,
-                  "State6 slot3 owner+0x1c+0x84==0 -> helper5 continuation")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(5u);
         spdlog::info(
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on margin connection +0x84==0 -> helper5 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),

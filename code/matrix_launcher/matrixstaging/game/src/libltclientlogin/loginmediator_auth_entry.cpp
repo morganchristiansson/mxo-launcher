@@ -75,10 +75,6 @@ static CLTLoginState*& GlobalLoginHelperDispatchSlotByIdScaffold(uint32_t helper
     return reinterpret_cast<CLTLoginState**>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId];
 }
 
-static CLTLoginState* GlobalLoginHelperDispatchStateByIdScaffold(uint32_t helperStateId) {
-    return (helperStateId < 20u) ? GlobalLoginHelperDispatchSlotByIdScaffold(helperStateId) : nullptr;
-}
-
 }  // namespace
 
 CLTLoginMediator::ConnectionHelperFamily g_LoginHelperDispatchTableScaffold = {};
@@ -184,109 +180,13 @@ void CLTLoginMediator::RegisterScaffoldState19(CLTLoginState* state) {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState0() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(0u);
+CLTLoginState* CLTLoginMediator::LoginHelperStateByIdScaffold(uint32_t helperStateId) const {
+    return (helperStateId < 20u) ? const_cast<CLTLoginState*&>(GlobalLoginHelperDispatchSlotByIdScaffold(helperStateId)) : nullptr;
 }
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState1() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(1u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState2() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(2u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState3() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(3u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState4() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(4u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState5() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(5u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState6() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(6u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState7() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(7u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState8() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(8u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState9() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(9u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState10() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(10u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState11() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(11u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState12() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(12u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState13() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(13u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState14() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(14u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState15() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(15u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState16() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(16u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState17() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(17u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState18() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(18u);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-CLTLoginState* CLTLoginMediator::ScaffoldState19() const {
-    return GlobalLoginHelperDispatchStateByIdScaffold(19u);
-}
-
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InstallInitialState0Scaffold() {
-    if (ScaffoldState0() == nullptr) {
+    if (LoginHelperStateByIdScaffold(0u) == nullptr) {
         spdlog::info(
             "ROUTE CHECKPOINT: startup initial state0 scaffold missing currentState={}",
             currentState_ ? currentState_->DebugName() : "<null>");
@@ -298,7 +198,7 @@ void CLTLoginMediator::InstallInitialState0Scaffold() {
     // - state0 itself does not own the first submit transition because its slot 3 is the shared
     //   no-op stub
     // - `ProcessLoginRequest` later performs the first happy-path state switch (`state0 -> state2`)
-    currentState_ = ScaffoldState0();
+    currentState_ = LoginHelperStateByIdScaffold(0u);
     spdlog::info(
         "ROUTE CHECKPOINT: startup installed initial helper state0 currentState={} role=idle/start anchor=(launcher.exe:0x41b160 -> owner+0x10 = helper0 / 0x4f7868)",
         currentState_->DebugName());
@@ -480,37 +380,6 @@ const CLTLoginMediator::MarginRouteState& CLTLoginMediator::CurrentMarginRouteSt
     return marginRouteState_;
 }
 
-// UNANCHORED: source-owned wrapper over `0x41b450` plus explicit new-helper slot-3 dispatch.
-uint32_t CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold(
-    uint32_t helperStateId,
-    CLTLoginState* state,
-    void* upstreamOrArg,
-    const char* reason) {
-    const CLTLoginState* const oldState = currentState_;
-    SwitchHelperStateScaffold(helperStateId, state);
-    if (state == nullptr) {
-        spdlog::info(
-            "CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold helperState=0x{:02x} reason='{}' oldState={} upstream={} upstreamPhaseCode={} -> skipped (no target state)",
-            static_cast<unsigned>(helperStateId),
-            reason ? reason : "<unspecified>",
-            oldState ? oldState->DebugName() : "<null>",
-            fmt::ptr(upstreamOrArg),
-            static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(upstreamOrArg)));
-        return 0u;
-    }
-
-    const uint32_t result = state->Slot3_BeginOrContinue(upstreamOrArg, this);
-    spdlog::info(
-        "CLTLoginMediator::SwitchHelperStateAndDispatchSlot3Scaffold helperState=0x{:02x} reason='{}' oldState={} newState={} upstream={} upstreamPhaseCode={} -> slot3Result=0x{:08x}",
-        static_cast<unsigned>(helperStateId),
-        reason ? reason : "<unspecified>",
-        oldState ? oldState->DebugName() : "<null>",
-        state->DebugName(),
-        fmt::ptr(upstreamOrArg),
-        static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(upstreamOrArg)),
-        static_cast<unsigned>(result));
-    return result;
-}
 
 // anchor: launcher.exe:0x41b490
 bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
@@ -602,12 +471,8 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         spdlog::info(
             "ROUTE CHECKPOINT: early-auth state0 -> state2 via owner ProcessLoginRequest (favored g_LaunchPadGateState16State18==0 happy path) upstreamState={} clearedOwnerF4=1",
             upstreamState ? upstreamState->DebugName() : "<null>");
-        if (ScaffoldState2() != nullptr) {
-            const uint32_t state2EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
-                2u,
-                ScaffoldState2(),
-                upstreamState,
-                "ProcessLoginRequest default g_LaunchPadGateState16State18==0 branch");
+        if (LoginHelperStateByIdScaffold(2u) != nullptr) {
+            const uint32_t state2EntryResult = SwitchHelperStateByIdScaffold(2u);
             spdlog::info(
                 "CLTLoginMediator::ProcessLoginRequest default state2 entry upstreamState={} -> slot3Result=0x{:08x}",
                 upstreamState ? upstreamState->DebugName() : "<null>",
@@ -636,12 +501,8 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
             spdlog::info(
                 "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state16 (string60 non-empty, helper65c absent) upstreamState={}",
                 upstreamState ? upstreamState->DebugName() : "<null>");
-            if (ScaffoldState16() != nullptr) {
-                (void)SwitchHelperStateAndDispatchSlot3Scaffold(
-                    16u,
-                    ScaffoldState16(),
-                    upstreamState,
-                    "ProcessLoginRequest alternate g_LaunchPadGateState16State18!=0 branch / no helper65c");
+            if (LoginHelperStateByIdScaffold(16u) != nullptr) {
+                (void)SwitchHelperStateByIdScaffold(16u);
             } else {
                 spdlog::info(
                     "CLTLoginMediator::ProcessLoginRequest missing registered state16 scaffold for alternate no-helper65c branch currentState={}",
@@ -653,12 +514,8 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         spdlog::info(
             "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state2 (string60 non-empty, helper65c present) upstreamState={}",
             upstreamState ? upstreamState->DebugName() : "<null>");
-        if (ScaffoldState2() != nullptr) {
-            (void)SwitchHelperStateAndDispatchSlot3Scaffold(
-                2u,
-                ScaffoldState2(),
-                upstreamState,
-                "ProcessLoginRequest alternate g_LaunchPadGateState16State18!=0 branch / helper65c present");
+        if (LoginHelperStateByIdScaffold(2u) != nullptr) {
+            (void)SwitchHelperStateByIdScaffold(2u);
         } else {
             spdlog::info(
                 "CLTLoginMediator::ProcessLoginRequest missing registered state2 scaffold for alternate helper65c-present branch currentState={}",
@@ -682,12 +539,8 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state16 (string60 empty) upstreamState={} helper65cPresent={}",
         upstreamState ? upstreamState->DebugName() : "<null>",
         sessionCallbackHelper65c_ ? 1u : 0u);
-    if (ScaffoldState16() != nullptr) {
-        (void)SwitchHelperStateAndDispatchSlot3Scaffold(
-            16u,
-            ScaffoldState16(),
-            upstreamState,
-            "ProcessLoginRequest alternate g_LaunchPadGateState16State18!=0 branch / string60 empty");
+    if (LoginHelperStateByIdScaffold(16u) != nullptr) {
+        (void)SwitchHelperStateByIdScaffold(16u);
     } else {
         spdlog::info(
             "CLTLoginMediator::ProcessLoginRequest missing registered state16 scaffold for alternate string60-empty branch currentState={}",
@@ -713,35 +566,35 @@ void CLTLoginMediator::InitializeConnectionHelpers() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot15() {
-    if (ScaffoldState15() == nullptr) {
+    if (LoginHelperStateByIdScaffold(15u) == nullptr) {
         RegisterScaffoldState15(&GetBuiltinScaffoldStates().state15);
     }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot16() {
-    if (ScaffoldState16() == nullptr) {
+    if (LoginHelperStateByIdScaffold(16u) == nullptr) {
         RegisterScaffoldState16(&GetBuiltinScaffoldStates().state16);
     }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot17() {
-    if (ScaffoldState17() == nullptr) {
+    if (LoginHelperStateByIdScaffold(17u) == nullptr) {
         RegisterScaffoldState17(&GetBuiltinScaffoldStates().state17);
     }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot18() {
-    if (ScaffoldState18() == nullptr) {
+    if (LoginHelperStateByIdScaffold(18u) == nullptr) {
         RegisterScaffoldState18(&GetBuiltinScaffoldStates().state18);
     }
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::InitializeHelperDispatchSlot19() {
-    if (ScaffoldState19() == nullptr) {
+    if (LoginHelperStateByIdScaffold(19u) == nullptr) {
         RegisterScaffoldState19(&GetBuiltinScaffoldStates().state19);
     }
 }
@@ -805,7 +658,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
 
 // UNANCHORED: source-owned early-auth helper that stages state1 then dispatches slot 3.
 uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
-    CLTLoginState* const state1 = ScaffoldState1();
+    CLTLoginState* const state1 = LoginHelperStateByIdScaffold(1u);
     if (state1 == nullptr) {
         spdlog::warn(
             "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold missing registered state1 scaffold currentState={}",
@@ -822,11 +675,7 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(AuthConnectAttemptCountScaffold()),
         static_cast<unsigned>(AuthConnectCandidateCountScaffold()));
-    const uint32_t result = SwitchHelperStateAndDispatchSlot3Scaffold(
-        1u,
-        state1,
-        upstreamState,
-        "BeginAuthConnectionViaState1Scaffold");
+    const uint32_t result = SwitchHelperStateByIdScaffold(1u);
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold upstreamState={} currentState={} -> result=0x{:08x}",
         upstreamState ? upstreamState->DebugName() : "<null>",
@@ -837,7 +686,7 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
-    CLTLoginState* const state4 = ScaffoldState4();
+    CLTLoginState* const state4 = LoginHelperStateByIdScaffold(4u);
     if (state4 == nullptr) {
         spdlog::warn(
             "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold missing registered state4 scaffold currentState={}",
@@ -846,11 +695,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
     }
 
     CLTLoginState* const upstreamState = currentState_;
-    const uint32_t result = SwitchHelperStateAndDispatchSlot3Scaffold(
-        4u,
-        state4,
-        upstreamState,
-        "BeginMarginConnectionViaState4Scaffold");
+    const uint32_t result = SwitchHelperStateByIdScaffold(4u);
     const std::string marginHost = ResolvedMarginHostName();
     spdlog::info(
         "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold upstreamState={} currentState={} marginHost='{}' -> result=0x{:08x}",

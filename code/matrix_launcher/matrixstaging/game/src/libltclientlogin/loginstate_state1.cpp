@@ -66,11 +66,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginM
                     fmt::ptr(cachedUpstreamOrArg_),
                     mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
             }
-            switchDispatchResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                cachedUpstreamPhaseCode,
-                cachedUpstreamState,
-                this,
-                "State1 slot1 zero-status success -> restore cached upstream and re-enter new helper slot3");
+            switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(cachedUpstreamPhaseCode);
         } else {
             spdlog::info(
                 "CLTLoginState_State1::Slot1_HandlePrimaryGate original zero-status success missing cached upstream cachedUpstream={} upstreamPhaseCode={} currentState={}",
@@ -103,7 +99,16 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginM
                     fmt::ptr(cachedUpstreamOrArg_),
                     mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
             }
-            mediator->SwitchHelperStateScaffold(cachedUpstreamPhaseCode, cachedUpstreamState);
+            const uint32_t resumeResult = mediator->SwitchHelperStateByIdScaffold(cachedUpstreamPhaseCode);
+            spdlog::info(
+                "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} resumeResult=0x{:08x}",
+                static_cast<unsigned>(workResultCode),
+                fmt::ptr(cachedUpstreamOrArg_),
+                static_cast<unsigned>(cachedUpstreamPhaseCode),
+                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+                static_cast<unsigned>(mediator->AuthConnectionFlag2c()),
+                static_cast<unsigned>(resumeResult));
+            return resumeResult;
         }
 
         const uint32_t handshakeResult = mediator->AuthBootstrapChild680().PrepareAndDispatch(*mediator);
@@ -137,11 +142,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginM
     }
 
     mediator->ResetAuthConnectRetryStateScaffold();
-    const uint32_t resetResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-        0u,
-        mediator->ScaffoldState0(),
-        this,
-        "State1 slot1 retry exhausted -> state0 / error0");
+    const uint32_t resetResult = mediator->SwitchHelperStateByIdScaffold(0u);
     mediator->PostErrorScaffold(0u);
     spdlog::info(
         "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} -> currentState={} resetResult=0x{:08x} then PostError(0x00)",

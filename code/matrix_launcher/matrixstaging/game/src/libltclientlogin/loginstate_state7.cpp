@@ -65,28 +65,14 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     // - send through `0x41af70`
     // - post event `7`
     if (!mediator->State10HasReadyConnectionState2()) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState4();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  4u,
-                  fallbackState,
-                  this,
-                  "State7 slot3 owner+0x1c state!=2 -> helper4 margin-connect continuation")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(4u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return fallbackResult;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0u) {
-        CLTLoginState* fallbackState = mediator->ScaffoldState6();
-        const uint32_t fallbackResult = fallbackState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  6u,
-                  fallbackState,
-                  this,
-                  "State7 slot3 owner+0xf14==0 -> helper6 margin-bootstrap continuation")
-            : 0u;
+        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
@@ -137,9 +123,7 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     }
 
     mediator->WorldListCountOrStatus80() = parsed.result09;
-    if (CLTLoginState* state3 = mediator->ScaffoldState3()) {
-        mediator->SwitchHelperStateScaffold(3u, state3);
-    }
+    (void)mediator->SwitchHelperStateByIdScaffold(3u);
 
     // Tightened event-8 meaning from the real state7 reply body:
     // - success/result `< 1` posts event `8`

@@ -183,9 +183,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
     if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
         mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
-        if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
-            mediator->SwitchHelperStateScaffold(3u, failureState);
-        }
+        (void)mediator->SwitchHelperStateByIdScaffold(3u);
         mediator->PostErrorScaffold(12u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage observed failure status=0x{:08x} handoffWord=0x{:04x}; mirrored original owner+0x108 clear, owner+0xcc8=0xff, state3 switch, and error=12",
@@ -428,21 +426,16 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
 
     const bool completed = (replySectionsExpected_ != 0u) && (replySectionsSeen_ >= replySectionsExpected_);
     if (completed) {
-        if (CLTLoginState* nextBase = mediator->ScaffoldState9()) {
-            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
-                // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
-                // Current source-owned mirror keeps that on the concrete state9 object.
-                nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
-            }
-            mediator->SwitchHelperStateScaffold(9u, nextBase);
-            if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(nextBase)) {
-                const uint32_t slot3Result = nextState->Slot3_BeginOrContinue(this, mediator);
-                spdlog::info(
-                    "CLTLoginState_State11::Slot6_HandleSecondaryMessage mirrored 0x41b450 new-helper slot3 notification into helper9 before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
-                    loadCharacterReplyEnvelope.handoffWord09,
-                    static_cast<unsigned>(slot3Result));
-            }
+        if (auto* nextState = dynamic_cast<CLTLoginState_State9*>(mediator->LoginHelperStateByIdScaffold(9u))) {
+            // `0x440320` writes parsed word `+9` into helper9 `this+6` before switching state.
+            // Current source-owned mirror keeps that on the concrete state9 object.
+            nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
         }
+        const uint32_t slot3Result = mediator->SwitchHelperStateByIdScaffold(9u);
+        spdlog::info(
+            "CLTLoginState_State11::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
+            loadCharacterReplyEnvelope.handoffWord09,
+            static_cast<unsigned>(slot3Result));
         // anchor: launcher.exe:0x440320 completion tail posts event 0x16 after switching to helper9.
         // Next owner-controlled continuation is now tighter too:
         // - helper9 slot3 (`0x439780`) immediately consumes that handoff word during `0x41b450`

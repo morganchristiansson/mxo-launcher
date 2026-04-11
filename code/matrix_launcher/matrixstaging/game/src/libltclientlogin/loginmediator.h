@@ -921,7 +921,7 @@ public:
     // - new helper `+0x08` -> slot 3 / BeginOrContinue
     // Active post-state9 consequence: the state9 -> state12 pair maps both of those to tiny stubs,
     // so the immediate continuation stays the later explicit PostEvent/listener work.
-    void SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state);
+    
 
     // Narrow source-owned scaffolds for the launcher.exe logging/event side effects at
     // `0x41cfb0` / `0x41d090`.
@@ -1004,26 +1004,7 @@ public:
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
-    CLTLoginState* ScaffoldState0() const;
-    CLTLoginState* ScaffoldState1() const;
-    CLTLoginState* ScaffoldState2() const;
-    CLTLoginState* ScaffoldState3() const;
-    CLTLoginState* ScaffoldState4() const;
-    CLTLoginState* ScaffoldState5() const;
-    CLTLoginState* ScaffoldState6() const;
-    CLTLoginState* ScaffoldState7() const;
-    CLTLoginState* ScaffoldState8() const;
-    CLTLoginState* ScaffoldState9() const;
-    CLTLoginState* ScaffoldState10() const;
-    CLTLoginState* ScaffoldState11() const;
-    CLTLoginState* ScaffoldState12() const;
-    CLTLoginState* ScaffoldState13() const;
-    CLTLoginState* ScaffoldState14() const;
-    CLTLoginState* ScaffoldState15() const;
-    CLTLoginState* ScaffoldState16() const;
-    CLTLoginState* ScaffoldState17() const;
-    CLTLoginState* ScaffoldState18() const;
-    CLTLoginState* ScaffoldState19() const;
+    CLTLoginState* LoginHelperStateByIdScaffold(uint32_t helperStateId) const;
     // anchor: launcher.exe:0x41b450
     // Faithful by-id helper switch mirror for anchored call sites that statically prove the
     // original passes only the helper/state id into `0x41b450` and lets that body load the target
@@ -1179,14 +1160,6 @@ public:
     // - keep the launcher-object ABI shell thin and arg5-shaped
     void ResetLauncherConnectionsScaffold();
     uint32_t BeginLauncherMarginConnectionScaffold();
-    // Focused source-owned wrapper for the missing new-helper slot-3 callback side of
-    // `0x41b450` on the early auth path. Keep this narrow instead of changing the generic
-    // switch scaffold until more of the broader helper transition surface is source-owned.
-    uint32_t SwitchHelperStateAndDispatchSlot3Scaffold(
-        uint32_t helperStateId,
-        CLTLoginState* state,
-        void* upstreamOrArg,
-        const char* reason = nullptr);
     // anchor: launcher.exe:0x41b490
     // Tiny auth transport-ready test used by state2 slot 3 before it reaches the bootstrap
     // dispatcher. Current best concrete read: auth connection exists and connection `+0x34 == 2`.

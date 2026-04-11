@@ -198,9 +198,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
         case kAuthBootstrap680InboundAuthReplyError: {
             mediator->expectedMarginRequestName_ = nullptr;
             AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
-            if (CLTLoginState* state0 = mediator->ScaffoldState0()) {
-                mediator->SwitchHelperStateScaffold(0u, state0);
-            }
+            (void)mediator->SwitchHelperStateByIdScaffold(0u);
             mediator->PostErrorScaffold(4u);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x0b error reply owner+0x80=0x{:08x}; mirrored original state0 switch and error=4",
@@ -210,9 +208,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
 
         case kAuthBootstrap680InboundGetPublicKeyReplyError:
         case kAuthBootstrap680InboundGetPublicKeyWorkerError: {
-            if (CLTLoginState* state0 = mediator->ScaffoldState0()) {
-                mediator->SwitchHelperStateScaffold(0u, state0);
-            }
+            (void)mediator->SwitchHelperStateByIdScaffold(0u);
             mediator->PostErrorScaffold(2u);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x07 failure childResult={} owner+0x80=0x{:08x}; mirrored original state0 switch and error=2",
@@ -225,9 +221,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
             mediator->expectedMarginRequestName_ = nullptr;
             AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
             mediator->WorldListCountOrStatus80() = 0x1200000bu;
-            if (CLTLoginState* state0 = mediator->ScaffoldState0()) {
-                mediator->SwitchHelperStateScaffold(0u, state0);
-            }
+            (void)mediator->SwitchHelperStateByIdScaffold(0u);
             mediator->PostErrorScaffold(0x0fu);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch rejected early raw-0x0b success-side adoption owner+0x80=0x{:08x}; mirrored original state0 switch and error=0x0f",
@@ -239,9 +233,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
             break;
     }
 
-    if (CLTLoginState* state0 = mediator->ScaffoldState0()) {
-        mediator->SwitchHelperStateScaffold(0u, state0);
-    }
+    (void)mediator->SwitchHelperStateByIdScaffold(0u);
     mediator->PostErrorScaffold(4u);
     spdlog::warn(
         "CLTLoginState_AuthenticatePending::AuthMessageDispatch reached unexpected childResult={} rawCode=0x{:02x}; mirrored fallback state0 switch and error=4",

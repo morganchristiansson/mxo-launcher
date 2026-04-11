@@ -1440,12 +1440,8 @@ void CLTLoginMediator::RequestAuthCloseAndSwitchToState0() {
     const CLTLoginState* const oldState = currentState_;
     const bool authCloseArmed = RequestAuthConnectionCloseWaitEvent1();
     uint32_t state0EntryResult = 0u;
-    if (ScaffoldState0() != nullptr) {
-        state0EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
-            0u,
-            ScaffoldState0(),
-            const_cast<CLTLoginState*>(oldState),
-            "RequestAuthCloseAndSwitchToState0 0x41c0d0");
+    if (LoginHelperStateByIdScaffold(0u) != nullptr) {
+        state0EntryResult = SwitchHelperStateByIdScaffold(0u);
     }
     spdlog::info(
         "CLTLoginMediator::RequestAuthCloseAndSwitchToState0 authCloseArmed={} oldState={} currentState={} state0EntryResult=0x{:08x}",
@@ -1745,7 +1741,7 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectedSlotRecordIndex) {
     if (currentState_ && currentState_->DispatchPhaseCode() > 2u && selectedSlotRecordIndex < 100u) {
         SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu));
-        if (ScaffoldState7() != nullptr) {
+        if (LoginHelperStateByIdScaffold(7u) != nullptr) {
             (void)SwitchHelperStateByIdScaffold(7u);
         }
         // Bounded source note:
@@ -1815,7 +1811,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
 
     const CLTLoginState* const oldState = currentState_;
     uint32_t state8EntryResult = 0u;
-    if (ScaffoldState8() != nullptr) {
+    if (LoginHelperStateByIdScaffold(8u) != nullptr) {
         // anchor: launcher.exe:0x41c1f0 -> 0x41b450(8)
         // Important existing-character continuation detail:
         // - the original owner `+0xec` tail does not stop at `currentState = state8`
@@ -1825,11 +1821,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
         // - without that immediate slot-3 continuation, the later type-2 margin completion lands on
         //   shared state8 slot2 and returns 0 instead of restoring the original state4/state5/state6
         //   chain back toward the first natural state8 raw-0x0f send
-        state8EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
-            8u,
-            ScaffoldState8(),
-            const_cast<CLTLoginState*>(oldState),
-            "PersistSelectionContextForState8 0x41c1f0 -> 0x41b450 immediate state8 slot3 continuation");
+        state8EntryResult = SwitchHelperStateByIdScaffold(8u);
     }
 
     spdlog::info(
@@ -1984,16 +1976,12 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
 
     const CLTLoginState* const oldState = currentState_;
     uint32_t state10EntryResult = 0u;
-    if (ScaffoldState10() != nullptr) {
+    if (LoginHelperStateByIdScaffold(10u) != nullptr) {
         // anchor: launcher.exe:0x41c3c0 -> 0x41b450(10)
         // Like the neighboring owner-side state writers, the original helper switch does not stop
         // at plain `currentState = state10`; the active continuation needs the immediate state10
         // slot-3 claim-name send (`0x43bf90`) to start `MS_ClaimCharacterNameRequest`.
-        state10EntryResult = SwitchHelperStateAndDispatchSlot3Scaffold(
-            10u,
-            ScaffoldState10(),
-            const_cast<CLTLoginState*>(oldState),
-            "ProcessCreateCharacterInput120 0x41c3c0 -> 0x41b450 immediate state10 slot3 continuation");
+        state10EntryResult = SwitchHelperStateByIdScaffold(10u);
     }
 
     spdlog::info(

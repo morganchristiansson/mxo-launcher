@@ -141,7 +141,7 @@ uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t f
             return 0x12000000u;
         case 12u:
             ownerOptionalField90_ = field90Value;
-            if (ScaffoldState13() != nullptr) {
+            if (LoginHelperStateByIdScaffold(0x0du) != nullptr) {
                 (void)SwitchHelperStateByIdScaffold(0x0du);
             }
             spdlog::info(

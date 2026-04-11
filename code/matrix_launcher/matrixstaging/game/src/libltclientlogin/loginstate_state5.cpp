@@ -87,14 +87,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
             mediator->AuthBootstrapReplyCopyShadowF4Scaffold());
     const bool replyCopyShadowStillValid = mediator->HasValidState5ReplyCopyShadowF4Scaffold();
     if (!replyCopyShadowStillValid) {
-        CLTLoginState* nextState = mediator->ScaffoldState2();
-        const uint32_t switchDispatchResult = nextState
-            ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                  2u,
-                  nextState,
-                  this,
-                  "State5 slot3 missing-or-expired owner+0x680+0xf4 copy block -> helper2 continuation")
-            : 0u;
+        const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(2u);
         spdlog::info(
             "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=0 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} currentState={} -> helper2 switchDispatchResult=0x{:08x}",
             fmt::ptr(cachedUpstreamOrArg_),

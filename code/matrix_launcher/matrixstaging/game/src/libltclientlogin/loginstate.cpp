@@ -71,14 +71,7 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator
     if (mediator->GetLastLoginStatus() == 0u) {
         mediator->WorldListCountOrStatus80() = 1u;
     }
-    CLTLoginState* const fallbackState = mediator->ScaffoldState0();
-    const uint32_t switchDispatchResult = fallbackState
-        ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-              0u,
-              fallbackState,
-              this,
-              "Shared slot1 auth close-gate -> state0 / error1")
-        : 0u;
+    const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(0u);
     mediator->PostErrorScaffold(1u);
     spdlog::info(
         "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed unarmed owner+0x2c -> owner+0x80=0x{:08x} currentState={} switchDispatchResult=0x{:08x}",
@@ -110,9 +103,7 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediat
     if (mediator->GetLastLoginStatus() == 0u) {
         mediator->WorldListCountOrStatus80() = 1u;
     }
-    if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
-        mediator->SwitchHelperStateScaffold(3u, failureState);
-    }
+    (void)mediator->SwitchHelperStateByIdScaffold(3u);
     mediator->PostErrorScaffold(7u);
     spdlog::info(
         "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed unarmed owner+0x2d -> owner+0x80=0x{:08x} currentState={}",

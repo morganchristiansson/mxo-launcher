@@ -73,9 +73,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
         const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
         mediator->ResetMarginConnectAttemptCountScaffold();
         if (nextHelperStateId != 13u) {
-            if (CLTLoginState* failureState = mediator->ScaffoldState3()) {
-                mediator->SwitchHelperStateScaffold(3u, failureState);
-            }
+            (void)mediator->SwitchHelperStateByIdScaffold(3u);
         }
         mediator->PostErrorScaffold(6u);
         spdlog::info(
