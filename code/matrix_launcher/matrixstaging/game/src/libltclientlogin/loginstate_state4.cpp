@@ -97,15 +97,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     cachedUpstreamOrArg_ = nullptr;
     mediator->MutableMarginRouteState().currentWorldId = -1;
-    CLTLoginState* nextState =
-        mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId);
-    const uint32_t switchDispatchResult = nextState
-        ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-              nextHelperStateId,
-              nextState,
-              this,
-              "State4 slot2 zero-status success -> restore cached upstream and re-enter new helper slot3")
-        : 0u;
+    const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
     mediator->PostEventScaffold(0x0eu);
     spdlog::info(
         "CLTLoginState_State4::Slot2_HandleSecondaryGate status=0x{:08x} cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",

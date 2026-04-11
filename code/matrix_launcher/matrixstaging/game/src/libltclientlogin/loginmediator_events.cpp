@@ -361,6 +361,77 @@ void CLTLoginMediator::EraseObserverRange674(
     }
 }
 
+uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId) {
+    // anchor: launcher.exe:0x41b450
+    // Direct call-site recheck in Ghidra on `0x4393f0`, `0x439590`, `0x440780`, and `0x43f300`
+    // shows those bodies do not resolve a helper object locally before calling `0x41b450`.
+    // They compute/read the next helper-state id, then pass only that id to:
+    //   `mov edx, [edi*4 + 0x4f7868]`
+    // inside `0x41b450`.
+    // Source mirrors that call shape here by resolving through the registered slot mirrors only
+    // inside this by-id switch body, then performing the same immediate new-helper slot-3
+    // notification against the old helper object.
+    CLTLoginState* newState = nullptr;
+    switch (helperStateId) {
+        case 0u: newState = scaffoldState0_; break;
+        case 1u: newState = scaffoldState1_; break;
+        case 2u: newState = scaffoldState2_; break;
+        case 3u: newState = scaffoldState3_; break;
+        case 4u: newState = scaffoldState4_; break;
+        case 5u: newState = scaffoldState5_; break;
+        case 6u: newState = scaffoldState6_; break;
+        case 7u: newState = scaffoldState7_; break;
+        case 8u: newState = scaffoldState8_; break;
+        case 9u: newState = scaffoldState9_; break;
+        case 10u: newState = scaffoldState10_; break;
+        case 11u: newState = scaffoldState11_; break;
+        case 12u: newState = scaffoldState12_; break;
+        case 13u: newState = scaffoldState13_; break;
+        case 14u: newState = scaffoldState14_; break;
+        case 15u: newState = scaffoldState15_; break;
+        case 16u: newState = scaffoldState16_; break;
+        case 17u: newState = scaffoldState17_; break;
+        case 18u: newState = scaffoldState18_; break;
+        case 19u: newState = scaffoldState19_; break;
+        default:
+            break;
+    }
+
+    lastSwitchedHelperStateScaffold_ = helperStateId;
+    CLTLoginState* const oldState = currentState_;
+    if (oldState != nullptr) {
+        // Current source surface still models slot 4 as the shared no-op stub signature instead of
+        // the original `oldHelper->vtable[+0x0c](newHelper)` call shape, so keep the already-owned
+        // slot-4 notification as the narrow placeholder and preserve the more consequential
+        // immediate new-helper slot-3 re-entry below.
+        oldState->Slot4_NoOp();
+    }
+
+    if (newState == nullptr) {
+        spdlog::info(
+            "CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} newState=<null> (anchor: launcher.exe:0x41b450 / dispatch-table miss leaves currentState unchanged)",
+            static_cast<unsigned>(helperStateId),
+            oldState ? oldState->DebugName() : "<null>");
+        return 0u;
+    }
+
+    currentState_ = newState;
+    const uint32_t slot3Result = newState->Slot3_BeginOrContinue(oldState, this);
+    spdlog::info(
+        "CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} newState={} -> slot3Result=0x{:08x} (anchor: launcher.exe:0x41b450 / [id*4 + 0x4f7868])",
+        static_cast<unsigned>(helperStateId),
+        oldState ? oldState->DebugName() : "<null>",
+        newState->DebugName(),
+        static_cast<unsigned>(slot3Result));
+    spdlog::info(
+        "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} newState={} slot3Result=0x{:08x}",
+        static_cast<unsigned>(helperStateId & 0xffu),
+        oldState ? oldState->DebugName() : "<null>",
+        newState->DebugName(),
+        static_cast<unsigned>(slot3Result));
+    return slot3Result;
+}
+
 void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
     // anchor: launcher.exe:0x41b450
     // Tightened recovered shape from the current Ghidra pass plus direct vtable reads:

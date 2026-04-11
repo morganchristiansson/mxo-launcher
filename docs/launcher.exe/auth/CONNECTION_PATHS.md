@@ -331,6 +331,11 @@ Static recheck of the same existing-character continuation now also matches that
   - clears `this+4`
   - switches helper through `0x41b450`
   - posts event `0x0e`
+  - source-faithfulness consequence from the newer Ghidra recheck:
+    - this site does **not** first resolve a helper object through any separate mediator-side
+      lookup helper
+    - it passes only the recovered helper/state id into `0x41b450`, which then loads
+      `[id*4 + 0x4f7868]` itself
 - `0x43bd48..0x43bd54` / state8 slot3 gate:
   - if owner byte `+0xf14 == 0`, it switches helper state to `6` and returns
 - `0x439590` / state5 slot2 local type-`0x0b`:
@@ -351,6 +356,11 @@ Static recheck of the same existing-character continuation now also matches that
   - calls its vtable `+0x18`
   - switches helper through `0x41b450`
   - posts event `0x12`
+- `0x43f300` / state2 auth-reply success helper restore:
+  - after normalizing cached-upstream phase `0/0x10 -> 3`, it calls `0x41b450(nextHelperStateId)`
+  - again there is no separate mediator-side helper-object lookup before the switch
+  - practical source consequence: replacement should model these anchored restore sites as
+    by-id `0x41b450` calls, not as a synthetic `ResolveRegistered...` helper layer
 
 Current replacement milestone on that exact blocker (`2026-03-30`, later same-day rerun):
 - source now preserves the runtime-backed existing-character happy-path order through:

@@ -147,31 +147,14 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, 
                 nextHelperStateId = 3u;
             }
 
-            CLTLoginState* nextState =
-                mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId);
-            uint32_t switchDispatchResult = 0u;
-            if (nextState != nullptr) {
-                if (nextHelperStateId == 8u) {
-                    // Current existing-character bridge refinement:
-                    // once early auth reply success has rebuilt the owner auth/bootstrap state,
-                    // re-enter state8 slot 3 immediately so the now-proven margin-connect
-                    // continuation can begin from the restored helper instead of stalling at the
-                    // bare helper install.
-                    switchDispatchResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-                        nextHelperStateId,
-                        nextState,
-                        this,
-                        "State2 raw-0x0b success -> existing-character state8 margin continuation");
-                } else {
-                    mediator->SwitchHelperStateScaffold(nextHelperStateId, nextState);
-                }
-            } else {
-                spdlog::warn(
-                    "CLTLoginState_AuthenticatePending::AuthMessageDispatch could not resolve registered helper state 0x{:02x} from cachedUpstream={} currentState={} after raw-0x0b success",
-                    static_cast<unsigned>(nextHelperStateId),
-                    fmt::ptr(cachedUpstreamOrArg_),
-                    mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
-            }
+            // Ghidra recheck of `0x43f300` now matters here directly:
+            // - after the cached-upstream phase normalization (`0/0x10 -> 3`), the original does
+            //   not resolve a helper object locally
+            // - it passes only the resulting helper/state id to `0x41b450`
+            // - `0x41b450` then loads `[id*4 + 0x4f7868]`, installs owner `+0x10`, and
+            //   immediately re-enters the new helper slot 3 with old-state `this`
+            const uint32_t switchDispatchResult =
+                mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
             mediator->PostEventScaffold(5u);
 
             // Replacement-only post-AS_AuthReply margin auto-begin now stays on the concrete

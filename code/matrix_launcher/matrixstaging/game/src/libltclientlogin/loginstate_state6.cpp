@@ -428,32 +428,13 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     }
 
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
-    if (CLTLoginState* nextState =
-            mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId)) {
-        const uint32_t switchDispatchResult = mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-            nextHelperStateId,
-            nextState,
-            this,
-            "State6 slot6 opcode-0x09 success -> choose restored helper from cached upstream phase and re-enter its slot3");
-        mediator->PostEventScaffold(0x12u);
-        spdlog::info(
-            "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
-            static_cast<unsigned>(parsed.udpSessionSecret09),
-            static_cast<unsigned>(nextHelperStateId),
-            static_cast<unsigned>(switchDispatchResult));
-    } else {
-        spdlog::info(
-            "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} but could not resolve nextHelperState={} from cachedUpstream={}; preserving currentState={}",
-            static_cast<unsigned>(parsed.udpSessionSecret09),
-            static_cast<unsigned>(parsed.metricIdCount),
-            resolvedMetricFilenameCount,
-            unresolvedMetricFilenameCount,
-            BuildMetricIdPreview(parsed.metricIds),
-            static_cast<unsigned>(nextHelperStateId),
-            fmt::ptr(cachedUpstreamOrArg_),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
-        return 1u;
-    }
+    const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
+    mediator->PostEventScaffold(0x12u);
+    spdlog::info(
+        "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
+        static_cast<unsigned>(parsed.udpSessionSecret09),
+        static_cast<unsigned>(nextHelperStateId),
+        static_cast<unsigned>(switchDispatchResult));
 
     spdlog::info(
         "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} -> nextHelperState={} currentState={}",

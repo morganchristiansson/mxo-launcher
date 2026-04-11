@@ -1026,9 +1026,13 @@ public:
     CLTLoginState* ScaffoldState17() const;
     CLTLoginState* ScaffoldState18() const;
     CLTLoginState* ScaffoldState19() const;
-    // Current owner-side registered-state lookup bridge used by state transitions that already know
-    // the helper/state id but should not own a local phase-code table.
-    CLTLoginState* ResolveRegisteredScaffoldStateByIdScaffold(uint32_t stateId) const;
+    // anchor: launcher.exe:0x41b450
+    // Faithful by-id helper switch mirror for anchored call sites that statically prove the
+    // original passes only the helper/state id into `0x41b450` and lets that body load the target
+    // from the helper dispatch table rooted at `0x4f7868`.
+    // Current source returns the new-helper slot-3 result for diagnostics even though the original
+    // helper-switch body itself returns `void`.
+    uint32_t SwitchHelperStateByIdScaffold(uint32_t helperStateId);
     // Installs the source-owned initial idle/start helper convention (`state0`) after
     // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
     // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.

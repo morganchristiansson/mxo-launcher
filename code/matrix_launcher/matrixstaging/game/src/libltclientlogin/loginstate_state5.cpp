@@ -53,22 +53,13 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
     // - calls cached upstream vtable `+0x18`
     // - passes that state id to `0x41b450`
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
-    CLTLoginState* nextState =
-        mediator->ResolveRegisteredScaffoldStateByIdScaffold(nextHelperStateId);
-    const uint32_t switchDispatchResult = nextState != nullptr
-        ? mediator->SwitchHelperStateAndDispatchSlot3Scaffold(
-              nextHelperStateId,
-              nextState,
-              this,
-              "State5 slot2 local type0x0b -> restore cached upstream and re-enter new helper slot3")
-        : 0u;
+    const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
 
     spdlog::info(
-        "CLTLoginState_State5::Slot2_HandleSecondaryGate handled local type0x0b status=0x{:08x} cachedUpstream={} nextHelperState=0x{:02x} resolvedNextState={} owner+0x2d={} currentState={} switchDispatchResult=0x{:08x}",
+        "CLTLoginState_State5::Slot2_HandleSecondaryGate handled local type0x0b status=0x{:08x} cachedUpstream={} nextHelperState=0x{:02x} owner+0x2d={} currentState={} switchDispatchResult=0x{:08x}",
         static_cast<unsigned>(status),
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(nextHelperStateId),
-        nextState ? nextState->DebugName() : "<null>",
         mediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold() ? 1u : 0u,
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
         static_cast<unsigned>(switchDispatchResult));
