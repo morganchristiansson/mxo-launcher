@@ -369,12 +369,12 @@ uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId)
     // - `0x41b450` itself loads the target helper from `[id*4 + 0x4f7868]`
     // - old helper notification happens before owner `+0x10` is updated
     // - new helper slot 3 then runs with the old helper object as its upstream arg
-    // Source cannot mirror the original data-global table literally, but `helpers_` is now the
-    // source-owned slot mirror for that same helper dispatch family.
+    // Source now mirrors that helper storage as the process-global
+    // `g_LoginHelperDispatchTableScaffold` rooted at slot `0x4f7868`.
     CLTLoginState* const oldState = currentState_;
     CLTLoginState* const newState =
         (helperStateId < 20u)
-            ? static_cast<CLTLoginState*>(reinterpret_cast<void* const*>(&helpers_.helper7868)[helperStateId])
+            ? static_cast<CLTLoginState*>(reinterpret_cast<void* const*>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId])
             : nullptr;
 
     lastSwitchedHelperStateScaffold_ = helperStateId;
@@ -385,7 +385,7 @@ uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId)
 
     if (newState == nullptr) {
         spdlog::info(
-            "CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} dispatchTableBase=&helpers_.helper7868 newState=<null>",
+            "CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} dispatchTableBase=&g_LoginHelperDispatchTableScaffold.helper7868 newState=<null>",
             static_cast<unsigned>(helperStateId),
             oldState ? oldState->DebugName() : "<null>");
         return 0u;
@@ -394,7 +394,7 @@ uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId)
     currentState_ = newState;
     const uint32_t slot3Result = newState->Slot3_BeginOrContinue(oldState, this);
     spdlog::info(
-        "CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} newState={} dispatchTableBase=&helpers_.helper7868 -> slot3Result=0x{:08x}",
+        "CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} newState={} dispatchTableBase=&g_LoginHelperDispatchTableScaffold.helper7868 -> slot3Result=0x{:08x}",
         static_cast<unsigned>(helperStateId),
         oldState ? oldState->DebugName() : "<null>",
         newState->DebugName(),
@@ -404,42 +404,31 @@ uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId)
 
 void CLTLoginMediator::SwitchHelperStateScaffold(uint32_t helperStateId, CLTLoginState* state) {
     // anchor: launcher.exe:0x41b450
-    // Tightened recovered shape from the current Ghidra pass plus direct vtable reads:
-    // - if an old helper exists, call its vtable `+0x0c` with the new helper object
-    // - install the dispatch-table target into owner `+0x10`
-    // - then call the new helper's vtable `+0x08` with the old helper object
-    // Because the concrete login-state vtables begin directly at slot 1, those offsets now map to:
-    // - old helper `+0x0c` -> slot 4
-    // - new helper `+0x08` -> slot 3 / BeginOrContinue
-    // Active post-state9 consequence:
-    // - on the state9 -> state12 switch, old helper slot 4 is the shared tiny stub
-    // - new helper state12 slot 3 is also the shared tiny stub
-    // - so the immediate post-state9 work is not another hidden state body inside `0x41b450`; it
-    //   returns to the caller and the next concrete work stays the explicit `0x41cfb0(0x18)`
-    //   observer/listener walk.
+    // Narrow source wrapper for call sites that still want only the install side without relying on
+    // this helper to own the immediate slot-3 continuation. Even here, resolve the helper from the
+    // global dispatch-table mirror first so storage stays faithful to `[id*4 + 0x4f7868]`.
+    CLTLoginState* const resolvedState =
+        (helperStateId < 20u)
+            ? static_cast<CLTLoginState*>(reinterpret_cast<void* const*>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId])
+            : nullptr;
+    if (resolvedState != nullptr) {
+        state = resolvedState;
+    }
+
     lastSwitchedHelperStateScaffold_ = helperStateId;
     CLTLoginState* oldState = currentState_;
     if (!state) {
         spdlog::info(
-            "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState=<null> (source scaffold leaves currentState unchanged)",
+            "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState=<null> (dispatch-table miss leaves currentState unchanged)",
             static_cast<unsigned>(helperStateId),
-            oldState ? oldState->DebugName() : "<null>");
-        spdlog::info(
-            "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState=<null>",
-            (unsigned)(helperStateId & 0xffu),
             oldState ? oldState->DebugName() : "<null>");
         return;
     }
 
     currentState_ = state;
     spdlog::info(
-        "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState={} (anchor: launcher.exe:0x41b450; original also performs old/new helper notification calls around the install)",
+        "CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState={} dispatchTableBase=&g_LoginHelperDispatchTableScaffold.helper7868",
         static_cast<unsigned>(helperStateId),
-        oldState ? oldState->DebugName() : "<null>",
-        state->DebugName());
-    spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator::SwitchHelperStateScaffold helperState=0x{:02x} oldState={} newState={}",
-        (unsigned)(helperStateId & 0xffu),
         oldState ? oldState->DebugName() : "<null>",
         state->DebugName());
 }

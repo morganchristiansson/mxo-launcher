@@ -900,10 +900,9 @@ public:
         const char* background = nullptr;
     };
 
-    // Narrow active-state-source bridge for wrapper-facing/model code.
-    // Current runtime still lets diagnostics register a separate live controller instance here,
-    // but callers should depend on this generic hook instead of reaching back into diagnostics
-    // globals so future ownership can move without a broad rewrite.
+    // Narrow wrapper-facing bridge on top of the launcher global current-mediator pointer
+    // (`0x4f78b8 = g_CurrentLoginMediator`). Keep callers on this hook instead of reaching into a
+    // TU-local global directly.
     static void RegisterActiveStateSourceScaffold(CLTLoginMediator* mediator);
     static bool UnregisterActiveStateSourceScaffold(const CLTLoginMediator* mediator);
     static CLTLoginMediator* ActiveStateSourceScaffold();
@@ -948,10 +947,9 @@ public:
     // Focused source home for this early auth/state-entry wiring:
     // - `loginmediator_auth_entry.cpp`
     // Source-owned scaffold registration for concrete CLTLoginState objects that live outside the
-    // mediator header. This preserves the original helper-state ownership on the login-state
-    // vtables while still letting the mediator switch between the active scaffold states.
-    // Early concrete auth-side states with real current value now use the same mediator-owned
-    // registration/access pattern too.
+    // mediator header. Current source now mirrors the original storage shape more closely by
+    // populating the process-global helper dispatch-table mirror rooted at `0x4f7868` instead of
+    // mediator-owned per-slot fields.
     // Current practical startup/auth focus:
     // - state 0  = initial idle/start current helper installed by mediator init
     // - state 1  = auth-connect pending
@@ -1626,27 +1624,6 @@ private:
     uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
     uint16_t lastMarginPacketOpcodeScaffold_ = 0;
     uint32_t lastMarginPacketSizeScaffold_ = 0;
-    CLTLoginState* scaffoldState0_;
-    CLTLoginState* scaffoldState1_;
-    CLTLoginState* scaffoldState2_;
-    CLTLoginState* scaffoldState3_;
-    CLTLoginState* scaffoldState4_;
-    CLTLoginState* scaffoldState5_;
-    CLTLoginState* scaffoldState6_;
-    CLTLoginState* scaffoldState7_;
-    CLTLoginState* scaffoldState8_;
-    CLTLoginState* scaffoldState9_;
-    CLTLoginState* scaffoldState10_;
-    CLTLoginState* scaffoldState11_;
-    CLTLoginState* scaffoldState12_;
-    CLTLoginState* scaffoldState13_;
-    CLTLoginState* scaffoldState14_;
-    CLTLoginState* scaffoldState15_;
-    CLTLoginState* scaffoldState16_;
-    CLTLoginState* scaffoldState17_;
-    CLTLoginState* scaffoldState18_;
-    CLTLoginState* scaffoldState19_;
-
     mxo::liblttcp::CMessageConnection* authConnection_;
     mxo::liblttcp::CMessageConnection* marginConnection_;
     bool authConnectionOwnedByMediator_ = false;
@@ -1654,7 +1631,6 @@ private:
     bool authPeerCloseQueuedScaffold_ = false;
     bool marginPeerCloseQueuedScaffold_ = false;
 
-    ConnectionHelperFamily helpers_;
     MarginRouteState marginRouteState_;
     // Original non-virtual `CLTIPAddressList` helper rooted at owner `+0x3c`.
     // Recovered original in-object layout:
@@ -1856,6 +1832,14 @@ private:
     Arg6SelectionConfig arg6Selection_;
     uint32_t arg6VariantWorldNameQueryCountE0_ = 0u; // wrapper-facing arg6 `+0xe0` query count
 };
+
+// anchor: launcher.exe:0x43b300 / 0x41b450 / 0x4f7868..0x4f78b4
+// Source-owned mirror of the contiguous global login-helper dispatch table.
+extern CLTLoginMediator::ConnectionHelperFamily g_LoginHelperDispatchTableScaffold;
+
+// anchor: launcher.exe:0x4f78b8
+// Source-owned mirror of the launcher global current mediator pointer consumed by the helper family.
+extern CLTLoginMediator* g_CurrentLoginMediator;
 
 }  // namespace mxo::ltlogin
 

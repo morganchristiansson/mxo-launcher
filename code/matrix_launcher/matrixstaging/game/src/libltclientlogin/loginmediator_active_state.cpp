@@ -17,8 +17,6 @@
 namespace mxo::ltlogin {
 namespace {
 
-static CLTLoginMediator* g_ActiveStateSourceScaffold = nullptr;
-
 static const char* NonEmptyOrNull(const char* value) {
     return (value && value[0]) ? value : nullptr;
 }
@@ -33,25 +31,28 @@ static bool IsLikelyMiddleInitialOnly(const char* value) {
 
 }  // namespace
 
+CLTLoginMediator* g_CurrentLoginMediator = nullptr;
+
 void CLTLoginMediator::RegisterActiveStateSourceScaffold(CLTLoginMediator* mediator) {
-    g_ActiveStateSourceScaffold = mediator;
+    // anchor: launcher.exe:0x4f78b8
+    g_CurrentLoginMediator = mediator;
 }
 
 bool CLTLoginMediator::UnregisterActiveStateSourceScaffold(const CLTLoginMediator* mediator) {
-    if (g_ActiveStateSourceScaffold != mediator) {
+    if (g_CurrentLoginMediator != mediator) {
         return false;
     }
 
-    g_ActiveStateSourceScaffold = nullptr;
+    g_CurrentLoginMediator = nullptr;
     return true;
 }
 
 CLTLoginMediator* CLTLoginMediator::ActiveStateSourceScaffold() {
-    return g_ActiveStateSourceScaffold;
+    return g_CurrentLoginMediator;
 }
 
 const CLTLoginMediator* CLTLoginMediator::ResolveActiveStateSourceScaffold() const {
-    return g_ActiveStateSourceScaffold ? g_ActiveStateSourceScaffold : this;
+    return g_CurrentLoginMediator ? g_CurrentLoginMediator : this;
 }
 
 CLTLoginMediator::ActiveCharacterStateViewScaffold

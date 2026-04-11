@@ -40,14 +40,21 @@ High-value anchors:
 ## Auth-side launcher path
 
 ### Owner construction / helper-state seed
-- owner root global: `0x4f78b8`
+- owner root global: `0x4f78b8 = g_CurrentLoginMediator`
 - owner construction path stores `0x4f78b8 = esi`
 - then immediately calls `0x43b300`
-- `0x43b300` initializes the helper/state family at:
-  - `0x4f7868`
-  - `0x4f786c`
-  - `0x4f7870`
-  - `0x4f78a0`
+- `0x43b300` initializes the contiguous helper/state pointer table rooted at `0x4f7868`:
+  - `0x4f7868 = g_LoginHelperState0`
+  - `0x4f786c = g_LoginHelperState1`
+  - `0x4f7870 = g_LoginHelperState2`
+  - ...
+  - `0x4f78a0 = g_LoginHelperState14`
+  - `0x4f78a4..0x4f78b4 = g_LoginHelperState15..19`
+- source fidelity consequence:
+  - helper-id switches should load from this global table shape, not mediator-owned named fields
+  - current source now mirrors both globals explicitly:
+    - global current mediator pointer
+    - global helper dispatch-table mirror
 
 ### Auth config consumption
 - auth DNS current string consumed from `0x4f7b14`
