@@ -1344,10 +1344,6 @@ public:
     void DestroySelectionRouteState684Scaffold();
     void SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex);
 
-    // Wrapper-facing arg6 `+0x44` source picker / scratch builder.
-    const SlotRecordState004b5328* ResolveArg6CurrentSlotRecord44Source() const;
-    bool RefreshArg6CurrentSlotRecordObject44();
-
     // =============================================================================
     // Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
     // =============================================================================
