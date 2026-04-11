@@ -204,8 +204,8 @@ void CLTLoginMediator::InstallInitialState0Scaffold() {
         currentState_->DebugName());
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
+// anchor: launcher.exe:0x43b300 / full helper-dispatch table seed
+void CLTLoginMediator::InitializeHelperDispatchTable() {
     auto& states = GetBuiltinScaffoldStates();
 
     RegisterScaffoldState0(&states.state0);
@@ -228,7 +228,6 @@ void CLTLoginMediator::EnsureBuiltinScaffoldStatesRegistered() {
     RegisterScaffoldState17(&states.state17);
     RegisterScaffoldState18(&states.state18);
     RegisterScaffoldState19(&states.state19);
-    InitializeConnectionHelpers();
 
     if (currentState_ == nullptr) {
         InstallInitialState0Scaffold();
@@ -547,21 +546,6 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
             currentState_ ? currentState_->DebugName() : "<null>");
     }
     return 0u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::InitializeConnectionHelpers() {
-    // anchor: launcher.exe:0x43b300
-    // Original launcher allocates/fills the global helper dispatch table rooted at
-    // `0x4f7868..0x4f78b4`. Source now mirrors that storage as the process-global
-    // `g_LoginHelperDispatchTableScaffold`; for the currently recovered concrete family we seed
-    // any missing late slots through the same built-in C++ objects instead of leaving raw vtable
-    // pointers in mediator-owned storage.
-    InitializeHelperDispatchSlot15();
-    InitializeHelperDispatchSlot16();
-    InitializeHelperDispatchSlot17();
-    InitializeHelperDispatchSlot18();
-    InitializeHelperDispatchSlot19();
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.

@@ -471,7 +471,7 @@ void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* ne
 
     SetNetworkEngine(networkEngineOverride);
     EnsureAuthBootstrapChild680Scaffold();
-    EnsureBuiltinScaffoldStatesRegistered();
+    InitializeHelperDispatchTable();
     RegisterActiveStateSourceScaffold(this);
     InstallInitialState0Scaffold();
     ResetAuthConnectRetryStateScaffold();

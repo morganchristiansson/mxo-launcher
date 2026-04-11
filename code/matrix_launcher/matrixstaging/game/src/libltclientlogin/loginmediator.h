@@ -168,15 +168,16 @@ public:
     static constexpr const char* kLogPrefixPostError = "CLTLoginMediator::PostError():";
 
     struct ConnectionHelperFamily {
-        // launcher.exe:0x43b300 initializes a contiguous 15-slot helper/state array rooted at
-        // `0x4f7868`, immediately after `0x4f78b8 = esi`.
+        // launcher.exe:0x43b300 seeds the contiguous helper/state table rooted at `0x4f7868`,
+        // immediately after `0x4f78b8 = esi`.
         //
-        // From Ghidra decompilation of 0x43b300 (CLTLoginMediator_InitializeHelperDispatchTable):
-        // - Allocates the helper/state objects installed into 0x4f7868..0x4f78b4
+        // From Ghidra decompilation of `CLTLoginMediator_InitializeHelperDispatchTable`:
+        // - The recovered routine allocates the helper/state objects installed into `0x4f7868..0x4f78b4`
+        //   in one contiguous pass covering slots `0..19`
         // - Those objects carry `CLTLoginState_*` vtables such as `0x4b4fc4`, `0x4b4fec`, `0x4b5014`
         // - slot 1 on many of those vtables reuses shared gate `0x438d80`
-        // - InitializeHelperDispatchSlot15..Slot19 (0x420640..0x4209a0) populate the late
-        //   `CLTLoginState_State15..State19` tail at 0x4f78a4..0x4f78b4
+        // - `InitializeHelperDispatchTable()` now covers the earlier `0..14`
+        //   registrations and keeps the late `15..19` tail in the same seed
         //
         // Discovered function names from Ghidra renaming:
         // - launcher.exe:0x438d80 = shared `CLTLoginState_*` slot-1 gate
@@ -1019,7 +1020,7 @@ public:
     // Registers the built-in recovered `CLTLoginState_*` family on this mediator and preserves the
     // startup `state0` install convention when the mediator has not advanced yet. Callers should
     // prefer this over rebuilding the concrete scaffold-state table from diagnostics code.
-    void EnsureBuiltinScaffoldStatesRegistered();
+    void InitializeHelperDispatchTable();
 
     // Recovered config anchors:
     // - launcher `qsAuthServerDNSName` / `AuthServerPort`
@@ -1046,20 +1047,15 @@ public:
     uint32_t MarginConnectCandidateCountScaffold() const { return static_cast<uint32_t>(marginAddressList3c_.Count()); }
     void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
-    // launcher.exe:0x43b300
+    // launcher.exe:0x43b300 / full helper-dispatch table seed
     // Current best read:
-    // - allocates / initializes the mediator-owned helper/state dispatch array
-    // - the earlier recovered block covers slots `0..14` at `0x4f7868 .. 0x4f78a0`
-    // - the late recovered tail covers slots `15..19` at `0x4f78a4 .. 0x4f78b4` and is now
-    //   concretely typed as `CLTLoginState_State15..State19`
-    // - exact class names for most earlier helper objects are still being recovered
-    void InitializeConnectionHelpers();
-
+    // - the decompiled routine seeds helper/state slots `0..19` in one contiguous pass
+    // - source now keeps the entire seed in `InitializeHelperDispatchTable()`
+    //
     // HELPER / STATE DISPATCH TABLE INITIALIZATION HELPERS (from Ghidra analysis of 0x43b300):
     // ==============================================================================
-    // launcher.exe:0x4f7868..0x4f78a0 = recovered earlier helper/state block (`0..14`)
-    // launcher.exe:0x420640..0x4209a0 = InitializeHelperDispatchSlot15..Slot19 for the late
-    // `CLTLoginState_State15..State19` tail at `0x4f78a4..0x4f78b4`
+    // launcher.exe:0x4f7868..0x4f78b4 = contiguous helper/state table covering slots `0..19`
+    // `InitializeHelperDispatchTable()` now performs the full seed inline
     // ==============================================================================
     // launcher.exe:0x420640 = InitializeHelperDispatchSlot15 (slot at 0x4f78a4)
     //   Original: allocates 8 bytes, stores vtable 0x4b0b88 (`CLTLoginState_State15`)
