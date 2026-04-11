@@ -76,101 +76,121 @@ static BuiltinScaffoldStates& GetBuiltinScaffoldStates() {
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState0(CLTLoginState* state) {
     scaffoldState0_ = state;
+    helpers_.helper7868 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState1(CLTLoginState* state) {
     scaffoldState1_ = state;
+    helpers_.helper786C = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState2(CLTLoginState* state) {
     scaffoldState2_ = state;
+    helpers_.helper7870 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState3(CLTLoginState* state) {
     scaffoldState3_ = state;
+    helpers_.helper7874 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState4(CLTLoginState* state) {
     scaffoldState4_ = state;
+    helpers_.helper7878 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState5(CLTLoginState* state) {
     scaffoldState5_ = state;
+    helpers_.helper787C = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState6(CLTLoginState* state) {
     scaffoldState6_ = state;
+    helpers_.helper7880 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState7(CLTLoginState* state) {
     scaffoldState7_ = state;
+    helpers_.helper7884 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState8(CLTLoginState* state) {
     scaffoldState8_ = state;
+    helpers_.helper7888 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState9(CLTLoginState* state) {
     scaffoldState9_ = state;
+    helpers_.helper788C = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState10(CLTLoginState* state) {
     scaffoldState10_ = state;
+    helpers_.helper7890 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState11(CLTLoginState* state) {
     scaffoldState11_ = state;
+    helpers_.helper7894 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState12(CLTLoginState* state) {
     scaffoldState12_ = state;
+    helpers_.helper7898 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState13(CLTLoginState* state) {
     scaffoldState13_ = state;
+    helpers_.helper789C = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState14(CLTLoginState* state) {
     scaffoldState14_ = state;
+    helpers_.helper78A0 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState15(CLTLoginState* state) {
     scaffoldState15_ = state;
+    helpers_.helper78A4 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState16(CLTLoginState* state) {
     scaffoldState16_ = state;
+    helpers_.helper78A8 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState17(CLTLoginState* state) {
     scaffoldState17_ = state;
+    helpers_.helper78AC = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState18(CLTLoginState* state) {
     scaffoldState18_ = state;
+    helpers_.helper78B0 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RegisterScaffoldState19(CLTLoginState* state) {
     scaffoldState19_ = state;
+    helpers_.helper78B4 = state;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
