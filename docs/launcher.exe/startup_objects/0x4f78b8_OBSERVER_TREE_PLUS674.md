@@ -14,8 +14,9 @@ It is also the target of the arg6 / `ILTLoginMediator.Default` registration brid
 
 Current best read: this is a std::_Tree-like ordered container keyed by the observer pointer itself.
 The replacement now source-owns that shape closely enough to do in-order event/error walks without
-flattening it into a vector, but balancing/color bits and original node-pool recycling are still not
-fully reconstructed.
+flattening it into a vector, and now drives insert/erase/increment through libstdc++
+`<bits/stl_tree.h>` directly instead of keeping a separate source-only successor helper. Balancing,
+color-bit meaning, and original node-pool recycling are still only partially reconstructed.
 
 Current concrete observer identities on the active route:
 - `0x629ddfc8`

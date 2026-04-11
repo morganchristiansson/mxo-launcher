@@ -270,7 +270,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
-    mediator->PostEventScaffold(0x09u);
+    mediator->PostEvent(0x09u);
 
     spdlog::debug(
         "CLTLoginState_State8::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0(il.cfg)={} d00(hl.cfg)={} d10(an.cfg)={} d20(rl.cfg)={} d30(cl.cfg)={} d40(pi.cfg)={} d50(ai.cfg)={} d60(bl/cs.cfg)={} d70(cui.cfg)={}",
@@ -368,7 +368,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     ownerState.worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         (void)mediator->SwitchHelperStateByIdScaffold(3u);
-        mediator->PostErrorScaffold(10u);
+        mediator->PostError(10u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would latch owner+0x80 to that raw server code, switch helper state to 3, and post generic OnLoginError error=10 currentState={}",
             loadCharacterReplyEnvelope.status,
@@ -842,7 +842,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem, CLTL
         // Important recovered ordering detail from `0x41b450`:
         // - the helper9/state9 install itself immediately notifies the new helper through slot 3
         // - `0x439780` therefore runs before this later `PostEvent(0x0b)` tail
-        mediator->PostEventScaffold(0x0bu);
+        mediator->PostEvent(0x0bu);
 
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} usedCurrentSlotRecord={} -> currentState=helper9 event=0x0b",

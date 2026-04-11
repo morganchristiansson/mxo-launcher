@@ -90,7 +90,7 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u);
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
-    mediator->PostEventScaffold(0x07u);
+    mediator->PostEvent(0x07u);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue built raw-0x0d packet fixedBytes=0x{:02x} totalBytes=0x{:02x} sourceBlock94String60='{}' gcidLow=0x{:08x} gcidHigh=0x{:08x} currentSlotName='{}' -> sendResult=0x{:08x} then posts event=0x07",
@@ -132,13 +132,13 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     // - negative result: that makes the concrete `0x40ec70 -> +0xf0 -> state7 -> event 8`
     //   corridor removal-oriented, not the hidden success-side `+0xec / 0x41c1f0` producer
     if (parsed.result09 < 1u) {
-        mediator->PostEventScaffold(0x08u);
+        mediator->PostEvent(0x08u);
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e success result09=0x{:08x} -> switch helper state3 then PostEvent(0x08) currentState={}",
             static_cast<unsigned>(parsed.result09),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
     } else {
-        mediator->PostErrorScaffold(0x09u);
+        mediator->PostError(0x09u);
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e failure result09=0x{:08x} -> switch helper state3 then PostError(0x09) currentState={}",
             static_cast<unsigned>(parsed.result09),

@@ -332,7 +332,7 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
         mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data());
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
-    mediator->PostEventScaffold(0x13u);
+    mediator->PostEvent(0x13u);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> sendResult=0x{:08x} then posts event=0x13",
@@ -380,7 +380,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
 
     if (mediator->WorldListCountOrStatus80() >= 1u) {
         (void)mediator->SwitchHelperStateByIdScaffold(3u);
-        mediator->PostErrorScaffold(0x0bu);
+        mediator->PostError(0x0bu);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
             static_cast<unsigned>(mediator->WorldListCountOrStatus80()));
@@ -398,7 +398,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         spdlog::warn(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed successful MS_ClaimCharacterNameReply but has no registered helper11 state");
     }
-    mediator->PostEventScaffold(0x14u);
+    mediator->PostEvent(0x14u);
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage successful MS_ClaimCharacterNameReply -> helper11 entry result=0x{:08x} then PostEvent(0x14)",
         static_cast<unsigned>(helper11EntryResult));

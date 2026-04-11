@@ -75,7 +75,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
         if (nextHelperStateId != 13u) {
             (void)mediator->SwitchHelperStateByIdScaffold(3u);
         }
-        mediator->PostErrorScaffold(6u);
+        mediator->PostError(6u);
         spdlog::info(
             "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostError(0x06)",
             static_cast<unsigned>(status),
@@ -96,7 +96,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
     cachedUpstreamOrArg_ = nullptr;
     mediator->MutableMarginRouteState().currentWorldId = -1;
     const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
-    mediator->PostEventScaffold(0x0eu);
+    mediator->PostEvent(0x0eu);
     spdlog::info(
         "CLTLoginState_State4::Slot2_HandleSecondaryGate status=0x{:08x} cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",
         static_cast<unsigned>(status),

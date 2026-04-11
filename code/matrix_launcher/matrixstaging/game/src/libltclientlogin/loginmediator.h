@@ -925,12 +925,11 @@ public:
     // so the immediate continuation stays the later explicit PostEvent/listener work.
 
 
-    // Narrow source-owned scaffolds for the launcher.exe logging/event side effects at
-    // `0x41cfb0` / `0x41d090`.
-    // Current implementation now keeps lightweight event/error history together with a minimal
+    // Anchored launcher.exe logging/event side effects at `0x41cfb0` / `0x41d090`.
+    // Current implementation keeps lightweight event/error history together with the recovered
     // observer registration bridge for arg6/`ILTLoginMediator.Default` slots `+0x170/+0x174`.
-    void PostEventScaffold(uint32_t eventId);
-    void PostErrorScaffold(uint32_t errorId);
+    void PostEvent(uint32_t eventId);
+    void PostError(uint32_t errorId);
     bool RegisterLoginObserver(void* observer) override;
     // +0x174
     bool UnregisterLoginObserver(void* observer) override;
@@ -1513,7 +1512,6 @@ private:
     void ClearObserverTree674();
     LoginObserverTreeNode674* ObserverTreeBegin674() const;
     LoginObserverTreeNode674* ObserverTreeEnd674() const;
-    LoginObserverTreeNode674* ObserverTreeSuccessor674(LoginObserverTreeNode674* node) const;
     LoginObserverTreeNode674* FindObserverNode674(void* observer) const;
     void EqualRangeObserver674(
         void* observer,
@@ -1577,10 +1575,6 @@ private:
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine_;
     CLTLoginState* currentState_;
     uint32_t lastSwitchedHelperStateScaffold_ = 0;
-    uint32_t lastPostedEventScaffold_ = 0;
-    uint32_t lastPostedErrorScaffold_ = 0;
-    std::array<uint32_t, 8> recentPostedEventsScaffold_{};
-    uint32_t recentPostedEventCountScaffold_ = 0;
     uint32_t marginPacketReceiveCountScaffold_ = 0;
     uint32_t marginPacketFilteredBeforeSlot6CountScaffold_ = 0;
     uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;

@@ -61,7 +61,7 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator
     }
 
     if (mediator->AuthConnectionFlag2c() != 0u) {
-        mediator->PostEventScaffold(1u);
+        mediator->PostEvent(1u);
         spdlog::info(
             "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed armed owner+0x2c -> event=0x01 currentState={}",
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
@@ -72,7 +72,7 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator
         mediator->WorldListCountOrStatus80() = 1u;
     }
     const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(0u);
-    mediator->PostErrorScaffold(1u);
+    mediator->PostError(1u);
     spdlog::info(
         "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed unarmed owner+0x2c -> owner+0x80=0x{:08x} currentState={} switchDispatchResult=0x{:08x}",
         static_cast<unsigned>(mediator->WorldListCountOrStatus80()),
@@ -93,7 +93,7 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediat
     }
 
     if (mediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold()) {
-        mediator->PostEventScaffold(0x0fu);
+        mediator->PostEvent(0x0fu);
         spdlog::info(
             "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed armed owner+0x2d -> event=0x0f currentState={}",
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
@@ -104,7 +104,7 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediat
         mediator->WorldListCountOrStatus80() = 1u;
     }
     (void)mediator->SwitchHelperStateByIdScaffold(3u);
-    mediator->PostErrorScaffold(7u);
+    mediator->PostError(7u);
     spdlog::info(
         "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed unarmed owner+0x2d -> owner+0x80=0x{:08x} currentState={}",
         static_cast<unsigned>(mediator->WorldListCountOrStatus80()),

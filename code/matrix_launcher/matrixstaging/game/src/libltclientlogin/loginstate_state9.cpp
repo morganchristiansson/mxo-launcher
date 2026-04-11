@@ -55,7 +55,7 @@ uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
     if (submitResult < 1u) {
         // anchor: launcher.exe:0x00439780 success-side event post after the `0x41de40` submit call.
-        mediator->PostEventScaffold(0x17u);
+        mediator->PostEvent(0x17u);
         spdlog::info(
             "CLTLoginState_State9::Slot3_BeginOrContinue consumed helper-local payload byte4=0x{:02x} word6=0x{:04x} -> submitResult=0x{:08x} then posts event=0x17",
             static_cast<unsigned>(consumedByte4),
@@ -121,7 +121,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
             "ROUTE CHECKPOINT: late-login state9 success -> state12 event=0x18 currentState={}",
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         // anchor: launcher.exe:0x43c180 success tail posts event 0x18 after switching to state 0x0c.
-        mediator->PostEventScaffold(0x18u);
+        mediator->PostEvent(0x18u);
         spdlog::info(
             "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
             static_cast<unsigned>(parsedStatus),
@@ -131,7 +131,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
 
     (void)mediator->SwitchHelperStateByIdScaffold(3u);
     // anchor: launcher.exe:0x43c180 failure tail posts error 0x0d after switching back to state 3.
-    mediator->PostErrorScaffold(0x0du);
+    mediator->PostError(0x0du);
     spdlog::info(
         "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
         static_cast<unsigned>(parsedStatus),

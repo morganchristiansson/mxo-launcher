@@ -295,7 +295,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
     packetBuilder.SetCurrentHelperPhaseByte(currentHelperPhaseByte);
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
-    mediator->PostEventScaffold(0x11u);
+    mediator->PostEvent(0x11u);
     spdlog::info(
         "CLTLoginState_State6::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
         State6Packet0x06FixedPayload::kFixedByteCount,
@@ -415,7 +415,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTL
 
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
-    mediator->PostEventScaffold(0x12u);
+    mediator->PostEvent(0x12u);
     spdlog::info(
         "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
         static_cast<unsigned>(parsed.udpSessionSecret09),

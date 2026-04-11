@@ -53,7 +53,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
         packet.bytes.data(),
         static_cast<uint32_t>(packet.bytes.size()),
         nullptr);
-    mediator->PostEventScaffold(0x1bu);
+    mediator->PostEvent(0x1bu);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_WorldListPending::Slot3_BeginOrContinue built raw-0x35 packet headerLen={} payloadLen={} byteCount={} currentState={} -> sendResult=0x{:08x} then posts event=0x1b",

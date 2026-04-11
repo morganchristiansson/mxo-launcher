@@ -204,7 +204,9 @@ Current best read:
     proven direct fall into `0x004397e0` / `0x0041c5c0`
 
 Current source stance:
-- event history and the narrow helper9 bridge are source-owned
+- no extra state9/helper9 continuation now lives inside `PostEvent`; the earlier source-owned
+  event-`0x0b` fallback was removed once state8/state11 tails mirrored the immediate helper slot-3
+  notify before their later `PostEvent(0x0b/0x16)` observer walk
 - arg6/observer registration is now source-owned through a std::_Tree-like owner `+0x674`
   scaffold instead of the older flat vector bridge
 - source now uses that same tree shape for general in-order event/error walks again, not just for

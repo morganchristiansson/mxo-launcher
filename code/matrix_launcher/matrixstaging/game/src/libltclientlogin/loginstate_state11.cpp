@@ -131,7 +131,7 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
     packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
-    mediator->PostEventScaffold(0x15u);
+    mediator->PostEvent(0x15u);
 
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
@@ -184,7 +184,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
         ownerState.createCharacterData108.characterName00[0] = '\0';
         mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
         (void)mediator->SwitchHelperStateByIdScaffold(3u);
-        mediator->PostErrorScaffold(12u);
+        mediator->PostError(12u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage observed failure status=0x{:08x} handoffWord=0x{:04x}; mirrored original owner+0x108 clear, owner+0xcc8=0xff, state3 switch, and error=12",
             static_cast<unsigned>(loadCharacterReplyEnvelope.status),
@@ -441,7 +441,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem, CLT
         // - helper9 slot3 (`0x439780`) immediately consumes that handoff word during `0x41b450`
         // - it then calls owner `0x41de40`
         // - later state9 slot6 raw `0x11` success switches to helper12 and posts event `0x18`
-        mediator->PostEventScaffold(0x16u);
+        mediator->PostEvent(0x16u);
 
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} name='{}' -> currentState=helper9 event=0x16",

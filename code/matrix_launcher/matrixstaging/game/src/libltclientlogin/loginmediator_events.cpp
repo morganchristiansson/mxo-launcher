@@ -4,10 +4,14 @@
 #include "loginstate.h"
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
+#include <bits/stl_tree.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+
+static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "observer tree node-base size mismatch");
+static_assert(sizeof(mxo::ltlogin::LoginObserverTreeNode674) == 0x14, "observer tree node size mismatch");
 
 namespace mxo::ltlogin {
 namespace {
@@ -18,25 +22,6 @@ namespace {
 //   late state-`0x0c` bridge
 // - canonical reference:
 //   `../../../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md`
-static std::string BuildRecentEventHistoryPreview(const std::array<uint32_t, 8>& events, uint32_t count) {
-    if (count == 0u) {
-        return "[]";
-    }
-
-    const uint32_t boundedCount = std::min<uint32_t>(count, static_cast<uint32_t>(events.size()));
-    std::string out = "[";
-    char buffer[16] = {};
-    for (uint32_t i = 0; i < boundedCount; ++i) {
-        if (i != 0u) {
-            out += ", ";
-        }
-        std::snprintf(buffer, sizeof(buffer), "0x%02x", static_cast<unsigned>(events[i] & 0xffu));
-        out += buffer;
-    }
-    out += "]";
-    return out;
-}
-
 using LoginObserverOnEventFn = void(__thiscall*)(void*, uint32_t);
 using LoginObserverOnErrorFn = void(__thiscall*)(void*, uint32_t);
 
@@ -44,24 +29,33 @@ static uintptr_t ObserverTreeKey(void* observer) {
     return reinterpret_cast<uintptr_t>(observer);
 }
 
-static LoginObserverTreeNode674* ObserverTreeMinimum(LoginObserverTreeNode674* node) {
-    if (!node) {
-        return nullptr;
-    }
-    while (node->left08 != nullptr) {
-        node = node->left08;
-    }
-    return node;
+template <typename Node>
+static std::_Rb_tree_node_base* ObserverTreeNodeBase(Node* node) {
+    return reinterpret_cast<std::_Rb_tree_node_base*>(node);
 }
 
-static LoginObserverTreeNode674* ObserverTreeMaximum(LoginObserverTreeNode674* node) {
-    if (!node) {
-        return nullptr;
+template <typename Node>
+static const std::_Rb_tree_node_base* ObserverTreeNodeBase(const Node* node) {
+    return reinterpret_cast<const std::_Rb_tree_node_base*>(node);
+}
+
+static LoginObserverTreeNode674* ObserverTreeNodeFromBase(std::_Rb_tree_node_base* node) {
+    return reinterpret_cast<LoginObserverTreeNode674*>(node);
+}
+
+static const LoginObserverTreeNode674* ObserverTreeNodeFromBase(const std::_Rb_tree_node_base* node) {
+    return reinterpret_cast<const LoginObserverTreeNode674*>(node);
+}
+
+// UNANCHORED: source-owned free-backed mirror of the duplicate subtree destroy helpers emitted at
+// `0x419570` / `0x41d370` for the small non-vtable observer tree class at owner `+0x674`.
+static void DestroyObserverSubtreeNodes674(LoginObserverTreeNode674* subtreeRoot) {
+    while (subtreeRoot != nullptr) {
+        DestroyObserverSubtreeNodes674(subtreeRoot->right0c);
+        LoginObserverTreeNode674* const currentNode = subtreeRoot;
+        subtreeRoot = currentNode->left08;
+        std::free(currentNode);
     }
-    while (node->right0c != nullptr) {
-        node = node->right0c;
-    }
-    return node;
 }
 
 static void** GetLoginObserverVtable(void* observer) {
@@ -108,23 +102,25 @@ static void DispatchLoginObserverError(void* observer, uint32_t errorId) {
 void CLTLoginMediator::InitializeObserverTree674() {
     observerTree674_.header00 = &observerTreeHeader674_;
     observerTree674_.nodeCount04 = 0u;
-    observerTreeHeader674_.colorOrFlags00 = 0u;
-    observerTreeHeader674_.parent04 = nullptr;
-    observerTreeHeader674_.left08 = &observerTreeHeader674_;
-    observerTreeHeader674_.right0c = &observerTreeHeader674_;
-    observerTreeHeader674_.observerKey10 = nullptr;
+
+    observerTreeHeader674_ = {};
+    std::_Rb_tree_node_base* const headerBase = ObserverTreeNodeBase(&observerTreeHeader674_);
+    headerBase->_M_color = std::_S_red;
+    headerBase->_M_parent = nullptr;
+    headerBase->_M_left = headerBase;
+    headerBase->_M_right = headerBase;
+
     latestObserver170_ = nullptr;
     latestObserver174_ = nullptr;
 }
 
 // UNANCHORED: source-owned tree cleanup for the recovered owner `+0x674` observer container.
 void CLTLoginMediator::ClearObserverTree674() {
-    LoginObserverTreeNode674* node = ObserverTreeBegin674();
-    const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
-    while (node != end) {
-        LoginObserverTreeNode674* const next = ObserverTreeSuccessor674(node);
-        std::free(node);
-        node = next;
+    if (observerTree674_.header00 == nullptr) {
+        return;
+    }
+    if (observerTree674_.nodeCount04 != 0u) {
+        DestroyObserverSubtreeNodes674(observerTreeHeader674_.parent04);
     }
     InitializeObserverTree674();
 }
@@ -134,35 +130,12 @@ LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeBegin674() const {
     if (observerTree674_.header00 == nullptr || observerTree674_.nodeCount04 == 0u) {
         return observerTree674_.header00;
     }
-    return observerTreeHeader674_.left08;
+    return ObserverTreeNodeFromBase(ObserverTreeNodeBase(observerTree674_.header00)->_M_left);
 }
 
 // UNANCHORED: source-owned `end()`/header helper over the recovered owner `+0x674` observer tree.
 LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeEnd674() const {
     return observerTree674_.header00;
-}
-
-// UNANCHORED: source-owned in-order successor helper mirroring the `0x41cfb0/0x41d090`
-// owner `+0x674` traversal shape.
-LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeSuccessor674(LoginObserverTreeNode674* node) const {
-    LoginObserverTreeNode674* const header = ObserverTreeEnd674();
-    if (node == nullptr || header == nullptr) {
-        return header;
-    }
-
-    if (node->right0c != nullptr) {
-        return ObserverTreeMinimum(node->right0c);
-    }
-
-    LoginObserverTreeNode674* parent = node->parent04;
-    while (parent != nullptr && node == parent->right0c) {
-        node = parent;
-        parent = parent->parent04;
-    }
-    if (node->right0c != parent) {
-        node = parent;
-    }
-    return node ? node : header;
 }
 
 // UNANCHORED: source-owned keyed lookup over the recovered owner `+0x674` observer tree.
@@ -182,8 +155,8 @@ LoginObserverTreeNode674* CLTLoginMediator::FindObserverNode674(void* observer) 
     return nullptr;
 }
 
-// UNANCHORED: source-owned equal-range helper mirroring the `0x419510` owner `+0x674`
-// search-pair builder.
+// anchor: launcher.exe:0x419510
+// owner `+0x674` equal-range/search-pair builder used by `0x41dde0`.
 void CLTLoginMediator::EqualRangeObserver674(
     void* observer,
     LoginObserverTreeNode674** outLowerBound,
@@ -220,28 +193,30 @@ void CLTLoginMediator::EqualRangeObserver674(
     }
 }
 
-// UNANCHORED: source-owned iterator-distance helper mirroring the `0x41baa0` owner `+0x674`
-// range-count walk.
+// anchor: launcher.exe:0x41baa0
+// owner `+0x674` iterator-distance / range-count walk.
 uint32_t CLTLoginMediator::CountObserverRange674(
     LoginObserverTreeNode674* first,
     LoginObserverTreeNode674* last) const {
     uint32_t count = 0u;
     while (first != last) {
-        first = ObserverTreeSuccessor674(first);
+        first = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(first)));
         ++count;
     }
     return count;
 }
 
-// UNANCHORED: source-owned insert helper for the recovered owner `+0x674` observer tree.
+// UNANCHORED: source-owned single helper collapsing the original `0x415f20` search/insert gate
+// plus its internal `0x452c10` node-allocation/rebalance path for owner `+0x674`.
 bool CLTLoginMediator::InsertObserverNode674(void* observer) {
-    LoginObserverTreeNode674* parent = &observerTreeHeader674_;
+    std::_Rb_tree_node_base* const headerBase = ObserverTreeNodeBase(observerTree674_.header00);
+    std::_Rb_tree_node_base* parentBase = headerBase;
     LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
     const uintptr_t targetKey = ObserverTreeKey(observer);
     bool insertLeft = true;
 
     while (current != nullptr) {
-        parent = current;
+        parentBase = ObserverTreeNodeBase(current);
         const uintptr_t currentKey = ObserverTreeKey(current->observerKey10);
         if (targetKey < currentKey) {
             insertLeft = true;
@@ -258,90 +233,33 @@ bool CLTLoginMediator::InsertObserverNode674(void* observer) {
     if (!node) {
         return false;
     }
-    node->colorOrFlags00 = 0u;
-    node->parent04 = parent;
+    node->colorOrFlags00 = static_cast<uint32_t>(std::_S_red);
+    node->parent04 = nullptr;
     node->left08 = nullptr;
     node->right0c = nullptr;
     node->observerKey10 = observer;
 
-    if (observerTreeHeader674_.parent04 == nullptr) {
-        observerTreeHeader674_.parent04 = node;
-        observerTreeHeader674_.left08 = node;
-        observerTreeHeader674_.right0c = node;
-    } else if (insertLeft) {
-        parent->left08 = node;
-        if (observerTreeHeader674_.left08 == parent) {
-            observerTreeHeader674_.left08 = node;
-        }
-    } else {
-        parent->right0c = node;
-        if (observerTreeHeader674_.right0c == parent) {
-            observerTreeHeader674_.right0c = node;
-        }
-    }
-
+    std::_Rb_tree_insert_and_rebalance(insertLeft, ObserverTreeNodeBase(node), parentBase, *headerBase);
     ++observerTree674_.nodeCount04;
     return true;
 }
 
-// UNANCHORED: source-owned erase-one helper for the recovered owner `+0x674` observer tree.
+// UNANCHORED: source-owned single-node erase wrapper factored out of the original range-erase
+// family around `0x41d430` / `_Rb_tree_rebalance_for_erase` for owner `+0x674`.
 bool CLTLoginMediator::EraseObserverNode674(void* observer) {
-    LoginObserverTreeNode674* node = FindObserverNode674(observer);
+    LoginObserverTreeNode674* const node = FindObserverNode674(observer);
     if (node == nullptr) {
         return false;
     }
 
-    auto transplant = [this](LoginObserverTreeNode674* oldNode, LoginObserverTreeNode674* replacement) {
-        LoginObserverTreeNode674* const header = &observerTreeHeader674_;
-        if (oldNode->parent04 == header) {
-            header->parent04 = replacement;
-        } else if (oldNode == oldNode->parent04->left08) {
-            oldNode->parent04->left08 = replacement;
-        } else {
-            oldNode->parent04->right0c = replacement;
-        }
-        if (replacement != nullptr) {
-            replacement->parent04 = oldNode->parent04;
-        }
-    };
-
-    if (node->left08 == nullptr) {
-        transplant(node, node->right0c);
-    } else if (node->right0c == nullptr) {
-        transplant(node, node->left08);
-    } else {
-        LoginObserverTreeNode674* successor = ObserverTreeMinimum(node->right0c);
-        if (successor->parent04 != node) {
-            transplant(successor, successor->right0c);
-            successor->right0c = node->right0c;
-            if (successor->right0c != nullptr) {
-                successor->right0c->parent04 = successor;
-            }
-        }
-        transplant(node, successor);
-        successor->left08 = node->left08;
-        if (successor->left08 != nullptr) {
-            successor->left08->parent04 = successor;
-        }
-    }
-
+    (void)std::_Rb_tree_rebalance_for_erase(ObserverTreeNodeBase(node), *ObserverTreeNodeBase(observerTree674_.header00));
     std::free(node);
     --observerTree674_.nodeCount04;
-
-    if (observerTree674_.nodeCount04 == 0u) {
-        observerTreeHeader674_.parent04 = nullptr;
-        observerTreeHeader674_.left08 = &observerTreeHeader674_;
-        observerTreeHeader674_.right0c = &observerTreeHeader674_;
-    } else {
-        observerTreeHeader674_.left08 = ObserverTreeMinimum(observerTreeHeader674_.parent04);
-        observerTreeHeader674_.right0c = ObserverTreeMaximum(observerTreeHeader674_.parent04);
-    }
-
     return true;
 }
 
-// UNANCHORED: source-owned erase-range helper mirroring the `0x41d430` owner `+0x674`
-// erase walk, including its full-range clear special case.
+// anchor: launcher.exe:0x41d430
+// owner `+0x674` erase-range walk, including its full-range clear special case.
 void CLTLoginMediator::EraseObserverRange674(
     LoginObserverTreeNode674* first,
     LoginObserverTreeNode674* last) {
@@ -353,8 +271,11 @@ void CLTLoginMediator::EraseObserverRange674(
     }
 
     while (first != last) {
-        LoginObserverTreeNode674* const next = ObserverTreeSuccessor674(first);
-        EraseObserverNode674(first->observerKey10);
+        LoginObserverTreeNode674* const next =
+            ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(first)));
+        (void)std::_Rb_tree_rebalance_for_erase(ObserverTreeNodeBase(first), *ObserverTreeNodeBase(observerTree674_.header00));
+        std::free(first);
+        --observerTree674_.nodeCount04;
         first = next;
     }
 }
@@ -469,7 +390,7 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     return returnValue;
 }
 
-void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
+void CLTLoginMediator::PostEvent(uint32_t eventId) {
     // anchor: launcher.exe:0x41cfb0
     // Current post-state9 continuation read:
     // - this is not a trivial logger
@@ -489,40 +410,25 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     //   - continuing from there immediately hit `0x41cfb0` with event `0x0f`
     //   - static `CLTEvilBlockingLoginObserver::WaitForEvent` callers currently prove waits for
     //     events `1`, `8`, and `0x0f`, but not for `0x18`
-    // - practical scaffold consequence:
-    //   keep explicit event-history logging here and source-own a std::_Tree-like owner `+0x674`
-    //   observer container/traversal shape, while still leaving balancing/color bits and the
-    //   original node-pool recycling helpers only partially reconstructed.
-    lastPostedEventScaffold_ = eventId;
-    if (recentPostedEventCountScaffold_ < recentPostedEventsScaffold_.size()) {
-        recentPostedEventsScaffold_[recentPostedEventCountScaffold_++] = eventId;
-    } else {
-        std::move(
-            recentPostedEventsScaffold_.begin() + 1,
-            recentPostedEventsScaffold_.end(),
-            recentPostedEventsScaffold_.begin());
-        recentPostedEventsScaffold_.back() = eventId;
-    }
-    const std::string recentEventsPreview =
-        BuildRecentEventHistoryPreview(recentPostedEventsScaffold_, recentPostedEventCountScaffold_);
+    // - practical source consequence:
+    //   source-own only the recovered std::_Tree-like owner `+0x674` observer walk here, while
+    //   leaving balancing/color bits and original node-pool recycling only partially reconstructed.
     spdlog::info(
-        "{} Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 observer walk active)",
+        "{} Event# {} currentState={} lastSwitch=0x{:02x} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 observer walk active)",
         kLogPrefixPostEvent,
         static_cast<unsigned>(eventId),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(lastSwitchedHelperStateScaffold_ & 0xffu),
-        recentEventsPreview,
         static_cast<unsigned>(observerTree674_.nodeCount04),
         fmt::ptr(observerTree674_.header00),
         fmt::ptr(observerTreeHeader674_.parent04),
         fmt::ptr(observerTreeHeader674_.left08),
         fmt::ptr(observerTreeHeader674_.right0c));
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# {} currentState={} lastSwitch=0x{:02x} recentEvents={}",
+        "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# {} currentState={} lastSwitch=0x{:02x}",
         (unsigned)eventId,
         currentState_ ? currentState_->DebugName() : "<null>",
-        (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu),
-        recentEventsPreview.c_str());
+        (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu));
 
     // Observer dispatch note:
     // - `0x41cfb0` itself walks the owner `+0x674` tree for whatever event number it is given;
@@ -537,38 +443,22 @@ void CLTLoginMediator::PostEventScaffold(uint32_t eventId) {
     while (node != end) {
         void* const observer = node->observerKey10;
         spdlog::info(
-            "CLTLoginMediator::PostEventScaffold dispatching observerNode={} observer={} event=0x{:02x}",
+            "CLTLoginMediator::PostEvent dispatching observerNode={} observer={} event=0x{:02x}",
             fmt::ptr(node),
             fmt::ptr(observer),
             static_cast<unsigned>(eventId & 0xffu));
         DispatchLoginObserverEvent(observer, eventId);
-        node = ObserverTreeSuccessor674(node);
+        node = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(node)));
     }
 
-    // State9/helper9 continuation note:
-    // - the earlier narrow event-`0x0b` bridge here was only compensating for a source-side gap
-    //   where `0x41b450` helper installs were not yet mirroring the new-helper slot-3 notify
-    // - the active state8/state11 completion tails now explicitly mirror that immediate helper9
-    //   slot-3 call before their later `PostEvent(0x0b/0x16)` tail
-    // - keep only a guarded fallback here for any future path that still reaches event `0x0b`
-    //   with helper9/state9 pending payload not yet consumed
-    if (eventId == 0x0bu && currentState_ != nullptr && currentState_->DispatchPhaseCode() == 9u) {
-        if (auto* state9 = dynamic_cast<CLTLoginState_State9*>(currentState_); state9 != nullptr &&
-            state9->HasPendingPayload()) {
-            const uint32_t continueResult = state9->Slot3_BeginOrContinue(state9, this);
-            spdlog::info(
-                "CLTLoginMediator::PostEventScaffold guarded helper9 continuation fallback event=0x0b currentState={} -> slot3Result=0x{:08x}",
-                currentState_->DebugName(),
-                static_cast<unsigned>(continueResult));
-            spdlog::info(
-                "DIAGNOSTIC: CLTLoginMediator::PostEvent() guarded helper9 continuation fallback event=0x0b currentState={} -> slot3Result=0x{:08x}",
-                currentState_->DebugName(),
-                continueResult);
-        }
-    }
+    // Fidelity note:
+    // - no extra state9/helper9 continuation belongs in `0x41cfb0` itself
+    // - the earlier source-owned event-`0x0b` fallback here has been removed because the active
+    //   state8/state11 tails now mirror the immediate helper slot-3 notify before their later
+    //   `PostEvent(0x0b/0x16)` observer walk
 }
 
-void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
+void CLTLoginMediator::PostError(uint32_t errorId) {
     // anchor: launcher.exe:0x41d090
     // Static Ghidra/decompilation for the original body is now concrete enough to mirror here:
     // - log `CLTLoginMediator::PostError(): Error# %d`
@@ -577,7 +467,6 @@ void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
     // This matters for the state8 failure path because `0x43f930` first writes the raw server
     // result dword to owner `+0x80`, then posts error `10`; client observer-side error handling
     // queries mediator slot `+0x178` to read back that status and choose the visible popup.
-    lastPostedErrorScaffold_ = errorId;
     spdlog::info(
         "{} Error# {} status80=0x{:08x} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 error walk active)",
         kLogPrefixPostError,
@@ -594,13 +483,13 @@ void CLTLoginMediator::PostErrorScaffold(uint32_t errorId) {
     while (node != end) {
         void* const observer = node->observerKey10;
         spdlog::info(
-            "CLTLoginMediator::PostErrorScaffold dispatching observerNode={} observer={} error=0x{:02x} status80=0x{:08x}",
+            "CLTLoginMediator::PostError dispatching observerNode={} observer={} error=0x{:02x} status80=0x{:08x}",
             fmt::ptr(node),
             fmt::ptr(observer),
             static_cast<unsigned>(errorId & 0xffu),
             static_cast<unsigned>(WorldListCountOrStatus80()));
         DispatchLoginObserverError(observer, errorId);
-        node = ObserverTreeSuccessor674(node);
+        node = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(node)));
     }
 }
 
