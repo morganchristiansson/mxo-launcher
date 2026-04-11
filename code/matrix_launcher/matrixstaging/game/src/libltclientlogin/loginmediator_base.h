@@ -9,32 +9,52 @@
 namespace mxo {
 namespace ltlogin {
 
+// Forward declarations for message ref classes
+namespace liblttcp {
+class CMessageConnectionMessageRef;
+}
+
 // Type definitions used in pure virtual methods
 struct Arg6SelectionConfig;
+
+// anchor: launcher.exe:0x004af2a4 / vtable
+// anchor: launcher.exe:0x439840 / ctor
+// Shared packet builder envelope base class. Uses CMessageConnectionMessage_CreateRef 
+// for internal message storage. This is the shared base pattern used by 
+// CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
+// Full object size: 0x32 (50 bytes)
+class PacketBuilder_0x4af2a4 {
+public:
+    // VTable pointer at +0x00
+    void** vtable00 = nullptr;
+    
+    // Shared packet builder envelope fields:
+    uint32_t nopatchLauncherVersionValue04 = 0;    // +0x04
+    liblttcp::CMessageConnectionMessageRef* messageRef08 = nullptr;  // +0x08
+    uint32_t ownerReadyFlag0c = 0;                  // +0x0c
+    
+    // Payload pointers (set by derived classes):
+    void* payloadBegin10 = nullptr;               // +0x10
+    uint16_t payloadLength14 = 0;                 // +0x14
+    uint8_t statusByte16 = 0;                    // +0x16
+    
+    // Character slot fields (used by derived slot record):
+    uint32_t characterIdLow1c = 0;                 // +0x1c
+    uint32_t characterIdHigh20 = 0;                // +0x20
+    uint16_t worldId24 = 0;                       // +0x24
+    
+    // Default ctor/dtor matching original:
+    PacketBuilder_0x4af2a4() = default;
+    ~PacketBuilder_0x4af2a4() = default;
+};
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
 // anchor: launcher.exe:0x439910 / dtor
-// Inherits from: cls_0x4af2a4 (shared packet builder envelope base)
+// Character slot record class. Inherits from PacketBuilder_0x4af2a4 for shared envelope layout.
 // Full object size: 0x32 (50 bytes)
-class SlotRecordState004b5328 {
-    // VTable pointer at +0x00 (inherited from base)
-    // Base fields from cls_0x4af2a4: +0x00 .. +0x31
-    //
-    // Additional fields from slot-record specific payload:
-    // - object `+0x10` = heap string begin pointer
-    // - object `+0x14` = heap string length
-    // - object `+0x18` = status byte
-    // - object `+0x1c` = paired id low dword
-    // - object `+0x20` = paired id high dword
-    // - object `+0x24` = world id word
-    //
-    // Current recovered fields of interest:
-    // - object `+0x14` = heap string written by `0x43aa80`
-    // - object `+0x10 + 0x03` = paired id low dword
-    // - object `+0x10 + 0x07` = paired id high dword
-    // - object `+0x10 + 0x0b` = status byte
-    // - object `+0x10 + 0x0c` = world id word
+class SlotRecordState004b5328 : public PacketBuilder_0x4af2a4 {
 public:
+    // Additional slot-record specific fields:
     std::string heapString14;           // +0x14
     uint32_t globalCharacterIdLow03 = 0;   // +0x1c
     uint32_t globalCharacterIdHigh07 = 0;  // +0x20
