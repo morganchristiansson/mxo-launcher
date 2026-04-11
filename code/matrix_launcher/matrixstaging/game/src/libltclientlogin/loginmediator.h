@@ -32,23 +32,24 @@ class CLTLoginMediator;
 // - the earlier mediator-owned bridge-context scaffolds have been retired from the active path
 
 // owner `+0x674` listener tree sketch tightened from `0x41ddb0 / 0x41dde0 / 0x41cfb0 / 0x41d090`:
-// - container object is an 8-byte pair `{ headerPtr, count }`
+// - container object is an 8-byte pair `{ headerPtr, nodeCount }`
+// - this matches the small non-vtable OOAnalyzer class at `0x419510`
 // - header node is std::_Tree-like and self-referential when empty
 //   - `header + 0x04` = root
 //   - `header + 0x08` = leftmost/begin
 //   - `header + 0x0c` = rightmost
 // - concrete nodes compare/store the observer pointer at `+0x10`
 struct LoginObserverTreeNode674 {
-    void* reserved00 = nullptr;                    // current meaning unresolved in this bounded pass
+    uint32_t colorOrFlags00 = 0;                  // SGI/std::_Tree-like node color/flag field; exact bit meaning still unresolved
     LoginObserverTreeNode674* parent04 = nullptr;
     LoginObserverTreeNode674* left08 = nullptr;
     LoginObserverTreeNode674* right0c = nullptr;
-    void* observer10 = nullptr;
+    void* observerKey10 = nullptr;
 };
 
 struct LoginObserverTree674 {
     LoginObserverTreeNode674* header00 = nullptr;
-    uint32_t count04 = 0;
+    uint32_t nodeCount04 = 0;
 };
 
 // Reimplementation note:

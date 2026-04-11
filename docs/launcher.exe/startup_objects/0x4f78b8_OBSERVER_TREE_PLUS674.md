@@ -40,18 +40,21 @@ Current concrete observer identities on the active route:
 
 Recovered from `0x41cfb0 / 0x41d090 / 0x41ddb0 / 0x41dde0 / 0x419510 / 0x41d430`.
 
+Current better type read: owner `+0x674` is the small non-vtable OOAnalyzer class `cls_0x419510`,
+which is an SGI/libstdc++-style tree container head pair:
+
 ```cpp
 struct LoginObserverTreeNode674 {
-    void* reserved00;                 // current meaning unresolved in this bounded pass
+    uint32_t colorOrFlags00;          // SGI/std::_Tree-like node color/flag field
     LoginObserverTreeNode674* parent04;
     LoginObserverTreeNode674* left08;
     LoginObserverTreeNode674* right0c;
-    void* observer10;                 // comparison key / stored observer pointer
+    void* observerKey10;              // comparison key / stored observer pointer
 };
 
 struct LoginObserverTree674 {
     LoginObserverTreeNode674* header00;
-    uint32_t count04;
+    uint32_t nodeCount04;
 };
 ```
 
@@ -134,16 +137,25 @@ Current replacement note:
 
 `0x41dde0` is also small and delegates to three helpers over `this + 0x674`:
 
-1. `0x419510`
+1. `0x419510 = cls_0x419510::BuildEqualRangeForKey`
    - builds an equal-range pair for the observer pointer key
    - current best read:
      - out[0] = lower_bound (first node with key `>= observer`)
      - out[1] = upper_bound (first node with key `> observer`)
 2. `0x41baa0`
    - counts the iterator distance between those two nodes
-3. `0x41d430`
+3. `0x41d430 = cls_0x419510::EraseRange_0x41d430`
    - erases the range `[first, last)`
    - has a full-range fast path when erasing the whole tree
+
+Related duplicate OOAnalyzer emissions on the same class:
+- `0x419570 = DestroySubtreeNodes_0x419570`
+- `0x4195c0 = EraseRange_0x4195c0`
+- `0x41d370 = DestroySubtreeNodes_0x41d370`
+- `0x41d430 = EraseRange_0x41d430`
+
+The two destroy/erase pairs decompile identically and now read as duplicate compiler emissions of the
+same SGI tree helpers rather than distinct observer-specific algorithms.
 
 Important bounded detail:
 
