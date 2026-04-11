@@ -11,26 +11,41 @@ namespace ltlogin {
 
 // Type definitions used in pure virtual methods
 struct Arg6SelectionConfig;
-struct SlotRecordState004b5328 {
-    // Current best source-owned mirror of the heap object allocated by `0x4398b0` and stored
-    // under owner `+0x688[index]` by `0x4401a0`.
-    // Address / vtable anchors:
-    // - ctor/init: `0x4398b0`
-    // - dtor: `0x439910`
-    // - debug printer: `0x43dc80`
-    // - payload reset/prepare: `0x439940`
-    // - heap-string copy helper: `0x43aa80`
+// anchor: launcher.exe:0x004b5328 / vtable
+// anchor: launcher.exe:0x4398b0 / ctor
+// anchor: launcher.exe:0x439910 / dtor
+// Inherits from: cls_0x4af2a4 (shared packet builder envelope base)
+// Full object size: 0x32 (50 bytes)
+class SlotRecordState004b5328 {
+    // VTable pointer at +0x00 (inherited from base)
+    // Base fields from cls_0x4af2a4: +0x00 .. +0x31
+    //
+    // Additional fields from slot-record specific payload:
+    // - object `+0x10` = heap string begin pointer
+    // - object `+0x14` = heap string length
+    // - object `+0x18` = status byte
+    // - object `+0x1c` = paired id low dword
+    // - object `+0x20` = paired id high dword
+    // - object `+0x24` = world id word
+    //
     // Current recovered fields of interest:
     // - object `+0x14` = heap string written by `0x43aa80`
     // - object `+0x10 + 0x03` = paired id low dword
     // - object `+0x10 + 0x07` = paired id high dword
     // - object `+0x10 + 0x0b` = status byte
     // - object `+0x10 + 0x0c` = world id word
-    std::string heapString14;
-    uint32_t globalCharacterIdLow03 = 0;
-    uint32_t globalCharacterIdHigh07 = 0;
-    uint8_t status0b = 0;
-    uint16_t worldId0c = 0;
+public:
+    std::string heapString14;           // +0x14
+    uint32_t globalCharacterIdLow03 = 0;   // +0x1c
+    uint32_t globalCharacterIdHigh07 = 0;  // +0x20
+    uint8_t status0b = 0;             // +0x18
+    uint16_t worldId0c = 0;            // +0x24
+
+    // Default ctor/dtor matching original:
+    // - ctor: 0x4398b0 calls base init then zero-inits
+    // - dtor: 0x439910 calls base dtor then optionally frees
+    SlotRecordState004b5328() = default;
+    ~SlotRecordState004b5328() = default;
 };
 
 // Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.
