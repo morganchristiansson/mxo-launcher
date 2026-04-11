@@ -141,9 +141,7 @@ uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t f
             return 0x12000000u;
         case 12u:
             ownerOptionalField90_ = field90Value;
-            if (LoginHelperStateByIdScaffold(0x0du) != nullptr) {
-                (void)SwitchHelperStateByIdScaffold(0x0du);
-            }
+            SwitchHelperStateByIdScaffold(0x0du);
             spdlog::info(
                 "CLTLoginMediator::SetState9OptionalField90AndSwitchToState13 stored owner+0x90=0x{:08x} currentState={}",
                 static_cast<unsigned>(ownerOptionalField90_),
@@ -156,10 +154,6 @@ uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t f
 
 // anchor: launcher.exe:0x41e690
 uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) {
-    return FillState9CallbackBlob18cScaffold(outDwords, arg2, arg3);
-}
-
-uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) {
     if (!outDwords) {
         return 1u;
     }
@@ -173,7 +167,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords
     if (!currentSlotRecord) {
         std::memset(outDwords, 0, 0x20u);
         spdlog::info(
-            "CLTLoginMediator::FillState9CallbackBlob18cScaffold missing current slot record while state9-gated; zeroed 0x20-byte blob and returned generic failure");
+            "CLTLoginMediator::FillState9CallbackBlob18c missing current slot record while state9-gated; zeroed 0x20-byte blob and returned generic failure");
         return 1u;
     }
 
@@ -192,7 +186,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords
     if (state9SeedPointer85D4 == nullptr) {
         std::memset(outDwords + 4, 0, 16u);
         spdlog::info(
-            "CLTLoginMediator::FillState9CallbackBlob18cScaffold missing 16-byte state9 seed from mediator+0xd4; zeroed blob tail ownerF18=0x{:08x}",
+            "CLTLoginMediator::FillState9CallbackBlob18c missing 16-byte state9 seed from mediator+0xd4; zeroed blob tail ownerF18=0x{:08x}",
             static_cast<unsigned>(ownerF18));
         return 1u;
     }
@@ -208,14 +202,14 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18cScaffold(uint32_t* outDwords
         ciphertext.size() != 16u) {
         std::memset(outDwords + 4, 0, 16u);
         spdlog::info(
-            "CLTLoginMediator::FillState9CallbackBlob18cScaffold Twofish block transform failed ownerF18=0x{:08x}",
+            "CLTLoginMediator::FillState9CallbackBlob18c Twofish block transform failed ownerF18=0x{:08x}",
             static_cast<unsigned>(ownerF18));
         return 1u;
     }
 
     std::memcpy(outDwords + 4, ciphertext.data(), 16u);
     spdlog::info(
-        "CLTLoginMediator::FillState9CallbackBlob18cScaffold built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource=mediator+0xd4 seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
+        "CLTLoginMediator::FillState9CallbackBlob18c built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource=mediator+0xd4 seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
         static_cast<unsigned>(outDwords[0]),
         static_cast<unsigned>(outDwords[1]),
         static_cast<unsigned>(outDwords[2]),
