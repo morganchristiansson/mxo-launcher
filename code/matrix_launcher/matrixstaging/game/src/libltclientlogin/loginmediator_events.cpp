@@ -58,47 +58,11 @@ static void DestroyObserverSubtreeNodes674(LoginObserverTreeNode674* subtreeRoot
     }
 }
 
-static void** GetLoginObserverVtable(void* observer) {
-    if (!observer) {
-        return nullptr;
-    }
-    return *reinterpret_cast<void***>(observer);
-}
-
-static bool LooksLikeLoginObserverEventVtable(void* observer) {
-    void** vtable = GetLoginObserverVtable(observer);
-    return vtable != nullptr && vtable[0] != nullptr;
-}
-
-static bool LooksLikeLoginObserverErrorVtable(void* observer) {
-    void** vtable = GetLoginObserverVtable(observer);
-    return vtable != nullptr && vtable[1] != nullptr;
-}
-
-static void DispatchLoginObserverEvent(void* observer, uint32_t eventId) {
-    if (!LooksLikeLoginObserverEventVtable(observer)) {
-        return;
-    }
-
-    void** vtable = GetLoginObserverVtable(observer);
-    const auto fn = reinterpret_cast<LoginObserverOnEventFn>(vtable[0]);
-    fn(observer, eventId);
-}
-
-static void DispatchLoginObserverError(void* observer, uint32_t errorId) {
-    if (!LooksLikeLoginObserverErrorVtable(observer)) {
-        return;
-    }
-
-    void** vtable = GetLoginObserverVtable(observer);
-    const auto fn = reinterpret_cast<LoginObserverOnErrorFn>(vtable[1]);
-    fn(observer, errorId);
-}
-
 }  // namespace
 
-// UNANCHORED: source-owned std::_Tree-like initialization for the recovered owner `+0x674`
-// observer container scaffold.
+// anchor-family: launcher.exe ctor/dtor field initialization of owner `+0x674`
+// The original setup is inlined into constructor/cleanup code rather than isolated as a named
+// standalone helper.
 void CLTLoginMediator::InitializeObserverTree674() {
     observerTree674_.header00 = &observerTreeHeader674_;
     observerTree674_.nodeCount04 = 0u;
@@ -114,7 +78,8 @@ void CLTLoginMediator::InitializeObserverTree674() {
     latestObserver174_ = nullptr;
 }
 
-// UNANCHORED: source-owned tree cleanup for the recovered owner `+0x674` observer container.
+// anchor-family: launcher.exe:0x419570 / 0x41d370 / 0x41f6a0
+// Source-owned free-backed cleanup over the recovered owner `+0x674` observer container.
 void CLTLoginMediator::ClearObserverTree674() {
     if (observerTree674_.header00 == nullptr) {
         return;
@@ -125,7 +90,7 @@ void CLTLoginMediator::ClearObserverTree674() {
     InitializeObserverTree674();
 }
 
-// UNANCHORED: source-owned `begin()` helper over the recovered owner `+0x674` observer tree.
+// anchor-family: inlined `begin()` expression used by launcher.exe:0x41cfb0 / 0x41d090 / 0x41d430
 LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeBegin674() const {
     if (observerTree674_.header00 == nullptr || observerTree674_.nodeCount04 == 0u) {
         return observerTree674_.header00;
@@ -133,12 +98,13 @@ LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeBegin674() const {
     return ObserverTreeNodeFromBase(ObserverTreeNodeBase(observerTree674_.header00)->_M_left);
 }
 
-// UNANCHORED: source-owned `end()`/header helper over the recovered owner `+0x674` observer tree.
+// anchor-family: inlined header/end expression used by launcher.exe:0x41cfb0 / 0x41d090 / 0x41d430
 LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeEnd674() const {
     return observerTree674_.header00;
 }
 
-// UNANCHORED: source-owned keyed lookup over the recovered owner `+0x674` observer tree.
+// anchor-family: source-owned single-node lookup distilled from the same key-compare tree family
+// used by launcher.exe:0x415f20 / 0x419510 over owner `+0x674`.
 LoginObserverTreeNode674* CLTLoginMediator::FindObserverNode674(void* observer) const {
     LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
     const uintptr_t targetKey = ObserverTreeKey(observer);
@@ -442,12 +408,14 @@ void CLTLoginMediator::PostEvent(uint32_t eventId) {
     const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
     while (node != end) {
         void* const observer = node->observerKey10;
+        void** const observerVtable = *reinterpret_cast<void***>(observer);
+        const auto onLoginEvent = reinterpret_cast<LoginObserverOnEventFn>(observerVtable[0]);
         spdlog::info(
             "CLTLoginMediator::PostEvent dispatching observerNode={} observer={} event=0x{:02x}",
             fmt::ptr(node),
             fmt::ptr(observer),
             static_cast<unsigned>(eventId & 0xffu));
-        DispatchLoginObserverEvent(observer, eventId);
+        onLoginEvent(observer, eventId);
         node = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(node)));
     }
 
@@ -482,13 +450,15 @@ void CLTLoginMediator::PostError(uint32_t errorId) {
     const LoginObserverTreeNode674* const end = ObserverTreeEnd674();
     while (node != end) {
         void* const observer = node->observerKey10;
+        void** const observerVtable = *reinterpret_cast<void***>(observer);
+        const auto onLoginError = reinterpret_cast<LoginObserverOnErrorFn>(observerVtable[1]);
         spdlog::info(
             "CLTLoginMediator::PostError dispatching observerNode={} observer={} error=0x{:02x} status80=0x{:08x}",
             fmt::ptr(node),
             fmt::ptr(observer),
             static_cast<unsigned>(errorId & 0xffu),
             static_cast<unsigned>(WorldListCountOrStatus80()));
-        DispatchLoginObserverError(observer, errorId);
+        onLoginError(observer, errorId);
         node = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(node)));
     }
 }
