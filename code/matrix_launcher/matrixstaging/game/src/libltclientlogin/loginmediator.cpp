@@ -1577,23 +1577,6 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::HandleMarginConnectStatus(uint32_t workResultCode) {
-    lastMarginConnectStatus_ = workResultCode;
-    ++marginConnectStatusCount_;
-    if (workResultCode == kConnectStatusSuccess && marginConnection_ != nullptr) {
-        // Active state8/state10 sender gates at `0x41b4b0` require owner `+0x1c` connection state `== 2`.
-        // On the current scaffold path the successful margin connect-status callback is the
-        // narrowest evidence-backed place to promote the live margin connection into that ready
-        // send state before slot-3 send bodies run.
-        marginConnection_->SetState(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
-        spdlog::info(
-            "CLTLoginMediator::HandleMarginConnectStatus promoted margin connection to ready state=2 after connect-status success currentState={}",
-            currentState_ ? currentState_->DebugName() : "<null>");
-    }
-    return (workResultCode == kConnectStatusSuccess) ? BeginMarginHandshake() : 0u;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::BeginMarginHandshake() {
     // Important ownership split to keep explicit in source:
     // - mediator owns the shared margin-connection transport helper (`0x41e500` family)

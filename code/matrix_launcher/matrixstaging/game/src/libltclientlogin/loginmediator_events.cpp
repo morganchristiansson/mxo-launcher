@@ -115,8 +115,6 @@ void CLTLoginMediator::InitializeObserverTree674() {
     observerTreeHeader674_.observer10 = nullptr;
     latestObserver170_ = nullptr;
     latestObserver174_ = nullptr;
-    observerRegister170Count_ = 0u;
-    observerUnregister174Count_ = 0u;
 }
 
 // UNANCHORED: source-owned tree cleanup for the recovered owner `+0x674` observer container.
@@ -412,7 +410,6 @@ bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
     }
 
     latestObserver170_ = observer;
-    ++observerRegister170Count_;
 
     const bool inserted = InsertObserverNode674(observer);
     const bool returnValue = !inserted;
@@ -451,7 +448,6 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     }
 
     latestObserver174_ = observer;
-    ++observerUnregister174Count_;
 
     LoginObserverTreeNode674* lowerBound = nullptr;
     LoginObserverTreeNode674* upperBound = nullptr;

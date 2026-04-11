@@ -922,7 +922,7 @@ public:
     // - new helper `+0x08` -> slot 3 / BeginOrContinue
     // Active post-state9 consequence: the state9 -> state12 pair maps both of those to tiny stubs,
     // so the immediate continuation stays the later explicit PostEvent/listener work.
-    
+
 
     // Narrow source-owned scaffolds for the launcher.exe logging/event side effects at
     // `0x41cfb0` / `0x41d090`.
@@ -934,8 +934,6 @@ public:
     // +0x174
     bool UnregisterLoginObserver(void* observer) override;
     // Observer count getters for wrapper diagnostics (moved from g_MediatorRuntimeState):
-    uint32_t ObserverRegisterCount() const { return observerRegister170Count_; }
-    uint32_t ObserverUnregisterCount() const { return observerUnregister174Count_; }
 
     // Narrow post-auth receive-boundary counters used only for short runtime discrimination:
     // - no packet arrived yet
@@ -1067,11 +1065,6 @@ public:
     //   Original: allocates 8 bytes, stores vtable 0x4b0c00 (`CLTLoginState_State18`)
     // launcher.exe:0x4209a0 = InitializeHelperDispatchSlot19 (slot at 0x4f78b4)
     //   Original: allocates 4 bytes, stores vtable 0x4b0c28 (`CLTLoginState_State19`)
-    void InitializeHelperDispatchSlot15();
-    void InitializeHelperDispatchSlot16();
-    void InitializeHelperDispatchSlot17();
-    void InitializeHelperDispatchSlot18();
-    void InitializeHelperDispatchSlot19();
     // Slot anchors from Ghidra decompilation:
     // launcher.exe:0x4f7868 = slot 0, launcher.exe:0x4f78a0 = slot 1, launcher.exe:0x4f786c = slot 2,
     // launcher.exe:0x4f7870 = slot 3, launcher.exe:0x4f7874 = slot 4, launcher.exe:0x4f7878 = slot 5,
@@ -1186,7 +1179,6 @@ public:
     // - state1/state2 should therefore call the separate owner+0x680 child directly instead of
     //   routing through a fake mediator-owned auth-bootstrap method
     uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
-    uint32_t HandleMarginConnectStatus(uint32_t workResultCode);
     uint32_t BeginMarginHandshake();
     // Current source-owned lifecycle mirror for owner `+0x680`:
     // - original `0x41b160` allocates the child during mediator initialize
@@ -1709,8 +1701,6 @@ private:
     LoginObserverTreeNode674 observerTreeHeader674_{};
     void* latestObserver170_ = nullptr;         // most recent register call observer
     void* latestObserver174_ = nullptr;         // most recent unregister call observer
-    uint32_t observerRegister170Count_ = 0;     // register call count
-    uint32_t observerUnregister174Count_ = 0;   // unregister call count
 
     std::string authServerDnsName_;
     uint16_t authServerPortHostOrder_;
