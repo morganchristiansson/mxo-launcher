@@ -261,6 +261,15 @@ public:
     CMessageConnectionMessageRef& operator=(CMessageConnectionMessageRef&&) = delete;
 };
 
+// anchor: launcher.exe:0x41bc20 / CMessageConnectionMessageRef_DecodeMessageCode
+// Exported decode helper used by CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
+// at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload,
+// handling both headerless (locator-based) and non-headerless (direct) payload formats.
+bool CMessageConnection_DecodeMessageCodeScaffold(
+    const CMessageConnectionMessageRef& messageRef,
+    uint16_t* outMessageCode,
+    bool* outUsedHeaderlessLocatorDecode);
+
 struct CMessageConnectionMessageRefHandleScaffold {
     // anchor family: launcher.exe:0x455cd0 / 0x4489d0
     // Tiny retained outer-message-ref handle helper used by packet-agenda read handoff and by

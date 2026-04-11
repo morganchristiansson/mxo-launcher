@@ -1480,59 +1480,6 @@ static bool CBaseMarginConnection_OnMessageCode5Scaffold(
     return true;
 }
 
-// anchor family: launcher.exe:0x41bc20 / 0x41bbb0 decoded message-id read from a message-ref
-static bool CMessageConnection_DecodeMessageCodeScaffold(
-    const CMessageConnectionMessageRef& messageRef,
-    uint16_t* outMessageCode,
-    bool* outUsedHeaderlessLocatorDecode) {
-    if (outMessageCode) {
-        *outMessageCode = 0u;
-    }
-    if (outUsedHeaderlessLocatorDecode) {
-        *outUsedHeaderlessLocatorDecode = false;
-    }
-
-    const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
-    if (!messageStorage) {
-        return false;
-    }
-
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return false;
-    }
-
-    const uint8_t* messageCodePointer = nullptr;
-    if (!CMessageConnection_ResolveMessageCodePointerScaffold(
-            messageRef,
-            &messageCodePointer,
-            /*outTargetLocatorType=*/nullptr,
-            /*outSenderLocatorType=*/nullptr,
-            outUsedHeaderlessLocatorDecode)) {
-        return false;
-    }
-
-    const size_t messageCodeOffset =
-        static_cast<size_t>(messageCodePointer - payloadBytes);
-    const uint8_t firstByte = *messageCodePointer;
-    uint16_t messageCode = firstByte;
-    if ((firstByte & 0x80u) != 0u) {
-        if (messageCodeOffset + 1u >= payloadByteCount) {
-            return false;
-        }
-        messageCode = static_cast<uint16_t>(
-            ((static_cast<uint16_t>(firstByte) << 8) |
-             static_cast<uint16_t>(payloadBytes[messageCodeOffset + 1u])) &
-            0x7fffu);
-    }
-
-    if (outMessageCode) {
-        *outMessageCode = messageCode;
-    }
-    return true;
-}
-
 // anchor: launcher.exe:0x442d00
 // Source-owned narrow predicate exposing the specific consumed-code gate inside
 // `CBaseMarginConnection::DispatchMessage`.
@@ -1653,6 +1600,61 @@ static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
 }
 
 }  // namespace
+
+// anchor: launcher.exe:0x41bc20 / CMessageConnectionMessageRef_DecodeMessageCode
+// Exported decode helper for CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
+// at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload.
+bool CMessageConnection_DecodeMessageCodeScaffold(
+    const CMessageConnectionMessageRef& messageRef,
+    uint16_t* outMessageCode,
+    bool* outUsedHeaderlessLocatorDecode) {
+    if (outMessageCode) {
+        *outMessageCode = 0u;
+    }
+    if (outUsedHeaderlessLocatorDecode) {
+        *outUsedHeaderlessLocatorDecode = false;
+    }
+
+    const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
+    if (!messageStorage) {
+        return false;
+    }
+
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    if (!payloadBytes || payloadByteCount == 0u) {
+        return false;
+    }
+
+    const uint8_t* messageCodePointer = nullptr;
+    if (!CMessageConnection_ResolveMessageCodePointerScaffold(
+            messageRef,
+            &messageCodePointer,
+            /*outTargetLocatorType=*/nullptr,
+            /*outSenderLocatorType=*/nullptr,
+            outUsedHeaderlessLocatorDecode)) {
+        return false;
+    }
+
+    const size_t messageCodeOffset =
+        static_cast<size_t>(messageCodePointer - payloadBytes);
+    const uint8_t firstByte = *messageCodePointer;
+    uint16_t messageCode = firstByte;
+    if ((firstByte & 0x80u) != 0u) {
+        if (messageCodeOffset + 1u >= payloadByteCount) {
+            return false;
+        }
+        messageCode = static_cast<uint16_t>(
+            ((static_cast<uint16_t>(firstByte) << 8) |
+             static_cast<uint16_t>(payloadBytes[messageCodeOffset + 1u])) &
+            0x7fffu);
+    }
+
+    if (outMessageCode) {
+        *outMessageCode = messageCode;
+    }
+    return true;
+}
 
 // UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
 uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(

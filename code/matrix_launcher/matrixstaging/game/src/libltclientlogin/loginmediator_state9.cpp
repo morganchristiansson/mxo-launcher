@@ -65,57 +65,54 @@ void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, v
 }
 
 // anchor: launcher.exe:0x41c5c0
+// anchor: launcher.exe:0x41bc20 -> CMessageConnectionMessageRef_DecodeMessageCode
 uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workItem) {
-    // Current best read from `0x41c5c0`:
+    // Faithful read from `0x41c5c0`:
     // - if owner `+0x84` is null, return `1`
-    // - otherwise derive the incoming secondary-message opcode through `0x41bc20`
-    // - then call callback84 vtable `+0x0c(&opcodeStorage, workItem)`
-    // Current source scaffold note:
-    // - the active margin post-copy path now passes a minimal client-compatible outer
-    //   receive/message-ref bridge so callback84 no longer receives null on the late raw-0x38 path
-    // - this mirror still derives the opcode from staged auth/margin bytes when possible because
-    //   the broader original callback84/message-ref reconstruction remains incomplete
+    // - otherwise cast workItem to CMessageConnectionMessageRef* and call
+    //   `CMessageConnectionMessageRef_DecodeMessageCode` at `0x41bc20` to get the message opcode
+    // - construct the opcodeStorage dword (low word = decoded message code)
+    // - call callback84 vtable `+0x0c(&opcodeStorage, workItem)`
+    //
+    // Original assembly:
+    //   uVar2 = CMessageConnectionMessageRef_DecodeMessageCode((CMessageConnectionMessageRef*)param_1);
+    //   param_1 = (int*)CONCAT22(extraout_var, uVar2);  // opcode in low word
+    //   uVar3 = (**(code**)(*(int*)this->ownerCallback84 + 0xc))(&param_1, piVar1);
     if (!ownerCallback84_) {
         return 1u;
     }
 
-    uint32_t opcodeStorage = 0u;
-    if (!stagedIncomingMarginPacketBytes_.empty()) {
-        opcodeStorage = state9submit::ReadOpcodePrefixVariableWidth(
-            stagedIncomingMarginPacketBytes_.data(),
-            stagedIncomingMarginPacketBytes_.size());
-    } else if (!stagedIncomingAuthPacketBytes_.empty()) {
-        mxo::auth::FramedPacket framedPacket;
-        if (mxo::auth::ParseVariableLengthPacket(
-                stagedIncomingAuthPacketBytes_.data(),
-                stagedIncomingAuthPacketBytes_.size(),
-                &framedPacket) &&
-            !framedPacket.payloadBytes.empty()) {
-            opcodeStorage = state9submit::ReadOpcodePrefixVariableWidth(
-                framedPacket.payloadBytes.data(),
-                framedPacket.payloadBytes.size());
-        } else {
-            // Current auth wrapper stages logical payload bytes, not the original higher-level
-            // incoming auth-message object. Keep callback84 opcode derivation tolerant of that
-            // staged payload form instead of assuming a second framing layer is still present here.
-            opcodeStorage = state9submit::ReadOpcodePrefixVariableWidth(
-                stagedIncomingAuthPacketBytes_.data(),
-                stagedIncomingAuthPacketBytes_.size());
-        }
-    }
-
-    using OwnerCallback84DispatchSecondaryFn = uint32_t(__thiscall*)(void*, uint32_t*, void*);
-    void** vtable = *reinterpret_cast<void***>(ownerCallback84_);
-    if (!vtable || !vtable[3]) {
+    // Cast workItem to message-ref and decode the message code using the original helper
+    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(workItem);
+    uint16_t decodedMessageCode = 0u;
+    bool usedHeaderless = false;
+    if (!mxo::liblttcp::CMessageConnection_DecodeMessageCodeScaffold(
+            *messageRef,
+            &decodedMessageCode,
+            &usedHeaderless)) {
+        spdlog::warn(
+            "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 failed to decode message code from messageRef this={}",
+            fmt::ptr(this));
         return 1u;
     }
 
-    const auto dispatchFn = reinterpret_cast<OwnerCallback84DispatchSecondaryFn>(vtable[3]);
+    // Construct opcodeStorage dword: low 16 bits = decoded message code
+    uint32_t opcodeStorage = static_cast<uint32_t>(decodedMessageCode);
+
+    // Call callback84 vtable+0x0c with (&opcodeStorage, workItem)
+    using OwnerCallback84DispatchSecondaryFn = uint32_t(__thiscall*)(void*, uint32_t*, void*);
+    void** callbackVtable = *reinterpret_cast<void***>(ownerCallback84_);
+    if (!callbackVtable || !callbackVtable[3]) {
+        return 1u;
+    }
+
+    const auto dispatchFn = reinterpret_cast<OwnerCallback84DispatchSecondaryFn>(callbackVtable[3]);
     const uint32_t dispatchResult = dispatchFn(ownerCallback84_, &opcodeStorage, workItem);
     spdlog::info(
-        "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 callback84={} opcode=0x{:04x} workItem={} -> dispatchResult=0x{:08x}",
+        "CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84 callback84={} decodedMessageCode=0x{:04x} opcodeStorage=0x{:08x} workItem={} -> dispatchResult=0x{:08x}",
         fmt::ptr(ownerCallback84_),
-        static_cast<unsigned>(opcodeStorage & 0xffffu),
+        static_cast<unsigned>(decodedMessageCode),
+        static_cast<unsigned>(opcodeStorage),
         fmt::ptr(workItem),
         static_cast<unsigned>(dispatchResult));
     return dispatchResult;
