@@ -15,7 +15,7 @@ namespace mxo::ltlogin {
 namespace {
 
 using PostAuthMarginLoadingState = CLTLoginMediator::PostAuthMarginLoadingState;
-using SlotRecordState = SlotRecordState004b5328;
+using SlotRecordState = SlotRecordState_0x4b5328;
 
 // Shared chunk-seen helper used by state8 slot6 section-0x0a handling.
 // anchor: launcher.exe:0x43c240 = StateReplyChunkBitset_SetSeen
@@ -237,7 +237,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
-    const SlotRecordState004b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
+    const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
     State8StructuredMarginPacketBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();
 

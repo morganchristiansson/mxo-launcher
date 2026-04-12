@@ -79,7 +79,7 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
         return fallbackResult;
     }
 
-    const SlotRecordState004b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
+    const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
     const char* sourceBlock94String60Begin = mediator->GetSourceBlock94SmallString60BeginScaffold();
 
     State7Packet0x0dBuilder packetBuilder;

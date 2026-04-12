@@ -159,7 +159,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         return 0x12000009u;
     }
 
-    const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord();
+    const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (!currentSlotRecord) {
         std::memset(outDwords, 0, 0x20u);
         spdlog::info(

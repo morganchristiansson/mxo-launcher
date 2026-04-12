@@ -339,7 +339,7 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRout
     }
 }
 
-const SlotRecordState004b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
+const SlotRecordState_0x4b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
     uint8_t slotIndex) const {
     if (slotIndex == 0xffu || slotIndex >= slotRecordValid04_.size() || !slotRecordValid04_[slotIndex]) {
         return nullptr;
@@ -347,7 +347,7 @@ const SlotRecordState004b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteS
     return &slotRecordTable04_[slotIndex];
 }
 
-SlotRecordState004b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
+SlotRecordState_0x4b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
     uint8_t slotIndex) {
     if (slotIndex == 0xffu || slotIndex >= slotRecordValid04_.size() || !slotRecordValid04_[slotIndex]) {
         return nullptr;
@@ -627,7 +627,7 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
         high8 == 0u &&
         low24 == static_cast<uint32_t>(currentSlotIndex);
 
-    const SlotRecordState004b5328* const currentSlotRecord =
+    const SlotRecordState_0x4b5328* const currentSlotRecord =
         (slotOwner && (matchedConfiguredRequest || matchedCurrentSlotIndexRequest))
             ? slotOwner->GetCurrentSlotRecord()
             : nullptr;
@@ -711,7 +711,7 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
 //   synthetic arg6-side source/fallback path
 Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44() {
     const CLTLoginMediator* const slotOwner = ResolveActiveMarginRouteOwner(this);
-    const SlotRecordState004b5328* const currentSlotRecord =
+    const SlotRecordState_0x4b5328* const currentSlotRecord =
         slotOwner ? slotOwner->GetCurrentSlotRecord() : nullptr;
 
     arg6CurrentSlotRecord44Payload_ = {};
@@ -756,7 +756,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
-    const SlotRecordState004b5328* slotRecord = GetCurrentSlotRecord();
+    const SlotRecordState_0x4b5328* slotRecord = GetCurrentSlotRecord();
     if (!slotRecord) {
         slotRecord = GetSlotRecordByIndex(0u);
     }
@@ -3299,7 +3299,7 @@ void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
             static_cast<unsigned>(rawStatus));
     }
 
-    SlotRecordState004b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[characterIndex];
+    SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[characterIndex];
     slotRecord = {};
     slotRecord.heapString14 = character.handle.text;
     slotRecord.globalCharacterIdLow03 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
@@ -3332,7 +3332,7 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
     // Fresh tightening from `0x41c3c0` + `0x4401a0`:
     // - owner `+0x12c` should not be backfilled from slot-record `worldId0c`
     // - the active branch uses `+0x12c` as a world-descriptor index/selector
-    const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord();
+    const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (currentSlotRecord != nullptr) {
         if (postAuthMarginLoadingState_.createCharacterData108.characterName00[0] == '\0' &&
             !currentSlotRecord->heapString14.empty()) {
@@ -3388,7 +3388,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
             continue;
         }
 
-        const SlotRecordState004b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
+        const SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
         const RouteHostStringTripleState& route = selectionRouteState684_.routeHostStringTriples194_[i];
         const char* characterName = slotRecord.heapString14.empty() ? "" : slotRecord.heapString14.c_str();
         const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";

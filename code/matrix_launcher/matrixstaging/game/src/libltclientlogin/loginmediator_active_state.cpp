@@ -59,8 +59,8 @@ CLTLoginMediator::ActiveCharacterStateViewScaffold
 CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
     ActiveCharacterStateViewScaffold view = {};
 
-    const SlotRecordState004b5328* currentSlotRecord = GetCurrentSlotRecord();
-    const SlotRecordState004b5328* slotZeroRecord = GetSlotRecordByIndex(0u);
+    const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
+    const SlotRecordState_0x4b5328* slotZeroRecord = GetSlotRecordByIndex(0u);
 
     if (currentSlotRecord) {
         view.characterIdLow = currentSlotRecord->globalCharacterIdLow03;

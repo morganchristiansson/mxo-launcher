@@ -52,7 +52,7 @@ public:
 // anchor: launcher.exe:0x439910 / dtor
 // Character slot record class. Inherits from PacketBuilder_0x4af2a4 for shared envelope layout.
 // Full object size: 0x32 (50 bytes)
-class SlotRecordState004b5328 : public PacketBuilder_0x4af2a4 {
+class SlotRecordState_0x4b5328 : public PacketBuilder_0x4af2a4 {
 public:
     // Additional slot-record specific fields:
     std::string heapString14;           // +0x14
@@ -64,8 +64,8 @@ public:
     // Default ctor/dtor matching original:
     // - ctor: 0x4398b0 calls base init then zero-inits
     // - dtor: 0x439910 calls base dtor then optionally frees
-    SlotRecordState004b5328() = default;
-    ~SlotRecordState004b5328() = default;
+    SlotRecordState_0x4b5328() = default;
+    ~SlotRecordState_0x4b5328() = default;
 };
 
 // Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.

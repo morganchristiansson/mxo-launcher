@@ -636,8 +636,8 @@ public:
         // anchor: launcher.exe:0x41dd00 / embedded owner subobject destroy/final release
         void DestroySelectionRouteState();
 
-        const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
-        SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex);
+        const SlotRecordState_0x4b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
+        SlotRecordState_0x4b5328* GetSlotRecordByIndex(uint8_t slotIndex);
 
         uint8_t CurrentSlotOrSelectionIndex644() const {
             return currentSlotOrSelectionIndex644_;
@@ -654,7 +654,7 @@ public:
         // - `+0x644` = current slot / selection byte
         // - `+0x64c .. +0x6fb` = persisted state3(wait)->state8 snapshot body
         uint8_t slotRecordCount00_ = 0;
-        std::array<SlotRecordState004b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
+        std::array<SlotRecordState_0x4b5328, kRecoveredWorldSlotCapacity> slotRecordTable04_{};
         std::array<bool, kRecoveredWorldSlotCapacity> slotRecordValid04_{};
         std::array<RouteHostStringTripleState, kRecoveredWorldSlotCapacity> routeHostStringTriples194_{};
         uint8_t currentSlotOrSelectionIndex644_ = 0xffu;
@@ -1281,9 +1281,9 @@ public:
     // Source home for the focused route/descriptor/getter cluster:
     // - `matrixstaging/game/src/libltclientlogin/loginmediator_margin_route.cpp`
     // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
-    const SlotRecordState004b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
+    const SlotRecordState_0x4b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41f300 / owner vtable +0x44
-    const SlotRecordState004b5328* GetCurrentSlotRecord() const;
+    const SlotRecordState_0x4b5328* GetCurrentSlotRecord() const;
     // anchor: launcher.exe:0x41b220
     // Source-owned helper over the recovered slot-record table; do not treat this as the current
     // `ILTLoginMediator` vtable slot `+0xdc` name.

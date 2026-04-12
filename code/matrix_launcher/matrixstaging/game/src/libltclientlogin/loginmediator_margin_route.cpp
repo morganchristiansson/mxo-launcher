@@ -189,20 +189,20 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 }
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
-const SlotRecordState004b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
+const SlotRecordState_0x4b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
     // Original body is a tiny read over the embedded selection-route subobject table.
     return selectionRouteState684_.GetSlotRecordByIndex(slotIndex);
 }
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
-const SlotRecordState004b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
+const SlotRecordState_0x4b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
     return selectionRouteState684_.GetSlotRecordByIndex(
         selectionRouteState684_.CurrentSlotOrSelectionIndex644());
 }
 
 // anchor: launcher.exe:0x41b220
 const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const {
-    const SlotRecordState004b5328* record = GetSlotRecordByIndex(slotIndex);
+    const SlotRecordState_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
     if (!record || record->heapString14.empty()) {
         return nullptr;
     }
@@ -238,7 +238,7 @@ const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) con
 
 // anchor: launcher.exe:0x41b2a0
 uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
-    const SlotRecordState004b5328* record = GetSlotRecordByIndex(slotIndex);
+    const SlotRecordState_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
     return record ? record->status0b : 7u;
 }
 
