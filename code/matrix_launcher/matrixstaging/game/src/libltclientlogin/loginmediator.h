@@ -1640,7 +1640,7 @@ private:
     // - `+0xd0`  = owner `+0x1460` small-string-like state8 section-11 view
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
-    Arg6SelectionDescriptor40PayloadSketch arg6SelectionDescriptor40Payload_{};
+    Arg6CurrentSlotRecord44PayloadSketch arg6SelectionDescriptor40Payload_{};
     Arg6SelectionDescriptor40ObjectSketch arg6SelectionDescriptor40_{};
     Arg6CurrentSlotRecord44PayloadSketch arg6CurrentSlotRecord44Payload_{};
     Arg6CurrentSlotRecord44ObjectSketch arg6CurrentSlotRecord44_{};

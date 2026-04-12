@@ -74,12 +74,16 @@ public:
 // - wrapper `+0x40` returns a selection-descriptor object consumed by client profile-path code
 // - wrapper `+0x44` returns a current-slot record object consumed by later save/profile code
 // Those are not the same thing as the owner-side `+0x40/+0x44` slot-record table accessors.
-struct __attribute__((packed)) Arg6SelectionDescriptor40PayloadSketch {
+struct __attribute__((packed)) Arg6CurrentSlotRecord44PayloadSketch {
     uint8_t reserved0;
     uint8_t reserved1;
     uint8_t reserved2;
-    uint32_t characterIdLow03;  // field03
-    uint32_t characterIdHigh07; // field07
+    uint32_t characterIdLow03;
+    uint32_t characterIdHigh07;
+    uint8_t status0b;
+    uint16_t worldId0c;
+    uint8_t reserved0e;
+    uint8_t reserved0f;
 };
 
 struct Arg6SelectionDescriptor40ObjectSketch {
@@ -94,25 +98,11 @@ struct Arg6SelectionDescriptor40ObjectSketch {
     void* backingObject08;
     uint8_t flag0c;
     uint8_t padding0d[3];
-    Arg6SelectionDescriptor40PayloadSketch* payload10; // +0x10
+    Arg6CurrentSlotRecord44PayloadSketch* payload10; // +0x10
 };
 
-static_assert(offsetof(Arg6SelectionDescriptor40PayloadSketch, characterIdLow03) == 0x03);
-static_assert(offsetof(Arg6SelectionDescriptor40PayloadSketch, characterIdHigh07) == 0x07);
 static_assert(offsetof(Arg6SelectionDescriptor40ObjectSketch, payload10) == 0x10);
 static_assert(sizeof(Arg6SelectionDescriptor40ObjectSketch) == 0x14);
-
-struct __attribute__((packed)) Arg6CurrentSlotRecord44PayloadSketch {
-    uint8_t reserved0;
-    uint8_t reserved1;
-    uint8_t reserved2;
-    uint32_t characterIdLow03;
-    uint32_t characterIdHigh07;
-    uint8_t status0b;
-    uint16_t worldId0c;
-    uint8_t reserved0e;
-    uint8_t reserved0f;
-};
 
 struct Arg6CurrentSlotRecord44ObjectSketch {
     // Wrapper-facing arg6 `+0x44` current-slot object.
@@ -135,6 +125,7 @@ static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, characterIdLow03) =
 static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, characterIdHigh07) == 0x07);
 static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, status0b) == 0x0b);
 static_assert(offsetof(Arg6CurrentSlotRecord44PayloadSketch, worldId0c) == 0x0c);
+
 static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
 static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapString14) == 0x14);
 static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapStringLen18) == 0x18);
