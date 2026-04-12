@@ -162,23 +162,6 @@ static uint32_t __thiscall Arg6SelectionDescriptor40_GetPayload10(Arg6CurrentSlo
     return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
 }
 
-static void** Arg6SelectionDescriptor40Vtable() {
-    static void* vtable[5] = {
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_Destroy),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetStateId),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_AppendDebugString),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor),
-        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetPayload10),
-    };
-    return vtable;
-}
-
-// Wrapper-facing arg6 `+0x44` object now mirrors the concrete `0x004b5328` slot-record outer
-// layout more closely:
-// - same 5-slot vtable surface
-// - same shared `+0x04 = 0x437b50 -> 0` tiny getter
-// - same shared `+0x10 = 0x481760 -> payload10` tiny getter
-
 static void** Arg6CurrentSlotRecord44Vtable() {
     static void* vtable[5] = {
         reinterpret_cast<void*>(Arg6SelectionDescriptor40_Destroy),
@@ -639,7 +622,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
     // - keep this wrapper payload sourced from the real owner-side current-slot record id pair
     arg6SelectionDescriptor40Payload_.characterIdLow03 = currentSlotRecord->globalCharacterIdLow03;
     arg6SelectionDescriptor40Payload_.characterIdHigh07 = currentSlotRecord->globalCharacterIdHigh07;
-    arg6SelectionDescriptor40_.vtable = Arg6SelectionDescriptor40Vtable();
+    arg6SelectionDescriptor40_.vtable = Arg6CurrentSlotRecord44Vtable();
     arg6SelectionDescriptor40_.bufferBase04 = &arg6SelectionDescriptor40Payload_;
     arg6SelectionDescriptor40_.backingObject08 = nullptr;
     arg6SelectionDescriptor40_.flag0c = 1u;
