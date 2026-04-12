@@ -305,13 +305,6 @@ void CLTLoginMediator::EqualRangeObserver674(
         const_cast<LoginObserverTreeNode674*>(&observerTreeHeader674_), observer, outLowerBound, outUpperBound);
 }
 
-// anchor: launcher.exe:0x41baa0
-uint32_t CLTLoginMediator::CountObserverRange674(
-    LoginObserverTreeNode674* first,
-    LoginObserverTreeNode674* last) const {
-    return LoginObserverTreeHelper674::CountRange(first, last);
-}
-
 // anchor: launcher.exe:0x415f20
 bool CLTLoginMediator::InsertObserverNode674(void* observer) {
     return LoginObserverTreeHelper674::InsertNode(
@@ -419,7 +412,7 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
     LoginObserverTreeNode674* lowerBound = nullptr;
     LoginObserverTreeNode674* upperBound = nullptr;
     EqualRangeObserver674(observer, &lowerBound, &upperBound);
-    const uint32_t rangeCount = CountObserverRange674(lowerBound, upperBound);
+    const uint32_t rangeCount = LoginObserverTreeHelper674::CountRange(lowerBound, upperBound);
     EraseObserverRange674(lowerBound, upperBound);
     const bool returnValue = (rangeCount == 0u);
 

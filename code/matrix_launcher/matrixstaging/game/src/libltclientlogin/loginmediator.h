@@ -1516,9 +1516,6 @@ private:
         void* observer,
         LoginObserverTreeNode674** outLowerBound,
         LoginObserverTreeNode674** outUpperBound) const;
-    uint32_t CountObserverRange674(
-        LoginObserverTreeNode674* first,
-        LoginObserverTreeNode674* last) const;
     bool InsertObserverNode674(void* observer);
     void EraseObserverRange674(
         LoginObserverTreeNode674* first,
