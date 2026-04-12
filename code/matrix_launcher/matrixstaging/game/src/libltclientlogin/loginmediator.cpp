@@ -154,12 +154,12 @@ static uint32_t __thiscall Arg6SelectionDescriptor40_ResetPayloadForSourceDescri
         return 0u;
     }
     self->backingObject08 = nullptr;
-    self->flag0c = (self->packed != nullptr) ? 1u : 0u;
+    self->flag0c = (self->payload10 != nullptr) ? 1u : 0u;
     return 1u;
 }
 
 static uint32_t __thiscall Arg6SelectionDescriptor40_GetPayload10(Arg6SelectionDescriptor40ObjectSketch* self) {
-    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->packed : nullptr));
+    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
 }
 
 static void** Arg6SelectionDescriptor40Vtable() {
@@ -178,40 +178,14 @@ static void** Arg6SelectionDescriptor40Vtable() {
 // - same 5-slot vtable surface
 // - same shared `+0x04 = 0x437b50 -> 0` tiny getter
 // - same shared `+0x10 = 0x481760 -> payload10` tiny getter
-static uint32_t __thiscall Arg6CurrentSlotRecord44_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    return self ? 1u : 0u;
-}
-
-static uint32_t __thiscall Arg6CurrentSlotRecord44_GetStateId(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 0u;
-}
-
-static uint32_t __thiscall Arg6CurrentSlotRecord44_AppendDebugString(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    (void)self;
-    return 1u;
-}
-
-static uint32_t __thiscall Arg6CurrentSlotRecord44_ResetPayloadForSourceDescriptor(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    if (!self) {
-        return 0u;
-    }
-    self->backingObject08 = nullptr;
-    self->flag0c = (self->payload10 != nullptr) ? 1u : 0u;
-    return 1u;
-}
-
-static uint32_t __thiscall Arg6CurrentSlotRecord44_GetPayload10(Arg6CurrentSlotRecord44ObjectSketch* self) {
-    return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
-}
 
 static void** Arg6CurrentSlotRecord44Vtable() {
     static void* vtable[5] = {
-        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_Destroy),
-        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_GetStateId),
-        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_AppendDebugString),
-        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_ResetPayloadForSourceDescriptor),
-        reinterpret_cast<void*>(Arg6CurrentSlotRecord44_GetPayload10),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_Destroy),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetStateId),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_AppendDebugString),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor),
+        reinterpret_cast<void*>(Arg6SelectionDescriptor40_GetPayload10),
     };
     return vtable;
 }
@@ -656,20 +630,20 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
         return nullptr;
     }
 
-    arg6SelectionDescriptor40Packed_ = {};
+    arg6SelectionDescriptor40Payload_ = {};
     arg6SelectionDescriptor40_ = {};
     // Current tight static read from `client.dll:0x62195ff0`:
     // - the profile-path builder pushes payload dword `+0x03` into the `%X` suffix slot for
     //   `"Profiles\\%s\\%s_%X\\"`
     // - the middle `%s` comes from client global `DAT_629de48c`, not from this descriptor payload
     // - keep this wrapper payload sourced from the real owner-side current-slot record id pair
-    arg6SelectionDescriptor40Packed_.field03 = currentSlotRecord->globalCharacterIdLow03;
-    arg6SelectionDescriptor40Packed_.field07 = currentSlotRecord->globalCharacterIdHigh07;
+    arg6SelectionDescriptor40Payload_.characterIdLow03 = currentSlotRecord->globalCharacterIdLow03;
+    arg6SelectionDescriptor40Payload_.characterIdHigh07 = currentSlotRecord->globalCharacterIdHigh07;
     arg6SelectionDescriptor40_.vtable00 = Arg6SelectionDescriptor40Vtable();
-    arg6SelectionDescriptor40_.bufferBase04 = &arg6SelectionDescriptor40Packed_;
+    arg6SelectionDescriptor40_.bufferBase04 = &arg6SelectionDescriptor40Payload_;
     arg6SelectionDescriptor40_.backingObject08 = nullptr;
     arg6SelectionDescriptor40_.flag0c = 1u;
-    arg6SelectionDescriptor40_.packed = &arg6SelectionDescriptor40Packed_;
+    arg6SelectionDescriptor40_.payload10 = &arg6SelectionDescriptor40Payload_;
 
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
@@ -678,13 +652,13 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
         !g_LastLoggedSelectionDescriptor40Valid ||
         g_LastLoggedSelectionDescriptor40WasNull ||
         g_LastLoggedSelectionDescriptor40SelectionIndex != selectionIndex ||
-        g_LastLoggedSelectionDescriptor40Field03 != arg6SelectionDescriptor40Packed_.field03 ||
-        g_LastLoggedSelectionDescriptor40Field07 != arg6SelectionDescriptor40Packed_.field07;
+        g_LastLoggedSelectionDescriptor40Field03 != arg6SelectionDescriptor40Payload_.characterIdLow03 ||
+        g_LastLoggedSelectionDescriptor40Field07 != arg6SelectionDescriptor40Payload_.characterIdHigh07;
     g_LastLoggedSelectionDescriptor40Valid = true;
     g_LastLoggedSelectionDescriptor40WasNull = false;
     g_LastLoggedSelectionDescriptor40SelectionIndex = selectionIndex;
-    g_LastLoggedSelectionDescriptor40Field03 = arg6SelectionDescriptor40Packed_.field03;
-    g_LastLoggedSelectionDescriptor40Field07 = arg6SelectionDescriptor40Packed_.field07;
+    g_LastLoggedSelectionDescriptor40Field03 = arg6SelectionDescriptor40Payload_.characterIdLow03;
+    g_LastLoggedSelectionDescriptor40Field07 = arg6SelectionDescriptor40Payload_.characterIdHigh07;
     if (shouldLogDescriptor) {
         spdlog::debug(
             "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} currentSlotIndex=0x{:02x} slotName='{}' vtable={} field03=0x{:08x} field07=0x{:08x})",
@@ -696,8 +670,8 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
             static_cast<unsigned>(currentSlotIndex),
             currentSlotRecord->heapString14.empty() ? "<empty>" : currentSlotRecord->heapString14.c_str(),
             fmt::ptr(arg6SelectionDescriptor40_.vtable00),
-            static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field03),
-            static_cast<unsigned>(arg6SelectionDescriptor40Packed_.field07));
+            static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdLow03),
+            static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdHigh07));
     }
     return &arg6SelectionDescriptor40_;
 }

@@ -19,30 +19,30 @@ struct Arg6SelectionConfig;
 
 // anchor: launcher.exe:0x004af2a4 / vtable
 // anchor: launcher.exe:0x439840 / ctor
-// Shared packet builder envelope base class. Uses CMessageConnectionMessage_CreateRef 
-// for internal message storage. This is the shared base pattern used by 
+// Shared packet builder envelope base class. Uses CMessageConnectionMessage_CreateRef
+// for internal message storage. This is the shared base pattern used by
 // CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
 // Full object size: 0x32 (50 bytes)
 class PacketBuilder_0x4af2a4 {
 public:
     // VTable pointer at +0x00
     void** vtable00 = nullptr;
-    
+
     // Shared packet builder envelope fields:
     uint32_t nopatchLauncherVersionValue04 = 0;    // +0x04
     liblttcp::CMessageConnectionMessageRef* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                  // +0x0c
-    
+
     // Payload pointers (set by derived classes):
     void* payloadBegin10 = nullptr;               // +0x10
     uint16_t payloadLength14 = 0;                 // +0x14
     uint8_t statusByte16 = 0;                    // +0x16
-    
+
     // Character slot fields (used by derived slot record):
     uint32_t characterIdLow1c = 0;                 // +0x1c
     uint32_t characterIdHigh20 = 0;                // +0x20
     uint16_t worldId24 = 0;                       // +0x24
-    
+
     // Default ctor/dtor matching original:
     PacketBuilder_0x4af2a4() = default;
     ~PacketBuilder_0x4af2a4() = default;
@@ -74,12 +74,12 @@ public:
 // - wrapper `+0x40` returns a selection-descriptor object consumed by client profile-path code
 // - wrapper `+0x44` returns a current-slot record object consumed by later save/profile code
 // Those are not the same thing as the owner-side `+0x40/+0x44` slot-record table accessors.
-struct __attribute__((packed)) Arg6SelectionDescriptor40PackedSketch {
+struct __attribute__((packed)) Arg6SelectionDescriptor40PayloadSketch {
     uint8_t reserved0;
     uint8_t reserved1;
     uint8_t reserved2;
-    uint32_t field03;
-    uint32_t field07;
+    uint32_t characterIdLow03;  // field03
+    uint32_t characterIdHigh07; // field07
 };
 
 struct Arg6SelectionDescriptor40ObjectSketch {
@@ -94,12 +94,12 @@ struct Arg6SelectionDescriptor40ObjectSketch {
     void* backingObject08;
     uint8_t flag0c;
     uint8_t padding0d[3];
-    Arg6SelectionDescriptor40PackedSketch* packed; // +0x10
+    Arg6SelectionDescriptor40PayloadSketch* payload10; // +0x10
 };
 
-static_assert(offsetof(Arg6SelectionDescriptor40PackedSketch, field03) == 0x03);
-static_assert(offsetof(Arg6SelectionDescriptor40PackedSketch, field07) == 0x07);
-static_assert(offsetof(Arg6SelectionDescriptor40ObjectSketch, packed) == 0x10);
+static_assert(offsetof(Arg6SelectionDescriptor40PayloadSketch, characterIdLow03) == 0x03);
+static_assert(offsetof(Arg6SelectionDescriptor40PayloadSketch, characterIdHigh07) == 0x07);
+static_assert(offsetof(Arg6SelectionDescriptor40ObjectSketch, payload10) == 0x10);
 static_assert(sizeof(Arg6SelectionDescriptor40ObjectSketch) == 0x14);
 
 struct __attribute__((packed)) Arg6CurrentSlotRecord44PayloadSketch {
