@@ -1272,7 +1272,7 @@ public:
     // - arg6 `+0x40` = selection-descriptor object family
     // - arg6 `+0x44` = current-slot-record object family
     // - owner `+0x40 = 0x41f2e0` remains the separate `GetSlotRecordByIndex` accessor
-    Arg6SelectionDescriptor40ObjectSketch* GetArg6SelectionDescriptorObject40(
+    Arg6CurrentSlotRecord44ObjectSketch* GetArg6SelectionDescriptorObject40(
         uint32_t selectionIndex) override;
     Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() override;
 
@@ -1641,7 +1641,7 @@ private:
     // - `+0x10c` = owner `+0x30` small-string-like route descriptor
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     Arg6CurrentSlotRecord44PayloadSketch arg6SelectionDescriptor40Payload_{};
-    Arg6SelectionDescriptor40ObjectSketch arg6SelectionDescriptor40_{};
+    Arg6CurrentSlotRecord44ObjectSketch arg6SelectionDescriptor40_{};
     Arg6CurrentSlotRecord44PayloadSketch arg6CurrentSlotRecord44Payload_{};
     Arg6CurrentSlotRecord44ObjectSketch arg6CurrentSlotRecord44_{};
     std::string arg6CurrentSlotRecord44NameOwned_;

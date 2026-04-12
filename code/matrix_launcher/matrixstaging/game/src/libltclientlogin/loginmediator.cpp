@@ -135,21 +135,21 @@ static uint32_t ReadU32LE(const uint8_t* p) {
 // - slot `+0x04` is the shared tiny getter at `0x437b50` and returns `0`
 // - slot `+0x10` is the shared tiny getter at `0x481760` and returns the `+0x10` payload pointer
 // - keep `+0x08/+0x0c` conservative until the concrete wrapper object class is recovered
-static uint32_t __thiscall Arg6SelectionDescriptor40_Destroy(Arg6SelectionDescriptor40ObjectSketch* self) {
+static uint32_t __thiscall Arg6SelectionDescriptor40_Destroy(Arg6CurrentSlotRecord44ObjectSketch* self) {
     return self ? 1u : 0u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_GetStateId(Arg6SelectionDescriptor40ObjectSketch* self) {
+static uint32_t __thiscall Arg6SelectionDescriptor40_GetStateId(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 0u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_AppendDebugString(Arg6SelectionDescriptor40ObjectSketch* self) {
+static uint32_t __thiscall Arg6SelectionDescriptor40_AppendDebugString(Arg6CurrentSlotRecord44ObjectSketch* self) {
     (void)self;
     return 1u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor(Arg6SelectionDescriptor40ObjectSketch* self) {
+static uint32_t __thiscall Arg6SelectionDescriptor40_ResetPayloadForSourceDescriptor(Arg6CurrentSlotRecord44ObjectSketch* self) {
     if (!self) {
         return 0u;
     }
@@ -158,7 +158,7 @@ static uint32_t __thiscall Arg6SelectionDescriptor40_ResetPayloadForSourceDescri
     return 1u;
 }
 
-static uint32_t __thiscall Arg6SelectionDescriptor40_GetPayload10(Arg6SelectionDescriptor40ObjectSketch* self) {
+static uint32_t __thiscall Arg6SelectionDescriptor40_GetPayload10(Arg6CurrentSlotRecord44ObjectSketch* self) {
     return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(self ? self->payload10 : nullptr));
 }
 
@@ -587,7 +587,7 @@ const char* CLTLoginMediator::GetProfileRootName() const {
 // - keep the wrapper-facing object because client arg6 `+0x40` really returns a distinct ABI shape
 // - but source its payload directly from the anchored owner-side current-slot family instead of
 //   carrying a second synthetic arg6-side source picker/fallback tree
-Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
+Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
     uint32_t selectionIndex) {
     const CLTLoginMediator* const slotOwner = ResolveActiveMarginRouteOwner(this);
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
@@ -639,7 +639,7 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
     // - keep this wrapper payload sourced from the real owner-side current-slot record id pair
     arg6SelectionDescriptor40Payload_.characterIdLow03 = currentSlotRecord->globalCharacterIdLow03;
     arg6SelectionDescriptor40Payload_.characterIdHigh07 = currentSlotRecord->globalCharacterIdHigh07;
-    arg6SelectionDescriptor40_.vtable00 = Arg6SelectionDescriptor40Vtable();
+    arg6SelectionDescriptor40_.vtable = Arg6SelectionDescriptor40Vtable();
     arg6SelectionDescriptor40_.bufferBase04 = &arg6SelectionDescriptor40Payload_;
     arg6SelectionDescriptor40_.backingObject08 = nullptr;
     arg6SelectionDescriptor40_.flag0c = 1u;
@@ -669,7 +669,7 @@ Arg6SelectionDescriptor40ObjectSketch* CLTLoginMediator::GetArg6SelectionDescrip
             matchMode,
             static_cast<unsigned>(currentSlotIndex),
             currentSlotRecord->heapString14.empty() ? "<empty>" : currentSlotRecord->heapString14.c_str(),
-            fmt::ptr(arg6SelectionDescriptor40_.vtable00),
+            fmt::ptr(arg6SelectionDescriptor40_.vtable),
             static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdLow03),
             static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdHigh07));
     }

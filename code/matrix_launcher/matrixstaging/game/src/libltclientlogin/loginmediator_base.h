@@ -86,24 +86,6 @@ struct __attribute__((packed)) Arg6CurrentSlotRecord44PayloadSketch {
     uint8_t reserved0f;
 };
 
-struct Arg6SelectionDescriptor40ObjectSketch {
-    // Wrapper-facing arg6 `+0x40` outer object.
-    // Current Ghidra tightening:
-    // - client code only proves reads of payload dwords at `+0x10 +0x03/+0x07`
-    // - the outer `0x14` header still best matches the common descriptor-style base used by
-    //   launcher classes such as `0x004b533c` (vtable / `+0x04` / `+0x08` / flag / `+0x10` payload)
-    // - do not collapse this wrapper object onto owner vtable `+0x40 = GetSlotRecordByIndex`
-    void** vtable00;
-    void* bufferBase04;
-    void* backingObject08;
-    uint8_t flag0c;
-    uint8_t padding0d[3];
-    Arg6CurrentSlotRecord44PayloadSketch* payload10; // +0x10
-};
-
-static_assert(offsetof(Arg6SelectionDescriptor40ObjectSketch, payload10) == 0x10);
-static_assert(sizeof(Arg6SelectionDescriptor40ObjectSketch) == 0x14);
-
 struct Arg6CurrentSlotRecord44ObjectSketch {
     // Wrapper-facing arg6 `+0x44` current-slot object.
     // Current Ghidra tightening:
@@ -437,7 +419,7 @@ public:
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40
-    virtual Arg6SelectionDescriptor40ObjectSketch* GetArg6SelectionDescriptorObject40(uint32_t selectionIndex) = 0;
+    virtual Arg6CurrentSlotRecord44ObjectSketch* GetArg6SelectionDescriptorObject40(uint32_t selectionIndex) = 0;
     // +0x44
     virtual Arg6CurrentSlotRecord44ObjectSketch* GetArg6CurrentSlotRecordObject44() = 0;
     // +0x48
