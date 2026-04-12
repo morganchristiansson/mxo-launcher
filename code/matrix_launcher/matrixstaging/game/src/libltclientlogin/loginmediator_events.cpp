@@ -193,6 +193,7 @@ public:
     }
 };
 
+// Legacy type aliases (used by CLTLoginMediator methods)
 // Focused post-state9 event/listener split:
 // - keep the immediate `0x41b450 -> 0x41cfb0` continuation in its own TU
 // - this avoids reopening the broader mediator auth/bootstrap transport file just to work on the
@@ -238,14 +239,12 @@ static void DestroyObserverSubtreeNodes674(LoginObserverTreeNode674* subtreeRoot
 }  // namespace
 
 // anchor-family: launcher.exe ctor/dtor field initialization of owner `+0x674`
-// The original setup is inlined into constructor/cleanup code rather than isolated as a named
-// standalone helper.
 void CLTLoginMediator::InitializeObserverTree674() {
     observerTree674_.header00 = &observerTreeHeader674_;
     observerTree674_.nodeCount04 = 0u;
 
     observerTreeHeader674_ = {};
-    std::_Rb_tree_node_base* const headerBase = ObserverTreeNodeBase(&observerTreeHeader674_);
+    std::_Rb_tree_node_base* headerBase = LoginObserverTreeHelper674::TreeNodeBase(&observerTreeHeader674_);
     headerBase->_M_color = std::_S_red;
     headerBase->_M_parent = nullptr;
     headerBase->_M_left = headerBase;
@@ -255,14 +254,13 @@ void CLTLoginMediator::InitializeObserverTree674() {
     latestObserver174_ = nullptr;
 }
 
-// anchor-family: launcher.exe:0x419570 / 0x41d370 / 0x41f6a0
-// Source-owned free-backed cleanup over the recovered owner `+0x674` observer container.
+// anchor: launcher.exe:0x419570 / 0x41d370
 void CLTLoginMediator::ClearObserverTree674() {
     if (observerTree674_.header00 == nullptr) {
         return;
     }
     if (observerTree674_.nodeCount04 != 0u) {
-        DestroyObserverSubtreeNodes674(observerTreeHeader674_.parent04);
+        LoginObserverTreeHelper674::DestroySubtreeNodes(&observerTreeHeader674_);
     }
     InitializeObserverTree674();
 }
@@ -272,7 +270,8 @@ LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeBegin674() const {
     if (observerTree674_.header00 == nullptr || observerTree674_.nodeCount04 == 0u) {
         return observerTree674_.header00;
     }
-    return ObserverTreeNodeFromBase(ObserverTreeNodeBase(observerTree674_.header00)->_M_left);
+    return LoginObserverTreeHelper674::NodeFromBase(
+        LoginObserverTreeHelper674::TreeNodeBase(observerTree674_.header00)->_M_left);
 }
 
 // anchor-family: inlined header/end expression used by launcher.exe:0x41cfb0 / 0x41d090 / 0x41d430
@@ -280,13 +279,12 @@ LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeEnd674() const {
     return observerTree674_.header00;
 }
 
-// anchor-family: source-owned single-node lookup distilled from the same key-compare tree family
-// used by launcher.exe:0x415f20 / 0x419510 over owner `+0x674`.
+// anchor-family: source-owned single-node lookup (uses helper but is not in helper class)
 LoginObserverTreeNode674* CLTLoginMediator::FindObserverNode674(void* observer) const {
     LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
-    const uintptr_t targetKey = ObserverTreeKey(observer);
+    const uintptr_t targetKey = LoginObserverTreeHelper674::TreeKey(observer);
     while (current != nullptr) {
-        const uintptr_t currentKey = ObserverTreeKey(current->observerKey10);
+        const uintptr_t currentKey = LoginObserverTreeHelper674::TreeKey(current->observerKey10);
         if (targetKey < currentKey) {
             current = current->left08;
         } else if (currentKey < targetKey) {
@@ -298,114 +296,34 @@ LoginObserverTreeNode674* CLTLoginMediator::FindObserverNode674(void* observer) 
     return nullptr;
 }
 
-// anchor: launcher.exe:0x419510
-// owner `+0x674` equal-range/search-pair builder used by `0x41dde0`.
+// anchor: launcher.exe:0x419510 / BuildEqualRangeForKey
 void CLTLoginMediator::EqualRangeObserver674(
     void* observer,
     LoginObserverTreeNode674** outLowerBound,
     LoginObserverTreeNode674** outUpperBound) const {
-    LoginObserverTreeNode674* lowerBound = const_cast<LoginObserverTreeNode674*>(&observerTreeHeader674_);
-    LoginObserverTreeNode674* upperBound = const_cast<LoginObserverTreeNode674*>(&observerTreeHeader674_);
-    LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
-    const uintptr_t targetKey = ObserverTreeKey(observer);
-
-    while (current != nullptr) {
-        if (targetKey < ObserverTreeKey(current->observerKey10)) {
-            upperBound = current;
-            current = current->left08;
-        } else {
-            current = current->right0c;
-        }
-    }
-
-    current = observerTreeHeader674_.parent04;
-    while (current != nullptr) {
-        if (ObserverTreeKey(current->observerKey10) < targetKey) {
-            current = current->right0c;
-        } else {
-            lowerBound = current;
-            current = current->left08;
-        }
-    }
-
-    if (outLowerBound) {
-        *outLowerBound = lowerBound;
-    }
-    if (outUpperBound) {
-        *outUpperBound = upperBound;
-    }
+    LoginObserverTreeHelper674::BuildEqualRange(
+        const_cast<LoginObserverTreeNode674*>(&observerTreeHeader674_), observer, outLowerBound, outUpperBound);
 }
 
 // anchor: launcher.exe:0x41baa0
-// owner `+0x674` iterator-distance / range-count walk.
 uint32_t CLTLoginMediator::CountObserverRange674(
     LoginObserverTreeNode674* first,
     LoginObserverTreeNode674* last) const {
-    uint32_t count = 0u;
-    while (first != last) {
-        first = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(first)));
-        ++count;
-    }
-    return count;
+    return LoginObserverTreeHelper674::CountRange(first, last);
 }
 
-// UNANCHORED: source-owned single helper collapsing the original `0x415f20` search/insert gate
-// plus its internal `0x452c10` node-allocation/rebalance path for owner `+0x674`.
+// anchor: launcher.exe:0x415f20
 bool CLTLoginMediator::InsertObserverNode674(void* observer) {
-    std::_Rb_tree_node_base* const headerBase = ObserverTreeNodeBase(observerTree674_.header00);
-    std::_Rb_tree_node_base* parentBase = headerBase;
-    LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
-    const uintptr_t targetKey = ObserverTreeKey(observer);
-    bool insertLeft = true;
-
-    while (current != nullptr) {
-        parentBase = ObserverTreeNodeBase(current);
-        const uintptr_t currentKey = ObserverTreeKey(current->observerKey10);
-        if (targetKey < currentKey) {
-            insertLeft = true;
-            current = current->left08;
-        } else if (currentKey < targetKey) {
-            insertLeft = false;
-            current = current->right0c;
-        } else {
-            return false;
-        }
-    }
-
-    auto* node = static_cast<LoginObserverTreeNode674*>(std::malloc(sizeof(LoginObserverTreeNode674)));
-    if (!node) {
-        return false;
-    }
-    node->colorOrFlags00 = static_cast<uint32_t>(std::_S_red);
-    node->parent04 = nullptr;
-    node->left08 = nullptr;
-    node->right0c = nullptr;
-    node->observerKey10 = observer;
-
-    std::_Rb_tree_insert_and_rebalance(insertLeft, ObserverTreeNodeBase(node), parentBase, *headerBase);
-    ++observerTree674_.nodeCount04;
-    return true;
+    return LoginObserverTreeHelper674::InsertNode(
+        &observerTreeHeader674_, observer, &observerTree674_.nodeCount04);
 }
 
 // anchor: launcher.exe:0x41d430
 void CLTLoginMediator::EraseObserverRange674(
     LoginObserverTreeNode674* first,
     LoginObserverTreeNode674* last) {
-    if (first == ObserverTreeBegin674() && last == ObserverTreeEnd674()) {
-        if (observerTree674_.nodeCount04 != 0u) {
-            ClearObserverTree674();
-        }
-        return;
-    }
-
-    while (first != last) {
-        LoginObserverTreeNode674* const next =
-            ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(first)));
-        (void)std::_Rb_tree_rebalance_for_erase(ObserverTreeNodeBase(first), *ObserverTreeNodeBase(observerTree674_.header00));
-        std::free(first);
-        --observerTree674_.nodeCount04;
-        first = next;
-    }
+    LoginObserverTreeHelper674::EraseRangeFull(
+        first, last, &observerTreeHeader674_, &observerTree674_.nodeCount04);
 }
 
 // anchor: launcher.exe:0x41b450
