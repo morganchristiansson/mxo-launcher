@@ -58,6 +58,8 @@ public:
     virtual const char* VtableSlot08() const { return nullptr; }
     // anchor: launcher.exe:0x41baf0 / vtable +0x0c
     virtual void VtableSlot0c() {}
+    // anchor: launcher.exe:0x481760 / vtable +0x10
+    virtual void* VtableSlot10() { return payloadBegin10; }
 };
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
@@ -80,15 +82,15 @@ public:
     uint16_t worldId0c = 0;            // +0x24
 
     // Virtual methods (5 vtable slots):
-    // anchor: launcher.exe:0x439910 / vtable +0x00
+    // anchor: launcher.exe:0x439910 / vtable +0x00 (replaces base 0x443aa0)
     ~SlotRecordState_0x4b5328() override = default;
     // anchor: launcher.exe:0x437b50 / vtable +0x04 (inherited from base)
-    // anchor: launcher.exe:0x43dc80 / vtable +0x08
+    // anchor: launcher.exe:0x43dc80 / vtable +0x08 (replaces base)
     const char* VtableSlot08() const override { return nullptr; }
-    // anchor: launcher.exe:0x439940 / vtable +0x0c
-    virtual void VtableSlot0c() {}
-    // anchor: launcher.exe:0x481760 / vtable +0x10
-    virtual void* VtableSlot10() { return payloadBegin10; }
+    // anchor: launcher.exe:0x439940 / vtable +0x0c (replaces base 0x41baf0)
+    virtual void VtableSlot0c() override {}
+    // anchor: launcher.exe:0x481760 / vtable +0x10 (new slot)
+    virtual void* VtableSlot10() override { return payloadBegin10; }
 };
 
 // Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.
