@@ -201,19 +201,6 @@ static const CLTLoginMediator* ResolveActiveState8PersistenceOwner(const CLTLogi
     return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
 }
 
-// UNANCHORED: wrapper-facing arg6 current-slot/selection-descriptor builders should source their
-// payload from the same active owner-side slot/route family as `GetCurrentSlotRecord()` and
-// `CurrentCharacterRouteIndexCc8Scaffold()`, instead of carrying a second synthetic source picker.
-static const CLTLoginMediator* ResolveActiveMarginRouteOwner(const CLTLoginMediator* mediator) {
-    if (!mediator) {
-        return nullptr;
-    }
-    if (const CLTLoginMediator* activeSource = mediator->ResolveActiveStateSourceScaffold()) {
-        return activeSource;
-    }
-    return mediator;
-}
-
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 static uint32_t LogLiveSelectionCfgCorpusFlag(
     const char* slotLabel,
@@ -572,21 +559,21 @@ const char* CLTLoginMediator::GetProfileRootName() const {
 //   carrying a second synthetic arg6-side source picker/fallback tree
 Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescriptorObject40(
     uint32_t selectionIndex) {
-    const CLTLoginMediator* const slotOwner = ResolveActiveMarginRouteOwner(this);
+    const CLTLoginMediator* const activeSource = ResolveActiveStateSourceScaffold();
     const uint32_t low24 = selectionIndex & 0x00ffffffu;
     const uint32_t high8 = (selectionIndex >> 24) & 0xffu;
     const uint32_t expectedScratchRequest = Arg6ExpectedSelectionDescriptorScratchRequest();
     const bool matchedConfiguredRequest = Arg6SelectionDescriptorMatchesRequest(selectionIndex);
-    const uint8_t currentSlotIndex = slotOwner ? slotOwner->CurrentCharacterRouteIndexCc8Scaffold() : 0xffu;
+    const uint8_t currentSlotIndex = activeSource ? activeSource->CurrentCharacterRouteIndexCc8Scaffold() : 0xffu;
     const bool matchedCurrentSlotIndexRequest =
-        slotOwner != nullptr &&
-        CurrentHelperStateCodeOrZero(slotOwner) >= 3u &&
+        activeSource != nullptr &&
+        CurrentHelperStateCodeOrZero(activeSource) >= 3u &&
         high8 == 0u &&
         low24 == static_cast<uint32_t>(currentSlotIndex);
 
     const SlotRecordState_0x4b5328* const currentSlotRecord =
-        (slotOwner && (matchedConfiguredRequest || matchedCurrentSlotIndexRequest))
-            ? slotOwner->GetCurrentSlotRecord()
+        (activeSource && (matchedConfiguredRequest || matchedCurrentSlotIndexRequest))
+            ? activeSource->GetCurrentSlotRecord()
             : nullptr;
 
     if (!currentSlotRecord) {
@@ -667,9 +654,9 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
 // - but source it directly from the anchored owner-side current-slot accessor instead of a second
 //   synthetic arg6-side source/fallback path
 Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44() {
-    const CLTLoginMediator* const slotOwner = ResolveActiveMarginRouteOwner(this);
+    const CLTLoginMediator* const activeSource = ResolveActiveStateSourceScaffold();
     const SlotRecordState_0x4b5328* const currentSlotRecord =
-        slotOwner ? slotOwner->GetCurrentSlotRecord() : nullptr;
+        activeSource ? activeSource->GetCurrentSlotRecord() : nullptr;
 
     arg6CurrentSlotRecord44Payload_ = {};
     arg6CurrentSlotRecord44_ = {};
@@ -679,7 +666,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
     if (!currentSlotRecord) {
         spdlog::info(
             "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> NULL [currentSlotIndex=0x{:02x}]",
-            static_cast<unsigned>(slotOwner ? slotOwner->CurrentCharacterRouteIndexCc8Scaffold() : 0xffu));
+            static_cast<unsigned>(activeSource ? activeSource->CurrentCharacterRouteIndexCc8Scaffold() : 0xffu));
         return nullptr;
     }
 
