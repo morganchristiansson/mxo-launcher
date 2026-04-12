@@ -47,10 +47,6 @@ bool CLTLoginMediator::UnregisterActiveStateSourceScaffold(const CLTLoginMediato
     return true;
 }
 
-CLTLoginMediator* CLTLoginMediator::ActiveStateSourceScaffold() {
-    return g_CurrentLoginMediator;
-}
-
 const CLTLoginMediator* CLTLoginMediator::ResolveActiveStateSourceScaffold() const {
     return g_CurrentLoginMediator ? g_CurrentLoginMediator : this;
 }

@@ -1057,7 +1057,7 @@ static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaf
         return mediator;
     }
 
-    mediator = mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+    mediator = mxo::ltlogin::g_CurrentLoginMediator;
     return (mediator != nullptr && self->OwnerContext() == mediator) ? mediator : nullptr;
 }
 

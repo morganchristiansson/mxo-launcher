@@ -66,7 +66,7 @@ static mxo::ltlogin::CLTLoginMediator* DiagnosticGetActiveMediatorForCharacterSt
     if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
         return const_cast<mxo::ltlogin::CLTLoginMediator*>(mediator->ResolveActiveStateSourceScaffold());
     }
-    return mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+    return mxo::ltlogin::g_CurrentLoginMediator;
 }
 
 // UNANCHORED: trivial accessors into the recovered CLTLoginMediator sidecar model.
@@ -964,7 +964,7 @@ extern "C" uint32_t Mediator_ProcessCreateCharacterInput120_Impl(
     uint32_t result = 1u;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
     mxo::ltlogin::CLTLoginMediator* activeStateSource =
-        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+        mxo::ltlogin::g_CurrentLoginMediator;
 
     if (mediator) {
         const bool applyOwnerSemantics = (activeStateSource == nullptr || activeStateSource == mediator);

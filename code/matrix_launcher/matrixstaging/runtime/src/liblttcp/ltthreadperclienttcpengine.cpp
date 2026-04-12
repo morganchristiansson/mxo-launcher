@@ -3219,7 +3219,7 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionContextScaffold(
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine::PumpLauncherConnectionsFromArg5HelperScaffold() {
     mxo::ltlogin::CLTLoginMediator* mediator =
-        mxo::ltlogin::CLTLoginMediator::ActiveStateSourceScaffold();
+        mxo::ltlogin::g_CurrentLoginMediator;
     if (mediator == nullptr) {
         return;
     }
