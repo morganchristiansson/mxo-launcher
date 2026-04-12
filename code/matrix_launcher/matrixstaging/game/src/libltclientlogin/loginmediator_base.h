@@ -23,6 +23,12 @@ struct Arg6SelectionConfig;
 // for internal message storage. This is the shared base pattern used by
 // CLTLoginMediatorSlotRecord and potentially CLTLoginMediator.
 // Full object size: 0x32 (50 bytes)
+// VTable methods (inherited by derived classes):
+// - +0x00: dtor / release retained outer message-ref (0x00443aa0)
+// - +0x04: stub returns 0 (0x00437b50)
+// - +0x08: append debug string (builder-specific)
+// - +0x0c: reset/init helper (builder-specific)
+// - +0x10: return builder +0x10 packet-payload base (0x00481760)
 class PacketBuilder_0x4af2a4 {
 public:
     // VTable pointer at +0x00
@@ -43,9 +49,17 @@ public:
     uint32_t characterIdHigh20 = 0;                // +0x20
     uint16_t worldId24 = 0;                       // +0x24
 
-    // Default ctor/dtor matching original:
-    PacketBuilder_0x4af2a4() = default;
-    ~PacketBuilder_0x4af2a4() = default;
+    // Virtual methods from vtable (anchor: launcher.exe:0x004af2a4):
+    // anchor: launcher.exe:0x00443aa0 / vtable +0x00
+    virtual ~PacketBuilder_0x4af2a4() = default;
+    // anchor: launcher.exe:0x00437b50 / vtable +0x04
+    virtual uint32_t VtableSlot04() { return 0; }
+    // anchor: launcher.exe:0x41af50 / vtable +0x08 (builder-specific debug string)
+    virtual const char* VtableSlot08() const { return nullptr; }
+    // anchor: launcher.exe:0x43dc80 / vtable +0x0c (reset/init helper)
+    virtual void VtableSlot0c() {}
+    // anchor: launcher.exe:0x00481760 / vtable +0x10
+    virtual void* VtableSlot10() { return payloadBegin10; }
 };
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
