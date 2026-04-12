@@ -657,7 +657,6 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
     arg6CurrentSlotRecord44Payload_ = {};
     arg6CurrentSlotRecord44_ = {};
     arg6CurrentSlotRecord44NameOwned_.clear();
-    arg6CurrentSlotRecord44Present_ = false;
 
     if (!currentSlotRecord) {
         spdlog::info(
@@ -682,7 +681,6 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
             static_cast<uint16_t>((nameLength < 0xffffu) ? nameLength : 0xffffu);
     }
 
-    arg6CurrentSlotRecord44Present_ = true;
     spdlog::info(
         "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
         fmt::ptr(&arg6CurrentSlotRecord44_),
