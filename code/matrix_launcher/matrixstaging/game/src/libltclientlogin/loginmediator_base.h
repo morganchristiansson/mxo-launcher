@@ -49,23 +49,27 @@ public:
     uint32_t characterIdHigh20 = 0;                // +0x20
     uint16_t worldId24 = 0;                       // +0x24
 
-    // Virtual methods from vtable (anchor: launcher.exe:0x004af2a4):
-    // anchor: launcher.exe:0x00443aa0 / vtable +0x00
+    // Virtual methods from vtable (4 slots at 0x004af2a4):
+    // anchor: launcher.exe:0x443aa0 / vtable +0x00
     virtual ~PacketBuilder_0x4af2a4() = default;
-    // anchor: launcher.exe:0x00437b50 / vtable +0x04
+    // anchor: launcher.exe:0x437b50 / vtable +0x04
     virtual uint32_t VtableSlot04() { return 0; }
-    // anchor: launcher.exe:0x41af50 / vtable +0x08 (builder-specific debug string)
+    // anchor: launcher.exe:0x4af2ac / vtable +0x08
     virtual const char* VtableSlot08() const { return nullptr; }
-    // anchor: launcher.exe:0x43dc80 / vtable +0x0c (reset/init helper)
+    // anchor: launcher.exe:0x41baf0 / vtable +0x0c
     virtual void VtableSlot0c() {}
-    // anchor: launcher.exe:0x00481760 / vtable +0x10
-    virtual void* VtableSlot10() { return payloadBegin10; }
 };
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
 // anchor: launcher.exe:0x439910 / dtor
 // Character slot record class. Inherits from PacketBuilder_0x4af2a4 for shared envelope layout.
 // Full object size: 0x32 (50 bytes)
+// VTable methods (5 slots):
+// - +0x00: dtor (0x439910) - replaces base +0x00
+// - +0x04: stub returns 0 (0x437b50) - inherited
+// - +0x08: debug string (0x43dc80) - replaces base +0x08
+// - +0x0c: reset/prepare (0x439940)
+// - +0x10: return payload base (0x481760)
 class SlotRecordState_0x4b5328 : public PacketBuilder_0x4af2a4 {
 public:
     // Additional slot-record specific fields:
@@ -75,11 +79,16 @@ public:
     uint8_t status0b = 0;             // +0x18
     uint16_t worldId0c = 0;            // +0x24
 
-    // Default ctor/dtor matching original:
-    // - ctor: 0x4398b0 calls base init then zero-inits
-    // - dtor: 0x439910 calls base dtor then optionally frees
-    SlotRecordState_0x4b5328() = default;
-    ~SlotRecordState_0x4b5328() = default;
+    // Virtual methods (5 vtable slots):
+    // anchor: launcher.exe:0x439910 / vtable +0x00
+    ~SlotRecordState_0x4b5328() override = default;
+    // anchor: launcher.exe:0x437b50 / vtable +0x04 (inherited from base)
+    // anchor: launcher.exe:0x43dc80 / vtable +0x08
+    const char* VtableSlot08() const override { return nullptr; }
+    // anchor: launcher.exe:0x439940 / vtable +0x0c
+    virtual void VtableSlot0c() {}
+    // anchor: launcher.exe:0x481760 / vtable +0x10
+    virtual void* VtableSlot10() { return payloadBegin10; }
 };
 
 // Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.
