@@ -1479,72 +1479,6 @@ const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
     return nullptr;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::BeginMarginHandshake() {
-    // Important ownership split to keep explicit in source:
-    // - mediator owns the shared margin-connection transport helper (`0x41e500` family)
-    // - the concrete post-bootstrap payload send body remains on the active `CLTLoginState`
-    //   vtable object
-    // - mediator only owns the launcher-side CERT/MS bootstrap progression that must complete on
-    //   the connected margin transport before state8/state11 payload sends like raw `0x0f`
-    if (!currentState_) {
-        spdlog::warn("DIAGNOSTIC: BeginMarginHandshake has no active CLTLoginState to dispatch");
-        return 0u;
-    }
-
-    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
-    switch (marginBootstrapState.phase) {
-        case MarginBootstrapPhase::kReady:
-            spdlog::info(
-                "DIAGNOSTIC: launcher-owned margin bootstrap already complete; returning control to current state slot3 currentState={} sessionId=0x{:08x}",
-                currentState_->DebugName(),
-                marginBootstrapState.marginSessionId);
-            return currentState_->Slot3_BeginOrContinue(/*upstreamOrArg=*/currentState_, this);
-
-        case MarginBootstrapPhase::kIdle:
-            break;
-
-        case MarginBootstrapPhase::kSentCertConnectRequest:
-        case MarginBootstrapPhase::kSentCertChallengeResponse:
-        case MarginBootstrapPhase::kSentMsConnectRequest:
-        case MarginBootstrapPhase::kSentMsConnectChallengeResponse:
-            spdlog::info(
-                "DIAGNOSTIC: launcher-owned margin bootstrap already in progress phase={} waitingOn='{}' currentState={}",
-                static_cast<uint32_t>(marginBootstrapState.phase),
-                expectedMarginRequestName_ ? expectedMarginRequestName_ : "<unset>",
-                currentState_->DebugName());
-            return 1u;
-    }
-
-    if (!lastAuthReply_.signedData.valid || lastAuthReply_.signedData.rawBytes.empty() ||
-        lastAuthReply_.authSignatureBytes.empty()) {
-        spdlog::info(
-            "DIAGNOSTIC: BeginMarginHandshake missing auth-reply signed-data material for CERT_ConnectRequest currentState={}",
-            currentState_->DebugName());
-        return 0u;
-    }
-
-    mxo::auth::FramedPacket packet;
-    if (!mxo::auth::BuildMarginCertConnectRequestPacket(
-            lastAuthReply_,
-            mxo::auth::kFrameModeAuto,
-            &packet)) {
-        spdlog::info("DIAGNOSTIC: BeginMarginHandshake failed to build CERT_ConnectRequest");
-        return 0u;
-    }
-
-    const uint32_t sendResult = SendMarginFramedPacket(
-        packet,
-        0x01u,
-        "CERT_ConnectRequest",
-        /*encryptedTransport=*/false);
-    if (sendResult != 0u) {
-        marginBootstrapState.phase = MarginBootstrapPhase::kSentCertConnectRequest;
-        expectedMarginRequestName_ = "CERT_Challenge";
-    }
-    return sendResult;
-}
-
 // anchor: launcher.exe:0x41ecd0
 void CLTLoginMediator::ResetSelectionContext0ecMirror() {
     selectionContext0ecCopy_ = {};
@@ -2479,10 +2413,6 @@ uint32_t CLTLoginMediator::Arg6SelectedVariantState() const {
         return static_cast<uint32_t>(GetSlotRecordStatusByIndex(static_cast<uint8_t>(variantIndex)));
     }
     return arg6Selection_.selectedVariantState_;
-}
-
-uint32_t CLTLoginMediator::Arg6MappedSelectionId() const {
-    return arg6Selection_.mappedSelectionId_;
 }
 
 const char* CLTLoginMediator::Arg6MappedSelectionName() const {

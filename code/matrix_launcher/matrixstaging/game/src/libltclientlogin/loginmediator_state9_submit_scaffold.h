@@ -64,15 +64,7 @@ inline std::string BuildSubmitTargetText(
     return out;
 }
 
-inline uint16_t ReadOpcodePrefixVariableWidth(const uint8_t* bytes, size_t byteCount) {
-    if (!bytes || byteCount == 0u) {
-        return 0u;
-    }
-    if ((bytes[0] & 0x80u) != 0u && byteCount >= 2u) {
-        return static_cast<uint16_t>(((bytes[0] & 0x7fu) << 8) | bytes[1]);
-    }
-    return bytes[0];
-}
+// UNUSED: inline uint16_t ReadOpcodePrefixVariableWidth
 
 inline bool TryCallback84FillPair(void* callback84, uint32_t* outLow, uint32_t* outHigh) {
     if (outLow) {

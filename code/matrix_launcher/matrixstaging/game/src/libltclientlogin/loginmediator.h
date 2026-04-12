@@ -1101,7 +1101,6 @@ public:
     uint32_t Arg6SelectedWorldIndexLow24() const;
     uint32_t Arg6SelectedVariantIndexHigh8() const;
     uint32_t Arg6SelectedVariantState() const;
-    uint32_t Arg6MappedSelectionId() const;
     const char* Arg6MappedSelectionName() const;
     const char* Arg6MappedVariantName() const;
     const char* Arg6ProfileName() const;
@@ -1180,8 +1179,7 @@ public:
     //   later world-list sender
     // - state1/state2 should therefore call the separate owner+0x680 child directly instead of
     //   routing through a fake mediator-owned auth-bootstrap method
-    uint32_t HandleAuthConnectStatus(uint32_t workResultCode);
-    uint32_t BeginMarginHandshake();
+
     // Current source-owned lifecycle mirror for owner `+0x680`:
     // - original `0x41b160` allocates the child during mediator initialize
     // - original `0x41f510` frees it during reset/clear-owned-runtime-state
@@ -1522,7 +1520,6 @@ private:
         LoginObserverTreeNode674* first,
         LoginObserverTreeNode674* last) const;
     bool InsertObserverNode674(void* observer);
-    bool EraseObserverNode674(void* observer);
     void EraseObserverRange674(
         LoginObserverTreeNode674* first,
         LoginObserverTreeNode674* last);

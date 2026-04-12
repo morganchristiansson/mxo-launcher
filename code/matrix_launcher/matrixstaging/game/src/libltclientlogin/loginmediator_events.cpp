@@ -210,21 +210,9 @@ bool CLTLoginMediator::InsertObserverNode674(void* observer) {
     return true;
 }
 
-// UNANCHORED: source-owned single-node erase wrapper factored out of the original range-erase
-// family around `0x41d430` / `_Rb_tree_rebalance_for_erase` for owner `+0x674`.
-bool CLTLoginMediator::EraseObserverNode674(void* observer) {
-    LoginObserverTreeNode674* const node = FindObserverNode674(observer);
-    if (node == nullptr) {
-        return false;
-    }
-
-    (void)std::_Rb_tree_rebalance_for_erase(ObserverTreeNodeBase(node), *ObserverTreeNodeBase(observerTree674_.header00));
-    std::free(node);
-    --observerTree674_.nodeCount04;
-    return true;
-}
-
 // anchor: launcher.exe:0x41d430
+// UNUSED: single-node erase wrapper:
+// bool CLTLoginMediator::EraseObserverNode674(void* observer) {...}
 // owner `+0x674` erase-range walk, including its full-range clear special case.
 void CLTLoginMediator::EraseObserverRange674(
     LoginObserverTreeNode674* first,

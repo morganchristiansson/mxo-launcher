@@ -678,21 +678,6 @@ uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
         : 0u;
 }
 
-// UNANCHORED: source-owned owner-side cache/update entry for auth type-2 connect-status work.
-uint32_t CLTLoginMediator::HandleAuthConnectStatus(uint32_t workResultCode) {
-    lastAuthConnectStatus_ = workResultCode;
-    ++authConnectStatusCount_;
-    if (authConnection_ != nullptr &&
-        ((workResultCode == 0u &&
-          authConnection_->State() == mxo::liblttcp::LTTCPEngineConnectionState::kConnectActive) ||
-         workResultCode == kConnectStatusSuccess)) {
-        // Current source now re-enters helper/state 2 on auth connect success, so mirror the
-        // owner-side `+0x18 -> +0x34 == 2` ready state before state2 runs its `0x41b490` gate.
-        authConnection_->SetState(mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive);
-    }
-    return ContinueRecordedAuthConnectStatusScaffold();
-}
-
 // UNANCHORED: source-owned builder for the auth endpoint mirror rooted at owner `+0x5c`.
 void CLTLoginMediator::BuildAuthEndpoint() {
     // Placeholder only.
