@@ -418,7 +418,8 @@ static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldDescri
 static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, slotRecordAccessor70) == 0x70u);
 static_assert(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch) == 0x8cu);
 
-struct AuthBootstrap680Child {
+class AuthBootstrap680Child {
+public:
     // Current best source-owned class boundary for the separate phase-2 auth/bootstrap child
     // allocated by:
     // - launcher.exe:0x41b160 = owner init path
