@@ -94,7 +94,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
     // - post event `0x0e`
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     cachedUpstreamOrArg_ = nullptr;
-    mediator->MutableMarginRouteState().currentWorldId = -1;
+    mediator->marginRouteState_.currentWorldId = -1;
     const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
     mediator->PostEvent(0x0eu);
     spdlog::info(
@@ -154,10 +154,10 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 
         default: {
             // Current source-owned mirror for the default branch's owner `+0x104` dword remains
-            // `CurrentMarginRouteState().currentWorldId`; keep the field meaning provisional and
+            // `marginRouteState_.currentWorldId`; keep the field meaning provisional and
             // only preserve the original `!= -1 -> owner vtable +0xfc -> if non-null call 0x41e500`
             // structure here.
-            const int32_t field104Value = mediator->CurrentMarginRouteState().currentWorldId;
+            const int32_t field104Value = mediator->marginRouteState_.currentWorldId;
             if (field104Value == -1) {
                 return 0u;
             }

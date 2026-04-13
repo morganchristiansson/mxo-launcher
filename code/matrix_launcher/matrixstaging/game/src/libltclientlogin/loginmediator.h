@@ -22,6 +22,12 @@ class LoginObserverTreeHelper674;
 namespace mxo {
 namespace ltlogin {
 
+// Forward declaration for helper function - actual definition in loginmediator_auth_entry.cpp
+void AssignOwnedSmallStringForAuthEntry(
+    AuthBootstrapSelectedSource38Sketch& dest,
+    const char* begin,
+    const char* current);
+
 class CLTLoginState;
 class CLTLoginState_State10;
 class CLTLoginState_AuthenticatePending;
@@ -1020,8 +1026,6 @@ public:
 
     void SetMarginRouteHostPrefix(const char* routeHostPrefix);
     void SetExactMarginHostName(const char* exactMarginHostName);
-    const MarginRouteState& CurrentMarginRouteState() const;
-    MarginRouteState& MutableMarginRouteState() { return marginRouteState_; }
     uint32_t MarginConnectAttemptCountScaffold() const { return marginBeginCount24_; }
     uint32_t MarginConnectCandidateCountScaffold() const { return static_cast<uint32_t>(marginAddressList3c_.Count()); }
     void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }

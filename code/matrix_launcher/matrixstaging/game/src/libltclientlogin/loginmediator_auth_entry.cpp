@@ -20,12 +20,11 @@
 #include <cstdlib>
 
 namespace mxo::ltlogin {
-namespace {
 
 // Keep the early auth-entry split self-contained so loginmediator.cpp no longer needs the
 // auth-credential logging helper just for state1/connect-status bringup.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-static void AssignOwnedSmallStringForAuthEntry(
+void AssignOwnedSmallStringForAuthEntry(
     AuthBootstrapSelectedSource38Sketch& dest,
     const char* begin,
     const char* current) {
@@ -41,8 +40,6 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.current = dest.string60.begin + dest.string60Owned.size();
     dest.string60.capacity = dest.string60.current;
 }
-
-}  // namespace
 
 CLTLoginMediator::ConnectionHelperFamily g_LoginHelperDispatchTableScaffold = {};
 
@@ -240,12 +237,6 @@ void CLTLoginMediator::SetExactMarginHostName(const char* exactMarginHostName) {
         BuildMarginEndpoint();
     }
 }
-
-// UNANCHORED: source-owned accessor for the reconstructed margin route-state mirror.
-const CLTLoginMediator::MarginRouteState& CLTLoginMediator::CurrentMarginRouteState() const {
-    return marginRouteState_;
-}
-
 
 // anchor: launcher.exe:0x41b490
 bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
