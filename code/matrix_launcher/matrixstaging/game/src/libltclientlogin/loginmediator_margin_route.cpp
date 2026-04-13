@@ -209,7 +209,7 @@ const SlotRecordState_0x4b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
 }
 
 // anchor: launcher.exe:0x41b220
-// Original body calls currentState_->GetStateId(), checks result > 2, then accesses field
+// Original body: calls GetStateId(), checks result > 2, directly indexes slotRecordTable04[slotIndex], returns *(char**)(ptr + 0x14)
 const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const {
     if (!currentState_) {
         return nullptr;
@@ -221,7 +221,7 @@ const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotInde
     if (slotIndex >= 100u) {
         return nullptr;
     }
-    const SlotRecordState_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
+    const SlotRecordState_0x4b5328* record = &selectionRouteState684_.slotRecordTable04_[slotIndex];
     if (!record) {
         return nullptr;
     }
