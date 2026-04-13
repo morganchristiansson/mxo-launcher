@@ -582,20 +582,13 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
         return nullptr;
     }
 
-    arg6SelectionDescriptor40Payload_ = {};
     arg6SelectionDescriptor40_ = {};
-    // Current tight static read from `client.dll:0x62195ff0`:
-    // - the profile-path builder pushes payload dword `+0x03` into the `%X` suffix slot for
-    //   `"Profiles\\%s\\%s_%X\\"`
-    // - the middle `%s` comes from client global `DAT_629de48c`, not from this descriptor payload
-    // - keep this wrapper payload sourced from the real owner-side current-slot record id pair
-    arg6SelectionDescriptor40Payload_.characterIdLow03 = currentSlotRecord->globalCharacterIdLow03;
-    arg6SelectionDescriptor40Payload_.characterIdHigh07 = currentSlotRecord->globalCharacterIdHigh07;
+    // Set payload10 to point to currentSlotRecord's fields directly
+    // The client accesses fields at offset +0x03/+0x07 relative to this pointer
     arg6SelectionDescriptor40_.vtable = Arg6CurrentSlotRecord44Vtable();
-    arg6SelectionDescriptor40_.bufferBase04 = &arg6SelectionDescriptor40Payload_;
-    arg6SelectionDescriptor40_.backingObject08 = nullptr;
+    arg6SelectionDescriptor40_.payload10 = reinterpret_cast<Arg6CurrentSlotRecord44PayloadSketch*>(
+        const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord));
     arg6SelectionDescriptor40_.flag0c = 1u;
-    arg6SelectionDescriptor40_.payload10 = &arg6SelectionDescriptor40Payload_;
 
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
@@ -610,8 +603,8 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
         static_cast<unsigned>(currentSlotIndex),
         currentSlotRecord->heapString14.empty() ? "<empty>" : currentSlotRecord->heapString14.c_str(),
         fmt::ptr(arg6SelectionDescriptor40_.vtable),
-        static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdLow03),
-        static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdHigh07));
+        static_cast<unsigned>(currentSlotRecord->globalCharacterIdLow03),
+        static_cast<unsigned>(currentSlotRecord->globalCharacterIdHigh07));
     return &arg6SelectionDescriptor40_;
 }
 
