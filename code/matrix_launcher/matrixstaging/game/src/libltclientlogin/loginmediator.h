@@ -1319,8 +1319,7 @@ public:
     //   route strings + current-slot byte `+0xcc8` + snapshot body `+0xcd0..+0xd7f`
     // - replacement now models that ownership island as the nested
     //   `CLTLoginMediatorSelectionRouteState` class and keeps the anchored method boundaries there
-    void ResetSelectionRouteState684Scaffold();
-    void DestroySelectionRouteState684Scaffold();
+
     void SetCurrentCharacterRouteIndexCc8Scaffold(uint8_t slotIndex);
 
     // =============================================================================

@@ -109,7 +109,7 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         ++mediator->worldDescriptorCountD80_;
     }
 
-    mediator->ResetSelectionRouteState684Scaffold();
+    mediator->selectionRouteState684_.ResetSelectionRouteState();
 
     const size_t characterCount = std::min(
         mediator->selectionRouteState684_.slotRecordTable04_.size(),

@@ -293,25 +293,11 @@ CLTLoginMediator::CLTLoginMediator()
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::~CLTLoginMediator() {
-    DestroySelectionRouteState684Scaffold();
+    selectionRouteState684_.DestroySelectionRouteState();
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
     ClearObserverTree674();
     EraseMarginBootstrapState(this);
-}
-
-// anchor: launcher.exe:0x41d270 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::ResetSelectionRouteState
-void CLTLoginMediator::ResetSelectionRouteState684Scaffold() {
-    selectionRouteState684_.ResetSelectionRouteState();
-    postAuthMarginLoadingState_.characterRouteIndexCc8 = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
-    marginRouteState_.currentCharacterOrRouteIndex = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
-}
-
-// anchor: launcher.exe:0x41dd00 / embedded CLTLoginMediatorSelectionRouteState_0x41dba0::DestroySelectionRouteState
-void CLTLoginMediator::DestroySelectionRouteState684Scaffold() {
-    selectionRouteState684_.DestroySelectionRouteState();
-    postAuthMarginLoadingState_.characterRouteIndexCc8 = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
-    marginRouteState_.currentCharacterOrRouteIndex = selectionRouteState684_.CurrentSlotOrSelectionIndex644();
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -424,7 +410,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
 // UNANCHORED: earlier `0x41f060` anchor was stale; current static RE now assigns that VA to the
 // nopatch launcher-version setter instead.
 void CLTLoginMediator::ClearEngine() {
-    ResetSelectionRouteState684Scaffold();
+    selectionRouteState684_.ResetSelectionRouteState();
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
     sessionCallbackHelper65c_ = nullptr;
