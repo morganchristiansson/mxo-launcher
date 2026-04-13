@@ -18,6 +18,8 @@ class FeedbackSizeTransformAdapterSmall;
 
 namespace mxo::ltlogin {
 
+struct AuthBootstrap680ReplyAuthDataValidatorACSketch;
+
 class CLTLoginMediator;
 struct AuthBootstrap680RsaPublicKeyPairOwnedState;
 
@@ -50,7 +52,7 @@ public:
     // anchor: launcher.exe:0x44add0
     bool IsFresh(int timeBias) const;
     // anchor: launcher.exe:0x44aec0
-    uint32_t VerifyWithValidator(void* validator, int timeBias) const;
+    uint32_t VerifyWithValidator(AuthBootstrap680ReplyAuthDataValidatorACSketch* validator, const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair, int timeBias) const;
 };
 
 struct AuthBootstrap680BigIntObjects_0x4ba50c {

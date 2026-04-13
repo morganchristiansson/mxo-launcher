@@ -1588,7 +1588,8 @@ uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(
                 MutableAuthBootstrap680ChildOwnedState(&child);
             const bool replyAuthDataValidatorAccepted =
                 copyShadowCandidate.VerifyWithValidator(
-                    &ownedState.replyAuthDataValidatorAC,
+                    ownedState.replyAuthDataValidatorAC.object.get(),
+                    ownedState.replyAuthDataValidatorAC.publicKeyPair0c,
                     child.authServerTimeBias80);
             if (!replyAuthDataValidatorAccepted) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
@@ -1638,22 +1639,35 @@ bool AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(int timeBias) const {
 }
 
 // anchor: launcher.exe:0x44aec0
-// Full fidelity implementation delegates to the existing scaffold
-// which handles time bias calculation, MD5 digest building, and signature verification
-uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(void* validator, int timeBias) const {
-    // TODO: Implement full verification matching Ghidra static-RE
-    // Current: just check expiry, full logic in VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold
-    // Ghidra calls: AuthBootstrapReplyCopyShadowF4_BuildSignedDataMd5Digest10(this, md5Digest)
-    //              validator->vtable+0x2c(md5Digest, 0x10, this, 0x80)
-    const time_t now = time(nullptr);
-    const uint32_t expiry = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(this) + 0xac);
-    const uint32_t currentAuthServerTime = (now > static_cast<time_t>(timeBias))
-        ? static_cast<uint32_t>(now - static_cast<time_t>(timeBias))
-        : 0u;
-    if (currentAuthServerTime >= expiry) {
+// Full fidelity: builds MD5 of signedData80 and delegates to validator
+uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
+    AuthBootstrap680ReplyAuthDataValidatorACSketch* validator,
+    const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair,
+    int timeBias) const {
+    // Calculate current auth server time
+    const std::time_t now = std::time(nullptr);
+    const uint32_t currentAuthServerTime =
+        (now > static_cast<std::time_t>(timeBias))
+            ? static_cast<uint32_t>(now - static_cast<std::time_t>(timeBias))
+            : 0u;
+    
+    // Read expiry from signedData80 + 0x2c (= +0xac in class)
+    const uint32_t expiryTimeAc = *reinterpret_cast<const uint32_t*>(signedData80.data() + 0x2c);
+    if (currentAuthServerTime >= expiryTimeAc) {
         return 0;
     }
-    return 1;
+    
+    // Build MD5 over signed data (0xb6 bytes from +0x80)
+    std::array<uint8_t, 16> md5Digest10{};
+    BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold(*this, &md5Digest10);
+    
+    // Call validator verify with public key pair
+    return validator->VerifySignatureRecoveredFinalizeScaffold(
+        publicKeyPair,
+        md5Digest10.data(),
+        md5Digest10.size(),
+        authSignature00.data(),
+        authSignature00.size());
 }
 
 // anchor: launcher.exe:0x447eb0
