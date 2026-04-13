@@ -115,7 +115,6 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
 // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)
 uint32_t CLTLoginState_State5::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     return 0;
 }
 
