@@ -275,6 +275,50 @@ struct ProcessLoginRequestInputSketch {
     uint8_t flag6C = 0;                          // input `+0x6c`
 };
 
+// anchor: launcher.exe:0x41eb80
+// Owner-side auth/bootstrap source block at owner +0x94.
+// Has a method CopyFromSubmitLoginRequestInput that copies from the input to this block.
+// Also has a separate session token string at +0xf4 (block offset +0x60).
+class OwnerAuthBootstrapSource94Class {
+public:
+    // Same layout as AuthBootstrapSelectedSource38Sketch
+    std::array<char, 0x20> username00{};    // +0x00
+    std::array<char, 0x20> password20{};     // +0x20
+    std::array<uint8_t, 16> keyConfigMd540{}; // +0x40
+    std::array<uint8_t, 16> uiConfigMd550{};  // +0x50
+    // +0x60: session token string (SmallStringLike60Sketch - 12 bytes)
+    struct SmallString60 {
+        const char* begin = nullptr;
+        const char* current = nullptr;
+        const char* capacity = nullptr;
+    } sessionToken60;
+    uint8_t flag6C = 0;                     // +0x6c
+    // Total block size: 0x70 bytes (112 bytes)
+
+    // Note: there's also a separate session token string at +0xf4 in the parent object
+    // (owner +0x94 + 0x60 = owner +0xf4), cleared by the +0x30 path.
+
+    // anchor: launcher.exe:0x41eb80
+    // Copies from ProcessLoginRequestInputSketch to this block.
+    // Uses delta-based byte copy matching the static-RE implementation.
+    void CopyFromSubmitLoginRequestInput(const ProcessLoginRequestInputSketch& input) {
+        // Copy username (32 bytes)
+        std::copy_n(input.inlineString00.begin(), 0x20, username00.begin());
+        // Copy password (32 bytes)
+        std::copy_n(input.inlineString20.begin(), 0x20, password20.begin());
+        // Copy keyConfigMd5 block (16 bytes)
+        std::copy_n(input.block40.begin(), 0x10, keyConfigMd540.begin());
+        // Copy uiConfigMd5 block (16 bytes)
+        std::copy_n(input.block50.begin(), 0x10, uiConfigMd550.begin());
+        // Copy session token string
+        sessionToken60.begin = input.string60.begin;
+        sessionToken60.current = input.string60.current;
+        sessionToken60.capacity = input.string60.capacity;
+        // Copy flag
+        flag6C = input.flag6C;
+    }
+};
+
 // launcher.exe owner object `0x4f78b8` - active login / margin / load-character state.
 // Keep only the source-owned field sketches needed by current code here; deeper evidence lives
 // in the canonical docs.

@@ -1641,6 +1641,12 @@ public:
     const void* arg6CreateCharacterInput120_ = nullptr; // wrapper-facing `+0x120` last raw input pointer
     uint32_t arg6CreateCharacterInputCount120_ = 0u;     // wrapper-facing `+0x120` call count
     uint32_t ownerOptionalField90_ = 0;                  // owner `+0x90`, only forwarded when helper byte `+4 != 0`
+    // launcher.exe:0x41f0a0 / owner vtable +0x38: returns pointer to this block at +0x94
+    // anchor: launcher.exe:0x41eb80 copies from submit input into this block
+    // Layout: +0x00=username[32], +0x20=password[32], +0x40=keyConfigMd5[16], +0x50=uiConfigMd5[16],
+    //         +0x60=sessionTokenString, +0x6c=flag6c. Total 112 bytes (0x70).
+    // Note: there's also a separate session token string at +0xf4 (+0x94 + 0x60) cleared by +0x30 path.
+    OwnerAuthBootstrapSource94Class ownerAuthBootstrapSource94_{};
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper/class
     // (`CLTLoginMediatorSelectionRouteState_0x41dba0` in current Ghidra).

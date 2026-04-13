@@ -504,6 +504,9 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     authBootstrapSource38_.flag6C = input.flag6C;
     AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, input.string60.begin, input.string60.current);
 
+    // Fidelity: populate owner+0x94 block using CopyFromSubmitLoginRequestInput method
+    ownerAuthBootstrapSource94_.CopyFromSubmitLoginRequestInput(input);
+
     spdlog::info(
         "CLTLoginMediator::ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} currentState={} stateCode={} launchPadGateState16State18AltPath={} helper65cPresent={} submitOwnership=owner",
         authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
@@ -640,16 +643,16 @@ void CLTLoginMediator::RequestAuthCloseAndSwitchToState0() {
 }
 
 // anchor: launcher.exe:0x41f0a0 / owner vtable +0x38
-// Static-RE shows: `return &this->ownerAuthBootstrapSource94` (ptr to inline dword at +0x94)
-// Our implementation sources from authBootstrapSource38_.inlineString00 which is a more directly
-// accessible C++ field - both contain the profile/username string from login submission.
+// Static-RE: `return &this->ownerAuthBootstrapSource94` (returns pointer to inline struct at +0x94)
+// The inline struct's first 4 bytes (the username string pointer) is what callers read.
 const char* CLTLoginMediator::GetProfileRootName() const {
-    const char* profileRootName = authBootstrapSource38_.inlineString00.data();
+    // Fidelity: read from the owner+0x94 block as per static-RE
+    const char* profileRootName = ownerAuthBootstrapSource94_.username00.data();
     const char* normalizedProfileRootName = NonEmptyTextOrPlaceholder(profileRootName);
     if (g_LastLoggedProfileRootName38 != normalizedProfileRootName) {
         g_LastLoggedProfileRootName38 = normalizedProfileRootName;
         spdlog::debug(
-            "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}' [source=owner+0x94.inlineString00]",
+            "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}' [source=owner+0x94.username00]",
             normalizedProfileRootName);
     }
     return profileRootName;
