@@ -640,6 +640,9 @@ void CLTLoginMediator::RequestAuthCloseAndSwitchToState0() {
 }
 
 // anchor: launcher.exe:0x41f0a0 / owner vtable +0x38
+// Static-RE shows: `return &this->ownerAuthBootstrapSource94` (ptr to inline dword at +0x94)
+// Our implementation sources from authBootstrapSource38_.inlineString00 which is a more directly
+// accessible C++ field - both contain the profile/username string from login submission.
 const char* CLTLoginMediator::GetProfileRootName() const {
     const char* profileRootName = authBootstrapSource38_.inlineString00.data();
     const char* normalizedProfileRootName = NonEmptyTextOrPlaceholder(profileRootName);
