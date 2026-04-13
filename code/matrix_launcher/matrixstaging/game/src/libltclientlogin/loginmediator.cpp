@@ -586,8 +586,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
     // Set payload10 to point to currentSlotRecord's fields directly
     // The client accesses fields at offset +0x03/+0x07 relative to this pointer
     arg6SelectionDescriptor40_.vtable = Arg6CurrentSlotRecord44Vtable();
-    arg6SelectionDescriptor40_.payload10 = reinterpret_cast<Arg6CurrentSlotRecord44PayloadSketch*>(
-        const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord));
+    arg6SelectionDescriptor40_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
     arg6SelectionDescriptor40_.flag0c = 1u;
 
     const char* matchMode =
@@ -631,8 +630,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
     // Set payload10 to point to currentSlotRecord's fields directly
     // The client accesses fields at offset +0x03/+0x07/+0x0b/+0x0c relative to this pointer
     arg6CurrentSlotRecord44_.vtable = Arg6CurrentSlotRecord44Vtable();
-    arg6CurrentSlotRecord44_.payload10 = reinterpret_cast<Arg6CurrentSlotRecord44PayloadSketch*>(
-        const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord));
+    arg6CurrentSlotRecord44_.payload10 = const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord);
     arg6CurrentSlotRecord44_.flag0c = 1u;
     arg6CurrentSlotRecord44NameOwned_ = currentSlotRecord->heapString14;
 
