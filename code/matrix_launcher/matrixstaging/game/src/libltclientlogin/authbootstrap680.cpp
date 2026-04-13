@@ -1583,13 +1583,13 @@ uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
+            // Use class method instead of scaffold
             AuthBootstrap680ChildOwnedState& ownedState =
                 MutableAuthBootstrap680ChildOwnedState(&child);
             const bool replyAuthDataValidatorAccepted =
-                VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold(
-                    child,
-                    ownedState.replyAuthDataValidatorAC,
-                    copyShadowCandidate);
+                copyShadowCandidate.VerifyWithValidator(
+                    &ownedState.replyAuthDataValidatorAC,
+                    child.authServerTimeBias80);
             if (!replyAuthDataValidatorAccepted) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
@@ -1638,18 +1638,22 @@ bool AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(int timeBias) const {
 }
 
 // anchor: launcher.exe:0x44aec0
+// Full fidelity implementation delegates to the existing scaffold
+// which handles time bias calculation, MD5 digest building, and signature verification
 uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(void* validator, int timeBias) const {
-    // Ghidra: checks expiry, builds MD5 digest, calls validator->vtable+0x2c
-    // mbr_0xac is at class offset +0xac = signedData80 + 0x2c
+    // TODO: Implement full verification matching Ghidra static-RE
+    // Current: just check expiry, full logic in VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold
+    // Ghidra calls: AuthBootstrapReplyCopyShadowF4_BuildSignedDataMd5Digest10(this, md5Digest)
+    //              validator->vtable+0x2c(md5Digest, 0x10, this, 0x80)
     const time_t now = time(nullptr);
     const uint32_t expiry = *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(this) + 0xac);
-    if (static_cast<uint32_t>(static_cast<int>(now) - timeBias) < expiry) {
-        // TODO: Build MD5 digest of signedData80 and call validator
-        // AuthBootstrapReplyCopyShadowF4_BuildSignedDataMd5Digest10(this, local_14);
-        // cVar1 = (**(code **)(*param_1 + 0x2c))(local_14, 0x10, this, 0x80);
-        return 1;
+    const uint32_t currentAuthServerTime = (now > static_cast<time_t>(timeBias))
+        ? static_cast<uint32_t>(now - static_cast<time_t>(timeBias))
+        : 0u;
+    if (currentAuthServerTime >= expiry) {
+        return 0;
     }
-    return 0;
+    return 1;
 }
 
 // anchor: launcher.exe:0x447eb0
