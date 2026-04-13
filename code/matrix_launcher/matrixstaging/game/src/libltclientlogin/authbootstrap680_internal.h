@@ -59,7 +59,7 @@ public:
 };
 static_assert(sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0) == 0x136u, "reply copy shadow must be 310 bytes");
 
-struct AuthBootstrap680BigIntObject20Scaffold {
+struct AuthBootstrap680BigIntObjects_0x4ba50c {
     // Exact `0x14`-byte big-int object family initialized by `0x45d000` and copied by `0x45de10`.
     // Current field certainty:
     // - `+0x00` = vtable `0x004ba50c`
@@ -73,7 +73,7 @@ struct AuthBootstrap680BigIntObject20Scaffold {
     void* digits0c = nullptr;
     uint32_t sign10 = 0u;
 };
-static_assert(sizeof(AuthBootstrap680BigIntObject20Scaffold) == 0x14u);
+static_assert(sizeof(AuthBootstrap680BigIntObjects_0x4ba50c) == 0x14u);
 
 struct AuthBootstrap680RsaPublicKeyPairSubobject0cSketch {
     // Common `0x40`-byte subobject constructed at worker `+0x0c` by `0x4420f0` inside both the
@@ -89,8 +89,8 @@ struct AuthBootstrap680RsaPublicKeyPairSubobject0cSketch {
     //   the embedded modulus object through this subobject `+0x08`
     uint32_t vtable00 = 0u;
     uint32_t helperVtable04 = 0u;
-    AuthBootstrap680BigIntObject20Scaffold modulus08{};
-    AuthBootstrap680BigIntObject20Scaffold exponent1c{};
+    AuthBootstrap680BigIntObjects_0x4ba50c modulus08{};
+    AuthBootstrap680BigIntObjects_0x4ba50c exponent1c{};
     uint32_t helperThunk30 = 0u;
     uint32_t helperThunk34 = 0u;
     uint32_t helperThunk38 = 0u;
@@ -240,8 +240,8 @@ struct AuthBootstrap680ValidatorTemporaryWorker84Sketch {
     uint32_t reserved28 = 0u;
     uint32_t reserved2c = 0u;
     uint32_t reserved30 = 0u;
-    AuthBootstrap680BigIntObject20Scaffold bigInt34{};
-    AuthBootstrap680BigIntObject20Scaffold bigInt48{};
+    AuthBootstrap680BigIntObjects_0x4ba50c bigInt34{};
+    AuthBootstrap680BigIntObjects_0x4ba50c bigInt48{};
     uint8_t readyOrEmptyUpdateFlag5c = 0u;
     std::array<uint8_t, 3> padding5d{};
     std::array<uint8_t, 0x24> md5Accumulator60{};
@@ -482,9 +482,9 @@ public:
     // - `+0xb0` <- modulus bytes from copied `+0xf4 + 0xd2 .. + 0x131`
     // - `+0xc4` <- low public-exponent byte from copied `+0xf4 + 0xd1`
     // - `+0xd8` <- derived 96-byte private-exponent/transform output used by the same prep path
-    AuthBootstrap680BigIntObject20Scaffold modulusBigIntB0{};        // original child `+0xb0`
-    AuthBootstrap680BigIntObject20Scaffold publicExponentBigIntC4{}; // original child `+0xc4`
-    AuthBootstrap680BigIntObject20Scaffold privateExponentBigIntD8{}; // original child `+0xd8`
+    AuthBootstrap680BigIntObjects_0x4ba50c modulusBigIntB0{};        // original child `+0xb0`
+    AuthBootstrap680BigIntObjects_0x4ba50c publicExponentBigIntC4{}; // original child `+0xc4`
+    AuthBootstrap680BigIntObjects_0x4ba50c privateExponentBigIntD8{}; // original child `+0xd8`
 
     uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
     AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it

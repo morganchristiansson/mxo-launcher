@@ -298,7 +298,7 @@ static uint32_t RoundAuthBootstrap680BigIntCapacityWords(size_t requiredWordCoun
 }
 
 static void ResetAuthBootstrap680BigIntObject(
-    AuthBootstrap680BigIntObject20Scaffold* outObject,
+    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
     std::vector<uint32_t>* ownedDigits) {
     if (!outObject || !ownedDigits) {
         return;
@@ -313,12 +313,12 @@ static void ResetAuthBootstrap680BigIntObject(
 }
 
 static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-    AuthBootstrap680BigIntObject20Scaffold* outObject,
+    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
     std::vector<uint32_t>* ownedDigits,
     const uint8_t* bigEndianBytes,
     size_t byteCount);
 static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
-    AuthBootstrap680BigIntObject20Scaffold* outObject,
+    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
     std::vector<uint32_t>* ownedDigits,
     uint8_t value);
 
@@ -763,12 +763,12 @@ static void ResetAuthBootstrap680ReplyMaterialization(
 }
 
 static const uint8_t* AuthBootstrap680BigIntObjectBytes(
-    const AuthBootstrap680BigIntObject20Scaffold& object) {
+    const AuthBootstrap680BigIntObjects_0x4ba50c& object) {
     return reinterpret_cast<const uint8_t*>(&object);
 }
 
 static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
-    AuthBootstrap680BigIntObject20Scaffold* outObject,
+    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
     std::vector<uint32_t>* ownedDigits,
     const uint8_t* bigEndianBytes,
     size_t byteCount) {
@@ -795,7 +795,7 @@ static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
 }
 
 static bool BuildPositiveAuthBootstrap680BigIntFromUnsignedByte(
-    AuthBootstrap680BigIntObject20Scaffold* outObject,
+    AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
     std::vector<uint32_t>* ownedDigits,
     uint8_t value) {
     if (!outObject || !ownedDigits) {
@@ -2183,9 +2183,9 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
 
     child.authReplyCopyShadowF4 = ownedState.authReplyCopyShadowF4.get();
 
-    AuthBootstrap680BigIntObject20Scaffold* blockB0 = &child.modulusBigIntB0;
-    AuthBootstrap680BigIntObject20Scaffold* blockC4 = &child.publicExponentBigIntC4;
-    AuthBootstrap680BigIntObject20Scaffold* blockD8 = &child.privateExponentBigIntD8;
+    AuthBootstrap680BigIntObjects_0x4ba50c* blockB0 = &child.modulusBigIntB0;
+    AuthBootstrap680BigIntObjects_0x4ba50c* blockC4 = &child.publicExponentBigIntC4;
+    AuthBootstrap680BigIntObjects_0x4ba50c* blockD8 = &child.privateExponentBigIntD8;
 
     const bool builtBlockB0 = BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
         blockB0,
