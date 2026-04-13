@@ -1636,7 +1636,6 @@ private:
     // - `+0x118` = owner `+0x1470` vector-like late-entry list of 12-byte string-triple entries
     Arg6CurrentSlotRecord44PayloadSketch arg6SelectionDescriptor40Payload_{};
     Arg6CurrentSlotRecord44ObjectSketch arg6SelectionDescriptor40_{};
-    Arg6CurrentSlotRecord44PayloadSketch arg6CurrentSlotRecord44Payload_{};
     Arg6CurrentSlotRecord44ObjectSketch arg6CurrentSlotRecord44_{};
     std::string arg6CurrentSlotRecord44NameOwned_;
     RouteDescriptor30SmallStringLikeSketch state8Section11String1460_{};

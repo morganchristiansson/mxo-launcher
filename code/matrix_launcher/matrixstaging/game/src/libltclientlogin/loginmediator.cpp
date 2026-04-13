@@ -625,7 +625,6 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
 Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordObject44() {
     const SlotRecordState_0x4b5328* const currentSlotRecord = this->GetCurrentSlotRecord();
 
-    arg6CurrentSlotRecord44Payload_ = {};
     arg6CurrentSlotRecord44_ = {};
     arg6CurrentSlotRecord44NameOwned_.clear();
 
@@ -636,13 +635,12 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
         return nullptr;
     }
 
+    // Set payload10 to point to currentSlotRecord's fields directly
+    // The client accesses fields at offset +0x03/+0x07/+0x0b/+0x0c relative to this pointer
     arg6CurrentSlotRecord44_.vtable = Arg6CurrentSlotRecord44Vtable();
-    arg6CurrentSlotRecord44_.payload10 = &arg6CurrentSlotRecord44Payload_;
+    arg6CurrentSlotRecord44_.payload10 = reinterpret_cast<Arg6CurrentSlotRecord44PayloadSketch*>(
+        const_cast<SlotRecordState_0x4b5328*>(currentSlotRecord));
     arg6CurrentSlotRecord44_.flag0c = 1u;
-    arg6CurrentSlotRecord44Payload_.characterIdLow03 = currentSlotRecord->globalCharacterIdLow03;
-    arg6CurrentSlotRecord44Payload_.characterIdHigh07 = currentSlotRecord->globalCharacterIdHigh07;
-    arg6CurrentSlotRecord44Payload_.status0b = currentSlotRecord->status0b;
-    arg6CurrentSlotRecord44Payload_.worldId0c = currentSlotRecord->worldId0c;
     arg6CurrentSlotRecord44NameOwned_ = currentSlotRecord->heapString14;
 
     if (!arg6CurrentSlotRecord44NameOwned_.empty()) {
@@ -656,10 +654,10 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
         "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
         fmt::ptr(&arg6CurrentSlotRecord44_),
         arg6CurrentSlotRecord44_.heapString14 ? arg6CurrentSlotRecord44_.heapString14 : "<empty>",
-        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.characterIdLow03),
-        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.characterIdHigh07),
-        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.status0b),
-        static_cast<unsigned>(arg6CurrentSlotRecord44Payload_.worldId0c));
+        static_cast<unsigned>(currentSlotRecord->globalCharacterIdLow03),
+        static_cast<unsigned>(currentSlotRecord->globalCharacterIdHigh07),
+        static_cast<unsigned>(currentSlotRecord->status0b),
+        static_cast<unsigned>(currentSlotRecord->worldId0c));
     return &arg6CurrentSlotRecord44_;
 }
 
