@@ -1099,38 +1099,6 @@ static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorSca
         reply.signatureBytes.size());
 }
 
-// anchor: launcher.exe:0x44aec0 / 0x44add0
-static bool VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold(
-    const AuthBootstrap680Child& child,
-    const AuthBootstrap680ReplyAuthDataValidatorOwnedState& validatorOwnedState,
-    const AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow) {
-    const std::time_t now = std::time(nullptr);
-    const uint32_t currentAuthServerTime =
-        (now > static_cast<std::time_t>(child.authServerTimeBias80))
-            ? static_cast<uint32_t>(now - static_cast<std::time_t>(child.authServerTimeBias80))
-            : 0u;
-    const uint32_t expiryTimeAc = ReadU32LE(copyShadow.signedData80.data() + 0x2cu);
-    if (currentAuthServerTime >= expiryTimeAc) {
-        return false;
-    }
-
-    // `0x44ae40/0x44aec0` now closes the caller-side bytes tightly too:
-    // - build MD5 over copied signed-data `this+0x80 .. +0x135` (`0xb6` bytes)
-    // - then call validator vtable `+0x2c(md5Digest10, 0x10, this, 0x80)`
-    // Combined with the recovered finalize path, source now mirrors this exactly as a second MD5
-    // stage inside the worker before the EMSA-PKCS1-v1_5(MD5) compare. Current live runs now pass
-    // this source-side validator path too, so the copied `0xb6`-byte span and `0x80`-byte
-    // signature slice are now enforced instead of bypassed.
-    std::array<uint8_t, 16> md5Digest10{};
-    BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold(copyShadow, &md5Digest10);
-    return child.replyAuthDataValidatorAC->VerifySignatureRecoveredFinalizeScaffold(
-        validatorOwnedState.publicKeyPair0c,
-        md5Digest10.data(),
-        md5Digest10.size(),
-        copyShadow.authSignature00.data(),
-        copyShadow.authSignature00.size());
-}
-
 static void ClearSmallStringMirror(AuthBootstrap680SmallStringMirror& mirror) {
     mirror.owned.clear();
     mirror.begin = nullptr;
@@ -1638,6 +1606,17 @@ bool AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(int timeBias) const {
     return static_cast<bool>('\x01' - (static_cast<uint32_t>(static_cast<int>(now) - timeBias) < expiry));
 }
 
+// anchor: launcher.exe:0x44ae40
+void AuthBootstrapReplyCopyShadowF4_0x44add0::BuildSignedDataMd5Digest(std::array<uint8_t, 16>* outDigest) const {
+    if (!outDigest) {
+        return;
+    }
+    // Uses same logic as BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold
+    CryptoPP::Weak::MD5 md5;
+    md5.Update(signedData80.data(), signedData80.size());
+    md5.Final(outDigest->data());
+}
+
 // anchor: launcher.exe:0x44aec0
 // Full fidelity: builds MD5 of signedData80 and delegates to validator
 uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
@@ -1659,7 +1638,7 @@ uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(
     
     // Build MD5 over signed data (0xb6 bytes from +0x80)
     std::array<uint8_t, 16> md5Digest10{};
-    BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold(*this, &md5Digest10);
+    BuildSignedDataMd5Digest(&md5Digest10);
     
     // Call validator verify with public key pair
     return validator->VerifySignatureRecoveredFinalizeScaffold(

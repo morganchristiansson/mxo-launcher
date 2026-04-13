@@ -49,10 +49,16 @@ public:
     std::array<uint8_t, 0x80> authSignature00{};
     std::array<uint8_t, 0xb6> signedData80{};
 
+    // anchor: launcher.exe:0x44ae40
+    void BuildSignedDataMd5Digest(std::array<uint8_t, 16>* outDigest) const;
+
     // anchor: launcher.exe:0x44add0
     bool IsFresh(int timeBias) const;
     // anchor: launcher.exe:0x44aec0
-    uint32_t VerifyWithValidator(AuthBootstrap680ReplyAuthDataValidatorACSketch* validator, const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair, int timeBias) const;
+    uint32_t VerifyWithValidator(
+        AuthBootstrap680ReplyAuthDataValidatorACSketch* validator,
+        const AuthBootstrap680RsaPublicKeyPairOwnedState& publicKeyPair,
+        int timeBias) const;
 };
 
 struct AuthBootstrap680BigIntObjects_0x4ba50c {
