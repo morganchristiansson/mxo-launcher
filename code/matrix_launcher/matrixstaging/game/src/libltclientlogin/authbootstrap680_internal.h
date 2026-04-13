@@ -486,7 +486,7 @@ public:
 
     uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
     AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
-    void* authReplyCopyShadowF4 = nullptr;       // original child `+0xf4`; reply-derived copied `0x136` block used later by `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`
+    AuthBootstrapReplyCopyShadowF4Sketch* authReplyCopyShadowF4 = nullptr; // original child `+0xf4`; reply-derived copied `0x136` block used later by `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`
     AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8 .. +0x100`; `0x441330` writes the prompt-password small-string neighboring the `+0xf0` auth-reply parse/copy family, and owner vtable `+0x60 / 0x41f3c0` later surfaces its begin pointer
     uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; sibling `0x441330` SecurID-tail flag surfaced by owner vtable `+0x58 / 0x41f390`
     std::array<uint8_t, 3> padding105{};         // original child `+0x105 .. +0x107`

@@ -800,16 +800,16 @@ const char* CLTLoginMediator::GetProfileOrSessionName() const {
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 void* CLTLoginMediator::BootstrapRaw08AuxHandle50() const {
-    void* value = authBootstrapChild680_ ? authBootstrapChild680_->BootstrapRaw08AuxHandle50() : nullptr;
-    if (!bootstrapRaw08AuxHandle50Logged_ || lastBootstrapRaw08AuxHandle50_ != value) {
-        spdlog::info(
-            "CLTLoginMediator::BootstrapRaw08AuxHandle50(+0x50) -> {}{}",
-            fmt::ptr(value),
-            bootstrapRaw08AuxHandle50Logged_ ? " [changed]" : " [first]");
-        bootstrapRaw08AuxHandle50Logged_ = true;
-        lastBootstrapRaw08AuxHandle50_ = value;
+    // Fidelity to static-RE: direct access to child->authReplyCopyShadowF4 + 0xa8
+    // No delegation to child method, no logging
+    const auto* copyShadow =
+        authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr;
+    if (copyShadow != nullptr) {
+        // Read dword at offset +0xa8 (signedData80.data() + 0x28 = 0x80 + 0x28)
+        return reinterpret_cast<void*>(
+            *reinterpret_cast<const uint32_t*>(copyShadow->signedData80.data() + 0x28u));
     }
-    return value;
+    return nullptr;
 }
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
