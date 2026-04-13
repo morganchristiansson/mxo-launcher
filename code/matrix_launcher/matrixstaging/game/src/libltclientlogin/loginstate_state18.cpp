@@ -27,8 +27,6 @@ uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
 uint32_t CLTLoginState_State18::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x004208e0");
 }
 
@@ -41,8 +39,6 @@ uint32_t CLTLoginState_State18::Slot7_GetStateId() const {
 uint32_t CLTLoginState_State18::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) {
     (void)param1;
     (void)context;
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x00420960");
 }
 

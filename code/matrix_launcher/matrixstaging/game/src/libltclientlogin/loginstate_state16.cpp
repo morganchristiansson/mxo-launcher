@@ -18,16 +18,12 @@ uint32_t CLTLoginState_State16::Slot3_BeginOrContinue(void* upstreamOrArg) {
     // - keep this placeholder narrow until the non-happy/session branch itself is recovered as a
     //   faithful state-owned body rather than grown ad hoc inside the mediator
     (void)upstreamOrArg;
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x00420720");
 }
 
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bb0 slot 6)
 uint32_t CLTLoginState_State16::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x004208e0");
 }
 
@@ -46,8 +42,6 @@ uint32_t CLTLoginState_State16::Slot8_HandleAuxiliaryEvent(uint32_t param1, void
     //   enters `0x439090 -> 0x41d170` on the auth-connect path
     (void)param1;
     (void)context;
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x004207c0");
 }
 

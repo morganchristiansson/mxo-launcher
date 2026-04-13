@@ -116,7 +116,6 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
 uint32_t CLTLoginState_State5::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    (void)mediator;
     return 0;
 }
 
