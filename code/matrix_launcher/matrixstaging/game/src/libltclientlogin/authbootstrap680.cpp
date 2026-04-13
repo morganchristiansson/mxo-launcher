@@ -1631,9 +1631,8 @@ uint8_t AuthBootstrap680Child::GetCrashReporterPromptForSecurId58() const {
 // anchor: launcher.exe:0x44add0
 bool AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(int timeBias) const {
     // Ghidra: return (bool)('\x01' - ((uint)((int)time(NULL) - param_1) < this->mbr_0xac));
-    // Read expiry time at +0xac and compare with current time - timeBias
     const time_t now = time(nullptr);
-    const uint32_t expiry = expiryTimeAc;
+    const uint32_t expiry = GetExpiryTime();
     return static_cast<bool>('\x01' - (static_cast<uint32_t>(static_cast<int>(now) - timeBias) < expiry));
 }
 
@@ -1641,7 +1640,7 @@ bool AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(int timeBias) const {
 uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(void* validator, int timeBias) const {
     // Ghidra: checks expiry, builds MD5 digest, calls validator->vtable+0x2c
     const time_t now = time(nullptr);
-    const uint32_t expiry = expiryTimeAc;
+    const uint32_t expiry = GetExpiryTime();
     if (static_cast<uint32_t>(static_cast<int>(now) - timeBias) < expiry) {
         // TODO: Build MD5 digest of signedData80 and call validator
         // AuthBootstrapReplyCopyShadowF4_BuildSignedDataMd5Digest10(this, local_14);

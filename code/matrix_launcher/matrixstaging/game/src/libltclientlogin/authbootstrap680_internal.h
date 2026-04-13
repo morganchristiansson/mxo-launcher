@@ -36,27 +36,28 @@ public:
     // Source-owned shadow of the original reply-derived `0x136` heap block copied into child
     // `+0xf4` by `0x448140`.
     //
-    // Unpacked auth block layout:
+    // Unpacked auth block layout (310 bytes / 0x136):
     // - +0x00 .. +0x7f = 128-byte auth-signature span
     // - +0x80 .. +0x135 = signed-data span (0xb6 bytes)
-    // Fields of interest:
-    // - +0x85 = signed-data +0x05
-    // - +0xa8 = signed-data +0x28 (BootstrapRaw08AuxHandle)
-    // - +0xac = signed-data +0x2c (expiry time)  
-    // - +0xd1 = signed-data +0x51 (low public-exponent byte)
-    // - +0xd2 .. +0x131 = signed-data +0x52 .. +0xb1 (modulus bytes)
+    // Fields of interest within signedData80:
+    // - +0xa8 = signedData80[0x28] (BootstrapRaw08AuxHandle)
+    // - +0xac = signedData80[0x2c] (expiry time)
+    // - +0xd1 = signedData80[0x51] (low public-exponent byte)
+    // - +0xd2 .. +0x131 = signedData80[0x52..0xb1] (modulus bytes)
     std::array<uint8_t, 0x80> authSignature00{};
     std::array<uint8_t, 0xb6> signedData80{};
+
+    // Convenience accessor for expiry time at signedData80 + 0x2c (= +0xac)
+    uint32_t GetExpiryTime() const {
+        return *reinterpret_cast<const uint32_t*>(signedData80.data() + 0x2c);
+    }
 
     // anchor: launcher.exe:0x44add0
     bool IsFresh(int timeBias) const;
     // anchor: launcher.exe:0x44aec0
     uint32_t VerifyWithValidator(void* validator, int timeBias) const;
-
-    // Ghidra: mbr_0xac = expiry-time dword at offset +0xac
-    uint32_t expiryTimeAc = 0;
 };
-// static_assert offsets no longer valid with expiryTimeAc added at end
+static_assert(sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0) == 0x136u, "reply copy shadow must be 310 bytes");
 
 struct AuthBootstrap680BigIntObject20Scaffold {
     // Exact `0x14`-byte big-int object family initialized by `0x45d000` and copied by `0x45de10`.
