@@ -706,7 +706,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
         fmt::ptr(&arg6SelectionDescriptor40_),
         matchMode,
         static_cast<unsigned>(currentSlotIndex),
-        currentSlotRecord->heapString14.empty() ? "<empty>" : currentSlotRecord->heapString14.c_str(),
+        currentSlotRecord->heapString14 ? currentSlotRecord->heapString14 : "<empty>",
         fmt::ptr(arg6SelectionDescriptor40_.vtable),
         static_cast<unsigned>(currentSlotRecord->globalCharacterIdLow03),
         static_cast<unsigned>(currentSlotRecord->globalCharacterIdHigh07));
@@ -770,8 +770,8 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     const char* worldOrSelectionName = Arg6MappedSelectionName();
     const char* source = "arg6-selection";
 
-    if (slotRecord && !slotRecord->heapString14.empty()) {
-        worldOrSelectionName = slotRecord->heapString14.c_str();
+    if (slotRecord && slotRecord->heapString14) {
+        worldOrSelectionName = slotRecord->heapString14;
         source = "slotRecord+0x14";
     } else if (ownerState.characterNameBufferF1c[0]) {
         worldOrSelectionName = ownerState.characterNameBufferF1c;
@@ -788,8 +788,8 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
         "CLTLoginMediator::GetWorldOrSelectionName(+0x48) -> '{}' [source={} currentSlot='{}' profile='{}' mappedSelection='{}']",
         NonEmptyTextOrPlaceholder(worldOrSelectionName),
         source,
-        (slotRecord && !slotRecord->heapString14.empty())
-            ? slotRecord->heapString14.c_str()
+        (slotRecord && slotRecord->heapString14)
+            ? slotRecord->heapString14
             : "<empty>",
         NonEmptyTextOrPlaceholder(Arg6ProfileName()),
         NonEmptyTextOrPlaceholder(Arg6MappedSelectionName()));
@@ -1436,7 +1436,7 @@ uint32_t CLTLoginMediator::RemoveSlotRecordAndCompactRouteStateByIndex(uint32_t 
 
     const size_t slotIndex = static_cast<size_t>(selectedSlotRecordIndex);
     const uint8_t oldCount = selectionRouteState684_.slotRecordCount00_;
-    const std::string removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].heapString14;
+    const std::string removedName = selectionRouteState684_.slotRecordTable04_[slotIndex].heapString14 ? selectionRouteState684_.slotRecordTable04_[slotIndex].heapString14 : "";
 
     // anchor: launcher.exe:0x41ec00
     // Original order:
@@ -3384,7 +3384,7 @@ void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
 
     SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[characterIndex];
     slotRecord = {};
-    slotRecord.heapString14 = character.handle.text;
+    slotRecord.heapString14 = character.handle.text.c_str();
     slotRecord.globalCharacterIdLow03 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
     slotRecord.globalCharacterIdHigh07 = static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
     slotRecord.status0b = normalizedStatus;
@@ -3418,12 +3418,12 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
     const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (currentSlotRecord != nullptr) {
         if (postAuthMarginLoadingState_.createCharacterData108.characterName00[0] == '\0' &&
-            !currentSlotRecord->heapString14.empty()) {
+            currentSlotRecord->heapString14) {
             const size_t copyCount = std::min(
-                currentSlotRecord->heapString14.size(),
+                std::strlen(currentSlotRecord->heapString14),
                 postAuthMarginLoadingState_.createCharacterData108.characterName00.size() - 1);
             std::copy_n(
-                currentSlotRecord->heapString14.data(),
+                currentSlotRecord->heapString14,
                 copyCount,
                 postAuthMarginLoadingState_.createCharacterData108.characterName00.begin());
             postAuthMarginLoadingState_.createCharacterData108.characterName00[copyCount] = '\0';
@@ -3473,7 +3473,7 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
 
         const SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[i];
         const RouteHostStringTripleState& route = selectionRouteState684_.routeHostStringTriples194_[i];
-        const char* characterName = slotRecord.heapString14.empty() ? "" : slotRecord.heapString14.c_str();
+        const char* characterName = slotRecord.heapString14 ? slotRecord.heapString14 : "";
         const char* routeText = route.BeginOrNull() ? route.BeginOrNull() : "";
         std::fprintf(file, "Character%u:=%s,%s\n", static_cast<unsigned>(i), characterName, routeText);
         ++persistedCount;

@@ -41,8 +41,9 @@ public:
 
     // Payload pointers (set by derived classes):
     void* payloadBegin10 = nullptr;               // +0x10
-    uint16_t payloadLength14 = 0;                 // +0x14
-    uint8_t statusByte16 = 0;                    // +0x16
+    const char* heapString14 = nullptr;           // +0x14 (char* in original, at PacketBuilder_0x4af2a4 offset)
+    uint16_t payloadLength14 = 0;                 // +0x18
+    uint8_t statusByte16 = 0;                     // +0x1a
 
     // Character slot fields (used by derived slot record):
     uint32_t characterIdLow1c = 0;                 // +0x1c
@@ -64,33 +65,41 @@ public:
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
 // anchor: launcher.exe:0x439910 / dtor
-// Character slot record class. Inherits from PacketBuilder_0x4af2a4 for shared envelope layout.
+// Character slot record class. Same layout as PacketBuilder_0x4af2a4 at +0x00 (50 bytes).
+// Ghidra shows this as containing PacketBuilder at offset 0, meaning same memory layout.
 // Full object size: 0x32 (50 bytes)
 // VTable methods (5 slots):
-// - +0x00: dtor (0x439910) - replaces base +0x00
-// - +0x04: stub returns 0 (0x437b50) - inherited
-// - +0x08: debug string (0x43dc80) - replaces base +0x08
+// - +0x00: dtor (0x439910)
+// - +0x04: stub returns 0 (0x437b50)
+// - +0x08: debug string (0x43dc80)
 // - +0x0c: reset/prepare (0x439940)
 // - +0x10: return payload base (0x481760)
-class SlotRecordState_0x4b5328 : public PacketBuilder_0x4af2a4 {
+// Note: heapString14 is at +0x14 (same as PacketBuilder base layout)
+class SlotRecordState_0x4b5328 {
 public:
-    // Additional slot-record specific fields:
-    std::string heapString14;           // +0x14
-    uint32_t globalCharacterIdLow03 = 0;   // +0x1c
-    uint32_t globalCharacterIdHigh07 = 0;  // +0x20
-    uint8_t status0b = 0;             // +0x18
-    uint16_t worldId0c = 0;            // +0x24
+    // PacketBuilder layout at +0x00:
+    void** vtable00 = nullptr;                                  // +0x00
+    uint32_t nopatchLauncherVersionValue04 = 0;                // +0x04
+    liblttcp::CMessageConnectionMessageRef* messageRef08 = nullptr;  // +0x08
+    uint32_t ownerReadyFlag0c = 0;                             // +0x0c
+    void* payloadBegin10 = nullptr;                            // +0x10
+    const char* heapString14 = nullptr;                        // +0x14 - THIS IS WHAT GETS ACCESSED!
+    uint16_t padding16 = 0;                                   // +0x16
+    uint8_t statusByte16 = 0;                                  // +0x18
+    // ... rest of PacketBuilder fields through +0x31
 
-    // Virtual methods (5 vtable slots):
-    // anchor: launcher.exe:0x439910 / vtable +0x00 (replaces base 0x443aa0)
-    ~SlotRecordState_0x4b5328() override = default;
-    // anchor: launcher.exe:0x437b50 / vtable +0x04 (inherited from base)
-    // anchor: launcher.exe:0x43dc80 / vtable +0x08 (replaces base)
-    const char* VtableSlot08() const override { return nullptr; }
-    // anchor: launcher.exe:0x439940 / vtable +0x0c (replaces base 0x41baf0)
-    virtual void VtableSlot0c() override {}
-    // anchor: launcher.exe:0x481760 / vtable +0x10 (new slot)
-    virtual void* VtableSlot10() override { return payloadBegin10; }
+    // Slot-record specific fields at +0x32:
+    uint32_t globalCharacterIdLow03 = 0;                      // +0x32
+    uint32_t globalCharacterIdHigh07 = 0;                     // +0x36
+    uint8_t status0b = 0;                                      // +0x3a
+    uint16_t worldId0c = 0;                                   // +0x3c
+
+    // Virtual methods
+    ~SlotRecordState_0x4b5328() = default;
+    uint32_t VtableSlot04() { return 0; }
+    const char* VtableSlot08() const { return nullptr; }
+    void VtableSlot0c() {}
+    void* VtableSlot10() { return payloadBegin10; }
 };
 
 // Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.

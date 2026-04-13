@@ -49,8 +49,8 @@ CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
     if (currentSlotRecord) {
         view.characterIdLow = currentSlotRecord->globalCharacterIdLow03;
         view.characterIdHigh = currentSlotRecord->globalCharacterIdHigh07;
-        if (!currentSlotRecord->heapString14.empty()) {
-            view.characterName = currentSlotRecord->heapString14.c_str();
+        if (currentSlotRecord->heapString14) {
+            view.characterName = currentSlotRecord->heapString14;
         }
     }
 
@@ -59,8 +59,8 @@ CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
         view.characterIdHigh = slotZeroRecord->globalCharacterIdHigh07;
     }
 
-    if (!NonEmptyOrNull(view.characterName) && slotZeroRecord && !slotZeroRecord->heapString14.empty()) {
-        view.characterName = slotZeroRecord->heapString14.c_str();
+    if (!NonEmptyOrNull(view.characterName) && slotZeroRecord && slotZeroRecord->heapString14) {
+        view.characterName = slotZeroRecord->heapString14;
     }
 
     const auto& ownerState = postAuthMarginLoadingState_;

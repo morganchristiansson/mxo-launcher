@@ -100,7 +100,7 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
         sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
         currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
         currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u,
-        (currentSlotRecord && !currentSlotRecord->heapString14.empty()) ? currentSlotRecord->heapString14.c_str() : "<empty>",
+        currentSlotRecord && currentSlotRecord->heapString14 ? currentSlotRecord->heapString14 : "<empty>",
         sendResult);
     return sendResult;
 }

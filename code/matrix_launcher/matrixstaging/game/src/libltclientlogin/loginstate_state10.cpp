@@ -280,7 +280,7 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
         mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].BeginOrNull()
             ? mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].BeginOrNull()
             : "<empty>",
-        appendedSlotRecord.heapString14.empty() ? "<empty>" : appendedSlotRecord.heapString14.c_str(),
+        appendedSlotRecord.heapString14 ? appendedSlotRecord.heapString14 : "<empty>",
         DescribeOptionalState10ClaimReplyText(parsed));
     return 1u;
 }
