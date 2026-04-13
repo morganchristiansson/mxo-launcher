@@ -183,14 +183,7 @@ struct LiveSelectionCfgCorpusView {
 static std::string g_LastLoggedProfileRootName38;
 static uint32_t g_LastLoggedDefaultSelectionIndex3c = 0xffffffffu;
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static const CLTLoginMediator* ResolveActiveState8PersistenceOwner(const CLTLoginMediator* mediator) {
-    // Keep the wrapper-facing split explicit:
-    // - arg6 `ILTLoginMediator.Default` entrypoints may be invoked on the binder-owned stub object
-    // - the live `mcd.cfg` family still belongs to whichever mediator instance currently owns the
-    //   active character/load state when one is registered
-    return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
-}
+
 
 }  // namespace
 

@@ -47,9 +47,7 @@ bool CLTLoginMediator::UnregisterActiveStateSourceScaffold(const CLTLoginMediato
     return true;
 }
 
-const CLTLoginMediator* CLTLoginMediator::ResolveActiveStateSourceScaffold() const {
-    return g_CurrentLoginMediator ? g_CurrentLoginMediator : this;
-}
+
 
 CLTLoginMediator::ActiveCharacterStateViewScaffold
 CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
@@ -103,10 +101,7 @@ CLTLoginMediator::DescribeOwnCharacterStateScaffold() const {
 
 CLTLoginMediator::ActiveCharacterStateViewScaffold
 CLTLoginMediator::DescribeActiveCharacterStateScaffold() const {
-    const CLTLoginMediator* activeSource = ResolveActiveStateSourceScaffold();
-    if (activeSource && activeSource != this) {
-        return activeSource->DescribeOwnCharacterStateScaffold();
-    }
+    // inside CLTLoginMediator method - just use this
     return DescribeOwnCharacterStateScaffold();
 }
 

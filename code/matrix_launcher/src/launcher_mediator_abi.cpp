@@ -63,10 +63,8 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
 }
 
 static mxo::ltlogin::CLTLoginMediator* DiagnosticGetActiveMediatorForCharacterState() {
-    if (mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel()) {
-        return const_cast<mxo::ltlogin::CLTLoginMediator*>(mediator->ResolveActiveStateSourceScaffold());
-    }
-    return mxo::ltlogin::g_CurrentLoginMediator;
+    // caller is always CLTLoginMediator - return it directly
+    return DiagnosticEnsureMediatorModel();
 }
 
 // UNANCHORED: trivial accessors into the recovered CLTLoginMediator sidecar model.

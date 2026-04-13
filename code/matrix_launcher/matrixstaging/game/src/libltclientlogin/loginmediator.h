@@ -913,7 +913,6 @@ public:
     static void RegisterActiveStateSourceScaffold(CLTLoginMediator* mediator);
     static bool UnregisterActiveStateSourceScaffold(const CLTLoginMediator* mediator);
     static CLTLoginMediator* ActiveStateSourceScaffold();
-    const CLTLoginMediator* ResolveActiveStateSourceScaffold() const;
     ActiveCharacterStateViewScaffold DescribeOwnCharacterStateScaffold() const;
     ActiveCharacterStateViewScaffold DescribeActiveCharacterStateScaffold() const;
 
