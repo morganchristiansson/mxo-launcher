@@ -1,4 +1,5 @@
 #include "loginmediator.h"
+#include "loginstate.h"
 
 #include <spdlog/spdlog.h>
 
@@ -208,17 +209,36 @@ const SlotRecordState_0x4b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
 }
 
 // anchor: launcher.exe:0x41b220
+// Original body calls currentState_->Slot7_GetStateId(), checks result > 2, then accesses field
 const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const {
+    if (!currentState_) {
+        return nullptr;
+    }
+    const uint32_t stateId = currentState_->Slot7_GetStateId();
+    if (stateId <= 2u) {
+        return nullptr;
+    }
+    if (slotIndex >= 100u) {
+        return nullptr;
+    }
     const SlotRecordState_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
-    if (!record || record->heapString14.empty()) {
+    if (!record) {
         return nullptr;
     }
     return record->heapString14.c_str();
 }
 
 // anchor: launcher.exe:0x41b260
+// Original body calls currentState_->Slot7_GetStateId(), checks result > 2, then accesses field
 const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) const {
-    if (slotIndex >= selectionRouteState684_.routeHostStringTriples194_.size()) {
+    if (!currentState_) {
+        return nullptr;
+    }
+    const uint32_t stateId = currentState_->Slot7_GetStateId();
+    if (stateId <= 2u) {
+        return nullptr;
+    }
+    if (slotIndex >= 100u) {
         return nullptr;
     }
     const RouteHostStringTripleState& slot = selectionRouteState684_.routeHostStringTriples194_[slotIndex];
@@ -226,7 +246,18 @@ const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) con
 }
 
 // anchor: launcher.exe:0x41b2a0
+// Original body calls currentState_->Slot7_GetStateId(), checks result > 2, then accesses field
 uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
+    if (!currentState_) {
+        return 7u;
+    }
+    const uint32_t stateId = currentState_->Slot7_GetStateId();
+    if (stateId <= 2u) {
+        return 7u;
+    }
+    if (slotIndex >= 100u) {
+        return 7u;
+    }
     const SlotRecordState_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
     return record ? record->status0b : 7u;
 }
