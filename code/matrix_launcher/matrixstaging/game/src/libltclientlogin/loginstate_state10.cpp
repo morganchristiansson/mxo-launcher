@@ -291,10 +291,9 @@ const char* CLTLoginState_State10::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
-uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
-    void* upstreamOrArg,
-    CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
     (void)upstreamOrArg;
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return 0u;
     }
@@ -344,10 +343,9 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(
 }
 
 // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
-uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
-    void* workItem,
-    CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return 0u;
     }

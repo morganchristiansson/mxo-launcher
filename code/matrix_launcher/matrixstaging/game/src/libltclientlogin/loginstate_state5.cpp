@@ -33,14 +33,15 @@ const char* CLTLoginState_State5::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00439590 (vtable 0x004b5064 slot 2)
-uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!workItem || !mediator) {
         return 0u;
     }
 
     const uint32_t workType = LoginState5WorkItemTypeScaffold(workItem);
     if (workType != 0x0bu) {
-        return CLTLoginState::Slot2_HandleSecondaryGate(workItem, mediator);
+        return CLTLoginState::Slot2_HandleSecondaryGate(workItem);
     }
 
     const uint32_t status = LoginState5WorkItemPayloadScaffold(workItem);
@@ -67,7 +68,8 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem, CLTLogi
 }
 
 // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
-uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (upstreamOrArg != nullptr) {
         // Ghidra/disassembly recheck for `0x43952a..0x439549`:
         // - if `this+4` already exists and incoming upstream phase is `2` or `4`, keep the
@@ -111,8 +113,9 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)
-uint32_t CLTLoginState_State5::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State5::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)mediator;
     return 0;
 }

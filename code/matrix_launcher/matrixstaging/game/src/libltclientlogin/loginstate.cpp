@@ -50,7 +50,8 @@ static uint32_t LoginStateWorkItemTypeScaffold(const void* workItem) {
 }  // namespace
 
 // anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
-uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!workItem || !mediator) {
         return 0u;
     }
@@ -82,7 +83,8 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator
 }
 
 // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
-uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!workItem || !mediator) {
         return 0u;
     }
@@ -113,9 +115,8 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediat
 }
 
 // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-3 rows)
-uint32_t CLTLoginState::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState::Slot3_BeginOrContinue(void* upstreamOrArg) {
     (void)upstreamOrArg;
-    (void)mediator;
     // The original body is a prototype-agnostic bare `ret`. Source keeps a truthy no-op return
     // here only as a C++ placeholder for states that still inherit that stub.
     return 1u;
@@ -128,14 +129,13 @@ uint32_t CLTLoginState::Slot4_NoOp() {
 }
 
 // anchor: launcher.exe:0x004397c0 (shared slot-5 failure stub on many vtables)
-uint32_t CLTLoginState::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState::AuthMessageDispatch(void* workItem) {
     (void)workItem;
     // Exact recovered side effect from `0x004397c0`:
     // - write owner `+0x80 = 0x12000004`
     // - return false-like
-    // launcher.exe reaches owner `+0x80` through the global current-mediator singleton; source
-    // mirrors the same state through the already-threaded mediator pointer instead of inventing a
-    // second global owner handle.
+    // Uses g_CurrentLoginMediator (faithful to static-RE).
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (mediator != nullptr) {
         mediator->WorldListCountOrStatus80() = 0x12000004u;
     }
@@ -143,17 +143,15 @@ uint32_t CLTLoginState::AuthMessageDispatch(void* workItem, CLTLoginMediator* me
 }
 
 // anchor: launcher.exe:0x004397c0 (shared slot-6 failure stub on selected vtables only)
-uint32_t CLTLoginState::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
-    (void)mediator;
     return 0u;
 }
 
 // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-8 rows)
-uint32_t CLTLoginState::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) {
     (void)param1;
     (void)context;
-    (void)mediator;
     // Same caveat as slot 3/4: the original body is only `ret`.
     return 1u;
 }
@@ -169,11 +167,13 @@ uint32_t CLTLoginState::DispatchPhaseCode() const {
 }
 
 // anchor: launcher.exe:0x004397e0 (vtable 0x004b51b8 slot 6)
-uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(void* workItem) {
     // Exact recovered shape from `0x004397e0`:
     // - when object byte `this+4 == 1`, delegate to owner helper `0x41c5c0`
     // - if that helper returns `< 1`, return success-ish immediately
     // - otherwise write owner `+0x80 = 0x12000005` and fail
+    // Uses g_CurrentLoginMediator (faithful to static-RE).
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Live-path caution tightened again from the latest breakpoint-only original run:
     // - after the proven state9 success tail (`0x41b450(0x0c) -> 0x41cfb0(0x18)`), the natural run
     //   later re-hit `0x41cfb0` with event `0x0f` and entered game

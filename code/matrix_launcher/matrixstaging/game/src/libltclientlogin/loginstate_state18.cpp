@@ -9,7 +9,8 @@ const char* CLTLoginState_State18::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
-uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Stronger current read from disassembly review:
     // - this is the later state18 session-helper path in the alternate
     //   `g_LaunchPadGateState16State18` family, not the active state2 -> owner+0x680
@@ -24,8 +25,9 @@ uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLo
 }
 
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
-uint32_t CLTLoginState_State18::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State18::Slot6_HandleSecondaryMessage(void* workItem) {
     (void)workItem;
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x004208e0");
 }
@@ -36,9 +38,10 @@ uint32_t CLTLoginState_State18::Slot7_GetStateId() const {
 }
 
 // anchor: launcher.exe:0x00420960 (vtable 0x004b0c00 slot 8)
-uint32_t CLTLoginState_State18::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State18::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) {
     (void)param1;
     (void)context;
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)mediator;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x00420960");
 }

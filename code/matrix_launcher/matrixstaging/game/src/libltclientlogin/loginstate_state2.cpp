@@ -14,7 +14,8 @@ const char* CLTLoginState_AuthenticatePending::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00439210 (vtable 0x004b5014 slot 3)
-uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return 0u;
     }
@@ -78,7 +79,8 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
 }
 
 // anchor: launcher.exe:0x0043f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())
-uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return 0u;
     }

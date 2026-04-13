@@ -2091,7 +2091,7 @@ uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connecti
     }
 
     // anchor: launcher.exe:0x41afac / current helper vtable `+0x00`
-    return currentState_->Slot1_HandlePrimaryGate(workItem, this);
+    return currentState_->Slot1_HandlePrimaryGate(workItem);
 }
 
 // anchor: launcher.exe:0x41f250 / owner vtable `+0x180`
@@ -2100,7 +2100,7 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessage(void* workItem) {
     // - mov ecx, [ecx+0x10]
     // - mov eax, [ecx]
     // - jmp [eax+0x10]
-    return currentState_->AuthMessageDispatch(workItem, this);
+    return currentState_->AuthMessageDispatch(workItem);
 }
 
 // anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
@@ -2109,7 +2109,7 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperSlot6(void* workItem) {
     // - mov ecx, [ecx+0x10]
     // - mov eax, [ecx]
     // - jmp [eax+0x14]
-    return currentState_->Slot6_HandleSecondaryMessage(workItem, this);
+    return currentState_->Slot6_HandleSecondaryMessage(workItem);
 }
 
 // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
@@ -2129,7 +2129,7 @@ uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallback(void* connec
     }
 
     // anchor: launcher.exe:0x41afed / current helper vtable `+0x04`
-    return currentState_->Slot2_HandleSecondaryGate(workItem, this);
+    return currentState_->Slot2_HandleSecondaryGate(workItem);
 }
 
 // anchor: launcher.exe:0x41e690
@@ -3270,7 +3270,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             // route here instead of synthesizing readiness directly from bootstrap completion
             uint32_t state6Handled = 0u;
             if (currentHelperPhaseCodeBeforeReply == 6u) {
-                state6Handled = currentState_->Slot6_HandleSecondaryMessage(nullptr, this);
+                state6Handled = currentState_->Slot6_HandleSecondaryMessage(nullptr);
             }
 
             if (state6Handled != 0u &&

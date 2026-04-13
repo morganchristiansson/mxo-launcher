@@ -316,7 +316,7 @@ uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId)
     }
 
     currentState_ = newState;
-    const uint32_t slot3Result = newState->Slot3_BeginOrContinue(oldState, this);
+    const uint32_t slot3Result = newState->Slot3_BeginOrContinue(oldState);
     spdlog::info(
         "CLTLoginMediator::SwitchHelperStateByIdScaffold helperState=0x{:02x} oldState={} newState={} dispatchTableBase=&g_LoginHelperDispatchTableScaffold.helper7868 -> slot3Result=0x{:08x}",
         static_cast<unsigned>(helperStateId),

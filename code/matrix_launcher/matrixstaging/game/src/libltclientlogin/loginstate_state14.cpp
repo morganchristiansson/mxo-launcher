@@ -10,7 +10,8 @@ const char* CLTLoginState_WorldListPending::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
-uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrArg) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
         return 0u;
@@ -66,7 +67,8 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
 }
 
 // anchor: launcher.exe:0x0043d4d0 (string/file anchors: loginstate.cpp, CLTLoginState_WorldListPending::AuthMessageDispatch())
-uint32_t CLTLoginState_WorldListPending::AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_WorldListPending::AuthMessageDispatch(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Current best contextual role from the vtable and string anchors:
     // - vtable 0x004b4fec / slot 5
     // - AS_GetWorldListReply / AS_PSGetWorldListReply

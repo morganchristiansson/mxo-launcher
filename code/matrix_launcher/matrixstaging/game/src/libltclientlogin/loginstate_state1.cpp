@@ -23,7 +23,8 @@ const char* CLTLoginState_State1::DebugName() const {
 }
 
 // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
-uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!workItem || !mediator) {
         return 0u;
     }
@@ -46,7 +47,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginM
     //   narrow live success alias for that code while preserving the exact recovered helper
     //   switch/event/error shape
     if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
-        return CLTLoginState::Slot1_HandlePrimaryGate(workItem, mediator);
+        return CLTLoginState::Slot1_HandlePrimaryGate(workItem);
     }
 
     const uint32_t workResultCode = LoginState1WorkItemPayloadScaffold(workItem);
@@ -128,7 +129,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginM
     const uint32_t attemptCount = mediator->AuthConnectAttemptCountScaffold();
     const uint32_t candidateCount = mediator->AuthConnectCandidateCountScaffold();
     if (mediator->HasAuthConnectRetryCandidateRemainingScaffold()) {
-        const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_, mediator);
+        const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
         spdlog::info(
             "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} authFlag2c={} -> retry state1 slot3 result=0x{:08x}",
             static_cast<unsigned>(workResultCode),
@@ -157,7 +158,8 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem, CLTLoginM
 }
 
 // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
-uint32_t CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     cachedUpstreamOrArg_ = upstreamOrArg;
     if (!mediator) {
         return 0u;
@@ -174,7 +176,8 @@ uint32_t CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)
-uint32_t CLTLoginState_State1::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State1::Slot6_HandleSecondaryMessage(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (mediator != nullptr) {
         mediator->WorldListCountOrStatus80() = 0x12000005u;
     }

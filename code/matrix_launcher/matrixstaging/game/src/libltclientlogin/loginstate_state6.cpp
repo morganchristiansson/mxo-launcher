@@ -230,7 +230,8 @@ const char* CLTLoginState_State6::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
-uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Static recheck in Ghidra/disassembly for `0x43b8f0` now backs the cache rule directly:
     // - `0x43b8fc` tests state6 `this+4`
     // - `0x43b904..0x43b91a` calls incoming upstream vtable `+0x18`
@@ -312,7 +313,8 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 }
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
-uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State6::Slot6_HandleSecondaryMessage entered this={} mediator={} stagedMarginBytes={} currentState={}",

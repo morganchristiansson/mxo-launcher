@@ -27,7 +27,8 @@ const char* CLTLoginState_State9::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
-uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg) {
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
         return 0u;
@@ -72,7 +73,7 @@ uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg, CLTLog
 }
 
 // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
-uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) {
+uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem) {
     // Current live-status note:
     // - newer natural-original WineDbg now proves this slot-6 body is reached on the natural path
     // - representative natural stop hit the success-side branch at `0x43c1c2`
@@ -92,6 +93,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem, CLTL
     // - next natural-original question therefore moves later again, into the post-state9 /
     //   state-`0x0c` continuation after this slot posts event `0x18`
     (void)workItem;
+    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return 0u;
     }

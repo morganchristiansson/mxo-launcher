@@ -43,33 +43,38 @@ public:
     // anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
     // Exact launcher call shape keeps the queued work item on the stack and reads its type through
     // `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType(workItem)`.
-    virtual uint32_t Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator);
+    // Uses g_CurrentLoginMediator instead of passing mediator as parameter (faithful to static-RE).
+    virtual uint32_t Slot1_HandlePrimaryGate(void* workItem);
 
     // anchor: launcher.exe:0x00438df0 (shared slot 2 gate across multiple login-state vtables)
-    virtual uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator);
+    // Uses g_CurrentLoginMediator (faithful to static-RE).
+    virtual uint32_t Slot2_HandleSecondaryGate(void* workItem);
 
     // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-3 rows)
     // Valid as a reused stub address, but not the canonical meaning of slot 3 across the family:
     // most live states override slot 3 with their real begin/continue body.
-    virtual uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator);
+    // Uses g_CurrentLoginMediator (faithful to static-RE).
+    virtual uint32_t Slot3_BeginOrContinue(void* upstreamOrArg);
 
     // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by many slot-4 rows)
     virtual uint32_t Slot4_NoOp();
 
     // anchor: launcher.exe:0x004397c0 (shared slot-5 failure stub on many vtables)
     // Naming correction: slot 5 should stay `AuthMessageDispatch` across the family.
-    virtual uint32_t AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator);
+    virtual uint32_t AuthMessageDispatch(void* workItem);
 
     // anchor: launcher.exe:0x004397c0 (shared slot-6 failure stub on selected vtables only)
     // Valid as a reused default body, but many live states override slot 6 with concrete receive /
     // completion handlers.
-    virtual uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator);
+    // Uses g_CurrentLoginMediator (faithful to static-RE).
+    virtual uint32_t Slot6_HandleSecondaryMessage(void* workItem);
 
     // anchor: reconstructed shared slot 7 state-id surface
     virtual uint32_t Slot7_GetStateId() const = 0;
 
     // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-8 rows)
-    virtual uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator);
+    // Uses g_CurrentLoginMediator (faithful to static-RE).
+    virtual uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context);
 
     // anchor: launcher.exe:0x00437860 (shared slot 9 getter stub returning 1 on most live states)
     virtual uint32_t Slot9_IsNetworkDriven() const;
@@ -97,7 +102,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004397e0 (vtable 0x004b51b8 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x0048bc34 (vtable 0x004b51b8 slot 7 purecall)
     uint32_t Slot7_GetStateId() const override = 0;
@@ -148,13 +153,13 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
-    uint32_t Slot1_HandlePrimaryGate(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot1_HandlePrimaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x0044e360 (vtable 0x004b4fc4 slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -184,10 +189,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439210 (vtable 0x004b5014 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043f300 (vtable 0x004b5014 slot 5)
-    uint32_t AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t AuthMessageDispatch(void* workItem) override;
 
     // anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -238,13 +243,13 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004393f0 (vtable 0x004b503c slot 2)
-    uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot2_HandleSecondaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b503c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x004686b0 (vtable 0x004b503c slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -266,13 +271,13 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439590 (vtable 0x004b5064 slot 2)
-    uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot2_HandleSecondaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c60 (vtable 0x004b5064 slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -296,10 +301,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c70 (vtable 0x004b508c slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -317,10 +322,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043ba20 (vtable 0x004b50b4 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043bae0 (vtable 0x004b50b4 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c80 (vtable 0x004b50b4 slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -348,10 +353,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c90 (vtable 0x004b5104 slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -390,10 +395,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438cc0 (vtable 0x004b517c slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -424,10 +429,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -453,10 +458,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043c020 (vtable 0x004b5154 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438cb0 (vtable 0x004b5154 slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -493,13 +498,13 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439680 (vtable 0x004b50dc slot 2)
-    uint32_t Slot2_HandleSecondaryGate(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot2_HandleSecondaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x0043bb90 (vtable 0x004b50dc slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043bc60 (vtable 0x004b50dc slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438cd0 (vtable 0x004b50dc slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -521,10 +526,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043d4d0 (vtable 0x004b4fec slot 5)
-    uint32_t AuthMessageDispatch(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t AuthMessageDispatch(void* workItem) override;
 
     // anchor: launcher.exe:0x00438ce0 (vtable 0x004b4fec slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -541,16 +546,16 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00420680 (vtable 0x004b0b88 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0b88 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420310 (vtable 0x004b0b88 slot 7)
     uint32_t Slot7_GetStateId() const override;
 
     // anchor: launcher.exe:0x004206a0 (vtable 0x004b0b88 slot 8)
-    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
 };
 
 // anchor: launcher.exe vtable 0x004b0bb0
@@ -564,16 +569,16 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00420720 (vtable 0x004b0bb0 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bb0 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420320 (vtable 0x004b0bb0 slot 7)
     uint32_t Slot7_GetStateId() const override;
 
     // anchor: launcher.exe:0x004207c0 (vtable 0x004b0bb0 slot 8)
-    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
 };
 
 // anchor: launcher.exe vtable 0x004b0bd8
@@ -587,10 +592,10 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00420890 (vtable 0x004b0bd8 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bd8 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420330 (vtable 0x004b0bd8 slot 7)
     uint32_t Slot7_GetStateId() const override;
@@ -607,16 +612,16 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420340 (vtable 0x004b0c00 slot 7)
     uint32_t Slot7_GetStateId() const override;
 
     // anchor: launcher.exe:0x00420960 (vtable 0x004b0c00 slot 8)
-    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
 };
 
 // anchor: launcher.exe vtable 0x004b0c28
@@ -630,16 +635,16 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004209e0 (vtable 0x004b0c28 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg, CLTLoginMediator* mediator) override;
+    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c28 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem, CLTLoginMediator* mediator) override;
+    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420350 (vtable 0x004b0c28 slot 7)
     uint32_t Slot7_GetStateId() const override;
 
     // anchor: launcher.exe:0x00420a00 (vtable 0x004b0c28 slot 8)
-    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context, CLTLoginMediator* mediator) override;
+    uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
 };
 
 }  // namespace mxo::ltlogin
