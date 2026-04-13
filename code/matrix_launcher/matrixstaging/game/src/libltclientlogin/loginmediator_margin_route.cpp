@@ -189,15 +189,22 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 }
 
 // anchor: launcher.exe:0x41f2e0 / owner vtable +0x40
+// Original body: direct field access without validation
 const SlotRecordState_0x4b5328* CLTLoginMediator::GetSlotRecordByIndex(uint8_t slotIndex) const {
-    // Original body is a tiny read over the embedded selection-route subobject table.
-    return selectionRouteState684_.GetSlotRecordByIndex(slotIndex);
+    if (slotIndex != 0xffu) {
+        return &selectionRouteState684_.slotRecordTable04_[slotIndex];
+    }
+    return nullptr;
 }
 
 // anchor: launcher.exe:0x41f300 / owner vtable +0x44
+// Original body: direct field access
 const SlotRecordState_0x4b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
-    return selectionRouteState684_.GetSlotRecordByIndex(
-        selectionRouteState684_.CurrentSlotOrSelectionIndex644());
+    const uint8_t currentSlot = selectionRouteState684_.currentSlotOrSelectionIndex644_;
+    if (currentSlot != 0xffu) {
+        return &selectionRouteState684_.slotRecordTable04_[currentSlot];
+    }
+    return nullptr;
 }
 
 // anchor: launcher.exe:0x41b220

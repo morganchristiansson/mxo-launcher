@@ -223,22 +223,6 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRout
     }
 }
 
-const SlotRecordState_0x4b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
-    uint8_t slotIndex) const {
-    if (slotIndex == 0xffu || slotIndex >= slotRecordValid04_.size() || !slotRecordValid04_[slotIndex]) {
-        return nullptr;
-    }
-    return &slotRecordTable04_[slotIndex];
-}
-
-SlotRecordState_0x4b5328* CLTLoginMediator::CLTLoginMediatorSelectionRouteState::GetSlotRecordByIndex(
-    uint8_t slotIndex) {
-    if (slotIndex == 0xffu || slotIndex >= slotRecordValid04_.size() || !slotRecordValid04_[slotIndex]) {
-        return nullptr;
-    }
-    return &slotRecordTable04_[slotIndex];
-}
-
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),

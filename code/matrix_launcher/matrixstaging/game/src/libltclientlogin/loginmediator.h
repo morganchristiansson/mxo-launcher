@@ -644,9 +644,6 @@ public:
         // anchor: launcher.exe:0x41dd00 / embedded owner subobject destroy/final release
         void DestroySelectionRouteState();
 
-        const SlotRecordState_0x4b5328* GetSlotRecordByIndex(uint8_t slotIndex) const;
-        SlotRecordState_0x4b5328* GetSlotRecordByIndex(uint8_t slotIndex);
-
         uint8_t CurrentSlotOrSelectionIndex644() const {
             return currentSlotOrSelectionIndex644_;
         }
