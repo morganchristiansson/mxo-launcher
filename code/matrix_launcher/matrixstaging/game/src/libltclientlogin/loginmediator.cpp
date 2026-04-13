@@ -641,10 +641,7 @@ void CLTLoginMediator::RequestAuthCloseAndSwitchToState0() {
 }
 
 // anchor: launcher.exe:0x41f0a0 / owner vtable +0x38
-// Static-RE: `return &this->ownerAuthBootstrapSource94` (returns pointer to inline struct at +0x94)
-// The inline struct's first field (username00) is what callers read.
 const char* CLTLoginMediator::GetUsername() const {
-    // Fidelity: return pointer to first element of username00 array in owner+0x94 block
     return ownerAuthBootstrapSource94_.username00.data();
 }
 
