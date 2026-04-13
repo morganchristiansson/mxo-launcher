@@ -223,7 +223,7 @@ public:
     std::array<char, 0x20> password20{};     // +0x20
     std::array<uint8_t, 16> keyConfigMd540{}; // +0x40
     std::array<uint8_t, 16> uiConfigMd550{};  // +0x50
-    // +0x60: session token string (SmallStringLike60Sketch - 12 bytes)
+    // +0x60: session token string (SmallString60 - 12 bytes)
     struct SmallString60 {
         const char* begin = nullptr;
         const char* current = nullptr;
