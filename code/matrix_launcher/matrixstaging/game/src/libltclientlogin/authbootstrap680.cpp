@@ -1052,19 +1052,6 @@ bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextIntoCiphertex
 
 namespace {
 
-// anchor: launcher.exe:0x44ae40
-static void BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold(
-    const AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow,
-    std::array<uint8_t, 16>* outDigest10) {
-    if (!outDigest10) {
-        return;
-    }
-
-    CryptoPP::Weak::MD5 md5;
-    md5.Update(copyShadow.signedData80.data(), copyShadow.signedData80.size());
-    md5.Final(outDigest10->data());
-}
-
 // anchor: launcher.exe:0x468f80
 static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorScaffold(
     CLTLoginMediator& mediator,
