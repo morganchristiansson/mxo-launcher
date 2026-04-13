@@ -960,26 +960,22 @@ public:
     // Late Family-A states 15..19 stay non-happy / later-flow scaffolds for now, but keep
     // registration points source-owned so future work can switch to them without reopening the
     // generic mediator ownership split again.
-    void RegisterScaffoldState0(CLTLoginState* state);
-    void RegisterScaffoldState1(CLTLoginState* state);
-    void RegisterScaffoldState2(CLTLoginState* state);
-    void RegisterScaffoldState3(CLTLoginState* state);
-    void RegisterScaffoldState4(CLTLoginState* state);
-    void RegisterScaffoldState5(CLTLoginState* state);
-    void RegisterScaffoldState6(CLTLoginState* state);
-    void RegisterScaffoldState7(CLTLoginState* state);
-    void RegisterScaffoldState8(CLTLoginState* state);
-    void RegisterScaffoldState9(CLTLoginState* state);
-    void RegisterScaffoldState10(CLTLoginState* state);
-    void RegisterScaffoldState11(CLTLoginState* state);
-    void RegisterScaffoldState12(CLTLoginState* state);
-    void RegisterScaffoldState13(CLTLoginState* state);
-    void RegisterScaffoldState14(CLTLoginState* state);
-    void RegisterScaffoldState15(CLTLoginState* state);
-    void RegisterScaffoldState16(CLTLoginState* state);
-    void RegisterScaffoldState17(CLTLoginState* state);
-    void RegisterScaffoldState18(CLTLoginState* state);
-    void RegisterScaffoldState19(CLTLoginState* state);
+    CLTLoginState* LoginHelperStateByIdScaffold(uint32_t helperStateId) const;
+    // anchor: launcher.exe:0x41b450
+    // Faithful by-id helper switch mirror for anchored call sites that statically prove the
+    // original passes only the helper/state id into `0x41b450` and lets that body load the target
+    // from the helper dispatch table rooted at `0x4f7868`.
+    // Current source returns the new-helper slot-3 result for diagnostics even though the original
+    // helper-switch body itself returns `void`.
+    uint32_t SwitchHelperStateByIdScaffold(uint32_t helperStateId);
+    // Installs the source-owned initial idle/start helper convention (`state0`) after
+    // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
+    // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.
+    void InstallInitialState0Scaffold();
+    // Registers the built-in recovered `CLTLoginState_*` family on this mediator and preserves the
+    // startup `state0` install convention when the mediator has not advanced yet. Callers should
+    // prefer this over rebuilding the concrete scaffold-state table from diagnostics code.
+    void InitializeHelperDispatchTable();
     // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
     // Late-login state9 callback-seed getter. Original body is the tiny live-pointer read
     // `owner +0x1c + 0x85`; current replacement still keeps an explicit launcher-owned
@@ -1004,22 +1000,6 @@ public:
     // anchor: launcher.exe:0x41e690 / mediator vtable +0x18c
     uint32_t FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) override;
     uint32_t FillState9CallbackBlob18cScaffold(uint32_t* outDwords, uint32_t arg2, uint32_t arg3);
-    CLTLoginState* LoginHelperStateByIdScaffold(uint32_t helperStateId) const;
-    // anchor: launcher.exe:0x41b450
-    // Faithful by-id helper switch mirror for anchored call sites that statically prove the
-    // original passes only the helper/state id into `0x41b450` and lets that body load the target
-    // from the helper dispatch table rooted at `0x4f7868`.
-    // Current source returns the new-helper slot-3 result for diagnostics even though the original
-    // helper-switch body itself returns `void`.
-    uint32_t SwitchHelperStateByIdScaffold(uint32_t helperStateId);
-    // Installs the source-owned initial idle/start helper convention (`state0`) after
-    // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
-    // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.
-    void InstallInitialState0Scaffold();
-    // Registers the built-in recovered `CLTLoginState_*` family on this mediator and preserves the
-    // startup `state0` install convention when the mediator has not advanced yet. Callers should
-    // prefer this over rebuilding the concrete scaffold-state table from diagnostics code.
-    void InitializeHelperDispatchTable();
 
     // Recovered config anchors:
     // - launcher `qsAuthServerDNSName` / `AuthServerPort`
