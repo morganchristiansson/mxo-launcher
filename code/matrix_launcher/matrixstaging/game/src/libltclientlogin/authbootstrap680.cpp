@@ -1234,7 +1234,7 @@ static bool HasTrailingSlashSixDigitSuffix(const std::string& text) {
 }
 
 struct AuthBootstrap680PrepareCallShape {
-    const AuthBootstrapSelectedSource38Sketch* ownerSource94 = nullptr;
+    const OwnerAuthBootstrapSource94* ownerSource94 = nullptr;
     const char* sourceString00 = nullptr;
     const char* sourceString20 = nullptr;
     const char* sourceString60Begin = nullptr;
@@ -1248,7 +1248,7 @@ struct AuthBootstrap680PrepareCallShape {
 };
 
 static AuthBootstrap680PrepareCallShape BuildAuthBootstrap680PrepareCallShape(
-    const AuthBootstrapSelectedSource38Sketch& ownerSource94,
+    const OwnerAuthBootstrapSource94& ownerSource94,
     const char* fallbackUsername,
     const char* fallbackPassword,
     uint32_t write2C,
@@ -1259,20 +1259,20 @@ static AuthBootstrap680PrepareCallShape BuildAuthBootstrap680PrepareCallShape(
     // The original `0x439210 -> 0x448050` call shape only feeds owner `+0x94`; any fallback to
     // wrapper-facing auth strings remains a bounded replacement-only escape hatch for paths that
     // still reach this child without first passing through `0x41ecd0 = ProcessLoginRequest`.
-    callShape.sourceString00 = ownerSource94.inlineString00[0] ? ownerSource94.inlineString00.data() : fallbackUsername;
-    callShape.sourceString20 = ownerSource94.inlineString20[0] ? ownerSource94.inlineString20.data() : fallbackPassword;
-    callShape.sourceString60Begin = ownerSource94.string60.begin;
+    callShape.sourceString00 = ownerSource94.username00[0] ? ownerSource94.username00.data() : fallbackUsername;
+    callShape.sourceString20 = ownerSource94.password20[0] ? ownerSource94.password20.data() : fallbackPassword;
+    callShape.sourceString60Begin = ownerSource94.sessionToken60.begin;
     callShape.usedFallbackString00 =
-        (ownerSource94.inlineString00[0] == '\0') && fallbackUsername && fallbackUsername[0] != '\0';
+        (ownerSource94.username00[0] == '\0') && fallbackUsername && fallbackUsername[0] != '\0';
     callShape.usedFallbackString20 =
-        (ownerSource94.inlineString20[0] == '\0') && fallbackPassword && fallbackPassword[0] != '\0';
+        (ownerSource94.password20[0] == '\0') && fallbackPassword && fallbackPassword[0] != '\0';
     callShape.write28 = 1u;
     // `0x439265` is now concrete enough to keep explicit: state2 calls the tiny owner getter at
     // vtable `+0x20` / `0x41f070`, which returns owner `+0x08`; the paired setter is
     // vtable `+0x1c` / `0x41f060` from the nopatch version-config path.
     callShape.write2C = write2C;
-    callShape.sourceBlock40 = &ownerSource94.block40;
-    callShape.sourceBlock50 = &ownerSource94.block50;
+    callShape.sourceBlock40 = &ownerSource94.keyConfigMd540;
+    callShape.sourceBlock50 = &ownerSource94.uiConfigMd550;
     callShape.sendTarget50 = sendTarget50;
     return callShape;
 }
@@ -1286,14 +1286,14 @@ static void StageAuthBootstrap680ChildFromPrepareCallShape(
         callShape.sourceString00 +
             BoundedCStringLength(
                 callShape.sourceString00,
-                callShape.ownerSource94 ? callShape.ownerSource94->inlineString00.size() : 0u));
+                callShape.ownerSource94 ? callShape.ownerSource94->username00.size() : 0u));
     AssignSmallStringMirror(
         child.string10,
         callShape.sourceString20,
         callShape.sourceString20 +
             BoundedCStringLength(
                 callShape.sourceString20,
-                callShape.ownerSource94 ? callShape.ownerSource94->inlineString20.size() : 0u));
+                callShape.ownerSource94 ? callShape.ownerSource94->password20.size() : 0u));
     AssignSmallStringMirror(
         child.string1C,
         callShape.sourceString60Begin ? callShape.sourceString60Begin : "");
@@ -1359,7 +1359,7 @@ uint32_t AuthBootstrap680Child::PrepareAndDispatch(CLTLoginMediator& mediator) {
             : mediator.authLauncherVersion_;
 
     const AuthBootstrap680PrepareCallShape callShape = BuildAuthBootstrap680PrepareCallShape(
-        reinterpret_cast<const AuthBootstrapSelectedSource38Sketch&>(mediator.ownerAuthBootstrapSource94_),
+        mediator.ownerAuthBootstrapSource94_,
         mediator.Arg6AuthName(),
         mediator.Arg6AuthPassword(),
         recoveredLauncherVersion,

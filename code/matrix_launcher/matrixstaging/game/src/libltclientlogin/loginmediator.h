@@ -1646,7 +1646,7 @@ public:
     // Layout: +0x00=username[32], +0x20=password[32], +0x40=keyConfigMd5[16], +0x50=uiConfigMd5[16],
     //         +0x60=sessionTokenString, +0x6c=flag6c. Total 112 bytes (0x70).
     // Note: there's also a separate session token string at +0xf4 (+0x94 + 0x60) cleared by +0x30 path.
-    OwnerAuthBootstrapSource94Class ownerAuthBootstrapSource94_{};
+    OwnerAuthBootstrapSource94 ownerAuthBootstrapSource94_{};
     int32_t ownerCachedHandle147c_ = -1;       // owner `+0x147c`, managed-submit handle cached across `+0x1c` release / `+0x18` reacquire
     // launcher.exe owner `+0x684 .. +0xd7f` embedded selection-route helper/class
     // (`CLTLoginMediatorSelectionRouteState_0x41dba0` in current Ghidra).

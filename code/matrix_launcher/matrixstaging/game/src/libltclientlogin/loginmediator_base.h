@@ -279,7 +279,7 @@ struct ProcessLoginRequestInputSketch {
 // Owner-side auth/bootstrap source block at owner +0x94.
 // Has a method CopyFromSubmitLoginRequestInput that copies from the input to this block.
 // Also has a separate session token string at +0xf4 (block offset +0x60).
-class OwnerAuthBootstrapSource94Class {
+class OwnerAuthBootstrapSource94 {
 public:
     // Same layout as AuthBootstrapSelectedSource38Sketch
     std::array<char, 0x20> username00{};    // +0x00
