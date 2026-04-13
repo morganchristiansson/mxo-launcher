@@ -1478,9 +1478,6 @@ public:
     // and still fresh enough for the state5 copy/send path.
     bool HasValidState5ReplyCopyShadowF4Scaffold() const;
 
-    // owner `+0x80` - world list count or auth/status (used by state4 slot2)
-    uint32_t worldListCountOrStatus80 = 0;
-
 private:
     void RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(const mxo::auth::AuthReply& reply);
     void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
@@ -1564,6 +1561,10 @@ private:
     bool marginConnectionOwnedByMediator_ = false;
     bool authPeerCloseQueuedScaffold_ = false;
     bool marginPeerCloseQueuedScaffold_ = false;
+
+public:
+    // owner `+0x80` - world list count or auth/status (used by state4 slot2)
+    uint32_t worldListCountOrStatus80 = 0;
 
     MarginRouteState marginRouteState_;
     // Original non-virtual `CLTIPAddressList` helper rooted at owner `+0x3c`.

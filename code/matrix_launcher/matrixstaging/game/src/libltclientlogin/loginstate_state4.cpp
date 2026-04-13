@@ -58,7 +58,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
     mediator->worldListCountOrStatus80 = status;
 
     if (status != 0u) {
-        mediator->SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(true);
+        mediator->marginConnectionFlag2d_ = 1;
         if (mediator->marginBeginCount24_ < static_cast<uint32_t>(mediator->marginAddressList3c_.Count())) {
             const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
             spdlog::info(

@@ -88,7 +88,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     }
 
     if (liveSuccessAlias) {
-        mediator->AuthConnectionFlag2c() = 1u;
+        mediator->authConnectionFlag2c_ = 1u;
 
         if (cachedUpstreamState != nullptr && cachedUpstreamPhaseCode != 0u) {
             // Keep the active replacement happy path source-owned without pretending the original
@@ -107,7 +107,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(cachedUpstreamPhaseCode),
                 mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
-                static_cast<unsigned>(mediator->AuthConnectionFlag2c()),
+                static_cast<unsigned>(mediator->authConnectionFlag2c_),
                 static_cast<unsigned>(resumeResult));
             return resumeResult;
         }
@@ -119,12 +119,12 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
-            static_cast<unsigned>(mediator->AuthConnectionFlag2c()),
+            static_cast<unsigned>(mediator->authConnectionFlag2c_),
             static_cast<unsigned>(handshakeResult));
         return handshakeResult;
     }
 
-    mediator->AuthConnectionFlag2c() = 1u;
+    mediator->authConnectionFlag2c_ = 1u;
 
     const uint32_t attemptCount = mediator->AuthConnectAttemptCountScaffold();
     const uint32_t candidateCount = mediator->AuthConnectCandidateCountScaffold();
@@ -137,7 +137,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
             static_cast<unsigned>(cachedUpstreamPhaseCode),
             static_cast<unsigned>(attemptCount),
             static_cast<unsigned>(candidateCount),
-            static_cast<unsigned>(mediator->AuthConnectionFlag2c()),
+            static_cast<unsigned>(mediator->authConnectionFlag2c_),
             static_cast<unsigned>(retryResult));
         return 1u;
     }

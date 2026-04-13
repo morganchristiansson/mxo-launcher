@@ -24,7 +24,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
     // - post event `0x1b`
     // Keep this intentionally limited to the outgoing half already described in the vtable docs;
     // the broader `0x36` reply handling remains owned by AuthMessageDispatch().
-    if (mediator->AuthConnectionFlag2c() == 0u) {
+    if (mediator->authConnectionFlag2c_ == 0u) {
         spdlog::info(
             "CLTLoginState_WorldListPending::Slot3_BeginOrContinue blocked on owner+0x2c==0 currentState={}",
             mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");

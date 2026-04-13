@@ -46,7 +46,7 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem) {
 
     const uint32_t status = LoginState5WorkItemPayloadScaffold(workItem);
     if (status != 0u) {
-        mediator->SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(true);
+        mediator->marginConnectionFlag2d_ = 1;
     }
 
     // Ghidra/disassembly recheck for `0x4395c8..0x4395d9`:

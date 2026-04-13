@@ -61,7 +61,7 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem) {
         return 0u;
     }
 
-    if (mediator->AuthConnectionFlag2c() != 0u) {
+    if (mediator->authConnectionFlag2c_ != 0u) {
         mediator->PostEvent(1u);
         spdlog::info(
             "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed armed owner+0x2c -> event=0x01 currentState={}",
