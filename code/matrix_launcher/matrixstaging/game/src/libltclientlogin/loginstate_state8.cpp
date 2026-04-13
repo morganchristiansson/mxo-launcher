@@ -347,7 +347,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
                 fallbackResult);
             return 1u;
         }
-        mediator->WorldListCountOrStatus80() = 0x12000005u;
+        mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
             fallbackResult);
@@ -367,7 +367,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
 
     auto& ownerState = mediator->postAuthMarginLoadingState_;
-    ownerState.worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
+    mediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         (void)mediator->SwitchHelperStateByIdScaffold(3u);
         mediator->PostError(10u);

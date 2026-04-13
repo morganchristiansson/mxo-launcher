@@ -409,7 +409,7 @@ void CLTLoginMediator::PostError(uint32_t errorId) {
         "{} Error# {} status80=0x{:08x} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 error walk active)",
         kLogPrefixPostError,
         static_cast<unsigned>(errorId),
-        static_cast<unsigned>(WorldListCountOrStatus80()),
+        static_cast<unsigned>(g_CurrentLoginMediator ? g_CurrentLoginMediator->worldListCountOrStatus80 : 0u),
         static_cast<unsigned>(observerTree674_.nodeCount04),
         fmt::ptr(observerTree674_.header00),
         fmt::ptr(observerTreeHeader674_.parent04),
@@ -427,7 +427,7 @@ void CLTLoginMediator::PostError(uint32_t errorId) {
             fmt::ptr(node),
             fmt::ptr(observer),
             static_cast<unsigned>(errorId & 0xffu),
-            static_cast<unsigned>(WorldListCountOrStatus80()));
+            static_cast<unsigned>(worldListCountOrStatus80));
         onLoginError(observer, errorId);
         node = ObserverTreeNodeFromBase(std::_Rb_tree_increment(ObserverTreeNodeBase(node)));
     }

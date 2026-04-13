@@ -51,7 +51,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     }
 
     const uint32_t workResultCode = LoginState1WorkItemPayloadScaffold(workItem);
-    mediator->WorldListCountOrStatus80() = workResultCode;
+    mediator->worldListCountOrStatus80 = workResultCode;
 
     CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_);
     const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
@@ -179,7 +179,7 @@ uint32_t CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg) {
 uint32_t CLTLoginState_State1::Slot6_HandleSecondaryMessage(void* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (mediator != nullptr) {
-        mediator->WorldListCountOrStatus80() = 0x12000005u;
+        mediator->worldListCountOrStatus80 = 0x12000005u;
     }
     spdlog::info(
         "CLTLoginState_State1::Slot6_HandleSecondaryMessage workItem={} set owner+0x80=0x12000005",

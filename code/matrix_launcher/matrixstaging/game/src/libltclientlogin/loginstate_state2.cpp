@@ -102,7 +102,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
     const std::vector<uint8_t>& stagedBytes = mediator->stagedIncomingAuthPacketBytes_;
     const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
     if (childResult == kAuthBootstrap680InboundUnhandled) {
-        mediator->WorldListCountOrStatus80() = 0x12000004u;
+        mediator->worldListCountOrStatus80 = 0x12000004u;
         spdlog::info(
             "CLTLoginState_AuthenticatePending::AuthMessageDispatch rejected staged auth bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000004 and returned false-like",
             static_cast<unsigned>(stagedBytes.size()),
@@ -118,7 +118,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
         return 1u;
     }
 
-    mediator->WorldListCountOrStatus80() = mediator->AuthBootstrapChild680().inboundAuthStatusEc;
+    mediator->worldListCountOrStatus80 = mediator->AuthBootstrapChild680().inboundAuthStatusEc;
 
     switch (childResult) {
         case kAuthBootstrap680InboundAuthReplySuccess: {
@@ -186,7 +186,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05 triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x}",
                 static_cast<unsigned>(rawCode),
-                static_cast<unsigned>(mediator->WorldListCountOrStatus80()),
+                static_cast<unsigned>(mediator->worldListCountOrStatus80),
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(nextHelperStateId),
                 mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
@@ -204,7 +204,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             mediator->PostError(4u);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x0b error reply owner+0x80=0x{:08x}; mirrored original state0 switch and error=4",
-                static_cast<unsigned>(mediator->WorldListCountOrStatus80()));
+                static_cast<unsigned>(mediator->worldListCountOrStatus80));
             return 1u;
         }
 
@@ -215,19 +215,19 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x07 failure childResult={} owner+0x80=0x{:08x}; mirrored original state0 switch and error=2",
                 static_cast<unsigned>(childResult),
-                static_cast<unsigned>(mediator->WorldListCountOrStatus80()));
+                static_cast<unsigned>(mediator->worldListCountOrStatus80));
             return 1u;
         }
 
         case kAuthBootstrap680InboundAuthReplyValidationError: {
             mediator->expectedMarginRequestName_ = nullptr;
             AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
-            mediator->WorldListCountOrStatus80() = 0x1200000bu;
+            mediator->worldListCountOrStatus80 = 0x1200000bu;
             (void)mediator->SwitchHelperStateByIdScaffold(0u);
             mediator->PostError(0x0fu);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch rejected early raw-0x0b success-side adoption owner+0x80=0x{:08x}; mirrored original state0 switch and error=0x0f",
-                static_cast<unsigned>(mediator->WorldListCountOrStatus80()));
+                static_cast<unsigned>(mediator->worldListCountOrStatus80));
             return 1u;
         }
 

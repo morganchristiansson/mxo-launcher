@@ -129,7 +129,7 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
     }
 
     // Writeback to owner +0x80 (world list count/status family)
-    mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 =
+    mediator->worldListCountOrStatus80 =
         static_cast<uint32_t>(mediator->lastAuthReply_.worlds.size());
 
     if (characterCount != 0) {
@@ -208,7 +208,7 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
         return 0u;
     }
 
-    mediator->postAuthMarginLoadingState_.worldListCountOrStatus80 = parsed.status;
+    mediator->worldListCountOrStatus80 = parsed.status;
     if (parsed.status >= 1u) {
         spdlog::info(
             "DIAGNOSTIC: state10 raw-0x0b claim-name reply failure status=0x{:08x} optionalTextOffset=0x{:04x} optionalTextLen=0x{:04x} optionalText='{}'",
@@ -363,7 +363,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
     //   `state11 slot3 / 0x43c020 -> state11 slot6 / 0x440320 -> helper9 slot3 / 0x439780
     //    -> owner 0x41de40`
     if (rawCode != 0x0bu) {
-        mediator->WorldListCountOrStatus80() = 0x12000005u;
+        mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
             static_cast<unsigned>(stagedBytes.size()),
@@ -376,12 +376,12 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
         return 0u;
     }
 
-    if (mediator->WorldListCountOrStatus80() >= 1u) {
+    if (mediator->worldListCountOrStatus80 >= 1u) {
         (void)mediator->SwitchHelperStateByIdScaffold(3u);
         mediator->PostError(0x0bu);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
-            static_cast<unsigned>(mediator->WorldListCountOrStatus80()));
+            static_cast<unsigned>(mediator->worldListCountOrStatus80));
         return 1u;
     }
 

@@ -55,7 +55,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
     }
 
     const uint32_t status = LoginState4WorkItemPayloadScaffold(workItem);
-    mediator->WorldListCountOrStatus80() = status;
+    mediator->worldListCountOrStatus80 = status;
 
     if (status != 0u) {
         mediator->SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(true);

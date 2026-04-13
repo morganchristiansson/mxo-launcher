@@ -429,7 +429,6 @@ public:
         // ========================================================================
         // Post-auth HandleLoadCharacterReply outputs (0x440320)
         // ========================================================================
-        uint32_t worldListCountOrStatus80 = 0;           // `+0x80`
 
         // owner byte `+0xf14`; shared send gate used by the active state8 path and later state10.
         // Strongest current writer is state6 opcode-`9` success, which sets it alongside owner
@@ -1454,7 +1453,6 @@ public:
     // State-owned slot-6 bodies mutate this mediator-owned owner-state block directly.
 
     // Post-auth load-character reply outputs (0x440320) plus neighboring auth/margin send flags:
-    uint32_t& WorldListCountOrStatus80() { return postAuthMarginLoadingState_.worldListCountOrStatus80; }
     // Caution: original `0x4390b0` writes owner `+0x2c` on its non-zero payload branch, while the
     // current replacement also reuses this byte as a narrow live auth-ready alias on the active
     // happy path. Keep the storage stable, but do not overstate the exact original semantic yet.
@@ -1480,6 +1478,9 @@ public:
     // Returns whether the owner `+0x680 +0xf4` auth-reply-derived `0x136` copy block is present
     // and still fresh enough for the state5 copy/send path.
     bool HasValidState5ReplyCopyShadowF4Scaffold() const;
+
+    // owner `+0x80` - world list count or auth/status (used by state4 slot2)
+    uint32_t worldListCountOrStatus80 = 0;
 
 private:
     void RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(const mxo::auth::AuthReply& reply);

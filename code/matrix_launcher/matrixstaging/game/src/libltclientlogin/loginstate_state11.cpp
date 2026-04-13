@@ -172,7 +172,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem) {
     // anchor: launcher.exe:0x43ae50
     LoadCharacterReplyEnvelope loadCharacterReplyEnvelope(stagedBytes, true);
     if (!loadCharacterReplyEnvelope.valid) {
-        mediator->WorldListCountOrStatus80() = 0x12000005u;
+        mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "CLTLoginState_State11::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
             static_cast<unsigned>(stagedBytes.size()),
@@ -181,7 +181,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem) {
     }
 
     auto& ownerState = mediator->postAuthMarginLoadingState_;
-    ownerState.worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
+    mediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
         mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);

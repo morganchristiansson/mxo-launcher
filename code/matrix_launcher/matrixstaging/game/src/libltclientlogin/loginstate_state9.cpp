@@ -107,7 +107,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem) {
                 static_cast<unsigned>(fallbackResult));
             return 1u;
         }
-        mediator->WorldListCountOrStatus80() = 0x12000005u;
+        mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "CLTLoginState_State9::Slot6_HandleSecondaryMessage non-0x11 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
             static_cast<unsigned>(fallbackResult));
@@ -115,7 +115,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem) {
     }
 
     const uint32_t parsedStatus = ReadU32LEState9(bytes.data() + 1u);
-    mediator->WorldListCountOrStatus80() = parsedStatus;
+    mediator->worldListCountOrStatus80 = parsedStatus;
     if (parsedStatus < 1u) {
         mediator->HandleState9Opcode11SuccessSideEffect();
         (void)mediator->SwitchHelperStateByIdScaffold(0x0cu);

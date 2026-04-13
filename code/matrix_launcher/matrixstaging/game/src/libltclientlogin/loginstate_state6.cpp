@@ -368,7 +368,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem) {
         return 0u;
     }
 
-    mediator->WorldListCountOrStatus80() = parsed.status01;
+    mediator->worldListCountOrStatus80 = parsed.status01;
     if (parsed.status01 != 0u) {
         spdlog::info(
             "CLTLoginState_State6::Slot6_HandleSecondaryMessage observed opcode-0x09 failure status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x}; success-side owner+0xf14/+0xf18 write is source-owned but the broader failure-side helper-switch/error path is still not",

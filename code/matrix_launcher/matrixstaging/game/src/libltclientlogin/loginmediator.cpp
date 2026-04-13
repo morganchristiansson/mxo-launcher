@@ -2062,7 +2062,7 @@ bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
 uint32_t CLTLoginMediator::GetLastLoginStatus() {
     // Keep this wrapper-facing slot as close as practical to the original tiny getter
     // `0x41f240: mov eax, [ecx+0x80] ; ret`.
-    return this->WorldListCountOrStatus80();
+    return worldListCountOrStatus80;
 }
 
 // DELETEME

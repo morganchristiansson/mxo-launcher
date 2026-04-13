@@ -116,7 +116,7 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(void* workItem) {
     const std::vector<uint8_t>& stagedMarginBytes = mediator->StagedIncomingMarginPacketBytes();
     const ParsedState7Opcode0eReplyScaffold parsed = ParseState7Opcode0eReplyScaffold(stagedMarginBytes);
     if (!parsed.valid) {
-        mediator->WorldListCountOrStatus80() = 0x12000005u;
+        mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005",
             static_cast<unsigned>(stagedMarginBytes.size()),
@@ -124,7 +124,7 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(void* workItem) {
         return 0u;
     }
 
-    mediator->WorldListCountOrStatus80() = parsed.result09;
+    mediator->worldListCountOrStatus80 = parsed.result09;
     (void)mediator->SwitchHelperStateByIdScaffold(3u);
 
     // Tightened event-8 meaning from the real state7 reply body:
