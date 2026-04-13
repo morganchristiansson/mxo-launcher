@@ -70,7 +70,7 @@ public:
     virtual uint32_t Slot6_HandleSecondaryMessage(void* workItem);
 
     // anchor: reconstructed shared slot 7 state-id surface
-    virtual uint32_t Slot7_GetStateId() const = 0;
+    virtual uint32_t GetStateId() const = 0;
 
     // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-8 rows)
     // Uses g_CurrentLoginMediator (faithful to static-RE).
@@ -80,7 +80,7 @@ public:
     virtual uint32_t Slot9_IsNetworkDriven() const;
 
     // anchor: launcher.exe:0x00439300 and launcher.exe:0x004439300 consult slot-7-style helper codes;
-    // reimplementation wrapper forwards to Slot7_GetStateId().
+    // reimplementation wrapper forwards to GetStateId().
     virtual uint32_t DispatchPhaseCode() const;
 };
 
@@ -105,7 +105,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x0048bc34 (vtable 0x004b51b8 slot 7 purecall)
-    uint32_t Slot7_GetStateId() const override = 0;
+    uint32_t GetStateId() const override = 0;
 
     // anchor: launcher.exe:0x00437b40 (vtable 0x004b51b8 slot 9)
     uint32_t Slot9_IsNetworkDriven() const override;
@@ -132,7 +132,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00437b50 (vtable 0x004b51e0 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b4fc4
@@ -162,7 +162,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x0044e360 (vtable 0x004b4fc4 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b5014
@@ -195,7 +195,7 @@ public:
     uint32_t AuthMessageDispatch(void* workItem) override;
 
     // anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b5208
@@ -222,7 +222,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00438cf0 (vtable 0x004b5208 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b503c
@@ -252,7 +252,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x004686b0 (vtable 0x004b503c slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b5064
@@ -280,7 +280,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c60 (vtable 0x004b5064 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b508c
@@ -307,7 +307,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c70 (vtable 0x004b508c slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b50b4
@@ -328,7 +328,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c80 (vtable 0x004b50b4 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b5104
@@ -359,7 +359,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438c90 (vtable 0x004b5104 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b517c
@@ -401,7 +401,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438cc0 (vtable 0x004b517c slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b512c
@@ -435,7 +435,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b5154
@@ -464,7 +464,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438cb0 (vtable 0x004b5154 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b5230
@@ -483,7 +483,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00438d00 (vtable 0x004b5230 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b50dc
@@ -507,7 +507,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00438cd0 (vtable 0x004b50dc slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b4fec
@@ -532,7 +532,7 @@ public:
     uint32_t AuthMessageDispatch(void* workItem) override;
 
     // anchor: launcher.exe:0x00438ce0 (vtable 0x004b4fec slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b0b88
@@ -552,7 +552,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420310 (vtable 0x004b0b88 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 
     // anchor: launcher.exe:0x004206a0 (vtable 0x004b0b88 slot 8)
     uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
@@ -575,7 +575,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420320 (vtable 0x004b0bb0 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 
     // anchor: launcher.exe:0x004207c0 (vtable 0x004b0bb0 slot 8)
     uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
@@ -598,7 +598,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420330 (vtable 0x004b0bd8 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 };
 
 // anchor: launcher.exe vtable 0x004b0c00
@@ -618,7 +618,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420340 (vtable 0x004b0c00 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 
     // anchor: launcher.exe:0x00420960 (vtable 0x004b0c00 slot 8)
     uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
@@ -641,7 +641,7 @@ public:
     uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
 
     // anchor: launcher.exe:0x00420350 (vtable 0x004b0c28 slot 7)
-    uint32_t Slot7_GetStateId() const override;
+    uint32_t GetStateId() const override;
 
     // anchor: launcher.exe:0x00420a00 (vtable 0x004b0c28 slot 8)
     uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;

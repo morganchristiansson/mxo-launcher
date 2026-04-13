@@ -150,7 +150,7 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00438c80 (vtable 0x004b50b4 slot 7)
-uint32_t CLTLoginState_State7::Slot7_GetStateId() const {
+uint32_t CLTLoginState_State7::GetStateId() const {
     return 7;
 }
 

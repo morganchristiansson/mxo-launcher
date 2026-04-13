@@ -78,7 +78,7 @@ uint32_t CLTLoginState_WorldListPending::AuthMessageDispatch(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00438ce0 (vtable 0x004b4fec slot 7)
-uint32_t CLTLoginState_WorldListPending::Slot7_GetStateId() const {
+uint32_t CLTLoginState_WorldListPending::GetStateId() const {
     return 14;
 }
 

@@ -33,7 +33,7 @@ These names are intentionally structural and avoid overclaiming semantics where 
 | slot 4 | `Slot4_NoOp` | trivial `ret` stub on most reviewed vtables |
 | slot 5 | `AuthMessageDispatch` | first inbound-message / failure surface; string-backed auth/world-list handlers live here on some states |
 | slot 6 | `Slot6_HandleSecondaryMessage` | second inbound-message / completion surface |
-| slot 7 | `Slot7_GetStateId` | tiny state-id getter, or `purecall` on the abstract final-leaf base |
+| slot 7 | `GetStateId` | tiny state-id getter, or `purecall` on the abstract final-leaf base |
 | slot 8 | `Slot8_HandleAuxiliaryEvent` | optional auxiliary completion / UI / status handler |
 | slot 9 | `Slot9_IsNetworkDriven` | tiny boolean-style getter (`1` on most active states, `0` on final-leaf family) |
 | slot 10 | initializer / constructor entry | tracked in docs/comments, not exposed as a C++ virtual in the scaffold |

@@ -163,7 +163,7 @@ uint32_t CLTLoginState::Slot9_IsNetworkDriven() const {
 
 // anchor: launcher.exe:0x004439300 consults slot-7-style state/helper ids before margin-route dispatch
 uint32_t CLTLoginState::DispatchPhaseCode() const {
-    return Slot7_GetStateId();
+    return GetStateId();
 }
 
 // anchor: launcher.exe:0x004397e0 (vtable 0x004b51b8 slot 6)

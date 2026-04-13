@@ -34,7 +34,7 @@ const char* CLTLoginState_State12::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00438d00 (vtable 0x004b5230 slot 7)
-uint32_t CLTLoginState_State12::Slot7_GetStateId() const {
+uint32_t CLTLoginState_State12::GetStateId() const {
     return 12;
 }
 

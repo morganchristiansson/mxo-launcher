@@ -13,7 +13,7 @@ const char* CLTLoginState_State3::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00438cf0 (vtable 0x004b5208 slot 7)
-uint32_t CLTLoginState_State3::Slot7_GetStateId() const {
+uint32_t CLTLoginState_State3::GetStateId() const {
     return 3;
 }
 

@@ -209,12 +209,12 @@ const SlotRecordState_0x4b5328* CLTLoginMediator::GetCurrentSlotRecord() const {
 }
 
 // anchor: launcher.exe:0x41b220
-// Original body calls currentState_->Slot7_GetStateId(), checks result > 2, then accesses field
+// Original body calls currentState_->GetStateId(), checks result > 2, then accesses field
 const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const {
     if (!currentState_) {
         return nullptr;
     }
-    const uint32_t stateId = currentState_->Slot7_GetStateId();
+    const uint32_t stateId = currentState_->GetStateId();
     if (stateId <= 2u) {
         return nullptr;
     }
@@ -229,12 +229,12 @@ const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotInde
 }
 
 // anchor: launcher.exe:0x41b260
-// Original body calls currentState_->Slot7_GetStateId(), checks result > 2, then accesses field
+// Original body calls currentState_->GetStateId(), checks result > 2, then accesses field
 const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) const {
     if (!currentState_) {
         return nullptr;
     }
-    const uint32_t stateId = currentState_->Slot7_GetStateId();
+    const uint32_t stateId = currentState_->GetStateId();
     if (stateId <= 2u) {
         return nullptr;
     }
@@ -246,12 +246,12 @@ const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) con
 }
 
 // anchor: launcher.exe:0x41b2a0
-// Original body calls currentState_->Slot7_GetStateId(), checks result > 2, then accesses field
+// Original body calls currentState_->GetStateId(), checks result > 2, then accesses field
 uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
     if (!currentState_) {
         return 7u;
     }
-    const uint32_t stateId = currentState_->Slot7_GetStateId();
+    const uint32_t stateId = currentState_->GetStateId();
     if (stateId <= 2u) {
         return 7u;
     }

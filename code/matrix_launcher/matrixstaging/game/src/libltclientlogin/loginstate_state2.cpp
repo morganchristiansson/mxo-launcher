@@ -245,7 +245,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
 }
 
 // anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
-uint32_t CLTLoginState_AuthenticatePending::Slot7_GetStateId() const {
+uint32_t CLTLoginState_AuthenticatePending::GetStateId() const {
     return 2;
 }
 
