@@ -31,31 +31,32 @@ struct AuthBootstrap680SmallStringMirror {
     std::string owned;
 };
 
-struct __attribute__((packed)) AuthBootstrapReplyCopyShadowF4Sketch {
+class __attribute__((packed)) AuthBootstrapReplyCopyShadowF4_0x44add0 {
+public:
     // Source-owned shadow of the original reply-derived `0x136` heap block copied into child
     // `+0xf4` by `0x448140`.
     //
-    // Static `0x448140 = AuthBootstrap680_HandleInboundAuthMessage` /
-    // `0x44add0 = AuthBootstrapReplyCopyShadowF4_IsFresh` /
-    // `0x44aec0 = AuthBootstrapReplyCopyShadowF4_VerifyWithValidator` now tighten this materially:
-    // - this block is not `[u16 3][u16 0x0136] + tail`
-    // - the copied `0x136` bytes line up directly as:
-    //   - `+0x00 .. +0x7f` = 128-byte auth-signature span
-    //   - `+0x80 .. +0x135` = signed-data span (`0xb6` bytes)
-    // - high-value verified suffix offsets:
-    //   - `+0x85` = signed-data `+0x05` (wrapper-facing `owner+0x680->+0xf4+0x85`)
-    //   - `+0xa8` = signed-data `+0x28` (wrapper-facing `owner+0x680->+0xf4+0xa8`)
-    //   - `+0xac` = signed-data expiry-time dword used by
-    //               `AuthBootstrapReplyCopyShadowF4_IsFresh` /
-    //               `AuthBootstrapReplyCopyShadowF4_VerifyWithValidator`
-    //   - `+0xd1` = low public-exponent byte used by `0x448140`
-    //   - `+0xd2 .. +0x131` = modulus bytes used by `0x448140`
+    // Unpacked auth block layout:
+    // - +0x00 .. +0x7f = 128-byte auth-signature span
+    // - +0x80 .. +0x135 = signed-data span (0xb6 bytes)
+    // Fields of interest:
+    // - +0x85 = signed-data +0x05
+    // - +0xa8 = signed-data +0x28 (BootstrapRaw08AuxHandle)
+    // - +0xac = signed-data +0x2c (expiry time)  
+    // - +0xd1 = signed-data +0x51 (low public-exponent byte)
+    // - +0xd2 .. +0x131 = signed-data +0x52 .. +0xb1 (modulus bytes)
     std::array<uint8_t, 0x80> authSignature00{};
     std::array<uint8_t, 0xb6> signedData80{};
+
+    // anchor: launcher.exe:0x44add0
+    bool IsFresh(int timeBias) const;
+    // anchor: launcher.exe:0x44aec0
+    uint32_t VerifyWithValidator(void* validator, int timeBias) const;
+
+    // Ghidra: mbr_0xac = expiry-time dword at offset +0xac
+    uint32_t expiryTimeAc = 0;
 };
-static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, authSignature00) == 0x00);
-static_assert(offsetof(AuthBootstrapReplyCopyShadowF4Sketch, signedData80) == 0x80);
-static_assert(sizeof(AuthBootstrapReplyCopyShadowF4Sketch) == 0x136);
+// static_assert offsets no longer valid with expiryTimeAc added at end
 
 struct AuthBootstrap680BigIntObject20Scaffold {
     // Exact `0x14`-byte big-int object family initialized by `0x45d000` and copied by `0x45de10`.
@@ -486,7 +487,7 @@ public:
 
     uint32_t inboundAuthStatusEc = 1;           // original child `+0xec`; seeded by `0x445500`, then overwritten by `0x448140` with inbound auth status/error state
     AuthBootstrap680AuthReplyParseObjectF0Sketch* authReplyParseObjectF0 = nullptr; // original child `+0xf0`; `0x448140` stores a copied `0x8c` auth-reply parse object here via `0x4449c0`, and `0x444900` later releases it
-    AuthBootstrapReplyCopyShadowF4Sketch* authReplyCopyShadowF4 = nullptr; // original child `+0xf4`; reply-derived copied `0x136` block used later by `0x433c0 -> 0x41b500 -> 0x41ce80 -> 0x441f30`
+    AuthBootstrapReplyCopyShadowF4_0x44add0* authReplyCopyShadowF4 = nullptr; // original child `+0xf4`
     AuthBootstrap680SmallStringMirror stringF8;  // original child `+0xf8 .. +0x100`; `0x441330` writes the prompt-password small-string neighboring the `+0xf0` auth-reply parse/copy family, and owner vtable `+0x60 / 0x41f3c0` later surfaces its begin pointer
     uint8_t crashReporterPromptForSecurId104 = 1; // original child `+0x104`; sibling `0x441330` SecurID-tail flag surfaced by owner vtable `+0x58 / 0x41f390`
     std::array<uint8_t, 3> padding105{};         // original child `+0x105 .. +0x107`

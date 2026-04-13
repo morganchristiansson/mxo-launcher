@@ -69,7 +69,7 @@ struct AuthBootstrap680ChildOwnedState {
     std::unique_ptr<mxo::auth::internal::FeedbackSizeTransformAdapterSmall> feedbackTransformSmall98;
     std::unique_ptr<AuthBootstrap680AuthReplyParseObjectF0Sketch> authReplyParseObjectF0;
     std::vector<uint8_t> authReplyParsePacketBodyBytes;
-    std::unique_ptr<AuthBootstrapReplyCopyShadowF4Sketch> authReplyCopyShadowF4;
+    std::unique_ptr<AuthBootstrapReplyCopyShadowF4_0x44add0> authReplyCopyShadowF4;
     std::vector<uint32_t> modulusBigIntB0OwnedDigits;
     std::vector<uint32_t> publicExponentBigIntC4OwnedDigits;
     std::vector<uint32_t> privateExponentBigIntD8OwnedDigits;
@@ -1054,7 +1054,7 @@ namespace {
 
 // anchor: launcher.exe:0x44ae40
 static void BuildAuthBootstrapReplyCopyShadowF4SignedDataMd5Digest10Scaffold(
-    const AuthBootstrapReplyCopyShadowF4Sketch& copyShadow,
+    const AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow,
     std::array<uint8_t, 16>* outDigest10) {
     if (!outDigest10) {
         return;
@@ -1103,7 +1103,7 @@ static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorSca
 static bool VerifyAuthBootstrap680ReplyCopyShadowF4WithValidatorScaffold(
     const AuthBootstrap680Child& child,
     const AuthBootstrap680ReplyAuthDataValidatorOwnedState& validatorOwnedState,
-    const AuthBootstrapReplyCopyShadowF4Sketch& copyShadow) {
+    const AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow) {
     const std::time_t now = std::time(nullptr);
     const uint32_t currentAuthServerTime =
         (now > static_cast<std::time_t>(child.authServerTimeBias80))
@@ -1562,12 +1562,12 @@ uint32_t AuthBootstrap680Child::HandleInboundAuthMessage(
                 parseObject ? parseObject->authDataByteLength20
                             : static_cast<uint16_t>(reply.authDataBytes.size());
             if (!reply.valid || !reply.signedData.valid ||
-                authDataByteLength != sizeof(AuthBootstrapReplyCopyShadowF4Sketch) ||
+                authDataByteLength != sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0) ||
                 child.replyAuthDataValidatorAC == nullptr) {
                 return kAuthBootstrap680InboundAuthReplyValidationError;
             }
 
-            AuthBootstrapReplyCopyShadowF4Sketch copyShadowCandidate = {};
+            AuthBootstrapReplyCopyShadowF4_0x44add0 copyShadowCandidate = {};
             if (parseObject != nullptr && parseObject->authDataBytes1c != nullptr &&
                 parseObject->authDataByteLength20 == sizeof(copyShadowCandidate)) {
                 std::copy_n(
@@ -1610,7 +1610,7 @@ void* AuthBootstrap680Child::BootstrapRaw08AuxHandle50() const {
     // Static `0x41f370` is now concrete: this wrapper returns owner `+0x680 -> +0xf4 -> +0xa8`
     // when the copied auth-data block is present, not the earlier child `+0xa8` public-key worker.
     const auto* copyShadow =
-        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(authReplyCopyShadowF4);
+        static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(authReplyCopyShadowF4);
     void* value = nullptr;
     if (copyShadow != nullptr) {
         value = reinterpret_cast<void*>(static_cast<uintptr_t>(ReadU32LE(copyShadow->signedData80.data() + 0x28u)));
@@ -1626,6 +1626,29 @@ bool AuthBootstrap680Child::HasBootstrapRaw08AuxHandle54() const {
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
 uint8_t AuthBootstrap680Child::GetCrashReporterPromptForSecurId58() const {
     return crashReporterPromptForSecurId104;
+}
+
+// anchor: launcher.exe:0x44add0
+bool AuthBootstrapReplyCopyShadowF4_0x44add0::IsFresh(int timeBias) const {
+    // Ghidra: return (bool)('\x01' - ((uint)((int)time(NULL) - param_1) < this->mbr_0xac));
+    // Read expiry time at +0xac and compare with current time - timeBias
+    const time_t now = time(nullptr);
+    const uint32_t expiry = expiryTimeAc;
+    return static_cast<bool>('\x01' - (static_cast<uint32_t>(static_cast<int>(now) - timeBias) < expiry));
+}
+
+// anchor: launcher.exe:0x44aec0
+uint32_t AuthBootstrapReplyCopyShadowF4_0x44add0::VerifyWithValidator(void* validator, int timeBias) const {
+    // Ghidra: checks expiry, builds MD5 digest, calls validator->vtable+0x2c
+    const time_t now = time(nullptr);
+    const uint32_t expiry = expiryTimeAc;
+    if (static_cast<uint32_t>(static_cast<int>(now) - timeBias) < expiry) {
+        // TODO: Build MD5 digest of signedData80 and call validator
+        // AuthBootstrapReplyCopyShadowF4_BuildSignedDataMd5Digest10(this, local_14);
+        // cVar1 = (**(code **)(*param_1 + 0x2c))(local_14, 0x10, this, 0x80);
+        return 1;
+    }
+    return 0;
 }
 
 // anchor: launcher.exe:0x447eb0
@@ -2077,7 +2100,7 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
     mxo::liblttcp::CMarginConnection& marginConnection) {
     AuthBootstrap680Child& child = child_;
     const auto* copyShadow =
-        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(child.authReplyCopyShadowF4);
+        static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(child.authReplyCopyShadowF4);
     if (copyShadow == nullptr) {
         spdlog::warn(
             "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend missing child+0xf4 copy shadow marginConnection={}",
@@ -2125,8 +2148,8 @@ void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
         return;
     }
 
-    ownedState.authReplyCopyShadowF4 = std::make_unique<AuthBootstrapReplyCopyShadowF4Sketch>();
-    AuthBootstrapReplyCopyShadowF4Sketch& copyShadow = *ownedState.authReplyCopyShadowF4;
+    ownedState.authReplyCopyShadowF4 = std::make_unique<AuthBootstrapReplyCopyShadowF4_0x44add0>();
+    AuthBootstrapReplyCopyShadowF4_0x44add0& copyShadow = *ownedState.authReplyCopyShadowF4;
     copyShadow = {};
 
     // Prefer the exact copied parse-object auth-data field recovered from

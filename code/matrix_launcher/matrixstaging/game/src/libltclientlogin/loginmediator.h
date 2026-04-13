@@ -703,8 +703,6 @@ public:
     // family around `0x41f060/0x41f070` and `0x41f080/0x41f090`.
     uint32_t nopatchLauncherVersionValue08_ = 0;  // original owner `+0x08`
     uint32_t nopatchClientVersionValue0c_ = 0;    // original owner `+0x0c`
-    mutable bool bootstrapRaw08AuxHandle50Logged_ = false; // +0x50 change-log state moved from ABI wrapper
-    mutable void* lastBootstrapRaw08AuxHandle50_ = nullptr; // +0x50 last logged value moved from ABI wrapper
     mutable bool liveCuiCfgAbsentNoteLogged90_ = false;     // +0x90 one-shot caveat log moved from ABI wrapper
 
     // anchor: launcher.exe:0x41f070

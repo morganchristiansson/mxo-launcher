@@ -3308,7 +3308,7 @@ bool CLTLoginMediator::HasValidState5ReplyCopyShadowF4Scaffold() const {
     //   `(time(NULL) - child+0x80) < *(uint32_t*)(child+0xf4 + 0xac)`
     //   where child `+0x80` is the server-time bias seeded by `0x448140`, so the left side is
     //   effectively the current auth-server time
-    const auto* copyShadow = static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
+    const auto* copyShadow = static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(
         authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr);
     if (copyShadow == nullptr) {
         return false;
