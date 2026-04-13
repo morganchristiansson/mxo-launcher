@@ -800,14 +800,12 @@ const char* CLTLoginMediator::GetProfileOrSessionName() const {
 
 // anchor: launcher.exe:0x41f370 / owner vtable +0x50
 void* CLTLoginMediator::BootstrapRaw08AuxHandle50() const {
-    // Fidelity to static-RE: direct access to child->authReplyCopyShadowF4 + 0xa8
-    // No delegation to child method, no logging
+    // Fidelity to static-RE: reads dword at offset +0xa8 from copyShadow
     const auto* copyShadow =
         authBootstrapChild680_ ? authBootstrapChild680_->authReplyCopyShadowF4 : nullptr;
     if (copyShadow != nullptr) {
-        // Read dword at offset +0xa8 (signedData80.data() + 0x28 = 0x80 + 0x28)
         return reinterpret_cast<void*>(
-            *reinterpret_cast<const uint32_t*>(copyShadow->signedData80.data() + 0x28u));
+            *reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(copyShadow) + 0xa8));
     }
     return nullptr;
 }

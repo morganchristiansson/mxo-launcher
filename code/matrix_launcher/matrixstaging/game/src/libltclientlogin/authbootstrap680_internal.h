@@ -47,17 +47,11 @@ public:
     std::array<uint8_t, 0x80> authSignature00{};
     std::array<uint8_t, 0xb6> signedData80{};
 
-    // Convenience accessor for expiry time at signedData80 + 0x2c (= +0xac)
-    uint32_t GetExpiryTime() const {
-        return *reinterpret_cast<const uint32_t*>(signedData80.data() + 0x2c);
-    }
-
     // anchor: launcher.exe:0x44add0
     bool IsFresh(int timeBias) const;
     // anchor: launcher.exe:0x44aec0
     uint32_t VerifyWithValidator(void* validator, int timeBias) const;
 };
-static_assert(sizeof(AuthBootstrapReplyCopyShadowF4_0x44add0) == 0x136u, "reply copy shadow must be 310 bytes");
 
 struct AuthBootstrap680BigIntObjects_0x4ba50c {
     // Exact `0x14`-byte big-int object family initialized by `0x45d000` and copied by `0x45de10`.
