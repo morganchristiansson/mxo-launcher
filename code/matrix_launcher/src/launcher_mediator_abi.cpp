@@ -1,5 +1,5 @@
 #include "diagnostics.h"
-#include "launcher_mediator_abi_shared.h"
+#include "launcher_mediator_abi.h"
 #include "launcher_network_object_abi.h"
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 
@@ -176,56 +176,6 @@ static std::string DescribeRouteDescriptorText(
         return "<empty>";
     }
     return std::string(descriptor->begin, descriptor->current);
-}
-
-void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress) {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticGetActiveMediatorForCharacterState();
-    if (!mediator) {
-        return;
-    }
-
-    const auto characterState = mediator->DescribeOwnCharacterStateScaffold();
-    const auto* currentState = mediator->CurrentState();
-    const auto* currentSlotRecord = mediator->GetCurrentSlotRecord();
-    const auto* persistence = static_cast<const mxo::ltlogin::CLTLoginMediator::CLTLoginMediatorCharacterPersistenceData*>(
-        mediator->GetState8PersistenceF1c());
-    const char* currentSlotName =
-        (currentSlotRecord && !currentSlotRecord->heapString14.empty())
-            ? currentSlotRecord->heapString14.c_str()
-            : "<empty>";
-    const char* sourceLeadString108 = "<direct-field-unavailable>";
-    const char* characterNameBufferF1c =
-        (persistence && persistence->characterName00[0]) ? persistence->characterName00.data() : "<empty>";
-    const char* section0StringF8c =
-        (persistence && persistence->realFirstName70[0]) ? persistence->realFirstName70.data() : "<empty>";
-    const char* section0StringFac =
-        (persistence && persistence->realLastName90[0]) ? persistence->realLastName90.data() : "<empty>";
-    const char* section0StringFcc =
-        (persistence && persistence->backgroundB0[0]) ? persistence->backgroundB0.data() : "<empty>";
-    const char* activeCharacterName = NonEmptyOrPlaceholder(characterState.characterName);
-    const uint32_t activeCharacterIdLow = characterState.characterIdLow;
-    const uint32_t activeCharacterIdHigh = characterState.characterIdHigh;
-
-    spdlog::debug(
-        "MediatorStub::{} caller={} [{}] context{{mappedWorld='{}' profile='{}' currentSlot='{}' source108='{}' f1c='{}' section0f8c='{}' section0fac='{}' section0fcc='{}' activeChar='{}' activeIdLow=0x{:08x} activeIdHigh=0x{:08x} activeIdLow16=0x{:04x} currentState={} worldId=0x{:04x} status=0x{:02x}}}",
-        slotLabel ? slotLabel : "<slot>",
-        fmt::ptr(returnAddress),
-        DescribeMediatorCaller(returnAddress),
-        NonEmptyOrPlaceholder(DiagnosticMediatorMappedSelectionName()),
-        NonEmptyOrPlaceholder(DiagnosticMediatorProfileName()),
-        currentSlotName,
-        sourceLeadString108,
-        characterNameBufferF1c,
-        section0StringF8c,
-        section0StringFac,
-        section0StringFcc,
-        activeCharacterName,
-        activeCharacterIdLow,
-        activeCharacterIdHigh,
-        static_cast<unsigned>(activeCharacterIdLow & 0xffffu),
-        fmt::ptr(currentState),
-        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->worldId0c) : 0u,
-        currentSlotRecord ? static_cast<unsigned>(currentSlotRecord->status0b) : 0u);
 }
 
 // UNANCHORED: resets the replacement mediator stub and clears stale active-state registration.

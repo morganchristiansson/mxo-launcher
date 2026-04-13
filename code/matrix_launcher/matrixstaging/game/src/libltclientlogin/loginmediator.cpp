@@ -30,7 +30,7 @@
 #include "loginmediator_events.h"
 
 #include "loginstate.h"
-#include "../../../../src/launcher_mediator_abi_shared.h"
+#include "../../../../src/launcher_mediator_abi.h"
 #include "authbootstrap680_internal.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
 #include "../../../runtime/src/libltnet/sys/pc/pcsocket.h"
@@ -190,50 +190,6 @@ static const CLTLoginMediator* ResolveActiveState8PersistenceOwner(const CLTLogi
     // - the live `mcd.cfg` family still belongs to whichever mediator instance currently owns the
     //   active character/load state when one is registered
     return mediator ? mediator->ResolveActiveStateSourceScaffold() : nullptr;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t LogLiveSelectionCfgCorpusFlag(
-    const char* slotLabel,
-    const char* corpusLabel,
-    const char* storageLabel,
-    const LiveSelectionCfgCorpusView& view) {
-    spdlog::info(
-        "{} -> {} [live {} via {} ptr={} length=0x{:04x}]",
-        slotLabel ? slotLabel : "<slot>",
-        static_cast<unsigned>(view.ready),
-        corpusLabel ? corpusLabel : "<corpus>",
-        storageLabel ? storageLabel : "<owner fields>",
-        fmt::ptr(view.buffer),
-        static_cast<unsigned>(view.length));
-    if (view.ready == 0u) {
-        LogMediatorCharacterStateContext(slotLabel, nullptr);
-    }
-    return view.ready;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static void* LogLiveSelectionCfgCorpusGetter(
-    const char* slotLabel,
-    const char* corpusLabel,
-    const char* storageLabel,
-    const LiveSelectionCfgCorpusView& view,
-    uint32_t* outLength) {
-    if (outLength) {
-        *outLength = view.length;
-    }
-    spdlog::info(
-        "{} -> {} [live {} via {} flag={} length=0x{:04x}]",
-        slotLabel ? slotLabel : "<slot>",
-        fmt::ptr(view.buffer),
-        corpusLabel ? corpusLabel : "<corpus>",
-        storageLabel ? storageLabel : "<owner fields>",
-        static_cast<unsigned>(view.ready),
-        static_cast<unsigned>(view.length));
-    if (view.buffer == nullptr || view.length == 0u) {
-        LogMediatorCharacterStateContext(slotLabel, nullptr);
-    }
-    return view.buffer;
 }
 
 }  // namespace
@@ -948,153 +904,90 @@ const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValu
 // +0x68
 uint32_t CLTLoginMediator::HasLiveHlCfg68() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag140e != 0u);
-        view.buffer = ownerState->allocatedBuffer1408;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength140c);
+        return static_cast<uint32_t>(ownerState->allocatedBufferFlag140e != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveHlCfg68(+0x68)",
-        "hl.cfg / state8 section6",
-        "owner+0x140e/0x1408/0x140c",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x6c
 uint32_t CLTLoginMediator::HasLiveAnCfg6c() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->flag1416 != 0u);
-        view.buffer = ownerState->allocatedBuffer1410;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1414);
+        return static_cast<uint32_t>(ownerState->flag1416 != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveAnCfg6c(+0x6c)",
-        "an.cfg / state8 section7",
-        "owner+0x1416/0x1410/0x1414",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x70
 uint32_t CLTLoginMediator::HasLivePiCfg70() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag141e != 0u);
-        view.buffer = ownerState->allocatedBuffer1418;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength141c);
+        return static_cast<uint32_t>(ownerState->allocatedBufferFlag141e != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLivePiCfg70(+0x70)",
-        "pi.cfg / state8 section3",
-        "owner+0x141e/0x1418/0x141c",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x74
 uint32_t CLTLoginMediator::HasLiveAiCfg74() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag1426 != 0u);
-        view.buffer = ownerState->allocatedBuffer1420;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1424);
+        return static_cast<uint32_t>(ownerState->allocatedBufferFlag1426 != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveAiCfg74(+0x74)",
-        "ai.cfg / state8 section4",
-        "owner+0x1426/0x1420/0x1424",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x78
 uint32_t CLTLoginMediator::HasLiveCsCfg78() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->allocatedBufferFlag142e != 0u);
-        view.buffer = ownerState->allocatedBuffer1428;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength142c);
+        return static_cast<uint32_t>(ownerState->allocatedBufferFlag142e != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveCsCfg78(+0x78)",
-        "cs.cfg / state8 section5",
-        "owner+0x142e/0x1428/0x142c",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x7c
 uint32_t CLTLoginMediator::HasLiveBlCfg7c() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->flag13fe != 0u);
-        view.buffer = ownerState->allocatedBuffer13f8;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength13fc);
+        return static_cast<uint32_t>(ownerState->flag13fe != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveBlCfg7c(+0x7c)",
-        "bl.cfg / state8 section1",
-        "owner+0x13fe/0x13f8/0x13fc",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x80
 uint32_t CLTLoginMediator::HasLiveIlCfg80() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->flag1406 != 0u);
-        view.buffer = ownerState->allocatedBuffer1400;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1404);
+        return static_cast<uint32_t>(ownerState->flag1406 != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveIlCfg80(+0x80)",
-        "il.cfg / state8 section2",
-        "owner+0x1406/0x1400/0x1404",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x84
 uint32_t CLTLoginMediator::HasLiveRlCfg84() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->flag1448 != 0u);
-        view.buffer = ownerState->allocatedBuffer1440;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1444);
+        return static_cast<uint32_t>(ownerState->flag1448 != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveRlCfg84(+0x84)",
-        "rl.cfg / state8 section8",
-        "owner+0x1448/0x1440/0x1444",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 // +0x88
 uint32_t CLTLoginMediator::HasLiveClCfg88() const {
     const auto* ownerState = &this->postAuthMarginLoadingState_;
-    LiveSelectionCfgCorpusView view = {};
     if (ownerState) {
-        view.ready = static_cast<uint32_t>(ownerState->flag1452 != 0u);
-        view.buffer = ownerState->allocatedBuffer144c;
-        view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1450);
+        return static_cast<uint32_t>(ownerState->flag1452 != 0u);
     }
-    return LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveClCfg88(+0x88)",
-        "cl.cfg / state8 section9",
-        "owner+0x1452/0x144c/0x1450",
-        view);
+    return 0u;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1120,11 +1013,7 @@ uint32_t CLTLoginMediator::HasLiveCuiCfg90() const {
         view.buffer = ownerState->allocatedBuffer1454;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1458);
     }
-    const uint32_t result = LogLiveSelectionCfgCorpusFlag(
-        "CLTLoginMediator::HasLiveCuiCfg90(+0x90)",
-        "cui.cfg / state8 section10",
-        "owner+0x145a/0x1454/0x1458",
-        view);
+    const uint32_t result = view.ready;
     if (result == 0u && !liveCuiCfgAbsentNoteLogged90_) {
         liveCuiCfgAbsentNoteLogged90_ = true;
         spdlog::info(
@@ -1143,12 +1032,10 @@ void* CLTLoginMediator::GetLiveHlCfg94(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1408;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength140c);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveHlCfg94(+0x94)",
-        "hl.cfg / state8 section6",
-        "owner+0x1408/0x140c",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1161,12 +1048,10 @@ void* CLTLoginMediator::GetLiveAnCfg98(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1410;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1414);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveAnCfg98(+0x98)",
-        "an.cfg / state8 section7",
-        "owner+0x1410/0x1414",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1179,12 +1064,10 @@ void* CLTLoginMediator::GetLivePiCfg9c(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1418;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength141c);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLivePiCfg9c(+0x9c)",
-        "pi.cfg / state8 section3",
-        "owner+0x1418/0x141c",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1197,12 +1080,10 @@ void* CLTLoginMediator::GetLiveAiCfgA0(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1420;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1424);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveAiCfgA0(+0xa0)",
-        "ai.cfg / state8 section4",
-        "owner+0x1420/0x1424",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1215,12 +1096,10 @@ void* CLTLoginMediator::GetLiveCsCfgA4(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1428;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength142c);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveCsCfgA4(+0xa4)",
-        "cs.cfg / state8 section5",
-        "owner+0x1428/0x142c",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1233,12 +1112,10 @@ void* CLTLoginMediator::GetLiveBlCfgA8(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer13f8;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength13fc);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveBlCfgA8(+0xa8)",
-        "bl.cfg / state8 section1",
-        "owner+0x13f8/0x13fc",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1251,12 +1128,10 @@ void* CLTLoginMediator::GetLiveIlCfgAc(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1400;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1404);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveIlCfgAc(+0xac)",
-        "il.cfg / state8 section2",
-        "owner+0x1400/0x1404",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1269,12 +1144,10 @@ void* CLTLoginMediator::GetLiveRlCfgB0(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1440;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1444);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveRlCfgB0(+0xb0)",
-        "rl.cfg / state8 section8",
-        "owner+0x1440/0x1444",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1287,12 +1160,10 @@ void* CLTLoginMediator::GetLiveClCfgB4(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer144c;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1450);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveClCfgB4(+0xb4)",
-        "cl.cfg / state8 section9",
-        "owner+0x144c/0x1450",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -1305,12 +1176,10 @@ void* CLTLoginMediator::GetLiveCuiCfgB8(uint32_t* outLength) const {
         view.buffer = ownerState->allocatedBuffer1454;
         view.length = static_cast<uint32_t>(ownerState->allocatedBufferLength1458);
     }
-    return LogLiveSelectionCfgCorpusGetter(
-        "CLTLoginMediator::GetLiveCuiCfgB8(+0xb8)",
-        "cui.cfg / state8 section10",
-        "owner+0x1454/0x1458",
-        view,
-        outLength);
+    if (outLength) {
+        *outLength = view.length;
+    }
+    return view.buffer;
 }
 
 // anchor: launcher.exe:0x41f170 / owner vtable +0xbc

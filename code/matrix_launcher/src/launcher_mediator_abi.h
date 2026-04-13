@@ -23,7 +23,6 @@ extern void* g_LoginMediatorVtable[104];
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel();
 bool IsProfilePathBuilderCaller(void* returnAddress);
 const char* DescribeMediatorCaller(void* returnAddress);
-void LogMediatorCharacterStateContext(const char* slotLabel, void* returnAddress);
 
 const char g_MediatorName[] = "ILTLoginMediator.Default";
 const char* MaskedSensitiveValue(const char* value);
