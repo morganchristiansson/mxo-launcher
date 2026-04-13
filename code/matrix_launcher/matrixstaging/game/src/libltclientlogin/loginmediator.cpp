@@ -181,11 +181,6 @@ struct LiveSelectionCfgCorpusView {
 
 static std::string g_LastLoggedProfileRootName38;
 static uint32_t g_LastLoggedDefaultSelectionIndex3c = 0xffffffffu;
-static bool g_LastLoggedSelectionDescriptor40Valid = false;
-static uint32_t g_LastLoggedSelectionDescriptor40SelectionIndex = 0xffffffffu;
-static uint32_t g_LastLoggedSelectionDescriptor40Field03 = 0u;
-static uint32_t g_LastLoggedSelectionDescriptor40Field07 = 0u;
-static bool g_LastLoggedSelectionDescriptor40WasNull = false;
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 static const CLTLoginMediator* ResolveActiveSelectionCfgCorpusOwner(const CLTLoginMediator* mediator) {
@@ -575,26 +570,15 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
             : nullptr;
 
     if (!currentSlotRecord) {
-        const bool shouldLogNull =
-            !g_LastLoggedSelectionDescriptor40Valid ||
-            !g_LastLoggedSelectionDescriptor40WasNull ||
-            g_LastLoggedSelectionDescriptor40SelectionIndex != selectionIndex;
-        g_LastLoggedSelectionDescriptor40Valid = true;
-        g_LastLoggedSelectionDescriptor40WasNull = true;
-        g_LastLoggedSelectionDescriptor40SelectionIndex = selectionIndex;
-        g_LastLoggedSelectionDescriptor40Field03 = 0u;
-        g_LastLoggedSelectionDescriptor40Field07 = 0u;
-        if (shouldLogNull) {
-            spdlog::debug(
-                "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={})",
-                static_cast<unsigned>(selectionIndex),
-                static_cast<unsigned>(low24),
-                static_cast<unsigned>(high8),
-                static_cast<unsigned>(currentSlotIndex),
-                static_cast<unsigned>(expectedScratchRequest),
-                matchedConfiguredRequest ? 1u : 0u,
-                matchedCurrentSlotIndexRequest ? 1u : 0u);
-        }
+        spdlog::debug(
+            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> NULL (currentSlotIndex=0x{:02x} expectedScratchRequest=0x{:08x} matchedConfiguredRequest={} matchedCurrentSlotIndexRequest={})",
+            static_cast<unsigned>(selectionIndex),
+            static_cast<unsigned>(low24),
+            static_cast<unsigned>(high8),
+            static_cast<unsigned>(currentSlotIndex),
+            static_cast<unsigned>(expectedScratchRequest),
+            matchedConfiguredRequest ? 1u : 0u,
+            matchedCurrentSlotIndexRequest ? 1u : 0u);
         return nullptr;
     }
 
@@ -616,31 +600,18 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
     const char* matchMode =
         (selectionIndex == expectedScratchRequest) ? "arg7-scratch-shape" :
         (matchedCurrentSlotIndexRequest ? "current-slot-index" : "configured-request");
-    const bool shouldLogDescriptor =
-        !g_LastLoggedSelectionDescriptor40Valid ||
-        g_LastLoggedSelectionDescriptor40WasNull ||
-        g_LastLoggedSelectionDescriptor40SelectionIndex != selectionIndex ||
-        g_LastLoggedSelectionDescriptor40Field03 != arg6SelectionDescriptor40Payload_.characterIdLow03 ||
-        g_LastLoggedSelectionDescriptor40Field07 != arg6SelectionDescriptor40Payload_.characterIdHigh07;
-    g_LastLoggedSelectionDescriptor40Valid = true;
-    g_LastLoggedSelectionDescriptor40WasNull = false;
-    g_LastLoggedSelectionDescriptor40SelectionIndex = selectionIndex;
-    g_LastLoggedSelectionDescriptor40Field03 = arg6SelectionDescriptor40Payload_.characterIdLow03;
-    g_LastLoggedSelectionDescriptor40Field07 = arg6SelectionDescriptor40Payload_.characterIdHigh07;
-    if (shouldLogDescriptor) {
-        spdlog::debug(
-            "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} currentSlotIndex=0x{:02x} slotName='{}' vtable={} field03=0x{:08x} field07=0x{:08x})",
-            static_cast<unsigned>(selectionIndex),
-            static_cast<unsigned>(low24),
-            static_cast<unsigned>(high8),
-            fmt::ptr(&arg6SelectionDescriptor40_),
-            matchMode,
-            static_cast<unsigned>(currentSlotIndex),
-            currentSlotRecord->heapString14.empty() ? "<empty>" : currentSlotRecord->heapString14.c_str(),
-            fmt::ptr(arg6SelectionDescriptor40_.vtable),
-            static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdLow03),
-            static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdHigh07));
-    }
+    spdlog::debug(
+        "CLTLoginMediator::GetArg6SelectionDescriptorObject40(+0x40 selectionIndex=0x{:08x} low24=0x{:06x} high8=0x{:02x}) -> {} (matchMode={} currentSlotIndex=0x{:02x} slotName='{}' vtable={} field03=0x{:08x} field07=0x{:08x})",
+        static_cast<unsigned>(selectionIndex),
+        static_cast<unsigned>(low24),
+        static_cast<unsigned>(high8),
+        fmt::ptr(&arg6SelectionDescriptor40_),
+        matchMode,
+        static_cast<unsigned>(currentSlotIndex),
+        currentSlotRecord->heapString14.empty() ? "<empty>" : currentSlotRecord->heapString14.c_str(),
+        fmt::ptr(arg6SelectionDescriptor40_.vtable),
+        static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdLow03),
+        static_cast<unsigned>(arg6SelectionDescriptor40Payload_.characterIdHigh07));
     return &arg6SelectionDescriptor40_;
 }
 
