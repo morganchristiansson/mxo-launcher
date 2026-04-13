@@ -1455,8 +1455,7 @@ public:
     // Caution: original `0x4390b0` writes owner `+0x2c` on its non-zero payload branch, while the
     // current replacement also reuses this byte as a narrow live auth-ready alias on the active
     // happy path. Keep the storage stable, but do not overstate the exact original semantic yet.
-    uint8_t AuthConnectionFlag2c() const { return authConnectionFlag2c_; }
-    uint8_t& AuthConnectionFlag2c() { return authConnectionFlag2c_; }
+
     bool MarginConnectionCloseWaitEvent0fGateArmedScaffold() const { return marginConnectionFlag2d_ != 0u; }
     void SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(bool armed) {
         marginConnectionFlag2d_ = armed ? 1u : 0u;
