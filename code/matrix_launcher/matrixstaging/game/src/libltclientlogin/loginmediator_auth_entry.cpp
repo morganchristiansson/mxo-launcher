@@ -74,29 +74,11 @@ CLTLoginState* CLTLoginMediator::LoginHelperStateByIdScaffold(uint32_t helperSta
     return (helperStateId < 20u) ? const_cast<CLTLoginState*&>(reinterpret_cast<CLTLoginState**>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId]) : nullptr;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::InstallInitialState0Scaffold() {
-    if (LoginHelperStateByIdScaffold(0u) == nullptr) {
-        spdlog::info(
-            "ROUTE CHECKPOINT: startup initial state0 scaffold missing currentState={}",
-            currentState_ ? currentState_->DebugName() : "<null>");
-        return;
-    }
-
-    // Fresh happy-path proof keeps startup ownership split explicit:
-    // - mediator init installs state0 as the initial idle/start helper
-    // - state0 itself does not own the first submit transition because its slot 3 is the shared
-    //   no-op stub
-    // - `ProcessLoginRequest` later performs the first happy-path state switch (`state0 -> state2`)
-    currentState_ = LoginHelperStateByIdScaffold(0u);
-    spdlog::info(
-        "ROUTE CHECKPOINT: startup installed initial helper state0 currentState={} role=idle/start anchor=(launcher.exe:0x41b160 -> owner+0x10 = helper0 / 0x4f7868)",
-        currentState_->DebugName());
-}
-
-// anchor: launcher.exe:0x43b300 / full helper-dispatch table seed
+// anchor: launcher.exe:0x43b300 / static helper-dispatch table seed
+// Static method - does not use this pointer, only initializes global state dispatch table.
 void CLTLoginMediator::InitializeHelperDispatchTable() {
     // Direct dispatch table slot assignments - matches static-RE pattern at 0x43b300
+    // Original was a static method that allocated heap and stored vtable pointers to globals
     g_LoginHelperDispatchTableScaffold.helper7868 = &g_State0;
     g_LoginHelperDispatchTableScaffold.helper786C = &g_State1;
     g_LoginHelperDispatchTableScaffold.helper7870 = &g_AuthenticatePending;
@@ -117,10 +99,6 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
     g_LoginHelperDispatchTableScaffold.helper78AC = &g_State17;
     g_LoginHelperDispatchTableScaffold.helper78B0 = &g_State18;
     g_LoginHelperDispatchTableScaffold.helper78B4 = &g_State19;
-
-    if (currentState_ == nullptr) {
-        InstallInitialState0Scaffold();
-    }
 }
 
 uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {

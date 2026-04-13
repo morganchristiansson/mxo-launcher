@@ -971,11 +971,11 @@ public:
     // Installs the source-owned initial idle/start helper convention (`state0`) after
     // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
     // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.
-    void InstallInitialState0Scaffold();
-    // Registers the built-in recovered `CLTLoginState_*` family on this mediator and preserves the
-    // startup `state0` install convention when the mediator has not advanced yet. Callers should
-    // prefer this over rebuilding the concrete scaffold-state table from diagnostics code.
-    void InitializeHelperDispatchTable();
+    // anchor: launcher.exe:0x43b300
+    // Static helper-dispatch table seed. Does not use this pointer - only initializes
+    // global state objects in g_LoginHelperDispatchTableScaffold. currentState_ init
+    // should be done by caller.
+    static void InitializeHelperDispatchTable();
     // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
     // Late-login state9 callback-seed getter. Original body is the tiny live-pointer read
     // `owner +0x1c + 0x85`; current replacement still keeps an explicit launcher-owned

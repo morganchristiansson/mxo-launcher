@@ -372,7 +372,12 @@ void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* ne
     InitializeHelperDispatchTable();
     // inline RegisterActiveStateSourceScaffold
     g_CurrentLoginMediator = this;
-    InstallInitialState0Scaffold();
+    // Inline InstallInitialState0Scaffold - set initial helper state0
+    // anchor: launcher.exe:0x41b160 -> owner+0x10 = helper0 / 0x4f7868
+    currentState_ = LoginHelperStateByIdScaffold(0u);
+    spdlog::info(
+        "CLTLoginMediator::Initialize installed initial state0 currentState={}",
+        currentState_ ? currentState_->DebugName() : "<null>");
     ResetAuthConnectRetryStateScaffold();
     RefreshAuthAddressListForCurrentHostScaffold();
 
