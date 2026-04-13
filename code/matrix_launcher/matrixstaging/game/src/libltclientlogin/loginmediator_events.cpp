@@ -17,24 +17,28 @@ namespace mxo::ltlogin {
 namespace {
 
 // anchor: launcher.exe:0x419510 / cls_0x419510
+// anchor: launcher.exe:0x415f20 / cls_0x415f20
 // LoginObserverTreeHelper674 - static method wrapper for observer tree operations
-// Methods match Ghidra class cls_0x419510:
+// These two Ghidra classes (cls_0x419510 and cls_0x415f20) are duplicate compiler emissions
+// of the same SGI STL red-black tree helper - this is a Dinkumware/MSVC STL artifact that
+// emits multiple copies of essentially identical tree operations.
+// Both classes use identical tree layout: parent at +0x04, left at +0x08, right at +0x0c, key at +0x10.
+//
+// cls_0x419510 methods (current implementation):
 // - BuildEqualRangeForKey (0x419510)
 // - DestroySubtreeNodes_0x419570 (0x419570)
 // - DestroySubtreeNodes_0x41d370 (0x41d370)
 // - EraseRange_0x4195c0 (0x4195c0)
 // - EraseRange_0x41d430 (0x41d430)
 //
-// Note: cls_0x415f20 is a separate tree class with methods:
-// - meth_0x415f20 (tree insert-or-find)
-// - meth_0x452c10 (insert with rebalance)
-// - meth_0x452b70 (recursive destroy)
-// - meth_0x452bc0 (clear tree)
-// - meth_0x47e370 (equal range)
-// - meth_0x47e8e0 (erase range)
-// - meth_0x47ebf0 (find+erase)
-// The cls_0x415f20 methods are NOT currently needed - the observer tree uses the
-// helper class methods instead. Future use would require proper class wrapper.
+// cls_0x415f20 duplicate methods (not needed - same logic):
+// - meth_0x415f20 (0x415f20) - tree insert-or-find
+// - meth_0x452c10 (0x452c10) - insert with rebalance
+// - meth_0x452b70 (0x452b70) - recursive destroy
+// - meth_0x452bc0 (0x452bc0) - clear tree
+// - meth_0x47e370 (0x47e370) - equal range
+// - meth_0x47e8e0 (0x47e8e0) - erase range
+// - meth_0x47ebf0 (0x47ebf0) - find+erase
 class LoginObserverTreeHelper674 {
 public:
     static uintptr_t TreeKey(void* observer) {
