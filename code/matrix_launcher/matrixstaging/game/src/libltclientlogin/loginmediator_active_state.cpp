@@ -33,19 +33,9 @@ static bool IsLikelyMiddleInitialOnly(const char* value) {
 
 CLTLoginMediator* g_CurrentLoginMediator = nullptr;
 
-void CLTLoginMediator::RegisterActiveStateSourceScaffold(CLTLoginMediator* mediator) {
-    // anchor: launcher.exe:0x4f78b8
-    g_CurrentLoginMediator = mediator;
-}
 
-bool CLTLoginMediator::UnregisterActiveStateSourceScaffold(const CLTLoginMediator* mediator) {
-    if (g_CurrentLoginMediator != mediator) {
-        return false;
-    }
 
-    g_CurrentLoginMediator = nullptr;
-    return true;
-}
+
 
 
 

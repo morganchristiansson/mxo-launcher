@@ -910,9 +910,6 @@ public:
     // Narrow wrapper-facing bridge on top of the launcher global current-mediator pointer
     // (`0x4f78b8 = g_CurrentLoginMediator`). Keep callers on this hook instead of reaching into a
     // TU-local global directly.
-    static void RegisterActiveStateSourceScaffold(CLTLoginMediator* mediator);
-    static bool UnregisterActiveStateSourceScaffold(const CLTLoginMediator* mediator);
-    static CLTLoginMediator* ActiveStateSourceScaffold();
     ActiveCharacterStateViewScaffold DescribeOwnCharacterStateScaffold() const;
     ActiveCharacterStateViewScaffold DescribeActiveCharacterStateScaffold() const;
 

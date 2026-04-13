@@ -332,7 +332,8 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
 
     SetCurrentState(nullptr);
     SetNetworkEngine(nullptr);
-    UnregisterActiveStateSourceScaffold(this);
+    // inline UnregisterActiveStateSourceScaffold
+    g_CurrentLoginMediator = nullptr;
 
     if (authConnectionOwnedByMediator_) {
         delete authConnection_;
@@ -369,7 +370,8 @@ void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* ne
     SetNetworkEngine(networkEngineOverride);
     EnsureAuthBootstrapChild680Scaffold();
     InitializeHelperDispatchTable();
-    RegisterActiveStateSourceScaffold(this);
+    // inline RegisterActiveStateSourceScaffold
+    g_CurrentLoginMediator = this;
     InstallInitialState0Scaffold();
     ResetAuthConnectRetryStateScaffold();
     RefreshAuthAddressListForCurrentHostScaffold();

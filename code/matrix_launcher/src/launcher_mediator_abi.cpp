@@ -179,8 +179,8 @@ static std::string DescribeRouteDescriptorText(
 // UNANCHORED: resets the replacement mediator stub and clears stale active-state registration.
 static void ResetMediatorObjectState() {
     std::memset(&g_LoginMediatorStub, 0, sizeof(g_LoginMediatorStub));
-    mxo::ltlogin::CLTLoginMediator::UnregisterActiveStateSourceScaffold(
-        dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default));
+    // inline UnregisterActiveStateSourceScaffold
+    mxo::ltlogin::g_CurrentLoginMediator = nullptr;
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
 
