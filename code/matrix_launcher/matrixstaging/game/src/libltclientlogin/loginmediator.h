@@ -1026,7 +1026,6 @@ public:
     void SetMarginRouteHostPrefix(const char* routeHostPrefix);
     void SetExactMarginHostName(const char* exactMarginHostName);
     uint32_t MarginConnectAttemptCountScaffold() const { return marginBeginCount24_; }
-    uint32_t MarginConnectCandidateCountScaffold() const { return static_cast<uint32_t>(marginAddressList3c_.Count()); }
     void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
     // launcher.exe:0x43b300 / full helper-dispatch table seed

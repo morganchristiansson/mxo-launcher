@@ -59,14 +59,14 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
 
     if (status != 0u) {
         mediator->SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(true);
-        if (mediator->MarginConnectAttemptCountScaffold() < mediator->MarginConnectCandidateCountScaffold()) {
+        if (mediator->marginBeginCount24_ < static_cast<uint32_t>(mediator->marginAddressList3c_.Count())) {
             const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
             spdlog::info(
                 "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3 result=0x{:08x}",
                 static_cast<unsigned>(status),
                 fmt::ptr(cachedUpstreamOrArg_),
-                static_cast<unsigned>(mediator->MarginConnectAttemptCountScaffold()),
-                static_cast<unsigned>(mediator->MarginConnectCandidateCountScaffold()),
+                static_cast<unsigned>(mediator->marginBeginCount24_),
+                static_cast<unsigned>(mediator->marginAddressList3c_.Count()),
                 static_cast<unsigned>(retryResult));
             return 1u;
         }
