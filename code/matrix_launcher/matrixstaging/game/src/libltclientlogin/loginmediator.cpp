@@ -180,7 +180,6 @@ struct LiveSelectionCfgCorpusView {
     uint32_t length = 0u;
 };
 
-static std::string g_LastLoggedProfileRootName38;
 static uint32_t g_LastLoggedDefaultSelectionIndex3c = 0xffffffffu;
 
 
@@ -643,18 +642,10 @@ void CLTLoginMediator::RequestAuthCloseAndSwitchToState0() {
 
 // anchor: launcher.exe:0x41f0a0 / owner vtable +0x38
 // Static-RE: `return &this->ownerAuthBootstrapSource94` (returns pointer to inline struct at +0x94)
-// The inline struct's first 4 bytes (the username string pointer) is what callers read.
-const char* CLTLoginMediator::GetProfileRootName() const {
-    // Fidelity: read from the owner+0x94 block as per static-RE
-    const char* profileRootName = ownerAuthBootstrapSource94_.username00.data();
-    const char* normalizedProfileRootName = NonEmptyTextOrPlaceholder(profileRootName);
-    if (g_LastLoggedProfileRootName38 != normalizedProfileRootName) {
-        g_LastLoggedProfileRootName38 = normalizedProfileRootName;
-        spdlog::debug(
-            "CLTLoginMediator::GetProfileRootName(+0x38) -> '{}' [source=owner+0x94.username00]",
-            normalizedProfileRootName);
-    }
-    return profileRootName;
+// The inline struct's first field (username00) is what callers read.
+const char* CLTLoginMediator::GetUsername() const {
+    // Fidelity: return pointer to first element of username00 array in owner+0x94 block
+    return ownerAuthBootstrapSource94_.username00.data();
 }
 
 // Wrapper-facing arg6 `+0x40` selection-descriptor object builder.

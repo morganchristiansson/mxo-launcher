@@ -746,7 +746,7 @@ public:
     uint32_t IsConnected() override;
     // +0x38
     // anchor: launcher.exe:0x41f0a0 / exact tiny body returns owner `+0x94`
-    const char* GetProfileRootName() const override;
+    const char* GetUsername() const override;
     // +0x3c
     // anchor: launcher.exe:0x41f2d0 / exact tiny body returns owner byte `+0xcc8`
     uint32_t GetDefaultSelectionIndex() const override;

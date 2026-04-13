@@ -269,9 +269,9 @@ static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) 
 
 // anchor: client.dll profile-root formatting path uses arg6 +0x38 for Profiles\%s\... construction
 // vtable: ILTLoginMediator.Default slot +0x38
-static const char* __thiscall Mediator_GetProfileRootName38(MinimalLoginMediatorStub* self) {
+static const char* __thiscall Mediator_GetUsername38(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
+    return mxo::ltlogin::ILTLoginMediator::Default->GetUsername();
 }
 
 // anchor: client.dll fallback-selection path asks arg6 +0x3c for the default selection index when given 0xff
@@ -1192,7 +1192,7 @@ static void InitializeMediatorStub() {
     // +0x28
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[12] = (void*)Mediator_ProcessLoginRequest30; // +0x30
-    g_LoginMediatorVtable[14] = (void*)Mediator_GetProfileRootName38;  // +0x38
+    g_LoginMediatorVtable[14] = (void*)Mediator_GetUsername38;  // +0x38
     g_LoginMediatorVtable[15] = (void*)Mediator_GetDefaultSelectionIndex; // +0x3c
     g_LoginMediatorVtable[16] = (void*)Mediator_GetSelectionDescriptor40; // +0x40
     g_LoginMediatorVtable[17] = (void*)Mediator_GetCurrentSlotRecordObject44; // +0x44

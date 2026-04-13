@@ -420,7 +420,7 @@ public:
     // +0x34
     virtual void RequestAuthCloseAndSwitchToState0() = 0;
     // +0x38
-    virtual const char* GetProfileRootName() const = 0;
+    virtual const char* GetUsername() const = 0;
     // +0x3c
     virtual uint32_t GetDefaultSelectionIndex() const = 0;
     // +0x40

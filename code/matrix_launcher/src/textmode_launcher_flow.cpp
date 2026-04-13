@@ -717,7 +717,7 @@ character_selection_menu:
         }
 
         const char* deleteProfileRootNameToUse =
-            mxo::ltlogin::ILTLoginMediator::Default->GetProfileRootName();
+            mxo::ltlogin::ILTLoginMediator::Default->GetUsername();
         if (!deleteProfileRootNameToUse || !deleteProfileRootNameToUse[0]) {
             deleteProfileRootNameToUse = g_LauncherCommandLine.AuthUsername();
         }
