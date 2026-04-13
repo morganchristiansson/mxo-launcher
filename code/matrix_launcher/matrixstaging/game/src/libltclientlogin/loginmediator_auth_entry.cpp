@@ -42,46 +42,36 @@ static void AssignOwnedSmallStringForAuthEntry(
     dest.string60.capacity = dest.string60.current;
 }
 
-struct BuiltinScaffoldStates {
-    CLTLoginState_State0 state0 = {};
-    CLTLoginState_State1 state1 = {};
-    CLTLoginState_AuthenticatePending authenticatePending = {};
-    CLTLoginState_State3 state3 = {};
-    CLTLoginState_State4 state4 = {};
-    CLTLoginState_State5 state5 = {};
-    CLTLoginState_State6 state6 = {};
-    CLTLoginState_State7 state7 = {};
-    CLTLoginState_State8 state8 = {};
-    CLTLoginState_State9 state9 = {};
-    CLTLoginState_State10 state10 = {};
-    CLTLoginState_State11 state11 = {};
-    CLTLoginState_State12 state12 = {};
-    CLTLoginState_State13 state13 = {};
-    CLTLoginState_WorldListPending worldListPending = {};
-    CLTLoginState_State15 state15 = {};
-    CLTLoginState_State16 state16 = {};
-    CLTLoginState_State17 state17 = {};
-    CLTLoginState_State18 state18 = {};
-    CLTLoginState_State19 state19 = {};
-};
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static BuiltinScaffoldStates& GetBuiltinScaffoldStates() {
-    static BuiltinScaffoldStates states = {};
-    return states;
-}
-
-static CLTLoginState*& GlobalLoginHelperDispatchSlotByIdScaffold(uint32_t helperStateId) {
-    return reinterpret_cast<CLTLoginState**>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId];
-}
-
 }  // namespace
 
 CLTLoginMediator::ConnectionHelperFamily g_LoginHelperDispatchTableScaffold = {};
 
+// Inline state objects - replaces static BuiltinScaffoldStates singleton pattern
+// anchor: launcher.exe:0x43b300 / dispatch table seed
+static CLTLoginState_State0 g_State0 = {};
+static CLTLoginState_State1 g_State1 = {};
+static CLTLoginState_AuthenticatePending g_AuthenticatePending = {};
+static CLTLoginState_State3 g_State3 = {};
+static CLTLoginState_State4 g_State4 = {};
+static CLTLoginState_State5 g_State5 = {};
+static CLTLoginState_State6 g_State6 = {};
+static CLTLoginState_State7 g_State7 = {};
+static CLTLoginState_State8 g_State8 = {};
+static CLTLoginState_State9 g_State9 = {};
+static CLTLoginState_State10 g_State10 = {};
+static CLTLoginState_State11 g_State11 = {};
+static CLTLoginState_State12 g_State12 = {};
+static CLTLoginState_State13 g_State13 = {};
+static CLTLoginState_WorldListPending g_WorldListPending = {};
+static CLTLoginState_State15 g_State15 = {};
+static CLTLoginState_State16 g_State16 = {};
+static CLTLoginState_State17 g_State17 = {};
+static CLTLoginState_State18 g_State18 = {};
+static CLTLoginState_State19 g_State19 = {};
+
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginState* CLTLoginMediator::LoginHelperStateByIdScaffold(uint32_t helperStateId) const {
-    return (helperStateId < 20u) ? const_cast<CLTLoginState*&>(GlobalLoginHelperDispatchSlotByIdScaffold(helperStateId)) : nullptr;
+    return (helperStateId < 20u) ? const_cast<CLTLoginState*&>(reinterpret_cast<CLTLoginState**>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId]) : nullptr;
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
@@ -106,28 +96,27 @@ void CLTLoginMediator::InstallInitialState0Scaffold() {
 
 // anchor: launcher.exe:0x43b300 / full helper-dispatch table seed
 void CLTLoginMediator::InitializeHelperDispatchTable() {
-    // Inlined from RegisterScaffoldState* helpers - direct dispatch table slot assignment
-    // Static RE pattern: allocate slots and store pointers to state objects
-    g_LoginHelperDispatchTableScaffold.helper7868 = &GetBuiltinScaffoldStates().state0;
-    g_LoginHelperDispatchTableScaffold.helper786C = &GetBuiltinScaffoldStates().state1;
-    g_LoginHelperDispatchTableScaffold.helper7870 = &GetBuiltinScaffoldStates().authenticatePending;
-    g_LoginHelperDispatchTableScaffold.helper7874 = &GetBuiltinScaffoldStates().state3;
-    g_LoginHelperDispatchTableScaffold.helper7878 = &GetBuiltinScaffoldStates().state4;
-    g_LoginHelperDispatchTableScaffold.helper787C = &GetBuiltinScaffoldStates().state5;
-    g_LoginHelperDispatchTableScaffold.helper7880 = &GetBuiltinScaffoldStates().state6;
-    g_LoginHelperDispatchTableScaffold.helper7884 = &GetBuiltinScaffoldStates().state7;
-    g_LoginHelperDispatchTableScaffold.helper7888 = &GetBuiltinScaffoldStates().state8;
-    g_LoginHelperDispatchTableScaffold.helper788C = &GetBuiltinScaffoldStates().state9;
-    g_LoginHelperDispatchTableScaffold.helper7890 = &GetBuiltinScaffoldStates().state10;
-    g_LoginHelperDispatchTableScaffold.helper7894 = &GetBuiltinScaffoldStates().state11;
-    g_LoginHelperDispatchTableScaffold.helper7898 = &GetBuiltinScaffoldStates().state12;
-    g_LoginHelperDispatchTableScaffold.helper789C = &GetBuiltinScaffoldStates().state13;
-    g_LoginHelperDispatchTableScaffold.helper78A0 = &GetBuiltinScaffoldStates().worldListPending;
-    g_LoginHelperDispatchTableScaffold.helper78A4 = &GetBuiltinScaffoldStates().state15;
-    g_LoginHelperDispatchTableScaffold.helper78A8 = &GetBuiltinScaffoldStates().state16;
-    g_LoginHelperDispatchTableScaffold.helper78AC = &GetBuiltinScaffoldStates().state17;
-    g_LoginHelperDispatchTableScaffold.helper78B0 = &GetBuiltinScaffoldStates().state18;
-    g_LoginHelperDispatchTableScaffold.helper78B4 = &GetBuiltinScaffoldStates().state19;
+    // Direct dispatch table slot assignments - matches static-RE pattern at 0x43b300
+    g_LoginHelperDispatchTableScaffold.helper7868 = &g_State0;
+    g_LoginHelperDispatchTableScaffold.helper786C = &g_State1;
+    g_LoginHelperDispatchTableScaffold.helper7870 = &g_AuthenticatePending;
+    g_LoginHelperDispatchTableScaffold.helper7874 = &g_State3;
+    g_LoginHelperDispatchTableScaffold.helper7878 = &g_State4;
+    g_LoginHelperDispatchTableScaffold.helper787C = &g_State5;
+    g_LoginHelperDispatchTableScaffold.helper7880 = &g_State6;
+    g_LoginHelperDispatchTableScaffold.helper7884 = &g_State7;
+    g_LoginHelperDispatchTableScaffold.helper7888 = &g_State8;
+    g_LoginHelperDispatchTableScaffold.helper788C = &g_State9;
+    g_LoginHelperDispatchTableScaffold.helper7890 = &g_State10;
+    g_LoginHelperDispatchTableScaffold.helper7894 = &g_State11;
+    g_LoginHelperDispatchTableScaffold.helper7898 = &g_State12;
+    g_LoginHelperDispatchTableScaffold.helper789C = &g_State13;
+    g_LoginHelperDispatchTableScaffold.helper78A0 = &g_WorldListPending;
+    g_LoginHelperDispatchTableScaffold.helper78A4 = &g_State15;
+    g_LoginHelperDispatchTableScaffold.helper78A8 = &g_State16;
+    g_LoginHelperDispatchTableScaffold.helper78AC = &g_State17;
+    g_LoginHelperDispatchTableScaffold.helper78B0 = &g_State18;
+    g_LoginHelperDispatchTableScaffold.helper78B4 = &g_State19;
 
     if (currentState_ == nullptr) {
         InstallInitialState0Scaffold();
