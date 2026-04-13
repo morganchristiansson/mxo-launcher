@@ -190,74 +190,6 @@ struct SessionCallbackHelper65cSketch {
     uint8_t flag2D = 0;                 // helper `+0x2d`
 };
 
-struct AuthBootstrapSelectedSource38Sketch {
-    struct SmallStringLike60Sketch {
-        // Same three-dword small-string family used by `0x407dd0`:
-        // - `+0x00` = begin/data pointer
-        // - `+0x04` = current/end pointer
-        // - `+0x08` = capacity/end-of-storage pointer
-        // launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch only consumes the first dword here as a raw `char*` for its arg9 path,
-        // but `0x41eb80` proves the full embedded small-string object still lives here.
-        const char* begin = nullptr;
-        const char* current = nullptr;
-        const char* capacity = nullptr;
-    };
-
-    // Current best concrete family returned by owner vtable `+0x38`:
-    // - getter is tiny function `0x41f0a0 = lea eax,[ecx+0x94] ; ret`
-    // - so this is an **embedded owner subobject at `0x4f78b8 + 0x94`**, not a separate heap object
-    // - owner vtable `+0x30` / `0x41ecd0` then acts as the corresponding setter/consumer and
-    //   uses `0x41eb80` to copy the same family into owner `+0x94`
-    // - owner vtable `+0x150` / `0x41f270` is now also a direct first-string writer for the
-    //   same block and copies up to `0x20` bytes into owner `+0x94`
-    //
-    // Current best recovered layout from launcher.exe:0x41f0a0 + launcher.exe:0x41ecd0
-    // + launcher.exe:0x41eb80 + launcher.exe:0x439210, where state2 owns the handoff into the
-    // owner `+0x680` bootstrap child, plus later owner-path uses like `0x43f300`, `0x41330`,
-    // `0x21a50`, and `0x20720`:
-    // - `+0x00 .. +0x1f` = first inline 32-byte NUL-terminated string
-    // - `+0x20 .. +0x3f` = second inline 32-byte NUL-terminated string
-    // - `+0x40 .. +0x4f` = first copied 16-byte block
-    // - `+0x50 .. +0x5f` = second copied 16-byte block
-    // - `+0x60 .. +0x68` = embedded small-string object
-    // - `+0x6c` = trailing byte/flag
-    //
-    // Newer direct `0x439210 -> 0x448050` call-shape tightening now closes the active use of
-    // this owner block too:
-    // - arg1 = owner `+0x94 + 0x00`
-    // - arg2 = owner `+0x94 + 0x20`
-    // - arg5 = owner `+0x94 + 0x40`
-    // - arg6 = owner `+0x94 + 0x50`
-    // - arg8 = first dword / begin pointer from owner `+0x94 + 0x60`
-    //
-    // Newer semantic anchors on individual fields:
-    // - `+0x00` first string:
-    //   - owner vtable `+0x150` / `0x41f270` writes it directly
-    //   - later auth-reply path `0x43f300 -> owner +0x150` feeds it from `0x43d480(...)`
-    // - `+0x20` second string:
-    //   - later copied into bootstrap `+0xf8` by `0x41330`
-    //   - `0x41330 -> 0x456c40` validates it against a concrete slash+6-digit shape
-    // - `+0x60` embedded small string:
-    //   - empty case falls through a literal `"STATION"` default path in `0x489bc0`
-    //   - non-empty case is later copied into owner `+0x65c + 0x18` through `0x21a50`
-    //   - that same helper-local string is then copied onward into owner `+0x664`
-    //     (`GameSessionID`) by `0x420e70` when helper flag `+0x2d` is clear
-    //
-    // Current best semantic read is therefore stronger than a generic auth blob but still
-    // deliberately provisional on exact original class name:
-    // an owner-side **station/bootstrap phase-2 auth source block** that later separate
-    // LaunchPad/session helpers also touch.
-    // Keep this on the mediator owner because it is shared state, not because the mediator and
-    // LaunchPadClient are the same class.
-    std::array<char, 0x20> inlineString00{};
-    std::array<char, 0x20> inlineString20{};
-    std::array<uint8_t, 16> block40{};
-    std::array<uint8_t, 16> block50{};
-    SmallStringLike60Sketch string60;
-    std::string string60Owned;         // source-owned backing storage for the copied `+0x60` small-string mirror
-    uint8_t flag6C = 0;
-};
-
 struct ProcessLoginRequestInputSketch {
     // owner vtable `+0x30` / `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest`
     // Live input shape confirmed:
@@ -271,7 +203,12 @@ struct ProcessLoginRequestInputSketch {
     std::array<char, 0x20> inlineString20{};     // input `+0x20 .. +0x3f` = password
     std::array<uint8_t, 16> block40{};           // input `+0x40 .. +0x4f`
     std::array<uint8_t, 16> block50{};           // input `+0x50 .. +0x5f`
-    AuthBootstrapSelectedSource38Sketch::SmallStringLike60Sketch string60; // input `+0x60 .. +0x68`
+    // SmallString60 (same as OwnerAuthBootstrapSource94::SmallString60)
+    struct SmallString60Sketch {
+        const char* begin = nullptr;
+        const char* current = nullptr;
+        const char* capacity = nullptr;
+    } string60; // input `+0x60 .. +0x68`
     uint8_t flag6C = 0;                          // input `+0x6c`
 };
 
@@ -281,7 +218,7 @@ struct ProcessLoginRequestInputSketch {
 // Also has a separate session token string at +0xf4 (block offset +0x60).
 class OwnerAuthBootstrapSource94 {
 public:
-    // Same layout as AuthBootstrapSelectedSource38Sketch
+    // Layout matches owner+0x94 block
     std::array<char, 0x20> username00{};    // +0x00
     std::array<char, 0x20> password20{};     // +0x20
     std::array<uint8_t, 16> keyConfigMd540{}; // +0x40

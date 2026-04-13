@@ -235,7 +235,6 @@ CLTLoginMediator::CLTLoginMediator()
       marginPeerCloseQueuedScaffold_(false),
       marginRouteState_{},
       marginAddressList3c_{},
-      authBootstrapSource38_{},
       authBootstrapChild680_(nullptr),
       sessionCallbackHelper65c_(nullptr),
       selectionRouteState684_{},
@@ -497,21 +496,18 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         return 4u;
     }
 
-    authBootstrapSource38_.inlineString00 = input.inlineString00;
-    authBootstrapSource38_.inlineString20 = input.inlineString20;
-    authBootstrapSource38_.block40 = input.block40;
-    authBootstrapSource38_.block50 = input.block50;
-    authBootstrapSource38_.flag6C = input.flag6C;
-    AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, input.string60.begin, input.string60.current);
-
-    // Fidelity: populate owner+0x94 block using CopyFromSubmitLoginRequestInput method
     ownerAuthBootstrapSource94_.CopyFromSubmitLoginRequestInput(input);
+
+    // Fidelity: session token at +0xf4 within owner+0x94 block
+    ownerAuthBootstrapSource94_.sessionToken60.begin = input.string60.begin;
+    ownerAuthBootstrapSource94_.sessionToken60.current = input.string60.current;
+    ownerAuthBootstrapSource94_.sessionToken60.capacity = input.string60.capacity;
 
     spdlog::info(
         "CLTLoginMediator::ProcessLoginRequest copied owner+0x94 username='{}' password='{}' string60Len={} currentState={} stateCode={} launchPadGateState16State18AltPath={} helper65cPresent={} submitOwnership=owner",
-        authBootstrapSource38_.inlineString00[0] ? authBootstrapSource38_.inlineString00.data() : "<empty>",
-        authBootstrapSource38_.inlineString20[0] ? authBootstrapSource38_.inlineString20.data() : "<empty>",
-        static_cast<unsigned>(authBootstrapSource38_.string60Owned.size()),
+        ownerAuthBootstrapSource94_.username00[0] ? ownerAuthBootstrapSource94_.username00.data() : "<empty>",
+        ownerAuthBootstrapSource94_.password20[0] ? ownerAuthBootstrapSource94_.password20.data() : "<empty>",
+        static_cast<unsigned>(ownerAuthBootstrapSource94_.sessionToken60.current - ownerAuthBootstrapSource94_.sessionToken60.begin),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(stateCode),
         0u,
@@ -538,7 +534,10 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         //   bootstrap child
         // This is the exact favored happy path and keeps submit ownership on the mediator/owner,
         // not on state0.
-        AssignOwnedSmallStringForAuthEntry(authBootstrapSource38_, nullptr, nullptr);
+        // Fidelity: clear session token in owner+0x94 block (as per static-RE 0x41ecd0)
+        ownerAuthBootstrapSource94_.sessionToken60.begin = nullptr;
+        ownerAuthBootstrapSource94_.sessionToken60.current = nullptr;
+        ownerAuthBootstrapSource94_.sessionToken60.capacity = nullptr;
         spdlog::info(
             "ROUTE CHECKPOINT: early-auth state0 -> state2 via owner ProcessLoginRequest (favored g_LaunchPadGateState16State18==0 happy path) upstreamState={} clearedOwnerF4=1",
             upstreamState ? upstreamState->DebugName() : "<null>");
@@ -597,10 +596,10 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
 
     if (sessionCallbackHelper65c_ != nullptr) {
         const char* helperString = sessionCallbackHelper65cState_.string18.c_str();
-        AssignOwnedSmallStringForAuthEntry(
-            authBootstrapSource38_,
-            helperString,
-            helperString + sessionCallbackHelper65cState_.string18.size());
+        // Fidelity: refresh session token in owner+0x94 block
+        ownerAuthBootstrapSource94_.sessionToken60.begin = helperString;
+        ownerAuthBootstrapSource94_.sessionToken60.current = helperString + sessionCallbackHelper65cState_.string18.size();
+        ownerAuthBootstrapSource94_.sessionToken60.capacity = ownerAuthBootstrapSource94_.sessionToken60.current;
         spdlog::info(
             "CLTLoginMediator::ProcessLoginRequest alternate g_LaunchPadGateState16State18!=0 branch refreshed owner+0xf4 from helper65c string18='{}'",
             sessionCallbackHelper65cState_.string18.empty() ? "<empty>" : sessionCallbackHelper65cState_.string18.c_str());
@@ -2709,8 +2708,9 @@ uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94
         return 0u;
     }
 
-    if (authBootstrapSource38_.string60.begin != nullptr && authBootstrapSource38_.string60.begin[0] != '\0') {
-        helper->string18 = authBootstrapSource38_.string60.begin;
+    // Fidelity: read session token from owner+0x94 block
+    if (ownerAuthBootstrapSource94_.sessionToken60.begin != nullptr && ownerAuthBootstrapSource94_.sessionToken60.begin[0] != '\0') {
+        helper->string18 = ownerAuthBootstrapSource94_.sessionToken60.begin;
     }
 
     return CommitSessionCallbackHelperGameSessionId664();

@@ -21,26 +21,6 @@
 
 namespace mxo::ltlogin {
 
-// Keep the early auth-entry split self-contained so loginmediator.cpp no longer needs the
-// auth-credential logging helper just for state1/connect-status bringup.
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void AssignOwnedSmallStringForAuthEntry(
-    AuthBootstrapSelectedSource38Sketch& dest,
-    const char* begin,
-    const char* current) {
-    dest.string60Owned.clear();
-    dest.string60 = {};
-
-    if (!begin || !current || current <= begin) {
-        return;
-    }
-
-    dest.string60Owned.assign(begin, current);
-    dest.string60.begin = dest.string60Owned.c_str();
-    dest.string60.current = dest.string60.begin + dest.string60Owned.size();
-    dest.string60.capacity = dest.string60.current;
-}
-
 CLTLoginMediator::ConnectionHelperFamily g_LoginHelperDispatchTableScaffold = {};
 
 // Inline state objects - replaces static BuiltinScaffoldStates singleton pattern

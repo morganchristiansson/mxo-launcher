@@ -22,12 +22,6 @@ class LoginObserverTreeHelper674;
 namespace mxo {
 namespace ltlogin {
 
-// Forward declaration for helper function - actual definition in loginmediator_auth_entry.cpp
-void AssignOwnedSmallStringForAuthEntry(
-    AuthBootstrapSelectedSource38Sketch& dest,
-    const char* begin,
-    const char* current);
-
 class CLTLoginState;
 class CLTLoginState_State10;
 class CLTLoginState_AuthenticatePending;
@@ -1582,7 +1576,6 @@ public:
     uint8_t authConnectionFlag2c_ = 0;
     uint8_t marginConnectionFlag2d_ = 0;
     uint32_t marginSelectedIpv4_7c_ = 0;
-    AuthBootstrapSelectedSource38Sketch authBootstrapSource38_;
     // Separate phase-2 auth/bootstrap child rooted at owner `+0x680`.
     // Keep this as a distinct child/module mirror rather than folding its fields back into the
     // mediator body comments or generic mediator helpers.
