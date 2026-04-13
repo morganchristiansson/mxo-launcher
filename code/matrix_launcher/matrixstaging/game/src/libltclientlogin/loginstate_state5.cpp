@@ -85,7 +85,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
     }
 
     const auto* authReplyCopyShadowF4 =
-        static_cast<const AuthBootstrapReplyCopyShadowF4Sketch*>(
+        static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(
             mediator->AuthBootstrapReplyCopyShadowF4Scaffold());
     const bool replyCopyShadowStillValid = mediator->HasValidState5ReplyCopyShadowF4Scaffold();
     if (!replyCopyShadowStillValid) {
