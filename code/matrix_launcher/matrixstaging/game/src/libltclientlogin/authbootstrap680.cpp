@@ -1359,7 +1359,7 @@ uint32_t AuthBootstrap680Child::PrepareAndDispatch(CLTLoginMediator& mediator) {
             : mediator.authLauncherVersion_;
 
     const AuthBootstrap680PrepareCallShape callShape = BuildAuthBootstrap680PrepareCallShape(
-        mediator.authBootstrapSource38_,
+        reinterpret_cast<const AuthBootstrapSelectedSource38Sketch&>(mediator.ownerAuthBootstrapSource94_),
         mediator.Arg6AuthName(),
         mediator.Arg6AuthPassword(),
         recoveredLauncherVersion,
@@ -2227,7 +2227,7 @@ void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
     const mxo::auth::AuthReply& reply) {
     const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
 
-    std::string promptPassword = mediator.authBootstrapSource38_.inlineString20.data();
+    std::string promptPassword = mediator.ownerAuthBootstrapSource94_.password20.data();
     const bool promptForSecurId = HasTrailingSlashSixDigitSuffix(promptPassword);
     if (promptForSecurId && promptPassword.size() >= 7u) {
         promptPassword.resize(promptPassword.size() - 7u);
@@ -2307,8 +2307,8 @@ void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
         "AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold childField114=0x{:08x} childField118=0x{:08x} ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
         static_cast<unsigned>(child.authReplySuccessField15_114),
         static_cast<unsigned>(child.authReplySuccessField15Timestamp118),
-        mediator.authBootstrapSource38_.inlineString00[0] != '\0'
-            ? mediator.authBootstrapSource38_.inlineString00.data()
+        mediator.ownerAuthBootstrapSource94_.username00[0] != '\0'
+            ? mediator.ownerAuthBootstrapSource94_.username00.data()
             : "<empty>",
         static_cast<unsigned>(ownedState.opaqueReplyBlob108Owned.size()),
         static_cast<unsigned>(ownedState.opaqueReplyBlob10COwned.size()),

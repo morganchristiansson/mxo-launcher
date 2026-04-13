@@ -835,7 +835,8 @@ bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
 }
 
 const char* CLTLoginMediator::GetSourceBlock94SmallString60BeginScaffold() const {
-    return authBootstrapSource38_.string60.begin;
+    // Fidelity: read from owner+0x94 block
+    return ownerAuthBootstrapSource94_.sessionToken60.begin;
 }
 
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
@@ -2641,16 +2642,17 @@ uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetByt
 
 // anchor: launcher.exe:0x41f270
 void CLTLoginMediator::SetLaunchPadSourceBlock94FirstString(const char* value) {
-    std::fill(authBootstrapSource38_.inlineString00.begin(), authBootstrapSource38_.inlineString00.end(), '\0');
+    // Fidelity: write to owner+0x94 block as per static-RE
+    std::fill(ownerAuthBootstrapSource94_.username00.begin(), ownerAuthBootstrapSource94_.username00.end(), '\0');
     if (!value) {
         return;
     }
 
     const size_t copyCount = std::min(
         std::char_traits<char>::length(value),
-        authBootstrapSource38_.inlineString00.size() - 1);
-    std::copy_n(value, copyCount, authBootstrapSource38_.inlineString00.begin());
-    authBootstrapSource38_.inlineString00[copyCount] = '\0';
+        ownerAuthBootstrapSource94_.username00.size() - 1);
+    std::copy_n(value, copyCount, ownerAuthBootstrapSource94_.username00.begin());
+    ownerAuthBootstrapSource94_.username00[copyCount] = '\0';
 }
 
 // UNANCHORED: source-owned shared GameSessionID writer mirror for later session/play callback paths
@@ -2833,17 +2835,20 @@ const char* CLTLoginMediator::Arg6MappedVariantName() const {
 }
 
 const char* CLTLoginMediator::Arg6ProfileName() const {
-    const char* profileName = authBootstrapSource38_.inlineString00.data();
+    // Fidelity: read from owner+0x94 block
+    const char* profileName = ownerAuthBootstrapSource94_.username00.data();
     return (profileName && profileName[0] != '\0') ? profileName : arg6Selection_.profileName_.c_str();
 }
 
 const char* CLTLoginMediator::Arg6AuthName() const {
-    const char* authName = authBootstrapSource38_.inlineString00.data();
+    // Fidelity: read from owner+0x94 block
+    const char* authName = ownerAuthBootstrapSource94_.username00.data();
     return (authName && authName[0] != '\0') ? authName : arg6Selection_.authName_.c_str();
 }
 
 const char* CLTLoginMediator::Arg6AuthPassword() const {
-    const char* authPassword = authBootstrapSource38_.inlineString20.data();
+    // Fidelity: read from owner+0x94 block
+    const char* authPassword = ownerAuthBootstrapSource94_.password20.data();
     return (authPassword && authPassword[0] != '\0') ? authPassword : arg6Selection_.authPassword_.c_str();
 }
 
