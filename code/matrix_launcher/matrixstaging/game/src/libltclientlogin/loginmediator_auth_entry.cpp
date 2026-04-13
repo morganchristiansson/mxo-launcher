@@ -206,28 +206,28 @@ void CLTLoginMediator::InstallInitialState0Scaffold() {
 
 // anchor: launcher.exe:0x43b300 / full helper-dispatch table seed
 void CLTLoginMediator::InitializeHelperDispatchTable() {
-    auto& states = GetBuiltinScaffoldStates();
-
-    RegisterScaffoldState0(&states.state0);
-    RegisterScaffoldState1(&states.state1);
-    RegisterScaffoldState2(&states.authenticatePending);
-    RegisterScaffoldState3(&states.state3);
-    RegisterScaffoldState4(&states.state4);
-    RegisterScaffoldState5(&states.state5);
-    RegisterScaffoldState6(&states.state6);
-    RegisterScaffoldState7(&states.state7);
-    RegisterScaffoldState8(&states.state8);
-    RegisterScaffoldState9(&states.state9);
-    RegisterScaffoldState10(&states.state10);
-    RegisterScaffoldState11(&states.state11);
-    RegisterScaffoldState12(&states.state12);
-    RegisterScaffoldState13(&states.state13);
-    RegisterScaffoldState14(&states.worldListPending);
-    RegisterScaffoldState15(&states.state15);
-    RegisterScaffoldState16(&states.state16);
-    RegisterScaffoldState17(&states.state17);
-    RegisterScaffoldState18(&states.state18);
-    RegisterScaffoldState19(&states.state19);
+    // Inlined from RegisterScaffoldState* helpers - direct dispatch table slot assignment
+    // Static RE pattern: allocate slots and store pointers to state objects
+    g_LoginHelperDispatchTableScaffold.helper7868 = &GetBuiltinScaffoldStates().state0;
+    g_LoginHelperDispatchTableScaffold.helper786C = &GetBuiltinScaffoldStates().state1;
+    g_LoginHelperDispatchTableScaffold.helper7870 = &GetBuiltinScaffoldStates().authenticatePending;
+    g_LoginHelperDispatchTableScaffold.helper7874 = &GetBuiltinScaffoldStates().state3;
+    g_LoginHelperDispatchTableScaffold.helper7878 = &GetBuiltinScaffoldStates().state4;
+    g_LoginHelperDispatchTableScaffold.helper787C = &GetBuiltinScaffoldStates().state5;
+    g_LoginHelperDispatchTableScaffold.helper7880 = &GetBuiltinScaffoldStates().state6;
+    g_LoginHelperDispatchTableScaffold.helper7884 = &GetBuiltinScaffoldStates().state7;
+    g_LoginHelperDispatchTableScaffold.helper7888 = &GetBuiltinScaffoldStates().state8;
+    g_LoginHelperDispatchTableScaffold.helper788C = &GetBuiltinScaffoldStates().state9;
+    g_LoginHelperDispatchTableScaffold.helper7890 = &GetBuiltinScaffoldStates().state10;
+    g_LoginHelperDispatchTableScaffold.helper7894 = &GetBuiltinScaffoldStates().state11;
+    g_LoginHelperDispatchTableScaffold.helper7898 = &GetBuiltinScaffoldStates().state12;
+    g_LoginHelperDispatchTableScaffold.helper789C = &GetBuiltinScaffoldStates().state13;
+    g_LoginHelperDispatchTableScaffold.helper78A0 = &GetBuiltinScaffoldStates().worldListPending;
+    g_LoginHelperDispatchTableScaffold.helper78A4 = &GetBuiltinScaffoldStates().state15;
+    g_LoginHelperDispatchTableScaffold.helper78A8 = &GetBuiltinScaffoldStates().state16;
+    g_LoginHelperDispatchTableScaffold.helper78AC = &GetBuiltinScaffoldStates().state17;
+    g_LoginHelperDispatchTableScaffold.helper78B0 = &GetBuiltinScaffoldStates().state18;
+    g_LoginHelperDispatchTableScaffold.helper78B4 = &GetBuiltinScaffoldStates().state19;
 
     if (currentState_ == nullptr) {
         InstallInitialState0Scaffold();
