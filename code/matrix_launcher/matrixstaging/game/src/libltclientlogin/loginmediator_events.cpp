@@ -1,4 +1,5 @@
 #include "loginmediator.h"
+#include "loginmediator_events.h"
 
 #include "../../../../src/diagnostics.h"
 #include "loginstate.h"
@@ -14,199 +15,151 @@ static_assert(sizeof(std::_Rb_tree_node_base) == 0x10, "observer tree node-base 
 static_assert(sizeof(mxo::ltlogin::LoginObserverTreeNode674) == 0x14, "observer tree node size mismatch");
 
 namespace mxo::ltlogin {
-namespace {
 
-// anchor: launcher.exe:0x419510 / cls_0x419510
-// anchor: launcher.exe:0x415f20 / cls_0x415f20
-// LoginObserverTreeHelper674 - static method wrapper for observer tree operations
-// These two Ghidra classes (cls_0x419510 and cls_0x415f20) are duplicate compiler emissions
-// of the same SGI STL red-black tree helper - this is a Dinkumware/MSVC STL artifact that
-// emits multiple copies of essentially identical tree operations.
-// Both classes use identical tree layout: parent at +0x04, left at +0x08, right at +0x0c, key at +0x10.
-//
-// cls_0x419510 methods (current implementation):
-// - BuildEqualRangeForKey (0x419510)
-// - DestroySubtreeNodes_0x419570 (0x419570)
-// - DestroySubtreeNodes_0x41d370 (0x41d370)
-// - EraseRange_0x4195c0 (0x4195c0)
-// - EraseRange_0x41d430 (0x41d430)
-//
-// cls_0x415f20 duplicate methods (not needed - same logic):
-// - meth_0x415f20 (0x415f20) - tree insert-or-find
-// - meth_0x452c10 (0x452c10) - insert with rebalance
-// - meth_0x452b70 (0x452b70) - recursive destroy
-// - meth_0x452bc0 (0x452bc0) - clear tree
-// - meth_0x47e370 (0x47e370) - equal range
-// - meth_0x47e8e0 (0x47e8e0) - erase range
-// - meth_0x47ebf0 (0x47ebf0) - find+erase
-class LoginObserverTreeHelper674 {
-public:
-    static uintptr_t TreeKey(void* observer) {
-        return reinterpret_cast<uintptr_t>(observer);
+// Implementations of non-template methods from loginmediator_events.h
+
+// anchor: launcher.exe:0x419570 / DestroySubtreeNodes
+void LoginObserverTreeHelper674::DestroySubtreeNodes(LoginObserverTreeNode674* subtreeRoot) {
+    while (subtreeRoot != nullptr) {
+        DestroySubtreeNodes(subtreeRoot->right0c);
+        LoginObserverTreeNode674* currentNode = subtreeRoot;
+        subtreeRoot = currentNode->left08;
+        std::free(currentNode);
     }
+}
 
-    template <typename Node>
-    static std::_Rb_tree_node_base* TreeNodeBase(Node* node) {
-        return reinterpret_cast<std::_Rb_tree_node_base*>(node);
-    }
+// anchor: launcher.exe:0x41d370 / DestroySubtreeNodes2 (duplicate)
+void LoginObserverTreeHelper674::DestroySubtreeNodes2(LoginObserverTreeNode674* subtreeRoot) {
+    DestroySubtreeNodes(subtreeRoot);
+}
 
-    template <typename Node>
-    static const std::_Rb_tree_node_base* TreeNodeBase(const Node* node) {
-        return reinterpret_cast<const std::_Rb_tree_node_base*>(node);
-    }
+// anchor: launcher.exe:0x419510 / BuildEqualRangeForKey
+void LoginObserverTreeHelper674::BuildEqualRange(
+    LoginObserverTreeNode674* header,
+    void* observer,
+    LoginObserverTreeNode674** outLowerBound,
+    LoginObserverTreeNode674** outUpperBound) {
+    LoginObserverTreeNode674* lowerBound = const_cast<LoginObserverTreeNode674*>(header);
+    LoginObserverTreeNode674* upperBound = const_cast<LoginObserverTreeNode674*>(header);
+    LoginObserverTreeNode674* current = header->parent04;
+    const uintptr_t targetKey = TreeKey(observer);
 
-    static LoginObserverTreeNode674* NodeFromBase(std::_Rb_tree_node_base* node) {
-        return reinterpret_cast<LoginObserverTreeNode674*>(node);
-    }
-
-    static const LoginObserverTreeNode674* NodeFromBase(const std::_Rb_tree_node_base* node) {
-        return reinterpret_cast<const LoginObserverTreeNode674*>(node);
-    }
-
-    // anchor: launcher.exe:0x419570 / DestroySubtreeNodes_0x419570
-    static void DestroySubtreeNodes(LoginObserverTreeNode674* subtreeRoot) {
-        while (subtreeRoot != nullptr) {
-            DestroySubtreeNodes(subtreeRoot->right0c);
-            LoginObserverTreeNode674* currentNode = subtreeRoot;
-            subtreeRoot = currentNode->left08;
-            std::free(currentNode);
+    while (current != nullptr) {
+        if (targetKey < TreeKey(current->observerKey10)) {
+            upperBound = current;
+            current = current->left08;
+        } else {
+            current = current->right0c;
         }
     }
 
-    // anchor: launcher.exe:0x41d370 / DestroySubtreeNodes_0x41d370 (duplicate, same as 0x419570)
-    static void DestroySubtreeNodes2(LoginObserverTreeNode674* subtreeRoot) {
-        DestroySubtreeNodes(subtreeRoot);
-    }
-
-    // anchor: launcher.exe:0x419510 / BuildEqualRangeForKey
-    static void BuildEqualRange(
-        LoginObserverTreeNode674* header,
-        void* observer,
-        LoginObserverTreeNode674** outLowerBound,
-        LoginObserverTreeNode674** outUpperBound) {
-        LoginObserverTreeNode674* lowerBound = const_cast<LoginObserverTreeNode674*>(header);
-        LoginObserverTreeNode674* upperBound = const_cast<LoginObserverTreeNode674*>(header);
-        LoginObserverTreeNode674* current = header->parent04;
-        const uintptr_t targetKey = TreeKey(observer);
-
-        while (current != nullptr) {
-            if (targetKey < TreeKey(current->observerKey10)) {
-                upperBound = current;
-                current = current->left08;
-            } else {
-                current = current->right0c;
-            }
-        }
-
-        current = header->parent04;
-        while (current != nullptr) {
-            if (TreeKey(current->observerKey10) < targetKey) {
-                current = current->right0c;
-            } else {
-                lowerBound = current;
-                current = current->left08;
-            }
-        }
-
-        if (outLowerBound) {
-            *outLowerBound = lowerBound;
-        }
-        if (outUpperBound) {
-            *outUpperBound = upperBound;
+    current = header->parent04;
+    while (current != nullptr) {
+        if (TreeKey(current->observerKey10) < targetKey) {
+            current = current->right0c;
+        } else {
+            lowerBound = current;
+            current = current->left08;
         }
     }
 
-    // anchor: launcher.exe:0x41baa0 / count iterator distance
-    static uint32_t CountRange(
-        LoginObserverTreeNode674* first,
-        LoginObserverTreeNode674* last) {
-        uint32_t count = 0u;
-        while (first != last) {
-            first = NodeFromBase(std::_Rb_tree_increment(TreeNodeBase(first)));
-            ++count;
-        }
-        return count;
+    if (outLowerBound) {
+        *outLowerBound = lowerBound;
     }
-
-    // anchor: launcher.exe:0x4195c0 / EraseRange_0x4195c0
-    static void EraseRange(
-        LoginObserverTreeNode674* first,
-        LoginObserverTreeNode674* last,
-        std::_Rb_tree_node_base* headerBase,
-        uint32_t* nodeCount) {
-        while (first != last) {
-            (void)std::_Rb_tree_rebalance_for_erase(TreeNodeBase(first), *headerBase);
-            LoginObserverTreeNode674* next = NodeFromBase(std::_Rb_tree_increment(TreeNodeBase(first)));
-            std::free(first);
-            first = next;
-            --(*nodeCount);
-        }
+    if (outUpperBound) {
+        *outUpperBound = upperBound;
     }
+}
 
-    // anchor: launcher.exe:0x41d430 / EraseRange_0x41d430
-    static void EraseRangeFull(
-        LoginObserverTreeNode674* first,
-        LoginObserverTreeNode674* last,
-        LoginObserverTreeNode674* header,
-        uint32_t* nodeCount) {
-        std::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
-        LoginObserverTreeNode674* begin = NodeFromBase(headerBase->_M_left);
-        LoginObserverTreeNode674* end = header;
-        
-        if (first == begin && last == end) {
-            if (*nodeCount != 0u) {
-                DestroySubtreeNodes(reinterpret_cast<LoginObserverTreeNode674*>(headerBase->_M_parent));
-            }
-            headerBase->_M_parent = nullptr;
-            headerBase->_M_left = headerBase;
-            headerBase->_M_right = headerBase;
-            *nodeCount = 0u;
-            return;
-        }
-        EraseRange(first, last, headerBase, nodeCount);
+// anchor: launcher.exe:0x41baa0 / CountRange
+uint32_t LoginObserverTreeHelper674::CountRange(
+    LoginObserverTreeNode674* first,
+    LoginObserverTreeNode674* last) {
+    uint32_t count = 0u;
+    while (first != last) {
+        first = NodeFromBase(std::_Rb_tree_increment(TreeNodeBase(first)));
+        ++count;
     }
+    return count;
+}
 
-    // anchor: launcher.exe:0x415f20 / InsertNode (inlined)
-    static bool InsertNode(
-        LoginObserverTreeNode674* header,
-        void* observer,
-        uint32_t* nodeCount) {
-        std::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
-        std::_Rb_tree_node_base* parentBase = headerBase;
-        LoginObserverTreeNode674* current = header->parent04;
-        const uintptr_t targetKey = TreeKey(observer);
-        bool insertLeft = true;
+// anchor: launcher.exe:0x4195c0 / EraseRange
+void LoginObserverTreeHelper674::EraseRange(
+    LoginObserverTreeNode674* first,
+    LoginObserverTreeNode674* last,
+    std::_Rb_tree_node_base* headerBase,
+    uint32_t* nodeCount) {
+    while (first != last) {
+        (void)std::_Rb_tree_rebalance_for_erase(TreeNodeBase(first), *headerBase);
+        LoginObserverTreeNode674* next = NodeFromBase(std::_Rb_tree_increment(TreeNodeBase(first)));
+        std::free(first);
+        first = next;
+        --(*nodeCount);
+    }
+}
 
-        while (current != nullptr) {
-            parentBase = TreeNodeBase(current);
-            const uintptr_t currentKey = TreeKey(current->observerKey10);
-            if (targetKey < currentKey) {
-                insertLeft = true;
-                current = current->left08;
-            } else if (currentKey < targetKey) {
-                insertLeft = false;
-                current = current->right0c;
-            } else {
-                return false;
-            }
+// anchor: launcher.exe:0x41d430 / EraseRangeFull
+void LoginObserverTreeHelper674::EraseRangeFull(
+    LoginObserverTreeNode674* first,
+    LoginObserverTreeNode674* last,
+    LoginObserverTreeNode674* header,
+    uint32_t* nodeCount) {
+    std::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
+    LoginObserverTreeNode674* begin = NodeFromBase(headerBase->_M_left);
+    LoginObserverTreeNode674* end = header;
+
+    if (first == begin && last == end) {
+        if (*nodeCount != 0u) {
+            DestroySubtreeNodes(reinterpret_cast<LoginObserverTreeNode674*>(headerBase->_M_parent));
         }
+        headerBase->_M_parent = nullptr;
+        headerBase->_M_left = headerBase;
+        headerBase->_M_right = headerBase;
+        *nodeCount = 0u;
+        return;
+    }
+    EraseRange(first, last, headerBase, nodeCount);
+}
 
-        auto* node = static_cast<LoginObserverTreeNode674*>(std::malloc(sizeof(LoginObserverTreeNode674)));
-        if (!node) {
+// anchor: launcher.exe:0x415f20 / InsertNode
+bool LoginObserverTreeHelper674::InsertNode(
+    LoginObserverTreeNode674* header,
+    void* observer,
+    uint32_t* nodeCount) {
+    std::_Rb_tree_node_base* headerBase = TreeNodeBase(header);
+    std::_Rb_tree_node_base* parentBase = headerBase;
+    LoginObserverTreeNode674* current = header->parent04;
+    const uintptr_t targetKey = TreeKey(observer);
+    bool insertLeft = true;
+
+    while (current != nullptr) {
+        parentBase = TreeNodeBase(current);
+        const uintptr_t currentKey = TreeKey(current->observerKey10);
+        if (targetKey < currentKey) {
+            insertLeft = true;
+            current = current->left08;
+        } else if (currentKey < targetKey) {
+            insertLeft = false;
+            current = current->right0c;
+        } else {
             return false;
         }
-        node->colorOrFlags00 = static_cast<uint32_t>(std::_S_red);
-        node->parent04 = nullptr;
-        node->left08 = nullptr;
-        node->right0c = nullptr;
-        node->observerKey10 = observer;
-
-
-        std::_Rb_tree_insert_and_rebalance(insertLeft, TreeNodeBase(node), parentBase, *headerBase);
-        ++(*nodeCount);
-        return true;
     }
-};
+
+    auto* node = static_cast<LoginObserverTreeNode674*>(std::malloc(sizeof(LoginObserverTreeNode674)));
+    if (!node) {
+        return false;
+    }
+    node->colorOrFlags00 = static_cast<uint32_t>(std::_S_red);
+    node->parent04 = nullptr;
+    node->left08 = nullptr;
+    node->right0c = nullptr;
+    node->observerKey10 = observer;
+
+    std::_Rb_tree_insert_and_rebalance(insertLeft, TreeNodeBase(node), parentBase, *headerBase);
+    ++(*nodeCount);
+    return true;
+}
 
 // Legacy type aliases (used by CLTLoginMediator methods)
 // Focused post-state9 event/listener split:
@@ -250,8 +203,6 @@ static void DestroyObserverSubtreeNodes674(LoginObserverTreeNode674* subtreeRoot
         std::free(currentNode);
     }
 }
-
-}  // namespace
 
 // anchor-family: launcher.exe ctor/dtor field initialization of owner `+0x674`
 void CLTLoginMediator::InitializeObserverTree674() {
@@ -373,75 +324,6 @@ uint32_t CLTLoginMediator::SwitchHelperStateByIdScaffold(uint32_t helperStateId)
         newState->DebugName(),
         static_cast<unsigned>(slot3Result));
     return slot3Result;
-}
-
-bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
-    // anchor: launcher.exe:0x41ddb0
-    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
-    // identifies `+0x170` as insertion into the owner `+0x674` listener tree, not as a startup
-    // context handoff.
-    if (!observer) {
-        return false;
-    }
-
-    latestObserver170_ = observer;
-
-    const bool inserted = InsertObserverNode674(observer);
-    const bool returnValue = !inserted;
-    if (!inserted) {
-        spdlog::info(
-            "CLTLoginMediator::RegisterLoginObserver observer={} already registered treeCount={} header={} root={} leftmost={} rightmost={} returnValue={} (0x41ddb0 returns !insertedFlag from the helper result pair)",
-            fmt::ptr(observer),
-            static_cast<unsigned>(observerTree674_.nodeCount04),
-            fmt::ptr(observerTree674_.header00),
-            fmt::ptr(observerTreeHeader674_.parent04),
-            fmt::ptr(observerTreeHeader674_.left08),
-            fmt::ptr(observerTreeHeader674_.right0c),
-            returnValue ? 1u : 0u);
-        return returnValue;
-    }
-
-    spdlog::info(
-        "CLTLoginMediator::RegisterLoginObserver observer={} treeCount={} header={} root={} leftmost={} rightmost={} inserted={} returnValue={} (source-owned std::_Tree-like owner+0x674 bridge active)",
-        fmt::ptr(observer),
-        static_cast<unsigned>(observerTree674_.nodeCount04),
-        fmt::ptr(observerTree674_.header00),
-        fmt::ptr(observerTreeHeader674_.parent04),
-        fmt::ptr(observerTreeHeader674_.left08),
-        fmt::ptr(observerTreeHeader674_.right0c),
-        inserted ? 1u : 0u,
-        returnValue ? 1u : 0u);
-    return returnValue;
-}
-
-bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
-    // anchor: launcher.exe:0x41dde0
-    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
-    // identifies `+0x174` as removal from the owner `+0x674` listener tree.
-    if (!observer) {
-        return false;
-    }
-
-    latestObserver174_ = observer;
-
-    LoginObserverTreeNode674* lowerBound = nullptr;
-    LoginObserverTreeNode674* upperBound = nullptr;
-    EqualRangeObserver674(observer, &lowerBound, &upperBound);
-    const uint32_t rangeCount = LoginObserverTreeHelper674::CountRange(lowerBound, upperBound);
-    EraseObserverRange674(lowerBound, upperBound);
-    const bool returnValue = (rangeCount == 0u);
-
-    spdlog::info(
-        "CLTLoginMediator::UnregisterLoginObserverScaffold observer={} rangeCount={} treeCount={} header={} root={} leftmost={} rightmost={} returnValue={} (0x41dde0 mirrors equal_range + distance + erase_range and returns rangeCount==0)",
-        fmt::ptr(observer),
-        static_cast<unsigned>(rangeCount),
-        static_cast<unsigned>(observerTree674_.nodeCount04),
-        fmt::ptr(observerTree674_.header00),
-        fmt::ptr(observerTreeHeader674_.parent04),
-        fmt::ptr(observerTreeHeader674_.left08),
-        fmt::ptr(observerTreeHeader674_.right0c),
-        returnValue ? 1u : 0u);
-    return returnValue;
 }
 
 void CLTLoginMediator::PostEvent(uint32_t eventId) {

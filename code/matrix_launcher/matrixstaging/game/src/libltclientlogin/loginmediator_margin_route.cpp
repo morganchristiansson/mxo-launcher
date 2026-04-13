@@ -209,24 +209,6 @@ const char* CLTLoginMediator::LookupSlotRecordHeapStringByIndex(uint8_t slotInde
     return record->heapString14.c_str();
 }
 
-// anchor: launcher.exe:0x41f2c0
-RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetRouteDescriptor30() {
-    // Keep the wrapper-facing arg6 `+0x10c` small-string object explicit.
-    // The owner-side route-text resolution still lives in `ResolveMarginRouteDescriptor()`.
-    const char* routeDescriptor = ResolveMarginRouteDescriptor();
-    routeDescriptor30Owned_ = routeDescriptor ? routeDescriptor : "";
-    routeDescriptor30_.begin = routeDescriptor30Owned_.c_str();
-    routeDescriptor30_.current = routeDescriptor30_.begin + routeDescriptor30Owned_.size();
-    routeDescriptor30_.capacity = routeDescriptor30_.current;
-
-    spdlog::info(
-        "CLTLoginMediator::GetRouteDescriptor30(+0x10c) -> begin={} current={} text='{}'",
-        fmt::ptr(routeDescriptor30_.begin),
-        fmt::ptr(routeDescriptor30_.current),
-        routeDescriptor30Owned_.empty() ? "<empty>" : routeDescriptor30Owned_.c_str());
-    return &routeDescriptor30_;
-}
-
 // anchor: launcher.exe:0x41b260
 const char* CLTLoginMediator::LookupRouteHostPrefixBySlot(uint8_t slotIndex) const {
     if (slotIndex >= selectionRouteState684_.routeHostStringTriples194_.size()) {

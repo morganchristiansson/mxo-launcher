@@ -24,34 +24,6 @@ static uint32_t TryInvokeGracefulMarginConnectionClose0cScaffold(
 
 }  // namespace
 
-// Focused late-login/state9 split:
-// - `loginmediator_state9.cpp` now keeps only the mediator-owned state9 methods
-// - callback84/object88/submit-helper detail lives in
-//   `loginmediator_state9_submit_scaffold.h`
-// - canonical docs:
-//   - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
-//   - `../../../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md`
-// - this keeps future INetMgr.Default / CUDPDriver::JoinSession work scoped to the active
-//   late-login surface instead of forcing rereads of broader mediator/auth files
-
-// wrapper-facing +0x124 startup triple capture; owner-side mirror remains explicit below.
-void CLTLoginMediator::ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) {
-    provideStartupTripleNetShell_ = netShell;
-    provideStartupTripleNetMgr_ = netMgr;
-    provideStartupTripleDistrObjExecutive_ = distrObjExecutive;
-    ++provideStartupTripleCount_;
-
-    // Keep the wrapper-facing capture and the owner-side submit mirror unified on the mediator.
-    SetState9CallbackObjectTriple84_88_8c(netShell, netMgr, distrObjExecutive);
-
-    spdlog::info(
-        "CLTLoginMediator::ProvideStartupTriple(+0x124 wrapper-facing netShell={} netMgr={} distrObjExecutive={} [count={}] ownerMirror=+0x84/+0x88/+0x8c)",
-        fmt::ptr(provideStartupTripleNetShell_),
-        fmt::ptr(provideStartupTripleNetMgr_),
-        fmt::ptr(provideStartupTripleDistrObjExecutive_),
-        provideStartupTripleCount_);
-}
-
 // anchor: launcher.exe:0x41f1d0 / owner-side mirror of the startup triple into +0x84/+0x88/+0x8c
 void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c) {
     ownerCallback84_ = callback84;
@@ -116,111 +88,6 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
         fmt::ptr(workItem),
         static_cast<unsigned>(dispatchResult));
     return dispatchResult;
-}
-
-// anchor: launcher.exe:0x41c510
-uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t field90Value) {
-    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
-    switch (stateCode) {
-        case 0u:
-        case 1u:
-        case 2u:
-        case 3u:
-            return 0x12000006u;
-        case 4u:
-        case 6u:
-        case 7u:
-        case 8u:
-        case 9u:
-        case 10u:
-        case 11u:
-            return 0x12000000u;
-        case 12u:
-            ownerOptionalField90_ = field90Value;
-            SwitchHelperStateByIdScaffold(0x0du);
-            spdlog::info(
-                "CLTLoginMediator::SetState9OptionalField90AndSwitchToState13 stored owner+0x90=0x{:08x} currentState={}",
-                static_cast<unsigned>(ownerOptionalField90_),
-                currentState_ ? currentState_->DebugName() : "<unchanged>");
-            return 0u;
-        default:
-            return 1u;
-    }
-}
-
-// anchor: launcher.exe:0x41e690
-uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32_t arg2, uint32_t arg3) {
-    if (!outDwords) {
-        return 1u;
-    }
-
-    const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
-    if (stateCode != 9u) {
-        return 0x12000009u;
-    }
-
-    const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
-    if (!currentSlotRecord) {
-        std::memset(outDwords, 0, 0x20u);
-        spdlog::info(
-            "CLTLoginMediator::FillState9CallbackBlob18c missing current slot record while state9-gated; zeroed 0x20-byte blob and returned generic failure");
-        return 1u;
-    }
-
-    outDwords[0] = currentSlotRecord->globalCharacterIdLow03;
-    outDwords[1] = currentSlotRecord->globalCharacterIdHigh07;
-    outDwords[2] = arg2;
-    outDwords[3] = arg3;
-
-    std::array<uint8_t, 16> transformInput{};
-    const uint32_t ownerF18 = State6UdpSessionSecretF18();
-    std::memcpy(transformInput.data(), &ownerF18, sizeof(ownerF18));
-
-    std::array<uint8_t, 16> marginTwofishKey{};
-    const uint8_t* state9SeedPointer85D4 =
-        static_cast<const uint8_t*>(GetState9CallbackSeedPointer85D4());
-    if (state9SeedPointer85D4 == nullptr) {
-        std::memset(outDwords + 4, 0, 16u);
-        spdlog::info(
-            "CLTLoginMediator::FillState9CallbackBlob18c missing 16-byte state9 seed from mediator+0xd4; zeroed blob tail ownerF18=0x{:08x}",
-            static_cast<unsigned>(ownerF18));
-        return 1u;
-    }
-    std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
-    const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(marginTwofishKey.data());
-
-    mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransformAdapter;
-    if (!feedbackTransformAdapter.FeedbackSizeTransformAdapter_ConstructSmall(
-            marginTwofishKey.data(),
-            static_cast<uint32_t>(marginTwofishKey.size()),
-            mxo::auth::internal::FeedbackSizeTransformAdapterZeroIv().data(),
-            0u) ||
-        !feedbackTransformAdapter.FeedbackSizeTransformAdapter_TransformBuffer(
-            outDwords + 4,
-            transformInput.data(),
-            16u)) {
-        std::memset(outDwords + 4, 0, 16u);
-        spdlog::info(
-            "CLTLoginMediator::FillState9CallbackBlob18c Twofish block transform failed ownerF18=0x{:08x}",
-            static_cast<unsigned>(ownerF18));
-        return 1u;
-    }
-    spdlog::info(
-        "CLTLoginMediator::FillState9CallbackBlob18c built blob currentSlotLow=0x{:08x} currentSlotHigh=0x{:08x} arg2=0x{:08x} arg3=0x{:08x} ownerF18=0x{:08x} seedSource=mediator+0xd4 seed[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] tail10=0x{:08x} tail14=0x{:08x} tail18=0x{:08x} tail1c=0x{:08x} (AssemblyTwofish + zero-IV one-block transform over [ownerF18,0,0,0])",
-        static_cast<unsigned>(outDwords[0]),
-        static_cast<unsigned>(outDwords[1]),
-        static_cast<unsigned>(outDwords[2]),
-        static_cast<unsigned>(outDwords[3]),
-        static_cast<unsigned>(ownerF18),
-        static_cast<unsigned>(seedWords[0]),
-        static_cast<unsigned>(seedWords[1]),
-        static_cast<unsigned>(seedWords[2]),
-        static_cast<unsigned>(seedWords[3]),
-        static_cast<unsigned>(outDwords[4]),
-        static_cast<unsigned>(outDwords[5]),
-        static_cast<unsigned>(outDwords[6]),
-        static_cast<unsigned>(outDwords[7]));
-    return 0u;
 }
 
 // anchor: launcher.exe:0x41de40
@@ -359,34 +226,6 @@ bool CLTLoginMediator::PrepareMarginConnectionCloseWaitEvent0fScaffold(
         *outWouldCallConnectionClose0c = wouldCallConnectionClose0c;
     }
     return true;
-}
-
-// anchor: launcher.exe teardown path 0x40b360..0x40b3df / wrapper-facing arg6 slot +0x16c
-// Keep the split explicit:
-// - launcher teardown treats this as a close-and-wait-event-`0x0f` predicate
-// - the same underlying owner body is also the state9 success-side helper anchored below at
-//   `0x41b420`
-bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
-    uint32_t rawState = 0u;
-    bool wouldCallConnectionClose0c = false;
-    const bool armed = PrepareMarginConnectionCloseWaitEvent0fScaffold(
-        &rawState,
-        &wouldCallConnectionClose0c,
-        /*clearState10SendGateF14=*/true);
-    const uint32_t closeResult = TryInvokeGracefulMarginConnectionClose0cScaffold(
-        marginConnection_,
-        wouldCallConnectionClose0c);
-
-    spdlog::info(
-        "CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f(+0x16c wrapper-facing) -> {} [owner+0xf14={} owner+0x2d={} marginConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x} currentState={} split=teardown-wait-event-0x0f vs owner-state9-success-helper laterExpectedTail=0x41afc0->0x438df0->0x41cfb0(0x0f)]",
-        armed ? 1u : 0u,
-        static_cast<unsigned>(postAuthMarginLoadingState_.state10SendGateFlagF14),
-        static_cast<unsigned>(marginConnectionFlag2d_),
-        rawState,
-        wouldCallConnectionClose0c ? 1u : 0u,
-        static_cast<unsigned>(closeResult),
-        currentState_ ? currentState_->DebugName() : "<null>");
-    return armed;
 }
 
 // anchor: launcher.exe:0x41b420

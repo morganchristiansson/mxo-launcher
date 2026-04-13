@@ -16,6 +16,9 @@
 #include "loginmediator_base.h"
 #include "authbootstrap680_internal.h"
 
+// Forward declaration - full class is defined in loginmediator_events.cpp
+class LoginObserverTreeHelper674;
+
 namespace mxo {
 namespace ltlogin {
 

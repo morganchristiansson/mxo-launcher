@@ -1236,8 +1236,12 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[2] = (void*)Mediator_RegisterLauncherNetworkEngineObject08; // +0x08
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
     g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
+    // +0x14
+    // +0x18
     g_LoginMediatorVtable[7] = (void*)Mediator_SetValue1;        // +0x1c
+    // +0x20
     g_LoginMediatorVtable[9] = (void*)Mediator_SetValue2;        // +0x24
+    // +0x28
     g_LoginMediatorVtable[11] = (void*)Mediator_IsConnected;     // +0x2c
     g_LoginMediatorVtable[12] = (void*)Mediator_ProcessLoginRequest30; // +0x30
     g_LoginMediatorVtable[14] = (void*)Mediator_GetProfileRootName38;  // +0x38
@@ -1251,6 +1255,7 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[22] = (void*)Mediator_GetCrashReporterPromptForSecurId58; // +0x58
     g_LoginMediatorVtable[23] = (void*)Mediator_GetCrashReporterUsername5c; // +0x5c
     g_LoginMediatorVtable[24] = (void*)Mediator_GetCrashReporterPassword60; // +0x60
+    // +0x64
     g_LoginMediatorVtable[26] = (void*)Mediator_HasLiveCorpus68; // +0x68
     g_LoginMediatorVtable[27] = (void*)Mediator_HasLiveCorpus6c; // +0x6c
     g_LoginMediatorVtable[28] = (void*)Mediator_HasLiveCorpus70; // +0x70
@@ -1291,11 +1296,27 @@ static void InitializeMediatorStub() {
     g_LoginMediatorVtable[65] = (void*)Mediator_GetWorldTypeByteByIndex; // +0x104
     g_LoginMediatorVtable[66] = (void*)Mediator_GetWorldPopulationNibbleByIndex; // +0x108
     g_LoginMediatorVtable[67] = (void*)Mediator_GetRouteDescriptor10c; // +0x10c
+    // +0x110
+    // +0x114
     g_LoginMediatorVtable[70] = (void*)Mediator_GetLateEntryList118; // +0x118
+    // +0x11c
     g_LoginMediatorVtable[72] = (void*)Mediator_ProcessCreateCharacterInput120; // +0x120
     g_LoginMediatorVtable[73] = (void*)Mediator_ProvideStartupTriple; // +0x124
+    // +0x128
+    // +0x12c
+    // +0x130 GetSessionCallbackHelper65c
+    // +0x134 EnsureSessionCallbackHelper65c
+    // +0x138
     g_LoginMediatorVtable[79] = (void*)Mediator_InvokeSessionCallbackHelper13c; // +0x13c
+    // +0x140
+    // +0x144
     g_LoginMediatorVtable[82] = (void*)Mediator_GetGameSessionId; // +0x148
+    // +0x14c SetSharedMarginPacketField660
+    // +0x150
+    // +0x154
+    // +0x158 SetState9OptionalField90AndSwitchToState13
+    // +0x15c
+    // +0x160
     g_LoginMediatorVtable[89] = (void*)Mediator_RequestAuthConnectionCloseWaitEvent1;   // +0x164
     g_LoginMediatorVtable[91] = (void*)Mediator_RequestMarginConnectionCloseWaitEvent0f;   // +0x16c
     g_LoginMediatorVtable[92] = (void*)Mediator_RegisterLoginObserver170; // +0x170
