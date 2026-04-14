@@ -31,12 +31,10 @@ struct Arg6SelectionConfig;
 // - +0x10: return builder +0x10 packet-payload base (0x00481760)
 class PacketBuilder_0x4af2a4 {
 public:
-    // VTable pointer at +0x00
-    void** vtable00 = nullptr;
-
-    // Shared packet builder envelope fields:
+    // Shared packet builder envelope fields (no raw vtable ptr - uses C++ virtual):
+    // +0x00: vtable pointer (C++ implicit)
     uint32_t nopatchLauncherVersionValue04 = 0;    // +0x04
-    liblttcp::CMessageConnectionMessageRef* messageRef08 = nullptr;  // +0x08
+    ::mxo::liblttcp::CMessageConnectionMessageRef* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                  // +0x0c
 
     // Payload pointers (set by derived classes):
@@ -50,14 +48,14 @@ public:
     uint32_t characterIdHigh20 = 0;                // +0x20
     uint16_t worldId24 = 0;                       // +0x24
 
-    // Virtual methods from vtable (4 slots at 0x004af2a4):
-    // anchor: launcher.exe:0x443aa0 / vtable +0x00
+    // Virtual methods from vtable (5 slots at 0x004af2a4):
+    // anchor: launcher.exe:0x443aa0 / vtable +0x00 = PacketBuilder_Destroy
     virtual ~PacketBuilder_0x4af2a4() = default;
     // anchor: launcher.exe:0x437b50 / vtable +0x04
     virtual uint32_t VtableSlot04() { return 0; }
     // anchor: launcher.exe:0x4af2ac / vtable +0x08
     virtual const char* VtableSlot08() const { return nullptr; }
-    // anchor: launcher.exe:0x41baf0 / vtable +0x0c
+    // anchor: launcher.exe:0x41baf0 / vtable +0x0c = virt_meth_0x41baf0
     virtual void VtableSlot0c() {}
     // anchor: launcher.exe:0x481760 / vtable +0x10
     virtual void* VtableSlot10() { return payloadBegin10; }

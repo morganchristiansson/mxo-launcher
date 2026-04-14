@@ -267,7 +267,7 @@ const char* CLTLoginMediator::GetDescriptorInlineNameByIndex(uint8_t slotIndex) 
     if (slotIndex >= worldDescriptorValidD84_.size() || !worldDescriptorValidD84_[slotIndex]) {
         return nullptr;
     }
-    const WorldDescriptorState004b533c& slot = worldDescriptorsD84_[slotIndex];
+    const WorldDescriptorState_0x4b533c& slot = worldDescriptorsD84_[slotIndex];
     return slot.inlineNamePlus03.empty() ? nullptr : slot.inlineNamePlus03.c_str();
 }
 

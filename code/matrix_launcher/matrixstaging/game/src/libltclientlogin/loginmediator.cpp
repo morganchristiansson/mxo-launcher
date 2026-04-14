@@ -3341,7 +3341,7 @@ void CLTLoginMediator::SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIn
             static_cast<unsigned>(rawType));
     }
 
-    WorldDescriptorState004b533c& descriptor = worldDescriptorsD84_[worldIndex];
+    WorldDescriptorState_0x4b533c& descriptor = worldDescriptorsD84_[worldIndex];
     descriptor.worldId01 = world.worldId;
     descriptor.inlineNamePlus03 = world.worldName;
     descriptor.status17 = normalizedStatus;

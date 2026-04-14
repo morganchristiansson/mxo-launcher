@@ -660,7 +660,11 @@ public:
         PersistedSelectionContext64c persistedSelectionContext64c_{};
     };
 
-    struct WorldDescriptorState004b533c {
+    // anchor: launcher.exe:0x4b533c / vtable
+    // Inherits from PacketBuilder_0x4af2a4, then retables to own vtable in ctor.
+    // Methods: dtor (0x443aa0), debug (0x43ded0), reset (0x439a70)
+    class WorldDescriptorState_0x4b533c : public PacketBuilder_0x4af2a4 {
+    public:
         // Current best source-owned mirror of the `0x14`-byte heap object allocated by the
         // broader auth writer `0x43f300` and stored under owner `+0xd84[index]`.
         // Concrete class/vtable family now recovered from the ctor/reset/debug path:
@@ -690,6 +694,23 @@ public:
         uint8_t serverLanguage1d = 0;
         uint8_t privateFlag1e = 0;
         uint8_t populationLevel1f = 0;
+
+        // Implement all virtual methods from parent PacketBuilder_0x4af2a4:
+        // slot0: dtor (inherits)
+        // slot1: stub returns 0
+        // anchor: launcher.exe:0x43ded0 / vtable +0x08
+        const char* VtableSlot08() const override { return nullptr; }
+        // anchor: launcher.exe:0x439a70 / vtable +0x0c
+        void VtableSlot0c() override {}
+        // anchor: launcher.exe:0x481760 / vtable +0x10
+        void* VtableSlot10() override { return payloadBegin10; }
+        // Additional slots from WorldDescriptorState vtable:
+        // anchor: launcher.exe:0x43c350 / vtable +0x18
+        void* VtableSlot18() { return nullptr; }
+        // anchor: launcher.exe:0x439b50 / vtable +0x1c
+        void VtableSlot1c() {}
+        // anchor: launcher.exe:0x481760 / vtable +0x20
+        void* VtableSlot20() { return payloadBegin10; }
     };
 
     CLTLoginMediator();
@@ -1648,7 +1669,7 @@ public:
     // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.
     PostAuthMarginLoadingState postAuthMarginLoadingState_;
     // launcher.exe:0x4f78b8 owner-side world-descriptor table (`+0xd84`).
-    std::array<WorldDescriptorState004b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
+    std::array<WorldDescriptorState_0x4b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
     std::array<bool, kRecoveredWorldSlotCapacity> worldDescriptorValidD84_{};
     uint8_t worldDescriptorCountD80_ = 0;
 

@@ -11,72 +11,7 @@
 namespace mxo::ltlogin {
 namespace {
 
-struct State6Packet0x06FixedPayload {
-    // anchor: launcher.exe:0x41bf70 = CLTLoginMediator_MarginOpcodeName
-    // raw margin opcode `0x06` = `MS_ConnectRequest`
-    static constexpr uint8_t kPayloadTag06 = 0x06;
-    static constexpr size_t kLauncherVersionOffset = 0x01;
-    static constexpr size_t kClientVersionOffset = 0x05;
-    static constexpr size_t kStateByteOffset = 0x09;
-    static constexpr uint8_t kStateByteValue = 0x01;
-    static constexpr size_t kFixedDwordAOffset = 0x0a;
-    static constexpr uint32_t kFixedDwordA = 0x11186887u;
-    static constexpr size_t kFixedDwordEOffset = 0x0e;
-    static constexpr uint32_t kFixedDwordE = 0x7460a4b0u;
-    static constexpr size_t kGobFileGuidOffset = 0x12;
-    static constexpr size_t kCurrentHelperPhaseOffset = 0x22;
-    static constexpr size_t kFixedByteCount = 0x23;
-};
-
-struct State6Packet0x06BuilderRawScaffold {
-    mxo::liblttcp::CMessageConnectionPacketBuilderPayloadScaffold builder00{};
-};
-
-class State6Packet0x06Builder final
-    : public RecoveredPacketBuilderEnvelopeBase<State6Packet0x06BuilderRawScaffold> {
-public:
-    static constexpr uintptr_t kPacketBuilderVtable00 = 0x004b5364u;
-
-    // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
-    void ResetAndInitialize() {
-        ResetPacketPayloadBuilderScaffold(
-            kPacketBuilderVtable00,
-            State6Packet0x06FixedPayload::kFixedByteCount);
-        WritePayloadByte(0x00, State6Packet0x06FixedPayload::kPayloadTag06);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kLauncherVersionOffset, 0u);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kClientVersionOffset, 0u);
-        WritePayloadByte(
-            State6Packet0x06FixedPayload::kStateByteOffset,
-            State6Packet0x06FixedPayload::kStateByteValue);
-        WritePayloadU32LE(
-            State6Packet0x06FixedPayload::kFixedDwordAOffset,
-            State6Packet0x06FixedPayload::kFixedDwordA);
-        WritePayloadU32LE(
-            State6Packet0x06FixedPayload::kFixedDwordEOffset,
-            State6Packet0x06FixedPayload::kFixedDwordE);
-        SetGobFileGuid({0u, 0u, 0u, 0u});
-        WritePayloadByte(State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset, 0u);
-    }
-
-    void SetLauncherVersion(uint32_t value) {
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kLauncherVersionOffset, value);
-    }
-
-    void SetClientVersion(uint32_t value) {
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kClientVersionOffset, value);
-    }
-
-    void SetGobFileGuid(const std::array<uint32_t, 4>& guidWords) {
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x0, guidWords[0]);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x4, guidWords[1]);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0x8, guidWords[2]);
-        WritePayloadU32LE(State6Packet0x06FixedPayload::kGobFileGuidOffset + 0xc, guidWords[3]);
-    }
-
-    void SetCurrentHelperPhaseByte(uint8_t value) {
-        WritePayloadByte(State6Packet0x06FixedPayload::kCurrentHelperPhaseOffset, value);
-    }
-};
+// State6Packet0x06FixedPayload is defined in loginstate_packet_builder_scaffold.h
 
 static std::array<uint32_t, 4> ResolveState6GobFileGuidWords(CLTLoginMediator* mediator) {
     (void)mediator;
