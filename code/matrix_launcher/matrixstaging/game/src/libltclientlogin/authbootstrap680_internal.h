@@ -422,7 +422,7 @@ static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, worldDescri
 static_assert(offsetof(AuthBootstrap680AuthReplyParseObjectF0Sketch, slotRecordAccessor70) == 0x70u);
 static_assert(sizeof(AuthBootstrap680AuthReplyParseObjectF0Sketch) == 0x8cu);
 
-class AuthBootstrap680Child {
+class AuthBootstrap680Child_0x441290 {
 public:
     // Current best source-owned class boundary for the separate phase-2 auth/bootstrap child
     // allocated by:
@@ -501,9 +501,9 @@ public:
     uint32_t authReplySuccessField15Timestamp118 = 0; // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
 
     // anchor: launcher.exe:0x441290 / 0x445500
-    AuthBootstrap680Child();
+    AuthBootstrap680Child_0x441290();
     // anchor: launcher.exe:0x445a40 / 0x445610
-    ~AuthBootstrap680Child();
+    ~AuthBootstrap680Child_0x441290();
 
     // anchor: launcher.exe:0x448050
     uint32_t PrepareAndDispatch(CLTLoginMediator& owner);
@@ -531,7 +531,7 @@ private:
 
 class AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0 {
 public:
-    explicit AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0(AuthBootstrap680Child& child)
+    explicit AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0(AuthBootstrap680Child_0x441290& child)
         : child_(child) {}
 
     // anchor: launcher.exe:0x4435f0
@@ -542,7 +542,7 @@ public:
     void PrepareState5MarginConnectionCopySend(mxo::liblttcp::CMarginConnection& marginConnection);
 
 private:
-    AuthBootstrap680Child& child_;
+    AuthBootstrap680Child_0x441290& child_;
 };
 
 enum AuthBootstrap680InboundAuthResult : uint32_t {
@@ -559,16 +559,16 @@ void AuthBootstrap680LogParsedAuthReply(
     const CLTLoginMediator& owner,
     const mxo::auth::AuthReply& reply);
 void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
-    AuthBootstrap680Child& child,
+    AuthBootstrap680Child_0x441290& child,
     CLTLoginMediator& owner,
     const mxo::auth::AuthReply& reply);
 void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
-    AuthBootstrap680Child& child,
+    AuthBootstrap680Child_0x441290& child,
     CLTLoginMediator& owner,
     const mxo::auth::AuthReply& reply);
 bool AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold();
 void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
-    AuthBootstrap680Child& child,
+    AuthBootstrap680Child_0x441290& child,
     CLTLoginMediator& owner,
     const mxo::auth::AuthReply& reply);
 

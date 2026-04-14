@@ -283,9 +283,9 @@ CLTLoginMediator::~CLTLoginMediator() {
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-AuthBootstrap680Child& CLTLoginMediator::EnsureAuthBootstrapChild680Scaffold() {
+AuthBootstrap680Child_0x441290& CLTLoginMediator::EnsureAuthBootstrapChild680Scaffold() {
     if (!authBootstrapChild680_) {
-        authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child>();
+        authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child_0x441290>();
     }
     return *authBootstrapChild680_;
 }
@@ -336,7 +336,9 @@ void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* ne
     }
 
     SetNetworkEngine(networkEngineOverride);
-    EnsureAuthBootstrapChild680Scaffold();
+    if (!authBootstrapChild680_) {
+        authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child_0x441290>();
+    }
     InitializeHelperDispatchTable();
     // inline RegisterActiveStateSourceScaffold
     g_CurrentLoginMediator = this;
@@ -839,6 +841,7 @@ uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
 //   through the next call
 // Keep the incoming value opaque here instead of forcing a false `const char*` semantic.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
+// +0x5c
 const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValueToken) {
     const char* authName = Arg6AuthName();
     spdlog::info(
@@ -848,6 +851,7 @@ const char* CLTLoginMediator::GetCrashReporterUsername5c(const void* chainedValu
     return authName;
 }
 
+// +0x60
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetCrashReporterPassword60(const void* chainedValueToken) {
     const char* authPassword = Arg6AuthPassword();

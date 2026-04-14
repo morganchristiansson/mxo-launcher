@@ -101,20 +101,20 @@ class CLTLoginMediator : public ILTLoginMediator {
     //   is source-owned there instead of in the mediator wrapper
     // - keep access narrow by granting focused friendship instead of widening the mediator
     //   surface generically
-    friend struct AuthBootstrap680Child;
+    friend struct AuthBootstrap680Child_0x441290;
     friend void AuthBootstrap680LogParsedAuthReply(
         const CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
     friend void AuthBootstrap680MaterializeReplyCopyShadowScaffold(
-        AuthBootstrap680Child& child,
+        AuthBootstrap680Child_0x441290& child,
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
     friend void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
-        AuthBootstrap680Child& child,
+        AuthBootstrap680Child_0x441290& child,
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
     friend void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
-        AuthBootstrap680Child& child,
+        AuthBootstrap680Child_0x441290& child,
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
     friend class CLTLoginState_AuthenticatePending;
@@ -1155,9 +1155,9 @@ public:
     // - original `0x41f510` frees it during reset/clear-owned-runtime-state
     // - source therefore allocates it lazily through this helper instead of constructing it in the
     //   C++ object ctor
-    AuthBootstrap680Child& EnsureAuthBootstrapChild680Scaffold();
-    AuthBootstrap680Child& AuthBootstrapChild680() { return EnsureAuthBootstrapChild680Scaffold(); }
-    const AuthBootstrap680Child& AuthBootstrapChild680() const {
+    AuthBootstrap680Child_0x441290& EnsureAuthBootstrapChild680Scaffold();
+    AuthBootstrap680Child_0x441290& AuthBootstrapChild680() { return EnsureAuthBootstrapChild680Scaffold(); }
+    const AuthBootstrap680Child_0x441290& AuthBootstrapChild680() const {
         return const_cast<CLTLoginMediator*>(this)->EnsureAuthBootstrapChild680Scaffold();
     }
     void ResetAuthConnectRetryStateScaffold();
@@ -1590,7 +1590,7 @@ public:
     //   suffix family without re-inventing a semantic object model
     // Replacement source now also keeps the ownership boundary explicit by storing this as a
     // separate child object instead of flattening it into the mediator body.
-    std::unique_ptr<AuthBootstrap680Child> authBootstrapChild680_;
+    std::unique_ptr<AuthBootstrap680Child_0x441290> authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
     // Lazily allocated session callback helper whose `+0x18` string can later feed owner `+0x664`.
