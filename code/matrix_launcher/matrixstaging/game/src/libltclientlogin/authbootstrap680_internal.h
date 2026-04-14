@@ -529,6 +529,8 @@ private:
     void AuthBootstrap680ChildBase_ctor();
     // anchor: launcher.exe:0x445610
     void AuthBootstrap680ChildBase_dtor();
+    // anchor: launcher.exe:0x444900 (called by base dtor)
+    void ClearReplyParseAndCopyShadowFields();
 };
 
 class AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0 {

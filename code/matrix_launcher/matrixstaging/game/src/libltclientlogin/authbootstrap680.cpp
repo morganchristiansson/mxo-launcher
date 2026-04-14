@@ -1358,9 +1358,6 @@ AuthBootstrap680Child_0x441290::~AuthBootstrap680Child_0x441290() {
 // anchor: launcher.exe:0x445610
 // Base dtor handles +0x00..+0xf4 (validators, helpers, big-ints, parse objects, copy shadow)
 void AuthBootstrap680Child_0x441290::AuthBootstrap680ChildBase_dtor() {
-    // Note: AuthBootstrap680_ClearReplyParseAndCopyShadowFields handles +0xf0, +0xf4
-    // and other base fields. Source uses owned state for some of these.
-
     // +0x94: feedbackTransformLarge94 - call dtor(1) if non-null
     if (feedbackTransformLarge94 != nullptr) {
         // feedbackTransformLarge94->~FeedbackSizeTransformAdapterLarge();
@@ -1391,17 +1388,8 @@ void AuthBootstrap680Child_0x441290::AuthBootstrap680ChildBase_dtor() {
         replyAuthDataValidatorAC = nullptr;
     }
 
-    // +0xf0: authReplyParseObjectF0 - call dtor(1) if non-null (0x444900)
-    if (authReplyParseObjectF0 != nullptr) {
-        // authReplyParseObjectF0->~AuthBootstrap680AuthReplyParseObjectF0Sketch();
-        authReplyParseObjectF0 = nullptr;
-    }
-
-    // +0xf4: authReplyCopyShadowF4 - free if non-null (tracked deallocation from 0x448140)
-    if (authReplyCopyShadowF4 != nullptr) {
-        // Tracked deallocation: InterlockedExchangeAdd(-0x136), InterlockedDecrement, free()
-        authReplyCopyShadowF4 = nullptr;
-    }
+    // anchor: launcher.exe:0x444900 - called at this point in base dtor flow
+    ClearReplyParseAndCopyShadowFields();
 
     // +0xb0, +0xc4, +0xd8: big-int objects reset (vtable reset, no heap)
     modulusBigIntB0 = {};
@@ -1418,6 +1406,41 @@ void AuthBootstrap680Child_0x441290::AuthBootstrap680ChildBase_dtor() {
 
     // Erase owned state from global map
     g_authBootstrap680ChildOwnedStateByChild.erase(this);
+}
+
+// anchor: launcher.exe:0x444900
+// Handles +0x04 (string04), +0x10 (string10), +0x28..+0x4c (block30, block40, sendTarget50, loginType28, launcherVersion2C)
+// +0xf0 (authReplyParseObjectF0), +0xf4 (authReplyCopyShadowF4)
+void AuthBootstrap680Child_0x441290::ClearReplyParseAndCopyShadowFields() {
+    // +0x04: string04 small string mirror - zero if begin != capacity
+    if (string04.begin != nullptr && string04.begin != string04.capacity) {
+        string04 = {};
+    }
+
+    // +0x10: string10 small string mirror - zero if begin != capacity
+    if (string10.begin != nullptr && string10.begin != string10.capacity) {
+        string10 = {};
+    }
+
+    // +0x28..+0x4c: zero these fields
+    loginType28 = 0u;
+    launcherVersion2C = 0u;
+    // +0x30: block30 - already zeroed with ={}
+    // +0x40: block40 - already zeroed with ={}
+    // +0x50: sendTarget50 - zeroed below
+    sendTarget50 = nullptr;
+
+    // +0xf4: authReplyCopyShadowF4 - tracked deallocation
+    if (authReplyCopyShadowF4 != nullptr) {
+        // Tracked: _msize, InterlockedExchangeAdd(-size), InterlockedDecrement, free
+        authReplyCopyShadowF4 = nullptr;
+    }
+
+    // +0xf0: authReplyParseObjectF0 - call dtor(1) if non-null
+    if (authReplyParseObjectF0 != nullptr) {
+        // authReplyParseObjectF0->~AuthBootstrap680AuthReplyParseObjectF0Sketch();
+        authReplyParseObjectF0 = nullptr;
+    }
 }
 
 // anchor: launcher.exe:0x448050
