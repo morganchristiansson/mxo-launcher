@@ -904,7 +904,7 @@ public:
     // anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
     // Exact tiny wrapper: reload current helper from owner `+0x10` and tail-jump to helper
     // vtable `+0x14` / current best read slot 6. No synthetic guard.
-    uint32_t DispatchCurrentHelperSlot6(void* workItem) override;
+    uint32_t DispatchCurrentHelperSlot6(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
     // anchor: launcher.exe:0x41afc0 / owner vtable `+0x188`
     // Thin owner-body mirror: compare against owner `+0x1c`, clear the live margin-connection
     // field on type-1 close, then jump straight back through current helper slot 2.

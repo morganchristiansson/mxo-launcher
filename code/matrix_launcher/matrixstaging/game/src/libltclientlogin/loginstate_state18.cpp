@@ -25,7 +25,7 @@ uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
-uint32_t CLTLoginState_State18::Slot6_HandleSecondaryMessage(void* workItem) {
+uint32_t CLTLoginState_State18::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
     (void)workItem;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x004208e0");
 }

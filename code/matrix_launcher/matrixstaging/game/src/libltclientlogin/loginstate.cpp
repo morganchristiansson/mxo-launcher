@@ -144,7 +144,7 @@ uint32_t CLTLoginState::AuthMessageDispatch(void* workItem) {
 }
 
 // anchor: launcher.exe:0x004397c0 (shared slot-6 failure stub on selected vtables only)
-uint32_t CLTLoginState::Slot6_HandleSecondaryMessage(void* workItem) {
+uint32_t CLTLoginState::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
     (void)workItem;
     return 0u;
 }
@@ -168,7 +168,7 @@ uint32_t CLTLoginState::DispatchPhaseCode() const {
 }
 
 // anchor: launcher.exe:0x004397e0 (vtable 0x004b51b8 slot 6)
-uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(void* workItem) {
+uint32_t CLTLoginState_AbstractFinalLeafBase::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
     // Exact recovered shape from `0x004397e0`:
     // - when object byte `this+4 == 1`, delegate to owner helper `0x41c5c0`
     // - if that helper returns `< 1`, return success-ish immediately

@@ -2899,7 +2899,8 @@ uint32_t CMarginConnection::DispatchMessage(void* messageRef) {
     uint32_t handled = 0u;
     if (mediator->currentState_ != nullptr) {
         ++mediator->marginPacketSlot6DispatchCountScaffold_;
-        handled = mediator->DispatchCurrentHelperSlot6(messageRef);
+        handled = mediator->DispatchCurrentHelperSlot6(
+            static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(messageRef));
     }
     spdlog::info(
         "CMarginConnection::DispatchMessage rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} messageRef={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",

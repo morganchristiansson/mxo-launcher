@@ -73,7 +73,7 @@ public:
     // Valid as a reused default body, but many live states override slot 6 with concrete receive /
     // completion handlers.
     // Uses g_CurrentLoginMediator (faithful to static-RE).
-    virtual uint32_t Slot6_HandleSecondaryMessage(void* workItem);
+    virtual uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem);
 
     // anchor: reconstructed shared slot 7 state-id surface
     virtual uint32_t GetStateId() const = 0;
@@ -108,7 +108,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004397e0 (vtable 0x004b51b8 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x0048bc34 (vtable 0x004b51b8 slot 7 purecall)
     uint32_t GetStateId() const override = 0;
@@ -165,7 +165,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x0044e360 (vtable 0x004b4fc4 slot 7)
     uint32_t GetStateId() const override;
@@ -255,7 +255,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b503c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x004686b0 (vtable 0x004b503c slot 7)
     uint32_t GetStateId() const override;
@@ -283,7 +283,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438c60 (vtable 0x004b5064 slot 7)
     uint32_t GetStateId() const override;
@@ -310,7 +310,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438c70 (vtable 0x004b508c slot 7)
     uint32_t GetStateId() const override;
@@ -331,7 +331,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043bae0 (vtable 0x004b50b4 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438c80 (vtable 0x004b50b4 slot 7)
     uint32_t GetStateId() const override;
@@ -362,7 +362,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438c90 (vtable 0x004b5104 slot 7)
     uint32_t GetStateId() const override;
@@ -404,7 +404,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438cc0 (vtable 0x004b517c slot 7)
     uint32_t GetStateId() const override;
@@ -424,13 +424,6 @@ public:
     // `0x4401a0`.
     static void AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator);
 
-    // UNANCHORED: source-owned raw-0x0b margin claim-name reply helper for state10 slot 6.
-    // Faithful recovered packet family:
-    // - slot 3 sends `MS_ClaimCharacterNameRequest` (`0x0a`) through the current margin connection
-    // - slot 6 then consumes `MS_ClaimCharacterNameReply` (`0x0b`) and appends one new slot record
-    //   under owner `+0x688/+0x818/+0xcc8`
-    static uint32_t HandleStagedClaimCharacterNameReplyScaffold(CLTLoginMediator* mediator);
-
     // anchor: launcher.exe vtable 0x004b512c
     const char* DebugName() const override;
 
@@ -438,7 +431,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438ca0 (vtable 0x004b512c slot 7)
     uint32_t GetStateId() const override;
@@ -467,7 +460,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438cb0 (vtable 0x004b5154 slot 7)
     uint32_t GetStateId() const override;
@@ -510,7 +503,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043bc60 (vtable 0x004b50dc slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00438cd0 (vtable 0x004b50dc slot 7)
     uint32_t GetStateId() const override;
@@ -555,7 +548,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0b88 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00420310 (vtable 0x004b0b88 slot 7)
     uint32_t GetStateId() const override;
@@ -578,7 +571,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bb0 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00420320 (vtable 0x004b0bb0 slot 7)
     uint32_t GetStateId() const override;
@@ -601,7 +594,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bd8 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00420330 (vtable 0x004b0bd8 slot 7)
     uint32_t GetStateId() const override;
@@ -621,7 +614,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00420340 (vtable 0x004b0c00 slot 7)
     uint32_t GetStateId() const override;
@@ -644,7 +637,7 @@ public:
     uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c28 slot 6)
-    uint32_t Slot6_HandleSecondaryMessage(void* workItem) override;
+    uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
     // anchor: launcher.exe:0x00420350 (vtable 0x004b0c28 slot 7)
     uint32_t GetStateId() const override;

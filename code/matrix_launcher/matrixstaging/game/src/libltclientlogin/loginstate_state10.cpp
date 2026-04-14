@@ -33,29 +33,30 @@ struct ParsedState10ClaimCharacterNameReplyScaffold {
 };
 
 static ParsedState10ClaimCharacterNameReplyScaffold ParseState10ClaimCharacterNameReplyScaffold(
-    const std::vector<uint8_t>& bytes) {
+    const uint8_t* bytes,
+    uint16_t byteCount) {
     ParsedState10ClaimCharacterNameReplyScaffold out = {};
-    if (bytes.size() < 0x0fu || bytes[0] != 0x0bu) {
+    if (byteCount < 0x0fu || bytes[0] != 0x0bu) {
         return out;
     }
 
     out.valid = true;
-    out.optionalTextOffset01 = ReadU16LE(bytes.data() + 1u);
-    out.status = ReadU32LE(bytes.data() + 3u);
-    out.globalCharacterIdLow03 = ReadU32LE(bytes.data() + 7u);
-    out.globalCharacterIdHigh07 = ReadU32LE(bytes.data() + 0x0bu);
+    out.optionalTextOffset01 = ReadU16LE(bytes + 1u);
+    out.status = ReadU32LE(bytes + 3u);
+    out.globalCharacterIdLow03 = ReadU32LE(bytes + 7u);
+    out.globalCharacterIdHigh07 = ReadU32LE(bytes + 0x0bu);
 
     if (out.optionalTextOffset01 != 0u) {
         const size_t stringLengthFieldOffset = static_cast<size_t>(out.optionalTextOffset01);
-        if (stringLengthFieldOffset + 2u <= bytes.size()) {
-            out.optionalTextLength = ReadU16LE(bytes.data() + stringLengthFieldOffset);
+        if (stringLengthFieldOffset + 2u <= byteCount) {
+            out.optionalTextLength = ReadU16LE(bytes + stringLengthFieldOffset);
             const size_t stringBytesOffset = stringLengthFieldOffset + 2u;
-            const size_t availableTextBytes = bytes.size() - stringBytesOffset;
+            const size_t availableTextBytes = byteCount - stringBytesOffset;
             if (out.optionalTextLength > availableTextBytes) {
                 out.optionalTextLength = static_cast<uint16_t>(availableTextBytes);
             }
             if (out.optionalTextLength != 0u) {
-                out.optionalText = reinterpret_cast<const char*>(bytes.data() + stringBytesOffset);
+                out.optionalText = reinterpret_cast<const char*>(bytes + stringBytesOffset);
             }
         }
     }
@@ -193,97 +194,6 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
 }
 
 
-// UNANCHORED: source-owned raw-0x0b margin claim-name reply helper for state10 slot 6.
-uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTLoginMediator* mediator) {
-    if (!mediator || mediator->stagedIncomingMarginPacketBytes_.empty()) {
-        return 0u;
-    }
-
-    const ParsedState10ClaimCharacterNameReplyScaffold parsed =
-        ParseState10ClaimCharacterNameReplyScaffold(mediator->stagedIncomingMarginPacketBytes_);
-    if (!parsed.valid) {
-        spdlog::warn(
-            "DIAGNOSTIC: state10 raw-0x0b claim-name reply parse rejected staged margin bytes={} (expected >= 0x0f-byte MS_ClaimCharacterNameReply layout)",
-            static_cast<unsigned>(mediator->stagedIncomingMarginPacketBytes_.size()));
-        return 0u;
-    }
-
-    mediator->worldListCountOrStatus80 = parsed.status;
-    if (parsed.status >= 1u) {
-        spdlog::info(
-            "DIAGNOSTIC: state10 raw-0x0b claim-name reply failure status=0x{:08x} optionalTextOffset=0x{:04x} optionalTextLen=0x{:04x} optionalText='{}'",
-            static_cast<unsigned>(parsed.status),
-            static_cast<unsigned>(parsed.optionalTextOffset01),
-            static_cast<unsigned>(parsed.optionalTextLength),
-            DescribeOptionalState10ClaimReplyText(parsed));
-        return 1u;
-    }
-
-    const uint8_t appendedSlotIndex = mediator->selectionRouteState684_.slotRecordCount00_;
-    const uint32_t selectedWorldDescriptorIndex =
-        mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24;
-    if (appendedSlotIndex >= mediator->selectionRouteState684_.slotRecordTable04_.size() ||
-        appendedSlotIndex >= mediator->selectionRouteState684_.routeHostStringTriples194_.size() ||
-        selectedWorldDescriptorIndex >= mediator->worldDescriptorCountD80_ ||
-        selectedWorldDescriptorIndex >= mediator->worldDescriptorsD84_.size() ||
-        !mediator->worldDescriptorValidD84_[selectedWorldDescriptorIndex]) {
-        spdlog::warn(
-            "DIAGNOSTIC: state10 raw-0x0b claim-name reply success could not append slot record appendedSlotIndex={} selectedWorldDescriptorIndex={} worldDescriptorCount=0x{:02x}",
-            static_cast<unsigned>(appendedSlotIndex),
-            static_cast<unsigned>(selectedWorldDescriptorIndex),
-            static_cast<unsigned>(mediator->worldDescriptorCountD80_));
-        return 0u;
-    }
-
-    const CLTLoginMediator::WorldDescriptorState_0x4b533c& selectedWorldDescriptor =
-        mediator->worldDescriptorsD84_[selectedWorldDescriptorIndex];
-
-    // anchor: launcher.exe:0x4401a0
-    // Exact success-side write order recovered from the listing:
-    // - allocate/init new slot-record object
-    // - store it at +0x688[currentCount]
-    // - copy selected descriptor inline name into +0x818[currentCount]
-    // - set +0xcc8 = currentCount
-    // - increment +0x684
-    // - then fill the slot-record payload/name fields
-    mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
-    mediator->selectionRouteState684_.slotRecordValid04_[appendedSlotIndex] = true;
-    mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].Assign(
-        selectedWorldDescriptor.inlineNamePlus03);
-    mediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
-    mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
-
-    SlotRecordState_0x4b5328& appendedSlotRecord =
-        mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
-    appendedSlotRecord.heapString14 =
-        mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data();
-    appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
-    appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
-    appendedSlotRecord.status0b = 0u;
-    appendedSlotRecord.worldId0c = selectedWorldDescriptor.worldId01;
-
-    mediator->marginRouteState_.pendingWorldId = selectedWorldDescriptor.worldId01;
-    mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(selectedWorldDescriptor.worldId01);
-    if (const char* routeHostPrefix = mediator->LookupRouteHostPrefixBySlot(appendedSlotIndex)) {
-        mediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
-    } else {
-        mediator->marginRouteState_.routeHostPrefix.clear();
-    }
-
-    spdlog::info(
-        "DIAGNOSTIC: state10 raw-0x0b claim-name reply appended slot={} status=0x{:08x} globalCharacterIdLow=0x{:08x} globalCharacterIdHigh=0x{:08x} selectedWorldDescriptorIndex=0x{:08x} routeText='{}' characterName='{}' optionalText='{}'",
-        static_cast<unsigned>(appendedSlotIndex),
-        static_cast<unsigned>(parsed.status),
-        static_cast<unsigned>(parsed.globalCharacterIdLow03),
-        static_cast<unsigned>(parsed.globalCharacterIdHigh07),
-        static_cast<unsigned>(selectedWorldDescriptorIndex),
-        mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].BeginOrNull()
-            ? mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].BeginOrNull()
-            : "<empty>",
-        appendedSlotRecord.heapString14 ? appendedSlotRecord.heapString14 : "<empty>",
-        DescribeOptionalState10ClaimReplyText(parsed));
-    return 1u;
-}
 
 // anchor: launcher.exe vtable 0x004b512c
 const char* CLTLoginState_State10::DebugName() const {
@@ -343,15 +253,23 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
-uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
-    (void)workItem;
+uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
+        mxo::liblttcp::CMessageConnectionMessageRef* messageRef) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    if (!mediator) {
+    if (!mediator || !messageRef) {
         return 0u;
     }
 
-    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
-    const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
+    // anchor: launcher.exe:0x4401a0
+    // Original decodes message code from message-ref using `CMessageConnectionMessageRef_DecodeMessageCode`
+    uint16_t messageCode = 0;
+    bool usedHeaderlessLocator = false;
+    if (!CMessageConnection_DecodeMessageCodeScaffold(*messageRef, &messageCode, &usedHeaderlessLocator)) {
+        mediator->worldListCountOrStatus80 = 0x12000005u;
+        spdlog::info(
+            "CLTLoginState_State10::Slot6_HandleSecondaryMessage failed to decode message code; mirrored original owner+0x80=0x12000005 and returned false-like");
+        return 0u;
+    }
 
     // Fidelity correction from direct `0x43bf90 / 0x4401a0 / 0x41bf70` review:
     // - state10 slot 3 sends raw margin opcode `0x0a = MS_ClaimCharacterNameRequest`
@@ -362,23 +280,95 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
     // - immediate continuation after that success is:
     //   `state11 slot3 / 0x43c020 -> state11 slot6 / 0x440320 -> helper9 slot3 / 0x439780
     //    -> owner 0x41de40`
-    if (rawCode != 0x0bu) {
+    if (messageCode != 0x0bu) {
         mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
-            static_cast<unsigned>(stagedBytes.size()),
-            static_cast<unsigned>(rawCode));
+            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected messageCode=0x{:04x} (expected 0x0b); mirrored original owner+0x80=0x12000005 and returned false-like",
+            static_cast<unsigned>(messageCode));
         return 0u;
     }
 
+    // Parse payload directly from message ref
+    const uint8_t* payloadBytes = messageRef->messageStorage0c->payloadBytes0c.data();
+    const uint16_t payloadByteCount = messageRef->PayloadByteCountScaffold();
+
     // anchor: launcher.exe:0x4401a0
-    // Per original flow: single status check at +3 decides success/error branch.
-    // The scaffold returns 1 for both error(status>=1) and success, so we must
-    // re-check status to determine which path to take - this mirrors the original's
-    // if/else structure rather than a redundant check.
-    const uint32_t handled = HandleStagedClaimCharacterNameReplyScaffold(mediator);
-    if (handled == 0u) {
+    // Inline recovery of MS_ClaimCharacterNameReply parsing and slot record allocation:
+    // - parse inline name/status/character IDs from message-ref payload
+    // - set owner+0x80 = parsed status
+    // - if status < 1: allocate/init new slot record at +0x688[currentCount],
+    //   copy descriptor inline name into +0x818[currentCount], set owner+0xcc8=currentCount,
+    //   increment +0x684, fill slot record with character ID/name/worldId fields
+    const ParsedState10ClaimCharacterNameReplyScaffold parsed =
+        ParseState10ClaimCharacterNameReplyScaffold(payloadBytes, payloadByteCount);
+    if (!parsed.valid) {
+        spdlog::warn(
+            "DIAGNOSTIC: state10 raw-0x0b claim-name reply parse rejected payload bytes={} (expected >= 0x0f-byte MS_ClaimCharacterNameReply layout)",
+            static_cast<unsigned>(payloadByteCount));
         return 0u;
+    }
+
+    mediator->worldListCountOrStatus80 = parsed.status;
+
+    if (parsed.status >= 1u) {
+        spdlog::info(
+            "DIAGNOSTIC: state10 raw-0x0b claim-name reply failure status=0x{:08x}",
+            static_cast<unsigned>(parsed.status));
+        // Return 1 to signal the caller should proceed to error handling,
+        // which mirrors the original's single status check at +3.
+        return 1u;
+    }
+
+    // Success path: allocate and populate new slot record inline
+    const uint8_t appendedSlotIndex = mediator->selectionRouteState684_.slotRecordCount00_;
+    const uint32_t selectedWorldDescriptorIndex =
+        mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24;
+    if (appendedSlotIndex >= mediator->selectionRouteState684_.slotRecordTable04_.size() ||
+        appendedSlotIndex >= mediator->selectionRouteState684_.routeHostStringTriples194_.size() ||
+        selectedWorldDescriptorIndex >= mediator->worldDescriptorCountD80_ ||
+        selectedWorldDescriptorIndex >= mediator->worldDescriptorsD84_.size() ||
+        !mediator->worldDescriptorValidD84_[selectedWorldDescriptorIndex]) {
+        spdlog::warn(
+            "DIAGNOSTIC: state10 raw-0x0b claim-name reply success could not append slot record appendedSlotIndex={} selectedWorldDescriptorIndex={} worldDescriptorCount=0x{:02x}",
+            static_cast<unsigned>(appendedSlotIndex),
+            static_cast<unsigned>(selectedWorldDescriptorIndex),
+            static_cast<unsigned>(mediator->worldDescriptorCountD80_));
+        return 0u;
+    }
+
+    const CLTLoginMediator::WorldDescriptorState_0x4b533c& selectedWorldDescriptor =
+        mediator->worldDescriptorsD84_[selectedWorldDescriptorIndex];
+
+    // anchor: launcher.exe:0x4401a0
+    // Exact success-side write order recovered from listing:
+    // - allocate/init new slot-record object
+    // - store it at +0x688[currentCount]
+    // - copy selected descriptor inline name into +0x818[currentCount]
+    // - set +0xcc8 = currentCount
+    // - increment +0x684
+    // - then fill slot-record payload/name fields
+    mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
+    mediator->selectionRouteState684_.slotRecordValid04_[appendedSlotIndex] = true;
+    mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].Assign(
+        selectedWorldDescriptor.inlineNamePlus03);
+    mediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
+    mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
+
+    SlotRecordState_0x4b5328& appendedSlotRecord =
+        mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
+    appendedSlotRecord.heapString14 =
+        mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data();
+    appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
+    appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
+    appendedSlotRecord.status0b = 0u;
+    appendedSlotRecord.worldId0c = selectedWorldDescriptor.worldId01;
+
+    mediator->marginRouteState_.pendingWorldId = selectedWorldDescriptor.worldId01;
+    mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(selectedWorldDescriptor.worldId01);
+    if (const char* routeHostPrefix = mediator->LookupRouteHostPrefixBySlot(appendedSlotIndex)) {
+        mediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
+    } else {
+        mediator->marginRouteState_.routeHostPrefix.clear();
     }
 
     if (mediator->worldListCountOrStatus80 >= 1u) {

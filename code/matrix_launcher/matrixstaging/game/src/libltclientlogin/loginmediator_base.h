@@ -584,7 +584,7 @@ public:
     // +0x180
     virtual uint32_t DispatchCurrentHelperAuthMessage(void* workItem) = 0;
     // +0x184
-    virtual uint32_t DispatchCurrentHelperSlot6(void* workItem) = 0;
+    virtual uint32_t DispatchCurrentHelperSlot6(mxo::liblttcp::CMessageConnectionMessageRef* workItem) = 0;
     // +0x188
     virtual uint32_t HandleMarginConnectionCompletionFallback(void* connection, void* workItem) = 0;
     // +0x18c
