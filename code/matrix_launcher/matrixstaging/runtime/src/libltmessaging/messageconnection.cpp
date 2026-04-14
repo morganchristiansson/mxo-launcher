@@ -2918,4 +2918,74 @@ uint32_t CMarginConnection::DispatchMessage(void* messageRef) {
     return handled;
 }
 
+// anchor: launcher.exe:0x448050
+// AuthBootstrap680_PrepareAndDispatch from OOAnalyzer class CStreamPacketEncryptionModuleWriteHelper_0x4b8690
+void CStreamPacketEncryptionModuleWriteHelper::AuthBootstrap680_PrepareAndDispatch(
+    const char* pszUsername,
+    const char* pszPassword,
+    uint32_t loginType,
+    uint32_t launcherVersion,
+    const std::array<uint32_t, 4>* pKeyConfigMd5,
+    const std::array<uint32_t, 4>* pUiConfigMd5,
+    void* pSendTarget,
+    const char* pszStationOrFallback) {
+    // Stage string fields from parameters into helper fields
+    // - this->mbr_0x4 (string04) <- pszUsername
+    // - this->cls_0x4b00b0.mbr_0x4 (string10) <- pszPassword  
+    // - this->cls_0x4b00b0.mbr_0x10 (string1C) <- pszStationOrFallback (or "" if null)
+    // - this->cls_0x4b00b0.mbr_0x1c (loginType28) <- loginType
+    // - this->cls_0x4b00b0.mbr_0x20 (launcherVersion2C) <- launcherVersion
+    // - this->cls_0x4b00b0.mbr_0x28/+0x2c/+0x30 <- pKeyConfigMd5[1..3]
+    // - this->cls_0x4b00b0.field_0x34/+0x38 and this->mbr_0x48/+0x4c <- pUiConfigMd5
+    // - this->mbr_0x50 (sendTarget50) <- pSendTarget
+
+    // Note: The original uses cls_0x403f90::StringTriple_AssignFromRange to copy strings
+    // For now, we store the pointers directly (faithful to original behavior)
+    
+    // Username goes to string04 (helper +0x04)
+    string04 = pszUsername ? pszUsername : "";
+    
+    // Password goes to transformWorker.mbr_0x04 (string10, actually at worker +0x04)
+    transformWorker.string10 = pszPassword ? pszPassword : "";
+    
+    // Station/fallback goes to transformWorker.mbr_0x10 (string1C)
+    const char* station = pszStationOrFallback ? pszStationOrFallback : "";
+    transformWorker.string1C = station;
+    
+    // loginType -> transformWorker.mbr_0x1c
+    transformWorker.loginType28 = loginType;
+    
+    // launcherVersion -> transformWorker.mbr_0x20
+    transformWorker.launcherVersion2C = launcherVersion;
+    
+    // pKeyConfigMd5 -> transformWorker fields
+    if (pKeyConfigMd5) {
+        transformWorker.field24_0x28 = (*pKeyConfigMd5)[1];
+        transformWorker.field28_0x2c = (*pKeyConfigMd5)[2];
+        transformWorker.field2c_0x30 = (*pKeyConfigMd5)[3];
+    }
+    
+    // pUiConfigMd5 -> helper fields
+    if (pUiConfigMd5) {
+        transformWorker.field30_0x34 = (*pUiConfigMd5)[0];
+        transformWorker.field34_0x38 = (*pUiConfigMd5)[1];
+        block30 = (*pUiConfigMd5)[2];
+        block40 = (*pUiConfigMd5)[3];
+    }
+    
+    // sendTarget
+    sendTarget50 = pSendTarget;
+    
+    // Dispatch based on authRequestReadyA0
+    if (authRequestReadyA0 != 0) {
+        // Send auth request
+        spdlog::debug("AuthBootstrap680_PrepareAndDispatch: sending auth request (authRequestReadyA0={})", authRequestReadyA0);
+        // TODO: call AuthBootstrap680_SendAuthRequest(this);
+    } else {
+        // Send get public key request
+        spdlog::debug("AuthBootstrap680_PrepareAndDispatch: sending get-public-key request");
+        // TODO: call AuthBootstrap680_SendGetPublicKeyRequest(this);
+    }
+}
+
 }  // namespace mxo::liblttcp
