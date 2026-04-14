@@ -62,26 +62,6 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
     return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
 }
 
-static mxo::ltlogin::CLTLoginMediator* DiagnosticGetActiveMediatorForCharacterState() {
-    // caller is always CLTLoginMediator - return it directly
-    return DiagnosticEnsureMediatorModel();
-}
-
-// UNANCHORED: trivial accessors into the recovered CLTLoginMediator sidecar model.
-static const char* DiagnosticMediatorMappedSelectionName() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6MappedSelectionName() : g_MediatorStringC;
-}
-
-static const char* DiagnosticMediatorProfileName() {
-    mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
-    return mediator ? mediator->Arg6ProfileName() : g_MediatorStringA;
-}
-
-static const char* NonEmptyOrPlaceholder(const char* value) {
-    return (value && value[0]) ? value : "<empty>";
-}
-
 bool IsProfilePathBuilderCaller(void* returnAddress) {
     const uintptr_t address = reinterpret_cast<uintptr_t>(returnAddress);
     return address >= 0x62195ff0u && address <= 0x62196121u;

@@ -28,11 +28,6 @@ void LoginObserverTreeHelper674::DestroySubtreeNodes(LoginObserverTreeNode674* s
     }
 }
 
-// anchor: launcher.exe:0x41d370 / DestroySubtreeNodes2 (duplicate)
-void LoginObserverTreeHelper674::DestroySubtreeNodes2(LoginObserverTreeNode674* subtreeRoot) {
-    DestroySubtreeNodes(subtreeRoot);
-}
-
 // anchor: launcher.exe:0x419510 / BuildEqualRangeForKey
 void LoginObserverTreeHelper674::BuildEqualRange(
     LoginObserverTreeNode674* header,
@@ -171,10 +166,6 @@ bool LoginObserverTreeHelper674::InsertNode(
 using LoginObserverOnEventFn = void(__thiscall*)(void*, uint32_t);
 using LoginObserverOnErrorFn = void(__thiscall*)(void*, uint32_t);
 
-static uintptr_t ObserverTreeKey(void* observer) {
-    return reinterpret_cast<uintptr_t>(observer);
-}
-
 template <typename Node>
 static std::_Rb_tree_node_base* ObserverTreeNodeBase(Node* node) {
     return reinterpret_cast<std::_Rb_tree_node_base*>(node);
@@ -243,23 +234,6 @@ LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeBegin674() const {
 // anchor-family: inlined header/end expression used by launcher.exe:0x41cfb0 / 0x41d090 / 0x41d430
 LoginObserverTreeNode674* CLTLoginMediator::ObserverTreeEnd674() const {
     return observerTree674_.header00;
-}
-
-// anchor-family: source-owned single-node lookup (uses helper but is not in helper class)
-LoginObserverTreeNode674* CLTLoginMediator::FindObserverNode674(void* observer) const {
-    LoginObserverTreeNode674* current = observerTreeHeader674_.parent04;
-    const uintptr_t targetKey = LoginObserverTreeHelper674::TreeKey(observer);
-    while (current != nullptr) {
-        const uintptr_t currentKey = LoginObserverTreeHelper674::TreeKey(current->observerKey10);
-        if (targetKey < currentKey) {
-            current = current->left08;
-        } else if (currentKey < targetKey) {
-            current = current->right0c;
-        } else {
-            return current;
-        }
-    }
-    return nullptr;
 }
 
 // anchor: launcher.exe:0x419510 / BuildEqualRangeForKey
