@@ -324,27 +324,6 @@ inline void FeedbackSizeTransformAdapter_SecureFreeTrackedBuffer(void* storage, 
     std::free(storage);
 }
 
-inline uint8_t* FeedbackSizeTransformAdapter_ReallocateTrackedBuffer(
-    uint8_t* storage,
-    uint32_t currentByteCount,
-    uint32_t newByteCount,
-    bool preserveContents) {
-    // anchors: launcher.exe:0x41d660 / 0x41d730
-    if (currentByteCount == newByteCount) {
-        return storage;
-    }
-
-    uint8_t* const replacement =
-        FeedbackSizeTransformAdapter_TrackedAllocateBuffer(newByteCount);
-    if (replacement && preserveContents && storage && currentByteCount != 0u && newByteCount != 0u) {
-        std::memcpy(
-            replacement,
-            storage,
-            currentByteCount < newByteCount ? currentByteCount : newByteCount);
-    }
-    FeedbackSizeTransformAdapter_SecureFreeTrackedBuffer(storage, currentByteCount);
-    return replacement;
-}
 
 class FeedbackSizeTransformAdapterCommon {
 public:
@@ -378,10 +357,6 @@ public:
 
     ~FeedbackSizeTransformAdapterCommon() {
         Reset();
-    }
-
-    bool Configured() const {
-        return configured58_;
     }
 
     uint32_t QueryBlockByteCount10() const {

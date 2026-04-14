@@ -257,91 +257,6 @@ bool EncryptAuthRequestBlobWithKeyMaterial(
     }
 }
 
-bool BuildAuthRequestPacket(
-    const std::string& username,
-    const AuthBlobLayout& blobLayout,
-    const AuthRequestLayout& requestLayout,
-    FrameMode frameMode,
-    AuthRequestBuildResult* outResult) {
-    using namespace internal;
-
-    if (!outResult) {
-        return false;
-    }
-
-    AuthRequestBuildResult result;
-    result.includedUsernameNullTerminator = blobLayout.includeUsernameNullTerminator;
-    result.usedFixedHeaderOverride = !requestLayout.fixedHeaderBytes.empty();
-
-    if (!BuildAuthRequestBlobPlaintext(
-            username,
-            blobLayout,
-            &result.blobPlaintextBytes,
-            &result.twofishKeyBytes,
-            &result.usernameLengthField)) {
-        return false;
-    }
-
-    result.usedProvidedPublicKey =
-        !requestLayout.rsaModulusBytes.empty() && !requestLayout.rsaExponentBytes.empty();
-    const bool encrypted = result.usedProvidedPublicKey
-        ? EncryptAuthRequestBlobWithKeyMaterial(
-            result.blobPlaintextBytes,
-            requestLayout.rsaModulusBytes,
-            requestLayout.rsaExponentBytes,
-            &result.blobCiphertextBytes)
-        : EncryptAuthRequestBlob(result.blobPlaintextBytes, &result.blobCiphertextBytes);
-    if (!encrypted) {
-        return false;
-    }
-
-    if (requestLayout.fixedHeaderBytes.empty()) {
-        if (!BuildDefaultAuthHeaderBytes(
-                requestLayout,
-                &result.authHeaderBytes,
-                &result.keyConfigMd5Bytes,
-                &result.uiConfigMd5Bytes)) {
-            return false;
-        }
-    } else {
-        if (requestLayout.fixedHeaderBytes.size() != 35u) {
-            return false;
-        }
-        result.authHeaderBytes = requestLayout.fixedHeaderBytes;
-        result.keyConfigMd5Bytes.assign(
-            result.authHeaderBytes.begin() + 3u,
-            result.authHeaderBytes.begin() + 19u);
-        result.uiConfigMd5Bytes.assign(
-            result.authHeaderBytes.begin() + 19u,
-            result.authHeaderBytes.end());
-    }
-
-    if (result.blobCiphertextBytes.size() > 0xffffu) {
-        return false;
-    }
-
-    std::vector<uint8_t> payload;
-    payload.reserve(1u + 4u + 35u + 2u + result.blobCiphertextBytes.size());
-    payload.push_back(0x08u);
-    AppendU32LE(&payload, requestLayout.publicKeyId);
-    payload.insert(
-        payload.end(),
-        result.authHeaderBytes.begin(),
-        result.authHeaderBytes.end());
-    AppendU16LE(&payload, static_cast<uint16_t>(result.blobCiphertextBytes.size()));
-    payload.insert(
-        payload.end(),
-        result.blobCiphertextBytes.begin(),
-        result.blobCiphertextBytes.end());
-
-    if (!BuildVariableLengthPacket(payload.data(), payload.size(), frameMode, &result.packet)) {
-        return false;
-    }
-
-    *outResult = result;
-    return true;
-}
-
 bool BuildAuthChallengeResponsePacket(
     const std::vector<uint8_t>& encryptedChallengeBytes,
     const std::vector<uint8_t>& twofishKeyBytes,
@@ -479,41 +394,6 @@ bool DecryptAuthReplyPrivateExponent(
 //   - `../../../work/mxoemu/Proxy/EncryptedPacket.cpp`
 // - this is not a claim that final launcher-owned state progression should remain here
 
-bool BuildMarginCertConnectRequestPacket(
-    const AuthReply& reply,
-    FrameMode frameMode,
-    FramedPacket* outPacket) {
-    using namespace internal;
-
-    if (!outPacket) {
-        return false;
-    }
-
-    std::vector<uint8_t> payload;
-    payload.push_back(0x01u);
-
-    if (!reply.authDataBytes.empty()) {
-        payload.reserve(1u + reply.authDataBytes.size());
-        payload.insert(payload.end(), reply.authDataBytes.begin(), reply.authDataBytes.end());
-        return BuildVariableLengthPacket(payload.data(), payload.size(), frameMode, outPacket);
-    }
-
-    if (!reply.signedData.valid || reply.signedData.rawBytes.empty() ||
-        reply.authSignatureBytes.empty()) {
-        return false;
-    }
-
-    const uint16_t authDataFirstWord = reply.authDataFirstWord != 0u ? reply.authDataFirstWord : 3u;
-    const uint16_t authDataMarker = reply.hasAuthDataMarker ? reply.authDataMarker : 0x0136u;
-
-    payload.reserve(1u + 2u + 2u + reply.authSignatureBytes.size() + reply.signedData.rawBytes.size());
-    AppendU16LE(&payload, authDataFirstWord);
-    AppendU16LE(&payload, authDataMarker);
-    payload.insert(payload.end(), reply.authSignatureBytes.begin(), reply.authSignatureBytes.end());
-    payload.insert(payload.end(), reply.signedData.rawBytes.begin(), reply.signedData.rawBytes.end());
-    return BuildVariableLengthPacket(payload.data(), payload.size(), frameMode, outPacket);
-}
-
 bool ParseMarginCertChallengePayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,
@@ -577,37 +457,6 @@ bool ParseMarginCertChallengePayload(
     challenge.encryptedBlobBytes.assign(payloadBytes + 5u, payloadBytes + 5u + blobSize);
     challenge.twofishKeyBytes.assign(decryptedBytes.begin() + 1u, decryptedBytes.begin() + 17u);
     challenge.challengeBytes.assign(decryptedBytes.begin() + 17u, decryptedBytes.begin() + 33u);
-    *outChallenge = challenge;
-    return true;
-}
-
-bool ParseMarginCertChallengePacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    const AuthSignedData& signedData,
-    const std::vector<uint8_t>& privateExponentBytes,
-    MarginCertChallenge* outChallenge) {
-    if (!packetBytes || !outChallenge) {
-        return false;
-    }
-
-    FramedPacket framed;
-    if (!ParseVariableLengthPacket(packetBytes, packetSize, &framed)) {
-        return false;
-    }
-
-    MarginCertChallenge challenge;
-    if (!ParseMarginCertChallengePayload(
-            framed.payloadBytes.data(),
-            framed.payloadBytes.size(),
-            signedData,
-            privateExponentBytes,
-            &challenge)) {
-        return false;
-    }
-
-    challenge.headerBytes = framed.headerBytes;
-    challenge.bytes = framed.bytes;
     *outChallenge = challenge;
     return true;
 }
@@ -886,70 +735,6 @@ bool ParseMarginConnectReplyPayload(
     return ParseMarginMsConnectReplyPayload(payloadBytes, payloadSize, outReply);
 }
 
-bool ParseMarginMsConnectReplyPacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    MarginConnectReply* outReply) {
-    if (!packetBytes || !outReply) {
-        return false;
-    }
-
-    FramedPacket framed;
-    if (!ParseVariableLengthPacket(packetBytes, packetSize, &framed)) {
-        return false;
-    }
-
-    std::vector<uint8_t> payloadBytes;
-    if (!DecryptMarginPayloadPacket(
-            framed.payloadBytes.data(),
-            framed.payloadBytes.size(),
-            twofishKeyBytes,
-            &payloadBytes)) {
-        return false;
-    }
-
-    MarginConnectReply reply;
-    if (!ParseMarginMsConnectReplyPayload(payloadBytes.data(), payloadBytes.size(), &reply)) {
-        return false;
-    }
-
-    reply.headerBytes = framed.headerBytes;
-    reply.encryptedPayloadBytes = framed.payloadBytes;
-    reply.bytes = framed.bytes;
-    *outReply = reply;
-    return true;
-}
-
-std::vector<uint8_t> BuildAuthRequestBlob(
-    const char* username,
-    uint32_t embeddedTime,
-    uint32_t rsaMethod,
-    uint16_t someShort) {
-    AuthBlobLayout layout;
-    layout.embeddedTime = embeddedTime;
-    layout.rsaMethod = rsaMethod;
-    layout.someShort = someShort;
-
-    std::vector<uint8_t> plaintext;
-    std::vector<uint8_t> twofishKey;
-    uint16_t usernameLengthField = 0;
-    if (!BuildAuthRequestBlobPlaintext(
-            username ? std::string(username) : std::string(),
-            layout,
-            &plaintext,
-            &twofishKey,
-            &usernameLengthField)) {
-        return std::vector<uint8_t>();
-    }
-
-    std::vector<uint8_t> ciphertext;
-    if (!EncryptAuthRequestBlob(plaintext, &ciphertext)) {
-        return std::vector<uint8_t>();
-    }
-    return ciphertext;
-}
-
 std::vector<uint8_t> BuildAuthRequestBlobEx(
     const char* username,
     uint32_t rsaMethod,
@@ -982,15 +767,6 @@ std::vector<uint8_t> BuildAuthRequestBlobEx(
         return std::vector<uint8_t>();
     }
     return ciphertext;
-}
-
-std::string BuildAuthRequestBlobHex(
-    const char* username,
-    uint32_t rsaMethod,
-    uint16_t someShort) {
-    const std::vector<uint8_t> blob =
-        BuildAuthRequestBlobEx(username, rsaMethod, someShort, NULL);
-    return HexEncode(blob);
 }
 
 }  // namespace mxo::auth

@@ -47,39 +47,6 @@ std::string HexEncode(const std::vector<uint8_t>& bytes) {
     return bytes.empty() ? std::string() : HexEncode(bytes.data(), bytes.size());
 }
 
-bool HexDecode(const std::string& text, std::vector<uint8_t>* outBytes) {
-    if (!outBytes || (text.size() & 1u) != 0u) {
-        return false;
-    }
-
-    outBytes->assign(text.size() / 2u, 0u);
-    for (size_t i = 0; i < outBytes->size(); ++i) {
-        const char high = text[i * 2u];
-        const char low = text[i * 2u + 1u];
-        unsigned value = 0u;
-
-        const char pair[2] = {high, low};
-        for (size_t j = 0; j < 2u; ++j) {
-            value <<= 4u;
-            const char nibble = pair[j];
-            if (nibble >= '0' && nibble <= '9') {
-                value |= static_cast<unsigned>(nibble - '0');
-            } else if (nibble >= 'a' && nibble <= 'f') {
-                value |= static_cast<unsigned>(nibble - 'a' + 10);
-            } else if (nibble >= 'A' && nibble <= 'F') {
-                value |= static_cast<unsigned>(nibble - 'A' + 10);
-            } else {
-                outBytes->clear();
-                return false;
-            }
-        }
-
-        (*outBytes)[i] = static_cast<uint8_t>(value);
-    }
-
-    return true;
-}
-
 bool ParseGetPublicKeyReplyPayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,
@@ -125,33 +92,6 @@ bool ParseGetPublicKeyReplyPayload(
     return true;
 }
 
-bool ParseGetPublicKeyReplyPacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    GetPublicKeyReply* outReply) {
-    if (!packetBytes || !outReply) {
-        return false;
-    }
-
-    FramedPacket framed;
-    if (!ParseVariableLengthPacket(packetBytes, packetSize, &framed)) {
-        return false;
-    }
-
-    GetPublicKeyReply reply;
-    if (!ParseGetPublicKeyReplyPayload(
-            framed.payloadBytes.data(),
-            framed.payloadBytes.size(),
-            &reply)) {
-        return false;
-    }
-
-    reply.headerBytes = framed.headerBytes;
-    reply.bytes = framed.bytes;
-    *outReply = reply;
-    return true;
-}
-
 bool ParseAuthChallengePayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,
@@ -164,33 +104,6 @@ bool ParseAuthChallengePayload(
     challenge.valid = true;
     challenge.payloadBytes.assign(payloadBytes, payloadBytes + payloadSize);
     challenge.encryptedChallengeBytes.assign(payloadBytes + 1u, payloadBytes + payloadSize);
-    *outChallenge = challenge;
-    return true;
-}
-
-bool ParseAuthChallengePacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    AuthChallenge* outChallenge) {
-    if (!packetBytes || !outChallenge) {
-        return false;
-    }
-
-    FramedPacket framed;
-    if (!ParseVariableLengthPacket(packetBytes, packetSize, &framed)) {
-        return false;
-    }
-
-    AuthChallenge challenge;
-    if (!ParseAuthChallengePayload(
-            framed.payloadBytes.data(),
-            framed.payloadBytes.size(),
-            &challenge)) {
-        return false;
-    }
-
-    challenge.headerBytes = framed.headerBytes;
-    challenge.bytes = framed.bytes;
     *outChallenge = challenge;
     return true;
 }
@@ -363,33 +276,6 @@ bool ParseAuthReplyPayload(
         ParseMxoStringAtOffset(payloadBytes, payloadSize, reply.offsetUsername, &reply.username);
     }
 
-    *outReply = reply;
-    return true;
-}
-
-bool ParseAuthReplyPacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    AuthReply* outReply) {
-    if (!packetBytes || !outReply) {
-        return false;
-    }
-
-    FramedPacket framed;
-    if (!ParseVariableLengthPacket(packetBytes, packetSize, &framed)) {
-        return false;
-    }
-
-    AuthReply reply;
-    if (!ParseAuthReplyPayload(
-            framed.payloadBytes.data(),
-            framed.payloadBytes.size(),
-            &reply)) {
-        return false;
-    }
-
-    reply.headerBytes = framed.headerBytes;
-    reply.bytes = framed.bytes;
     *outReply = reply;
     return true;
 }

@@ -318,10 +318,6 @@ struct AuthReply {
 // - exact original helper VAs for these tiny helpers: [not yet isolated]
 const char* AuthOpcodeName(uint8_t rawCode);
 
-std::string HexEncode(const uint8_t* data, size_t size);
-std::string HexEncode(const std::vector<uint8_t>& bytes);
-bool HexDecode(const std::string& text, std::vector<uint8_t>* outBytes);
-
 // Variable-length framing anchors:
 // - source file anchor:
 //   `\matrixstaging\runtime\src\libltmessaging\variablelengthprefixedtcpstreamparser.cpp`
@@ -366,11 +362,6 @@ bool ParseGetPublicKeyReplyPayload(
     size_t payloadSize,
     GetPublicKeyReply* outReply);
 
-bool ParseGetPublicKeyReplyPacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    GetPublicKeyReply* outReply);
-
 // Raw 0x08 / AS_AuthRequest build anchors:
 // - source file anchor:
 //   `\matrixstaging\runtime\src\libltcrypto\sessionkeyencryption.cpp`
@@ -397,13 +388,6 @@ bool EncryptAuthRequestBlobWithKeyMaterial(
     const std::vector<uint8_t>& exponentBytes,
     std::vector<uint8_t>* outCiphertext);
 
-bool BuildAuthRequestPacket(
-    const std::string& username,
-    const AuthBlobLayout& blobLayout,
-    const AuthRequestLayout& requestLayout,
-    FrameMode frameMode,
-    AuthRequestBuildResult* outResult);
-
 // Raw 0x09 / AS_AuthChallenge parse anchors:
 // - source file anchor:
 //   `\matrixstaging\runtime\src\libltcrypto\filters.cpp`
@@ -411,11 +395,6 @@ bool BuildAuthRequestPacket(
 bool ParseAuthChallengePayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,
-    AuthChallenge* outChallenge);
-
-bool ParseAuthChallengePacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
     AuthChallenge* outChallenge);
 
 // Raw 0x0a / AS_AuthChallengeResponse build anchors:
@@ -443,11 +422,6 @@ bool BuildAuthChallengeResponsePacket(
 bool ParseAuthReplyPayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,
-    AuthReply* outReply);
-
-bool ParseAuthReplyPacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
     AuthReply* outReply);
 
 // Auth-reply private-exponent decrypt anchors:
@@ -519,23 +493,10 @@ struct MarginConnectReply {
           field15(0) {}
 };
 
-// Plaintext raw 0x01 / CERT_ConnectRequest builder.
-bool BuildMarginCertConnectRequestPacket(
-    const AuthReply& reply,
-    FrameMode frameMode,
-    FramedPacket* outPacket);
-
 // Plaintext raw 0x02 / CERT_Challenge parse helpers.
 bool ParseMarginCertChallengePayload(
     const uint8_t* payloadBytes,
     size_t payloadSize,
-    const AuthSignedData& signedData,
-    const std::vector<uint8_t>& privateExponentBytes,
-    MarginCertChallenge* outChallenge);
-
-bool ParseMarginCertChallengePacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
     const AuthSignedData& signedData,
     const std::vector<uint8_t>& privateExponentBytes,
     MarginCertChallenge* outChallenge);
@@ -603,12 +564,6 @@ bool ParseMarginConnectReplyPayload(
     size_t payloadSize,
     MarginConnectReply* outReply);
 
-bool ParseMarginMsConnectReplyPacket(
-    const uint8_t* packetBytes,
-    size_t packetSize,
-    const std::vector<uint8_t>& twofishKeyBytes,
-    MarginConnectReply* outReply);
-
 // Generic encrypted margin payload wrapper used by MS bootstrap packets and later margin traffic.
 // Wire shape follows the open-server `EncryptedPacket` helper: random IV + Twofish-CBC ciphertext
 // over `[crc32][u16 length][u32 timestamp][payload]`.
@@ -624,26 +579,6 @@ bool DecryptMarginPayloadPacket(
     size_t encryptedPayloadSize,
     const std::vector<uint8_t>& twofishKeyBytes,
     std::vector<uint8_t>* outPayloadBytes);
-
-// Compatibility wrappers used by earlier diagnostics / tooling.
-// These are explicitly transitional convenience helpers, not a claim of original source-level
-// API fidelity.
-std::vector<uint8_t> BuildAuthRequestBlob(
-    const char* username,
-    uint32_t embeddedTime,
-    uint32_t rsaMethod = 4,
-    uint16_t someShort = 0x1b);
-
-std::vector<uint8_t> BuildAuthRequestBlobEx(
-    const char* username,
-    uint32_t rsaMethod = 4,
-    uint16_t someShort = 0x1b,
-    const uint8_t* twofishKey = nullptr);
-
-std::string BuildAuthRequestBlobHex(
-    const char* username,
-    uint32_t rsaMethod = 4,
-    uint16_t someShort = 0x1b);
 
 }  // namespace auth
 }  // namespace mxo
