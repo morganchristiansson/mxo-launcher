@@ -311,14 +311,14 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
     // - send through `0x41af70`
     // - post event `0x13`
     if (!mediator->State10HasReadyConnectionState2()) {
-        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(4u);
+        const uint32_t fallbackResult = mediator->SwitchHelperState(4u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return fallbackResult;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
-        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(6u);
+        const uint32_t fallbackResult = mediator->SwitchHelperState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
@@ -377,7 +377,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
     }
 
     if (mediator->worldListCountOrStatus80 >= 1u) {
-        (void)mediator->SwitchHelperStateByIdScaffold(3u);
+        (void)mediator->SwitchHelperState(3u);
         mediator->PostError(0x0bu);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
@@ -390,7 +390,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
         // anchor: launcher.exe:0x4401a0 success tail
         // Original ends with `0x41b450(0x0b)`, so keep the immediate helper11 slot-3 continuation
         // inside the central switch helper instead of restaging it through a source-only wrapper.
-        helper11EntryResult = mediator->SwitchHelperStateByIdScaffold(0x0bu);
+        helper11EntryResult = mediator->SwitchHelperState(0x0bu);
         mediator->expectedMarginRequestName_ = CLTLoginMediator::kMessageMsLoadCharacterReply;
     } else {
         spdlog::warn(

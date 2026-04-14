@@ -118,7 +118,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem) {
     mediator->worldListCountOrStatus80 = parsedStatus;
     if (parsedStatus < 1u) {
         mediator->HandleState9Opcode11SuccessSideEffect();
-        (void)mediator->SwitchHelperStateByIdScaffold(0x0cu);
+        (void)mediator->SwitchHelperState(0x0cu);
         spdlog::info(
             "ROUTE CHECKPOINT: late-login state9 success -> state12 event=0x18 currentState={}",
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
@@ -131,7 +131,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem) {
         return 1u;
     }
 
-    (void)mediator->SwitchHelperStateByIdScaffold(3u);
+    (void)mediator->SwitchHelperState(3u);
     // anchor: launcher.exe:0x43c180 failure tail posts error 0x0d after switching back to state 3.
     mediator->PostError(0x0du);
     spdlog::info(

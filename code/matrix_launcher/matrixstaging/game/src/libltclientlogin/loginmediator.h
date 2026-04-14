@@ -960,7 +960,8 @@ public:
     // from the helper dispatch table rooted at `0x4f7868`.
     // Current source returns the new-helper slot-3 result for diagnostics even though the original
     // helper-switch body itself returns `void`.
-    uint32_t SwitchHelperStateByIdScaffold(uint32_t helperStateId);
+    // anchor: launcher.exe:0x41b450
+    uint32_t SwitchHelperState(uint32_t helperStateId);
     // Installs the source-owned initial idle/start helper convention (`state0`) after
     // registration. This stays separate from owner-owned submit handling: state0 keeps the shared
     // slot-3 no-op stub, and `ProcessLoginRequest` performs the first happy-path switch to state2.

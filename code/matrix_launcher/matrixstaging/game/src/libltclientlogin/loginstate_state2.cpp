@@ -162,7 +162,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             // - `0x41b450` then loads `[id*4 + 0x4f7868]`, installs owner `+0x10`, and
             //   immediately re-enters the new helper slot 3 with old-state `this`
             const uint32_t switchDispatchResult =
-                mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
+                mediator->SwitchHelperState(nextHelperStateId);
             mediator->PostEvent(5u);
 
             // Replacement-only post-AS_AuthReply margin auto-begin now stays on the concrete
@@ -206,7 +206,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
         case kAuthBootstrap680InboundAuthReplyError: {
             mediator->expectedMarginRequestName_ = nullptr;
             AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
-            (void)mediator->SwitchHelperStateByIdScaffold(0u);
+            (void)mediator->SwitchHelperState(0u);
             mediator->PostError(4u);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x0b error reply owner+0x80=0x{:08x}; mirrored original state0 switch and error=4",
@@ -216,7 +216,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
 
         case kAuthBootstrap680InboundGetPublicKeyReplyError:
         case kAuthBootstrap680InboundGetPublicKeyWorkerError: {
-            (void)mediator->SwitchHelperStateByIdScaffold(0u);
+            (void)mediator->SwitchHelperState(0u);
             mediator->PostError(2u);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x07 failure childResult={} owner+0x80=0x{:08x}; mirrored original state0 switch and error=2",
@@ -229,7 +229,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             mediator->expectedMarginRequestName_ = nullptr;
             AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
             mediator->worldListCountOrStatus80 = 0x1200000bu;
-            (void)mediator->SwitchHelperStateByIdScaffold(0u);
+            (void)mediator->SwitchHelperState(0u);
             mediator->PostError(0x0fu);
             spdlog::info(
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch rejected early raw-0x0b success-side adoption owner+0x80=0x{:08x}; mirrored original state0 switch and error=0x0f",
@@ -241,7 +241,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             break;
     }
 
-    (void)mediator->SwitchHelperStateByIdScaffold(0u);
+    (void)mediator->SwitchHelperState(0u);
     mediator->PostError(4u);
     spdlog::warn(
         "CLTLoginState_AuthenticatePending::AuthMessageDispatch reached unexpected childResult={} rawCode=0x{:02x}; mirrored fallback state0 switch and error=4",

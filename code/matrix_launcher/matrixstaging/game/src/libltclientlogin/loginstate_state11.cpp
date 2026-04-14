@@ -185,7 +185,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem) {
     if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
         mediator->SetCurrentCharacterRouteIndexCc8Scaffold(0xffu);
-        (void)mediator->SwitchHelperStateByIdScaffold(3u);
+        (void)mediator->SwitchHelperState(3u);
         mediator->PostError(12u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage observed failure status=0x{:08x} handoffWord=0x{:04x}; mirrored original owner+0x108 clear, owner+0xcc8=0xff, state3 switch, and error=12",
@@ -433,7 +433,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem) {
             // Current source-owned mirror keeps that on the concrete state9 object.
             nextState->SetPendingPayload(/*byte4=*/0, loadCharacterReplyEnvelope.handoffWord09);
         }
-        const uint32_t slot3Result = mediator->SwitchHelperStateByIdScaffold(9u);
+        const uint32_t slot3Result = mediator->SwitchHelperState(9u);
         spdlog::info(
             "CLTLoginState_State11::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
             loadCharacterReplyEnvelope.handoffWord09,

@@ -251,7 +251,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
     }
 
     if (!mediator->State10HasReadyConnectionState2()) {
-        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(4u);
+        const uint32_t fallbackResult = mediator->SwitchHelperState(4u);
         spdlog::info(
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on owner+0x1c state!=2 -> helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
@@ -263,7 +263,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
     const bool marginConnectionReady84 =
         marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84();
     if (!marginConnectionReady84) {
-        const uint32_t fallbackResult = mediator->SwitchHelperStateByIdScaffold(5u);
+        const uint32_t fallbackResult = mediator->SwitchHelperState(5u);
         spdlog::info(
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on margin connection +0x84==0 -> helper5 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
@@ -416,7 +416,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem) {
     }
 
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
-    const uint32_t switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(nextHelperStateId);
+    const uint32_t switchDispatchResult = mediator->SwitchHelperState(nextHelperStateId);
     mediator->PostEvent(0x12u);
     spdlog::info(
         "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
