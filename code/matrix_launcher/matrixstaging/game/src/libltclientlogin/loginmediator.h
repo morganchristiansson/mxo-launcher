@@ -1014,8 +1014,7 @@ public:
 
     void SetMarginRouteHostPrefix(const char* routeHostPrefix);
     void SetExactMarginHostName(const char* exactMarginHostName);
-    uint32_t MarginConnectAttemptCountScaffold() const { return marginBeginCount24_; }
-    void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
+void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
     // launcher.exe:0x43b300 / full helper-dispatch table seed
     // Current best read:
@@ -1445,9 +1444,6 @@ public:
     // happy path. Keep the storage stable, but do not overstate the exact original semantic yet.
 
     bool MarginConnectionCloseWaitEvent0fGateArmedScaffold() const { return marginConnectionFlag2d_ != 0u; }
-    void SetMarginConnectionCloseWaitEvent0fGateArmedScaffold(bool armed) {
-        marginConnectionFlag2d_ = armed ? 1u : 0u;
-    }
     uint32_t State6UdpSessionSecretF18() const;
     void SetState6UdpSessionSecretF18(uint32_t value);
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50

@@ -1814,7 +1814,7 @@ void CLTLoginMediator::ProvideStartupTriple(void* netShell, void* netMgr, void* 
 }
 
 // anchor: launcher.exe:0x41f310 slot +0x130
-SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() const {
+[[maybe_unused]] SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() const {
     // Tiny owner-vtable getter used by the later session-callback helper family.
     return sessionCallbackHelper65c_;
 }
@@ -1857,7 +1857,7 @@ void CLTLoginMediator::SetSharedMarginPacketField660(uint32_t value) {
 }
 
 // anchor: launcher.exe:0x41c510 +0x158
-uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t field90Value) {
+[[maybe_unused]] uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t field90Value) {
     const uint32_t stateCode = currentState_ ? currentState_->DispatchPhaseCode() : 0u;
     switch (stateCode) {
         case 0u:
