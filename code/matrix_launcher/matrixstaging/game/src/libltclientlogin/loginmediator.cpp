@@ -298,7 +298,7 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
         marginConnection_->SetOwnerContext(nullptr);
     }
 
-    SetCurrentState(nullptr);
+    SetCurrentState(0u);
     SetNetworkEngine(nullptr);
     // inline UnregisterActiveStateSourceScaffold
     g_CurrentLoginMediator = nullptr;
@@ -543,7 +543,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
             "ROUTE CHECKPOINT: early-auth state0 -> state2 via owner ProcessLoginRequest (favored g_LaunchPadGateState16State18==0 happy path) upstreamState={} clearedOwnerF4=1",
             upstreamState ? upstreamState->DebugName() : "<null>");
         if (LoginHelperStateByIdScaffold(2u) != nullptr) {
-            const uint32_t state2EntryResult = SwitchHelperState(2u);
+            const uint32_t state2EntryResult = SetCurrentState(2u);
             spdlog::info(
                 "CLTLoginMediator::ProcessLoginRequest default state2 entry upstreamState={} -> slot3Result=0x{:08x}",
                 upstreamState ? upstreamState->DebugName() : "<null>",
@@ -573,7 +573,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
                 "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state16 (string60 non-empty, helper65c absent) upstreamState={}",
                 upstreamState ? upstreamState->DebugName() : "<null>");
             if (LoginHelperStateByIdScaffold(16u) != nullptr) {
-                (void)SwitchHelperState(16u);
+                (void)SetCurrentState(16u);
             } else {
                 spdlog::info(
                     "CLTLoginMediator::ProcessLoginRequest missing registered state16 scaffold for alternate no-helper65c branch currentState={}",
@@ -586,7 +586,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
             "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state2 (string60 non-empty, helper65c present) upstreamState={}",
             upstreamState ? upstreamState->DebugName() : "<null>");
         if (LoginHelperStateByIdScaffold(2u) != nullptr) {
-            (void)SwitchHelperState(2u);
+            (void)SetCurrentState(2u);
         } else {
             spdlog::info(
                 "CLTLoginMediator::ProcessLoginRequest missing registered state2 scaffold for alternate helper65c-present branch currentState={}",
@@ -611,7 +611,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         upstreamState ? upstreamState->DebugName() : "<null>",
         sessionCallbackHelper65c_ ? 1u : 0u);
     if (LoginHelperStateByIdScaffold(16u) != nullptr) {
-        (void)SwitchHelperState(16u);
+        (void)SetCurrentState(16u);
     } else {
         spdlog::info(
             "CLTLoginMediator::ProcessLoginRequest missing registered state16 scaffold for alternate string60-empty branch currentState={}",
@@ -632,7 +632,7 @@ void CLTLoginMediator::RequestAuthCloseAndSwitchToState0() {
     const bool authCloseArmed = RequestAuthConnectionCloseWaitEvent1();
     uint32_t state0EntryResult = 0u;
     if (LoginHelperStateByIdScaffold(0u) != nullptr) {
-        state0EntryResult = SwitchHelperState(0u);
+        state0EntryResult = SetCurrentState(0u);
     }
     spdlog::info(
         "CLTLoginMediator::RequestAuthCloseAndSwitchToState0 authCloseArmed={} oldState={} currentState={} state0EntryResult=0x{:08x}",
@@ -1532,7 +1532,7 @@ uint32_t CLTLoginMediator::PersistSelectionContextForState8(const State3Selectio
         // - without that immediate slot-3 continuation, the later type-2 margin completion lands on
         //   shared state8 slot2 and returns 0 instead of restoring the original state4/state5/state6
         //   chain back toward the first natural state8 raw-0x0f send
-        state8EntryResult = SwitchHelperState(8u);
+        state8EntryResult = SetCurrentState(8u);
     }
 
     spdlog::info(
@@ -1551,7 +1551,7 @@ uint32_t CLTLoginMediator::SetSelectionIndexAndSwitchToState7(uint32_t selectedS
     if (currentState_ && currentState_->DispatchPhaseCode() > 2u && selectedSlotRecordIndex < 100u) {
         SetCurrentCharacterRouteIndexCc8Scaffold(static_cast<uint8_t>(selectedSlotRecordIndex & 0xffu));
         if (LoginHelperStateByIdScaffold(7u) != nullptr) {
-            (void)SwitchHelperState(7u);
+            (void)SetCurrentState(7u);
         }
         // Bounded source note:
         // - original `0x41c390` switches helper state to `7`
@@ -1766,7 +1766,7 @@ uint32_t CLTLoginMediator::ProcessCreateCharacterInput120(const ProcessCreateCha
         // Like the neighboring owner-side state writers, the original helper switch does not stop
         // at plain `currentState = state10`; the active continuation needs the immediate state10
         // slot-3 claim-name send (`0x43bf90`) to start `MS_ClaimCharacterNameRequest`.
-        state10EntryResult = SwitchHelperState(10u);
+        state10EntryResult = SetCurrentState(10u);
     }
 
     spdlog::info(
@@ -1875,7 +1875,7 @@ uint32_t CLTLoginMediator::SetState9OptionalField90AndSwitchToState13(uint32_t f
             return 0x12000000u;
         case 12u:
             ownerOptionalField90_ = field90Value;
-            SwitchHelperState(0x0du);
+            SetCurrentState(0x0du);
             spdlog::info(
                 "CLTLoginMediator::SetState9OptionalField90AndSwitchToState13 stored owner+0x90=0x{:08x} currentState={}",
                 static_cast<unsigned>(ownerOptionalField90_),
@@ -2031,12 +2031,7 @@ uint32_t CLTLoginMediator::GetLastLoginStatus() {
     return worldListCountOrStatus80;
 }
 
-// anchor: launcher.exe:0x41b450 - helper dispatcher table switch
-void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
-    // Original SwitchHelperState also does vtable+0x0c slot4 NoOp on old state,
-    // then vtable+0x08 slot3 on new state. Source now does direct assignment + slot3.
-    currentState_ = state;
-}
+
 
 
 

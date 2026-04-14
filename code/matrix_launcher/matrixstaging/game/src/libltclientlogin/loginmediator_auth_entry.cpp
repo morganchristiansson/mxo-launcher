@@ -300,7 +300,7 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(AuthConnectAttemptCountScaffold()),
         static_cast<unsigned>(AuthConnectCandidateCountScaffold()));
-    const uint32_t result = SwitchHelperState(1u);
+    const uint32_t result = SetCurrentState(1u);
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold upstreamState={} currentState={} -> result=0x{:08x}",
         upstreamState ? upstreamState->DebugName() : "<null>",
@@ -320,7 +320,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
     }
 
     CLTLoginState* const upstreamState = currentState_;
-    const uint32_t result = SwitchHelperState(4u);
+    const uint32_t result = SetCurrentState(4u);
     const std::string marginHost = ResolvedMarginHostName();
     spdlog::info(
         "CLTLoginMediator::BeginMarginConnectionViaState4Scaffold upstreamState={} currentState={} marginHost='{}' -> result=0x{:08x}",
