@@ -208,6 +208,49 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot9_IsNetworkDriven() const {
 
 // Implementation of LoadCharacterReplyEnvelope_0x4b542c
 
+// More faithful constructor using CMessageConnectionMessageRef directly
+// anchor: launcher.exe:0x43ae50
+LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
+    mxo::liblttcp::CMessageConnectionMessageRef* incomingMessageRef,
+    char initializeEmptyReply)
+    : initializeEmptyReply0c_(!!initializeEmptyReply) {
+    // Extract raw bytes from the message ref (more faithful to static-RE)
+    if (incomingMessageRef && incomingMessageRef->messageStorage0c) {
+        const auto* storage = incomingMessageRef->messageStorage0c;
+        const uint8_t* payloadBase = storage->PayloadBaseScaffold();
+        uint16_t payloadByteCount = storage->PayloadByteCountScaffold();
+        messageBase04_ = payloadByteCount > 0 ? const_cast<uint8_t*>(payloadBase) : nullptr;
+        // Also track via the vector pointer for RefreshDataSectionView compatibility
+        incomingMarginMessageBytes08_ = nullptr;  // N/A for message ref approach
+    } else {
+        messageBase04_ = nullptr;
+        incomingMarginMessageBytes08_ = nullptr;
+    }
+
+    RefreshDataSectionView(initializeEmptyReply);
+    if (!initializeEmptyReply) {
+        ResetToDefaultMessage();
+    }
+
+    // For headerless messages, we can't validate the same way - use payload presence
+    valid = currentMessage10_ != nullptr;
+    if (!valid) {
+        return;
+    }
+
+    // Parse standard message envelope fields
+    status = ReadU32LE(currentMessage10_ + 1u);
+    field05 = ReadU32LE(currentMessage10_ + 5u);
+    handoffWord09 = ReadU16LE(currentMessage10_ + 9u);
+    expectedSectionCount0b = currentMessage10_[0x0b];
+    shouldSeedExpectedSectionCount = (currentMessage10_[0x0c] == 0x01u);
+    sectionSelectorMinus2 = static_cast<uint8_t>(currentMessage10_[0x0d] - 2u);
+    sectionOffset0e = ReadU16LE(currentMessage10_ + 0x0eu);
+    sectionByteCount = dataSectionByteCount18_;
+    sectionData = dataSectionBytes14_;
+}
+
+// Convenience constructor using pre-extracted bytes
 // anchor: launcher.exe:0x43ae50
 LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
     const std::vector<uint8_t>& incomingMarginMessageBytes,

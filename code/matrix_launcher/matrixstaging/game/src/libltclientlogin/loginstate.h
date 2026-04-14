@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "../../../runtime/src/libltmessaging/messageconnection.h"
+
 namespace mxo::ltlogin {
 
 class CLTLoginMediator;
@@ -666,7 +668,13 @@ inline uint32_t ReadU32LE(const uint8_t* p) {
 // anchor: launcher.exe:0x4b542c
 class LoadCharacterReplyEnvelope_0x4b542c {
 public:
+    // More faithful constructor using CMessageConnectionMessageRef directly
     // anchor: launcher.exe:0x43ae50
+    LoadCharacterReplyEnvelope_0x4b542c(
+        mxo::liblttcp::CMessageConnectionMessageRef* incomingMessageRef,
+        char initializeEmptyReply);
+
+    // Convenience constructor using pre-extracted bytes (maintains backward compatibility)
     LoadCharacterReplyEnvelope_0x4b542c(
         const std::vector<uint8_t>& incomingMarginMessageBytes,
         bool initializeEmptyReply);
