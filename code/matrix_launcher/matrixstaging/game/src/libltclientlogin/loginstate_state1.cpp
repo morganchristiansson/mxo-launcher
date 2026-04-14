@@ -24,10 +24,13 @@ const char* CLTLoginState_State1::DebugName() const {
 
 // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
 uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
+    // Original entry: no null checks - directly accesses g_CurrentLoginMediator and workItem
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
+    (void)mediator;
     if (!workItem || !mediator) {
         return 0u;
     }
+    // Note: source-added safety check above not in original (assembly directly uses inputs)
 
     const auto* workHeader =
         static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
@@ -50,92 +53,56 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
         return CLTLoginState::Slot1_HandlePrimaryGate(workItem);
     }
 
+    // Assembly flow: read work-item payload (offset +8 from workItem header)
+    // 0x004390d3: CALL GetStatusOrPayloadDword -> store to [mediator+0x80]
+    // 0x004390e0: CALL GetStatusOrPayloadDword again -> TEST result
+    // The second result is NOT stored, just used for zero-check
     const uint32_t workResultCode = LoginState1WorkItemPayloadScaffold(workItem);
-    mediator->worldListCountOrStatus80 = workResultCode;
+    g_CurrentLoginMediator->worldListCountOrStatus80 = workResultCode;
+    (void)LoginState1WorkItemPayloadScaffold(workItem);  // 2nd call (matches assembly: unused result)
 
-    CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_);
-    const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    // Assembly branches on: payload == 0 vs payload != 0
+    // There's only ONE success path in original: workResultCode == 0
+    // The 0x07000001 branch is source-added replacement logic (liveSuccessAlias)
     const bool originalZeroStatusSuccess = (workResultCode == 0u);
+    // Source-added: live bridge success alias for 0x07000001 in replacement flow
     const bool liveSuccessAlias = (workResultCode == CLTLoginMediator::kConnectStatusSuccess);
 
     if (originalZeroStatusSuccess) {
-        // Original 0x41b450: switch to cached upstream state object, then re-enter its slot3
-        // with old state passed as argument. Source now mirrors that exactly.
-        if (cachedUpstreamState != nullptr && cachedUpstreamPhaseCode != 0u) {
-            if (cachedUpstreamPhaseCode == 2u) {
-                spdlog::info(
-                    "ROUTE CHECKPOINT: early-auth original state1 success-side restore -> state2 cachedUpstream={} currentStateBeforeRestore={} (0x41b450 then re-enters state2 slot3 with oldState=state1)",
-                    fmt::ptr(cachedUpstreamOrArg_),
-                    mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-            }
-            // Original: SwitchHelperState(value) sets currentState10 and calls new state's slot3
+        // Original flow at 0x00439147-0x0043916c:
+        // - Get cached upstream state from this+4
+        // - Call vtable+0x18 on it to get state ID
+        // - Call SetCurrentState(mediator, stateId) at 0x0041b450
+        // - Call PostEvent(mediator, 0) at 0x0041cfb0
+        CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_);
+        if (cachedUpstreamState != nullptr) {
             mediator->currentState_ = cachedUpstreamState;
             cachedUpstreamState->Slot3_BeginOrContinue(this);
-        } else {
-            spdlog::info(
-                "CLTLoginState_State1::Slot1_HandlePrimaryGate original zero-status success missing cached upstream cachedUpstream={} upstreamPhaseCode={} currentState={}",
-                fmt::ptr(cachedUpstreamOrArg_),
-                static_cast<unsigned>(cachedUpstreamPhaseCode),
-                mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         }
-
         mediator->PostEvent(0u);
-        spdlog::info(
-            "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=original-zero-status cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostEvent(0x00)",
-            static_cast<unsigned>(workResultCode),
-            fmt::ptr(cachedUpstreamOrArg_),
-            static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
+    // All non-zero status values fall into this path in original binary
+    // Source splits into: 0x07000001 -> liveSuccessAlias path, else -> retry/error
     if (liveSuccessAlias) {
+        // Source-added: live replacement flow with auth flag + bootstrap child
         mediator->authConnectionFlag2c_ = 1u;
-
-        if (cachedUpstreamState != nullptr && cachedUpstreamPhaseCode != 0u) {
-            // Keep the active replacement happy path source-owned without pretending the original
-            // zero-status success path behaves this way: the live bridge still restores the cached
-            // helper object directly, then enters the owner+0x680 auth bootstrap child.
-            if (cachedUpstreamPhaseCode == 2u) {
-                spdlog::info(
-                    "ROUTE CHECKPOINT: early-auth live state1 success alias -> state2 phase2-bootstrap-child resume cachedUpstream={} currentStateBeforeRestore={}",
-                    fmt::ptr(cachedUpstreamOrArg_),
-                    mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-            }
-            // Original: SwitchHelperState(value) - copies state pointer from table, then new state's slot3
+        CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_);
+        if (cachedUpstreamState != nullptr) {
             CLTLoginState* oldState = this;
             mediator->currentState_ = cachedUpstreamState;
-            const uint32_t resumeResult = cachedUpstreamState->Slot3_BeginOrContinue(oldState);
-            spdlog::info(
-                "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} resumeResult=0x{:08x}",
-                static_cast<unsigned>(workResultCode),
-                fmt::ptr(cachedUpstreamOrArg_),
-                static_cast<unsigned>(cachedUpstreamPhaseCode),
-                mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
-                static_cast<unsigned>(mediator->authConnectionFlag2c_),
-                static_cast<unsigned>(resumeResult));
-            return resumeResult;
+            return cachedUpstreamState->Slot3_BeginOrContinue(oldState);
         }
-
-        // Ready-side: exact call shape matched to assembly
+        // No cached upstream: continue to bootstrap child dispatch
         auto* child = &mediator->AuthBootstrapChild680();
         void* sendTarget = mediator->AuthConnection();
         const char* sessionToken = mediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
-        const uint32_t handshakeResult = child->PrepareAndDispatch(*mediator, sendTarget, sessionToken);
-        spdlog::info(
-            "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} owner+0x680::PrepareAndDispatch=0x{:08x}",
-            static_cast<unsigned>(workResultCode),
-            fmt::ptr(cachedUpstreamOrArg_),
-            static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
-            static_cast<unsigned>(mediator->authConnectionFlag2c_),
-            static_cast<unsigned>(handshakeResult));
-        return handshakeResult;
+        return child->PrepareAndDispatch(*mediator, sendTarget, sessionToken);
     }
 
-    mediator->authConnectionFlag2c_ = 1u;
-
-    // Original: retry if attemptCount < ((addressListEnd - addressListBegin) >> 2)
+    // Original: non-zero status retry/error path at 0x004390e7-0x00439144
+    g_CurrentLoginMediator->authConnectionFlag2c_ = 1u;
     const uint32_t candidateCount = mediator->AuthConnectCandidateCountScaffold();
     const uint32_t attemptCount = mediator->authConnectAttemptCount28_;
     if (attemptCount < candidateCount) {
@@ -143,13 +110,11 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
         ++mediator->authConnectAttemptCount28_;
         const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
         spdlog::info(
-            "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} authFlag2c={} -> retry state1 slot3 result=0x{:08x}",
+            "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount28={} candidateCount={} -> retry state1 slot3 result=0x{:08x}",
             static_cast<unsigned>(workResultCode),
             fmt::ptr(cachedUpstreamOrArg_),
-            static_cast<unsigned>(cachedUpstreamPhaseCode),
             static_cast<unsigned>(attemptCount),
             static_cast<unsigned>(candidateCount),
-            static_cast<unsigned>(mediator->authConnectionFlag2c_),
             static_cast<unsigned>(retryResult));
         return 1u;
     }
@@ -164,10 +129,9 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     }
     mediator->PostError(0u);
     spdlog::info(
-        "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
+        "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
         static_cast<unsigned>(workResultCode),
         fmt::ptr(cachedUpstreamOrArg_),
-        static_cast<unsigned>(cachedUpstreamPhaseCode),
         static_cast<unsigned>(attemptCount),
         static_cast<unsigned>(candidateCount),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
