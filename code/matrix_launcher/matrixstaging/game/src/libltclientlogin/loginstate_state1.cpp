@@ -70,14 +70,14 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     // Original: non-zero status retry/error path at 0x004390e7-0x00439144:
     // - Set owner+0x2c = 1 (authConnectionFlag)
     // - Compare attemptCount (owner+0x28) vs candidateCount ((owner+0x50-owner+0x4c)>>2)
-    // - If attempts remain: retry this slot3 with this+4 (cached upstream), increment count
-    // - If exhausted: reset count, switch to state0, PostError(0)
+    // - If attempts remain: call slot3 with this+4, return 1 (NO increment in original!)
+    // - If exhausted: reset count to 0, switch to state0, PostError(0)
     g_CurrentLoginMediator->authConnectionFlag2c_ = 1u;
     const uint32_t candidateCount = g_CurrentLoginMediator->AuthConnectCandidateCountScaffold();
     const uint32_t attemptCount = g_CurrentLoginMediator->authConnectAttemptCount28_;
+    // Original: if attempt count < candidate count, call slot3 with this+4 (retry)
+    // NOTE: no increment of attemptCount in original - directly calls slot3
     if (attemptCount < candidateCount) {
-        // Original: retry this slot3 with this+4 (cached upstream)
-        ++g_CurrentLoginMediator->authConnectAttemptCount28_;
         const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
         spdlog::info(
             "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount28={} candidateCount={} -> retry state1 slot3 result=0x{:08x}",
