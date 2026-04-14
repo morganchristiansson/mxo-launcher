@@ -502,7 +502,7 @@ public:
 
     // anchor: launcher.exe:0x441290 / 0x445500 (two-phase constructor)
     AuthBootstrap680Child_0x441290();
-    // anchor: launcher.exe:0x445a40 / 0x445610
+    // anchor: launcher.exe:0x445a40 (dtor in vtable), then base dtor at 0x445610
     ~AuthBootstrap680Child_0x441290();
 
     // anchor: launcher.exe:0x448050
@@ -528,7 +528,7 @@ private:
     // anchor: launcher.exe:0x445500
     void AuthBootstrap680ChildBase_ctor();
     // anchor: launcher.exe:0x445610
-    void ReleaseOwnedState();
+    void AuthBootstrap680ChildBase_dtor();
 };
 
 class AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0 {

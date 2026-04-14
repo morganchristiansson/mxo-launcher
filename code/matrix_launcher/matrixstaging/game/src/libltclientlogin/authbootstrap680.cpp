@@ -1319,11 +1319,104 @@ AuthBootstrap680Child_0x441290::AuthBootstrap680Child_0x441290() {
     authReplySuccessField15Timestamp118 = 0u;
 }
 
+// anchor: launcher.exe:0x445a40 (dtor in vtable, calls base dtor then optionally frees this)
+// Handles +0xf8..+0x118 fields (opaque blobs, stringF8, success fields)
 AuthBootstrap680Child_0x441290::~AuthBootstrap680Child_0x441290() {
-    ReleaseOwnedState();
+    // meth_0x4410b0 (0x4410b0) handles +0x108, +0x10c opaque blob freeing
+    // with InterlockedExchangeAdd tracked deallocation
+    // +0xf8: stringF8 small string mirror (if allocated, call FUN_00403c20)
+    // +0x110, +0x114, +0x118: success fields (no dynamic allocation)
+
+    // Release opaque blob at +0x108 with tracked deallocation
+    if (opaqueReplyBlob108 != nullptr) {
+        // Tracked deallocation pattern: _msize, InterlockedExchangeAdd(-size), InterlockedDecrement, free
+        void* blob = opaqueReplyBlob108;
+        opaqueReplyBlob108 = nullptr;
+        // TODO: implement tracked deallocation properly
+        (void)blob;
+    }
+
+    // Release opaque blob at +0x10c with tracked deallocation
+    if (opaqueReplyBlob10C != nullptr) {
+        void* blob = opaqueReplyBlob10C;
+        opaqueReplyBlob10C = nullptr;
+        // TODO: implement tracked deallocation properly
+        (void)blob;
+    }
+
+    // +0xf8: stringF8 - free if begin != current (FUN_00403c20 pattern)
+    if (stringF8.begin != nullptr && stringF8.begin != stringF8.current) {
+        // FUN_00403c20(begin, current - begin) to deallocate
+        // Currently just clear in source
+        stringF8 = {};
+    }
+
+    // Then call base dtor for +0x00..+0xf4
+    AuthBootstrap680ChildBase_dtor();
 }
 
-void AuthBootstrap680Child_0x441290::ReleaseOwnedState() {
+// anchor: launcher.exe:0x445610
+// Base dtor handles +0x00..+0xf4 (validators, helpers, big-ints, parse objects, copy shadow)
+void AuthBootstrap680Child_0x441290::AuthBootstrap680ChildBase_dtor() {
+    // Note: AuthBootstrap680_ClearReplyParseAndCopyShadowFields handles +0xf0, +0xf4
+    // and other base fields. Source uses owned state for some of these.
+
+    // +0x94: feedbackTransformLarge94 - call dtor(1) if non-null
+    if (feedbackTransformLarge94 != nullptr) {
+        // feedbackTransformLarge94->~FeedbackSizeTransformAdapterLarge();
+        feedbackTransformLarge94 = nullptr;
+    }
+
+    // +0x98: feedbackTransformSmall98 - call dtor(1) if non-null
+    if (feedbackTransformSmall98 != nullptr) {
+        // feedbackTransformSmall98->~FeedbackSizeTransformAdapterSmall();
+        feedbackTransformSmall98 = nullptr;
+    }
+
+    // +0xa4: lazyPubkeyDatValidatorA4 - call dtor(1) if non-null
+    if (lazyPubkeyDatValidatorA4 != nullptr) {
+        // lazyPubkeyDatValidatorA4->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
+        lazyPubkeyDatValidatorA4 = nullptr;
+    }
+
+    // +0xa8: raw08PublicKeyWorkerA8 - call dtor(1) if non-null
+    if (raw08PublicKeyWorkerA8 != nullptr) {
+        // raw08PublicKeyWorkerA8->~AuthBootstrap680Raw08PublicKeyWorkerA8Sketch();
+        raw08PublicKeyWorkerA8 = nullptr;
+    }
+
+    // +0xac: replyAuthDataValidatorAC - call dtor(1) if non-null
+    if (replyAuthDataValidatorAC != nullptr) {
+        // replyAuthDataValidatorAC->~AuthBootstrap680ReplyAuthDataValidatorACSketch();
+        replyAuthDataValidatorAC = nullptr;
+    }
+
+    // +0xf0: authReplyParseObjectF0 - call dtor(1) if non-null (0x444900)
+    if (authReplyParseObjectF0 != nullptr) {
+        // authReplyParseObjectF0->~AuthBootstrap680AuthReplyParseObjectF0Sketch();
+        authReplyParseObjectF0 = nullptr;
+    }
+
+    // +0xf4: authReplyCopyShadowF4 - free if non-null (tracked deallocation from 0x448140)
+    if (authReplyCopyShadowF4 != nullptr) {
+        // Tracked deallocation: InterlockedExchangeAdd(-0x136), InterlockedDecrement, free()
+        authReplyCopyShadowF4 = nullptr;
+    }
+
+    // +0xb0, +0xc4, +0xd8: big-int objects reset (vtable reset, no heap)
+    modulusBigIntB0 = {};
+    publicExponentBigIntC4 = {};
+    privateExponentBigIntD8 = {};
+
+    // +0x54: feedbackSeedHelper54 - clear/reset (calls FUN_0041c750 pattern for each buffer)
+    feedbackSeedHelper54 = {};
+
+    // +0x04..+0x24: small string mirrors cleared (three groups of three pointers)
+    string04 = {};
+    string10 = {};
+    string1C = {};
+
+    // Erase owned state from global map
     g_authBootstrap680ChildOwnedStateByChild.erase(this);
 }
 
