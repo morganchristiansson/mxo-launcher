@@ -166,16 +166,13 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem) {
         return 0u;
     }
 
-    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
-    const uint16_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
+    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(workItem);
     // anchor: launcher.exe:0x43ae50
-    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(stagedBytes, true);
+    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
     if (!loadCharacterReplyEnvelope.valid) {
         mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State11::Slot6_HandleSecondaryMessage rejected staged margin bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000005 and returned false-like",
-            static_cast<unsigned>(stagedBytes.size()),
-            static_cast<unsigned>(rawCode));
+            "CLTLoginState_State11::Slot6_HandleSecondaryMessage rejected message ref; mirrored original owner+0x80=0x12000005 and returned false-like");
         return 0u;
     }
 

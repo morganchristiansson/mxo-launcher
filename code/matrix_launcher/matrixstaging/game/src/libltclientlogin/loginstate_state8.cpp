@@ -329,14 +329,14 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
     // - only other decoded message codes fall through owner `+0x184 -> 0x41f260` and land here
     // - practical consequence: the raw state8 reply opcode `0x10` belongs on that fallback path,
     //   not on the base code-4 wrapper branch
-    const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
+    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(workItem);
     // anchor: launcher.exe:0x43ae50
-    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(stagedBytes, true);
+    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
     if (!loadCharacterReplyEnvelope.valid) {
-        if (!stagedBytes.empty() && stagedBytes[0] == 0x10u) {
+        // Log only if we got a message ref but it couldn't be parsed
+        if (messageRef != nullptr) {
             spdlog::info(
-                "CLTLoginState_State8::Slot6_HandleSecondaryMessage saw raw opcode 0x10 but parse rejected stagedBytes={} currentState={} (expected >= 0x10-byte MS_LoadCharacterReply layout)",
-                static_cast<unsigned>(stagedBytes.size()),
+                "CLTLoginState_State8::Slot6_HandleSecondaryMessage saw message ref but parse rejected currentState={} (expected MS_LoadCharacterReply layout)",
                 mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         }
         const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);

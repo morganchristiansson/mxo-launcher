@@ -250,39 +250,6 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
     sectionData = dataSectionBytes14_;
 }
 
-// Convenience constructor using pre-extracted bytes
-// anchor: launcher.exe:0x43ae50
-LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
-    const std::vector<uint8_t>& incomingMarginMessageBytes,
-    bool initializeEmptyReply)
-    : incomingMarginMessageBytes08_(&incomingMarginMessageBytes),
-      initializeEmptyReply0c_(initializeEmptyReply) {
-    messageBase04_ = incomingMarginMessageBytes.empty()
-        ? nullptr
-        : const_cast<uint8_t*>(incomingMarginMessageBytes.data());
-    RefreshDataSectionView(static_cast<char>(initializeEmptyReply ? 1 : 0));
-    if (!initializeEmptyReply) {
-        ResetToDefaultMessage();
-    }
-
-    valid = currentMessage10_ != nullptr &&
-            incomingMarginMessageBytes.size() >= 0x10u &&
-            currentMessage10_[0] == 0x10u;
-    if (!valid) {
-        return;
-    }
-
-    status = ReadU32LE(currentMessage10_ + 1u);
-    field05 = ReadU32LE(currentMessage10_ + 5u);
-    handoffWord09 = ReadU16LE(currentMessage10_ + 9u);
-    expectedSectionCount0b = currentMessage10_[0x0b];
-    shouldSeedExpectedSectionCount = (currentMessage10_[0x0c] == 0x01u);
-    sectionSelectorMinus2 = static_cast<uint8_t>(currentMessage10_[0x0d] - 2u);
-    sectionOffset0e = ReadU16LE(currentMessage10_ + 0x0eu);
-    sectionByteCount = dataSectionByteCount18_;
-    sectionData = dataSectionBytes14_;
-}
-
 // anchor: launcher.exe:0x43ae00
 void LoadCharacterReplyEnvelope_0x4b542c::RefreshDataSectionView(char initializeEmptyReply) {
     currentMessage10_ = messageBase04_;

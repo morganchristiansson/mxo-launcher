@@ -674,11 +674,6 @@ public:
         mxo::liblttcp::CMessageConnectionMessageRef* incomingMessageRef,
         char initializeEmptyReply);
 
-    // Convenience constructor using pre-extracted bytes (maintains backward compatibility)
-    LoadCharacterReplyEnvelope_0x4b542c(
-        const std::vector<uint8_t>& incomingMarginMessageBytes,
-        bool initializeEmptyReply);
-
     // anchor: launcher.exe:0x43ae00
     void RefreshDataSectionView(char initializeEmptyReply);
 
