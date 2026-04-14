@@ -358,7 +358,7 @@ void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* ne
     spdlog::info(
         "CLTLoginMediator::Initialize engine={} currentState={} authAddressListReinitFlags=0x{:02x} authCandidates={}",
         fmt::ptr(networkEngineOverride),
-        CurrentState() ? CurrentState()->DebugName() : "<null>",
+        currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(authAddressListReinitFlags),
         AuthConnectCandidateCountScaffold());
 }
@@ -440,7 +440,7 @@ static bool DiagnosticShouldLogRepeatedRuntimeCount(uint32_t count) {
 // Source-owned helper for tightening owner-backed selection/world readers toward launcher.exe
 // state-gated table access patterns (`stateCode >= 3`).
 static uint32_t CurrentHelperStateCodeOrZero(const mxo::ltlogin::CLTLoginMediator* mediator) {
-    const mxo::ltlogin::CLTLoginState* state = mediator ? mediator->CurrentState() : nullptr;
+    const mxo::ltlogin::CLTLoginState* state = mediator ? mediator->currentState_ : nullptr;
     return state ? state->DispatchPhaseCode() : 0u;
 }
 
@@ -2031,15 +2031,16 @@ uint32_t CLTLoginMediator::GetLastLoginStatus() {
     return worldListCountOrStatus80;
 }
 
-// DELETEME
+// anchor: launcher.exe:0x41b450 - helper dispatcher table switch
 void CLTLoginMediator::SetCurrentState(CLTLoginState* state) {
+    // Original SwitchHelperState also does vtable+0x0c slot4 NoOp on old state,
+    // then vtable+0x08 slot3 on new state. Source now does direct assignment + slot3.
     currentState_ = state;
 }
 
-// DELETEME
-CLTLoginState* CLTLoginMediator::CurrentState() const {
-    return currentState_;
-}
+
+
+
 
 // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
 uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connection, void* workItem) {

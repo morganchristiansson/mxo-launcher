@@ -62,7 +62,7 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem) {
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(nextHelperStateId),
         mediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold() ? 1u : 0u,
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(switchDispatchResult));
     return 1u;
 }
@@ -95,7 +95,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
             fmt::ptr(cachedUpstreamOrArg_),
             fmt::ptr(upstreamOrArg),
             fmt::ptr(authReplyCopyShadowF4),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
             static_cast<unsigned>(switchDispatchResult));
         return switchDispatchResult;
     }
@@ -108,7 +108,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
         fmt::ptr(upstreamOrArg),
         fmt::ptr(authReplyCopyShadowF4),
         static_cast<unsigned>(sendResult),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     return sendResult;
 }
 

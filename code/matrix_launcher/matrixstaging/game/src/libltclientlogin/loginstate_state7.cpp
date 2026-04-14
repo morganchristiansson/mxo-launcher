@@ -138,13 +138,13 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(void* workItem) {
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e success result09=0x{:08x} -> switch helper state3 then PostEvent(0x08) currentState={}",
             static_cast<unsigned>(parsed.result09),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     } else {
         mediator->PostError(0x09u);
         spdlog::info(
             "CLTLoginState_State7::Slot6_HandleSecondaryMessage opcode-0x0e failure result09=0x{:08x} -> switch helper state3 then PostError(0x09) currentState={}",
             static_cast<unsigned>(parsed.result09),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     }
     return 1u;
 }

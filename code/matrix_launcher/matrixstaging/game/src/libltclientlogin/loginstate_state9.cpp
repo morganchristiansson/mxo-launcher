@@ -121,13 +121,13 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem) {
         (void)mediator->SwitchHelperStateByIdScaffold(0x0cu);
         spdlog::info(
             "ROUTE CHECKPOINT: late-login state9 success -> state12 event=0x18 currentState={}",
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         // anchor: launcher.exe:0x43c180 success tail posts event 0x18 after switching to state 0x0c.
         mediator->PostEvent(0x18u);
         spdlog::info(
             "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 success status=0x{:08x}; original calls owner vtable +0x16c, switches helper state to 0x0c, then posts event=0x18 currentState={}",
             static_cast<unsigned>(parsedStatus),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return 1u;
     }
 
@@ -137,7 +137,7 @@ uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(void* workItem) {
     spdlog::info(
         "CLTLoginState_State9::Slot6_HandleSecondaryMessage observed raw-0x11 failure status=0x{:08x}; original switches helper state to 3 and posts error=0x0d currentState={}",
         static_cast<unsigned>(parsedStatus),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
     return 1u;
 }
 

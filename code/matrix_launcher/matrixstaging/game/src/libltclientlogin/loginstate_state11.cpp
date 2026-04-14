@@ -152,7 +152,7 @@ uint32_t CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg) {
         sendResult);
     spdlog::info(
         "CLTLoginState_State11::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(mediator->MarginPacketReceiveCountScaffold()),
         static_cast<unsigned>(mediator->MarginPacketFilteredBeforeSlot6CountScaffold()),
         static_cast<unsigned>(mediator->MarginPacketSlot6DispatchCountScaffold()));

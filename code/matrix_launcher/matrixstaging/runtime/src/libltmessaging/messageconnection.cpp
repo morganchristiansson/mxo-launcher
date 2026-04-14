@@ -2006,7 +2006,7 @@ uint32_t CAuthStartupConnection::DispatchMessage(void* messageRef) {
     spdlog::info(
         "CAuthStartupConnection::DispatchMessage forwarded unconsumed messageRef={} to owner+0x180 currentState={} handled={} this={} ownerContext={} remoteHost='{}'",
         fmt::ptr(messageRef),
-        fmt::ptr(mediator->CurrentState()),
+        fmt::ptr(mediator->currentState_),
         handled,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
@@ -2112,7 +2112,7 @@ uint32_t CBaseMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         fmt::ptr(CMessageConnection_LoginMediatorOwnerScaffold(this)
-                     ? CMessageConnection_LoginMediatorOwnerScaffold(this)->CurrentState()
+                     ? CMessageConnection_LoginMediatorOwnerScaffold(this)->currentState_
                      : nullptr),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     return handled;
@@ -2680,7 +2680,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             static_cast<unsigned>(handledCode2),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
-            fmt::ptr(mediator ? mediator->CurrentState() : nullptr),
+            fmt::ptr(mediator ? mediator->currentState_ : nullptr),
             remoteHostForLog);
         return 1u;
     }
@@ -2717,7 +2717,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             MessageCode4SuccessFlag84() ? 1u : 0u,
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
-            fmt::ptr(mediator ? mediator->CurrentState() : nullptr),
+            fmt::ptr(mediator ? mediator->currentState_ : nullptr),
             remoteHostForLog);
         return 1u;
     }
@@ -2749,7 +2749,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
                     (static_cast<uint32_t>(code5Message.seedBytes0c[3]) << 24u)),
                 fmt::ptr(this),
                 fmt::ptr(OwnerContext()),
-                fmt::ptr(mediator ? mediator->CurrentState() : nullptr),
+                fmt::ptr(mediator ? mediator->currentState_ : nullptr),
                 remoteHostForLog);
         } else {
             spdlog::info(
@@ -2760,7 +2760,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
                 static_cast<unsigned>(logicalPayloadByteCount),
                 fmt::ptr(this),
                 fmt::ptr(OwnerContext()),
-                fmt::ptr(mediator ? mediator->CurrentState() : nullptr),
+                fmt::ptr(mediator ? mediator->currentState_ : nullptr),
                 remoteHostForLog);
         }
         return 1u;
@@ -2890,14 +2890,14 @@ uint32_t CMarginConnection::DispatchMessage(void* messageRef) {
             fmt::ptr(messageRef),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
-            fmt::ptr(mediator->CurrentState()),
+            fmt::ptr(mediator->currentState_),
             bootstrapHandled,
             remoteHostForLog);
         return bootstrapHandled;
     }
 
     uint32_t handled = 0u;
-    if (mediator->CurrentState() != nullptr) {
+    if (mediator->currentState_ != nullptr) {
         ++mediator->marginPacketSlot6DispatchCountScaffold_;
         handled = mediator->DispatchCurrentHelperSlot6(messageRef);
     }
@@ -2912,7 +2912,7 @@ uint32_t CMarginConnection::DispatchMessage(void* messageRef) {
         fmt::ptr(messageRef),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
-        fmt::ptr(mediator->CurrentState()),
+        fmt::ptr(mediator->currentState_),
         handled,
         remoteHostForLog);
     return handled;

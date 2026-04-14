@@ -27,7 +27,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
     if (mediator->authConnectionFlag2c_ == 0u) {
         spdlog::info(
             "CLTLoginState_WorldListPending::Slot3_BeginOrContinue blocked on owner+0x2c==0 currentState={}",
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 0u;
     }
 
@@ -35,7 +35,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
     if (connection == nullptr) {
         spdlog::info(
             "CLTLoginState_WorldListPending::Slot3_BeginOrContinue missing auth connection object currentState={}",
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 0u;
     }
 
@@ -61,7 +61,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
         packet.headerBytes.size(),
         packet.payloadBytes.size(),
         packet.bytes.size(),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(sendResult));
     return sendResult;
 }

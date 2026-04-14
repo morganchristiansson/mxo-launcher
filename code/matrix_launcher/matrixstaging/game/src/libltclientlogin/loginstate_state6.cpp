@@ -255,7 +255,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
         spdlog::info(
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on owner+0x1c state!=2 -> helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return fallbackResult;
     }
 
@@ -267,7 +267,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
         spdlog::info(
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on margin connection +0x84==0 -> helper5 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return fallbackResult;
     }
 
@@ -288,7 +288,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
     const uint32_t clientVersion = clientVersionPtr ? *clientVersionPtr : 0u;
     const auto gobFileGuidWords = ResolveState6GobFileGuidWords(mediator);
     const uint8_t currentHelperPhaseByte = static_cast<uint8_t>(
-        mediator->CurrentState() ? mediator->CurrentState()->DispatchPhaseCode() : 0u);
+        mediator->currentState_ ? mediator->currentState_->DispatchPhaseCode() : 0u);
 
     packetBuilder.SetLauncherVersion(launcherVersion);
     packetBuilder.SetClientVersion(clientVersion);
@@ -308,7 +308,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
         static_cast<unsigned>(gobFileGuidWords[3]),
         static_cast<unsigned>(currentHelperPhaseByte),
         static_cast<unsigned>(sendResult),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     return sendResult;
 }
 
@@ -321,7 +321,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem) {
         fmt::ptr(this),
         fmt::ptr(mediator),
         mediator ? mediator->StagedIncomingMarginPacketBytes().size() : 0u,
-        (mediator && mediator->CurrentState()) ? mediator->CurrentState()->DebugName() : "<null>");
+        (mediator && mediator->currentState_) ? mediator->currentState_->DebugName() : "<null>");
     if (!mediator) {
         return 0u;
     }
@@ -411,7 +411,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem) {
             resolvedMetricFilenameCount,
             unresolvedMetricFilenameCount,
             BuildMetricIdPreview(parsed.metricIds),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
@@ -434,7 +434,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(void* workItem) {
         unresolvedMetricFilenameCount,
         BuildMetricIdPreview(parsed.metricIds),
         static_cast<unsigned>(nextHelperStateId),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     return 1u;
 }
 

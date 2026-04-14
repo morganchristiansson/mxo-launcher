@@ -218,7 +218,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return fallbackResult;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
@@ -226,7 +226,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
             static_cast<unsigned>(fallbackResult),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return fallbackResult;
     }
 
@@ -234,7 +234,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
         "ROUTE CHECKPOINT: state8 slot3 entered past the 0x43bd48 owner+0xf14 gate ownerF14={} ownerF18=0x{:08x} currentState={}",
         static_cast<unsigned>(mediator->postAuthMarginLoadingState_.state10SendGateFlagF14),
         static_cast<unsigned>(mediator->State6UdpSessionSecretF18()),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
 
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
@@ -338,7 +338,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
             spdlog::info(
                 "CLTLoginState_State8::Slot6_HandleSecondaryMessage saw raw opcode 0x10 but parse rejected stagedBytes={} currentState={} (expected >= 0x10-byte MS_LoadCharacterReply layout)",
                 static_cast<unsigned>(stagedBytes.size()),
-                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+                mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         }
         const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
@@ -364,7 +364,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionSelectorMinus2),
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionOffset0e),
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionByteCount),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
 
     auto& ownerState = mediator->postAuthMarginLoadingState_;
     mediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
@@ -374,7 +374,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would latch owner+0x80 to that raw server code, switch helper state to 3, and post generic OnLoginError error=10 currentState={}",
             loadCharacterReplyEnvelope.status,
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<unchanged>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return 1u;
     }
 
@@ -839,7 +839,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
         spdlog::info(
             "ROUTE CHECKPOINT: late-login state8 complete -> state9 handoffWord=0x{:04x} currentState={}",
             loadCharacterReplyEnvelope.handoffWord09,
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         // anchor: launcher.exe:0x43f930 completion tail posts event 0x0b after switching to helper9.
         // Important recovered ordering detail from `0x41b450`:
         // - the helper9/state9 install itself immediately notifies the new helper through slot 3

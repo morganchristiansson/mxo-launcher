@@ -66,19 +66,17 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
                 spdlog::info(
                     "ROUTE CHECKPOINT: early-auth original state1 success-side restore -> state2 cachedUpstream={} currentStateBeforeRestore={} (0x41b450 then re-enters state2 slot3 with oldState=state1)",
                     fmt::ptr(cachedUpstreamOrArg_),
-                    mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+                    mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
             }
-            // Original: calls cached upstream's vtable+0x18 to get phase, then SwitchHelperState(value)
-            // Source now directly switches to the cached state object
+            // Original: SwitchHelperState(value) sets currentState10 and calls new state's slot3
             mediator->currentState_ = cachedUpstreamState;
-            // Original also calls the new state's slot3 with old state as argument
-            mediator->currentState_->Slot3_BeginOrContinue(this);
+            cachedUpstreamState->Slot3_BeginOrContinue(this);
         } else {
             spdlog::info(
                 "CLTLoginState_State1::Slot1_HandlePrimaryGate original zero-status success missing cached upstream cachedUpstream={} upstreamPhaseCode={} currentState={}",
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(cachedUpstreamPhaseCode),
-                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+                mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         }
 
         mediator->PostEvent(0u);
@@ -87,7 +85,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
             static_cast<unsigned>(workResultCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
@@ -102,18 +100,18 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
                 spdlog::info(
                     "ROUTE CHECKPOINT: early-auth live state1 success alias -> state2 phase2-bootstrap-child resume cachedUpstream={} currentStateBeforeRestore={}",
                     fmt::ptr(cachedUpstreamOrArg_),
-                    mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+                    mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
             }
-            // Original: switch to cached state object, then re-enter its slot3 with old state
+            // Original: SwitchHelperState(value) - copies state pointer from table, then new state's slot3
             CLTLoginState* oldState = this;
-            mediator->SetCurrentState(cachedUpstreamState);
-            const uint32_t resumeResult = mediator->CurrentState()->Slot3_BeginOrContinue(oldState);
+            mediator->currentState_ = cachedUpstreamState;
+            const uint32_t resumeResult = cachedUpstreamState->Slot3_BeginOrContinue(oldState);
             spdlog::info(
                 "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} resumeResult=0x{:08x}",
                 static_cast<unsigned>(workResultCode),
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(cachedUpstreamPhaseCode),
-                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+                mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
                 static_cast<unsigned>(mediator->authConnectionFlag2c_),
                 static_cast<unsigned>(resumeResult));
             return resumeResult;
@@ -129,7 +127,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
             static_cast<unsigned>(workResultCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
             static_cast<unsigned>(mediator->authConnectionFlag2c_),
             static_cast<unsigned>(handshakeResult));
         return handshakeResult;
@@ -157,8 +155,13 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     }
 
     // Original: reset attempt count and switch to state 0
+    // Original: SwitchHelperState(0) - switch to state0 from g_LoginHelperState0[0]
     mediator->authConnectAttemptCount28_ = 0;
-    mediator->SetCurrentState(mediator->LoginHelperStateByIdScaffold(0u));  // switch to state0
+    CLTLoginState* newState = mediator->LoginHelperStateByIdScaffold(0u);
+    mediator->currentState_ = newState;
+    if (newState) {
+        newState->Slot3_BeginOrContinue(this);
+    }
     mediator->PostError(0u);
     spdlog::info(
         "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
@@ -167,7 +170,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
         static_cast<unsigned>(cachedUpstreamPhaseCode),
         static_cast<unsigned>(attemptCount),
         static_cast<unsigned>(candidateCount),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     return 1u;
 }
 
@@ -184,7 +187,7 @@ uint32_t CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg) {
         "CLTLoginState_State1::Slot3_BeginOrContinue cachedUpstream={} upstreamPhaseCode={} currentState={} -> BeginAuthConnection=0x{:08x}",
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_)),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(connectResult));
     return connectResult;
 }

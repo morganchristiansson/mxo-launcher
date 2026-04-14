@@ -42,7 +42,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
             static_cast<unsigned>(incomingUpstreamPhaseCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         const uint32_t connectResult = mediator->BeginAuthConnectionViaState1Scaffold();
         spdlog::info(
             "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue auth transport not ready incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} -> BeginAuthConnectionViaState1Scaffold=0x{:08x}",
@@ -50,7 +50,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
             static_cast<unsigned>(incomingUpstreamPhaseCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
             static_cast<unsigned>(connectResult));
         return connectResult;
     }
@@ -68,7 +68,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
 
     spdlog::info(
         "ROUTE CHECKPOINT: early-auth state2 ready-side owner+0x680 bootstrap-child dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode));
     const uint32_t sendResult = child->PrepareAndDispatch(*mediator, sendTarget, sessionToken);
@@ -78,7 +78,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
         static_cast<unsigned>(incomingUpstreamPhaseCode),
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         mediator->HasReadyAuthConnectionState2() ? 1u : 0u,
         static_cast<unsigned>(sendResult));
     return sendResult;
@@ -120,7 +120,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
         spdlog::info(
             "CLTLoginState_AuthenticatePending::AuthMessageDispatch routed staged auth rawCode=0x{:02x} through owner+0x680 child and remained in the early wait path currentState={}",
             static_cast<unsigned>(rawCode),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
@@ -172,7 +172,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             bool deferredMarginAutoBeginToState8 = false;
             if (!mediator->postAuthMarginAutoBeginAttemptedScaffold_) {
                 const uint32_t currentHelperPhaseCode =
-                    mediator->CurrentState() ? mediator->CurrentState()->DispatchPhaseCode() : 0u;
+                    mediator->currentState_ ? mediator->currentState_->DispatchPhaseCode() : 0u;
 
                 // Existing-character continuation correction:
                 // - starting the margin connect while we are still on state3 leaves helper4's
@@ -195,7 +195,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
                 static_cast<unsigned>(mediator->worldListCountOrStatus80),
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(nextHelperStateId),
-                mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+                mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
                 static_cast<unsigned>(switchDispatchResult),
                 triggeredMarginAutoBegin ? 1u : 0u,
                 deferredMarginAutoBeginToState8 ? 1u : 0u,

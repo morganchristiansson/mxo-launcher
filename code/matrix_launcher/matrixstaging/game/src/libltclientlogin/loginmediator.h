@@ -871,7 +871,6 @@ public:
     uint32_t GetLastLoginStatus() override;
 
     void SetCurrentState(CLTLoginState* state);
-    CLTLoginState* CurrentState() const;
 
     // anchor: launcher.exe:0x41af80 / owner vtable `+0x17c`
     // Exact owner-body mirror: compare against owner `+0x18`, clear only that field on type-1

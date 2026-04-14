@@ -82,7 +82,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
             static_cast<unsigned>(status),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(nextHelperStateId),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
@@ -102,7 +102,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
         "CLTLoginState_State4::Slot2_HandleSecondaryGate status=0x{:08x} cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",
         static_cast<unsigned>(status),
         static_cast<unsigned>(nextHelperStateId),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(switchDispatchResult));
     return 1u;
 }

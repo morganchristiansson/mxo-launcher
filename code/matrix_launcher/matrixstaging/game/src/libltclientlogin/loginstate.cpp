@@ -65,7 +65,7 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem) {
         mediator->PostEvent(1u);
         spdlog::info(
             "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed armed owner+0x2c -> event=0x01 currentState={}",
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
@@ -77,7 +77,7 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem) {
     spdlog::info(
         "CLTLoginState::Slot1_HandlePrimaryGate shared auth close-gate observed unarmed owner+0x2c -> owner+0x80=0x{:08x} currentState={} switchDispatchResult=0x{:08x}",
         static_cast<unsigned>(mediator->worldListCountOrStatus80),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(switchDispatchResult));
     return 1u;
 }
@@ -98,7 +98,7 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
         mediator->PostEvent(0x0fu);
         spdlog::info(
             "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed armed owner+0x2d -> event=0x0f currentState={}",
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
@@ -110,7 +110,7 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
     spdlog::info(
         "CLTLoginState::Slot2_HandleSecondaryGate shared close-gate observed unarmed owner+0x2d -> owner+0x80=0x{:08x} currentState={}",
         static_cast<unsigned>(mediator->worldListCountOrStatus80),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
+        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     return 1u;
 }
 
