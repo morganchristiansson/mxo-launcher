@@ -235,7 +235,7 @@ uint32_t CLTLoginState_State10::HandleStagedClaimCharacterNameReplyScaffold(CLTL
         return 0u;
     }
 
-    const CLTLoginMediator::WorldDescriptorState004b533c& selectedWorldDescriptor =
+    const CLTLoginMediator::WorldDescriptorState_0x4b533c& selectedWorldDescriptor =
         mediator->worldDescriptorsD84_[selectedWorldDescriptorIndex];
 
     // anchor: launcher.exe:0x4401a0
@@ -371,12 +371,18 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(void* workItem) {
         return 0u;
     }
 
+    // anchor: launcher.exe:0x4401a0
+    // Per original flow: single status check at +3 decides success/error branch.
+    // The scaffold returns 1 for both error(status>=1) and success, so we must
+    // re-check status to determine which path to take - this mirrors the original's
+    // if/else structure rather than a redundant check.
     const uint32_t handled = HandleStagedClaimCharacterNameReplyScaffold(mediator);
     if (handled == 0u) {
         return 0u;
     }
 
     if (mediator->worldListCountOrStatus80 >= 1u) {
+        // Original: "SetCurrentState(3), PostError(0xb)" - mirrors +0x80 status>=1 branch
         (void)mediator->SetCurrentState(3u);
         mediator->PostError(0x0bu);
         spdlog::info(
