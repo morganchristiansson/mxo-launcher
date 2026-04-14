@@ -286,12 +286,12 @@ void CLTLoginMediator::EraseObserverRange674(
 }
 
 // anchor: launcher.exe:0x41b450
-// Static RE at 0x41b450:
+// Static RE:
 //   - old helper vtable+0x0c(new) NoOp
 //   - install owner+0x10 from g_LoginHelperState0[value]
 //   - new helper vtable+0x08(old) slot3
-// Source returns slot3 result for caller convenience (original returns void).
-uint32_t CLTLoginMediator::SwitchHelperState(uint32_t helperStateId) {
+// Source returns slot3 result (original returns void).
+uint32_t CLTLoginMediator::SetCurrentState(uint32_t helperStateId) {
     CLTLoginState* const oldState = currentState_;
     CLTLoginState* const newState =
         (helperStateId < 20u)

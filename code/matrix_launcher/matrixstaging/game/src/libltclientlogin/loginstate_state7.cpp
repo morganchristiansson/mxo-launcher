@@ -66,14 +66,14 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
     // - send through `0x41af70`
     // - post event `7`
     if (!mediator->State10HasReadyConnectionState2()) {
-        const uint32_t fallbackResult = mediator->SwitchHelperState(4u);
+        const uint32_t fallbackResult = mediator->SetCurrentState(4u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
         return fallbackResult;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0u) {
-        const uint32_t fallbackResult = mediator->SwitchHelperState(6u);
+        const uint32_t fallbackResult = mediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
@@ -125,7 +125,7 @@ uint32_t CLTLoginState_State7::Slot6_HandleSecondaryMessage(void* workItem) {
     }
 
     mediator->worldListCountOrStatus80 = parsed.result09;
-    (void)mediator->SwitchHelperState(3u);
+    (void)mediator->SetCurrentState(3u);
 
     // Tightened event-8 meaning from the real state7 reply body:
     // - success/result `< 1` posts event `8`

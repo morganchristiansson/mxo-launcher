@@ -74,7 +74,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
         const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
         mediator->ResetMarginConnectAttemptCountScaffold();
         if (nextHelperStateId != 13u) {
-            (void)mediator->SwitchHelperState(3u);
+            (void)mediator->SetCurrentState(3u);
         }
         mediator->PostError(6u);
         spdlog::info(
@@ -96,7 +96,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     cachedUpstreamOrArg_ = nullptr;
     mediator->marginRouteState_.currentWorldId = -1;
-    const uint32_t switchDispatchResult = mediator->SwitchHelperState(nextHelperStateId);
+    const uint32_t switchDispatchResult = mediator->SetCurrentState(nextHelperStateId);
     mediator->PostEvent(0x0eu);
     spdlog::info(
         "CLTLoginState_State4::Slot2_HandleSecondaryGate status=0x{:08x} cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",
