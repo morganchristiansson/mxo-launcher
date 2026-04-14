@@ -4,7 +4,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "../libltcrypto/auth_internal.h"
@@ -442,18 +441,6 @@ public:
     mxo::auth::internal::FeedbackSizeTransformAdapterSmall feedbackTransform;
     bool hasConfiguredFeedbackTransform = false;
 
-    // Auth bootstrap fields from OOAnalyzer class cls_0x4b00b0
-    // anchor: cls_0x4b00b0 / worker vtable 0x004b86a8
-    const char* string10 = nullptr;       // worker +0x04
-    const char* string1C = nullptr;        // worker +0x10
-    uint32_t loginType28 = 0;             // worker +0x1c
-    uint32_t launcherVersion2C = 0;      // worker +0x20
-    uint32_t field24_0x28 = 0;            // worker +0x24
-    uint32_t field28_0x2c = 0;            // worker +0x28
-    uint32_t field2c_0x30 = 0;            // worker +0x2c
-    uint32_t field30_0x34 = 0;            // worker +0x30
-    uint32_t field34_0x38 = 0;            // worker +0x34
-
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
     bool TryTransform(
         const CMessageConnectionMessageRef& inputMessageRef,
@@ -517,29 +504,9 @@ public:
     bool hasTransformWorker = false;
     CMessageConnectionMessageRefOutputBuffer transformedOutput;
 
-    // Auth bootstrap fields from OOAnalyzer class cls_0x4b8690
-    // anchor: launcher.exe vtable 0x004b8690 / helper +0x04, +0x48, +0x50, +0xa0
-    const char* string04 = nullptr;        // helper +0x04
-    uint32_t block30 = 0;                 // helper +0x30
-    uint32_t block40 = 0;                 // helper +0x34
-    void* sendTarget50 = nullptr;         // helper +0x50
-    uint8_t authRequestReadyA0 = 0;       // helper +0xa0
-
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
     void ResetForOwner(CStreamPacketEncryptionModule* owner);
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
-
-    // anchor: launcher.exe:0x448050 / vtable 0x004b8690 method +0x14
-    // AuthBootstrap680_PrepareAndDispatch - stages auth request fields and dispatches
-    void AuthBootstrap680_PrepareAndDispatch(
-        const char* pszUsername,
-        const char* pszPassword,
-        uint32_t loginType,
-        uint32_t launcherVersion,
-        const std::array<uint32_t, 4>* pKeyConfigMd5,
-        const std::array<uint32_t, 4>* pUiConfigMd5,
-        void* pSendTarget,
-        const char* pszStationOrFallback);
 };
 
 class CStreamPacketEncryptionAgendaHelper : public CStreamPacketEncryptionHelperBase {
