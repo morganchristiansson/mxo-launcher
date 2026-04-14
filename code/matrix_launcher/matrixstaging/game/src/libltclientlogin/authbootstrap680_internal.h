@@ -500,7 +500,7 @@ public:
     uint32_t authReplySuccessField15_114 = 0; // original child `+0x114`; `0x441260` writes the fixed raw reply-header dword at `authReplyParseObjectF0->replyHeader10 + 0x15`
     uint32_t authReplySuccessField15Timestamp118 = 0; // original child `+0x118`; `0x441260` writes current time alongside `+0x114`
 
-    // anchor: launcher.exe:0x441290 / 0x445500
+    // anchor: launcher.exe:0x441290 / 0x445500 (two-phase constructor)
     AuthBootstrap680Child_0x441290();
     // anchor: launcher.exe:0x445a40 / 0x445610
     ~AuthBootstrap680Child_0x441290();
@@ -525,6 +525,8 @@ public:
     uint32_t SendAuthChallengeResponse(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
 
 private:
+    // anchor: launcher.exe:0x445500
+    void AuthBootstrap680ChildBase_ctor();
     // anchor: launcher.exe:0x445610
     void ReleaseOwnedState();
 };

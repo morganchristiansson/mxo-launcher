@@ -1266,20 +1266,54 @@ static void StageAuthBootstrap680ChildFromPrepareCallShape(
 
 }  // namespace
 
-AuthBootstrap680Child_0x441290::AuthBootstrap680Child_0x441290() {
+// anchor: launcher.exe:0x445500
+void AuthBootstrap680Child_0x441290::AuthBootstrap680ChildBase_ctor() {
+    // Compiler handles vtable at +0x00
+    // +0x04, +0x08, +0x0c: small string mirrors cleared by UpdateExceptionState(8) pattern
+    // +0x10, +0x14, +0x18: more small string mirrors cleared by UpdateExceptionState(8)
+    // +0x1c, +0x20, +0x24: final small string mirrors cleared by UpdateExceptionState(8)
+
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(this);
     ResetAuthBootstrap680Field54Helper(&feedbackSeedHelper54, &ownedState.field54Helper);
+
+    // +0x80, +0x94, +0x98, +0x9c, +0xa0: zeroed
+    // +0xa4: lazy validator object reset below
     ResetAuthBootstrap680ReplyPublicKeyWorkers(*this, ownedState);
+    // +0xa8: raw08 worker reset in ReplyPublicKeyWorkers
+    // +0xac: validator reset in ReplyPublicKeyWorkers
+
     ResetAuthBootstrap680FeedbackTransforms(*this, ownedState);
+    // +0x94: large transform nulled
+    // +0x98: small transform nulled
+
     ownedState.lazyPubkeyDatValidatorA4.object.reset();
     ResetAuthBootstrap680RsaPublicKeyPairOwnedState(&ownedState.lazyPubkeyDatValidatorA4.publicKeyPair0c);
+    lazyPubkeyDatValidatorA4 = nullptr;  // +0xa4 = 0
+
     ResetAuthBootstrap680ReplyParseObject(*this, ownedState);
+    // +0xf0: parse object nulled
+
     ResetAuthBootstrap680ReplyMaterialization(*this, ownedState);
-    ClearSmallStringMirror(stringF8);
-    ownedState.opaqueReplyBlob108Owned.clear();
-    ownedState.opaqueReplyBlob10COwned.clear();
+    // +0xb0, +0xc4, +0xd8: big-int objects reset
+
+    inboundAuthStatusEc = 1u;  // +0xec = 1
+
+    // +0xf4: auth reply copy shadow pointer nulled in ResetAuthBootstrap680ReplyMaterialization
+}
+
+// anchor: launcher.exe:0x441290
+AuthBootstrap680Child_0x441290::AuthBootstrap680Child_0x441290() {
+    // AuthBootstrap680ChildBase_ctor handles +0x00 through +0xf4
+    // This phase handles +0xf8 through +0x118
+    AuthBootstrap680ChildBase_ctor();
+
+    ClearSmallStringMirror(stringF8);  // +0xf8
+
+    // +0x108, +0x10c: opaque blob pointers
     opaqueReplyBlob108 = nullptr;
     opaqueReplyBlob10C = nullptr;
+
+    // +0x110, +0x114, +0x118: success header/field/timestamp
     authReplySuccessHeaderDword07_110 = 0u;
     authReplySuccessField15_114 = 0u;
     authReplySuccessField15Timestamp118 = 0u;
