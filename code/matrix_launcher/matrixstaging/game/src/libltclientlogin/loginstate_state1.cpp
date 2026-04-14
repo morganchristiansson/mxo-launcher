@@ -137,9 +137,12 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
 
     mediator->authConnectionFlag2c_ = 1u;
 
-    const uint32_t attemptCount = mediator->AuthConnectAttemptCountScaffold();
+    // Original: retry if attemptCount < ((addressListEnd - addressListBegin) >> 2)
     const uint32_t candidateCount = mediator->AuthConnectCandidateCountScaffold();
-    if (mediator->HasAuthConnectRetryCandidateRemainingScaffold()) {
+    const uint32_t attemptCount = mediator->authConnectAttemptCount28_;
+    if (attemptCount < candidateCount) {
+        // Original: retry this slot3 with cached upstream (this+4)
+        ++mediator->authConnectAttemptCount28_;
         const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
         spdlog::info(
             "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} authFlag2c={} -> retry state1 slot3 result=0x{:08x}",
@@ -153,18 +156,18 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
         return 1u;
     }
 
-    mediator->ResetAuthConnectRetryStateScaffold();
-    const uint32_t resetResult = mediator->SwitchHelperStateByIdScaffold(0u);
+    // Original: reset attempt count and switch to state 0
+    mediator->authConnectAttemptCount28_ = 0;
+    mediator->SetCurrentState(mediator->LoginHelperStateByIdScaffold(0u));  // switch to state0
     mediator->PostError(0u);
     spdlog::info(
-        "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} -> currentState={} resetResult=0x{:08x} then PostError(0x00)",
+        "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
         static_cast<unsigned>(workResultCode),
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode),
         static_cast<unsigned>(attemptCount),
         static_cast<unsigned>(candidateCount),
-        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
-        static_cast<unsigned>(resetResult));
+        mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
     return 1u;
 }
 
