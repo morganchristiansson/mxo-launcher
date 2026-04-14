@@ -1,6 +1,10 @@
 #pragma once
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <string>
+#include <vector>
 
 namespace mxo::ltlogin {
 
@@ -645,6 +649,56 @@ public:
 
     // anchor: launcher.exe:0x00420a00 (vtable 0x004b0c28 slot 8)
     uint32_t Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) override;
+};
+
+// Inline helpers for little-endian parsing
+inline uint16_t ReadU16LE(const uint8_t* p) {
+    return static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8);
+}
+
+inline uint32_t ReadU32LE(const uint8_t* p) {
+    return static_cast<uint32_t>(p[0]) |
+           (static_cast<uint32_t>(p[1]) << 8) |
+           (static_cast<uint32_t>(p[2]) << 16) |
+           (static_cast<uint32_t>(p[3]) << 24);
+}
+
+// anchor: launcher.exe:0x4b542c
+class LoadCharacterReplyEnvelope_0x4b542c {
+public:
+    // anchor: launcher.exe:0x43ae50
+    LoadCharacterReplyEnvelope_0x4b542c(
+        const std::vector<uint8_t>& incomingMarginMessageBytes,
+        bool initializeEmptyReply);
+
+    // anchor: launcher.exe:0x43ae00
+    void RefreshDataSectionView(char initializeEmptyReply);
+
+    // anchor: launcher.exe:0x43af20
+    void ResetToDefaultMessage();
+
+    // anchor: launcher.exe:0x43cca0
+    void AppendDebugString(std::string& out, int verbosityLevel) const;
+
+    bool valid = false;
+    uint32_t status = 0;
+    uint32_t field05 = 0;
+    uint16_t handoffWord09 = 0;
+    uint8_t expectedSectionCount0b = 0;
+    bool shouldSeedExpectedSectionCount = false;
+    uint8_t sectionSelectorMinus2 = 0xff;
+    uint16_t sectionOffset0e = 0;
+    uint16_t sectionByteCount = 0;
+    const uint8_t* sectionData = nullptr;
+
+private:
+    uint8_t* messageBase04_ = nullptr;
+    const std::vector<uint8_t>* incomingMarginMessageBytes08_ = nullptr;
+    bool initializeEmptyReply0c_ = false;
+    uint8_t* currentMessage10_ = nullptr;
+    const uint8_t* dataSectionBytes14_ = nullptr;
+    uint16_t dataSectionByteCount18_ = 0;
+    std::array<uint8_t, 0x10> defaultMessageStorage_{};
 };
 
 }  // namespace mxo::ltlogin

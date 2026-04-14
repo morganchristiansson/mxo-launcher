@@ -122,14 +122,6 @@ static std::string BuildHexPreview(const void* bytes, size_t byteCount, size_t m
     return out;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-static uint32_t ReadU32LE(const uint8_t* p) {
-    return static_cast<uint32_t>(p[0]) |
-           (static_cast<uint32_t>(p[1]) << 8) |
-           (static_cast<uint32_t>(p[2]) << 16) |
-           (static_cast<uint32_t>(p[3]) << 24);
-}
-
 // Wrapper-facing arg6 `+0x40` outer object currently only needs the common 5-slot virtual
 // surface shape shared by the launcher descriptor/slot-record families.
 // Current fidelity tightening from Ghidra:

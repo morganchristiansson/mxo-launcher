@@ -6,7 +6,6 @@
 
 #include "loginstate.h"
 #include "loginmediator.h"
-#include "loginstate_loadcharacterreply_scaffold.h"
 #include "loginstate_packet_builder_scaffold.h"
 
 namespace mxo::ltlogin {
@@ -170,7 +169,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(void* workItem) {
     const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
     const uint16_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
     // anchor: launcher.exe:0x43ae50
-    LoadCharacterReplyEnvelope loadCharacterReplyEnvelope(stagedBytes, true);
+    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(stagedBytes, true);
     if (!loadCharacterReplyEnvelope.valid) {
         mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(

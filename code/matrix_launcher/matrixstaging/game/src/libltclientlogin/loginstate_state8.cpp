@@ -1,7 +1,6 @@
 #include "loginstate.h"
 
 #include "loginmediator.h"
-#include "loginstate_loadcharacterreply_scaffold.h"
 #include "loginstate_packet_builder_scaffold.h"
 #include "../../../../src/diagnostics.h"
 #include <spdlog/spdlog.h>
@@ -332,7 +331,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(void* workItem) {
     //   not on the base code-4 wrapper branch
     const std::vector<uint8_t>& stagedBytes = mediator->StagedIncomingMarginPacketBytes();
     // anchor: launcher.exe:0x43ae50
-    LoadCharacterReplyEnvelope loadCharacterReplyEnvelope(stagedBytes, true);
+    LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(stagedBytes, true);
     if (!loadCharacterReplyEnvelope.valid) {
         if (!stagedBytes.empty() && stagedBytes[0] == 0x10u) {
             spdlog::info(

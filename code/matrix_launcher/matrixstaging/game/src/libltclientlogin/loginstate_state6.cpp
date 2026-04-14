@@ -1,7 +1,6 @@
 #include <spdlog/spdlog.h>
 #include "loginstate.h"
 #include "loginmediator.h"
-#include "loginstate_loadcharacterreply_scaffold.h"
 #include "loginstate_packet_builder_scaffold.h"
 #include "../../../../src/diagnostics.h"
 
