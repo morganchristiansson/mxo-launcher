@@ -52,17 +52,18 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
 
     // Assembly branches on: payload == 0 vs payload != 0
     // There's only ONE success path in original: workResultCode == 0
+    // Assembly success path at 0x00439147-0x0043916c:
+    // 1. Get state ID from cached upstream: this+4 -> vtable -> GetStateId() at vtable+0x18
+    // 2. Call SetCurrentState(mediator, stateId) at 0x0041b450:
+    //    - Calls old state's Slot4 (cleanup)
+    //    - Sets currentState_ from dispatch table
+    //    - Calls new state's Slot3(oldState)
+    // 3. Call PostEvent(mediator, 0) at 0x0041cfb0
+    // 4. Return 1
     if (workResultCode == 0u) {
-        // Original flow at 0x00439147-0x0043916c:
-        // - Get cached upstream state from this+4: [EDI+4]
-        // - Call vtable+0x18 on cached upstream to get state ID
-        // - Call SetCurrentState(mediator, stateId) at 0x0041b450
-        // - Call PostEvent(mediator, 0) at 0x0041cfb0
         CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_);
-        if (cachedUpstreamState != nullptr) {
-            g_CurrentLoginMediator->currentState_ = cachedUpstreamState;
-            cachedUpstreamState->Slot3_BeginOrContinue(this);
-        }
+        const uint32_t stateId = cachedUpstreamState->GetStateId();
+        g_CurrentLoginMediator->SetCurrentState(stateId);
         g_CurrentLoginMediator->PostEvent(0u);
         return 1u;
     }
@@ -89,13 +90,13 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
         return 1u;
     }
 
-    // Original: reset attempt count (owner+0x28=0), switch to state0, PostError(0)
+    // Assembly at 0x0043911d-0x00439144:
+    // 1. Reset owner+0x28 to 0: *(mediator+0x28) = 0
+    // 2. Call SetCurrentState(mediator, 0) - switch to state0
+    // 3. Call PostError(0)
+    // 4. Return 1
     g_CurrentLoginMediator->authConnectAttemptCount28_ = 0;
-    CLTLoginState* newState = g_CurrentLoginMediator->LoginHelperStateByIdScaffold(0u);
-    g_CurrentLoginMediator->currentState_ = newState;
-    if (newState) {
-        newState->Slot3_BeginOrContinue(this);
-    }
+    g_CurrentLoginMediator->SetCurrentState(0u);
     g_CurrentLoginMediator->PostError(0u);
     spdlog::info(
         "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
