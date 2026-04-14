@@ -208,23 +208,53 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot9_IsNetworkDriven() const {
 
 // Implementation of LoadCharacterReplyEnvelope_0x4b542c
 
+// Static lookup table for message offset calculations (DAT_004cb4d4)
+// Used for headerless message path to compute payload offset
+static const uint32_t kMessageOffsetLookupTable[] = {
+    0x00000011u,  // index 0
+    0x00000004u,  // index 1
+    0x00000010u,  // index 2
+    0x0000000bu,  // index 3
+    0x00000010u,  // index 4
+    0x00000011u,  // index 5
+    0x00000010u,  // index 6
+    0x00004aacu,  // index 7
+};
+
 // More faithful constructor using CMessageConnectionMessageRef directly
 // anchor: launcher.exe:0x43ae50
 LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
     mxo::liblttcp::CMessageConnectionMessageRef* incomingMessageRef,
     char initializeEmptyReply)
     : initializeEmptyReply0c_(!!initializeEmptyReply) {
-    // Extract raw bytes from the message ref (more faithful to static-RE)
-    if (incomingMessageRef && incomingMessageRef->messageStorage0c) {
-        const auto* storage = incomingMessageRef->messageStorage0c;
-        const uint8_t* payloadBase = storage->PayloadBaseScaffold();
-        uint16_t payloadByteCount = storage->PayloadByteCountScaffold();
-        messageBase04_ = payloadByteCount > 0 ? const_cast<uint8_t*>(payloadBase) : nullptr;
-        // Also track via the vector pointer for RefreshDataSectionView compatibility
-        incomingMarginMessageBytes08_ = nullptr;  // N/A for message ref approach
+    // Store the incoming message ref and call AddRef
+    incomingMessageRef08_ = incomingMessageRef;
+    if (incomingMessageRef != nullptr) {
+        incomingMessageRef->AddRef();
+    }
+
+    // Compute messageBase04_ based on headerless flag
+    if (incomingMessageRef == nullptr || incomingMessageRef->headerless10 == 0) {
+        // Non-headerless path: messageBase points past the header
+        if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c) {
+            messageBase04_ = reinterpret_cast<uint8_t*>(incomingMessageRef->messageStorage0c) + 0xc;
+        } else {
+            messageBase04_ = nullptr;
+        }
     } else {
-        messageBase04_ = nullptr;
-        incomingMarginMessageBytes08_ = nullptr;
+        // Headerless path: more complex offset calculation using lookup table
+        if (incomingMessageRef != nullptr && incomingMessageRef->messageStorage0c) {
+            uint8_t* storageBase = reinterpret_cast<uint8_t*>(incomingMessageRef->messageStorage0c);
+            uint32_t iVar2 = reinterpret_cast<uint32_t>(storageBase + 0xc);
+            uint8_t bVar1 = *(storageBase + 0xc + 0xd);
+            uint32_t lookup1 = kMessageOffsetLookupTable[(bVar1 >> 4) & 7];
+            uint32_t lookup2 = kMessageOffsetLookupTable[bVar1 & 7];
+            messageBase04_ = reinterpret_cast<uint8_t*>(lookup1 + lookup2 + iVar2 + 0x1e);
+            // Mark as headerless
+            incomingMessageRef->headerless10 = 1;
+        } else {
+            messageBase04_ = nullptr;
+        }
     }
 
     RefreshDataSectionView(initializeEmptyReply);
@@ -232,7 +262,6 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
         ResetToDefaultMessage();
     }
 
-    // For headerless messages, we can't validate the same way - use payload presence
     valid = currentMessage10_ != nullptr;
     if (!valid) {
         return;
@@ -258,19 +287,27 @@ void LoadCharacterReplyEnvelope_0x4b542c::RefreshDataSectionView(char initialize
         dataSectionByteCount18_ = 0u;
         return;
     }
-    if (currentMessage10_ == nullptr || incomingMarginMessageBytes08_ == nullptr ||
-        incomingMarginMessageBytes08_->size() < 0x10u) {
+    if (currentMessage10_ == nullptr || incomingMessageRef08_ == nullptr) {
+        dataSectionBytes14_ = nullptr;
+        dataSectionByteCount18_ = 0u;
+        return;
+    }
+
+    // Get payload info from the message ref's storage
+    const auto* storage = incomingMessageRef08_->messageStorage0c;
+    if (storage == nullptr) {
         dataSectionBytes14_ = nullptr;
         dataSectionByteCount18_ = 0u;
         return;
     }
 
     const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10_ + 0x0eu);
+    const uint16_t payloadByteCount = storage->PayloadByteCountScaffold();
     if (sectionOffset0eLocal != 0u &&
-        static_cast<size_t>(sectionOffset0eLocal) + 2u <= incomingMarginMessageBytes08_->size()) {
+        static_cast<size_t>(sectionOffset0eLocal) + 2u <= payloadByteCount) {
         dataSectionByteCount18_ = ReadU16LE(currentMessage10_ + sectionOffset0eLocal);
         dataSectionBytes14_ = currentMessage10_ + sectionOffset0eLocal + 2u;
-        const size_t remaining = incomingMarginMessageBytes08_->size() - (sectionOffset0eLocal + 2u);
+        const size_t remaining = payloadByteCount - (sectionOffset0eLocal + 2u);
         if (dataSectionByteCount18_ > remaining) {
             dataSectionByteCount18_ = static_cast<uint16_t>(remaining);
         }

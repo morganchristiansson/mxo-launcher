@@ -674,6 +674,13 @@ public:
         mxo::liblttcp::CMessageConnectionMessageRef* incomingMessageRef,
         char initializeEmptyReply);
 
+    ~LoadCharacterReplyEnvelope_0x4b542c() {
+        // Release the message ref if we hold one
+        if (incomingMessageRef08_ != nullptr) {
+            incomingMessageRef08_->Release();
+        }
+    }
+
     // anchor: launcher.exe:0x43ae00
     void RefreshDataSectionView(char initializeEmptyReply);
 
@@ -695,12 +702,16 @@ public:
     const uint8_t* sectionData = nullptr;
 
 private:
-    uint8_t* messageBase04_ = nullptr;
-    const std::vector<uint8_t>* incomingMarginMessageBytes08_ = nullptr;
-    bool initializeEmptyReply0c_ = false;
-    uint8_t* currentMessage10_ = nullptr;
-    const uint8_t* dataSectionBytes14_ = nullptr;
-    uint16_t dataSectionByteCount18_ = 0;
+    // vtable pointer - initially set to temp vtable, then swapped to real vtable
+    // anchor: launcher.exe:0x4b542c
+    void** vftptr_0x0 = nullptr;
+    uint8_t* messageBase04_ = nullptr;  // +0x04
+    mxo::liblttcp::CMessageConnectionMessageRef* incomingMessageRef08_ = nullptr;  // +0x08
+    bool initializeEmptyReply0c_ = false;  // +0x0c
+    uint8_t* currentMessage10_ = nullptr;  // +0x10
+    const uint8_t* dataSectionBytes14_ = nullptr;  // +0x14
+    uint16_t dataSectionByteCount18_ = 0;  // +0x18
+    // +0x1c: defaultMessageStorage_ inline array
     std::array<uint8_t, 0x10> defaultMessageStorage_{};
 };
 
