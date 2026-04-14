@@ -59,7 +59,8 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     const bool liveSuccessAlias = (workResultCode == CLTLoginMediator::kConnectStatusSuccess);
 
     if (originalZeroStatusSuccess) {
-        uint32_t switchDispatchResult = 0u;
+        // Original 0x41b450: switch to cached upstream state object, then re-enter its slot3
+        // with old state passed as argument. Source now mirrors that exactly.
         if (cachedUpstreamState != nullptr && cachedUpstreamPhaseCode != 0u) {
             if (cachedUpstreamPhaseCode == 2u) {
                 spdlog::info(
@@ -67,7 +68,11 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
                     fmt::ptr(cachedUpstreamOrArg_),
                     mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
             }
-            switchDispatchResult = mediator->SwitchHelperStateByIdScaffold(cachedUpstreamPhaseCode);
+            // Original: calls cached upstream's vtable+0x18 to get phase, then SwitchHelperState(value)
+            // Source now directly switches to the cached state object
+            mediator->currentState_ = cachedUpstreamState;
+            // Original also calls the new state's slot3 with old state as argument
+            mediator->currentState_->Slot3_BeginOrContinue(this);
         } else {
             spdlog::info(
                 "CLTLoginState_State1::Slot1_HandlePrimaryGate original zero-status success missing cached upstream cachedUpstream={} upstreamPhaseCode={} currentState={}",
@@ -78,12 +83,11 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
 
         mediator->PostEvent(0u);
         spdlog::info(
-            "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=original-zero-status cachedUpstream={} upstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} then PostEvent(0x00)",
+            "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=original-zero-status cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostEvent(0x00)",
             static_cast<unsigned>(workResultCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
-            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
-            static_cast<unsigned>(switchDispatchResult));
+            mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
         return 1u;
     }
 
@@ -100,7 +104,10 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
                     fmt::ptr(cachedUpstreamOrArg_),
                     mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>");
             }
-            const uint32_t resumeResult = mediator->SwitchHelperStateByIdScaffold(cachedUpstreamPhaseCode);
+            // Original: switch to cached state object, then re-enter its slot3 with old state
+            CLTLoginState* oldState = this;
+            mediator->SetCurrentState(cachedUpstreamState);
+            const uint32_t resumeResult = mediator->CurrentState()->Slot3_BeginOrContinue(oldState);
             spdlog::info(
                 "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} resumeResult=0x{:08x}",
                 static_cast<unsigned>(workResultCode),
@@ -112,7 +119,11 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
             return resumeResult;
         }
 
-        const uint32_t handshakeResult = mediator->AuthBootstrapChild680().PrepareAndDispatch(*mediator);
+        // Ready-side: exact call shape matched to assembly
+        auto* child = &mediator->AuthBootstrapChild680();
+        void* sendTarget = mediator->AuthConnection();
+        const char* sessionToken = mediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
+        const uint32_t handshakeResult = child->PrepareAndDispatch(*mediator, sendTarget, sessionToken);
         spdlog::info(
             "CLTLoginState_State1::Slot1_HandlePrimaryGate status=0x{:08x} successMode=live-0x07000001-success-alias cachedUpstream={} upstreamPhaseCode={} -> currentState={} authFlag2c={} owner+0x680::PrepareAndDispatch=0x{:08x}",
             static_cast<unsigned>(workResultCode),

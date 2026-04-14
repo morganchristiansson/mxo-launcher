@@ -14,26 +14,21 @@ const char* CLTLoginState_AuthenticatePending::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00439210 (vtable 0x004b5014 slot 3)
+// Static RE now recovers the exact assembly call to PrepareAndDispatch at 0x448050:
+//   call dword ptr [EDX + 0x168]  -> sends send target result to stack
+//   call dword ptr [EAX + 0x20]   -> gets launcher version value
+//   call dword ptr [EDX + 0x38]    -> gets username pointer
+//   mov ECX, dword ptr [EAX + 0x60] -> session token pointer
+//   push session, push sendtarget, push uiMD5, push keyMD5, push loginType=1,
+//        push password, push username
+//   call 0x448050
+// Source now mirrors the exact call shape instead of the mediator-ref-based convenience.
 uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return 0u;
     }
 
-    // Current tighter source-owned mirror of `0x439210`:
-    // - this is the post-submit helper entered from owner-owned `ProcessLoginRequest`, not the
-    //   startup default helper
-    // - cache the incoming upstream/helper unless that object's phase/state code is already `1`
-    // - gate on `0x41b490` / auth connection state `+0x34 == 2`
-    // - if not connected yet, switch to helper/state 1 so its slot-3 body starts the auth
-    //   transport connection
-    // - if already connected, this state2 body owns the ready-side handoff into the owner+0x680
-    //   bootstrap child: static `0x439210` gathers owner-side inputs from `+0x94`, the
-    //   owner-side getter result, and the send target, then forwards that concrete call shape
-    //   into `0x448050`
-    // - current source now mirrors that split explicitly by calling the separate owner+0x680
-    //   child directly from state2 instead of routing through a fake mediator auth-bootstrap
-    //   method
     const uint32_t incomingUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
     if (incomingUpstreamPhaseCode != 1u) {
         cachedUpstreamOrArg_ = upstreamOrArg;
@@ -60,12 +55,23 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
         return connectResult;
     }
 
+    // Ready-side handoff: extract exact call shape from owner+0x94 to match assembly
+    // vtable+0x168: gets send target from child->connection
+    // vtable+0x20: gets launcher version value
+    // vtable+0x38: gets username char* directly from owner+0x94
+    // password is username+0x20, session token is username+0x60
+    // UI MD5 is username+0x50, key MD5 is username+0x40
+    auto* child = &mediator->AuthBootstrapChild680();
+    // Send target comes from the auth connection object (vtable+0x168 returns connection)
+    void* sendTarget = mediator->AuthConnection();
+    const char* sessionToken = mediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
+
     spdlog::info(
         "ROUTE CHECKPOINT: early-auth state2 ready-side owner+0x680 bootstrap-child dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
         mediator->CurrentState() ? mediator->CurrentState()->DebugName() : "<null>",
         fmt::ptr(cachedUpstreamOrArg_),
         static_cast<unsigned>(cachedUpstreamPhaseCode));
-    const uint32_t sendResult = mediator->AuthBootstrapChild680().PrepareAndDispatch(*mediator);
+    const uint32_t sendResult = child->PrepareAndDispatch(*mediator, sendTarget, sessionToken);
     spdlog::info(
         "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch=0x{:08x}",
         fmt::ptr(upstreamOrArg),

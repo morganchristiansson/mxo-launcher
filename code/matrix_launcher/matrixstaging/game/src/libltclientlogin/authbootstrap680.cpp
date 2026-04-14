@@ -1444,46 +1444,76 @@ void AuthBootstrap680Child_0x441290::ClearReplyParseAndCopyShadowFields() {
 }
 
 // anchor: launcher.exe:0x448050
-uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(CLTLoginMediator& mediator) {
+// Static RE at 0x448050 now recovered as:
+//   void __thiscall AuthBootstrap680Child_0x441290::AuthBootstrap680_PrepareAndDispatch(
+//       AuthBootstrap680Child_0x441290 *this, char *pszUsername, char *pszPassword,
+//       undefined4 loginType, undefined4 launcherVersionOrDispatchValue,
+//       undefined4 *pKeyConfigMd5, undefined4 *pUiConfigMd5,
+//       undefined4 pSendTarget, char *pszStationOrFallback)
+// The original extracts strings via owner+0x94 direct field offsets and copies them
+// using the small-string triple helper. Source now mirrors that exact call shape.
+uint32_t AuthBootstrap680Child_0x441290::PrepareAndDispatch(
+    CLTLoginMediator& mediator,
+    void* sendTarget,
+    const char* sessionTokenBegin) {
     AuthBootstrap680Child_0x441290& child = *this;
-    if (mediator.authLoginType_ != 1u) {
-        spdlog::warn(
-            "AuthBootstrap680_PrepareAndDispatch current source config loginType={} differs from recovered 0x439210 immediate write28=1; ready-side staging still mirrors the original call shape",
-            static_cast<unsigned>(mediator.authLoginType_));
-    }
+    // +0x28 = loginType: always writes 1 in original
+    child.loginType28 = 1u;
 
-    void* sendTarget50 = mediator.AuthConnection();
-    if (!sendTarget50) {
-        sendTarget50 = mediator.EnsureAuthConnectionObject();
-    }
-
+    // +0x2c = launcher version from owner+0x08 via getter vtable +0x20, or fallback to owner side
     const uint32_t* recoveredLauncherVersionPtr = mediator.GetNoPatchLauncherVersionValuePtr08();
     const uint32_t recoveredLauncherVersion =
         (recoveredLauncherVersionPtr && *recoveredLauncherVersionPtr != 0u)
             ? *recoveredLauncherVersionPtr
             : mediator.authLauncherVersion_;
+    child.launcherVersion2C = recoveredLauncherVersion;
 
-    const AuthBootstrap680PrepareCallShape callShape = BuildAuthBootstrap680PrepareCallShape(
-        mediator.ownerAuthBootstrapSource94_,
-        mediator.Arg6AuthName(),
-        mediator.Arg6AuthPassword(),
-        recoveredLauncherVersion,
-        sendTarget50);
+    // +0x04: username from owner+0x94 via caller-passed direct char* (original extracts from caller arg)
+    // +0x10: password from owner+0x94 +0x20
+    // +0x1c: station/session token from caller arg directly (original reads from +0x60 of caller source)
+    const char* username = mediator.ownerAuthBootstrapSource94_.username00.data();
+    const char* password = mediator.ownerAuthBootstrapSource94_.password20.data();
+    const char* sessionToken = sessionTokenBegin ? sessionTokenBegin : "";
 
-    StageAuthBootstrap680ChildFromPrepareCallShape(child, callShape);
+    // Use the original small-string triple assign pattern for exact field copy semantics
+    AssignSmallStringMirror(
+        child.string04,
+        username,
+        username + BoundedCStringLength(
+            username,
+            mediator.ownerAuthBootstrapSource94_.username00.size()));
+    AssignSmallStringMirror(
+        child.string10,
+        password,
+        password + BoundedCStringLength(
+            password,
+            mediator.ownerAuthBootstrapSource94_.password20.size()));
+    AssignSmallStringMirror(child.string1C, sessionToken);
+
+    // +0x30..+0x3f: key config MD5 from owner+0x94 +0x40
+    // +0x40..+0x4f: ui config MD5 from owner+0x94 +0x50
+    // Original checks pKeyConfigMd5/pUiConfigMd5 pointers before copying
+    if (!mediator.ownerAuthBootstrapSource94_.keyConfigMd540.empty()) {
+        child.block30 = mediator.ownerAuthBootstrapSource94_.keyConfigMd540;
+    }
+    if (!mediator.ownerAuthBootstrapSource94_.uiConfigMd550.empty()) {
+        child.block40 = mediator.ownerAuthBootstrapSource94_.uiConfigMd550;
+    }
+
+    // +0x50: send target from caller-passed pointer (original reads from child vtable+0x168 return)
+    child.sendTarget50 = sendTarget;
+    child.currentPublicKeyId9C = mediator.authCurrentPublicKeyId_;
+
     child.currentPublicKeyId9C = mediator.authCurrentPublicKeyId_;
 
     const uint8_t authRequestReadyA0 = child.authRequestReadyA0;
     const bool sendAuthRequestBranch = authRequestReadyA0 != 0u;
 
     spdlog::info(
-        "AuthBootstrap680Child_0x441290::PrepareAndDispatch staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94={} len04={} len10={} len1C={} fallback04={} fallback10={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={}",
-        fmt::ptr(callShape.ownerSource94),
+        "AuthBootstrap680Child_0x441290::PrepareAndDispatch staged owner+0x680 child (+0x04/+0x10/+0x1c/+0x28/+0x2c/+0x30..+0x4f/+0x50) from owner+0x94 len04={} len10={} len1C={} write28={} write2C={} currentPublicKeyId9C={} sendTarget50={} authRequestReadyA0=0x{:02x} branch={}",
         static_cast<unsigned>(SmallStringMirrorLength(child.string04)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
         static_cast<unsigned>(SmallStringMirrorLength(child.string1C)),
-        callShape.usedFallbackString00 ? 1u : 0u,
-        callShape.usedFallbackString20 ? 1u : 0u,
         static_cast<unsigned>(child.loginType28),
         static_cast<unsigned>(child.launcherVersion2C),
         static_cast<unsigned>(child.currentPublicKeyId9C),

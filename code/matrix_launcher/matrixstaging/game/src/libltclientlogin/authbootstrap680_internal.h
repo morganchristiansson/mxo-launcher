@@ -506,7 +506,15 @@ public:
     ~AuthBootstrap680Child_0x441290();
 
     // anchor: launcher.exe:0x448050
-    uint32_t PrepareAndDispatch(CLTLoginMediator& owner);
+    // Static RE mirrors original signature:
+    //   void __thiscall AuthBootstrap680Child_0x441290::AuthBootstrap680_PrepareAndDispatch(
+    //       AuthBootstrap680Child_0x441290 *this, char *pszUsername, char *pszPassword,
+    //       undefined4 loginType, undefined4 launcherVersionOrDispatchValue,
+    //       undefined4 *pKeyConfigMd5, undefined4 *pUiConfigMd5,
+    //       undefined4 pSendTarget, char *pszStationOrFallback)
+    // But source consolidates args to mirror caller-gathered call shape:
+    //   PrepareAndDispatch(CLTLoginMediator& owner, void* sendTarget, const char* sessionTokenBegin)
+    uint32_t PrepareAndDispatch(CLTLoginMediator& owner, void* sendTarget, const char* sessionTokenBegin);
     // anchor: launcher.exe:0x448140
     // Original call shape consumes the incoming auth-message object directly.
     uint32_t HandleInboundAuthMessage(void* incomingAuthMessage, CLTLoginMediator& owner);

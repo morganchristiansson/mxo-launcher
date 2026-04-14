@@ -331,29 +331,6 @@ uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
     return result;
 }
 
-// UNANCHORED: source-owned status replay helper that re-enters the active helper after caching type-2 auth connect status.
-uint32_t CLTLoginMediator::ContinueRecordedAuthConnectStatusScaffold() {
-    // Keep the status-recording contract explicit:
-    // - `HandleAuthConnectStatus` must cache the type-2 payload on the mediator first
-    // - the natural auth leaf now routes that same work through `0x449a70 -> 0x41af80 -> slot1`
-    // - this replay helper therefore synthesizes only the same narrow type-2 work-item shape when
-    //   state1 is still active, while non-state1 callers retain the older live-success fallback
-    if (currentState_ != nullptr && currentState_->DispatchPhaseCode() == 1u) {
-        mxo::liblttcp::CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold statusWorkItem = {};
-        statusWorkItem.header.workType =
-            mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus;
-        statusWorkItem.header.statusOrPayloadDword08 = lastAuthConnectStatus_;
-        // There is no separate launcher owner wrapper for this tail re-entry beyond
-        // `0x41af80`; this source-only replay intentionally mirrors only the final current-helper
-        // slot-1 dispatch on the synthesized type-2 work-item shape.
-        return currentState_->Slot1_HandlePrimaryGate(&statusWorkItem);
-    }
-
-    return (lastAuthConnectStatus_ == kConnectStatusSuccess)
-        ? AuthBootstrapChild680().PrepareAndDispatch(*this)
-        : 0u;
-}
-
 // UNANCHORED: source-owned builder for the auth endpoint mirror rooted at owner `+0x5c`.
 void CLTLoginMediator::BuildAuthEndpoint() {
     // Placeholder only.

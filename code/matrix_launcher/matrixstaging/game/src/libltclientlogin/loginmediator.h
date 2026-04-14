@@ -1511,7 +1511,6 @@ private:
     bool SelectMarginEndpointIpv4();
     mxo::liblttcp::CMessageConnection* EnsureAuthConnectionObject();
     mxo::liblttcp::CMessageConnection* EnsureMarginConnectionObject();
-    uint32_t ContinueRecordedAuthConnectStatusScaffold();
 
     // Condensed `0x4f78b8` owner sketch for the active branch:
     // - `+0x10` = current helper/state object
@@ -1535,7 +1534,6 @@ private:
     // - `+0x818` = per-slot route-host string family
     // - `+0xd84` = world-descriptor table
     mxo::liblttcp::CLTThreadPerClientTCPEngine* engine_;
-    CLTLoginState* currentState_;
     uint32_t lastSwitchedHelperStateScaffold_ = 0;
     uint32_t marginPacketReceiveCountScaffold_ = 0;
     uint32_t marginPacketFilteredBeforeSlot6CountScaffold_ = 0;
@@ -1550,6 +1548,9 @@ private:
     bool marginPeerCloseQueuedScaffold_ = false;
 
 public:
+    // anchor: launcher.exe:0x4b01c8 +0x10 (current helper/state object)
+    CLTLoginState* currentState_;
+
     // owner `+0x80` - world list count or auth/status (used by state4 slot2)
     uint32_t worldListCountOrStatus80 = 0;
 
