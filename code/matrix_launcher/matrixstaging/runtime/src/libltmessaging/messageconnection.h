@@ -367,12 +367,13 @@ struct CMessageConnectionPacketBuilderPayloadScaffold {
  *
  * The constructor at 0x443220:
  * 1. Takes messageRef pointer and '\x01' flag
- * 2. Stores 16 bytes at mbr_0x10 for extraction from +1/+5/+9/+0xd
- * 3. Sets up packet builder envelope with opcode 0x03
+ * 2. Stores 16 bytes from decrypted challenge blob into mbr_0x10
+ * 3. Extracts 4 dwords from mbr_0x10 at offsets +1/+5/+9/+0xd
+ * 4. Writes to connection fields at this+0x85/0x89/0x8d/0x91
  *
  * Usage in 0x4429b0:
- * 1. Create cls_0x4b6538 envelope with messageRef and '\x01' flag
- * 2. Extract 16 bytes from envelope.mbr_0x10 + 1/+5/+9/+0xd
+ * 1. Create cls_0x4b6538 envelope via cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
+ * 2. Extract 16 bytes from envelope.mbr_0x10 at offsets +1/+5/+9/+0xd
  * 3. Write to connection fields at this+0x85/0x89/0x8d/0x91
  * 4. Initialize packet builder envelope via CLTLoginMediatorPacketBuilderEnvelope_Initialize
  * 5. Set opcode 0x11 and copy challenge bytes from envelope.mbr_0x10 + 0x11/+0x15/+0x19/+0x1d
@@ -382,16 +383,15 @@ class CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 {
 public:
     // anchor: launcher.exe vtable `0x004b6538`
     CMessageConnectionPacketBuilderPayloadScaffold builder00{};  // +0x00 (shared front matter)
-    
-    // Derived fields for challenge-response envelope
-    // The mbr_0x10 layout is used for extracting 16 bytes at offsets +1/+5/+9/+0xd
-    uint8_t padding20_2f[16] = {0u};
-    
-    // anchor: launcher.exe:0x443220 - constructor stores these bytes from decrypted challenge blob
-    // Extracted via: *(dword *)(this + 0x85) = *(dword *)(mbr_0x10 + 1)
+
+    // anchor: launcher.exe:0x443220 - cls_0x4b6538 constructor stores challenge bytes here
+    // The original stores 16 bytes from decrypted challenge blob into mbr_0x10
+    // Byte extraction at 0x443220 uses: *(dword *)(this + 0x85) = *(dword *)(mbr_0x10 + 1)
     //               *(dword *)(this + 0x89) = *(dword *)(mbr_0x10 + 5)
     //               *(dword *)(this + 0x8d) = *(dword *)(mbr_0x10 + 9)
     //               *(dword *)(this + 0x91) = *(dword *)(mbr_0x10 + 0xd)
+    // Layout: 4 dwords stored at offsets 0x01, 0x05, 0x09, 0x0d within mbr_0x10 (16-byte region)
+    uint8_t mbr_0x10[16] = {0u};
 
 public:
     // Forward declarations for vtable methods
@@ -422,7 +422,7 @@ public:
 };
 
 // Size: 0x28 (40 bytes) - shared front matter (0x10) + mbr_0x10 storage (0x10) + vtable (0x10) + padding (0x08)
-static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x28, 
+static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x28,
               "CLTLoginMediatorPacketBuilderEnvelope size mismatch");
 
 /**
@@ -438,27 +438,24 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
  * Implementation: Populate envelope with challenge bytes from decrypted blob.
  * This mirrors the original flow where cls_0x4b6538 constructor stores bytes
  * into mbr_0x10 for later extraction via vtable dispatch.
+ *
+ * Original stores 16 bytes from decrypted challenge blob into mbr_0x10.
+ * These are then extracted as 4 dwords at offsets +1/+5/+9/+0xd within mbr_0x10.
  */
 inline void CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::PopulateFromDecryptedBlob(
     const std::array<uint8_t, 16>& decryptedBytes) {
-    // Original stores bytes at mbr_0x10 positions for extraction at +1/+5/+9/+0xd
-    // Since mbr_0x10 is 16 bytes at padding20_2f offset, we copy directly
-    std::copy(decryptedBytes.begin(), decryptedBytes.end(), this->padding20_2f);
+    // Store all 16 bytes into mbr_0x10 for later extraction
+    std::copy(decryptedBytes.begin(), decryptedBytes.end(), this->mbr_0x10);
 }
 
-/**
- * Implementation: Extract 16 bytes from envelope mbr_0x10 + 1/+5/+9/+0xd.
- * Original at 0x443220 extracts via:
- *   *(dword *)(this + 0x85) = *(dword *)(mbr_0x10 + 1)
- *   *(dword *)(this + 0x89) = *(dword *)(mbr_0x10 + 5)
- *   *(dword *)(this + 0x8d) = *(dword *)(mbr_0x10 + 9)
- *   *(dword *)(this + 0x91) = *(dword *)(mbr_0x10 + 0xd)
- */
+// anchor: launcher.exe:0x443220
 inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::ExtractChallengeBytes() const {
     std::array<uint8_t, 16> result{};
-    for (int i = 0; i < 16; i++) {
-        result[i] = padding20_2f[i + 1];
-    }
+    // Extract 4 dwords from mbr_0x10 at offsets +1/+5/+9/+0xd
+    std::memcpy(&result[0], this->mbr_0x10 + 1, 4);   // first dword
+    std::memcpy(&result[4], this->mbr_0x10 + 5, 4);  // second dword
+    std::memcpy(&result[8], this->mbr_0x10 + 9, 4);  // third dword
+    std::memcpy(&result[12], this->mbr_0x10 + 13, 4); // fourth dword (0xd = 13)
     return result;
 }
 
