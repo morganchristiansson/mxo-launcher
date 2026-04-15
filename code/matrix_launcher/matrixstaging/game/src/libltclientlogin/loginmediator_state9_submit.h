@@ -7,7 +7,63 @@
 #include "../../../runtime/src/liblttcp/lttcpconnection.h"
 #include "spdlog/fmt/fmt.h"
 
-namespace mxo::ltlogin::state9submit_scaffold {
+namespace mxo::ltlogin {
+
+// Helper functions - defined first so methods can use them
+inline uint16_t ByteSwap16(uint16_t value) {
+    return static_cast<uint16_t>((value << 8) | (value >> 8));
+}
+
+inline std::string FormatIpv4StoredDwordLittleEndianDottedQuad(uint32_t storedIpv4Dword) {
+    // anchor: launcher.exe:0x44b0d0
+    // Formats IPv4 dword as dotted-quad text
+    return fmt::format(
+        "{}.{}.{}.{}",
+        static_cast<unsigned>(storedIpv4Dword & 0xffu),
+        static_cast<unsigned>((storedIpv4Dword >> 8) & 0xffu),
+        static_cast<unsigned>((storedIpv4Dword >> 16) & 0xffu),
+        static_cast<unsigned>((storedIpv4Dword >> 24) & 0xffu));
+}
+
+// Static-RE anchor: launcher.exe:0x44afd0 / 0x44b0d0
+// 16-byte submit-address block created at local stack by CLTLoginMediator_State9SubmitFollowup
+// Used to build the host:port target string before UDP send
+class SubmitAddressBlock {
+public:
+    // anchor: launcher.exe:0x44afd0 / 0x44b0d0
+    // Raw 16-byte block: +0 family, +2 port, +4 ipv4, +8 reserved
+    // These match the endpoint key layout copied from marginConnection +0x24
+
+    // anchor: launcher.exe:0x44afd0
+    void SetPortFromHelperWord(uint16_t helperWord6) {
+        portNetworkOrder_ = ByteSwap16(helperWord6);
+    }
+
+    // anchor: launcher.exe:0x44b0d0
+    std::string FormatHostPortString(char appendPortFlag) const {
+        if (family_ != 2u || ipv4NetworkOrder_ == 0u) {
+            return std::string();
+        }
+
+        std::string out = FormatIpv4StoredDwordLittleEndianDottedQuad(ipv4NetworkOrder_);
+        if (appendPortFlag != 0) {
+            const uint16_t portHostOrder = ByteSwap16(portNetworkOrder_);
+            out += fmt::format(":{}", static_cast<unsigned>(portHostOrder));
+        }
+        return out;
+    }
+
+    uint16_t family_;      // +0
+    uint16_t portNetworkOrder_; // +2
+    uint32_t ipv4NetworkOrder_; // +4
+    uint32_t reserved0_;   // +8
+    uint32_t reserved1_;   // +12
+};
+
+static_assert(sizeof(SubmitAddressBlock) == 16, "submit address block size mismatch");
+
+// VTable call helpers - NOT reimplementations of client.dll classes.
+// These are thin wrappers for vtable calls on pointers we get from launcher.
 
 // Focused late-login helper split:
 // - keep the state9 callback84/object88/submit helpers out of `loginmediator_state9.cpp`
@@ -22,47 +78,6 @@ namespace mxo::ltlogin::state9submit_scaffold {
 //   - client.dll:0x620065e0 = ClientNetShell_BuildState9SeedObject3c
 //   - launcher.exe string anchor `AssemblyTwofish` now closes the active one-block transform enough
 //     to source-own it as Twofish over a zero-IV single block
-
-inline uint16_t ByteSwap16(uint16_t value) {
-    return static_cast<uint16_t>((value << 8) | (value >> 8));
-}
-
-inline std::string FormatIpv4StoredDwordLittleEndianDottedQuad(uint32_t storedIpv4Dword) {
-    // anchor: launcher.exe:0x44b0d0
-    // Natural-original correction from the `0x41df0b` submit stop:
-    // - the copied IPv4 dword is rendered in memory-byte order
-    // - representative natural values:
-    //   - stored dword `0x3d7a3025`
-    //   - formatted text `"37.48.122.61:10000"`
-    return fmt::format(
-        "{}.{}.{}.{}",
-        static_cast<unsigned>(storedIpv4Dword & 0xffu),
-        static_cast<unsigned>((storedIpv4Dword >> 8) & 0xffu),
-        static_cast<unsigned>((storedIpv4Dword >> 16) & 0xffu),
-        static_cast<unsigned>((storedIpv4Dword >> 24) & 0xffu));
-}
-
-inline std::string BuildSubmitTargetText(
-    const mxo::liblttcp::LTTCPEndpointKey& endpoint,
-    uint16_t helperWord6,
-    bool appendPort) {
-    // anchors: launcher.exe:0x44afd0 / 0x44b0d0
-    // Current best source-owned contract:
-    // - `0x44afd0` endian-swaps helper word `+6` into submit-address bytes `+2..+3`
-    // - `0x44b0d0` formats bytes `+4..+7` into dotted-quad text
-    // - when requested, it appends `":%d"` using the decoded host-order port
-    if (endpoint.family != 2u || endpoint.ipv4NetworkOrder == 0u) {
-        return std::string();
-    }
-
-    const uint16_t portNetworkOrder = ByteSwap16(helperWord6);
-    const uint16_t portHostOrder = ByteSwap16(portNetworkOrder);
-    std::string out = FormatIpv4StoredDwordLittleEndianDottedQuad(endpoint.ipv4NetworkOrder);
-    if (appendPort) {
-        out += fmt::format(":{}", static_cast<unsigned>(portHostOrder));
-    }
-    return out;
-}
 
 // UNUSED: inline uint16_t ReadOpcodePrefixVariableWidth
 
@@ -265,4 +280,4 @@ inline uint32_t ExecuteObject88Submit(
         forwardedArg90);
 }
 
-}  // namespace mxo::ltlogin::state9submit_scaffold
+}  // namespace mxo::ltlogin

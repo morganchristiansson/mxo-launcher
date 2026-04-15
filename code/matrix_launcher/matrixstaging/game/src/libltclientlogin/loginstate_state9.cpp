@@ -50,7 +50,7 @@ void CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg) {
     //   - `this+6 = 0x2710`
     const uint8_t consumedByte4 = pendingByte4_;
     const uint16_t consumedWord6 = pendingWord6_;
-    const uint32_t submitResult = mediator->State9SubmitFollowupScaffold(consumedByte4, consumedWord6);
+    const uint32_t submitResult = mediator->State9SubmitFollowup(consumedByte4, consumedWord6);
     pendingByte4_ = 0;
     pendingWord6_ = 0;
 

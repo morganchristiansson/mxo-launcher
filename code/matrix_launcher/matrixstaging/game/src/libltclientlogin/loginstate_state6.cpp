@@ -165,43 +165,32 @@ const char* CLTLoginState_State6::DebugName() const {
 
 // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
 void CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    // Static recheck in Ghidra/disassembly for `0x43b8f0` now backs the cache rule directly:
-    // - `0x43b8fc` tests state6 `this+4`
-    // - `0x43b904..0x43b91a` calls incoming upstream vtable `+0x18`
-    // - if that reported phase is `4` or `5`, execution jumps to `0x43b91f` and preserves the
-    //   existing cached pointer
-    // - otherwise `0x43b91c` overwrites `this+4 = upstream`
-    // - that cached upstream later matters on opcode-`9` success because `0x440acc..0x440ae0`
-    //   reads it back and calls its vtable `+0x18` to choose the next helper-state target
+    // anchor: launcher.exe:0x43b8f0 upstream caching logic at `0x43b8f9..0x43b91c`
+    // - `0x43b8f9` loads existing cached from this+4
+    // - `0x43b8fc` tests if cached is null - if so, jumps to store at `0x43b91c`
+    // - `0x43b904..0x43b91a` calls incoming upstream's vtable `+0x18` to get phase code
+    // - if phase==4 or phase==5, jumps to `0x43b91f` preserving existing cached
+    // - otherwise `0x43b91c` overwrites this+4 with incoming upstream pointer
+    // That cached upstream is later used on opcode-9 success (`0x440acc..0x440ae0`) to choose
+    // the next helper-state target via vtable+0x18.
     if (upstreamOrArg != nullptr) {
         const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
         if (cachedUpstreamOrArg_ == nullptr || (upstreamPhaseCode != 4u && upstreamPhaseCode != 5u)) {
             cachedUpstreamOrArg_ = upstreamOrArg;
         }
     }
-    if (!mediator) {
+    // anchor: launcher.exe:0x43b91f..0x43b92a - direct g_CurrentLoginMediator access, no null check
+    if (!g_CurrentLoginMediator->State10HasReadyConnectionState2()) {
+        g_CurrentLoginMediator->SetCurrentState(4u);
         return;
     }
 
-    if (!mediator->State10HasReadyConnectionState2()) {
-        const uint32_t fallbackResult = mediator->SetCurrentState(4u);
-        spdlog::info(
-            "CLTLoginState_State6::Slot3_BeginOrContinue blocked on owner+0x1c state!=2 -> helper4 result=0x{:08x} currentState={}",
-            static_cast<unsigned>(fallbackResult),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-        return;
-    }
-
-    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(mediator->MarginConnection());
+    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(g_CurrentLoginMediator->MarginConnection());
     const bool marginConnectionReady84 =
         marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84();
+    // anchor: launcher.exe:0x43b94a..0x43b95e - no logging on fallback, just return void
     if (!marginConnectionReady84) {
-        const uint32_t fallbackResult = mediator->SetCurrentState(5u);
-        spdlog::info(
-            "CLTLoginState_State6::Slot3_BeginOrContinue blocked on margin connection +0x84==0 -> helper5 result=0x{:08x} currentState={}",
-            static_cast<unsigned>(fallbackResult),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+        g_CurrentLoginMediator->SetCurrentState(5u);
         return;
     }
 
@@ -216,21 +205,21 @@ void CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
     State6Packet0x06Builder packetBuilder;
     packetBuilder.ResetAndInitialize();
 
-    const uint32_t* launcherVersionPtr = mediator->GetNoPatchLauncherVersionValuePtr08();
-    const uint32_t* clientVersionPtr = mediator->GetNoPatchClientVersionValuePtr0c();
+    const uint32_t* launcherVersionPtr = g_CurrentLoginMediator->GetNoPatchLauncherVersionValuePtr08();
+    const uint32_t* clientVersionPtr = g_CurrentLoginMediator->GetNoPatchClientVersionValuePtr0c();
     const uint32_t launcherVersion = launcherVersionPtr ? *launcherVersionPtr : 0u;
     const uint32_t clientVersion = clientVersionPtr ? *clientVersionPtr : 0u;
-    const auto gobFileGuidWords = ResolveState6GobFileGuidWords(mediator);
+    const auto gobFileGuidWords = ResolveState6GobFileGuidWords(g_CurrentLoginMediator);
     const uint8_t currentHelperPhaseByte = static_cast<uint8_t>(
-        mediator->currentState_ ? mediator->currentState_->DispatchPhaseCode() : 0u);
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode() : 0u);
 
     packetBuilder.SetLauncherVersion(launcherVersion);
     packetBuilder.SetClientVersion(clientVersion);
     packetBuilder.SetGobFileGuid(gobFileGuidWords);
     packetBuilder.SetCurrentHelperPhaseByte(currentHelperPhaseByte);
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
-    mediator->PostEvent(0x11u);
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
+    g_CurrentLoginMediator->PostEvent(0x11u);
     spdlog::info(
         "CLTLoginState_State6::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",
         State6Packet0x06FixedPayload::kFixedByteCount,
@@ -242,7 +231,7 @@ void CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
         static_cast<unsigned>(gobFileGuidWords[3]),
         static_cast<unsigned>(currentHelperPhaseByte),
         static_cast<unsigned>(sendResult),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     return;
 }
 

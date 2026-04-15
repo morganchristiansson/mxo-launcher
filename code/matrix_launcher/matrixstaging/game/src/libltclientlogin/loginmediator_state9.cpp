@@ -1,6 +1,6 @@
 #include "loginmediator.h"
 
-#include "loginmediator_state9_submit_scaffold.h"
+#include "loginmediator_state9_submit.h"
 #include "loginstate.h"
 #include "../../../runtime/src/libltcrypto/auth_internal.h"
 #include <spdlog/spdlog.h>
@@ -10,7 +10,7 @@
 #include <string>
 
 namespace mxo::ltlogin {
-namespace state9submit = mxo::ltlogin::state9submit_scaffold;
+// using mxo::ltlogin directly
 namespace {
 }  // namespace
 
@@ -81,7 +81,7 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
 }
 
 // anchor: launcher.exe:0x41de40
-uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6) {
+uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t helperWord6) {
     // Current focused state9 submit read:
     // - natural original now proves `0x439780 -> 0x41de40 -> 0x43c180`
     // - `0x41de40` first queries callback84 `+0x38`, then builds submit target text from the
@@ -105,28 +105,36 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     const uint32_t forwardedArg90 = helperByte4 != 0u ? ownerOptionalField90_ : 0u;
     uint32_t callbackOutLow = 0u;
     uint32_t callbackOutHigh = 0u;
+    // call through callback84 vtable+0x38 (client.dll ClientNetShell)
     const bool callbackPairReady =
-        state9submit::TryCallback84FillPair(ownerCallback84_, &callbackOutLow, &callbackOutHigh);
+        mxo::ltlogin::TryCallback84FillPair(ownerCallback84_, &callbackOutLow, &callbackOutHigh);
 
     std::string submitTargetText;
     std::string remoteHostName = "<empty>";
     bool submitTargetReady = false;
     uint32_t submitTargetIpv4NetworkOrder = 0u;
     if (marginConnection_ != nullptr) {
-        const mxo::liblttcp::LTTCPEndpointKey& endpoint = marginConnection_->RemoteEndpoint();
-        submitTargetIpv4NetworkOrder = endpoint.ipv4NetworkOrder;
+        // Mirror assembly at 0x41de40: copy endpoint +0x24..+0x30 to local 16-byte block,
+        // then call class methods at 0x44afd0 / 0x44b0d0
+        const mxo::liblttcp::LTTCPEndpointKey& remoteEndpoint = marginConnection_->RemoteEndpoint();
+        submitTargetIpv4NetworkOrder = remoteEndpoint.ipv4NetworkOrder;
         if (!marginConnection_->RemoteHostName().empty()) {
             remoteHostName = marginConnection_->RemoteHostName();
         }
-        submitTargetText = state9submit::BuildSubmitTargetText(
-            endpoint,
-            helperWord6,
-            /*appendPort=*/true);
+        // Fidelity to static-RE: use SubmitAddressBlock class matching original 16-byte layout
+        // anchor: launcher.exe:0x44afd0 / 0x44b0d0
+        mxo::ltlogin::SubmitAddressBlock localBlock{};
+        localBlock.family_ = remoteEndpoint.family;
+        localBlock.portNetworkOrder_ = remoteEndpoint.portNetworkOrder;
+        localBlock.ipv4NetworkOrder_ = remoteEndpoint.ipv4NetworkOrder;
+        localBlock.SetPortFromHelperWord(helperWord6);
+        submitTargetText = localBlock.FormatHostPortString(/*appendPortFlag=*/1);
         submitTargetReady = !submitTargetText.empty();
     }
 
-    const state9submit::Object88SubmitPlan object88SubmitPlan =
-        state9submit::BuildObject88SubmitPlan(
+    // call through object88 vtable+0x44 (client.dll INetMgr)
+    const mxo::ltlogin::Object88SubmitPlan object88Plan =
+        mxo::ltlogin::BuildObject88SubmitPlan(
             ownerObject88_,
             callbackPairReady,
             submitTargetReady,
@@ -135,12 +143,12 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
 
     uint32_t submitResult = 0u;
     const bool shouldExecuteSubmit =
-        object88SubmitPlan.modeQueryReady && callbackPairReady && submitTargetReady &&
-        (object88SubmitPlan.wouldCallDirectSend28 || object88SubmitPlan.wouldCallManagedSend24);
+        object88Plan.modeQueryReady && callbackPairReady && submitTargetReady &&
+        (object88Plan.wouldCallDirectSend28 || object88Plan.wouldCallManagedSend24);
     if (shouldExecuteSubmit) {
-        submitResult = state9submit::ExecuteObject88Submit(
+        submitResult = mxo::ltlogin::ExecuteObject88Submit(
             ownerObject88_,
-            object88SubmitPlan.managedSendMode,
+            object88Plan.managedSendMode,
             &ownerCachedHandle147c_,
             submitTargetText.c_str(),
             callbackOutLow,
@@ -149,7 +157,7 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
     }
 
     spdlog::info(
-        "CLTLoginMediator::State9SubmitFollowupScaffold helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} object88ModeQueryReady={} managedSendMode={} object88Route='{}' wouldReleaseCachedHandle147c={} wouldAcquireManagedHandle18={} wouldCallDirectSend28={} wouldCallManagedSend24={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' executedSubmit={} submitResult=0x{:08x} (state9 now preserves startup-provided +0x124 callback84/object88 provenance, uses live +0x18c callback blob fill, and executes the natural direct-vs-managed object88 branch only when all proven prerequisites are present)",
+        "CLTLoginMediator::State9SubmitFollowup helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' executedSubmit={} submitResult=0x{:08x}",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
         static_cast<unsigned>(State6UdpSessionSecretF18()),
@@ -161,13 +169,7 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
         callbackPairReady ? 1u : 0u,
         static_cast<unsigned>(callbackOutLow),
         static_cast<unsigned>(callbackOutHigh),
-        object88SubmitPlan.modeQueryReady ? 1u : 0u,
-        object88SubmitPlan.managedSendMode ? 1u : 0u,
-        state9submit::Object88SubmitRouteName(object88SubmitPlan.route),
-        object88SubmitPlan.wouldReleaseCachedHandle147c ? 1u : 0u,
-        object88SubmitPlan.wouldAcquireManagedHandle18 ? 1u : 0u,
-        object88SubmitPlan.wouldCallDirectSend28 ? 1u : 0u,
-        object88SubmitPlan.wouldCallManagedSend24 ? 1u : 0u,
+        object88Plan.managedSendMode ? 1u : 0u,
         submitTargetReady ? 1u : 0u,
         static_cast<unsigned>(submitTargetIpv4NetworkOrder),
         submitTargetText,
@@ -176,7 +178,7 @@ uint32_t CLTLoginMediator::State9SubmitFollowupScaffold(uint8_t helperByte4, uin
         static_cast<unsigned>(submitResult));
     if (shouldExecuteSubmit && submitResult == 3u) {
         spdlog::warn(
-            "CLTLoginMediator::State9SubmitFollowupScaffold managed join returned 0x00000003 (client.dll: CUDPDriver_ReallyJoinSession timeout path) target='{}' callbackBlobPtr=0x{:08x} callbackBlobLen=0x{:08x} cachedHandle147c={} -- current boundary is before state9 raw-0x11 success / event=0x18",
+            "CLTLoginMediator::State9SubmitFollowup managed join returned 0x00000003 (client.dll: CUDPDriver_ReallyJoinSession timeout path) target='{}' callbackBlobPtr=0x{:08x} callbackBlobLen=0x{:08x} cachedHandle147c={} -- current boundary is before state9 raw-0x11 success / event=0x18",
             submitTargetText,
             static_cast<unsigned>(callbackOutLow),
             static_cast<unsigned>(callbackOutHigh),
