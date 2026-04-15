@@ -388,15 +388,6 @@ private:
     uint16_t pendingWord6_ = 0;
 
 public:
-    void SetPendingPayload(uint8_t byte4, uint16_t word6) {
-        pendingByte4_ = byte4;
-        pendingWord6_ = word6;
-    }
-
-    bool HasPendingPayload() const {
-        return pendingByte4_ != 0u || pendingWord6_ != 0u;
-    }
-
     // anchor: launcher.exe vtable 0x004b517c
     const char* DebugName() const override;
 
