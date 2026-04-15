@@ -12,18 +12,6 @@
 namespace mxo::ltlogin {
 namespace state9submit = mxo::ltlogin::state9submit_scaffold;
 namespace {
-
-static uint32_t InvokeMarginConnectionVtable0cWithArg1(
-    mxo::liblttcp::CMessageConnection* marginConnection) {
-    // anchor: launcher.exe:0x41b448 / vtable+0x0c call with arg 1
-    // Direct vtable dispatch: (*marginConnection->vtable)[0x3](marginConnection, 1)
-    // Corresponds to CMessageConnection::Close(true) in our implementation
-    if (!marginConnection) {
-        return 0u;
-    }
-    return marginConnection->Close(/*graceful=*/true);
-}
-
 }  // namespace
 
 // anchor: launcher.exe:0x41f1d0 / owner-side mirror of the startup triple into +0x84/+0x88/+0x8c
@@ -255,7 +243,7 @@ uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
     // anchor: launcher.exe:0x41b43a-0x41b448 / state check and vtable+0x0c(1) call
     const uint32_t closeResult =
         (rawState == 1 || rawState == 2) && marginConnection_
-            ? InvokeMarginConnectionVtable0cWithArg1(marginConnection_)
+            ? marginConnection_->Close(/*graceful=*/true)
             : 0u;
 
     spdlog::info(

@@ -1902,16 +1902,6 @@ bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
     return true;
 }
 
-static uint32_t InvokeMarginConnectionVtable0cWithArg1(
-    mxo::liblttcp::CMessageConnection* marginConnection) {
-    // Direct vtable dispatch: (*marginConnection->vtable)[0x3](marginConnection, 1)
-    // Corresponds to CMessageConnection::Close(true) in our implementation
-    if (!marginConnection) {
-        return 0u;
-    }
-    return marginConnection->Close(/*graceful=*/true);
-}
-
 // anchor: launcher.exe teardown path 0x40b360..0x40b3df / wrapper-facing arg6 slot +0x16c
 // Keep the split explicit:
 // - launcher teardown treats this as a close-and-wait-event-`0x0f` predicate
@@ -1926,7 +1916,7 @@ bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
         /*clearState10SendGateF14=*/true);
     const uint32_t closeResult =
         (rawState == 1 || rawState == 2) && marginConnection_
-            ? InvokeMarginConnectionVtable0cWithArg1(marginConnection_)
+            ? marginConnection_->Close(/*graceful=*/true)
             : 0u;
 
     spdlog::info(
