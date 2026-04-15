@@ -261,7 +261,8 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // Get next IPv4 from address list - anchor: launcher.exe:0x41d1f2
     // anchor: launcher.exe:0x41d1f2 / call CLTIPAddressList_GetNextAddress(ESI+0x4c, 1)
     // anchor: launcher.exe:0x41d1e8 / LEA ECX, [ESI+0x4c] - auth address list at +0x4c
-    const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
+    // First refresh the address list (PrepareNextAuthEndpointForConnectAttemptScaffold does this)
+    PrepareNextAuthEndpointForConnectAttemptScaffold();
 
     // Build endpoint at +0x5c using helper at 0x44b090 - anchor: launcher.exe:0x41d205
     // The helper takes the next IPv4 and port from DAT_004f7a50
@@ -271,12 +272,10 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d202 / LEA ECX, [EBP-0x14] - local endpoint
     // anchor: launcher.exe:0x41d205 / CALL 0x44b090
     // anchor: launcher.exe:0x41d20a-0x41d225 / copy endpoint fields to this+0x5c
-    const uint16_t authPortNetworkOrder = *(uint16_t*)0x004f7a50;
-    mxo::liblttcp::LTTCPEndpointKey localEndpoint = {};
-    localEndpoint.family = 2;
-    localEndpoint.portNetworkOrder = authPortNetworkOrder;
-    localEndpoint.ipv4NetworkOrder = nextIpv4;
-    authEndpoint_ = localEndpoint;
+    // Note: authEndpoint_.ipv4NetworkOrder already set by PrepareNextAuthEndpointForConnectAttemptScaffold
+    // Just ensure port is set correctly from config
+    authEndpoint_.portNetworkOrder =
+        static_cast<uint16_t>((authServerPortHostOrder_ << 8) | (authServerPortHostOrder_ >> 8));
 
     // Increment attempt counter - anchor: launcher.exe:0x41d22b-0x41d22c
     // anchor: launcher.exe:0x41d222 / MOV EDI, dword ptr [ESI+0x28]
