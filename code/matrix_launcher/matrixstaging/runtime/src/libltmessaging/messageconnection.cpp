@@ -1053,7 +1053,7 @@ static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaf
     mxo::ltlogin::CLTLoginMediator* mediator =
         static_cast<mxo::ltlogin::CLTLoginMediator*>(self->OwnerContext());
     if (mediator != nullptr &&
-        (self == mediator->AuthConnection() || self == mediator->MarginConnection())) {
+        (self == mediator->authConnection_ || self == mediator->marginConnection_)) {
         return mediator;
     }
 
@@ -1064,7 +1064,7 @@ static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaf
 static bool CMessageConnection_IsMediatorAuthConnectionScaffold(
     CMessageConnection* self,
     const mxo::ltlogin::CLTLoginMediator* mediator) {
-    return self != nullptr && mediator != nullptr && self == mediator->AuthConnection();
+    return self != nullptr && mediator != nullptr && self == mediator->authConnection_;
 }
 
 static bool CMessageConnection_IsMediatorMarginConnectionScaffold(

@@ -1026,7 +1026,6 @@ public:
 
     std::string ResolvedMarginHostName() const;
 
-    mxo::liblttcp::CMessageConnection* AuthConnection() const;
     mxo::liblttcp::CMessageConnection* MarginConnection() const;
     bool AuthPeerCloseQueuedScaffold() const { return authPeerCloseQueuedScaffold_; }
     bool MarginPeerCloseQueuedScaffold() const { return marginPeerCloseQueuedScaffold_; }
@@ -1547,14 +1546,15 @@ private:
     uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
     uint16_t lastMarginPacketOpcodeScaffold_ = 0;
     uint32_t lastMarginPacketSizeScaffold_ = 0;
-    mxo::liblttcp::CMessageConnection* authConnection_;
-    mxo::liblttcp::CMessageConnection* marginConnection_;
     bool authConnectionOwnedByMediator_ = false;
     bool marginConnectionOwnedByMediator_ = false;
     bool authPeerCloseQueuedScaffold_ = false;
     bool marginPeerCloseQueuedScaffold_ = false;
 
 public:
+    mxo::liblttcp::CMessageConnection* authConnection_;
+    mxo::liblttcp::CMessageConnection* marginConnection_;
+
     // anchor: launcher.exe:0x4b01c8 +0x10 (current helper/state object)
     CLTLoginState* currentState_;
 

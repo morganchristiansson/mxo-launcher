@@ -31,7 +31,7 @@ void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrArg) 
         return;
     }
 
-    mxo::liblttcp::CMessageConnection* connection = mediator->AuthConnection();
+    mxo::liblttcp::CMessageConnection* connection = mediator->authConnection_;
     if (connection == nullptr) {
         spdlog::info(
             "CLTLoginState_WorldListPending::Slot3_BeginOrContinue missing auth connection object currentState={}",

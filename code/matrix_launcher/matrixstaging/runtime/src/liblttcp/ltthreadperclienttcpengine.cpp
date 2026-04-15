@@ -3225,7 +3225,7 @@ void CLTThreadPerClientTCPEngine::PumpLauncherConnectionsFromArg5HelperScaffold(
     }
 
     PumpLauncherConnectionContextScaffold(
-        mediator->AuthConnection(),
+        mediator->authConnection_,
         mediator,
         /*isMarginConnection=*/false,
         "AuthReceivePacket");
