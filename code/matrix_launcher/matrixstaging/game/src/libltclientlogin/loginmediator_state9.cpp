@@ -13,10 +13,12 @@ namespace mxo::ltlogin {
 namespace state9submit = mxo::ltlogin::state9submit_scaffold;
 namespace {
 
-static uint32_t TryInvokeGracefulMarginConnectionClose0cScaffold(
-    mxo::liblttcp::CMessageConnection* marginConnection,
-    bool wouldCallConnectionClose0c) {
-    if (!marginConnection || !wouldCallConnectionClose0c) {
+static uint32_t InvokeMarginConnectionVtable0cWithArg1(
+    mxo::liblttcp::CMessageConnection* marginConnection) {
+    // anchor: launcher.exe:0x41b448 / vtable+0x0c call with arg 1
+    // Direct vtable dispatch: (*marginConnection->vtable)[0x3](marginConnection, 1)
+    // Corresponds to CMessageConnection::Close(true) in our implementation
+    if (!marginConnection) {
         return 0u;
     }
     return marginConnection->Close(/*graceful=*/true);
@@ -250,9 +252,11 @@ uint32_t CLTLoginMediator::HandleState9Opcode11SuccessSideEffect() {
         &rawState,
         &wouldCallConnectionClose0c,
         /*clearState10SendGateF14=*/true);
-    const uint32_t closeResult = TryInvokeGracefulMarginConnectionClose0cScaffold(
-        marginConnection_,
-        wouldCallConnectionClose0c);
+    // anchor: launcher.exe:0x41b43a-0x41b448 / state check and vtable+0x0c(1) call
+    const uint32_t closeResult =
+        (rawState == 1 || rawState == 2) && marginConnection_
+            ? InvokeMarginConnectionVtable0cWithArg1(marginConnection_)
+            : 0u;
 
     spdlog::info(
         "CLTLoginMediator::HandleState9Opcode11SuccessSideEffect cleared owner+0xf14, set owner+0x2d, marginConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x} expectedLaterTail=0x41afc0->0x438df0->0x41cfb0(0x0f)",

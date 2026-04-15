@@ -1902,10 +1902,11 @@ bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
     return true;
 }
 
-static uint32_t TryInvokeGracefulMarginConnectionClose0cScaffold(
-    mxo::liblttcp::CMessageConnection* marginConnection,
-    bool wouldCallConnectionClose0c) {
-    if (!marginConnection || !wouldCallConnectionClose0c) {
+static uint32_t InvokeMarginConnectionVtable0cWithArg1(
+    mxo::liblttcp::CMessageConnection* marginConnection) {
+    // Direct vtable dispatch: (*marginConnection->vtable)[0x3](marginConnection, 1)
+    // Corresponds to CMessageConnection::Close(true) in our implementation
+    if (!marginConnection) {
         return 0u;
     }
     return marginConnection->Close(/*graceful=*/true);
@@ -1923,9 +1924,10 @@ bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
         &rawState,
         &wouldCallConnectionClose0c,
         /*clearState10SendGateF14=*/true);
-    const uint32_t closeResult = TryInvokeGracefulMarginConnectionClose0cScaffold(
-        marginConnection_,
-        wouldCallConnectionClose0c);
+    const uint32_t closeResult =
+        (rawState == 1 || rawState == 2) && marginConnection_
+            ? InvokeMarginConnectionVtable0cWithArg1(marginConnection_)
+            : 0u;
 
     spdlog::info(
         "CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f(+0x16c wrapper-facing) -> {} [owner+0xf14={} owner+0x2d={} marginConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x} currentState={} split=teardown-wait-event-0x0f vs owner-state9-success-helper laterExpectedTail=0x41afc0->0x438df0->0x41cfb0(0x0f)]",
