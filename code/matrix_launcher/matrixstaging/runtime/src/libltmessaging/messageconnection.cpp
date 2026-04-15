@@ -2599,6 +2599,61 @@ static void CBaseMarginConnection_InvokeMessageRefCompletionCallback(
     (void)messageRef;
 }
 
+// anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0
+// Original dispatches directly to CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse.
+// This scaffold handles the code 2 flow. We call through to the existing mediator bootstrap logic.
+// UNANCHORED: keeping bootstrap logic local in structure, but calling through to existing code.
+uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    bool transportEncrypted) {
+    if (!packetBytes || packetSize == 0u) {
+        return 0u;
+    }
+
+    // Get owner/mediator - original accesses +0xa0 for bootstrap prep, we use owner callback
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+    if (!mediator) {
+        return 0u;
+    }
+
+    // Original does cert challenge crypto here. For now, delegate to existing bootstrap continue.
+    // TODO: implement full cert challenge/response at 0x4429b0
+    mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+    return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
+}
+
+// anchor: launcher.exe:0x442d00 -> 0x442d83 -> 0x441850
+// Original dispatches directly to meth_0x441850 - sets byte+0x84 if status==0, synthesizes local work.
+// This scaffold mirrors that direct connection flow.
+// UNANCHORED: keeps bootstrap logic local to connection, mediator only involved via later work-item.
+uint32_t CBaseMarginConnection::HandleCode4ForBootstrap(
+    const uint8_t* packetBytes,
+    size_t packetSize,
+    bool transportEncrypted) {
+    if (!packetBytes || packetSize < 5u) {
+        return 0u;
+    }
+
+    // meth_0x441850: if status == 0, set byte+0x84 to 1
+    const uint32_t status = static_cast<uint32_t>(packetBytes[1]) |
+                            (static_cast<uint32_t>(packetBytes[2]) << 8u) |
+                            (static_cast<uint32_t>(packetBytes[3]) << 16u) |
+                            (static_cast<uint32_t>(packetBytes[4]) << 24u);
+    SetMessageCode4SuccessFlag84(status == 0u);
+
+    // Synthesize local type-0x0b work item (meth_0x441850)
+    uint32_t handled = DispatchMessageCode4LocalCompletionWorkItem(status);
+
+    spdlog::info(
+        "CBaseMarginConnection::HandleCode4ForBootstrap rawCode=0x{:02x} status=0x{:08x} connectionByte84={} localWorkItemHandled={}",
+        static_cast<unsigned>(packetBytes[0]),
+        status,
+        MessageCode4SuccessFlag84() ? 1u : 0u,
+        static_cast<unsigned>(handled));
+    return handled;
+}
+
 // anchor: launcher.exe:0x442d00
 uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
     if (!messageRef) {
@@ -2649,7 +2704,8 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
         const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
         uint32_t handledCode2 = 0u;
         if (marginOwnerPath) {
-            handledCode2 = mediator->HandleMarginConsumedCode2AtConnectionSeamScaffold(
+            // anchor: launcher.exe:0x442d9e -> 0x4429b0
+            handledCode2 = HandleCode2ForBootstrap(
                 logicalPayloadBytes,
                 logicalPayloadByteCount,
                 /*transportEncrypted=*/false);
@@ -2686,7 +2742,8 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
         const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
         uint32_t handledCode4 = 0u;
         if (marginOwnerPath) {
-            handledCode4 = mediator->HandleMarginConsumedCode4AtConnectionSeamScaffold(
+            // anchor: launcher.exe:0x442d83 -> 0x441850
+            handledCode4 = HandleCode4ForBootstrap(
                 logicalPayloadBytes,
                 logicalPayloadByteCount,
                 /*transportEncrypted=*/false);

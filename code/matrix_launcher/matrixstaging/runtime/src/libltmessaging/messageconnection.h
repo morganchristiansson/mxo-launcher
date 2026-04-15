@@ -6,6 +6,8 @@
 #include <memory>
 #include <vector>
 
+// Forward declare CLTLoginMediator to avoid circular include
+namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
 #include "../libltcrypto/auth_internal.h"
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
@@ -837,6 +839,23 @@ public:
     // - then route decoded code `2/4/5` through the recovered direct helper families before the
     //   later connection/owner continuations
     virtual uint32_t DispatchMessage(void* messageRef);
+
+    // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse)
+    // Handle decoded code 2: stage packet bytes and continue margin bootstrap handshake.
+    // UNANCHORED: original direct call is from CBaseMarginConnection::DispatchMessage to
+    // CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse.
+    uint32_t HandleCode2ForBootstrap(
+        const uint8_t* packetBytes,
+        size_t packetSize,
+        bool transportEncrypted);
+
+    // anchor: launcher.exe:0x442d00 -> 0x442d83 -> 0x441850 (meth_0x441850 -> CBaseMarginConnection_HandleCode4CertChallengeAndSendResponse)
+    // Handle decoded code 4: set success flag, synthesize local completion work item, continue bootstrap.
+    // UNANCHORED: original direct call is from CBaseMarginConnection::DispatchMessage to meth_0x441850.
+    uint32_t HandleCode4ForBootstrap(
+        const uint8_t* packetBytes,
+        size_t packetSize,
+        bool transportEncrypted);
 
 protected:
     // anchor: launcher.exe:0x442d00 -> vtable `+0x2c`

@@ -3398,7 +3398,9 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
         static_cast<unsigned>(postAuthMarginLoadingState_.characterRouteIndexCc8));
 }
 
-// anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441a30 / 0x4429b0
+// UNANCHORED: higher-level wrapper over original call path 0x442d00 -> 0x442d9e -> 0x4429b0
+// The original dispatches directly to CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse.
+// This scaffold provides a mediator entry point for the same logical flow.
 uint32_t CLTLoginMediator::HandleMarginConsumedCode2AtConnectionSeamScaffold(
     const uint8_t* packetBytes,
     size_t packetSize,
@@ -3419,7 +3421,9 @@ uint32_t CLTLoginMediator::HandleMarginConsumedCode2AtConnectionSeamScaffold(
     return handled;
 }
 
-// anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441bc0 / 0x441850
+// UNANCHORED: higher-level wrapper over original call path 0x442d00 -> 0x442d83 -> 0x441850
+// The original dispatches directly to meth_0x441850 which synthesizes a local type-0x0b work item.
+// This scaffold provides a mediator entry point for the same logical flow.
 uint32_t CLTLoginMediator::HandleMarginConsumedCode4AtConnectionSeamScaffold(
     const uint8_t* packetBytes,
     size_t packetSize,

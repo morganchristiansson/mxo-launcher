@@ -125,6 +125,7 @@ class CLTLoginMediator : public ILTLoginMediator {
     friend class CLTLoginState_State10;
     friend class CLTLoginState_State11;
     friend class mxo::liblttcp::CAuthStartupConnection;
+    friend class mxo::liblttcp::CBaseMarginConnection;
     friend class mxo::liblttcp::CMarginConnection;
 
 public:
@@ -1183,14 +1184,14 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // - only other codes survive into owner `+0x184` / current helper slot 6
     // - practical consequence for that later path: the first real `MS_LoadCharacterReply` candidate must
     //   arrive as raw code `0x10` *after* that base-dispatch filter
-    // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441a30 / 0x4429b0
+    // UNANCHORED: source-owned higher-level wrapper, real call path is 0x442d00 -> 0x442d9e -> 0x4429b0
     // Narrow source-owned mirror of one consumed decoded-code-2 branch moved closer to the
     // connection/leaf dispatch seam.
     uint32_t HandleMarginConsumedCode2AtConnectionSeamScaffold(
         const uint8_t* packetBytes,
         size_t packetSize,
         bool transportEncrypted);
-    // anchor: launcher.exe:0x442d00 -> 0x41bc20 / 0x441bc0 / 0x441850
+    // UNANCHORED: source-owned higher-level wrapper, real call path is 0x442d00 -> 0x442d83 -> 0x441850
     // Narrow source-owned mirror of one consumed decoded-code-4 branch moved closer to the
     // connection/leaf dispatch seam.
     // Current bounded split:
