@@ -90,7 +90,7 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
         currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
         currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u);
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     mediator->PostEvent(0x07u);
 
     spdlog::info(

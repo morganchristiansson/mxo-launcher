@@ -130,7 +130,7 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg) {
         mediator->postAuthMarginLoadingState_.createCharacterData108.backgroundB0.data());
     packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     mediator->PostEvent(0x15u);
 
     spdlog::info(

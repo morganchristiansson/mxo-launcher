@@ -729,10 +729,6 @@ CMessageConnectionPacketNameFamily CMessageConnection::PacketNameFamily() const 
     return packetNameFamily_;
 }
 
-bool CMessageConnection::PacketizedMessagesEnabled() const {
-    return packetizedMessagesEnabled_;
-}
-
 // anchor: launcher.exe:0x448980
 void CMessageConnection::ConfigurePacketAgenda(
     CStreamPacketEncryptionModule* streamPacketEncryptionModule) {

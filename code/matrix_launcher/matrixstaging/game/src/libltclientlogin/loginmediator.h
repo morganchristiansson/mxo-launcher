@@ -1402,9 +1402,8 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //   shared_ptr-owned convenience shell
     // - helper-side packet-agenda replacement/discard and the larger builder-local metadata tails
     //   beyond that front matter still remain incomplete
-    uint32_t SendCurrentMarginPacketScaffold(
+    uint32_t SendCurrentMarginPacket(
         mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& envelope);
-    uint32_t SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount);
 
     // anchor: launcher.exe:0x41e500
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`

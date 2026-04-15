@@ -218,7 +218,7 @@ void CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
     packetBuilder.SetGobFileGuid(gobFileGuidWords);
     packetBuilder.SetCurrentHelperPhaseByte(currentHelperPhaseByte);
 
-    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
+    const uint32_t sendResult = g_CurrentLoginMediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     g_CurrentLoginMediator->PostEvent(0x11u);
     spdlog::info(
         "CLTLoginState_State6::Slot3_BeginOrContinue built fixed raw-0x06 margin packet fixedBytes=0x{:02x} launcherVersion=0x{:08x} clientVersion=0x{:08x} gobGuid=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] helperPhaseByte=0x{:02x} sendResult=0x{:08x} currentState={} then posts event=0x11",

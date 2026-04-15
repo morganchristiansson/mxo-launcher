@@ -269,7 +269,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
 
     packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     mediator->PostEvent(0x09u);
 
     spdlog::debug(

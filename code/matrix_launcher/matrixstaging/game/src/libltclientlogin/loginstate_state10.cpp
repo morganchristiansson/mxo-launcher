@@ -240,7 +240,7 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
     packetBuilder.SetCharacterName(
         mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacketScaffold(packetBuilder.Envelope());
+    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     mediator->PostEvent(0x13u);
 
     spdlog::info(

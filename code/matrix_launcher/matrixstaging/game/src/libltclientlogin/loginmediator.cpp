@@ -2508,100 +2508,19 @@ void CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold(
 }
 
 // anchor: launcher.exe:0x41af70
-uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(
+// Original is a thin thunk:
+//   - loads margin connection from this+0x1c
+//   - jumps to connection->vtable[+0x24] (CMessageConnection_SendPacket)
+// which then chains to vtable[+0x28] (ForwardEnvelopeToSendPacket -> SendPacketMessageRef)
+// Current source preserves envelope-based send bridge for packet-builder integration.
+uint32_t CLTLoginMediator::SendCurrentMarginPacket(
     mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& envelope) {
-    // anchor: launcher.exe:0x41af70
-    // Keep this narrow: `0x41af70` forwards the local packet-builder envelope through the current
-    // margin connection send bridge (`0x41cf30 -> 0x448cf0`) instead of flattening caller bytes
-    // directly.
-    mxo::liblttcp::CMessageConnection* connection = MarginConnection();
+    mxo::liblttcp::CMessageConnection* const connection = MarginConnection();
     if (!connection) {
-        connection = EnsureMarginConnectionObject();
-    }
-
-    mxo::liblttcp::CMessageConnectionMessageRef* const messageRef = envelope.messageRef08;
-    mxo::liblttcp::CMessageConnectionMessageStorage* const messageStorage =
-        messageRef ? messageRef->messageStorage0c : nullptr;
-    if (!connection || !messageRef || !messageStorage) {
         return 0u;
     }
 
-    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBase = messageStorage->PayloadBaseScaffold();
-    const mxo::liblttcp::CMessageConnectionPacketAgenda* const agenda = connection->PacketAgenda();
-    if (marginBootstrapState.phase == MarginBootstrapPhase::kReady) {
-        // Fidelity correction from live original-launcher WineDbg on the natural state8 send:
-        // - post-bootstrap state8 does not bypass the message-ref path with a raw encrypted-byte
-        //   send
-        // - the natural call chain is:
-        //   `0x43bf5f -> 0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x44d390 -> 0x448a00`
-        // - concrete observed transformed-storage facts at `0x448a00` on that send:
-        //   - output payload length bytes at inner `+0x0a/+0x0b` = `0x80/0xe0`
-        //   - transformed payload bytes = `0xe0`
-        //   - submitted framed bytes = `0xe2`
-        // Practical consequence:
-        // - keep ready-phase packets on the inherited connection send/agenda path so the installed
-        //   `CStreamPacketEncryptionModule` write helper owns the post-bootstrap transform.
-        spdlog::info(
-            "CLTLoginMediator::SendCurrentMarginPacketScaffold ready-phase envelope send rawOpcode=0x{:02x} payloadBytes={} sessionId=0x{:08x} packetizedEnabled={} agendaCreated={} agendaModuleCount={} agendaHasWriteHead={} host='{}' state={}",
-            payloadBase ? static_cast<unsigned>(payloadBase[0]) : 0u,
-            static_cast<unsigned>(payloadByteCount),
-            static_cast<unsigned>(marginBootstrapState.marginSessionId),
-            connection->PacketizedMessagesEnabled() ? 1u : 0u,
-            (agenda && agenda->created) ? 1u : 0u,
-            agenda ? static_cast<unsigned>(agenda->configuredModuleCount4c) : 0u,
-            (agenda && agenda->writeHelperChainHead44 != nullptr) ? 1u : 0u,
-            connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-            static_cast<unsigned>(connection->State()));
-        return connection->ForwardPacketBuilderEnvelopeToSendPacket(envelope);
-    }
-
-    const size_t submitOffset = ((messageStorage->payloadLengthHigh0a >> 7) == 0u) ? 1u : 0u;
-    const uint32_t submittedByteCount =
-        static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
-    const uint8_t* const submittedBytes =
-        (payloadBase && payloadByteCount != 0u) ? (payloadBase - 2u + submitOffset) : nullptr;
-    const std::string submittedPreview =
-        (submittedBytes && submittedByteCount != 0u)
-            ? BuildHexPreview(submittedBytes, submittedByteCount, 32u)
-            : std::string();
-    spdlog::info(
-        "CLTLoginMediator::SendCurrentMarginPacketScaffold ForwardPacketBuilderEnvelopeToSendPacket host='{}' state={} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} submitOffset={} preview={} agendaGap=packet-processing-metadata-still-missing",
-        connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
-        static_cast<unsigned>(connection->State()),
-        static_cast<unsigned>(messageStorage->reservedBytes08),
-        static_cast<unsigned>(payloadByteCount),
-        static_cast<unsigned>(submittedByteCount),
-        static_cast<unsigned>(submitOffset),
-        submittedPreview.empty() ? std::string("<empty>") : submittedPreview);
     return connection->ForwardPacketBuilderEnvelopeToSendPacket(envelope);
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::SendCurrentMarginPacketScaffold(const void* packetBytes, uint32_t packetByteCount) {
-    if (!packetBytes || packetByteCount == 0u ||
-        packetByteCount > mxo::liblttcp::CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
-        return 0u;
-    }
-
-    mxo::liblttcp::CMessageConnectionMessageRef messageRef = {};
-    messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
-    if (!messageRef.messageStorage0c) {
-        return 0u;
-    }
-
-    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(static_cast<uint16_t>(packetByteCount));
-    uint8_t* const payloadBytes = messageRef.messageStorage0c->PayloadBaseScaffold();
-    if (!payloadBytes) {
-        return 0u;
-    }
-    std::copy_n(static_cast<const uint8_t*>(packetBytes), packetByteCount, payloadBytes);
-
-    mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope = {};
-    envelope.payloadBase04 = payloadBytes;
-    envelope.messageRef08 = &messageRef;
-    return SendCurrentMarginPacketScaffold(envelope);
 }
 
 // anchor: launcher.exe:0x41f270

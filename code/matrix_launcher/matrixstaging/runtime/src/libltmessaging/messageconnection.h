@@ -643,8 +643,6 @@ public:
 
     // Source-owned enum view over the packet-name family field.
     CMessageConnectionPacketNameFamily PacketNameFamily() const;
-    // Source-owned bool view over the packetized-messages enable field.
-    bool PacketizedMessagesEnabled() const;
 
     // anchor: launcher.exe:0x448980
     // Narrow source-owned mirror of the lazy packet-agenda install/configure helper at
@@ -773,6 +771,7 @@ private:
     // from raw inner `+0x0a/+0x0b/+0x0c..` storage.
     uint32_t SubmitMessageRefBytes(const CMessageConnectionMessageRef& messageRef);
 
+public:
     CMessageConnectionPacketNameFamily packetNameFamily_ = CMessageConnectionPacketNameFamily::kUnknown;
     uintptr_t packetNameCallback_ = 0;
     bool packetizedMessagesEnabled_ = false;
