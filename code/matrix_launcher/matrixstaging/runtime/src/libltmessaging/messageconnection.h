@@ -637,17 +637,13 @@ public:
     // Narrow source-owned wrapper over the per-connection packet-name callback configuration:
     // - original writes connection `+0x78 = enabled`
     // - when enabled, original writes connection `+0x70 = callback`
-    // Current source API still accepts a family enum, but immediately maps that family to the
-    // currently known callback bodies (`0x41ce00` auth, `0x41ce40` margin).
     void ConfigurePacketNameFamily(
         CMessageConnectionPacketNameFamily family,
         bool packetizedMessagesEnabled);
 
-    // anchor family: launcher.exe:0x448960 -> connection `+0x70`
-    // Source-owned enum view over the recovered packet-name callback pointer field.
+    // Source-owned enum view over the packet-name family field.
     CMessageConnectionPacketNameFamily PacketNameFamily() const;
-    // anchor family: launcher.exe:0x448960 -> connection `+0x78`
-    // Source-owned bool view over the recovered packetized-messages enable byte.
+    // Source-owned bool view over the packetized-messages enable field.
     bool PacketizedMessagesEnabled() const;
 
     // anchor: launcher.exe:0x448980
@@ -777,6 +773,7 @@ private:
     // from raw inner `+0x0a/+0x0b/+0x0c..` storage.
     uint32_t SubmitMessageRefBytes(const CMessageConnectionMessageRef& messageRef);
 
+    CMessageConnectionPacketNameFamily packetNameFamily_ = CMessageConnectionPacketNameFamily::kUnknown;
     uintptr_t packetNameCallback_ = 0;
     bool packetizedMessagesEnabled_ = false;
     std::unique_ptr<CMessageConnectionCompletionHelperScaffold> connectCompletionHelper7c_;

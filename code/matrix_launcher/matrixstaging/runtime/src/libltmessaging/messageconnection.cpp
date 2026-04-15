@@ -718,37 +718,17 @@ const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacke
     }
 }
 
-// anchor: launcher.exe:0x448960
 void CMessageConnection::ConfigurePacketNameFamily(
     CMessageConnectionPacketNameFamily family,
     bool packetizedMessagesEnabled) {
-    switch (family) {
-        case CMessageConnectionPacketNameFamily::kAuth:
-            packetNameCallback_ = 0x0041ce00u;
-            break;
-        case CMessageConnectionPacketNameFamily::kMargin:
-            packetNameCallback_ = 0x0041ce40u;
-            break;
-        default:
-            packetNameCallback_ = 0u;
-            break;
-    }
+    packetNameFamily_ = family;
     packetizedMessagesEnabled_ = packetizedMessagesEnabled;
 }
 
-// anchor family: launcher.exe:0x448960 -> connection `+0x70`
 CMessageConnectionPacketNameFamily CMessageConnection::PacketNameFamily() const {
-    switch (packetNameCallback_) {
-        case 0x0041ce00u:
-            return CMessageConnectionPacketNameFamily::kAuth;
-        case 0x0041ce40u:
-            return CMessageConnectionPacketNameFamily::kMargin;
-        default:
-            return CMessageConnectionPacketNameFamily::kUnknown;
-    }
+    return packetNameFamily_;
 }
 
-// anchor family: launcher.exe:0x448960 -> connection `+0x78`
 bool CMessageConnection::PacketizedMessagesEnabled() const {
     return packetizedMessagesEnabled_;
 }
