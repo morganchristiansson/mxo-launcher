@@ -257,7 +257,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     lastAuthReply_ = mxo::auth::AuthReply();
     postAuthMarginAutoBeginAttemptedScaffold_ = false;
     ResetMarginBootstrapState();
-    EnsureAuthBootstrapChild680Scaffold();
+    *authBootstrapChild680_;
     expectedAuthRequestName_ = nullptr;
     expectedMarginRequestName_ = nullptr;
     BuildAuthEndpoint();
