@@ -718,40 +718,22 @@ const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacke
     }
 }
 
-// anchor family: launcher.exe:0x448960 -> connection `+0x70`
-uintptr_t CMessageConnection::PacketNameCallbackAddressScaffold(
-    CMessageConnectionPacketNameFamily family) {
-    switch (family) {
-        case CMessageConnectionPacketNameFamily::kAuth:
-            return 0x0041ce00u;
-        case CMessageConnectionPacketNameFamily::kMargin:
-            return 0x0041ce40u;
-        default:
-            return 0u;
-    }
-}
-
 // anchor: launcher.exe:0x448960
 void CMessageConnection::ConfigurePacketNameFamily(
     CMessageConnectionPacketNameFamily family,
     bool packetizedMessagesEnabled) {
-    packetNameCallback_ = PacketNameCallbackAddressScaffold(family);
-    packetizedMessagesEnabled_ = packetizedMessagesEnabled;
-}
-
-// anchor: launcher.exe:0x448960
-void CMessageConnection::ConfigurePacketNameCallback(
-    bool packetizedMessagesEnabled,
-    void* packetNameCallback) {
-    // Direct implementation matching static RE at 0x448960:
-    // this->packetizedMessagesEnabled = packetizedMessagesEnabled;
-    // if (packetizedMessagesEnabled != '\0') {
-    //     this->packetNameCallback = packetNameCallback;
-    // }
-    packetizedMessagesEnabled_ = packetizedMessagesEnabled;
-    if (packetizedMessagesEnabled) {
-        packetNameCallback_ = reinterpret_cast<uintptr_t>(packetNameCallback);
+    switch (family) {
+        case CMessageConnectionPacketNameFamily::kAuth:
+            packetNameCallback_ = 0x0041ce00u;
+            break;
+        case CMessageConnectionPacketNameFamily::kMargin:
+            packetNameCallback_ = 0x0041ce40u;
+            break;
+        default:
+            packetNameCallback_ = 0u;
+            break;
     }
+    packetizedMessagesEnabled_ = packetizedMessagesEnabled;
 }
 
 // anchor family: launcher.exe:0x448960 -> connection `+0x70`

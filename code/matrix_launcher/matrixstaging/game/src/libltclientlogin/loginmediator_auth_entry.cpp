@@ -251,7 +251,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d1c0 / CLTLoginMediator_Helper1_StartAuthConnection
     // anchor: launcher.exe:0x41d1d1 / vftptr = 0x4afef0
     // anchor: launcher.exe:0x41d1d7 / owner = this at offset 0xa4
-    // anchor: launcher.exe:0x41d1dd / ConfigurePacketNameCallback(1, 0x41ce00)
+    // anchor: launcher.exe:0x41d1dd / ConfigurePacketNameFamily in original
     // Free existing connection first (like static RE - fresh allocation every time)
     if (authConnectionOwnedByMediator_ && authConnection_ != nullptr) {
         delete authConnection_;
@@ -262,10 +262,12 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     }
     authConnectionOwnedByMediator_ = true;
     authConnection_->SetOwnerContext(this);
-    // High-fidelity: use ConfigurePacketNameCallback with specific callback pointer
-    // anchor: launcher.exe:0x41d1cd / PUSH 0x1 (packetizedMessagesEnabled = true)
-    // anchor: launcher.exe:0x41d1c8 / PUSH 0x41ce00 (packetNameCallback for auth)
-    authConnection_->ConfigurePacketNameCallback(true, reinterpret_cast<void*>(0x41ce00));
+    // Configure packet naming using high-level API (ConfigurePacketNameFamily handles
+    // the callback pointer internally - original used ConfigurePacketNameCallback with
+    // a binary-specific callback at launcher.exe:0x41ce00)
+    authConnection_->ConfigurePacketNameFamily(
+        mxo::liblttcp::CMessageConnectionPacketNameFamily::kAuth,
+        true);
 
     auto* connection = authConnection_;
     if (!connection) {

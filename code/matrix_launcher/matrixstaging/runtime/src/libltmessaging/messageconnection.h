@@ -643,13 +643,6 @@ public:
         CMessageConnectionPacketNameFamily family,
         bool packetizedMessagesEnabled);
 
-    // anchor: launcher.exe:0x448960
-    // Direct callback pointer configuration from static RE at 0x448960
-    // Matches CMessageConnection_ConfigurePacketNameCallback(connection, 1, 0x41ce00)
-    void ConfigurePacketNameCallback(
-        bool packetizedMessagesEnabled,
-        void* packetNameCallback);
-
     // anchor family: launcher.exe:0x448960 -> connection `+0x70`
     // Source-owned enum view over the recovered packet-name callback pointer field.
     CMessageConnectionPacketNameFamily PacketNameFamily() const;
@@ -767,11 +760,6 @@ protected:
 private:
     // UNANCHORED: source-owned diagnostic stringifier for the recovered packet-name family enum.
     static const char* PacketNameFamilyToString(CMessageConnectionPacketNameFamily family);
-    // anchor family: launcher.exe:0x448960 -> connection `+0x70`
-    // Source-owned helper mapping the recovered family enum onto the known callback bodies:
-    // - `0x41ce00` auth
-    // - `0x41ce40` margin
-    static uintptr_t PacketNameCallbackAddressScaffold(CMessageConnectionPacketNameFamily family);
     // anchor: launcher.exe:0x469950
     // Source-owned send-side packet-agenda handoff helper.
     // Current bounded model preserves the nearer
