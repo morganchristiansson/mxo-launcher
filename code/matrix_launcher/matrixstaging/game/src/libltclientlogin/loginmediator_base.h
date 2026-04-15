@@ -171,15 +171,25 @@ struct LateEntryList1470VectorLikeSketch {
     LateEntryList1470EntrySketch* capacity = nullptr;
 };
 
-struct SessionCallbackHelper65cSketch {
-    // Current best source-owned mirror of the lazy helper at owner `+0x65c`.
-    // Concrete chain now in scope:
-    // - owner vtable `+0x130` / `0x41f310` returns this helper
-    // - owner vtable `+0x134` / `0x420d00` lazy-allocates it through `0x420ca0`
-    // - owner vtable `+0x13c` / `0x4202c0` pumps helper vtable `+0x04` when present
-    // - helper `+0x18` is a small-string object
-    // - `0x421a50` refreshes that helper string from owner `+0x94 + 0x60`
-    // - `0x420e70` then copies helper `+0x18` into owner `+0x664`
+// Session callback helper object at owner +0x65c.
+// Concrete chain:
+// - owner vtable `+0x130` / `0x41f310` returns this helper
+// - owner vtable `+0x134` / `0x420d00` lazy-allocates it through `0x420ca0`
+// - owner vtable `+0x13c` / `0x4202c0` pumps helper vtable `+0x04` when present
+// - helper `+0x18` is a small-string object
+// - `0x421a50` refreshes that helper string from owner `+0x94 + 0x60`
+// - `0x420e70` then copies helper `+0x18` into owner `+0x664`
+//
+// Note: original initialization sets vtable to 0x4b0e48 (shared with LaunchPadClient).
+// slot +0x04 -> CheckObjectTimeout (0x4203d0).
+class SessionCallbackHelper65cSketch {
+public:
+    // Virtual method for vtable slot +0x04 call fidelity
+    // anchor: launcher.exe:0x4203d0 / vtable[+0x04] = CheckObjectTimeout
+    virtual void InvokeVtableSlot4() {
+        // Original checks/handles timeouts on helper state
+    }
+
     void* owner10 = nullptr;            // helper `+0x10`
     std::string string18;               // helper `+0x18`
     uint32_t field24 = 0;               // helper `+0x24`

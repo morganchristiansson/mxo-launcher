@@ -1820,8 +1820,9 @@ void CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4() {
             "CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4(+0x13c) skipped (no helper)");
         return;
     }
-
-    (void)InvokeSessionCallbackHelper65cVtable4IfPresent();
+    // Fidelity: original loads helper from this+0x65c, tests null, calls through helper vtable[+0x04]
+    // Our virtual method provides the same dispatch
+    sessionCallbackHelper65c_->InvokeVtableSlot4();
 }
 
 // anchor: launcher.exe:0x41f320 +0x148
@@ -2585,14 +2586,6 @@ void CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     if (state2 != nullptr) {
         state2->Slot1_HandlePrimaryGate(reinterpret_cast<void*>(2));
     }
-}
-
-// Source-added helper function used by HelperSlot13c_InvokeSessionHelperVtable4
-// UNANCHORED: no original launcher.exe anchor - this is source-added scaffolding
-uint32_t CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent() {
-    // Delegated to the static-RE faithful implementation above
-    CommitSessionCallbackHelperGameSessionId664();
-    return 1u;  // Original function returns void, but this path returns uint for compatibility
 }
 
 // source-owned shared helper for `CLTLoginState_State18` slot 3 / `0x421a50`
