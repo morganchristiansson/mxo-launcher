@@ -128,11 +128,6 @@ uint32_t CLTLoginMediator::AuthConnectCandidateCountScaffold() const {
     return static_cast<uint32_t>(authAddressList4c_.Count());
 }
 
-// UNANCHORED: source-owned predicate matching the `0x4390b0` owner `+0x28` vs `(+0x50 - +0x4c) >> 2` retry gate.
-bool CLTLoginMediator::HasAuthConnectRetryCandidateRemainingScaffold() const {
-    return authConnectAttemptCount28_ < AuthConnectCandidateCountScaffold();
-}
-
 // UNANCHORED: source-owned host-resolution mirror for the auth-side dword IPv4 list rooted at owner `+0x4c`.
 void CLTLoginMediator::RefreshAuthAddressListForCurrentHostScaffold() {
     const bool hostChanged = (authAddressListResolvedHostName4c_ != authServerDnsName_);

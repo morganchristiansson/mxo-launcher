@@ -1175,9 +1175,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     void RefreshAuthAddressListForCurrentHostScaffold();
     uint32_t AuthConnectAttemptCountScaffold() const;
     uint32_t AuthConnectCandidateCountScaffold() const;
-    bool HasAuthConnectRetryCandidateRemainingScaffold() const;
-
-
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch

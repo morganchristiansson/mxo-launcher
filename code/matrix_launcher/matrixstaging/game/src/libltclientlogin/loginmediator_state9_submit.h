@@ -188,17 +188,6 @@ struct Object88SubmitPlan {
     uint32_t forwardedArg90 = 0u;
 };
 
-inline const char* Object88SubmitRouteName(Object88SubmitRoute route) {
-    switch (route) {
-        case Object88SubmitRoute::kDirectSlot28:
-            return "direct:+0x28";
-        case Object88SubmitRoute::kManagedSlots18_1c_24:
-            return "managed:+0x1c/+0x18/+0x24";
-        default:
-            return "unavailable";
-    }
-}
-
 inline Object88SubmitPlan BuildObject88SubmitPlan(
     void* object88,
     bool callbackPairReady,
