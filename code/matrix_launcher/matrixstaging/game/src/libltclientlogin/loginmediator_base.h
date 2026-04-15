@@ -532,9 +532,9 @@ public:
     // +0x12c
     void UnknownSlot75();
     // +0x130
-    virtual LaunchPadClient_0x4b0e48* GetSessionCallbackHelper65c() const = 0;
+    virtual LaunchPadClient_0x4b0e48* GetLaunchPadClient65c() const = 0;
     // +0x134
-    virtual LaunchPadClient_0x4b0e48* EnsureSessionCallbackHelper65c() = 0;
+    virtual LaunchPadClient_0x4b0e48* EnsureLaunchPadClient65c() = 0;
     // +0x138
     void UnknownSlot78();
     // +0x13c

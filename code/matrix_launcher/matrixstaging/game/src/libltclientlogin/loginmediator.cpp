@@ -228,7 +228,7 @@ CLTLoginMediator::CLTLoginMediator()
       marginRouteState_{},
       marginAddressList3c_{},
       authBootstrapChild680_(nullptr),
-      sessionCallbackHelper65c_(nullptr),
+      launchPadClient65c_(nullptr),
       selectionRouteState684_{},
       selectionContext0ecCopy_{},
       selectionContext0ecCopyValid_(false),
@@ -382,7 +382,7 @@ void CLTLoginMediator::ClearEngine() {
     selectionRouteState684_.ResetSelectionRouteState();
     FreeLateEntryList1470StorageScaffold();
     ResetLauncherConnectionsScaffold();
-    sessionCallbackHelper65c_ = nullptr;
+    launchPadClient65c_ = nullptr;
     authBootstrapChild680_.reset();
     spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold");
 }
@@ -497,7 +497,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(stateCode),
         0u,
-        sessionCallbackHelper65c_ ? 1u : 0u);
+        launchPadClient65c_ ? 1u : 0u);
 
     CLTLoginState* const upstreamState = currentState_;
     if (stateCode == 0u) {
@@ -506,7 +506,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
             upstreamState ? upstreamState->DebugName() : "<null>",
             string60Empty ? 1u : 0u,
             0u,
-            sessionCallbackHelper65c_ ? 1u : 0u);
+            launchPadClient65c_ ? 1u : 0u);
     }
     if (true) {
         // Static + runtime now line up on the default happy path at `0x41ecd0`:
@@ -553,7 +553,7 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     // That alternate family is separate from the active state2 -> owner+0x680 bootstrap-child
     // handoff.
     if (!string60Empty) {
-        if (sessionCallbackHelper65c_ == nullptr) {
+        if (launchPadClient65c_ == nullptr) {
             spdlog::info(
                 "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state16 (string60 non-empty, helper65c absent) upstreamState={}",
                 upstreamState ? upstreamState->DebugName() : "<null>");
@@ -580,21 +580,21 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
         return 0u;
     }
 
-    if (sessionCallbackHelper65c_ != nullptr) {
-        const char* helperString = sessionCallbackHelper65c_->authConnection18.c_str();
+    if (launchPadClient65c_ != nullptr) {
+        const char* helperString = launchPadClient65c_->authConnection18.c_str();
         // Fidelity: refresh session token in owner+0x94 block
         ownerAuthBootstrapSource94_.sessionToken60.begin = helperString;
-        ownerAuthBootstrapSource94_.sessionToken60.current = helperString + sessionCallbackHelper65c_->authConnection18.size();
+        ownerAuthBootstrapSource94_.sessionToken60.current = helperString + launchPadClient65c_->authConnection18.size();
         ownerAuthBootstrapSource94_.sessionToken60.capacity = ownerAuthBootstrapSource94_.sessionToken60.current;
         spdlog::info(
             "CLTLoginMediator::ProcessLoginRequest alternate g_LaunchPadGateState16State18!=0 branch refreshed owner+0xf4 from helper65c string18='{}'",
-            sessionCallbackHelper65c_->authConnection18.empty() ? "<empty>" : sessionCallbackHelper65c_->authConnection18.c_str());
+            launchPadClient65c_->authConnection18.empty() ? "<empty>" : launchPadClient65c_->authConnection18.c_str());
     }
 
     spdlog::info(
         "ROUTE CHECKPOINT: early-auth nonhappy ProcessLoginRequest g_LaunchPadGateState16State18 branch -> state16 (string60 empty) upstreamState={} helper65cPresent={}",
         upstreamState ? upstreamState->DebugName() : "<null>",
-        sessionCallbackHelper65c_ ? 1u : 0u);
+        launchPadClient65c_ ? 1u : 0u);
     if (LoginHelperStateByIdScaffold(16u) != nullptr) {
         (void)SetCurrentState(16u);
     } else {
@@ -1799,33 +1799,33 @@ void CLTLoginMediator::ProvideStartupTriple(void* netShell, void* netMgr, void* 
 }
 
 // anchor: launcher.exe:0x41f310 slot +0x130
-[[maybe_unused]] LaunchPadClient_0x4b0e48* CLTLoginMediator::GetSessionCallbackHelper65c() const {
+[[maybe_unused]] LaunchPadClient_0x4b0e48* CLTLoginMediator::GetLaunchPadClient65c() const {
     // Tiny owner-vtable getter used by the later session-callback helper family.
-    return sessionCallbackHelper65c_;
+    return launchPadClient65c_;
 }
 
 // anchor: launcher.exe:0x420d00 +0x134
 // Lazy allocator for mediator owner +0x65c session callback helper.
 // Allocates and initializes a LaunchPadClient_0x4b0e48 when null.
-LaunchPadClient_0x4b0e48* CLTLoginMediator::EnsureSessionCallbackHelper65c() {
-    if (sessionCallbackHelper65c_ == nullptr) {
+LaunchPadClient_0x4b0e48* CLTLoginMediator::EnsureLaunchPadClient65c() {
+    if (launchPadClient65c_ == nullptr) {
         // Fidelity: original allocates 0x30 bytes with malloc
-        sessionCallbackHelper65c_ = new LaunchPadClient_0x4b0e48();
-        sessionCallbackHelper65c_->currentState10 = this;
+        launchPadClient65c_ = new LaunchPadClient_0x4b0e48();
+        launchPadClient65c_->currentState10 = this;
     }
-    return sessionCallbackHelper65c_;
+    return launchPadClient65c_;
 }
 
 // anchor: launcher.exe:0x4202c0 +0x13c
 void CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4() {
-    if (sessionCallbackHelper65c_ == nullptr) {
+    if (launchPadClient65c_ == nullptr) {
         spdlog::debug(
             "CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4(+0x13c) skipped (no helper)");
         return;
     }
     // Fidelity: original loads helper from this+0x65c, tests null, calls through helper vtable[+0x04]
     // Our virtual method provides the same dispatch
-    sessionCallbackHelper65c_->InvokeVtableSlot4();
+    launchPadClient65c_->InvokeVtableSlot4();
 }
 
 // anchor: launcher.exe:0x41f320 +0x148
