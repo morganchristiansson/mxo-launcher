@@ -48,11 +48,11 @@ const char* CLTLoginState_State7::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043ba20 (vtable 0x004b50b4 slot 3)
-uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     // Fresh `0x43ba20` decompile/disassembly tightening:
@@ -70,14 +70,14 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
-        return fallbackResult;
+        return;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0u) {
         const uint32_t fallbackResult = mediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
-        return fallbackResult;
+        return;
     }
 
     const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
@@ -102,7 +102,7 @@ uint32_t CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
         currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u,
         currentSlotRecord && currentSlotRecord->heapString14 ? currentSlotRecord->heapString14 : "<empty>",
         sendResult);
-    return sendResult;
+    return;
 }
 
 // anchor: launcher.exe:0x0043bae0 (vtable 0x004b50b4 slot 6)

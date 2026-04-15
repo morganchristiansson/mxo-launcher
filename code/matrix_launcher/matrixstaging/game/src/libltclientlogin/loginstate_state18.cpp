@@ -9,7 +9,7 @@ const char* CLTLoginState_State18::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
-uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Stronger current read from disassembly review:
     // - this is the later state18 session-helper path in the alternate
@@ -21,7 +21,8 @@ uint32_t CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
     // - it then reaches `0x420e70`, which copies helper `+0x18` into owner `+0x664`
     //   (`GameSessionID`) when helper flag `+0x2d` is clear
     (void)upstreamOrArg;
-    return mediator ? mediator->RefreshSessionHelperGameSessionId664FromSourceBlock94() : 0u;
+    (void)(mediator ? mediator->RefreshSessionHelperGameSessionId664FromSourceBlock94() : 0u);
+    return;
 }
 
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)

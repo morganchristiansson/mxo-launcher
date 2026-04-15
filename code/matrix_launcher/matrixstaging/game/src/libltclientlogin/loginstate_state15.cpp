@@ -9,9 +9,10 @@ const char* CLTLoginState_State15::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00420680 (vtable 0x004b0b88 slot 3)
-uint32_t CLTLoginState_State15::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State15::Slot3_BeginOrContinue(void* upstreamOrArg) {
     (void)upstreamOrArg;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x00420680");
+    (void)PlaceholderStateAction(DebugName(), "launcher.exe:0x00420680");
+    return;
 }
 
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0b88 slot 6)

@@ -60,7 +60,7 @@ public:
     // Valid as a reused stub address, but not the canonical meaning of slot 3 across the family:
     // most live states override slot 3 with their real begin/continue body.
     // Uses g_CurrentLoginMediator (faithful to static-RE).
-    virtual uint32_t Slot3_BeginOrContinue(void* upstreamOrArg);
+    virtual void Slot3_BeginOrContinue(void* upstreamOrArg);
 
     // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by many slot-4 rows)
     virtual uint32_t Slot4_NoOp();
@@ -162,7 +162,7 @@ public:
     uint32_t Slot1_HandlePrimaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -195,7 +195,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439210 (vtable 0x004b5014 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043f300 (vtable 0x004b5014 slot 5)
     uint32_t AuthMessageDispatch(void* workItem) override;
@@ -252,7 +252,7 @@ public:
     uint32_t Slot2_HandleSecondaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b503c slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -280,7 +280,7 @@ public:
     uint32_t Slot2_HandleSecondaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -307,7 +307,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -328,7 +328,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043ba20 (vtable 0x004b50b4 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043bae0 (vtable 0x004b50b4 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -359,7 +359,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -401,7 +401,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -428,7 +428,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -457,7 +457,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043c020 (vtable 0x004b5154 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -500,7 +500,7 @@ public:
     uint32_t Slot2_HandleSecondaryGate(void* workItem) override;
 
     // anchor: launcher.exe:0x0043bb90 (vtable 0x004b50dc slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043bc60 (vtable 0x004b50dc slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -525,7 +525,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x0043d4d0 (vtable 0x004b4fec slot 5)
     uint32_t AuthMessageDispatch(void* workItem) override;
@@ -545,7 +545,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00420680 (vtable 0x004b0b88 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0b88 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -568,7 +568,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00420720 (vtable 0x004b0bb0 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bb0 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -591,7 +591,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00420890 (vtable 0x004b0bd8 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0bd8 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -611,7 +611,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
@@ -634,7 +634,7 @@ public:
     const char* DebugName() const override;
 
     // anchor: launcher.exe:0x004209e0 (vtable 0x004b0c28 slot 3)
-    uint32_t Slot3_BeginOrContinue(void* upstreamOrArg) override;
+    void Slot3_BeginOrContinue(void* upstreamOrArg) override;
 
     // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c28 slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;

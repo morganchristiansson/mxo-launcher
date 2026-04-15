@@ -79,14 +79,13 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     // Original: if attempt count < candidate count, call slot3 with this+4 (retry)
     // NOTE: no increment of attemptCount in original - directly calls slot3
     if (attemptCount < candidateCount) {
-        const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
+        Slot3_BeginOrContinue(cachedUpstreamOrArg_);
         spdlog::info(
-            "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount28={} candidateCount={} -> retry state1 slot3 result=0x{:08x}",
+            "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount28={} candidateCount={} -> retry state1 slot3",
             static_cast<unsigned>(workResultCode),
             fmt::ptr(cachedUpstreamOrArg_),
             static_cast<unsigned>(attemptCount),
-            static_cast<unsigned>(candidateCount),
-            static_cast<unsigned>(retryResult));
+            static_cast<unsigned>(candidateCount));
         return 1u;
     }
 
@@ -109,11 +108,11 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
-uint32_t CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     cachedUpstreamOrArg_ = upstreamOrArg;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     const uint32_t connectResult = mediator->BeginAuthConnection();
@@ -123,7 +122,7 @@ uint32_t CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg) {
         static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_)),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(connectResult));
-    return connectResult;
+    return;
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)

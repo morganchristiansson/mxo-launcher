@@ -29,10 +29,10 @@ const char* CLTLoginState_AuthenticatePending::DebugName() const {
 //   call 0x448050
 //
 // Source mirrors the exact call shape via PrepareAndDispatch on owner+0x680 child.
-uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     const uint32_t incomingUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
@@ -58,7 +58,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
             static_cast<unsigned>(cachedUpstreamPhaseCode),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
             static_cast<unsigned>(connectResult));
-        return connectResult;
+        return;
     }
 
     // Ready-side handoff: extract exact call shape from owner+0x94 to match assembly
@@ -88,7 +88,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
         mediator->HasReadyAuthConnectionState2() ? 1u : 0u,
         static_cast<unsigned>(sendResult));
     // Ghidra shows original returns void - return value is effectively ignored by callers
-    return sendResult;
+    return;
 }
 
 // anchor: launcher.exe:0x0043f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())

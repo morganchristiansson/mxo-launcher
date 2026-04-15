@@ -164,7 +164,7 @@ const char* CLTLoginState_State6::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
-uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Static recheck in Ghidra/disassembly for `0x43b8f0` now backs the cache rule directly:
     // - `0x43b8fc` tests state6 `this+4`
@@ -181,7 +181,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
         }
     }
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     if (!mediator->State10HasReadyConnectionState2()) {
@@ -190,7 +190,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on owner+0x1c state!=2 -> helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-        return fallbackResult;
+        return;
     }
 
     auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(mediator->MarginConnection());
@@ -202,7 +202,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
             "CLTLoginState_State6::Slot3_BeginOrContinue blocked on margin connection +0x84==0 -> helper5 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-        return fallbackResult;
+        return;
     }
 
     // anchor: launcher.exe:0x43b8f0 / local packet-builder family `0x004b5364`
@@ -243,7 +243,7 @@ uint32_t CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
         static_cast<unsigned>(currentHelperPhaseByte),
         static_cast<unsigned>(sendResult),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-    return sendResult;
+    return;
 }
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)

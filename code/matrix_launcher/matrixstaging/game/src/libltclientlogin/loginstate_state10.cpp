@@ -201,11 +201,11 @@ const char* CLTLoginState_State10::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043bf90 (vtable 0x004b512c slot 3)
-uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
     (void)upstreamOrArg;
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     // Fresh `0x43bf90` read from decompilation + disassembly:
@@ -225,14 +225,14 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
-        return fallbackResult;
+        return;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = mediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
             static_cast<unsigned>(fallbackResult));
-        return fallbackResult;
+        return;
     }
 
     State10Packet0x0aBuilder packetBuilder;
@@ -249,7 +249,7 @@ uint32_t CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
         packetBuilder.PayloadByteCount(),
         std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data()),
         sendResult);
-    return sendResult;
+    return;
 }
 
 // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)

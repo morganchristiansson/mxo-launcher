@@ -15,9 +15,10 @@ uint32_t CLTLoginState_State13::Slot2_HandleSecondaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x0043bb90 (vtable 0x004b50dc slot 3)
-uint32_t CLTLoginState_State13::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State13::Slot3_BeginOrContinue(void* upstreamOrArg) {
     (void)upstreamOrArg;
-    return PlaceholderStateAction(DebugName(), "launcher.exe:0x0043bb90");
+    (void)PlaceholderStateAction(DebugName(), "launcher.exe:0x0043bb90");
+    return;
 }
 
 // anchor: launcher.exe:0x0043bc60 (vtable 0x004b50dc slot 6)

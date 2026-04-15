@@ -10,11 +10,11 @@ const char* CLTLoginState_WorldListPending::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
-uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     // Current evidence-backed narrow scaffold for helper/state 14:
@@ -28,7 +28,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
         spdlog::info(
             "CLTLoginState_WorldListPending::Slot3_BeginOrContinue blocked on owner+0x2c==0 currentState={}",
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-        return 0u;
+        return;
     }
 
     mxo::liblttcp::CMessageConnection* connection = mediator->AuthConnection();
@@ -36,7 +36,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
         spdlog::info(
             "CLTLoginState_WorldListPending::Slot3_BeginOrContinue missing auth connection object currentState={}",
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-        return 0u;
+        return;
     }
 
     const uint8_t payload[] = {CLTLoginMediator::kAuthRawCodeGetWorldListRequest};
@@ -47,7 +47,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
             mxo::auth::kFrameModeAuto,
             &packet)) {
         spdlog::info("DIAGNOSTIC: CLTLoginState_WorldListPending::Slot3_BeginOrContinue failed to build AS_GetWorldListRequest");
-        return 0u;
+        return;
     }
 
     const uint32_t sendResult = connection->SendPacket(
@@ -63,7 +63,7 @@ uint32_t CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrA
         packet.bytes.size(),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(sendResult));
-    return sendResult;
+    return;
 }
 
 // anchor: launcher.exe:0x0043d4d0 (string/file anchors: loginstate.cpp, CLTLoginState_WorldListPending::AuthMessageDispatch())

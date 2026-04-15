@@ -116,11 +116,11 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by selected slot-3 rows)
-uint32_t CLTLoginState::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState::Slot3_BeginOrContinue(void* upstreamOrArg) {
     (void)upstreamOrArg;
     // The original body is a prototype-agnostic bare `ret`. Source keeps a truthy no-op return
     // here only as a C++ placeholder for states that still inherit that stub.
-    return 1u;
+    return;
 }
 
 // anchor: launcher.exe:0x00441790 (shared raw `ret` stub reused by many slot-4 rows)

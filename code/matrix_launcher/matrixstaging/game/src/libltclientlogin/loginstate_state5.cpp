@@ -68,7 +68,7 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
-uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (upstreamOrArg != nullptr) {
         // Ghidra/disassembly recheck for `0x43952a..0x439549`:
@@ -81,7 +81,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
         }
     }
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     const auto* authReplyCopyShadowF4 =
@@ -97,7 +97,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
             fmt::ptr(authReplyCopyShadowF4),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
             static_cast<unsigned>(switchDispatchResult));
-        return switchDispatchResult;
+        return;
     }
 
     const uint32_t sendResult = mediator->PrepareState5MarginConnectionCopySendScaffold();
@@ -109,7 +109,7 @@ uint32_t CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
         fmt::ptr(authReplyCopyShadowF4),
         static_cast<unsigned>(sendResult),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
-    return sendResult;
+    return;
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b5064 slot 6)

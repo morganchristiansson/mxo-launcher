@@ -289,14 +289,13 @@ uint32_t CLTLoginMediator::SetCurrentState(uint32_t helperStateId) {
     // Original: this->currentState10 = newState
     currentState_ = newState;
     // Original: new helper vtable+0x08(oldState) slot3
-    const uint32_t slot3Result = newState->Slot3_BeginOrContinue(oldState);
+    newState->Slot3_BeginOrContinue(oldState);
     spdlog::info(
-        "CLTLoginMediator::SwitchHelperState helperState=0x{:02x} oldState={} newState={} dispatchTableBase=&g_LoginHelperDispatchTableScaffold.helper7868 -> slot3Result=0x{:08x}",
+        "CLTLoginMediator::SwitchHelperState helperState=0x{:02x} oldState={} newState={} dispatchTableBase=&g_LoginHelperDispatchTableScaffold.helper7868 -> slot3Result=0x00000000 (void)",
         static_cast<unsigned>(helperStateId),
         oldState ? oldState->DebugName() : "<null>",
-        newState->DebugName(),
-        static_cast<unsigned>(slot3Result));
-    return slot3Result;
+        newState->DebugName());
+    return 0u;
 }
 
 void CLTLoginMediator::PostEvent(uint32_t eventId) {

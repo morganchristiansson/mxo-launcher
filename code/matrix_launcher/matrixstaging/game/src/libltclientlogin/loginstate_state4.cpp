@@ -60,14 +60,13 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
     if (status != 0u) {
         mediator->marginConnectionFlag2d_ = 1;
         if (mediator->marginBeginCount24_ < static_cast<uint32_t>(mediator->marginAddressList3c_.Count())) {
-            const uint32_t retryResult = Slot3_BeginOrContinue(cachedUpstreamOrArg_);
+            Slot3_BeginOrContinue(cachedUpstreamOrArg_);
             spdlog::info(
-                "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3 result=0x{:08x}",
+                "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3",
                 static_cast<unsigned>(status),
                 fmt::ptr(cachedUpstreamOrArg_),
                 static_cast<unsigned>(mediator->marginBeginCount24_),
-                static_cast<unsigned>(mediator->marginAddressList3c_.Count()),
-                static_cast<unsigned>(retryResult));
+                static_cast<unsigned>(mediator->marginAddressList3c_.Count()));
             return 1u;
         }
 
@@ -108,10 +107,10 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
-uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     // Faithfulness/ownership correction from the fresh `0x439300` disassembly review:
@@ -127,32 +126,38 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg) {
 
     const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
     switch (upstreamPhaseCode) {
-        case 6:
-            return BeginMarginConnectionForState4Case(
+        case 6: {
+            BeginMarginConnectionForState4Case(
                 mediator,
                 mediator->ResolveMarginRouteDescriptor(),
                 0u);
+            return;
+        }
 
         case 7:
         case 8:
-        case 13:
+        case 13: {
             // Exact `0x439300 -> 0x41e500` consequence to preserve:
             // - this branch forwards owner byte `+0xcc8` as arg2
             // - `0x41e500` only refreshes route/address state on `arg2 == 0`
             // - so on the live state8/state13 continuation path the returned route-text pointer is
             //   forwarded even when current source still has no populated route-string table entry
-            return BeginMarginConnectionForState4Case(
+            BeginMarginConnectionForState4Case(
                 mediator,
                 mediator->ResolveMarginRouteFromCurrentCharacterSlot(),
                 mediator->CurrentCharacterRouteIndexCc8Scaffold());
+            return;
+        }
 
-        case 10:
-            return BeginMarginConnectionForState4Case(
+        case 10: {
+            BeginMarginConnectionForState4Case(
                 mediator,
                 mediator->ResolveMarginRouteFromDescriptorIndex(
                     mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24),
                 static_cast<uint8_t>(
                     mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24 & 0xffu));
+            return;
+        }
 
         default: {
             // Current source-owned mirror for the default branch's owner `+0x104` dword remains
@@ -161,14 +166,14 @@ uint32_t CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg) {
             // structure here.
             const int32_t field104Value = mediator->marginRouteState_.currentWorldId;
             if (field104Value == -1) {
-                return 0u;
+                return;
             }
             const char* const routeHostText =
                 mediator->ResolveMarginRouteFromWorldId(static_cast<uint32_t>(field104Value));
             if (routeHostText == nullptr) {
-                return 0u;
+                return;
             }
-            return BeginMarginConnectionForState4Case(
+            BeginMarginConnectionForState4Case(
                 mediator,
                 routeHostText,
                 0u);

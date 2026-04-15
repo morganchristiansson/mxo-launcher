@@ -27,11 +27,11 @@ const char* CLTLoginState_State9::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
-uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     // Current best read from `0x00439780` + `0x41de40`:
@@ -69,7 +69,7 @@ uint32_t CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg) {
             static_cast<unsigned>(consumedWord6),
             static_cast<unsigned>(submitResult));
     }
-    return 1u;
+    return;
 }
 
 // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)

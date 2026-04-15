@@ -158,11 +158,11 @@ const char* CLTLoginState_State8::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
-uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
-        return 0u;
+        return;
     }
 
     // Ownership/fidelity correction:
@@ -218,7 +218,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
-        return fallbackResult;
+        return;
     }
     if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = mediator->SetCurrentState(6u);
@@ -226,7 +226,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
             static_cast<unsigned>(fallbackResult),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
-        return fallbackResult;
+        return;
     }
 
     spdlog::info(
@@ -311,7 +311,7 @@ uint32_t CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
         mediator->SelectionContextBlockD70()[3],
         gameSessionId ? gameSessionId : "<empty>",
         sendResult);
-    return sendResult;
+    return;
 }
 
 // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
