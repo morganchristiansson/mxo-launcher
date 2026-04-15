@@ -13,16 +13,22 @@ const char* CLTLoginState_AuthenticatePending::DebugName() const {
     return "CLTLoginState_AuthenticatePending";
 }
 
-// anchor: launcher.exe:0x00439210 (vtable 0x004b5014 slot 3)
+// anchor: launcher.exe:0x00439210 / vtable 0x4b5014 slot 3
+// Ghidra signature:
+//   void __thiscall CLTLoginState_AuthenticatePending_Slot3_BeginOrContinue(void *this, int *pUpstreamState)
+//   - Original returns void (return value in EAX is not set)
+//   - Source keeps uint32_t for practical reasons but result is typically ignored
+//
 // Static RE now recovers the exact assembly call to PrepareAndDispatch at 0x448050:
-//   call dword ptr [EDX + 0x168]  -> sends send target result to stack
-//   call dword ptr [EAX + 0x20]   -> gets launcher version value
-//   call dword ptr [EDX + 0x38]    -> gets username pointer
-//   mov ECX, dword ptr [EAX + 0x60] -> session token pointer
+//   call dword ptr [EDX + 0x168]  -> vtable+0x168: GetAuthConnection - sends send target result to stack
+//   call dword ptr [EAX + 0x20]   -> vtable+0x20: GetNoPatchLauncherVersionValuePtr
+//   call dword ptr [EDX + 0x38]  -> vtable+0x38: GetUsername returns owner+0x94 char*
+//   mov ECX, dword ptr [EAX + 0x60] -> session token pointer from owner+0x94
 //   push session, push sendtarget, push uiMD5, push keyMD5, push loginType=1,
 //        push password, push username
 //   call 0x448050
-// Source now mirrors the exact call shape instead of the mediator-ref-based convenience.
+//
+// Source mirrors the exact call shape via PrepareAndDispatch on owner+0x680 child.
 uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
@@ -81,6 +87,7 @@ uint32_t CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstream
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         mediator->HasReadyAuthConnectionState2() ? 1u : 0u,
         static_cast<unsigned>(sendResult));
+    // Ghidra shows original returns void - return value is effectively ignored by callers
     return sendResult;
 }
 
