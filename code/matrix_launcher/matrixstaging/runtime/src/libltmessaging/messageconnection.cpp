@@ -2612,11 +2612,107 @@ static void CBaseMarginConnection_InvokeMessageRefCompletionCallback(
     // The callback signals back to the connection completion chain (connection+0x94 vtable+0x08)
 }
 
-// anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0
-// Original dispatches directly to CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse.
-// This scaffold handles the code 2 flow. We call through to the existing mediator bootstrap logic.
-// UNANCHORED: keeping bootstrap logic local in structure, but calling through to existing code.
-// anchor: launcher.exe:0x4429b0
+namespace {
+
+// anchor: launcher.exe:0x465d70 / decrypt helper reached from 0x437810 -> 0x468130
+// RSA private key decryption using the bootstrap state (modulus, exponent, private exponent)
+// The decrypted output format: 16 bytes at offset 1,5,9,13 are used as seed bytes
+static bool CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
+    const CMarginConnectionBootstrapPrepStateA0Scaffold* prepState,
+    const void* encryptedBytes,
+    size_t encryptedByteCount,
+    std::array<uint8_t, 16>* outDecryptedChallengeBytes) {
+    if (!prepState || !encryptedBytes || encryptedByteCount == 0u || !outDecryptedChallengeBytes) {
+        return false;
+    }
+
+    // Build RSA private key from the bootstrap state BigInts
+    try {
+        const CryptoPP::Integer modulus =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(prepState->field_0xc.field_0x8);
+        const CryptoPP::Integer publicExponent =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(prepState->field_0xc.field_0x1c);
+        const CryptoPP::Integer privateExponent =
+            CMarginConnectionBootstrapPrepBigIntObjectToInteger(prepState->field_0xc.field_0x3c);
+
+        if (modulus.IsZero() || publicExponent.IsZero() || privateExponent.IsZero()) {
+            spdlog::warn(
+                "CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: zero BigInt component modulus={} exponent={} privateExp={}",
+                modulus.IsZero() ? "zero" : "non-zero",
+                publicExponent.IsZero() ? "zero" : "non_zero",
+                privateExponent.IsZero() ? "zero" : "non_zero");
+            return false;
+        }
+
+        CryptoPP::RSA::PrivateKey privateKey;
+        privateKey.Initialize(modulus, publicExponent, privateExponent);
+
+        // RSA decrypt the challenge blob
+        std::vector<uint8_t> decryptedBytes;
+        CryptoPP::AutoSeededRandomPool rng;
+        CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
+        CryptoPP::StringSource source(
+            static_cast<const uint8_t*>(encryptedBytes),
+            encryptedByteCount,
+            true,
+            new CryptoPP::PK_DecryptorFilter(
+                rng,
+                decryptor,
+                new CryptoPP::VectorSink(decryptedBytes)));
+
+        // Extract 16 bytes from offset 1,5,9,13 (DWORD aligned positions in decrypted blob)
+        // Each DWORD is stored at byte positions [1-4], [5-8], [9-12], [13-16] (little-endian)
+        if (decryptedBytes.size() < 0x11u) {  // Need at least 17 bytes
+            spdlog::warn(
+                "CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: decrypted too short {} < 17",
+                decryptedBytes.size());
+            return false;
+        }
+
+        // The original extracts: [1-4], [5-8], [9-12], [13-16] as little-endian DWORDs
+        (*outDecryptedChallengeBytes)[0] = decryptedBytes[1];
+        (*outDecryptedChallengeBytes)[1] = decryptedBytes[2];
+        (*outDecryptedChallengeBytes)[2] = decryptedBytes[3];
+        (*outDecryptedChallengeBytes)[3] = decryptedBytes[4];
+        (*outDecryptedChallengeBytes)[4] = decryptedBytes[5];
+        (*outDecryptedChallengeBytes)[5] = decryptedBytes[6];
+        (*outDecryptedChallengeBytes)[6] = decryptedBytes[7];
+        (*outDecryptedChallengeBytes)[7] = decryptedBytes[8];
+        (*outDecryptedChallengeBytes)[8] = decryptedBytes[9];
+        (*outDecryptedChallengeBytes)[9] = decryptedBytes[10];
+        (*outDecryptedChallengeBytes)[10] = decryptedBytes[11];
+        (*outDecryptedChallengeBytes)[11] = decryptedBytes[12];
+        (*outDecryptedChallengeBytes)[12] = decryptedBytes[13];
+        (*outDecryptedChallengeBytes)[13] = decryptedBytes[14];
+        (*outDecryptedChallengeBytes)[14] = decryptedBytes[15];
+        (*outDecryptedChallengeBytes)[15] = decryptedBytes[16];
+
+        spdlog::debug(
+            "CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge decrypted size={} firstDword=0x{:08x}",
+            decryptedBytes.size(),
+            static_cast<unsigned>(
+                static_cast<uint32_t>((*outDecryptedChallengeBytes)[0]) |
+                (static_cast<uint32_t>((*outDecryptedChallengeBytes)[1]) << 8u) |
+                (static_cast<uint32_t>((*outDecryptedChallengeBytes)[2]) << 16u) |
+                (static_cast<uint32_t>((*outDecryptedChallengeBytes)[3]) << 24u)));
+
+        return true;
+    } catch (const CryptoPP::Exception& ex) {
+        spdlog::warn(
+            "CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge CryptoPP exception: {}",
+            ex.what());
+        return false;
+    }
+}
+
+}  // namespace
+
+// anchor: launcher.exe:0x4429b0 (CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse)
+// Original flow:
+// - Uses bootstrap prep state (this+0xa0) to decrypt the incoming encrypted challenge blob
+// - Extracts 16 bytes from decrypted result at offsets 1,5,9,13 -> stores to this+0x85..0x93
+// - Calls EnsureStreamPacketEncryptionModule to install encryption from those 16 bytes
+// - Sends response packet with opcode 0x11 containing the challenge bytes
 uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     const uint8_t* packetBytes,
     size_t packetSize) {
@@ -2624,16 +2720,77 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
         return 0u;
     }
 
-    // Get owner/mediator - original accesses +0xa0 for bootstrap prep, we use owner callback
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    if (!mediator) {
-        return 0u;
+    // anchor: launcher.exe:0x4429b0 -> this+0xa0 bootstrap prep state
+    // The original retrieves the prep object at connection+0xa0 and uses it for decryption.
+    // If no bootstrap state is available, fall back to the original's error handling.
+    if (!bootstrapPrepStateA0_) {
+        spdlog::warn(
+            "CBaseMarginConnection::HandleCode2ForBootstrap missing bootstrapPrepStateA0_ (this+0xa0) this={} ownerContext={}",
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()));
+        // Fall back to original stub behavior for now
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+        if (!mediator) {
+            return 0u;
+        }
+        mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+        return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
     }
 
-    // Original does cert challenge crypto here. For now, delegate to existing bootstrap continue.
-    // TODO: implement full cert challenge/response at 0x4429b0
-    mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-    return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
+    // anchor: launcher.exe:0x4429b0 -> vtable+0x1c call region (~0x437810)
+    // Use the bootstrap state to decrypt the incoming challenge payload.
+    // Note: packetBytes point to the message opcode (0x02) at start, so we pass packetBytes+1
+    // to skip the opcode and get the encrypted challenge blob.
+    std::array<uint8_t, 16> decryptedChallengeBytes{};
+    const bool decryptSuccess = CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
+        bootstrapPrepStateA0_.get(),
+        packetBytes + 1u,  // Skip the opcode byte
+        packetSize > 1u ? packetSize - 1u : 0u,
+        &decryptedChallengeBytes);
+
+    // anchor: launcher.exe:0x4429b0 -> decryption failure path
+    // Original shows MessageBox error then calls connection->vtable+0xc (close/disconnect)
+    if (!decryptSuccess) {
+        spdlog::warn(
+            "CBaseMarginConnection::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
+            static_cast<unsigned>(packetSize),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()));
+        // Fall back to original stub behavior
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+        if (!mediator) {
+            return 0u;
+        }
+        // Continue with the raw packet bytes for now
+        mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+        return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
+    }
+
+    // anchor: launcher.exe:0x4429b0 -> decrypted bytes stored to this+0x85..0x93
+    // Write the 16 decrypted challenge bytes to connection fields at +0x85..+0x94
+    // These bytes serve dual purpose: (1) challenge response payload, (2) stream encryption seed
+    SetMessageCode5SeedBytes85(decryptedChallengeBytes);
+
+    // anchor: launcher.exe:0x4429b0 -> EnsureStreamPacketEncryptionModule call
+    // Already done inside SetMessageCode5SeedBytes85 -> EnsureStreamPacketEncryptionModuleFromSeed85
+
+    // anchor: launcher.exe:0x4429b0 -> sends response with opcode 0x11
+    // Send the cert challenge response packet containing the 16 challenge bytes
+    const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(decryptedChallengeBytes);
+
+    spdlog::info(
+        "CBaseMarginConnection::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} packetSize={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
+        sendResult,
+        static_cast<unsigned>(packetSize),
+        static_cast<unsigned>(
+            static_cast<uint32_t>(decryptedChallengeBytes[0]) |
+            (static_cast<uint32_t>(decryptedChallengeBytes[1]) << 8u) |
+            (static_cast<uint32_t>(decryptedChallengeBytes[2]) << 16u) |
+            (static_cast<uint32_t>(decryptedChallengeBytes[3]) << 24u)),
+        fmt::ptr(this),
+        fmt::ptr(OwnerContext()));
+
+    return sendResult != 0u ? 1u : 0u;
 }
 
 // anchor: launcher.exe:0x442d00 -> 0x442d83 -> 0x441850
