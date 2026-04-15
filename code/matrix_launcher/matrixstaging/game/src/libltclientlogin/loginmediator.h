@@ -1509,7 +1509,6 @@ private:
     void BuildMarginEndpoint();
     bool RebuildMarginAddressList();
     bool SelectMarginEndpointIpv4();
-    mxo::liblttcp::CMessageConnection* EnsureAuthConnectionObject();
     mxo::liblttcp::CMessageConnection* EnsureMarginConnectionObject();
 
     // Condensed `0x4f78b8` owner sketch for the active branch:

@@ -246,10 +246,28 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d17c / vtable+0x164
     RequestAuthConnectionCloseWaitEvent1();
 
-    // Allocate and initialize auth connection - replaces launcher.exe:0x41d1a9-0x41d1dd
-    // anchor: launcher.exe:0x41d1a9 / malloc(0xa8) and CLTLoginMediator_Helper1_StartAuthConnection
-    // anchor: launcher.exe:0x41d1d1 / vftptr = 0x4afef0, owner = this, ConfigurePacketNameCallback
-    auto* connection = EnsureAuthConnectionObject();
+    // Inline allocation and initialization - replaces EnsureAuthConnectionObject()
+    // anchor: launcher.exe:0x41d1a9 / malloc(0xa8)
+    // anchor: launcher.exe:0x41d1c0 / CLTLoginMediator_Helper1_StartAuthConnection
+    // anchor: launcher.exe:0x41d1d1 / vftptr = 0x4afef0
+    // anchor: launcher.exe:0x41d1d7 / owner = this at offset 0xa4
+    // anchor: launcher.exe:0x41d1dd / ConfigurePacketNameCallback(1, 0x41ce00)
+    // Free existing connection first (like static RE - fresh allocation every time)
+    if (authConnectionOwnedByMediator_ && authConnection_ != nullptr) {
+        delete authConnection_;
+    }
+    authConnection_ = new mxo::liblttcp::CAuthStartupConnection(engine_);
+    if (!authConnection_) {
+        return 0u;
+    }
+    authConnectionOwnedByMediator_ = true;
+    authConnection_->SetOwnerContext(this);
+    // High-fidelity: use ConfigurePacketNameCallback with specific callback pointer
+    // anchor: launcher.exe:0x41d1cd / PUSH 0x1 (packetizedMessagesEnabled = true)
+    // anchor: launcher.exe:0x41d1c8 / PUSH 0x41ce00 (packetNameCallback for auth)
+    authConnection_->ConfigurePacketNameCallback(true, reinterpret_cast<void*>(0x41ce00));
+
+    auto* connection = authConnection_;
     if (!connection) {
         return 0u;
     }
@@ -374,39 +392,6 @@ void CLTLoginMediator::BuildMarginEndpoint() {
     marginEndpoint_.portNetworkOrder =
         static_cast<uint16_t>((marginServerPortHostOrder_ << 8) | (marginServerPortHostOrder_ >> 8));
     marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
-}
-
-// UNANCHORED: source-owned auth-connection child materializer mirroring owner `+0x18` construction.
-mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureAuthConnectionObject() {
-    mxo::liblttcp::CAuthStartupConnection* authConnection =
-        dynamic_cast<mxo::liblttcp::CAuthStartupConnection*>(authConnection_);
-    if (!authConnection) {
-        if (authConnectionOwnedByMediator_ && authConnection_ != nullptr) {
-            delete authConnection_;
-        }
-        authConnection = new mxo::liblttcp::CAuthStartupConnection(engine_);
-        if (!authConnection) {
-            authConnection_ = nullptr;
-            authConnectionOwnedByMediator_ = false;
-            return nullptr;
-        }
-
-        authConnection_ = authConnection;
-        authConnectionOwnedByMediator_ = true;
-    }
-
-    authConnection->SetEngine(engine_);
-    authConnection->SetOwnerContext(this);
-
-    // anchor: launcher.exe:0x41d170 / vtable `0x004afef0`
-    // Current bounded source correction:
-    // - auth startup no longer materializes only a base `CMessageConnection` here
-    // - source now keeps the auth-side leaf completion wrapper explicit so type-2 status and the
-    //   later receive-drain proxy can re-enter through the nearer connection callback surface
-    authConnection->ConfigurePacketNameFamily(
-        mxo::liblttcp::CMessageConnectionPacketNameFamily::kAuth,
-        /*packetizedMessagesEnabled=*/true);
-    return authConnection_;
 }
 
 }  // namespace mxo::ltlogin

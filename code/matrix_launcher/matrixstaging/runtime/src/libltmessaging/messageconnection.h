@@ -642,6 +642,14 @@ public:
     void ConfigurePacketNameFamily(
         CMessageConnectionPacketNameFamily family,
         bool packetizedMessagesEnabled);
+
+    // anchor: launcher.exe:0x448960
+    // Direct callback pointer configuration from static RE at 0x448960
+    // Matches CMessageConnection_ConfigurePacketNameCallback(connection, 1, 0x41ce00)
+    void ConfigurePacketNameCallback(
+        bool packetizedMessagesEnabled,
+        void* packetNameCallback);
+
     // anchor family: launcher.exe:0x448960 -> connection `+0x70`
     // Source-owned enum view over the recovered packet-name callback pointer field.
     CMessageConnectionPacketNameFamily PacketNameFamily() const;

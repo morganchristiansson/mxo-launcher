@@ -739,6 +739,21 @@ void CMessageConnection::ConfigurePacketNameFamily(
     packetizedMessagesEnabled_ = packetizedMessagesEnabled;
 }
 
+// anchor: launcher.exe:0x448960
+void CMessageConnection::ConfigurePacketNameCallback(
+    bool packetizedMessagesEnabled,
+    void* packetNameCallback) {
+    // Direct implementation matching static RE at 0x448960:
+    // this->packetizedMessagesEnabled = packetizedMessagesEnabled;
+    // if (packetizedMessagesEnabled != '\0') {
+    //     this->packetNameCallback = packetNameCallback;
+    // }
+    packetizedMessagesEnabled_ = packetizedMessagesEnabled;
+    if (packetizedMessagesEnabled) {
+        packetNameCallback_ = reinterpret_cast<uintptr_t>(packetNameCallback);
+    }
+}
+
 // anchor family: launcher.exe:0x448960 -> connection `+0x70`
 CMessageConnectionPacketNameFamily CMessageConnection::PacketNameFamily() const {
     switch (packetNameCallback_) {
