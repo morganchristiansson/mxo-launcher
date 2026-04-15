@@ -1267,8 +1267,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     const char* LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41f320 / owner vtable +0x148
     const char* GetGameSessionId() const override;
-    // UNANCHORED: source-owned owner-field setter used by separate LaunchPad/session callback paths
-    void SetGameSessionId664(const char* value);
+    // Removed: SetGameSessionId664 - now using direct public access to gameSessionId664_
     // anchor: launcher.exe:0x41f270 / owner vtable +0x150
     void SetLaunchPadSourceBlock94FirstString(const char* value);
     // anchor: launcher.exe:0x41f330 / owner vtable +0x14c
@@ -1597,7 +1596,8 @@ public:
     SessionCallbackHelper65cSketch sessionCallbackHelper65cState_{};
     SessionCallbackHelper65cSketch* sessionCallbackHelper65c_ = nullptr;
     uint32_t sharedMarginPacketField660_ = 0;  // owner `+0x660`
-    std::string gameSessionId664_;             // owner `+0x664`
+public:
+    std::string gameSessionId664_;             // owner `+0x664` (public for direct access)
     // Wrapper-facing arg6 object mirrors:
     // - `+0x40`  = selection-descriptor object for profile-path / arg7-derived selection work
     // - `+0x44`  = current-slot record object for later save/profile work

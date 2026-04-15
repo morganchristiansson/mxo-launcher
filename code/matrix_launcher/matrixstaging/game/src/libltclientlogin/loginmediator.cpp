@@ -2538,10 +2538,7 @@ void CLTLoginMediator::SetLaunchPadSourceBlock94FirstString(const char* value) {
     ownerAuthBootstrapSource94_.username00[copyCount] = '\0';
 }
 
-// UNANCHORED: source-owned shared GameSessionID writer mirror for later session/play callback paths
-void CLTLoginMediator::SetGameSessionId664(const char* value) {
-    gameSessionId664_ = value ? value : "";
-}
+// Removed: SetGameSessionId664 method - now using direct public access to gameSessionId664_
 
 // anchor: launcher.exe:0x420e70
 uint32_t CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
@@ -2568,7 +2565,7 @@ uint32_t CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent() {
         return 0u;
     }
 
-    SetGameSessionId664(helper->string18.c_str());
+    gameSessionId664_ = helper->string18.empty() ? "" : helper->string18;
     helper->field24 = 0;
 
     spdlog::info(
