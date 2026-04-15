@@ -401,9 +401,9 @@ public:
     // UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
     LTTCPEngineConnectionState State() const;
 
-    // UNANCHORED: source-owned endpoint setter over the recovered connection `+0x24` copy.
+    // UNANCHORED: source-owned endpoint setter over the recovered connection +0x24 copy.
     void SetRemoteEndpoint(const LTTCPEndpointKey& endpoint);
-    // UNANCHORED: source-owned endpoint accessor over the recovered connection `+0x24` copy.
+    // UNANCHORED: source-owned endpoint accessor over the recovered connection +0x24 copy.
     const LTTCPEndpointKey& RemoteEndpoint() const;
 
     // UNANCHORED: source-owned hostname setter used by the current resolver scaffold.
@@ -502,11 +502,13 @@ public:
     //   enqueue success result because original `0x436820` returns `void`
     void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
 
+    // anchor: launcher.exe:0x41de6a - endpoint at connection +0x24
+    LTTCPEndpointKey remoteEndpoint_;
+
 private:
     void* ownerContext_;
     uint32_t socketHandle_;
     CLTThreadPerClientTCPEngine_WorkerThread* workerThread08_;
-    LTTCPEndpointKey remoteEndpoint_;
     std::string remoteHostName_;
     CLTTCPConnection_PendingSendQueue pendingSendQueueState38_;
     // High-confidence original seam: `CLTTCPConnection_ctor` stores a concrete

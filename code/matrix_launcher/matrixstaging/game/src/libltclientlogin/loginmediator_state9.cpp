@@ -114,19 +114,18 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
     bool submitTargetReady = false;
     uint32_t submitTargetIpv4NetworkOrder = 0u;
     if (marginConnection_ != nullptr) {
-        // Mirror assembly at 0x41de40: copy endpoint +0x24..+0x30 to local 16-byte block,
-        // then call class methods at 0x44afd0 / 0x44b0d0
-        const mxo::liblttcp::LTTCPEndpointKey& remoteEndpoint = marginConnection_->RemoteEndpoint();
-        submitTargetIpv4NetworkOrder = remoteEndpoint.ipv4NetworkOrder;
+        // Copy endpoint bytes directly from marginConnection +0x24 (matches assembly 0x41de6a)
+        // anchor: launcher.exe:0x41de6a
         if (!marginConnection_->RemoteHostName().empty()) {
             remoteHostName = marginConnection_->RemoteHostName();
         }
-        // Fidelity to static-RE: use SubmitAddressBlock class matching original 16-byte layout
-        // anchor: launcher.exe:0x44afd0 / 0x44b0d0
         mxo::ltlogin::SubmitAddressBlock localBlock{};
-        localBlock.family_ = remoteEndpoint.family;
-        localBlock.portNetworkOrder_ = remoteEndpoint.portNetworkOrder;
-        localBlock.ipv4NetworkOrder_ = remoteEndpoint.ipv4NetworkOrder;
+        // Copy +0x24..+0x30: family, port, ipv4, reserved
+        // endpoint is public at connection +0x24
+        localBlock.family_ = marginConnection_->remoteEndpoint_.family;
+        localBlock.portNetworkOrder_ = marginConnection_->remoteEndpoint_.portNetworkOrder;
+        localBlock.ipv4NetworkOrder_ = marginConnection_->remoteEndpoint_.ipv4NetworkOrder;
+        submitTargetIpv4NetworkOrder = localBlock.ipv4NetworkOrder_;
         localBlock.SetPortFromHelperWord(helperWord6);
         submitTargetText = localBlock.FormatHostPortString(/*appendPortFlag=*/1);
         submitTargetReady = !submitTargetText.empty();
