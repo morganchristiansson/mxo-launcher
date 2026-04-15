@@ -841,8 +841,15 @@ public:
     virtual uint32_t DispatchMessage(void* messageRef);
 
     // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse)
-    // Handle decoded code 2: stage packet bytes and continue margin bootstrap handshake.
-    // anchor: launcher.exe:0x4429b0 - takes 2 params (this, parsed message object)
+    // Original signature: void __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse(void *this, int param_1)
+    //   param_1 = parsed message result object with message context at +0x14 (dword) and +0x18 (word)
+    // Original: Decrypts challenge via prep object vtable+0x1c (0x437810 -> 0x468130),
+    //   extracts 16 bytes via cls_0x4b6538 envelope, writes to this+0x85..0x91,
+    //   ensures stream encryption module, sends response packet opcode 0x11 via vtable+0x24.
+    // SOURCE DIVERGENCE: Current source takes raw bytes instead of message object,
+    //   uses static helper instead of vtable dispatch, lacks cls_0x4b6538 envelope construction,
+    //   uses helper methods instead of inline field writes and packet building.
+    // See implementation in .cpp for full fidelity notes and TODOs.
     uint32_t HandleCode2ForBootstrap(
         const uint8_t* packetBytes,
         size_t packetSize);

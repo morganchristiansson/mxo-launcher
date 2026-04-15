@@ -2708,11 +2708,58 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
 }  // namespace
 
 // anchor: launcher.exe:0x4429b0 (CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse)
-// Original flow:
-// - Uses bootstrap prep state (this+0xa0) to decrypt the incoming encrypted challenge blob
-// - Extracts 16 bytes from decrypted result at offsets 1,5,9,13 -> stores to this+0x85..0x93
-// - Calls EnsureStreamPacketEncryptionModule to install encryption from those 16 bytes
-// - Sends response packet with opcode 0x11 containing the challenge bytes
+// Original signature: void __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse(void *this, int param_1)
+//   param_1 = parsed message result object with:
+//     - message context at param_1+0x14 (dword)
+//     - message context at param_1+0x18 (word)
+// Original flow (decompile verified):
+// 1. Static init check for crypto context at DAT_004f7bf4 (cls_0x4b42bc with vtables 0x4b695c/0x4b68a8/0x4b41e0)
+// 2. Create local message ref via CMessageConnectionMessage_CreateRef(&local_8, 0) at cls_0x4489d0
+// 3. Get inner storage: pCVar1 = local_8.messageRef00->messageStorage0c
+// 4. Read local_c = *(dword *)(param_1 + 0x14)
+// 5. Call prep object vtable+0x1c: (**(code **)(**(int **)(this+0xa0) + 0x1c))(local_10, &DAT_004f7bf4, local_c, *(word *)(param_1 + 0x18), pCVar1->payloadBytes0c + payload_offset)
+//    - vtable+0x1c = 0x437810 -> calls virt_meth_0x468130 for actual RSA decrypt operation
+// 6. Check result: if (*(int *)(iVar2 + 4) == 0) -> error path
+//    - Error: MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
+//    - Call connection vtable+0xc: (**(code **)(*(int *)this + 0xc))(1) -> close/disconnect
+//    - Release message ref via vtable+0x08: (*(local_8.messageRef00->vftptr_0x0->Release_8))(local_8.messageRef00)
+//    - Return
+// 7. Success path:
+//    - GrowPayloadByteCount: (*(local_8.messageRef00->vftptr_0x0->GrowPayloadByteCount_24))(local_8.messageRef00, *(int *)(iVar2 + 4))
+//    - Construct cls_0x4b6538 envelope: cls_0x4b6538::cls_0x4b6538(&local_38, (int *)local_8.messageRef00, '\x01') at 0x443220
+//      - vtable_0x4b6538 = {0x443aa0 (Destroy), 0x437b50, 0x4425f0, 0x4418a0, 0x481760}
+//    - Extract 16 bytes from local_38.mbr_0x10 + 1, +5, +9, +0xd -> write to this+0x85, 0x89, 0x8d, 0x91
+//    - Call CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this) at 0x441470
+//    - Initialize packet builder envelope: CLTLoginMediatorPacketBuilderEnvelope_Initialize(&local_24)
+//      - local_24.vftable set to cls_0x4b654c__vftable_4b654c_004b654c initially
+//    - Set opcode: *(byte *)&local_14 = 3 (later overwritten to 0x11)
+//    - Copy 16 bytes from local_38.mbr_0x10 + 0x11, +0x15, +0x19, +0x1d to packet at +1, +5, +9, +0xd
+//    - Send via connection vtable+0x24: (**(code **)(*(int *)this + 0x24))(&local_24)
+//    - Cleanup: release local_1c, local_38, local_8 via vtable+0x08
+//    - Return
+//
+// SOURCE DIVERGENCE NOTES:
+// - Current source takes raw bytes (packetBytes, packetSize) instead of parsed message object.
+//   Original extracts encrypted blob from message ref at param_1+0x14/0x18 context.
+// - Source uses static helper CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge
+//   instead of calling through prep object vtable+0x1c -> 0x437810 -> 0x468130.
+// - Source does not create local message ref via CMessageConnectionMessage_CreateRef.
+//   Original creates local_8 (cls_0x4489d0), decrypts into its storage, grows payload.
+// - Source does not construct cls_0x4b6538 envelope object (vtable 0x4b6538 at 0x443220).
+//   Original constructs envelope wrapping message ref with flag '\x01', extracts bytes from mbr_0x10.
+// - Source uses SetMessageCode5SeedBytes85 helper instead of direct field writes to +0x85, 0x89, 0x8d, 0x91.
+// - Source delegates to SendCertChallengeResponseFromChallengeBytes helper.
+//   Original does inline packet builder construction and sends via vtable+0x24 directly.
+// - Source lacks MessageBox error handling and vtable+0xc close call on decrypt failure.
+//   Original shows MessageBox("Failed to decrypt challenge blob from server!") then closes.
+//
+// FIDELITY TODOs for future passes:
+// 1. Change signature to accept parsed message result object (with +0x14/+0x18 context fields)
+// 2. Create local message ref via CMessageConnectionMessage_CreateRef equivalent
+// 3. Route decryption through bootstrapPrepStateA0_->vtable+0x1c instead of static helper
+// 4. Implement cls_0x4b6538 envelope class for challenge byte extraction
+// 5. Add MessageBox error handling and connection vtable+0xc close on failure
+// 6. Inline the packet builder construction and send via vtable+0x24 instead of helper
 uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     const uint8_t* packetBytes,
     size_t packetSize) {
@@ -2721,14 +2768,15 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     }
 
     // anchor: launcher.exe:0x4429b0 -> this+0xa0 bootstrap prep state
-    // The original retrieves the prep object at connection+0xa0 and uses it for decryption.
-    // If no bootstrap state is available, fall back to the original's error handling.
+    // Original: Loads [this+0xa0], calls prep-object vtable +0x1c (0x437810), which reaches vtable +0x24 (0x468130)
+    // Current source: Uses static helper instead of vtable dispatch.
     if (!bootstrapPrepStateA0_) {
         spdlog::warn(
             "CBaseMarginConnection::HandleCode2ForBootstrap missing bootstrapPrepStateA0_ (this+0xa0) this={} ownerContext={}",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
-        // Fall back to original stub behavior for now
+        // SOURCE DIVERGENCE: Original shows MessageBox and calls vtable+0xc to close connection.
+        // Source falls back to mediator continuation instead.
         mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
         if (!mediator) {
             return 0u;
@@ -2737,45 +2785,68 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
         return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
     }
 
-    // anchor: launcher.exe:0x4429b0 -> vtable+0x1c call region (~0x437810)
-    // Use the bootstrap state to decrypt the incoming challenge payload.
-    // Note: packetBytes point to the message opcode (0x02) at start, so we pass packetBytes+1
-    // to skip the opcode and get the encrypted challenge blob.
+    // anchor: launcher.exe:0x4429b0 -> vtable+0x1c call region (0x437810 -> 0x468130)
+    // Original: Creates local message ref (cls_0x4489d0), calls prep object vtable+0x1c with:
+    //   - param_1: local_10 (output buffer)
+    //   - param_2: &DAT_004f7bf4 (crypto context with vtables 0x4b695c/0x4b68a8/0x4b41e0)
+    //   - param_3: local_c (message context from param_1+0x14)
+    //   - param_4: *(word *)(param_1 + 0x18) (message context word)
+    //   - param_5: payloadBytes + payload_offset (encrypted challenge blob)
+    // Current source: Static helper with raw bytes instead of message ref creation.
     std::array<uint8_t, 16> decryptedChallengeBytes{};
     const bool decryptSuccess = CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
         bootstrapPrepStateA0_.get(),
-        packetBytes + 1u,  // Skip the opcode byte
+        packetBytes + 1u,  // Skip the opcode byte (original uses payload offset from message ref)
         packetSize > 1u ? packetSize - 1u : 0u,
         &decryptedChallengeBytes);
 
-    // anchor: launcher.exe:0x4429b0 -> decryption failure path
-    // Original shows MessageBox error then calls connection->vtable+0xc (close/disconnect)
+    // anchor: launcher.exe:0x4429b0 -> decryption failure check (*(int *)(iVar2 + 4) == 0)
+    // Original: On failure, shows MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
+    // then calls connection vtable+0xc with arg 1 to close/disconnect.
+    // Current source: Logs warning and falls back to mediator continuation (no MessageBox, no close).
     if (!decryptSuccess) {
         spdlog::warn(
             "CBaseMarginConnection::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
             static_cast<unsigned>(packetSize),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
-        // Fall back to original stub behavior
+        // FIDELITY TODO: Add MessageBoxA error and connection vtable+0xc(1) close call here.
         mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
         if (!mediator) {
             return 0u;
         }
-        // Continue with the raw packet bytes for now
         mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
         return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
     }
 
-    // anchor: launcher.exe:0x4429b0 -> decrypted bytes stored to this+0x85..0x93
-    // Write the 16 decrypted challenge bytes to connection fields at +0x85..+0x94
-    // These bytes serve dual purpose: (1) challenge response payload, (2) stream encryption seed
+    // anchor: launcher.exe:0x4429b0 -> success path: cls_0x4b6538 envelope construction (0x443220)
+    // Original: Constructs cls_0x4b6538 envelope with message ref and '\x01' flag,
+    // then extracts 16 bytes from envelope.mbr_0x10 + 1, +5, +9, +0xd.
+    // Current source: Direct byte array, no envelope construction.
+    // FIDELITY TODO: Implement cls_0x4b6538 envelope class (vtable 0x4b6538: 0x443aa0, 0x437b50, 0x4425f0, 0x4418a0, 0x481760)
+
+    // anchor: launcher.exe:0x4429b0 -> write extracted bytes to this+0x85, 0x89, 0x8d, 0x91
+    // Original: Direct field writes to connection object memory at offsets 0x85, 0x89, 0x8d, 0x91.
+    //   *(dword *)(this + 0x85) = *(dword *)(local_38.mbr_0x10 + 1)
+    //   *(dword *)(this + 0x89) = *(dword *)(local_38.mbr_0x10 + 5)
+    //   *(dword *)(this + 0x8d) = *(dword *)(local_38.mbr_0x10 + 9)
+    //   *(dword *)(this + 0x91) = *(dword *)(local_38.mbr_0x10 + 0xd)
+    // Current source: Uses SetMessageCode5SeedBytes85 helper which also triggers EnsureStreamPacketEncryptionModuleFromSeed85.
     SetMessageCode5SeedBytes85(decryptedChallengeBytes);
 
-    // anchor: launcher.exe:0x4429b0 -> EnsureStreamPacketEncryptionModule call
-    // Already done inside SetMessageCode5SeedBytes85 -> EnsureStreamPacketEncryptionModuleFromSeed85
+    // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule call (0x441470)
+    // Original: Explicit call to EnsureStreamPacketEncryptionModule after writing seed bytes.
+    // Current source: Already done inside SetMessageCode5SeedBytes85 -> EnsureStreamPacketEncryptionModuleFromSeed85.
 
-    // anchor: launcher.exe:0x4429b0 -> sends response with opcode 0x11
-    // Send the cert challenge response packet containing the 16 challenge bytes
+    // anchor: launcher.exe:0x4429b0 -> response packet construction and send via vtable+0x24
+    // Original:
+    //   1. Initialize packet builder envelope via CLTLoginMediatorPacketBuilderEnvelope_Initialize
+    //   2. Set opcode 0x11 at packet+0
+    //   3. Copy 16 challenge bytes to packet+1, +5, +9, +0xd from envelope.mbr_0x10 + 0x11, +0x15, +0x19, +0x1d
+    //   4. Send via (**(code **)(*(int *)this + 0x24))(&local_24) -> connection vtable+0x24
+    //   5. Cleanup: release envelope, local_38, local_8 via vtable+0x08
+    // Current source: Delegates to SendCertChallengeResponseFromChallengeBytes helper.
+    // FIDELITY TODO: Inline the packet builder construction and send via vtable+0x24 dispatch.
     const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(decryptedChallengeBytes);
 
     spdlog::info(
