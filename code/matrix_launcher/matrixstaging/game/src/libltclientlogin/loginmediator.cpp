@@ -1908,27 +1908,30 @@ bool CLTLoginMediator::RequestAuthConnectionCloseWaitEvent1() {
 // - the same underlying owner body is also the state9 success-side helper anchored below at
 //   `0x41b420`
 bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
-    uint32_t rawState = 0u;
-    bool wouldCallConnectionClose0c = false;
-    const bool armed = PrepareMarginConnectionCloseWaitEvent0fScaffold(
-        &rawState,
-        &wouldCallConnectionClose0c,
-        /*clearState10SendGateF14=*/true);
+    if (!marginConnection_) {
+        return false;
+    }
+    // anchor: launcher.exe:0x41b42c / clear owner+0xf14
+    postAuthMarginLoadingState_.state10SendGateFlagF14 = 0u;
+    // anchor: launcher.exe:0x41b433 / set owner+0x2d
+    marginConnectionFlag2d_ = 1u;
+    // anchor: launcher.exe:0x41b437 / query margin connection state at +0x34
+    const uint32_t rawState = static_cast<uint32_t>(marginConnection_->State());
+    // anchor: launcher.exe:0x41b43a-0x41b448 / state check (1 or 2) and vtable+0x0c(1) call
     const uint32_t closeResult =
         (rawState == 1 || rawState == 2) && marginConnection_
             ? marginConnection_->Close(/*graceful=*/true)
             : 0u;
 
     spdlog::info(
-        "CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f(+0x16c wrapper-facing) -> {} [owner+0xf14={} owner+0x2d={} marginConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x} currentState={} split=teardown-wait-event-0x0f vs owner-state9-success-helper laterExpectedTail=0x41afc0->0x438df0->0x41cfb0(0x0f)]",
-        armed ? 1u : 0u,
+        "CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f(+0x16c wrapper-facing) -> 1 [owner+0xf14={} owner+0x2d={} marginConnectionState={} wouldCallConnectionClose0cArg1={} closeResult=0x{:08x} currentState={} split=teardown-wait-event-0x0f vs owner-state9-success-helper laterExpectedTail=0x41afc0->0x438df0->0x41cfb0(0x0f)]",
         static_cast<unsigned>(postAuthMarginLoadingState_.state10SendGateFlagF14),
         static_cast<unsigned>(marginConnectionFlag2d_),
         rawState,
-        wouldCallConnectionClose0c ? 1u : 0u,
+        (rawState == 1 || rawState == 2) ? 1u : 0u,
         static_cast<unsigned>(closeResult),
         currentState_ ? currentState_->DebugName() : "<null>");
-    return armed;
+    return true;
 }
 
 // anchor: launcher.exe:0x41ddb0 slot +0x170

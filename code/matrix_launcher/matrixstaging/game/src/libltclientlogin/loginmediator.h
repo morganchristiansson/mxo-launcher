@@ -1381,12 +1381,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     //     - direct submit `+0x28`
     //     - managed submit `+0x1c`, `+0x18`, `+0x24`
     uint32_t State9SubmitFollowupScaffold(uint8_t helperByte4, uint16_t helperWord6);
-    // Shared owner-side helper for the wrapper-facing `+0x16c` close/wait-event-`0x0f` surface
-    // and the owner-anchored state9 success-side effect at `0x41b420`.
-    bool PrepareMarginConnectionCloseWaitEvent0fScaffold(
-        uint32_t* outConnectionState,
-        bool* outWouldCallConnectionClose0c,
-        bool clearState10SendGateF14);
     // - state9 slot 6 success side effect / launcher.exe:0x41b420 (owner vtable +0x16c)
     uint32_t HandleState9Opcode11SuccessSideEffect();
     // anchor: launcher.exe:0x41b4b0
