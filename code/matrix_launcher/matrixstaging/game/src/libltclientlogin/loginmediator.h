@@ -1170,16 +1170,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // - state1/state2 should therefore call the separate owner+0x680 child directly instead of
     //   routing through a fake mediator-owned auth-bootstrap method
 
-    // Current source-owned lifecycle mirror for owner `+0x680`:
-    // - original `0x41b160` allocates the child during mediator initialize
-    // - original `0x41f510` frees it during reset/clear-owned-runtime-state
-    // - source therefore allocates it lazily through this helper instead of constructing it in the
-    //   C++ object ctor
-    AuthBootstrap680Child_0x441290& EnsureAuthBootstrapChild680Scaffold();
-    AuthBootstrap680Child_0x441290& AuthBootstrapChild680() { return EnsureAuthBootstrapChild680Scaffold(); }
-    const AuthBootstrap680Child_0x441290& AuthBootstrapChild680() const {
-        return const_cast<CLTLoginMediator*>(this)->EnsureAuthBootstrapChild680Scaffold();
-    }
     void ResetAuthConnectRetryStateScaffold();
     // Current source-owned mirror of owner `+0x4c` auth address-list reinit used by startup
     // helper `0x41b160` after launcher config has already seeded the auth host name.

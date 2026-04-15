@@ -274,14 +274,6 @@ CLTLoginMediator::~CLTLoginMediator() {
     EraseMarginBootstrapState(this);
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-AuthBootstrap680Child_0x441290& CLTLoginMediator::EnsureAuthBootstrapChild680Scaffold() {
-    if (!authBootstrapChild680_) {
-        authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child_0x441290>();
-    }
-    return *authBootstrapChild680_;
-}
-
 void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
     if (authConnection_) {
         authConnection_->SetOwnerContext(nullptr);

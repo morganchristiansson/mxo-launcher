@@ -67,7 +67,7 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrAr
     // vtable+0x38: gets username char* directly from owner+0x94
     // password is username+0x20, session token is username+0x60
     // UI MD5 is username+0x50, key MD5 is username+0x40
-    auto* child = &mediator->AuthBootstrapChild680();
+    auto* child = mediator->authBootstrapChild680_.get();
     // Send target comes from the auth connection object (vtable+0x168 returns connection)
     void* sendTarget = mediator->AuthConnection();
     const char* sessionToken = mediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
@@ -111,7 +111,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
     //   resolves the `0x41bc20`-style logical payload span from the incoming message object
     // - this state2 body still owns the early inbound auth return-code switch
     const uint32_t childResult =
-        mediator->AuthBootstrapChild680().HandleInboundAuthMessage(workItem, *mediator);
+        mediator->authBootstrapChild680_->HandleInboundAuthMessage(workItem, *mediator);
     const std::vector<uint8_t>& stagedBytes = mediator->stagedIncomingAuthPacketBytes_;
     const uint8_t rawCode = stagedBytes.empty() ? 0u : stagedBytes[0];
     if (childResult == kAuthBootstrap680InboundUnhandled) {
@@ -131,12 +131,12 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
         return 1u;
     }
 
-    mediator->worldListCountOrStatus80 = mediator->AuthBootstrapChild680().inboundAuthStatusEc;
+    mediator->worldListCountOrStatus80 = mediator->authBootstrapChild680_->inboundAuthStatusEc;
 
     switch (childResult) {
         case kAuthBootstrap680InboundAuthReplySuccess: {
             AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
-                mediator->AuthBootstrapChild680(),
+                *mediator->authBootstrapChild680_,
                 *mediator,
                 mediator->lastAuthReply_);
             mediator->ResetMarginBootstrapState();
@@ -145,7 +145,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             if (AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold()) {
                 CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
                 AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
-                    mediator->AuthBootstrapChild680(),
+                    *mediator->authBootstrapChild680_,
                     *mediator,
                     mediator->lastAuthReply_);
                 mediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
