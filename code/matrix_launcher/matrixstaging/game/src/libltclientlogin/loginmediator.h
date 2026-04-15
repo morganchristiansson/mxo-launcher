@@ -1276,7 +1276,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     LaunchPadClient_0x4b0e48* EnsureLaunchPadClient65c();
     // anchor: launcher.exe:0x420e70
     void CommitSessionCallbackHelperGameSessionId664();
-    uint32_t InvokeLaunchPadClient65cVtable4IfPresent();
     // source-owned shared helper used by `CLTLoginState_State18` slot 3 / `0x421a50`
     void RefreshSessionHelperGameSessionId664FromSourceBlock94();
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
