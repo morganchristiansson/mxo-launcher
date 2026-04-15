@@ -1275,10 +1275,10 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // anchor: launcher.exe:0x420d00 / owner vtable +0x134
     SessionCallbackHelper65cSketch* EnsureSessionCallbackHelper65c();
     // anchor: launcher.exe:0x420e70
-    uint32_t CommitSessionCallbackHelperGameSessionId664();
+    void CommitSessionCallbackHelperGameSessionId664();
     uint32_t InvokeSessionCallbackHelper65cVtable4IfPresent();
     // source-owned shared helper used by `CLTLoginState_State18` slot 3 / `0x421a50`
-    uint32_t RefreshSessionHelperGameSessionId664FromSourceBlock94();
+    void RefreshSessionHelperGameSessionId664FromSourceBlock94();
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
     SessionCallbackHelper65cSketch* GetSessionCallbackHelper65c() const override;
     // anchor: launcher.exe:0x4202c0 / owner vtable +0x13c

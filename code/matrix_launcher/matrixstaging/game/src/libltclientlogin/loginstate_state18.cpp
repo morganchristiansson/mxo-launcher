@@ -21,7 +21,9 @@ void CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
     // - it then reaches `0x420e70`, which copies helper `+0x18` into owner `+0x664`
     //   (`GameSessionID`) when helper flag `+0x2d` is clear
     (void)upstreamOrArg;
-    (void)(mediator ? mediator->RefreshSessionHelperGameSessionId664FromSourceBlock94() : 0u);
+    if (mediator) {
+        mediator->RefreshSessionHelperGameSessionId664FromSourceBlock94();
+    }
     return;
 }
 

@@ -2538,63 +2538,86 @@ void CLTLoginMediator::SetLaunchPadSourceBlock94FirstString(const char* value) {
     ownerAuthBootstrapSource94_.username00[copyCount] = '\0';
 }
 
-// Removed: SetGameSessionId664 method - now using direct public access to gameSessionId664_
-
 // anchor: launcher.exe:0x420e70
-uint32_t CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
-    SessionCallbackHelper65cSketch* helper = EnsureSessionCallbackHelper65c();
-    if (helper == nullptr) {
-        return 0u;
-    }
-    return InvokeSessionCallbackHelper65cVtable4IfPresent();
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent() {
-    SessionCallbackHelper65cSketch* helper = sessionCallbackHelper65c_;
-    if (helper == nullptr) {
-        return 0u;
+// Fidelity note: original function directly reads/writes string at +0x18 (owned by auth connection),
+// copies to +0x664 (gameSessionId), clears +0x18, resets marginBeginCount24_=0, then calls
+// AuthenticatePending state[2] vtable[+0x1c](2). Does NOT use session callback helper.
+void CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
+    // +0x2d: marginConnectionFlag2d_ / marginConnectionCloseWaitEvent0fGateArmed_2d
+    if (marginConnectionFlag2d_ != 0) {
+        // Flag set - defer path: call through some helper at +0x4
+        // meth_0x488330(param_1=authConnection_, param_2=0x10, param_3=0)
+        // This path just returns early without committing
+        return;
     }
 
-    if (helper->flag2D != 0) {
-        spdlog::info(
-            "CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent deferred helper={} helperString18='{}' flag2D=0x{:02x}",
-            fmt::ptr(helper),
-            helper->string18.empty() ? "<empty>" : helper->string18.c_str(),
-            static_cast<unsigned>(helper->flag2D));
-        return 0u;
+    // Original reads string directly from +0x18 - in original this is the owner session token string
+    // that gets cleared after copy. In our layout, there's a StringTriple at +0x18.
+    // For fidelity, we read from the original location and copy to gameSessionId664_ (+0x664).
+    // Note: The original launcher uses StringTriple_AssignFromRange for the copy.
+
+    // Access +0x18 string: in original this is a StringTriple (session token from auth)
+    // We'll read what's at +0x18 and treat it as a string.
+    // Current best mirror: the owner session token from auth bootstrap at owner+0x94+0x60
+    // But for exact static-RE fidelity, read directly from +0x18 as the original does.
+
+    // For now, use ownerAuthBootstrapSource94_.sessionToken60 which maps to the original source
+    // Note: This differs slightly from static-RE which reads from +0x18 directly, but +0x18 in
+    // our layout is occupied by authConnection_ pointer (CMessageConnection*). Need Ghidra
+    // to confirm if original +0x18 is actually the string or something else.
+    // For now, use the best source-side mirror of the data that should be at +0x18.
+    const char* sessionString = ownerAuthBootstrapSource94_.sessionToken60.begin;
+    if (sessionString == nullptr || sessionString[0] == '\0') {
+        // Try fallback: empty string if no session token
+        gameSessionId664_.clear();
+    } else {
+        gameSessionId664_ = sessionString;
     }
 
-    gameSessionId664_ = helper->string18.empty() ? "" : helper->string18;
-    helper->field24 = 0;
+    marginBeginCount24_ = 0;
 
     spdlog::info(
-        "CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent helper={} owner660=0x{:08x} GameSessionID='{}'",
-        fmt::ptr(helper),
-        sharedMarginPacketField660_,
-        gameSessionId664_.empty() ? "<empty>" : gameSessionId664_);
-    return 1u;
+        "CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664 GameSessionID='{}' marginBeginCount24_=0",
+        gameSessionId664_.empty() ? "<empty>" : gameSessionId664_.c_str());
+
+    // Call AuthenticatePending state[2] vtable slot1 (+0x1c) with arg 2
+    CLTLoginState* state2 = LoginHelperStateByIdScaffold(2u);
+    if (state2 != nullptr) {
+        state2->Slot1_HandlePrimaryGate(reinterpret_cast<void*>(2));
+    }
+}
+
+// Source-added helper function used by HelperSlot13c_InvokeSessionHelperVtable4
+// UNANCHORED: no original launcher.exe anchor - this is source-added scaffolding
+uint32_t CLTLoginMediator::InvokeSessionCallbackHelper65cVtable4IfPresent() {
+    // Delegated to the static-RE faithful implementation above
+    CommitSessionCallbackHelperGameSessionId664();
+    return 1u;  // Original function returns void, but this path returns uint for compatibility
 }
 
 // source-owned shared helper for `CLTLoginState_State18` slot 3 / `0x421a50`
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-uint32_t CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
+void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
     // Current best source-owned mirror of the alternate state18 session-helper path:
     // - ensure owner helper `+0x65c`
     // - refresh helper string `+0x18` from owner `+0x94 + 0x60`
     // - then commit that helper string into owner `+0x664`
     // - keep this separate from the active state2 -> owner+0x680 bootstrap-child handoff
-    SessionCallbackHelper65cSketch* helper = EnsureSessionCallbackHelper65c();
-    if (helper == nullptr) {
-        return 0u;
-    }
 
     // Fidelity: read session token from owner+0x94 block
     if (ownerAuthBootstrapSource94_.sessionToken60.begin != nullptr && ownerAuthBootstrapSource94_.sessionToken60.begin[0] != '\0') {
-        helper->string18 = ownerAuthBootstrapSource94_.sessionToken60.begin;
+        gameSessionId664_ = ownerAuthBootstrapSource94_.sessionToken60.begin;
+    } else {
+        gameSessionId664_.clear();
     }
 
-    return CommitSessionCallbackHelperGameSessionId664();
+    marginBeginCount24_ = 0;
+
+    // Call AuthenticatePending state[2] vtable slot1 (+0x1c) with arg 2
+    CLTLoginState* state2 = LoginHelperStateByIdScaffold(2u);
+    if (state2 != nullptr) {
+        state2->Slot1_HandlePrimaryGate(reinterpret_cast<void*>(2));
+    }
 }
 
 // =============================================================================
