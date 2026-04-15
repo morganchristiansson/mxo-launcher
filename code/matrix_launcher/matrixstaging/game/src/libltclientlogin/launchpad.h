@@ -47,9 +47,8 @@ public:
 
     // Virtual method for vtable slot +0x04 call fidelity
     // anchor: launcher.exe:0x4203d0 / vtable[+0x04] = CheckObjectTimeout
-    virtual void InvokeVtableSlot4() {
-        // Original checks/handles timeouts on helper state
-    }
+    // This is called from CLTLoginMediator::HelperSlot13c_InvokeSessionHelperVtable4
+    virtual void InvokeVtableSlot4();
 
     // Source-owned success-path mirrors for the concrete mediator-owner writeback already proven in
     // the original LaunchPadClient handlers. Non-success branches remain documented in the vtable
