@@ -61,16 +61,17 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrAr
         return;
     }
 
-    // Ready-side handoff: extract exact call shape from owner+0x94 to match assembly
-    // vtable+0x168: gets send target from child->connection
-    // vtable+0x20: gets launcher version value
-    // vtable+0x38: gets username char* directly from owner+0x94
-    // password is username+0x20, session token is username+0x60
-    // UI MD5 is username+0x50, key MD5 is username+0x40
+    // Ready-side handoff: direct field access mirrors assembly:
+    //   call dword ptr [EDX + 0x168] -> GetAuthConnection returns authConnection_ at owner+0x18
+    //   call dword ptr [EAX + 0x20] -> GetNoPatchLauncherVersionValuePtr
+    //   call dword ptr [EDX + 0x38] -> GetUsername returns char* to owner+0x94 (username00)
+    //   mov ECX, dword ptr [EAX + 0x60] -> session token at owner+0xf4
     auto* child = mediator->authBootstrapChild680_.get();
-    // Send target comes from the auth connection object (vtable+0x168 returns connection)
-    void* sendTarget = mediator->AuthConnection();
-    const char* sessionToken = mediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
+    // Direct field access: owner+0x18 (authConnection_) instead of accessor
+    void* sendTarget = mediator->authConnection_;
+    // Direct offset access: owner+0x94 + 0x60 = ownerAuthBootstrapSource94_.sessionToken60.begin
+    const char* sessionToken = *reinterpret_cast<const char**>(
+        reinterpret_cast<uint8_t*>(&mediator->ownerAuthBootstrapSource94_) + 0x60);
 
     spdlog::info(
         "ROUTE CHECKPOINT: early-auth state2 ready-side owner+0x680 bootstrap-child dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
