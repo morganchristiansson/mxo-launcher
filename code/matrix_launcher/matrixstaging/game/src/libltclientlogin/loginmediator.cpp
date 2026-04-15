@@ -217,13 +217,13 @@ void CLTLoginMediator::CLTLoginMediatorSelectionRouteState::DestroySelectionRout
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 CLTLoginMediator::CLTLoginMediator()
     : engine_(nullptr),
-      currentState_(nullptr),
-      authConnection_(nullptr),
-      marginConnection_(nullptr),
       authConnectionOwnedByMediator_(false),
       marginConnectionOwnedByMediator_(false),
       authPeerCloseQueuedScaffold_(false),
       marginPeerCloseQueuedScaffold_(false),
+      authConnection_(nullptr),
+      marginConnection_(nullptr),
+      currentState_(nullptr),
       marginRouteState_{},
       marginAddressList3c_{},
       authBootstrapChild680_(nullptr),
