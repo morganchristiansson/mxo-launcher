@@ -842,20 +842,16 @@ public:
 
     // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse)
     // Handle decoded code 2: stage packet bytes and continue margin bootstrap handshake.
-    // UNANCHORED: original direct call is from CBaseMarginConnection::DispatchMessage to
-    // CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse.
+    // anchor: launcher.exe:0x4429b0 - takes 2 params (this, parsed message object)
     uint32_t HandleCode2ForBootstrap(
         const uint8_t* packetBytes,
-        size_t packetSize,
-        bool transportEncrypted);
+        size_t packetSize);
 
-    // anchor: launcher.exe:0x442d00 -> 0x442d83 -> 0x441850 (meth_0x441850 -> CBaseMarginConnection_HandleCode4CertChallengeAndSendResponse)
     // Handle decoded code 4: set success flag, synthesize local completion work item, continue bootstrap.
-    // UNANCHORED: original direct call is from CBaseMarginConnection::DispatchMessage to meth_0x441850.
+    // anchor: launcher.exe:0x441850 - takes 2 params (this, parsed message object)
     uint32_t HandleCode4ForBootstrap(
         const uint8_t* packetBytes,
-        size_t packetSize,
-        bool transportEncrypted);
+        size_t packetSize);
 
 protected:
     // anchor: launcher.exe:0x442d00 -> vtable `+0x2c`

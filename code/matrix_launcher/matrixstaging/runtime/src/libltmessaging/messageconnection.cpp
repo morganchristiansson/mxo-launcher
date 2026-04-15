@@ -2589,25 +2589,37 @@ const uint8_t* CBaseMarginConnection::MessageCode5SeedBytes85Pointer() const {
 // Note: Original uses raw vtable[2] function pointer call. Our C++ implementation uses virtual
 // methods for the message ref, so we model this as the inner storage Release which runs after
 // dispatch completes. The original callback signals the completion helper for async flows.
+// anchor: launcher.exe:0x442daa / 0x442dac / 0x442d65 / vtable+0x08
+// anchor: launcher.exe:0x442da6 / 0x442d65
+// Original invokes completion callback via vtable+0x8 on the parse-result object returned
+// by OnMessageCodeX. The callback fires only when OnMessageCode returns a valid parse object,
+// not based on our parse-success determination. This is the key fidelity point: original flow
+// checks parse result object validity (non-null), extracts callback from that object, calls it.
+// We model this callback for tracing; the original invokes completion via:
+// (**(code **)(*completionCallback + 8))()
+// The messageRef is kept alive by the caller's unique_ptr through the dispatch.
 static void CBaseMarginConnection_InvokeMessageRefCompletionCallback(
-    CMessageConnectionMessageRef* messageRef) {
-    if (!messageRef) {
+    CMessageConnectionMessageRef* messageRef,
+    void** completionCallbackSlot) {
+    if (!completionCallbackSlot || *completionCallbackSlot == nullptr) {
         return;
     }
-    // In the original, this invokes vtable+0x08 which signals the completion helper.
-    // In our scaffold, we let the caller manage async completion through the work-item flow.
-    // The message ref will be released by the caller's unique_ptr deleter.
-    (void)messageRef;
+    spdlog::trace(
+        "CBaseMarginConnection_InvokeMessageRefCompletionCallback callback={} messageRef={}",
+        fmt::ptr(*completionCallbackSlot),
+        fmt::ptr(messageRef));
+    // Note: In original, this is (**(code **)(*callback + 8))(); call vtable+0x8
+    // The callback signals back to the connection completion chain (connection+0x94 vtable+0x08)
 }
 
 // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0
 // Original dispatches directly to CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse.
 // This scaffold handles the code 2 flow. We call through to the existing mediator bootstrap logic.
 // UNANCHORED: keeping bootstrap logic local in structure, but calling through to existing code.
+// anchor: launcher.exe:0x4429b0
 uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     const uint8_t* packetBytes,
-    size_t packetSize,
-    bool transportEncrypted) {
+    size_t packetSize) {
     if (!packetBytes || packetSize == 0u) {
         return 0u;
     }
@@ -2621,17 +2633,17 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     // Original does cert challenge crypto here. For now, delegate to existing bootstrap continue.
     // TODO: implement full cert challenge/response at 0x4429b0
     mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-    return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, transportEncrypted);
+    return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
 }
 
 // anchor: launcher.exe:0x442d00 -> 0x442d83 -> 0x441850
 // Original dispatches directly to meth_0x441850 - sets byte+0x84 if status==0, synthesizes local work.
 // This scaffold mirrors that direct connection flow.
 // UNANCHORED: keeps bootstrap logic local to connection, mediator only involved via later work-item.
+// anchor: launcher.exe:0x441850
 uint32_t CBaseMarginConnection::HandleCode4ForBootstrap(
     const uint8_t* packetBytes,
-    size_t packetSize,
-    bool transportEncrypted) {
+    size_t packetSize) {
     if (!packetBytes || packetSize < 5u) {
         return 0u;
     }
@@ -2691,6 +2703,11 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
 
     const std::string remoteHostForLog =
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName();
+    // anchor: launcher.exe:0x442d30 / decode result object pointer stored at EBP-0x14 for code2/4
+    // Original: Completion callback is stored in the parse result object returned by OnMessageCodeX.
+    // The parse result buffer is stack-allocated and contains: [callback, parsed data].
+    // Our scaffolds don't track the callback directly - they just do payload resolution.
+    void* code2CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 2u) {
         CBaseMarginConnectionCode2MessageScaffold code2Message = {};
         const bool parsedCode2 =
@@ -2708,8 +2725,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             // anchor: launcher.exe:0x442d9e -> 0x4429b0
             handledCode2 = HandleCode2ForBootstrap(
                 logicalPayloadBytes,
-                logicalPayloadByteCount,
-                /*transportEncrypted=*/false);
+                logicalPayloadByteCount);
         }
         spdlog::info(
             "CBaseMarginConnection::DispatchMessage consumed code2 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode2={} logicalPayloadBytes={} marginOwnerPath={} handledCode2={} this={} ownerContext={} currentState={} remoteHost='{}'",
@@ -2724,11 +2740,21 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             fmt::ptr(OwnerContext()),
             fmt::ptr(mediator ? mediator->currentState_ : nullptr),
             remoteHostForLog);
-        // anchor: launcher.exe:0x442d9e -> 0x4429b0 -> completion callback at 0x442daa/0x442d65
-        CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef);
+        // anchor: launcher.exe:0x442da6-0x442dac - callback only fires if OnMessageCode2 result non-null
+        // In original: extracts callback from parse-result object (at EBP-0x14 + 0), calls vtable+0x8
+        // The parse result buffer contains callback at offset 0. Here we simulate the callback-fire
+        // based on having gotten to this point - the original checks for non-null parse result object.
+        // Note: In original, callback comes from the OnMessageCode2 return value's vtable structure.
+        // We simulate: callback fires if OnMessageCode2 returned a valid result object (parsedCode2).
+        if (parsedCode2) {
+            // Simulated parse-result callback: original extracts from code4And5ParseResult[0]
+            CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code2CompletionCallbackSlot);
+        }
         return 1u;
     }
 
+    // anchor: launcher.exe:0x442d38 - similar to code2, parse result stored at EBP-0x14 with callback at +0
+    void* code4CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 4u) {
         CBaseMarginConnectionCode4MessageScaffold code4Message = {};
         const bool parsedCode4 =
@@ -2746,8 +2772,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             // anchor: launcher.exe:0x442d83 -> 0x441850
             handledCode4 = HandleCode4ForBootstrap(
                 logicalPayloadBytes,
-                logicalPayloadByteCount,
-                /*transportEncrypted=*/false);
+                logicalPayloadByteCount);
         }
         spdlog::info(
             "CBaseMarginConnection::DispatchMessage consumed code4 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode4={} logicalPayloadBytes={} status=0x{:08x} marginOwnerPath={} handledCode4={} connectionByte84={} this={} ownerContext={} currentState={} remoteHost='{}'",
@@ -2764,13 +2789,17 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             fmt::ptr(OwnerContext()),
             fmt::ptr(mediator ? mediator->currentState_ : nullptr),
             remoteHostForLog);
-        // anchor: launcher.exe:0x442d83 -> call meth_0x441850, then completion callback at 0x442dac
-        // Note: meth_0x441850 synthesizes a local type-0x0b work item and sends it through
-        // connection vtable+0x10. Our scaffold handles this via the mediator callbacks above.
-        CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef);
+        // anchor: 0x442da6-0x442dac - callback only fires if OnMessageCode4 result non-null
+        // In original: extracts callback from parse-result (EBP-0x14 + 0), calls vtable+0x8
+        // Here we simulate: callback fires if parsing/result object was non-null
+        if (parsedCode4) {
+            CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code4CompletionCallbackSlot);
+        }
         return 1u;
     }
 
+    // anchor: launcher.exe:0x442d42 / EBP-0xc contains parse result for code5 (different stack offset than 2/4)
+    void* code5CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 5u) {
         CBaseMarginConnectionCode5MessageScaffold code5Message = {};
         const bool parsedCode5 =
@@ -2785,7 +2814,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
         const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
         if (parsedCode5) {
             // anchor: launcher.exe:0x442d42..0x442d5e / direct write to this+0x85..0x91
-            // Original writes directly: [ESI+0x85]=EAX+1, [ESI+0x89]=EAX+5, [ESI+0x8d]=EAX+9, [ESI+0x91]=EAX+0xd
+            // Original writes directly from parse result buffer+1,+5,+9,+d to this+0x85,0x89,0x8d,0x91
             SetMessageCode5SeedBytes85(code5Message.seedBytes0c);
             spdlog::info(
                 "CBaseMarginConnection::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
@@ -2802,8 +2831,12 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
                 fmt::ptr(OwnerContext()),
                 fmt::ptr(mediator ? mediator->currentState_ : nullptr),
                 remoteHostForLog);
+            // Original callback for code5: after writing bytes, checks callback from parse result
+            // at [EBP-0xc], calls vtable+0x8 if non-null, THEN returns (callbackResult << 8) | 1
+            // Our callback simulation fires after write, before return.
+            CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code5CompletionCallbackSlot);
         } else {
-            spdlog::info(
+            spdlog::warn(
                 "CBaseMarginConnection::DispatchMessage consumed short/malformed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=0 logicalPayloadBytes={} this={} ownerContext={} currentState={} remoteHost='{}'",
                 static_cast<unsigned>(rawCode),
                 usedHeaderlessLocatorDecode ? 1u : 0u,
@@ -2814,8 +2847,8 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
                 fmt::ptr(mediator ? mediator->currentState_ : nullptr),
                 remoteHostForLog);
         }
-        // anchor: launcher.exe:0x442d68 / completion callback after code5
-        CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef);
+        // anchor: 0x442d59-0x442d65 - callback only fires if OnMessageCode5 result non-null
+        // Note: In original, the callback check and invocation happens BEFORE return for code5.
         return 1u;
     }
 
