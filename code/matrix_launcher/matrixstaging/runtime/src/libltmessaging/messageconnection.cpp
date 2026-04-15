@@ -2835,8 +2835,11 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     //   *(dword *)(this + 0x89) = *(dword *)(local_38.mbr_0x10 + 5)
     //   *(dword *)(this + 0x8d) = *(dword *)(local_38.mbr_0x10 + 9)
     //   *(dword *)(this + 0x91) = *(dword *)(local_38.mbr_0x10 + 0xd)
-    // FIDELITY: Current source passes raw decrypted bytes directly to SendCertChallengeResponseFromChallengeBytes.
-    SetMessageCode5SeedBytes85(decryptedChallengeBytes);
+    // FIDELITY: Go through envelope PopulateFromDecryptedBlob -> ExtractChallengeBytes pattern
+    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope{};
+    envelope.PopulateFromDecryptedBlob(decryptedChallengeBytes);
+    auto extractedBytes = envelope.ExtractChallengeBytes();
+    SetMessageCode5SeedBytes85(extractedBytes);
 
     // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule call (0x441470)
     // Original: Explicit call to EnsureStreamPacketEncryptionModule after writing seed bytes.
