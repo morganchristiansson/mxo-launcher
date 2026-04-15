@@ -2818,18 +2818,7 @@ uint32_t CLTLoginMediator::SendMarginFramedPacket(
     return sendResult;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::ResetMarginBootstrapState() {
-    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
-    marginBootstrapState.phase = MarginBootstrapPhase::kIdle;
-    marginBootstrapState.authReplyPrivateExponentBytes.clear();
-    marginBootstrapState.marginTwofishKeyBytes.clear();
-    marginBootstrapState.certChallengeBytes.clear();
-    marginBootstrapState.marginSessionId = 0u;
-    marginBootstrapState.state6UdpSessionSecretF18 = 0u;
-    postAuthMarginLoadingState_.state10SendGateFlagF14 = 0u;
-    stagedIncomingMarginPacketBytes_.clear();
-}
+
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
@@ -2848,6 +2837,22 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 "launcher-owned margin bootstrap received CERT_Challenge transportEncrypted={} payloadLen={}",
                 transportEncrypted ? 1u : 0u,
                 payloadSize);
+
+            // REMOVED from auth-reply path (unfaithful static RE from launcher.exe:0x43f300)
+            // Original does inline recovery during margin bootstrap, not pre-recovery at auth-reply success.
+            // Do lazy inline recovery if buffer is empty (original recovers inline via margin +0xa0 bootstrap object).
+            if (marginBootstrapState.authReplyPrivateExponentBytes.empty()) {
+                spdlog::info(
+                    "DIAGNOSTIC: lazy inline private exponent recovery for margin CERT_Challenge (original recovers inline from margin +0xa0 bootstrap object)");
+                if (!mxo::auth::DecryptAuthReplyPrivateExponent(
+                        lastAuthReply_,
+                        lastAuthRequestBuildResult_.twofishKeyBytes,
+                        lastAuthChallenge_.encryptedChallengeBytes,
+                        &marginBootstrapState.authReplyPrivateExponentBytes)) {
+                    marginBootstrapState.authReplyPrivateExponentBytes.clear();
+                    spdlog::info("DIAGNOSTIC: inline private exponent recovery failed");
+                }
+            }
 
             mxo::auth::MarginCertChallenge challenge;
             if (!mxo::auth::ParseMarginCertChallengePayload(
@@ -3399,22 +3404,6 @@ void CLTLoginMediator::PersistCharactersIniFromRecoveredAuthStateScaffold() cons
 }
 
 
-
-// UNANCHORED: narrower mediator-owned bridge into the auth-reply-derived margin-bootstrap
-// sidecar. State10 owns the broader raw-0x0b parse/adopt body and calls this only for the
-// private-exponent recovery step.
-void CLTLoginMediator::RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(
-    const mxo::auth::AuthReply& reply) {
-    MarginBootstrapSessionState& marginBootstrapState = MutableMarginBootstrapState(this);
-    if (!mxo::auth::DecryptAuthReplyPrivateExponent(
-            reply,
-            lastAuthRequestBuildResult_.twofishKeyBytes,
-            lastAuthChallenge_.encryptedChallengeBytes,
-            &marginBootstrapState.authReplyPrivateExponentBytes)) {
-        marginBootstrapState.authReplyPrivateExponentBytes.clear();
-        spdlog::info("DIAGNOSTIC: launcher-owned auth could not recover private exponent bytes needed for later margin CERT bootstrap");
-    }
-}
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() const {

@@ -1443,7 +1443,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     bool HasValidState5ReplyCopyShadowF4Scaffold() const;
 
 private:
-    void RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(const mxo::auth::AuthReply& reply);
     void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
@@ -1478,7 +1477,6 @@ private:
     // - margin CERT/MS bootstrap/session storage is intentionally kept in a sidecar keyed by the
     //   mediator pointer in `loginmediator.cpp`
     // - do not add those transient fields into the middle of `CLTLoginMediator`
-    void ResetMarginBootstrapState();
     void FreeLateEntryList1470StorageScaffold();
 
     void BuildAuthEndpoint();

@@ -133,6 +133,8 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
     }
 
     mediator->worldListCountOrStatus80 = mediator->authBootstrapChild680_->inboundAuthStatusEc;
+    // anchor: launcher.exe:0x43f300 / sets authConnectionFlag2c_ = 1 when childResult != 0 && childResult != 1
+    mediator->authConnectionFlag2c_ = 1u;
 
     switch (childResult) {
         case kAuthBootstrap680InboundAuthReplySuccess: {
@@ -140,8 +142,10 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
                 *mediator->authBootstrapChild680_,
                 *mediator,
                 mediator->lastAuthReply_);
-            mediator->ResetMarginBootstrapState();
-            mediator->RecoverAuthReplyPrivateExponentIntoMarginBootstrapState(mediator->lastAuthReply_);
+            // REMOVED for fidelity: original at 0x43f300 does NOT call ResetMarginBootstrapState or
+            // RecoverAuthReplyPrivateExponentIntoMarginBootstrapState in auth-reply success path.
+            // Original does inline recovery during margin CERT_Challenge (via margin +0xa0 bootstrap object).
+            // See ContinueMarginBootstrapHandshake for lazy inline recovery implementation.
             AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
             if (AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold()) {
                 CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
