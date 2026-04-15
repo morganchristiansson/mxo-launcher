@@ -352,6 +352,59 @@ struct CMessageConnectionPacketBuilderPayloadScaffold {
     uint8_t* packetPayload10 = nullptr;
 };
 
+/**
+ * VTable `0x004b6538` - CLTLoginMediatorPacketBuilderEnvelope for challenge response (packet 0x03)
+ *
+ * Derived local envelope used by `CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse`
+ * (0x4429b0) to construct the CERT_ChallengeResponse packet.
+ *
+ * Layout mirrors CMessageConnectionPacketBuilderPayloadScaffold but with specific vtable dispatch:
+ * - `vtable+0` = PacketBuilder_Destroy (0x443aa0)
+ * - `vtable+1` = cls_0x4b6538 ctor (0x443220) - creates envelope with '\x01' flag
+ * - `vtable+2` = virt_meth_0x442690 (debug/serialization)
+ * - `vtable+3` = virt_meth_0x4419c0 (init/cleanup)
+ * - `vtable+4` = EnsureStreamPacketEncryptionModule (0x441470)
+ *
+ * The constructor at 0x443220:
+ * 1. Takes messageRef pointer and '\x01' flag
+ * 2. Stores 16 bytes at mbr_0x10 for extraction from +1/+5/+9/+0xd
+ * 3. Sets up packet builder envelope with opcode 0x03
+ *
+ * Usage in 0x4429b0:
+ * 1. Create cls_0x4b6538 envelope with messageRef and '\x01' flag
+ * 2. Extract 16 bytes from envelope.mbr_0x10 + 1/+5/+9/+0xd
+ * 3. Write to connection fields at this+0x85/0x89/0x8d/0x91
+ * 4. Initialize packet builder envelope via CLTLoginMediatorPacketBuilderEnvelope_Initialize
+ * 5. Set opcode 0x11 and copy challenge bytes from envelope.mbr_0x10 + 0x11/+0x15/+0x19/+0x1d
+ * 6. Send via connection vtable+0x24
+ */
+class CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 {
+public:
+    // anchor: launcher.exe vtable `0x004b6538`
+    CMessageConnectionPacketBuilderPayloadScaffold builder00{};  // +0x00 (shared front matter)
+    
+    // Derived fields for challenge-response envelope
+    // The mbr_0x10 layout is used for extracting 16 bytes at offsets +1/+5/+9/+0xd
+    uint8_t padding20_2f[16] = {0u};
+    
+    // anchor: launcher.exe:0x443220 - constructor stores these bytes from decrypted challenge blob
+    // Extracted via: *(dword *)(this + 0x85) = *(dword *)(mbr_0x10 + 1)
+    //               *(dword *)(this + 0x89) = *(dword *)(mbr_0x10 + 5)
+    //               *(dword *)(this + 0x8d) = *(dword *)(mbr_0x10 + 9)
+    //               *(dword *)(this + 0x91) = *(dword *)(mbr_0x10 + 0xd)
+    
+    // Size: 0x20 (32 bytes) - shared front matter (0x10) + mbr_0x10 storage (0x10)
+    static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x20, 
+                  "CLTLoginMediatorPacketBuilderEnvelope size mismatch");
+
+private:
+    // Forward declarations for vtable methods
+    virtual ~CLTLoginMediatorPacketBuilderEnvelope() = default;
+    virtual uint32_t dummyVTableMethod0() const { return 0; }
+    virtual void dummyVTableMethod1() {}  // virt_meth_0x442690 (debug)
+    virtual void dummyVTableMethod2() {}  // virt_meth_0x4419c0 (init/cleanup)
+};
+
 static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPayload10) == 0x10, "packet-builder payload pointer offset mismatch");
 
 struct CMessageConnectionPacketBuilderPayloadWithReservationScaffold {
