@@ -9,6 +9,10 @@
 namespace mxo {
 namespace ltlogin {
 
+// Forward declarations
+class CLTLoginMediator;
+class LaunchPadClient_0x4b0e48;
+
 // Forward declarations for message ref classes
 namespace liblttcp {
 class CMessageConnectionMessageRef;
@@ -171,32 +175,8 @@ struct LateEntryList1470VectorLikeSketch {
     LateEntryList1470EntrySketch* capacity = nullptr;
 };
 
-// Session callback helper object at owner +0x65c.
-// Concrete chain:
-// - owner vtable `+0x130` / `0x41f310` returns this helper
-// - owner vtable `+0x134` / `0x420d00` lazy-allocates it through `0x420ca0`
-// - owner vtable `+0x13c` / `0x4202c0` pumps helper vtable `+0x04` when present
-// - helper `+0x18` is a small-string object
-// - `0x421a50` refreshes that helper string from owner `+0x94 + 0x60`
-// - `0x420e70` then copies helper `+0x18` into owner `+0x664`
-//
-// Note: original initialization sets vtable to 0x4b0e48 (shared with LaunchPadClient).
-// slot +0x04 -> CheckObjectTimeout (0x4203d0).
-class SessionCallbackHelper65cSketch {
-public:
-    // Virtual method for vtable slot +0x04 call fidelity
-    // anchor: launcher.exe:0x4203d0 / vtable[+0x04] = CheckObjectTimeout
-    virtual void InvokeVtableSlot4() {
-        // Original checks/handles timeouts on helper state
-    }
-
-    void* owner10 = nullptr;            // helper `+0x10`
-    std::string string18;               // helper `+0x18`
-    uint32_t field24 = 0;               // helper `+0x24`
-    uint32_t field28 = 0;               // helper `+0x28`
-    uint8_t flag2C = 0;                 // helper `+0x2c`
-    uint8_t flag2D = 0;                 // helper `+0x2d`
-};
+// SessionCallbackHelper65cSketch is now LaunchPadClient_0x4b0e48 (see launchpad.h)
+// The session callback helper at CLTLoginMediator +0x65c is a LaunchPadClient instance.
 
 struct ProcessLoginRequestInputSketch {
     // owner vtable `+0x30` / `0x41ecd0 = CLTLoginMediator::ProcessLoginRequest`
@@ -552,9 +532,9 @@ public:
     // +0x12c
     void UnknownSlot75();
     // +0x130
-    virtual SessionCallbackHelper65cSketch* GetSessionCallbackHelper65c() const = 0;
+    virtual LaunchPadClient_0x4b0e48* GetSessionCallbackHelper65c() const = 0;
     // +0x134
-    virtual SessionCallbackHelper65cSketch* EnsureSessionCallbackHelper65c() = 0;
+    virtual LaunchPadClient_0x4b0e48* EnsureSessionCallbackHelper65c() = 0;
     // +0x138
     void UnknownSlot78();
     // +0x13c

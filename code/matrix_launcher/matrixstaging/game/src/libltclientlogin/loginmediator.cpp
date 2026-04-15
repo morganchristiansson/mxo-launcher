@@ -28,6 +28,7 @@
 
 #include "loginmediator.h"
 #include "loginmediator_events.h"
+#include "launchpad.h"
 
 #include "loginstate.h"
 #include "../../../../src/launcher_mediator_abi.h"
@@ -580,14 +581,14 @@ uint32_t CLTLoginMediator::ProcessLoginRequest(const ProcessLoginRequestInputSke
     }
 
     if (sessionCallbackHelper65c_ != nullptr) {
-        const char* helperString = sessionCallbackHelper65c_->string18.c_str();
+        const char* helperString = sessionCallbackHelper65c_->authConnection18.c_str();
         // Fidelity: refresh session token in owner+0x94 block
         ownerAuthBootstrapSource94_.sessionToken60.begin = helperString;
-        ownerAuthBootstrapSource94_.sessionToken60.current = helperString + sessionCallbackHelper65c_->string18.size();
+        ownerAuthBootstrapSource94_.sessionToken60.current = helperString + sessionCallbackHelper65c_->authConnection18.size();
         ownerAuthBootstrapSource94_.sessionToken60.capacity = ownerAuthBootstrapSource94_.sessionToken60.current;
         spdlog::info(
             "CLTLoginMediator::ProcessLoginRequest alternate g_LaunchPadGateState16State18!=0 branch refreshed owner+0xf4 from helper65c string18='{}'",
-            sessionCallbackHelper65c_->string18.empty() ? "<empty>" : sessionCallbackHelper65c_->string18.c_str());
+            sessionCallbackHelper65c_->authConnection18.empty() ? "<empty>" : sessionCallbackHelper65c_->authConnection18.c_str());
     }
 
     spdlog::info(
@@ -1798,19 +1799,19 @@ void CLTLoginMediator::ProvideStartupTriple(void* netShell, void* netMgr, void* 
 }
 
 // anchor: launcher.exe:0x41f310 slot +0x130
-[[maybe_unused]] SessionCallbackHelper65cSketch* CLTLoginMediator::GetSessionCallbackHelper65c() const {
+[[maybe_unused]] LaunchPadClient_0x4b0e48* CLTLoginMediator::GetSessionCallbackHelper65c() const {
     // Tiny owner-vtable getter used by the later session-callback helper family.
     return sessionCallbackHelper65c_;
 }
 
 // anchor: launcher.exe:0x420d00 +0x134
 // Lazy allocator for mediator owner +0x65c session callback helper.
-// Allocates 0x30 bytes and initializes when null.
-SessionCallbackHelper65cSketch* CLTLoginMediator::EnsureSessionCallbackHelper65c() {
+// Allocates and initializes a LaunchPadClient_0x4b0e48 when null.
+LaunchPadClient_0x4b0e48* CLTLoginMediator::EnsureSessionCallbackHelper65c() {
     if (sessionCallbackHelper65c_ == nullptr) {
         // Fidelity: original allocates 0x30 bytes with malloc
-        sessionCallbackHelper65c_ = new SessionCallbackHelper65cSketch();
-        sessionCallbackHelper65c_->owner10 = this;
+        sessionCallbackHelper65c_ = new LaunchPadClient_0x4b0e48();
+        sessionCallbackHelper65c_->currentState10 = this;
     }
     return sessionCallbackHelper65c_;
 }

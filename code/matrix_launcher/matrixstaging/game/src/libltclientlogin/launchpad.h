@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace mxo::ltlogin {
 
@@ -37,9 +38,18 @@ class CLTLoginMediator;
 // - it is **not** the `CLTLoginMediator` class and **not** part of the `CLTLoginState_*` family
 // - the mediator pointer passed into the success-path mirrors below is only the downstream owner
 //   writeback target recovered from the original handlers
-class LaunchPadClient {
+//
+// Note: CLTLoginMediator lazy-allocates a LaunchPadClient_0x4b0e48 at owner+0x65c
+// and calls through its vtable[+0x04] (CheckObjectTimeout).
+class LaunchPadClient_0x4b0e48 {
 public:
-    LaunchPadClient() = default;
+    LaunchPadClient_0x4b0e48() = default;
+
+    // Virtual method for vtable slot +0x04 call fidelity
+    // anchor: launcher.exe:0x4203d0 / vtable[+0x04] = CheckObjectTimeout
+    virtual void InvokeVtableSlot4() {
+        // Original checks/handles timeouts on helper state
+    }
 
     // Source-owned success-path mirrors for the concrete mediator-owner writeback already proven in
     // the original LaunchPadClient handlers. Non-success branches remain documented in the vtable
@@ -58,6 +68,18 @@ public:
     uint32_t OnConnectionOpened();        // launcher.exe:0x420440
     uint32_t OnSessionClosed();           // launcher.exe:0x4204f0
     uint32_t OnSubscriptionValidation();  // launcher.exe:0x420580
+
+    // Fields for session callback helper at CLTLoginMediator +0x65c
+    // These are used when this object is allocated as the session callback helper
+    void* currentState10 = nullptr;      // helper +0x10 -> owner/mediator pointer
+    std::string authConnection18;        // helper +0x18
+    uint32_t marginBeginCount24 = 0;     // helper +0x24
+    uint32_t authConnectAttemptCount28 = 0;  // helper +0x28
+    uint8_t authConnectionFlag2c = 0;    // helper +0x2c
+    uint8_t marginConnectionCloseWaitEvent0fGateArmed_2d = 0;  // helper +0x2d
 };
+
+// Backward compatibility alias
+using LaunchPadClient = LaunchPadClient_0x4b0e48;
 
 }  // namespace mxo::ltlogin

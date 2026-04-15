@@ -1273,14 +1273,14 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // anchor: launcher.exe:0x41f330 / owner vtable +0x14c
     void SetSharedMarginPacketField660(uint32_t value);
     // anchor: launcher.exe:0x420d00 / owner vtable +0x134
-    SessionCallbackHelper65cSketch* EnsureSessionCallbackHelper65c();
+    LaunchPadClient_0x4b0e48* EnsureSessionCallbackHelper65c();
     // anchor: launcher.exe:0x420e70
     void CommitSessionCallbackHelperGameSessionId664();
     uint32_t InvokeSessionCallbackHelper65cVtable4IfPresent();
     // source-owned shared helper used by `CLTLoginState_State18` slot 3 / `0x421a50`
     void RefreshSessionHelperGameSessionId664FromSourceBlock94();
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
-    SessionCallbackHelper65cSketch* GetSessionCallbackHelper65c() const override;
+    LaunchPadClient_0x4b0e48* GetSessionCallbackHelper65c() const override;
     // anchor: launcher.exe:0x4202c0 / owner vtable +0x13c
     void HelperSlot13c_InvokeSessionHelperVtable4() override;
     // anchor: launcher.exe:0x41b260
@@ -1592,9 +1592,9 @@ public:
     std::unique_ptr<AuthBootstrap680Child_0x441290> authBootstrapChild680_;
     // Source-owned mirror for owner `+0x65c`.
     // anchor: launcher.exe:0x41f310 / owner vtable +0x130
-    // Lazily allocated session callback helper whose `+0x18` string can later feed owner `+0x664`.
-    SessionCallbackHelper65cSketch sessionCallbackHelper65cState_{};
-    SessionCallbackHelper65cSketch* sessionCallbackHelper65c_ = nullptr;
+    // Lazily allocated session callback helper (a LaunchPadClient_0x4b0e48)
+    // whose `+0x18` string can later feed owner `+0x664`.
+    LaunchPadClient_0x4b0e48* sessionCallbackHelper65c_ = nullptr;
     uint32_t sharedMarginPacketField660_ = 0;  // owner `+0x660`
 public:
     std::string gameSessionId664_;             // owner `+0x664` (public for direct access)
