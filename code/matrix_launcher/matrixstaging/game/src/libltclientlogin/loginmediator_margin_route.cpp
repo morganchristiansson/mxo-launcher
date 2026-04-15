@@ -165,7 +165,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     if (!marginHost.empty()) {
         connection->SetRemoteHostName(marginHost.c_str());
     }
-    connection->SetRemoteEndpoint(marginEndpoint_);
+    connection->remoteEndpoint_ = marginEndpoint_;
 
     const uint32_t result = connection->EnsureConnected();
     spdlog::info(

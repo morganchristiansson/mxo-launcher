@@ -263,7 +263,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     }
 
     connection->SetRemoteHostName(authServerDnsName_.c_str());
-    connection->SetRemoteEndpoint(authEndpoint_);
+    connection->remoteEndpoint_ = authEndpoint_;
 
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> EnsureConnected()",

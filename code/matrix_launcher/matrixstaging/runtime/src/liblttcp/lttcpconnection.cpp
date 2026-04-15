@@ -488,15 +488,6 @@ LTTCPEngineConnectionState CLTTCPConnection::State() const {
     return CBaseConnection::State();
 }
 
-// UNANCHORED: source-owned endpoint setter over the recovered connection `+0x24` copy.
-void CLTTCPConnection::SetRemoteEndpoint(const LTTCPEndpointKey& endpoint) {
-    endpoint.CopyTo(&remoteEndpoint_);
-}
-
-// UNANCHORED: source-owned endpoint accessor over the recovered connection `+0x24` copy.
-const LTTCPEndpointKey& CLTTCPConnection::RemoteEndpoint() const {
-    return remoteEndpoint_;
-}
 
 // UNANCHORED: source-owned hostname setter used by the current resolver scaffold.
 void CLTTCPConnection::SetRemoteHostName(const char* hostName) {

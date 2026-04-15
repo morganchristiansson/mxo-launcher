@@ -1941,7 +1941,7 @@ uint32_t CMessageConnection::EnsureConnected() {
         return 0;
     }
 
-    const uint32_t result = CLTTCPConnection::Connect(RemoteEndpoint());
+    const uint32_t result = CLTTCPConnection::Connect(this->remoteEndpoint_);
     if (result == 0u) {
         spdlog::debug(
             "CMessageConnection::EnsureConnected connect failed this={} ownerContext={} remoteHost='{}'",

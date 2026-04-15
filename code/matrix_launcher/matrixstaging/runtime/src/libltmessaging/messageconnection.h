@@ -607,7 +607,7 @@ public:
 
     // anchor family: launcher.exe:0x449cd0
     // Source-owned bool-return wrapper over the inherited `CLTTCPConnection::Connect` body that
-    // copies `RemoteEndpoint()` into connection `+0x24` and then calls engine slot `+0x18`.
+    // reads connection `remoteEndpoint_` directly and then calls engine slot `+0x18`.
     uint32_t EnsureConnected();
 
     // anchor family: launcher.exe:0x449d20

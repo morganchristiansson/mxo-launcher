@@ -2387,7 +2387,7 @@ uint32_t CLTThreadPerClientTCPEngine::Connect(void* contextKey) {
     }
 
     void* queuedConnectionContext = connection->QueueContextScaffold();
-    const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
+    const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
     if (connection->State() != LTTCPEngineConnectionState::kClosed) {
         spdlog::info(
             "CLTThreadPerClientTCPEngine::Connect rejected connection={} state={} remoteHost='{}' port={} ip=0x{:08x}",
@@ -2576,7 +2576,7 @@ uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
         // anchor: launcher.exe:0x42f9af / shutdown(socket, 1)
         const int shutdownResult = shutdown(static_cast<SOCKET>(connection->SocketHandle()), SD_SEND);
         if (shutdownResult == SOCKET_ERROR) {
-            const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
+            const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
             const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
             const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
             const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
@@ -2602,7 +2602,7 @@ uint32_t CLTThreadPerClientTCPEngine::Close(void* contextKey, bool graceful) {
     // anchor: launcher.exe:0x42fac0 / closesocket(socket)
     const int closeResult = closesocket(static_cast<SOCKET>(connection->SocketHandle()));
     if (closeResult == SOCKET_ERROR) {
-        const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
+        const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
         const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
         const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
         const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);
@@ -2664,7 +2664,7 @@ uint32_t CLTThreadPerClientTCPEngine::SendBuffer(
         return connection->SendRawSocketBufferScaffold(buffer, byteCount, completionContext);
     }
 
-    const LTTCPEndpointKey& remoteEndpoint = connection->RemoteEndpoint();
+    const LTTCPEndpointKey& remoteEndpoint = connection->remoteEndpoint_;
     const unsigned ipv4Byte0 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 0u) & 0xffu);
     const unsigned ipv4Byte1 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 8u) & 0xffu);
     const unsigned ipv4Byte2 = static_cast<unsigned>((remoteEndpoint.ipv4NetworkOrder >> 16u) & 0xffu);

@@ -401,11 +401,6 @@ public:
     // UNANCHORED: source-owned connection-state accessor used by the current scaffolds.
     LTTCPEngineConnectionState State() const;
 
-    // UNANCHORED: source-owned endpoint setter over the recovered connection +0x24 copy.
-    void SetRemoteEndpoint(const LTTCPEndpointKey& endpoint);
-    // UNANCHORED: source-owned endpoint accessor over the recovered connection +0x24 copy.
-    const LTTCPEndpointKey& RemoteEndpoint() const;
-
     // UNANCHORED: source-owned hostname setter used by the current resolver scaffold.
     void SetRemoteHostName(const char* hostName);
     // UNANCHORED: source-owned hostname accessor used by the current resolver scaffold.
