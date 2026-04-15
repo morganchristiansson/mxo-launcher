@@ -222,48 +222,75 @@ bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
 // anchor: launcher.exe:0x41d170
 uint32_t CLTLoginMediator::BeginAuthConnection() {
     // Address anchors:
-    // - launcher.exe:0x41d170 = strongest current BeginAuthConnection implementation
-    // - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection (upstream)
-    // - launcher.exe:0x440bb0 = auth-side dword-list iterator used from owner `+0x4c`
-    // - launcher.exe:0x44b090 = endpoint builder fed by the selected IPv4 + auth port
+    // - launcher.exe:0x41d170 = BeginAuthConnection implementation
+    // - launcher.exe:0x4417e0 = CLTLoginMediator_Helper1_StartAuthConnection (ctor for auth connection)
+    // - launcher.exe:0x440bb0 = CLTIPAddressList_GetNextAddress
+    // - launcher.exe:0x44b090 = endpoint builder helper (port from 0x004f7a50, ipv4 from iterator)
     //
-    // Current tightened launcher path:
-    // - this is reached only after owner-owned submit has already handed off from state0 -> state2
-    //   -> state1 on the happy path
-    // - clear owner byte `+0x2c`
-    // - increment owner dword `+0x28`
-    // - pull the next auth IPv4 dword from the iterator rooted at owner `+0x4c`
-    // - build endpoint at owner `+0x5c`
-    // - allocate auth-side CMessageConnection child
-    // - call `connection->+0x1c(owner+0x5c)` (ensure-connected wrapper)
-    authGetPublicKeyRequestSent_ = false;
-    authRequestSent_ = false;
-    authChallengeResponseSent_ = false;
-    authConnectionFlag2c_ = 0u;
-    // Fidelity improvement for launcher retry:
-    // - `0x41d170` allocates a fresh auth connection child at owner `+0x18`, but current static RE
-    //   does not show it clearing the broader owner `+0x680` bootstrap child or cached public-key
-    //   state on every retry
-    // - preserve the cached AS_GetPublicKeyReply / currentPublicKeyId / child worker family across
-    //   retries so later compact raw-`0x07` replies with no embedded key material can still reuse
-    //   the previously validated key when the publicKeyId matches
-    lastAuthRequestBuildResult_ = mxo::auth::AuthRequestBuildResult();
-    lastAuthChallenge_ = mxo::auth::AuthChallenge();
-    lastAuthReply_ = mxo::auth::AuthReply();
-    postAuthMarginAutoBeginAttemptedScaffold_ = false;
-    ResetMarginBootstrapState();
-    *authBootstrapChild680_;
-    expectedAuthRequestName_ = nullptr;
-    expectedMarginRequestName_ = nullptr;
-    BuildAuthEndpoint();
-    PrepareNextAuthEndpointForConnectAttemptScaffold();
+    // Call sequence:
+    // 1. vtable+0x164 (RequestAuthConnectionCloseWaitEvent1)
+    // 2. Allocation tracking via g_TrackedAllocationBytes/Count
+    // 3. malloc(0xa8) for auth connection
+    // 4. CLTLoginMediator_Helper1_StartAuthConnection(connection, engine)
+    // 5. Set vtable to 0x4afef0
+    // 6. Set owner context at offset 0xa4 to this
+    // 7. CMessageConnection_ConfigurePacketNameCallback(connection, 1, 0x41ce00)
+    // 8. Store connection at this+0x18
+    // 9. Clear byte at this+0x2c
+    // 10. Get next address from authAddressList at +0x4c
+    // 11. Build endpoint at +0x5c using helper at 0x44b090 with port from DAT_004f7a50
+    // 12. Increment counter at this+0x28
+    // 13. Call vtable+0x1c (EnsureConnected) with endpoint at +0x5c
+
+    // Call vtable slot 0x164 - close wait event before new connection
+    // anchor: launcher.exe:0x41d17c / vtable+0x164
+    RequestAuthConnectionCloseWaitEvent1();
+
+    // Allocate and initialize auth connection - replaces launcher.exe:0x41d1a9-0x41d1dd
+    // anchor: launcher.exe:0x41d1a9 / malloc(0xa8) and CLTLoginMediator_Helper1_StartAuthConnection
+    // anchor: launcher.exe:0x41d1d1 / vftptr = 0x4afef0, owner = this, ConfigurePacketNameCallback
     auto* connection = EnsureAuthConnectionObject();
     if (!connection) {
         return 0u;
     }
 
-    connection->SetRemoteHostName(authServerDnsName_.c_str());
+    // Clear flag byte at +0x2c - anchor: launcher.exe:0x41d1ee
+    // anchor: launcher.exe:0x41d1ee / byte ptr [ESI + 0x2c] = 0
+    authConnectionFlag2c_ = 0u;
+
+    // Get next IPv4 from address list - anchor: launcher.exe:0x41d1f2
+    // anchor: launcher.exe:0x41d1f2 / call CLTIPAddressList_GetNextAddress(ESI+0x4c, 1)
+    // anchor: launcher.exe:0x41d1e8 / LEA ECX, [ESI+0x4c] - auth address list at +0x4c
+    const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
+
+    // Build endpoint at +0x5c using helper at 0x44b090 - anchor: launcher.exe:0x41d205
+    // The helper takes the next IPv4 and port from DAT_004f7a50
+    // anchor: launcher.exe:0x41d1f7 / XOR ECX, ECX
+    // anchor: launcher.exe:0x41d1f9 / MOV CX, word ptr [0x004f7a50] - port from global
+    // anchor: launcher.exe:0x41d201 / PUSH EAX - next IPv4
+    // anchor: launcher.exe:0x41d202 / LEA ECX, [EBP-0x14] - local endpoint
+    // anchor: launcher.exe:0x41d205 / CALL 0x44b090
+    // anchor: launcher.exe:0x41d20a-0x41d225 / copy endpoint fields to this+0x5c
+    const uint16_t authPortNetworkOrder = *(uint16_t*)0x004f7a50;
+    mxo::liblttcp::LTTCPEndpointKey localEndpoint = {};
+    localEndpoint.family = 2;
+    localEndpoint.portNetworkOrder = authPortNetworkOrder;
+    localEndpoint.ipv4NetworkOrder = nextIpv4;
+    authEndpoint_ = localEndpoint;
+
+    // Increment attempt counter - anchor: launcher.exe:0x41d22b-0x41d22c
+    // anchor: launcher.exe:0x41d222 / MOV EDI, dword ptr [ESI+0x28]
+    // anchor: launcher.exe:0x41d22b / INC EDI
+    // anchor: launcher.exe:0x41d22c / MOV dword ptr [ESI+0x28], EDI
+    ++authConnectAttemptCount28_;
+
+    // Set connection endpoint and call EnsureConnected - anchor: launcher.exe:0x41d228-0x41d232
+    // anchor: launcher.exe:0x41d228 / MOV ECX, dword ptr [ESI+0x18] - load connection
+    // anchor: 0x41d22f / MOV EAX, dword ptr [ECX] - get vtable
+    // anchor: 0x41d231 / PUSH EDX - endpoint
+    // anchor: 0x41d232 / CALL dword ptr [EAX+0x1c] - EnsureConnected
     connection->remoteEndpoint_ = authEndpoint_;
+    connection->SetRemoteHostName(authServerDnsName_.c_str());
 
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> EnsureConnected()",
@@ -273,6 +300,9 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
         static_cast<unsigned>(authEndpoint_.ipv4NetworkOrder),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(authConnectionFlag2c_));
+
+    // Call EnsureConnected via vtable+0x1c - anchor: launcher.exe:0x41d232
+    // anchor: launcher.exe:0x41d232 / call dword ptr [ECX + 0x1c]
     return connection->EnsureConnected();
 }
 
