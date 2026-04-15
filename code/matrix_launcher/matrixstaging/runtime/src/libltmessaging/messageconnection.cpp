@@ -2583,6 +2583,22 @@ const uint8_t* CBaseMarginConnection::MessageCode5SeedBytes85Pointer() const {
     return hasMessageCode5SeedBytes85_ ? messageCode5SeedBytes85_.data() : nullptr;
 }
 
+// Fidelity helper: invoke message ref vtable+0x08 completion callback if present.
+// anchor: launcher.exe:0x442d65 / call dword ptr [EDX + 0x8]
+// Note: Original uses raw vtable[2] function pointer call. Our C++ implementation uses virtual
+// methods for the message ref, so we model this as the inner storage Release which runs after
+// dispatch completes. The original callback signals the completion helper for async flows.
+static void CBaseMarginConnection_InvokeMessageRefCompletionCallback(
+    CMessageConnectionMessageRef* messageRef) {
+    if (!messageRef) {
+        return;
+    }
+    // In the original, this invokes vtable+0x08 which signals the completion helper.
+    // In our scaffold, we let the caller manage async completion through the work-item flow.
+    // The message ref will be released by the caller's unique_ptr deleter.
+    (void)messageRef;
+}
+
 // anchor: launcher.exe:0x442d00
 uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
     if (!messageRef) {
@@ -2651,6 +2667,8 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             fmt::ptr(OwnerContext()),
             fmt::ptr(mediator ? mediator->currentState_ : nullptr),
             remoteHostForLog);
+        // anchor: launcher.exe:0x442d9e -> 0x4429b0 -> completion callback at 0x442daa/0x442d65
+        CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef);
         return 1u;
     }
 
@@ -2688,6 +2706,10 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             fmt::ptr(OwnerContext()),
             fmt::ptr(mediator ? mediator->currentState_ : nullptr),
             remoteHostForLog);
+        // anchor: launcher.exe:0x442d83 -> call meth_0x441850, then completion callback at 0x442dac
+        // Note: meth_0x441850 synthesizes a local type-0x0b work item and sends it through
+        // connection vtable+0x10. Our scaffold handles this via the mediator callbacks above.
+        CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef);
         return 1u;
     }
 
@@ -2704,6 +2726,8 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             parsedCode5 ? code5Message.parsedPayload00.logicalPayloadByteCount04 : payloadByteCount;
         const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
         if (parsedCode5) {
+            // anchor: launcher.exe:0x442d42..0x442d5e / direct write to this+0x85..0x91
+            // Original writes directly: [ESI+0x85]=EAX+1, [ESI+0x89]=EAX+5, [ESI+0x8d]=EAX+9, [ESI+0x91]=EAX+0xd
             SetMessageCode5SeedBytes85(code5Message.seedBytes0c);
             spdlog::info(
                 "CBaseMarginConnection::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
@@ -2732,10 +2756,16 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
                 fmt::ptr(mediator ? mediator->currentState_ : nullptr),
                 remoteHostForLog);
         }
+        // anchor: launcher.exe:0x442d68 / completion callback after code5
+        CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef);
         return 1u;
     }
 
-    return 0u;
+    // anchor: launcher.exe:0x442d26..0x442d2d
+    // Original returns (code - 5) & 0xFFFFFF00 which is 0 for code 5, negative-ish for others
+    // This allows leaf CMarginConnection::DispatchMessage to detect unconsumed codes
+    // and forward to CLTLoginMediator_DispatchCurrentHelperSlot6 (owner+0x184)
+    return (static_cast<int>(decodedMessageCode) - 5) & 0xFFFFFF00;
 }
 
 // anchor: launcher.exe:0x44af60

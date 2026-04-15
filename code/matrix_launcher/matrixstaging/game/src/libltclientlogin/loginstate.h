@@ -397,6 +397,14 @@ public:
     // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
     uint32_t Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) override;
 
+    // Fidelity: original sets pendingByte4_/pendingWord6_ from caller, no explicit setter but
+    // the call path needs this. Ghidra references: state8/state11 calls to set after successful
+    // load-character reply handoff to state9 transition.
+    void SetPendingPayload(uint8_t byte4, uint16_t word6) {
+        pendingByte4_ = byte4;
+        pendingWord6_ = word6;
+    }
+
     // anchor: launcher.exe:0x00438cc0 (vtable 0x004b517c slot 7)
     uint32_t GetStateId() const override;
 };
