@@ -641,9 +641,6 @@ public:
         CMessageConnectionPacketNameFamily family,
         bool packetizedMessagesEnabled);
 
-    // Source-owned enum view over the packet-name family field.
-    CMessageConnectionPacketNameFamily PacketNameFamily() const;
-
     // anchor: launcher.exe:0x448980
     // Narrow source-owned mirror of the lazy packet-agenda install/configure helper at
     // connection `+0x74`.

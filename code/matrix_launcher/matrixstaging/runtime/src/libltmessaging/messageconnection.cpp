@@ -725,10 +725,6 @@ void CMessageConnection::ConfigurePacketNameFamily(
     packetizedMessagesEnabled_ = packetizedMessagesEnabled;
 }
 
-CMessageConnectionPacketNameFamily CMessageConnection::PacketNameFamily() const {
-    return packetNameFamily_;
-}
-
 // anchor: launcher.exe:0x448980
 void CMessageConnection::ConfigurePacketAgenda(
     CStreamPacketEncryptionModule* streamPacketEncryptionModule) {
@@ -982,7 +978,7 @@ uint32_t CMessageConnection::SendPacketMessageRef(
         static_cast<unsigned>(payloadByteCount),
         static_cast<unsigned>(submittedByteCount),
         static_cast<uint32_t>(packetNameCallback_),
-        PacketNameFamilyToString(PacketNameFamily()),
+        PacketNameFamilyToString(packetNameFamily_),
         packetizedMessagesEnabled_ ? 1u : 0u,
         (agenda && agenda->created) ? 1u : 0u,
         agenda ? static_cast<unsigned>(agenda->configuredModuleCount4c) : 0u,
