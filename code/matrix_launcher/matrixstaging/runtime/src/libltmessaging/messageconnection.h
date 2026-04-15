@@ -924,6 +924,51 @@ public:
 // ============================================================
 // CMarginConnection class declaration
 // ============================================================
+
+// anchor: launcher.exe:0x464870 / ctor 0x00464870
+// Small work-item wrapper class used in meth_0x441850 (0x441850) to synthesize
+// local type-0x0b continuation. This is the "cls_0x4baa00" that wraps a base subobject.
+class CMarginConnectionLocalCompletionWorkItemWrapper0xb {
+public:
+    // Embedded base/root subobject - this is what gets passed to the connection's
+    // OnOperationCompleted. The base subobject has its own vtable that handles the work.
+    CLTThreadPerClientTCPEngine_WorkItemHeader baseSubobject04{};
+
+    CMarginConnectionLocalCompletionWorkItemWrapper0xb();
+
+    // Dummy virtual to establish vtable presence (matches original +0x00 vtable pointer)
+    virtual ~CMarginConnectionLocalCompletionWorkItemWrapper0xb() = default;
+};
+static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemWrapper0xb) == 0x10, "work item wrapper size mismatch");
+
+// anchor: launcher.exe:0x463e10 / ctor + vtable 0x004ba948
+// Larger wrapper/decorator class from the queue family. Wraps another object at +0x10
+// and forwards calls through virtual slots +0x7c/+0x80. Used in the code4 path to
+// pass the local completion work item through the connection's vtable.
+class CMarginConnectionWorkItemDecorator0xb {
+public:
+    // embedded/interface-like subobject vtable at +0x04 (0x004b41e0)
+    void** embeddedVtable04 = nullptr;
+    // ctor-seeded dword at +0x08 (0xffffffff)
+    uint32_t field08 = 0xFFFFFFFFu;
+    // low-byte flag at +0x0c
+    uint8_t flag0c = 0u;
+    uint8_t padding0d = 0u;
+    // wrapped target/owner pointer at +0x10
+    void* wrappedObject10 = nullptr;
+    // enable/limit flag at +0x14
+    uint8_t flag14 = 0u;
+    // remaining-count / clamp limit at +0x18
+    uint32_t countLimit18 = 0u;
+
+    // Set status/payload dword - this is virt_meth_0x4444e0
+    void SetStatusPayload(uint32_t status);
+
+    // Dummy virtual to establish vtable presence
+    virtual ~CMarginConnectionWorkItemDecorator0xb() = default;
+};
+static_assert(sizeof(CMarginConnectionWorkItemDecorator0xb) == 0x1c, "work item decorator size mismatch");
+
 struct CMarginConnectionLocalCompletionWorkItemScaffold {
     // anchor: launcher.exe:0x434ce0 -> 0x464870 / 0x4444e0
     // Minimal local stack work-item shape recovered for the `0x441850` continuation.

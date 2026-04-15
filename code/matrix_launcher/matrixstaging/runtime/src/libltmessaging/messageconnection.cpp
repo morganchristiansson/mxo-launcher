@@ -2055,6 +2055,19 @@ static void** CMarginConnection_LocalCompletionWorkItemVtableScaffold() {
 
 }  // namespace
 
+// anchor: launcher.exe:0x464870 / ctor -> cls_0x4baa00
+CMarginConnectionLocalCompletionWorkItemWrapper0xb::CMarginConnectionLocalCompletionWorkItemWrapper0xb() {
+    // C++ vtable is automatically managed via virtual destructor
+    baseSubobject04.workType = 0x0bu;
+}
+
+// anchor: launcher.exe:0x4444e0 / virt_meth_0x4444e0 -> cls_0x4ba948
+void CMarginConnectionWorkItemDecorator0xb::SetStatusPayload(uint32_t status) {
+    // This sets the status/payload dword in the wrapped object at +0x10
+    // In the original, this forwards to the wrapped object's vtable+0x20 slot
+    field08 = status;
+}
+
 // anchor: launcher.exe:0x441850
 void CBaseMarginConnection::SetMessageCode4SuccessFlag84(bool value) {
     messageCode4SuccessFlag84_ = value;
@@ -2067,13 +2080,24 @@ bool CBaseMarginConnection::MessageCode4SuccessFlag84() const {
 
 // anchor: launcher.exe:0x441850
 uint32_t CBaseMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint32_t workPayloadStatus) {
-    CMarginConnectionLocalCompletionWorkItemScaffold workItem = {};
-    workItem.header.vtable = CMarginConnection_LocalCompletionWorkItemVtableScaffold();
-    workItem.header.workType = 0x0bu;
-    workItem.header.statusOrPayloadDword08 = workPayloadStatus;
+    // meth_0x441850 (0x441850) flow:
+    // 1. Create cls_0x4baa00 base work item wrapper on stack
+    // 2. Create cls_0x4ba948 decorator, passing the status dword
+    // 3. Call connection vtable+0x10 (OnOperationCompleted) with this connection
+    //
+    // The original structure:
+    // - cls_0x4baa00 has the basic work item with type 0x0b
+    // - cls_0x4ba948 wraps it and provides forwarding through virtual slots
 
+    // Build the base work item similar to cls_0x4baa00
+    CMarginConnectionLocalCompletionWorkItemWrapper0xb baseWorkItem{};
+    baseWorkItem.baseSubobject04.statusOrPayloadDword08 = workPayloadStatus;
+
+    // The original decorator (cls_0x4ba948) wraps and forwards. For now, pass the base
+    // work item's address as the wrapped object to the connection's OnOperationCompleted.
+    // This better mirrors the original flow where the work item is passed through vtable+0x10.
     CMessageConnection* selfAsMessageConnection = this;
-    const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&workItem);
+    const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&baseWorkItem);
     spdlog::info(
         "CBaseMarginConnection::DispatchMessageCode4LocalCompletionWorkItem synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
         workPayloadStatus,
