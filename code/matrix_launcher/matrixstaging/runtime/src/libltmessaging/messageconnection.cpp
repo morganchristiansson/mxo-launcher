@@ -2829,32 +2829,31 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     // FIDELITY: Current source uses static helper CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge
     // which mirrors steps 1-2, then passes raw decrypted bytes directly.
 
-    // anchor: launcher.exe:0x4429b0 -> write extracted bytes to this+0x85, 0x89, 0x8d, 0x91
-    // Original: Extracts 16 bytes from cls_0x4b6538 envelope.mbr_0x10 + 1/+5/+9/+0xd
-    //   *(dword *)(this + 0x85) = *(dword *)(local_38.mbr_0x10 + 1)
-    //   *(dword *)(this + 0x89) = *(dword *)(local_38.mbr_0x10 + 5)
-    //   *(dword *)(this + 0x8d) = *(dword *)(local_38.mbr_0x10 + 9)
-    //   *(dword *)(this + 0x91) = *(dword *)(local_38.mbr_0x10 + 0xd)
-    // FIDELITY: Go through envelope PopulateFromDecryptedBlob -> ExtractChallengeBytes pattern
+    // anchor: launcher.exe:0x442ac6 -> envelope.mbr_0x10 +1/+5/+9/+0xd extracts to this+0x85/0x89/0x8d/0x91
+    // Original at 0x442ac6-0x442ae0 extracts seed bytes then:
+    // 1. Calls EnsureStreamPacketEncryptionModule (0x441470)
+    // 2. Initializes packet builder via CLTLoginMediatorPacketBuilderEnvelope_Initialize
+    // 3. Sets opcode 0x11 at packet+0
+    // 4. Copies from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
+    // FIDELITY: First extraction pass uses ExtractChallengeBytes() (+1/+5/+9/+0xd offsets)
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope{};
     envelope.PopulateFromDecryptedBlob(decryptedChallengeBytes);
-    auto extractedBytes = envelope.ExtractChallengeBytes();
-    SetMessageCode5SeedBytes85(extractedBytes);
+    auto seedBytes = envelope.ExtractChallengeBytes();  // +1/+5/+9/+0xd for seed fields
+    SetMessageCode5SeedBytes85(seedBytes);
 
     // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule call (0x441470)
     // Original: Explicit call to EnsureStreamPacketEncryptionModule after writing seed bytes.
     // Current source: Already done inside SetMessageCode5SeedBytes85 -> EnsureStreamPacketEncryptionModuleFromSeed85.
 
-    // anchor: launcher.exe:0x4429b0 -> response packet construction and send via vtable+0x24
-    // Original:
-    //   1. Initialize packet builder envelope via CLTLoginMediatorPacketBuilderEnvelope_Initialize
-    //   2. Set opcode 0x11 at packet+0
-    //   3. Copy 16 challenge bytes to packet+1, +5, +9, +0xd from envelope.mbr_0x10 + 0x11, +0x15, +0x19, +0x1d
-    //   4. Send via (**(code **)(*(int *)this + 0x24))(&local_24) -> connection vtable+0x24
-    //   5. Cleanup: release envelope, local_38, local_8 via vtable+0x08
-    // Current source: Delegates to SendCertChallengeResponseFromChallengeBytes helper.
-    // FIDELITY TODO: Inline the packet builder construction and send via vtable+0x24 dispatch.
-    const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(decryptedChallengeBytes);
+    // anchor: launcher.exe:0x442b18 -> copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
+    // Original flow:
+    //   - After seed extraction, initializes packet builder (0x439840)
+    //   - Sets opcode 0x11 at packet+0
+    //   - Copies from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
+    //   - Sends via connection vtable+0x24
+    // FIDELITY: Second extraction pass uses ExtractForResponsePacket() (+0x11/+0x15/+0x19/+0x1d offsets)
+    auto responseBytes = envelope.ExtractForResponsePacket();  // +0x11/+0x15/+0x19/+0x1d for packet
+    const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(responseBytes);
 
     spdlog::info(
         "CBaseMarginConnection::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} packetSize={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",

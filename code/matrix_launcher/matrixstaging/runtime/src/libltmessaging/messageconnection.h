@@ -410,15 +410,30 @@ public:
      */
     void PopulateFromDecryptedBlob(const std::array<uint8_t, 16>& decryptedBytes);
 
+    // anchor: launcher.exe:0x442ac6 -> envelope.mbr_0x10 +1/+5/+9/+0xd extracts to this+0x85/0x89/0x8d/0x91
+    // Original at 0x442ac6-0x442ae0 extracts seed bytes via:
+    //   *(dword *)(this + 0x85) = *(dword *)(local_38.mbr_0x10 + 1)
+    //   *(dword *)(this + 0x89) = *(dword *)(local_38.mbr_0x10 + 5)
+    //   *(dword *)(this + 0x8d) = *(dword *)(local_38.mbr_0x10 + 9)
+    //   *(dword *)(this + 0x91) = *(dword *)(local_38.mbr_0x10 + 0xd)
     /**
-     * Extract 16 bytes from envelope mbr_0x10 + 1/+5/+9/+0xd.
-     * Original at 0x443220 extracts via:
-     *   *(dword *)(this + 0x85) = *(dword *)(mbr_0x10 + 1)
-     *   *(dword *)(this + 0x89) = *(dword *)(mbr_0x10 + 5)
-     *   *(dword *)(this + 0x8d) = *(dword *)(mbr_0x10 + 9)
-     *   *(dword *)(this + 0x91) = *(dword *)(mbr_0x10 + 0xd)
+     * Extract 16 bytes from envelope mbr_0x10 + 1/+5/+9/+0xd for connection seed fields.
+     * This is the first extraction pass - copies to connection this+0x85..+0x91.
      */
     std::array<uint8_t, 16> ExtractChallengeBytes() const;
+
+    // anchor: launcher.exe:0x442b18 -> copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
+    // Original at 0x442b18-0x442b28 copies response packet bytes via:
+    //   *(dword *)(packet + 1) = *(dword *)(local_38.mbr_0x10 + 0x11)
+    //   *(dword *)(packet + 5) = *(dword *)(local_38.mbr_0x10 + 0x15)
+    //   *(dword *)(packet + 9) = *(dword *)(local_38.mbr_0x10 + 0x19)
+    //   *(dword *)(packet + 0xd) = *(dword *)(local_38.mbr_0x10 + 0x1d)
+    /**
+     * Extract 16 bytes from envelope mbr_0x10 + 0x11/+0x15/+0x19/+0x1d for response packet.
+     * This is the second extraction pass - copies to response packet payload at offset +1.
+     * Note: Different offsets than ExtractChallengeBytes - uses +0x11 instead of +1, etc.
+     */
+    std::array<uint8_t, 16> ExtractForResponsePacket() const;
 };
 
 // Size: 0x28 (40 bytes) - shared front matter (0x10) + mbr_0x10 storage (0x10) + vtable (0x10) + padding (0x08)
@@ -456,6 +471,17 @@ inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::E
     std::memcpy(&result[4], this->mbr_0x10 + 5, 4);  // second dword
     std::memcpy(&result[8], this->mbr_0x10 + 9, 4);  // third dword
     std::memcpy(&result[12], this->mbr_0x10 + 13, 4); // fourth dword (0xd = 13)
+    return result;
+}
+
+// anchor: launcher.exe:0x442b18 -> uses mbr_0x10 +0x11/+0x15/+0x19/+0x1d for response packet
+inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::ExtractForResponsePacket() const {
+    std::array<uint8_t, 16> result{};
+    // Extract 4 dwords from mbr_0x10 at offsets +0x11/+0x15/+0x19/+0x1d
+    std::memcpy(&result[0], this->mbr_0x10 + 0x11, 4);   // first dword
+    std::memcpy(&result[4], this->mbr_0x10 + 0x15, 4);  // second dword
+    std::memcpy(&result[8], this->mbr_0x10 + 0x19, 4);  // third dword
+    std::memcpy(&result[12], this->mbr_0x10 + 0x1d, 4); // fourth dword
     return result;
 }
 
