@@ -108,7 +108,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
-void CLTLoginState_State1::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State1::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     cachedUpstreamOrArg_ = upstreamOrArg;
     if (!mediator) {

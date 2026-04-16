@@ -107,7 +107,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
-void CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State4::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return;

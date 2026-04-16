@@ -10,7 +10,7 @@ const char* CLTLoginState_WorldListPending::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
-void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {

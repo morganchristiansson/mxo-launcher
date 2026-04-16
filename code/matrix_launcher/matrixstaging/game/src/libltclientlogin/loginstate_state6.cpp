@@ -164,7 +164,7 @@ const char* CLTLoginState_State6::DebugName() const {
 }
 
 // anchor: launcher.exe:0x0043b8f0 (vtable 0x004b508c slot 3)
-void CLTLoginState_State6::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State6::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     // anchor: launcher.exe:0x43b8f0 upstream caching logic at `0x43b8f9..0x43b91c`
     // - `0x43b8f9` loads existing cached from this+4
     // - `0x43b8fc` tests if cached is null - if so, jumps to store at `0x43b91c`

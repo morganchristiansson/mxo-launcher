@@ -27,7 +27,7 @@ const char* CLTLoginState_State9::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00439780 (vtable 0x004b517c slot 3)
-void CLTLoginState_State9::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State9::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {

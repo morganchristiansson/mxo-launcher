@@ -9,7 +9,7 @@ const char* CLTLoginState_State16::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00420720 (vtable 0x004b0bb0 slot 3)
-void CLTLoginState_State16::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State16::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     // Current ownership boundary:
     // - `0x41ecd0` can target state16 only on the alternate
     //   `g_LaunchPadGateState16State18 != 0` family

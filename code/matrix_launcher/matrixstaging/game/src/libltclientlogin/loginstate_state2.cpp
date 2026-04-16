@@ -29,7 +29,7 @@ const char* CLTLoginState_AuthenticatePending::DebugName() const {
 //   call 0x448050
 //
 // Source mirrors the exact call shape via PrepareAndDispatch on owner+0x680 child.
-void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return;

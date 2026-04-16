@@ -9,7 +9,7 @@ const char* CLTLoginState_State18::DebugName() const {
 }
 
 // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
-void CLTLoginState_State18::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State18::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Stronger current read from disassembly review:
     // - this is the later state18 session-helper path in the alternate

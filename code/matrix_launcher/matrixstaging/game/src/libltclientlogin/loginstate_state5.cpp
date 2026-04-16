@@ -68,7 +68,7 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439520 (vtable 0x004b5064 slot 3)
-void CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
+void CLTLoginState_State5::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (upstreamOrArg != nullptr) {
         // Ghidra/disassembly recheck for `0x43952a..0x439549`:
