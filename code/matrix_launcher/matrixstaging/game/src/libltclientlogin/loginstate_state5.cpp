@@ -100,14 +100,13 @@ void CLTLoginState_State5::Slot3_BeginOrContinue(void* upstreamOrArg) {
         return;
     }
 
-    const uint32_t sendResult = mediator->PrepareState5MarginConnectionCopySendScaffold();
+    mediator->PrepareState5MarginConnectionCopySend();
     mediator->PostEvent(0x10u);
     spdlog::info(
-        "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} sendResult=0x{:08x} currentState={} then PostEvent(0x10)",
+        "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} currentState={} then PostEvent(0x10)",
         fmt::ptr(cachedUpstreamOrArg_),
         fmt::ptr(upstreamOrArg),
         fmt::ptr(authReplyCopyShadowF4),
-        static_cast<unsigned>(sendResult),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
     return;
 }

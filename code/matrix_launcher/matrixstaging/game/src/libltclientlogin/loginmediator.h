@@ -1435,7 +1435,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     void* BootstrapRaw08AuxHandle50() const override;
 
     // anchor: launcher.exe:0x41b500 -> 0x4435f0 / 0x441f30
-    uint32_t PrepareState5MarginConnectionCopySendScaffold();
+    void PrepareState5MarginConnectionCopySend();
     const void* AuthBootstrapReplyCopyShadowF4Scaffold() const;
     // anchor: launcher.exe:0x004433c0 / 0x0044add0
     // Returns whether the owner `+0x680 +0xf4` auth-reply-derived `0x136` copy block is present

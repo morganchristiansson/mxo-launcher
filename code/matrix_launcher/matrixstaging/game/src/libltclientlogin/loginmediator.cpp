@@ -3203,15 +3203,11 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 }
 
 // anchor: launcher.exe:0x41b500 -> 0x4435f0 / 0x441f30
-uint32_t CLTLoginMediator::PrepareState5MarginConnectionCopySendScaffold() {
-    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
-    if (marginConnection == nullptr || authBootstrapChild680_ == nullptr) {
-        return 0u;
-    }
-
+void CLTLoginMediator::PrepareState5MarginConnectionCopySend() {
+    auto* marginConnection = static_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_);
     AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0(*authBootstrapChild680_)
         .PrepareState5MarginConnectionCopySend(*marginConnection);
-    return marginConnection->SendStoredBootstrapReplyCopy98();
+    marginConnection->SendStoredBootstrapReplyCopy98();
 }
 
 const void* CLTLoginMediator::AuthBootstrapReplyCopyShadowF4Scaffold() const {
