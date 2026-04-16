@@ -115,7 +115,7 @@ namespace mxo::liblttcp {
 // Later leaf on top of the shared message-connection surface:
 // CLTTCPConnection (0x004b8034)
 // └── CMessageConnection-family base surface (`0x448b40`, `0x448cf0`, `0x4490c0`)
-//     └── CBaseMarginConnection (0x004b64a8)
+//     └── CBaseMarginConnection_0x4b64a8 (0x004b64a8)
 //         └── CBasicMarginConnection (0x004afef0)
 // Key leaf-only rows now relevant here:
 // - 0x004afef0 = 0x0041cf50 scalar-deleting-dtor wrapper
@@ -131,7 +131,7 @@ namespace mxo::liblttcp {
 // Later leaf on top of:
 // CLTTCPConnection (0x004b8034)
 // └── CMessageConnection-family base surface
-//     └── CBaseMarginConnection (0x004b64a8)
+//     └── CBaseMarginConnection_0x4b64a8 (0x004b64a8)
 //         └── CMarginConnection (0x004aff38)
 // Key leaf-only rows:
 // - 0x004aff38 = 0x0041cf80 scalar-deleting-dtor wrapper
@@ -907,18 +907,18 @@ struct CMarginConnectionBootstrapPrepStateA0Scaffold;
 class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 
 // ============================================================
-// CBaseMarginConnection class declaration
+// CBaseMarginConnection_0x4b64a8 class declaration
 // ============================================================
 // Current recovered intermediate base between `CMessageConnection` and the auth/margin startup
 // leaf families.
-class CBaseMarginConnection : public CMessageConnection {
+class CBaseMarginConnection_0x4b64a8 : public CMessageConnection {
 public:
     // UNANCHORED: source-owned narrow intermediate-base ctor.
-    CBaseMarginConnection();
+    CBaseMarginConnection_0x4b64a8();
     // UNANCHORED: source-owned narrow intermediate-base ctor that only seeds the recovered engine.
-    explicit CBaseMarginConnection(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine);
+    explicit CBaseMarginConnection_0x4b64a8(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine);
     // UNANCHORED: source-owned default intermediate-base destructor.
-    ~CBaseMarginConnection() override;
+    ~CBaseMarginConnection_0x4b64a8() override;
 
     // anchor: launcher.exe:0x441850
     // Narrow source-owned mirror of the consumed decoded-code-4 side effect that sets connection
@@ -959,7 +959,7 @@ public:
     //   later connection/owner continuations
     virtual uint32_t DispatchMessage(void* messageRef);
 
-    // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse)
+    // anchor: launcher.exe:0x442d00 -> 0x442d9e -> 0x4429b0 (CBaseMarginConnection_0x4b64a8_HandleCode2CertChallengeAndSendResponse)
     // Original signature: void __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse(void *this, int param_1)
     //   param_1 = parsed message result object with message context at +0x14 (dword) and +0x18 (word)
     // Original: Decrypts challenge via prep object vtable+0x1c (0x437810 -> 0x468130),
@@ -1016,7 +1016,7 @@ private:
 // - the surrounding canonical docs still carry older naming on `0x004afef0`
 // - but current static RE is strong that this is the auth-side leaf completion wrapper reached
 //   through `0x449a70`, not just a generic base `CMessageConnection`
-class CAuthStartupConnection : public CBaseMarginConnection {
+class CAuthStartupConnection : public CBaseMarginConnection_0x4b64a8 {
 public:
     // UNANCHORED: source-owned narrow leaf ctor.
     CAuthStartupConnection();
@@ -1035,7 +1035,7 @@ public:
     uint32_t OnOperationCompleted(void* workItem) override;
 
     // anchor: launcher.exe:0x449a30
-    // Thin auth-side leaf override on top of `CBaseMarginConnection::DispatchMessage`:
+    // Thin auth-side leaf override on top of `CBaseMarginConnection_0x4b64a8::DispatchMessage`:
     // - call base `0x442d00` first
     // - if that returns 0, call owner `+0x180(messageRef)`
     // Replacement-only auth payload staging, when still needed by deeper state2/`0x448140`
@@ -1141,7 +1141,7 @@ static_assert(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold) == 0xe0, "bo
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {
 public:
-    explicit CMarginConnectionBootstrapPrepStateOwner_0x443340(CBaseMarginConnection& connection)
+    explicit CMarginConnectionBootstrapPrepStateOwner_0x443340(CBaseMarginConnection_0x4b64a8& connection)
         : connection_(connection) {}
 
     // anchor: launcher.exe:0x443340
@@ -1153,10 +1153,10 @@ public:
         const void* blockD8);
 
 private:
-    CBaseMarginConnection& connection_;
+    CBaseMarginConnection_0x4b64a8& connection_;
 };
 
-class CMarginConnection_0x4aff38 : public CBaseMarginConnection {
+class CMarginConnection_0x4aff38 : public CBaseMarginConnection_0x4b64a8 {
 public:
     // UNANCHORED: source-owned narrow leaf ctor.
     CMarginConnection_0x4aff38();
@@ -1180,9 +1180,9 @@ public:
     uint32_t OnOperationCompleted(void* workItem) override;
 
     // anchor: launcher.exe:0x44af20
-    // Later leaf dispatch override on top of `CBaseMarginConnection::DispatchMessage`.
+    // Later leaf dispatch override on top of `CBaseMarginConnection_0x4b64a8::DispatchMessage`.
     // Current best original order:
-    // - call `CBaseMarginConnection::DispatchMessage(this, messageRef)` (`0x442d00`)
+    // - call `CBaseMarginConnection_0x4b64a8::DispatchMessage(this, messageRef)` (`0x442d00`)
     // - if that returns 0, call owner `+0x184(messageRef)`
     uint32_t DispatchMessage(void* messageRef) override;
 };

@@ -1236,24 +1236,24 @@ constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
     0x10u,
 };
 
-struct CBaseMarginConnectionParsedPayloadSpanScaffold {
+struct CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold {
     const uint8_t* logicalPayloadBytes00 = nullptr;
     size_t logicalPayloadByteCount04 = 0u;
     bool headerless08 = false;
     bool usedHeaderlessLocatorDecode09 = false;
 };
 
-struct CBaseMarginConnectionCode2MessageScaffold {
-    CBaseMarginConnectionParsedPayloadSpanScaffold parsedPayload00{};
+struct CBaseMarginConnection_0x4b64a8_Code2MessageScaffold {
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
 };
 
-struct CBaseMarginConnectionCode4MessageScaffold {
-    CBaseMarginConnectionParsedPayloadSpanScaffold parsedPayload00{};
+struct CBaseMarginConnection_0x4b64a8_Code4MessageScaffold {
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
     uint32_t statusOrPayload0c = 0u;
 };
 
-struct CBaseMarginConnectionCode5MessageScaffold {
-    CBaseMarginConnectionParsedPayloadSpanScaffold parsedPayload00{};
+struct CBaseMarginConnection_0x4b64a8_Code5MessageScaffold {
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
     std::array<uint8_t, 16> seedBytes0c{};
 };
 
@@ -1331,9 +1331,9 @@ static bool CMessageConnection_ResolveMessageCodePointerScaffold(
     return true;
 }
 
-static bool CBaseMarginConnection_ResolveLogicalPayloadSpanScaffold(
+static bool CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
     const CMessageConnectionMessageRef& messageRef,
-    CBaseMarginConnectionParsedPayloadSpanScaffold* outParsedPayload) {
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold* outParsedPayload) {
     if (outParsedPayload) {
         *outParsedPayload = {};
     }
@@ -1376,15 +1376,15 @@ static bool CBaseMarginConnection_ResolveLogicalPayloadSpanScaffold(
     return true;
 }
 
-static bool CBaseMarginConnection_OnMessageCode2Scaffold(
+static bool CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
     const CMessageConnectionMessageRef& messageRef,
-    CBaseMarginConnectionCode2MessageScaffold* outCode2Message,
+    CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
     bool parseIncomingMessage) {
     if (outCode2Message) {
         *outCode2Message = {};
     }
     if (!parseIncomingMessage || !outCode2Message ||
-        !CBaseMarginConnection_ResolveLogicalPayloadSpanScaffold(
+        !CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
             messageRef,
             &outCode2Message->parsedPayload00)) {
         return false;
@@ -1395,15 +1395,15 @@ static bool CBaseMarginConnection_OnMessageCode2Scaffold(
            parsedPayload.logicalPayloadBytes00[0] == 2u;
 }
 
-static bool CBaseMarginConnection_OnMessageCode4Scaffold(
+static bool CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
     const CMessageConnectionMessageRef& messageRef,
-    CBaseMarginConnectionCode4MessageScaffold* outCode4Message,
+    CBaseMarginConnection_0x4b64a8_Code4MessageScaffold* outCode4Message,
     bool parseIncomingMessage) {
     if (outCode4Message) {
         *outCode4Message = {};
     }
     if (!parseIncomingMessage || !outCode4Message ||
-        !CBaseMarginConnection_ResolveLogicalPayloadSpanScaffold(
+        !CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
             messageRef,
             &outCode4Message->parsedPayload00)) {
         return false;
@@ -1422,15 +1422,15 @@ static bool CBaseMarginConnection_OnMessageCode4Scaffold(
     return true;
 }
 
-static bool CBaseMarginConnection_OnMessageCode5Scaffold(
+static bool CBaseMarginConnection_0x4b64a8_OnMessageCode5Scaffold(
     const CMessageConnectionMessageRef& messageRef,
-    CBaseMarginConnectionCode5MessageScaffold* outCode5Message,
+    CBaseMarginConnection_0x4b64a8_Code5MessageScaffold* outCode5Message,
     bool parseIncomingMessage) {
     if (outCode5Message) {
         *outCode5Message = {};
     }
     if (!parseIncomingMessage || !outCode5Message ||
-        !CBaseMarginConnection_ResolveLogicalPayloadSpanScaffold(
+        !CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
             messageRef,
             &outCode5Message->parsedPayload00)) {
         return false;
@@ -1451,8 +1451,8 @@ static bool CBaseMarginConnection_OnMessageCode5Scaffold(
 
 // anchor: launcher.exe:0x442d00
 // Source-owned narrow predicate exposing the specific consumed-code gate inside
-// `CBaseMarginConnection::DispatchMessage`.
-static uint32_t CBaseMarginConnection_DispatchMessageFilterScaffold(
+// `CBaseMarginConnection_0x4b64a8::DispatchMessage`.
+static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
     const CMessageConnectionMessageRef& messageRef,
     uint16_t* outDecodedMessageCode,
     bool* outUsedHeaderlessLocatorDecode,
@@ -1924,15 +1924,15 @@ uint32_t CMessageConnection::EnsureConnected() {
 // ============================================================
 // VTable 0x004b64a8 - shared base margin router
 // ============================================================
-CBaseMarginConnection::CBaseMarginConnection()
+CBaseMarginConnection_0x4b64a8::CBaseMarginConnection_0x4b64a8()
     : CMessageConnection() {}
 
-CBaseMarginConnection::CBaseMarginConnection(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine)
+CBaseMarginConnection_0x4b64a8::CBaseMarginConnection_0x4b64a8(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine)
     : CMessageConnection(connectionEngine) {}
 
-CBaseMarginConnection::~CBaseMarginConnection() = default;
+CBaseMarginConnection_0x4b64a8::~CBaseMarginConnection_0x4b64a8() = default;
 
-uint32_t CBaseMarginConnection::DispatchCopiedParsedPacketTailScaffold(
+uint32_t CBaseMarginConnection_0x4b64a8::DispatchCopiedParsedPacketTailScaffold(
     CMessageConnectionMessageRef& messageRef) {
     return DispatchMessage(&messageRef);
 }
@@ -1949,10 +1949,10 @@ uint32_t CBaseMarginConnection::DispatchCopiedParsedPacketTailScaffold(
 // - then immediately calls `connection->+0x1c(owner+0x5c)`
 // Current source keeps the class name conservative until wider naming cleanup is done.
 CAuthStartupConnection::CAuthStartupConnection()
-    : CBaseMarginConnection() {}
+    : CBaseMarginConnection_0x4b64a8() {}
 
 CAuthStartupConnection::CAuthStartupConnection(CLTThreadPerClientTCPEngine_0x4b2768* authEngine)
-    : CBaseMarginConnection(authEngine) {}
+    : CBaseMarginConnection_0x4b64a8(authEngine) {}
 
 CAuthStartupConnection::~CAuthStartupConnection() = default;
 
@@ -1962,7 +1962,7 @@ uint32_t CAuthStartupConnection::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    if (CBaseMarginConnection::DispatchMessage(messageRef) != 0u) {
+    if (CBaseMarginConnection_0x4b64a8::DispatchMessage(messageRef) != 0u) {
         return 1u;
     }
 
@@ -2026,16 +2026,16 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
 // Later leaf on top of:
 // CLTTCPConnection (0x004b8034)
 // └── CMessageConnection-family base surface
-//     └── CBaseMarginConnection (0x004b64a8)
+//     └── CBaseMarginConnection_0x4b64a8 (0x004b64a8)
 //         └── CMarginConnection_0x4aff38 (0x004aff38)
 
 // UNANCHORED: source-owned narrow leaf ctor.
 CMarginConnection_0x4aff38::CMarginConnection_0x4aff38()
-    : CBaseMarginConnection() {}
+    : CBaseMarginConnection_0x4b64a8() {}
 
 // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
 CMarginConnection_0x4aff38::CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngine_0x4b2768* marginEngine)
-    : CBaseMarginConnection(marginEngine) {}
+    : CBaseMarginConnection_0x4b64a8(marginEngine) {}
 
 // UNANCHORED: source-owned default destructor.
 // Current tighter static-RE split:
@@ -2056,17 +2056,17 @@ static void** CMarginConnection_LocalCompletionWorkItemVtableScaffold() {
 }  // namespace
 
 // anchor: launcher.exe:0x441850
-void CBaseMarginConnection::SetMessageCode4SuccessFlag84(bool value) {
+void CBaseMarginConnection_0x4b64a8::SetMessageCode4SuccessFlag84(bool value) {
     messageCode4SuccessFlag84_ = value;
 }
 
 // anchor family: launcher.exe:0x441850 / 0x44af20 -> connection `+0x84`
-bool CBaseMarginConnection::MessageCode4SuccessFlag84() const {
+bool CBaseMarginConnection_0x4b64a8::MessageCode4SuccessFlag84() const {
     return messageCode4SuccessFlag84_;
 }
 
 // anchor: launcher.exe:0x441850
-uint32_t CBaseMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint32_t workPayloadStatus) {
+uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWorkItem(uint32_t workPayloadStatus) {
     // meth_0x441850 (0x441850) creates a local work item and passes it to connection vtable+0x10.
     // Original directly constructs the work item; use the simple scaffold approach that works.
     CMarginConnectionLocalCompletionWorkItemScaffold workItem = {};
@@ -2076,7 +2076,7 @@ uint32_t CBaseMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint
     CMessageConnection* selfAsMessageConnection = this;
     const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&workItem);
     spdlog::info(
-        "CBaseMarginConnection::DispatchMessageCode4LocalCompletionWorkItem synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWorkItem synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
         workPayloadStatus,
         handled,
         fmt::ptr(this),
@@ -2089,7 +2089,7 @@ uint32_t CBaseMarginConnection::DispatchMessageCode4LocalCompletionWorkItem(uint
 }
 
 // anchor: launcher.exe:0x41ce80 -> connection `+0x98`
-bool CBaseMarginConnection::StoreBootstrapReplyCopy98(const void* bytes, size_t byteCount) {
+bool CBaseMarginConnection_0x4b64a8::StoreBootstrapReplyCopy98(const void* bytes, size_t byteCount) {
     if (!bytes || byteCount != bootstrapReplyCopy98_.size()) {
         return false;
     }
@@ -2100,7 +2100,7 @@ bool CBaseMarginConnection::StoreBootstrapReplyCopy98(const void* bytes, size_t 
         bootstrapReplyCopy98_.begin());
     hasBootstrapReplyCopy98_ = true;
     spdlog::info(
-        "CBaseMarginConnection::StoreBootstrapReplyCopy98 stored reply-copy block bytes=0x{:03x} this={} ownerContext={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::StoreBootstrapReplyCopy98 stored reply-copy block bytes=0x{:03x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(bootstrapReplyCopy98_.size()),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
@@ -2395,7 +2395,7 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
 }
 
 // anchor: launcher.exe:0x41f30
-uint32_t CBaseMarginConnection::SendStoredBootstrapReplyCopy98() {
+uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     if (!hasBootstrapReplyCopy98_) {
         return 0u;
     }
@@ -2456,7 +2456,7 @@ uint32_t CBaseMarginConnection::SendStoredBootstrapReplyCopy98() {
     const uint32_t sendResult =
         ForwardPacketBuilderEnvelopeToSendPacket(builder.builder00.envelope00);
     spdlog::info(
-        "CBaseMarginConnection::SendStoredBootstrapReplyCopy98 sent packetBuilderVtable=0x{:08x} payloadBase10={} reservedReplyCopyBytes=0x{:03x} totalPayloadBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent packetBuilderVtable=0x{:08x} payloadBase10={} reservedReplyCopyBytes=0x{:03x} totalPayloadBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(kPacketBuilderVtable00),
         fmt::ptr(builder.builder00.packetPayload10),
         static_cast<unsigned>(builder.reservation14.reservedContentByteCount04),
@@ -2469,19 +2469,19 @@ uint32_t CBaseMarginConnection::SendStoredBootstrapReplyCopy98() {
 }
 
 // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
-uint32_t CBaseMarginConnection::SendCertChallengeResponseFromChallengeBytes(
+uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes(
     const std::array<uint8_t, 16>& challengeBytes) {
     if (!hasMessageCode5SeedBytes85_) {
         return 0u;
     }
 
-    // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule (0x441470)
+    // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_0x4b64a8_EnsureStreamPacketEncryptionModule (0x441470)
     // Original: Called after writing seed bytes to connection +0x85..+0x91, before building envelope
     EnsureStreamPacketEncryptionModuleFromSeed85();
     const CMessageConnectionPacketAgenda* const agenda = PacketAgenda();
     if (!agenda || !agenda->created || agenda->writeHelperChainHead44 == nullptr) {
         spdlog::info(
-            "CBaseMarginConnection::SendCertChallengeResponseFromChallengeBytes missing agenda write helper after seed ensure this={} ownerContext={} remoteHost='{}'",
+            "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes missing agenda write helper after seed ensure this={} ownerContext={} remoteHost='{}'",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()),
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
@@ -2519,7 +2519,7 @@ uint32_t CBaseMarginConnection::SendCertChallengeResponseFromChallengeBytes(
     const uint32_t sendResult =
         ForwardPacketBuilderEnvelopeToSendPacket(builder.envelope00);
     spdlog::info(
-        "CBaseMarginConnection::SendCertChallengeResponseFromChallengeBytes sent packetBuilderVtable=0x{:08x} packetPayload10={} challengeBytes=0x{:02x} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes sent packetBuilderVtable=0x{:08x} packetPayload10={} challengeBytes=0x{:02x} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(kPacketBuilderVtable00),
         fmt::ptr(builder.packetPayload10),
         static_cast<unsigned>(challengeBytes.size()),
@@ -2533,7 +2533,7 @@ uint32_t CBaseMarginConnection::SendCertChallengeResponseFromChallengeBytes(
 }
 
 // anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
-void CBaseMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85() {
+void CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed85() {
     if (!hasMessageCode5SeedBytes85_) {
         return;
     }
@@ -2559,7 +2559,7 @@ void CBaseMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85() {
     }
 
     spdlog::info(
-        "CBaseMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85 {} connection+0x9c module from seed85_94 module={} agenda={} firstDword=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        "CBaseMarginConnection_0x4b64a8::EnsureStreamPacketEncryptionModuleFromSeed85 {} connection+0x9c module from seed85_94 module={} agenda={} firstDword=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         needsInitialInstall ? "installed" : "refreshed",
         fmt::ptr(streamPacketEncryptionModule9c_.get()),
         fmt::ptr(PacketAgenda()),
@@ -2574,14 +2574,14 @@ void CBaseMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85() {
 }
 
 // anchor: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-void CBaseMarginConnection::SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value) {
+void CBaseMarginConnection_0x4b64a8::SetMessageCode5SeedBytes85(const std::array<uint8_t, 16>& value) {
     messageCode5SeedBytes85_ = value;
     hasMessageCode5SeedBytes85_ = true;
     EnsureStreamPacketEncryptionModuleFromSeed85();
 }
 
 // anchor family: launcher.exe:0x4429b0 / 0x441470 / 0x442d00 -> connection `+0x85 .. +0x94`
-const uint8_t* CBaseMarginConnection::MessageCode5SeedBytes85Pointer() const {
+const uint8_t* CBaseMarginConnection_0x4b64a8::MessageCode5SeedBytes85Pointer() const {
     return hasMessageCode5SeedBytes85_ ? messageCode5SeedBytes85_.data() : nullptr;
 }
 
@@ -2599,14 +2599,14 @@ const uint8_t* CBaseMarginConnection::MessageCode5SeedBytes85Pointer() const {
 // We model this callback for tracing; the original invokes completion via:
 // (**(code **)(*completionCallback + 8))()
 // The messageRef is kept alive by the caller's unique_ptr through the dispatch.
-static void CBaseMarginConnection_InvokeMessageRefCompletionCallback(
+static void CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
     CMessageConnectionMessageRef* messageRef,
     void** completionCallbackSlot) {
     if (!completionCallbackSlot || *completionCallbackSlot == nullptr) {
         return;
     }
     spdlog::trace(
-        "CBaseMarginConnection_InvokeMessageRefCompletionCallback callback={} messageRef={}",
+        "CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback callback={} messageRef={}",
         fmt::ptr(*completionCallbackSlot),
         fmt::ptr(messageRef));
     // Note: In original, this is (**(code **)(*callback + 8))(); call vtable+0x8
@@ -2761,7 +2761,7 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
 // 4. Implement cls_0x4b6538 envelope class for challenge byte extraction
 // 5. Add MessageBox error handling and connection vtable+0xc close on failure
 // 6. Inline the packet builder construction and send via vtable+0x24 instead of helper
-uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
+uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     const uint8_t* packetBytes,
     size_t packetSize) {
     if (!packetBytes || packetSize == 0u) {
@@ -2773,7 +2773,7 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     // Current source: Uses static helper instead of vtable dispatch.
     if (!bootstrapPrepStateA0_) {
         spdlog::warn(
-            "CBaseMarginConnection::HandleCode2ForBootstrap missing bootstrapPrepStateA0_ (this+0xa0) this={} ownerContext={}",
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap missing bootstrapPrepStateA0_ (this+0xa0) this={} ownerContext={}",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
         // SOURCE DIVERGENCE: Original shows MessageBox and calls vtable+0xc to close connection.
@@ -2806,7 +2806,7 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     // then calls connection vtable+0xc with arg 1 to close/disconnect.
     if (!decryptSuccess) {
         spdlog::error(
-            "CBaseMarginConnection::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
             static_cast<unsigned>(packetSize),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
@@ -2855,7 +2855,7 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(responseBytes);
 
     spdlog::info(
-        "CBaseMarginConnection::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} packetSize={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
+        "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} packetSize={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
         sendResult,
         static_cast<unsigned>(packetSize),
         static_cast<unsigned>(
@@ -2874,7 +2874,7 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
 // This scaffold mirrors that direct connection flow.
 // UNANCHORED: keeps bootstrap logic local to connection, mediator only involved via later work-item.
 // anchor: launcher.exe:0x441850
-uint32_t CBaseMarginConnection::HandleCode4ForBootstrap(
+uint32_t CBaseMarginConnection_0x4b64a8::HandleCode4ForBootstrap(
     const uint8_t* packetBytes,
     size_t packetSize) {
     if (!packetBytes || packetSize < 5u) {
@@ -2892,7 +2892,7 @@ uint32_t CBaseMarginConnection::HandleCode4ForBootstrap(
     uint32_t handled = DispatchMessageCode4LocalCompletionWorkItem(status);
 
     spdlog::info(
-        "CBaseMarginConnection::HandleCode4ForBootstrap rawCode=0x{:02x} status=0x{:08x} connectionByte84={} localWorkItemHandled={}",
+        "CBaseMarginConnection_0x4b64a8::HandleCode4ForBootstrap rawCode=0x{:02x} status=0x{:08x} connectionByte84={} localWorkItemHandled={}",
         static_cast<unsigned>(packetBytes[0]),
         status,
         MessageCode4SuccessFlag84() ? 1u : 0u,
@@ -2901,7 +2901,7 @@ uint32_t CBaseMarginConnection::HandleCode4ForBootstrap(
 }
 
 // anchor: launcher.exe:0x442d00
-uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
+uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
     if (!messageRef) {
         return 0u;
     }
@@ -2925,7 +2925,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
     bool hadValidMessageCode = false;
-    (void)CBaseMarginConnection_DispatchMessageFilterScaffold(
+    (void)CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
         copiedMessageRef,
         &decodedMessageCode,
         &usedHeaderlessLocatorDecode,
@@ -2942,9 +2942,9 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
     // Our scaffolds don't track the callback directly - they just do payload resolution.
     void* code2CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 2u) {
-        CBaseMarginConnectionCode2MessageScaffold code2Message = {};
+        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold code2Message = {};
         const bool parsedCode2 =
-            CBaseMarginConnection_OnMessageCode2Scaffold(
+            CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
                 copiedMessageRef,
                 &code2Message,
                 /*parseIncomingMessage=*/true);
@@ -2961,7 +2961,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
                 logicalPayloadByteCount);
         }
         spdlog::info(
-            "CBaseMarginConnection::DispatchMessage consumed code2 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode2={} logicalPayloadBytes={} marginOwnerPath={} handledCode2={} this={} ownerContext={} currentState={} remoteHost='{}'",
+            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code2 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode2={} logicalPayloadBytes={} marginOwnerPath={} handledCode2={} this={} ownerContext={} currentState={} remoteHost='{}'",
             static_cast<unsigned>(rawCode),
             parsedCode2 && code2Message.parsedPayload00.headerless08 ? 1u : 0u,
             parsedCode2 && code2Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
@@ -2981,7 +2981,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
         // We simulate: callback fires if OnMessageCode2 returned a valid result object (parsedCode2).
         if (parsedCode2) {
             // Simulated parse-result callback: original extracts from code4And5ParseResult[0]
-            CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code2CompletionCallbackSlot);
+            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code2CompletionCallbackSlot);
         }
         return 1u;
     }
@@ -2989,9 +2989,9 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
     // anchor: launcher.exe:0x442d38 - similar to code2, parse result stored at EBP-0x14 with callback at +0
     void* code4CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 4u) {
-        CBaseMarginConnectionCode4MessageScaffold code4Message = {};
+        CBaseMarginConnection_0x4b64a8_Code4MessageScaffold code4Message = {};
         const bool parsedCode4 =
-            CBaseMarginConnection_OnMessageCode4Scaffold(
+            CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
                 copiedMessageRef,
                 &code4Message,
                 /*parseIncomingMessage=*/true);
@@ -3008,7 +3008,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
                 logicalPayloadByteCount);
         }
         spdlog::info(
-            "CBaseMarginConnection::DispatchMessage consumed code4 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode4={} logicalPayloadBytes={} status=0x{:08x} marginOwnerPath={} handledCode4={} connectionByte84={} this={} ownerContext={} currentState={} remoteHost='{}'",
+            "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code4 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode4={} logicalPayloadBytes={} status=0x{:08x} marginOwnerPath={} handledCode4={} connectionByte84={} this={} ownerContext={} currentState={} remoteHost='{}'",
             static_cast<unsigned>(rawCode),
             parsedCode4 && code4Message.parsedPayload00.headerless08 ? 1u : 0u,
             parsedCode4 && code4Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : usedHeaderlessLocatorDecode ? 1u : 0u,
@@ -3026,7 +3026,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
         // In original: extracts callback from parse-result (EBP-0x14 + 0), calls vtable+0x8
         // Here we simulate: callback fires if parsing/result object was non-null
         if (parsedCode4) {
-            CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code4CompletionCallbackSlot);
+            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code4CompletionCallbackSlot);
         }
         return 1u;
     }
@@ -3034,9 +3034,9 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
     // anchor: launcher.exe:0x442d42 / EBP-0xc contains parse result for code5 (different stack offset than 2/4)
     void* code5CompletionCallbackSlot = nullptr;
     if (decodedMessageCode == 5u) {
-        CBaseMarginConnectionCode5MessageScaffold code5Message = {};
+        CBaseMarginConnection_0x4b64a8_Code5MessageScaffold code5Message = {};
         const bool parsedCode5 =
-            CBaseMarginConnection_OnMessageCode5Scaffold(
+            CBaseMarginConnection_0x4b64a8_OnMessageCode5Scaffold(
                 copiedMessageRef,
                 &code5Message,
                 /*parseIncomingMessage=*/true);
@@ -3050,7 +3050,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             // Original writes directly from parse result buffer+1,+5,+9,+d to this+0x85,0x89,0x8d,0x91
             SetMessageCode5SeedBytes85(code5Message.seedBytes0c);
             spdlog::info(
-                "CBaseMarginConnection::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
+                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=1 logicalPayloadBytes={} storedConnectionSeed85_94=1 firstDword=0x{:08x} this={} ownerContext={} currentState={} remoteHost='{}'",
                 static_cast<unsigned>(rawCode),
                 code5Message.parsedPayload00.headerless08 ? 1u : 0u,
                 code5Message.parsedPayload00.usedHeaderlessLocatorDecode09 ? 1u : 0u,
@@ -3067,10 +3067,10 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
             // Original callback for code5: after writing bytes, checks callback from parse result
             // at [EBP-0xc], calls vtable+0x8 if non-null, THEN returns (callbackResult << 8) | 1
             // Our callback simulation fires after write, before return.
-            CBaseMarginConnection_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code5CompletionCallbackSlot);
+            CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(&copiedMessageRef, &code5CompletionCallbackSlot);
         } else {
             spdlog::warn(
-                "CBaseMarginConnection::DispatchMessage consumed short/malformed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=0 logicalPayloadBytes={} this={} ownerContext={} currentState={} remoteHost='{}'",
+                "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed short/malformed code5 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode5=0 logicalPayloadBytes={} this={} ownerContext={} currentState={} remoteHost='{}'",
                 static_cast<unsigned>(rawCode),
                 usedHeaderlessLocatorDecode ? 1u : 0u,
                 usedHeaderlessLocatorDecode ? 1u : 0u,
@@ -3137,7 +3137,7 @@ uint32_t CMarginConnection_0x4aff38::OnOperationCompleted(void* workItem) {
 }
 
 // anchor: launcher.exe:0x44af20
-// Later leaf dispatch override on top of `CBaseMarginConnection::DispatchMessage`.
+// Later leaf dispatch override on top of `CBaseMarginConnection_0x4b64a8::DispatchMessage`.
 // Current tighter source split:
 // - base `0x442d00` now owns the consumed decoded-code `2/4/5` router again
 // - only the surviving path stages bytes for the later launcher-owned bootstrap / slot-6 path
@@ -3146,7 +3146,7 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    if (CBaseMarginConnection::DispatchMessage(messageRef) != 0u) {
+    if (CBaseMarginConnection_0x4b64a8::DispatchMessage(messageRef) != 0u) {
         return 1u;
     }
 
@@ -3164,14 +3164,14 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    CBaseMarginConnectionParsedPayloadSpanScaffold parsedPayload = {};
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload = {};
     const bool resolvedLogicalPayload =
-        CBaseMarginConnection_ResolveLogicalPayloadSpanScaffold(copiedMessageRef, &parsedPayload);
+        CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(copiedMessageRef, &parsedPayload);
 
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
     bool hadValidMessageCode = false;
-    (void)CBaseMarginConnection_DispatchMessageFilterScaffold(
+    (void)CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
         copiedMessageRef,
         &decodedMessageCode,
         &usedHeaderlessLocatorDecode,
