@@ -2157,11 +2157,6 @@ uint32_t CLTLoginMediator::State6UdpSessionSecretF18() const {
     return state6UdpSessionSecretF18_;
 }
 
-// anchor: launcher.exe:0x440ac6 (direct write to owner +0xf18)
-void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
-    state6UdpSessionSecretF18_ = value;
-}
-
 // anchor: launcher.exe:0x41ecd0
 void CLTLoginMediator::ResetSelectionContext0ecMirror() {
     selectionContext0ecCopy_ = {};
