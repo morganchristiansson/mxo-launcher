@@ -2835,9 +2835,8 @@ uint32_t CBaseMarginConnection::HandleCode2ForBootstrap(
     // 2. Initializes packet builder via CLTLoginMediatorPacketBuilderEnvelope_Initialize
     // 3. Sets opcode 0x11 at packet+0
     // 4. Copies from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
-    // FIDELITY: First extraction pass uses ExtractChallengeBytes() (+1/+5/+9/+0xd offsets)
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope{};
-    envelope.PopulateFromDecryptedBlob(decryptedChallengeBytes);
+    // FIDELITY: Constructor populates envelope mbr_0x10 with decrypted bytes
+    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope{decryptedChallengeBytes};
     auto seedBytes = envelope.ExtractChallengeBytes();  // +1/+5/+9/+0xd for seed fields
     SetMessageCode5SeedBytes85(seedBytes);
 

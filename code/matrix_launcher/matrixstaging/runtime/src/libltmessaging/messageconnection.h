@@ -403,12 +403,9 @@ public:
     // Allow default construction for stack-local envelope instances
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538();
 
-    /**
-     * Populate envelope with challenge bytes from decrypted blob.
-     * This mirrors the original flow where cls_0x4b6538 constructor stores bytes
-     * into mbr_0x10 for later extraction via vtable dispatch.
-     */
-    void PopulateFromDecryptedBlob(const std::array<uint8_t, 16>& decryptedBytes);
+    // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
+    explicit CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
+        const std::array<uint8_t, 16>& decryptedBytes);
 
     // anchor: launcher.exe:0x442ac6 -> envelope.mbr_0x10 +1/+5/+9/+0xd extracts to this+0x85/0x89/0x8d/0x91
     // Original at 0x442ac6-0x442ae0 extracts seed bytes via:
@@ -416,10 +413,8 @@ public:
     //   *(dword *)(this + 0x89) = *(dword *)(local_38.mbr_0x10 + 5)
     //   *(dword *)(this + 0x8d) = *(dword *)(local_38.mbr_0x10 + 9)
     //   *(dword *)(this + 0x91) = *(dword *)(local_38.mbr_0x10 + 0xd)
-    /**
-     * Extract 16 bytes from envelope mbr_0x10 + 1/+5/+9/+0xd for connection seed fields.
-     * This is the first extraction pass - copies to connection this+0x85..+0x91.
-     */
+    // Extract 16 bytes from envelope mbr_0x10 +1/+5/+9/+0xd for connection seed fields.
+    // This is the first extraction pass - copies to connection this+0x85..+0x91.
     std::array<uint8_t, 16> ExtractChallengeBytes() const;
 
     // anchor: launcher.exe:0x442b18 -> copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
@@ -428,11 +423,9 @@ public:
     //   *(dword *)(packet + 5) = *(dword *)(local_38.mbr_0x10 + 0x15)
     //   *(dword *)(packet + 9) = *(dword *)(local_38.mbr_0x10 + 0x19)
     //   *(dword *)(packet + 0xd) = *(dword *)(local_38.mbr_0x10 + 0x1d)
-    /**
-     * Extract 16 bytes from envelope mbr_0x10 + 0x11/+0x15/+0x19/+0x1d for response packet.
-     * This is the second extraction pass - copies to response packet payload at offset +1.
-     * Note: Different offsets than ExtractChallengeBytes - uses +0x11 instead of +1, etc.
-     */
+    // Extract 16 bytes from envelope mbr_0x10 +0x11/+0x15/+0x19/+0x1d for response packet.
+    // This is the second extraction pass - copies to response packet payload at offset +1.
+    // Note: Different offsets than ExtractChallengeBytes - uses +0x11 instead of +1, etc.
     std::array<uint8_t, 16> ExtractForResponsePacket() const;
 };
 
@@ -449,17 +442,10 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     // Default initialization - in original, this would take messageRef and '\x01' flag
 }
 
-/**
- * Implementation: Populate envelope with challenge bytes from decrypted blob.
- * This mirrors the original flow where cls_0x4b6538 constructor stores bytes
- * into mbr_0x10 for later extraction via vtable dispatch.
- *
- * Original stores 16 bytes from decrypted challenge blob into mbr_0x10.
- * These are then extracted as 4 dwords at offsets +1/+5/+9/+0xd within mbr_0x10.
- */
-inline void CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::PopulateFromDecryptedBlob(
+// anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
+inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
     const std::array<uint8_t, 16>& decryptedBytes) {
-    // Store all 16 bytes into mbr_0x10 for later extraction
+    // Store 16 bytes into mbr_0x10 for later extraction via two different offset patterns
     std::copy(decryptedBytes.begin(), decryptedBytes.end(), this->mbr_0x10);
 }
 
