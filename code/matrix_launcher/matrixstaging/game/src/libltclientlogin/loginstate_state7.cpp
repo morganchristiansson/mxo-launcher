@@ -72,7 +72,7 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(void* upstreamOrArg) {
             static_cast<unsigned>(fallbackResult));
         return;
     }
-    if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0u) {
+    if (mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0u) {
         const uint32_t fallbackResult = mediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State7::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",

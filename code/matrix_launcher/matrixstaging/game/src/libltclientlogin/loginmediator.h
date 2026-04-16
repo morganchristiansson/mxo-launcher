@@ -1626,7 +1626,7 @@ public:
     uint32_t selection0ecCount_ = 0;
     mutable uint32_t profile0f4Count_ = 0;
     // launcher.exe:0x4f78b8 owner-side post-auth margin/loading area used by state8/state10/state11.
-    PostAuthMarginLoadingState postAuthMarginLoadingState_;
+    PostAuthMarginLoadingState postAuthMarginLoadingState_0xf14;
     // launcher.exe:0x4f78b8 owner-side world-descriptor table (`+0xd84`).
     std::array<WorldDescriptorState_0x4b533c, kRecoveredWorldSlotCapacity> worldDescriptorsD84_;
     std::array<bool, kRecoveredWorldSlotCapacity> worldDescriptorValidD84_{};

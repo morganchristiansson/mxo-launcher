@@ -153,9 +153,9 @@ void CLTLoginState_State4::Slot3_BeginOrContinue(void* upstreamOrArg) {
             BeginMarginConnectionForState4Case(
                 mediator,
                 mediator->ResolveMarginRouteFromDescriptorIndex(
-                    mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24),
+                    mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24),
                 static_cast<uint8_t>(
-                    mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24 & 0xffu));
+                    mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 & 0xffu));
             return;
         }
 

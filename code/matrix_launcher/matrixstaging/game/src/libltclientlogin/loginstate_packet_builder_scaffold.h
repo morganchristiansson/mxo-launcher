@@ -283,7 +283,7 @@ struct State10Packet0x0aFixedPayload {
     static constexpr size_t kFixedByteCount = 0x03;
 };
 
-class State10Packet0x0aBuilder final : public PacketBuilderEnvelopeBase {
+class State10Packet0x0aBuilder_0x4b53b4 final : public PacketBuilderEnvelopeBase {
 public:
     // anchor: launcher.exe:0x43a1f0 / local packet-builder family `0x004b53b4`
     void ResetAndInitialize() {

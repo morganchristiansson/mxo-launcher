@@ -323,7 +323,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
             static_cast<unsigned>(metricId));
     }
 
-    mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 = 1u;
+    mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
     mediator->SetState6UdpSessionSecretF18(parsed.udpSessionSecret09);
 
     if (cachedUpstreamOrArg_ == nullptr) {

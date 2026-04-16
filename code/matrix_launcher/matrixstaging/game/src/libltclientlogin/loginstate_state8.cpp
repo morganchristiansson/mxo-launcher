@@ -220,7 +220,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return;
     }
-    if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
+    if (mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = mediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
@@ -231,7 +231,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(void* upstreamOrArg) {
 
     spdlog::info(
         "ROUTE CHECKPOINT: state8 slot3 entered past the 0x43bd48 owner+0xf14 gate ownerF14={} ownerF18=0x{:08x} currentState={}",
-        static_cast<unsigned>(mediator->postAuthMarginLoadingState_.state10SendGateFlagF14),
+        static_cast<unsigned>(mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14),
         static_cast<unsigned>(mediator->State6UdpSessionSecretF18()),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
 
@@ -365,7 +365,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         static_cast<unsigned>(loadCharacterReplyEnvelope.sectionByteCount),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
 
-    auto& ownerState = mediator->postAuthMarginLoadingState_;
+    auto& ownerState = mediator->postAuthMarginLoadingState_0xf14;
     mediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         (void)mediator->SetCurrentState(3u);

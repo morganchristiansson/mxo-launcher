@@ -154,7 +154,7 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
     }
 
     if (const char* routeHostPrefix =
-            mediator->LookupRouteHostPrefixBySlot(mediator->postAuthMarginLoadingState_.characterRouteIndexCc8)) {
+            mediator->LookupRouteHostPrefixBySlot(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)) {
         mediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
     } else {
         mediator->marginRouteState_.routeHostPrefix.clear();
@@ -187,8 +187,8 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
             ? 0u
             : static_cast<unsigned>(mediator->selectionRouteState684_.slotRecordTable04_[0].worldId0c),
         mediator->marginRouteState_.routeHostPrefix.empty() ? "<empty>" : mediator->marginRouteState_.routeHostPrefix.c_str(),
-        mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_.characterRouteIndexCc8)
-            ? mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_.characterRouteIndexCc8)
+        mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)
+            ? mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)
             : "<empty>",
         currentDescriptorName);
 }
@@ -227,7 +227,7 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
             static_cast<unsigned>(fallbackResult));
         return;
     }
-    if (mediator->postAuthMarginLoadingState_.state10SendGateFlagF14 == 0) {
+    if (mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = mediator->SetCurrentState(6u);
         spdlog::info(
             "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue blocked on owner+0xf14==0; switched/dispatched helper6 result=0x{:08x}",
@@ -235,10 +235,10 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
         return;
     }
 
-    State10Packet0x0aBuilder packetBuilder;
+    State10Packet0x0aBuilder_0x4b53b4 packetBuilder;
     packetBuilder.ResetAndInitialize();
     packetBuilder.SetCharacterName(
-        mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data());
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data());
 
     (void)mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     mediator->PostEvent(0x13u);
@@ -247,7 +247,7 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
         "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> postEvent=0x13",
         State10Packet0x0aFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
-        std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data()));
+        std::string(mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data()));
     return;
 }
 
@@ -321,7 +321,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // Success path: allocate and populate new slot record inline
     const uint8_t appendedSlotIndex = mediator->selectionRouteState684_.slotRecordCount00_;
     const uint32_t selectedWorldDescriptorIndex =
-        mediator->postAuthMarginLoadingState_.createCharacterData108.selectedWorldField24;
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24;
     if (appendedSlotIndex >= mediator->selectionRouteState684_.slotRecordTable04_.size() ||
         appendedSlotIndex >= mediator->selectionRouteState684_.routeHostStringTriples194_.size() ||
         selectedWorldDescriptorIndex >= mediator->worldDescriptorCountD80_ ||
@@ -356,7 +356,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     SlotRecordState_0x4b5328& appendedSlotRecord =
         mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
     appendedSlotRecord.heapString14 =
-        mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data();
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data();
     appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
     appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
     appendedSlotRecord.status0b = 0u;

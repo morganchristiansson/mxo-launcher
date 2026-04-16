@@ -90,14 +90,14 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg) {
     //   and then stalls before any incoming `MS_LoadCharacterReply`
     std::array<uint32_t, 17> sourceDwords134{};
     std::copy(
-        mediator->postAuthMarginLoadingState_.createCharacterData108.header2c.begin(),
-        mediator->postAuthMarginLoadingState_.createCharacterData108.header2c.end(),
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.begin(),
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.header2c.end(),
         sourceDwords134.begin());
     std::copy(
-        mediator->postAuthMarginLoadingState_.createCharacterData108.secondary4c.begin(),
-        mediator->postAuthMarginLoadingState_.createCharacterData108.secondary4c.end(),
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.begin(),
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.secondary4c.end(),
         sourceDwords134.begin() + 8);
-    sourceDwords134[16] = mediator->postAuthMarginLoadingState_.createCharacterData108.bodyWord6c;
+    sourceDwords134[16] = mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.bodyWord6c;
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
     State11Packet0x4dBuilder packetBuilder;
@@ -123,11 +123,11 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg) {
     packetBuilder.SetFixedDword(0x41, sourceDwords134[16]);
 
     packetBuilder.SetRealFirstName(
-        mediator->postAuthMarginLoadingState_.createCharacterData108.realFirstName70.data());
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data());
     packetBuilder.SetRealLastName(
-        mediator->postAuthMarginLoadingState_.createCharacterData108.realLastName90.data());
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data());
     packetBuilder.SetBackground(
-        mediator->postAuthMarginLoadingState_.createCharacterData108.backgroundB0.data());
+        mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data());
     packetBuilder.SetGameSessionId(mediator->GetGameSessionId());
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
@@ -144,9 +144,9 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(void* upstreamOrArg) {
         sourceDwords134[3],
         sourceDwords134[4],
         sourceDwords134[16],
-        std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.realFirstName70.data()),
-        std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.realLastName90.data()),
-        std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.backgroundB0.data()),
+        std::string(mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realFirstName70.data()),
+        std::string(mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.realLastName90.data()),
+        std::string(mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.backgroundB0.data()),
         mediator->GetGameSessionId() ? mediator->GetGameSessionId() : "<empty>",
         sendResult);
     spdlog::info(
@@ -176,7 +176,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
         return 0u;
     }
 
-    auto& ownerState = mediator->postAuthMarginLoadingState_;
+    auto& ownerState = mediator->postAuthMarginLoadingState_0xf14;
     mediator->worldListCountOrStatus80 = loadCharacterReplyEnvelope.status;
     if (loadCharacterReplyEnvelope.status >= 1u) {
         ownerState.createCharacterData108.characterName00[0] = '\0';
