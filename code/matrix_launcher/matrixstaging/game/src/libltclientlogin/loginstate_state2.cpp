@@ -186,8 +186,11 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             // `local_1c->field4_0x4->vftptr_0x0->GetStateId()`).
             // This is a compiler code-gen artifact (register pressure causes redundant
             // re-evaluation), not a decompiler misinterpretation. Since all three calls
-            // target the same virtual on the same object, the source simplifies to a single
-            // RecoverCachedUpstreamPhaseCode call with the same 0/0x10→3 normalization.
+            // target the same virtual on the same object with no mutation between them,
+            // the else branch (call 3) returns the same value already held, and the
+            // source's single-call simplification is semantically equivalent:
+            //   binary: if (X==0 || X==0x10) iVar6=3 else iVar6=X (via call 3)
+            //   source: if (X==0 || X==0x10) nextHelper=3 else nextHelper=X (already held)
             // field_0x4 = cachedUpstreamOrArg_ = the upstream state pointer set in
             // Slot3_BeginOrContinue when pUpstreamState->GetStateId() != 1.
             uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
