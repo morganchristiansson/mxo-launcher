@@ -16,7 +16,7 @@
 ## Rule 2: Keep launcher working
 
 At end of task:
-- `make -j6 run` should launch into game
+- Run `make -j4` to build OR `make -j4 run` to build and run the game.
 
 ### Rule 3: Implementation, documentation and Ghidra should move together
 - Do not treat documentation as a separate afterthought.
