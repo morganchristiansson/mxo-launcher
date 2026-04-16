@@ -260,14 +260,16 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     }
 
     // anchor: launcher.exe:0x4401a0
-    // Original decodes message code from message-ref using `CMessageConnectionMessageRef_DecodeMessageCode`
+    // Original at 0x4401aa: CALL 0x41bc20 (CMessageConnectionMessageRef_DecodeMessageCode)
+    // returns u16 opcode directly. At 0x4401b3: CMP AX,0xb; JNZ reject_path.
+    // No separate decode-failure branch — a failed decode returns 0, which != 0xb,
+    // so it takes the same reject path. The scaffold wraps this into a bool+out-param
+    // pattern; keep the scaffold for consistency but merge the failure branch into
+    // the single reject path below.
     uint16_t messageCode = 0;
-    bool usedHeaderlessLocator = false;
-    if (!CMessageConnection_DecodeMessageCodeScaffold(*messageRef, &messageCode, &usedHeaderlessLocator)) {
-        mediator->worldListCountOrStatus80 = 0x12000005u;
-        spdlog::info(
-            "CLTLoginState_State10::Slot6_HandleSecondaryMessage failed to decode message code; mirrored original owner+0x80=0x12000005 and returned false-like");
-        return 0u;
+    if (!CMessageConnection_DecodeMessageCodeScaffold(*messageRef, &messageCode, nullptr)) {
+        // Decode failed — original would just see opcode 0 (≠ 0xb) and go to reject.
+        // Fall through to the single reject path below.
     }
 
     // Fidelity correction from direct `0x43bf90 / 0x4401a0 / 0x41bf70` review:
@@ -279,19 +281,31 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // - immediate continuation after that success is:
     //   `state11 slot3 / 0x43c020 -> state11 slot6 / 0x440320 -> helper9 slot3 / 0x439780
     //    -> owner 0x41de40`
+    //
+    // Fidelity note on return value: original reject path at 0x4402fc-0x44030b
+    // returns (mediator_ptr & 0xFFFFFF00) — non-zero. Source returns 0u for now.
+    // If the caller distinguishes non-zero returns, this will need revisiting.
     if (messageCode != 0x0bu) {
         mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected messageCode=0x{:04x} (expected 0x0b); mirrored original owner+0x80=0x12000005 and returned false-like",
+            "CLTLoginState_State10::Slot6_HandleSecondaryMessage rejected messageCode=0x{:04x} (expected 0x0b); mirrored original owner+0x80=0x12000005",
             static_cast<unsigned>(messageCode));
         return 0u;
     }
 
-    // Parse payload directly from message ref
+    // anchor: launcher.exe:0x4401a0
+    // Original at 0x4401c0: CALL 0x43a330 (State10ClaimCharacterNameReplyParseObject_InitFromIncomingPacket)
+    // with LEA ECX,[EBP-0x28]; PUSH 1; PUSH ESI (messageRef). This constructs a parse
+    // object on the stack directly from the raw CMessageConnectionMessageRef*, not from
+    // extracted payload bytes. The parse object has a virtual destructor cleaned up at
+    // 0x4402e7-0x4402f0: TEST ECX,ECX; JZ skip; MOV EDX,[ECX]; CALL [EDX+8].
+    //
+    // Current approach: extract payload bytes + use a POD scaffold parser. This produces
+    // the same field values (offsets +3=status, +7=charIdLow, +0xb=charIdHigh match) but
+    // doesn't mirror the original's parse-object lifetime or virtual dispatch.
     const uint8_t* payloadBytes = messageRef->messageStorage0c->payloadBytes0c.data();
     const uint16_t payloadByteCount = messageRef->PayloadByteCountScaffold();
 
-    // anchor: launcher.exe:0x4401a0
     // Inline recovery of MS_ClaimCharacterNameReply parsing and slot record allocation:
     // - parse inline name/status/character IDs from message-ref payload
     // - set owner+0x80 = parsed status
@@ -307,18 +321,29 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
         return 0u;
     }
 
+    // anchor: launcher.exe:0x4401cb-0x4401d4
+    // Original: MOV ECX,[EAX+3]; MOV [EDX+0x80],ECX; CMP [EAX+3],1; JGE error_path
+    // Status check is BEFORE allocation. If status >= 1, jump to error path at 0x4402cd.
     mediator->worldListCountOrStatus80 = parsed.status;
 
     if (parsed.status >= 1u) {
+        // Error path: SetCurrentState(3), PostError(0xb) — matches 0x4402cd-0x4402e2
+        (void)mediator->SetCurrentState(3u);
+        mediator->PostError(0x0bu);
         spdlog::info(
-            "DIAGNOSTIC: state10 raw-0x0b claim-name reply failure status=0x{:08x}",
-            static_cast<unsigned>(parsed.status));
-        // Return 1 to signal the caller should proceed to error handling,
-        // which mirrors the original's single status check at +3.
+            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
+            static_cast<unsigned>(mediator->worldListCountOrStatus80));
         return 1u;
     }
 
-    // Success path: allocate and populate new slot record inline
+    // Success path (status < 1): allocate and populate new slot record
+    //
+    // Fidelity note on allocation model:
+    // Original at 0x4401ec-0x440228: PUSH 0x1c; CALL 0x403260 (TrackedMalloc);
+    // CALL 0x4398b0 (SlotRecord_Initialize); then stores the pointer at
+    // [ESI + count*4 + 4] (pointer table at +0x688). Current source uses an
+    // inline std::array<SlotRecordState_0x4b5328, N> instead of a pointer table,
+    // so the TrackedMalloc+Init is approximated by value-initialization.
     const uint8_t appendedSlotIndex = mediator->selectionRouteState684_.slotRecordCount00_;
     const uint32_t selectedWorldDescriptorIndex =
         mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24;
@@ -340,61 +365,52 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
 
     // anchor: launcher.exe:0x4401a0
     // Exact success-side write order recovered from listing:
-    // - allocate/init new slot-record object
-    // - store it at +0x688[currentCount]
-    // - copy selected descriptor inline name into +0x818[currentCount]
-    // - set +0xcc8 = currentCount
-    // - increment +0x684
-    // - then fill slot-record payload/name fields
+    // 1. store initialized slot record at +0x688[currentCount]  (0x440228)
+    // 2. copy selected descriptor inline name into +0x818[currentCount]  (0x44022c-0x44024d)
+    //    via CopyInlineNameToString(0x43d430) + StringTriple_AssignFromRange(0x407dd0)
+    // 3. free temp inline-name copy string  (0x440252-0x440265)
+    // 4. set +0x644 = currentCount  (0x440268-0x44026a)
+    // 5. increment +0x00 (count)  (0x440270-0x440272)
+    // 6. SetCharacterName from createCharacterData  (0x440274-0x440283)
+    // 7. write character IDs / status / worldId  (0x440288-0x4402ab)
+    // 8. SetCurrentState(0xb)  (0x4402af-0x4402b7)
+    // 9. PostEvent(0x14)  (0x4402bc-0x4402c4)
+    //
+    // Note: original has no slotRecordValid04_ write — just the pointer store at 0x440228.
     mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex] = {};
-    mediator->selectionRouteState684_.slotRecordValid04_[appendedSlotIndex] = true;
     mediator->selectionRouteState684_.routeHostStringTriples194_[appendedSlotIndex].Assign(
         selectedWorldDescriptor.inlineNamePlus03);
     mediator->SetCurrentCharacterRouteIndexCc8Scaffold(appendedSlotIndex);
     mediator->selectionRouteState684_.slotRecordCount00_ = static_cast<uint8_t>(appendedSlotIndex + 1u);
 
+    // anchor: launcher.exe:0x440274-0x440283
+    // Original: PUSH &mediator->createCharacterData108; MOV ECX,pNewSlotRecord;
+    // CALL 0x43aa80 (SetCharacterName). This copies the character name into the slot
+    // record's payload buffer via ReserveLengthPrefixedString + WriteReservedCString.
+    // Current code approximates this by setting the heapString14 pointer directly.
+    // TODO: Once slot records are heap-allocated with payload buffers, replace with
+    // a proper SetCharacterName call.
     SlotRecordState_0x4b5328& appendedSlotRecord =
         mediator->selectionRouteState684_.slotRecordTable04_[appendedSlotIndex];
     appendedSlotRecord.heapString14 =
         mediator->postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00.data();
+
+    // anchor: launcher.exe:0x440288-0x4402ab
+    // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,
+    // [EDI+0x10]+0xb = 0 (status), [EDI+0x10]+0xc = worldId (word from descriptor)
     appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
     appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
     appendedSlotRecord.status0b = 0u;
     appendedSlotRecord.worldId0c = selectedWorldDescriptor.worldId01;
 
-    mediator->marginRouteState_.pendingWorldId = selectedWorldDescriptor.worldId01;
-    mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(selectedWorldDescriptor.worldId01);
-    if (const char* routeHostPrefix = mediator->LookupRouteHostPrefixBySlot(appendedSlotIndex)) {
-        mediator->marginRouteState_.routeHostPrefix = routeHostPrefix;
-    } else {
-        mediator->marginRouteState_.routeHostPrefix.clear();
-    }
-
-    if (mediator->worldListCountOrStatus80 >= 1u) {
-        // Original: "SetCurrentState(3), PostError(0xb)" - mirrors +0x80 status>=1 branch
-        (void)mediator->SetCurrentState(3u);
-        mediator->PostError(0x0bu);
-        spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage observed error MS_ClaimCharacterNameReply; mirrored original state3 switch and error=0x0b owner+0x80=0x{:08x}",
-            static_cast<unsigned>(mediator->worldListCountOrStatus80));
-        return 1u;
-    }
-
-    uint32_t helper11EntryResult = 0u;
-    if (mediator->LoginHelperStateByIdScaffold(0x0bu) != nullptr) {
-        // anchor: launcher.exe:0x4401a0 success tail
-        // Original ends with `0x41b450(0x0b)`, so keep the immediate helper11 slot-3 continuation
-        // inside the central switch helper instead of restaging it through a source-only wrapper.
-        helper11EntryResult = mediator->SetCurrentState(0x0bu);
-        mediator->expectedMarginRequestName_ = CLTLoginMediator::kMessageMsLoadCharacterReply;
-    } else {
-        spdlog::warn(
-            "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage parsed successful MS_ClaimCharacterNameReply but has no registered helper11 state");
-    }
+    // anchor: launcher.exe:0x4402af-0x4402c4
+    // Original: SetCurrentState(g_Mediator, 0xb) then PostEvent(g_Mediator, 0x14).
+    // No helper-state null-check, no expectedMarginRequestName_ write, no marginRouteState_
+    // writes. The parse-object virtual destructor runs at 0x4402e7-0x4402f0 before return.
+    (void)mediator->SetCurrentState(0x0bu);
     mediator->PostEvent(0x14u);
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage successful MS_ClaimCharacterNameReply -> helper11 entry result=0x{:08x} then PostEvent(0x14)",
-        static_cast<unsigned>(helper11EntryResult));
+        "DIAGNOSTIC: CLTLoginState_State10::Slot6_HandleSecondaryMessage successful MS_ClaimCharacterNameReply -> SetCurrentState(0xb) then PostEvent(0x14)");
     return 1u;
 }
 
