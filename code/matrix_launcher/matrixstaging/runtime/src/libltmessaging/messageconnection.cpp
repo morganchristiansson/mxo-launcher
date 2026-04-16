@@ -87,7 +87,7 @@ CMessageConnection::CMessageConnection()
 
 // UNANCHORED: source-owned narrow subset of `0x448b40(engine, createCompletionHelpers)`.
 CMessageConnection::CMessageConnection(
-    CLTThreadPerClientTCPEngine* engine,
+    CLTThreadPerClientTCPEngine_0x4b2768* engine,
     bool allocateCompletionHelpers)
     : CLTTCPConnection(),
       packetNameCallback_(0),
@@ -108,12 +108,12 @@ CMessageConnection::CMessageConnection(
 CMessageConnection::~CMessageConnection() = default;
 
 // UNANCHORED: source-owned compatibility pass-through over the recovered base `+0x10` engine field.
-void CMessageConnection::SetEngine(CLTThreadPerClientTCPEngine* engine) {
+void CMessageConnection::SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine) {
     CLTTCPConnection::SetEngine(engine);
 }
 
 // UNANCHORED: source-owned compatibility accessor over the recovered base `+0x10` engine field.
-CLTThreadPerClientTCPEngine* CMessageConnection::Engine() const {
+CLTThreadPerClientTCPEngine_0x4b2768* CMessageConnection::Engine() const {
     return CLTTCPConnection::Engine();
 }
 
@@ -1000,7 +1000,7 @@ uint32_t CMessageConnection::SendPacketMessageRef(
 // leaf wrappers (for example `0x449a70` / `0x44af60`) after base `0x4490c0` returns false-ish.
 static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
     const auto* header =
-        static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+        static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     const uint32_t workType = header ? header->workType : 0u;
     const uint32_t resultCode = header ? header->statusOrPayloadDword08 : 0u;
     const char* resultName = mxo::libltbase::CResultNameArrayItem_GetResultName(resultCode);
@@ -1050,8 +1050,8 @@ static uint32_t CMessageConnection_WorkItemTypeScaffold(const void* workItem) {
         return 0u;
     }
 
-    const CLTThreadPerClientTCPEngine_WorkItemHeader* header =
-        static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader* header =
+        static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     return header->workType;
 }
 
@@ -1063,8 +1063,8 @@ static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const vo
         return 0u;
     }
 
-    const CLTThreadPerClientTCPEngine_WorkItemHeader* statusWorkItem =
-        static_cast<const CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+    const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader* statusWorkItem =
+        static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     return statusWorkItem->statusOrPayloadDword08;
 }
 
@@ -1686,21 +1686,21 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
-    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+    if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         if (closeCompletionHelper80_) {
             closeCompletionHelper80_->Signal();
             return 1u;
         }
         return 0u;
     }
-    if (workType == CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+    if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus) {
         if (connectCompletionHelper7c_) {
             connectCompletionHelper7c_->Signal();
             return 1u;
         }
         return 0u;
     }
-    if (workType != CLTThreadPerClientTCPEngine::kWorkTypeParsedPacket) {
+    if (workType != CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeParsedPacket) {
         return 0u;
     }
     if (CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem) != 0u) {
@@ -1927,7 +1927,7 @@ uint32_t CMessageConnection::EnsureConnected() {
 CBaseMarginConnection::CBaseMarginConnection()
     : CMessageConnection() {}
 
-CBaseMarginConnection::CBaseMarginConnection(CLTThreadPerClientTCPEngine* connectionEngine)
+CBaseMarginConnection::CBaseMarginConnection(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine)
     : CMessageConnection(connectionEngine) {}
 
 CBaseMarginConnection::~CBaseMarginConnection() = default;
@@ -1951,7 +1951,7 @@ uint32_t CBaseMarginConnection::DispatchCopiedParsedPacketTailScaffold(
 CAuthStartupConnection::CAuthStartupConnection()
     : CBaseMarginConnection() {}
 
-CAuthStartupConnection::CAuthStartupConnection(CLTThreadPerClientTCPEngine* authEngine)
+CAuthStartupConnection::CAuthStartupConnection(CLTThreadPerClientTCPEngine_0x4b2768* authEngine)
     : CBaseMarginConnection(authEngine) {}
 
 CAuthStartupConnection::~CAuthStartupConnection() = default;
@@ -2010,7 +2010,7 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
     }
 
     if (CMessageConnection_WorkItemTypeScaffold(workItem) ==
-        CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         // anchor: launcher.exe:0x449a70 tail
         // The original tail calls vtable[0](1), i.e. the deleting-dtor-style teardown path,
         // not the ordinary `Close(bool)` wrapper.
@@ -2034,7 +2034,7 @@ CMarginConnection_0x4aff38::CMarginConnection_0x4aff38()
     : CBaseMarginConnection() {}
 
 // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
-CMarginConnection_0x4aff38::CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngine* marginEngine)
+CMarginConnection_0x4aff38::CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngine_0x4b2768* marginEngine)
     : CBaseMarginConnection(marginEngine) {}
 
 // UNANCHORED: source-owned default destructor.
@@ -3121,7 +3121,7 @@ uint32_t CMarginConnection_0x4aff38::OnOperationCompleted(void* workItem) {
     }
 
     if (CMessageConnection_WorkItemTypeScaffold(workItem) ==
-        CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
         if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator)) {
             mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 0u;

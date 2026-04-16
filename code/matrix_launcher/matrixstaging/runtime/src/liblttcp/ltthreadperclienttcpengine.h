@@ -20,14 +20,14 @@ class CLTLoginMediator;
 namespace mxo::liblttcp {
 
 class CMessageConnection;
-class CLTThreadPerClientTCPEngine;
+class CLTThreadPerClientTCPEngine_0x4b2768;
 
 // Recovered base-queue object from CLTBaseThreadPerClientTCPEngine.
 // Current high-confidence field map comes from 0x436610 -> 0x436340 and later consumer paths.
 // This matches the launcher arg5 queue storage shape at:
 // - +0x0c..+0x33
 // - +0x34..+0x5b
-struct CLTThreadPerClientTCPEngine_Queue {
+struct CLTThreadPerClientTCPEngine_0x4b2768_Queue {
     void* current0;        // +0x00
     void* block0;          // +0x04
     void* end0;            // +0x08
@@ -44,7 +44,7 @@ struct CLTThreadPerClientTCPEngine_Queue {
 // Current best reading:
 // - value0 = workItem pointer
 // - value1 = context / owner pointer
-struct CLTThreadPerClientTCPEngine_QueuedPair {
+struct CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair {
     uint32_t value0;
     uint32_t value1;
 };
@@ -58,31 +58,31 @@ struct CLTThreadPerClientTCPEngine_QueuedPair {
 // - `+0x00` = vtable
 // - `+0x04` = work-item type/code consumed by the queue consumer
 // - `+0x08` = shared status/payload dword used by connection/completion consumers
-struct CLTThreadPerClientTCPEngine_WorkItemHeader {
+struct CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader {
     void** vtable; // +0x00
     uint32_t workType; // +0x04
     uint32_t statusOrPayloadDword08; // +0x08
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_WorkItemHeader) == 0x0c, "work-item header size mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_WorkItemHeader, workType) == 0x04, "work-item header workType offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_WorkItemHeader, statusOrPayloadDword08) == 0x08, "work-item header status/payload offset mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader) == 0x0c, "work-item header size mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader, workType) == 0x04, "work-item header workType offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader, statusOrPayloadDword08) == 0x08, "work-item header status/payload offset mismatch");
 
-struct CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold {
+struct CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold {
     // anchor: launcher.exe:0x435050 / vtable `0x004b3df8`
     // Small queued type-2 work item used by the worker-thread connect-completion path.
-    CLTThreadPerClientTCPEngine_WorkItemHeader header{};
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader header{};
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_ConnectionStatusWorkItemScaffold) == 0x0c, "connection-status work-item size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold) == 0x0c, "connection-status work-item size mismatch");
 
-struct CLTThreadPerClientTCPEngine_CloseWorkItemScaffold {
+struct CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold {
     // anchor: launcher.exe:0x435070 / vtable `0x004b3e00`
     // Small queued type-1 work item used by the worker-thread close/peer-closed path.
-    CLTThreadPerClientTCPEngine_WorkItemHeader header{};
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader header{};
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold) == 0x0c, "close work-item size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold) == 0x0c, "close work-item size mismatch");
 
 // Recovered launcher-visible arg5 helper root at +0x5c.
 // Current source note:
@@ -91,7 +91,7 @@ static_assert(sizeof(CLTThreadPerClientTCPEngine_CloseWorkItemScaffold) == 0x0c,
 // - the target class now also owns a first-class surrogate for the helper family so wrapper code
 //   can delegate helper semantics/mechanical mirror state into liblttcp instead of keeping all
 //   arg5-only state bookkeeping in `src/launcher_network_object_abi.cpp`
-struct CLTThreadPerClientTCPEngine_WaitHelperScaffold {
+struct CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold {
     void** vtable;
 };
 
@@ -100,13 +100,13 @@ struct CLTThreadPerClientTCPEngine_WaitHelperScaffold {
 // - original embeds a `CRITICAL_SECTION` immediately after the vtable root
 // - keep that inline shape on the native class too so the class body can converge on the original
 //   `0xb4` arg5 layout instead of carrying heap-backed helper storage baggage
-struct CLTThreadPerClientTCPEngine_LockHelperScaffold {
+struct CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold {
     void** vtable;
     CRITICAL_SECTION crit;
 };
 
 // Recovered allocated sentinel/tree head shape reached from arg5 +0x80.
-struct CLTThreadPerClientTCPEngine_EndpointTreeHead24 {
+struct CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24 {
     unsigned char colorOrFlag;
     unsigned char padding[3];
     void* root;
@@ -116,7 +116,7 @@ struct CLTThreadPerClientTCPEngine_EndpointTreeHead24 {
 };
 
 // Recovered allocated sentinel/tree head shape reached from arg5 +0x8c.
-struct CLTThreadPerClientTCPEngine_ContextTreeHead18 {
+struct CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18 {
     unsigned char colorOrFlag;
     unsigned char padding[3];
     void* root;
@@ -128,11 +128,11 @@ struct CLTThreadPerClientTCPEngine_ContextTreeHead18 {
 // Launcher-visible shell attachment map used by the current wrapper boundary.
 // This intentionally keeps the raw arg5 shell outside liblttcp while letting the target class own
 // more of the constructor/runtime-visible state that the shell mirrors.
-struct CLTThreadPerClientTCPEngine_LauncherAbiAttachment {
+struct CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment {
     uint32_t* field04CtorFlags = nullptr;
     void** field08QueueThreadArray = nullptr;
-    CLTThreadPerClientTCPEngine_Queue* queue0C = nullptr;
-    CLTThreadPerClientTCPEngine_Queue* queue34 = nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue0C = nullptr;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue34 = nullptr;
     void* queueLock = nullptr;
     void* queueSignalEvent = nullptr;
     void* cleanupLock = nullptr;
@@ -142,10 +142,10 @@ struct CLTThreadPerClientTCPEngine_LauncherAbiAttachment {
     uint32_t* field90ContextCount = nullptr;
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_WaitHelperScaffold) == 0x04, "wait helper size mismatch");
-static_assert(sizeof(CLTThreadPerClientTCPEngine_LockHelperScaffold) == 0x1c, "lock helper size mismatch");
-static_assert(sizeof(CLTThreadPerClientTCPEngine_EndpointTreeHead24) == 0x24, "endpoint head size mismatch");
-static_assert(sizeof(CLTThreadPerClientTCPEngine_ContextTreeHead18) == 0x18, "context head size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold) == 0x04, "wait helper size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold) == 0x1c, "lock helper size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24) == 0x24, "endpoint head size mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18) == 0x18, "context head size mismatch");
 
 // Recovered generic thread-base surface shared by several launcher worker objects.
 // Current original anchors:
@@ -218,22 +218,22 @@ protected:
 // - inherits generic CLTThread-style base state
 // - stores owner engine pointer at +0x38
 // - overrides the thread-main slot to call owner RunCompletedOperationQueue(owner, 0)
-class CLTThreadPerClientTCPEngine_QueueThread : public CLTThread {
+class CLTThreadPerClientTCPEngine_0x4b2768_QueueThread : public CLTThread {
 public:
     // anchor: launcher.exe:0x4365a0
-    explicit CLTThreadPerClientTCPEngine_QueueThread(CLTThreadPerClientTCPEngine* owner);
+    explicit CLTThreadPerClientTCPEngine_0x4b2768_QueueThread(CLTThreadPerClientTCPEngine_0x4b2768* owner);
     // UNANCHORED: current vtable family keeps the shared CLTThread deleting dtor at slot +0x2c
-    ~CLTThreadPerClientTCPEngine_QueueThread() override;
+    ~CLTThreadPerClientTCPEngine_0x4b2768_QueueThread() override;
 
     // UNANCHORED: scaffold accessor for the recovered child +0x38 owner field
-    CLTThreadPerClientTCPEngine* Owner() const;
+    CLTThreadPerClientTCPEngine_0x4b2768* Owner() const;
 
 protected:
     // anchor: launcher.exe:0x436fc0
     void Run() override;
 
 private:
-    CLTThreadPerClientTCPEngine* owner_;
+    CLTThreadPerClientTCPEngine_0x4b2768* owner_;
 };
 
 // Recovered accept-thread child stored as the +0x80 endpoint-tree payload.
@@ -245,12 +245,12 @@ private:
 //     listening socket handle
 // - stores the listening socket handle at +0x3c
 // - owns a wakeup socket helper at +0x40
-class CLTThreadPerClientTCPEngine_AcceptThread : public CLTThread {
+class CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread : public CLTThread {
 public:
     // anchor: launcher.exe:0x431ab0
-    CLTThreadPerClientTCPEngine_AcceptThread(uint32_t listenSocketHandle, void* ownerContext);
+    CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread(uint32_t listenSocketHandle, void* ownerContext);
     // anchor: launcher.exe:0x431b30 deleting wrapper / +0x40 wakeup helper teardown
-    ~CLTThreadPerClientTCPEngine_AcceptThread() override;
+    ~CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread() override;
 
     // UNANCHORED: scaffold accessor for recovered child +0x38 owner/context field
     void* OwnerContext() const;
@@ -278,12 +278,12 @@ private:
 // - stores a mode byte at +0x3c
 // - owns a wakeup socket helper at +0x40
 // - stores an exit-request flag at +0x44
-class CLTThreadPerClientTCPEngine_WorkerThread : public CLTThread {
+class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread : public CLTThread {
 public:
     // anchor: launcher.exe:0x431b60
-    CLTThreadPerClientTCPEngine_WorkerThread(void* contextKey, bool datagramMode);
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread(void* contextKey, bool datagramMode);
     // anchor: launcher.exe:0x431be0 deleting wrapper / +0x40 wakeup helper teardown
-    ~CLTThreadPerClientTCPEngine_WorkerThread() override;
+    ~CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread() override;
 
     // UNANCHORED: scaffold accessor for recovered child +0x38 context/connection key field
     void* ContextKey() const;
@@ -319,8 +319,8 @@ private:
 // - queue-thread child ctor 0x4365a0
 // - primary vtable 0x4b2768
 // strongest current class string:
-// - CLTThreadPerClientTCPEngine
-class CLTThreadPerClientTCPEngine : public ILTTCPEngine {
+// - CLTThreadPerClientTCPEngine_0x4b2768
+class CLTThreadPerClientTCPEngine_0x4b2768 : public ILTTCPEngine {
 public:
     // Source note:
     // - original slot return conventions are not uniform
@@ -368,9 +368,9 @@ public:
     // - there is no extra launcher-side wrapper record around either payload family
 
     // anchor: launcher.exe:0x431c30 / base ctor 0x4366f0
-    CLTThreadPerClientTCPEngine();
+    CLTThreadPerClientTCPEngine_0x4b2768();
     // anchor: launcher.exe:0x40b389..0x40b404 teardown release path; current C++ body remains scaffold-only
-    ~CLTThreadPerClientTCPEngine();
+    ~CLTThreadPerClientTCPEngine_0x4b2768();
 
     // anchor: launcher.exe:0x4319a0
     int Release(uint32_t flags) override;
@@ -409,17 +409,17 @@ public:
 
 
     // anchor: launcher.exe:0x436340
-    static void Queue_Free(CLTThreadPerClientTCPEngine_Queue* queue);
+    static void Queue_Free(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue);
     // anchor: launcher.exe:0x436340
-    static bool Queue_Init(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t initialSize);
+    static bool Queue_Init(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue, uint32_t initialSize);
     // anchor: launcher.exe:0x436670 selected-queue push body reached from `0x436820`
     // Original helper returns `void`; once the caller reaches this push path it does not receive
     // enqueue-success feedback.
-    static void Queue_PushPair(CLTThreadPerClientTCPEngine_Queue* queue, uint32_t value0, uint32_t value1);
+    static void Queue_PushPair(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue, uint32_t value0, uint32_t value1);
     // anchor: launcher.exe:0x436b10 / client.dll:0x62531c10 empty-queue check shape
-    static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_Queue* queue);
+    static bool Queue_IsEmpty(const CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue);
     // anchor: launcher.exe:0x436d31..0x436ee7 consumer pop shape
-    static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_Queue* queue, CLTThreadPerClientTCPEngine_QueuedPair* outPair);
+    static bool Queue_TryPopPair(CLTThreadPerClientTCPEngine_0x4b2768_Queue* queue, CLTThreadPerClientTCPEngine_0x4b2768_QueuedPair* outPair);
 
     // UNANCHORED: scaffold bridge because the current liblttcp engine still lives beside the raw
     // launcher ABI shell.
@@ -432,7 +432,7 @@ public:
     //   fallback queue/event/lock state while also exposing which count/head fields on the shell
     //   should mirror class-owned state directly
     void AttachLauncherAbiSurfaceScaffold(
-        const CLTThreadPerClientTCPEngine_LauncherAbiAttachment& attachment);
+        const CLTThreadPerClientTCPEngine_0x4b2768_LauncherAbiAttachment& attachment);
     // UNANCHORED: explicit detach/reset helper for the launcher ABI bridge.
     void DetachLauncherAbiSurfaceScaffold();
     // UNANCHORED: current auth/margin begin wrappers and launcher ABI helper thunks still call this
@@ -490,30 +490,30 @@ public:
     // - no generic synthetic fallback allocation
     CMessageConnection* FindMessageConnection(void* contextKey);
 
-    friend class CLTThreadPerClientTCPEngine_WorkerThread;
+    friend class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread;
 
 private:
     // UNANCHORED: starter helper mirroring the recovered endpoint-key shape.
     static LTTCPEndpointKey MakeEndpointKey(uint16_t portHostOrder, uint32_t ipv4NetworkOrder);
     // anchor: launcher.exe:0x42fdb0 search shape over the endpoint-keyed `+0x80` tree family.
-    CLTThreadPerClientTCPEngine_AcceptThread* FindMonitoredPort(const LTTCPEndpointKey& key);
+    CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* FindMonitoredPort(const LTTCPEndpointKey& key);
     // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
-    CLTThreadPerClientTCPEngine_WorkerThread* FindWorker(void* contextKey);
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* FindWorker(void* contextKey);
     // Source-owned shared engine-slot connection resolver.
     // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection`
     // objects when original caller/object evidence is missing.
     CMessageConnection* ResolveConnectionForEngineSlotScaffold(void* contextKey);
     // anchor: launcher.exe:0x431ff0 worker creation/insertion helper.
-    CLTThreadPerClientTCPEngine_WorkerThread* CreateAndInsertWorkerThread(
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CreateAndInsertWorkerThread(
         CMessageConnection* connection,
         bool datagramMode,
         bool startThread = false);
     // UNANCHORED: source-owned teardown helper for the direct `AcceptThread` payload stored at
     // `[endpointNode+0x20]`.
-    void StopAcceptThreadScaffold(CLTThreadPerClientTCPEngine_AcceptThread* acceptThread);
+    void StopAcceptThreadScaffold(CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* acceptThread);
     // UNANCHORED: source-owned teardown helper for the direct `WorkerThread` payload stored at
     // `[contextNode+0x14]`.
-    void StopWorkerThreadScaffold(CLTThreadPerClientTCPEngine_WorkerThread* workerThread);
+    void StopWorkerThreadScaffold(CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread);
     // UNANCHORED: current sidecar enqueue helper preserving original `0x436820` lock/order shape
     // while still returning `false` to synthetic callers when no attached target queue exists.
     // Unlike original `0x436820`, this source-owned helper exposes queue availability to bounded
@@ -547,79 +547,79 @@ private:
     // UNANCHORED: launcher-visible mirror refresh for the recovered +0x80/+0x8c sentinel heads and
     // count dwords.
     void RefreshOwnedLauncherMirrorStateScaffold();
-    CLTThreadPerClientTCPEngine_Queue* ActiveQueue0CScaffold();
-    CLTThreadPerClientTCPEngine_Queue* ActiveQueue34Scaffold();
-    const CLTThreadPerClientTCPEngine_Queue* ActiveQueue0CScaffold() const;
-    const CLTThreadPerClientTCPEngine_Queue* ActiveQueue34Scaffold() const;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue0CScaffold();
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue34Scaffold();
+    const CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue0CScaffold() const;
+    const CLTThreadPerClientTCPEngine_0x4b2768_Queue* ActiveQueue34Scaffold() const;
     void* ActiveQueueLockScaffold() const;
     void* ActiveQueueSignalEventScaffold() const;
     void* ActiveCleanupLockScaffold() const;
-    static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_LockHelperScaffold* helper);
-    static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_LockHelperScaffold* helper);
-    static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_EndpointTreeHead24* head);
-    static void InitializeContextTreeHead18(CLTThreadPerClientTCPEngine_ContextTreeHead18* head);
+    static void InitializeLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
+    static void DeleteLockHelperScaffold(CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold* helper);
+    static void InitializeEndpointTreeHead24(CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* head);
+    static void InitializeContextTreeHead18(CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* head);
 
     uint32_t ctorFlagsField04_;
     void* queueThreadArrayField08_;
-    CLTThreadPerClientTCPEngine_Queue ownedQueue0C_;
-    CLTThreadPerClientTCPEngine_Queue ownedQueue34_;
-    CLTThreadPerClientTCPEngine_WaitHelperScaffold ownedWaitHelper5C_;
-    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedQueueLockHelper60_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue ownedQueue0C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue ownedQueue34_;
+    CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold ownedWaitHelper5C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold ownedQueueLockHelper60_;
     HANDLE ownedQueueSignalEvent7C_;
-    CLTThreadPerClientTCPEngine_EndpointTreeHead24* ownedEndpointTreeHead80_;
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* ownedEndpointTreeHead80_;
     uint32_t ownedEndpointCount84_;
     uint32_t reserved88_;
-    CLTThreadPerClientTCPEngine_ContextTreeHead18* ownedContextTreeHead8C_;
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* ownedContextTreeHead8C_;
     uint32_t ownedContextCount90_;
     uint32_t reserved94_;
-    CLTThreadPerClientTCPEngine_LockHelperScaffold ownedCleanupLockHelper98_;
+    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold ownedCleanupLockHelper98_;
 };
 
-struct CLTThreadPerClientTCPEngine_LayoutMirror {
+struct CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror {
     void** vtable;
     uint32_t field04;
     void* field08;
-    CLTThreadPerClientTCPEngine_Queue queue0C;
-    CLTThreadPerClientTCPEngine_Queue queue34;
-    CLTThreadPerClientTCPEngine_WaitHelperScaffold waitHelper5C;
-    CLTThreadPerClientTCPEngine_LockHelperScaffold queueLockHelper60;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue queue0C;
+    CLTThreadPerClientTCPEngine_0x4b2768_Queue queue34;
+    CLTThreadPerClientTCPEngine_0x4b2768_WaitHelperScaffold waitHelper5C;
+    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold queueLockHelper60;
     HANDLE queueSignalEvent7C;
-    CLTThreadPerClientTCPEngine_EndpointTreeHead24* endpointTreeHead80;
+    CLTThreadPerClientTCPEngine_0x4b2768_EndpointTreeHead24* endpointTreeHead80;
     uint32_t endpointCount84;
     uint32_t reserved88;
-    CLTThreadPerClientTCPEngine_ContextTreeHead18* contextTreeHead8C;
+    CLTThreadPerClientTCPEngine_0x4b2768_ContextTreeHead18* contextTreeHead8C;
     uint32_t contextCount90;
     uint32_t reserved94;
-    CLTThreadPerClientTCPEngine_LockHelperScaffold cleanupLockHelper98;
+    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold cleanupLockHelper98;
 };
 
-static_assert(sizeof(CLTThreadPerClientTCPEngine_LayoutMirror) == 0xb4, "layout mirror size mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, field04) == 0x04, "field04 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, field08) == 0x08, "field08 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queue0C) == 0x0c, "queue0C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queue34) == 0x34, "queue34 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, waitHelper5C) == 0x5c, "waitHelper5C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queueLockHelper60) == 0x60, "queueLockHelper60 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, queueSignalEvent7C) == 0x7c, "queueSignalEvent7C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, endpointTreeHead80) == 0x80, "endpointTreeHead80 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, endpointCount84) == 0x84, "endpointCount84 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, reserved88) == 0x88, "reserved88 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, contextTreeHead8C) == 0x8c, "contextTreeHead8C offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, contextCount90) == 0x90, "contextCount90 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, reserved94) == 0x94, "reserved94 offset mismatch");
-static_assert(offsetof(CLTThreadPerClientTCPEngine_LayoutMirror, cleanupLockHelper98) == 0x98, "cleanupLockHelper98 offset mismatch");
-static_assert(sizeof(CLTThreadPerClientTCPEngine) == sizeof(CLTThreadPerClientTCPEngine_LayoutMirror), "CLTThreadPerClientTCPEngine size must match launcher arg5");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror) == 0xb4, "layout mirror size mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field04) == 0x04, "field04 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, field08) == 0x08, "field08 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queue0C) == 0x0c, "queue0C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queue34) == 0x34, "queue34 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, waitHelper5C) == 0x5c, "waitHelper5C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueLockHelper60) == 0x60, "queueLockHelper60 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, queueSignalEvent7C) == 0x7c, "queueSignalEvent7C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointTreeHead80) == 0x80, "endpointTreeHead80 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, endpointCount84) == 0x84, "endpointCount84 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, reserved88) == 0x88, "reserved88 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, contextTreeHead8C) == 0x8c, "contextTreeHead8C offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, contextCount90) == 0x90, "contextCount90 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, reserved94) == 0x94, "reserved94 offset mismatch");
+static_assert(offsetof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror, cleanupLockHelper98) == 0x98, "cleanupLockHelper98 offset mismatch");
+static_assert(sizeof(CLTThreadPerClientTCPEngine_0x4b2768) == sizeof(CLTThreadPerClientTCPEngine_0x4b2768_LayoutMirror), "CLTThreadPerClientTCPEngine_0x4b2768 size must match launcher arg5");
 
 // Starter binding object used by the launcher scaffold while arg5 still enters through
 // the dedicated launcher-network ABI layer in src/launcher_network_object_abi.cpp.
 // This keeps owner/engine binding state out of src/diagnostics.cpp and on the
 // recovered liblttcp side.
-class CLTThreadPerClientTCPEngineBinding {
+class CLTThreadPerClientTCPEngine_0x4b2768Binding {
 public:
     // UNANCHORED: starter binding helper.
-    CLTThreadPerClientTCPEngineBinding();
+    CLTThreadPerClientTCPEngine_0x4b2768Binding();
     // UNANCHORED: starter binding helper.
-    ~CLTThreadPerClientTCPEngineBinding();
+    ~CLTThreadPerClientTCPEngine_0x4b2768Binding();
 
     // UNANCHORED: starter binding helper.
     // Faithfulness note from the current Ghidra pass:
@@ -634,11 +634,11 @@ public:
     // UNANCHORED: starter binding helper.
     void* Owner() const;
     // UNANCHORED: starter binding helper.
-    CLTThreadPerClientTCPEngine* Engine() const;
+    CLTThreadPerClientTCPEngine_0x4b2768* Engine() const;
 
 private:
     void* owner_;
-    std::unique_ptr<CLTThreadPerClientTCPEngine> engine_;
+    std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768> engine_;
 };
 
 }  // namespace mxo::liblttcp

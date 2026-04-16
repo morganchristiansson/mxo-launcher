@@ -423,12 +423,12 @@ CBaseConnection::CBaseConnection(LTTCPEngineConnectionState initialState)
 }
 
 // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
-void CLTTCPConnection::SetEngine(CLTThreadPerClientTCPEngine* engine) {
+void CLTTCPConnection::SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine) {
     engine_ = engine;
 }
 
 // UNANCHORED: source-owned compatibility accessor over the recovered connection `+0x10` engine field.
-CLTThreadPerClientTCPEngine* CLTTCPConnection::Engine() const {
+CLTThreadPerClientTCPEngine_0x4b2768* CLTTCPConnection::Engine() const {
     return engine_;
 }
 
@@ -470,11 +470,11 @@ uint32_t CLTTCPConnection::SocketHandle() const {
 }
 
 void CLTTCPConnection::SetWorkerThreadScaffold(
-    CLTThreadPerClientTCPEngine_WorkerThread* workerThread) {
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread) {
     workerThread08_ = workerThread;
 }
 
-CLTThreadPerClientTCPEngine_WorkerThread* CLTTCPConnection::WorkerThreadScaffold() const {
+CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTTCPConnection::WorkerThreadScaffold() const {
     return workerThread08_;
 }
 

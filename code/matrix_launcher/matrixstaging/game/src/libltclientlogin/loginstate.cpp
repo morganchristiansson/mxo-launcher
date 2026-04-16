@@ -44,7 +44,7 @@ static uint32_t LoginStateWorkItemTypeScaffold(const void* workItem) {
     }
 
     const auto* header =
-        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     return header->workType;
 }
 
@@ -58,7 +58,7 @@ uint32_t CLTLoginState::Slot1_HandlePrimaryGate(void* workItem) {
     }
 
     const uint32_t workType = LoginStateWorkItemTypeScaffold(workItem);
-    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         return 0u;
     }
 
@@ -91,7 +91,7 @@ uint32_t CLTLoginState::Slot2_HandleSecondaryGate(void* workItem) {
     }
 
     const uint32_t workType = LoginStateWorkItemTypeScaffold(workItem);
-    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         return 0u;
     }
 

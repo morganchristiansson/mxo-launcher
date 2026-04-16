@@ -30,7 +30,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     }
 
     const auto* workHeader =
-        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     const uint32_t workType = workHeader ? workHeader->workType : 0u;
 
     // Assembly flow:
@@ -38,7 +38,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     // - if work type == 2: read payload, store to owner+0x80, TEST for zero
     // - payload == 0: switch to cached upstream, re-enter that state's slot3, PostEvent(0)
     // - payload != 0: set owner+0x2c=1, retry or exhaust/error
-    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeConnectionStatus) {
+    if (workType != mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus) {
         return CLTLoginState::Slot1_HandlePrimaryGate(workItem);
     }
 

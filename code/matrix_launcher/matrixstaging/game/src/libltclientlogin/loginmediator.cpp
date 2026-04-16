@@ -315,7 +315,7 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
 // - rebuild owner `+0x4c` auth `CLTIPAddressList` from `qsAuthServerDNSName` with flags:
 //   - `0x01` = shuffle
 //   - `0x03` = shuffle | ignore-hosts-file when `IgnoreHostsFileForAuth` is set
-void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) {
+void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) {
     if (networkEngineOverride == nullptr) {
         networkEngineOverride = engine_;
     }
@@ -358,7 +358,7 @@ const char* CLTLoginMediator::GetName() {
 // Do not sync this directly to owner vtable `0x004b01c8 +0x0c`; current Ghidra now assigns that
 // owner slot to `launcher.exe:0x41f510`, which looks like reset/clear logic instead.
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine) {
+void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine) {
     engine_ = engine;
     if (authConnection_) {
         authConnection_->SetEngine(engine_);
@@ -2029,8 +2029,8 @@ uint32_t CLTLoginMediator::HandleAuthConnectionCompletionFallback(void* connecti
     }
 
     const auto* workHeader =
-        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
-    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
+    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         // anchor: launcher.exe:0x41afa5
         authConnection_ = nullptr;
     }
@@ -2065,8 +2065,8 @@ uint32_t CLTLoginMediator::HandleMarginConnectionCompletionFallback(void* connec
     }
 
     const auto* workHeader =
-        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
-    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine::kWorkTypeClose) {
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
+    if (workHeader->workType == mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         // anchor: launcher.exe:0x41afe7
         // launcher.exe also zeroes owner `+0x20` here; keep that discrepancy documented until the
         // source layout grows a proven home for it.

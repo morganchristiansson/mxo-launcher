@@ -191,7 +191,7 @@ public:
         // - launcher.exe:0x438d80 = shared `CLTLoginState_*` slot-1 gate
         //   - older Ghidra label: `LaunchPadClient_ProcessEvent0x17`
         // - launcher.exe:0x4816f0 = reused inline helper that returns the queued work-item type
-        //   - current Ghidra name: `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType`
+        //   - current Ghidra name: `CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader_GetWorkType`
         //   - older Ghidra label: `LaunchPadClient_GetVtableOffset`
         // - launcher.exe:0x41cfb0 = CLTLoginMediator_PostEvent (event posting mechanism)
         // - launcher.exe:0x41b450 = CLTLoginMediator_SwitchHelperState (switches helper dispatch table)
@@ -199,7 +199,7 @@ public:
         //
         // Disassembly of 0x438d80 shows:
         //   - Calls reused inline helper
-        //     `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType(this+8)`
+        //     `CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader_GetWorkType(this+8)`
         //   - Checks if event flag at [this+0x2c] is set
         //   - If event flag set, calls CLTLoginMediator_PostEvent(this, 1)
         //   - Otherwise calls vtable[+0x178]() and updates state at [this+0x80]
@@ -749,11 +749,11 @@ public:
     // +0x00
     const char* GetName() override;
     // +0x08
-    void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) override;
+    void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) override;
     // UNANCHORED helper kept explicit from the real wrapper/owner vtable rows:
     // - wrapper `ILTLoginMediator.Default +0x08` currently forwards into `Initialize(...)`
     // - owner `CLTLoginMediator +0x0c` is `0x41f510 = ResetOwnedRuntimeState`, not a direct engine setter
-    void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine* engine);
+    void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine);
     // +0x0c
     void ClearEngine() override;
     // +0x14
@@ -1139,7 +1139,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     uint32_t BeginMarginConnectionViaState4Scaffold();
     // Launcher-owned arg5/auth connection migration:
     // - keep the direct auth/margin child ownership on `CLTLoginMediator`
-    // - let `CLTThreadPerClientTCPEngine` own the current queue push / no-worker pump seam
+    // - let `CLTThreadPerClientTCPEngine_0x4b2768` own the current queue push / no-worker pump seam
     // - keep the launcher-object ABI shell thin and arg5-shaped
     void ResetLauncherConnectionsScaffold();
     uint32_t BeginLauncherMarginConnectionScaffold();
@@ -1510,7 +1510,7 @@ private:
     // - `+0x688` = current-slot character-record table
     // - `+0x818` = per-slot route-host string family
     // - `+0xd84` = world-descriptor table
-    mxo::liblttcp::CLTThreadPerClientTCPEngine* engine_;
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine_;
     uint32_t lastSwitchedHelperStateScaffold_ = 0;
     uint32_t marginPacketReceiveCountScaffold_ = 0;
     uint32_t marginPacketFilteredBeforeSlot6CountScaffold_ = 0;

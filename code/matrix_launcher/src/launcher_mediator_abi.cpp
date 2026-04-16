@@ -189,7 +189,7 @@ static int __thiscall Mediator_RegisterLauncherNetworkEngineObject08(
     void* object) {
     (void)self;
 
-    mxo::liblttcp::CLTThreadPerClientTCPEngine* const engine =
+    mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* const engine =
         LauncherNetworkEngineFromAbiShell(object);
     mxo::ltlogin::ILTLoginMediator::Default->Initialize(engine);
     return object ? 0 : 1;

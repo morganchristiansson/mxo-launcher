@@ -12,7 +12,7 @@ static uint32_t LoginState5WorkItemTypeScaffold(const void* workItem) {
     }
 
     const auto* header =
-        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_WorkItemHeader*>(workItem);
+        static_cast<const mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     return header->workType;
 }
 

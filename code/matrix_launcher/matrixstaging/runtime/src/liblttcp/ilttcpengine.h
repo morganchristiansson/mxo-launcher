@@ -17,7 +17,7 @@ class LTTCPEndpointKey;
 //   - docs/launcher.exe/VTABLES/0x004b2768.md
 //
 // This mirrors the launcher arg5 / network-engine primary vtable shape so the current
-// CLTThreadPerClientTCPEngine scaffolding can keep moving toward a direct ABI-compatible surface.
+// CLTThreadPerClientTCPEngine_0x4b2768 scaffolding can keep moving toward a direct ABI-compatible surface.
 // Keep the slot names stable where they are string-backed or already anchored in the canonical
 // vtable docs; keep low-confidence slots explicitly labeled by address.
 // =============================================================================

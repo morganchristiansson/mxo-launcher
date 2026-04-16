@@ -384,7 +384,7 @@ public:
     // +0x04
     // virtual ~ILTLoginMediator();
     // +0x08
-    virtual void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine* networkEngineOverride) = 0;
+    virtual void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) = 0;
     // +0x0c
     virtual void ClearEngine() = 0;
     // +0x10

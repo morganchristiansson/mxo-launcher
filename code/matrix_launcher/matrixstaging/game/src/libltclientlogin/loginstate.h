@@ -48,7 +48,7 @@ public:
 
     // anchor: launcher.exe:0x00438d80 (shared slot 1 gate across multiple login-state vtables)
     // Exact launcher call shape keeps the queued work item on the stack and reads its type through
-    // `CLTThreadPerClientTCPEngine_WorkItemHeader_GetWorkType(workItem)`.
+    // `CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader_GetWorkType(workItem)`.
     // Uses g_CurrentLoginMediator instead of passing mediator as parameter (faithful to static-RE).
     virtual uint32_t Slot1_HandlePrimaryGate(void* workItem);
 

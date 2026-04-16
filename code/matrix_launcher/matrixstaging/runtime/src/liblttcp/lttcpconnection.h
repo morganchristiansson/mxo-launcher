@@ -10,8 +10,8 @@
 
 namespace mxo::liblttcp {
 
-class CLTThreadPerClientTCPEngine;
-class CLTThreadPerClientTCPEngine_WorkerThread;
+class CLTThreadPerClientTCPEngine_0x4b2768;
+class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread;
 
 // Reimplementation note:
 // This is still a starter original-name skeleton.
@@ -19,7 +19,7 @@ class CLTThreadPerClientTCPEngine_WorkerThread;
 // - docs/launcher.exe/startup_objects/0x4d6304_network_engine.md
 // - docs/launcher.exe/VTABLES/0x004b8034.md
 
-// State values recovered from original CLTThreadPerClientTCPEngine paths.
+// State values recovered from original CLTThreadPerClientTCPEngine_0x4b2768 paths.
 // Only the meanings marked in comments are evidence-backed so far.
 enum class LTTCPEngineConnectionState : uint32_t {
     kUnknown = 0,
@@ -149,7 +149,7 @@ static_assert(sizeof(CLTTCPReadOperationRefHandle) == 0x04, "fragment ref handle
 // - `+0x08` = shared status/payload dword; parser-produced packets zero it
 // - utility child/helper objects directly touched on this path now also include:
 //   - `0x434fa0` = retained-fragment ref helper over a single `CLTTCPReadOperation*`
-//   - shared work-item root prefix `CLTThreadPerClientTCPEngine_WorkItemHeader`
+//   - shared work-item root prefix `CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader`
 // - this same object family is used in two phases:
 //   - parser-owned assembly state while stream bytes are being accumulated
 //   - emitted completed packet object after `Parse(...)` returns `0`
@@ -353,7 +353,7 @@ class CBaseConnection {
   uint8_t autoReleaseFlag04_;
   uint8_t padding05_07_[3];
   // Source-owned compatibility mirror of the recovered base connection `+0x10` engine field.
-  CLTThreadPerClientTCPEngine* engine_;
+  CLTThreadPerClientTCPEngine_0x4b2768* engine_;
   LTTCPEngineConnectionState state_;
   CBaseConnection_QueueContextScaffold queueContextScaffold_;
 };
@@ -378,9 +378,9 @@ public:
     ~CLTTCPConnection();
 
     // UNANCHORED: source-owned compatibility wrapper over the recovered connection `+0x10` engine field.
-    void SetEngine(CLTThreadPerClientTCPEngine* engine);
+    void SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine);
     // UNANCHORED: source-owned compatibility accessor over the recovered connection `+0x10` engine field.
-    CLTThreadPerClientTCPEngine* Engine() const;
+    CLTThreadPerClientTCPEngine_0x4b2768* Engine() const;
 
     // UNANCHORED: source-owned owner-context setter used by the current scaffolds.
     void SetOwnerContext(void* ownerContext);
@@ -393,8 +393,8 @@ public:
     uint32_t SocketHandle() const;
 
     // Recovered direct connection `+0x08` worker pointer from `0x431ff0` / `0x42fbd0` / `0x42fe50`.
-    void SetWorkerThreadScaffold(CLTThreadPerClientTCPEngine_WorkerThread* workerThread);
-    CLTThreadPerClientTCPEngine_WorkerThread* WorkerThreadScaffold() const;
+    void SetWorkerThreadScaffold(CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread);
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* WorkerThreadScaffold() const;
 
     // UNANCHORED: source-owned connection-state setter used by the current scaffolds.
     void SetState(LTTCPEngineConnectionState state);
@@ -503,7 +503,7 @@ public:
 private:
     void* ownerContext_;
     uint32_t socketHandle_;
-    CLTThreadPerClientTCPEngine_WorkerThread* workerThread08_;
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* workerThread08_;
     std::string remoteHostName_;
     CLTTCPConnection_PendingSendQueue pendingSendQueueState38_;
     // High-confidence original seam: `CLTTCPConnection_ctor` stores a concrete

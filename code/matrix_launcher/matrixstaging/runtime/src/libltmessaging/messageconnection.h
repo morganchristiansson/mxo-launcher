@@ -32,7 +32,7 @@ namespace mxo::liblttcp {
 // Current evidence-backed role:
 // - `0x448b40` first constructs a base CLTTCPConnection-family object, then overwrites
 //   its vtable to the CMessageConnection-family vtable at `0x4b7928`
-// - captures a CLTThreadPerClientTCPEngine pointer at +0x10
+// - captures a CLTThreadPerClientTCPEngine_0x4b2768 pointer at +0x10
 // - carries an endpoint copy at +0x24
 // - carries the inherited parser pointer at +0x6c
 // - Ghidra/OOAnalyzer fidelity note for the active receive path:
@@ -286,7 +286,7 @@ struct CMessageConnectionCompletionHelperScaffold {
     // Small event + embedded-lock helper reached by `CMessageConnection::OnOperationCompleted`
     // on work types `1` and `2` through connection `+0x7c/+0x80`.
     void** vtable00 = nullptr; // +0x00
-    CLTThreadPerClientTCPEngine_LockHelperScaffold embeddedLockHelper04{}; // +0x04
+    CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold embeddedLockHelper04{}; // +0x04
     HANDLE eventHandle20 = nullptr; // +0x20
 
     CMessageConnectionCompletionHelperScaffold();
@@ -714,17 +714,17 @@ public:
     // Current source now also mirrors the optional `+0x7c/+0x80` completion-helper allocation
     // branch when explicitly requested.
     explicit CMessageConnection(
-        CLTThreadPerClientTCPEngine* engine,
+        CLTThreadPerClientTCPEngine_0x4b2768* engine,
         bool allocateCompletionHelpers = false);
     // UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
     ~CMessageConnection();
 
     // UNANCHORED: source-owned compatibility pass-through over the recovered base-connection
     // `+0x10` engine field; no separate leaf-owned engine slot is evidenced here.
-    void SetEngine(CLTThreadPerClientTCPEngine* engine);
+    void SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine);
     // UNANCHORED: source-owned compatibility accessor over the recovered base-connection `+0x10`
     // engine field; no separate leaf-owned engine slot is evidenced here.
-    CLTThreadPerClientTCPEngine* Engine() const;
+    CLTThreadPerClientTCPEngine_0x4b2768* Engine() const;
 
     // anchor family: launcher.exe:0x449cd0
     // Source-owned bool-return wrapper over the inherited `CLTTCPConnection::Connect` body that
@@ -916,7 +916,7 @@ public:
     // UNANCHORED: source-owned narrow intermediate-base ctor.
     CBaseMarginConnection();
     // UNANCHORED: source-owned narrow intermediate-base ctor that only seeds the recovered engine.
-    explicit CBaseMarginConnection(CLTThreadPerClientTCPEngine* connectionEngine);
+    explicit CBaseMarginConnection(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine);
     // UNANCHORED: source-owned default intermediate-base destructor.
     ~CBaseMarginConnection() override;
 
@@ -1021,7 +1021,7 @@ public:
     // UNANCHORED: source-owned narrow leaf ctor.
     CAuthStartupConnection();
     // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
-    explicit CAuthStartupConnection(CLTThreadPerClientTCPEngine* authEngine);
+    explicit CAuthStartupConnection(CLTThreadPerClientTCPEngine_0x4b2768* authEngine);
     ~CAuthStartupConnection();
 
     // anchor: launcher.exe:0x449a70
@@ -1052,7 +1052,7 @@ public:
 // Layout: vtable(+0x00), workType(+0x04), statusOrPayload(+0x08), extra data(+0x10,+0x14)
 class CMarginConnectionLocalCompletionWorkItemScaffold {
 public:
-    CLTThreadPerClientTCPEngine_WorkItemHeader header{};
+    CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader header{};
 };
 
 static_assert(sizeof(CMarginConnectionLocalCompletionWorkItemScaffold) == 0x0c, "margin code-4 local completion work-item size mismatch");
@@ -1161,7 +1161,7 @@ public:
     // UNANCHORED: source-owned narrow leaf ctor.
     CMarginConnection_0x4aff38();
     // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
-    explicit CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngine* marginEngine);
+    explicit CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngine_0x4b2768* marginEngine);
     // UNANCHORED: source-owned default destructor.
     // Current tighter static-RE split:
     // - live leaf teardown is through scalar-deleting-dtor wrappers at `0x41cf50/0x41cf80`
