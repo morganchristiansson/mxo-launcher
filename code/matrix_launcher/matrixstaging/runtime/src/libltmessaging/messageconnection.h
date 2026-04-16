@@ -482,31 +482,31 @@ struct CMessageConnectionPacketBuilderPayloadWithReservationScaffold {
 
 static_assert(offsetof(CMessageConnectionPacketBuilderPayloadWithReservationScaffold, reservation14) == 0x14, "packet-builder reservation offset mismatch");
 
-class CStreamPacketEncryptionOwnerBase {
+class CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:
     // anchor: launcher.exe vtable `0x004b81dc`
     // Source-owned full virtual C++ mirror of the owner-side base. This family is only used by
     // our own code, so we intentionally let the compiler own the C++ vptr instead of storing a
     // fake raw `vtable00` field.
-    virtual ~CStreamPacketEncryptionOwnerBase() = default;
-    virtual const char* ClassName() const { return "CStreamPacketEncryptionOwnerBase"; }
+    virtual ~CStreamPacketEncryptionOwnerBase_0x4b81dc() = default;
+    virtual const char* ClassName() const { return "CStreamPacketEncryptionOwnerBase_0x4b81dc"; }
 };
 
-class CStreamPacketEncryptionHelperBase {
+class CStreamPacketEncryptionHelperBase_0x4b81c8 {
 public:
     // anchor: launcher.exe vtable `0x004b81c8`
     // Source-owned full virtual C++ mirror of the helper-side base shared by:
     // - module read helper `0x004b86f0`
     // - module write helper `0x004b8690`
     // - embedded agenda helper `0x004baf48`
-    virtual ~CStreamPacketEncryptionHelperBase() = default;
+    virtual ~CStreamPacketEncryptionHelperBase_0x4b81c8() = default;
     virtual void HandleOpaqueMessageRef(void* opaqueMessageRef) = 0;
 
     // Current best role for original helper `+0x04`:
     // - a downstream helper-family object link, not a message-ref or owner pointer
     // - read side: previous agenda read-chain head
     // - write side: next write helper, or finally the embedded agenda write helper
-    CStreamPacketEncryptionHelperBase* nextHelper04 = nullptr;
+    CStreamPacketEncryptionHelperBase_0x4b81c8* nextHelper04 = nullptr;
 
 protected:
     void ForwardToNextHelper(void* opaqueMessageRef);
@@ -549,7 +549,7 @@ public:
         CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
-class CStreamPacketEncryptionModuleWriteTransformWorker {
+class CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8 {
 public:
     // Source-owned real C++ mirror of the embedded write-side transform worker rooted at helper
     // `+0x0c` by `0x44d820` / worker vtable `0x004b86a8`.
@@ -568,7 +568,7 @@ public:
         CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
-class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase {
+class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
 public:
     // Current common source-owned state on the two module child helpers.
     // `0x469740 = CMessageConnectionPacketAgenda_InstallStreamPacketEncryptionModule` gives the
@@ -621,7 +621,7 @@ public:
     // - `0x44d390` can forward either a fresh transformed message-ref or a null discard through
     //   helper `+0x04`
     // - source now models that as a real worker class rather than raw placeholder pointers
-    CStreamPacketEncryptionModuleWriteTransformWorker transformWorker;
+    CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8 transformWorker;
     bool hasTransformWorker = false;
     CMessageConnectionMessageRefOutputBuffer transformedOutput;
 
@@ -630,7 +630,7 @@ public:
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 };
 
-class CStreamPacketEncryptionAgendaHelper : public CStreamPacketEncryptionHelperBase {
+class CStreamPacketEncryptionAgendaHelper : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
 public:
     // anchor: launcher.exe vtable `0x004baf48`
     // Source-owned full virtual C++ mirror of the embedded agenda helper object materialized twice
@@ -641,16 +641,16 @@ public:
     uint32_t field08 = 0;
     const char* helperLabel0c = nullptr;
     void** outputSlotAddress10 = nullptr;
-    CStreamPacketEncryptionHelperBase** downstreamHelperSlot14 = nullptr;
+    CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot14 = nullptr;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
     void ResetForAgenda(
         const char* helperLabel,
         void** outputSlotAddress,
-        CStreamPacketEncryptionHelperBase** downstreamHelperSlot);
+        CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot);
 };
 
-class CStreamPacketEncryptionModule : public CStreamPacketEncryptionOwnerBase {
+class CStreamPacketEncryptionModule : public CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:
     // anchor: launcher.exe:0x44da00 / vtable `0x004b8704`
     // Named owner/aggregator recovered from:
@@ -691,9 +691,9 @@ struct CMessageConnectionPacketAgenda {
     // - `writeHelperChainTail48` mirrors original agenda `+0x48`
     // Ghidra evidence from `0x469850 / 0x469740` shows `+0x44/+0x48` are real write-chain
     // head/tail pointers, not source-invented convenience state.
-    CStreamPacketEncryptionHelperBase* readHelperChainHead40 = nullptr;
-    CStreamPacketEncryptionHelperBase* writeHelperChainHead44 = nullptr;
-    CStreamPacketEncryptionHelperBase* writeHelperChainTail48 = nullptr;
+    CStreamPacketEncryptionHelperBase_0x4b81c8* readHelperChainHead40 = nullptr;
+    CStreamPacketEncryptionHelperBase_0x4b81c8* writeHelperChainHead44 = nullptr;
+    CStreamPacketEncryptionHelperBase_0x4b81c8* writeHelperChainTail48 = nullptr;
     uint16_t configuredModuleCount4c = 0;
     uint16_t reserved4e = 0;
     bool created = false;

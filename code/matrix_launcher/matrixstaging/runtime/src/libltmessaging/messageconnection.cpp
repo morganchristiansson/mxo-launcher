@@ -509,7 +509,7 @@ bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
 }
 
 // anchor: launcher.exe:0x44d820 / 0x44daf0
-void CStreamPacketEncryptionModuleWriteTransformWorker::ResetForSeed(
+void CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
     hasConfiguredFeedbackTransform =
@@ -521,7 +521,7 @@ void CStreamPacketEncryptionModuleWriteTransformWorker::ResetForSeed(
 }
 
 // anchor: launcher.exe:0x44d390
-bool CStreamPacketEncryptionModuleWriteTransformWorker::TryTransform(
+bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
     const CMessageConnectionMessageRef& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
     // Source still keeps the confirmed packet semantic at the worker boundary here, but the
@@ -556,7 +556,7 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker::TryTransform(
 
 // UNANCHORED: source-owned helper forwarding through the recovered helper-family `nextHelper04`
 // link used by the agenda read/write chains.
-void CStreamPacketEncryptionHelperBase::ForwardToNextHelper(
+void CStreamPacketEncryptionHelperBase_0x4b81c8::ForwardToNextHelper(
     void* opaqueMessageRef) {
     if (nextHelper04) {
         nextHelper04->HandleOpaqueMessageRef(opaqueMessageRef);
@@ -661,7 +661,7 @@ void CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef(
 void CStreamPacketEncryptionAgendaHelper::ResetForAgenda(
     const char* helperLabel,
     void** outputSlotAddress,
-    CStreamPacketEncryptionHelperBase** downstreamHelperSlot) {
+    CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot) {
     nextHelper04 = nullptr;
     field04 = 0u;
     field08 = 0u;
@@ -781,13 +781,13 @@ void CMessageConnection::ConfigurePacketAgenda(
     agenda.configuredModuleList04 = streamPacketEncryptionModule;
 
     if (streamPacketEncryptionModule->readHelper04) {
-        CStreamPacketEncryptionHelperBase* const previousReadHead = agenda.readHelperChainHead40;
+        CStreamPacketEncryptionHelperBase_0x4b81c8* const previousReadHead = agenda.readHelperChainHead40;
         agenda.readHelperChainHead40 = streamPacketEncryptionModule->readHelper04;
         streamPacketEncryptionModule->readHelper04->nextHelper04 = previousReadHead;
     }
 
     if (streamPacketEncryptionModule->writeHelper08) {
-        CStreamPacketEncryptionHelperBase* const previousWriteTail = agenda.writeHelperChainTail48;
+        CStreamPacketEncryptionHelperBase_0x4b81c8* const previousWriteTail = agenda.writeHelperChainTail48;
         streamPacketEncryptionModule->writeHelper08->nextHelper04 =
             &agenda.embeddedWriteHelper28;
         agenda.writeHelperChainTail48 = streamPacketEncryptionModule->writeHelper08;
@@ -1822,7 +1822,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
                 static_cast<unsigned>(lastReceivedPacketBodyBytesScaffold_.size()),
                 static_cast<unsigned>(agenda->configuredModuleCount4c),
                 (agenda->readHelperChainHead40 ==
-                 static_cast<const CStreamPacketEncryptionHelperBase*>(&agenda->embeddedReadHelper0c))
+                 static_cast<const CStreamPacketEncryptionHelperBase_0x4b81c8*>(&agenda->embeddedReadHelper0c))
                     ? 1u
                     : 0u,
                 fmt::ptr(this),
