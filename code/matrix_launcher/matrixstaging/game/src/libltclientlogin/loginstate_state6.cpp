@@ -331,7 +331,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     }
 
     g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
-    g_CurrentLoginMediator->SetState6UdpSessionSecretF18(parsed.udpSessionSecret09);
+    g_CurrentLoginMediator->state6UdpSessionSecretF18_ = parsed.udpSessionSecret09;
 
     if (cachedUpstreamOrArg_0x4 == nullptr) {
         spdlog::info(

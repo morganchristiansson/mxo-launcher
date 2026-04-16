@@ -2152,15 +2152,14 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
     return 0u;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x440ac6 (direct write to owner +0xf18)
 uint32_t CLTLoginMediator::State6UdpSessionSecretF18() const {
-    const auto it = g_marginBootstrapStateByMediator.find(this);
-    return (it != g_marginBootstrapStateByMediator.end()) ? it->second.state6UdpSessionSecretF18 : 0u;
+    return state6UdpSessionSecretF18_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+// anchor: launcher.exe:0x440ac6 (direct write to owner +0xf18)
 void CLTLoginMediator::SetState6UdpSessionSecretF18(uint32_t value) {
-    MutableMarginBootstrapState(this).state6UdpSessionSecretF18 = value;
+    state6UdpSessionSecretF18_ = value;
 }
 
 // anchor: launcher.exe:0x41ecd0
