@@ -8,7 +8,7 @@
 #include "../../../runtime/src/libltcrypto/auth_crypto.h"
 
 namespace mxo::liblttcp {
-class CMarginConnection;
+class CMarginConnection_0x4aff38;
 }
 
 namespace mxo::auth::internal {
@@ -551,7 +551,7 @@ public:
     // connection vtable `+0x44 / 0x41ce80`, then materializes the separate connection `+0xa0`
     // prep object through standalone helper `0x443340`. The immediate state5 path stops there;
     // the first later original consumer of that stored `+0xa0` object is `0x4429b0`.
-    void PrepareState5MarginConnectionCopySend(mxo::liblttcp::CMarginConnection& marginConnection);
+    void PrepareState5MarginConnectionCopySend(mxo::liblttcp::CMarginConnection_0x4aff38& marginConnection);
 
 private:
     AuthBootstrap680Child_0x441290& child_;

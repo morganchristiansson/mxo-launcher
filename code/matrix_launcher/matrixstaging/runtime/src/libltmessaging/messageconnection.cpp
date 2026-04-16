@@ -2021,27 +2021,27 @@ uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
 }
 
 // ============================================================
-// VTable 0x004aff38 - CMarginConnection
+// VTable 0x004aff38 - CMarginConnection_0x4aff38
 // ============================================================
 // Later leaf on top of:
 // CLTTCPConnection (0x004b8034)
 // └── CMessageConnection-family base surface
 //     └── CBaseMarginConnection (0x004b64a8)
-//         └── CMarginConnection (0x004aff38)
+//         └── CMarginConnection_0x4aff38 (0x004aff38)
 
 // UNANCHORED: source-owned narrow leaf ctor.
-CMarginConnection::CMarginConnection()
+CMarginConnection_0x4aff38::CMarginConnection_0x4aff38()
     : CBaseMarginConnection() {}
 
 // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
-CMarginConnection::CMarginConnection(CLTThreadPerClientTCPEngine* marginEngine)
+CMarginConnection_0x4aff38::CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngine* marginEngine)
     : CBaseMarginConnection(marginEngine) {}
 
 // UNANCHORED: source-owned default destructor.
 // Current tighter static-RE split:
 // - live leaf teardown is through the scalar-deleting-dtor wrappers at `0x41cf50/0x41cf80`
 // - `0x41ce80` is the separate connection `+0x98` reply-copy helper, not this C++ destructor body
-CMarginConnection::~CMarginConnection() = default;
+CMarginConnection_0x4aff38::~CMarginConnection_0x4aff38() = default;
 
 namespace {
 
@@ -3087,7 +3087,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
 
     // anchor: launcher.exe:0x442d26..0x442d2d
     // Original returns (code - 5) & 0xFFFFFF00 which is 0 for code 5, negative-ish for others
-    // This allows leaf CMarginConnection::DispatchMessage to detect unconsumed codes
+    // This allows leaf CMarginConnection_0x4aff38::DispatchMessage to detect unconsumed codes
     // and forward to CLTLoginMediator_DispatchCurrentHelperSlot6 (owner+0x184)
     return (static_cast<int>(decodedMessageCode) - 5) & 0xFFFFFF00;
 }
@@ -3102,7 +3102,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
 // - if work type == 1, clear owner byte `+0xf14` and tear down through the connection object
 // - there is no separate type-2 connect-status split in this leaf; that work still flows through
 //   the same owner `+0x188` fallback path
-uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
+uint32_t CMarginConnection_0x4aff38::OnOperationCompleted(void* workItem) {
     if (!workItem) {
         return 0u;
     }
@@ -3141,7 +3141,7 @@ uint32_t CMarginConnection::OnOperationCompleted(void* workItem) {
 // Current tighter source split:
 // - base `0x442d00` now owns the consumed decoded-code `2/4/5` router again
 // - only the surviving path stages bytes for the later launcher-owned bootstrap / slot-6 path
-uint32_t CMarginConnection::DispatchMessage(void* messageRef) {
+uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
     if (!messageRef) {
         return 0u;
     }

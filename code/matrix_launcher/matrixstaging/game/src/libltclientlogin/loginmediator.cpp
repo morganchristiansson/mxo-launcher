@@ -365,7 +365,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
     }
     if (marginConnection_) {
         marginConnection_->SetEngine(engine_);
-        if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
+        if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_)) {
             marginConnection->SetEngine(engine_);
         }
     }
@@ -1230,7 +1230,7 @@ RouteDescriptor30SmallStringLikeSketch* CLTLoginMediator::GetState8Section11Stri
 
 // anchor: launcher.exe:0x41b4f0 +0xd4
 const void* CLTLoginMediator::GetState9CallbackSeedPointer85D4() const {
-    if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_)) {
+    if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_)) {
         if (const uint8_t* seedPointer = marginConnection->MessageCode5SeedBytes85Pointer()) {
             const uint32_t* seedWords = reinterpret_cast<const uint32_t*>(seedPointer);
             spdlog::info(
@@ -2882,7 +2882,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             // - writing that live `+0x85..+0x94` mirror on the margin connection now also triggers
             //   the lazy local `+0x9c = CStreamPacketEncryptionModule` scaffold install/refresh,
             //   matching the newly recovered agenda-module ownership point more closely.
-            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
+            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(MarginConnection());
                 marginConnection != nullptr && marginBootstrapState.marginTwofishKeyBytes.size() == 16u) {
                 std::array<uint8_t, 16> liveSeedBytes85 = {};
                 std::copy_n(
@@ -2896,7 +2896,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             }
 
             uint32_t sendResult = 0u;
-            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection*>(MarginConnection());
+            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(MarginConnection());
                 marginConnection != nullptr &&
                 marginBootstrapState.marginTwofishKeyBytes.size() == 16u &&
                 marginBootstrapState.certChallengeBytes.size() == 16u) {
@@ -2909,7 +2909,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     challengeBytes);
                 if (sendResult != 0u) {
                     spdlog::info(
-                        "DIAGNOSTIC: launcher-owned margin mirrored original 0x4429b0 send seam by routing CERT_ChallengeResponse through CMarginConnection packet-builder/message-ref send connection={}",
+                        "DIAGNOSTIC: launcher-owned margin mirrored original 0x4429b0 send seam by routing CERT_ChallengeResponse through CMarginConnection_0x4aff38 packet-builder/message-ref send connection={}",
                         fmt::ptr(marginConnection));
                 }
             }
@@ -3204,7 +3204,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
 
 // anchor: launcher.exe:0x41b500 -> 0x4435f0 / 0x441f30
 void CLTLoginMediator::PrepareState5MarginConnectionCopySend() {
-    auto* marginConnection = static_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_);
+    auto* marginConnection = static_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
     AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0(*authBootstrapChild680_)
         .PrepareState5MarginConnectionCopySend(*marginConnection);
     marginConnection->SendStoredBootstrapReplyCopy98();
@@ -3441,13 +3441,13 @@ bool CLTLoginMediator::SelectMarginEndpointIpv4() {
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CMessageConnection* CLTLoginMediator::EnsureMarginConnectionObject() {
-    mxo::liblttcp::CMarginConnection* marginConnection =
-        dynamic_cast<mxo::liblttcp::CMarginConnection*>(marginConnection_);
+    mxo::liblttcp::CMarginConnection_0x4aff38* marginConnection =
+        dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
     if (!marginConnection) {
         if (marginConnectionOwnedByMediator_) {
             delete marginConnection_;
         }
-        marginConnection = new mxo::liblttcp::CMarginConnection(engine_);
+        marginConnection = new mxo::liblttcp::CMarginConnection_0x4aff38(engine_);
         if (!marginConnection) {
             marginConnection_ = nullptr;
             marginConnectionOwnedByMediator_ = false;

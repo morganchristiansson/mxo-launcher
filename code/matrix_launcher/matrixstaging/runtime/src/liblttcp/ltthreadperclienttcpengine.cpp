@@ -1511,7 +1511,7 @@ void CLTThreadPerClientTCPEngine_WorkerThread::Run() {
         return;
     }
 
-    const bool isMarginConnection = dynamic_cast<CMarginConnection*>(connection) != nullptr;
+    const bool isMarginConnection = dynamic_cast<CMarginConnection_0x4aff38*>(connection) != nullptr;
     const char* connectStatusLabel =
         isMarginConnection ? "MarginConnectStatus" : "AuthConnectStatus";
     const char* closeStatusLabel =

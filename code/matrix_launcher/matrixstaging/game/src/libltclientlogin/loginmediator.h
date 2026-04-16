@@ -126,7 +126,7 @@ class CLTLoginMediator : public ILTLoginMediator {
     friend class CLTLoginState_State11;
     friend class mxo::liblttcp::CAuthStartupConnection;
     friend class mxo::liblttcp::CBaseMarginConnection;
-    friend class mxo::liblttcp::CMarginConnection;
+    friend class mxo::liblttcp::CMarginConnection_0x4aff38;
 
 public:
     static constexpr uint32_t kRecoveredWorldSlotCapacity = 100;

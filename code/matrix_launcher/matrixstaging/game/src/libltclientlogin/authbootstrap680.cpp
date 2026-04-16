@@ -2186,7 +2186,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
 
 // anchor: launcher.exe:0x4435f0
 void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend(
-    mxo::liblttcp::CMarginConnection& marginConnection) {
+    mxo::liblttcp::CMarginConnection_0x4aff38& marginConnection) {
     AuthBootstrap680Child_0x441290& child = child_;
     const auto* copyShadow =
         static_cast<const AuthBootstrapReplyCopyShadowF4_0x44add0*>(child.authReplyCopyShadowF4);

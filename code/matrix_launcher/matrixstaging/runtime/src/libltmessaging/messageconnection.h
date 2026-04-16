@@ -1156,17 +1156,17 @@ private:
     CBaseMarginConnection& connection_;
 };
 
-class CMarginConnection : public CBaseMarginConnection {
+class CMarginConnection_0x4aff38 : public CBaseMarginConnection {
 public:
     // UNANCHORED: source-owned narrow leaf ctor.
-    CMarginConnection();
+    CMarginConnection_0x4aff38();
     // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
-    explicit CMarginConnection(CLTThreadPerClientTCPEngine* marginEngine);
+    explicit CMarginConnection_0x4aff38(CLTThreadPerClientTCPEngine* marginEngine);
     // UNANCHORED: source-owned default destructor.
     // Current tighter static-RE split:
     // - live leaf teardown is through scalar-deleting-dtor wrappers at `0x41cf50/0x41cf80`
     // - `0x41ce80` is the separate connection `+0x98` reply-copy helper
-    ~CMarginConnection();
+    ~CMarginConnection_0x4aff38();
 
     // anchor: launcher.exe:0x44af60
     // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
