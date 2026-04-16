@@ -181,10 +181,15 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             // SOURCE-ONLY: expectedMarginRequestName_ has no binary counterpart in 0x43f300.
             mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
 
-            // The binary dispatches the cached upstream's vtable+0x18 up to 3 times here
-            // (likely a decompiler artifact from register pressure — the same virtual call
-            // is re-evaluated). The source simplifies to a single RecoverCachedUpstreamPhaseCode
-            // call with the same 0/0x10→3 normalization semantics.
+            // The binary dispatches this->field_0x4->GetStateId() up to 3 times here
+            // (confirmed by improved Ghidra types: all three calls are
+            // `local_1c->field4_0x4->vftptr_0x0->GetStateId()`).
+            // This is a compiler code-gen artifact (register pressure causes redundant
+            // re-evaluation), not a decompiler misinterpretation. Since all three calls
+            // target the same virtual on the same object, the source simplifies to a single
+            // RecoverCachedUpstreamPhaseCode call with the same 0/0x10→3 normalization.
+            // field_0x4 = cachedUpstreamOrArg_ = the upstream state pointer set in
+            // Slot3_BeginOrContinue when pUpstreamState->GetStateId() != 1.
             uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
             if (nextHelperStateId == 0u || nextHelperStateId == 0x10u) {
                 nextHelperStateId = 3u;
