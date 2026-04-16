@@ -368,7 +368,7 @@ static bool CMessageConnection_ResolveTransformInputSpan(
 }
 
 static void CStreamPacketEncryptionModuleReadHelper_RecordSuccessfulTransformIndex(
-    CStreamPacketEncryptionModuleReadHelper* helper,
+    CStreamPacketEncryptionModuleReadHelper_0x4b86f0* helper,
     size_t successfulIndex) {
     if (!helper || helper->transformWorkers.size() <= 1u) {
         return;
@@ -564,7 +564,7 @@ void CStreamPacketEncryptionHelperBase_0x4b81c8::ForwardToNextHelper(
 }
 
 // anchor: launcher.exe:0x44d500
-void CStreamPacketEncryptionModuleReadHelper::HandleOpaqueMessageRef(
+void CStreamPacketEncryptionModuleReadHelper_0x4b86f0::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
     CMessageConnectionMessageRef* const inputMessageRef =
         static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef);
@@ -591,8 +591,8 @@ void CStreamPacketEncryptionModuleReadHelper::HandleOpaqueMessageRef(
 }
 
 // anchor: launcher.exe:0x44da00 / 0x44daf0
-void CStreamPacketEncryptionModuleReadHelper::ResetForOwner(
-    CStreamPacketEncryptionModule* owner) {
+void CStreamPacketEncryptionModuleReadHelper_0x4b86f0::ResetForOwner(
+    CStreamPacketEncryptionModule_0x4b8704* owner) {
     nextHelper04 = nullptr;
     owner08 = owner;
     collectionControl0c = 0u;
@@ -601,7 +601,7 @@ void CStreamPacketEncryptionModuleReadHelper::ResetForOwner(
 }
 
 // anchor: launcher.exe:0x44da00 / 0x44daf0
-void CStreamPacketEncryptionModuleReadHelper::ResetForSeed(
+void CStreamPacketEncryptionModuleReadHelper_0x4b86f0::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     collectionControl0c = 0u;
     transformWorkers.clear();
@@ -611,7 +611,7 @@ void CStreamPacketEncryptionModuleReadHelper::ResetForSeed(
 }
 
 // anchor: launcher.exe:0x44d390
-void CStreamPacketEncryptionModuleWriteHelper::HandleOpaqueMessageRef(
+void CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
     CMessageConnectionMessageRef* const inputMessageRef =
         static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef);
@@ -626,8 +626,8 @@ void CStreamPacketEncryptionModuleWriteHelper::HandleOpaqueMessageRef(
 }
 
 // anchor: launcher.exe:0x44d820 / 0x44daf0
-void CStreamPacketEncryptionModuleWriteHelper::ResetForOwner(
-    CStreamPacketEncryptionModule* owner) {
+void CStreamPacketEncryptionModuleWriteHelper_0x4b8690::ResetForOwner(
+    CStreamPacketEncryptionModule_0x4b8704* owner) {
     nextHelper04 = nullptr;
     owner08 = owner;
     hasTransformWorker = false;
@@ -636,7 +636,7 @@ void CStreamPacketEncryptionModuleWriteHelper::ResetForOwner(
 }
 
 // anchor: launcher.exe:0x44d820 / 0x44daf0
-void CStreamPacketEncryptionModuleWriteHelper::ResetForSeed(
+void CStreamPacketEncryptionModuleWriteHelper_0x4b8690::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     hasTransformWorker = true;
     transformWorker.ResetForSeed(seedBytes);
@@ -644,7 +644,7 @@ void CStreamPacketEncryptionModuleWriteHelper::ResetForSeed(
 }
 
 // anchor: launcher.exe:0x469980
-void CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef(
+void CStreamPacketEncryptionAgendaHelper_0x4baf48::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
     // Original helper stores/replaces a retained outer message-ref through helper field `+0x10`.
     // Now that both receive-side and transform-output message-ref objects are heap-backed, source
@@ -658,7 +658,7 @@ void CStreamPacketEncryptionAgendaHelper::HandleOpaqueMessageRef(
 }
 
 // anchor: launcher.exe:0x469850
-void CStreamPacketEncryptionAgendaHelper::ResetForAgenda(
+void CStreamPacketEncryptionAgendaHelper_0x4baf48::ResetForAgenda(
     const char* helperLabel,
     void** outputSlotAddress,
     CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot) {
@@ -671,7 +671,7 @@ void CStreamPacketEncryptionAgendaHelper::ResetForAgenda(
 }
 
 // anchor: launcher.exe:0x44da00
-void CStreamPacketEncryptionModule::InitializeForMarginConnectionSeed(
+void CStreamPacketEncryptionModule_0x4b8704::InitializeForMarginConnectionSeed(
     const std::array<uint8_t, 16>& seedBytes85) {
     readHelper04 = nullptr;
     writeHelper08 = nullptr;
@@ -687,7 +687,7 @@ void CStreamPacketEncryptionModule::InitializeForMarginConnectionSeed(
 }
 
 // anchor: launcher.exe:0x44daf0
-void CStreamPacketEncryptionModule::RefreshFromMarginConnectionSeed(
+void CStreamPacketEncryptionModule_0x4b8704::RefreshFromMarginConnectionSeed(
     const std::array<uint8_t, 16>& seedBytes85) {
     if (readHelper04 == nullptr) {
         readHelper04 = &ownedReadHelper14;
@@ -727,7 +727,7 @@ void CMessageConnection::ConfigurePacketNameFamily(
 
 // anchor: launcher.exe:0x448980
 void CMessageConnection::ConfigurePacketAgenda(
-    CStreamPacketEncryptionModule* streamPacketEncryptionModule) {
+    CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule) {
     if (!packetAgenda_) {
         packetAgenda_ = std::make_unique<CMessageConnectionPacketAgenda>();
     }
@@ -2541,7 +2541,7 @@ void CBaseMarginConnection::EnsureStreamPacketEncryptionModuleFromSeed85() {
     const bool needsInitialInstall = (streamPacketEncryptionModule9c_ == nullptr);
     if (needsInitialInstall) {
         streamPacketEncryptionModule9c_ =
-            std::make_unique<CStreamPacketEncryptionModule>();
+            std::make_unique<CStreamPacketEncryptionModule_0x4b8704>();
     }
     if (!streamPacketEncryptionModule9c_) {
         ConfigurePacketAgenda(nullptr);

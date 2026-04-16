@@ -513,7 +513,7 @@ protected:
 };
 
 class CMessageConnection;
-class CStreamPacketEncryptionModule;
+class CStreamPacketEncryptionModule_0x4b8704;
 
 class CMessageConnectionMessageRefOutputBuffer {
 public:
@@ -581,10 +581,10 @@ public:
     //   - read side passes that 16-byte peer block into `0x44bca0 = CPacketDecryptor_DecryptPacket`
     //     for discard/expiry logging
     //   - write side likewise passes it into `0x44c750 = CPacketEncryptor_EncryptPacket`
-    CStreamPacketEncryptionModule* owner08 = nullptr;
+    CStreamPacketEncryptionModule_0x4b8704* owner08 = nullptr;
 };
 
-class CStreamPacketEncryptionModuleReadHelper
+class CStreamPacketEncryptionModuleReadHelper_0x4b86f0
     : public CStreamPacketEncryptionModuleHelper {
 public:
     // anchor: launcher.exe vtable `0x004b86f0`
@@ -603,11 +603,11 @@ public:
     CMessageConnectionMessageRefOutputBuffer transformedOutput;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
-    void ResetForOwner(CStreamPacketEncryptionModule* owner);
+    void ResetForOwner(CStreamPacketEncryptionModule_0x4b8704* owner);
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 };
 
-class CStreamPacketEncryptionModuleWriteHelper
+class CStreamPacketEncryptionModuleWriteHelper_0x4b8690
     : public CStreamPacketEncryptionModuleHelper {
 public:
     // anchor: launcher.exe vtable `0x004b8690`
@@ -626,11 +626,11 @@ public:
     CMessageConnectionMessageRefOutputBuffer transformedOutput;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
-    void ResetForOwner(CStreamPacketEncryptionModule* owner);
+    void ResetForOwner(CStreamPacketEncryptionModule_0x4b8704* owner);
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 };
 
-class CStreamPacketEncryptionAgendaHelper : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
+class CStreamPacketEncryptionAgendaHelper_0x4baf48 : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
 public:
     // anchor: launcher.exe vtable `0x004baf48`
     // Source-owned full virtual C++ mirror of the embedded agenda helper object materialized twice
@@ -650,7 +650,7 @@ public:
         CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot);
 };
 
-class CStreamPacketEncryptionModule : public CStreamPacketEncryptionOwnerBase_0x4b81dc {
+class CStreamPacketEncryptionModule_0x4b8704 : public CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:
     // anchor: launcher.exe:0x44da00 / vtable `0x004b8704`
     // Named owner/aggregator recovered from:
@@ -661,12 +661,12 @@ public:
     // - `writeHelper08` = module **write helper** rooted at `0x004b8690`
     // - `nextConfiguredModule0c` = next configured module in the agenda-owned module list
     // - `configuredConnection10` = agenda `+0x00` connection pointer copied during install
-    CStreamPacketEncryptionModuleReadHelper* readHelper04 = nullptr;
-    CStreamPacketEncryptionModuleWriteHelper* writeHelper08 = nullptr;
-    CStreamPacketEncryptionModule* nextConfiguredModule0c = nullptr;
+    CStreamPacketEncryptionModuleReadHelper_0x4b86f0* readHelper04 = nullptr;
+    CStreamPacketEncryptionModuleWriteHelper_0x4b8690* writeHelper08 = nullptr;
+    CStreamPacketEncryptionModule_0x4b8704* nextConfiguredModule0c = nullptr;
     CMessageConnection* configuredConnection10 = nullptr;
-    CStreamPacketEncryptionModuleReadHelper ownedReadHelper14{};
-    CStreamPacketEncryptionModuleWriteHelper ownedWriteHelper2c{};
+    CStreamPacketEncryptionModuleReadHelper_0x4b86f0 ownedReadHelper14{};
+    CStreamPacketEncryptionModuleWriteHelper_0x4b8690 ownedWriteHelper2c{};
     std::array<uint8_t, 16> associatedSeedBytes40{};
 
     const char* ClassName() const override { return "CStreamPacketEncryptionModule"; }
@@ -680,11 +680,11 @@ struct CMessageConnectionPacketAgenda {
     // This scaffold now keeps the recovered agenda front matter explicit where source can do so
     // faithfully while still representing the two embedded helper objects as internal C++ wrappers.
     CMessageConnection* connectionOwner00 = nullptr;
-    CStreamPacketEncryptionModule* configuredModuleList04 = nullptr;
+    CStreamPacketEncryptionModule_0x4b8704* configuredModuleList04 = nullptr;
     CMessageConnectionMessageRef* readOutputSlot08 = nullptr;
-    CStreamPacketEncryptionAgendaHelper embeddedReadHelper0c{};
+    CStreamPacketEncryptionAgendaHelper_0x4baf48 embeddedReadHelper0c{};
     CMessageConnectionMessageRef* writeOutputSlot24 = nullptr;
-    CStreamPacketEncryptionAgendaHelper embeddedWriteHelper28{};
+    CStreamPacketEncryptionAgendaHelper_0x4baf48 embeddedWriteHelper28{};
     // faithful raw-field naming from the recovered agenda object:
     // - `readHelperChainHead40` mirrors original agenda `+0x40`
     // - `writeHelperChainHead44` mirrors original agenda `+0x44`
@@ -697,7 +697,7 @@ struct CMessageConnectionPacketAgenda {
     uint16_t configuredModuleCount4c = 0;
     uint16_t reserved4e = 0;
     bool created = false;
-    CStreamPacketEncryptionModule* configuredStreamPacketEncryptionModule = nullptr;
+    CStreamPacketEncryptionModule_0x4b8704* configuredStreamPacketEncryptionModule = nullptr;
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
@@ -778,7 +778,7 @@ public:
     // replacement/discard through source-owned real C++ worker classes for the newly recovered
     // module family.
     void ConfigurePacketAgenda(
-        CStreamPacketEncryptionModule* streamPacketEncryptionModule = nullptr);
+        CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule = nullptr);
     // anchor family: launcher.exe:0x448980 -> connection `+0x74`
     // Source-owned accessor for the recovered lazy packet-agenda pointer.
     const CMessageConnectionPacketAgenda* PacketAgenda() const;
@@ -1001,7 +1001,7 @@ private:
     std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here, and the first later original consumer is `0x4429b0 -> +0x1c / 0x437810`
     bool hasMessageCode5SeedBytes85_ = false;
     std::array<uint8_t, 16> messageCode5SeedBytes85_{};
-    std::unique_ptr<CStreamPacketEncryptionModule> streamPacketEncryptionModule9c_;
+    std::unique_ptr<CStreamPacketEncryptionModule_0x4b8704> streamPacketEncryptionModule9c_;
 };
 
 // ============================================================
