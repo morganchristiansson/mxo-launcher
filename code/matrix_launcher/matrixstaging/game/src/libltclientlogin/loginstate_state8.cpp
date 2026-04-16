@@ -14,7 +14,6 @@ namespace mxo::ltlogin {
 namespace {
 
 using PostAuthMarginLoadingState = CLTLoginMediator::PostAuthMarginLoadingState;
-using SlotRecordState = SlotRecordState_0x4b5328;
 
 // Shared chunk-seen helper used by state8 slot6 section-0x0a handling.
 // anchor: launcher.exe:0x43c240 = StateReplyChunkBitset_SetSeen
@@ -421,7 +420,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         ownerState.characterReplyFieldF3c = loadCharacterReplyEnvelope.field05;
         ownerState.state8PersistenceDataF1c.replyField20 = loadCharacterReplyEnvelope.field05;
 
-        const SlotRecordState* currentSlotRecord = mediator->GetCurrentSlotRecord();
+        const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
         if (currentSlotRecord != nullptr) {
             if (currentSlotRecord->heapString14) {
                 const size_t copyCount = std::min(
