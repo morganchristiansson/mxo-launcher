@@ -231,7 +231,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     spdlog::info(
         "ROUTE CHECKPOINT: state8 slot3 entered past the 0x43bd48 owner+0xf14 gate ownerF14={} ownerF18=0x{:08x} currentState={}",
         static_cast<unsigned>(mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14),
-        static_cast<unsigned>(mediator->State6UdpSessionSecretF18()),
+        static_cast<unsigned>(mediator->state6UdpSessionSecretF18_),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
 
     replySectionsSeen_ = 0;

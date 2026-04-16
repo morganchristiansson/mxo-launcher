@@ -2152,11 +2152,6 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
     return 0u;
 }
 
-// anchor: launcher.exe:0x440ac6 (direct write to owner +0xf18)
-uint32_t CLTLoginMediator::State6UdpSessionSecretF18() const {
-    return state6UdpSessionSecretF18_;
-}
-
 // anchor: launcher.exe:0x41ecd0
 void CLTLoginMediator::ResetSelectionContext0ecMirror() {
     selectionContext0ecCopy_ = {};
@@ -3040,7 +3035,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 marginBootstrapState.phase == MarginBootstrapPhase::kSentMsConnectChallengeResponse &&
                 currentHelperPhaseCode == 6u &&
                 postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0u &&
-                State6UdpSessionSecretF18() == 0u;
+                state6UdpSessionSecretF18_ == 0u;
             if ((marginBootstrapState.phase == MarginBootstrapPhase::kSentMsConnectChallengeResponse ||
                  marginBootstrapState.phase == MarginBootstrapPhase::kReady) &&
                 !awaitingFirstState6ConnectReply) {
@@ -3049,7 +3044,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                     static_cast<unsigned>(marginBootstrapState.phase),
                     currentState_ ? currentState_->DebugName() : "<null>",
                     postAuthMarginLoadingState_0xf14.state10SendGateFlagF14,
-                    State6UdpSessionSecretF18());
+                    state6UdpSessionSecretF18_);
                 return 1u;
             }
 
@@ -3116,12 +3111,12 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             if (marginBootstrapState.phase == MarginBootstrapPhase::kReady &&
                 currentHelperPhaseCodeBeforeReply != 6u &&
                 (postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 != 0u ||
-                 State6UdpSessionSecretF18() != 0u)) {
+                 state6UdpSessionSecretF18_ != 0u)) {
                 spdlog::info(
                     "DIAGNOSTIC: launcher-owned margin ignoring duplicate MS_ConnectReply outside the proven state6 slot6 route phase={} ownerF14={} ownerF18=0x{:08x} parsed={} duplicateSessionId=0x{:08x} duplicateStatus0=0x{:08x} duplicateStatus1=0x{:08x} currentState={}",
                     static_cast<unsigned>(marginBootstrapState.phase),
                     postAuthMarginLoadingState_0xf14.state10SendGateFlagF14,
-                    State6UdpSessionSecretF18(),
+                    state6UdpSessionSecretF18_,
                     duplicateReadyReplyParsed ? 1u : 0u,
                     duplicateReadyReplyParsed ? duplicateReadyReplyPreview.sessionId : 0u,
                     duplicateReadyReplyParsed ? duplicateReadyReplyPreview.status0 : 0u,
@@ -3173,7 +3168,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 reply.field15,
                 state6Handled,
                 postAuthMarginLoadingState_0xf14.state10SendGateFlagF14,
-                State6UdpSessionSecretF18(),
+                state6UdpSessionSecretF18_,
                 currentHelperPhaseCodeBeforeReply,
                 currentState_ ? currentState_->DebugName() : "<null>");
             if (state6Handled != 0u) {
@@ -3185,7 +3180,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 currentHelperPhaseCodeBeforeReply,
                 currentState_ ? currentState_->DebugName() : "<null>",
                 postAuthMarginLoadingState_0xf14.state10SendGateFlagF14,
-                State6UdpSessionSecretF18());
+                state6UdpSessionSecretF18_);
             return 1u;
         }
 

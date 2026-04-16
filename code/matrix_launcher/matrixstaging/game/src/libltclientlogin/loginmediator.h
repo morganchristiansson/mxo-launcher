@@ -1428,7 +1428,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // happy path. Keep the storage stable, but do not overstate the exact original semantic yet.
 
     bool MarginConnectionCloseWaitEvent0fGateArmedScaffold() const { return marginConnectionFlag2d_ != 0u; }
-    uint32_t State6UdpSessionSecretF18() const;
+
     // anchor: launcher.exe:0x41f370 / owner vtable +0x50
     // Wrapper-facing helper related to the owner `+0x680` auth/bootstrap child.
     // Newer `0x448140` tightening now keeps the reply-derived `+0xf4` copy as wire-shaped bytes,

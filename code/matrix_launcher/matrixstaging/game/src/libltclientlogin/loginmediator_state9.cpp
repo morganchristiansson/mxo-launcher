@@ -159,7 +159,7 @@ uint32_t CLTLoginMediator::State9SubmitFollowup(uint8_t helperByte4, uint16_t he
         "CLTLoginMediator::State9SubmitFollowup helperByte4=0x{:02x} helperWord6=0x{:04x} ownerF18=0x{:08x} callback84={} object88={} object8c={} forwardedArg90=0x{:08x} cachedHandle147c={} callbackPairReady={} callbackOutLow=0x{:08x} callbackOutHigh=0x{:08x} managedSendMode={} submitTargetReady={} submitTargetIpv4=0x{:08x} submitTarget='{}' remoteHost='{}' executedSubmit={} submitResult=0x{:08x}",
         static_cast<unsigned>(helperByte4),
         static_cast<unsigned>(helperWord6),
-        static_cast<unsigned>(State6UdpSessionSecretF18()),
+        static_cast<unsigned>(state6UdpSessionSecretF18_),
         fmt::ptr(ownerCallback84_),
         fmt::ptr(ownerObject88_),
         fmt::ptr(ownerObject8c_),
