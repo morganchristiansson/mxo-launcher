@@ -118,12 +118,12 @@ CLTThreadPerClientTCPEngine* CMessageConnection::Engine() const {
 }
 
 // anchor: launcher.exe:0x42f850 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x04`
-uint32_t CMessageConnectionMessageStorage::AddRef() {
+uint32_t CMessageConnectionMessageStorage_0x4ba208::AddRef() {
     return static_cast<uint32_t>(InterlockedIncrement(&referenceCount04));
 }
 
 // anchor: launcher.exe:0x42f860 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x08`
-uint32_t CMessageConnectionMessageStorage::Release() {
+uint32_t CMessageConnectionMessageStorage_0x4ba208::Release() {
     const LONG current = InterlockedDecrement(&referenceCount04);
     if (current == 0) {
         FinalRelease();
@@ -131,26 +131,26 @@ uint32_t CMessageConnectionMessageStorage::Release() {
     return static_cast<uint32_t>(current);
 }
 
-void CMessageConnectionMessageStorage::FinalRelease() {
+void CMessageConnectionMessageStorage_0x4ba208::FinalRelease() {
     // anchor: launcher.exe:0x455ad0 / vtable `0x004ba208 +0x0c`
     // The original heap object returns to a pool here. This internal mirror is stack/inline owned,
     // so the final-release path is intentionally non-deleting.
 }
 
 // anchor: launcher.exe:0x42f880 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x10`
-void CMessageConnectionMessageStorage::ResetRefCount() {
+void CMessageConnectionMessageStorage_0x4ba208::ResetRefCount() {
     InterlockedExchange(&referenceCount04, 0);
 }
 
 // anchor: launcher.exe:0x42f890 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x14`
-void CMessageConnectionMessageStorage::SetRefCountFromPtr(const volatile long* refCountSource) {
+void CMessageConnectionMessageStorage_0x4ba208::SetRefCountFromPtr(const volatile long* refCountSource) {
     if (!refCountSource) {
         return;
     }
     InterlockedExchange(&referenceCount04, *refCountSource);
 }
 
-void CMessageConnectionMessageStorage::ResetForPacketBuilderScaffold() {
+void CMessageConnectionMessageStorage_0x4ba208::ResetForPacketBuilderScaffold() {
     // anchor: launcher.exe:0x455bd0 inner-storage setup before the outer object stores/AddRefs it
     referenceCount04 = 0;
     reservedBytes08 = kBuilderReservedBytes08;
@@ -159,7 +159,7 @@ void CMessageConnectionMessageStorage::ResetForPacketBuilderScaffold() {
     std::fill(payloadBytes0c.begin(), payloadBytes0c.end(), 0u);
 }
 
-void CMessageConnectionMessageStorage::ResetPayloadByteCountScaffold(uint16_t payloadByteCount) {
+void CMessageConnectionMessageStorage_0x4ba208::ResetPayloadByteCountScaffold(uint16_t payloadByteCount) {
     const uint16_t oldByteCount = PayloadByteCountScaffold();
     const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, kMaxPayloadByteCount);
     if (clampedByteCount < oldByteCount) {
@@ -176,7 +176,7 @@ void CMessageConnectionMessageStorage::ResetPayloadByteCountScaffold(uint16_t pa
     SetPayloadByteCountRawScaffold(clampedByteCount);
 }
 
-void CMessageConnectionMessageStorage::SetPayloadByteCountRawScaffold(uint16_t payloadByteCount) {
+void CMessageConnectionMessageStorage_0x4ba208::SetPayloadByteCountRawScaffold(uint16_t payloadByteCount) {
     const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, kMaxPayloadByteCount);
     payloadLengthLow0b = static_cast<uint8_t>(clampedByteCount & 0xffu);
     payloadLengthHigh0a =
@@ -185,7 +185,7 @@ void CMessageConnectionMessageStorage::SetPayloadByteCountRawScaffold(uint16_t p
             : 0u;
 }
 
-uint16_t CMessageConnectionMessageStorage::GrowPayloadByteCountScaffold(uint16_t additionalByteCount) {
+uint16_t CMessageConnectionMessageStorage_0x4ba208::GrowPayloadByteCountScaffold(uint16_t additionalByteCount) {
     // anchor: launcher.exe:0x4557b0
     const uint32_t oldByteCount = PayloadByteCountScaffold();
     const uint32_t requestedByteCount = oldByteCount + static_cast<uint32_t>(additionalByteCount);
@@ -198,7 +198,7 @@ uint16_t CMessageConnectionMessageStorage::GrowPayloadByteCountScaffold(uint16_t
     return newByteCount;
 }
 
-uint16_t CMessageConnectionMessageStorage::PayloadByteCountScaffold() const {
+uint16_t CMessageConnectionMessageStorage_0x4ba208::PayloadByteCountScaffold() const {
     const uint16_t encodedPayloadByteCount =
         static_cast<uint16_t>(
             (static_cast<uint16_t>(payloadLengthHigh0a & 0x7fu) << 8u) |
@@ -206,7 +206,7 @@ uint16_t CMessageConnectionMessageStorage::PayloadByteCountScaffold() const {
     return std::min<uint16_t>(encodedPayloadByteCount, kMaxPayloadByteCount);
 }
 
-uint16_t CMessageConnectionMessageStorage::RemainingAppendableByteCountScaffold() const {
+uint16_t CMessageConnectionMessageStorage_0x4ba208::RemainingAppendableByteCountScaffold() const {
     const uint32_t payloadByteCount = PayloadByteCountScaffold();
     if (payloadByteCount >= kMaxPayloadByteCount || reservedBytes08 >= kMaxPayloadByteCount) {
         return 0u;
@@ -216,11 +216,11 @@ uint16_t CMessageConnectionMessageStorage::RemainingAppendableByteCountScaffold(
     return static_cast<uint16_t>(std::min<uint32_t>(remaining, kMaxPayloadByteCount));
 }
 
-uint8_t* CMessageConnectionMessageStorage::PayloadBaseScaffold() {
+uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBaseScaffold() {
     return payloadBytes0c.data();
 }
 
-const uint8_t* CMessageConnectionMessageStorage::PayloadBaseScaffold() const {
+const uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBaseScaffold() const {
     return payloadBytes0c.data();
 }
 
@@ -282,7 +282,7 @@ uint8_t* CMessageConnectionMessageRefBase_0x4ba220::PayloadAppendPointerScaffold
 // anchor: launcher.exe:0x41bb60
 bool CMessageConnectionMessageRefBase_0x4ba220::SetPayloadByteCountScaffold(
     uint32_t payloadByteCount) {
-    if (!messageStorage0c || payloadByteCount > CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
+    if (!messageStorage0c || payloadByteCount > CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
         return false;
     }
     messageStorage0c->SetPayloadByteCountRawScaffold(static_cast<uint16_t>(payloadByteCount));
@@ -300,7 +300,7 @@ void CMessageConnectionMessageRef::FinalRelease() {
     // delete after releasing the inner storage is closer to the original lifetime than keeping the
     // receive-side outer message-ref on the stack.
     if (messageStorage0c) {
-        CMessageConnectionMessageStorage* const storage = messageStorage0c;
+        CMessageConnectionMessageStorage_0x4ba208* const storage = messageStorage0c;
         messageStorage0c = nullptr;
         storage->Release();
     }
@@ -344,7 +344,7 @@ static bool CMessageConnection_ResolveTransformInputSpan(
         *outPayloadByteCount = 0u;
     }
 
-    const CMessageConnectionMessageStorage* const messageStorage =
+    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage =
         inputMessageRef.messageStorage0c;
     if (!messageStorage) {
         return false;
@@ -435,7 +435,7 @@ bool CMessageConnectionMessageRefOutputBuffer::SetPayloadBytes(
     size_t payloadByteCount) {
     Reset();
     if (!payloadBytes || payloadByteCount == 0u ||
-        payloadByteCount > CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
+        payloadByteCount > CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
         return false;
     }
 
@@ -820,7 +820,7 @@ static void CMessageConnection_ApplySendMessageRefMutations(
     // - inner `+0x12 .. +0x15` = 00 00 00 00
     // - inner `+0x16` = 0xff
     // - inner `+0x17` = 0xff
-    CMessageConnectionMessageStorage& messageStorage = *messageRef->messageStorage0c;
+    CMessageConnectionMessageStorage_0x4ba208& messageStorage = *messageRef->messageStorage0c;
     uint8_t* const payloadBase = messageStorage.PayloadBaseScaffold();
     if (!payloadBase) {
         return;
@@ -911,7 +911,7 @@ uint32_t CMessageConnection::SubmitMessageRefBytes(
         return 0u;
     }
 
-    const CMessageConnectionMessageStorage& messageStorage = *messageRef.messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208& messageStorage = *messageRef.messageStorage0c;
     const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
     const uint8_t* const payloadBase = messageStorage.PayloadBaseScaffold();
     if (!payloadBase || payloadByteCount == 0u) {
@@ -962,7 +962,7 @@ uint32_t CMessageConnection::SendPacketMessageRef(
         return 0u;
     }
 
-    const CMessageConnectionMessageStorage& messageStorage = *messageRefForSubmit->messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208& messageStorage = *messageRefForSubmit->messageStorage0c;
     const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
     const uint8_t* const payloadBytes = messageStorage.PayloadBaseScaffold();
     const uint8_t rawOpcode = (payloadBytes && payloadByteCount != 0u) ? payloadBytes[0] : 0u;
@@ -1087,14 +1087,14 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
     if (payloadByteCount == 0u) {
         return true;
     }
-    if (!payloadBytes || payloadByteCount > CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
+    if (!payloadBytes || payloadByteCount > CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
         return false;
     }
 
     const uint16_t oldPayloadByteCount = messageRef->PayloadByteCountScaffold();
     const uint32_t requestedPayloadByteCount =
         static_cast<uint32_t>(oldPayloadByteCount) + payloadByteCount;
-    if (requestedPayloadByteCount > CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
+    if (requestedPayloadByteCount > CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
         return false;
     }
 
@@ -1277,7 +1277,7 @@ static bool CMessageConnection_ResolveMessageCodePointerScaffold(
         *outUsedHeaderlessLocatorDecode = false;
     }
 
-    const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = messageRef.messageStorage0c;
     if (!messageStorage) {
         return false;
     }
@@ -1341,7 +1341,7 @@ static bool CBaseMarginConnection_ResolveLogicalPayloadSpanScaffold(
         return false;
     }
 
-    const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = messageRef.messageStorage0c;
     if (!messageStorage) {
         return false;
     }
@@ -1551,7 +1551,7 @@ static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
         *outProtocolId = 0u;
     }
 
-    const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = messageRef.messageStorage0c;
     if (!messageStorage) {
         return false;
     }
@@ -1584,7 +1584,7 @@ bool CMessageConnection_DecodeMessageCodeScaffold(
         *outUsedHeaderlessLocatorDecode = false;
     }
 
-    const CMessageConnectionMessageStorage* const messageStorage = messageRef.messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = messageRef.messageStorage0c;
     if (!messageStorage) {
         return false;
     }
@@ -1755,7 +1755,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     lastReceivedPacketBodyBytesScaffold_.clear();
-    if (const CMessageConnectionMessageStorage* const messageStorage = copiedMessageRef->messageStorage0c) {
+    if (const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = copiedMessageRef->messageStorage0c) {
         const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
         if (const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
             payloadBytes && payloadByteCount != 0u) {
@@ -1807,7 +1807,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
         if (agendaTouched) {
             lastReceivedPacketBodyBytesScaffold_.clear();
-            if (const CMessageConnectionMessageStorage* const messageStorage = messageRefForDispatch->messageStorage0c) {
+            if (const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = messageRefForDispatch->messageStorage0c) {
                 const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
                 if (const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
                     payloadBytes && payloadByteCount != 0u) {
@@ -2907,7 +2907,7 @@ uint32_t CBaseMarginConnection::DispatchMessage(void* messageRef) {
     }
 
     auto& copiedMessageRef = *static_cast<CMessageConnectionMessageRef*>(messageRef);
-    const CMessageConnectionMessageStorage* const messageStorage = copiedMessageRef.messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = copiedMessageRef.messageStorage0c;
     if (!messageStorage) {
         return 0u;
     }
@@ -3152,7 +3152,7 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
 
     auto& copiedMessageRef = *static_cast<CMessageConnectionMessageRef*>(messageRef);
     mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    const CMessageConnectionMessageStorage* const messageStorage = copiedMessageRef.messageStorage0c;
+    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = copiedMessageRef.messageStorage0c;
     if (!mediator || !CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator) ||
         !messageStorage) {
         return 0u;

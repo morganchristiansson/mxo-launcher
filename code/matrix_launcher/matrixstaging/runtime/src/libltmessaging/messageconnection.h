@@ -160,7 +160,7 @@ public:
     virtual void SetRefCountFromPtr(const volatile long* refCountSource) = 0;
 };
 
-class CMessageConnectionMessageStorage : public CMessageConnectionLocalRefCountedBase {
+class CMessageConnectionMessageStorage_0x4ba208 : public CMessageConnectionLocalRefCountedBase {
 public:
     // anchor: launcher.exe vtable `0x004ba208`
     // Inner payload-storage leaf allocated by `0x455bd0` and retained through the outer message-ref
@@ -208,7 +208,7 @@ public:
     // retables the created object to `0x004ba23c`.
     volatile long referenceCount04 = 0;
     uint32_t field08 = 0;
-    CMessageConnectionMessageStorage* messageStorage0c = nullptr;
+    CMessageConnectionMessageStorage_0x4ba208* messageStorage0c = nullptr;
 
     uint32_t AddRef() override;
     uint32_t Release() override;
@@ -232,7 +232,7 @@ public:
     uint16_t PayloadByteCountScaffold() const;
 
 protected:
-    CMessageConnectionMessageStorage ownedMessageStorage_{};
+    CMessageConnectionMessageStorage_0x4ba208 ownedMessageStorage_{};
 };
 
 class CMessageConnectionMessageRef : public CMessageConnectionMessageRefBase_0x4ba220 {
