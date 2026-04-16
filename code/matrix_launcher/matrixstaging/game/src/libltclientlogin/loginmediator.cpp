@@ -2101,9 +2101,9 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
     outDwords[2] = arg2;
     outDwords[3] = arg3;
 
+    // anchor: launcher.exe:0x41e690 / direct field access at vtable +0x18c
     std::array<uint8_t, 16> transformInput{};
-    const uint32_t ownerF18 = State6UdpSessionSecretF18();
-    std::memcpy(transformInput.data(), &ownerF18, sizeof(ownerF18));
+    std::memcpy(transformInput.data(), &state6UdpSessionSecretF18_, sizeof(state6UdpSessionSecretF18_));
 
     std::array<uint8_t, 16> marginTwofishKey{};
     const uint8_t* state9SeedPointer85D4 =
@@ -2112,7 +2112,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         std::memset(outDwords + 4, 0, 16u);
         spdlog::info(
             "CLTLoginMediator::FillState9CallbackBlob18c missing 16-byte state9 seed from mediator+0xd4; zeroed blob tail ownerF18=0x{:08x}",
-            static_cast<unsigned>(ownerF18));
+            static_cast<unsigned>(state6UdpSessionSecretF18_));
         return 1u;
     }
     std::memcpy(marginTwofishKey.data(), state9SeedPointer85D4, marginTwofishKey.size());
@@ -2131,7 +2131,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         std::memset(outDwords + 4, 0, 16u);
         spdlog::info(
             "CLTLoginMediator::FillState9CallbackBlob18c Twofish block transform failed ownerF18=0x{:08x}",
-            static_cast<unsigned>(ownerF18));
+            static_cast<unsigned>(state6UdpSessionSecretF18_));
         return 1u;
     }
     spdlog::info(
@@ -2140,7 +2140,7 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         static_cast<unsigned>(outDwords[1]),
         static_cast<unsigned>(outDwords[2]),
         static_cast<unsigned>(outDwords[3]),
-        static_cast<unsigned>(ownerF18),
+        static_cast<unsigned>(state6UdpSessionSecretF18_),
         static_cast<unsigned>(seedWords[0]),
         static_cast<unsigned>(seedWords[1]),
         static_cast<unsigned>(seedWords[2]),
