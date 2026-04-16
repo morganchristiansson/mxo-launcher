@@ -90,7 +90,7 @@ public:
     virtual uint32_t DispatchPhaseCode() const;
 
 protected:
-    CLTLoginState* cachedUpstreamOrArg_ = nullptr;
+    CLTLoginState* cachedUpstreamOrArg_0x4 = nullptr;
 };
 
 // anchor: launcher.exe vtable 0x004b51b8

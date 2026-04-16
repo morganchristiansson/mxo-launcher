@@ -37,16 +37,16 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* ups
 
     const uint32_t incomingUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
     if (incomingUpstreamPhaseCode != 1u) {
-        cachedUpstreamOrArg_ = upstreamOrArg;
+        cachedUpstreamOrArg_0x4 = upstreamOrArg;
     }
 
-    const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    const uint32_t cachedUpstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     if (!mediator->HasReadyAuthConnectionState2()) {
         spdlog::info(
             "ROUTE CHECKPOINT: early-auth state2 -> state1 auth-connect incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={}",
             fmt::ptr(upstreamOrArg),
             static_cast<unsigned>(incomingUpstreamPhaseCode),
-            fmt::ptr(cachedUpstreamOrArg_),
+            fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         const uint32_t connectResult = mediator->BeginAuthConnectionViaState1Scaffold();
@@ -54,7 +54,7 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* ups
             "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue auth transport not ready incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} -> BeginAuthConnectionViaState1Scaffold=0x{:08x}",
             fmt::ptr(upstreamOrArg),
             static_cast<unsigned>(incomingUpstreamPhaseCode),
-            fmt::ptr(cachedUpstreamOrArg_),
+            fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
             static_cast<unsigned>(connectResult));
@@ -76,14 +76,14 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* ups
     spdlog::info(
         "ROUTE CHECKPOINT: early-auth state2 ready-side owner+0x680 bootstrap-child dispatch currentState={} cachedUpstream={} cachedUpstreamPhaseCode={} (static 0x439210 ready branch feeds 0x448050)",
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
-        fmt::ptr(cachedUpstreamOrArg_),
+        fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(cachedUpstreamPhaseCode));
     const uint32_t sendResult = child->PrepareAndDispatch(*mediator, sendTarget, sessionToken);
     spdlog::info(
         "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch=0x{:08x}",
         fmt::ptr(upstreamOrArg),
         static_cast<unsigned>(incomingUpstreamPhaseCode),
-        fmt::ptr(cachedUpstreamOrArg_),
+        fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(cachedUpstreamPhaseCode),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         mediator->HasReadyAuthConnectionState2() ? 1u : 0u,
@@ -191,9 +191,9 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             // source's single-call simplification is semantically equivalent:
             //   binary: if (X==0 || X==0x10) iVar6=3 else iVar6=X (via call 3)
             //   source: if (X==0 || X==0x10) nextHelper=3 else nextHelper=X (already held)
-            // field_0x4 = cachedUpstreamOrArg_ = the upstream state pointer set in
+            // field_0x4 = cachedUpstreamOrArg_0x4 = the upstream state pointer set in
             // Slot3_BeginOrContinue when pUpstreamState->GetStateId() != 1.
-            uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+            uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
             if (nextHelperStateId == 0u || nextHelperStateId == 0x10u) {
                 nextHelperStateId = 3u;
             }
@@ -238,7 +238,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
                 "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05 triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x}",
                 static_cast<unsigned>(rawCode),
                 static_cast<unsigned>(mediator->worldListCountOrStatus80),
-                fmt::ptr(cachedUpstreamOrArg_),
+                fmt::ptr(cachedUpstreamOrArg_0x4),
                 static_cast<unsigned>(nextHelperStateId),
                 mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
                 static_cast<unsigned>(switchDispatchResult),

@@ -53,13 +53,13 @@ uint32_t CLTLoginState_State5::Slot2_HandleSecondaryGate(void* workItem) {
     // - local type-`0x0b` completion restores through cached upstream `this+4`
     // - calls cached upstream vtable `+0x18`
     // - passes that state id to `0x41b450`
-    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     const uint32_t switchDispatchResult = mediator->SetCurrentState(nextHelperStateId);
 
     spdlog::info(
         "CLTLoginState_State5::Slot2_HandleSecondaryGate handled local type0x0b status=0x{:08x} cachedUpstream={} nextHelperState=0x{:02x} owner+0x2d={} currentState={} switchDispatchResult=0x{:08x}",
         static_cast<unsigned>(status),
-        fmt::ptr(cachedUpstreamOrArg_),
+        fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(nextHelperStateId),
         mediator->MarginConnectionCloseWaitEvent0fGateArmedScaffold() ? 1u : 0u,
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
@@ -76,8 +76,8 @@ void CLTLoginState_State5::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
         //   existing cached pointer
         // - otherwise overwrite `this+4 = upstream`
         const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
-        if (cachedUpstreamOrArg_ == nullptr || (upstreamPhaseCode != 2u && upstreamPhaseCode != 4u)) {
-            cachedUpstreamOrArg_ = upstreamOrArg;
+        if (cachedUpstreamOrArg_0x4 == nullptr || (upstreamPhaseCode != 2u && upstreamPhaseCode != 4u)) {
+            cachedUpstreamOrArg_0x4 = upstreamOrArg;
         }
     }
     if (!mediator) {
@@ -92,7 +92,7 @@ void CLTLoginState_State5::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
         const uint32_t switchDispatchResult = mediator->SetCurrentState(2u);
         spdlog::info(
             "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=0 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} currentState={} -> helper2 switchDispatchResult=0x{:08x}",
-            fmt::ptr(cachedUpstreamOrArg_),
+            fmt::ptr(cachedUpstreamOrArg_0x4),
             fmt::ptr(upstreamOrArg),
             fmt::ptr(authReplyCopyShadowF4),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
@@ -104,7 +104,7 @@ void CLTLoginState_State5::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     mediator->PostEvent(0x10u);
     spdlog::info(
         "CLTLoginState_State5::Slot3_BeginOrContinue replyCopyShadowStillValid=1 cachedUpstream={} incomingUpstream={} authReplyCopyShadowF4={} currentState={} then PostEvent(0x10)",
-        fmt::ptr(cachedUpstreamOrArg_),
+        fmt::ptr(cachedUpstreamOrArg_0x4),
         fmt::ptr(upstreamOrArg),
         fmt::ptr(authReplyCopyShadowF4),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");

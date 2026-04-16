@@ -175,8 +175,8 @@ void CLTLoginState_State6::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     // the next helper-state target via vtable+0x18.
     if (upstreamOrArg != nullptr) {
         const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(upstreamOrArg);
-        if (cachedUpstreamOrArg_ == nullptr || (upstreamPhaseCode != 4u && upstreamPhaseCode != 5u)) {
-            cachedUpstreamOrArg_ = upstreamOrArg;
+        if (cachedUpstreamOrArg_0x4 == nullptr || (upstreamPhaseCode != 4u && upstreamPhaseCode != 5u)) {
+            cachedUpstreamOrArg_0x4 = upstreamOrArg;
         }
     }
     // anchor: launcher.exe:0x43b91f..0x43b92a - direct g_CurrentLoginMediator access, no null check
@@ -326,7 +326,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
     mediator->SetState6UdpSessionSecretF18(parsed.udpSessionSecret09);
 
-    if (cachedUpstreamOrArg_ == nullptr) {
+    if (cachedUpstreamOrArg_0x4 == nullptr) {
         spdlog::info(
             "CLTLoginState_State6::Slot6_HandleSecondaryMessage mirrored opcode-0x09 success owner+0xf14=1 owner+0xf18=0x{:08x} metricIdCount={} resolvedMetricFilenameCount={} unresolvedMetricFilenameCount={} metricIds={} but has no cached upstream helper at this+4 yet; leaving helper-switch/event-0x12 to the broader caller flow currentState={}",
             static_cast<unsigned>(parsed.udpSessionSecret09),
@@ -338,7 +338,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         return 1u;
     }
 
-    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     const uint32_t switchDispatchResult = mediator->SetCurrentState(nextHelperStateId);
     mediator->PostEvent(0x12u);
     spdlog::info(

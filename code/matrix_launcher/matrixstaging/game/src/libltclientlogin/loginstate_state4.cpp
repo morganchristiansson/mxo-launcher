@@ -60,17 +60,17 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
     if (status != 0u) {
         mediator->marginConnectionFlag2d_ = 1;
         if (mediator->marginBeginCount24_ < static_cast<uint32_t>(mediator->marginAddressList3c_.Count())) {
-            Slot3_BeginOrContinue(cachedUpstreamOrArg_);
+            Slot3_BeginOrContinue(cachedUpstreamOrArg_0x4);
             spdlog::info(
                 "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3",
                 static_cast<unsigned>(status),
-                fmt::ptr(cachedUpstreamOrArg_),
+                fmt::ptr(cachedUpstreamOrArg_0x4),
                 static_cast<unsigned>(mediator->marginBeginCount24_),
                 static_cast<unsigned>(mediator->marginAddressList3c_.Count()));
             return 1u;
         }
 
-        const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+        const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
         mediator->ResetMarginConnectAttemptCountScaffold();
         if (nextHelperStateId != 13u) {
             (void)mediator->SetCurrentState(3u);
@@ -79,7 +79,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
         spdlog::info(
             "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostError(0x06)",
             static_cast<unsigned>(status),
-            fmt::ptr(cachedUpstreamOrArg_),
+            fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(nextHelperStateId),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return 1u;
@@ -92,8 +92,8 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
     // - write owner `+0x104 = -1`
     // - switch helper through `0x41b450`
     // - post event `0x0e`
-    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
-    cachedUpstreamOrArg_ = nullptr;
+    const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
+    cachedUpstreamOrArg_0x4 = nullptr;
     mediator->marginRouteState_.currentWorldId = -1;
     const uint32_t switchDispatchResult = mediator->SetCurrentState(nextHelperStateId);
     mediator->PostEvent(0x0eu);
@@ -120,11 +120,11 @@ void CLTLoginState_State4::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     //   for the real case split
     // - only the narrow owner-side route getters and `0x41e500` transport/init stay on the
     //   mediator
-    if (cachedUpstreamOrArg_ == nullptr) {
-        cachedUpstreamOrArg_ = upstreamOrArg;
+    if (cachedUpstreamOrArg_0x4 == nullptr) {
+        cachedUpstreamOrArg_0x4 = upstreamOrArg;
     }
 
-    const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
+    const uint32_t upstreamPhaseCode = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
     switch (upstreamPhaseCode) {
         case 6: {
             BeginMarginConnectionForState4Case(

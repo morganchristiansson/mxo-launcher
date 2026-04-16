@@ -61,7 +61,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     // 3. Call PostEvent(mediator, 0) at 0x0041cfb0
     // 4. Return 1
     if (workResultCode == 0u) {
-        CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_);
+        CLTLoginState* const cachedUpstreamState = static_cast<CLTLoginState*>(cachedUpstreamOrArg_0x4);
         const uint32_t stateId = cachedUpstreamState->GetStateId();
         g_CurrentLoginMediator->SetCurrentState(stateId);
         g_CurrentLoginMediator->PostEvent(0u);
@@ -79,11 +79,11 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     // Original: if attempt count < candidate count, call slot3 with this+4 (retry)
     // NOTE: no increment of attemptCount in original - directly calls slot3
     if (attemptCount < candidateCount) {
-        Slot3_BeginOrContinue(cachedUpstreamOrArg_);
+        Slot3_BeginOrContinue(cachedUpstreamOrArg_0x4);
         spdlog::info(
             "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount28={} candidateCount={} -> retry state1 slot3",
             static_cast<unsigned>(workResultCode),
-            fmt::ptr(cachedUpstreamOrArg_),
+            fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(attemptCount),
             static_cast<unsigned>(candidateCount));
         return 1u;
@@ -100,7 +100,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     spdlog::info(
         "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
         static_cast<unsigned>(workResultCode),
-        fmt::ptr(cachedUpstreamOrArg_),
+        fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(attemptCount),
         static_cast<unsigned>(candidateCount),
         g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
@@ -110,7 +110,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
 // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
 void CLTLoginState_State1::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
-    cachedUpstreamOrArg_ = upstreamOrArg;
+    cachedUpstreamOrArg_0x4 = upstreamOrArg;
     if (!mediator) {
         return;
     }
@@ -118,8 +118,8 @@ void CLTLoginState_State1::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     const uint32_t connectResult = mediator->BeginAuthConnection();
     spdlog::info(
         "CLTLoginState_State1::Slot3_BeginOrContinue cachedUpstream={} upstreamPhaseCode={} currentState={} -> BeginAuthConnection=0x{:08x}",
-        fmt::ptr(cachedUpstreamOrArg_),
-        static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_)),
+        fmt::ptr(cachedUpstreamOrArg_0x4),
+        static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4)),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(connectResult));
     return;
