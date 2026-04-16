@@ -237,15 +237,13 @@ void CLTLoginState_State6::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
 uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
-    CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State6::Slot6_HandleSecondaryMessage entered this={} mediator={} stagedMarginBytes={} currentState={}",
+        "DIAGNOSTIC: CLTLoginState_State6::Slot6_HandleSecondaryMessage entered this={} stagedMarginBytes={} currentState={}",
         fmt::ptr(this),
-        fmt::ptr(mediator),
-        mediator ? mediator->StagedIncomingMarginPacketBytes().size() : 0u,
-        (mediator && mediator->currentState_) ? mediator->currentState_->DebugName() : "<null>");
-    if (!mediator) {
+        g_CurrentLoginMediator ? g_CurrentLoginMediator->StagedIncomingMarginPacketBytes().size() : 0u,
+        (g_CurrentLoginMediator && g_CurrentLoginMediator->currentState_) ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
+    if (!g_CurrentLoginMediator) {
         return 0u;
     }
 
@@ -271,7 +269,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     // - importantly, the immediate helper-state switch target is **not** derived from that dword:
     //   `0x440acc..0x440ae0` reloads state6 `this`, reads the cached upstream object at `this+4`,
     //   and calls its vtable `+0x18` to choose the next helper state
-    const std::vector<uint8_t>& stagedMarginBytes = mediator->StagedIncomingMarginPacketBytes();
+    const std::vector<uint8_t>& stagedMarginBytes = g_CurrentLoginMediator->StagedIncomingMarginPacketBytes();
     if (stagedMarginBytes.empty()) {
         return 0u;
     }
@@ -291,7 +289,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         return 0u;
     }
 
-    mediator->worldListCountOrStatus80 = parsed.status01;
+    g_CurrentLoginMediator->worldListCountOrStatus80 = parsed.status01;
     if (parsed.status01 != 0u) {
         spdlog::info(
             "CLTLoginState_State6::Slot6_HandleSecondaryMessage observed opcode-0x09 failure status=0x{:08x} goHereAddr=0x{:08x} udpSessionSecret=0x{:08x}; success-side owner+0xf14/+0xf18 write is source-owned but the broader failure-side helper-switch/error path is still not",
@@ -301,7 +299,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         return 1u;
     }
 
-    mediator->ClearLateEntryList1470Scaffold();
+    g_CurrentLoginMediator->ClearLateEntryList1470Scaffold();
 
     // Original at 0x440a42 calls FUN_0048dbc0 with (DAT_004f9cd4 + 0x200):
     // - Constructs a logrouter hook path string and calls into cls_0x48d020 registration system
@@ -321,7 +319,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
             metricFilenameStringTriple.begin = const_cast<char*>(filename);
             metricFilenameStringTriple.current = metricFilenameStringTriple.begin + filenameLength;
             metricFilenameStringTriple.capacity = metricFilenameStringTriple.current + 1u;
-            mediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple);
+            g_CurrentLoginMediator->AppendLateEntryStringTriple1470Scaffold(&metricFilenameStringTriple);
             ++resolvedMetricFilenameCount;
             continue;
         }
@@ -332,8 +330,8 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
             static_cast<unsigned>(metricId));
     }
 
-    mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
-    mediator->SetState6UdpSessionSecretF18(parsed.udpSessionSecret09);
+    g_CurrentLoginMediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 1u;
+    g_CurrentLoginMediator->SetState6UdpSessionSecretF18(parsed.udpSessionSecret09);
 
     if (cachedUpstreamOrArg_0x4 == nullptr) {
         spdlog::info(
@@ -343,13 +341,13 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
             resolvedMetricFilenameCount,
             unresolvedMetricFilenameCount,
             BuildMetricIdPreview(parsed.metricIds),
-            mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return 1u;
     }
 
     const uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4);
-    const uint32_t switchDispatchResult = mediator->SetCurrentState(nextHelperStateId);
-    mediator->PostEvent(0x12u);
+    const uint32_t switchDispatchResult = g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
+    g_CurrentLoginMediator->PostEvent(0x12u);
     spdlog::info(
         "CLTLoginState_State6::Slot6_HandleSecondaryMessage opcode-0x09 success wrote owner+0xf14=1 owner+0xf18=0x{:08x} and re-entered helperState=0x{:02x} via 0x41b450 oldState=state6 semantics switchDispatchResult=0x{:08x}",
         static_cast<unsigned>(parsed.udpSessionSecret09),
@@ -366,7 +364,7 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         unresolvedMetricFilenameCount,
         BuildMetricIdPreview(parsed.metricIds),
         static_cast<unsigned>(nextHelperStateId),
-        mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
+        g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
     return 1u;
 }
 
