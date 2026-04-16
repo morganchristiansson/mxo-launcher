@@ -302,6 +302,15 @@ uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     }
 
     mediator->ClearLateEntryList1470Scaffold();
+
+    // Original at 0x440a42 calls FUN_0048dbc0 with (DAT_004f9cd4 + 0x200):
+    // - Constructs a logrouter hook path string and calls into cls_0x48d020 registration system
+    // - This is an internal launcher infrastructure hook, not needed for the replacement path
+    // Original at 0x440ab4 calls FUN_0048cfd0 -> meth_0x48cea0:
+    // - Iterates internal margin state arrays and calls destructors (meth_0x48e010)
+    // - Cleanup of per-connection state; not needed for the self-contained replacement
+    // Both functions omitted with comment documenting intentional fidelity gap.
+
     uint32_t resolvedMetricFilenameCount = 0u;
     uint32_t unresolvedMetricFilenameCount = 0u;
     for (uint16_t metricId : parsed.metricIds) {
