@@ -238,7 +238,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     replySectionsSeen_ = 0;
     replySectionsExpected_ = 0;
     const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
-    State8StructuredMarginPacketBuilder packetBuilder;
+    State8StructuredMarginPacketBuilder_0x4af2a4 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
     packetBuilder.SetFixedDword(0x01, currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u);

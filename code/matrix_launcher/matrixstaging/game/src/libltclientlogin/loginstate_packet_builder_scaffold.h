@@ -404,7 +404,7 @@ struct State8StructuredMarginPacketFixedPayload {
     static constexpr size_t kFixedByteCount = 0xbb;
 };
 
-class State8StructuredMarginPacketBuilder final : public PacketBuilderEnvelopeBase {
+class State8StructuredMarginPacketBuilder_0x4af2a4 final : public PacketBuilderEnvelopeBase {
 public:
     // anchor: launcher.exe:0x43ac10 = CLTLoginMediatorPacket0x0f_ResetAndInitialize
     void ResetAndInitialize() {
