@@ -138,6 +138,9 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
 
     switch (childResult) {
         case kAuthBootstrap680InboundAuthReplySuccess: {
+            // anchor: launcher.exe:0x43f300 case 2 — pre-gate setup
+            // Binary order: PregateScaffold (field110+stringF8), then one-time gate body,
+            // then phase-code dispatch + PostEvent(5).
             AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
                 *mediator->authBootstrapChild680_,
                 *mediator,
@@ -146,22 +149,42 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             // RecoverAuthReplyPrivateExponentIntoMarginBootstrapState in auth-reply success path.
             // Original does inline recovery during margin CERT_Challenge (via margin +0xa0 bootstrap object).
             // See ContinueMarginBootstrapHandshake for lazy inline recovery implementation.
+
+            // SOURCE-ONLY: diagnostic logging; no binary counterpart.
             AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
+
             if (AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold()) {
-                CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(mediator);
-                AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
+                // anchor: launcher.exe:0x43f300 one-time gate body
+                //
+                // Binary ordering (verified against Ghidra decompilation of 0x43f300):
+                // 1. World descriptor loop (AdoptAuthReply_WorldDescriptors)
+                // 2. AuthBootstrap680_StoreField114AndTimestamp118 (field114/118)
+                // 3. ResetSelectionRouteState + character count cap
+                // 4. Character slot loop + route-host seeding (AdoptAuthReply_CharacterSlotRecords)
+                // 5. PersistCharactersIni
+                // 6. PostEvent(6)
+                // 7. AuthBootstrap680_CopyReplyString54 + SetLaunchPadSourceBlock94FirstString
+                // 8. AuthBootstrap680_CopyOpaqueReplyBlobs108_10c
+                CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorState_WorldDescriptors(mediator);
+                AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
+                    *mediator->authBootstrapChild680_,
+                    mediator->lastAuthReply_);
+                CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(mediator);
+                mediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
+                mediator->PostEvent(6u);
+                AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
                     *mediator->authBootstrapChild680_,
                     *mediator,
                     mediator->lastAuthReply_);
-                mediator->PersistCharactersIniFromRecoveredAuthStateScaffold();
-                mediator->PostEvent(6u);
             }
+
+            // SOURCE-ONLY: expectedMarginRequestName_ has no binary counterpart in 0x43f300.
             mediator->expectedMarginRequestName_ = "CERT_ConnectRequest";
 
-            // Current source now mirrors the pre-gate `0x441330` subset plus the gated one-time
-            // `0x441260 / 0x41e760 / PostEvent(6) / owner+0x150 / 0x441170` subset.
-            // Remaining uncertainty here is mostly on exact field/blob semantics, not on the
-            // existence of those side effects.
+            // The binary dispatches the cached upstream's vtable+0x18 up to 3 times here
+            // (likely a decompiler artifact from register pressure — the same virtual call
+            // is re-evaluated). The source simplifies to a single RecoverCachedUpstreamPhaseCode
+            // call with the same 0/0x10→3 normalization semantics.
             uint32_t nextHelperStateId = RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_);
             if (nextHelperStateId == 0u || nextHelperStateId == 0x10u) {
                 nextHelperStateId = 3u;
@@ -177,8 +200,10 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
                 mediator->SetCurrentState(nextHelperStateId);
             mediator->PostEvent(5u);
 
-            // Replacement-only post-AS_AuthReply margin auto-begin now stays on the concrete
-            // auth-reply handler path instead of broadening the thinner `0x449a30` bridge.
+            // SOURCE-ONLY: post-AS_AuthReply margin auto-begin. No binary counterpart in
+            // 0x43f300 — the original returns immediately after SetCurrentState+PostEvent(5).
+            // Added for source-side convenience to automatically kick off the margin connection
+            // after a successful auth reply.
             uint32_t marginAutoBeginResult = 0u;
             bool triggeredMarginAutoBegin = false;
             bool deferredMarginAutoBeginToState8 = false;
@@ -215,16 +240,12 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             return 1u;
         }
 
-        case kAuthBootstrap680InboundAuthReplyError: {
-            mediator->expectedMarginRequestName_ = nullptr;
-            AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
-            (void)mediator->SetCurrentState(0u);
-            mediator->PostError(4u);
-            spdlog::info(
-                "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x0b error reply owner+0x80=0x{:08x}; mirrored original state0 switch and error=4",
-                static_cast<unsigned>(mediator->worldListCountOrStatus80));
-            return 1u;
-        }
+        // NOTE: kAuthBootstrap680InboundAuthReplyError (3) has no explicit case in the binary.
+        // The binary's switch at 0x43f300 only has cases 2, 4, 5, 6, and default. Child result
+        // value 3 falls into default, which does SetCurrentState(0) + PostError(4) — the same
+        // behavior as the former explicit case below. Removed the explicit case to match the
+        // binary; source-only additions (expectedMarginRequestName_=nullptr, LogParsedAuthReply)
+        // that were on this case are dropped since the binary doesn't distinguish it.
 
         case kAuthBootstrap680InboundGetPublicKeyReplyError:
         case kAuthBootstrap680InboundGetPublicKeyWorkerError: {
@@ -238,8 +259,6 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
         }
 
         case kAuthBootstrap680InboundAuthReplyValidationError: {
-            mediator->expectedMarginRequestName_ = nullptr;
-            AuthBootstrap680LogParsedAuthReply(*mediator, mediator->lastAuthReply_);
             mediator->worldListCountOrStatus80 = 0x1200000bu;
             (void)mediator->SetCurrentState(0u);
             mediator->PostError(0x0fu);

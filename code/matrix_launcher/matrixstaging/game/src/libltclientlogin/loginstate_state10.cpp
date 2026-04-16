@@ -82,7 +82,14 @@ static std::string DescribeOptionalState10ClaimReplyText(
 
 }  // namespace
 
-void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLTLoginMediator* mediator) {
+// Phase A of the auth-reply adoption: build +0xd84 world descriptors.
+// anchor: launcher.exe:0x43f300 (world-descriptor loop in the one-time gate body)
+//
+// The original at 0x43f300 builds world descriptors first, then writes field114/118,
+// then resets selection-route state and builds character slot records. This phase A
+// covers only the world-descriptor portion so the caller can interleave field114/118
+// between phases A and B to match binary ordering.
+void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorState_WorldDescriptors(CLTLoginMediator* mediator) {
     if (!mediator) {
         return;
     }
@@ -109,6 +116,23 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         mediator->SeedRecoveredWorldDescriptorFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.worlds[i]);
         ++mediator->worldDescriptorCountD80_;
     }
+}
+
+// Phase B of the auth-reply adoption: reset selection-route state, cap +0x684 slot count to <=100,
+// populate +0x688 slot records, seed +0x818 route-host strings by matching slot worldId
+// against descriptor worldId.
+// anchor: launcher.exe:0x43f300 (character-slot loop + route-host seeding in the one-time gate body)
+//
+// NOTE: the original at 0x43f300 does NOT write back to owner +0x80 inside the one-time gate body;
+// +0x80 was already set from authBootstrapChild680.inboundAuthStatusEc before the switch.
+// The former monolithic AdoptAuthReplyIntoRecoveredMediatorStateScaffold incorrectly wrote
+// worldListCountOrStatus80 = worlds.size() here; that write has been removed.
+void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMediator* mediator) {
+    if (!mediator) {
+        return;
+    }
+
+    const size_t worldCount = std::min(mediator->worldSlots_.size(), mediator->lastAuthReply_.worlds.size());
 
     mediator->selectionRouteState684_.ResetSelectionRouteState();
 
@@ -129,9 +153,9 @@ void CLTLoginState_State10::AdoptAuthReplyIntoRecoveredMediatorStateScaffold(CLT
         }
     }
 
-    // Writeback to owner +0x80 (world list count/status family)
-    mediator->worldListCountOrStatus80 =
-        static_cast<uint32_t>(mediator->lastAuthReply_.worlds.size());
+    // NOTE: the binary does NOT write owner +0x80 inside the one-time gate body. It was already
+    // set from inboundAuthStatusEc before the switch. Do not add a worldListCountOrStatus80
+    // writeback here.
 
     if (characterCount != 0) {
         // Replacement-side mirror only:

@@ -2375,9 +2375,12 @@ bool AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold() {
 // - `0x441260 = AuthBootstrap680_StoreField114AndTimestamp118`
 // - owner vtable `+0x150` fed from `0x43d480 = AuthBootstrap680_CopyReplyString54`
 // - `0x441170 = AuthBootstrap680_CopyOpaqueReplyBlobs108_10c`
-void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
+// anchor: launcher.exe:0x441260 = AuthBootstrap680_StoreField114AndTimestamp118
+// Split out from the former monolithic OneTimeScaffold to match binary ordering:
+// the original writes field114/118 after the world-descriptor loop but before the
+// character-slot loop.
+void AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
     AuthBootstrap680Child_0x441290& child,
-    CLTLoginMediator& mediator,
     const mxo::auth::AuthReply& reply) {
     const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
 
@@ -2386,6 +2389,22 @@ void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
             ? ReadAuthBootstrap680AuthReplyParseHeaderDword(parseObject, 0x15u)
             : reply.unknown3;
     child.authReplySuccessField15Timestamp118 = static_cast<uint32_t>(std::time(nullptr));
+
+    spdlog::info(
+        "AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp childField114=0x{:08x} childField118=0x{:08x}",
+        static_cast<unsigned>(child.authReplySuccessField15_114),
+        static_cast<unsigned>(child.authReplySuccessField15Timestamp118));
+}
+
+// anchor: launcher.exe:0x43d480 = AuthBootstrap680_CopyReplyString54,
+//          launcher.exe:0x441170 = AuthBootstrap680_CopyOpaqueReplyBlobs108_10c
+// Split out from the former monolithic OneTimeScaffold to match binary ordering:
+// the original copies reply-string and opaque blobs after PersistCharactersIni + PostEvent(6).
+void AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
+    AuthBootstrap680Child_0x441290& child,
+    CLTLoginMediator& mediator,
+    const mxo::auth::AuthReply& reply) {
+    const AuthBootstrap680AuthReplyParseObjectF0Sketch* parseObject = child.authReplyParseObjectF0;
 
     std::string replyString1d = parseObject != nullptr
         ? CopyAuthBootstrap680ReplyParseString(
@@ -2416,9 +2435,7 @@ void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
     PointOpaqueBlobPointerAtOwnedBytes(child.opaqueReplyBlob10C, ownedState.opaqueReplyBlob10COwned);
 
     spdlog::info(
-        "AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold childField114=0x{:08x} childField118=0x{:08x} ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
-        static_cast<unsigned>(child.authReplySuccessField15_114),
-        static_cast<unsigned>(child.authReplySuccessField15Timestamp118),
+        "AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs ownerSource94FirstString='{}' opaqueBlob108Len={} opaqueBlob10CLen={} opaqueBlob108={} opaqueBlob10C={} parseObjectF0={}",
         mediator.ownerAuthBootstrapSource94_.username00[0] != '\0'
             ? mediator.ownerAuthBootstrapSource94_.username00.data()
             : "<empty>",

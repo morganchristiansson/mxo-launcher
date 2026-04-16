@@ -579,7 +579,10 @@ void AuthBootstrap680SyncState2AuthReplySuccessPregateScaffold(
     CLTLoginMediator& owner,
     const mxo::auth::AuthReply& reply);
 bool AuthBootstrap680ConsumeState2AuthReplySuccessOneTimeGateScaffold();
-void AuthBootstrap680SyncState2AuthReplySuccessOneTimeScaffold(
+void AuthBootstrap680SyncState2AuthReplySuccessOneTime_Field114AndTimestamp(
+    AuthBootstrap680Child_0x441290& child,
+    const mxo::auth::AuthReply& reply);
+void AuthBootstrap680SyncState2AuthReplySuccessOneTime_ReplyStringAndOpaqueBlobs(
     AuthBootstrap680Child_0x441290& child,
     CLTLoginMediator& owner,
     const mxo::auth::AuthReply& reply);
