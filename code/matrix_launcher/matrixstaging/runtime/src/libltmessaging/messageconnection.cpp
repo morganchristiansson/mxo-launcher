@@ -225,12 +225,12 @@ const uint8_t* CMessageConnectionMessageStorage::PayloadBaseScaffold() const {
 }
 
 // anchor: launcher.exe:0x42f850 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x04`
-uint32_t CMessageConnectionMessageRefBase::AddRef() {
+uint32_t CMessageConnectionMessageRefBase_0x4ba220::AddRef() {
     return static_cast<uint32_t>(InterlockedIncrement(&referenceCount04));
 }
 
 // anchor: launcher.exe:0x42f860 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x08`
-uint32_t CMessageConnectionMessageRefBase::Release() {
+uint32_t CMessageConnectionMessageRefBase_0x4ba220::Release() {
     const LONG current = InterlockedDecrement(&referenceCount04);
     if (current == 0) {
         FinalRelease();
@@ -239,19 +239,19 @@ uint32_t CMessageConnectionMessageRefBase::Release() {
 }
 
 // anchor: launcher.exe:0x42f880 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x10`
-void CMessageConnectionMessageRefBase::ResetRefCount() {
+void CMessageConnectionMessageRefBase_0x4ba220::ResetRefCount() {
     InterlockedExchange(&referenceCount04, 0);
 }
 
 // anchor: launcher.exe:0x42f890 / vtable `0x004ba208/0x004ba220/0x004ba23c +0x14`
-void CMessageConnectionMessageRefBase::SetRefCountFromPtr(const volatile long* refCountSource) {
+void CMessageConnectionMessageRefBase_0x4ba220::SetRefCountFromPtr(const volatile long* refCountSource) {
     if (!refCountSource) {
         return;
     }
     InterlockedExchange(&referenceCount04, *refCountSource);
 }
 
-void CMessageConnectionMessageRefBase::ResetBaseForPacketBuilderScaffold(uint32_t field08Value) {
+void CMessageConnectionMessageRefBase_0x4ba220::ResetBaseForPacketBuilderScaffold(uint32_t field08Value) {
     // anchor: launcher.exe:0x455bd0
     referenceCount04 = 0;
     field08 = field08Value;
@@ -261,7 +261,7 @@ void CMessageConnectionMessageRefBase::ResetBaseForPacketBuilderScaffold(uint32_
     messageStorage0c->AddRef();
 }
 
-uint16_t CMessageConnectionMessageRefBase::GrowPayloadByteCountScaffold(
+uint16_t CMessageConnectionMessageRefBase_0x4ba220::GrowPayloadByteCountScaffold(
     uint16_t additionalByteCount) {
     if (!messageStorage0c) {
         return 0u;
@@ -269,7 +269,7 @@ uint16_t CMessageConnectionMessageRefBase::GrowPayloadByteCountScaffold(
     return messageStorage0c->GrowPayloadByteCountScaffold(additionalByteCount);
 }
 
-uint8_t* CMessageConnectionMessageRefBase::PayloadAppendPointerScaffold() {
+uint8_t* CMessageConnectionMessageRefBase_0x4ba220::PayloadAppendPointerScaffold() {
     if (!messageStorage0c) {
         return nullptr;
     }
@@ -280,7 +280,7 @@ uint8_t* CMessageConnectionMessageRefBase::PayloadAppendPointerScaffold() {
 }
 
 // anchor: launcher.exe:0x41bb60
-bool CMessageConnectionMessageRefBase::SetPayloadByteCountScaffold(
+bool CMessageConnectionMessageRefBase_0x4ba220::SetPayloadByteCountScaffold(
     uint32_t payloadByteCount) {
     if (!messageStorage0c || payloadByteCount > CMessageConnectionMessageStorage::kMaxPayloadByteCount) {
         return false;
@@ -289,7 +289,7 @@ bool CMessageConnectionMessageRefBase::SetPayloadByteCountScaffold(
     return true;
 }
 
-uint16_t CMessageConnectionMessageRefBase::PayloadByteCountScaffold() const {
+uint16_t CMessageConnectionMessageRefBase_0x4ba220::PayloadByteCountScaffold() const {
     return messageStorage0c ? messageStorage0c->PayloadByteCountScaffold() : 0u;
 }
 

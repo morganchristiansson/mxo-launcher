@@ -201,7 +201,7 @@ public:
     const uint8_t* PayloadBaseScaffold() const;
 };
 
-class CMessageConnectionMessageRefBase : public CMessageConnectionLocalRefCountedBase {
+class CMessageConnectionMessageRefBase_0x4ba220 : public CMessageConnectionLocalRefCountedBase {
 public:
     // anchor: launcher.exe vtable `0x004ba220`
     // Reset-time/base outer message-ref table installed by `0x455bd0` before `0x455c60`
@@ -235,7 +235,7 @@ protected:
     CMessageConnectionMessageStorage ownedMessageStorage_{};
 };
 
-class CMessageConnectionMessageRef : public CMessageConnectionMessageRefBase {
+class CMessageConnectionMessageRef : public CMessageConnectionMessageRefBase_0x4ba220 {
 public:
     // anchor: launcher.exe vtable `0x004ba23c`
     // Live outer message-ref table produced by `0x455c60/0x455cd0`.
