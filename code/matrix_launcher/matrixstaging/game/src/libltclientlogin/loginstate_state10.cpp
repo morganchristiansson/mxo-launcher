@@ -240,15 +240,14 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(void* upstreamOrArg) {
     packetBuilder.SetCharacterName(
         mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data());
 
-    const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
+    (void)mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     mediator->PostEvent(0x13u);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> sendResult=0x{:08x} then posts event=0x13",
+        "DIAGNOSTIC: CLTLoginState_State10::Slot3_BeginOrContinue built raw-0x0a packet fixedBytes=0x{:02x} totalBytes=0x{:02x} CharacterName='{}' -> postEvent=0x13",
         State10Packet0x0aFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
-        std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data()),
-        sendResult);
+        std::string(mediator->postAuthMarginLoadingState_.createCharacterData108.characterName00.data()));
     return;
 }
 
