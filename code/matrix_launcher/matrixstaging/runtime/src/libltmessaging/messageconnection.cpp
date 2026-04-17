@@ -3197,6 +3197,24 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
             if (CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
                     copiedMessageRef, &parsedResult, /*parseIncomingMessage=*/true)) {
                 handledCode2 = HandleCode2ForBootstrap(&parsedResult);
+                
+                // FIDELITY: HandleCode2ForBootstrap handles the low-level decryption and response sending
+                // (matching original vtable+0x1c and vtable+0x24 calls), but the mediator needs to update
+                // bootstrap state for the next expected packet. The infidel method was handling this state
+                // management, so we call it to maintain the bootstrap flow.
+                if (handledCode2 != 0u && mediator) {
+                    // Call infidel method for state management (it will detect our response was already sent)
+                    const uint32_t infidelHandled = mediator->ContinueMarginBootstrapHandshake(
+                        logicalPayloadBytes,
+                        logicalPayloadByteCount,
+                        /*transportEncrypted=*/false);
+                    
+                    spdlog::info(
+                        "CBaseMarginConnection_0x4b64a8::DispatchMessage fidelity decryption+send succeeded, infidel state management result={} this={} ownerContext={}",
+                        static_cast<unsigned>(infidelHandled),
+                        fmt::ptr(this),
+                        fmt::ptr(OwnerContext()));
+                }
             } else {
                 spdlog::warn(
                     "CBaseMarginConnection_0x4b64a8::DispatchMessage: failed to parse code2 message for bootstrap");
