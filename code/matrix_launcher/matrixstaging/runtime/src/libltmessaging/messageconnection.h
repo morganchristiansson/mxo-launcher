@@ -403,6 +403,13 @@ public:
     // Allow default construction for stack-local envelope instances
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538();
 
+    // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
+    // Original signature: cls_0x4b6538::cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
+    // FIDELITY: Proper constructor that extracts from message ref payload
+    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
+        CMessageConnectionMessageRef* messageRef,
+        uint8_t flag);
+
     // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
     explicit CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
         const std::array<uint8_t, 16>& decryptedBytes);
@@ -440,6 +447,29 @@ static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x28,
  */
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() {
     // Default initialization - in original, this would take messageRef and '\x01' flag
+}
+
+// anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
+inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
+    CMessageConnectionMessageRef* messageRef,
+    uint8_t flag) {
+    // FIDELITY: Original extracts 16 bytes from message ref payload
+    // flag is '\x01' in the original call
+    if (messageRef && messageRef->messageStorage0c) {
+        const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
+        const size_t payloadSize = messageRef->messageStorage0c->PayloadByteCountScaffold();
+        
+        if (payload && payloadSize >= 16) {
+            // Copy first 16 bytes from message ref payload to mbr_0x10
+            std::copy(payload, payload + 16, this->mbr_0x10);
+        } else {
+            // If payload is too small, zero-initialize
+            std::fill(this->mbr_0x10, this->mbr_0x10 + 16, 0);
+        }
+    } else {
+        // If message ref is null, zero-initialize
+        std::fill(this->mbr_0x10, this->mbr_0x10 + 16, 0);
+    }
 }
 
 // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
@@ -1009,10 +1039,9 @@ public:
     // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
     //                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
     // FIDELITY TODOs:
-    // 1. Implement cls_0x4b6538 envelope class for proper byte extraction
-    // 2. Add MessageBox error handling on decryption failure
-    // 3. Call connection vtable+0xc to close on failure
-    // 4. Inline packet builder construction and send via vtable+0x24
+    // 1. Add MessageBox error handling on decryption failure (text-only launcher, skip)
+    // 2. Call connection vtable+0xc to close on failure
+    // 3. Inline packet builder construction and send via vtable+0x24
     uint32_t HandleCode2ForBootstrap(
         CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* parsedMessageResult);
 

@@ -3038,10 +3038,20 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // anchor: launcher.exe:0x442a5e -> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
         // Original: (&local_38, (int *)local_8.messageRef00, '\x01')
         // FIDELITY: Construct envelope with message ref and flag 0x01
-        CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope;
-        // TODO: Implement proper envelope constructor that extracts from message ref
-        // For now, copy decrypted bytes directly
-        std::copy(decryptOutput.begin() + 8, decryptOutput.begin() + 24, envelope.mbr_0x10);
+        // First, copy decrypted bytes to message ref payload for proper extraction
+        if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
+            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(decryptedByteCount);
+            uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
+            if (payloadBase) {
+                std::copy(
+                    decryptOutput.begin() + 8,
+                    decryptOutput.begin() + 8 + decryptedByteCount,
+                    payloadBase);
+            }
+        }
+        
+        // Now construct envelope with proper message ref and flag
+        CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope(&localMessageRef, 0x01);
         
         // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
         // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
