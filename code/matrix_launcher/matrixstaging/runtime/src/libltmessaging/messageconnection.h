@@ -948,7 +948,7 @@ public:
     // - the send-mode/headerless branch mutates raw inner bytes around `+0x12/+0x16/+0x17`, then
     //   later clears the first payload byte high bit on the original input object after the
     //   agenda/submit branch
-    uint32_t SendPacketMessageRef(CMessageConnectionMessageRef& messageRef);
+    void SendPacketMessageRef(CMessageConnectionMessageRef& messageRef);
 
     // anchor: launcher.exe:0x448960
     // Narrow source-owned wrapper over the per-connection packet-name callback configuration:

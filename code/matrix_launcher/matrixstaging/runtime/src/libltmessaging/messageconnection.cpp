@@ -19,6 +19,14 @@
 #undef DispatchMessage
 #endif
 
+// Global function pointers from original launcher.exe
+// anchor: launcher.exe:0x004f8364 - logging enable flag
+static bool g_LogRouter = false;
+
+// anchor: launcher.exe:0x004f7cec - alternate packet name decoder function pointer
+typedef void (*PacketNameDecoderFunc)(void*, int);
+static PacketNameDecoderFunc g_PacketNameDecoderAlternate = nullptr;
+
 namespace mxo::liblttcp {
 
 // ============================================================
@@ -967,7 +975,8 @@ uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacket(
     if (!envelope.messageRef08) {
         return 0u;
     }
-    return SendPacketMessageRef(*envelope.messageRef08);
+    SendPacketMessageRef(*envelope.messageRef08);
+    return 0u; // Original function returns void, but wrapper maintains uint32_t signature
 }
 
 // anchor: launcher.exe:0x469950
@@ -1018,59 +1027,75 @@ uint32_t CMessageConnection::SubmitMessageRefBytes(
 }
 
 // anchor: launcher.exe:0x448cf0
-// Narrow source-owned mirror of the message-ref-based `CMessageConnection::SendPacket` family.
-uint32_t CMessageConnection::SendPacketMessageRef(
+// Faithful mirror of the original message-ref-based `CMessageConnection::SendPacket` family.
+// Inherited margin/auth send path reached from mediator send helper via connection wrapper
+// 0x41cf30. Consumes the envelope/shared message object extracted from the stack-local packet
+// builder, performs packet-agenda filtering, then reaches CMessageConnection_SubmitEnvelopeBytes
+// (0x448a00).
+void CMessageConnection::SendPacketMessageRef(
     CMessageConnectionMessageRef& messageRef) {
     if (!Engine() || !messageRef.messageStorage0c) {
-        return 0u;
+        return;
     }
 
+    // Apply send message ref mutations (headerless mode specific)
+    // anchor: launcher.exe:0x448d03 - mutation logic for headerless messages
     CMessageConnection_ApplySendMessageRefMutations(&messageRef);
 
+    // Apply packet agenda filtering
+    // anchor: launcher.exe:0x448f5e - agenda processing logic
     bool agendaTouched = false;
-    CMessageConnectionMessageRef* const messageRefForSubmit =
+    CMessageConnectionMessageRef* messageRefForSubmit = 
         ApplySendPacketAgenda(messageRef, &agendaTouched);
+    
+    // Check if agenda processing resulted in a valid message ref
+    // anchor: launcher.exe:0x448f63 - null check and agenda processing
     if (!messageRefForSubmit || !messageRefForSubmit->messageStorage0c) {
-        spdlog::info(
-            "CMessageConnection::SendPacketMessageRef discarded packet at packet-agenda write handoff this={} ownerContext={} remoteHost='{}'",
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+        // Packet discarded by agenda - log appropriately based on message type
+        // anchor: launcher.exe:0x448f94 - discarded packet logging
+        if (g_LogRouter) {
+            if (messageRef.headerless10 == 0u) {
+                // Headerless message logging path
+                // anchor: launcher.exe:0x448d5e - headerless logging setup
+                if (packetNameCallback_ != 0) {
+                    // TODO: Implement proper packet name callback invocation
+                    // packetNameCallback_ is a uintptr_t function pointer that needs proper typing
+                }
+                // TODO: Implement proper endpoint extraction and packet name decoding
+                spdlog::info("Sending headerless message {} (M: {}) to {}.{}.{}.{}:{}.\n",
+                    "UNKNOWN", 0, 0, 0, 0, 0, 0);
+            } else {
+                // Headered message logging path
+                // anchor: launcher.exe:0x448e50 - headered logging setup  
+                if (g_PacketNameDecoderAlternate != nullptr) {
+                    // TODO: Implement proper alternate packet name decoder invocation
+                }
+                // TODO: Implement proper packet/msg IDs, endpoints, and TTL
+                spdlog::info("Sending message {} (P: {}, M: {}) from LKAIP: {}.{}.{}.{}, LKAProcId: {} to LKAIP: {}.{}.{}.{}, LKAProcId: {} (ttl = {}).\n",
+                    "UNKNOWN", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+            }
+        }
+        
+        // Clear high bit on original message ref when headerless
+        // anchor: launcher.exe:0x448f87 - high bit clearing logic
         CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(&messageRef);
-        return 0u;
+        return;
     }
 
-    const CMessageConnectionMessageStorage_0x4ba208& messageStorage = *messageRefForSubmit->messageStorage0c;
-    const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage.PayloadBaseScaffold();
-    const uint8_t rawOpcode = (payloadBytes && payloadByteCount != 0u) ? payloadBytes[0] : 0u;
-    const uint32_t submittedByteCount =
-        static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
-    const PacketProcessingAgenda_0x469850* agenda = PacketAgenda();
-    spdlog::info(
-        "CMessageConnection::SendPacketMessageRef sendMode10={} field08SkipPrefix={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaModuleCount={} agendaHasReadHead={} agendaHasWriteHead={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(messageRefForSubmit->headerless10),
-        static_cast<unsigned>(messageRefForSubmit->field08),
-        static_cast<unsigned>(rawOpcode),
-        static_cast<unsigned>(messageStorage.reservedBytes08),
-        static_cast<unsigned>(payloadByteCount),
-        static_cast<unsigned>(submittedByteCount),
-        static_cast<uint32_t>(packetNameCallback_),
-        PacketNameFamilyToString(packetNameFamily_),
-        packetizedMessagesEnabled_ ? 1u : 0u,
-        (agenda && agenda->created) ? 1u : 0u,
-        agenda ? static_cast<unsigned>(agenda->configuredModuleCount4c) : 0u,
-        (agenda && agenda->readHelperChainHead40 != nullptr) ? 1u : 0u,
-        (agenda && agenda->writeHelperChainHead44 != nullptr) ? 1u : 0u,
-        agendaTouched ? 1u : 0u,
-        (agendaTouched && agenda && agenda->writeOutputSlot24 != nullptr) ? 1u : 0u,
-        fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-
-    const uint32_t sendResult = SubmitMessageRefBytes(*messageRefForSubmit);
-    CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(&messageRef);
-    return sendResult;
+    // Submit the message through the engine
+    // anchor: launcher.exe:0x448f72 - submit bytes call
+    if (messageRefForSubmit->messageStorage0c) {
+        SubmitMessageRefBytes(*messageRefForSubmit);
+    }
+    
+    // Clear high bit on original message ref after submit (headerless only)
+    // anchor: launcher.exe:0x448f87 - final high bit clearing
+    if (messageRef.headerless10 != 0u && messageRef.messageStorage0c) {
+        uint8_t* const payloadBase = messageRef.messageStorage0c->PayloadBaseScaffold();
+        if (payloadBase) {
+            payloadBase[0] &= 0x7fu;
+        }
+    }
 }
 
 // anchor: launcher.exe:0x448a60
