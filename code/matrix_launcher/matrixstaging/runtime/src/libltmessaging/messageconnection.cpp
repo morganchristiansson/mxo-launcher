@@ -2796,14 +2796,8 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
             return false;
         }
 
-        // Debug: Check CRT fields (p, q, dP, dQ, qInv) - original uses these for decryption
-        // Use the BigInt object's own bit/byte count methods for accuracy
-        spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: CRT params p bits={} q bits={} dP bits={} dQ bits={} qInv bits={}",
-            prepState->field_0xc.field_0x50.GetBitCount(),
-            prepState->field_0xc.field_0x64.GetBitCount(),
-            prepState->field_0xc.mbr_0x78.GetBitCount(),
-            prepState->field_0xc.mbr_0x8c.GetBitCount(),
-            prepState->field_0xc.mbr_0xa0.GetBitCount());
+        // Note: CRT fields (p, q, dP, dQ, qInv) are not used in current implementation
+        // Original at 0x468130 uses custom big integer operations, not CRT optimization
 
         // Fidelity: Use Set* methods like InitializeFromBootstrapBlocks instead of throwing Initialize()
         CryptoPP::RSA::PrivateKey privateKey;
