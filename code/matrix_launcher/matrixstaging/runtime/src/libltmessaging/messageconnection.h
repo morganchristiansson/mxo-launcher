@@ -878,6 +878,15 @@ struct PacketProcessingAgenda_0x469850 {
     // Install stream packet encryption module into the agenda
     uint16_t InstallStreamPacketEncryptionModule(
         CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule);
+
+    // anchor: launcher.exe:0x469950 / 0x469930
+    // Apply packet agenda processing to message refs
+    CMessageConnectionMessageRef* ApplySendPacketAgenda(
+        CMessageConnectionMessageRef& inputMessageRef,
+        bool* outAgendaTouched = nullptr);
+    CMessageConnectionMessageRef* ApplyReceivePacketAgenda(
+        CMessageConnectionMessageRef* inputMessageRef,
+        bool* outAgendaTouched = nullptr);
 };
 
 struct CMessageConnectionReceivedPacketScaffold {

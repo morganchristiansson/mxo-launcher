@@ -897,6 +897,44 @@ uint16_t PacketProcessingAgenda_0x469850::InstallStreamPacketEncryptionModule(
     return configuredModuleCount4c;
 }
 
+// anchor: launcher.exe:0x469950
+CMessageConnectionMessageRef* PacketProcessingAgenda_0x469850::ApplySendPacketAgenda(
+    CMessageConnectionMessageRef& inputMessageRef,
+    bool* outAgendaTouched) {
+    // Faithful mirror of original PacketProcessingAgenda_DispatchWriteHelperChain
+    // - if no write helper chain head, return original message ref
+    // - otherwise drive the chain and return the output slot
+    if (outAgendaTouched) {
+        *outAgendaTouched = (writeHelperChainHead44 != nullptr);
+    }
+    
+    if (writeHelperChainHead44 == nullptr) {
+        return &inputMessageRef;
+    }
+
+    writeHelperChainHead44->HandleOpaqueMessageRef(&inputMessageRef);
+    return writeOutputSlot24;
+}
+
+// anchor: launcher.exe:0x469930
+CMessageConnectionMessageRef* PacketProcessingAgenda_0x469850::ApplyReceivePacketAgenda(
+    CMessageConnectionMessageRef* inputMessageRef,
+    bool* outAgendaTouched) {
+    // Faithful mirror of original PacketProcessingAgenda_DispatchReadHelperChain
+    // - if no input message ref or no read helper chain head, return null/original
+    // - otherwise drive the chain and return the output slot
+    if (outAgendaTouched) {
+        *outAgendaTouched = (readHelperChainHead40 != nullptr && inputMessageRef != nullptr);
+    }
+    
+    if (!inputMessageRef || readHelperChainHead40 == nullptr) {
+        return inputMessageRef;
+    }
+
+    readHelperChainHead40->HandleOpaqueMessageRef(inputMessageRef);
+    return readOutputSlot08;
+}
+
 static void** CMessageConnection_PacketBuilderVtablePointerScaffold(uintptr_t address) {
     return reinterpret_cast<void**>(address);
 }
@@ -914,32 +952,10 @@ uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacket(
 CMessageConnectionMessageRef* CMessageConnection::ApplySendPacketAgenda(
     CMessageConnectionMessageRef& inputMessageRef,
     bool* outAgendaTouched) {
-    if (outAgendaTouched) {
-        *outAgendaTouched = false;
-    }
-
-    // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
-    // Current bounded source model preserves the nearer `0x469950`
-    // (`PacketProcessingAgenda_0x469850_DispatchWriteHelperChain`) handoff shape:
-    // - no agenda / no active write helper (`+0x44 == 0`) => keep the original message-ref pointer
-    // - active write helper => return agenda `+0x24` exactly after the helper chain runs
-    // - original does not pre-clear agenda `+0x24`; it simply returns that slot after dispatch
-    // Source now models that chain with real internal worker classes, keeping helper-side
-    // replacement/discard visible at the same seam as the original.
+    // anchor: launcher.exe:0x469950
+    // Delegate to the agenda's ApplySendPacketAgenda method
     PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
-    if (!agenda || !agenda->created) {
-        return &inputMessageRef;
-    }
-
-    if (agenda->writeHelperChainHead44 == nullptr) {
-        return &inputMessageRef;
-    }
-
-    agenda->writeHelperChainHead44->HandleOpaqueMessageRef(&inputMessageRef);
-    if (outAgendaTouched) {
-        *outAgendaTouched = true;
-    }
-    return agenda->writeOutputSlot24;
+    return agenda ? agenda->ApplySendPacketAgenda(inputMessageRef, outAgendaTouched) : &inputMessageRef;
 }
 
 // anchor: launcher.exe:0x448a00
@@ -1825,8 +1841,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     bool agendaTouched = false;
     if (PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
         agenda && agenda->created) {
-        messageRefForDispatch = CMessageConnection_ApplyReceivePacketAgendaScaffold(
-            agenda,
+        messageRefForDispatch = agenda->ApplyReceivePacketAgenda(
             copiedMessageRef,
             &agendaTouched);
         if (!messageRefForDispatch) {
