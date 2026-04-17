@@ -3002,6 +3002,38 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // Check decrypt result: output[0] = success flag, output[4] = byte count
     const bool decryptSuccess = decryptOutput[0] != 0;
     
+    if (decryptSuccess) {
+        // FIDELITY: Construct cls_0x4b6538 envelope for proper byte extraction
+        // Original: CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
+        //           (&local_38, (int *)local_8.messageRef00, '\x01')
+        CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope;
+        std::copy(decryptOutput.begin() + 8, decryptOutput.begin() + 24, envelope.mbr_0x10);
+        
+        // FIDELITY: Extract seed bytes using envelope methods
+        // Original at 0x442ac6-0x442ae0: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
+        auto seedBytes = envelope.ExtractChallengeBytes();
+        SetMessageCode5SeedBytes85(seedBytes);
+        
+        // FIDELITY: Extract response bytes using envelope methods
+        // Original at 0x442b18-0x442b28: envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d -> packet+1/+5/+9/+0xd
+        auto responseBytes = envelope.ExtractForResponsePacket();
+        const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(responseBytes);
+        
+        spdlog::info(
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} packetSize={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
+            sendResult,
+            static_cast<unsigned>(packetSize),
+            static_cast<unsigned>(
+                static_cast<uint32_t>(decryptOutput[8]) |
+                (static_cast<uint32_t>(decryptOutput[9]) << 8u) |
+                (static_cast<uint32_t>(decryptOutput[10]) << 16u) |
+                (static_cast<uint32_t>(decryptOutput[11]) << 24u)),
+            fmt::ptr(this),
+            fmt::ptr(OwnerContext()));
+        
+        return sendResult != 0u ? 1u : 0u;
+    }
+    
     // Debug logging for decryption failure analysis
     if (!decryptSuccess) {
         spdlog::debug(
