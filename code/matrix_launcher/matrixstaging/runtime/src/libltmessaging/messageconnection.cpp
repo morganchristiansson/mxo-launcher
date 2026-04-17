@@ -3003,10 +3003,38 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     const bool decryptSuccess = decryptOutput[0] != 0;
     
     if (decryptSuccess) {
-        // FIDELITY: Construct cls_0x4b6538 envelope for proper byte extraction
+        // FIDELITY: Create local message ref and decrypt into its payload storage
+        // Original: CMessageConnectionMessage_CreateRef(&local_8, 0)
+        //           Decrypts into local_8.messageRef00->messageStorage0c->payloadBytes0c
+        CMessageConnectionMessageRef localMessageRef;
+        localMessageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
+        
+        if (!localMessageRef.messageStorage0c) {
+            spdlog::warn(
+                "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: failed to create local message ref for envelope construction");
+            return 0u;
+        }
+        
+        // Copy decrypted bytes into message ref payload storage
+        // Original: decrypts directly into message ref payload via vtable dispatch
+        const uint16_t decryptedByteCount = *reinterpret_cast<uint32_t*>(decryptOutput.data() + 4);
+        if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
+            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(decryptedByteCount);
+            uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
+            if (payloadBase) {
+                std::copy(
+                    decryptOutput.begin() + 8,
+                    decryptOutput.begin() + 8 + decryptedByteCount,
+                    payloadBase);
+            }
+        }
+        
+        // FIDELITY: Construct cls_0x4b6538 envelope with message ref and flag
         // Original: CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
         //           (&local_38, (int *)local_8.messageRef00, '\x01')
         CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope;
+        // In original, envelope constructor would extract bytes from message ref payload
+        // For now, copy decrypted bytes directly (future fidelity improvement)
         std::copy(decryptOutput.begin() + 8, decryptOutput.begin() + 24, envelope.mbr_0x10);
         
         // FIDELITY: Extract seed bytes using envelope methods
