@@ -2705,57 +2705,37 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
         std::vector<uint8_t> decryptedBytes;
         CryptoPP::AutoSeededRandomPool rng;
 
-        // The ciphertext is 100 bytes but OAEP expects 96 (modulus size).
-        // The first 4 bytes are likely a length prefix - strip them.
-        const uint8_t* cipherStart = static_cast<const uint8_t*>(encryptedBytes);
-        size_t cipherLen = encryptedByteCount;
-
-        // Check if first 4 bytes are a length prefix (big-endian length)
-        if (encryptedByteCount > 4) {
-            uint32_t prefixLength = (static_cast<uint32_t>(cipherStart[0]) << 24) |
-                                   (static_cast<uint32_t>(cipherStart[1]) << 16) |
-                                   (static_cast<uint32_t>(cipherStart[2]) << 8) |
-                                   static_cast<uint32_t>(cipherStart[3]);
-            // If the prefix matches the remaining length, skip it
-            if (prefixLength == encryptedByteCount - 4) {
-                spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: detected length prefix {}, skipping", prefixLength);
-                cipherStart += 4;
-                cipherLen = encryptedByteCount - 4;
-            }
-        }
-
-        // Try OAEP decryption with correct cipher length
+        // Original decrypts through prep object vtable+0x1c -> virt_meth_0x468130
+        // That function handles ciphertext format naturally - we use the ciphertext as-is
         try {
             CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
             CryptoPP::StringSource source(
-                cipherStart,
-                cipherLen,
+                static_cast<const uint8_t*>(encryptedBytes),
+                encryptedByteCount,
                 true,
                 new CryptoPP::PK_DecryptorFilter(
                     rng,
                     decryptor,
                     new CryptoPP::VectorSink(decryptedBytes)));
-            spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP succeeded with stripped length prefix");
         } catch (const CryptoPP::Exception& ex) {
-            spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP failed with {} bytes: {}, trying raw RSA",
-                cipherLen, ex.what());
+            spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP failed: {}, trying raw RSA", ex.what());
 
             // Fallback: raw RSA decryption without padding
+            // Note: This produces wrong results because we're not properly handling OAEP
+            // The proper fix requires using the vtable dispatch like original
             CryptoPP::Integer ciphertext(
-                cipherStart,
-                cipherLen);
+                static_cast<const uint8_t*>(encryptedBytes),
+                encryptedByteCount);
 
-            // Raw RSA: m = c^d mod n
             CryptoPP::Integer plaintext = ciphertext;
             plaintext ^= privateExponent;
             plaintext %= modulus;
 
-            // Convert plaintext to bytes
             size_t encodedSize = plaintext.MinEncodedSize();
             decryptedBytes.resize(encodedSize);
             plaintext.Encode(decryptedBytes.data(), encodedSize);
 
-            spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: raw RSA decrypted bytes={}", decryptedBytes.size());
+            spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: raw RSA fallback decrypted bytes={}", decryptedBytes.size());
         }
 
         // Extract 16 bytes from offset 1,5,9,13 (DWORD aligned positions in decrypted blob)
@@ -2898,20 +2878,16 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // anchor: launcher.exe:0x4429b0 -> decryption failure check (*(int *)(iVar2 + 4) == 0)
     // Original: Shows MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
     // then calls connection vtable+0xc with arg 1 to close/disconnect.
-    // TEMP: Keep continuation for now - raw RSA produces wrong results, need proper OAEP
+    // FIDELITY: Original does NOT fall back to continuation - just returns 0.
     if (!decryptSuccess) {
         spdlog::error(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
             static_cast<unsigned>(packetSize),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
-        // TEMP: Keep continuation for now until OAEP key is properly handled
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-        if (!mediator) {
-            return 0u;
-        }
-        mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-        return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
+        // Original shows MessageBox then calls vtable+0xc with arg 1 to close connection.
+        // Here we just return 0 to signal failure - no continuation fallback.
+        return 0u;
     }
 
     // anchor: launcher.exe:0x4429b0 -> success path
