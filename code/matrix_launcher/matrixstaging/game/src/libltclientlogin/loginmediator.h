@@ -1444,11 +1444,13 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // and still fresh enough for the state5 copy/send path.
     bool HasValidState5ReplyCopyShadowF4Scaffold() const;
 
-private:
+public:
     void SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIndex, const mxo::auth::AuthWorldEntry& world);
     void SeedRecoveredCharacterSlotRecordFromAuthReply(uint8_t characterIndex, const mxo::auth::AuthCharacterEntry& character);
     int FindRecoveredWorldDescriptorIndexByWorldId(uint16_t worldId) const;
     void SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset();
+
+private:
     void MirrorCreateCharacterInput120SourceBlock(const ProcessCreateCharacterInput120Sketch& input);
     void PersistCharactersIniFromRecoveredAuthStateScaffold() const;
 
