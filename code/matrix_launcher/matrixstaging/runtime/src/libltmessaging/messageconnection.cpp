@@ -3403,96 +3403,13 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
         return 1u;
     }
 
-    auto& copiedMessageRef = *static_cast<CMessageConnectionMessageRef*>(messageRef);
+    // Call owner->DispatchCurrentHelperSlot6(messageRef)
     mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = copiedMessageRef.messageStorage0c;
-    if (!mediator || !CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator) ||
-        !messageStorage) {
-        return 0u;
-    }
-
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
-    const size_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return 0u;
-    }
-
-    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload = {};
-    const bool resolvedLogicalPayload =
-        CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(copiedMessageRef, &parsedPayload);
-
-    uint16_t decodedMessageCode = 0u;
-    bool usedHeaderlessLocatorDecode = false;
-    bool hadValidMessageCode = false;
-    (void)CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
-        copiedMessageRef,
-        &decodedMessageCode,
-        &usedHeaderlessLocatorDecode,
-        &hadValidMessageCode);
-
-    const uint8_t* const logicalPayloadBytes =
-        resolvedLogicalPayload ? parsedPayload.logicalPayloadBytes00 : payloadBytes;
-    const size_t logicalPayloadByteCount =
-        resolvedLogicalPayload ? parsedPayload.logicalPayloadByteCount04 : payloadByteCount;
-    const uint8_t rawCode = logicalPayloadBytes ? logicalPayloadBytes[0] : 0u;
-    const bool headerless =
-        resolvedLogicalPayload ? parsedPayload.headerless08 : (copiedMessageRef.headerless10 != 0u);
-    const bool locatorDecoded =
-        resolvedLogicalPayload ? parsedPayload.usedHeaderlessLocatorDecode09 : usedHeaderlessLocatorDecode;
-    const std::string remoteHostForLog =
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName();
-
-    mediator->stagedIncomingMarginPacketBytes_.assign(
-        logicalPayloadBytes,
-        logicalPayloadBytes + logicalPayloadByteCount);
-    ++mediator->marginPacketReceiveCountScaffold_;
-    mediator->lastMarginPacketOpcodeScaffold_ = rawCode;
-    mediator->lastMarginPacketSizeScaffold_ = static_cast<uint32_t>(logicalPayloadByteCount);
-
-    const uint32_t bootstrapHandled =
-        mediator->ContinueMarginBootstrapHandshake(
-            logicalPayloadBytes,
-            logicalPayloadByteCount,
-            /*transportEncrypted=*/false);
-    if (bootstrapHandled != 0u) {
-        spdlog::info(
-            "CMarginConnection::DispatchMessage rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} messageRef={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
-            static_cast<unsigned>(rawCode),
-            static_cast<unsigned>(decodedMessageCode),
-            hadValidMessageCode ? 1u : 0u,
-            headerless ? 1u : 0u,
-            locatorDecoded ? 1u : 0u,
-            static_cast<unsigned>(logicalPayloadByteCount),
-            fmt::ptr(messageRef),
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            fmt::ptr(mediator->currentState_),
-            bootstrapHandled,
-            remoteHostForLog);
-        return bootstrapHandled;
-    }
-
-    uint32_t handled = 0u;
-    if (mediator->currentState_ != nullptr) {
-        ++mediator->marginPacketSlot6DispatchCountScaffold_;
-        handled = mediator->DispatchCurrentHelperSlot6(
+    if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator)) {
+        return mediator->DispatchCurrentHelperSlot6(
             static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(messageRef));
     }
-    spdlog::info(
-        "CMarginConnection::DispatchMessage rawCode=0x{:02x} decodedMessageCode={} decodedCodeValid={} headerless={} locatorDecoded={} payloadBytes={} messageRef={} this={} ownerContext={} currentState={} handled={} remoteHost='{}'",
-        static_cast<unsigned>(rawCode),
-        static_cast<unsigned>(decodedMessageCode),
-        hadValidMessageCode ? 1u : 0u,
-        headerless ? 1u : 0u,
-        locatorDecoded ? 1u : 0u,
-        static_cast<unsigned>(logicalPayloadByteCount),
-        fmt::ptr(messageRef),
-        fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        fmt::ptr(mediator->currentState_),
-        handled,
-        remoteHostForLog);
-    return handled;
+    return 0u;
 }
 
 }  // namespace mxo::liblttcp
