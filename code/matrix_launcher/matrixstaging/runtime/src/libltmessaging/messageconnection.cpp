@@ -1236,26 +1236,7 @@ constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
     0x10u,
 };
 
-struct CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold {
-    const uint8_t* logicalPayloadBytes00 = nullptr;
-    size_t logicalPayloadByteCount04 = 0u;
-    bool headerless08 = false;
-    bool usedHeaderlessLocatorDecode09 = false;
-};
 
-struct CBaseMarginConnection_0x4b64a8_Code2MessageScaffold {
-    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
-};
-
-struct CBaseMarginConnection_0x4b64a8_Code4MessageScaffold {
-    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
-    uint32_t statusOrPayload0c = 0u;
-};
-
-struct CBaseMarginConnection_0x4b64a8_Code5MessageScaffold {
-    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
-    std::array<uint8_t, 16> seedBytes0c{};
-};
 
 // anchor family: launcher.exe:0x41bc20 / 0x41bbb0 headerless-locator message-code decode
 static bool CMessageConnection_ResolveMessageCodePointerScaffold(
@@ -1391,8 +1372,21 @@ static bool CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
     }
 
     const auto& parsedPayload = outCode2Message->parsedPayload00;
-    return parsedPayload.logicalPayloadByteCount04 >= 1u &&
-           parsedPayload.logicalPayloadBytes00[0] == 2u;
+    if (parsedPayload.logicalPayloadByteCount04 < 1u ||
+        parsedPayload.logicalPayloadBytes00[0] != 2u) {
+        return false;
+    }
+
+    // FIDELITY: Set message context fields from message storage
+    // These correspond to param_1+0x14 and param_1+0x18 in the original
+    if (messageRef.messageStorage0c) {
+        // TODO: Add proper message context fields to CMessageConnectionMessageStorage_0x4ba208
+        // For now, use dummy values
+        outCode2Message->messageContext14 = 0u;
+        outCode2Message->messageContextWord18 = 0u;
+    }
+    
+    return true;
 }
 
 static bool CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
@@ -2947,77 +2941,89 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
 // - Source lacks MessageBox error handling and vtable+0xc close call on decrypt failure.
 //   Original shows MessageBox("Failed to decrypt challenge blob from server!") then closes.
 // - FIDELITY: Removed infidel mediator continuation fallback on decrypt failure - matches original return 0.
-// - FIDELITY: Removed infidel mediator continuation fallback on missing bootstrapPrepState - matches original return 0.
-//
-// FIDELITY TODOs for future passes:
-// 1. Change signature to accept parsed message result object (with +0x14/+0x18 context fields)
-// 2. Create local message ref via CMessageConnectionMessage_CreateRef equivalent
-// 3. Route decryption through bootstrapPrepStateA0_->vtable+0x1c instead of static helper
-// 4. Implement cls_0x4b6538 envelope class for challenge byte extraction
-// 5. Add MessageBox error handling and connection vtable+0xc close on failure
-// 6. Inline the packet builder construction and send via vtable+0x24 instead of helper
+// anchor: launcher.exe:0x4429b0 -> 0x442b6f
+// Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
+//                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
+// FIDELITY: Now accepts parsed message result object matching Ghidra decompile
+// FIDELITY TODOs:
+// 1. Implement cls_0x4b6538 envelope class for proper byte extraction
+// 2. Add MessageBox error handling on decryption failure
+// 3. Call connection vtable+0xc to close on failure
+// 4. Inline packet builder construction and send via vtable+0x24
 uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
-    const uint8_t* packetBytes,
-    size_t packetSize) {
-    if (!packetBytes || packetSize == 0u) {
+    CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* parsedMessageResult) {
+    if (!parsedMessageResult) {
         return 0u;
     }
 
     // anchor: launcher.exe:0x4429b0 -> this+0xa0 bootstrap prep state
-    // Original: Loads [this+0xa0], calls prep-object vtable +0x1c (0x437810), which reaches vtable +0x24 (0x468130)
-    // Current source: Uses static helper instead of vtable dispatch.
+    // Original: Loads [this+0xa0], calls prep-object vtable +0x1c (0x437810)
     if (!bootstrapPrepStateA0_) {
         spdlog::warn(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap missing bootstrapPrepStateA0_ (this+0xa0) this={} ownerContext={}",
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
-        // FIDELITY: Original shows MessageBox and calls vtable+0xc to close connection.
-        // Here we just return 0 to signal failure - no continuation fallback.
+        // FIDELITY: Original shows MessageBox and calls vtable+0xc to close connection
         return 0u;
     }
 
-    // anchor: launcher.exe:0x4429b0 -> vtable+0x1c call region (0x437810 -> 0x468130)
-    // Original: Creates local message ref (cls_0x4489d0), calls prep object vtable+0x1c with:
-    //   - param_1: local_10 (output buffer)
-    //   - param_2: &DAT_004f7bf4 (crypto context with vtables 0x4b695c/0x4b68a8/0x4b41e0)
-    //   - param_3: local_c (message context from param_1+0x14)
-    //   - param_4: *(word *)(param_1 + 0x18) (message context word)
-    //   - param_5: payloadBytes + payload_offset (encrypted challenge blob)
-    // FIDELITY: Now uses vtable dispatch instead of static helper
-    std::array<uint8_t, 32> decryptOutput{};  // output buffer: [success, byteCount, 16 bytes]
+    // anchor: launcher.exe:0x442a1e -> CMessageConnectionMessage_CreateRef(&local_8, 0)
+    // Original: Creates local message ref (cls_0x4489d0) for decryption target
+    CMessageConnectionMessageRef localMessageRef;
+    localMessageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
     
-    // FIDELITY FIX: Skip opcode and header to get to ciphertext
+    if (!localMessageRef.messageStorage0c) {
+        spdlog::warn(
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: failed to create local message ref for decryption target");
+        return 0u;
+    }
+
+    // anchor: launcher.exe:0x442a33 -> prep-object vtable+0x1c call
+    // Original parameters:
+    //   - param_1: local_10 (output buffer, but we use message ref payload)
+    //   - param_2: &DAT_004f7bf4 (crypto context with vtables 0x4b695c/0x4b68a8/0x4b41e0)
+    //   - param_3: local_c = *(undefined4 *)(param_1 + 0x14) (message context)
+    //   - param_4: *(undefined2 *)(param_1 + 0x18) (message context word)
+    //   - param_5: encrypted challenge blob from parsed message
+    
+    // Get message context fields from parsed result
+    const uint32_t messageContext = parsedMessageResult->messageContext14;
+    const uint16_t messageContextWord = parsedMessageResult->messageContextWord18;
+    
+    // Get encrypted payload from parsed message
+    const uint8_t* encryptedPayload = parsedMessageResult->GetEncryptedPayload();
+    size_t encryptedPayloadSize = parsedMessageResult->GetEncryptedPayloadSize();
+    
+    if (!encryptedPayload || encryptedPayloadSize == 0) {
+        spdlog::warn(
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: no encrypted payload in parsed message");
+        return 0u;
+    }
+    
+    // FIDELITY: Skip opcode and header to get to ciphertext
     // Based on packet analysis: [opcode(1)][header(4)][ciphertext(96)]
-    const void* ciphertextPtr = packetBytes + 1u + 4u;  // Skip opcode + 4-byte header
-    size_t ciphertextSize = packetSize > 5u ? packetSize - 5u : 0u;
+    // The GetEncryptedPayload() already skips the opcode, but we need to skip the 4-byte header too
+    const void* ciphertextPtr = encryptedPayload + 4u;  // Skip 4-byte header
+    size_t ciphertextSize = encryptedPayloadSize > 4u ? encryptedPayloadSize - 4u : 0u;
+
+    // anchor: launcher.exe:0x442a33 -> DecryptViaVtable0x1c with proper parameters
+    std::array<uint8_t, 32> decryptOutput{};  // [success, byteCount, 16 bytes]
     
     bootstrapPrepStateA0_->DecryptViaVtable0x1c(
         decryptOutput.data(),
-        nullptr,  // cryptoContext (not needed for current impl)
-        0u,        // messageContext
-        0u,        // messageContextWord
-        ciphertextPtr,  // Pointer to ciphertext (skip opcode and header)
+        nullptr,  // cryptoContext (TODO: implement proper crypto context)
+        messageContext,
+        messageContextWord,
+        ciphertextPtr,
         ciphertextSize);
 
     // Check decrypt result: output[0] = success flag, output[4] = byte count
     const bool decryptSuccess = decryptOutput[0] != 0;
+    const uint16_t decryptedByteCount = *reinterpret_cast<const uint32_t*>(decryptOutput.data() + 4);
     
     if (decryptSuccess) {
-        // FIDELITY: Create local message ref and decrypt into its payload storage
-        // Original: CMessageConnectionMessage_CreateRef(&local_8, 0)
-        //           Decrypts into local_8.messageRef00->messageStorage0c->payloadBytes0c
-        CMessageConnectionMessageRef localMessageRef;
-        localMessageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
-        
-        if (!localMessageRef.messageStorage0c) {
-            spdlog::warn(
-                "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: failed to create local message ref for envelope construction");
-            return 0u;
-        }
-        
-        // Copy decrypted bytes into message ref payload storage
-        // Original: decrypts directly into message ref payload via vtable dispatch
-        const uint16_t decryptedByteCount = *reinterpret_cast<uint32_t*>(decryptOutput.data() + 4);
+        // anchor: launcher.exe:0x442a48 -> GrowPayloadByteCount via vtable+0x24
+        // Original: (**(code **)(*(int *)local_8.messageRef00 + 0x24))(local_8.messageRef00, *(int *)(iVar2 + 4))
         if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
             localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(decryptedByteCount);
             uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
@@ -3029,28 +3035,38 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             }
         }
         
-        // FIDELITY: Construct cls_0x4b6538 envelope with message ref and flag
-        // Original: CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
-        //           (&local_38, (int *)local_8.messageRef00, '\x01')
+        // anchor: launcher.exe:0x442a5e -> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
+        // Original: (&local_38, (int *)local_8.messageRef00, '\x01')
+        // FIDELITY: Construct envelope with message ref and flag 0x01
         CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope;
-        // In original, envelope constructor would extract bytes from message ref payload
-        // For now, copy decrypted bytes directly (future fidelity improvement)
+        // TODO: Implement proper envelope constructor that extracts from message ref
+        // For now, copy decrypted bytes directly
         std::copy(decryptOutput.begin() + 8, decryptOutput.begin() + 24, envelope.mbr_0x10);
         
-        // FIDELITY: Extract seed bytes using envelope methods
-        // Original at 0x442ac6-0x442ae0: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
+        // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
+        // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
         auto seedBytes = envelope.ExtractChallengeBytes();
         SetMessageCode5SeedBytes85(seedBytes);
         
-        // FIDELITY: Extract response bytes using envelope methods
-        // Original at 0x442b18-0x442b28: envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d -> packet+1/+5/+9/+0xd
+        // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
+        // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
+        // Current: Already handled in SetMessageCode5SeedBytes85
+        
+        // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
+        // Original flow:
+        // 1. CLTLoginMediatorPacketBuilderEnvelope_Initialize(&local_24)
+        // 2. Set opcode 0x11
+        // 3. Copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
+        // 4. Send via connection vtable+0x24
+        
+        // FIDELITY: Extract response bytes and send
         auto responseBytes = envelope.ExtractForResponsePacket();
         const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(responseBytes);
         
         spdlog::info(
-            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} packetSize={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} decryptedByteCount={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
             sendResult,
-            static_cast<unsigned>(packetSize),
+            static_cast<unsigned>(decryptedByteCount),
             static_cast<unsigned>(
                 static_cast<uint32_t>(decryptOutput[8]) |
                 (static_cast<uint32_t>(decryptOutput[9]) << 8u) |
@@ -3062,95 +3078,17 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         return sendResult != 0u ? 1u : 0u;
     }
     
-    // Debug logging for decryption failure analysis
-    if (!decryptSuccess) {
-        spdlog::debug(
-            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: DecryptViaVtable0x1c failed - checking bootstrap state");
-        
-        // Log bootstrap state details for debugging
-        if (bootstrapPrepStateA0_) {
-            const uint32_t expectedSize = bootstrapPrepStateA0_->GetExpectedPayloadSizeFromBootstrapState();
-            
-            spdlog::debug(
-                "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: expected ciphertext size={}, actual size={}",
-                expectedSize,
-                ciphertextSize);
-                
-            // Log BigInt component details
-            spdlog::debug(
-                "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: modulus bits={}, exponent bits={}, privateExp bits={}",
-                bootstrapPrepStateA0_->field_0xc.field_0x8.GetBitCount(),
-                bootstrapPrepStateA0_->field_0xc.field_0x1c.GetBitCount(),
-                bootstrapPrepStateA0_->field_0xc.field_0x3c.GetBitCount());
-        }
-    }
-
-    // anchor: launcher.exe:0x4429b0 -> decryption failure check (*(int *)(iVar2 + 4) == 0)
-    // Original: Shows MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
-    // then calls connection vtable+0xc with arg 1 to close/disconnect.
-    // FIDELITY: Original does NOT fall back to continuation - just returns 0.
-    if (!decryptSuccess) {
-        spdlog::error(
-            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
-            static_cast<unsigned>(packetSize),
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()));
-        // Original shows MessageBox then calls vtable+0xc with arg 1 to close connection.
-        // Here we just return 0 to signal failure - no continuation fallback.
-        return 0u;
-    }
-
-    // anchor: launcher.exe:0x4429b0 -> success path
-    // Original flow:
-    // 1. Create local message ref (CMessageConnectionMessage_CreateRef at 0x455bd0)
-    // 2. Call prep object vtable+0x1c (0x437810) with encrypted challenge blob to decrypt into message payload
-    // 3. Construct cls_0x4b6538 envelope with '\x01' flag via cls_0x4b6538::cls_0x4b6538(&local_38, (int *)messageRef, '\x01') at 0x443220
-    // 4. Extract 16 bytes from envelope.mbr_0x10 + 1/+5/+9/+0xd and write to connection fields
-    // 5. Call SendCertChallengeResponseFromChallengeBytes with extracted bytes
-    // FIDELITY: Current source uses static helper CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge
-    // which mirrors steps 1-2, then passes raw decrypted bytes directly.
-
-    // anchor: launcher.exe:0x442ac6 -> envelope.mbr_0x10 +1/+5/+9/+0xd extracts to this+0x85/0x89/0x8d/0x91
-    // Original at 0x442ac6-0x442ae0 extracts seed bytes then:
-    // 1. Calls EnsureStreamPacketEncryptionModule (0x441470)
-    // 2. Initializes packet builder via CLTLoginMediatorPacketBuilderEnvelope_Initialize
-    // 3. Sets opcode 0x11 at packet+0
-    // 4. Copies from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
-    // FIDELITY: Constructor populates envelope mbr_0x10 with decrypted bytes
-    // Extract decrypted bytes from vtable dispatch output (at offset 8)
-    std::array<uint8_t, 16> decryptedChallengeBytes{};
-    std::copy(decryptOutput.begin() + 8, decryptOutput.end(), decryptedChallengeBytes.begin());
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope{decryptedChallengeBytes};
-    auto seedBytes = envelope.ExtractChallengeBytes();  // +1/+5/+9/+0xd for seed fields
-    SetMessageCode5SeedBytes85(seedBytes);
-
-    // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule call (0x441470)
-    // Original: Explicit call to EnsureStreamPacketEncryptionModule after writing seed bytes.
-    // Current source: Already done inside SetMessageCode5SeedBytes85 -> EnsureStreamPacketEncryptionModuleFromSeed85.
-
-    // anchor: launcher.exe:0x442b18 -> copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
-    // Original flow:
-    //   - After seed extraction, initializes packet builder (0x439840)
-    //   - Sets opcode 0x11 at packet+0
-    //   - Copies from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
-    //   - Sends via connection vtable+0x24
-    // FIDELITY: Second extraction pass uses ExtractForResponsePacket() (+0x11/+0x15/+0x19/+0x1d offsets)
-    auto responseBytes = envelope.ExtractForResponsePacket();  // +0x11/+0x15/+0x19/+0x1d for packet
-    const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(responseBytes);
-
-    spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} packetSize={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
-        sendResult,
-        static_cast<unsigned>(packetSize),
-        static_cast<unsigned>(
-            static_cast<uint32_t>(decryptedChallengeBytes[0]) |
-            (static_cast<uint32_t>(decryptedChallengeBytes[1]) << 8u) |
-            (static_cast<uint32_t>(decryptedChallengeBytes[2]) << 16u) |
-            (static_cast<uint32_t>(decryptedChallengeBytes[3]) << 24u)),
+    // anchor: launcher.exe:0x442a3d -> decryption failure handling
+    // Original: MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
+    //           then (**(code **)(*(int *)this + 0xc))(1) to close connection
+    spdlog::error(
+        "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed this={} ownerContext={}",
         fmt::ptr(this),
         fmt::ptr(OwnerContext()));
-
-    return sendResult != 0u ? 1u : 0u;
+    
+    // FIDELITY TODO: Show MessageBox and call connection vtable+0xc to close
+    // For now, just return failure
+    return 0u;
 }
 
 // anchor: launcher.exe:0x442d00 -> 0x442d83 -> 0x441850
@@ -3240,9 +3178,16 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         uint32_t handledCode2 = 0u;
         if (marginOwnerPath) {
             // anchor: launcher.exe:0x442d9e -> 0x4429b0
-            handledCode2 = HandleCode2ForBootstrap(
-                logicalPayloadBytes,
-                logicalPayloadByteCount);
+            // Original: CBaseMarginConnection_OnMessageCode2(code2ParseResult, messageRef, '\x01')
+            // then calls HandleCode2ForBootstrap with the parsed result
+            CBaseMarginConnection_0x4b64a8_Code2MessageScaffold parsedResult;
+            if (CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
+                    copiedMessageRef, &parsedResult, /*parseIncomingMessage=*/true)) {
+                handledCode2 = HandleCode2ForBootstrap(&parsedResult);
+            } else {
+                spdlog::warn(
+                    "CBaseMarginConnection_0x4b64a8::DispatchMessage: failed to parse code2 message for bootstrap");
+            }
         }
         spdlog::info(
             "CBaseMarginConnection_0x4b64a8::DispatchMessage consumed code2 rawCode=0x{:02x} headerless={} locatorDecoded={} parsedCode2={} logicalPayloadBytes={} marginOwnerPath={} handledCode2={} this={} ownerContext={} currentState={} remoteHost='{}'",

@@ -912,6 +912,42 @@ class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 // leaf families.
 class CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778;
 
+// Scaffold structures for parsed message results
+struct CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold {
+    const uint8_t* logicalPayloadBytes00 = nullptr;
+    size_t logicalPayloadByteCount04 = 0u;
+    bool headerless08 = false;
+    bool usedHeaderlessLocatorDecode09 = false;
+};
+
+struct CBaseMarginConnection_0x4b64a8_Code2MessageScaffold {
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
+    
+    // FIDELITY: Add fields matching cls_0x4b654c for bootstrap handling
+    uint32_t messageContext14 = 0u;     // from param_1+0x14
+    uint16_t messageContextWord18 = 0u; // from param_1+0x18
+    
+    const uint8_t* GetEncryptedPayload() const {
+        if (parsedPayload00.logicalPayloadByteCount04 <= 1u) return nullptr;
+        return parsedPayload00.logicalPayloadBytes00 + 1u;  // Skip opcode
+    }
+    
+    size_t GetEncryptedPayloadSize() const {
+        if (parsedPayload00.logicalPayloadByteCount04 <= 1u) return 0u;
+        return parsedPayload00.logicalPayloadByteCount04 - 1u;  // Skip opcode
+    }
+};
+
+struct CBaseMarginConnection_0x4b64a8_Code4MessageScaffold {
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
+    uint32_t statusOrPayload0c = 0u;
+};
+
+struct CBaseMarginConnection_0x4b64a8_Code5MessageScaffold {
+    CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
+    std::array<uint8_t, 16> seedBytes0c{};
+};
+
 class CBaseMarginConnection_0x4b64a8 : public CMessageConnection {
 public:
     // UNANCHORED: source-owned narrow intermediate-base ctor.
@@ -967,12 +1003,18 @@ public:
     //   extracts 16 bytes via cls_0x4b6538 envelope, writes to this+0x85..0x91,
     //   ensures stream encryption module, sends response packet opcode 0x11 via vtable+0x24.
     // SOURCE DIVERGENCE: Current source takes raw bytes instead of message object,
-    //   uses static helper instead of vtable dispatch, lacks cls_0x4b6538 envelope construction,
-    //   uses helper methods instead of inline field writes and packet building.
-    // See implementation in .cpp for full fidelity notes and TODOs.
+    // anchor: launcher.exe:0x4429b0 -> 0x442b6f
+    // Handle decoded code 2: decrypt challenge blob, extract seed/response bytes, send response.
+    // FIDELITY: Now accepts parsed message result object matching Ghidra decompile.
+    // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
+    //                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
+    // FIDELITY TODOs:
+    // 1. Implement cls_0x4b6538 envelope class for proper byte extraction
+    // 2. Add MessageBox error handling on decryption failure
+    // 3. Call connection vtable+0xc to close on failure
+    // 4. Inline packet builder construction and send via vtable+0x24
     uint32_t HandleCode2ForBootstrap(
-        const uint8_t* packetBytes,
-        size_t packetSize);
+        CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* parsedMessageResult);
 
     // Handle decoded code 4: set success flag, synthesize local completion work item, continue bootstrap.
     // anchor: launcher.exe:0x441850 - takes 2 params (this, parsed message object)
