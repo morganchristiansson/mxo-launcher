@@ -2658,7 +2658,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
     }
 
     messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kPayloadByteCount);
-    builder.packetPayload10[0] = 0x11u;  // CERT_ChallengeResponse opcode (corrected from 0x03)
+    builder.packetPayload10[0] = 0x03u;  // CERT_ChallengeResponse opcode (matches working infidel method)
     std::copy_n(
         challengeBytes.begin(),
         challengeBytes.size(),
