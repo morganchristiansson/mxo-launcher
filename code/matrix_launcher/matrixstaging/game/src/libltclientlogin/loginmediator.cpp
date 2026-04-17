@@ -2925,6 +2925,16 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             if (sendResult != 0u) {
                 marginBootstrapState.phase = MarginBootstrapPhase::kSentCertChallengeResponse;
                 expectedMarginRequestName_ = "CERT_ConnectReply";
+                
+                // DEBUG: Log that we're now waiting for CERT_ConnectReply
+                const std::string remoteHost = MarginConnection() 
+                    ? static_cast<mxo::liblttcp::CMessageConnection*>(MarginConnection())->RemoteHostName()
+                    : std::string("<no connection>");
+                spdlog::info(
+                    "CLTLoginMediator::ContinueMarginBootstrapHandshake ADVANCED to phase kSentCertChallengeResponse, now waiting for CERT_ConnectReply (opcode 0x04) this={} marginConnection={} remoteHost='{}'",
+                    fmt::ptr(this),
+                    fmt::ptr(MarginConnection()),
+                    remoteHost.empty() ? std::string("<empty>") : remoteHost);
             }
             return sendResult;
         }
