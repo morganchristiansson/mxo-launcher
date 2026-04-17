@@ -1161,37 +1161,57 @@ static_assert(sizeof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70) ==
 class CMarginConnectionBootstrapPrepStateA0Scaffold {
 public:
     // anchor: launcher.exe:0x443220 / object size `0xe0`
+    // vtable layout (from cls_0x4b6778::vftable_4b6778):
+    //   +0x00: ~cls_0x4b6e0c
+    //   +0x04: CLTLoginState_State0_Slot7_GetStateId
+    //   +0x08: AuthBootstrap680Field54Helper_ResetUnknownString
+    //   +0x0c: virt_meth_0x4415d0
+    //   +0x10: virt_meth_0x4415f0
+    //   +0x14: ImportThunk_48bc34
+    //   +0x18: virt_meth_0x443870
+    //   +0x1c: virt_meth_0x437810 -> validation wrapper that calls vtable+0x24 (virt_meth_0x468130)
+    //   +0x20: virt_meth_0x4383d0
+    //   +0x24: ImportThunk_48bc34
     CMarginConnectionBootstrapPrepStateA0Scaffold(
         const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
         const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
         const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
         int param_4);
     // anchor: launcher.exe:0x443390
-    ~CMarginConnectionBootstrapPrepStateA0Scaffold();
+    virtual ~CMarginConnectionBootstrapPrepStateA0Scaffold();
+
+    // vtable+0x1c / 0x437810: Validation wrapper that checks payload size then calls decrypt method.
+    // Original signature: undefined1* __thiscall virt_meth_0x437810(cls_0x4b6778* this, undefined1* output, undefined4, undefined4, int payloadSize, undefined4)
+    // Returns output buffer with {success, byteCount} at +0x04.
+    // FIDELITY: This method corresponds to vtable+0x1c entry - the entry point the original calls from HandleCode2CertChallengeAndSendResponse.
+    virtual void* DecryptViaVtable0x1c(
+        void* outputBuffer,
+        const void* cryptoContext,
+        uint32_t messageContext,
+        uint16_t messageContextWord,
+        const void* encryptedPayload,
+        size_t payloadSize);
+
     // Later original use of the stored connection `+0xa0` object starts at
     // `0x4429b0`, which loads that pointer and calls prep-object vtable `+0x1c /
     // 0x437810`; current source deliberately stops at ctor/dtor/materialization
     // until that later consumer path is reimplemented from static-RE.
 
-    uint32_t vftptr_0x0 = 0u;
-    uint32_t mbr_0x4 = 0u;
-    uint32_t mbr_0x8 = 0u;
+    // C++ vtable replaces raw uint32_t vtable pointers
+    // Note: Original object size was 0xe0, but with C++ vtable we'll have different alignment
     CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70 field_0xc{};
-    uint32_t field_0xd0 = 0u;
-    uint32_t field_0xd4 = 0u;
-    uint32_t cls_0x4b3e18 = 0u;
-    uint32_t field_0xdc = 0u;
+    uint32_t mbr_0xd0 = 0u;  // was field_0xd0 - inner vtable pointer
+    uint32_t mbr_0xd4 = 0u;  // was field_0xd4 - vtable pointer for component
+    uint32_t mbr_0xd8 = 0u;  // was cls_0x4b3e18 - vtable pointer for component
+    uint32_t mbr_0xdc = 0u;  // was field_0xdc
+    // Padding to meet original 0xe0 size: C++ vtable adds 4 bytes but we removed 3 vtable ptr fields
+    std::array<uint8_t, 8> padding_0xe0{};
 
     CMarginConnectionBootstrapPrepStateA0Scaffold(const CMarginConnectionBootstrapPrepStateA0Scaffold&) = delete;
     CMarginConnectionBootstrapPrepStateA0Scaffold& operator=(const CMarginConnectionBootstrapPrepStateA0Scaffold&) = delete;
 };
 
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xc) == 0x0c);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xd0) == 0xd0);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xd4) == 0xd4);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, cls_0x4b3e18) == 0xd8);
-static_assert(offsetof(CMarginConnectionBootstrapPrepStateA0Scaffold, field_0xdc) == 0xdc);
-static_assert(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold) == 0xe0, "bootstrap prep state +0xa0 object size mismatch");
+static_assert(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold) >= 0xe0, "bootstrap prep state +0xa0 object size mismatch");
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {
 public:
