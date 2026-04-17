@@ -1870,12 +1870,35 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
     lastReceivedPacketHeaderlessScaffold_ = (copiedMessageRef->headerless10 != 0u);
+    
+    // anchor: launcher.exe:0x4492a0 - packet agenda processing
+    CMessageConnectionMessageRef* messageRefForDispatch = copiedMessageRef;
+    bool agendaTouched = false;
+    if (PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
+        agenda && agenda->created) {
+        messageRefForDispatch = agenda->ApplyReceivePacketAgenda(copiedMessageRef, &agendaTouched);
+        
+        if (agendaTouched) {
+            // Update last received packet info if agenda modified the message
+            lastReceivedPacketBodyBytesScaffold_.clear();
+            if (const CMessageConnectionMessageStorage_0x4ba208* const agendaMessageStorage = messageRefForDispatch->messageStorage0c) {
+                const uint16_t agendaPayloadByteCount = agendaMessageStorage->PayloadByteCountScaffold();
+                if (const uint8_t* const agendaPayloadBytes = agendaMessageStorage->PayloadBaseScaffold();
+                    agendaPayloadBytes && agendaPayloadByteCount != 0u) {
+                    lastReceivedPacketBodyBytesScaffold_.assign(
+                        agendaPayloadBytes,
+                        agendaPayloadBytes + agendaPayloadByteCount);
+                }
+            }
+            lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
+        }
+    }
 
-    if (lastReceivedPacketHeaderlessScaffold_) {
+    if (messageRefForDispatch->headerless10 != 0u) {
         uint8_t targetLocatorType = 0u;
         uint8_t senderLocatorType = 0u;
         if (!CMessageConnection_ResolveMessageCodePointerScaffold(
-                *copiedMessageRef,
+                *messageRefForDispatch,
                 /*outMessageCodePointer=*/nullptr,
                 &targetLocatorType,
                 &senderLocatorType,
@@ -1892,8 +1915,6 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
 
-    CMessageConnectionMessageRef* messageRefForDispatch = copiedMessageRef;
-    bool agendaTouched = false;
     if (PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
         agenda && agenda->created) {
         messageRefForDispatch = agenda->ApplyReceivePacketAgenda(
