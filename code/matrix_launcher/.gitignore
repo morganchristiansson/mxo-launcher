@@ -12,3 +12,4 @@ secrets/
 
 # Local logs / scratch
 *.log
+/scratch
