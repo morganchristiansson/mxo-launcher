@@ -1039,9 +1039,7 @@ public:
     // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
     //                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
     // FIDELITY TODOs:
-    // 1. Add MessageBox error handling on decryption failure (text-only launcher, skip)
-    // 2. Call connection vtable+0xc to close on failure
-    // 3. Inline packet builder construction and send via vtable+0x24
+    // 1. Inline packet builder construction and send via vtable+0x24
     uint32_t HandleCode2ForBootstrap(
         CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* parsedMessageResult);
 

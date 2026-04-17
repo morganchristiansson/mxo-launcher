@@ -3096,8 +3096,11 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         fmt::ptr(this),
         fmt::ptr(OwnerContext()));
     
-    // FIDELITY TODO: Show MessageBox and call connection vtable+0xc to close
-    // For now, just return failure
+    // FIDELITY: Call connection vtable+0xc to close on failure
+    // Original: (**(code **)(*(int *)this + 0xc))(1)
+    // This corresponds to Close(bool graceful) with graceful=1
+    Close(/*graceful=*/true);
+    
     return 0u;
 }
 
