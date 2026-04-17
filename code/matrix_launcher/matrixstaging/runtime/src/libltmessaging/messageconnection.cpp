@@ -2854,20 +2854,17 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // anchor: launcher.exe:0x4429b0 -> decryption failure check (*(int *)(iVar2 + 4) == 0)
     // Original: Shows MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
     // then calls connection vtable+0xc with arg 1 to close/disconnect.
-    // Investigate: RSA decryption fails - bootstrap state may not be properly populated.
+    // FIDELITY: Original does NOT fall back to mediator continuation - just returns 0.
     if (!decryptSuccess) {
         spdlog::error(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
             static_cast<unsigned>(packetSize),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
-        // TEMP: Keep continuation for now until RSA key construction is fully debugged
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-        if (!mediator) {
-            return 0u;
-        }
-        mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
-        return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
+        // Original shows MessageBox then calls vtable+0xc with arg 1 to close connection.
+        // Here we just return 0 to signal failure - no continuation fallback.
+        // TODO: Add connection close via vtable+0xc if needed for full fidelity.
+        return 0u;
     }
 
     // anchor: launcher.exe:0x4429b0 -> success path
