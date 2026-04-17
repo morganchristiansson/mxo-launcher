@@ -158,7 +158,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // pattern; keep the scaffold for consistency but merge the failure branch into
     // the single reject path below.
     uint16_t messageCode = 0;
-    if (!CMessageConnection_DecodeMessageCodeScaffold(*messageRef, &messageCode, nullptr)) {
+    if (!CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(*messageRef, &messageCode, nullptr)) {
         // Decode failed — original would just see opcode 0 (≠ 0xb) and go to reject.
         // Fall through to the single reject path below.
     }

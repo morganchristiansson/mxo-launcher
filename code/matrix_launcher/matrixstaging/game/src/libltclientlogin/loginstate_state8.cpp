@@ -195,7 +195,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     //       it forwards the stack-local packet-envelope object into current margin connection
     //       vtable `+0x24` / `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
     //       and that wrapper then forwards envelope `+0x08` (the retained outer message-ref)
-    //       into vtable `+0x28` / inherited `CMessageConnection::SendPacket` (`0x448cf0`)
+    //       into vtable `+0x28` / inherited `CMessageConnection_0x4b7928::SendPacket` (`0x448cf0`)
     //   - post event `9`
     // Practical current boundary from the newest original-launcher runs:
     // - natural original reaches this sender, crosses the `0x41af70/0x41cf30` send bridge, and
@@ -205,7 +205,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     //   after it
     // - the receive-side route for that live slot-6 hit is now tighter too:
     //   `CMarginConnection::OnOperationCompleted` (`0x44af60`) ->
-    //   `CMessageConnection::OnOperationCompleted` (`0x4490c0`) ->
+    //   `CMessageConnection_0x4b7928::OnOperationCompleted` (`0x4490c0`) ->
     //   `CBaseMarginConnection::DispatchMessage` (`0x442d00`) ->
     //   mediator re-entry `0x41f260` into the active helper/state slot-6 body
     // - newer `0x442d00/0x441bc0/0x441850` review now also rules out one tempting shortcut:

@@ -19,7 +19,7 @@ class CLTLoginMediator;
 
 namespace mxo::liblttcp {
 
-class CMessageConnection;
+class CMessageConnection_0x4b7928;
 class CLTThreadPerClientTCPEngine_0x4b2768;
 
 // Recovered base-queue object from CLTBaseThreadPerClientTCPEngine.
@@ -355,7 +355,7 @@ public:
     // - `0x10000003` = source-owned receive-drain proxy only
     //   - this is intentionally *not* another original type-3 work item
     //   - it exists because source currently stages the copied parsed packet inside
-    //     `CMessageConnection::OnOperationCompleted`, but does not yet reimplement the later
+    //     `CMessageConnection_0x4b7928::OnOperationCompleted`, but does not yet reimplement the later
     //     original message-object / dispatch / owner-callback tail reached from that same callback
     static constexpr uint32_t kWorkTypeClose = 1u;
     static constexpr uint32_t kWorkTypeConnectionStatus = 2u;
@@ -488,7 +488,7 @@ public:
     // - direct connection object / direct owner-context identities
     // - active worker/context-tree payloads keyed by the direct connection object
     // - no generic synthetic fallback allocation
-    CMessageConnection* FindMessageConnection(void* contextKey);
+    CMessageConnection_0x4b7928* FindMessageConnection(void* contextKey);
 
     friend class CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread;
 
@@ -500,12 +500,12 @@ private:
     // anchor: launcher.exe:0x42fe10 search shape over the context-keyed `+0x8c` tree family.
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* FindWorker(void* contextKey);
     // Source-owned shared engine-slot connection resolver.
-    // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection`
+    // Faithfulness rule: this no longer synthesizes generic engine-owned `CMessageConnection_0x4b7928`
     // objects when original caller/object evidence is missing.
-    CMessageConnection* ResolveConnectionForEngineSlotScaffold(void* contextKey);
+    CMessageConnection_0x4b7928* ResolveConnectionForEngineSlotScaffold(void* contextKey);
     // anchor: launcher.exe:0x431ff0 worker creation/insertion helper.
     CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CreateAndInsertWorkerThread(
-        CMessageConnection* connection,
+        CMessageConnection_0x4b7928* connection,
         bool datagramMode,
         bool startThread = false);
     // UNANCHORED: source-owned teardown helper for the direct `AcceptThread` payload stored at
@@ -540,7 +540,7 @@ private:
     // - any remaining arg5-helper polling is therefore connection-centric and only used when a
     //   direct auth/margin connection exists without an attached worker thread
     void PumpLauncherConnectionContextScaffold(
-        CMessageConnection* connection,
+        CMessageConnection_0x4b7928* connection,
         mxo::ltlogin::CLTLoginMediator* mediator,
         bool isMarginConnection,
         const char* receiveLabel);

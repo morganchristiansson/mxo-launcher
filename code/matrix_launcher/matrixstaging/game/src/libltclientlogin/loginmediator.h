@@ -1030,7 +1030,7 @@ public:
 
     std::string ResolvedMarginHostName() const;
 
-    mxo::liblttcp::CMessageConnection* MarginConnection() const;
+    mxo::liblttcp::CMessageConnection_0x4b7928* MarginConnection() const;
     bool AuthPeerCloseQueuedScaffold() const { return authPeerCloseQueuedScaffold_; }
     bool MarginPeerCloseQueuedScaffold() const { return marginPeerCloseQueuedScaffold_; }
     void SetAuthPeerCloseQueuedScaffold(bool value) { authPeerCloseQueuedScaffold_ = value; }
@@ -1123,7 +1123,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // - copies auth DNS into owner `+0x4c`
     // - reads auth port from recovered config state
     // - builds endpoint into owner `+0x5c`
-    // - constructs auth-side CMessageConnection child at owner `+0x18`
+    // - constructs auth-side CMessageConnection_0x4b7928 child at owner `+0x18`
     // - then calls `connection->+0x1c(owner+0x5c)`
     // Current best method mapping still treats that virtual `+0x1c` as the connection-
     // oriented ensure-connected / engine-Connect wrapper.
@@ -1375,7 +1375,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Newer Ghidra tightening now makes that two-step downstream bridge more concrete:
     // - `+0x24` = `0x41cf30 = CMessageConnection_ForwardEnvelopeToSendPacket`
     // - that wrapper forwards envelope `+0x08` (the retained outer message-ref object) into
-    //   `+0x28` = inherited `CMessageConnection::SendPacket` / `0x448cf0`
+    //   `+0x28` = inherited `CMessageConnection_0x4b7928::SendPacket` / `0x448cf0`
     // - `0x448cf0` consumes that message-ref object, not bare payload bytes
     // Current source helper is therefore intentionally narrower/scaffold-only:
     // - local builder front matter now stays raw-first (`+0x04` payload base, `+0x08` message-ref)
@@ -1488,7 +1488,7 @@ private:
     void BuildMarginEndpoint();
     bool RebuildMarginAddressList();
     bool SelectMarginEndpointIpv4();
-    mxo::liblttcp::CMessageConnection* EnsureMarginConnectionObject();
+    mxo::liblttcp::CMessageConnection_0x4b7928* EnsureMarginConnectionObject();
 
     // Condensed `0x4f78b8` owner sketch for the active branch:
     // - `+0x10` = current helper/state object
@@ -1524,8 +1524,8 @@ private:
     bool marginPeerCloseQueuedScaffold_ = false;
 
 public:
-    mxo::liblttcp::CMessageConnection* authConnection_;
-    mxo::liblttcp::CMessageConnection* marginConnection_;
+    mxo::liblttcp::CMessageConnection_0x4b7928* authConnection_;
+    mxo::liblttcp::CMessageConnection_0x4b7928* marginConnection_;
 
     // anchor: launcher.exe:0x4b01c8 +0x10 (current helper/state object)
     CLTLoginState* currentState_;

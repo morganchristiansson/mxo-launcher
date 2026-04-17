@@ -30,7 +30,7 @@ namespace mxo::liblttcp {
 // - docs/launcher.exe/startup_objects/0x4d6304_network_engine.md
 // - docs/client.dll/RunClientDLL/README.md
 
-// Starter skeleton for the original CMessageConnection-family object now visible in
+// Starter skeleton for the original CMessageConnection_0x4b7928-family object now visible in
 // launcher.exe strings / vtable neighborhoods.
 //
 // Recovered source-file anchor:
@@ -38,7 +38,7 @@ namespace mxo::liblttcp {
 //
 // Current evidence-backed role:
 // - `0x448b40` first constructs a base CLTTCPConnection-family object, then overwrites
-//   its vtable to the CMessageConnection-family vtable at `0x4b7928`
+//   its vtable to the CMessageConnection_0x4b7928-family vtable at `0x4b7928`
 // - captures a CLTThreadPerClientTCPEngine_0x4b2768 pointer at +0x10
 // - carries an endpoint copy at +0x24
 // - carries the inherited parser pointer at +0x6c
@@ -50,8 +50,8 @@ namespace mxo::liblttcp {
 // - participates in queue0C producer traffic by enqueueing (workItem, this, 0)
 // - likely appears as the dequeued queue0C `context` on important consumer paths
 // - string-backed methods include:
-//   - CMessageConnection::SendPacket
-//   - CMessageConnection::OnOperationCompleted
+//   - CMessageConnection_0x4b7928::SendPacket
+//   - CMessageConnection_0x4b7928::OnOperationCompleted
 //
 // Current best virtual mapping from launcher.exe:
 // - base vtable +0x10 / 0x4490c0 -> likely OnOperationCompleted(workItem)
@@ -104,7 +104,7 @@ namespace mxo::liblttcp {
 //     as null on that path, so current auth/margin type-2 connect-status handling falls
 //     through to owner callbacks instead of using these helper objects
 // - inherited send path now tightens better as:
-//   - vtable slot 10 / `0x448cf0` = `CMessageConnection::SendPacket`
+//   - vtable slot 10 / `0x448cf0` = `CMessageConnection_0x4b7928::SendPacket`
 //   - consumes the retained outer message-ref object from local envelope `+0x08`, performs
 //     packet-agenda filtering, then reaches the lower submit helper `0x448a00`
 //   - that lower helper forwards final byte pointer/size together with `self` to engine `+0x20`
@@ -121,7 +121,7 @@ namespace mxo::liblttcp {
 // ============================================================
 // Later leaf on top of the shared message-connection surface:
 // CLTTCPConnection (0x004b8034)
-// └── CMessageConnection-family base surface (`0x448b40`, `0x448cf0`, `0x4490c0`)
+// └── CMessageConnection_0x4b7928-family base surface (`0x448b40`, `0x448cf0`, `0x4490c0`)
 //     └── CBaseMarginConnection_0x4b64a8 (0x004b64a8)
 //         └── CBasicMarginConnection (0x004afef0)
 // Key leaf-only rows now relevant here:
@@ -130,14 +130,14 @@ namespace mxo::liblttcp {
 // - 0x004aff1c = 0x00449a30 leaf `DispatchMessage` override
 // - 0x004aff34 = 0x0041ce80 connection `+0x98` reply-copy helper
 // The source file does not yet model `CBasicMarginConnection` as its own class, so do not treat
-// those leaf rows as base `CMessageConnection` methods.
+// those leaf rows as base `CMessageConnection_0x4b7928` methods.
 
 // ============================================================
 // VTable 0x004aff38 - CMarginConnection
 // ============================================================
 // Later leaf on top of:
 // CLTTCPConnection (0x004b8034)
-// └── CMessageConnection-family base surface
+// └── CMessageConnection_0x4b7928-family base surface
 //     └── CBaseMarginConnection_0x4b64a8 (0x004b64a8)
 //         └── CMarginConnection (0x004aff38)
 // Key leaf-only rows:
@@ -274,7 +274,7 @@ public:
 // Exported decode helper used by CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
 // at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload,
 // handling both headerless (locator-based) and non-headerless (direct) payload formats.
-bool CMessageConnection_DecodeMessageCodeScaffold(
+bool CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode);
@@ -300,7 +300,7 @@ static_assert(sizeof(CMessageConnectionMessageRefHandleScaffold) == 0x04, "messa
 
 struct CMessageConnectionCompletionHelperScaffold {
     // anchor family: launcher.exe:0x436080 / vtable `0x004b3e20`
-    // Small event + embedded-lock helper reached by `CMessageConnection::OnOperationCompleted`
+    // Small event + embedded-lock helper reached by `CMessageConnection_0x4b7928::OnOperationCompleted`
     // on work types `1` and `2` through connection `+0x7c/+0x80`.
     void** vtable00 = nullptr; // +0x00
     CLTThreadPerClientTCPEngine_0x4b2768_LockHelperScaffold embeddedLockHelper04{}; // +0x04
@@ -476,7 +476,7 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     if (messageRef && messageRef->messageStorage0c) {
         const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
         const size_t payloadSize = messageRef->messageStorage0c->PayloadByteCountScaffold();
-        
+
         if (payload && payloadSize >= 16) {
             // Copy first 16 bytes from message ref payload to mbr_0x10
             std::copy(payload, payload + 16, this->mbr_0x10);
@@ -560,7 +560,7 @@ protected:
     void ForwardToNextHelper(void* opaqueMessageRef);
 };
 
-class CMessageConnection;
+class CMessageConnection_0x4b7928;
 class CStreamPacketEncryptionModule_0x4b8704;
 
 class CMessageConnectionMessageRefOutputBuffer {
@@ -659,7 +659,7 @@ public:
 };
 
 // Static assertion to ensure correct size matches original structure
-static_assert(sizeof(MarginConnectionChallengeParsedResult_0x4b654c) == 0x1C, 
+static_assert(sizeof(MarginConnectionChallengeParsedResult_0x4b654c) == 0x1C,
               "MarginConnectionChallengeParsedResult_0x4b654c size mismatch");
 
 // ============================================================
@@ -743,7 +743,7 @@ public:
     // The original launcher.exe doesn't copy these helper objects
     MessageConnectionMessageRefHelper_0x4489d0(const MessageConnectionMessageRefHelper_0x4489d0&) = delete;
     MessageConnectionMessageRefHelper_0x4489d0& operator=(const MessageConnectionMessageRefHelper_0x4489d0&) = delete;
-    
+
     // anchor: launcher.exe:0x4489d0 - Message ref handle assignment
     static void CMessageConnectionMessageRefHandle_AssignRetained(
         MessageConnectionMessageRefHelper_0x4489d0* targetHandle,
@@ -751,7 +751,7 @@ public:
 };
 
 // Static assertion to ensure the helper maintains minimal size
-static_assert(sizeof(MessageConnectionMessageRefHelper_0x4489d0) <= 0x08, 
+static_assert(sizeof(MessageConnectionMessageRefHelper_0x4489d0) <= 0x08,
               "MessageConnectionMessageRefHelper_0x4489d0 size unexpected");
 
 class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
@@ -831,19 +831,19 @@ public:
 
     // anchor: launcher.exe:0x44c680 / vtable `0x004baf48 +0x00`
     ~PacketProcessingAgenda_0x4baf48() override;
-    
+
     // anchor: launcher.exe:0x44bb60 / vtable `0x004baf48 +0x04`
     virtual void VirtualMethod1_0x44bb60();
-    
+
     // anchor: launcher.exe:0x481750 / vtable `0x004baf48 +0x08`
     virtual uint32_t VirtualMethod2_0x481750();
-    
+
     // anchor: launcher.exe:0x469980 / vtable `0x004baf48 +0x0c`
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
-    
+
     // anchor: launcher.exe:0x469720 / vtable `0x004baf48 +0x10`
     virtual void DelegateToChainedHelper();
-    
+
     // anchor: launcher.exe:0x469980
     // Store opaque message ref with proper ref counting
     void StoreOpaqueMessageRef(CMessageConnectionMessageRef_0x4ba23c* messageRef);
@@ -863,7 +863,7 @@ public:
     CStreamPacketEncryptionModuleReadHelper_0x4b86f0* readHelper04 = nullptr;
     CStreamPacketEncryptionModuleWriteHelper_0x4b8690* writeHelper08 = nullptr;
     CStreamPacketEncryptionModule_0x4b8704* nextConfiguredModule0c = nullptr;
-    CMessageConnection* configuredConnection10 = nullptr;
+    CMessageConnection_0x4b7928* configuredConnection10 = nullptr;
     CStreamPacketEncryptionModuleReadHelper_0x4b86f0 ownedReadHelper14{};
     CStreamPacketEncryptionModuleWriteHelper_0x4b8690 ownedWriteHelper2c{};
     std::array<uint8_t, 16> associatedSeedBytes40{};
@@ -878,7 +878,7 @@ struct PacketProcessingAgenda_0x469850 {
     // connection `+0x74`.
     // This scaffold now keeps the recovered agenda front matter explicit where source can do so
     // faithfully while still representing the two embedded helper objects as internal C++ wrappers.
-    CMessageConnection* connectionOwner00 = nullptr;
+    CMessageConnection_0x4b7928* connectionOwner00 = nullptr;
     CStreamPacketEncryptionModule_0x4b8704* configuredModuleList04 = nullptr;
     CMessageConnectionMessageRef_0x4ba23c* readOutputSlot08 = nullptr;
     PacketProcessingAgenda_0x4baf48 embeddedReadHelper0c{};
@@ -900,7 +900,7 @@ struct PacketProcessingAgenda_0x469850 {
 
     // anchor: launcher.exe:0x469850
     // Constructor that mirrors the original initialization logic
-    explicit PacketProcessingAgenda_0x469850(CMessageConnection* connectionOwner);
+    explicit PacketProcessingAgenda_0x469850(CMessageConnection_0x4b7928* connectionOwner);
 
     // anchor: launcher.exe:0x469740
     // Install stream packet encryption module into the agenda
@@ -915,7 +915,7 @@ struct PacketProcessingAgenda_0x469850 {
     CMessageConnectionMessageRef_0x4ba23c* ApplyReceivePacketAgenda(
         CMessageConnectionMessageRef_0x4ba23c* inputMessageRef,
         bool* outAgendaTouched = nullptr);
-    
+
 
 };
 
@@ -927,19 +927,19 @@ struct CMessageConnectionReceivedPacketScaffold {
 // Forward declaration for the packet agenda struct
 struct PacketProcessingAgenda_0x469850;
 
-class CMessageConnection : public CLTTCPConnection {
+class CMessageConnection_0x4b7928 : public CLTTCPConnection {
 public:
     // UNANCHORED: source-owned narrow subset of `0x448b40` with a null engine and without the
     // optional `+0x7c/+0x80` completion-helper allocation path.
-    CMessageConnection();
+    CMessageConnection_0x4b7928();
     // UNANCHORED: source-owned narrow subset of `0x448b40(engine, createCompletionHelpers)`.
     // Current source now also mirrors the optional `+0x7c/+0x80` completion-helper allocation
     // branch when explicitly requested.
-    explicit CMessageConnection(
+    explicit CMessageConnection_0x4b7928(
         CLTThreadPerClientTCPEngine_0x4b2768* engine,
         bool allocateCompletionHelpers = false);
     // UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
-    ~CMessageConnection();
+    ~CMessageConnection_0x4b7928();
 
     // UNANCHORED: source-owned compatibility pass-through over the recovered base-connection
     // `+0x10` engine field; no separate leaf-owned engine slot is evidenced here.
@@ -1006,7 +1006,7 @@ public:
     const PacketProcessingAgenda_0x469850* PacketAgenda() const;
 
     // anchor: launcher.exe:0x4490c0
-    // string-backed original name: CMessageConnection::OnOperationCompleted
+    // string-backed original name: CMessageConnection_0x4b7928::OnOperationCompleted
     // current best read:
     // - main completion/receive-side bridge back into engine/queue handling
     // - the initial dispatch on `workItem+0x04` only directly handles work types `1`, `2`, and `3`
@@ -1130,7 +1130,7 @@ class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 // ============================================================
 // CBaseMarginConnection_0x4b64a8 class declaration
 // ============================================================
-// Current recovered intermediate base between `CMessageConnection` and the auth/margin startup
+// Current recovered intermediate base between `CMessageConnection_0x4b7928` and the auth/margin startup
 // leaf families.
 class CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778;
 
@@ -1144,16 +1144,16 @@ struct CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold {
 
 struct CBaseMarginConnection_0x4b64a8_Code2MessageScaffold {
     CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold parsedPayload00{};
-    
+
     // FIDELITY: Add fields matching cls_0x4b654c for bootstrap handling
     uint32_t messageContext14 = 0u;     // from param_1+0x14
     uint16_t messageContextWord18 = 0u; // from param_1+0x18
-    
+
     const uint8_t* GetEncryptedPayload() const {
         if (parsedPayload00.logicalPayloadByteCount04 <= 1u) return nullptr;
         return parsedPayload00.logicalPayloadBytes00 + 1u;  // Skip opcode
     }
-    
+
     size_t GetEncryptedPayloadSize() const {
         if (parsedPayload00.logicalPayloadByteCount04 <= 1u) return 0u;
         return parsedPayload00.logicalPayloadByteCount04 - 1u;  // Skip opcode
@@ -1170,7 +1170,7 @@ struct CBaseMarginConnection_0x4b64a8_Code5MessageScaffold {
     std::array<uint8_t, 16> seedBytes0c{};
 };
 
-class CBaseMarginConnection_0x4b64a8 : public CMessageConnection {
+class CBaseMarginConnection_0x4b64a8 : public CMessageConnection_0x4b7928 {
 public:
     // UNANCHORED: source-owned narrow intermediate-base ctor.
     CBaseMarginConnection_0x4b64a8();
@@ -1282,7 +1282,7 @@ private:
 // Keep the class name conservative in source for now:
 // - the surrounding canonical docs still carry older naming on `0x004afef0`
 // - but current static RE is strong that this is the auth-side leaf completion wrapper reached
-//   through `0x449a70`, not just a generic base `CMessageConnection`
+//   through `0x449a70`, not just a generic base `CMessageConnection_0x4b7928`
 class CAuthStartupConnection_0x4afef0 : public CBaseMarginConnection_0x4b64a8 {
 public:
     // UNANCHORED: source-owned narrow leaf ctor.
@@ -1504,7 +1504,7 @@ public:
     ~CMarginConnection_0x4aff38();
 
     // anchor: launcher.exe:0x44af60
-    // Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
+    // Later leaf override on top of the base `CMessageConnection_0x4b7928::OnOperationCompleted` family.
     // Current best original order:
     // - call base `0x4490c0`
     // - if base returns 0, call owner `+0x188(this, workItem)`

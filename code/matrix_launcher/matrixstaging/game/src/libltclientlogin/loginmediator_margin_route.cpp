@@ -108,7 +108,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     //   with the direct margin connection object as the context key
     marginPeerCloseQueuedScaffold_ = false;
 
-    mxo::liblttcp::CMessageConnection* connection = EnsureMarginConnectionObject();
+    mxo::liblttcp::CMessageConnection_0x4b7928* connection = EnsureMarginConnectionObject();
     if (!connection) {
         spdlog::warn("CLTLoginMediator::BeginMarginConnectionScaffold failed to allocate margin connection");
         return 0u;

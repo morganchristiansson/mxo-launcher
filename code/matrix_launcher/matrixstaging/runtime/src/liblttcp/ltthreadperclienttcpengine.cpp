@@ -1501,7 +1501,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::SignalWakeup() {
 
 // anchor: launcher.exe:0x42fe50
 void CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread::Run() {
-    CMessageConnection* connection = static_cast<CMessageConnection*>(contextKey_);
+    CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(contextKey_);
     if (!connection) {
         return;
     }
@@ -2280,7 +2280,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorPort(uint16_t portHostOrde
 // anchor: launcher.exe:0x4325d0
 // vtable: launcher.exe:0x004b2768 slot +0x08
 uint32_t CLTThreadPerClientTCPEngine_0x4b2768::UDPMonitorPort(uint16_t portHostOrder, void* contextKey, void* ipv4NetworkOrder) {
-    CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
+    CMessageConnection_0x4b7928* connection = ResolveConnectionForEngineSlotScaffold(contextKey);
     if (!connection || connection->State() != LTTCPEngineConnectionState::kClosed) {
         return 1u;
     }
@@ -2318,7 +2318,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::MonitorEphemeralUDPPort(uint16_t*
     const uint32_t result = UDPMonitorPort(/*portHostOrder=*/0, contextKey, ipv4NetworkOrder);
     if (result == 0u && outBoundPortHostOrder) {
         *outBoundPortHostOrder = 0;
-        if (CMessageConnection* connection = ResolveConnectionForEngineSlotScaffold(contextKey)) {
+        if (CMessageConnection_0x4b7928* connection = ResolveConnectionForEngineSlotScaffold(contextKey)) {
             sockaddr_in boundAddr = {};
             int boundAddrSize = sizeof(boundAddr);
             if (connection->SocketHandle() != kInvalidSocketHandle &&
@@ -2378,7 +2378,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     static constexpr uint32_t kConnectRejectedNotClosedPayload = 0x7000001u;
     static constexpr uint32_t kConnectImmediateFailurePayload = 1u;
 
-    CMessageConnection* connection = static_cast<CMessageConnection*>(contextKey);
+    CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(contextKey);
     if (!connection) {
         spdlog::debug(
             "CLTThreadPerClientTCPEngine_0x4b2768::Connect rejected null connection context={}",
@@ -2769,7 +2769,7 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::CleanupConnection(void* contextKe
     uint32_t result = 0u;
     std::unique_ptr<CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread> workerPayload;
 
-    if (CMessageConnection* connection = FindMessageConnection(cleanupContextKey)) {
+    if (CMessageConnection_0x4b7928* connection = FindMessageConnection(cleanupContextKey)) {
         connection->SetState(LTTCPEngineConnectionState::kClosed);
         connection->SetSocketHandle(kInvalidSocketHandle);
         connection->SetWorkerThreadScaffold(nullptr);
@@ -3162,7 +3162,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationFromConnecti
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTThreadPerClientTCPEngine_0x4b2768::PumpLauncherConnectionContextScaffold(
-    CMessageConnection* connection,
+    CMessageConnection_0x4b7928* connection,
     mxo::ltlogin::CLTLoginMediator* mediator,
     bool isMarginConnection,
     const char* receiveLabel) {
@@ -3320,7 +3320,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RunCompletedOperationQueue(
             if (CBaseConnection* completionTarget = CBaseConnection_FromQueueContextScaffold(context)) {
                 queuedBaseConnection = completionTarget;
                 queuedConnection = dynamic_cast<CLTTCPConnection*>(completionTarget);
-            } else if (CMessageConnection* directConnection = FindMessageConnection(context)) {
+            } else if (CMessageConnection_0x4b7928* directConnection = FindMessageConnection(context)) {
                 queuedBaseConnection = directConnection;
                 queuedConnection = dynamic_cast<CLTTCPConnection*>(directConnection);
             }
@@ -3432,11 +3432,11 @@ void CLTThreadPerClientTCPEngine_0x4b2768::RebuildQueueThreadsForCtorCount(uint3
 
 // UNANCHORED starter helper.
 // Keeps recovered connection-object-oriented queue/context handling out of diagnostics.cpp.
-CMessageConnection* CLTThreadPerClientTCPEngine_0x4b2768::FindMessageConnection(void* contextKey) {
+CMessageConnection_0x4b7928* CLTThreadPerClientTCPEngine_0x4b2768::FindMessageConnection(void* contextKey) {
     CBaseConnection* queueContextOwner = CBaseConnection_FromQueueContextScaffold(contextKey);
     void* resolvedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
     auto matchesConnectionKey =
-        [contextKey, resolvedContextKey, queueContextOwner](CMessageConnection* connection) -> bool {
+        [contextKey, resolvedContextKey, queueContextOwner](CMessageConnection_0x4b7928* connection) -> bool {
         if (!connection) {
             return false;
         }
@@ -3448,8 +3448,8 @@ CMessageConnection* CLTThreadPerClientTCPEngine_0x4b2768::FindMessageConnection(
             connection->OwnerContext() == resolvedContextKey;
     };
 
-    if (CMessageConnection* queuedConnection =
-            dynamic_cast<CMessageConnection*>(queueContextOwner);
+    if (CMessageConnection_0x4b7928* queuedConnection =
+            dynamic_cast<CMessageConnection_0x4b7928*>(queueContextOwner);
         queuedConnection && matchesConnectionKey(queuedConnection)) {
         return queuedConnection;
     }
@@ -3458,8 +3458,8 @@ CMessageConnection* CLTThreadPerClientTCPEngine_0x4b2768::FindMessageConnection(
             FindEngineContextPayloadBacking(this)) {
         for (const auto& it : contextBacking->entries) {
             const CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* worker = it.second->payload.get();
-            CMessageConnection* connection = worker
-                ? static_cast<CMessageConnection*>(worker->ContextKey())
+            CMessageConnection_0x4b7928* connection = worker
+                ? static_cast<CMessageConnection_0x4b7928*>(worker->ContextKey())
                 : nullptr;
             if (matchesConnectionKey(connection)) {
                 return connection;
@@ -3490,7 +3490,7 @@ CLTThreadPerClientTCPEngine_0x4b2768_AcceptThread* CLTThreadPerClientTCPEngine_0
 
 // anchor: launcher.exe:0x42fe10
 CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTThreadPerClientTCPEngine_0x4b2768::FindWorker(void* contextKey) {
-    CMessageConnection* connection = FindMessageConnection(contextKey);
+    CMessageConnection_0x4b7928* connection = FindMessageConnection(contextKey);
     if (!connection) {
         return nullptr;
     }
@@ -3501,14 +3501,14 @@ CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTThreadPerClientTCPEngine_0
     return node ? node->_M_valptr()->second : nullptr;
 }
 
-CMessageConnection* CLTThreadPerClientTCPEngine_0x4b2768::ResolveConnectionForEngineSlotScaffold(
+CMessageConnection_0x4b7928* CLTThreadPerClientTCPEngine_0x4b2768::ResolveConnectionForEngineSlotScaffold(
     void* contextKey) {
     if (!contextKey) {
         return nullptr;
     }
 
     void* normalizedContextKey = CBaseConnection_ResolveQueueCleanupContextKeyScaffold(contextKey);
-    CMessageConnection* connection = FindMessageConnection(contextKey);
+    CMessageConnection_0x4b7928* connection = FindMessageConnection(contextKey);
     if (!connection && normalizedContextKey != contextKey) {
         connection = FindMessageConnection(normalizedContextKey);
     }
@@ -3517,7 +3517,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine_0x4b2768::ResolveConnectionForEn
     // the direct connection object itself. After queue-context unwrapping above, remaining callers
     // are expected to already be passing that connection object.
     if (!connection) {
-        connection = static_cast<CMessageConnection*>(normalizedContextKey);
+        connection = static_cast<CMessageConnection_0x4b7928*>(normalizedContextKey);
     }
     if (!connection) {
         return nullptr;
@@ -3532,7 +3532,7 @@ CMessageConnection* CLTThreadPerClientTCPEngine_0x4b2768::ResolveConnectionForEn
 
 // anchor: launcher.exe:0x431ff0
 CLTThreadPerClientTCPEngine_0x4b2768_WorkerThread* CLTThreadPerClientTCPEngine_0x4b2768::CreateAndInsertWorkerThread(
-    CMessageConnection* connection,
+    CMessageConnection_0x4b7928* connection,
     bool datagramMode,
     bool startThread) {
     if (!connection) {
@@ -3597,7 +3597,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::StopWorkerThreadScaffold(
     workerThread->RequestExit();
     workerThread->SignalWakeup();
     (void)workerThread->Stop(/*waitAfterTerminate=*/true);
-    if (CMessageConnection* connection = static_cast<CMessageConnection*>(workerThread->ContextKey())) {
+    if (CMessageConnection_0x4b7928* connection = static_cast<CMessageConnection_0x4b7928*>(workerThread->ContextKey())) {
         connection->SetWorkerThreadScaffold(nullptr);
     }
 }

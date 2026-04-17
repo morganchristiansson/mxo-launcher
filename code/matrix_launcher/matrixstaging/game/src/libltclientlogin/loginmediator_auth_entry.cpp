@@ -185,8 +185,8 @@ std::string CLTLoginMediator::ResolvedMarginHostName() const {
     return std::string();
 }
 
-// UNANCHORED: source-owned accessor for the margin `CMessageConnection` child mirrored from owner `+0x1c`.
-mxo::liblttcp::CMessageConnection* CLTLoginMediator::MarginConnection() const {
+// UNANCHORED: source-owned accessor for the margin `CMessageConnection_0x4b7928` child mirrored from owner `+0x1c`.
+mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::MarginConnection() const {
     return marginConnection_;
 }
 

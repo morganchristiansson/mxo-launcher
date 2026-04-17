@@ -56,7 +56,7 @@ static_assert(sizeof(LTTCPEndpointKey) == 0x10, "endpoint key size mismatch");
 
 // Recovered parser input fragment family consumed by connection `+0x6c`
 // (`CVariableLengthPrefixedTCPStreamParser::Parse`).
-// Current best family name comes from `CMessageConnection::OnOperationCompleted` logging
+// Current best family name comes from `CMessageConnection_0x4b7928::OnOperationCompleted` logging
 // ("Unused buffers were attached to CLTTCPReadOperation ...") plus the worker-thread receive path.
 // This is a refcounted read-buffer fragment object, not a completed-packet work item.
 // High-confidence fields / methods from `0x42fe50`, `0x42f820`, `0x42f850`, `0x42f860`,
@@ -131,7 +131,7 @@ static_assert(sizeof(CLTTCPReadOperation) == 0x0c, "read-operation fragment pref
 struct CLTTCPReadOperationRefHandle {
     // anchor: launcher.exe:0x434fa0
     // Tiny retained-fragment handle helper used by parser state (`0x469bf0` / `0x4725c0`) and by
-    // `CMessageConnection::OnOperationCompleted` stack locals.
+    // `CMessageConnection_0x4b7928::OnOperationCompleted` stack locals.
     CLTTCPReadOperation* retainedFragment00 = nullptr; // +0x00
 };
 

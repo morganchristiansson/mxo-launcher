@@ -33,7 +33,7 @@ namespace mxo::liblttcp {
 // Message-connection family notes
 // ============================================================
 // Current corrected split:
-// - base `CMessageConnection` surface here is centered on the shared ctor/send/completion family:
+// - base `CMessageConnection_0x4b7928` surface here is centered on the shared ctor/send/completion family:
 //   - `0x448b40`
 //   - `0x448cf0`
 //   - `0x4490c0`
@@ -50,7 +50,7 @@ namespace mxo::liblttcp {
 
 namespace {
 
-static void** CMessageConnection_CompletionHelperVtableScaffold() {
+static void** CMessageConnection_0x4b7928_CompletionHelperVtableScaffold() {
     // anchor: launcher.exe vtable `0x004b3e20`
     static void* vtable[1] = {nullptr};
     return vtable;
@@ -59,7 +59,7 @@ static void** CMessageConnection_CompletionHelperVtableScaffold() {
 }  // namespace
 
 CMessageConnectionCompletionHelperScaffold::CMessageConnectionCompletionHelperScaffold() {
-    vtable00 = CMessageConnection_CompletionHelperVtableScaffold();
+    vtable00 = CMessageConnection_0x4b7928_CompletionHelperVtableScaffold();
     std::memset(&embeddedLockHelper04.crit, 0, sizeof(embeddedLockHelper04.crit));
     InitializeCriticalSection(&embeddedLockHelper04.crit);
     eventHandle20 = CreateEventA(nullptr, FALSE, FALSE, nullptr);
@@ -86,7 +86,7 @@ DWORD CMessageConnectionCompletionHelperScaffold::Wait(uint32_t timeoutMs) const
 
 // UNANCHORED: source-owned narrow subset of `0x448b40` with a null engine and without the
 // optional completion-helper allocation path.
-CMessageConnection::CMessageConnection()
+CMessageConnection_0x4b7928::CMessageConnection_0x4b7928()
     : CLTTCPConnection(),
       packetNameCallback_(0),
       packetizedMessagesEnabled_(false),
@@ -95,7 +95,7 @@ CMessageConnection::CMessageConnection()
       packetAgenda_() {}
 
 // UNANCHORED: source-owned narrow subset of `0x448b40(engine, createCompletionHelpers)`.
-CMessageConnection::CMessageConnection(
+CMessageConnection_0x4b7928::CMessageConnection_0x4b7928(
     CLTThreadPerClientTCPEngine_0x4b2768* engine,
     bool allocateCompletionHelpers)
     : CLTTCPConnection(),
@@ -114,15 +114,15 @@ CMessageConnection::CMessageConnection(
 }
 
 // UNANCHORED: source-owned default destructor; the original family uses several concrete deleting-dtor paths.
-CMessageConnection::~CMessageConnection() = default;
+CMessageConnection_0x4b7928::~CMessageConnection_0x4b7928() = default;
 
 // UNANCHORED: source-owned compatibility pass-through over the recovered base `+0x10` engine field.
-void CMessageConnection::SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine) {
+void CMessageConnection_0x4b7928::SetEngine(CLTThreadPerClientTCPEngine_0x4b2768* engine) {
     CLTTCPConnection::SetEngine(engine);
 }
 
 // UNANCHORED: source-owned compatibility accessor over the recovered base `+0x10` engine field.
-CLTThreadPerClientTCPEngine_0x4b2768* CMessageConnection::Engine() const {
+CLTThreadPerClientTCPEngine_0x4b2768* CMessageConnection_0x4b7928::Engine() const {
     return CLTTCPConnection::Engine();
 }
 
@@ -342,7 +342,7 @@ struct CMessageConnectionMessageRefReleaseDeleter {
     }
 };
 
-static bool CMessageConnection_ResolveTransformInputSpan(
+static bool CMessageConnection_0x4b7928_ResolveTransformInputSpan(
     const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     const uint8_t** outPayloadBytes,
     size_t* outPayloadByteCount) {
@@ -504,7 +504,7 @@ bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
 
     const uint8_t* encryptedPayloadBytes = nullptr;
     size_t encryptedPayloadByteCount = 0u;
-    if (!CMessageConnection_ResolveTransformInputSpan(
+    if (!CMessageConnection_0x4b7928_ResolveTransformInputSpan(
             inputMessageRef,
             &encryptedPayloadBytes,
             &encryptedPayloadByteCount)) {
@@ -549,7 +549,7 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
 
     const uint8_t* payloadBytes = nullptr;
     size_t payloadByteCount = 0u;
-    if (!CMessageConnection_ResolveTransformInputSpan(
+    if (!CMessageConnection_0x4b7928_ResolveTransformInputSpan(
             inputMessageRef,
             &payloadBytes,
             &payloadByteCount)) {
@@ -759,7 +759,7 @@ void CStreamPacketEncryptionModule_0x4b8704::RefreshFromMarginConnectionSeed(
 }
 
 // UNANCHORED: source-owned diagnostic stringifier for the recovered packet-name family enum.
-const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacketNameFamily family) {
+const char* CMessageConnection_0x4b7928::PacketNameFamilyToString(CMessageConnectionPacketNameFamily family) {
     switch (family) {
         case CMessageConnectionPacketNameFamily::kAuth:
             return "auth";
@@ -770,7 +770,7 @@ const char* CMessageConnection::PacketNameFamilyToString(CMessageConnectionPacke
     }
 }
 
-void CMessageConnection::ConfigurePacketNameFamily(
+void CMessageConnection_0x4b7928::ConfigurePacketNameFamily(
     CMessageConnectionPacketNameFamily family,
     bool packetizedMessagesEnabled) {
     packetNameFamily_ = family;
@@ -778,7 +778,7 @@ void CMessageConnection::ConfigurePacketNameFamily(
 }
 
 // anchor: launcher.exe:0x448980
-void CMessageConnection::ConfigurePacketAgenda(
+void CMessageConnection_0x4b7928::ConfigurePacketAgenda(
     CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule) {
     // anchor: launcher.exe:0x448980
     // Faithful mirror of original CMessageConnection_ConfigurePacketAgenda:
@@ -798,11 +798,11 @@ void CMessageConnection::ConfigurePacketAgenda(
 }
 
 // anchor family: launcher.exe:0x448980 -> connection `+0x74`
-const PacketProcessingAgenda_0x469850* CMessageConnection::PacketAgenda() const {
+const PacketProcessingAgenda_0x469850* CMessageConnection_0x4b7928::PacketAgenda() const {
     return packetAgenda_.get();
 }
 
-static void CMessageConnection_ApplySendMessageRefMutations(
+static void CMessageConnection_0x4b7928_ApplySendMessageRefMutations(
     CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || messageRef->headerless10 == 0u || !messageRef->messageStorage0c) {
         return;
@@ -835,7 +835,7 @@ static void CMessageConnection_ApplySendMessageRefMutations(
 }
 
 // anchor: launcher.exe:0x448cf0 post-submit/or-discard cleanup on the original input message-ref
-static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(
+static void CMessageConnection_0x4b7928_ClearSendMessageRefFirstPayloadByteHighBit(
     CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || messageRef->headerless10 == 0u || !messageRef->messageStorage0c) {
         return;
@@ -852,7 +852,7 @@ static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(
 }
 
 // anchor: launcher.exe:0x469850
-PacketProcessingAgenda_0x469850::PacketProcessingAgenda_0x469850(CMessageConnection* connectionOwner)
+PacketProcessingAgenda_0x469850::PacketProcessingAgenda_0x469850(CMessageConnection_0x4b7928* connectionOwner)
     : connectionOwner00(connectionOwner),
       configuredModuleList04(nullptr),
       readOutputSlot08(nullptr),
@@ -965,12 +965,12 @@ CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplyRec
     return readOutputSlot08;
 }
 
-static void** CMessageConnection_PacketBuilderVtablePointerScaffold(uintptr_t address) {
+static void** CMessageConnection_0x4b7928_PacketBuilderVtablePointerScaffold(uintptr_t address) {
     return reinterpret_cast<void**>(address);
 }
 
 // anchor: launcher.exe:0x41cf30
-uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacket(
+uint32_t CMessageConnection_0x4b7928::ForwardPacketBuilderEnvelopeToSendPacket(
     CMessageConnectionPacketBuilderEnvelope& envelope) {
     if (!envelope.messageRef08) {
         return 0u;
@@ -980,7 +980,7 @@ uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacket(
 }
 
 // anchor: launcher.exe:0x469950
-CMessageConnectionMessageRef_0x4ba23c* CMessageConnection::ApplySendPacketAgenda(
+CMessageConnectionMessageRef_0x4ba23c* CMessageConnection_0x4b7928::ApplySendPacketAgenda(
     CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     bool* outAgendaTouched) {
     // anchor: launcher.exe:0x469950
@@ -991,8 +991,8 @@ CMessageConnectionMessageRef_0x4ba23c* CMessageConnection::ApplySendPacketAgenda
 
 // anchor: launcher.exe:0x448a00
 // Narrow source-owned mirror of the lower submit helper beneath the original message-ref-based
-// `CMessageConnection::SendPacket` family.
-uint32_t CMessageConnection::SubmitMessageRefBytes(
+// `CMessageConnection_0x4b7928::SendPacket` family.
+uint32_t CMessageConnection_0x4b7928::SubmitMessageRefBytes(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     if (!Engine() || !messageRef.messageStorage0c) {
         return 0u;
@@ -1032,7 +1032,7 @@ uint32_t CMessageConnection::SubmitMessageRefBytes(
 // 0x41cf30. Consumes the envelope/shared message object extracted from the stack-local packet
 // builder, performs packet-agenda filtering, then reaches CMessageConnection_SubmitEnvelopeBytes
 // (0x448a00).
-void CMessageConnection::SendPacketMessageRef(
+void CMessageConnection_0x4b7928::SendPacketMessageRef(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     if (!Engine() || !messageRef.messageStorage0c) {
         return;
@@ -1040,7 +1040,7 @@ void CMessageConnection::SendPacketMessageRef(
 
     // Apply send message ref mutations (headerless mode specific)
     // anchor: launcher.exe:0x448d03 - mutation logic for headerless messages
-    CMessageConnection_ApplySendMessageRefMutations(&messageRef);
+    CMessageConnection_0x4b7928_ApplySendMessageRefMutations(&messageRef);
 
     // Apply packet agenda filtering
     // anchor: launcher.exe:0x448f5e - agenda processing logic
@@ -1078,7 +1078,7 @@ void CMessageConnection::SendPacketMessageRef(
 
         // Clear high bit on original message ref when headerless
         // anchor: launcher.exe:0x448f87 - high bit clearing logic
-        CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(&messageRef);
+        CMessageConnection_0x4b7928_ClearSendMessageRefFirstPayloadByteHighBit(&messageRef);
         return;
     }
 
@@ -1101,7 +1101,7 @@ void CMessageConnection::SendPacketMessageRef(
 // anchor: launcher.exe:0x448a60
 // Current tighter source mirror of the generic unhandled-operation log branch reached from later
 // leaf wrappers (for example `0x449a70` / `0x44af60`) after base `0x4490c0` returns false-ish.
-static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
+static void CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(void* workItem) {
     const auto* header =
         static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     const uint32_t workType = header ? header->workType : 0u;
@@ -1116,8 +1116,8 @@ static void CMessageConnection_LogUnhandledOperationScaffold(void* workItem) {
 // UNANCHORED: source-owned typed owner-context view used by the current `0x4490c0/0x449a70/0x44af60`
 // reconstruction when the launcher-owned connection owner at `+0xa4` is the direct login
 // mediator. Current static-RE anchor for that ownership write is `0x41d170 / 0x41e500`.
-static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaffold(
-    CMessageConnection* self) {
+static mxo::ltlogin::CLTLoginMediator* CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(
+    CMessageConnection_0x4b7928* self) {
     if (!self) {
         return nullptr;
     }
@@ -1133,22 +1133,22 @@ static mxo::ltlogin::CLTLoginMediator* CMessageConnection_LoginMediatorOwnerScaf
     return (mediator != nullptr && self->OwnerContext() == mediator) ? mediator : nullptr;
 }
 
-static bool CMessageConnection_IsMediatorAuthConnectionScaffold(
-    CMessageConnection* self,
+static bool CMessageConnection_0x4b7928_IsMediatorAuthConnectionScaffold(
+    CMessageConnection_0x4b7928* self,
     const mxo::ltlogin::CLTLoginMediator* mediator) {
     return self != nullptr && mediator != nullptr && self == mediator->authConnection_;
 }
 
-static bool CMessageConnection_IsMediatorMarginConnectionScaffold(
-    CMessageConnection* self,
+static bool CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(
+    CMessageConnection_0x4b7928* self,
     const mxo::ltlogin::CLTLoginMediator* mediator) {
     return self != nullptr && mediator != nullptr && self == mediator->MarginConnection();
 }
 
 // anchor: launcher.exe:0x4490c0 first dispatch on `workItem+0x04`
 // Source-owned decomposition of the initial work-type test inside
-// `CMessageConnection::OnOperationCompleted`.
-static uint32_t CMessageConnection_WorkItemTypeScaffold(const void* workItem) {
+// `CMessageConnection_0x4b7928::OnOperationCompleted`.
+static uint32_t CMessageConnection_0x4b7928_WorkItemTypeScaffold(const void* workItem) {
     if (!workItem) {
         return 0u;
     }
@@ -1161,7 +1161,7 @@ static uint32_t CMessageConnection_WorkItemTypeScaffold(const void* workItem) {
 // anchor: launcher.exe:0x4490c0 -> 0x434d00
 // Source-owned read of the shared `workItem+0x08` status/payload dword used by the type-3 early
 // return and by several later source-owned owner-fallback helpers.
-static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const void* workItem) {
+static uint32_t CMessageConnection_0x4b7928_WorkItemStatusOrPayloadDwordScaffold(const void* workItem) {
     if (!workItem) {
         return 0u;
     }
@@ -1180,7 +1180,7 @@ static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const vo
 // - resolve the current append pointer from the outer message-ref
 // - copy bytes into that tail span
 // - then commit the new payload length through outer grow helper `+0x18`
-static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
+static bool CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpanScaffold(
     CMessageConnectionMessageRef_0x4ba23c* messageRef,
     const uint8_t* payloadBytes,
     uint32_t payloadByteCount) {
@@ -1220,7 +1220,7 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
 // - `0x4350c0 = CParsedPacketWorkItem_BeginFragmentTraversal`
 // - `0x435510 = CParsedPacketWorkItem_GetNextFragment`
 // - `0x434fa0 = CLTTCPReadOperationRefHandle_AssignRetained`
-static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
+static bool CMessageConnection_0x4b7928_CopyParsedPacketIntoReceivedMessageRefScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
     CMessageConnectionMessageRef_0x4ba23c* outMessageRef,
     bool* outHadUnusedBuffers) {
@@ -1264,7 +1264,7 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
     const uint32_t firstCopyByteCount = std::min<uint32_t>(
         packetBodyByteCount,
         static_cast<uint32_t>(fragmentEnd - currentCursor));
-    if (!CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
+    if (!CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpanScaffold(
             outMessageRef,
             currentCursor,
             firstCopyByteCount)) {
@@ -1296,7 +1296,7 @@ static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
 
         const uint32_t copyByteCount =
             std::min<uint32_t>(remainingPacketBodyByteCount, currentFragment->byteCount08);
-        if (!CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
+        if (!CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpanScaffold(
                 outMessageRef,
                 reinterpret_cast<const uint8_t*>(currentFragment + 1),
                 copyByteCount)) {
@@ -1342,7 +1342,7 @@ constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
 
 
 // anchor family: launcher.exe:0x41bc20 / 0x41bbb0 headerless-locator message-code decode
-static bool CMessageConnection_ResolveMessageCodePointerScaffold(
+static bool CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     const uint8_t** outMessageCodePointer,
     uint8_t* outTargetLocatorType,
@@ -1437,7 +1437,7 @@ static bool CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
     }
 
     const uint8_t* messageCodePointer = nullptr;
-    if (!CMessageConnection_ResolveMessageCodePointerScaffold(
+    if (!CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
             messageRef,
             &messageCodePointer,
             /*outTargetLocatorType=*/nullptr,
@@ -1560,7 +1560,7 @@ static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
 
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
-    const bool hadValidMessageCode = CMessageConnection_DecodeMessageCodeScaffold(
+    const bool hadValidMessageCode = CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
         messageRef,
         &decodedMessageCode,
         &usedHeaderlessLocatorDecode);
@@ -1594,7 +1594,7 @@ static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
 // With the internal-only family now modeled as full virtual C++ classes, source routes this
 // through the helper-chain head directly, so module read helpers can now replace or discard the
 // message-ref before the embedded helper stores the output slot.
-static bool CMessageConnection_DriveAgendaReadHelperChainScaffold(
+static bool CMessageConnection_0x4b7928_DriveAgendaReadHelperChainScaffold(
     PacketProcessingAgenda_0x469850* agenda,
     CMessageConnectionMessageRef_0x4ba23c* inputMessageRef) {
     if (!agenda || agenda->readHelperChainHead40 == nullptr) {
@@ -1616,7 +1616,7 @@ static bool CMessageConnection_DriveAgendaReadHelperChainScaffold(
 //   source
 // - original `0x469930` (`PacketProcessingAgenda_0x469850_DispatchReadHelperChain`) does not
 //   pre-clear agenda `+0x08`; it simply drives the chain and returns the slot afterward
-static CMessageConnectionMessageRef_0x4ba23c* CMessageConnection_ApplyReceivePacketAgendaScaffold(
+static CMessageConnectionMessageRef_0x4ba23c* CMessageConnection_0x4b7928_ApplyReceivePacketAgendaScaffold(
     PacketProcessingAgenda_0x469850* agenda,
     CMessageConnectionMessageRef_0x4ba23c* inputMessageRef,
     bool* outAgendaTouched) {
@@ -1633,7 +1633,7 @@ static CMessageConnectionMessageRef_0x4ba23c* CMessageConnection_ApplyReceivePac
     if (outAgendaTouched) {
         *outAgendaTouched = true;
     }
-    if (!CMessageConnection_DriveAgendaReadHelperChainScaffold(agenda, inputMessageRef)) {
+    if (!CMessageConnection_0x4b7928_DriveAgendaReadHelperChainScaffold(agenda, inputMessageRef)) {
         return nullptr;
     }
 
@@ -1641,7 +1641,7 @@ static CMessageConnectionMessageRef_0x4ba23c* CMessageConnection_ApplyReceivePac
 }
 
 // anchor: launcher.exe:0x4490c0 packetized branch reads inner `+0x0f & 0x07`
-static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
+static bool CMessageConnection_0x4b7928_ResolvePacketizedProtocolIdScaffold(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint8_t* outProtocolId) {
     if (outProtocolId) {
@@ -1670,7 +1670,7 @@ static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
 // anchor: launcher.exe:0x41bc20 / CMessageConnectionMessageRef_DecodeMessageCode
 // Exported decode helper for CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
 // at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload.
-bool CMessageConnection_DecodeMessageCodeScaffold(
+bool CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode) {
@@ -1693,7 +1693,7 @@ bool CMessageConnection_DecodeMessageCodeScaffold(
     }
 
     const uint8_t* messageCodePointer = nullptr;
-    if (!CMessageConnection_ResolveMessageCodePointerScaffold(
+    if (!CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
             messageRef,
             &messageCodePointer,
             /*outTargetLocatorType=*/nullptr,
@@ -1723,34 +1723,34 @@ bool CMessageConnection_DecodeMessageCodeScaffold(
 }
 
 // UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
-uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
+uint32_t CMessageConnection_0x4b7928::DispatchCopiedParsedPacketTailScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 0u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x30`
-uint32_t CMessageConnection::DispatchPacketizedProtocol5MessageRefScaffold(
+uint32_t CMessageConnection_0x4b7928::DispatchPacketizedProtocol5MessageRefScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 1u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x34`
-uint32_t CMessageConnection::DispatchPacketizedProtocol7MessageRefScaffold(
+uint32_t CMessageConnection_0x4b7928::DispatchPacketizedProtocol7MessageRefScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 1u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x38`
-void CMessageConnection::PreDispatchMessageRefScaffold(
+void CMessageConnection_0x4b7928::PreDispatchMessageRefScaffold(
     CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
 }
 
 // anchor: launcher.exe:0x4490c0
-// string-backed original name: CMessageConnection::OnOperationCompleted
+// string-backed original name: CMessageConnection_0x4b7928::OnOperationCompleted
 // Current source body now mirrors the tighter current boundary read:
 // - the initial `workItem+0x04` dispatch only directly handles work types `1`, `2`, and `3`
 // - work types `1/2` are the optional completion-helper signal branches (`+0x80/+0x7c`)
@@ -1777,12 +1777,12 @@ void CMessageConnection::PreDispatchMessageRefScaffold(
 //     locally inside the same callback even when the callee returns false-ish
 //   - source-owned synthetic receive-drain and local type-`0x0b` continuations therefore belong to
 //     later compatibility / leaf-owner fallback scaffolding, not to base `0x4490c0`
-uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
+uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
     if (!Engine() || !workItem) {
         return 0u;
     }
 
-    const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
+    const uint32_t workType = CMessageConnection_0x4b7928_WorkItemTypeScaffold(workItem);
 
     // anchor: launcher.exe:0x4490c0 - work type 1 (close) handling
     if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
@@ -1808,7 +1808,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     // anchor: launcher.exe:0x449130 - check status/payload dword
-    if (CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem) != 0u) {
+    if (CMessageConnection_0x4b7928_WorkItemStatusOrPayloadDwordScaffold(workItem) != 0u) {
         return 1u;
     }
 
@@ -1832,7 +1832,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         ownedCopiedMessageRef(new CMessageConnectionMessageRef_0x4ba23c());
     CMessageConnectionMessageRef_0x4ba23c* const copiedMessageRef = ownedCopiedMessageRef.get();
     copiedMessageRef->ResetForPacketBuilderScaffold(!packetizedMessagesEnabled_);
-    const bool copied = CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
+    const bool copied = CMessageConnection_0x4b7928_CopyParsedPacketIntoReceivedMessageRefScaffold(
         parsedPacketWorkItem,
         copiedMessageRef,
         &hadUnusedBuffers);
@@ -1845,7 +1845,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
             static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
             fmt::ptr(parsedPacketWorkItem->currentCursor24),
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-        CMessageConnection_LogUnhandledOperationScaffold(workItem);
+        CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(workItem);
         return 1u;
     }
 
@@ -1903,7 +1903,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     if (messageRefForDispatch->headerless10 != 0u) {
         uint8_t targetLocatorType = 0u;
         uint8_t senderLocatorType = 0u;
-        if (!CMessageConnection_ResolveMessageCodePointerScaffold(
+        if (!CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
                 *messageRefForDispatch,
                 /*outMessageCodePointer=*/nullptr,
                 &targetLocatorType,
@@ -1968,7 +1968,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     uint8_t headerlessProtocolId = 0u;
     const bool hasHeaderlessProtocolId =
         headerlessForDispatch &&
-        CMessageConnection_ResolvePacketizedProtocolIdScaffold(
+        CMessageConnection_0x4b7928_ResolvePacketizedProtocolIdScaffold(
             *messageRefForDispatch,
             &headerlessProtocolId);
 
@@ -2018,7 +2018,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
 // Source-owned bool-return wrapper over the inherited `CLTTCPConnection_SendBuffer` path.
 // Keep it distinct from the message-ref send family rooted at
 // `0x41af70 -> 0x41cf30 -> 0x448cf0 -> 0x448a00`.
-uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext) {
+uint32_t CMessageConnection_0x4b7928::SendPacket(const void* packetData, uint32_t packetByteCount, void* completionContext) {
     if (!Engine() || !packetData || packetByteCount == 0) {
         return 0;
     }
@@ -2031,7 +2031,7 @@ uint32_t CMessageConnection::SendPacket(const void* packetData, uint32_t packetB
 
 // anchor family: launcher.exe:0x449cd0
 // Source-owned bool-return wrapper over the inherited `CLTTCPConnection_Connect` path.
-uint32_t CMessageConnection::EnsureConnected() {
+uint32_t CMessageConnection_0x4b7928::EnsureConnected() {
     if (!Engine()) {
         spdlog::debug(
             "CMessageConnection::EnsureConnected failed because engine is null this={} ownerContext={} remoteHost='{}'",
@@ -2123,10 +2123,10 @@ uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
 // VTable 0x004b64a8 - shared base margin router
 // ============================================================
 CBaseMarginConnection_0x4b64a8::CBaseMarginConnection_0x4b64a8()
-    : CMessageConnection() {}
+    : CMessageConnection_0x4b7928() {}
 
 CBaseMarginConnection_0x4b64a8::CBaseMarginConnection_0x4b64a8(CLTThreadPerClientTCPEngine_0x4b2768* connectionEngine)
-    : CMessageConnection(connectionEngine) {}
+    : CMessageConnection_0x4b7928(connectionEngine) {}
 
 CBaseMarginConnection_0x4b64a8::~CBaseMarginConnection_0x4b64a8() = default;
 
@@ -2164,8 +2164,8 @@ uint32_t CAuthStartupConnection_0x4afef0::DispatchMessage(void* messageRef) {
         return 1u;
     }
 
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    if (!mediator || !CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator)) {
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
+    if (!mediator || !CMessageConnection_0x4b7928_IsMediatorAuthConnectionScaffold(this, mediator)) {
         return 0u;
     }
 
@@ -2195,19 +2195,19 @@ uint32_t CAuthStartupConnection_0x4afef0::OnOperationCompleted(void* workItem) {
     }
 
     uint32_t handled = 0u;
-    if (CMessageConnection::OnOperationCompleted(workItem) != 0u) {
+    if (CMessageConnection_0x4b7928::OnOperationCompleted(workItem) != 0u) {
         handled = 1u;
     } else {
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-        if (mediator && CMessageConnection_IsMediatorAuthConnectionScaffold(this, mediator) &&
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
+        if (mediator && CMessageConnection_0x4b7928_IsMediatorAuthConnectionScaffold(this, mediator) &&
             mediator->HandleAuthConnectionCompletionFallback(this, workItem) != 0u) {
             handled = 1u;
         } else {
-            CMessageConnection_LogUnhandledOperationScaffold(workItem);
+            CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(workItem);
         }
     }
 
-    if (CMessageConnection_WorkItemTypeScaffold(workItem) ==
+    if (CMessageConnection_0x4b7928_WorkItemTypeScaffold(workItem) ==
         CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         // anchor: launcher.exe:0x449a70 tail
         // The original tail calls vtable[0](1), i.e. the deleting-dtor-style teardown path,
@@ -2223,7 +2223,7 @@ uint32_t CAuthStartupConnection_0x4afef0::OnOperationCompleted(void* workItem) {
 // ============================================================
 // Later leaf on top of:
 // CLTTCPConnection (0x004b8034)
-// └── CMessageConnection-family base surface
+// └── CMessageConnection_0x4b7928-family base surface
 //     └── CBaseMarginConnection_0x4b64a8 (0x004b64a8)
 //         └── CMarginConnection_0x4aff38 (0x004aff38)
 
@@ -2271,7 +2271,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWork
     workItem.header.workType = 0x0bu;
     workItem.header.statusOrPayloadDword08 = workPayloadStatus;
 
-    CMessageConnection* selfAsMessageConnection = this;
+    CMessageConnection_0x4b7928* selfAsMessageConnection = this;
     const uint32_t handled = selfAsMessageConnection->OnOperationCompleted(&workItem);
     spdlog::info(
         "CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWorkItem synthesized local type0x0b workItem status=0x{:08x} handled={} this={} ownerContext={} currentState={} remoteHost='{}'",
@@ -2279,8 +2279,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWork
         handled,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
-        fmt::ptr(CMessageConnection_LoginMediatorOwnerScaffold(this)
-                     ? CMessageConnection_LoginMediatorOwnerScaffold(this)->currentState_
+        fmt::ptr(CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this)
+                     ? CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this)->currentState_
                      : nullptr),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     return handled;
@@ -2782,7 +2782,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     }
 
     builder.builder00.envelope00.vtable00 =
-        CMessageConnection_PacketBuilderVtablePointerScaffold(kPacketBuilderVtable00);
+        CMessageConnection_0x4b7928_PacketBuilderVtablePointerScaffold(kPacketBuilderVtable00);
     builder.builder00.envelope00.payloadBase04 =
         messageRef.messageStorage0c->PayloadBaseScaffold();
     builder.builder00.envelope00.messageRef08 = &messageRef;
@@ -3474,9 +3474,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
     const bool marginOwnerPath =
-        mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator);
+        mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator);
 
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
@@ -3674,7 +3674,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
 }
 
 // anchor: launcher.exe:0x44af60
-// Later leaf override on top of the base `CMessageConnection::OnOperationCompleted` family.
+// Later leaf override on top of the base `CMessageConnection_0x4b7928::OnOperationCompleted` family.
 // Current tighter read from the direct `0x44af60` decompile/listing:
 // - call base `0x4490c0`
 // - if base returns 0, call owner `+0x188 / 0x41afc0`
@@ -3689,22 +3689,22 @@ uint32_t CMarginConnection_0x4aff38::OnOperationCompleted(void* workItem) {
     }
 
     uint32_t handled = 0u;
-    if (CMessageConnection::OnOperationCompleted(workItem) != 0u) {
+    if (CMessageConnection_0x4b7928::OnOperationCompleted(workItem) != 0u) {
         handled = 1u;
     } else {
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-        if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator) &&
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
+        if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator) &&
             mediator->HandleMarginConnectionCompletionFallback(this, workItem) != 0u) {
             handled = 1u;
         } else {
-            CMessageConnection_LogUnhandledOperationScaffold(workItem);
+            CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(workItem);
         }
     }
 
-    if (CMessageConnection_WorkItemTypeScaffold(workItem) ==
+    if (CMessageConnection_0x4b7928_WorkItemTypeScaffold(workItem) ==
         CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-        if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator)) {
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
+        if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator)) {
             mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 0u;
         }
 
@@ -3732,8 +3732,8 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
     }
 
     // Call owner->DispatchCurrentHelperSlot6(messageRef)
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
-    if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator)) {
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
+    if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator)) {
         return mediator->DispatchCurrentHelperSlot6(
             static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(messageRef));
     }
