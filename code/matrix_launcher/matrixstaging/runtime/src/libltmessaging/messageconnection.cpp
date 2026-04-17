@@ -756,45 +756,10 @@ void CMessageConnection::ConfigurePacketAgenda(
     // - then install the stream packet encryption module
     
     if (!packetAgenda_) {
-        packetAgenda_ = std::make_unique<CMessageConnectionPacketAgenda>();
+        packetAgenda_ = std::make_unique<CMessageConnectionPacketAgenda>(this);
         if (!packetAgenda_) {
             return;
         }
-        
-        // Initialize the agenda structure (mirrors 0x469850 constructor)
-        CMessageConnectionPacketAgenda& agenda = *packetAgenda_;
-        agenda.connectionOwner00 = this;
-        agenda.configuredModuleList04 = nullptr;
-        agenda.readOutputSlot08 = nullptr;
-        
-        // Set up embedded read helper at +0x0c (mirrors 0x46986c-0x469883)
-        agenda.embeddedReadHelper0c.nextHelper04 = nullptr;
-        agenda.embeddedReadHelper0c.field04 = 0u;
-        agenda.embeddedReadHelper0c.field08 = 0u;
-        agenda.embeddedReadHelper0c.helperLabel0c = "Agenda read helper";
-        agenda.embeddedReadHelper0c.outputSlotAddress10 = reinterpret_cast<void**>(&agenda.readOutputSlot08);
-        agenda.embeddedReadHelper0c.downstreamHelperSlot14 = &agenda.writeHelperChainHead44;
-        
-        agenda.writeOutputSlot24 = nullptr;
-        
-        // Set up embedded write helper at +0x28 (mirrors 0x469895-0x4698a3)
-        agenda.embeddedWriteHelper28.nextHelper04 = nullptr;
-        agenda.embeddedWriteHelper28.field04 = 0u;
-        agenda.embeddedWriteHelper28.field08 = 0u;
-        agenda.embeddedWriteHelper28.helperLabel0c = "Agenda write helper";
-        agenda.embeddedWriteHelper28.outputSlotAddress10 = reinterpret_cast<void**>(&agenda.writeOutputSlot24);
-        agenda.embeddedWriteHelper28.downstreamHelperSlot14 = nullptr;
-        
-        // Initialize helper chains
-        agenda.readHelperChainHead40 = &agenda.embeddedReadHelper0c;
-        agenda.writeHelperChainHead44 = nullptr;
-        agenda.writeHelperChainTail48 = nullptr;
-        
-        // Initialize counters
-        agenda.configuredModuleCount4c = 0u;
-        agenda.reserved4e = 0u;
-        agenda.created = true;
-        agenda.configuredStreamPacketEncryptionModule = nullptr;
     }
 
     // anchor: launcher.exe:0x448980 -> 0x469740
@@ -884,6 +849,43 @@ static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(
         return;
     }
     payloadBase[0] &= 0x7fu;
+}
+
+// anchor: launcher.exe:0x469850
+CMessageConnectionPacketAgenda::CMessageConnectionPacketAgenda(CMessageConnection* connectionOwner)
+    : connectionOwner00(connectionOwner),
+      configuredModuleList04(nullptr),
+      readOutputSlot08(nullptr),
+      embeddedReadHelper0c(),
+      writeOutputSlot24(nullptr),
+      embeddedWriteHelper28(),
+      readHelperChainHead40(nullptr),
+      writeHelperChainHead44(nullptr),
+      writeHelperChainTail48(nullptr),
+      configuredModuleCount4c(0),
+      reserved4e(0),
+      created(true),
+      configuredStreamPacketEncryptionModule(nullptr) {
+    // Set up embedded read helper at +0x0c (mirrors 0x46986c-0x469883)
+    embeddedReadHelper0c.nextHelper04 = nullptr;
+    embeddedReadHelper0c.field04 = 0u;
+    embeddedReadHelper0c.field08 = 0u;
+    embeddedReadHelper0c.helperLabel0c = "Agenda read helper";
+    embeddedReadHelper0c.outputSlotAddress10 = reinterpret_cast<void**>(&readOutputSlot08);
+    embeddedReadHelper0c.downstreamHelperSlot14 = &writeHelperChainHead44;
+    
+    // Set up embedded write helper at +0x28 (mirrors 0x469895-0x4698a3)
+    embeddedWriteHelper28.nextHelper04 = nullptr;
+    embeddedWriteHelper28.field04 = 0u;
+    embeddedWriteHelper28.field08 = 0u;
+    embeddedWriteHelper28.helperLabel0c = "Agenda write helper";
+    embeddedWriteHelper28.outputSlotAddress10 = reinterpret_cast<void**>(&writeOutputSlot24);
+    embeddedWriteHelper28.downstreamHelperSlot14 = nullptr;
+    
+    // Initialize helper chains
+    readHelperChainHead40 = &embeddedReadHelper0c;
+    writeHelperChainHead44 = nullptr;
+    writeHelperChainTail48 = nullptr;
 }
 
 static void** CMessageConnection_PacketBuilderVtablePointerScaffold(uintptr_t address) {

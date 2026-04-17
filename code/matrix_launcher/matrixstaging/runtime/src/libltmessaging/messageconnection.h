@@ -869,6 +869,10 @@ struct CMessageConnectionPacketAgenda {
     uint16_t reserved4e = 0;
     bool created = false;
     CStreamPacketEncryptionModule_0x4b8704* configuredStreamPacketEncryptionModule = nullptr;
+
+    // anchor: launcher.exe:0x469850
+    // Constructor that mirrors the original initialization logic
+    explicit CMessageConnectionPacketAgenda(CMessageConnection* connectionOwner);
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
