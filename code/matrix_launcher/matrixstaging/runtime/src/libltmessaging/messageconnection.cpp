@@ -1876,9 +1876,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     bool agendaTouched = false;
     if (PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
         agenda && agenda->created) {
+        spdlog::debug("CMessageConnection::OnOperationCompleted applying packet agenda to messageRef={} agenda={}", 
+                     fmt::ptr(copiedMessageRef), fmt::ptr(agenda));
         messageRefForDispatch = agenda->ApplyReceivePacketAgenda(copiedMessageRef, &agendaTouched);
         
         if (agendaTouched) {
+            spdlog::debug("CMessageConnection::OnOperationCompleted packet agenda touched messageRef={} -> result={}", 
+                         fmt::ptr(copiedMessageRef), fmt::ptr(messageRefForDispatch));
             // Update last received packet info if agenda modified the message
             lastReceivedPacketBodyBytesScaffold_.clear();
             if (const CMessageConnectionMessageStorage_0x4ba208* const agendaMessageStorage = messageRefForDispatch->messageStorage0c) {
@@ -1891,6 +1895,8 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
                 }
             }
             lastReceivedPacketHeaderlessScaffold_ = (messageRefForDispatch->headerless10 != 0u);
+        } else {
+            spdlog::debug("CMessageConnection::OnOperationCompleted packet agenda processed but did not modify message");
         }
     }
 
