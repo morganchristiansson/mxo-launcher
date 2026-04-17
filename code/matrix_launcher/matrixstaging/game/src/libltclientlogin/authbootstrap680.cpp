@@ -2197,22 +2197,22 @@ void AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5Mar
         return;
     }
 
-    const uint8_t* blockB0Bytes = AuthBootstrap680BigIntObjectBytes(child.modulusBigIntB0);
-    const uint8_t* blockC4Bytes = AuthBootstrap680BigIntObjectBytes(child.publicExponentBigIntC4);
-    const uint8_t* blockD8Bytes = AuthBootstrap680BigIntObjectBytes(child.privateExponentBigIntD8);
+    const auto* blockB0 = &child.modulusBigIntB0;
+    const auto* blockC4 = &child.publicExponentBigIntC4;
+    const auto* blockD8 = &child.privateExponentBigIntD8;
 
     const bool storedReplyCopy =
         marginConnection.StoreBootstrapReplyCopy98(copyShadow, sizeof(*copyShadow));
     mxo::liblttcp::CMarginConnectionBootstrapPrepStateOwner_0x443340(marginConnection)
-        .StoreBootstrapPrepStateA0(blockB0Bytes, blockC4Bytes, blockD8Bytes);
+        .StoreBootstrapPrepStateA0(blockB0, blockC4, blockD8);
 
     spdlog::info(
-        "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} childBlockB0FirstDword=0x{:08x} childBlockC4FirstDword=0x{:08x} childBlockD8FirstDword=0x{:08x}",
+        "AuthBootstrap680State5MarginConnectionPrepBridge_0x4435f0::PrepareState5MarginConnectionCopySend staged owner+0x680 child for state5 copy/send copyShadowF4={} storedReplyCopy98={} childBlockB0Cap={} childBlockC4Cap={} childBlockD8Cap={}",
         fmt::ptr(copyShadow),
         storedReplyCopy ? 1u : 0u,
-        static_cast<unsigned>(ReadU32LE(blockB0Bytes)),
-        static_cast<unsigned>(ReadU32LE(blockC4Bytes)),
-        static_cast<unsigned>(ReadU32LE(blockD8Bytes)));
+        blockB0->capacityWords08,
+        blockC4->capacityWords08,
+        blockD8->capacityWords08);
 }
 
 // Source-owned shared auth-reply materialization bridge for later child `+0xf4` consumers such as
