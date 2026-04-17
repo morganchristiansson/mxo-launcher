@@ -2090,6 +2090,8 @@ uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
     return static_cast<uint16_t>(payload[2]) | (static_cast<uint16_t>(payload[3]) << 8);
 }
 
+
+
 // ============================================================
 // VTable 0x004b64a8 - shared base margin router
 // ============================================================

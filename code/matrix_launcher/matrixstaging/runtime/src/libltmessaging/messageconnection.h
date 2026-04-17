@@ -915,6 +915,8 @@ struct PacketProcessingAgenda_0x469850 {
     CMessageConnectionMessageRef* ApplyReceivePacketAgenda(
         CMessageConnectionMessageRef* inputMessageRef,
         bool* outAgendaTouched = nullptr);
+    
+
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
