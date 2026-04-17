@@ -756,7 +756,7 @@ void CMessageConnection::ConfigurePacketAgenda(
     // - then install the stream packet encryption module
     
     if (!packetAgenda_) {
-        packetAgenda_ = std::make_unique<CMessageConnectionPacketAgenda_0x469850>(this);
+        packetAgenda_ = std::make_unique<PacketProcessingAgenda_0x469850>(this);
         if (!packetAgenda_) {
             return;
         }
@@ -764,7 +764,7 @@ void CMessageConnection::ConfigurePacketAgenda(
 
     // anchor: launcher.exe:0x448980 -> 0x469740
     // Install stream packet encryption module (always called, even if agenda was already created)
-    CMessageConnectionPacketAgenda_0x469850& agenda = *packetAgenda_;
+    PacketProcessingAgenda_0x469850& agenda = *packetAgenda_;
     
     if (!streamPacketEncryptionModule) {
         return;
@@ -798,7 +798,7 @@ void CMessageConnection::ConfigurePacketAgenda(
 }
 
 // anchor family: launcher.exe:0x448980 -> connection `+0x74`
-const CMessageConnectionPacketAgenda_0x469850* CMessageConnection::PacketAgenda() const {
+const PacketProcessingAgenda_0x469850* CMessageConnection::PacketAgenda() const {
     return packetAgenda_.get();
 }
 
@@ -852,7 +852,7 @@ static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(
 }
 
 // anchor: launcher.exe:0x469850
-CMessageConnectionPacketAgenda_0x469850::CMessageConnectionPacketAgenda_0x469850(CMessageConnection* connectionOwner)
+PacketProcessingAgenda_0x469850::PacketProcessingAgenda_0x469850(CMessageConnection* connectionOwner)
     : connectionOwner00(connectionOwner),
       configuredModuleList04(nullptr),
       readOutputSlot08(nullptr),
@@ -911,13 +911,13 @@ CMessageConnectionMessageRef* CMessageConnection::ApplySendPacketAgenda(
 
     // `0x448cf0` consults connection `+0x74` and may discard the packet before submit.
     // Current bounded source model preserves the nearer `0x469950`
-    // (`CMessageConnectionPacketAgenda_0x469850_DispatchWriteHelperChain`) handoff shape:
+    // (`PacketProcessingAgenda_0x469850_DispatchWriteHelperChain`) handoff shape:
     // - no agenda / no active write helper (`+0x44 == 0`) => keep the original message-ref pointer
     // - active write helper => return agenda `+0x24` exactly after the helper chain runs
     // - original does not pre-clear agenda `+0x24`; it simply returns that slot after dispatch
     // Source now models that chain with real internal worker classes, keeping helper-side
     // replacement/discard visible at the same seam as the original.
-    CMessageConnectionPacketAgenda_0x469850* agenda = packetAgenda_.get();
+    PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
     if (!agenda || !agenda->created) {
         return &inputMessageRef;
     }
@@ -999,7 +999,7 @@ uint32_t CMessageConnection::SendPacketMessageRef(
     const uint8_t rawOpcode = (payloadBytes && payloadByteCount != 0u) ? payloadBytes[0] : 0u;
     const uint32_t submittedByteCount =
         static_cast<uint32_t>(payloadByteCount) + ((payloadByteCount > 0x7fu) ? 2u : 1u);
-    const CMessageConnectionPacketAgenda_0x469850* agenda = PacketAgenda();
+    const PacketProcessingAgenda_0x469850* agenda = PacketAgenda();
     spdlog::info(
         "CMessageConnection::SendPacketMessageRef sendMode10={} field08SkipPrefix={} rawOpcode=0x{:02x} reservedBytes08=0x{:04x} payloadBytes={} submittedBytes={} packetNameCallback=0x{:08x} packetNameFamily={} packetizedEnabled={} agendaCreated={} agendaModuleCount={} agendaHasReadHead={} agendaHasWriteHead={} agendaWriteTouched={} agendaWriteOutputSlot24={} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(messageRefForSubmit->headerless10),
@@ -1523,7 +1523,7 @@ static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
 // through the helper-chain head directly, so module read helpers can now replace or discard the
 // message-ref before the embedded helper stores the output slot.
 static bool CMessageConnection_DriveAgendaReadHelperChainScaffold(
-    CMessageConnectionPacketAgenda_0x469850* agenda,
+    PacketProcessingAgenda_0x469850* agenda,
     CMessageConnectionMessageRef* inputMessageRef) {
     if (!agenda || agenda->readHelperChainHead40 == nullptr) {
         return false;
@@ -1542,10 +1542,10 @@ static bool CMessageConnection_DriveAgendaReadHelperChainScaffold(
 // - caller-installed read helpers can now replace or discard the message-ref through the recovered
 //   module family, though the exact original worker object/lifetime split is still narrower than
 //   source
-// - original `0x469930` (`CMessageConnectionPacketAgenda_0x469850_DispatchReadHelperChain`) does not
+// - original `0x469930` (`PacketProcessingAgenda_0x469850_DispatchReadHelperChain`) does not
 //   pre-clear agenda `+0x08`; it simply drives the chain and returns the slot afterward
 static CMessageConnectionMessageRef* CMessageConnection_ApplyReceivePacketAgendaScaffold(
-    CMessageConnectionPacketAgenda_0x469850* agenda,
+    PacketProcessingAgenda_0x469850* agenda,
     CMessageConnectionMessageRef* inputMessageRef,
     bool* outAgendaTouched) {
     if (outAgendaTouched) {
@@ -1814,7 +1814,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
 
     CMessageConnectionMessageRef* messageRefForDispatch = copiedMessageRef;
     bool agendaTouched = false;
-    if (CMessageConnectionPacketAgenda_0x469850* agenda = packetAgenda_.get();
+    if (PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
         agenda && agenda->created) {
         messageRefForDispatch = CMessageConnection_ApplyReceivePacketAgendaScaffold(
             agenda,

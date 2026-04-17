@@ -845,7 +845,7 @@ public:
     void RefreshFromMarginConnectionSeed(const std::array<uint8_t, 16>& seedBytes85);
 };
 
-struct CMessageConnectionPacketAgenda_0x469850 {
+struct PacketProcessingAgenda_0x469850 {
     // Source-owned mirror of the lazy packet-processing agenda object rooted at original
     // connection `+0x74`.
     // This scaffold now keeps the recovered agenda front matter explicit where source can do so
@@ -872,7 +872,7 @@ struct CMessageConnectionPacketAgenda_0x469850 {
 
     // anchor: launcher.exe:0x469850
     // Constructor that mirrors the original initialization logic
-    explicit CMessageConnectionPacketAgenda_0x469850(CMessageConnection* connectionOwner);
+    explicit PacketProcessingAgenda_0x469850(CMessageConnection* connectionOwner);
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
@@ -881,7 +881,7 @@ struct CMessageConnectionReceivedPacketScaffold {
 };
 
 // Forward declaration for the packet agenda struct
-struct CMessageConnectionPacketAgenda_0x469850;
+struct PacketProcessingAgenda_0x469850;
 
 class CMessageConnection : public CLTTCPConnection {
 public:
@@ -959,7 +959,7 @@ public:
         CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule = nullptr);
     // anchor family: launcher.exe:0x448980 -> connection `+0x74`
     // Source-owned accessor for the recovered lazy packet-agenda pointer.
-    const CMessageConnectionPacketAgenda_0x469850* PacketAgenda() const;
+    const PacketProcessingAgenda_0x469850* PacketAgenda() const;
 
     // anchor: launcher.exe:0x4490c0
     // string-backed original name: CMessageConnection::OnOperationCompleted
@@ -1073,7 +1073,7 @@ public:
     bool packetizedMessagesEnabled_ = false;
     std::unique_ptr<CMessageConnectionCompletionHelperScaffold> connectCompletionHelper7c_;
     std::unique_ptr<CMessageConnectionCompletionHelperScaffold> closeCompletionHelper80_;
-    std::unique_ptr<CMessageConnectionPacketAgenda_0x469850> packetAgenda_;
+    std::unique_ptr<PacketProcessingAgenda_0x469850> packetAgenda_;
     std::vector<uint8_t> lastReceivedPacketBodyBytesScaffold_;
     bool lastReceivedPacketHeaderlessScaffold_ = false;
     // Legacy fallback queue retained only as dormant compatibility scaffolding now that the
