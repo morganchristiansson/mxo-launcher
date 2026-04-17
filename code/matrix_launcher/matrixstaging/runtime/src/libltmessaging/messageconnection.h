@@ -1005,7 +1005,7 @@ private:
 };
 
 // ============================================================
-// CAuthStartupConnection class declaration
+// CAuthStartupConnection_0x4afef0 class declaration
 // ============================================================
 // Source-owned leaf mirror of the auth-side startup child built at `0x41d170` and assigned
 // vtable `0x004afef0` before the initial `connection->+0x1c(owner+0x5c)` call.
@@ -1016,13 +1016,13 @@ private:
 // - the surrounding canonical docs still carry older naming on `0x004afef0`
 // - but current static RE is strong that this is the auth-side leaf completion wrapper reached
 //   through `0x449a70`, not just a generic base `CMessageConnection`
-class CAuthStartupConnection : public CBaseMarginConnection_0x4b64a8 {
+class CAuthStartupConnection_0x4afef0 : public CBaseMarginConnection_0x4b64a8 {
 public:
     // UNANCHORED: source-owned narrow leaf ctor.
-    CAuthStartupConnection();
+    CAuthStartupConnection_0x4afef0();
     // UNANCHORED: source-owned narrow leaf ctor that only seeds the recovered base engine field.
-    explicit CAuthStartupConnection(CLTThreadPerClientTCPEngine_0x4b2768* authEngine);
-    ~CAuthStartupConnection();
+    explicit CAuthStartupConnection_0x4afef0(CLTThreadPerClientTCPEngine_0x4b2768* authEngine);
+    ~CAuthStartupConnection_0x4afef0();
 
     // anchor: launcher.exe:0x449a70
     // Current best original order:

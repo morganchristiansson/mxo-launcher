@@ -1948,16 +1948,16 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchCopiedParsedPacketTailScaffold(
 // - configures packet-name callback `0x41ce00`
 // - then immediately calls `connection->+0x1c(owner+0x5c)`
 // Current source keeps the class name conservative until wider naming cleanup is done.
-CAuthStartupConnection::CAuthStartupConnection()
+CAuthStartupConnection_0x4afef0::CAuthStartupConnection_0x4afef0()
     : CBaseMarginConnection_0x4b64a8() {}
 
-CAuthStartupConnection::CAuthStartupConnection(CLTThreadPerClientTCPEngine_0x4b2768* authEngine)
+CAuthStartupConnection_0x4afef0::CAuthStartupConnection_0x4afef0(CLTThreadPerClientTCPEngine_0x4b2768* authEngine)
     : CBaseMarginConnection_0x4b64a8(authEngine) {}
 
-CAuthStartupConnection::~CAuthStartupConnection() = default;
+CAuthStartupConnection_0x4afef0::~CAuthStartupConnection_0x4afef0() = default;
 
 // anchor: launcher.exe:0x449a30 -> owner vtable `+0x180` / `0x41f250`
-uint32_t CAuthStartupConnection::DispatchMessage(void* messageRef) {
+uint32_t CAuthStartupConnection_0x4afef0::DispatchMessage(void* messageRef) {
     if (!messageRef) {
         return 0u;
     }
@@ -1973,7 +1973,7 @@ uint32_t CAuthStartupConnection::DispatchMessage(void* messageRef) {
 
     const uint32_t handled = mediator->DispatchCurrentHelperAuthMessage(messageRef);
     spdlog::info(
-        "CAuthStartupConnection::DispatchMessage forwarded unconsumed messageRef={} to owner+0x180 currentState={} handled={} this={} ownerContext={} remoteHost='{}'",
+        "CAuthStartupConnection_0x4afef0::DispatchMessage forwarded unconsumed messageRef={} to owner+0x180 currentState={} handled={} this={} ownerContext={} remoteHost='{}'",
         fmt::ptr(messageRef),
         fmt::ptr(mediator->currentState_),
         handled,
@@ -1991,7 +1991,7 @@ uint32_t CAuthStartupConnection::DispatchMessage(void* messageRef) {
 // - only after that handled/unhandled decision, read `workItem+0x04`
 // - if work type == 1, tear down through the connection object
 // - there is no leaf-local type-2 split here; auth connect-status also flows through owner `+0x17c`
-uint32_t CAuthStartupConnection::OnOperationCompleted(void* workItem) {
+uint32_t CAuthStartupConnection_0x4afef0::OnOperationCompleted(void* workItem) {
     if (!workItem) {
         return 0u;
     }

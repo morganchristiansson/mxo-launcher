@@ -251,7 +251,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     if (authConnectionOwnedByMediator_ && authConnection_ != nullptr) {
         delete authConnection_;
     }
-    authConnection_ = new mxo::liblttcp::CAuthStartupConnection(engine_);
+    authConnection_ = new mxo::liblttcp::CAuthStartupConnection_0x4afef0(engine_);
     if (!authConnection_) {
         return 0u;
     }
