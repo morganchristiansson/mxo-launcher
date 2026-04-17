@@ -463,6 +463,13 @@ CMessageConnectionMessageRef* CMessageConnectionMessageRefOutputBuffer::MessageR
     return hasValue ? messageRef : nullptr;
 }
 
+
+
+// Basic implementation of bootstrap prep for fidelity
+// anchor: launcher.exe:0x4b6778 vtable family
+// This is a minimal implementation to support the faithful flow
+
+
 // anchor: launcher.exe:0x44d910 / 0x44daf0
 void CStreamPacketEncryptionModuleReadTransformWorker::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
@@ -2488,6 +2495,30 @@ void* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x
 // `0x4429b0`, which loads connection `+0xa0` and calls prep-object vtable
 // `+0x1c / 0x437810`.
 
+// anchor: launcher.exe:0x437810 / vtable +0x1c
+// Interface implementation for DecryptChallengeBlob
+uint8_t* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptChallengeBlob(
+    uint8_t* outBuffer,
+    void* prepHelper,
+    uint32_t contextDword,
+    uint32_t field18,
+    uint8_t* payloadBytes) {
+    // anchor: launcher.exe:0x4429d0 - call to bootstrap prep DecryptChallengeBlob
+    // This method is called from CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
+    // We delegate to the existing DecryptViaVtable0x1c method
+    
+    const size_t payloadSize = 16;  // Challenge bytes are always 16 bytes
+    void* result = DecryptViaVtable0x1c(
+        outBuffer,
+        prepHelper,
+        contextDword,
+        static_cast<uint16_t>(field18),
+        payloadBytes,
+        payloadSize);
+    
+    return static_cast<uint8_t*>(result);
+}
+
 namespace {
 // Forward declare the static helper (defined later in this anonymous namespace)
 static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge(
@@ -2617,63 +2648,159 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
         return 0u;
     }
 
-    // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_0x4b64a8_EnsureStreamPacketEncryptionModule (0x441470)
-    // Original: Called after writing seed bytes to connection +0x85..+0x91, before building envelope
-    EnsureStreamPacketEncryptionModuleFromSeed85();
-    const CMessageConnectionPacketAgenda* const agenda = PacketAgenda();
-    if (!agenda || !agenda->created || agenda->writeHelperChainHead44 == nullptr) {
-        spdlog::info(
-            "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes missing agenda write helper after seed ensure this={} ownerContext={} remoteHost='{}'",
-            fmt::ptr(this),
-            fmt::ptr(OwnerContext()),
-            RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    // anchor: launcher.exe:0x4429b0 - CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
+    // Faithful implementation following Ghidra decompilation of 0x4429b0
+    // Create local message reference for challenge processing
+    // anchor: launcher.exe:0x4429b8 - CMessageConnectionMessage_CreateRef(&local_8, 0)
+    // Use proper helper class for message reference management
+    MessageConnectionMessageRefHelper_0x4489d0 localMessageRefHelper{};
+    localMessageRefHelper.CreateRef(0);
+    
+    if (!localMessageRefHelper.IsValid()) {
         return 0u;
     }
+    
+    // Get direct pointer for convenience
+    CMessageConnectionMessageRef* localMessageRef = localMessageRefHelper.messageRef00;
+    
 
-    // FIDELITY: Use proper encryption and framing like the working infidel method
-    // This matches the infidel path that successfully launched the game
-    // Build payload: opcode (0x03) + challenge bytes (16 bytes)
-    std::vector<uint8_t> payload;
-    payload.reserve(17u);
-    payload.push_back(0x03u);  // CERT_ChallengeResponse opcode
-    payload.insert(payload.end(), challengeBytes.begin(), challengeBytes.end());
     
-    // Get the Twofish key from connection seed bytes
-    const uint8_t* seedBytesPtr = MessageCode5SeedBytes85Pointer();
-    if (!seedBytesPtr) {
-        spdlog::warn(
-            "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes: seed bytes not available");
-        return 0u;
-    }
-    std::vector<uint8_t> twofishKeyBytes(seedBytesPtr, seedBytesPtr + 16);
+    // Validation is now handled by IsValid() check above
     
-    // Encrypt the payload using the same method as the infidel path
-    mxo::auth::FramedPacket framedPacket;
-    if (!mxo::auth::EncryptMarginPayloadPacket(
-            payload.data(),
-            payload.size(),
-            twofishKeyBytes,
-            mxo::auth::kFrameModeAuto,
-            &framedPacket)) {
-        spdlog::warn(
-            "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes: EncryptMarginPayloadPacket failed");
+    // Copy challenge bytes into message storage payload
+    // anchor: launcher.exe:0x4429c0-0x4429d0 - copy challenge bytes to message storage
+    CMessageConnectionMessageStorage_0x4ba208* messageStorage = localMessageRef->messageStorage0c;
+    uint8_t* payloadBase = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadCapacity = messageStorage->RemainingAppendableByteCountScaffold();
+    
+    if (!payloadBase || payloadCapacity < 16) {
+        if (localMessageRef) {
+            localMessageRef->Release();
+        }
         return 0u;
     }
     
-    // Send the framed packet using raw buffer send (like infidel fallback)
-    const uint32_t sendResult = SendBuffer(
-        framedPacket.bytes.data(),
-        static_cast<uint32_t>(framedPacket.bytes.size()),
-        nullptr);
+    // Copy challenge bytes into payload
+    // anchor: launcher.exe:0x4429c0 - memcpy equivalent
+    std::copy_n(challengeBytes.data(), 16, payloadBase);
+    messageStorage->SetPayloadByteCountRawScaffold(16);
+    
+    // Use bootstrap prep object to decrypt challenge
+    // anchor: launcher.exe:0x4429b0 calls [this+0xa0] vtable +0x1c (0x437810)
+    // anchor: launcher.exe:0x4429d0 - call to bootstrap prep DecryptChallengeBlob
+    CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* bootstrapPrep = 
+        bootstrapPrepStateA0_.get();  // Get the existing bootstrap prep object
+    
+    if (!bootstrapPrep) {
+        // localMessageRef is managed by localMessageRefHelper, automatic cleanup
+        return 0u;
+    }
+    
+    // Prepare parsed message result structure
+    // anchor: launcher.exe:0x4429b0 uses local_38 (cls_0x4b654c)
+    MarginConnectionChallengeParsedResult_0x4b654c parsedResult{};
+    parsedResult.mbr_0x14 = 0;  // context - would come from message
+    parsedResult.mbr_0x18 = 0;  // field18 - would come from message
+    
+    // Call bootstrap prep to decrypt challenge
+    // This corresponds to the call at 0x4429d0 in Ghidra
+    // anchor: launcher.exe:0x437810 - virt_meth_0x437810 implementation
+    uint8_t* decryptedBuffer = bootstrapPrep->DecryptChallengeBlob(
+        messageStorage->PayloadBaseScaffold(),
+        nullptr,  // prepHelper - not fully recovered yet
+        parsedResult.mbr_0x14,
+        parsedResult.mbr_0x18,
+        messageStorage->PayloadBaseScaffold());
+    
+    if (!decryptedBuffer || *(int*)(decryptedBuffer + 4) == 0) {
+        // anchor: launcher.exe:0x4429e0 - MessageBoxA on decryption failure
+        // In text mode, we log instead of showing a message box
+        spdlog::error("Failed to decrypt challenge blob from server!");
+        // localMessageRef is managed by localMessageRefHelper, automatic cleanup
+        return 0u;
+    }
+    
+    // Grow payload to accommodate decrypted data
+    // anchor: launcher.exe:0x4429f0 - CMessageConnectionMessage_GrowPayloadByteCount
+    const uint32_t decryptedByteCount = *(uint32_t*)(decryptedBuffer + 4);
+    if (decryptedByteCount > 0) {
+        localMessageRef->GrowPayloadByteCountScaffold(
+            static_cast<uint16_t>(decryptedByteCount));
+    }
+    
+    // Create first packet builder envelope to extract seed bytes
+    // anchor: launcher.exe:0x442a60 - CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 constructor
+    // anchor: launcher.exe:0x443220 - cls_0x4b6538 constructor with message ref and flag
+    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 seedEnvelope(
+        localMessageRef, 0x01);
+    
+    // Extract seed bytes from envelope and store in connection
+    // anchor: launcher.exe:0x442ac6-0x442ae0 - extract to this+0x85..+0x91
+    std::array<uint8_t, 16> extractedSeedBytes = seedEnvelope.ExtractChallengeBytes();
+    std::copy_n(extractedSeedBytes.data(), 16, messageCode5SeedBytes85_.data());
+    
+    // Ensure stream packet encryption module is configured
+    // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule (0x441470)
+    // anchor: launcher.exe:0x442ae8 - call to EnsureStreamPacketEncryptionModule
+    EnsureStreamPacketEncryptionModuleFromSeed85();
+    
+    // Create second packet builder envelope for response packet
+    // anchor: launcher.exe:0x442af0 - CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 constructor
+    // anchor: launcher.exe:0x439840 - CLTLoginMediatorPacketBuilderEnvelope_Initialize
+    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
+    // Default constructor is sufficient for our use case
+    
+    // Set up response packet with opcode 0x03 (CERT_ChallengeResponse)
+    // anchor: launcher.exe:0x442b00-0x442b10 - build response packet
+    // Create a new message ref for the response packet
+    CMessageConnectionMessageRef* responseMessageRef = new CMessageConnectionMessageRef();
+    responseMessageRef->AddRef();
+    responseMessageRef->ResetForPacketBuilderScaffold(false, 0);
+    
+    uint8_t* responsePayload = responseMessageRef->PayloadAppendPointerScaffold();
+    if (!responsePayload) {
+        if (localMessageRef) {
+            localMessageRef->Release();
+        }
+        if (responseMessageRef) {
+            responseMessageRef->Release();
+        }
+        return 0u;
+    }
+    
+    // Write response packet: opcode + challenge bytes
+    // anchor: launcher.exe:0x442b00 - set opcode 0x03
+    *responsePayload = 0x03;  // CERT_ChallengeResponse opcode
+    std::copy_n(challengeBytes.data(), 16, responsePayload + 1);
+    responseMessageRef->SetPayloadByteCountScaffold(17);
+    
+    // Copy extracted bytes from seed envelope to response envelope
+    // anchor: launcher.exe:0x442b18-0x442b28 - copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d
+    // Use the ExtractForResponsePacket method which handles the correct offsets
+    std::array<uint8_t, 16> responsePacketBytes = seedEnvelope.ExtractForResponsePacket();
+    std::copy_n(responsePacketBytes.data(), 16, responsePayload + 1);
+    
+    // Set up the response envelope with the message ref
+    responseEnvelope.builder00.envelope00.messageRef08 = responseMessageRef;
+    
+    // Send through connection's packet send pipeline
+    // anchor: launcher.exe:0x442b30 -> connection vtable +0x24 (0x41cf30)
+    // anchor: launcher.exe:0x41cf30 - CMessageConnection_ForwardEnvelopeToSendPacket
+    const uint32_t sendResult = ForwardPacketBuilderEnvelopeToSendPacket(responseEnvelope.builder00.envelope00);
+    
+    // Clean up
+    // localMessageRef is managed by localMessageRefHelper, no need to manually release
+    if (responseMessageRef) {
+        responseMessageRef->Release();
+    }
+    
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes sent encrypted payload bytes={} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(framedPacket.bytes.size()),
-        static_cast<unsigned>(agenda->configuredModuleCount4c),
-        agenda->writeHelperChainHead44 != nullptr ? 1u : 0u,
+        "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes faithful implementation: sent response via packet builder envelope sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sendResult),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
+    
     return sendResult;
 }
 

@@ -11,6 +11,10 @@ namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
 #include "../libltcrypto/auth_internal.h"
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
+
+
+
+
 #ifdef DispatchMessage
 #undef DispatchMessage
 #endif
@@ -561,6 +565,8 @@ public:
     CMessageConnectionMessageRef* MessageRef();
 };
 
+
+
 class CStreamPacketEncryptionModuleReadTransformWorker {
 public:
     // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
@@ -597,6 +603,61 @@ public:
     bool TryTransform(
         const CMessageConnectionMessageRef& inputMessageRef,
         CMessageConnectionMessageRefOutputBuffer* outputBuffer);
+};
+
+// Challenge result structure from margin connection message parsing
+// anchor: launcher.exe:0x4b654c
+class MarginConnectionChallengeParsedResult_0x4b654c {
+public:
+    uint32_t mbr_0x00 = 0;        // +0x00
+    uint32_t mbr_0x04 = 0;        // +0x04
+    uint32_t mbr_0x08 = 0;        // +0x08
+    uint32_t mbr_0x0c = 0;        // +0x0c
+    uint32_t mbr_0x10 = 0;        // +0x10
+    uint32_t mbr_0x14 = 0;        // +0x14 - used as context
+    uint32_t mbr_0x18 = 0;        // +0x18 - used as field18
+    
+    MarginConnectionChallengeParsedResult_0x4b654c() = default;
+    explicit MarginConnectionChallengeParsedResult_0x4b654c(uint32_t context, uint32_t field18)
+        : mbr_0x14(context), mbr_0x18(field18) {}
+};
+
+// Message reference helper for challenge processing
+// anchor: launcher.exe:0x4489d0
+class MessageConnectionMessageRefHelper_0x4489d0 {
+public:
+    CMessageConnectionMessageRef* messageRef00 = nullptr;
+    
+    MessageConnectionMessageRefHelper_0x4489d0() = default;
+    ~MessageConnectionMessageRefHelper_0x4489d0() {
+        if (messageRef00) {
+            messageRef00->Release();
+            messageRef00 = nullptr;
+        }
+    }
+    
+    // anchor: launcher.exe:0x455cd0
+    // Create message ref with specified context
+    void CreateRef(int messageContext) {
+        messageRef00 = new CMessageConnectionMessageRef();
+        if (messageRef00) {
+            messageRef00->AddRef();
+            messageRef00->messageContext14 = messageContext;
+        }
+    }
+    
+    // Reset and clean up current message ref
+    void Reset() {
+        if (messageRef00) {
+            messageRef00->Release();
+            messageRef00 = nullptr;
+        }
+    }
+    
+    // Check if message ref is valid
+    bool IsValid() const {
+        return messageRef00 != nullptr && messageRef00->messageStorage0c != nullptr;
+    }
 };
 
 class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
@@ -1278,6 +1339,15 @@ public:
         const void* encryptedBytes,
         size_t encryptedByteCount,
         void* outputBuffer);
+
+    // anchor: launcher.exe:0x437810 / vtable +0x1c
+    // Interface implementation for DecryptChallengeBlob
+    uint8_t* DecryptChallengeBlob(
+        uint8_t* outBuffer,
+        void* prepHelper,
+        uint32_t contextDword,
+        uint32_t field18,
+        uint8_t* payloadBytes);
 
     // Later original use of the stored connection `+0xa0` object starts at
     // `0x4429b0`, which loads that pointer and calls prep-object vtable `+0x1c /
