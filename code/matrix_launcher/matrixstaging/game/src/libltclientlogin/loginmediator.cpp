@@ -354,6 +354,7 @@ const char* CLTLoginMediator::GetName() {
     return "CLTLoginMediator";
 }
 
+// +0x08
 // Wrapper-facing arg6 startup handoff helper used by the current `0x4d2c58` scaffold.
 // Do not sync this directly to owner vtable `0x004b01c8 +0x0c`; current Ghidra now assigns that
 // owner slot to `launcher.exe:0x41f510`, which looks like reset/clear logic instead.
@@ -371,6 +372,7 @@ void CLTLoginMediator::SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngi
     }
 }
 
+// anchor: launcher.exe:0x41f510 vtable offset +0x0c
 // Wrapper-facing arg6 clear helper reached from launcher teardown after arg5 release.
 // Current fidelity direction:
 // - owner vtable `0x004b01c8 +0x0c / 0x41f510` now reads as reset/clear-owned-runtime-state logic
@@ -386,8 +388,8 @@ void CLTLoginMediator::ClearEngine() {
     authBootstrapChild680_.reset();
     spdlog::info("CLTLoginMediator::ClearEngine mirrored reset-owned-runtime-state scaffold");
 }
-// +0x10
-// UNANCHORED: no original launcher.exe anchor assigned yet.
+
+// anchor: launcher.exe:0x41f030 vtable offset +0x10
 uint32_t CLTLoginMediator::IsReady() {
     spdlog::info("CLTLoginMediator::IsReady() -> 1");
     return 1;
@@ -738,6 +740,7 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
     return &arg6CurrentSlotRecord44_;
 }
 
+// +0x48
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     const SlotRecordState_0x4b5328* slotRecord = GetCurrentSlotRecord();
@@ -776,6 +779,7 @@ const char* CLTLoginMediator::GetWorldOrSelectionName() const {
     return worldOrSelectionName;
 }
 
+// +0x4c
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 const char* CLTLoginMediator::GetProfileOrSessionName() const {
     const char* profileOrSessionName = Arg6ProfileName();
@@ -1133,8 +1137,7 @@ void* CLTLoginMediator::GetLiveCuiCfgB8(uint32_t* outLength) const {
     return view.buffer;
 }
 
-// anchor: launcher.exe:0x41f170 / owner vtable +0xbc
-// +0xbc
+// anchor: launcher.exe:0x41f170 vtable +0xbc
 const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
     // Keep this wrapper-facing body close to the original tiny getter:
     // - original `0x41f170` returns owner `+0xf48`
@@ -1148,8 +1151,7 @@ const void* CLTLoginMediator::GetState8PersistenceHeaderBc() const {
     return header;
 }
 
-// anchor: launcher.exe:0x41f180 / owner vtable +0xc0
-// +0xc0
+// anchor: launcher.exe:0x41f180 vtable +0xc0
 const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
     // Keep this wrapper-facing body close to the original tiny getter:
     // - original `0x41f180` returns owner `+0xf88`
@@ -1163,8 +1165,7 @@ const void* CLTLoginMediator::GetState8PersistenceBodyC0() const {
     return body;
 }
 
-// anchor: launcher.exe:0x41aec0 / owner vtable +0xc4
-// +0xc4
+// anchor: launcher.exe:0x41aec0 vtable +0xc4
 void* CLTLoginMediator::GetState8PersistenceOverflowC4(uint16_t* outLength) const {
     // Keep this wrapper-facing body close to the original tiny getter:
     // - original `0x41aec0` returns owner `+0x13f0`

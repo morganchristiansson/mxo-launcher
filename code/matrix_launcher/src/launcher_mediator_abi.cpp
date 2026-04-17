@@ -1161,6 +1161,7 @@ static void InitializeMediatorStub() {
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
     // Forward to ILTLoginMediator::Default vtable slot 0 (original Mediator_GetName)
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
+    // +0x04
     g_LoginMediatorVtable[2] = (void*)Mediator_RegisterLauncherNetworkEngineObject08; // +0x08
     g_LoginMediatorVtable[3] = (void*)Mediator_ClearEngine;      // +0x0c
     g_LoginMediatorVtable[4] = (void*)Mediator_IsReady;          // +0x10
