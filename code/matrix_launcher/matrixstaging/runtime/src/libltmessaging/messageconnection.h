@@ -792,7 +792,7 @@ public:
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
 };
 
-class CStreamPacketEncryptionAgendaHelper_0x4baf48 : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
+class PacketProcessingAgenda_0x4baf48 : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
 public:
     // anchor: launcher.exe vtable `0x004baf48`
     // Source-owned full virtual C++ mirror of the embedded agenda helper object materialized twice
@@ -805,11 +805,20 @@ public:
     void** outputSlotAddress10 = nullptr;
     CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot14 = nullptr;
 
+    // anchor: launcher.exe:0x44c680 / vtable `0x004baf48 +0x00`
+    ~PacketProcessingAgenda_0x4baf48() override;
+    
+    // anchor: launcher.exe:0x44bb60 / vtable `0x004baf48 +0x04`
+    virtual void VirtualMethod1_0x44bb60();
+    
+    // anchor: launcher.exe:0x481750 / vtable `0x004baf48 +0x08`
+    virtual uint32_t VirtualMethod2_0x481750();
+    
+    // anchor: launcher.exe:0x469980 / vtable `0x004baf48 +0x0c`
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;
-    void ResetForAgenda(
-        const char* helperLabel,
-        void** outputSlotAddress,
-        CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot);
+    
+    // anchor: launcher.exe:0x469720 / vtable `0x004baf48 +0x10`
+    virtual void DelegateToChainedHelper();
 };
 
 class CStreamPacketEncryptionModule_0x4b8704 : public CStreamPacketEncryptionOwnerBase_0x4b81dc {
@@ -844,9 +853,9 @@ struct CMessageConnectionPacketAgenda {
     CMessageConnection* connectionOwner00 = nullptr;
     CStreamPacketEncryptionModule_0x4b8704* configuredModuleList04 = nullptr;
     CMessageConnectionMessageRef* readOutputSlot08 = nullptr;
-    CStreamPacketEncryptionAgendaHelper_0x4baf48 embeddedReadHelper0c{};
+    PacketProcessingAgenda_0x4baf48 embeddedReadHelper0c{};
     CMessageConnectionMessageRef* writeOutputSlot24 = nullptr;
-    CStreamPacketEncryptionAgendaHelper_0x4baf48 embeddedWriteHelper28{};
+    PacketProcessingAgenda_0x4baf48 embeddedWriteHelper28{};
     // faithful raw-field naming from the recovered agenda object:
     // - `readHelperChainHead40` mirrors original agenda `+0x40`
     // - `writeHelperChainHead44` mirrors original agenda `+0x44`

@@ -652,7 +652,7 @@ void CStreamPacketEncryptionModuleWriteHelper_0x4b8690::ResetForSeed(
 }
 
 // anchor: launcher.exe:0x469980
-void CStreamPacketEncryptionAgendaHelper_0x4baf48::HandleOpaqueMessageRef(
+void PacketProcessingAgenda_0x4baf48::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
     // Original helper stores/replaces a retained outer message-ref through helper field `+0x10`.
     // Now that both receive-side and transform-output message-ref objects are heap-backed, source
@@ -665,17 +665,31 @@ void CStreamPacketEncryptionAgendaHelper_0x4baf48::HandleOpaqueMessageRef(
         static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef));
 }
 
-// anchor: launcher.exe:0x469850
-void CStreamPacketEncryptionAgendaHelper_0x4baf48::ResetForAgenda(
-    const char* helperLabel,
-    void** outputSlotAddress,
-    CStreamPacketEncryptionHelperBase_0x4b81c8** downstreamHelperSlot) {
-    nextHelper04 = nullptr;
-    field04 = 0u;
-    field08 = 0u;
-    helperLabel0c = helperLabel;
-    outputSlotAddress10 = outputSlotAddress;
-    downstreamHelperSlot14 = downstreamHelperSlot;
+// anchor: launcher.exe:0x44c680 / vtable `0x004baf48 +0x00`
+PacketProcessingAgenda_0x4baf48::~PacketProcessingAgenda_0x4baf48() {
+    // Default destructor implementation
+}
+
+// anchor: launcher.exe:0x44bb60 / vtable `0x004baf48 +0x04`
+void PacketProcessingAgenda_0x4baf48::VirtualMethod1_0x44bb60() {
+    // Virtual method 1 implementation
+    // Original at 0x44bb60 - placeholder for future implementation
+}
+
+// anchor: launcher.exe:0x481750 / vtable `0x004baf48 +0x08`
+uint32_t PacketProcessingAgenda_0x4baf48::VirtualMethod2_0x481750() {
+    // Virtual method 2 implementation
+    // Original at 0x481750 - placeholder for future implementation
+    return 0;
+}
+
+// anchor: launcher.exe:0x469720 / vtable `0x004baf48 +0x10`
+void PacketProcessingAgenda_0x4baf48::DelegateToChainedHelper() {
+    // Delegate to chained helper implementation
+    // Original at 0x469720 - delegates to nextHelper04 if available
+    if (nextHelper04) {
+        nextHelper04->HandleOpaqueMessageRef(nullptr);
+    }
 }
 
 // anchor: launcher.exe:0x44da00
@@ -736,39 +750,47 @@ void CMessageConnection::ConfigurePacketNameFamily(
 // anchor: launcher.exe:0x448980
 void CMessageConnection::ConfigurePacketAgenda(
     CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule) {
+    // anchor: launcher.exe:0x448980
+    // Faithful mirror of original CMessageConnection_ConfigurePacketAgenda:
+    // - if packetAgenda74 is null, allocate and construct it
+    // - then install the stream packet encryption module
+    
     if (!packetAgenda_) {
         packetAgenda_ = std::make_unique<CMessageConnectionPacketAgenda>();
-    }
-    if (!packetAgenda_) {
-        return;
-    }
-
-    CMessageConnectionPacketAgenda& agenda = *packetAgenda_;
-    if (!agenda.created) {
-        // anchor: launcher.exe:0x448980 -> 0x469850
-        // Faithful agenda initialization recovered from `0x469850`:
-        // - agenda `+0x00` stores the owning connection pointer
-        // - agenda `+0x04` starts with no configured modules
-        // - embedded read helper at `+0x0c` stores into agenda `+0x08` and delegates via
-        //   helper field `+0x14 -> &agenda+0x44`
-        // - embedded write helper at `+0x28` stores into agenda `+0x24`
-        // - agenda `+0x40` starts at the embedded read helper
-        // - agenda `+0x44/+0x48` start empty
+        if (!packetAgenda_) {
+            return;
+        }
+        
+        // Initialize the agenda structure (mirrors 0x469850 constructor)
+        CMessageConnectionPacketAgenda& agenda = *packetAgenda_;
         agenda.connectionOwner00 = this;
         agenda.configuredModuleList04 = nullptr;
         agenda.readOutputSlot08 = nullptr;
-        agenda.embeddedReadHelper0c.ResetForAgenda(
-            "Agenda read helper",
-            reinterpret_cast<void**>(&agenda.readOutputSlot08),
-            &agenda.writeHelperChainHead44);
+        
+        // Set up embedded read helper at +0x0c (mirrors 0x46986c-0x469883)
+        agenda.embeddedReadHelper0c.nextHelper04 = nullptr;
+        agenda.embeddedReadHelper0c.field04 = 0u;
+        agenda.embeddedReadHelper0c.field08 = 0u;
+        agenda.embeddedReadHelper0c.helperLabel0c = "Agenda read helper";
+        agenda.embeddedReadHelper0c.outputSlotAddress10 = reinterpret_cast<void**>(&agenda.readOutputSlot08);
+        agenda.embeddedReadHelper0c.downstreamHelperSlot14 = &agenda.writeHelperChainHead44;
+        
         agenda.writeOutputSlot24 = nullptr;
-        agenda.embeddedWriteHelper28.ResetForAgenda(
-            "Agenda write helper",
-            reinterpret_cast<void**>(&agenda.writeOutputSlot24),
-            nullptr);
+        
+        // Set up embedded write helper at +0x28 (mirrors 0x469895-0x4698a3)
+        agenda.embeddedWriteHelper28.nextHelper04 = nullptr;
+        agenda.embeddedWriteHelper28.field04 = 0u;
+        agenda.embeddedWriteHelper28.field08 = 0u;
+        agenda.embeddedWriteHelper28.helperLabel0c = "Agenda write helper";
+        agenda.embeddedWriteHelper28.outputSlotAddress10 = reinterpret_cast<void**>(&agenda.writeOutputSlot24);
+        agenda.embeddedWriteHelper28.downstreamHelperSlot14 = nullptr;
+        
+        // Initialize helper chains
         agenda.readHelperChainHead40 = &agenda.embeddedReadHelper0c;
         agenda.writeHelperChainHead44 = nullptr;
         agenda.writeHelperChainTail48 = nullptr;
+        
+        // Initialize counters
         agenda.configuredModuleCount4c = 0u;
         agenda.reserved4e = 0u;
         agenda.created = true;
@@ -776,15 +798,14 @@ void CMessageConnection::ConfigurePacketAgenda(
     }
 
     // anchor: launcher.exe:0x448980 -> 0x469740
-    // Current tighter install read from `0x469740`:
-    // - module `+0x0c` becomes the next link in agenda `+0x04`
-    // - module `+0x04` is pushed onto agenda read head `+0x40`
-    // - module `+0x08` is appended onto the write chain rooted at agenda `+0x44/+0x48`
-    // - module `+0x10` receives agenda `+0x00` (the owning connection pointer)
+    // Install stream packet encryption module (always called, even if agenda was already created)
+    CMessageConnectionPacketAgenda& agenda = *packetAgenda_;
+    
     if (!streamPacketEncryptionModule) {
         return;
     }
 
+    // Install the module into the agenda
     streamPacketEncryptionModule->nextConfiguredModule0c = agenda.configuredModuleList04;
     agenda.configuredModuleList04 = streamPacketEncryptionModule;
 
