@@ -1118,7 +1118,7 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
 // - `0x435510 = CParsedPacketWorkItem_GetNextFragment`
 // - `0x434fa0 = CLTTCPReadOperationRefHandle_AssignRetained`
 static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
     CMessageConnectionMessageRef* outMessageRef,
     bool* outHadUnusedBuffers) {
     if (outHadUnusedBuffers) {
@@ -1707,8 +1707,8 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         return 1u;
     }
 
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* parsedPacketWorkItem =
-        static_cast<CLTTCPConnection_ParsedPacketWorkItemScaffold*>(workItem);
+    CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* parsedPacketWorkItem =
+        static_cast<CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08*>(workItem);
     if (parsedPacketWorkItem->assembledByteCount28 > 0x1000u) {
         spdlog::info(
             "CMessageConnection::OnOperationCompleted received illegally large packet payloadBytes={} this={} ownerContext={} remoteHost='{}' -> closing",

@@ -844,7 +844,7 @@ void CLTTCPConnection::OnReceive(CLTTCPReadOperation* readOperationFragment) {
     // - later drain handoffs are `parser->Parse(nullptr, &completedPacketWorkItem)`
     // - successful emits then hand off exactly `(engine+0x10, completedPacketWorkItem, this, false)`
     //   through `0x436820`
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* completedPacketWorkItem = nullptr;
+    CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* completedPacketWorkItem = nullptr;
 
     if (readOperationFragment) {
         readOperationFragment->AddRef();
@@ -993,7 +993,7 @@ uint32_t CLTTCPConnection::SendRawSocketBufferScaffold(
 
 // UNANCHORED: source-owned mirror of the exact `0x449d8a` enqueue handoff.
 void CLTTCPConnection::EnqueueCompletedPacketWorkItemScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem) {
+    CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem) {
     // Current best static read of `0x449d40` / `0x469bf0`:
     // - the queue handoff is exactly `(engine+0x10, completedPacketWorkItem, this, false)`
     // - launcher.exe queues the direct connection object there, but the active replacement may

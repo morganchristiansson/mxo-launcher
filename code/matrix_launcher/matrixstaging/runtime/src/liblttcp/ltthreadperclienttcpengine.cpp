@@ -3140,7 +3140,7 @@ bool CLTThreadPerClientTCPEngine_0x4b2768::EnqueueDirectConnectionStatusWorkItem
 
 // UNANCHORED: connection-owned helper for the recovered `0x449d8a -> 0x436820` handoff.
 void CLTThreadPerClientTCPEngine_0x4b2768::EnqueueCompletedOperationFromConnectionScaffold(
-    CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+    CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
     CLTTCPConnection* connection,
     const char* label) {
     // Current best original read for this receive path:

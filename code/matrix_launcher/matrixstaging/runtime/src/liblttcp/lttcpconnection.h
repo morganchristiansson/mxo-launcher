@@ -169,7 +169,7 @@ struct CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold {
 static_assert(sizeof(CParsedPacketWorkItem_RetainedFragmentNodeScaffold) == 0x0c, "parsed packet retained-fragment node size mismatch");
 static_assert(sizeof(CParsedPacketWorkItem_RetainedFragmentListOwnerScaffold) == 0x04, "parsed packet retained-fragment list owner size mismatch");
 
-struct CLTTCPConnection_ParsedPacketWorkItemScaffold {
+struct CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08 {
     void** vtable; // +0x00
     uint32_t workType; // +0x04 = 3
     uint32_t statusOrPayloadDword08; // +0x08 shared work-item-root status/payload dword; zero on parser-produced packets
@@ -184,7 +184,7 @@ struct CLTTCPConnection_ParsedPacketWorkItemScaffold {
     uint32_t assembledByteCount28; // +0x28 assembled packet-body byte count once prefix decode succeeds
 };
 
-static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold) == 0x2c, "parsed packet work item size mismatch");
+static_assert(sizeof(CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08) == 0x2c, "parsed packet work item size mismatch");
 
 // High-confidence original parser object at connection `+0x6c`:
 // - vtable `0x004baf84`
@@ -495,7 +495,7 @@ public:
     //   consumers so MSVC slot assumptions do not hit the MinGW object vtable directly
     // - ownership transfers to the engine queue here; caller-side lifetime does not branch on an
     //   enqueue success result because original `0x436820` returns `void`
-    void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem);
+    void EnqueueCompletedPacketWorkItemScaffold(CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem);
 
     // anchor: launcher.exe:0x41de6a - endpoint at connection +0x24
     LTTCPEndpointKey remoteEndpoint_;

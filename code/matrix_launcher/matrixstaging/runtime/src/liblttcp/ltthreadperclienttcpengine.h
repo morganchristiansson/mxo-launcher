@@ -466,7 +466,7 @@ public:
     // - ownership of `workItem` transfers to the queue/consumer here; original `0x436820` returns
     //   `void`, so caller-side lifetime does not depend on enqueue success/failure
     void EnqueueCompletedOperationFromConnectionScaffold(
-        CLTTCPConnection_ParsedPacketWorkItemScaffold* workItem,
+        CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
         CLTTCPConnection* connection,
         const char* label = nullptr);
     void PumpLauncherConnectionsFromArg5HelperScaffold();
