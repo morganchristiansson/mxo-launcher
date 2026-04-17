@@ -454,7 +454,8 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     CMessageConnectionMessageRef* messageRef,
     uint8_t flag) {
     // FIDELITY: Original extracts 16 bytes from message ref payload
-    // flag is '\x01' in the original call
+    // flag is '\x01' in the original call (unused in text-only launcher)
+    (void)flag;  // Suppress unused parameter warning
     if (messageRef && messageRef->messageStorage0c) {
         const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
         const size_t payloadSize = messageRef->messageStorage0c->PayloadByteCountScaffold();
