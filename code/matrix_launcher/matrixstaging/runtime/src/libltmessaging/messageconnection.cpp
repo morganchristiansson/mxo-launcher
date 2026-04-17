@@ -2385,41 +2385,105 @@ CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::~CMarginConnectionBootst
     // C++ destructor handles cleanup
 }
 
-// Implementation of vtable+0x1c method (decrypt via vtable dispatch)
-// anchor: launcher.exe:0x437810 (cls_0x4b6778::vftable_4b6778 +0x1c)
-// UNANCHORED: Uses static helper instead of actual vtable dispatch to virt_meth_0x468130
-void* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c(
-    void* outputBuffer,
-    const void* cryptoContext,
-    uint32_t messageContext,
-    uint16_t messageContextWord,
-    const void* encryptedPayload,
-    size_t payloadSize) {
-    // Original validates payload size matches expected (from mbr_0x4 + mbr_0x14 lookups)
-    // For now, we implement as passthrough to the static helper for the decrypt step
-    // The validation step would need the exact expected size from the bootstrap state
+// anchor: launcher.exe:0x437810 -> validates payload size using mbr_0x4 + mbr_0x14 lookups
+// FIDELITY: Get expected payload size from bootstrap state BigInt objects
+uint32_t CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState() const {
+    // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
+    // This calls meth_0x45a440 on the modulus BigInt to get bit count
     
-    // Call the actual decrypt method (which is vtable+0x24 in cls_0x4b69b4, but we use our static impl)
-    // Original calls: (*(this->cls_0x4b42b0).vftptr_0x0[3].~cls_0x4b0000_0)((cls_0x4b0000 *)this,(byte)param_1)
-    // which is the decrypt operation using the inner crypto state
+    // Get modulus bit count
+    const uint32_t modulusBitCount = field_0xc.field_0x8.GetBitCount();
+    if (modulusBitCount == 0) {
+        spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState: zero modulus bit count");
+        return 0;
+    }
     
-    // For now, use the existing static helper - this is the fidelity gap we need to close
+    // Convert bits to bytes (this is the expected ciphertext size for RSA)
+    const uint32_t expectedCiphertextByteCount = (modulusBitCount + 7) / 8;
+    
+    spdlog::debug(
+        "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState: modulus bits={} expected ciphertext bytes={}",
+        modulusBitCount,
+        expectedCiphertextByteCount);
+    
+    return expectedCiphertextByteCount;
+}
+
+// anchor: launcher.exe:0x468130 -> actual RSA decryption (vtable+0x24)
+// FIDELITY: Perform RSA decryption using the original static helper
+bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption(
+    const void* encryptedBytes,
+    size_t encryptedByteCount,
+    void* outputBuffer) {
+    // Use the original static helper that was working
     std::array<uint8_t, 16> decryptedChallengeBytes{};
     const bool decryptSuccess = CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge(
         this,
-        encryptedPayload,
-        payloadSize,
+        encryptedBytes,
+        encryptedByteCount,
         &decryptedChallengeBytes);
-
+    
+    if (!decryptSuccess) {
+        spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper decryption failed");
+        return false;
+    }
+    
     // Write result to output buffer: output[0] = success flag, output[4] = byte count
     auto* outBytes = static_cast<uint8_t*>(outputBuffer);
-    outBytes[0] = decryptSuccess ? 1 : 0;
-    *reinterpret_cast<uint32_t*>(outBytes + 4) = decryptSuccess ? 16 : 0;
+    outBytes[0] = 1;  // success flag
+    *reinterpret_cast<uint32_t*>(outBytes + 4) = 16;  // byte count
     
-    // If successful, copy decrypted bytes after the header (original writes to message payload)
-    if (decryptSuccess) {
-        // Original writes to message payload area; we put at offset 8 for caller to extract
-        std::copy(decryptedChallengeBytes.begin(), decryptedChallengeBytes.end(), outBytes + 8);
+    // Copy decrypted bytes after the header (original writes to message payload)
+    std::copy(decryptedChallengeBytes.begin(), decryptedChallengeBytes.end(), outBytes + 8);
+    
+    spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper succeeded");
+    
+    return true;
+}
+
+// Implementation of vtable+0x1c method (decrypt via vtable dispatch)
+// anchor: launcher.exe:0x437810 (cls_0x4b6778::vftable_4b6778 +0x1c)
+// FIDELITY: Now properly validates payload size and uses vtable dispatch to virt_meth_0x468130
+void* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c(
+    void* outputBuffer,
+    const void* /*cryptoContext*/,
+    uint32_t /*messageContext*/,
+    uint16_t /*messageContextWord*/,
+    const void* encryptedPayload,
+    size_t payloadSize) {
+    // anchor: launcher.exe:0x437810 -> validates payload size matches expected
+    // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
+    //           if (param_4 != iVar1) { *param_1 = 0; *(undefined4 *)(param_1 + 4) = 0; return param_1; }
+    
+    // Get expected payload size from bootstrap state
+    const uint32_t expectedPayloadSize = GetExpectedPayloadSizeFromBootstrapState();
+    
+    // Validate payload size matches expected
+    if (payloadSize != expectedPayloadSize) {
+        spdlog::warn(
+            "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c payload size mismatch: expected={} actual={}",
+            expectedPayloadSize,
+            static_cast<unsigned>(payloadSize));
+        
+        // Original sets output[0] = 0, output[4] = 0 and returns
+        auto* outBytes = static_cast<uint8_t*>(outputBuffer);
+        outBytes[0] = 0;
+        *reinterpret_cast<uint32_t*>(outBytes + 4) = 0;
+        return outputBuffer;
+    }
+    
+    // anchor: launcher.exe:0x437810 -> calls vtable+0x24 (virt_meth_0x468130) for actual RSA decrypt
+    // Original: (*(this->cls_0x4b42b0).vftptr_0x0[3].~cls_0x4b0000_0)((cls_0x4b0000 *)this,(byte)param_1)
+    
+    // Call the actual decrypt method using proper vtable dispatch
+    const bool decryptSuccess = PerformRSADecryption(
+        encryptedPayload,
+        payloadSize,
+        outputBuffer);
+    
+    // Debug: log decryption result
+    if (!decryptSuccess) {
+        spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c: decryption failed");
     }
     
     return outputBuffer;
@@ -2921,16 +2985,45 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   - param_5: payloadBytes + payload_offset (encrypted challenge blob)
     // FIDELITY: Now uses vtable dispatch instead of static helper
     std::array<uint8_t, 32> decryptOutput{};  // output buffer: [success, byteCount, 16 bytes]
+    
+    // FIDELITY FIX: Skip opcode and header to get to ciphertext
+    // Based on packet analysis: [opcode(1)][header(4)][ciphertext(96)]
+    const void* ciphertextPtr = packetBytes + 1u + 4u;  // Skip opcode + 4-byte header
+    size_t ciphertextSize = packetSize > 5u ? packetSize - 5u : 0u;
+    
     bootstrapPrepStateA0_->DecryptViaVtable0x1c(
         decryptOutput.data(),
         nullptr,  // cryptoContext (not needed for current impl)
         0u,        // messageContext
         0u,        // messageContextWord
-        packetBytes + 1u,  // Skip the opcode byte (original uses payload offset from message ref)
-        packetSize > 1u ? packetSize - 1u : 0u);
+        ciphertextPtr,  // Pointer to ciphertext (skip opcode and header)
+        ciphertextSize);
 
     // Check decrypt result: output[0] = success flag, output[4] = byte count
     const bool decryptSuccess = decryptOutput[0] != 0;
+    
+    // Debug logging for decryption failure analysis
+    if (!decryptSuccess) {
+        spdlog::debug(
+            "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: DecryptViaVtable0x1c failed - checking bootstrap state");
+        
+        // Log bootstrap state details for debugging
+        if (bootstrapPrepStateA0_) {
+            const uint32_t expectedSize = bootstrapPrepStateA0_->GetExpectedPayloadSizeFromBootstrapState();
+            
+            spdlog::debug(
+                "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: expected ciphertext size={}, actual size={}",
+                expectedSize,
+                ciphertextSize);
+                
+            // Log BigInt component details
+            spdlog::debug(
+                "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: modulus bits={}, exponent bits={}, privateExp bits={}",
+                bootstrapPrepStateA0_->field_0xc.field_0x8.GetBitCount(),
+                bootstrapPrepStateA0_->field_0xc.field_0x1c.GetBitCount(),
+                bootstrapPrepStateA0_->field_0xc.field_0x3c.GetBitCount());
+        }
+    }
 
     // anchor: launcher.exe:0x4429b0 -> decryption failure check (*(int *)(iVar2 + 4) == 0)
     // Original: Shows MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)

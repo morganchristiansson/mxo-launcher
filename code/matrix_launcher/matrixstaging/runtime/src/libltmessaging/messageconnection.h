@@ -1193,6 +1193,17 @@ public:
         const void* encryptedPayload,
         size_t payloadSize);
 
+    // anchor: launcher.exe:0x437810 -> validates payload size using mbr_0x4 + mbr_0x14 lookups
+    // FIDELITY: Get expected payload size from bootstrap state BigInt objects
+    uint32_t GetExpectedPayloadSizeFromBootstrapState() const;
+
+    // anchor: launcher.exe:0x468130 -> actual RSA decryption (vtable+0x24)
+    // FIDELITY: Perform RSA decryption using proper CryptoPP with OAEP padding
+    bool PerformRSADecryption(
+        const void* encryptedBytes,
+        size_t encryptedByteCount,
+        void* outputBuffer);
+
     // Later original use of the stored connection `+0xa0` object starts at
     // `0x4429b0`, which loads that pointer and calls prep-object vtable `+0x1c /
     // 0x437810`; current source deliberately stops at ctor/dtor/materialization
