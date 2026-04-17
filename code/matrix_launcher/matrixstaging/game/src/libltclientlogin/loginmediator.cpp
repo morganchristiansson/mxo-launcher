@@ -32,7 +32,7 @@
 
 #include "loginstate.h"
 #include "../../../../src/launcher_mediator_abi.h"
-#include "authbootstrap680_internal.h"
+#include "authbootstrap680.h"
 #include "../../../runtime/src/liblttcp/ltipaddresslist.h"
 #include "../../../runtime/src/libltnet/sys/pc/pcsocket.h"
 

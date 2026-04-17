@@ -14,7 +14,7 @@
 #include "../../../runtime/src/liblttcp/ltthreadperclienttcpengine.h"
 
 #include "loginmediator_base.h"
-#include "authbootstrap680_internal.h"
+#include "authbootstrap680.h"
 
 // Forward declaration - full class is defined in loginmediator_events.cpp
 class LoginObserverTreeHelper674;
