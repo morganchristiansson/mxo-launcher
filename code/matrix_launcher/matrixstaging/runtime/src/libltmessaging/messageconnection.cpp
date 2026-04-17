@@ -2970,17 +2970,16 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
         return 0u;
     }
     
-    // Write response packet: opcode + challenge bytes
+    // Write response packet: opcode + extracted response bytes from seed envelope
     // anchor: launcher.exe:0x442b00 - set opcode 0x03
     *responsePayload = 0x03;  // CERT_ChallengeResponse opcode
-    std::copy_n(challengeBytes.data(), 16, responsePayload + 1);
-    responseMessageRef->SetPayloadByteCountScaffold(17);
     
     // Copy extracted bytes from seed envelope to response envelope
     // anchor: launcher.exe:0x442b18-0x442b28 - copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d
     // Use the ExtractForResponsePacket method which handles the correct offsets
     std::array<uint8_t, 16> responsePacketBytes = seedEnvelope.ExtractForResponsePacket();
     std::copy_n(responsePacketBytes.data(), 16, responsePayload + 1);
+    responseMessageRef->SetPayloadByteCountScaffold(17);
     
     // Set up the response envelope with the message ref
     responseEnvelope.builder00.envelope00.messageRef08 = responseMessageRef;
