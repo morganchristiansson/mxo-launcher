@@ -2705,59 +2705,57 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
         std::vector<uint8_t> decryptedBytes;
         CryptoPP::AutoSeededRandomPool rng;
 
-        // Try OAEP decryption with padding handling
-        // The error "ciphertext length of 100 doesn't match required 96" suggests
-        // there may be extra bytes. Try skipping first 4 bytes.
+        // The ciphertext is 100 bytes but OAEP expects 96 (modulus size).
+        // The first 4 bytes are likely a length prefix - strip them.
+        const uint8_t* cipherStart = static_cast<const uint8_t*>(encryptedBytes);
+        size_t cipherLen = encryptedByteCount;
+
+        // Check if first 4 bytes are a length prefix (big-endian length)
+        if (encryptedByteCount > 4) {
+            uint32_t prefixLength = (static_cast<uint32_t>(cipherStart[0]) << 24) |
+                                   (static_cast<uint32_t>(cipherStart[1]) << 16) |
+                                   (static_cast<uint32_t>(cipherStart[2]) << 8) |
+                                   static_cast<uint32_t>(cipherStart[3]);
+            // If the prefix matches the remaining length, skip it
+            if (prefixLength == encryptedByteCount - 4) {
+                spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: detected length prefix {}, skipping", prefixLength);
+                cipherStart += 4;
+                cipherLen = encryptedByteCount - 4;
+            }
+        }
+
+        // Try OAEP decryption with correct cipher length
         try {
             CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
             CryptoPP::StringSource source(
-                static_cast<const uint8_t*>(encryptedBytes),
-                encryptedByteCount,
+                cipherStart,
+                cipherLen,
                 true,
                 new CryptoPP::PK_DecryptorFilter(
                     rng,
                     decryptor,
                     new CryptoPP::VectorSink(decryptedBytes)));
+            spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP succeeded with stripped length prefix");
         } catch (const CryptoPP::Exception& ex) {
-            spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP failed with full {} bytes: {}, trying with 4-byte skip",
-                encryptedByteCount, ex.what());
+            spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP failed with {} bytes: {}, trying raw RSA",
+                cipherLen, ex.what());
 
-            // Try skipping first 4 bytes (the length mismatch is 4 bytes: 100 vs 96)
-            if (encryptedByteCount > 4) {
-                try {
-                    CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor2(privateKey);
-                    CryptoPP::StringSource source2(
-                        static_cast<const uint8_t*>(encryptedBytes) + 4,
-                        encryptedByteCount - 4,
-                        true,
-                        new CryptoPP::PK_DecryptorFilter(
-                            rng,
-                            decryptor2,
-                            new CryptoPP::VectorSink(decryptedBytes)));
-                    spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP succeeded with 4-byte skip");
-                } catch (const CryptoPP::Exception& ex2) {
-                    spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: OAEP also failed with 4-byte skip: {}, trying raw RSA", ex2.what());
+            // Fallback: raw RSA decryption without padding
+            CryptoPP::Integer ciphertext(
+                cipherStart,
+                cipherLen);
 
-                    // Fallback: raw RSA decryption without padding
-                    CryptoPP::Integer ciphertext(
-                        static_cast<const uint8_t*>(encryptedBytes),
-                        encryptedByteCount);
+            // Raw RSA: m = c^d mod n
+            CryptoPP::Integer plaintext = ciphertext;
+            plaintext ^= privateExponent;
+            plaintext %= modulus;
 
-                    // Raw RSA: m = c^d mod n
-                    CryptoPP::Integer plaintext = ciphertext;
-                    plaintext ^= privateExponent;
-                    plaintext %= modulus;
+            // Convert plaintext to bytes
+            size_t encodedSize = plaintext.MinEncodedSize();
+            decryptedBytes.resize(encodedSize);
+            plaintext.Encode(decryptedBytes.data(), encodedSize);
 
-                    // Convert plaintext to bytes
-                    size_t encodedSize = plaintext.MinEncodedSize();
-                    decryptedBytes.resize(encodedSize);
-                    plaintext.Encode(decryptedBytes.data(), encodedSize);
-
-                    spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: raw RSA decrypted bytes={}", decryptedBytes.size());
-                }
-            } else {
-                throw;
-            }
+            spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge: raw RSA decrypted bytes={}", decryptedBytes.size());
         }
 
         // Extract 16 bytes from offset 1,5,9,13 (DWORD aligned positions in decrypted blob)
