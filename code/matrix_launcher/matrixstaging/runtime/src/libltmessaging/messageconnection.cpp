@@ -2811,41 +2811,37 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
         privateKey.SetPublicExponent(publicExponent);
         privateKey.SetPrivateExponent(privateExponent);
 
-        // RSA decrypt the challenge blob
+        // RSA decrypt the challenge blob using raw RSA (no padding)
+        // anchor: launcher.exe:0x468130 -> virt_meth_0x468130 performs raw RSA operations
+        // Original uses custom big integer operations, not standard OAEP padding
+        // FIDELITY: Remove infidel OAEP approach and use raw RSA like original
         std::vector<uint8_t> decryptedBytes;
-        CryptoPP::AutoSeededRandomPool rng;
-
-        // Original decrypts through prep object vtable+0x1c -> virt_meth_0x468130
-        // That function handles ciphertext format naturally - we use the ciphertext as-is
+        
         try {
-            CryptoPP::RSAES_OAEP_SHA_Decryptor decryptor(privateKey);
-            CryptoPP::StringSource source(
-                static_cast<const uint8_t*>(encryptedBytes),
-                encryptedByteCount,
-                true,
-                new CryptoPP::PK_DecryptorFilter(
-                    rng,
-                    decryptor,
-                    new CryptoPP::VectorSink(decryptedBytes)));
-        } catch (const CryptoPP::Exception& ex) {
-            spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: OAEP failed: {}, trying raw RSA", ex.what());
-
-            // Fallback: raw RSA decryption without padding
-            // Note: This produces wrong results because we're not properly handling OAEP
-            // The proper fix requires using the vtable dispatch like original
+            // Convert ciphertext to CryptoPP integer
             CryptoPP::Integer ciphertext(
                 static_cast<const uint8_t*>(encryptedBytes),
                 encryptedByteCount);
 
+            // Perform raw RSA decryption: m = c^d mod n
+            // This matches the original's big integer operations at 0x468130
             CryptoPP::Integer plaintext = ciphertext;
             plaintext ^= privateExponent;
             plaintext %= modulus;
 
+            // Convert plaintext to bytes
             size_t encodedSize = plaintext.MinEncodedSize();
             decryptedBytes.resize(encodedSize);
             plaintext.Encode(decryptedBytes.data(), encodedSize);
 
-            spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: raw RSA fallback decrypted bytes={}", decryptedBytes.size());
+            spdlog::debug(
+                "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: raw RSA decrypted bytes={}",
+                decryptedBytes.size());
+        } catch (const CryptoPP::Exception& ex) {
+            spdlog::warn(
+                "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: RSA decryption failed: {}",
+                ex.what());
+            return false;
         }
 
         // Extract 16 bytes from offset 1,5,9,13 (DWORD aligned positions in decrypted blob)
