@@ -242,7 +242,7 @@ protected:
     CMessageConnectionMessageStorage_0x4ba208 ownedMessageStorage_{};
 };
 
-class CMessageConnectionMessageRef : public CMessageConnectionMessageRefBase_0x4ba220 {
+class CMessageConnectionMessageRef_0x4ba23c : public CMessageConnectionMessageRefBase_0x4ba220 {
 public:
     // anchor: launcher.exe vtable `0x004ba23c`
     // Live outer message-ref table produced by `0x455c60/0x455cd0`.
@@ -253,7 +253,7 @@ public:
     uint32_t field1c = 0;
     uint32_t field20 = 0;
 
-    CMessageConnectionMessageRef() = default;
+    CMessageConnectionMessageRef_0x4ba23c() = default;
 
     // anchor: launcher.exe:0x455b80 / vtable `0x004ba23c +0x0c`
     void FinalRelease() override;
@@ -264,10 +264,10 @@ public:
 
     // Source note: keep the local outer scaffold noncopyable so raw `messageStorage0c` never
     // silently keeps a pointer into another instance's inline owned-storage tail.
-    CMessageConnectionMessageRef(const CMessageConnectionMessageRef&) = delete;
-    CMessageConnectionMessageRef& operator=(const CMessageConnectionMessageRef&) = delete;
-    CMessageConnectionMessageRef(CMessageConnectionMessageRef&&) = delete;
-    CMessageConnectionMessageRef& operator=(CMessageConnectionMessageRef&&) = delete;
+    CMessageConnectionMessageRef_0x4ba23c(const CMessageConnectionMessageRef_0x4ba23c&) = delete;
+    CMessageConnectionMessageRef_0x4ba23c& operator=(const CMessageConnectionMessageRef_0x4ba23c&) = delete;
+    CMessageConnectionMessageRef_0x4ba23c(CMessageConnectionMessageRef_0x4ba23c&&) = delete;
+    CMessageConnectionMessageRef_0x4ba23c& operator=(CMessageConnectionMessageRef_0x4ba23c&&) = delete;
 };
 
 // anchor: launcher.exe:0x41bc20 / CMessageConnectionMessageRef_DecodeMessageCode
@@ -275,25 +275,25 @@ public:
 // at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload,
 // handling both headerless (locator-based) and non-headerless (direct) payload formats.
 bool CMessageConnection_DecodeMessageCodeScaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode);
 
 // anchor: launcher.exe:0x41bc20 - CMessageConnectionMessageRef_DecodeMessageCode
 // Non-headerless message code decoder
 uint16_t CMessageConnectionMessageRef_DecodeMessageCode(
-    CMessageConnectionMessageRef* messageRef);
+    CMessageConnectionMessageRef_0x4ba23c* messageRef);
 
 // anchor: launcher.exe:0x41bbb0 - CMessageConnectionMessageRef_DecodeMessageCodeAlternate
 // Headerless message code decoder (alternate version)
 uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
-    CMessageConnectionMessageRef* messageRef);
+    CMessageConnectionMessageRef_0x4ba23c* messageRef);
 
 struct CMessageConnectionMessageRefHandleScaffold {
     // anchor family: launcher.exe:0x455cd0 / 0x4489d0
     // Tiny retained outer-message-ref handle helper used by packet-agenda read handoff and by
     // `CMessageConnection::OnOperationCompleted` stack locals.
-    CMessageConnectionMessageRef* messageRef00 = nullptr; // +0x00
+    CMessageConnectionMessageRef_0x4ba23c* messageRef00 = nullptr; // +0x00
 };
 
 static_assert(sizeof(CMessageConnectionMessageRefHandleScaffold) == 0x04, "message-ref handle size mismatch");
@@ -332,7 +332,7 @@ struct CMessageConnectionPacketBuilderEnvelope {
     // - `+0x08` = retained outer message-ref object consumed by `0x448cf0`
     void** vtable00 = nullptr;
     uint8_t* payloadBase04 = nullptr;
-    CMessageConnectionMessageRef* messageRef08 = nullptr;
+    CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;
 };
 
 static_assert(offsetof(CMessageConnectionPacketBuilderEnvelope, messageRef08) == 0x08, "packet-builder envelope message-ref offset mismatch");
@@ -424,7 +424,7 @@ public:
     // Original signature: cls_0x4b6538::cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
     // FIDELITY: Proper constructor that extracts from message ref payload
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
-        CMessageConnectionMessageRef* messageRef,
+        CMessageConnectionMessageRef_0x4ba23c* messageRef,
         uint8_t flag);
 
     // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
@@ -468,7 +468,7 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
 
 // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
-    CMessageConnectionMessageRef* messageRef,
+    CMessageConnectionMessageRef_0x4ba23c* messageRef,
     uint8_t flag) {
     // FIDELITY: Original extracts 16 bytes from message ref payload
     // flag is '\x01' in the original call (unused in text-only launcher)
@@ -569,13 +569,13 @@ public:
     // Canonical original sink vtables remain documented under:
     // - `0x004b8438`
     // - `0x004b84f0`
-    CMessageConnectionMessageRef* messageRef = nullptr;
+    CMessageConnectionMessageRef_0x4ba23c* messageRef = nullptr;
     bool hasValue = false;
 
     ~CMessageConnectionMessageRefOutputBuffer();
     void Reset();
     bool SetPayloadBytes(const uint8_t* payloadBytes, size_t payloadByteCount);
-    CMessageConnectionMessageRef* MessageRef();
+    CMessageConnectionMessageRef_0x4ba23c* MessageRef();
 };
 
 
@@ -595,7 +595,7 @@ public:
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
     bool TryTransform(
-        const CMessageConnectionMessageRef& inputMessageRef,
+        const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
         CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
@@ -614,7 +614,7 @@ public:
 
     void ResetForSeed(const std::array<uint8_t, 16>& seedBytes);
     bool TryTransform(
-        const CMessageConnectionMessageRef& inputMessageRef,
+        const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
         CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
@@ -678,13 +678,13 @@ void CMessageConnectionMessage_CreateRef(
 
 // Corresponds to the local_8 variable in CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse (0x4429b0).
 //
-// This class provides RAII-style management of CMessageConnectionMessageRef objects,
+// This class provides RAII-style management of CMessageConnectionMessageRef_0x4ba23c objects,
 // ensuring proper reference counting and cleanup. The original launcher.exe uses this
 // pattern extensively for temporary message objects during packet processing.
 
 class MessageConnectionMessageRefHelper_0x4489d0 {
 public:
-    CMessageConnectionMessageRef* messageRef00 = nullptr;  // +0x00 - retained message ref pointer
+    CMessageConnectionMessageRef_0x4ba23c* messageRef00 = nullptr;  // +0x00 - retained message ref pointer
 
     // anchor: launcher.exe:0x4429b8 (implicit default constructor)
     // Default constructor - initializes message ref pointer to nullptr
@@ -710,7 +710,7 @@ public:
     // Returns: void (messageRef00 is set to the new reference)
     void CreateRef(int messageContext) {
         // anchor: launcher.exe:0x455c60 - CMessageConnectionMessage_Create
-        messageRef00 = new CMessageConnectionMessageRef();
+        messageRef00 = new CMessageConnectionMessageRef_0x4ba23c();
         if (messageRef00) {
             // anchor: launcher.exe:0x455b80 - AddRef (vtable +0x04)
             messageRef00->AddRef();
@@ -747,7 +747,7 @@ public:
     // anchor: launcher.exe:0x4489d0 - Message ref handle assignment
     static void CMessageConnectionMessageRefHandle_AssignRetained(
         MessageConnectionMessageRefHelper_0x4489d0* targetHandle,
-        CMessageConnectionMessageRef* sourceMessageRef);
+        CMessageConnectionMessageRef_0x4ba23c* sourceMessageRef);
 };
 
 // Static assertion to ensure the helper maintains minimal size
@@ -846,7 +846,7 @@ public:
     
     // anchor: launcher.exe:0x469980
     // Store opaque message ref with proper ref counting
-    void StoreOpaqueMessageRef(CMessageConnectionMessageRef* messageRef);
+    void StoreOpaqueMessageRef(CMessageConnectionMessageRef_0x4ba23c* messageRef);
 };
 
 class CStreamPacketEncryptionModule_0x4b8704 : public CStreamPacketEncryptionOwnerBase_0x4b81dc {
@@ -880,9 +880,9 @@ struct PacketProcessingAgenda_0x469850 {
     // faithfully while still representing the two embedded helper objects as internal C++ wrappers.
     CMessageConnection* connectionOwner00 = nullptr;
     CStreamPacketEncryptionModule_0x4b8704* configuredModuleList04 = nullptr;
-    CMessageConnectionMessageRef* readOutputSlot08 = nullptr;
+    CMessageConnectionMessageRef_0x4ba23c* readOutputSlot08 = nullptr;
     PacketProcessingAgenda_0x4baf48 embeddedReadHelper0c{};
-    CMessageConnectionMessageRef* writeOutputSlot24 = nullptr;
+    CMessageConnectionMessageRef_0x4ba23c* writeOutputSlot24 = nullptr;
     PacketProcessingAgenda_0x4baf48 embeddedWriteHelper28{};
     // faithful raw-field naming from the recovered agenda object:
     // - `readHelperChainHead40` mirrors original agenda `+0x40`
@@ -909,11 +909,11 @@ struct PacketProcessingAgenda_0x469850 {
 
     // anchor: launcher.exe:0x469950 / 0x469930
     // Apply packet agenda processing to message refs
-    CMessageConnectionMessageRef* ApplySendPacketAgenda(
-        CMessageConnectionMessageRef& inputMessageRef,
+    CMessageConnectionMessageRef_0x4ba23c* ApplySendPacketAgenda(
+        CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
         bool* outAgendaTouched = nullptr);
-    CMessageConnectionMessageRef* ApplyReceivePacketAgenda(
-        CMessageConnectionMessageRef* inputMessageRef,
+    CMessageConnectionMessageRef_0x4ba23c* ApplyReceivePacketAgenda(
+        CMessageConnectionMessageRef_0x4ba23c* inputMessageRef,
         bool* outAgendaTouched = nullptr);
     
 
@@ -974,7 +974,7 @@ public:
     // - the send-mode/headerless branch mutates raw inner bytes around `+0x12/+0x16/+0x17`, then
     //   later clears the first payload byte high bit on the original input object after the
     //   agenda/submit branch
-    void SendPacketMessageRef(CMessageConnectionMessageRef& messageRef);
+    void SendPacketMessageRef(CMessageConnectionMessageRef_0x4ba23c& messageRef);
 
     // anchor: launcher.exe:0x448960
     // Narrow source-owned wrapper over the per-connection packet-name callback configuration:
@@ -1067,21 +1067,21 @@ protected:
     // - unlike earlier source-owned fallback logic, original `0x4490c0` still consumes the packet
     //   locally after calling this seam even when the callee returns false-ish
     virtual uint32_t DispatchCopiedParsedPacketTailScaffold(
-        CMessageConnectionMessageRef& messageRef);
+        CMessageConnectionMessageRef_0x4ba23c& messageRef);
     // anchor: launcher.exe:0x4490c0 -> vtable `+0x30`
     // Non-zero-flag protocol-`5` receive seam beneath the same callback tail.
     // Original call shape is `this->+0x30(messageRef)`.
     // Current startup auth/margin leaf tables keep this row on `0x441790`, so the default source
     // implementation mirrors that as a locally consumed no-op.
     virtual uint32_t DispatchPacketizedProtocol5MessageRefScaffold(
-        CMessageConnectionMessageRef& messageRef);
+        CMessageConnectionMessageRef_0x4ba23c& messageRef);
     // anchor: launcher.exe:0x4490c0 -> vtable `+0x34`
     // Non-zero-flag protocol-`7` receive seam beneath the same callback tail.
     // Original call shape is `this->+0x34(messageRef)`.
     // Current startup auth/margin leaf tables also keep this row on `0x441790`, so the default
     // source implementation mirrors that as a locally consumed no-op.
     virtual uint32_t DispatchPacketizedProtocol7MessageRefScaffold(
-        CMessageConnectionMessageRef& messageRef);
+        CMessageConnectionMessageRef_0x4ba23c& messageRef);
     // anchor: launcher.exe:0x4490c0 -> vtable `+0x38`
     // Pre-dispatch receive hook reached after the optional read-agenda handoff and before the
     // later `+0x2c/+0x30/+0x34` branch.
@@ -1089,7 +1089,7 @@ protected:
     // Current startup auth/margin/base tables keep this row on `0x441790`, so the default source
     // implementation remains a no-op.
     virtual void PreDispatchMessageRefScaffold(
-        CMessageConnectionMessageRef& messageRef);
+        CMessageConnectionMessageRef_0x4ba23c& messageRef);
 
 private:
     // UNANCHORED: source-owned diagnostic stringifier for the recovered packet-name family enum.
@@ -1103,13 +1103,13 @@ private:
     // - original returns that slot after dispatch without pre-clearing it first
     // Source now models that chain with real internal worker classes, so helper-side
     // replacement/discard remains visible at the same seam as the original.
-    CMessageConnectionMessageRef* ApplySendPacketAgenda(
-        CMessageConnectionMessageRef& inputMessageRef,
+    CMessageConnectionMessageRef_0x4ba23c* ApplySendPacketAgenda(
+        CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
         bool* outAgendaTouched);
     // anchor: launcher.exe:0x448a00
     // Lower submit helper beneath `0x448cf0`; source computes the final byte pointer/size directly
     // from raw inner `+0x0a/+0x0b/+0x0c..` storage.
-    uint32_t SubmitMessageRefBytes(const CMessageConnectionMessageRef& messageRef);
+    uint32_t SubmitMessageRefBytes(const CMessageConnectionMessageRef_0x4ba23c& messageRef);
 
 public:
     CMessageConnectionPacketNameFamily packetNameFamily_ = CMessageConnectionPacketNameFamily::kUnknown;
@@ -1252,7 +1252,7 @@ protected:
     // post-copy seam thin here by forwarding the local message-ref scaffold straight into the
     // concrete base/leaf `DispatchMessage` body.
     uint32_t DispatchCopiedParsedPacketTailScaffold(
-        CMessageConnectionMessageRef& messageRef) override;
+        CMessageConnectionMessageRef_0x4ba23c& messageRef) override;
 
 private:
     friend class CMarginConnectionBootstrapPrepStateOwner_0x443340;

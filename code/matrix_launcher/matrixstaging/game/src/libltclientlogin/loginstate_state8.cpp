@@ -314,7 +314,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
-uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
+uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
     if (!mediator) {
@@ -328,7 +328,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
     // - only other decoded message codes fall through owner `+0x184 -> 0x41f260` and land here
     // - practical consequence: the raw state8 reply opcode `0x10` belongs on that fallback path,
     //   not on the base code-4 wrapper branch
-    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(workItem);
+    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     // anchor: launcher.exe:0x43ae50
     LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
     if (!loadCharacterReplyEnvelope.valid) {

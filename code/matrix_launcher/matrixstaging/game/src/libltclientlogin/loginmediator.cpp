@@ -2050,7 +2050,7 @@ uint32_t CLTLoginMediator::DispatchCurrentHelperAuthMessage(void* workItem) {
 }
 
 // anchor: launcher.exe:0x41f260 / owner vtable `+0x184`
-uint32_t CLTLoginMediator::DispatchCurrentHelperSlot6(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
+uint32_t CLTLoginMediator::DispatchCurrentHelperSlot6(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     // Exact launcher wrapper body:
     // - mov ecx, [ecx+0x10]
     // - mov eax, [ecx]

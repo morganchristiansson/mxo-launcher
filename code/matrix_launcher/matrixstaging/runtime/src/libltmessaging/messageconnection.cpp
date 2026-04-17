@@ -302,7 +302,7 @@ uint16_t CMessageConnectionMessageRefBase_0x4ba220::PayloadByteCountScaffold() c
     return messageStorage0c ? messageStorage0c->PayloadByteCountScaffold() : 0u;
 }
 
-void CMessageConnectionMessageRef::FinalRelease() {
+void CMessageConnectionMessageRef_0x4ba23c::FinalRelease() {
     // anchor: launcher.exe:0x455b80 / vtable `0x004ba23c +0x0c`
     // Original live outer objects release the inner payload-storage object at `+0x0c`, collapse,
     // and return to the outer-object pool. Source still lacks the real pool, but a heap-backed
@@ -316,7 +316,7 @@ void CMessageConnectionMessageRef::FinalRelease() {
     delete this;
 }
 
-void CMessageConnectionMessageRef::ResetForPacketBuilderScaffold(
+void CMessageConnectionMessageRef_0x4ba23c::ResetForPacketBuilderScaffold(
     bool headerless,
     uint32_t messageContext14) {
     // anchor: launcher.exe:0x455cd0 / 0x455c60
@@ -335,7 +335,7 @@ void CMessageConnectionMessageRef::ResetForPacketBuilderScaffold(
 namespace {
 
 struct CMessageConnectionMessageRefReleaseDeleter {
-    void operator()(CMessageConnectionMessageRef* messageRef) const {
+    void operator()(CMessageConnectionMessageRef_0x4ba23c* messageRef) const {
         if (messageRef) {
             messageRef->Release();
         }
@@ -343,7 +343,7 @@ struct CMessageConnectionMessageRefReleaseDeleter {
 };
 
 static bool CMessageConnection_ResolveTransformInputSpan(
-    const CMessageConnectionMessageRef& inputMessageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     const uint8_t** outPayloadBytes,
     size_t* outPayloadByteCount) {
     if (outPayloadBytes) {
@@ -404,13 +404,13 @@ static std::vector<uint8_t> CStreamPacketEncryptionWorker_KeyBytes(
     return std::vector<uint8_t>(seedBytes.begin(), seedBytes.end());
 }
 
-static CMessageConnectionMessageRef* CMessageConnectionMessageRefHandle_AssignRetained(
-    CMessageConnectionMessageRef** slot,
-    CMessageConnectionMessageRef* newMessageRef) {
+static CMessageConnectionMessageRef_0x4ba23c* CMessageConnectionMessageRefHandle_AssignRetained(
+    CMessageConnectionMessageRef_0x4ba23c** slot,
+    CMessageConnectionMessageRef_0x4ba23c* newMessageRef) {
     if (!slot) {
         return nullptr;
     }
-    CMessageConnectionMessageRef* const oldMessageRef = *slot;
+    CMessageConnectionMessageRef_0x4ba23c* const oldMessageRef = *slot;
     if (oldMessageRef != newMessageRef) {
         if (oldMessageRef) {
             oldMessageRef->Release();
@@ -448,7 +448,7 @@ bool CMessageConnectionMessageRefOutputBuffer::SetPayloadBytes(
         return false;
     }
 
-    messageRef = new CMessageConnectionMessageRef();
+    messageRef = new CMessageConnectionMessageRef_0x4ba23c();
     messageRef->ResetForPacketBuilderScaffold(false, 0u);
     uint8_t* const appendPointer = messageRef->PayloadAppendPointerScaffold();
     if (!appendPointer) {
@@ -468,7 +468,7 @@ bool CMessageConnectionMessageRefOutputBuffer::SetPayloadBytes(
 }
 
 // anchor: launcher.exe:0x44d390 / 0x44d500
-CMessageConnectionMessageRef* CMessageConnectionMessageRefOutputBuffer::MessageRef() {
+CMessageConnectionMessageRef_0x4ba23c* CMessageConnectionMessageRefOutputBuffer::MessageRef() {
     return hasValue ? messageRef : nullptr;
 }
 
@@ -493,7 +493,7 @@ void CStreamPacketEncryptionModuleReadTransformWorker::ResetForSeed(
 
 // anchor: launcher.exe:0x44d500
 bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
-    const CMessageConnectionMessageRef& inputMessageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
     // Source still keeps the confirmed packet semantic at the worker boundary here, but the
     // recovered large/decrypting `FeedbackSize` adapter constructed by `0x44d910` is now held as a
@@ -538,7 +538,7 @@ void CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::ResetForSeed(
 
 // anchor: launcher.exe:0x44d390
 bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
-    const CMessageConnectionMessageRef& inputMessageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
     // Source still keeps the confirmed packet semantic at the worker boundary here, but the
     // recovered small/encrypting `FeedbackSize` adapter constructed by `0x44d820` is now held as a
@@ -582,8 +582,8 @@ void CStreamPacketEncryptionHelperBase_0x4b81c8::ForwardToNextHelper(
 // anchor: launcher.exe:0x44d500
 void CStreamPacketEncryptionModuleReadHelper_0x4b86f0::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
-    CMessageConnectionMessageRef* const inputMessageRef =
-        static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef);
+    CMessageConnectionMessageRef_0x4ba23c* const inputMessageRef =
+        static_cast<CMessageConnectionMessageRef_0x4ba23c*>(opaqueMessageRef);
     if (!inputMessageRef || transformWorkers.empty()) {
         collectionControl0c = 0u;
         ForwardToNextHelper(nullptr);
@@ -629,8 +629,8 @@ void CStreamPacketEncryptionModuleReadHelper_0x4b86f0::ResetForSeed(
 // anchor: launcher.exe:0x44d390
 void CStreamPacketEncryptionModuleWriteHelper_0x4b8690::HandleOpaqueMessageRef(
     void* opaqueMessageRef) {
-    CMessageConnectionMessageRef* const inputMessageRef =
-        static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef);
+    CMessageConnectionMessageRef_0x4ba23c* const inputMessageRef =
+        static_cast<CMessageConnectionMessageRef_0x4ba23c*>(opaqueMessageRef);
     if (!inputMessageRef || !hasTransformWorker ||
         !transformWorker.TryTransform(*inputMessageRef, &transformedOutput)) {
         transformedOutput.Reset();
@@ -669,21 +669,21 @@ void PacketProcessingAgenda_0x4baf48::HandleOpaqueMessageRef(
         return;
     }
     CMessageConnectionMessageRefHandle_AssignRetained(
-        reinterpret_cast<CMessageConnectionMessageRef**>(outputSlotAddress10),
-        static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef));
+        reinterpret_cast<CMessageConnectionMessageRef_0x4ba23c**>(outputSlotAddress10),
+        static_cast<CMessageConnectionMessageRef_0x4ba23c*>(opaqueMessageRef));
 }
 
 // anchor: launcher.exe:0x469980
-void PacketProcessingAgenda_0x4baf48::StoreOpaqueMessageRef(CMessageConnectionMessageRef* messageRef) {
+void PacketProcessingAgenda_0x4baf48::StoreOpaqueMessageRef(CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     // Faithful mirror of original CMessageConnectionPacketAgendaHelper_StoreOpaqueMessageRef
     // Handles proper ref counting when storing/replacing message refs
     if (!outputSlotAddress10) {
         return;
     }
-    
-    CMessageConnectionMessageRef** slot = reinterpret_cast<CMessageConnectionMessageRef**>(outputSlotAddress10);
-    CMessageConnectionMessageRef* current = *slot;
-    
+
+    CMessageConnectionMessageRef_0x4ba23c** slot = reinterpret_cast<CMessageConnectionMessageRef_0x4ba23c**>(outputSlotAddress10);
+    CMessageConnectionMessageRef_0x4ba23c* current = *slot;
+
     if (messageRef != current) {
         if (current != nullptr) {
             current->Release();
@@ -784,7 +784,7 @@ void CMessageConnection::ConfigurePacketAgenda(
     // Faithful mirror of original CMessageConnection_ConfigurePacketAgenda:
     // - if packetAgenda74 is null, allocate and construct it
     // - then install the stream packet encryption module via 0x469740
-    
+
     if (!packetAgenda_) {
         packetAgenda_ = std::make_unique<PacketProcessingAgenda_0x469850>(this);
         if (!packetAgenda_) {
@@ -803,7 +803,7 @@ const PacketProcessingAgenda_0x469850* CMessageConnection::PacketAgenda() const 
 }
 
 static void CMessageConnection_ApplySendMessageRefMutations(
-    CMessageConnectionMessageRef* messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || messageRef->headerless10 == 0u || !messageRef->messageStorage0c) {
         return;
     }
@@ -836,7 +836,7 @@ static void CMessageConnection_ApplySendMessageRefMutations(
 
 // anchor: launcher.exe:0x448cf0 post-submit/or-discard cleanup on the original input message-ref
 static void CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(
-    CMessageConnectionMessageRef* messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || messageRef->headerless10 == 0u || !messageRef->messageStorage0c) {
         return;
     }
@@ -873,7 +873,7 @@ PacketProcessingAgenda_0x469850::PacketProcessingAgenda_0x469850(CMessageConnect
     embeddedReadHelper0c.helperLabel0c = "Agenda read helper";
     embeddedReadHelper0c.outputSlotAddress10 = reinterpret_cast<void**>(&readOutputSlot08);
     embeddedReadHelper0c.downstreamHelperSlot14 = &writeHelperChainHead44;
-    
+
     // Set up embedded write helper at +0x28 (mirrors 0x469895-0x4698a3)
     embeddedWriteHelper28.nextHelper04 = nullptr;
     embeddedWriteHelper28.field04 = 0u;
@@ -881,7 +881,7 @@ PacketProcessingAgenda_0x469850::PacketProcessingAgenda_0x469850(CMessageConnect
     embeddedWriteHelper28.helperLabel0c = "Agenda write helper";
     embeddedWriteHelper28.outputSlotAddress10 = reinterpret_cast<void**>(&writeOutputSlot24);
     embeddedWriteHelper28.downstreamHelperSlot14 = nullptr;
-    
+
     // Initialize helper chains
     readHelperChainHead40 = &embeddedReadHelper0c;
     writeHelperChainHead44 = nullptr;
@@ -923,13 +923,13 @@ uint16_t PacketProcessingAgenda_0x469850::InstallStreamPacketEncryptionModule(
     streamPacketEncryptionModule->configuredConnection10 = connectionOwner00;
     configuredStreamPacketEncryptionModule = streamPacketEncryptionModule;
     ++configuredModuleCount4c;
-    
+
     return configuredModuleCount4c;
 }
 
 // anchor: launcher.exe:0x469950
-CMessageConnectionMessageRef* PacketProcessingAgenda_0x469850::ApplySendPacketAgenda(
-    CMessageConnectionMessageRef& inputMessageRef,
+CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplySendPacketAgenda(
+    CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     bool* outAgendaTouched) {
     // Faithful mirror of original PacketProcessingAgenda_DispatchWriteHelperChain
     // - if no write helper chain head, return original message ref
@@ -937,7 +937,7 @@ CMessageConnectionMessageRef* PacketProcessingAgenda_0x469850::ApplySendPacketAg
     if (outAgendaTouched) {
         *outAgendaTouched = (writeHelperChainHead44 != nullptr);
     }
-    
+
     if (writeHelperChainHead44 == nullptr) {
         return &inputMessageRef;
     }
@@ -947,8 +947,8 @@ CMessageConnectionMessageRef* PacketProcessingAgenda_0x469850::ApplySendPacketAg
 }
 
 // anchor: launcher.exe:0x469930
-CMessageConnectionMessageRef* PacketProcessingAgenda_0x469850::ApplyReceivePacketAgenda(
-    CMessageConnectionMessageRef* inputMessageRef,
+CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplyReceivePacketAgenda(
+    CMessageConnectionMessageRef_0x4ba23c* inputMessageRef,
     bool* outAgendaTouched) {
     // Faithful mirror of original PacketProcessingAgenda_DispatchReadHelperChain
     // - if no input message ref or no read helper chain head, return null/original
@@ -956,7 +956,7 @@ CMessageConnectionMessageRef* PacketProcessingAgenda_0x469850::ApplyReceivePacke
     if (outAgendaTouched) {
         *outAgendaTouched = (readHelperChainHead40 != nullptr && inputMessageRef != nullptr);
     }
-    
+
     if (!inputMessageRef || readHelperChainHead40 == nullptr) {
         return inputMessageRef;
     }
@@ -980,8 +980,8 @@ uint32_t CMessageConnection::ForwardPacketBuilderEnvelopeToSendPacket(
 }
 
 // anchor: launcher.exe:0x469950
-CMessageConnectionMessageRef* CMessageConnection::ApplySendPacketAgenda(
-    CMessageConnectionMessageRef& inputMessageRef,
+CMessageConnectionMessageRef_0x4ba23c* CMessageConnection::ApplySendPacketAgenda(
+    CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     bool* outAgendaTouched) {
     // anchor: launcher.exe:0x469950
     // Delegate to the agenda's ApplySendPacketAgenda method
@@ -993,7 +993,7 @@ CMessageConnectionMessageRef* CMessageConnection::ApplySendPacketAgenda(
 // Narrow source-owned mirror of the lower submit helper beneath the original message-ref-based
 // `CMessageConnection::SendPacket` family.
 uint32_t CMessageConnection::SubmitMessageRefBytes(
-    const CMessageConnectionMessageRef& messageRef) {
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     if (!Engine() || !messageRef.messageStorage0c) {
         return 0u;
     }
@@ -1033,7 +1033,7 @@ uint32_t CMessageConnection::SubmitMessageRefBytes(
 // builder, performs packet-agenda filtering, then reaches CMessageConnection_SubmitEnvelopeBytes
 // (0x448a00).
 void CMessageConnection::SendPacketMessageRef(
-    CMessageConnectionMessageRef& messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     if (!Engine() || !messageRef.messageStorage0c) {
         return;
     }
@@ -1045,9 +1045,9 @@ void CMessageConnection::SendPacketMessageRef(
     // Apply packet agenda filtering
     // anchor: launcher.exe:0x448f5e - agenda processing logic
     bool agendaTouched = false;
-    CMessageConnectionMessageRef* messageRefForSubmit = 
+    CMessageConnectionMessageRef_0x4ba23c* messageRefForSubmit =
         ApplySendPacketAgenda(messageRef, &agendaTouched);
-    
+
     // Check if agenda processing resulted in a valid message ref
     // anchor: launcher.exe:0x448f63 - null check and agenda processing
     if (!messageRefForSubmit || !messageRefForSubmit->messageStorage0c) {
@@ -1066,7 +1066,7 @@ void CMessageConnection::SendPacketMessageRef(
                     "UNKNOWN", 0, 0, 0, 0, 0, 0);
             } else {
                 // Headered message logging path
-                // anchor: launcher.exe:0x448e50 - headered logging setup  
+                // anchor: launcher.exe:0x448e50 - headered logging setup
                 if (g_PacketNameDecoderAlternate != nullptr) {
                     // TODO: Implement proper alternate packet name decoder invocation
                 }
@@ -1075,7 +1075,7 @@ void CMessageConnection::SendPacketMessageRef(
                     "UNKNOWN", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
             }
         }
-        
+
         // Clear high bit on original message ref when headerless
         // anchor: launcher.exe:0x448f87 - high bit clearing logic
         CMessageConnection_ClearSendMessageRefFirstPayloadByteHighBit(&messageRef);
@@ -1087,7 +1087,7 @@ void CMessageConnection::SendPacketMessageRef(
     if (messageRefForSubmit->messageStorage0c) {
         SubmitMessageRefBytes(*messageRefForSubmit);
     }
-    
+
     // Clear high bit on original message ref after submit (headerless only)
     // anchor: launcher.exe:0x448f87 - final high bit clearing
     if (messageRef.headerless10 != 0u && messageRef.messageStorage0c) {
@@ -1181,7 +1181,7 @@ static uint32_t CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(const vo
 // - copy bytes into that tail span
 // - then commit the new payload length through outer grow helper `+0x18`
 static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
-    CMessageConnectionMessageRef* messageRef,
+    CMessageConnectionMessageRef_0x4ba23c* messageRef,
     const uint8_t* payloadBytes,
     uint32_t payloadByteCount) {
     if (!messageRef || !messageRef->messageStorage0c) {
@@ -1222,7 +1222,7 @@ static bool CMessageConnection_AppendReceiveMessagePayloadSpanScaffold(
 // - `0x434fa0 = CLTTCPReadOperationRefHandle_AssignRetained`
 static bool CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
     CLTTCPConnection_ParsedPacketWorkItemScaffold_0x4b3e08* workItem,
-    CMessageConnectionMessageRef* outMessageRef,
+    CMessageConnectionMessageRef_0x4ba23c* outMessageRef,
     bool* outHadUnusedBuffers) {
     if (outHadUnusedBuffers) {
         *outHadUnusedBuffers = false;
@@ -1343,7 +1343,7 @@ constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
 
 // anchor family: launcher.exe:0x41bc20 / 0x41bbb0 headerless-locator message-code decode
 static bool CMessageConnection_ResolveMessageCodePointerScaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     const uint8_t** outMessageCodePointer,
     uint8_t* outTargetLocatorType,
     uint8_t* outSenderLocatorType,
@@ -1416,7 +1416,7 @@ static bool CMessageConnection_ResolveMessageCodePointerScaffold(
 }
 
 static bool CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     CBaseMarginConnection_0x4b64a8_ParsedPayloadSpanScaffold* outParsedPayload) {
     if (outParsedPayload) {
         *outParsedPayload = {};
@@ -1461,7 +1461,7 @@ static bool CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
 }
 
 static bool CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* outCode2Message,
     bool parseIncomingMessage) {
     if (outCode2Message) {
@@ -1488,12 +1488,12 @@ static bool CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
         outCode2Message->messageContext14 = 0u;
         outCode2Message->messageContextWord18 = 0u;
     }
-    
+
     return true;
 }
 
 static bool CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     CBaseMarginConnection_0x4b64a8_Code4MessageScaffold* outCode4Message,
     bool parseIncomingMessage) {
     if (outCode4Message) {
@@ -1520,7 +1520,7 @@ static bool CBaseMarginConnection_0x4b64a8_OnMessageCode4Scaffold(
 }
 
 static bool CBaseMarginConnection_0x4b64a8_OnMessageCode5Scaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     CBaseMarginConnection_0x4b64a8_Code5MessageScaffold* outCode5Message,
     bool parseIncomingMessage) {
     if (outCode5Message) {
@@ -1550,7 +1550,7 @@ static bool CBaseMarginConnection_0x4b64a8_OnMessageCode5Scaffold(
 // Source-owned narrow predicate exposing the specific consumed-code gate inside
 // `CBaseMarginConnection_0x4b64a8::DispatchMessage`.
 static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outDecodedMessageCode,
     bool* outUsedHeaderlessLocatorDecode,
     bool* outHadValidMessageCode) {
@@ -1596,7 +1596,7 @@ static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
 // message-ref before the embedded helper stores the output slot.
 static bool CMessageConnection_DriveAgendaReadHelperChainScaffold(
     PacketProcessingAgenda_0x469850* agenda,
-    CMessageConnectionMessageRef* inputMessageRef) {
+    CMessageConnectionMessageRef_0x4ba23c* inputMessageRef) {
     if (!agenda || agenda->readHelperChainHead40 == nullptr) {
         return false;
     }
@@ -1616,9 +1616,9 @@ static bool CMessageConnection_DriveAgendaReadHelperChainScaffold(
 //   source
 // - original `0x469930` (`PacketProcessingAgenda_0x469850_DispatchReadHelperChain`) does not
 //   pre-clear agenda `+0x08`; it simply drives the chain and returns the slot afterward
-static CMessageConnectionMessageRef* CMessageConnection_ApplyReceivePacketAgendaScaffold(
+static CMessageConnectionMessageRef_0x4ba23c* CMessageConnection_ApplyReceivePacketAgendaScaffold(
     PacketProcessingAgenda_0x469850* agenda,
-    CMessageConnectionMessageRef* inputMessageRef,
+    CMessageConnectionMessageRef_0x4ba23c* inputMessageRef,
     bool* outAgendaTouched) {
     if (outAgendaTouched) {
         *outAgendaTouched = false;
@@ -1642,7 +1642,7 @@ static CMessageConnectionMessageRef* CMessageConnection_ApplyReceivePacketAgenda
 
 // anchor: launcher.exe:0x4490c0 packetized branch reads inner `+0x0f & 0x07`
 static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint8_t* outProtocolId) {
     if (outProtocolId) {
         *outProtocolId = 0u;
@@ -1671,7 +1671,7 @@ static bool CMessageConnection_ResolvePacketizedProtocolIdScaffold(
 // Exported decode helper for CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
 // at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload.
 bool CMessageConnection_DecodeMessageCodeScaffold(
-    const CMessageConnectionMessageRef& messageRef,
+    const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode) {
     if (outMessageCode) {
@@ -1724,28 +1724,28 @@ bool CMessageConnection_DecodeMessageCodeScaffold(
 
 // UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
 uint32_t CMessageConnection::DispatchCopiedParsedPacketTailScaffold(
-    CMessageConnectionMessageRef& messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 0u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x30`
 uint32_t CMessageConnection::DispatchPacketizedProtocol5MessageRefScaffold(
-    CMessageConnectionMessageRef& messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 1u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x34`
 uint32_t CMessageConnection::DispatchPacketizedProtocol7MessageRefScaffold(
-    CMessageConnectionMessageRef& messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
     return 1u;
 }
 
 // anchor family: launcher.exe:0x4490c0 -> vtable `+0x38`
 void CMessageConnection::PreDispatchMessageRefScaffold(
-    CMessageConnectionMessageRef& messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     (void)messageRef;
 }
 
@@ -1783,7 +1783,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
-    
+
     // anchor: launcher.exe:0x4490c0 - work type 1 (close) handling
     if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         if (closeCompletionHelper80_) {
@@ -1792,7 +1792,7 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
         return 0u;
     }
-    
+
     // anchor: launcher.exe:0x4490f0 - work type 2 (connection status) handling
     if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus) {
         if (connectCompletionHelper7c_) {
@@ -1801,12 +1801,12 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
         return 0u;
     }
-    
+
     // anchor: launcher.exe:0x449120 - work type 3 (parsed packet) handling
     if (workType != CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeParsedPacket) {
         return 0u;
     }
-    
+
     // anchor: launcher.exe:0x449130 - check status/payload dword
     if (CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem) != 0u) {
         return 1u;
@@ -1828,9 +1828,9 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     bool hadUnusedBuffers = false;
-    std::unique_ptr<CMessageConnectionMessageRef, CMessageConnectionMessageRefReleaseDeleter>
-        ownedCopiedMessageRef(new CMessageConnectionMessageRef());
-    CMessageConnectionMessageRef* const copiedMessageRef = ownedCopiedMessageRef.get();
+    std::unique_ptr<CMessageConnectionMessageRef_0x4ba23c, CMessageConnectionMessageRefReleaseDeleter>
+        ownedCopiedMessageRef(new CMessageConnectionMessageRef_0x4ba23c());
+    CMessageConnectionMessageRef_0x4ba23c* const copiedMessageRef = ownedCopiedMessageRef.get();
     copiedMessageRef->ResetForPacketBuilderScaffold(!packetizedMessagesEnabled_);
     const bool copied = CMessageConnection_CopyParsedPacketIntoReceivedMessageRefScaffold(
         parsedPacketWorkItem,
@@ -1870,18 +1870,18 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
     }
     lastReceivedPacketHeaderlessScaffold_ = (copiedMessageRef->headerless10 != 0u);
-    
+
     // anchor: launcher.exe:0x4492a0 - packet agenda processing
-    CMessageConnectionMessageRef* messageRefForDispatch = copiedMessageRef;
+    CMessageConnectionMessageRef_0x4ba23c* messageRefForDispatch = copiedMessageRef;
     bool agendaTouched = false;
     if (PacketProcessingAgenda_0x469850* agenda = packetAgenda_.get();
         agenda && agenda->created) {
-        spdlog::debug("CMessageConnection::OnOperationCompleted applying packet agenda to messageRef={} agenda={}", 
+        spdlog::debug("CMessageConnection::OnOperationCompleted applying packet agenda to messageRef={} agenda={}",
                      fmt::ptr(copiedMessageRef), fmt::ptr(agenda));
         messageRefForDispatch = agenda->ApplyReceivePacketAgenda(copiedMessageRef, &agendaTouched);
-        
+
         if (agendaTouched) {
-            spdlog::debug("CMessageConnection::OnOperationCompleted packet agenda touched messageRef={} -> result={}", 
+            spdlog::debug("CMessageConnection::OnOperationCompleted packet agenda touched messageRef={} -> result={}",
                          fmt::ptr(copiedMessageRef), fmt::ptr(messageRefForDispatch));
             // Update last received packet info if agenda modified the message
             lastReceivedPacketBodyBytesScaffold_.clear();
@@ -2058,8 +2058,8 @@ void CMessageConnectionMessage_CreateRef(
     int messageContext) {
     // This corresponds to the original CMessageConnectionMessage_CreateRef function
     // that creates a new message reference and sets up the context.
-    
-    messageRefHelper->messageRef00 = new CMessageConnectionMessageRef();
+
+    messageRefHelper->messageRef00 = new CMessageConnectionMessageRef_0x4ba23c();
     if (messageRefHelper->messageRef00) {
         messageRefHelper->messageRef00->AddRef();
         messageRefHelper->messageRef00->messageContext14 = messageContext;
@@ -2071,12 +2071,12 @@ void CMessageConnectionMessage_CreateRef(
 // anchor: launcher.exe:0x4489d0 - Message ref handle assignment
 void MessageConnectionMessageRefHelper_0x4489d0::CMessageConnectionMessageRefHandle_AssignRetained(
     MessageConnectionMessageRefHelper_0x4489d0* targetHandle,
-    CMessageConnectionMessageRef* sourceMessageRef) {
+    CMessageConnectionMessageRef_0x4ba23c* sourceMessageRef) {
     // Release any existing reference
     if (targetHandle->messageRef00) {
         targetHandle->messageRef00->Release();
     }
-    
+
     // Assign new reference and add ref if it exists
     targetHandle->messageRef00 = sourceMessageRef;
     if (sourceMessageRef) {
@@ -2086,33 +2086,33 @@ void MessageConnectionMessageRefHelper_0x4489d0::CMessageConnectionMessageRefHan
 
 // anchor: launcher.exe:0x41bc20 - CMessageConnectionMessageRef_DecodeMessageCode
 uint16_t CMessageConnectionMessageRef_DecodeMessageCode(
-    CMessageConnectionMessageRef* messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || !messageRef->messageStorage0c) {
         return 0;
     }
-    
+
     // Non-headerless message code is at the start of the payload
     const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
     if (!payload) {
         return 0;
     }
-    
+
     return static_cast<uint16_t>(payload[0]) | (static_cast<uint16_t>(payload[1]) << 8);
 }
 
 // anchor: launcher.exe:0x41bbb0 - CMessageConnectionMessageRef_DecodeMessageCodeAlternate
 uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
-    CMessageConnectionMessageRef* messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || !messageRef->messageStorage0c) {
         return 0;
     }
-    
+
     // Headerless message code decoding from locator-based format
     const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
     if (!payload || messageRef->messageStorage0c->PayloadByteCountScaffold() < 2) {
         return 0;
     }
-    
+
     // Headerless format: message code is in bytes 2-3 (after locator bytes)
     return static_cast<uint16_t>(payload[2]) | (static_cast<uint16_t>(payload[3]) << 8);
 }
@@ -2131,7 +2131,7 @@ CBaseMarginConnection_0x4b64a8::CBaseMarginConnection_0x4b64a8(CLTThreadPerClien
 CBaseMarginConnection_0x4b64a8::~CBaseMarginConnection_0x4b64a8() = default;
 
 uint32_t CBaseMarginConnection_0x4b64a8::DispatchCopiedParsedPacketTailScaffold(
-    CMessageConnectionMessageRef& messageRef) {
+    CMessageConnectionMessageRef_0x4ba23c& messageRef) {
     return DispatchMessage(&messageRef);
 }
 
@@ -2573,7 +2573,7 @@ CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::CMarginConnectionBootstr
     mbr_0xd4 = 0u;
     mbr_0xd8 = 0u;
     mbr_0xdc = 0u;
-    
+
     field_0xc.InitializeFromBootstrapBlocks(param_1, param_2, param_3);
 }
 
@@ -2588,22 +2588,22 @@ CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::~CMarginConnectionBootst
 uint32_t CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState() const {
     // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
     // This calls meth_0x45a440 on the modulus BigInt to get bit count
-    
+
     // Get modulus bit count
     const uint32_t modulusBitCount = field_0xc.field_0x8.GetBitCount();
     if (modulusBitCount == 0) {
         spdlog::warn("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState: zero modulus bit count");
         return 0;
     }
-    
+
     // Convert bits to bytes (this is the expected ciphertext size for RSA)
     const uint32_t expectedCiphertextByteCount = (modulusBitCount + 7) / 8;
-    
+
     spdlog::debug(
         "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::GetExpectedPayloadSizeFromBootstrapState: modulus bits={} expected ciphertext bytes={}",
         modulusBitCount,
         expectedCiphertextByteCount);
-    
+
     return expectedCiphertextByteCount;
 }
 
@@ -2620,22 +2620,22 @@ bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryptio
         encryptedBytes,
         encryptedByteCount,
         &decryptedChallengeBytes);
-    
+
     if (!decryptSuccess) {
         spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper decryption failed");
         return false;
     }
-    
+
     // Write result to output buffer: output[0] = success flag, output[4] = byte count
     auto* outBytes = static_cast<uint8_t*>(outputBuffer);
     outBytes[0] = 1;  // success flag
     *reinterpret_cast<uint32_t*>(outBytes + 4) = 16;  // byte count
-    
+
     // Copy decrypted bytes after the header (original writes to message payload)
     std::copy(decryptedChallengeBytes.begin(), decryptedChallengeBytes.end(), outBytes + 8);
-    
+
     spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper succeeded");
-    
+
     return true;
 }
 
@@ -2652,38 +2652,38 @@ void* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x
     // anchor: launcher.exe:0x437810 -> validates payload size matches expected
     // Original: iVar1 = (**(code **)(*(int *)((int)&this->mbr_0x4 + *(int *)(this->mbr_0x4 + 8)) + 4))();
     //           if (param_4 != iVar1) { *param_1 = 0; *(undefined4 *)(param_1 + 4) = 0; return param_1; }
-    
+
     // Get expected payload size from bootstrap state
     const uint32_t expectedPayloadSize = GetExpectedPayloadSizeFromBootstrapState();
-    
+
     // Validate payload size matches expected
     if (payloadSize != expectedPayloadSize) {
         spdlog::warn(
             "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c payload size mismatch: expected={} actual={}",
             expectedPayloadSize,
             static_cast<unsigned>(payloadSize));
-        
+
         // Original sets output[0] = 0, output[4] = 0 and returns
         auto* outBytes = static_cast<uint8_t*>(outputBuffer);
         outBytes[0] = 0;
         *reinterpret_cast<uint32_t*>(outBytes + 4) = 0;
         return outputBuffer;
     }
-    
+
     // anchor: launcher.exe:0x437810 -> calls vtable+0x24 (virt_meth_0x468130) for actual RSA decrypt
     // Original: (*(this->cls_0x4b42b0).vftptr_0x0[3].~cls_0x4b0000_0)((cls_0x4b0000 *)this,(byte)param_1)
-    
+
     // Call the actual decrypt method using proper vtable dispatch
     const bool decryptSuccess = PerformRSADecryption(
         encryptedPayload,
         payloadSize,
         outputBuffer);
-    
+
     // Debug: log decryption result
     if (!decryptSuccess) {
         spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptViaVtable0x1c: decryption failed");
     }
-    
+
     return outputBuffer;
 }
 
@@ -2703,7 +2703,7 @@ uint8_t* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptChalleng
     // anchor: launcher.exe:0x4429d0 - call to bootstrap prep DecryptChallengeBlob
     // This method is called from CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
     // We delegate to the existing DecryptViaVtable0x1c method
-    
+
     const size_t payloadSize = 16;  // Challenge bytes are always 16 bytes
     void* result = DecryptViaVtable0x1c(
         outBuffer,
@@ -2712,7 +2712,7 @@ uint8_t* CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::DecryptChalleng
         static_cast<uint16_t>(field18),
         payloadBytes,
         payloadSize);
-    
+
     return static_cast<uint8_t*>(result);
 }
 
@@ -2775,7 +2775,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     constexpr uintptr_t kPacketBuilderVtable00 = 0x004b6524u;
 
     mxo::liblttcp::CMessageConnectionPacketBuilderPayloadWithReservationScaffold builder = {};
-    CMessageConnectionMessageRef messageRef = {};
+    CMessageConnectionMessageRef_0x4ba23c messageRef = {};
     messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
     if (!messageRef.messageStorage0c) {
         return 0u;
@@ -2847,63 +2847,63 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
 
     // anchor: launcher.exe:0x4429b0 - CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
     // Faithful implementation following Ghidra decompilation of 0x4429b0
-    
+
     // 1. Static init check for crypto context
     // anchor: launcher.exe:0x4429b0 - static init block
     mxo::liblttcp::EnsureCryptoContextInitialized();
-    
+
     // 2. Create local message reference for challenge processing
     // anchor: launcher.exe:0x4429b8 - CMessageConnectionMessage_CreateRef(&local_8, 0)
     // Use proper helper class for message reference management
     MessageConnectionMessageRefHelper_0x4489d0 localMessageRefHelper{};
     localMessageRefHelper.CreateRef(0);
-    
+
     if (!localMessageRefHelper.IsValid()) {
         return 0u;
     }
-    
-    // Get direct pointer for convenience
-    CMessageConnectionMessageRef* localMessageRef = localMessageRefHelper.messageRef00;
-    
 
-    
+    // Get direct pointer for convenience
+    CMessageConnectionMessageRef_0x4ba23c* localMessageRef = localMessageRefHelper.messageRef00;
+
+
+
     // Validation is now handled by IsValid() check above
-    
+
     // Copy challenge bytes into message storage payload
     // anchor: launcher.exe:0x4429c0-0x4429d0 - copy challenge bytes to message storage
     CMessageConnectionMessageStorage_0x4ba208* messageStorage = localMessageRef->messageStorage0c;
     uint8_t* payloadBase = messageStorage->PayloadBaseScaffold();
     const uint16_t payloadCapacity = messageStorage->RemainingAppendableByteCountScaffold();
-    
+
     if (!payloadBase || payloadCapacity < 16) {
         if (localMessageRef) {
             localMessageRef->Release();
         }
         return 0u;
     }
-    
+
     // Copy challenge bytes into payload
     // anchor: launcher.exe:0x4429c0 - memcpy equivalent
     std::copy_n(challengeBytes.data(), 16, payloadBase);
     messageStorage->SetPayloadByteCountRawScaffold(16);
-    
+
     // Use bootstrap prep object to decrypt challenge
     // anchor: launcher.exe:0x4429b0 calls [this+0xa0] vtable +0x1c (0x437810)
     // anchor: launcher.exe:0x4429d0 - call to bootstrap prep DecryptChallengeBlob
-    CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* bootstrapPrep = 
+    CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* bootstrapPrep =
         bootstrapPrepStateA0_.get();  // Get the existing bootstrap prep object
-    
+
     if (!bootstrapPrep) {
         // localMessageRef is managed by localMessageRefHelper, automatic cleanup
         return 0u;
     }
-    
+
     // Prepare parsed message result structure
     // anchor: launcher.exe:0x4429b0 uses local_38 (cls_0x4b654c)
     MarginConnectionChallengeParsedResult_0x4b654c parsedResult{};
     parsedResult.mbr_0x14 = 0;  // context - would come from message
     parsedResult.mbr_0x18 = 0;  // field18 - would come from message
-    
+
     // Call bootstrap prep to decrypt challenge
     // This corresponds to the call at 0x4429d0 in Ghidra
     // anchor: launcher.exe:0x437810 - virt_meth_0x437810 implementation
@@ -2913,7 +2913,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
         parsedResult.mbr_0x14,
         parsedResult.mbr_0x18,
         messageStorage->PayloadBaseScaffold());
-    
+
     if (!decryptedBuffer || *(int*)(decryptedBuffer + 4) == 0) {
         // anchor: launcher.exe:0x4429e0 - MessageBoxA on decryption failure
         // In text mode, we log instead of showing a message box
@@ -2921,7 +2921,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
         // localMessageRef is managed by localMessageRefHelper, automatic cleanup
         return 0u;
     }
-    
+
     // Grow payload to accommodate decrypted data
     // anchor: launcher.exe:0x4429f0 - CMessageConnectionMessage_GrowPayloadByteCount
     const uint32_t decryptedByteCount = *(uint32_t*)(decryptedBuffer + 4);
@@ -2929,36 +2929,36 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
         localMessageRef->GrowPayloadByteCountScaffold(
             static_cast<uint16_t>(decryptedByteCount));
     }
-    
+
     // Create first packet builder envelope to extract seed bytes
     // anchor: launcher.exe:0x442a60 - CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 constructor
     // anchor: launcher.exe:0x443220 - cls_0x4b6538 constructor with message ref and flag
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 seedEnvelope(
         localMessageRef, 0x01);
-    
+
     // Extract seed bytes from envelope and store in connection
     // anchor: launcher.exe:0x442ac6-0x442ae0 - extract to this+0x85..+0x91
     std::array<uint8_t, 16> extractedSeedBytes = seedEnvelope.ExtractChallengeBytes();
     std::copy_n(extractedSeedBytes.data(), 16, messageCode5SeedBytes85_.data());
-    
+
     // Ensure stream packet encryption module is configured
     // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule (0x441470)
     // anchor: launcher.exe:0x442ae8 - call to EnsureStreamPacketEncryptionModule
     EnsureStreamPacketEncryptionModuleFromSeed85();
-    
+
     // Create second packet builder envelope for response packet
     // anchor: launcher.exe:0x442af0 - CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 constructor
     // anchor: launcher.exe:0x439840 - CLTLoginMediatorPacketBuilderEnvelope_Initialize
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
     // Default constructor is sufficient for our use case
-    
+
     // Set up response packet with opcode 0x03 (CERT_ChallengeResponse)
     // anchor: launcher.exe:0x442b00-0x442b10 - build response packet
     // Create a new message ref for the response packet
-    CMessageConnectionMessageRef* responseMessageRef = new CMessageConnectionMessageRef();
+    CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = new CMessageConnectionMessageRef_0x4ba23c();
     responseMessageRef->AddRef();
     responseMessageRef->ResetForPacketBuilderScaffold(false, 0);
-    
+
     uint8_t* responsePayload = responseMessageRef->PayloadAppendPointerScaffold();
     if (!responsePayload) {
         if (localMessageRef) {
@@ -2969,39 +2969,39 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
         }
         return 0u;
     }
-    
+
     // Write response packet: opcode + extracted response bytes from seed envelope
     // anchor: launcher.exe:0x442b00 - set opcode 0x03
     *responsePayload = 0x03;  // CERT_ChallengeResponse opcode
-    
+
     // Copy extracted bytes from seed envelope to response envelope
     // anchor: launcher.exe:0x442b18-0x442b28 - copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d
     // Use the ExtractForResponsePacket method which handles the correct offsets
     std::array<uint8_t, 16> responsePacketBytes = seedEnvelope.ExtractForResponsePacket();
     std::copy_n(responsePacketBytes.data(), 16, responsePayload + 1);
     responseMessageRef->SetPayloadByteCountScaffold(17);
-    
+
     // Set up the response envelope with the message ref
     responseEnvelope.builder00.envelope00.messageRef08 = responseMessageRef;
-    
+
     // Send through connection's packet send pipeline
     // anchor: launcher.exe:0x442b30 -> connection vtable +0x24 (0x41cf30)
     // anchor: launcher.exe:0x41cf30 - CMessageConnection_ForwardEnvelopeToSendPacket
     const uint32_t sendResult = ForwardPacketBuilderEnvelopeToSendPacket(responseEnvelope.builder00.envelope00);
-    
+
     // Clean up
     // localMessageRef is managed by localMessageRefHelper, no need to manually release
     if (responseMessageRef) {
         responseMessageRef->Release();
     }
-    
+
     spdlog::info(
         "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes faithful implementation: sent response via packet builder envelope sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
         static_cast<unsigned>(sendResult),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-    
+
     return sendResult;
 }
 
@@ -3073,7 +3073,7 @@ const uint8_t* CBaseMarginConnection_0x4b64a8::MessageCode5SeedBytes85Pointer() 
 // (**(code **)(*completionCallback + 8))()
 // The messageRef is kept alive by the caller's unique_ptr through the dispatch.
 static void CBaseMarginConnection_0x4b64a8_InvokeMessageRefCompletionCallback(
-    CMessageConnectionMessageRef* messageRef,
+    CMessageConnectionMessageRef_0x4ba23c* messageRef,
     void** completionCallbackSlot) {
     if (!completionCallbackSlot || *completionCallbackSlot == nullptr) {
         return;
@@ -3141,7 +3141,7 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
         // Original uses custom big integer operations, not standard OAEP padding
         // FIDELITY: Remove infidel OAEP approach and use raw RSA like original
         std::vector<uint8_t> decryptedBytes;
-        
+
         try {
             // Convert ciphertext to CryptoPP integer
             CryptoPP::Integer ciphertext(
@@ -3290,9 +3290,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
     // anchor: launcher.exe:0x442a1e -> CMessageConnectionMessage_CreateRef(&local_8, 0)
     // Original: Creates local message ref (cls_0x4489d0) for decryption target
-    CMessageConnectionMessageRef localMessageRef;
+    CMessageConnectionMessageRef_0x4ba23c localMessageRef;
     localMessageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
-    
+
     if (!localMessageRef.messageStorage0c) {
         spdlog::warn(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: failed to create local message ref for decryption target");
@@ -3306,21 +3306,21 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     //   - param_3: local_c = *(undefined4 *)(param_1 + 0x14) (message context)
     //   - param_4: *(undefined2 *)(param_1 + 0x18) (message context word)
     //   - param_5: encrypted challenge blob from parsed message
-    
+
     // Get message context fields from parsed result
     const uint32_t messageContext = parsedMessageResult->messageContext14;
     const uint16_t messageContextWord = parsedMessageResult->messageContextWord18;
-    
+
     // Get encrypted payload from parsed message
     const uint8_t* encryptedPayload = parsedMessageResult->GetEncryptedPayload();
     size_t encryptedPayloadSize = parsedMessageResult->GetEncryptedPayloadSize();
-    
+
     if (!encryptedPayload || encryptedPayloadSize == 0) {
         spdlog::warn(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap: no encrypted payload in parsed message");
         return 0u;
     }
-    
+
     // FIDELITY: Skip opcode and header to get to ciphertext
     // Based on packet analysis: [opcode(1)][header(4)][ciphertext(96)]
     // The GetEncryptedPayload() already skips the opcode, but we need to skip the 4-byte header too
@@ -3329,7 +3329,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
     // anchor: launcher.exe:0x442a33 -> DecryptViaVtable0x1c with proper parameters
     std::array<uint8_t, 32> decryptOutput{};  // [success, byteCount, 16 bytes]
-    
+
     bootstrapPrepStateA0_->DecryptViaVtable0x1c(
         decryptOutput.data(),
         nullptr,  // cryptoContext (TODO: implement proper crypto context)
@@ -3341,7 +3341,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // Check decrypt result: output[0] = success flag, output[4] = byte count
     const bool decryptSuccess = decryptOutput[0] != 0;
     const uint16_t decryptedByteCount = *reinterpret_cast<const uint32_t*>(decryptOutput.data() + 4);
-    
+
     if (decryptSuccess) {
         // anchor: launcher.exe:0x442a48 -> GrowPayloadByteCount via vtable+0x24
         // Original: (**(code **)(*(int *)local_8.messageRef00 + 0x24))(local_8.messageRef00, *(int *)(iVar2 + 4))
@@ -3355,7 +3355,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
                     payloadBase);
             }
         }
-        
+
         // anchor: launcher.exe:0x442a5e -> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
         // Original: (&local_38, (int *)local_8.messageRef00, '\x01')
         // FIDELITY: Construct envelope with message ref and flag 0x01
@@ -3370,30 +3370,30 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
                     payloadBase);
             }
         }
-        
+
         // Now construct envelope with proper message ref and flag
         CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope(&localMessageRef, 0x01);
-        
+
         // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
         // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
         auto seedBytes = envelope.ExtractChallengeBytes();
         SetMessageCode5SeedBytes85(seedBytes);
-        
+
         // anchor: launcher.exe:0x442aae -> EnsureStreamPacketEncryptionModule
         // Original: CBaseMarginConnection_EnsureStreamPacketEncryptionModule(this)
         // Current: Already handled in SetMessageCode5SeedBytes85
-        
+
         // anchor: launcher.exe:0x442ab9-0x442b03 -> Initialize packet builder and copy response bytes
         // Original flow:
         // 1. CLTLoginMediatorPacketBuilderEnvelope_Initialize(&local_24)
         // 2. Set opcode 0x11
         // 3. Copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
         // 4. Send via connection vtable+0x24
-        
+
         // FIDELITY: Extract response bytes and send
         auto responseBytes = envelope.ExtractForResponsePacket();
         const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(responseBytes);
-        
+
         spdlog::info(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} decryptedByteCount={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
             sendResult,
@@ -3405,10 +3405,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
                 (static_cast<uint32_t>(decryptOutput[11]) << 24u)),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
-        
+
         return sendResult != 0u ? 1u : 0u;
     }
-    
+
     // anchor: launcher.exe:0x442a3d -> decryption failure handling
     // Original: MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
     //           then (**(code **)(*(int *)this + 0xc))(1) to close connection
@@ -3416,12 +3416,12 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed this={} ownerContext={}",
         fmt::ptr(this),
         fmt::ptr(OwnerContext()));
-    
+
     // FIDELITY: Call connection vtable+0xc to close on failure
     // Original: (**(code **)(*(int *)this + 0xc))(1)
     // This corresponds to Close(bool graceful) with graceful=1
     Close(/*graceful=*/true);
-    
+
     return 0u;
 }
 
@@ -3462,7 +3462,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    auto& copiedMessageRef = *static_cast<CMessageConnectionMessageRef*>(messageRef);
+    auto& copiedMessageRef = *static_cast<CMessageConnectionMessageRef_0x4ba23c*>(messageRef);
     const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = copiedMessageRef.messageStorage0c;
     if (!messageStorage) {
         return 0u;
@@ -3518,7 +3518,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
             if (CBaseMarginConnection_0x4b64a8_OnMessageCode2Scaffold(
                     copiedMessageRef, &parsedResult, /*parseIncomingMessage=*/true)) {
                 handledCode2 = HandleCode2ForBootstrap(&parsedResult);
-                
+
                 // FIDELITY: HandleCode2ForBootstrap handles the low-level decryption and response sending
                 // (matching original vtable+0x1c and vtable+0x24 calls), but the mediator needs to update
                 // bootstrap state for the next expected packet. The infidel method was handling this state
@@ -3529,7 +3529,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
                         logicalPayloadBytes,
                         logicalPayloadByteCount,
                         /*transportEncrypted=*/false);
-                    
+
                     spdlog::info(
                         "CBaseMarginConnection_0x4b64a8::DispatchMessage fidelity decryption+send succeeded, infidel state management result={} this={} ownerContext={}",
                         static_cast<unsigned>(infidelHandled),
@@ -3735,7 +3735,7 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
     mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
     if (mediator && CMessageConnection_IsMediatorMarginConnectionScaffold(this, mediator)) {
         return mediator->DispatchCurrentHelperSlot6(
-            static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(messageRef));
+            static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(messageRef));
     }
     return 0u;
 }

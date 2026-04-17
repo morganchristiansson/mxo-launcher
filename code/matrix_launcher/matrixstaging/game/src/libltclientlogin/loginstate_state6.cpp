@@ -236,7 +236,7 @@ void CLTLoginState_State6::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x00440780 (vtable 0x004b508c slot 6)
-uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
+uint32_t CLTLoginState_State6::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     (void)workItem;
     spdlog::info(
         "DIAGNOSTIC: CLTLoginState_State6::Slot6_HandleSecondaryMessage entered this={} stagedMarginBytes={} currentState={}",

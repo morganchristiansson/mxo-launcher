@@ -71,8 +71,8 @@ public:
         return MessageStorage() ? MessageStorage()->PayloadByteCountScaffold() : 0u;
     }
 
-    ::mxo::liblttcp::CMessageConnectionMessageRef& MessageRef() { return messageRef_; }
-    const ::mxo::liblttcp::CMessageConnectionMessageRef& MessageRef() const { return messageRef_; }
+    ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& MessageRef() { return messageRef_; }
+    const ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& MessageRef() const { return messageRef_; }
 
     // Returns envelope struct for send path compatibility.
     // anchor: launcher.exe:0x439840 / envelope fields
@@ -224,7 +224,7 @@ protected:
         reservation.writePointer00[reservation.reservedContentByteCount04 - 1u] = 0u;
     }
 
-    ::mxo::liblttcp::CMessageConnectionMessageRef messageRef_{};
+    ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c messageRef_;
     ::mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope envelope_{};
 };
 

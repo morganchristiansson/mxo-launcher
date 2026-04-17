@@ -144,7 +144,7 @@ void CLTLoginState_State10::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
 
 // anchor: launcher.exe:0x004401a0 (vtable 0x004b512c slot 6)
 uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
-        mxo::liblttcp::CMessageConnectionMessageRef* messageRef) {
+        mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator || !messageRef) {
         return 0u;
@@ -187,7 +187,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // anchor: launcher.exe:0x4401a0
     // Original at 0x4401c0: CALL 0x43a330 (State10ClaimCharacterNameReplyParseObject_InitFromIncomingPacket)
     // with LEA ECX,[EBP-0x28]; PUSH 1; PUSH ESI (messageRef). This constructs a parse
-    // object on the stack directly from the raw CMessageConnectionMessageRef*, not from
+    // object on the stack directly from the raw CMessageConnectionMessageRef_0x4ba23c*, not from
     // extracted payload bytes. The parse object has a virtual destructor cleaned up at
     // 0x4402e7-0x4402f0: TEST ECX,ECX; JZ skip; MOV EDX,[ECX]; CALL [EDX+8].
     //

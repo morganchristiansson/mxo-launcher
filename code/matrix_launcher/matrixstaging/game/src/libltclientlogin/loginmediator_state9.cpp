@@ -31,13 +31,13 @@ void CLTLoginMediator::SetState9CallbackObjectTriple84_88_8c(void* callback84, v
 uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workItem) {
     // Faithful read from `0x41c5c0`:
     // - if owner `+0x84` is null, return `1`
-    // - otherwise cast workItem to CMessageConnectionMessageRef* and call
+    // - otherwise cast workItem to CMessageConnectionMessageRef_0x4ba23c* and call
     //   `CMessageConnectionMessageRef_DecodeMessageCode` at `0x41bc20` to get the message opcode
     // - construct the opcodeStorage dword (low word = decoded message code)
     // - call callback84 vtable `+0x0c(&opcodeStorage, workItem)`
     //
     // Original assembly:
-    //   uVar2 = CMessageConnectionMessageRef_DecodeMessageCode((CMessageConnectionMessageRef*)param_1);
+    //   uVar2 = CMessageConnectionMessageRef_DecodeMessageCode((CMessageConnectionMessageRef_0x4ba23c*)param_1);
     //   param_1 = (int*)CONCAT22(extraout_var, uVar2);  // opcode in low word
     //   uVar3 = (**(code**)(*(int*)this->ownerCallback84 + 0xc))(&param_1, piVar1);
     if (!ownerCallback84_) {
@@ -45,7 +45,7 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
     }
 
     // Cast workItem to message-ref and decode the message code using the original helper
-    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(workItem);
+    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderless = false;
     if (!mxo::liblttcp::CMessageConnection_DecodeMessageCodeScaffold(

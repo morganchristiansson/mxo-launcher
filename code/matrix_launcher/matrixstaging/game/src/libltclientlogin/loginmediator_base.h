@@ -15,7 +15,7 @@ class LaunchPadClient_0x4b0e48;
 
 // Forward declarations for message ref classes
 namespace liblttcp {
-class CMessageConnectionMessageRef;
+class CMessageConnectionMessageRef_0x4ba23c;
 }
 
 // Type definitions used in pure virtual methods
@@ -38,7 +38,7 @@ public:
     // Shared packet builder envelope fields (no raw vtable ptr - uses C++ virtual):
     // +0x00: vtable pointer (C++ implicit)
     uint32_t nopatchLauncherVersionValue04 = 0;    // +0x04
-    ::mxo::liblttcp::CMessageConnectionMessageRef* messageRef08 = nullptr;  // +0x08
+    ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                  // +0x0c
 
     // Payload pointers (set by derived classes):
@@ -82,7 +82,7 @@ public:
     // PacketBuilder layout at +0x00:
     void** vtable00 = nullptr;                                  // +0x00
     uint32_t nopatchLauncherVersionValue04 = 0;                // +0x04
-    liblttcp::CMessageConnectionMessageRef* messageRef08 = nullptr;  // +0x08
+    liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                             // +0x0c
     void* payloadBegin10 = nullptr;                            // +0x10
     const char* heapString14 = nullptr;                        // +0x14 - THIS IS WHAT GETS ACCESSED!
@@ -574,7 +574,7 @@ public:
     // +0x180
     virtual uint32_t DispatchCurrentHelperAuthMessage(void* workItem) = 0;
     // +0x184
-    virtual uint32_t DispatchCurrentHelperSlot6(mxo::liblttcp::CMessageConnectionMessageRef* workItem) = 0;
+    virtual uint32_t DispatchCurrentHelperSlot6(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) = 0;
     // +0x188
     virtual uint32_t HandleMarginConnectionCompletionFallback(void* connection, void* workItem) = 0;
     // +0x18c

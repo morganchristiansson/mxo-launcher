@@ -159,14 +159,14 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
 }
 
 // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
-uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
+uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
     if (!mediator) {
         return 0u;
     }
 
-    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef*>(workItem);
+    auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     // anchor: launcher.exe:0x43ae50
     LoadCharacterReplyEnvelope_0x4b542c loadCharacterReplyEnvelope(messageRef, 1);
     if (!loadCharacterReplyEnvelope.valid) {

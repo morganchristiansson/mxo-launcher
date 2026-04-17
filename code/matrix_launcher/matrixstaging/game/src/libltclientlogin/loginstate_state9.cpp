@@ -73,7 +73,7 @@ void CLTLoginState_State9::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x0043c180 (vtable 0x004b517c slot 6)
-uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef* workItem) {
+uint32_t CLTLoginState_State9::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     // Current live-status note:
     // - newer natural-original WineDbg now proves this slot-6 body is reached on the natural path
     // - representative natural stop hit the success-side branch at `0x43c1c2`

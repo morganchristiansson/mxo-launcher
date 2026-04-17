@@ -97,7 +97,7 @@ struct IncomingAuthPayloadViewScaffold {
 
 // anchor family: launcher.exe:0x41bc20 / 0x41bbb0
 static bool ResolveIncomingAuthMessageCodePointerScaffold(
-    const mxo::liblttcp::CMessageConnectionMessageRef& incomingMessageRef,
+    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& incomingMessageRef,
     const uint8_t** outMessageCodePointer,
     bool* outUsedHeaderlessLocatorDecode) {
     if (outMessageCodePointer) {
@@ -155,7 +155,7 @@ static bool ResolveIncomingAuthMessageCodePointerScaffold(
 }
 
 static bool BuildIncomingAuthPayloadViewScaffold(
-    const mxo::liblttcp::CMessageConnectionMessageRef* incomingAuthMessageRef,
+    const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* incomingAuthMessageRef,
     IncomingAuthPayloadViewScaffold* outView) {
     if (outView) {
         *outView = {};
@@ -1466,7 +1466,7 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
     CLTLoginMediator& mediator) {
     IncomingAuthPayloadViewScaffold incomingPayload = {};
     if (!BuildIncomingAuthPayloadViewScaffold(
-            static_cast<const mxo::liblttcp::CMessageConnectionMessageRef*>(incomingAuthMessage),
+            static_cast<const mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(incomingAuthMessage),
             &incomingPayload)) {
         mediator.stagedIncomingAuthPacketBytes_.clear();
         return kAuthBootstrap680InboundUnhandled;
