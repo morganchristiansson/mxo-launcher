@@ -605,60 +605,127 @@ public:
         CMessageConnectionMessageRefOutputBuffer* outputBuffer);
 };
 
-// Challenge result structure from margin connection message parsing
+// ============================================================
+// Challenge Result Structure - cls_0x4b654c
+// ============================================================
 // anchor: launcher.exe:0x4b654c
+// Original structure used in CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
+// to store parsed challenge result information. This corresponds to the 'local_38' variable
+// in the Ghidra decompilation at 0x4429b0.
+//
+// Memory layout (28 bytes total):
+// +0x00: uint32_t mbr_0x00  - Unknown field 0
+// +0x04: uint32_t mbr_0x04  - Unknown field 1
+// +0x08: uint32_t mbr_0x08  - Unknown field 2
+// +0x0c: uint32_t mbr_0x0c  - Unknown field 3
+// +0x10: uint32_t mbr_0x10  - Unknown field 4
+// +0x14: uint32_t mbr_0x14  - Message context (passed to DecryptChallengeBlob)
+// +0x18: uint32_t mbr_0x18  - Field 18 (passed to DecryptChallengeBlob)
+
 class MarginConnectionChallengeParsedResult_0x4b654c {
 public:
-    uint32_t mbr_0x00 = 0;        // +0x00
-    uint32_t mbr_0x04 = 0;        // +0x04
-    uint32_t mbr_0x08 = 0;        // +0x08
-    uint32_t mbr_0x0c = 0;        // +0x0c
-    uint32_t mbr_0x10 = 0;        // +0x10
-    uint32_t mbr_0x14 = 0;        // +0x14 - used as context
-    uint32_t mbr_0x18 = 0;        // +0x18 - used as field18
-    
+    uint32_t mbr_0x00 = 0;        // +0x00 - unknown field 0
+    uint32_t mbr_0x04 = 0;        // +0x04 - unknown field 1
+    uint32_t mbr_0x08 = 0;        // +0x08 - unknown field 2
+    uint32_t mbr_0x0c = 0;        // +0x0c - unknown field 3
+    uint32_t mbr_0x10 = 0;        // +0x10 - unknown field 4
+    uint32_t mbr_0x14 = 0;        // +0x14 - message context for decryption
+    uint32_t mbr_0x18 = 0;        // +0x18 - field18 parameter for decryption
+
+    // anchor: launcher.exe:0x4429b0 (implicit default constructor)
+    // Default constructor - all fields initialized to zero
     MarginConnectionChallengeParsedResult_0x4b654c() = default;
+
+    // anchor: launcher.exe:0x4429b0 (constructor with context/field18)
+    // Constructor used in challenge processing to set up context parameters
+    // Corresponds to the initialization of local_38 in the original code
     explicit MarginConnectionChallengeParsedResult_0x4b654c(uint32_t context, uint32_t field18)
-        : mbr_0x14(context), mbr_0x18(field18) {}
+        : mbr_0x14(context), mbr_0x18(field18) {
+        // Other fields remain zero-initialized
+    }
 };
 
-// Message reference helper for challenge processing
+// Static assertion to ensure correct size matches original structure
+static_assert(sizeof(MarginConnectionChallengeParsedResult_0x4b654c) == 0x1C, 
+              "MarginConnectionChallengeParsedResult_0x4b654c size mismatch");
+
+// ============================================================
+// Message Reference Helper - cls_0x4489d0
+// ============================================================
 // anchor: launcher.exe:0x4489d0
+// Helper class that wraps message reference management for challenge processing.
+// Corresponds to the local_8 variable in CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse (0x4429b0).
+//
+// This class provides RAII-style management of CMessageConnectionMessageRef objects,
+// ensuring proper reference counting and cleanup. The original launcher.exe uses this
+// pattern extensively for temporary message objects during packet processing.
+
 class MessageConnectionMessageRefHelper_0x4489d0 {
 public:
-    CMessageConnectionMessageRef* messageRef00 = nullptr;
-    
+    CMessageConnectionMessageRef* messageRef00 = nullptr;  // +0x00 - retained message ref pointer
+
+    // anchor: launcher.exe:0x4429b8 (implicit default constructor)
+    // Default constructor - initializes message ref pointer to nullptr
     MessageConnectionMessageRefHelper_0x4489d0() = default;
+
+    // anchor: launcher.exe:0x4429d0 (implicit destructor)
+    // Destructor - automatically releases any retained message ref
+    // This ensures proper cleanup even if the helper goes out of scope unexpectedly
     ~MessageConnectionMessageRefHelper_0x4489d0() {
         if (messageRef00) {
             messageRef00->Release();
             messageRef00 = nullptr;
         }
     }
-    
-    // anchor: launcher.exe:0x455cd0
-    // Create message ref with specified context
+
+    // anchor: launcher.exe:0x455cd0 - CMessageConnectionMessage_CreateRef
+    // Creates a new message reference with the specified context.
+    // Corresponds to the call at 0x4429b8 in the original code.
+    //
+    // Parameters:
+    //   messageContext - Context value to store in message ref (field 0x14)
+    //
+    // Returns: void (messageRef00 is set to the new reference)
     void CreateRef(int messageContext) {
+        // anchor: launcher.exe:0x455c60 - CMessageConnectionMessage_Create
         messageRef00 = new CMessageConnectionMessageRef();
         if (messageRef00) {
+            // anchor: launcher.exe:0x455b80 - AddRef (vtable +0x04)
             messageRef00->AddRef();
+            // Set context field as in original
             messageRef00->messageContext14 = messageContext;
         }
     }
-    
-    // Reset and clean up current message ref
+
+    // anchor: launcher.exe:0x455ad0 (implicit Reset method)
+    // Explicitly reset and clean up the current message ref.
+    // This method provides the same cleanup as the destructor but can be
+    // called explicitly when needed.
     void Reset() {
         if (messageRef00) {
             messageRef00->Release();
             messageRef00 = nullptr;
         }
     }
-    
-    // Check if message ref is valid
+
+    // anchor: launcher.exe:0x4429c0 (validation pattern)
+    // Validates that the message ref is properly initialized and has storage.
+    // Corresponds to the null checks in the original code before using the message ref.
+    //
+    // Returns: true if message ref is valid and has storage, false otherwise
     bool IsValid() const {
         return messageRef00 != nullptr && messageRef00->messageStorage0c != nullptr;
     }
+
+    // Delete copy constructor and assignment operator to prevent accidental copying
+    // The original launcher.exe doesn't copy these helper objects
+    MessageConnectionMessageRefHelper_0x4489d0(const MessageConnectionMessageRefHelper_0x4489d0&) = delete;
+    MessageConnectionMessageRefHelper_0x4489d0& operator=(const MessageConnectionMessageRefHelper_0x4489d0&) = delete;
 };
+
+// Static assertion to ensure the helper maintains minimal size
+static_assert(sizeof(MessageConnectionMessageRefHelper_0x4489d0) <= 0x08, 
+              "MessageConnectionMessageRefHelper_0x4489d0 size unexpected");
 
 class CStreamPacketEncryptionModuleHelper : public CStreamPacketEncryptionHelperBase_0x4b81c8 {
 public:
