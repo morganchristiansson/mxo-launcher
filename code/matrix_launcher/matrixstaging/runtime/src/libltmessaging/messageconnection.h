@@ -903,7 +903,6 @@ public:
 };
 
 struct CMarginConnectionLocalCompletionWorkItemScaffold;
-struct CMarginConnectionBootstrapPrepStateA0Scaffold;
 class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 
 // ============================================================
@@ -911,6 +910,8 @@ class CMarginConnectionBootstrapPrepStateOwner_0x443340;
 // ============================================================
 // Current recovered intermediate base between `CMessageConnection` and the auth/margin startup
 // leaf families.
+class CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778;
+
 class CBaseMarginConnection_0x4b64a8 : public CMessageConnection {
 public:
     // UNANCHORED: source-owned narrow intermediate-base ctor.
@@ -998,7 +999,7 @@ private:
     bool messageCode4SuccessFlag84_ = false;
     bool hasBootstrapReplyCopy98_ = false;
     std::array<uint8_t, 0x136> bootstrapReplyCopy98_{};
-    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here, and the first later original consumer is `0x4429b0 -> +0x1c / 0x437810`
+    std::unique_ptr<CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778> bootstrapPrepStateA0_; // original connection `+0xa0`; standalone helper `0x443340` allocates/stores the `0xe0` prep object here, and the first later original consumer is `0x4429b0 -> +0x1c / 0x437810`
     bool hasMessageCode5SeedBytes85_ = false;
     std::array<uint8_t, 16> messageCode5SeedBytes85_{};
     std::unique_ptr<CStreamPacketEncryptionModule_0x4b8704> streamPacketEncryptionModule9c_;
@@ -1158,7 +1159,7 @@ static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, 
 static_assert(offsetof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70, field_0xb8) == 0xb8);
 static_assert(sizeof(CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70) == 0xc4, "bootstrap prep state subobject +0x0c size mismatch");
 
-class CMarginConnectionBootstrapPrepStateA0Scaffold {
+class CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778 {
 public:
     // anchor: launcher.exe:0x443220 / object size `0xe0`
     // vtable layout (from cls_0x4b6778::vftable_4b6778):
@@ -1172,13 +1173,13 @@ public:
     //   +0x1c: virt_meth_0x437810 -> validation wrapper that calls vtable+0x24 (virt_meth_0x468130)
     //   +0x20: virt_meth_0x4383d0
     //   +0x24: ImportThunk_48bc34
-    CMarginConnectionBootstrapPrepStateA0Scaffold(
+    CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778(
         const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_1,
         const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_2,
         const CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c* param_3,
         int param_4);
     // anchor: launcher.exe:0x443390
-    virtual ~CMarginConnectionBootstrapPrepStateA0Scaffold();
+    virtual ~CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778();
 
     // vtable+0x1c / 0x437810: Validation wrapper that checks payload size then calls decrypt method.
     // Original signature: undefined1* __thiscall virt_meth_0x437810(cls_0x4b6778* this, undefined1* output, undefined4, undefined4, int payloadSize, undefined4)
@@ -1207,11 +1208,11 @@ public:
     // Padding to meet original 0xe0 size: C++ vtable adds 4 bytes but we removed 3 vtable ptr fields
     std::array<uint8_t, 8> padding_0xe0{};
 
-    CMarginConnectionBootstrapPrepStateA0Scaffold(const CMarginConnectionBootstrapPrepStateA0Scaffold&) = delete;
-    CMarginConnectionBootstrapPrepStateA0Scaffold& operator=(const CMarginConnectionBootstrapPrepStateA0Scaffold&) = delete;
+    CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778(const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778&) = delete;
+    CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778& operator=(const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778&) = delete;
 };
 
-static_assert(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold) >= 0xe0, "bootstrap prep state +0xa0 object size mismatch");
+static_assert(sizeof(CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778) >= 0xe0, "bootstrap prep state +0xa0 object size mismatch");
 
 class CMarginConnectionBootstrapPrepStateOwner_0x443340 {
 public:
