@@ -11,6 +11,9 @@ namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
 #include "../libltcrypto/auth_internal.h"
 #include "../liblttcp/ltthreadperclienttcpengine.h"
 
+// Forward declare crypto helper
+class CryptoInitHelper_0x4b42bc;
+
 
 
 

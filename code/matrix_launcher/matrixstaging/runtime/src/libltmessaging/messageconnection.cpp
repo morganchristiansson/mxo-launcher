@@ -1,4 +1,5 @@
 #include "messageconnection.h"
+#include "crypto_init_helper.h"
 
 #include "../../../game/src/libltclientlogin/loginmediator.h"
 #include "../libltbase/ltresult.h"
@@ -2650,7 +2651,12 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
 
     // anchor: launcher.exe:0x4429b0 - CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
     // Faithful implementation following Ghidra decompilation of 0x4429b0
-    // Create local message reference for challenge processing
+    
+    // 1. Static init check for crypto context
+    // anchor: launcher.exe:0x4429b0 - static init block
+    mxo::liblttcp::EnsureCryptoContextInitialized();
+    
+    // 2. Create local message reference for challenge processing
     // anchor: launcher.exe:0x4429b8 - CMessageConnectionMessage_CreateRef(&local_8, 0)
     // Use proper helper class for message reference management
     MessageConnectionMessageRefHelper_0x4489d0 localMessageRefHelper{};
