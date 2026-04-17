@@ -1783,6 +1783,8 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
     }
 
     const uint32_t workType = CMessageConnection_WorkItemTypeScaffold(workItem);
+    
+    // anchor: launcher.exe:0x4490c0 - work type 1 (close) handling
     if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         if (closeCompletionHelper80_) {
             closeCompletionHelper80_->Signal();
@@ -1790,6 +1792,8 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
         return 0u;
     }
+    
+    // anchor: launcher.exe:0x4490f0 - work type 2 (connection status) handling
     if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeConnectionStatus) {
         if (connectCompletionHelper7c_) {
             connectCompletionHelper7c_->Signal();
@@ -1797,9 +1801,13 @@ uint32_t CMessageConnection::OnOperationCompleted(void* workItem) {
         }
         return 0u;
     }
+    
+    // anchor: launcher.exe:0x449120 - work type 3 (parsed packet) handling
     if (workType != CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeParsedPacket) {
         return 0u;
     }
+    
+    // anchor: launcher.exe:0x449130 - check status/payload dword
     if (CMessageConnection_WorkItemStatusOrPayloadDwordScaffold(workItem) != 0u) {
         return 1u;
     }
@@ -2015,6 +2023,71 @@ uint32_t CMessageConnection::EnsureConnected() {
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     }
     return result;
+}
+
+// anchor: launcher.exe:0x455cd0 - CMessageConnectionMessage_CreateRef
+void CMessageConnectionMessage_CreateRef(
+    MessageConnectionMessageRefHelper_0x4489d0* messageRefHelper,
+    int messageContext) {
+    // This corresponds to the original CMessageConnectionMessage_CreateRef function
+    // that creates a new message reference and sets up the context.
+    
+    messageRefHelper->messageRef00 = new CMessageConnectionMessageRef();
+    if (messageRefHelper->messageRef00) {
+        messageRefHelper->messageRef00->AddRef();
+        messageRefHelper->messageRef00->messageContext14 = messageContext;
+        // Reset the message ref for packet building
+        messageRefHelper->messageRef00->ResetForPacketBuilderScaffold(false);
+    }
+}
+
+// anchor: launcher.exe:0x4489d0 - Message ref handle assignment
+void MessageConnectionMessageRefHelper_0x4489d0::CMessageConnectionMessageRefHandle_AssignRetained(
+    MessageConnectionMessageRefHelper_0x4489d0* targetHandle,
+    CMessageConnectionMessageRef* sourceMessageRef) {
+    // Release any existing reference
+    if (targetHandle->messageRef00) {
+        targetHandle->messageRef00->Release();
+    }
+    
+    // Assign new reference and add ref if it exists
+    targetHandle->messageRef00 = sourceMessageRef;
+    if (sourceMessageRef) {
+        sourceMessageRef->AddRef();
+    }
+}
+
+// anchor: launcher.exe:0x41bc20 - CMessageConnectionMessageRef_DecodeMessageCode
+uint16_t CMessageConnectionMessageRef_DecodeMessageCode(
+    CMessageConnectionMessageRef* messageRef) {
+    if (!messageRef || !messageRef->messageStorage0c) {
+        return 0;
+    }
+    
+    // Non-headerless message code is at the start of the payload
+    const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
+    if (!payload) {
+        return 0;
+    }
+    
+    return static_cast<uint16_t>(payload[0]) | (static_cast<uint16_t>(payload[1]) << 8);
+}
+
+// anchor: launcher.exe:0x41bbb0 - CMessageConnectionMessageRef_DecodeMessageCodeAlternate
+uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
+    CMessageConnectionMessageRef* messageRef) {
+    if (!messageRef || !messageRef->messageStorage0c) {
+        return 0;
+    }
+    
+    // Headerless message code decoding from locator-based format
+    const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
+    if (!payload || messageRef->messageStorage0c->PayloadByteCountScaffold() < 2) {
+        return 0;
+    }
+    
+    // Headerless format: message code is in bytes 2-3 (after locator bytes)
+    return static_cast<uint16_t>(payload[2]) | (static_cast<uint16_t>(payload[3]) << 8);
 }
 
 // ============================================================

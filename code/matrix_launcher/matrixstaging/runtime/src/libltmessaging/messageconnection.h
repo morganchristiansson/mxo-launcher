@@ -279,6 +279,16 @@ bool CMessageConnection_DecodeMessageCodeScaffold(
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode);
 
+// anchor: launcher.exe:0x41bc20 - CMessageConnectionMessageRef_DecodeMessageCode
+// Non-headerless message code decoder
+uint16_t CMessageConnectionMessageRef_DecodeMessageCode(
+    CMessageConnectionMessageRef* messageRef);
+
+// anchor: launcher.exe:0x41bbb0 - CMessageConnectionMessageRef_DecodeMessageCodeAlternate
+// Headerless message code decoder (alternate version)
+uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
+    CMessageConnectionMessageRef* messageRef);
+
 struct CMessageConnectionMessageRefHandleScaffold {
     // anchor family: launcher.exe:0x455cd0 / 0x4489d0
     // Tiny retained outer-message-ref handle helper used by packet-agenda read handoff and by
@@ -657,6 +667,15 @@ static_assert(sizeof(MarginConnectionChallengeParsedResult_0x4b654c) == 0x1C,
 // ============================================================
 // anchor: launcher.exe:0x4489d0
 // Helper class that wraps message reference management for challenge processing.
+// Forward declaration for the message ref helper class
+class MessageConnectionMessageRefHelper_0x4489d0;
+
+// Standalone function for creating message references (used in OnOperationCompleted)
+// anchor: launcher.exe:0x455cd0
+void CMessageConnectionMessage_CreateRef(
+    MessageConnectionMessageRefHelper_0x4489d0* messageRefHelper,
+    int messageContext);
+
 // Corresponds to the local_8 variable in CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse (0x4429b0).
 //
 // This class provides RAII-style management of CMessageConnectionMessageRef objects,
@@ -724,6 +743,11 @@ public:
     // The original launcher.exe doesn't copy these helper objects
     MessageConnectionMessageRefHelper_0x4489d0(const MessageConnectionMessageRefHelper_0x4489d0&) = delete;
     MessageConnectionMessageRefHelper_0x4489d0& operator=(const MessageConnectionMessageRefHelper_0x4489d0&) = delete;
+    
+    // anchor: launcher.exe:0x4489d0 - Message ref handle assignment
+    static void CMessageConnectionMessageRefHandle_AssignRetained(
+        MessageConnectionMessageRefHelper_0x4489d0* targetHandle,
+        CMessageConnectionMessageRef* sourceMessageRef);
 };
 
 // Static assertion to ensure the helper maintains minimal size
