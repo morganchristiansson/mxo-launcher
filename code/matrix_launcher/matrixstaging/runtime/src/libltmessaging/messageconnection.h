@@ -819,6 +819,10 @@ public:
     
     // anchor: launcher.exe:0x469720 / vtable `0x004baf48 +0x10`
     virtual void DelegateToChainedHelper();
+    
+    // anchor: launcher.exe:0x469980
+    // Store opaque message ref with proper ref counting
+    void StoreOpaqueMessageRef(CMessageConnectionMessageRef* messageRef);
 };
 
 class CStreamPacketEncryptionModule_0x4b8704 : public CStreamPacketEncryptionOwnerBase_0x4b81dc {

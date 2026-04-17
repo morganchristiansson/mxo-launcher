@@ -665,6 +665,28 @@ void PacketProcessingAgenda_0x4baf48::HandleOpaqueMessageRef(
         static_cast<CMessageConnectionMessageRef*>(opaqueMessageRef));
 }
 
+// anchor: launcher.exe:0x469980
+void PacketProcessingAgenda_0x4baf48::StoreOpaqueMessageRef(CMessageConnectionMessageRef* messageRef) {
+    // Faithful mirror of original CMessageConnectionPacketAgendaHelper_StoreOpaqueMessageRef
+    // Handles proper ref counting when storing/replacing message refs
+    if (!outputSlotAddress10) {
+        return;
+    }
+    
+    CMessageConnectionMessageRef** slot = reinterpret_cast<CMessageConnectionMessageRef**>(outputSlotAddress10);
+    CMessageConnectionMessageRef* current = *slot;
+    
+    if (messageRef != current) {
+        if (current != nullptr) {
+            current->Release();
+        }
+        *slot = messageRef;
+        if (messageRef != nullptr) {
+            messageRef->AddRef();
+        }
+    }
+}
+
 // anchor: launcher.exe:0x44c680 / vtable `0x004baf48 +0x00`
 PacketProcessingAgenda_0x4baf48::~PacketProcessingAgenda_0x4baf48() {
     // Default destructor implementation
