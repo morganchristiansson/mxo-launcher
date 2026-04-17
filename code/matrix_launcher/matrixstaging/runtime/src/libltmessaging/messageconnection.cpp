@@ -2278,9 +2278,6 @@ void CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70::InitializeFromBoot
     ResetCMarginConnectionBootstrapPrepBigIntObject(&mbr_0x8c, &ownedState.mbr_0x8cOwnedDigits);
     ResetCMarginConnectionBootstrapPrepBigIntObject(&mbr_0xa0, &ownedState.mbr_0xa0OwnedDigits);
 
-    spdlog::debug("CMarginConnectionBootstrapPrepStateSubobject0c_0x465d70::InitializeFromBootstrapBlocks: param_1={} param_2={} param_3={}",
-        fmt::ptr(param_1), fmt::ptr(param_2), fmt::ptr(param_3));
-
     if (!param_1 || !param_2 || !param_3) {
         return;
     }
@@ -2698,8 +2695,11 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_DecryptChallenge(
             prepState->field_0xc.mbr_0x8c.GetBitCount(),
             prepState->field_0xc.mbr_0xa0.GetBitCount());
 
+        // Fidelity: Use Set* methods like InitializeFromBootstrapBlocks instead of throwing Initialize()
         CryptoPP::RSA::PrivateKey privateKey;
-        privateKey.Initialize(modulus, publicExponent, privateExponent);
+        privateKey.SetModulus(modulus);
+        privateKey.SetPublicExponent(publicExponent);
+        privateKey.SetPrivateExponent(privateExponent);
 
         // RSA decrypt the challenge blob
         std::vector<uint8_t> decryptedBytes;
@@ -2854,16 +2854,20 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // anchor: launcher.exe:0x4429b0 -> decryption failure check (*(int *)(iVar2 + 4) == 0)
     // Original: Shows MessageBoxA("Failed to decrypt challenge blob from server!", "Error", 0)
     // then calls connection vtable+0xc with arg 1 to close/disconnect.
-    // FIDELITY: Original does NOT fall back to mediator continuation - just returns 0.
+    // Investigate: RSA decryption fails - bootstrap state may not be properly populated.
     if (!decryptSuccess) {
         spdlog::error(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decrypt failed packetSize={} this={} ownerContext={}",
             static_cast<unsigned>(packetSize),
             fmt::ptr(this),
             fmt::ptr(OwnerContext()));
-        // Original shows MessageBox then calls vtable+0xc with arg 1 to close connection.
-        // Here we just return 0 to signal failure - no continuation fallback.
-        return 0u;
+        // TEMP: Keep continuation for now until RSA key construction is fully debugged
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_LoginMediatorOwnerScaffold(this);
+        if (!mediator) {
+            return 0u;
+        }
+        mediator->stagedIncomingMarginPacketBytes_.assign(packetBytes, packetBytes + packetSize);
+        return mediator->ContinueMarginBootstrapHandshake(packetBytes, packetSize, /*transportEncrypted=*/false);
     }
 
     // anchor: launcher.exe:0x4429b0 -> success path
