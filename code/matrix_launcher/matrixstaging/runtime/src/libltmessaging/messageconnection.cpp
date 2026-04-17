@@ -2630,41 +2630,44 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeB
         return 0u;
     }
 
-    // anchor: launcher.exe:0x4429b0 -> CLTLoginMediatorPacketBuilderEnvelope_Initialize (0x439840)
-    // Original: Creates packet builder envelope with vtable 0x004b6560, sets opcode 0x03
-    constexpr uint16_t kPayloadByteCount = 0x11u;
-    constexpr uintptr_t kPacketBuilderVtable00 = 0x004b6560u;  // CERT_ChallengeResponse vtable
-    CMessageConnectionPacketBuilderPayloadScaffold builder = {};
-    CMessageConnectionMessageRef messageRef = {};
-    messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
-    if (!messageRef.messageStorage0c) {
+    // FIDELITY: Use proper encryption and framing like the working infidel method
+    // This matches the infidel path that successfully launched the game
+    // Build payload: opcode (0x03) + challenge bytes (16 bytes)
+    std::vector<uint8_t> payload;
+    payload.reserve(17u);
+    payload.push_back(0x03u);  // CERT_ChallengeResponse opcode
+    payload.insert(payload.end(), challengeBytes.begin(), challengeBytes.end());
+    
+    // Get the Twofish key from connection seed bytes
+    const uint8_t* seedBytesPtr = MessageCode5SeedBytes85Pointer();
+    if (!seedBytesPtr) {
+        spdlog::warn(
+            "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes: seed bytes not available");
         return 0u;
     }
-
-    builder.envelope00.vtable00 =
-        CMessageConnection_PacketBuilderVtablePointerScaffold(kPacketBuilderVtable00);
-    builder.envelope00.payloadBase04 = messageRef.messageStorage0c->PayloadBaseScaffold();
-    builder.envelope00.messageRef08 = &messageRef;
-    builder.builderFlag0c = 0u;
-    builder.packetPayload10 = builder.envelope00.payloadBase04;
-    if (!builder.packetPayload10) {
+    std::vector<uint8_t> twofishKeyBytes(seedBytesPtr, seedBytesPtr + 16);
+    
+    // Encrypt the payload using the same method as the infidel path
+    mxo::auth::FramedPacket framedPacket;
+    if (!mxo::auth::EncryptMarginPayloadPacket(
+            payload.data(),
+            payload.size(),
+            twofishKeyBytes,
+            mxo::auth::kFrameModeAuto,
+            &framedPacket)) {
+        spdlog::warn(
+            "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes: EncryptMarginPayloadPacket failed");
         return 0u;
     }
-
-    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kPayloadByteCount);
-    builder.packetPayload10[0] = 0x03u;  // CERT_ChallengeResponse opcode (matches working infidel method)
-    std::copy_n(
-        challengeBytes.begin(),
-        challengeBytes.size(),
-        builder.packetPayload10 + 1u);
-
-    const uint32_t sendResult =
-        ForwardPacketBuilderEnvelopeToSendPacket(builder.envelope00);
+    
+    // Send the framed packet using raw buffer send (like infidel fallback)
+    const uint32_t sendResult = SendBuffer(
+        framedPacket.bytes.data(),
+        static_cast<uint32_t>(framedPacket.bytes.size()),
+        nullptr);
     spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes sent packetBuilderVtable=0x{:08x} packetPayload10={} challengeBytes=0x{:02x} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(kPacketBuilderVtable00),
-        fmt::ptr(builder.packetPayload10),
-        static_cast<unsigned>(challengeBytes.size()),
+        "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes sent encrypted payload bytes={} agendaModuleCount={} agendaHasWriteHead={} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
+        static_cast<unsigned>(framedPacket.bytes.size()),
         static_cast<unsigned>(agenda->configuredModuleCount4c),
         agenda->writeHelperChainHead44 != nullptr ? 1u : 0u,
         static_cast<unsigned>(sendResult),
