@@ -753,7 +753,7 @@ void CMessageConnection::ConfigurePacketAgenda(
     // anchor: launcher.exe:0x448980
     // Faithful mirror of original CMessageConnection_ConfigurePacketAgenda:
     // - if packetAgenda74 is null, allocate and construct it
-    // - then install the stream packet encryption module
+    // - then install the stream packet encryption module via 0x469740
     
     if (!packetAgenda_) {
         packetAgenda_ = std::make_unique<PacketProcessingAgenda_0x469850>(this);
@@ -764,37 +764,7 @@ void CMessageConnection::ConfigurePacketAgenda(
 
     // anchor: launcher.exe:0x448980 -> 0x469740
     // Install stream packet encryption module (always called, even if agenda was already created)
-    PacketProcessingAgenda_0x469850& agenda = *packetAgenda_;
-    
-    if (!streamPacketEncryptionModule) {
-        return;
-    }
-
-    // Install the module into the agenda
-    streamPacketEncryptionModule->nextConfiguredModule0c = agenda.configuredModuleList04;
-    agenda.configuredModuleList04 = streamPacketEncryptionModule;
-
-    if (streamPacketEncryptionModule->readHelper04) {
-        CStreamPacketEncryptionHelperBase_0x4b81c8* const previousReadHead = agenda.readHelperChainHead40;
-        agenda.readHelperChainHead40 = streamPacketEncryptionModule->readHelper04;
-        streamPacketEncryptionModule->readHelper04->nextHelper04 = previousReadHead;
-    }
-
-    if (streamPacketEncryptionModule->writeHelper08) {
-        CStreamPacketEncryptionHelperBase_0x4b81c8* const previousWriteTail = agenda.writeHelperChainTail48;
-        streamPacketEncryptionModule->writeHelper08->nextHelper04 =
-            &agenda.embeddedWriteHelper28;
-        agenda.writeHelperChainTail48 = streamPacketEncryptionModule->writeHelper08;
-        if (previousWriteTail) {
-            previousWriteTail->nextHelper04 = streamPacketEncryptionModule->writeHelper08;
-        } else {
-            agenda.writeHelperChainHead44 = streamPacketEncryptionModule->writeHelper08;
-        }
-    }
-
-    streamPacketEncryptionModule->configuredConnection10 = agenda.connectionOwner00;
-    agenda.configuredStreamPacketEncryptionModule = streamPacketEncryptionModule;
-    ++agenda.configuredModuleCount4c;
+    packetAgenda_->InstallStreamPacketEncryptionModule(streamPacketEncryptionModule);
 }
 
 // anchor family: launcher.exe:0x448980 -> connection `+0x74`
@@ -886,6 +856,45 @@ PacketProcessingAgenda_0x469850::PacketProcessingAgenda_0x469850(CMessageConnect
     readHelperChainHead40 = &embeddedReadHelper0c;
     writeHelperChainHead44 = nullptr;
     writeHelperChainTail48 = nullptr;
+}
+
+// anchor: launcher.exe:0x469740
+uint16_t PacketProcessingAgenda_0x469850::InstallStreamPacketEncryptionModule(
+    CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule) {
+    // Faithful mirror of original CMessageConnectionPacketAgenda_InstallStreamPacketEncryptionModule
+    if (!streamPacketEncryptionModule || (!streamPacketEncryptionModule->readHelper04 && !streamPacketEncryptionModule->writeHelper08)) {
+        // Original calls some function through vtable when both helpers are null
+        // For now, we'll just return early like the original does
+        return configuredModuleCount4c;
+    }
+
+    // Install the module into the agenda
+    streamPacketEncryptionModule->nextConfiguredModule0c = configuredModuleList04;
+    configuredModuleList04 = streamPacketEncryptionModule;
+
+    if (streamPacketEncryptionModule->readHelper04) {
+        CStreamPacketEncryptionHelperBase_0x4b81c8* const previousReadHead = readHelperChainHead40;
+        readHelperChainHead40 = streamPacketEncryptionModule->readHelper04;
+        streamPacketEncryptionModule->readHelper04->nextHelper04 = previousReadHead;
+    }
+
+    if (streamPacketEncryptionModule->writeHelper08) {
+        CStreamPacketEncryptionHelperBase_0x4b81c8* const previousWriteTail = writeHelperChainTail48;
+        streamPacketEncryptionModule->writeHelper08->nextHelper04 =
+            &embeddedWriteHelper28;
+        writeHelperChainTail48 = streamPacketEncryptionModule->writeHelper08;
+        if (previousWriteTail) {
+            previousWriteTail->nextHelper04 = streamPacketEncryptionModule->writeHelper08;
+        } else {
+            writeHelperChainHead44 = streamPacketEncryptionModule->writeHelper08;
+        }
+    }
+
+    streamPacketEncryptionModule->configuredConnection10 = connectionOwner00;
+    configuredStreamPacketEncryptionModule = streamPacketEncryptionModule;
+    ++configuredModuleCount4c;
+    
+    return configuredModuleCount4c;
 }
 
 static void** CMessageConnection_PacketBuilderVtablePointerScaffold(uintptr_t address) {

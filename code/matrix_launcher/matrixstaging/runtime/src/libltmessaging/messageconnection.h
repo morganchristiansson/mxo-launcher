@@ -873,6 +873,11 @@ struct PacketProcessingAgenda_0x469850 {
     // anchor: launcher.exe:0x469850
     // Constructor that mirrors the original initialization logic
     explicit PacketProcessingAgenda_0x469850(CMessageConnection* connectionOwner);
+
+    // anchor: launcher.exe:0x469740
+    // Install stream packet encryption module into the agenda
+    uint16_t InstallStreamPacketEncryptionModule(
+        CStreamPacketEncryptionModule_0x4b8704* streamPacketEncryptionModule);
 };
 
 struct CMessageConnectionReceivedPacketScaffold {
