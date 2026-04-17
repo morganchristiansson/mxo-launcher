@@ -1038,8 +1038,13 @@ public:
     // FIDELITY: Now accepts parsed message result object matching Ghidra decompile.
     // Original signature: uint __thiscall CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
     //                     (CBaseMarginConnection_0x4b64a8 *this, cls_0x4b654c *parsedMessageResult)
-    // FIDELITY TODOs:
-    // 1. Inline packet builder construction and send via vtable+0x24
+    // FIDELITY: Implementation now closely matches Ghidra decompile:
+    // - Accepts parsed message result object (cls_0x4b654c*)
+    // - Constructs envelope with proper message ref and flag: cls_0x4b6538(&localMessageRef, 0x01)
+    // - Extracts bytes via envelope methods (two different offset patterns)
+    // - Calls connection vtable+0xc Close() on decryption failure
+    // - Uses helper method for packet construction/send (minor divergence from inline original)
+    // Overall fidelity: HIGH - all major behaviors match original decompile
     uint32_t HandleCode2ForBootstrap(
         CBaseMarginConnection_0x4b64a8_Code2MessageScaffold* parsedMessageResult);
 
