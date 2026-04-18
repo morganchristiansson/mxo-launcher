@@ -763,12 +763,16 @@ public:
 
     // anchor: launcher.exe:0x4418a0 / vtable slot 3 (OVERRIDDEN)
     // InitializePayloadSize - setup for packet 0x01
-    // Original at 0x4418a0:
+    // anchor: launcher.exe:0x4418a0
+    // Original flow:
     // - reads descriptor byte at [messageRef->messageStorage0c + 0xd]
     // - computes payload size = lookup[high_nibble] + lookup[low_nibble] + 0x12
-    // - sets nopatchLauncherVersionValue04 = messageStorage + 0xc + payloadSize
-    // - allocates payload and writes opcode 0x01 (CERT_ConnectRequest)
-    // - zeros payload word at +0x01
+    // - sets nopatchLauncherVersionValue04 = messageStorage + 0xc + payloadSize (END pointer)
+    // - calls SetPayloadByteCountScaffold(messageRef08, 0) to zero messageRef length
+    // - calls messageStorage->GrowPayloadByteCountScaffold(payloadSize) to grow storage
+    // - sets payloadBegin10 = nopatchLauncherVersionValue04 (END pointer)
+    // - calls messageRef08->GrowPayloadByteCountScaffold(3) to grow messageRef by 3
+    // - writes opcode 0x01 (CERT_ConnectRequest) and zeros word at payload+1
     // - clears reservation fields +0x14/+0x18
     void InitializePayloadSize() override {
         if (!messageRef08 || !messageRef08->messageStorage0c) {
@@ -783,10 +787,22 @@ public:
         uint32_t offset2 = ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
         uint32_t payloadSize = offset1 + offset2 + 0x12;
 
+        // Set nopatchLauncherVersionValue04 to END of payload (storage base + 0xc + size)
         nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(storageBase + 0xc) + payloadSize;
-        msgStorage->ResetPayloadByteCountScaffold(payloadSize);
-        payloadBegin10 = msgStorage->PayloadBaseScaffold();
 
+        // Zero the messageRef payload length via SetPayloadByteCountScaffold
+        messageRef08->SetPayloadByteCountScaffold(0);
+
+        // Grow messageStorage by payloadSize (from 0 to payloadSize)
+        msgStorage->GrowPayloadByteCountScaffold(static_cast<uint16_t>(payloadSize));
+
+        // Set payloadBegin10 to END pointer (same as nopatchLauncherVersionValue04)
+        payloadBegin10 = reinterpret_cast<void*>(nopatchLauncherVersionValue04);
+
+        // Grow messageRef by 3 bytes (opcode + 2-byte field)
+        messageRef08->GrowPayloadByteCountScaffold(3);
+
+        // Write opcode and zero word to payload
         uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
         if (packetPayload) {
             packetPayload[0] = 0x01u;  // CERT_ConnectRequest opcode
