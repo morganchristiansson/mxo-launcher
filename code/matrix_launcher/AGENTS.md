@@ -114,6 +114,14 @@ mcp({ tool: "ghidra_annotate", args: '{"file_name":"launcher.exe","action":"crea
 // Batch related edits in one transaction
 mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"symbols","arguments":{"action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"Launcher_ParseCommandLine","variable_symbol_id":12345,"new_name":"stringCursor","new_data_type":"char *"}}]}' })
 
+// Variable renaming workflow (complete example):
+// 1. First list variables to discover the correct symbol_id
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"FunctionName"}' })
+// 2. Then rename using the actual symbol_id from step 1
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"FunctionName","variable_symbol_id":9621,"new_name":"betterName","new_data_type":"uint8_t *"}' })
+// 3. Or batch multiple renames together
+mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"functions","arguments":{"action":"rename_variable","name":"FunctionName","variable_symbol_id":9621,"new_name":"var1","new_data_type":"uint8_t *"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"FunctionName","variable_symbol_id":9622,"new_name":"var2","new_data_type":"uint16_t"}}]}' })
+
 // Oversized output
 mcp({ tool: "ghidra_read_tool_output", args: '{"action":"read","session_id":"ses_...","output_id":"out_...","offset":0,"max_chars":12000}' })
 ```

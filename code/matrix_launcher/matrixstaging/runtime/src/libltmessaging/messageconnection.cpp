@@ -564,7 +564,7 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
     // Server expects CERT packets (opcodes 1-5) with second field = 3 to be sent unencrypted
     // This matches launcher.exe behavior where certain critical packets bypass stream encryption
     bool shouldEncrypt = true;
-    if (payloadByteCount >= 3 && 
+    if (payloadByteCount >= 3 &&
         payloadBytes[0] >= 0x01 && payloadBytes[0] <= 0x05) {  // CERT opcodes 1-5
         const uint16_t secondField = *reinterpret_cast<const uint16_t*>(payloadBytes + 1);
         if (secondField == 3) {
@@ -2809,7 +2809,7 @@ void CMarginConnectionBootstrapPrepStateOwner_0x443340::StoreBootstrapPrepStateA
         connection_.RemoteHostName().empty() ? std::string("<empty>") : connection_.RemoteHostName());
 }
 
-// anchor: launcher.exe:0x41f30
+// anchor: launcher.exe:0x441f30
 uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     if (!hasBootstrapReplyCopy98_) {
         return 0u;
@@ -2817,64 +2817,42 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
 
     constexpr uint16_t kReplyCopyByteCount = 0x136u;
     constexpr uint16_t kLeadingType1PrefixByteCount = 3u;
-    constexpr uintptr_t kPacketBuilderVtable00 = 0x004b6524u;
 
-    mxo::liblttcp::CMessageConnectionPacketBuilderPayloadWithReservationScaffold builder = {};
+    // Use the new idiomatic C++ class for CERT_ConnectRequest packet building
+    CertConnectRequestPacketBuilder_0x4b6524 packetBuilder;
     CMessageConnectionMessageRef_0x4ba23c messageRef = {};
     messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
     if (!messageRef.messageStorage0c) {
         return 0u;
     }
 
-    builder.builder00.envelope00.vtable00 =
-        CMessageConnection_0x4b7928_PacketBuilderVtablePointerScaffold(kPacketBuilderVtable00);
-    builder.builder00.envelope00.payloadBase04 =
-        messageRef.messageStorage0c->PayloadBaseScaffold();
-    builder.builder00.envelope00.messageRef08 = &messageRef;
-    builder.builder00.builderFlag0c = 0u;
-    builder.builder00.packetPayload10 = builder.builder00.envelope00.payloadBase04;
-    if (!builder.builder00.packetPayload10) {
+    // Initialize the builder with message reference
+    packetBuilder.InitializeWithMessageRef(messageRef, kLeadingType1PrefixByteCount);
+    if (!packetBuilder.IsValidForSend()) {
         return 0u;
     }
 
-    // Tightened local builder mirror from `0x441f30` / vtable `0x004b6524`:
-    // - raw builder `+0x10` is the packet payload base
-    // - helper `0x43a230(0x136)` then reserves `(0x136 + 2)` bytes at the tail, caches the
-    //   concrete copy target in builder `+0x14`, and stores reserved content byte count at `+0x18`
-    messageRef.messageStorage0c->ResetPayloadByteCountScaffold(kLeadingType1PrefixByteCount);
-    builder.builder00.packetPayload10[0] = 0x01u;
-    builder.builder00.packetPayload10[1] = 0u;
-    builder.builder00.packetPayload10[2] = 0u;
+    // Set up the CERT_ConnectRequest packet header
+    // anchor: launcher.exe:0x441f64, 0x441f6a - opcode and field setup
+    packetBuilder.SetupCertConnectRequestHeader();
 
-    const uint16_t currentPayloadByteCount =
-        messageRef.messageStorage0c->PayloadByteCountScaffold();
-    uint8_t* const reservationHeader =
-        builder.builder00.envelope00.payloadBase04 + currentPayloadByteCount;
-    const uint16_t requestedGrowth =
-        static_cast<uint16_t>(kReplyCopyByteCount + sizeof(uint16_t));
-    const uint16_t newPayloadByteCount =
-        messageRef.messageStorage0c->GrowPayloadByteCountScaffold(requestedGrowth);
-    if (!reservationHeader ||
-        newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
+    // Reserve space for the bootstrap reply copy and copy the data
+    if (!packetBuilder.ReserveBootstrapReplySpace(messageRef, kReplyCopyByteCount)) {
         return 0u;
     }
 
-    reservationHeader[0] = static_cast<uint8_t>(kReplyCopyByteCount & 0xffu);
-    reservationHeader[1] = static_cast<uint8_t>((kReplyCopyByteCount >> 8) & 0xffu);
-    builder.reservation14.writePointer00 = reservationHeader + 2u;
-    builder.reservation14.reservedContentByteCount04 = kReplyCopyByteCount;
-    std::copy(
-        bootstrapReplyCopy98_.begin(),
-        bootstrapReplyCopy98_.end(),
-        builder.reservation14.writePointer00);
+    if (!packetBuilder.CopyBootstrapReplyData(bootstrapReplyCopy98_.data(), kReplyCopyByteCount)) {
+        return 0u;
+    }
 
+    // Send the packet using the envelope
     const uint32_t sendResult =
-        ForwardPacketBuilderEnvelopeToSendPacket(builder.builder00.envelope00);
+        ForwardPacketBuilderEnvelopeToSendPacket(packetBuilder.GetEnvelope());
     spdlog::info(
         "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent packetBuilderVtable=0x{:08x} payloadBase10={} reservedReplyCopyBytes=0x{:03x} totalPayloadBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(kPacketBuilderVtable00),
-        fmt::ptr(builder.builder00.packetPayload10),
-        static_cast<unsigned>(builder.reservation14.reservedContentByteCount04),
+        reinterpret_cast<uintptr_t>(packetBuilder.GetEnvelope().vtable00),
+        fmt::ptr(packetBuilder.packetPayload10),
+        static_cast<unsigned>(packetBuilder.reservedContentByteCount18),
         static_cast<unsigned>(messageRef.messageStorage0c->PayloadByteCountScaffold()),
         static_cast<unsigned>(sendResult),
         fmt::ptr(this),
@@ -3377,7 +3355,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte at responseEnvelope.packetPayloadPtr[0]
         // then copies 16 bytes from seedEnvelope.packetPayloadPtr+0x11/+0x15/+0x19/+0x1d to +1/+5/+9/+0xd
         // The opcode is for internal tracking, but the actual payload sent to server is 16 bytes
-        
+
         spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
             reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr));
         std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
@@ -3414,7 +3392,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[19],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[20],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[21]);
-        
+
         // DEBUG: Log the expected challenge from the seed bytes (should match bytes 0-15 of response)
         spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],

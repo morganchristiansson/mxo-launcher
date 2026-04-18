@@ -597,14 +597,111 @@ inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::E
 
 static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPayload10) == 0x10, "packet-builder payload pointer offset mismatch");
 
-struct CMessageConnectionPacketBuilderPayloadWithReservationScaffold {
-    // Most common next step on top of `CMessageConnectionPacketBuilderPayloadScaffold`:
-    // - one trailing reservation triplet rooted at raw `+0x14`
-    CMessageConnectionPacketBuilderPayloadScaffold builder00{};
-    CMessageConnectionPacketBuilderReservationScaffold reservation14{};
+// Idiomatic C++ class for CERT_ConnectRequest packet builder (opcode 0x01)
+// anchor: launcher.exe vtable `0x004b6524`
+// Faithful mirror of the local packet builder used in CMarginConnection_SendStoredBootstrapReplyCopy98
+// to construct CERT_ConnectRequest packets with length-prefixed blob payloads.
+class CertConnectRequestPacketBuilder_0x4b6524 {
+public:
+    CertConnectRequestPacketBuilder_0x4b6524() {
+        // anchor: launcher.exe:0x441f30 - constructor setup
+        envelope00.vtable00 = reinterpret_cast<void**>(0x004b6524);
+        envelope00.payloadBase04 = nullptr;
+        envelope00.messageRef08 = nullptr;
+        builderFlag0c = 0u;
+        packetPayload10 = nullptr;
+        reservationHeader14 = nullptr;
+        reservedContentByteCount18 = 0u;
+    }
+
+    // Initialize the builder with a message reference
+    // anchor: launcher.exe:0x441f3e - constructor call and field setup
+    void InitializeWithMessageRef(CMessageConnectionMessageRef_0x4ba23c& messageRef, uint16_t initialPayloadByteCount) {
+        envelope00.messageRef08 = &messageRef;
+        if (messageRef.messageStorage0c) {
+            envelope00.payloadBase04 = messageRef.messageStorage0c->PayloadBaseScaffold();
+            packetPayload10 = envelope00.payloadBase04;
+        }
+
+        // Reset payload to initial size (3 bytes for opcode + 2-byte field)
+        if (messageRef.messageStorage0c) {
+            messageRef.messageStorage0c->ResetPayloadByteCountScaffold(initialPayloadByteCount);
+        }
+    }
+
+    // Set up the CERT_ConnectRequest packet header
+    // anchor: launcher.exe:0x441f64, 0x441f6a - opcode and field setup
+    void SetupCertConnectRequestHeader() {
+        if (packetPayload10) {
+            packetPayload10[0] = 0x01u;  // CERT_ConnectRequest opcode
+            *reinterpret_cast<uint16_t*>(packetPayload10 + 1) = 0u;  // Field value
+        }
+    }
+
+    // Reserve space for the bootstrap reply copy
+    // anchor: launcher.exe:0x441f73 - LocalPacketBuilder_ReserveLengthPrefixedTail call
+    bool ReserveBootstrapReplySpace(CMessageConnectionMessageRef_0x4ba23c& messageRef, 
+                                    uint16_t replyByteCount) {
+        if (!messageRef.messageStorage0c || !packetPayload10) {
+            return false;
+        }
+
+        const uint16_t currentPayloadByteCount = messageRef.messageStorage0c->PayloadByteCountScaffold();
+        reservationHeader14 = packetPayload10 + currentPayloadByteCount;
+        
+        const uint16_t requestedGrowth = static_cast<uint16_t>(replyByteCount + sizeof(uint16_t));
+        const uint16_t newPayloadByteCount = 
+            messageRef.messageStorage0c->GrowPayloadByteCountScaffold(requestedGrowth);
+        
+        if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
+            return false;
+        }
+
+        // Write the length prefix
+        reservationHeader14[0] = static_cast<uint8_t>(replyByteCount & 0xffu);
+        reservationHeader14[1] = static_cast<uint8_t>((replyByteCount >> 8) & 0xffu);
+        
+        reservedContentByteCount18 = replyByteCount;
+        return true;
+    }
+
+    // Copy bootstrap reply data into the reserved space
+    // anchor: launcher.exe:0x441f8b-0x441f97 - memcpy loop
+    bool CopyBootstrapReplyData(const uint8_t* sourceData, uint16_t byteCount) {
+        if (!reservationHeader14 || byteCount != reservedContentByteCount18) {
+            return false;
+        }
+
+        uint8_t* destination = reservationHeader14 + sizeof(uint16_t);  // Skip length prefix
+        std::copy(sourceData, sourceData + byteCount, destination);
+        return true;
+    }
+
+    // Get the envelope for sending
+    CMessageConnectionPacketBuilderEnvelope& GetEnvelope() { return envelope00; }
+
+    // Check if the builder is valid for sending
+    bool IsValidForSend() const {
+        return envelope00.vtable00 != nullptr && 
+               envelope00.payloadBase04 != nullptr &&
+               packetPayload10 != nullptr;
+    }
+
+    // Raw fields matching the static-RE layout at 0x441f30
+    CMessageConnectionPacketBuilderEnvelope envelope00{};
+    uint8_t builderFlag0c = 0u;
+    uint8_t padding0d_0f[3] = {0u, 0u, 0u};
+    uint8_t* packetPayload10 = nullptr;
+    uint8_t* reservationHeader14 = nullptr;
+    uint16_t reservedContentByteCount18 = 0u;
 };
 
-static_assert(offsetof(CMessageConnectionPacketBuilderPayloadWithReservationScaffold, reservation14) == 0x14, "packet-builder reservation offset mismatch");
+static_assert(sizeof(CertConnectRequestPacketBuilder_0x4b6524) == 0x1c, 
+              "CertConnectRequestPacketBuilder_0x4b6524 size mismatch");
+static_assert(offsetof(CertConnectRequestPacketBuilder_0x4b6524, packetPayload10) == 0x10, 
+              "CertConnectRequestPacketBuilder_0x4b6524 packetPayload10 offset mismatch");
+static_assert(offsetof(CertConnectRequestPacketBuilder_0x4b6524, reservationHeader14) == 0x14, 
+              "CertConnectRequestPacketBuilder_0x4b6524 reservationHeader14 offset mismatch");
 
 class CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:
