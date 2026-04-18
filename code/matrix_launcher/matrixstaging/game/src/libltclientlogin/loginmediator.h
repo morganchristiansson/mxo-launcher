@@ -1142,7 +1142,6 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // - let `CLTThreadPerClientTCPEngine_0x4b2768` own the current queue push / no-worker pump seam
     // - keep the launcher-object ABI shell thin and arg5-shaped
     void ResetLauncherConnectionsScaffold();
-    uint32_t BeginLauncherMarginConnectionScaffold();
     // anchor: launcher.exe:0x41b490
     // Tiny auth transport-ready test used by state2 slot 3 before it reaches the bootstrap
     // dispatcher. Current best concrete read: auth connection exists and connection `+0x34 == 2`.
@@ -1691,7 +1690,6 @@ public:
     uint32_t lastMarginConnectStatus_;
     uint32_t authConnectStatusCount_;
     uint32_t marginConnectStatusCount_;
-    bool postAuthMarginAutoBeginAttemptedScaffold_ = false;
     const char* expectedAuthRequestName_;
     const char* expectedMarginRequestName_;
 

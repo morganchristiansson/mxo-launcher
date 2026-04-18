@@ -337,47 +337,21 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             // - it passes only the resulting helper/state id to `0x41b450`
             // - `0x41b450` then loads `[id*4 + 0x4f7868]`, installs owner `+0x10`, and
             //   immediately re-enters the new helper slot 3 with old-state `this`
+            // FIDELITY NOTE: The original binary at 0x43f300 ends here with SetCurrentState+PostEvent(5).
+            // Margin connection initiation happens later in State4::Slot3_BeginOrContinue (0x439300),
+            // not in the auth-reply success path.
             const uint32_t switchDispatchResult =
                 g_CurrentLoginMediator->SetCurrentState(nextHelperStateId);
             g_CurrentLoginMediator->PostEvent(5u);
 
-            // SOURCE-ONLY: post-AS_AuthReply margin auto-begin. No binary counterpart in
-            // 0x43f300 — the original returns immediately after SetCurrentState+PostEvent(5).
-            // Added for source-side convenience to automatically kick off the margin connection
-            // after a successful auth reply.
-            uint32_t marginAutoBeginResult = 0u;
-            bool triggeredMarginAutoBegin = false;
-            bool deferredMarginAutoBeginToState8 = false;
-            if (!g_CurrentLoginMediator->postAuthMarginAutoBeginAttemptedScaffold_) {
-                const uint32_t currentHelperPhaseCode =
-                    g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DispatchPhaseCode() : 0u;
-
-                // Existing-character continuation correction:
-                // - starting the margin connect while we are still on state3 leaves helper4's
-                //   cached upstream aligned to the old state3 wait leaf
-                // - on the natural existing-character path the first meaningful state4
-                //   margin-connect entry for this continuation is the later
-                //   `+0xec -> state8 slot3 -> helper4` handoff during "Loading Character"
-                if (currentHelperPhaseCode == 3u) {
-                    deferredMarginAutoBeginToState8 = true;
-                } else {
-                    g_CurrentLoginMediator->postAuthMarginAutoBeginAttemptedScaffold_ = true;
-                    triggeredMarginAutoBegin = true;
-                    marginAutoBeginResult = g_CurrentLoginMediator->BeginLauncherMarginConnectionScaffold();
-                }
-            }
-
             spdlog::info(
-                "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05 triggeredMarginAutoBegin={} deferredMarginAutoBeginToState8={} marginAutoBeginResult=0x{:08x}",
+                "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05",
                 static_cast<unsigned>(rawCode),
                 static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80),
                 fmt::ptr(cachedUpstreamOrArg_0x4),
                 static_cast<unsigned>(nextHelperStateId),
                 g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
-                static_cast<unsigned>(switchDispatchResult),
-                triggeredMarginAutoBegin ? 1u : 0u,
-                deferredMarginAutoBeginToState8 ? 1u : 0u,
-                static_cast<unsigned>(marginAutoBeginResult));
+                static_cast<unsigned>(switchDispatchResult));
             return 1u;
         }
 

@@ -102,8 +102,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     // - clear owner `+0x7c`
     // - call `connection->+0x1c(owner+0x6c)`
     // Current bounded active-path correction:
-    // - the existing-character state8 -> state4 path reaches here directly, not through the outer
-    //   `BeginLauncherMarginConnectionScaffold()` wrapper
+    // - the existing-character state8 -> state4 path reaches here directly
     // - keep that path connection-centric: `EnsureConnected()` re-enters the engine connect slot
     //   with the direct margin connection object as the context key
     marginPeerCloseQueuedScaffold_ = false;

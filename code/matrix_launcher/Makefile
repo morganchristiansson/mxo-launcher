@@ -123,7 +123,7 @@ $(TARGET): $(LAUNCHER_OBJS) | $(SPDLOG_DIR) $(CRYPTOPP_LIB)
 $(CRYPTOPP_DIR):
 	@echo "Downloading cryptopp..."
 	@mkdir -p $(dir $@)
-	@curl -L -o $(dir $@)/cryptopp890.zip https://www.cryptopp.com/cryptopp890.zip && \
+	@curl -k -L -o $(dir $@)/cryptopp890.zip https://www.cryptopp.com/cryptopp890.zip && \
 		unzip -q $(dir $@)/cryptopp890.zip -d $@ && \
 		rm $(dir $@)/cryptopp890.zip
 

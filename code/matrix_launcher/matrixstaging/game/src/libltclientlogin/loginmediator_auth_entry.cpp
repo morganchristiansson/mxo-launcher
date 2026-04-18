@@ -78,28 +78,6 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
     g_LoginHelperDispatchTableScaffold.helper78B4 = &g_State19;
 }
 
-uint32_t CLTLoginMediator::BeginLauncherMarginConnectionScaffold() {
-    if (engine_ == nullptr) {
-        spdlog::info(
-            "CLTLoginMediator::BeginLauncherMarginConnectionScaffold skipped engine={}",
-            fmt::ptr(engine_));
-        return 0u;
-    }
-
-    marginPeerCloseQueuedScaffold_ = false;
-
-    const uint32_t result = BeginMarginConnectionViaState4Scaffold();
-    const std::string marginHost = ResolvedMarginHostName();
-
-    engine_->SyncAttachedLauncherObjectStateScaffold();
-
-    spdlog::info(
-        "CLTLoginMediator::BeginLauncherMarginConnectionScaffold marginHost='{}' -> 0x{:08x}",
-        marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
-        static_cast<unsigned>(result));
-    return result;
-}
-
 
 
 // UNANCHORED: source-owned config setter for the auth host/port scaffold feeding owner `+0x4c/+0x5c`.
