@@ -3383,8 +3383,13 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
         spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
             responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
-        std::copy_n(responseBytes.data(), 16, responsePayload);  // Copy 16 bytes directly, no opcode prefix
-        responseMessageRef->SetPayloadByteCountScaffold(16);  // Exactly 16 bytes as server expects
+        // FIDELITY: CERT packet structure requires opcode and special field
+        // [opcode=3][specialField=3][challenge response (16 bytes)] = 19 bytes total
+        // The special field=3 tells server not to decrypt this packet (see MarginSocket::ProcessData)
+        responsePayload[0] = 0x03;  // CERT_ChallengeResponse opcode
+        *reinterpret_cast<uint16_t*>(responsePayload + 1) = 3;  // special field = 3 (unencrypted)
+        std::copy_n(responseBytes.data(), 16, responsePayload + 3);  // Copy 16 bytes after header
+        responseMessageRef->SetPayloadByteCountScaffold(19);  // 1 + 2 + 16 = 19 bytes total
 
         spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-22]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
