@@ -1495,10 +1495,17 @@ void DiagnosticConfigureLoginControllerNetwork(
         return;
     }
 
-    mediator->SetAuthServerConfig(
-        authDnsName,
-        authPortHostOrder,
-        ignoreHostsFileForAuth);
+    // Faithful launcher.exe-style auth config - set globals that Initialize() reads directly.
+    // Original launcher sets these globals during startup, Initialize() reads them directly.
+    // anchor: launcher.exe:0x4f7b14 / 0x4d6780 / 0x4f7a50
+    mxo::ltlogin::g_qsAuthServerDNSName = authDnsName ? authDnsName : "";
+    mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
+    *reinterpret_cast<uint16_t*>(0x4f7a50) = authPortHostOrder;
+    // Also mirror to instance fields for replacement code paths
+    mediator->authServerDnsName_ = mxo::ltlogin::g_qsAuthServerDNSName;
+    mediator->authServerPortHostOrder_ = authPortHostOrder;
+    mediator->ignoreHostsFileForAuth_ = ignoreHostsFileForAuth != 0;
+
     mediator->SetMarginServerConfig(
         marginDnsSuffix,
         marginPortHostOrder,

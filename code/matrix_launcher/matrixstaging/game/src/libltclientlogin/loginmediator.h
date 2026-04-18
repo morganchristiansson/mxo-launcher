@@ -749,7 +749,9 @@ public:
     // +0x00
     const char* GetName() override;
     // +0x08
-    void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) override;
+    // anchor: launcher.exe:0x41b160
+    // Return: 0x12000001 if auth address list is empty, 0 if it has entries
+    uint32_t Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) override;
     // UNANCHORED helper kept explicit from the real wrapper/owner vtable rows:
     // - wrapper `ILTLoginMediator.Default +0x08` currently forwards into `Initialize(...)`
     // - owner `CLTLoginMediator +0x0c` is `0x41f510 = ResetOwnedRuntimeState`, not a direct engine setter
@@ -1025,6 +1027,8 @@ public:
     // - launcher `MarginServerDNSSuffix` / `MarginServerPort`
     // The replacement launcher should eventually populate these from the same launcher-owned
     // config path instead of treating connection setup as generic ad-hoc socket work.
+    //
+    // Replacement helper - does not affect launcher.exe globals.
     void SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile = false);
     void SetMarginServerConfig(const char* dnsSuffix, uint16_t portHostOrder, bool ignoreHostsFile = false);
 
@@ -1511,6 +1515,8 @@ private:
     // - `+0x818` = per-slot route-host string family
     // - `+0xd84` = world-descriptor table
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine_;
+    // anchor: launcher.exe:0x41b1cd - owner byte +0x04 set to 1 during Initialize()
+    uint8_t ownerReadyFlag04_ = 0;
     uint32_t lastSwitchedHelperStateScaffold_ = 0;
     uint32_t marginPacketReceiveCountScaffold_ = 0;
     uint32_t marginPacketFilteredBeforeSlot6CountScaffold_ = 0;
@@ -1742,6 +1748,16 @@ extern CLTLoginMediator::ConnectionHelperFamily g_LoginHelperDispatchTableScaffo
 // anchor: launcher.exe:0x4f78b8
 // Source-owned mirror of the launcher global current mediator pointer consumed by the helper family.
 extern CLTLoginMediator* g_CurrentLoginMediator;
+
+// External globals from launcher.exe used by faithful Initialize implementation.
+// anchor: launcher.exe:0x4d6304
+extern void* g_pThreadPerClientTCPEngine;
+// anchor: launcher.exe:0x4f7868..0x4f78b4
+extern void* g_LoginHelperState0[20];
+// anchor: launcher.exe:0x4f7b14
+extern const char* g_qsAuthServerDNSName;
+// anchor: launcher.exe:0x4d6780
+extern uint32_t g_IgnoreHostsFileForAuth;
 
 }  // namespace mxo::ltlogin
 

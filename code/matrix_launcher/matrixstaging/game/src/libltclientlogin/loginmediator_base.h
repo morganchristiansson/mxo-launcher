@@ -414,7 +414,9 @@ public:
     // +0x04
     // virtual ~ILTLoginMediator();
     // +0x08
-    virtual void Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) = 0;
+    // anchor: launcher.exe:0x41b160
+    // Return: status dword (0x12000001 if auth address list empty, 0 if has entries)
+    virtual uint32_t Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) = 0;
     // +0x0c
     virtual void ClearEngine() = 0;
     // +0x10

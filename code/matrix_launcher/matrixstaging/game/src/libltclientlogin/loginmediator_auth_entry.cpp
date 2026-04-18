@@ -81,10 +81,12 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
 
 
 // UNANCHORED: source-owned config setter for the auth host/port scaffold feeding owner `+0x4c/+0x5c`.
+// Replacement helper - original launcher uses globals directly.
 void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile) {
     authServerDnsName_ = dnsName ? dnsName : "";
     authServerPortHostOrder_ = portHostOrder;
     ignoreHostsFileForAuth_ = ignoreHostsFile;
+
     ResetAuthConnectRetryStateScaffold();
     BuildAuthEndpoint();
 }

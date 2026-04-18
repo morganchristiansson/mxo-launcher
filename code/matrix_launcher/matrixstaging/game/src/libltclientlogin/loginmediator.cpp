@@ -306,46 +306,71 @@ void CLTLoginMediator::ResetLauncherConnectionsScaffold() {
 }
 
 // anchor: launcher.exe:0x41b160 / owner vtable +0x08
-// Faithful startup effects from the current Ghidra decompile/listing:
-// - if arg2 is null, fall back to the already-built launcher network engine object
-// - store the engine pointer at owner `+0x14`
-// - allocate/construct owner `+0x680` auth bootstrap child
-// - initialize helper dispatch table, then install state0 from `0x4f7868` into owner `+0x10`
+// Faithful implementation from Ghidra decompile:
+// - if arg2 is null, fall back to global `g_pThreadPerClientTCPEngine`
+// - store the engine pointer at owner `+0x14` (direct store, not via SetNetworkEngine)
+// - allocate/construct owner `+0x680` auth bootstrap child with malloc + in-place ctor
+// - call virtual constructor method on auth bootstrap child
+// - set `g_CurrentLoginMediator = this`
+// - call `CLTLoginMediator_InitializeHelperDispatchTable()`
+// - install state0 from `g_LoginHelperState0[0]` into owner `+0x10`
 // - mark owner byte `+0x04 = 1`
-// - rebuild owner `+0x4c` auth `CLTIPAddressList` from `qsAuthServerDNSName` with flags:
+// - rebuild owner `+0x4c` auth `CLTIPAddressList` from `g_qsAuthServerDNSName` with flags:
 //   - `0x01` = shuffle
-//   - `0x03` = shuffle | ignore-hosts-file when `IgnoreHostsFileForAuth` is set
-void CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) {
+//   - `0x03` = shuffle | ignore-hosts-file when `g_IgnoreHostsFileForAuth != 0`
+// - return status dword based on address list count
+uint32_t CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) {
+    // anchor: launcher.exe:0x41b16f..0x41b174
     if (networkEngineOverride == nullptr) {
-        networkEngineOverride = engine_;
+        networkEngineOverride = reinterpret_cast<mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768*>(g_pThreadPerClientTCPEngine);
     }
 
-    SetNetworkEngine(networkEngineOverride);
+    // anchor: launcher.exe:0x41b17a - direct store to owner+0x14
+    engine_ = networkEngineOverride;
+
+    // anchor: launcher.exe:0x41b180..0x41b1a9 - allocate/construct auth bootstrap child
+    // Original uses malloc + in-place ctor with allocation tracking; replacement uses make_unique
     if (!authBootstrapChild680_) {
         authBootstrapChild680_ = std::make_unique<AuthBootstrap680Child_0x441290>();
     }
-    InitializeHelperDispatchTable();
-    // inline RegisterActiveStateSourceScaffold
+
+    // anchor: launcher.exe:0x41b1b4 - set global current mediator
     g_CurrentLoginMediator = this;
-    // Inline InstallInitialState0Scaffold - set initial helper state0
-    // anchor: launcher.exe:0x41b160 -> owner+0x10 = helper0 / 0x4f7868
-    currentState_ = LoginHelperStateByIdScaffold(0u);
-    spdlog::info(
-        "CLTLoginMediator::Initialize installed initial state0 currentState={}",
-        currentState_ ? currentState_->DebugName() : "<null>");
-    ResetAuthConnectRetryStateScaffold();
-    RefreshAuthAddressListForCurrentHostScaffold();
 
-    const uint32_t authAddressListReinitFlags =
-        mxo::liblttcp::CLTIPAddressList::kFlagShuffle |
-        (ignoreHostsFileForAuth_ ? mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile : 0u);
+    // anchor: launcher.exe:0x41b1ba - initialize helper dispatch table
+    InitializeHelperDispatchTable();
+
+    // anchor: launcher.exe:0x41b1c0..0x41b1c7 - install state0 from global array
+    // g_LoginHelperState0[0] points to the state0 object at 0x4f7868
+    currentState_ = reinterpret_cast<CLTLoginState*>(g_LoginHelperState0[0]);
+
+    // anchor: launcher.exe:0x41b1cd - set owner ready flag byte at +0x04
+    ownerReadyFlag04_ = 1;
+
+    // anchor: launcher.exe:0x41b1d3..0x41b1e2 - build flags and reinit address list
+    uint32_t authAddressListReinitFlags = 1;  // kFlagShuffle
+    if (g_IgnoreHostsFileForAuth != 0) {
+        authAddressListReinitFlags = 3;  // kFlagShuffle | kFlagIgnoreHostsFile
+    }
+
+    // anchor: launcher.exe:0x41b1e8..0x41b1ef - direct CLTIPAddressList_Reinit call
+    // Pass the raw pointer range for authAddressList4c_
+    authAddressList4c_.Reinit(g_qsAuthServerDNSName, authAddressListReinitFlags);
+
+    // anchor: launcher.exe:0x41b1f5..0x41b207 - return status based on address list count
+    // Return value: 0x12000001 if list is empty, 0 if list has entries
+    const size_t addressCount = authAddressList4c_.Count();
+    const uint32_t returnStatus = addressCount != 0 ? 0u : 0x12000001u;
 
     spdlog::info(
-        "CLTLoginMediator::Initialize engine={} currentState={} authAddressListReinitFlags=0x{:02x} authCandidates={}",
+        "CLTLoginMediator::Initialize engine={} currentState={} authAddressListReinitFlags=0x{:02x} authCandidates={} returnStatus=0x{:08x}",
         fmt::ptr(networkEngineOverride),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(authAddressListReinitFlags),
-        AuthConnectCandidateCountScaffold());
+        static_cast<unsigned>(addressCount),
+        static_cast<unsigned>(returnStatus));
+
+    return returnStatus;
 }
 
 // +0x00
