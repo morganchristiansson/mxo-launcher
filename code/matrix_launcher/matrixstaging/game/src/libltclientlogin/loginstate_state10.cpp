@@ -158,7 +158,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // pattern; keep the scaffold for consistency but merge the failure branch into
     // the single reject path below.
     uint16_t messageCode = 0;
-    if (!CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(*messageRef, &messageCode, nullptr)) {
+    if (!CMessageConnection_0x4b7928_DecodeMessageCode(*messageRef, &messageCode, nullptr)) {
         // Decode failed — original would just see opcode 0 (≠ 0xb) and go to reject.
         // Fall through to the single reject path below.
     }
@@ -195,7 +195,7 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // the same field values (offsets +3=status, +7=charIdLow, +0xb=charIdHigh match) but
     // doesn't mirror the original's parse-object lifetime or virtual dispatch.
     const uint8_t* payloadBytes = messageRef->messageStorage0c->payloadBytes0c.data();
-    const uint16_t payloadByteCount = messageRef->PayloadByteCountScaffold();
+    const uint16_t payloadByteCount = messageRef->PayloadByteCount();
 
     // Inline recovery of MS_ClaimCharacterNameReply parsing and slot record allocation:
     // - parse inline name/status/character IDs from message-ref payload

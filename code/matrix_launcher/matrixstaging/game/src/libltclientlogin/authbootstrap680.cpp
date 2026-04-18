@@ -112,8 +112,8 @@ static bool ResolveIncomingAuthMessageCodePointerScaffold(
         return false;
     }
 
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
     if (!payloadBytes || payloadByteCount == 0u) {
         return false;
     }
@@ -169,8 +169,8 @@ static bool BuildIncomingAuthPayloadViewScaffold(
         return false;
     }
 
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
     if (!payloadBytes || payloadByteCount == 0u) {
         return false;
     }

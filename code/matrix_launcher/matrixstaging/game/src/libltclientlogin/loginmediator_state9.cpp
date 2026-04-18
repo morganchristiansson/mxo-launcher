@@ -48,7 +48,7 @@ uint32_t CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84(void* workI
     auto* messageRef = static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(workItem);
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderless = false;
-    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
+    if (!mxo::liblttcp::CMessageConnection_0x4b7928_DecodeMessageCode(
             *messageRef,
             &decodedMessageCode,
             &usedHeaderless)) {

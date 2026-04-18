@@ -50,7 +50,7 @@ namespace mxo::liblttcp {
 
 namespace {
 
-static void** CMessageConnection_0x4b7928_CompletionHelperVtableScaffold() {
+static void** CMessageConnection_0x4b7928_CompletionHelperVtable() {
     // anchor: launcher.exe vtable `0x004b3e20`
     static void* vtable[1] = {nullptr};
     return vtable;
@@ -59,7 +59,7 @@ static void** CMessageConnection_0x4b7928_CompletionHelperVtableScaffold() {
 }  // namespace
 
 CMessageConnectionCompletionHelperScaffold::CMessageConnectionCompletionHelperScaffold() {
-    vtable00 = CMessageConnection_0x4b7928_CompletionHelperVtableScaffold();
+    vtable00 = CMessageConnection_0x4b7928_CompletionHelperVtable();
     std::memset(&embeddedLockHelper04.crit, 0, sizeof(embeddedLockHelper04.crit));
     InitializeCriticalSection(&embeddedLockHelper04.crit);
     eventHandle20 = CreateEventA(nullptr, FALSE, FALSE, nullptr);
@@ -159,7 +159,7 @@ void CMessageConnectionMessageStorage_0x4ba208::SetRefCountFromPtr(const volatil
     InterlockedExchange(&referenceCount04, *refCountSource);
 }
 
-void CMessageConnectionMessageStorage_0x4ba208::ResetForPacketBuilderScaffold() {
+void CMessageConnectionMessageStorage_0x4ba208::ResetForPacketBuilder() {
     // anchor: launcher.exe:0x455bd0 inner-storage setup before the outer object stores/AddRefs it
     referenceCount04 = 0;
     reservedBytes08 = kBuilderReservedBytes08;
@@ -168,8 +168,8 @@ void CMessageConnectionMessageStorage_0x4ba208::ResetForPacketBuilderScaffold() 
     std::fill(payloadBytes0c.begin(), payloadBytes0c.end(), 0u);
 }
 
-void CMessageConnectionMessageStorage_0x4ba208::ResetPayloadByteCountScaffold(uint16_t payloadByteCount) {
-    const uint16_t oldByteCount = PayloadByteCountScaffold();
+void CMessageConnectionMessageStorage_0x4ba208::ResetPayloadByteCount(uint16_t payloadByteCount) {
+    const uint16_t oldByteCount = PayloadByteCount();
     const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, kMaxPayloadByteCount);
     if (clampedByteCount < oldByteCount) {
         std::fill(
@@ -182,10 +182,10 @@ void CMessageConnectionMessageStorage_0x4ba208::ResetPayloadByteCountScaffold(ui
             payloadBytes0c.begin() + clampedByteCount,
             0u);
     }
-    SetPayloadByteCountRawScaffold(clampedByteCount);
+    SetPayloadByteCountRaw(clampedByteCount);
 }
 
-void CMessageConnectionMessageStorage_0x4ba208::SetPayloadByteCountRawScaffold(uint16_t payloadByteCount) {
+void CMessageConnectionMessageStorage_0x4ba208::SetPayloadByteCountRaw(uint16_t payloadByteCount) {
     const uint16_t clampedByteCount = std::min<uint16_t>(payloadByteCount, kMaxPayloadByteCount);
     payloadLengthLow0b = static_cast<uint8_t>(clampedByteCount & 0xffu);
     payloadLengthHigh0a =
@@ -194,20 +194,20 @@ void CMessageConnectionMessageStorage_0x4ba208::SetPayloadByteCountRawScaffold(u
             : 0u;
 }
 
-uint16_t CMessageConnectionMessageStorage_0x4ba208::GrowPayloadByteCountScaffold(uint16_t additionalByteCount) {
+uint16_t CMessageConnectionMessageStorage_0x4ba208::GrowPayloadByteCount(uint16_t additionalByteCount) {
     // anchor: launcher.exe:0x4557b0
-    const uint32_t oldByteCount = PayloadByteCountScaffold();
+    const uint32_t oldByteCount = PayloadByteCount();
     const uint32_t requestedByteCount = oldByteCount + static_cast<uint32_t>(additionalByteCount);
     if (requestedByteCount > kMaxPayloadByteCount) {
         return static_cast<uint16_t>(oldByteCount);
     }
 
     const uint16_t newByteCount = static_cast<uint16_t>(requestedByteCount);
-    SetPayloadByteCountRawScaffold(newByteCount);
+    SetPayloadByteCountRaw(newByteCount);
     return newByteCount;
 }
 
-uint16_t CMessageConnectionMessageStorage_0x4ba208::PayloadByteCountScaffold() const {
+uint16_t CMessageConnectionMessageStorage_0x4ba208::PayloadByteCount() const {
     const uint16_t encodedPayloadByteCount =
         static_cast<uint16_t>(
             (static_cast<uint16_t>(payloadLengthHigh0a & 0x7fu) << 8u) |
@@ -215,8 +215,8 @@ uint16_t CMessageConnectionMessageStorage_0x4ba208::PayloadByteCountScaffold() c
     return std::min<uint16_t>(encodedPayloadByteCount, kMaxPayloadByteCount);
 }
 
-uint16_t CMessageConnectionMessageStorage_0x4ba208::RemainingAppendableByteCountScaffold() const {
-    const uint32_t payloadByteCount = PayloadByteCountScaffold();
+uint16_t CMessageConnectionMessageStorage_0x4ba208::RemainingAppendableByteCount() const {
+    const uint32_t payloadByteCount = PayloadByteCount();
     if (payloadByteCount >= kMaxPayloadByteCount || reservedBytes08 >= kMaxPayloadByteCount) {
         return 0u;
     }
@@ -225,11 +225,11 @@ uint16_t CMessageConnectionMessageStorage_0x4ba208::RemainingAppendableByteCount
     return static_cast<uint16_t>(std::min<uint32_t>(remaining, kMaxPayloadByteCount));
 }
 
-uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBaseScaffold() {
+uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBase() {
     return payloadBytes0c.data();
 }
 
-const uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBaseScaffold() const {
+const uint8_t* CMessageConnectionMessageStorage_0x4ba208::PayloadBase() const {
     return payloadBytes0c.data();
 }
 
@@ -260,46 +260,46 @@ void CMessageConnectionMessageRefBase_0x4ba220::SetRefCountFromPtr(const volatil
     InterlockedExchange(&referenceCount04, *refCountSource);
 }
 
-void CMessageConnectionMessageRefBase_0x4ba220::ResetBaseForPacketBuilderScaffold(uint32_t field08Value) {
+void CMessageConnectionMessageRefBase_0x4ba220::ResetBaseForPacketBuilder(uint32_t field08Value) {
     // anchor: launcher.exe:0x455bd0
     referenceCount04 = 0;
     field08 = field08Value;
     messageStorage0c = nullptr;
-    ownedMessageStorage_.ResetForPacketBuilderScaffold();
+    ownedMessageStorage_.ResetForPacketBuilder();
     messageStorage0c = &ownedMessageStorage_;
     messageStorage0c->AddRef();
 }
 
-uint16_t CMessageConnectionMessageRefBase_0x4ba220::GrowPayloadByteCountScaffold(
+uint16_t CMessageConnectionMessageRefBase_0x4ba220::GrowPayloadByteCount(
     uint16_t additionalByteCount) {
     if (!messageStorage0c) {
         return 0u;
     }
-    return messageStorage0c->GrowPayloadByteCountScaffold(additionalByteCount);
+    return messageStorage0c->GrowPayloadByteCount(additionalByteCount);
 }
 
-uint8_t* CMessageConnectionMessageRefBase_0x4ba220::PayloadAppendPointerScaffold() {
+uint8_t* CMessageConnectionMessageRefBase_0x4ba220::PayloadAppendPointer() {
     if (!messageStorage0c) {
         return nullptr;
     }
-    uint8_t* const payloadBase = messageStorage0c->PayloadBaseScaffold();
+    uint8_t* const payloadBase = messageStorage0c->PayloadBase();
     return payloadBase
-        ? (payloadBase + static_cast<size_t>(messageStorage0c->PayloadByteCountScaffold()))
+        ? (payloadBase + static_cast<size_t>(messageStorage0c->PayloadByteCount()))
         : nullptr;
 }
 
 // anchor: launcher.exe:0x41bb60
-bool CMessageConnectionMessageRefBase_0x4ba220::SetPayloadByteCountScaffold(
+bool CMessageConnectionMessageRefBase_0x4ba220::SetPayloadByteCount(
     uint32_t payloadByteCount) {
     if (!messageStorage0c || payloadByteCount > CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
         return false;
     }
-    messageStorage0c->SetPayloadByteCountRawScaffold(static_cast<uint16_t>(payloadByteCount));
+    messageStorage0c->SetPayloadByteCountRaw(static_cast<uint16_t>(payloadByteCount));
     return true;
 }
 
-uint16_t CMessageConnectionMessageRefBase_0x4ba220::PayloadByteCountScaffold() const {
-    return messageStorage0c ? messageStorage0c->PayloadByteCountScaffold() : 0u;
+uint16_t CMessageConnectionMessageRefBase_0x4ba220::PayloadByteCount() const {
+    return messageStorage0c ? messageStorage0c->PayloadByteCount() : 0u;
 }
 
 void CMessageConnectionMessageRef_0x4ba23c::FinalRelease() {
@@ -316,11 +316,11 @@ void CMessageConnectionMessageRef_0x4ba23c::FinalRelease() {
     delete this;
 }
 
-void CMessageConnectionMessageRef_0x4ba23c::ResetForPacketBuilderScaffold(
+void CMessageConnectionMessageRef_0x4ba23c::ResetForPacketBuilder(
     bool headerless,
     uint32_t messageContext14) {
     // anchor: launcher.exe:0x455cd0 / 0x455c60
-    ResetBaseForPacketBuilderScaffold(/*field08Value=*/0u);
+    ResetBaseForPacketBuilder(/*field08Value=*/0u);
     headerless10 = headerless ? 1u : 0u;
     padding11_13[0] = 0u;
     padding11_13[1] = 0u;
@@ -359,8 +359,8 @@ static bool CMessageConnection_0x4b7928_ResolveTransformInputSpan(
         return false;
     }
 
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
     const uint32_t skippedPrefixByteCount = inputMessageRef.field08;
     if (!payloadBytes || skippedPrefixByteCount > payloadByteCount) {
         return false;
@@ -449,15 +449,15 @@ bool CMessageConnectionMessageRefOutputBuffer::SetPayloadBytes(
     }
 
     messageRef = new CMessageConnectionMessageRef_0x4ba23c();
-    messageRef->ResetForPacketBuilderScaffold(false, 0u);
-    uint8_t* const appendPointer = messageRef->PayloadAppendPointerScaffold();
+    messageRef->ResetForPacketBuilder(false, 0u);
+    uint8_t* const appendPointer = messageRef->PayloadAppendPointer();
     if (!appendPointer) {
         Reset();
         return false;
     }
 
     std::copy_n(payloadBytes, payloadByteCount, appendPointer);
-    if (messageRef->GrowPayloadByteCountScaffold(static_cast<uint16_t>(payloadByteCount)) !=
+    if (messageRef->GrowPayloadByteCount(static_cast<uint16_t>(payloadByteCount)) !=
         payloadByteCount) {
         Reset();
         return false;
@@ -842,7 +842,7 @@ static void CMessageConnection_0x4b7928_ApplySendMessageRefMutations(
     // - inner `+0x16` = 0xff
     // - inner `+0x17` = 0xff
     CMessageConnectionMessageStorage_0x4ba208& messageStorage = *messageRef->messageStorage0c;
-    uint8_t* const payloadBase = messageStorage.PayloadBaseScaffold();
+    uint8_t* const payloadBase = messageStorage.PayloadBase();
     if (!payloadBase) {
         return;
     }
@@ -871,7 +871,7 @@ static void CMessageConnection_0x4b7928_ClearSendMessageRefFirstPayloadByteHighB
     // anchor: launcher.exe:0x448cf0
     // After either submit or agenda discard, original code clears the first payload byte high bit
     // on the original input message-ref's inner storage at `inner + 0x0c`.
-    uint8_t* const payloadBase = messageRef->messageStorage0c->PayloadBaseScaffold();
+    uint8_t* const payloadBase = messageRef->messageStorage0c->PayloadBase();
     if (!payloadBase) {
         return;
     }
@@ -967,7 +967,7 @@ CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplySen
 
     spdlog::debug("ApplySendPacketAgenda: writeHelperChainHead44={} inputPayloadBytes={}",
         fmt::ptr(writeHelperChainHead44),
-        inputMessageRef.PayloadByteCountScaffold());
+        inputMessageRef.PayloadByteCount());
 
     if (writeHelperChainHead44 == nullptr) {
         return &inputMessageRef;
@@ -976,7 +976,7 @@ CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplySen
     writeHelperChainHead44->HandleOpaqueMessageRef(&inputMessageRef);
     spdlog::debug("ApplySendPacketAgenda: outputSlot={} outputPayloadBytes={}",
         fmt::ptr(writeOutputSlot24),
-        writeOutputSlot24 ? writeOutputSlot24->PayloadByteCountScaffold() : 0);
+        writeOutputSlot24 ? writeOutputSlot24->PayloadByteCount() : 0);
     return writeOutputSlot24;
 }
 
@@ -999,7 +999,7 @@ CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplyRec
     return readOutputSlot08;
 }
 
-static void** CMessageConnection_0x4b7928_PacketBuilderVtablePointerScaffold(uintptr_t address) {
+static void** CMessageConnection_0x4b7928_PacketBuilderVtablePointer(uintptr_t address) {
     return reinterpret_cast<void**>(address);
 }
 
@@ -1011,7 +1011,7 @@ uint32_t CMessageConnection_0x4b7928::ForwardPacketBuilderEnvelopeToSendPacket(
     }
     spdlog::debug("ForwardPacketBuilderEnvelopeToSendPacket: messageRef08={} payloadBytes={}",
         fmt::ptr(envelope.messageRef08),
-        envelope.messageRef08->PayloadByteCountScaffold());
+        envelope.messageRef08->PayloadByteCount());
     SendPacketMessageRef(*envelope.messageRef08);
     return 0u; // Original function returns void, but wrapper maintains uint32_t signature
 }
@@ -1036,8 +1036,8 @@ uint32_t CMessageConnection_0x4b7928::SubmitMessageRefBytes(
     }
 
     const CMessageConnectionMessageStorage_0x4ba208& messageStorage = *messageRef.messageStorage0c;
-    const uint16_t payloadByteCount = messageStorage.PayloadByteCountScaffold();
-    const uint8_t* const payloadBase = messageStorage.PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage.PayloadByteCount();
+    const uint8_t* const payloadBase = messageStorage.PayloadBase();
     if (!payloadBase || payloadByteCount == 0u) {
         return 0u;
     }
@@ -1129,7 +1129,7 @@ void CMessageConnection_0x4b7928::SendPacketMessageRef(
     // Clear high bit on original message ref after submit (headerless only)
     // anchor: launcher.exe:0x448f87 - final high bit clearing
     if (messageRef.headerless10 != 0u && messageRef.messageStorage0c) {
-        uint8_t* const payloadBase = messageRef.messageStorage0c->PayloadBaseScaffold();
+        uint8_t* const payloadBase = messageRef.messageStorage0c->PayloadBase();
         if (payloadBase) {
             payloadBase[0] &= 0x7fu;
         }
@@ -1139,7 +1139,7 @@ void CMessageConnection_0x4b7928::SendPacketMessageRef(
 // anchor: launcher.exe:0x448a60
 // Current tighter source mirror of the generic unhandled-operation log branch reached from later
 // leaf wrappers (for example `0x449a70` / `0x44af60`) after base `0x4490c0` returns false-ish.
-static void CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(void* workItem) {
+static void CMessageConnection_0x4b7928_LogUnhandledOperation(void* workItem) {
     const auto* header =
         static_cast<const CLTThreadPerClientTCPEngine_0x4b2768_WorkItemHeader*>(workItem);
     const uint32_t workType = header ? header->workType : 0u;
@@ -1154,7 +1154,7 @@ static void CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(void* work
 // UNANCHORED: source-owned typed owner-context view used by the current `0x4490c0/0x449a70/0x44af60`
 // reconstruction when the launcher-owned connection owner at `+0xa4` is the direct login
 // mediator. Current static-RE anchor for that ownership write is `0x41d170 / 0x41e500`.
-static mxo::ltlogin::CLTLoginMediator* CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(
+static mxo::ltlogin::CLTLoginMediator* CMessageConnection_0x4b7928_LoginMediatorOwner(
     CMessageConnection_0x4b7928* self) {
     if (!self) {
         return nullptr;
@@ -1171,13 +1171,13 @@ static mxo::ltlogin::CLTLoginMediator* CMessageConnection_0x4b7928_LoginMediator
     return (mediator != nullptr && self->OwnerContext() == mediator) ? mediator : nullptr;
 }
 
-static bool CMessageConnection_0x4b7928_IsMediatorAuthConnectionScaffold(
+static bool CMessageConnection_0x4b7928_IsMediatorAuthConnection(
     CMessageConnection_0x4b7928* self,
     const mxo::ltlogin::CLTLoginMediator* mediator) {
     return self != nullptr && mediator != nullptr && self == mediator->authConnection_;
 }
 
-static bool CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(
+static bool CMessageConnection_0x4b7928_IsMediatorMarginConnection(
     CMessageConnection_0x4b7928* self,
     const mxo::ltlogin::CLTLoginMediator* mediator) {
     return self != nullptr && mediator != nullptr && self == mediator->MarginConnection();
@@ -1186,7 +1186,7 @@ static bool CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(
 // anchor: launcher.exe:0x4490c0 first dispatch on `workItem+0x04`
 // Source-owned decomposition of the initial work-type test inside
 // `CMessageConnection_0x4b7928::OnOperationCompleted`.
-static uint32_t CMessageConnection_0x4b7928_WorkItemTypeScaffold(const void* workItem) {
+static uint32_t CMessageConnection_0x4b7928_WorkItemType(const void* workItem) {
     if (!workItem) {
         return 0u;
     }
@@ -1199,7 +1199,7 @@ static uint32_t CMessageConnection_0x4b7928_WorkItemTypeScaffold(const void* wor
 // anchor: launcher.exe:0x4490c0 -> 0x434d00
 // Source-owned read of the shared `workItem+0x08` status/payload dword used by the type-3 early
 // return and by several later source-owned owner-fallback helpers.
-static uint32_t CMessageConnection_0x4b7928_WorkItemStatusOrPayloadDwordScaffold(const void* workItem) {
+static uint32_t CMessageConnection_0x4b7928_WorkItemStatusOrPayloadDword(const void* workItem) {
     if (!workItem) {
         return 0u;
     }
@@ -1218,7 +1218,7 @@ static uint32_t CMessageConnection_0x4b7928_WorkItemStatusOrPayloadDwordScaffold
 // - resolve the current append pointer from the outer message-ref
 // - copy bytes into that tail span
 // - then commit the new payload length through outer grow helper `+0x18`
-static bool CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpanScaffold(
+static bool CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpan(
     CMessageConnectionMessageRef_0x4ba23c* messageRef,
     const uint8_t* payloadBytes,
     uint32_t payloadByteCount) {
@@ -1232,21 +1232,21 @@ static bool CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpanScaffold(
         return false;
     }
 
-    const uint16_t oldPayloadByteCount = messageRef->PayloadByteCountScaffold();
+    const uint16_t oldPayloadByteCount = messageRef->PayloadByteCount();
     const uint32_t requestedPayloadByteCount =
         static_cast<uint32_t>(oldPayloadByteCount) + payloadByteCount;
     if (requestedPayloadByteCount > CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
         return false;
     }
 
-    uint8_t* const appendPointer = messageRef->PayloadAppendPointerScaffold();
+    uint8_t* const appendPointer = messageRef->PayloadAppendPointer();
     if (!appendPointer) {
         return false;
     }
 
     std::copy_n(payloadBytes, payloadByteCount, appendPointer);
     const uint16_t newPayloadByteCount =
-        messageRef->GrowPayloadByteCountScaffold(static_cast<uint16_t>(payloadByteCount));
+        messageRef->GrowPayloadByteCount(static_cast<uint16_t>(payloadByteCount));
     return newPayloadByteCount == requestedPayloadByteCount;
 }
 
@@ -1302,7 +1302,7 @@ static bool CMessageConnection_0x4b7928_CopyParsedPacketIntoReceivedMessageRefSc
     const uint32_t firstCopyByteCount = std::min<uint32_t>(
         packetBodyByteCount,
         static_cast<uint32_t>(fragmentEnd - currentCursor));
-    if (!CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpanScaffold(
+    if (!CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpan(
             outMessageRef,
             currentCursor,
             firstCopyByteCount)) {
@@ -1334,7 +1334,7 @@ static bool CMessageConnection_0x4b7928_CopyParsedPacketIntoReceivedMessageRefSc
 
         const uint32_t copyByteCount =
             std::min<uint32_t>(remainingPacketBodyByteCount, currentFragment->byteCount08);
-        if (!CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpanScaffold(
+        if (!CMessageConnection_0x4b7928_AppendReceiveMessagePayloadSpan(
                 outMessageRef,
                 reinterpret_cast<const uint8_t*>(currentFragment + 1),
                 copyByteCount)) {
@@ -1380,7 +1380,7 @@ constexpr uint32_t kMessageLocatorPayloadOffsetTable[7] = {
 
 
 // anchor family: launcher.exe:0x41bc20 / 0x41bbb0 headerless-locator message-code decode
-static bool CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
+static bool CMessageConnection_0x4b7928_ResolveMessageCodePointer(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     const uint8_t** outMessageCodePointer,
     uint8_t* outTargetLocatorType,
@@ -1404,8 +1404,8 @@ static bool CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
         return false;
     }
 
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
     if (!payloadBytes || payloadByteCount == 0u) {
         return false;
     }
@@ -1468,14 +1468,14 @@ static bool CBaseMarginConnection_0x4b64a8_ResolveLogicalPayloadSpanScaffold(
         return false;
     }
 
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
     if (!payloadBytes || payloadByteCount == 0u) {
         return false;
     }
 
     const uint8_t* messageCodePointer = nullptr;
-    if (!CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
+    if (!CMessageConnection_0x4b7928_ResolveMessageCodePointer(
             messageRef,
             &messageCodePointer,
             /*outTargetLocatorType=*/nullptr,
@@ -1598,7 +1598,7 @@ static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
 
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
-    const bool hadValidMessageCode = CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
+    const bool hadValidMessageCode = CMessageConnection_0x4b7928_DecodeMessageCode(
         messageRef,
         &decodedMessageCode,
         &usedHeaderlessLocatorDecode);
@@ -1691,8 +1691,8 @@ static bool CMessageConnection_0x4b7928_ResolvePacketizedProtocolIdScaffold(
         return false;
     }
 
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
     if (!payloadBytes || payloadByteCount < 4u) {
         return false;
     }
@@ -1708,7 +1708,7 @@ static bool CMessageConnection_0x4b7928_ResolvePacketizedProtocolIdScaffold(
 // anchor: launcher.exe:0x41bc20 / CMessageConnectionMessageRef_DecodeMessageCode
 // Exported decode helper for CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
 // at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload.
-bool CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
+bool CMessageConnection_0x4b7928_DecodeMessageCode(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode) {
@@ -1724,14 +1724,14 @@ bool CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
         return false;
     }
 
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
     if (!payloadBytes || payloadByteCount == 0u) {
         return false;
     }
 
     const uint8_t* messageCodePointer = nullptr;
-    if (!CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
+    if (!CMessageConnection_0x4b7928_ResolveMessageCodePointer(
             messageRef,
             &messageCodePointer,
             /*outTargetLocatorType=*/nullptr,
@@ -1820,7 +1820,7 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
         return 0u;
     }
 
-    const uint32_t workType = CMessageConnection_0x4b7928_WorkItemTypeScaffold(workItem);
+    const uint32_t workType = CMessageConnection_0x4b7928_WorkItemType(workItem);
 
     // anchor: launcher.exe:0x4490c0 - work type 1 (close) handling
     if (workType == CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
@@ -1846,7 +1846,7 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
     }
 
     // anchor: launcher.exe:0x449130 - check status/payload dword
-    if (CMessageConnection_0x4b7928_WorkItemStatusOrPayloadDwordScaffold(workItem) != 0u) {
+    if (CMessageConnection_0x4b7928_WorkItemStatusOrPayloadDword(workItem) != 0u) {
         return 1u;
     }
 
@@ -1869,7 +1869,7 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
     std::unique_ptr<CMessageConnectionMessageRef_0x4ba23c, CMessageConnectionMessageRefReleaseDeleter>
         ownedCopiedMessageRef(new CMessageConnectionMessageRef_0x4ba23c());
     CMessageConnectionMessageRef_0x4ba23c* const copiedMessageRef = ownedCopiedMessageRef.get();
-    copiedMessageRef->ResetForPacketBuilderScaffold(!packetizedMessagesEnabled_);
+    copiedMessageRef->ResetForPacketBuilder(!packetizedMessagesEnabled_);
     const bool copied = CMessageConnection_0x4b7928_CopyParsedPacketIntoReceivedMessageRefScaffold(
         parsedPacketWorkItem,
         copiedMessageRef,
@@ -1883,7 +1883,7 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
             static_cast<unsigned>(parsedPacketWorkItem->retainedFragmentCount0C),
             fmt::ptr(parsedPacketWorkItem->currentCursor24),
             RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-        CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(workItem);
+        CMessageConnection_0x4b7928_LogUnhandledOperation(workItem);
         return 1u;
     }
 
@@ -1899,8 +1899,8 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
 
     lastReceivedPacketBodyBytesScaffold_.clear();
     if (const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = copiedMessageRef->messageStorage0c) {
-        const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-        if (const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+        const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+        if (const uint8_t* const payloadBytes = messageStorage->PayloadBase();
             payloadBytes && payloadByteCount != 0u) {
             lastReceivedPacketBodyBytesScaffold_.assign(
                 payloadBytes,
@@ -1924,8 +1924,8 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
             // Update last received packet info if agenda modified the message
             lastReceivedPacketBodyBytesScaffold_.clear();
             if (const CMessageConnectionMessageStorage_0x4ba208* const agendaMessageStorage = messageRefForDispatch->messageStorage0c) {
-                const uint16_t agendaPayloadByteCount = agendaMessageStorage->PayloadByteCountScaffold();
-                if (const uint8_t* const agendaPayloadBytes = agendaMessageStorage->PayloadBaseScaffold();
+                const uint16_t agendaPayloadByteCount = agendaMessageStorage->PayloadByteCount();
+                if (const uint8_t* const agendaPayloadBytes = agendaMessageStorage->PayloadBase();
                     agendaPayloadBytes && agendaPayloadByteCount != 0u) {
                     lastReceivedPacketBodyBytesScaffold_.assign(
                         agendaPayloadBytes,
@@ -1941,7 +1941,7 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
     if (messageRefForDispatch->headerless10 != 0u) {
         uint8_t targetLocatorType = 0u;
         uint8_t senderLocatorType = 0u;
-        if (!CMessageConnection_0x4b7928_ResolveMessageCodePointerScaffold(
+        if (!CMessageConnection_0x4b7928_ResolveMessageCodePointer(
                 *messageRefForDispatch,
                 /*outMessageCodePointer=*/nullptr,
                 &targetLocatorType,
@@ -1977,8 +1977,8 @@ uint32_t CMessageConnection_0x4b7928::OnOperationCompleted(void* workItem) {
         if (agendaTouched) {
             lastReceivedPacketBodyBytesScaffold_.clear();
             if (const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = messageRefForDispatch->messageStorage0c) {
-                const uint16_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
-                if (const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
+                const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
+                if (const uint8_t* const payloadBytes = messageStorage->PayloadBase();
                     payloadBytes && payloadByteCount != 0u) {
                     lastReceivedPacketBodyBytesScaffold_.assign(
                         payloadBytes,
@@ -2102,7 +2102,7 @@ void CMessageConnectionMessage_CreateRef(
         messageRefHelper->messageRef00->AddRef();
         messageRefHelper->messageRef00->messageContext14 = messageContext;
         // Reset the message ref for packet building
-        messageRefHelper->messageRef00->ResetForPacketBuilderScaffold(false);
+        messageRefHelper->messageRef00->ResetForPacketBuilder(false);
     }
 }
 
@@ -2130,7 +2130,7 @@ uint16_t CMessageConnectionMessageRef_DecodeMessageCode(
     }
 
     // Non-headerless message code is at the start of the payload
-    const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
+    const uint8_t* payload = messageRef->messageStorage0c->PayloadBase();
     if (!payload) {
         return 0;
     }
@@ -2146,8 +2146,8 @@ uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
     }
 
     // Headerless message code decoding from locator-based format
-    const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
-    if (!payload || messageRef->messageStorage0c->PayloadByteCountScaffold() < 2) {
+    const uint8_t* payload = messageRef->messageStorage0c->PayloadBase();
+    if (!payload || messageRef->messageStorage0c->PayloadByteCount() < 2) {
         return 0;
     }
 
@@ -2202,8 +2202,8 @@ uint32_t CAuthStartupConnection_0x4afef0::DispatchMessage(void* messageRef) {
         return 1u;
     }
 
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
-    if (!mediator || !CMessageConnection_0x4b7928_IsMediatorAuthConnectionScaffold(this, mediator)) {
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
+    if (!mediator || !CMessageConnection_0x4b7928_IsMediatorAuthConnection(this, mediator)) {
         return 0u;
     }
 
@@ -2236,16 +2236,16 @@ uint32_t CAuthStartupConnection_0x4afef0::OnOperationCompleted(void* workItem) {
     if (CMessageConnection_0x4b7928::OnOperationCompleted(workItem) != 0u) {
         handled = 1u;
     } else {
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
-        if (mediator && CMessageConnection_0x4b7928_IsMediatorAuthConnectionScaffold(this, mediator) &&
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
+        if (mediator && CMessageConnection_0x4b7928_IsMediatorAuthConnection(this, mediator) &&
             mediator->HandleAuthConnectionCompletionFallback(this, workItem) != 0u) {
             handled = 1u;
         } else {
-            CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(workItem);
+            CMessageConnection_0x4b7928_LogUnhandledOperation(workItem);
         }
     }
 
-    if (CMessageConnection_0x4b7928_WorkItemTypeScaffold(workItem) ==
+    if (CMessageConnection_0x4b7928_WorkItemType(workItem) ==
         CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
         // anchor: launcher.exe:0x449a70 tail
         // The original tail calls vtable[0](1), i.e. the deleting-dtor-style teardown path,
@@ -2317,8 +2317,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessageCode4LocalCompletionWork
         handled,
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
-        fmt::ptr(CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this)
-                     ? CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this)->currentState_
+        fmt::ptr(CMessageConnection_0x4b7928_LoginMediatorOwner(this)
+                     ? CMessageConnection_0x4b7928_LoginMediatorOwner(this)->currentState_
                      : nullptr),
         RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
     return handled;
@@ -2821,7 +2821,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     // Use the new idiomatic C++ class for CERT_ConnectRequest packet building
     CertConnectRequestPacketBuilder_0x4b6524 packetBuilder;
     CMessageConnectionMessageRef_0x4ba23c messageRef = {};
-    messageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
+    messageRef.ResetForPacketBuilder(/*headerless=*/false);
     if (!messageRef.messageStorage0c) {
         return 0u;
     }
@@ -2854,7 +2854,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
         reinterpret_cast<uintptr_t>(envelope.vtable00),
         fmt::ptr(packetBuilder.payloadBegin10),
         static_cast<unsigned>(packetBuilder.reservedContentByteCount18),
-        static_cast<unsigned>(messageRef.messageStorage0c->PayloadByteCountScaffold()),
+        static_cast<unsigned>(messageRef.messageStorage0c->PayloadByteCount()),
         static_cast<unsigned>(sendResult),
         fmt::ptr(this),
         fmt::ptr(OwnerContext()),
@@ -3166,7 +3166,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     // anchor: launcher.exe:0x442a1e -> CMessageConnectionMessage_CreateRef(&local_8, 0)
     // Original: Creates local message ref (cls_0x4489d0) for decryption target
     CMessageConnectionMessageRef_0x4ba23c localMessageRef;
-    localMessageRef.ResetForPacketBuilderScaffold(/*headerless=*/false);
+    localMessageRef.ResetForPacketBuilder(/*headerless=*/false);
 
     if (!localMessageRef.messageStorage0c) {
         spdlog::warn(
@@ -3220,18 +3220,18 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     if (decryptSuccess) {
         // anchor: launcher.exe:0x442a48 -> GrowPayloadByteCount via vtable+0x24
         // Original: (**(code **)(*(int *)local_8.messageRef00 + 0x24))(local_8.messageRef00, *(int *)(iVar2 + 4))
-        // Use GrowPayloadByteCount NOT ResetPayloadByteCountScaffold!
+        // Use GrowPayloadByteCount NOT ResetPayloadByteCount!
         // IMPORTANT: The original uses GrowPayloadByteCount to INCREASE the size, not reset!
         if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
             // IMPORTANT: Original calls GrowPayloadByteCount with decryptedByteCount, which ADDS to current size
             // But we need to grow to decryptedByteCount, not ADD decryptedByteCount to existing size
-            // The message ref was created with ResetForPacketBuilderScaffold(false, 0), so has 0 size
-            // So we need to set the size directly - use ResetPayloadByteCountScaffold
+            // The message ref was created with ResetForPacketBuilder(false, 0), so has 0 size
+            // So we need to set the size directly - use ResetPayloadByteCount
             // FIDELITY: We need the full decrypted buffer (96 bytes) to extract both seed and challenge
             // The decrypted buffer contains: [0][twofishKey(16)][challenge(16)][padding]
             const size_t fullDecryptedSize = 96u;  // RSA decryption produces 96 bytes
-            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(fullDecryptedSize);
-            uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
+            localMessageRef.messageStorage0c->ResetPayloadByteCount(fullDecryptedSize);
+            uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBase();
             if (payloadBase) {
                 std::copy(
                     decryptOutput.begin() + 8,
@@ -3248,34 +3248,34 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         spdlog::debug("HandleCode2ForBootstrap: localMessageRef={:08x}, storage={:08x}, payloadBase={:08x}",
             reinterpret_cast<uintptr_t>(&localMessageRef),
             reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c),
-            reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBaseScaffold()));
+            reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBase()));
 
         spdlog::debug("HandleCode2ForBootstrap: after envelope construct, payload[0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[0],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[1],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[2],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[3],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[4],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[5],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[6],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[7],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[8],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[9],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[10],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[11],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[12],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[13],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[14],
-            localMessageRef.messageStorage0c->PayloadBaseScaffold()[15]);
+            localMessageRef.messageStorage0c->PayloadBase()[0],
+            localMessageRef.messageStorage0c->PayloadBase()[1],
+            localMessageRef.messageStorage0c->PayloadBase()[2],
+            localMessageRef.messageStorage0c->PayloadBase()[3],
+            localMessageRef.messageStorage0c->PayloadBase()[4],
+            localMessageRef.messageStorage0c->PayloadBase()[5],
+            localMessageRef.messageStorage0c->PayloadBase()[6],
+            localMessageRef.messageStorage0c->PayloadBase()[7],
+            localMessageRef.messageStorage0c->PayloadBase()[8],
+            localMessageRef.messageStorage0c->PayloadBase()[9],
+            localMessageRef.messageStorage0c->PayloadBase()[10],
+            localMessageRef.messageStorage0c->PayloadBase()[11],
+            localMessageRef.messageStorage0c->PayloadBase()[12],
+            localMessageRef.messageStorage0c->PayloadBase()[13],
+            localMessageRef.messageStorage0c->PayloadBase()[14],
+            localMessageRef.messageStorage0c->PayloadBase()[15]);
 
         // DEBUG: Log what's in the envelope mbr_0x10_ptr after construction
         spdlog::debug("HandleCode2ForBootstrap: decryptedByteCount={}, payloadBase={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
             decryptedByteCount,
-            localMessageRef.messageStorage0c ? reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBaseScaffold()) : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[0] : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[1] : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[2] : 0,
-            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[3] : 0);
+            localMessageRef.messageStorage0c ? reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBase()) : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[0] : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[1] : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[2] : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBase()[3] : 0);
 
         spdlog::debug("HandleCode2ForBootstrap: envelope.packetPayloadPtr={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
             reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr),
@@ -3327,7 +3327,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         }
 
         // Set up response packet: [opcode=3][response bytes from seed envelope at +0x11/+0x15/+0x19/+0x1d]
-        uint8_t* responsePayload = responseMessageRef->PayloadAppendPointerScaffold();
+        uint8_t* responsePayload = responseMessageRef->PayloadAppendPointer();
         if (!responsePayload) {
             spdlog::warn("HandleCode2ForBootstrap: responseMessageRef has no payload pointer");
             return 0u;
@@ -3368,31 +3368,31 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         responsePayload[0] = 0x03;  // CERT_ChallengeResponse opcode
         *reinterpret_cast<uint16_t*>(responsePayload + 1) = 3;  // special field = 3 (unencrypted)
         std::copy_n(responseBytes.data(), 16, responsePayload + 3);  // Copy 16 bytes after header
-        responseMessageRef->SetPayloadByteCountScaffold(19);  // 1 + 2 + 16 = 19 bytes total
+        responseMessageRef->SetPayloadByteCount(19);  // 1 + 2 + 16 = 19 bytes total
 
         spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-22]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[1],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[2],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[3],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[4],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[5],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[6],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[7],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[8],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[9],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[10],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[11],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[12],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[13],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[14],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[15],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[16],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[17],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[18],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[19],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[20],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[21]);
+            responseMessageRef->messageStorage0c->PayloadBase()[0],
+            responseMessageRef->messageStorage0c->PayloadBase()[1],
+            responseMessageRef->messageStorage0c->PayloadBase()[2],
+            responseMessageRef->messageStorage0c->PayloadBase()[3],
+            responseMessageRef->messageStorage0c->PayloadBase()[4],
+            responseMessageRef->messageStorage0c->PayloadBase()[5],
+            responseMessageRef->messageStorage0c->PayloadBase()[6],
+            responseMessageRef->messageStorage0c->PayloadBase()[7],
+            responseMessageRef->messageStorage0c->PayloadBase()[8],
+            responseMessageRef->messageStorage0c->PayloadBase()[9],
+            responseMessageRef->messageStorage0c->PayloadBase()[10],
+            responseMessageRef->messageStorage0c->PayloadBase()[11],
+            responseMessageRef->messageStorage0c->PayloadBase()[12],
+            responseMessageRef->messageStorage0c->PayloadBase()[13],
+            responseMessageRef->messageStorage0c->PayloadBase()[14],
+            responseMessageRef->messageStorage0c->PayloadBase()[15],
+            responseMessageRef->messageStorage0c->PayloadBase()[16],
+            responseMessageRef->messageStorage0c->PayloadBase()[17],
+            responseMessageRef->messageStorage0c->PayloadBase()[18],
+            responseMessageRef->messageStorage0c->PayloadBase()[19],
+            responseMessageRef->messageStorage0c->PayloadBase()[20],
+            responseMessageRef->messageStorage0c->PayloadBase()[21]);
 
         // DEBUG: Log the expected challenge from the seed bytes (should match bytes 0-15 of response)
         spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
@@ -3406,10 +3406,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // In our code, use SendPacketMessageRef with the response message ref
         spdlog::debug("HandleCode2ForBootstrap: about to send responseMessageRef={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
             reinterpret_cast<uintptr_t>(responseMessageRef),
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[1],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[2],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[3]);
+            responseMessageRef->messageStorage0c->PayloadBase()[0],
+            responseMessageRef->messageStorage0c->PayloadBase()[1],
+            responseMessageRef->messageStorage0c->PayloadBase()[2],
+            responseMessageRef->messageStorage0c->PayloadBase()[3]);
         SendPacketMessageRef(*responseMessageRef);
         const uint32_t sendResult = 0;  // Success
 
@@ -3487,15 +3487,15 @@ uint32_t CBaseMarginConnection_0x4b64a8::DispatchMessage(void* messageRef) {
         return 0u;
     }
 
-    const uint8_t* const payloadBytes = messageStorage->PayloadBaseScaffold();
-    const size_t payloadByteCount = messageStorage->PayloadByteCountScaffold();
+    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
+    const size_t payloadByteCount = messageStorage->PayloadByteCount();
     if (!payloadBytes || payloadByteCount == 0u) {
         return 0u;
     }
 
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
     const bool marginOwnerPath =
-        mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator);
+        mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnection(this, mediator);
 
     uint16_t decodedMessageCode = 0u;
     bool usedHeaderlessLocatorDecode = false;
@@ -3711,19 +3711,19 @@ uint32_t CMarginConnection_0x4aff38::OnOperationCompleted(void* workItem) {
     if (CMessageConnection_0x4b7928::OnOperationCompleted(workItem) != 0u) {
         handled = 1u;
     } else {
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
-        if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator) &&
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
+        if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnection(this, mediator) &&
             mediator->HandleMarginConnectionCompletionFallback(this, workItem) != 0u) {
             handled = 1u;
         } else {
-            CMessageConnection_0x4b7928_LogUnhandledOperationScaffold(workItem);
+            CMessageConnection_0x4b7928_LogUnhandledOperation(workItem);
         }
     }
 
-    if (CMessageConnection_0x4b7928_WorkItemTypeScaffold(workItem) ==
+    if (CMessageConnection_0x4b7928_WorkItemType(workItem) ==
         CLTThreadPerClientTCPEngine_0x4b2768::kWorkTypeClose) {
-        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
-        if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator)) {
+        mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
+        if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnection(this, mediator)) {
             mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 = 0u;
         }
 
@@ -3751,8 +3751,8 @@ uint32_t CMarginConnection_0x4aff38::DispatchMessage(void* messageRef) {
     }
 
     // Call owner->DispatchCurrentHelperSlot6(messageRef)
-    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwnerScaffold(this);
-    if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnectionScaffold(this, mediator)) {
+    mxo::ltlogin::CLTLoginMediator* mediator = CMessageConnection_0x4b7928_LoginMediatorOwner(this);
+    if (mediator && CMessageConnection_0x4b7928_IsMediatorMarginConnection(this, mediator)) {
         return mediator->DispatchCurrentHelperSlot6(
             static_cast<mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c*>(messageRef));
     }

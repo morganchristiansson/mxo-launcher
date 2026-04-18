@@ -55,8 +55,8 @@ public:
     PacketBuilderEnvelopeBase() {
         // Initialize message ref for packet building
         messageRef08 = &messageRef_;
-        messageRef_.ResetForPacketBuilderScaffold(/*headerless=*/false);
-        payloadBegin10 = MessageStorage() ? MessageStorage()->PayloadBaseScaffold() : nullptr;
+        messageRef_.ResetForPacketBuilder(/*headerless=*/false);
+        payloadBegin10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
     }
 
     ~PacketBuilderEnvelopeBase() override = default;
@@ -68,7 +68,7 @@ public:
     const uint8_t* PayloadBase() const { return static_cast<const uint8_t*>(payloadBegin10); }
 
     uint32_t PayloadByteCount() const {
-        return MessageStorage() ? MessageStorage()->PayloadByteCountScaffold() : 0u;
+        return MessageStorage() ? MessageStorage()->PayloadByteCount() : 0u;
     }
 
     ::mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c& MessageRef() { return messageRef_; }
@@ -107,8 +107,8 @@ protected:
             return;
         }
         statusByte16 = 0u;
-        messageStorage->ResetPayloadByteCountScaffold(static_cast<uint16_t>(fixedByteCount));
-        payloadBegin10 = MessageStorage() ? MessageStorage()->PayloadBaseScaffold() : nullptr;
+        messageStorage->ResetPayloadByteCount(static_cast<uint16_t>(fixedByteCount));
+        payloadBegin10 = MessageStorage() ? MessageStorage()->PayloadBase() : nullptr;
     }
 
     void ClearReservation(
@@ -121,7 +121,7 @@ protected:
     void WritePayloadByte(size_t offset, uint8_t value) {
         ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
         uint8_t* const packetPayload = static_cast<uint8_t*>(payloadBegin10);
-        if (!messageStorage || !packetPayload || offset >= messageStorage->PayloadByteCountScaffold()) {
+        if (!messageStorage || !packetPayload || offset >= messageStorage->PayloadByteCount()) {
             return;
         }
         packetPayload[offset] = value;
@@ -131,7 +131,7 @@ protected:
         ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
         uint8_t* const packetPayload = static_cast<uint8_t*>(payloadBegin10);
         const uint16_t payloadByteCount =
-            messageStorage ? messageStorage->PayloadByteCountScaffold() : 0u;
+            messageStorage ? messageStorage->PayloadByteCount() : 0u;
         if (!packetPayload || offset + 1u >= payloadByteCount) {
             return;
         }
@@ -143,7 +143,7 @@ protected:
         ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* const messageStorage = MessageStorage();
         uint8_t* const packetPayload = static_cast<uint8_t*>(payloadBegin10);
         const uint16_t payloadByteCount =
-            messageStorage ? messageStorage->PayloadByteCountScaffold() : 0u;
+            messageStorage ? messageStorage->PayloadByteCount() : 0u;
         if (!packetPayload || offset + 3u >= payloadByteCount) {
             return;
         }
@@ -174,9 +174,9 @@ protected:
             ++textLengthWithoutNul;
         }
 
-        const uint16_t currentPayloadByteCount = messageStorage->PayloadByteCountScaffold();
+        const uint16_t currentPayloadByteCount = messageStorage->PayloadByteCount();
         const uint16_t remainingAfterLength =
-            messageStorage->RemainingAppendableByteCountScaffold();
+            messageStorage->RemainingAppendableByteCount();
         if (remainingAfterLength < 2u) {
             return 0u;
         }
@@ -185,7 +185,7 @@ protected:
             std::min<size_t>(textLengthWithoutNul + 1u, remainingAfterLength - 2u));
         const uint16_t requestedGrowth = static_cast<uint16_t>(storedLength + 2u);
         const uint16_t newPayloadByteCount =
-            messageStorage->GrowPayloadByteCountScaffold(requestedGrowth);
+            messageStorage->GrowPayloadByteCount(requestedGrowth);
         if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
             return 0u;
         }

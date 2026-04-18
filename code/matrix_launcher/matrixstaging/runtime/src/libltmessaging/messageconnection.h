@@ -191,23 +191,23 @@ public:
     void SetRefCountFromPtr(const volatile long* refCountSource) override;
 
     // anchor: launcher.exe:0x455bd0 inner-storage setup before outer `+0x0c` stores/AddRefs it
-    void ResetForPacketBuilderScaffold();
+    void ResetForPacketBuilder();
     // UNANCHORED: source-owned deterministic reset helper that zero-fills the newly selected span
     // before committing the raw payload-length header bytes.
-    void ResetPayloadByteCountScaffold(uint16_t payloadByteCount);
+    void ResetPayloadByteCount(uint16_t payloadByteCount);
     // anchor: launcher.exe:0x4557b0 / shared raw length write behavior with `0x41bb60`
-    void SetPayloadByteCountRawScaffold(uint16_t payloadByteCount);
+    void SetPayloadByteCountRaw(uint16_t payloadByteCount);
     // anchor: launcher.exe:0x4557b0
-    uint16_t GrowPayloadByteCountScaffold(uint16_t additionalByteCount);
+    uint16_t GrowPayloadByteCount(uint16_t additionalByteCount);
     // UNANCHORED: source-owned raw payload-length decoder from `+0x0a/+0x0b`, clamped to the
     // recovered `0x1000` payload ceiling.
-    uint16_t PayloadByteCountScaffold() const;
+    uint16_t PayloadByteCount() const;
     // UNANCHORED: source-owned capacity helper over the recovered raw payload-storage layout.
-    uint16_t RemainingAppendableByteCountScaffold() const;
+    uint16_t RemainingAppendableByteCount() const;
     // UNANCHORED: source-owned accessor for raw inline payload base `+0x0c`.
-    uint8_t* PayloadBaseScaffold();
+    uint8_t* PayloadBase();
     // UNANCHORED: source-owned accessor for raw inline payload base `+0x0c`.
-    const uint8_t* PayloadBaseScaffold() const;
+    const uint8_t* PayloadBase() const;
 };
 
 class CMessageConnectionMessageRefBase_0x4ba220 : public CMessageConnectionLocalRefCountedBase {
@@ -230,15 +230,15 @@ public:
     // anchor: launcher.exe:0x455bd0
     // Resets the base outer state, materializes a fresh inner storage object, and retains it
     // through `messageStorage0c`.
-    void ResetBaseForPacketBuilderScaffold(uint32_t field08 = 0u);
+    void ResetBaseForPacketBuilder(uint32_t field08 = 0u);
     // anchor: launcher.exe:0x4557b0 / outer vtable `0x004ba220 +0x18`
-    uint16_t GrowPayloadByteCountScaffold(uint16_t additionalByteCount);
+    uint16_t GrowPayloadByteCount(uint16_t additionalByteCount);
     // anchor: launcher.exe:0x439820
-    uint8_t* PayloadAppendPointerScaffold();
+    uint8_t* PayloadAppendPointer();
     // anchor: launcher.exe:0x41bb60
-    bool SetPayloadByteCountScaffold(uint32_t payloadByteCount);
+    bool SetPayloadByteCount(uint32_t payloadByteCount);
     // UNANCHORED: source-owned convenience wrapper over the inner payload-byte-count header.
-    uint16_t PayloadByteCountScaffold() const;
+    uint16_t PayloadByteCount() const;
 
 protected:
     CMessageConnectionMessageStorage_0x4ba208 ownedMessageStorage_{};
@@ -262,7 +262,7 @@ public:
 
     // anchor: launcher.exe:0x455cd0 / 0x455c60
     // Source-local live-object initializer mirroring `CreateRef(Create(...), messageContext14)`.
-    void ResetForPacketBuilderScaffold(bool headerless, uint32_t messageContext14 = 0u);
+    void ResetForPacketBuilder(bool headerless, uint32_t messageContext14 = 0u);
 
     // Source note: keep the local outer scaffold noncopyable so raw `messageStorage0c` never
     // silently keeps a pointer into another instance's inline owned-storage tail.
@@ -276,7 +276,7 @@ public:
 // Exported decode helper used by CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
 // at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload,
 // handling both headerless (locator-based) and non-headerless (direct) payload formats.
-bool CMessageConnection_0x4b7928_DecodeMessageCodeScaffold(
+bool CMessageConnection_0x4b7928_DecodeMessageCode(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode);
@@ -350,7 +350,7 @@ struct CMessageConnectionPacketBuilderReservationScaffold {
     uint16_t reservedPadding06 = 0u;
 };
 
-static_assert(sizeof(CMessageConnectionPacketBuilderReservationScaffold) == 0x08, "packet-builder reservation scaffold size mismatch");
+static_assert(sizeof(CMessageConnectionPacketBuilderReservationScaffold) == 0x08, "packet-builder reservation size mismatch");
 
 struct CMessageConnectionPacketBuilderPayloadScaffold {
     // Common active derived local packet-builder shape laid on top of the raw `0x439840` envelope
@@ -431,7 +431,7 @@ public:
     // Original at 0x4419c0: allocates payload size 0x21, sets opcode byte to 0x00
     void InitializePayloadSize() override {
         if (messageRef08 && messageRef08->messageStorage0c) {
-            messageRef08->messageStorage0c->ResetPayloadByteCountScaffold(0x21);
+            messageRef08->messageStorage0c->ResetPayloadByteCount(0x21);
             packetPayloadPtr = static_cast<uint8_t*>(payloadBegin10);
             if (packetPayloadPtr) {
                 *packetPayloadPtr = 0x00;  // Opcode byte
@@ -509,12 +509,12 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     if (newMessageRef) {
         newMessageRef->AddRef();
         // Initialize message storage
-        newMessageRef->ResetForPacketBuilderScaffold(false, 0);
+        newMessageRef->ResetForPacketBuilder(false, 0);
         // Store message ref at messageRef08
         messageRef08 = newMessageRef;
         // nopatchLauncherVersionValue04 = message ref payload base + 0xc (actual payload data offset within storage)
         if (newMessageRef->messageStorage0c) {
-            uint8_t* payloadBase = newMessageRef->messageStorage0c->PayloadBaseScaffold();
+            uint8_t* payloadBase = newMessageRef->messageStorage0c->PayloadBase();
             // Original adds +0x0c to get to actual payload data
             nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
             // Set packetPayloadPtr to point to payload for response extraction
@@ -534,7 +534,7 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     messageRef08 = messageRef;
     
     if (messageRef && messageRef->messageStorage0c) {
-        const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
+        const uint8_t* payload = messageRef->messageStorage0c->PayloadBase();
         // nopatchLauncherVersionValue04: payload base pointer when flag != 0
         nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payload);
         // packetPayloadPtr points to same payload for response extraction
@@ -665,12 +665,12 @@ public:
     void InitializeWithMessageRef(CMessageConnectionMessageRef_0x4ba23c& messageRef, uint16_t initialPayloadByteCount) {
         messageRef08 = &messageRef;
         if (messageRef.messageStorage0c) {
-            payloadBegin10 = messageRef.messageStorage0c->PayloadBaseScaffold();
+            payloadBegin10 = messageRef.messageStorage0c->PayloadBase();
         }
 
         // Reset payload to initial size (3 bytes for opcode + 2-byte field)
         if (messageRef.messageStorage0c) {
-            messageRef.messageStorage0c->ResetPayloadByteCountScaffold(initialPayloadByteCount);
+            messageRef.messageStorage0c->ResetPayloadByteCount(initialPayloadByteCount);
         }
     }
 
@@ -693,12 +693,12 @@ public:
             return false;
         }
 
-        const uint16_t currentPayloadByteCount = messageRef.messageStorage0c->PayloadByteCountScaffold();
+        const uint16_t currentPayloadByteCount = messageRef.messageStorage0c->PayloadByteCount();
         reservationHeader14 = packetPayload + currentPayloadByteCount;
 
         const uint16_t requestedGrowth = static_cast<uint16_t>(replyByteCount + sizeof(uint16_t));
         const uint16_t newPayloadByteCount =
-            messageRef.messageStorage0c->GrowPayloadByteCountScaffold(requestedGrowth);
+            messageRef.messageStorage0c->GrowPayloadByteCount(requestedGrowth);
 
         if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
             return false;
@@ -768,10 +768,10 @@ public:
     // - reads descriptor byte at [messageRef->messageStorage0c + 0xd]
     // - computes payload size = lookup[high_nibble] + lookup[low_nibble] + 0x12
     // - sets nopatchLauncherVersionValue04 = messageStorage + 0xc + payloadSize (END pointer)
-    // - calls SetPayloadByteCountScaffold(messageRef08, 0) to zero messageRef length
-    // - calls messageStorage->GrowPayloadByteCountScaffold(payloadSize) to grow storage
+    // - calls SetPayloadByteCount(messageRef08, 0) to zero messageRef length
+    // - calls messageStorage->GrowPayloadByteCount(payloadSize) to grow storage
     // - sets payloadBegin10 = nopatchLauncherVersionValue04 (END pointer)
-    // - calls messageRef08->GrowPayloadByteCountScaffold(3) to grow messageRef by 3
+    // - calls messageRef08->GrowPayloadByteCount(3) to grow messageRef by 3
     // - writes opcode 0x01 (CERT_ConnectRequest) and zeros word at payload+1
     // - clears reservation fields +0x14/+0x18
     void InitializePayloadSize() override {
@@ -790,17 +790,17 @@ public:
         // Set nopatchLauncherVersionValue04 to END of payload (storage base + 0xc + size)
         nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(storageBase + 0xc) + payloadSize;
 
-        // Zero the messageRef payload length via SetPayloadByteCountScaffold
-        messageRef08->SetPayloadByteCountScaffold(0);
+        // Zero the messageRef payload length via SetPayloadByteCount
+        messageRef08->SetPayloadByteCount(0);
 
         // Grow messageStorage by payloadSize (from 0 to payloadSize)
-        msgStorage->GrowPayloadByteCountScaffold(static_cast<uint16_t>(payloadSize));
+        msgStorage->GrowPayloadByteCount(static_cast<uint16_t>(payloadSize));
 
         // Set payloadBegin10 to END pointer (same as nopatchLauncherVersionValue04)
         payloadBegin10 = reinterpret_cast<void*>(nopatchLauncherVersionValue04);
 
         // Grow messageRef by 3 bytes (opcode + 2-byte field)
-        messageRef08->GrowPayloadByteCountScaffold(3);
+        messageRef08->GrowPayloadByteCount(3);
 
         // Write opcode and zero word to payload
         uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
@@ -1021,7 +1021,7 @@ public:
             // anchor: launcher.exe:0x455b80 - AddRef (vtable +0x04)
             messageRef00->AddRef();
             // Initialize the message storage (this is what the original does)
-            messageRef00->ResetForPacketBuilderScaffold(false, static_cast<uint32_t>(messageContext));
+            messageRef00->ResetForPacketBuilder(false, static_cast<uint32_t>(messageContext));
         }
     }
 

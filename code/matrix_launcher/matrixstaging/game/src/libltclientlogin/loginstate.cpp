@@ -289,7 +289,7 @@ void LoadCharacterReplyEnvelope_0x4b542c::RefreshDataSectionView(char initialize
     }
 
     const uint16_t sectionOffset0eLocal = ReadU16LE(currentMessage10_ + 0x0eu);
-    const uint16_t payloadByteCount = storage->PayloadByteCountScaffold();
+    const uint16_t payloadByteCount = storage->PayloadByteCount();
     if (sectionOffset0eLocal != 0u &&
         static_cast<size_t>(sectionOffset0eLocal) + 2u <= payloadByteCount) {
         dataSectionByteCount18_ = ReadU16LE(currentMessage10_ + sectionOffset0eLocal);
