@@ -42,14 +42,17 @@ void LoadServerConfigurations() {
     
     // Try to load from game directory first
     configs = LoadServerConfigs("servers.cfg");
+    spdlog::info("DIAGNOSTIC: loaded {} servers from servers.cfg", configs.size());
     
     // If not found, try relative path from executable
     if (configs.empty()) {
         configs = LoadServerConfigs("../servers.cfg");
+        spdlog::info("DIAGNOSTIC: loaded {} servers from ../servers.cfg", configs.size());
     }
     
     // If still empty, use default production server
     if (configs.empty()) {
+        spdlog::warn("DIAGNOSTIC: servers.cfg not found, using default production server");
         ServerConfig defaultConfig;
         defaultConfig.name = "production";
         defaultConfig.authServerDnsName = "auth.lith.thematrixonline.net";
@@ -64,12 +67,17 @@ void LoadServerConfigurations() {
         configs.push_back(std::move(defaultConfig));
     }
     
+    for (const auto& cfg : configs) {
+        spdlog::info("DIAGNOSTIC: server '{}' -> {}:{}", cfg.name, cfg.authServerDnsName, cfg.authServerPort);
+    }
+    
     SetServerConfigs(std::move(configs));
 }
 
 // Interactive server selection menu
 bool SelectServerInteractive() {
     const auto& configs = GetAllServerConfigs();
+    spdlog::info("DIAGNOSTIC: SelectServerInteractive called with {} servers", configs.size());
     
     if (configs.size() <= 1) {
         // Only one server available, use it automatically
@@ -894,6 +902,9 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         spdlog::error("ERROR: server selection failed");
         return false;
     }
+    
+    // Apply selected server config to mediator globals
+    ApplySelectedServerConfigToMediator();
     
     if (!RunTextModeLoginRichEditSubmitCredentialsStage()) {
         return false;

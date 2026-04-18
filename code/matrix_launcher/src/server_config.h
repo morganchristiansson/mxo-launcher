@@ -33,6 +33,10 @@ const ServerConfig* GetSelectedServerConfig();
 // Set the selected server config
 void SetSelectedServerConfig(const ServerConfig* config);
 
+// Apply selected server config to mediator globals (g_qsAuthServerDNSName, g_AuthServerPort, etc.)
+// Call this after server selection to configure the login mediator.
+void ApplySelectedServerConfigToMediator();
+
 // Set all server configs (for testing)
 void SetServerConfigs(std::vector<ServerConfig>&& configs);
 

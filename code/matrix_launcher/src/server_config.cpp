@@ -5,10 +5,19 @@
 
 #include "../matrixstaging/runtime/src/libltbase/consolevar.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+
+// Mediator globals - defined in loginmediator_active_state.cpp
+namespace mxo::ltlogin {
+extern const char* g_qsAuthServerDNSName;
+extern uint16_t g_AuthServerPort;
+extern uint32_t g_IgnoreHostsFileForAuth;
+} // namespace mxo::ltlogin
 
 namespace mxo::launcher {
 
@@ -82,11 +91,13 @@ bool ParseServerSection(
 }
 
 // Find all section names in the config file
-// Returns vector of (sectionName, filePosition) pairs
-std::vector<std::pair<std::string, long>> FindAllSections(
+// Returns vector of (sectionName, lineBuffer) pairs
+// Note: We store the line content instead of file positions because seeking
+// and re-reading is more reliable than trying to calculate byte offsets
+std::vector<std::pair<std::string, std::string>> FindAllSections(
     FILE* file,
     mxo::libltbase::ConsoleParseErrorSink& /*errors*/) {
-    std::vector<std::pair<std::string, long>> sections;
+    std::vector<std::pair<std::string, std::string>> sections;
     if (!file) {
         return sections;
     }
@@ -99,7 +110,6 @@ std::vector<std::pair<std::string, long>> FindAllSections(
         }
         
         if (*cursor == '[') {
-            const long position = std::ftell(file) - std::strlen(lineBuffer);
             ++cursor;
             char* sectionEnd = std::strchr(cursor, ']');
             if (sectionEnd) {
@@ -122,7 +132,7 @@ std::vector<std::pair<std::string, long>> FindAllSections(
                         sectionName = sectionName.substr(nameStart);
                     }
                 }
-                sections.emplace_back(sectionName, position);
+                sections.emplace_back(sectionName, std::string(lineBuffer));
             }
         }
     }
@@ -159,41 +169,76 @@ std::vector<ServerConfig> LoadServerConfigs(const char* configPath) {
     }
     state.activeFile = state.primaryFile;
     
-    // First pass: find all section names
-    std::vector<std::pair<std::string, long>> sections = FindAllSections(state.primaryFile, errors);
+    // Parse each section using the consolevar section-finding logic
+    // This is faithful to how the original launcher parses config sections
+    char lineBuffer[0x5dc];
     
-    // Reset file position
+    // First, find all section names
+    std::vector<std::string> sectionNames;
     std::fseek(state.primaryFile, 0, SEEK_SET);
     state.activeFile = state.primaryFile;
     
-    // Second pass: parse each section
-    char lineBuffer[0x5dc];
-    
-    for (const auto& [sectionName, sectionPos] : sections) {
-        // Seek to section and parse it
-        std::fseek(state.primaryFile, sectionPos, SEEK_SET);
-        state.activeFile = state.primaryFile;
-        state.configSectionName = sectionName;
-        state.foundSectionHeader = false;
-        state.reachedEndOfFile = false;
-        
-        // Read and validate section header
-        if (!mxo::libltbase::CConsoleVar::GetNextConfigFileLine(state, lineBuffer, sizeof(lineBuffer), &errors)) {
-            continue;
-        }
-        
-        // Verify we're at the expected section
+    while (mxo::libltbase::CConsoleVar::GetNextConfigFileLine(state, lineBuffer, sizeof(lineBuffer), &errors)) {
         char* cursor = lineBuffer;
         while (*cursor && std::isspace(static_cast<unsigned char>(*cursor))) {
             ++cursor;
         }
-        if (*cursor != '[') {
+        
+        if (*cursor == '[') {
+            ++cursor;
+            char* sectionEnd = std::strchr(cursor, ']');
+            if (sectionEnd) {
+                *sectionEnd = '\0';
+                std::string sectionName = TrimString(cursor);
+                // Skip "server" prefix sections - we want the actual server names
+                if (!sectionName.empty() && sectionName.find("server ") == 0) {
+                    // Extract name from [server "name"] format
+                    size_t nameStart = 6; // skip "server "
+                    while (nameStart < sectionName.size() && sectionName[nameStart] == ' ') {
+                        ++nameStart;
+                    }
+                    if (nameStart < sectionName.size() && sectionName[nameStart] == '"') {
+                        ++nameStart;
+                        size_t nameEnd = sectionName.find('"', nameStart);
+                        if (nameEnd != std::string::npos) {
+                            sectionName = sectionName.substr(nameStart, nameEnd - nameStart);
+                        }
+                    } else {
+                        sectionName = sectionName.substr(nameStart);
+                    }
+                }
+                sectionNames.push_back(sectionName);
+            }
+        }
+    }
+    
+    spdlog::info("DIAGNOSTIC: Found {} sections in config file", sectionNames.size());
+    
+    // Second pass: parse each section by name using FindConfigFileSection
+    // This is the same approach the original launcher uses for -configsection
+    for (const std::string& sectionName : sectionNames) {
+        spdlog::info("DIAGNOSTIC: Parsing section '{}'", sectionName);
+        
+        // Reset file and find the section
+        std::fseek(state.primaryFile, 0, SEEK_SET);
+        state.activeFile = state.primaryFile;
+        state.foundSectionHeader = false;
+        state.reachedEndOfFile = false;
+        
+        if (!mxo::libltbase::CConsoleVar::FindConfigFileSection(state, sectionName.c_str(), &errors)) {
+            spdlog::warn("DIAGNOSTIC: Failed to find section '{}'", sectionName);
             continue;
         }
         
+        // Now parse the section contents
+        state.configSectionName = sectionName;
         ServerConfig config;
         if (ParseServerSection(state, config, errors)) {
+            spdlog::info("DIAGNOSTIC: Successfully parsed server '{}' -> {}:{}", 
+                config.name, config.authServerDnsName, config.authServerPort);
             configs.push_back(std::move(config));
+        } else {
+            spdlog::warn("DIAGNOSTIC: Failed to parse server section '{}'", sectionName);
         }
     }
     
@@ -234,6 +279,24 @@ void SetServerConfigs(std::vector<ServerConfig>&& configs) {
 
 const std::vector<ServerConfig>& GetAllServerConfigs() {
     return g_ServerConfigs;
+}
+
+void ApplySelectedServerConfigToMediator() {
+    if (!g_SelectedServerConfig) {
+        spdlog::warn("ApplySelectedServerConfigToMediator: no server config selected");
+        return;
+    }
+
+    // Apply to mediator globals that Initialize() reads directly
+    mxo::ltlogin::g_qsAuthServerDNSName = g_SelectedServerConfig->authServerDnsName.c_str();
+    mxo::ltlogin::g_AuthServerPort = g_SelectedServerConfig->authServerPort;
+    mxo::ltlogin::g_IgnoreHostsFileForAuth = 0u;
+
+    spdlog::info(
+        "DIAGNOSTIC: applied server config '{}' to mediator globals: auth='{}' port={}",
+        g_SelectedServerConfig->name,
+        g_SelectedServerConfig->authServerDnsName,
+        g_SelectedServerConfig->authServerPort);
 }
 
 } // namespace mxo::launcher
