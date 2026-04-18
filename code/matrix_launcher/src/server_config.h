@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-namespace mxo::launcher {
-
 struct ServerConfig {
     std::string name;
     std::string authServerDnsName;
@@ -43,5 +41,3 @@ void SetServerConfigs(std::vector<ServerConfig>&& configs);
 
 // Get all server configs (for testing)
 const std::vector<ServerConfig>& GetAllServerConfigs();
-
-} // namespace mxo::launcher

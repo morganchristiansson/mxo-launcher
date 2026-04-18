@@ -3,9 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace mxo {
-namespace launcher {
-
 // anchor: launcher.exe:0x004a9b40
 // Recovered autodetect dialog object used from CLauncher::InitInstance when 0x4d2c64 is set.
 // This source-owned model intentionally omits the actual GUI/modal loop while preserving the
@@ -59,5 +56,4 @@ public:
 static_assert(offsetof(CAutodetectDialog, m_ResultReady74) == 0x74, "CAutodetectDialog +0x74 drifted");
 static_assert(offsetof(CAutodetectDialog, m_Icon78) == 0x78, "CAutodetectDialog +0x78 drifted");
 
-} // namespace launcher
-} // namespace mxo
+

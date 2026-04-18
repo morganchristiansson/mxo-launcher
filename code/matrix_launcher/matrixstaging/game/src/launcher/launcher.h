@@ -3,9 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace mxo {
-namespace launcher {
-
 // launcher.exe:0x40dc40 / 0x40d8d0 / 0x40e1c0
 // Launcher-owned selection-page row payload kept in the `CListCtrl+0x68` node list.
 // Current static-RE tightening from the live selection-page family:
@@ -128,5 +125,4 @@ static_assert(offsetof(CLauncher, m_FieldA8) == 0xa8, "CLauncher +0xa8 drifted")
 static_assert(offsetof(CLauncher, m_FieldAC) == 0xac, "CLauncher +0xac drifted");
 static_assert(offsetof(CLauncher, m_FieldB0) == 0xb0, "CLauncher +0xb0 drifted");
 
-} // namespace launcher
-} // namespace mxo
+

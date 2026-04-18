@@ -33,15 +33,9 @@
 // Include the login mediator header for world list builder access
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 
-namespace mxo {
-namespace ltlogin {
-    using namespace std;
-}
-}
-
 #define DLLEXPORT __declspec(dllexport)
 
-using mxo::launcher::CLauncher;
+
 
 extern int g_CrtArgc;
 extern char** g_CrtArgv;

@@ -22,7 +22,7 @@ extern const char* g_ServerPublicExponentB64;
 extern uint32_t g_SkipAuthPublicKeyReplyValidation;
 } // namespace mxo::ltlogin
 
-namespace mxo::launcher {
+
 
 namespace {
 
@@ -317,4 +317,3 @@ void ApplySelectedServerConfigToMediator() {
         g_SelectedServerConfig->skipPublicKeyValidation ? 1 : 0);
 }
 
-} // namespace mxo::launcher

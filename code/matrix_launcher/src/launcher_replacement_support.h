@@ -3,8 +3,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace mxo::launcher::replacement {
-
 // Replacement-only shared launcher selection metadata.
 // This does not claim an original launcher.exe helper/class boundary; it only centralizes the
 // current recovered world-selection defaults used by both launcher-owned startup scaffolding and
@@ -22,5 +20,3 @@ uint32_t RecoveredSelectionWorldIndexLow24();
 
 bool LoadLastWorldNameFromRegistry(char* out, size_t outSize);
 bool StoreLastWorldNameInRegistry(const char* selectionName);
-
-} // namespace mxo::launcher::replacement

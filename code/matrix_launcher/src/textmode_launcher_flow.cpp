@@ -23,13 +23,7 @@ extern mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 extern void* g_pLauncherObject6304;
 extern char g_LastWorldName[256];
 
-namespace {
 
-using mxo::launcher::ServerConfig;
-using mxo::launcher::LoadServerConfigs;
-using mxo::launcher::SetServerConfigs;
-using mxo::launcher::GetAllServerConfigs;
-using mxo::launcher::SetSelectedServerConfig;
 
 // Forward declarations for helper functions defined later in this file
 void WriteMatrixConsoleText(const char* text, bool appendNewline);
@@ -39,17 +33,17 @@ bool ReadInteractiveLauncherIndex(const char* prompt, uint32_t upperBoundExclusi
 // Load server configurations from servers.cfg
 void LoadServerConfigurations() {
     std::vector<ServerConfig> configs;
-    
+
     // Try to load from game directory first
     configs = LoadServerConfigs("servers.cfg");
     spdlog::info("DIAGNOSTIC: loaded {} servers from servers.cfg", configs.size());
-    
+
     // If not found, try relative path from executable
     if (configs.empty()) {
         configs = LoadServerConfigs("../servers.cfg");
         spdlog::info("DIAGNOSTIC: loaded {} servers from ../servers.cfg", configs.size());
     }
-    
+
     // If still empty, use default production server
     if (configs.empty()) {
         spdlog::warn("DIAGNOSTIC: servers.cfg not found, using default production server");
@@ -59,18 +53,18 @@ void LoadServerConfigurations() {
         defaultConfig.authServerPort = 11000;
         defaultConfig.marginServerSuffix = ".lith.thematrixonline.net";
         defaultConfig.marginServerPort = 10000;
-        defaultConfig.kServerPublicModulusB64 = 
+        defaultConfig.kServerPublicModulusB64 =
             "qMIfEkrXWpRr44ecWMzJHV7Hjg9bnru2PZv3NydzOZ6uab52wET+RoHhIzv+zJb3"
             "zBhmETAtsrmNnBXiW7tfqPK0xf6lb9RbvupfnfYSHO5WaEcWEi0JjQRBevg9d8ql"
             "ETo9Hrfy9PEfpeK1T2WF+xxx73chvBTB12Paa7yT+Ik=";
         defaultConfig.kServerPublicExponentB64 = "EQ==";
         configs.push_back(std::move(defaultConfig));
     }
-    
+
     for (const auto& cfg : configs) {
         spdlog::info("DIAGNOSTIC: server '{}' -> {}:{}", cfg.name, cfg.authServerDnsName, cfg.authServerPort);
     }
-    
+
     SetServerConfigs(std::move(configs));
 }
 
@@ -78,7 +72,7 @@ void LoadServerConfigurations() {
 bool SelectServerInteractive() {
     const auto& configs = GetAllServerConfigs();
     spdlog::info("DIAGNOSTIC: SelectServerInteractive called with {} servers", configs.size());
-    
+
     if (configs.size() <= 1) {
         // Only one server available, use it automatically
         if (!configs.empty()) {
@@ -90,7 +84,7 @@ bool SelectServerInteractive() {
         }
         return true;
     }
-    
+
     WriteMatrixConsoleText("Select server:", true);
     for (size_t i = 0; i < configs.size(); ++i) {
         const ServerConfig& config = configs[i];
@@ -101,7 +95,7 @@ bool SelectServerInteractive() {
             config.authServerDnsName.c_str(),
             config.authServerPort);
     }
-    
+
     uint32_t selectedIndex = 0;
     while (!ReadInteractiveLauncherIndex(
             "Server index: ",
@@ -110,7 +104,7 @@ bool SelectServerInteractive() {
            selectedIndex == 0) {
         WriteMatrixConsoleText("Invalid server index.", true);
     }
-    
+
     const ServerConfig* selected = &configs[selectedIndex - 1];
     SetSelectedServerConfig(selected);
     WriteMatrixConsoleFormattedLine(
@@ -119,10 +113,6 @@ bool SelectServerInteractive() {
         selected->authServerDnsName.c_str());
     return true;
 }
-
-} // namespace
-
-namespace {
 
 const char* MaskedArgValue(const char* value) {
     if (!value || !value[0]) {
@@ -602,9 +592,6 @@ bool BuildNoGuiProcessLoginRequestInput(
     return true;
 }
 
-} // namespace
-
-namespace mxo::launcher {
 
 // UNANCHORED: text-mode analogue of the launcher page-6 rich-edit prompt/submit corridor.
 // anchor: launcher.exe:0x408ee0
@@ -864,7 +851,7 @@ character_selection_menu:
     m_FieldA8 = resolvedA8;
     m_FieldAC = resolvedAC;
     CopyTextModeBuffer(g_LastWorldName, sizeof(g_LastWorldName), resolvedWorldName);
-    replacement::StoreLastWorldNameInRegistry(g_LastWorldName);
+    StoreLastWorldNameInRegistry(g_LastWorldName);
     g_LauncherCommandLine.SetLauncherCharacter(
         selectedRow.IsCreatePlaceholder() ? "" : selectedRow.selectionName);
 
@@ -895,6 +882,7 @@ character_selection_menu:
 // Replacement-only ownership note:
 // - this implementation intentionally lives under src/ so launcher.cpp can stay focused on
 //   recovered launcher-owned startup coordination and anchored method bodies.
+
 bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
     // Load and select server first (before credentials)
     LoadServerConfigurations();
@@ -902,14 +890,12 @@ bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
         spdlog::error("ERROR: server selection failed");
         return false;
     }
-    
+
     // Apply selected server config to mediator globals
     ApplySelectedServerConfigToMediator();
-    
+
     if (!RunTextModeLoginRichEditSubmitCredentialsStage()) {
         return false;
     }
     return RunTextModeSelectionListStage();
 }
-
-} // namespace mxo::launcher

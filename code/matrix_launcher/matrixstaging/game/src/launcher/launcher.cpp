@@ -40,7 +40,7 @@ char** g_CrtArgv = NULL;
 uint32_t g_LauncherFilteredArgCount = 0;    // original: [0x4d2c5c]
 char** g_LauncherFilteredArgv = NULL;       // original: [0x4d2c60]
 mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
-mxo::launcher::CLauncher g_Launcher;
+CLauncher g_Launcher;
 void* g_pLauncherObject6304 = NULL;
 void* g_pILTLoginMediatorDefault = NULL;
 uint8_t g_LauncherInitClientFlagByte = 0;   // original byte: [0x4d2c69]
@@ -48,8 +48,6 @@ char g_LastWorldName[256] = {0};
 
 extern bool DiagnosticInitializePreclientEnvironmentLike402EC0();
 extern bool IsRecoveredPreclientEnvironmentActive();
-
-namespace {
 
 template <typename T>
 T ResolveProc(HMODULE module, const char* name) {
@@ -73,11 +71,8 @@ void LowercaseAsciiCopy(char* destination, size_t destinationSize, const char* s
     destination[write] = '\0';
 }
 
-const char* MaskedArgValue(const char* value) {
-    if (!value || !value[0]) return "<empty>";
-    return "<provided>";
-}
 
+const char* MaskedArgValue(const char* value);
 void LogLauncherPreprocessingState() {
     spdlog::info("=== Launcher switch preprocessing ===");
     spdlog::info("auth username      = {}", MaskedArgValue(g_LauncherCommandLine.AuthUsername()));
@@ -124,7 +119,7 @@ bool PreloadDependencies() {
     return true;
 }
 
-void LogKnownStartupState(const mxo::launcher::CLauncher& launcher) {
+void LogKnownStartupState(const CLauncher& launcher) {
     spdlog::info("=== Known startup frame ===");
     spdlog::info("arg1 filteredArgCount        = 0x{:08x}", g_LauncherFilteredArgCount);
     spdlog::info("arg2 filteredArgv            = {}", fmt::ptr(g_LauncherFilteredArgv));
@@ -150,11 +145,6 @@ void LogClientLifecycleFailure(const char* phase, ErrorClientDLLFunc errorClient
         clientError ? ": " : "",
         clientError ? clientError : "");
 }
-
-} // namespace
-
-namespace mxo {
-namespace launcher {
 
 // anchor: launcher.exe:0x40a55c / 0x40b430
 uint32_t CLauncher::BuildPackedArg7Selection() const {
@@ -315,8 +305,8 @@ bool CLauncher::BuildRecoveredSelectionNameAndState(char* selectionName, size_t 
     // Replacement-only stand-in for launcher-owned selection fallback state that must already exist
     // by the time 0x40a4d0 consumes [this+0xa8]/[this+0xac]. Final world writeback is deferred to
     // the later pre-client character-selection stage after the character index is read.
-    if (const mxo::launcher::replacement::RecoveredLauncherSelectionRecord* defaultSelection =
-            mxo::launcher::replacement::DefaultRecoveredLauncherSelectionRecord();
+    if (const RecoveredLauncherSelectionRecord* defaultSelection =
+            DefaultRecoveredLauncherSelectionRecord();
         defaultSelection != nullptr && defaultSelection->selectionName != nullptr) {
         std::strncpy(selectionName, defaultSelection->selectionName, selectionNameCapacity - 1);
         selectionName[selectionNameCapacity - 1] = '\0';
@@ -330,13 +320,13 @@ bool CLauncher::BuildRecoveredSelectionNameAndState(char* selectionName, size_t 
             selectionName);
     }
 
-    const mxo::launcher::replacement::RecoveredLauncherSelectionRecord* recoveredSelection =
-        mxo::launcher::replacement::FindRecoveredLauncherSelectionRecord(selectionName);
+    const RecoveredLauncherSelectionRecord* recoveredSelection =
+        FindRecoveredLauncherSelectionRecord(selectionName);
     if (recoveredSelection) {
         std::strncpy(selectionName, recoveredSelection->selectionName, selectionNameCapacity - 1);
         selectionName[selectionNameCapacity - 1] = '\0';
         m_FieldA8 = 0u;
-        m_FieldAC = mxo::launcher::replacement::RecoveredSelectionWorldIndexLow24();
+        m_FieldAC = RecoveredSelectionWorldIndexLow24();
         const uint32_t packedArg7Selection = BuildPackedArg7Selection();
         spdlog::info(
             "DIAGNOSTIC: seeded launcher selection defaults from recovered world '{}' -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} selectionGateByte100={} variantState={} routePrefix='{}'",
@@ -410,8 +400,8 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
 
     DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
 
-    const mxo::launcher::replacement::RecoveredLauncherSelectionRecord* recoveredSelection =
-        mxo::launcher::replacement::FindRecoveredLauncherSelectionRecord(selectionName);
+    const RecoveredLauncherSelectionRecord* recoveredSelection =
+        FindRecoveredLauncherSelectionRecord(selectionName);
     const uint32_t selectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
     const uint32_t nopatchLauncherVersionValue = g_LauncherCommandLine.NoPatchLauncherVersionValue();
     const uint32_t nopatchClientVersionValue = g_LauncherCommandLine.NoPatchClientVersionValue();
@@ -452,7 +442,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
             if (resolvedSelectionName[0]) {
                 std::strncpy(g_LastWorldName, resolvedSelectionName, sizeof(g_LastWorldName) - 1);
                 g_LastWorldName[sizeof(g_LastWorldName) - 1] = '\0';
-                mxo::launcher::replacement::StoreLastWorldNameInRegistry(g_LastWorldName);
+                StoreLastWorldNameInRegistry(g_LastWorldName);
             }
             spdlog::info(
                 "DIAGNOSTIC: arg7 rebuilt through ILTLoginMediator.Default selection path -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
@@ -732,5 +722,3 @@ cleanup:
     return operationSucceeded;
 }
 
-} // namespace launcher
-} // namespace mxo

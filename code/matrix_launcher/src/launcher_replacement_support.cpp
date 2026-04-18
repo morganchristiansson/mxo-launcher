@@ -10,7 +10,7 @@ namespace {
 constexpr char kLauncherRegistryKeyPath[] = "Software\\Monolith Productions\\The Matrix Online\\";
 constexpr uint32_t kRecoveredSelectionWorldIndexLow24 = 0x00002au;
 
-const mxo::launcher::replacement::RecoveredLauncherSelectionRecord kRecoveredLauncherSelectionRecords[] = {
+const RecoveredLauncherSelectionRecord kRecoveredLauncherSelectionRecords[] = {
     {"Reality", "reality", 1u, 0u},
 };
 
@@ -68,8 +68,6 @@ void CanonicalizeLauncherSelectionLookupName(
 }
 
 } // namespace
-
-namespace mxo::launcher::replacement {
 
 const RecoveredLauncherSelectionRecord* DefaultRecoveredLauncherSelectionRecord() {
     constexpr size_t kRecordCount =
@@ -200,5 +198,3 @@ bool StoreLastWorldNameInRegistry(const char* selectionName) {
         (disposition == REG_CREATED_NEW_KEY) ? " (created key)" : "");
     return true;
 }
-
-} // namespace mxo::launcher::replacement

@@ -8,8 +8,6 @@
 
 #include <spdlog/spdlog.h>
 
-namespace mxo {
-namespace launcher {
 namespace {
 
 CAutodetectDialog* g_CurrentAutodetectDialog2570 = nullptr; // anchor: launcher.exe:0x4d2570
@@ -281,5 +279,3 @@ bool CAutodetectDialog::LaunchHiddenAutodetectProcess(std::uint32_t* exitCode, b
     return true;
 }
 
-} // namespace launcher
-} // namespace mxo
