@@ -583,13 +583,14 @@ inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::E
         mbr_0x10_ptr ? mbr_0x10_ptr[29] : 0,
         mbr_0x10_ptr ? mbr_0x10_ptr[30] : 0,
         mbr_0x10_ptr ? mbr_0x10_ptr[31] : 0);
-    // FIDELITY HACK: Read from +1 instead of +0x11 because our payload only has 16 bytes
-    // The original's packetPayloadPtr is offset differently in the message ref
+    // FIDELITY: Read from +0x11/+0x15/+0x19/+0x1d as per launcher.exe:0x442b18
+    // The decrypted RSA buffer contains: [0][twofishKey(16)][challenge(16)][padding]
+    // Challenge response is at offsets +0x11, +0x15, +0x19, +0x1d (17, 21, 25, 29)
     if (mbr_0x10_ptr) {
-        std::memcpy(&result[0], mbr_0x10_ptr + 1, 4);   // first dword (was +0x11)
-        std::memcpy(&result[4], mbr_0x10_ptr + 5, 4);  // second dword (was +0x15)
-        std::memcpy(&result[8], mbr_0x10_ptr + 9, 4);  // third dword (was +0x19)
-        std::memcpy(&result[12], mbr_0x10_ptr + 13, 4); // fourth dword (was +0x1d)
+        std::memcpy(&result[0], mbr_0x10_ptr + 0x11, 4);   // first dword (bytes 17-20)
+        std::memcpy(&result[4], mbr_0x10_ptr + 0x15, 4);  // second dword (bytes 21-24)
+        std::memcpy(&result[8], mbr_0x10_ptr + 0x19, 4);  // third dword (bytes 25-28)
+        std::memcpy(&result[12], mbr_0x10_ptr + 0x1d, 4); // fourth dword (bytes 29-32)
     }
     return result;
 }

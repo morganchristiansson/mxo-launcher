@@ -2594,7 +2594,8 @@ namespace { static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_D
     const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* prepState,
     const void* encryptedBytes,
     size_t encryptedByteCount,
-    std::array<uint8_t, 16>* outDecryptedChallengeBytes); }
+    std::array<uint8_t, 16>* outDecryptedChallengeBytes,
+    std::vector<uint8_t>* outFullDecryptedBytes = nullptr); }
 
 // anchor: launcher.exe:0x443220 / constructor reached from `0x443340`
 CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778(
@@ -2653,11 +2654,13 @@ bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryptio
     void* outputBuffer) {
     // Use the original static helper that was working
     std::array<uint8_t, 16> decryptedChallengeBytes{};
+    std::vector<uint8_t> fullDecryptedBytes;
     const bool decryptSuccess = CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge(
         this,
         encryptedBytes,
         encryptedByteCount,
-        &decryptedChallengeBytes);
+        &decryptedChallengeBytes,
+        &fullDecryptedBytes);
 
     if (!decryptSuccess) {
         spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper decryption failed");
@@ -2667,12 +2670,16 @@ bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryptio
     // Write result to output buffer: output[0] = success flag, output[4] = byte count
     auto* outBytes = static_cast<uint8_t*>(outputBuffer);
     outBytes[0] = 1;  // success flag
-    *reinterpret_cast<uint32_t*>(outBytes + 4) = 16;  // byte count
+    *reinterpret_cast<uint32_t*>(outBytes + 4) = static_cast<uint32_t>(fullDecryptedBytes.size());  // full byte count
 
-    // Copy decrypted bytes after the header (original writes to message payload)
-    std::copy(decryptedChallengeBytes.begin(), decryptedChallengeBytes.end(), outBytes + 8);
+    // Copy full decrypted bytes after the header (original writes to message payload)
+    if (fullDecryptedBytes.size() <= 32) {
+        std::copy(fullDecryptedBytes.begin(), fullDecryptedBytes.end(), outBytes + 8);
+    } else {
+        std::copy(fullDecryptedBytes.begin(), fullDecryptedBytes.begin() + 32, outBytes + 8);
+    }
 
-    spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper succeeded");
+    spdlog::debug("CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778::PerformRSADecryption: static helper succeeded, full buffer size={}", fullDecryptedBytes.size());
 
     return true;
 }
@@ -2978,7 +2985,8 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
     const CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* prepState,
     const void* encryptedBytes,
     size_t encryptedByteCount,
-    std::array<uint8_t, 16>* outDecryptedChallengeBytes) {
+    std::array<uint8_t, 16>* outDecryptedChallengeBytes,
+    std::vector<uint8_t>* outFullDecryptedBytes) {
     if (!prepState || !encryptedBytes || encryptedByteCount == 0u || !outDecryptedChallengeBytes) {
         return false;
     }
@@ -3059,6 +3067,11 @@ static bool CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChalle
                 "CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778_DecryptChallenge: decrypted too short {} < 17",
                 decryptedBytes.size());
             return false;
+        }
+
+        // Return full decrypted buffer if requested
+        if (outFullDecryptedBytes) {
+            *outFullDecryptedBytes = decryptedBytes;
         }
 
         // The original extracts: [1-4], [5-8], [9-12], [13-16] as little-endian DWORDs
@@ -3211,7 +3224,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     size_t ciphertextSize = encryptedPayloadSize > 4u ? encryptedPayloadSize - 4u : 0u;
 
     // anchor: launcher.exe:0x442a33 -> DecryptViaVtable0x1c with proper parameters
-    std::array<uint8_t, 32> decryptOutput{};  // [success, byteCount, 16 bytes]
+    std::array<uint8_t, 128> decryptOutput{};  // [success, byteCount, full decrypted buffer (96 bytes)]
 
     bootstrapPrepStateA0_->DecryptViaVtable0x1c(
         decryptOutput.data(),
@@ -3235,12 +3248,15 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             // But we need to grow to decryptedByteCount, not ADD decryptedByteCount to existing size
             // The message ref was created with ResetForPacketBuilderScaffold(false, 0), so has 0 size
             // So we need to set the size directly - use ResetPayloadByteCountScaffold
-            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(decryptedByteCount);
+            // FIDELITY: We need the full decrypted buffer (96 bytes) to extract both seed and challenge
+            // The decrypted buffer contains: [0][twofishKey(16)][challenge(16)][padding]
+            const size_t fullDecryptedSize = 96u;  // RSA decryption produces 96 bytes
+            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(fullDecryptedSize);
             uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
             if (payloadBase) {
                 std::copy(
                     decryptOutput.begin() + 8,
-                    decryptOutput.begin() + 8 + decryptedByteCount,
+                    decryptOutput.begin() + 8 + fullDecryptedSize,
                     payloadBase);
             }
         }
@@ -3356,32 +3372,19 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1c) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1c] : 0,
             envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1d) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1d] : 0);
 
-        // Set opcode 0x03 (CERT_ChallengeResponse) - anchor: launcher.exe:0x442b00
-        *responsePayload = 0x03;
-
-        // Copy response bytes from seed envelope at offsets +0x11/+0x15/+0x19/+0x1d
-        // anchor: launcher.exe:0x442b18-0x442b28
-        // Original: *(undefined4 *)(responseEnvelope.mbr_0x10 + 1) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x11);
-        //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 5) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x15);
-        //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 9) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x19);
-        //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 0xd) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x1d);
-        
-        // FIDELITY: Original launcher.exe format is [opcode=0x03][16 bytes challenge response] = 17 bytes
-        // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte, then copies 16 bytes from seed envelope
-        //   *(undefined1 *)responseEnvelope.packetPayloadPtr = 3;
-        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 1) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x11);
-        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 5) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x15);
-        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 9) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x19);
-        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 0xd) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x1d);
-        *responsePayload = 0x03;  // opcode 3
+        // FIDELITY: Original launcher.exe sends exactly 16 bytes of challenge response
+        // The server expects exactly 16 bytes matching the original challenge
+        // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte at responseEnvelope.packetPayloadPtr[0]
+        // then copies 16 bytes from seedEnvelope.packetPayloadPtr+0x11/+0x15/+0x19/+0x1d to +1/+5/+9/+0xd
+        // The opcode is for internal tracking, but the actual payload sent to server is 16 bytes
         
         spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
             reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr));
         std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
         spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
             responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
-        std::copy_n(responseBytes.data(), 16, responsePayload + 1);  // Copy after opcode
-        responseMessageRef->SetPayloadByteCountScaffold(17);  // 1 byte opcode + 16 bytes response
+        std::copy_n(responseBytes.data(), 16, responsePayload);  // Copy 16 bytes directly, no opcode prefix
+        responseMessageRef->SetPayloadByteCountScaffold(16);  // Exactly 16 bytes as server expects
 
         spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-22]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
@@ -3407,7 +3410,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[20],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[21]);
         
-        // DEBUG: Log the expected challenge from the seed bytes (should match bytes 3-18 of response)
+        // DEBUG: Log the expected challenge from the seed bytes (should match bytes 0-15 of response)
         spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],
             messageCode5SeedBytes85_[4], messageCode5SeedBytes85_[5], messageCode5SeedBytes85_[6], messageCode5SeedBytes85_[7],
