@@ -3208,8 +3208,9 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
     if (decryptSuccess) {
         // anchor: launcher.exe:0x442a48 -> GrowPayloadByteCount via vtable+0x24
         // Original: (**(code **)(*(int *)local_8.messageRef00 + 0x24))(local_8.messageRef00, *(int *)(iVar2 + 4))
+        // Use GrowPayloadByteCount NOT ResetPayloadByteCountScaffold!
         if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
-            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(decryptedByteCount);
+            localMessageRef.messageStorage0c->GrowPayloadByteCountScaffold(decryptedByteCount);
             uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
             if (payloadBase) {
                 std::copy(
@@ -3237,6 +3238,13 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // Now construct envelope with proper message ref and flag
         CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope(&localMessageRef, 0x01);
 
+        // DEBUG: Log what's in the envelope mbr_0x10 after construction
+        spdlog::debug("HandleCode2ForBootstrap: envelope.mbr_0x10[0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            envelope.mbr_0x10[0], envelope.mbr_0x10[1], envelope.mbr_0x10[2], envelope.mbr_0x10[3],
+            envelope.mbr_0x10[4], envelope.mbr_0x10[5], envelope.mbr_0x10[6], envelope.mbr_0x10[7],
+            envelope.mbr_0x10[8], envelope.mbr_0x10[9], envelope.mbr_0x10[10], envelope.mbr_0x10[11],
+            envelope.mbr_0x10[12], envelope.mbr_0x10[13], envelope.mbr_0x10[14], envelope.mbr_0x10[15]);
+
         // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
         // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
         auto seedBytes = envelope.ExtractChallengeBytes();
@@ -3259,7 +3267,10 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // Create response envelope (default constructor as per original)
         CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
         // Original at 0x442af4 sets: responseEnvelope.mbr_0x10 = responseEnvelope.mbr_0x4
-        // This copies the default-constructed message ref from +0x04 to the +0x10 slot
+        // In original, mbr_0x10 is a pointer field (not a 16-byte buffer as in our C++ class)
+        // The original copies the message ref pointer from mbr_0x8 to mbr_0x10, then later
+        // accesses packet payload through that pointer. Our C++ class can't replicate this
+        // exactly because mbr_0x10 is a buffer. We use the message ref from builder00 instead.
         // FIDELITY: In our C++ version, the builder00 already has an initialized messageRef
         // from default construction, so we use it directly
 
@@ -3290,6 +3301,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 9) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x19);
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 0xd) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x1d);
         std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
+        spdlog::debug("HandleCode2ForBootstrap: responseBytes[0-4]={:02x} {:02x} {:02x} {:02x}",
+            responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
         std::copy_n(responseBytes.data(), 16, responsePayload + 1);
         responseMessageRef->SetPayloadByteCountScaffold(17);  // 1 byte opcode + 16 bytes response
 

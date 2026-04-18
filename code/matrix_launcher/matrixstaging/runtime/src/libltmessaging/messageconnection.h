@@ -529,6 +529,11 @@ inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::E
 }
 
 // anchor: launcher.exe:0x442b18 -> uses mbr_0x10 +0x11/+0x15/+0x19/+0x1d for response packet
+// FIDELITY NOTE: The original mbr_0x10 is a POINTER to packet payload, not a fixed 16-byte buffer.
+// Our C++ model uses a fixed 16-byte array, which causes out-of-bounds reads at offsets +0x11 (17)
+// and beyond when extracting response bytes. The original reads from pointer offsets into the
+// actual packet payload data. This is a structural difference between original (pointer-based)
+// and our C++ (buffer-based) implementation that causes incorrect response bytes to be sent.
 inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::ExtractForResponsePacket() const {
     std::array<uint8_t, 16> result{};
     // Extract 4 dwords from mbr_0x10 at offsets +0x11/+0x15/+0x19/+0x1d
