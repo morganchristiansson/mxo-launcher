@@ -90,6 +90,10 @@ mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"decom
 mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"listing","address":"0x40b430","end_address":"0x40b4d0"}' })
 mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"references_to","address":"0x004d2c69"}' })
 
+// VTable inspection - list vtable entries at address
+mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"listing","address":"0x4af2a4","end_address":"0x4af300"}' })
+mcp({ tool: "ghidra_inspect", args: '{"file_name":"launcher.exe","action":"listing","address":"0x4b6524","end_address":"0x4b6538"}' })
+
 // Functions / locals
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"Launcher_ParseCommandLine"}' })
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"Launcher_ParseCommandLine","variable_symbol_id":12345,"new_name":"stringCursor","new_data_type":"char *"}' })
