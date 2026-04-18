@@ -544,6 +544,7 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
     // recovered small/encrypting `FeedbackSize` adapter constructed by `0x44d820` is now held as a
     // real object alongside that packet-level behavior instead of being collapsed away entirely.
     if (!outputBuffer || !hasConfiguredFeedbackTransform) {
+        spdlog::debug("TryTransform: no outputBuffer or no hasConfiguredFeedbackTransform");
         return false;
     }
 
@@ -553,8 +554,11 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
             inputMessageRef,
             &payloadBytes,
             &payloadByteCount)) {
+        spdlog::debug("TryTransform: failed to resolve transform input span");
         return false;
     }
+
+    spdlog::debug("TryTransform: input payload[0]={:02x} count={}", payloadBytes[0], payloadByteCount);
 
     mxo::auth::FramedPacket encryptedPacket;
     if (!mxo::auth::EncryptMarginPayloadPacket(
@@ -563,8 +567,11 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
             CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
             mxo::auth::kFrameModeAuto,
             &encryptedPacket)) {
+        spdlog::debug("TryTransform: EncryptMarginPayloadPacket failed");
         return false;
     }
+
+    spdlog::debug("TryTransform: encrypted output size={}", encryptedPacket.payloadBytes.size());
     return outputBuffer->SetPayloadBytes(
         encryptedPacket.payloadBytes.data(),
         encryptedPacket.payloadBytes.size());
@@ -938,11 +945,18 @@ CMessageConnectionMessageRef_0x4ba23c* PacketProcessingAgenda_0x469850::ApplySen
         *outAgendaTouched = (writeHelperChainHead44 != nullptr);
     }
 
+    spdlog::debug("ApplySendPacketAgenda: writeHelperChainHead44={} inputPayloadBytes={}",
+        fmt::ptr(writeHelperChainHead44),
+        inputMessageRef.PayloadByteCountScaffold());
+
     if (writeHelperChainHead44 == nullptr) {
         return &inputMessageRef;
     }
 
     writeHelperChainHead44->HandleOpaqueMessageRef(&inputMessageRef);
+    spdlog::debug("ApplySendPacketAgenda: outputSlot={} outputPayloadBytes={}",
+        fmt::ptr(writeOutputSlot24),
+        writeOutputSlot24 ? writeOutputSlot24->PayloadByteCountScaffold() : 0);
     return writeOutputSlot24;
 }
 
@@ -975,6 +989,9 @@ uint32_t CMessageConnection_0x4b7928::ForwardPacketBuilderEnvelopeToSendPacket(
     if (!envelope.messageRef08) {
         return 0u;
     }
+    spdlog::debug("ForwardPacketBuilderEnvelopeToSendPacket: messageRef08={} payloadBytes={}",
+        fmt::ptr(envelope.messageRef08),
+        envelope.messageRef08->PayloadByteCountScaffold());
     SendPacketMessageRef(*envelope.messageRef08);
     return 0u; // Original function returns void, but wrapper maintains uint32_t signature
 }
@@ -1052,6 +1069,7 @@ void CMessageConnection_0x4b7928::SendPacketMessageRef(
     // anchor: launcher.exe:0x448f63 - null check and agenda processing
     if (!messageRefForSubmit || !messageRefForSubmit->messageStorage0c) {
         // Packet discarded by agenda - log appropriately based on message type
+        spdlog::warn("SendPacketMessageRef: packet DISCARDED by agenda! agendaTouched={}", agendaTouched);
         // anchor: launcher.exe:0x448f94 - discarded packet logging
         if (g_LogRouter) {
             if (messageRef.headerless10 == 0u) {
@@ -2840,169 +2858,14 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
 
 // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
 uint32_t CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes(
-    const std::array<uint8_t, 16>& challengeBytes) {
-    if (!hasMessageCode5SeedBytes85_) {
-        return 0u;
-    }
-
-    // anchor: launcher.exe:0x4429b0 - CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
-    // Faithful implementation following Ghidra decompilation of 0x4429b0
-
-    // 1. Static init check for crypto context
-    // anchor: launcher.exe:0x4429b0 - static init block
-    mxo::liblttcp::EnsureCryptoContextInitialized();
-
-    // 2. Create local message reference for challenge processing
-    // anchor: launcher.exe:0x4429b8 - CMessageConnectionMessage_CreateRef(&local_8, 0)
-    // Use proper helper class for message reference management
-    MessageConnectionMessageRefHelper_0x4489d0 localMessageRefHelper{};
-    localMessageRefHelper.CreateRef(0);
-
-    if (!localMessageRefHelper.IsValid()) {
-        return 0u;
-    }
-
-    // Get direct pointer for convenience
-    CMessageConnectionMessageRef_0x4ba23c* localMessageRef = localMessageRefHelper.messageRef00;
-
-
-
-    // Validation is now handled by IsValid() check above
-
-    // Copy challenge bytes into message storage payload
-    // anchor: launcher.exe:0x4429c0-0x4429d0 - copy challenge bytes to message storage
-    CMessageConnectionMessageStorage_0x4ba208* messageStorage = localMessageRef->messageStorage0c;
-    uint8_t* payloadBase = messageStorage->PayloadBaseScaffold();
-    const uint16_t payloadCapacity = messageStorage->RemainingAppendableByteCountScaffold();
-
-    if (!payloadBase || payloadCapacity < 16) {
-        if (localMessageRef) {
-            localMessageRef->Release();
-        }
-        return 0u;
-    }
-
-    // Copy challenge bytes into payload
-    // anchor: launcher.exe:0x4429c0 - memcpy equivalent
-    std::copy_n(challengeBytes.data(), 16, payloadBase);
-    messageStorage->SetPayloadByteCountRawScaffold(16);
-
-    // Use bootstrap prep object to decrypt challenge
-    // anchor: launcher.exe:0x4429b0 calls [this+0xa0] vtable +0x1c (0x437810)
-    // anchor: launcher.exe:0x4429d0 - call to bootstrap prep DecryptChallengeBlob
-    CMarginConnectionBootstrapPrepStateA0Scaffold_0x4b6778* bootstrapPrep =
-        bootstrapPrepStateA0_.get();  // Get the existing bootstrap prep object
-
-    if (!bootstrapPrep) {
-        // localMessageRef is managed by localMessageRefHelper, automatic cleanup
-        return 0u;
-    }
-
-    // Prepare parsed message result structure
-    // anchor: launcher.exe:0x4429b0 uses local_38 (cls_0x4b654c)
-    MarginConnectionChallengeParsedResult_0x4b654c parsedResult{};
-    parsedResult.mbr_0x14 = 0;  // context - would come from message
-    parsedResult.mbr_0x18 = 0;  // field18 - would come from message
-
-    // Call bootstrap prep to decrypt challenge
-    // This corresponds to the call at 0x4429d0 in Ghidra
-    // anchor: launcher.exe:0x437810 - virt_meth_0x437810 implementation
-    uint8_t* decryptedBuffer = bootstrapPrep->DecryptChallengeBlob(
-        messageStorage->PayloadBaseScaffold(),
-        nullptr,  // prepHelper - not fully recovered yet
-        parsedResult.mbr_0x14,
-        parsedResult.mbr_0x18,
-        messageStorage->PayloadBaseScaffold());
-
-    if (!decryptedBuffer || *(int*)(decryptedBuffer + 4) == 0) {
-        // anchor: launcher.exe:0x4429e0 - MessageBoxA on decryption failure
-        // In text mode, we log instead of showing a message box
-        spdlog::error("Failed to decrypt challenge blob from server!");
-        // localMessageRef is managed by localMessageRefHelper, automatic cleanup
-        return 0u;
-    }
-
-    // Grow payload to accommodate decrypted data
-    // anchor: launcher.exe:0x4429f0 - CMessageConnectionMessage_GrowPayloadByteCount
-    const uint32_t decryptedByteCount = *(uint32_t*)(decryptedBuffer + 4);
-    if (decryptedByteCount > 0) {
-        localMessageRef->GrowPayloadByteCountScaffold(
-            static_cast<uint16_t>(decryptedByteCount));
-    }
-
-    // Create first packet builder envelope to extract seed bytes
-    // anchor: launcher.exe:0x442a60 - CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 constructor
-    // anchor: launcher.exe:0x443220 - cls_0x4b6538 constructor with message ref and flag
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 seedEnvelope(
-        localMessageRef, 0x01);
-
-    // Extract seed bytes from envelope and store in connection
-    // anchor: launcher.exe:0x442ac6-0x442ae0 - extract to this+0x85..+0x91
-    std::array<uint8_t, 16> extractedSeedBytes = seedEnvelope.ExtractChallengeBytes();
-    std::copy_n(extractedSeedBytes.data(), 16, messageCode5SeedBytes85_.data());
-
-    // Ensure stream packet encryption module is configured
-    // anchor: launcher.exe:0x4429b0 -> CBaseMarginConnection_EnsureStreamPacketEncryptionModule (0x441470)
-    // anchor: launcher.exe:0x442ae8 - call to EnsureStreamPacketEncryptionModule
-    EnsureStreamPacketEncryptionModuleFromSeed85();
-
-    // Create second packet builder envelope for response packet
-    // anchor: launcher.exe:0x442af0 - CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 constructor
-    // anchor: launcher.exe:0x439840 - CLTLoginMediatorPacketBuilderEnvelope_Initialize
-    CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
-    // Default constructor is sufficient for our use case
-
-    // Set up response packet with opcode 0x03 (CERT_ChallengeResponse)
-    // anchor: launcher.exe:0x442b00-0x442b10 - build response packet
-    // Create a new message ref for the response packet
-    CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = new CMessageConnectionMessageRef_0x4ba23c();
-    responseMessageRef->AddRef();
-    responseMessageRef->ResetForPacketBuilderScaffold(false, 0);
-
-    uint8_t* responsePayload = responseMessageRef->PayloadAppendPointerScaffold();
-    if (!responsePayload) {
-        if (localMessageRef) {
-            localMessageRef->Release();
-        }
-        if (responseMessageRef) {
-            responseMessageRef->Release();
-        }
-        return 0u;
-    }
-
-    // Write response packet: opcode + extracted response bytes from seed envelope
-    // anchor: launcher.exe:0x442b00 - set opcode 0x03
-    *responsePayload = 0x03;  // CERT_ChallengeResponse opcode
-
-    // Copy extracted bytes from seed envelope to response envelope
-    // anchor: launcher.exe:0x442b18-0x442b28 - copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d
-    // Use the ExtractForResponsePacket method which handles the correct offsets
-    std::array<uint8_t, 16> responsePacketBytes = seedEnvelope.ExtractForResponsePacket();
-    std::copy_n(responsePacketBytes.data(), 16, responsePayload + 1);
-    responseMessageRef->SetPayloadByteCountScaffold(17);
-
-    // Set up the response envelope with the message ref
-    responseEnvelope.builder00.envelope00.messageRef08 = responseMessageRef;
-
-    // Send through connection's packet send pipeline
-    // anchor: launcher.exe:0x442b30 -> connection vtable +0x24 (0x41cf30)
-    // anchor: launcher.exe:0x41cf30 - CMessageConnection_ForwardEnvelopeToSendPacket
-    const uint32_t sendResult = ForwardPacketBuilderEnvelopeToSendPacket(responseEnvelope.builder00.envelope00);
-
-    // Clean up
-    // localMessageRef is managed by localMessageRefHelper, no need to manually release
-    if (responseMessageRef) {
-        responseMessageRef->Release();
-    }
-
-    spdlog::info(
-        "CBaseMarginConnection_0x4b64a8::SendCertChallengeResponseFromChallengeBytes faithful implementation: sent response via packet builder envelope sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        static_cast<unsigned>(sendResult),
-        fmt::ptr(this),
-        fmt::ptr(OwnerContext()),
-        RemoteHostName().empty() ? std::string("<empty>") : RemoteHostName());
-
-    return sendResult;
+    const std::array<uint8_t, 16>& /*challengeBytes*/) {
+    // anchor: launcher.exe:0x4429b0 - This function is no longer used.
+    // The response is now built inline in HandleCode2ForBootstrap to match
+    // launcher.exe:0x442ab9-0x442b30 exactly.
+    // This function remains for potential future use but currently returns 0
+    // since HandleCode2ForBootstrap builds and sends the response directly.
+    spdlog::warn("SendCertChallengeResponseFromChallengeBytes called but response is built inline in HandleCode2ForBootstrap");
+    return 0u;
 }
 
 // anchor: launcher.exe:0x441470 / 0x44da00 / 0x44daf0
@@ -3390,9 +3253,48 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // 3. Copy from envelope.mbr_0x10 +0x11/+0x15/+0x19/+0x1d to packet+1/+5/+9/+0xd
         // 4. Send via connection vtable+0x24
 
-        // FIDELITY: Extract response bytes and send
-        auto responseBytes = envelope.ExtractForResponsePacket();
-        const uint32_t sendResult = SendCertChallengeResponseFromChallengeBytes(responseBytes);
+        // FIDELITY: Build response packet inline to match launcher.exe:0x442ab9-0x442b03
+        // The original at 0x442ab9 creates a response envelope on the stack and populates it directly
+
+        // Create response envelope (default constructor as per original)
+        CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 responseEnvelope;
+        // Original at 0x442af4 sets: responseEnvelope.mbr_0x10 = responseEnvelope.mbr_0x4
+        // This copies the default-constructed message ref from +0x04 to the +0x10 slot
+        // FIDELITY: In our C++ version, the builder00 already has an initialized messageRef
+        // from default construction, so we use it directly
+
+        // The original at 0x442b00 sets opcode 3:
+        //   *(undefined1 *)responseEnvelope.mbr_0x10 = 3;
+        // Get the message ref from response envelope and set up the packet
+        CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = responseEnvelope.builder00.envelope00.messageRef08;
+        if (!responseMessageRef) {
+            // Should not happen - envelope has default-constructed message ref
+            spdlog::warn("HandleCode2ForBootstrap: responseEnvelope has no messageRef");
+            return 0u;
+        }
+
+        // Set up response packet: [opcode=3][response bytes from seed envelope at +0x11/+0x15/+0x19/+0x1d]
+        uint8_t* responsePayload = responseMessageRef->PayloadAppendPointerScaffold();
+        if (!responsePayload) {
+            spdlog::warn("HandleCode2ForBootstrap: responseMessageRef has no payload pointer");
+            return 0u;
+        }
+
+        // Set opcode 0x03 (CERT_ChallengeResponse) - anchor: launcher.exe:0x442b00
+        *responsePayload = 0x03;
+
+        // Copy response bytes from seed envelope at offsets +0x11/+0x15/+0x19/+0x1d
+        // anchor: launcher.exe:0x442b18-0x442b28
+        // Original: *(undefined4 *)(responseEnvelope.mbr_0x10 + 1) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x11);
+        //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 5) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x15);
+        //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 9) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x19);
+        //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 0xd) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x1d);
+        std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
+        std::copy_n(responseBytes.data(), 16, responsePayload + 1);
+        responseMessageRef->SetPayloadByteCountScaffold(17);  // 1 byte opcode + 16 bytes response
+
+        // Send via connection vtable+0x24 - anchor: launcher.exe:0x442b30
+        const uint32_t sendResult = ForwardPacketBuilderEnvelopeToSendPacket(responseEnvelope.builder00.envelope00);
 
         spdlog::info(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} decryptedByteCount={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",

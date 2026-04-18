@@ -6,6 +6,8 @@
 #include <memory>
 #include <vector>
 
+#include <spdlog/spdlog.h>
+
 // Forward declare CLTLoginMediator to avoid circular include
 namespace mxo { namespace ltlogin { class CLTLoginMediator; } }
 #include "../libltcrypto/auth_internal.h"
@@ -461,9 +463,27 @@ static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x28,
  * Implementation: Default constructor for stack-local envelope instances.
  * This mirrors the original cls_0x4b6538 constructor that takes messageRef and '\x01' flag,
  * but we use a simpler default-constructed version since we're using static helpers.
+ *
+ * anchor: launcher.exe:0x439840 - CLTLoginMediatorPacketBuilderEnvelope_ctor
+ * Sets vftable to PacketBuilder_0x4af2a4__vftable, creates message ref at +0x8, sets +0x4
  */
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() {
-    // Default initialization - in original, this would take messageRef and '\x01' flag
+    // Default initialization - mirror original at 0x439840
+    // The original sets vftable to PacketBuilder vtable
+    // Then creates a message ref and stores it at mbr_0x8 (+0x08)
+    // Then sets mbr_0x4 = *(int *)(this->mbr_0x8 + 0xc) + 0xc
+
+    // Create message ref as per original 0x439840
+    // This mirrors: CMessageConnectionMessage_CreateRef(&local_8, 0)
+    // We use new directly since the helper class is defined later in this header
+    CMessageConnectionMessageRef_0x4ba23c* newMessageRef = new CMessageConnectionMessageRef_0x4ba23c();
+    if (newMessageRef) {
+        newMessageRef->AddRef();
+        // Initialize message storage
+        newMessageRef->ResetForPacketBuilderScaffold(false, 0);
+        // Store at builder00.envelope00.messageRef08
+        builder00.envelope00.messageRef08 = newMessageRef;
+    }
 }
 
 // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
@@ -714,8 +734,8 @@ public:
         if (messageRef00) {
             // anchor: launcher.exe:0x455b80 - AddRef (vtable +0x04)
             messageRef00->AddRef();
-            // Set context field as in original
-            messageRef00->messageContext14 = messageContext;
+            // Initialize the message storage (this is what the original does)
+            messageRef00->ResetForPacketBuilderScaffold(false, static_cast<uint32_t>(messageContext));
         }
     }
 
