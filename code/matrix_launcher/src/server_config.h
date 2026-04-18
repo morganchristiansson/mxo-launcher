@@ -14,6 +14,7 @@ struct ServerConfig {
     uint16_t marginServerPort = 10000;
     std::string kServerPublicModulusB64;
     std::string kServerPublicExponentB64;
+    bool skipPublicKeyValidation = false;  // For non-standard key sizes (e.g., 2048-bit)
 };
 
 // Parse servers.cfg and return list of server configurations

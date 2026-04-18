@@ -1053,10 +1053,20 @@ bool AuthBootstrap680Raw08PublicKeyWorkerA8Sketch::EncryptPlaintextIntoCiphertex
 namespace {
 
 // anchor: launcher.exe:0x468f80
+// Replacement: when g_SkipAuthPublicKeyReplyValidation is set, skip the lazy pubkey.dat validator
+// entirely (which requires 1024-bit keys with signatures) and just accept the key.
 static bool VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorScaffold(
     CLTLoginMediator& mediator,
     AuthBootstrap680Child_0x441290& child,
     const mxo::auth::GetPublicKeyReply& reply) {
+    if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation != 0u) {
+        // Skip validation for non-standard key sizes (e.g., 2048-bit)
+        (void)mediator;
+        (void)child;
+        (void)reply;
+        return true;
+    }
+
     AuthBootstrap680ChildOwnedState& ownedState = MutableAuthBootstrap680ChildOwnedState(&child);
     if (!EnsureAuthBootstrap680LazyPubkeyDatValidatorA4FallbackScaffold(mediator, child) ||
         child.lazyPubkeyDatValidatorA4 == nullptr) {
@@ -2133,9 +2143,21 @@ uint32_t AuthBootstrap680Child_0x441290::HandleGetPublicKeyReply(
 
     // `0x447780` first enforces a recovered modulus-byte-size gate (`0x80`) before consulting the
     // lazy `qspubkey.dat` validator at child `+0xa4` through `0x468f80`.
-    if (!reply.hasEmbeddedPublicKey || reply.modulusBytes.size() != 0x80u || reply.publicExponentByte == 0u) {
-        child.authRequestReadyA0 = 0u;
-        return 1u;
+    // Replacement: skip validation when g_SkipAuthPublicKeyReplyValidation is set (for 2048-bit keys)
+    if (mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation == 0u) {
+        if (!reply.hasEmbeddedPublicKey || reply.modulusBytes.size() != 0x80u || reply.publicExponentByte == 0u) {
+            child.authRequestReadyA0 = 0u;
+            return 1u;
+        }
+    } else {
+        // Replacement validation: just check that we have some key material
+        if (!reply.hasEmbeddedPublicKey || reply.modulusBytes.empty() || reply.publicExponentByte == 0u) {
+            child.authRequestReadyA0 = 0u;
+            return 1u;
+        }
+        spdlog::info(
+            "DIAGNOSTIC: skipping AS_GetPublicKeyReply modulus size validation (g_SkipAuthPublicKeyReplyValidation=1) modulusBytes={}",
+            reply.modulusBytes.size());
     }
     const bool lazyPubkeyDatValidatorAccepted =
         VerifyAuthBootstrap680ReplyPublicKeyAgainstLazyPubkeyDatValidatorScaffold(mediator, child, reply);

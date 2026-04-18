@@ -47,6 +47,9 @@ uint16_t g_AuthServerPort = 11000;
 // Initialized by ApplySelectedServerConfigToMediator()
 const char* g_ServerPublicModulusB64 = nullptr;
 const char* g_ServerPublicExponentB64 = nullptr;
+// Skip AS_GetPublicKeyReply embedded key validation (for non-standard key sizes like 2048-bit)
+// Initialized by ApplySelectedServerConfigToMediator() from server config
+uint32_t g_SkipAuthPublicKeyReplyValidation = 0u;
 
 
 

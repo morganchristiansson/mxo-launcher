@@ -1761,6 +1761,8 @@ extern uint16_t g_AuthServerPort;
 // Server RSA public key (base64 encoded) - from selected server config
 extern const char* g_ServerPublicModulusB64;
 extern const char* g_ServerPublicExponentB64;
+// Skip AS_GetPublicKeyReply embedded key validation (for non-standard key sizes like 2048-bit)
+extern uint32_t g_SkipAuthPublicKeyReplyValidation;
 
 }  // namespace mxo::ltlogin
 

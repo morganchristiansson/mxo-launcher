@@ -19,6 +19,7 @@ extern uint16_t g_AuthServerPort;
 extern uint32_t g_IgnoreHostsFileForAuth;
 extern const char* g_ServerPublicModulusB64;
 extern const char* g_ServerPublicExponentB64;
+extern uint32_t g_SkipAuthPublicKeyReplyValidation;
 } // namespace mxo::ltlogin
 
 namespace mxo::launcher {
@@ -84,6 +85,8 @@ bool ParseServerSection(
             outConfig.kServerPublicModulusB64 = value;
         } else if (_stricmp(state.currentName.c_str(), "kServerPublicExponentB64") == 0) {
             outConfig.kServerPublicExponentB64 = value;
+        } else if (_stricmp(state.currentName.c_str(), "skipPublicKeyValidation") == 0) {
+            outConfig.skipPublicKeyValidation = (_stricmp(value.c_str(), "true") == 0 || value == "1");
         }
         // Unknown vars are silently ignored (ignoreUnknownVars is true by default)
     }
@@ -302,12 +305,16 @@ void ApplySelectedServerConfigToMediator() {
         mxo::ltlogin::g_ServerPublicExponentB64 = g_SelectedServerConfig->kServerPublicExponentB64.c_str();
     }
 
+    // Apply skip public key validation flag (for non-standard key sizes)
+    mxo::ltlogin::g_SkipAuthPublicKeyReplyValidation = g_SelectedServerConfig->skipPublicKeyValidation ? 1u : 0u;
+
     spdlog::info(
-        "DIAGNOSTIC: applied server config '{}' to mediator globals: auth='{}' port={} modulus={}",
+        "DIAGNOSTIC: applied server config '{}' to mediator globals: auth='{}' port={} modulus={} skipValidation={}",
         g_SelectedServerConfig->name,
         g_SelectedServerConfig->authServerDnsName,
         g_SelectedServerConfig->authServerPort,
-        g_SelectedServerConfig->kServerPublicModulusB64.empty() ? "<default>" : "<custom>");
+        g_SelectedServerConfig->kServerPublicModulusB64.empty() ? "<default>" : "<custom>",
+        g_SelectedServerConfig->skipPublicKeyValidation ? 1 : 0);
 }
 
 } // namespace mxo::launcher
