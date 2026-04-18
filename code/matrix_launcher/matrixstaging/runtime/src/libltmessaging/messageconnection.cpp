@@ -560,13 +560,19 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
 
     spdlog::debug("TryTransform: input payload[0]={:02x} count={}", payloadBytes[0], payloadByteCount);
 
-    // FIDELITY: CERT_ChallengeResponse SHOULD be encrypted
-    // Original launcher.exe sets up encryption module and sends through packet agenda
-    // Server expects encrypted packets with proper framing/headers
-    // Encrypt all packets by default (stream encryption module handles CERT exceptions if needed)
+    // FIDELITY: Check for CERT packet format [opcode][3][data] which should NOT be encrypted
+    // Server expects CERT packets (opcodes 1-5) with second field = 3 to be sent unencrypted
+    // This matches launcher.exe behavior where certain critical packets bypass stream encryption
     bool shouldEncrypt = true;
-    // Note: Original launcher.exe behavior suggests CERT_ChallengeResponse goes through normal
-    // encryption path. Server should decrypt and process the 17-byte [opcode][challenge] format
+    if (payloadByteCount >= 3 && 
+        payloadBytes[0] >= 0x01 && payloadBytes[0] <= 0x05) {  // CERT opcodes 1-5
+        const uint16_t secondField = *reinterpret_cast<const uint16_t*>(payloadBytes + 1);
+        if (secondField == 3) {
+            shouldEncrypt = false;
+            spdlog::debug("TryTransform: skipping encryption for CERT packet with unencrypted flag (opcode={:02x}, field=3)",
+                payloadBytes[0]);
+        }
+    }
 
     if (shouldEncrypt) {
         mxo::auth::FramedPacket encryptedPacket;
@@ -3361,7 +3367,6 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 0xd) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x1d);
         
         // FIDELITY: Original launcher.exe format is [opcode=0x03][16 bytes challenge response] = 17 bytes
-        // Server reads first 3 bytes to determine encryption, expects opcode 0x03 for CERT_ChallengeResponse
         // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte, then copies 16 bytes from seed envelope
         //   *(undefined1 *)responseEnvelope.packetPayloadPtr = 3;
         //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 1) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x11);
@@ -3378,7 +3383,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         std::copy_n(responseBytes.data(), 16, responsePayload + 1);  // Copy after opcode
         responseMessageRef->SetPayloadByteCountScaffold(17);  // 1 byte opcode + 16 bytes response
 
-        spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-17]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-22]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[1],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[2],
@@ -3395,7 +3400,12 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[13],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[14],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[15],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[16]);
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[16],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[17],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[18],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[19],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[20],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[21]);
         
         // DEBUG: Log the expected challenge from the seed bytes (should match bytes 3-18 of response)
         spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
