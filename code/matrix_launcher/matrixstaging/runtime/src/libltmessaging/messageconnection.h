@@ -371,54 +371,80 @@ struct CMessageConnectionPacketBuilderPayloadScaffold {
     uint8_t* packetPayload10 = nullptr;
 };
 
-/**
- * VTable `0x004b6538` - CLTLoginMediatorPacketBuilderEnvelope for challenge response (packet 0x03)
- *
- * Derived local envelope used by `CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse`
- * (0x4429b0) to construct the CERT_ChallengeResponse packet.
- *
- * Layout mirrors CMessageConnectionPacketBuilderPayloadScaffold but with specific vtable dispatch:
- * - `vtable+0` = PacketBuilder_Destroy (0x443aa0)
- * - `vtable+1` = cls_0x4b6538 ctor (0x443220) - creates envelope with '\x01' flag
- * - `vtable+2` = virt_meth_0x442690 (debug/serialization)
- * - `vtable+3` = virt_meth_0x4419c0 (init/cleanup)
- * - `vtable+4` = EnsureStreamPacketEncryptionModule (0x441470)
- *
- * The constructor at 0x443220:
- * 1. Takes messageRef pointer and '\x01' flag
- * 2. Stores 16 bytes from decrypted challenge blob into mbr_0x10
- * 3. Extracts 4 dwords from mbr_0x10 at offsets +1/+5/+9/+0xd
- * 4. Writes to connection fields at this+0x85/0x89/0x8d/0x91
- *
- * Usage in 0x4429b0:
- * 1. Create cls_0x4b6538 envelope via cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
- * 2. Extract 16 bytes from envelope.mbr_0x10 at offsets +1/+5/+9/+0xd
- * 3. Write to connection fields at this+0x85/0x89/0x8d/0x91
- * 4. Initialize packet builder envelope via CLTLoginMediatorPacketBuilderEnvelope_Initialize
- * 5. Set opcode 0x11 and copy challenge bytes from envelope.mbr_0x10 + 0x11/+0x15/+0x19/+0x1d
- * 6. Send via connection vtable+0x24
- */
-class CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 {
-public:
-    // anchor: launcher.exe vtable `0x004b6538`
-    // Original layout: vftptr(4) + mbr_0x4(4) + mbr_0x8(4) + mbr_0xc(1) + padding(3) + mbr_0x10_ptr(4) = 20 bytes
-    void* vftptr_0x0 = nullptr;
-    uint32_t mbr_0x4 = 0;     // Computed from message ref (payload base pointer)
-    void* mbr_0x8 = nullptr;  // message ref pointer
-    uint8_t mbr_0xc = 0;      // flag parameter
-    uint8_t padding_0xd[3] = {0, 0, 0};  // padding to align mbr_0x10
-    
-    // anchor: launcher.exe:0x443220 - mbr_0x10 is a POINTER to packet payload
-    // Set to mbr_0x4 in constructor: this->mbr_0x10 = this->mbr_0x4
-    // This pointer is used for extracting response bytes at offsets +0x11/+0x15/+0x19/+0x1d
-    uint8_t* mbr_0x10_ptr = nullptr;
 
+};  // Close namespace mxo::liblttcp
+
+// Include PacketBuilder base class for inheritance
+#include "../../../game/src/libltclientlogin/loginmediator_base.h"
+
+namespace mxo::liblttcp {
+
+/**
+ * CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 - Challenge response packet builder (packet 0x03)
+ * anchor: launcher.exe vtable `0x004b6538`
+ *
+ * Derived packet builder used by CBaseMarginConnection_HandleCode2CertChallengeAndSendResponse
+ * (0x4429b0) to construct the CERT_ChallengeResponse packet with SessionKey and Secret fields.
+ *
+ * VTable layout at 0x4b6538 (5 slots, inherits from PacketBuilder_0x4af2a4):
+ * - Slot 0 (+0x00): 0x443aa0 - destructor (inherited)
+ * - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited, returns 0)
+ * - Slot 2 (+0x08): 0x442690 - DebugString (OVERRIDDEN - "SessionKey:" and "Secret:" output)
+ * - Slot 3 (+0x0c): 0x4419c0 - InitializePayloadSize (OVERRIDDEN - packet 0x11 setup, size 0x21)
+ * - Slot 4 (+0x10): 0x441470 - EnsureStreamPacketEncryptionModule (OVERRIDDEN)
+ */
+class CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 : public ltlogin::PacketBuilder_0x4af2a4 {
 public:
-    // Forward declarations for vtable methods
-    virtual ~CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() = default;
-    virtual uint32_t dummyVTableMethod0() const { return 0; }
-    virtual void dummyVTableMethod1() {}  // virt_meth_0x442690 (debug)
-    virtual void dummyVTableMethod2() {}  // virt_meth_0x4419c0 (init/cleanup)
+    // Additional field for challenge response extraction (follows base class fields)
+    // packetPayloadPtr points to payload for extracting SessionKey/Secret bytes
+    // at offsets +0x11/+0x15/+0x19/+0x1d for response packet construction
+    uint8_t* packetPayloadPtr = nullptr;  // +0x28 (after base's worldId24 at +0x24)
+
+    // anchor: launcher.exe:0x443aa0 / vtable slot 0 (inherited destructor)
+    ~CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() override = default;
+
+    // anchor: launcher.exe:0x437b50 / vtable slot 1 (inherited, returns 0)
+    // StubReturn0() inherited from base
+
+    // anchor: launcher.exe:0x442690 / vtable slot 2 (OVERRIDDEN)
+    // DebugString - outputs "SessionKey:" and "Secret:" debug info
+    // Original at 0x442690:
+    // - formatType 2: "SessionKey:(Array of size 0x10) Secret:(Array of size 0x10) "
+    // - formatType 3: "SessionKey:[byte0,...,] Secret:[byte0,...,] "
+    void DebugString(int formatType = 2) override {
+        if (formatType == 2) {
+            spdlog::debug("CLTLoginMediatorPacketBuilderEnvelope: SessionKey:(Array of size 0x10) Secret:(Array of size 0x10)");
+        } else if (formatType == 3 && payloadBegin10) {
+            std::string sessionKeyBytes, secretBytes;
+            for (int i = 0; i < 16; ++i) {
+                if (i > 0) { sessionKeyBytes += ","; secretBytes += ","; }
+                sessionKeyBytes += fmt::format("0x{:02x}", static_cast<uint8_t*>(payloadBegin10)[i + 1]);
+                secretBytes += fmt::format("0x{:02x}", static_cast<uint8_t*>(payloadBegin10)[i + 0x11]);
+            }
+            spdlog::debug("CLTLoginMediatorPacketBuilderEnvelope: SessionKey:[{}] Secret:[{}]",
+                         sessionKeyBytes, secretBytes);
+        }
+    }
+
+    // anchor: launcher.exe:0x4419c0 / vtable slot 3 (OVERRIDDEN)
+    // InitializePayloadSize - setup for packet 0x11 (challenge response)
+    // Original at 0x4419c0: allocates payload size 0x21, sets opcode byte to 0x00
+    void InitializePayloadSize() override {
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            messageRef08->messageStorage0c->ResetPayloadByteCountScaffold(0x21);
+            packetPayloadPtr = static_cast<uint8_t*>(payloadBegin10);
+            if (packetPayloadPtr) {
+                *packetPayloadPtr = 0x00;  // Opcode byte
+            }
+        }
+    }
+
+    // anchor: launcher.exe:0x441470 / vtable slot 4 (OVERRIDDEN)
+    // EnsureStreamPacketEncryptionModule - refreshes encryption from challenge material
+    void EnsureStreamPacketEncryptionModule() {
+        // Placeholder - would call CStreamPacketEncryptionModule_RefreshFromChallengeMaterial
+        spdlog::debug("CLTLoginMediatorPacketBuilderEnvelope: EnsureStreamPacketEncryptionModule called");
+    }
 
     // Allow default construction for stack-local envelope instances
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538();
@@ -426,9 +452,9 @@ public:
     // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
     // Original signature: cls_0x4b6538::cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
     // FIDELITY: Proper constructor matching original:
-    //   this->mbr_0x8 = messageRef;
-    //   this->mbr_0x4 = (flag == '\0') ? *(messageRef+0xc)+0xc : computed value
-    //   this->mbr_0x10 = this->mbr_0x4
+    //   this->messageRef08 = messageRef;
+    //   this->nopatchLauncherVersionValue04 = (flag == '\0') ? *(messageRef+0xc)+0xc : computed value
+    //   this->mbr_0x10 = this->nopatchLauncherVersionValue04
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
         CMessageConnectionMessageRef_0x4ba23c* messageRef,
         uint8_t flag);
@@ -459,8 +485,8 @@ public:
     std::array<uint8_t, 16> ExtractForResponsePacket() const;
 };
 
-// Size: 0x18 (24 bytes) - vftptr(4) + mbr_0x4(4) + mbr_0x8(4) + mbr_0xc(1) + padding(3) + mbr_0x10_ptr(4) = 20 bytes (actual may be padded to 24)
-static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x18,
+// Size: 0x18 (24 bytes) - vftptr(4) + nopatchLauncherVersionValue04(4) + messageRef08(4) + ownerReadyFlag0c(1) + padding(3) + packetPayloadPtr(4) = 20 bytes (actual may be padded to 24)
+static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x2c,
               "CLTLoginMediatorPacketBuilderEnvelope size mismatch");
 
 /**
@@ -474,8 +500,8 @@ static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x18,
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() {
     // Default initialization - mirror original at 0x439840
     // The original sets vftable to PacketBuilder vtable
-    // Then creates a message ref and stores it at mbr_0x8 (+0x08)
-    // Then sets mbr_0x4 = *(int *)(this->mbr_0x8 + 0xc) + 0xc
+    // Then creates a message ref and stores it at messageRef08 (+0x08)
+    // Then sets nopatchLauncherVersionValue04 = *(int *)(this->messageRef08 + 0xc) + 0xc
     // Which means: get messageStorage at +0x0c, get its payload base at +0x0c, add +0x0c = actual payload start
 
     // Create message ref as per original 0x439840
@@ -484,15 +510,15 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
         newMessageRef->AddRef();
         // Initialize message storage
         newMessageRef->ResetForPacketBuilderScaffold(false, 0);
-        // Store message ref at mbr_0x8
-        mbr_0x8 = newMessageRef;
-        // mbr_0x4 = message ref payload base + 0xc (actual payload data offset within storage)
+        // Store message ref at messageRef08
+        messageRef08 = newMessageRef;
+        // nopatchLauncherVersionValue04 = message ref payload base + 0xc (actual payload data offset within storage)
         if (newMessageRef->messageStorage0c) {
             uint8_t* payloadBase = newMessageRef->messageStorage0c->PayloadBaseScaffold();
             // Original adds +0x0c to get to actual payload data
-            mbr_0x4 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
-            // Set mbr_0x10_ptr to point to payload for response extraction
-            mbr_0x10_ptr = payloadBase;
+            nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payloadBase) + 0xc;
+            // Set packetPayloadPtr to point to payload for response extraction
+            packetPayloadPtr = payloadBase;
         }
     }
 }
@@ -502,23 +528,23 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     CMessageConnectionMessageRef_0x4ba23c* messageRef,
     uint8_t flag) {
     // FIDELITY: Match original constructor:
-    //   this->mbr_0x8 = messageRef;
-    //   this->mbr_0x4 = computed from messageRef based on flag
-    //   this->mbr_0x10 = this->mbr_0x4
-    mbr_0x8 = reinterpret_cast<void*>(messageRef);
+    //   this->messageRef08 = messageRef;
+    //   this->nopatchLauncherVersionValue04 = computed from messageRef based on flag
+    //   this->mbr_0x10 = this->nopatchLauncherVersionValue04
+    messageRef08 = messageRef;
     
     if (messageRef && messageRef->messageStorage0c) {
         const uint8_t* payload = messageRef->messageStorage0c->PayloadBaseScaffold();
-        // mbr_0x4: payload base pointer when flag != 0
-        mbr_0x4 = reinterpret_cast<uint32_t>(payload);
-        // mbr_0x10_ptr points to same payload for response extraction
-        mbr_0x10_ptr = const_cast<uint8_t*>(payload);
+        // nopatchLauncherVersionValue04: payload base pointer when flag != 0
+        nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(payload);
+        // packetPayloadPtr points to same payload for response extraction
+        packetPayloadPtr = const_cast<uint8_t*>(payload);
     } else {
-        mbr_0x4 = 0;
-        mbr_0x10_ptr = nullptr;
+        nopatchLauncherVersionValue04 = 0;
+        packetPayloadPtr = nullptr;
     }
     
-    mbr_0xc = flag;
+    ownerReadyFlag0c = flag;
 }
 
 // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
@@ -526,18 +552,18 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     const std::array<uint8_t, 16>& decryptedBytes) {
     // Not used in main flow - the messageRef constructor is used instead
     (void)decryptedBytes;
-    mbr_0x10_ptr = nullptr;
+    packetPayloadPtr = nullptr;
 }
 
 // anchor: launcher.exe:0x443220
 inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::ExtractChallengeBytes() const {
     std::array<uint8_t, 16> result{};
-    // Extract 4 dwords from mbr_0x10_ptr at offsets +1/+5/+9/+0xd
-    if (mbr_0x10_ptr) {
-        std::memcpy(&result[0], mbr_0x10_ptr + 1, 4);   // first dword
-        std::memcpy(&result[4], mbr_0x10_ptr + 5, 4);  // second dword
-        std::memcpy(&result[8], mbr_0x10_ptr + 9, 4);  // third dword
-        std::memcpy(&result[12], mbr_0x10_ptr + 13, 4); // fourth dword (0xd = 13)
+    // Extract 4 dwords from packetPayloadPtr at offsets +1/+5/+9/+0xd
+    if (packetPayloadPtr) {
+        std::memcpy(&result[0], packetPayloadPtr + 1, 4);   // first dword
+        std::memcpy(&result[4], packetPayloadPtr + 5, 4);  // second dword
+        std::memcpy(&result[8], packetPayloadPtr + 9, 4);  // third dword
+        std::memcpy(&result[12], packetPayloadPtr + 13, 4); // fourth dword (0xd = 13)
     }
     return result;
 }
@@ -549,48 +575,48 @@ inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::E
 // HACK: Use offset +1 instead of +0x11 to get correct response bytes (since payload only has 16 bytes)
 inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::ExtractForResponsePacket() const {
     std::array<uint8_t, 16> result{};
-    spdlog::debug("ExtractForResponsePacket: mbr_0x10_ptr={:08x}, content[0-31]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-        reinterpret_cast<uintptr_t>(mbr_0x10_ptr),
-        mbr_0x10_ptr ? mbr_0x10_ptr[0] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[1] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[2] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[3] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[4] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[5] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[6] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[7] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[8] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[9] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[10] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[11] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[12] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[13] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[14] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[15] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[16] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[17] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[18] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[19] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[20] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[21] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[22] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[23] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[24] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[25] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[26] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[27] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[28] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[29] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[30] : 0,
-        mbr_0x10_ptr ? mbr_0x10_ptr[31] : 0);
+    spdlog::debug("ExtractForResponsePacket: packetPayloadPtr={:08x}, content[0-31]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        reinterpret_cast<uintptr_t>(packetPayloadPtr),
+        packetPayloadPtr ? packetPayloadPtr[0] : 0,
+        packetPayloadPtr ? packetPayloadPtr[1] : 0,
+        packetPayloadPtr ? packetPayloadPtr[2] : 0,
+        packetPayloadPtr ? packetPayloadPtr[3] : 0,
+        packetPayloadPtr ? packetPayloadPtr[4] : 0,
+        packetPayloadPtr ? packetPayloadPtr[5] : 0,
+        packetPayloadPtr ? packetPayloadPtr[6] : 0,
+        packetPayloadPtr ? packetPayloadPtr[7] : 0,
+        packetPayloadPtr ? packetPayloadPtr[8] : 0,
+        packetPayloadPtr ? packetPayloadPtr[9] : 0,
+        packetPayloadPtr ? packetPayloadPtr[10] : 0,
+        packetPayloadPtr ? packetPayloadPtr[11] : 0,
+        packetPayloadPtr ? packetPayloadPtr[12] : 0,
+        packetPayloadPtr ? packetPayloadPtr[13] : 0,
+        packetPayloadPtr ? packetPayloadPtr[14] : 0,
+        packetPayloadPtr ? packetPayloadPtr[15] : 0,
+        packetPayloadPtr ? packetPayloadPtr[16] : 0,
+        packetPayloadPtr ? packetPayloadPtr[17] : 0,
+        packetPayloadPtr ? packetPayloadPtr[18] : 0,
+        packetPayloadPtr ? packetPayloadPtr[19] : 0,
+        packetPayloadPtr ? packetPayloadPtr[20] : 0,
+        packetPayloadPtr ? packetPayloadPtr[21] : 0,
+        packetPayloadPtr ? packetPayloadPtr[22] : 0,
+        packetPayloadPtr ? packetPayloadPtr[23] : 0,
+        packetPayloadPtr ? packetPayloadPtr[24] : 0,
+        packetPayloadPtr ? packetPayloadPtr[25] : 0,
+        packetPayloadPtr ? packetPayloadPtr[26] : 0,
+        packetPayloadPtr ? packetPayloadPtr[27] : 0,
+        packetPayloadPtr ? packetPayloadPtr[28] : 0,
+        packetPayloadPtr ? packetPayloadPtr[29] : 0,
+        packetPayloadPtr ? packetPayloadPtr[30] : 0,
+        packetPayloadPtr ? packetPayloadPtr[31] : 0);
     // FIDELITY: Read from +0x11/+0x15/+0x19/+0x1d as per launcher.exe:0x442b18
     // The decrypted RSA buffer contains: [0][twofishKey(16)][challenge(16)][padding]
     // Challenge response is at offsets +0x11, +0x15, +0x19, +0x1d (17, 21, 25, 29)
-    if (mbr_0x10_ptr) {
-        std::memcpy(&result[0], mbr_0x10_ptr + 0x11, 4);   // first dword (bytes 17-20)
-        std::memcpy(&result[4], mbr_0x10_ptr + 0x15, 4);  // second dword (bytes 21-24)
-        std::memcpy(&result[8], mbr_0x10_ptr + 0x19, 4);  // third dword (bytes 25-28)
-        std::memcpy(&result[12], mbr_0x10_ptr + 0x1d, 4); // fourth dword (bytes 29-32)
+    if (packetPayloadPtr) {
+        std::memcpy(&result[0], packetPayloadPtr + 0x11, 4);   // first dword (bytes 17-20)
+        std::memcpy(&result[4], packetPayloadPtr + 0x15, 4);  // second dword (bytes 21-24)
+        std::memcpy(&result[8], packetPayloadPtr + 0x19, 4);  // third dword (bytes 25-28)
+        std::memcpy(&result[12], packetPayloadPtr + 0x1d, 4); // fourth dword (bytes 29-32)
     }
     return result;
 }
@@ -611,7 +637,6 @@ static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPay
 // - Slot 3 (+0x0c): 0x4418a0 - InitializePayloadSize (OVERRIDDEN - packet 0x01 setup)
 // - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
 // Include PacketBuilder base class for inheritance (after CMessageConnectionMessageRef is defined)
-#include "../../../game/src/libltclientlogin/loginmediator_base.h"
 
 namespace mxo::liblttcp {
 

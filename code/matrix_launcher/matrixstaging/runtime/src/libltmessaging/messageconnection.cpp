@@ -3277,18 +3277,18 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[2] : 0,
             localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[3] : 0);
 
-        spdlog::debug("HandleCode2ForBootstrap: envelope.mbr_0x10_ptr={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
-            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr),
-            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[0] : 0,
-            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[1] : 0,
-            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[2] : 0,
-            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[3] : 0);
+        spdlog::debug("HandleCode2ForBootstrap: envelope.packetPayloadPtr={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
+            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr),
+            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[0] : 0,
+            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[1] : 0,
+            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[2] : 0,
+            envelope.packetPayloadPtr ? envelope.packetPayloadPtr[3] : 0);
 
         // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
         // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
         spdlog::debug("HandleCode2ForBootstrap: before ExtractChallengeBytes, envelope={:08x}, mbr_0x10_ptr={:08x}",
             reinterpret_cast<uintptr_t>(&envelope),
-            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr));
+            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
         auto seedBytes = envelope.ExtractChallengeBytes();
         SetMessageCode5SeedBytes85(seedBytes);
 
@@ -3319,7 +3319,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // The original at 0x442b00 sets opcode 3:
         //   *(undefined1 *)responseEnvelope.mbr_0x10 = 3;
         // Get the message ref from response envelope (stored at mbr_0x8) and set up the packet
-        CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = static_cast<CMessageConnectionMessageRef_0x4ba23c*>(responseEnvelope.mbr_0x8);
+        CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = static_cast<CMessageConnectionMessageRef_0x4ba23c*>(responseEnvelope.messageRef08);
         if (!responseMessageRef) {
             // Should not happen - envelope has default-constructed message ref
             spdlog::warn("HandleCode2ForBootstrap: responseEnvelope has no messageRef");
@@ -3335,21 +3335,21 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
         // DEBUG: Log the extraction that happens in ExtractForResponsePacket
         spdlog::debug("HandleCode2ForBootstrap: ExtractForResponsePacket reads from mbr_0x10_ptr+0x11={:08x}",
-            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr + 0x11 : 0));
+            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr ? envelope.packetPayloadPtr + 0x11 : 0));
         spdlog::debug("HandleCode2ForBootstrap: bytes at +0x11..+0x1f: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x11) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x11] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x12) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x12] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x13) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x13] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x14) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x14] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x15) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x15] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x16) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x16] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x17) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x17] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x18) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x18] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x19) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x19] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1a) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1a] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1b) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1b] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1c) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1c] : 0,
-            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1d) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1d] : 0);
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x11) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x11] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x12) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x12] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x13) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x13] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x14) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x14] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x15) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x15] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x16) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x16] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x17) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x17] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x18) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x18] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x19) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x19] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1a) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1a] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1b) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1b] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1c) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1c] : 0,
+            envelope.packetPayloadPtr && (reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr + 0x1d) < reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr) + 16) ? envelope.packetPayloadPtr[0x1d] : 0);
 
         // FIDELITY: Original launcher.exe sends exactly 16 bytes of challenge response
         // The server expects exactly 16 bytes matching the original challenge
@@ -3358,7 +3358,7 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // The opcode is for internal tracking, but the actual payload sent to server is 16 bytes
 
         spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
-            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr));
+            reinterpret_cast<uintptr_t>(envelope.packetPayloadPtr));
         std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
         spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
             responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
