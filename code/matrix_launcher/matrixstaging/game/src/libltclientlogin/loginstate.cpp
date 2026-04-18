@@ -208,19 +208,6 @@ uint32_t CLTLoginState_AbstractFinalLeafBase::Slot9_IsNetworkDriven() const {
 
 // Implementation of LoadCharacterReplyEnvelope_0x4b542c
 
-// Static lookup table for message offset calculations (DAT_004cb4d4)
-// Used for headerless message path to compute payload offset
-static const uint32_t kMessageOffsetLookupTable[] = {
-    0x00000011u,  // index 0
-    0x00000004u,  // index 1
-    0x00000010u,  // index 2
-    0x0000000bu,  // index 3
-    0x00000010u,  // index 4
-    0x00000011u,  // index 5
-    0x00000010u,  // index 6
-    0x00004aacu,  // index 7
-};
-
 // More faithful constructor using CMessageConnectionMessageRef_0x4ba23c directly
 // anchor: launcher.exe:0x43ae50
 LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
@@ -247,8 +234,8 @@ LoadCharacterReplyEnvelope_0x4b542c::LoadCharacterReplyEnvelope_0x4b542c(
             uint8_t* storageBase = reinterpret_cast<uint8_t*>(incomingMessageRef->messageStorage0c);
             uint32_t iVar2 = reinterpret_cast<uint32_t>(storageBase + 0xc);
             uint8_t bVar1 = *(storageBase + 0xc + 0xd);
-            uint32_t lookup1 = kMessageOffsetLookupTable[(bVar1 >> 4) & 7];
-            uint32_t lookup2 = kMessageOffsetLookupTable[bVar1 & 7];
+            uint32_t lookup1 = g_MessageOffsetLookupTable[(bVar1 >> 4) & 7];
+            uint32_t lookup2 = g_MessageOffsetLookupTable[bVar1 & 7];
             messageBase04_ = reinterpret_cast<uint8_t*>(lookup1 + lookup2 + iVar2 + 0x1e);
             // Mark as headerless
             incomingMessageRef->headerless10 = 1;

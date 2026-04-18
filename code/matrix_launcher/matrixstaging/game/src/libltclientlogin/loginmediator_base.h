@@ -13,6 +13,24 @@ namespace ltlogin {
 class CLTLoginMediator;
 class LaunchPadClient_0x4b0e48;
 
+// anchor: launcher.exe:0x004cb4d4
+// Static lookup table for message offset calculations.
+// Used by headerless message path to compute payload offset from descriptor byte.
+// The descriptor byte at [messageRef + 0xc + 0xd] is split into two 3-bit indices:
+// - high nibble: (descriptor >> 4) & 7
+// - low nibble: descriptor & 7
+// Payload size = lookup[high] + lookup[low] + 0x12
+inline const uint32_t g_MessageOffsetLookupTable[8] = {
+    0x00000011u,  // index 0
+    0x00000004u,  // index 1
+    0x00000010u,  // index 2
+    0x0000000bu,  // index 3
+    0x00000010u,  // index 4
+    0x00000011u,  // index 5
+    0x00000010u,  // index 6
+    0x004AC434u,  // index 7 (pointer? unused in practice)
+};
+
 // Forward declarations for message ref classes
 namespace liblttcp {
 class CMessageConnectionMessageRef_0x4ba23c;

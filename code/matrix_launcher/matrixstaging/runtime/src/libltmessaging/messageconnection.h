@@ -764,14 +764,29 @@ public:
     // anchor: launcher.exe:0x4418a0 / vtable slot 3 (OVERRIDDEN)
     // InitializePayloadSize - setup for packet 0x01
     // Original at 0x4418a0:
-    // - allocates fixed payload 3 bytes
-    // - writes packet byte 0x01 (CERT_ConnectRequest opcode)
+    // - reads descriptor byte at [messageRef->messageStorage0c + 0xd]
+    // - computes payload size = lookup[high_nibble] + lookup[low_nibble] + 0x12
+    // - sets nopatchLauncherVersionValue04 = messageStorage + 0xc + payloadSize
+    // - allocates payload and writes opcode 0x01 (CERT_ConnectRequest)
     // - zeros payload word at +0x01
     // - clears reservation fields +0x14/+0x18
     void InitializePayloadSize() override {
-        if (messageRef08 && messageRef08->messageStorage0c) {
-            messageRef08->messageStorage0c->ResetPayloadByteCountScaffold(3);
+        if (!messageRef08 || !messageRef08->messageStorage0c) {
+            return;
         }
+
+        auto* msgStorage = messageRef08->messageStorage0c;
+        uint8_t* storageBase = reinterpret_cast<uint8_t*>(msgStorage);
+        uint8_t descriptor = *(storageBase + 0xc + 0xd);
+
+        uint32_t offset1 = ltlogin::g_MessageOffsetLookupTable[(descriptor >> 4) & 7];
+        uint32_t offset2 = ltlogin::g_MessageOffsetLookupTable[descriptor & 7];
+        uint32_t payloadSize = offset1 + offset2 + 0x12;
+
+        nopatchLauncherVersionValue04 = reinterpret_cast<uint32_t>(storageBase + 0xc) + payloadSize;
+        msgStorage->ResetPayloadByteCountScaffold(payloadSize);
+        payloadBegin10 = msgStorage->PayloadBaseScaffold();
+
         uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
         if (packetPayload) {
             packetPayload[0] = 0x01u;  // CERT_ConnectRequest opcode
