@@ -2846,12 +2846,13 @@ uint32_t CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98() {
     }
 
     // Send the packet using the envelope
+    auto envelope = packetBuilder.GetEnvelope();
     const uint32_t sendResult =
-        ForwardPacketBuilderEnvelopeToSendPacket(packetBuilder.GetEnvelope());
+        ForwardPacketBuilderEnvelopeToSendPacket(envelope);
     spdlog::info(
         "CBaseMarginConnection_0x4b64a8::SendStoredBootstrapReplyCopy98 sent packetBuilderVtable=0x{:08x} payloadBase10={} reservedReplyCopyBytes=0x{:03x} totalPayloadBytes=0x{:03x} sendResult=0x{:08x} this={} ownerContext={} remoteHost='{}'",
-        reinterpret_cast<uintptr_t>(packetBuilder.GetEnvelope().vtable00),
-        fmt::ptr(packetBuilder.packetPayload10),
+        reinterpret_cast<uintptr_t>(envelope.vtable00),
+        fmt::ptr(packetBuilder.payloadBegin10),
         static_cast<unsigned>(packetBuilder.reservedContentByteCount18),
         static_cast<unsigned>(messageRef.messageStorage0c->PayloadByteCountScaffold()),
         static_cast<unsigned>(sendResult),

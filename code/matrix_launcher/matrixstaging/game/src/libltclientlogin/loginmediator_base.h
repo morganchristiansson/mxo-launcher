@@ -56,13 +56,17 @@ public:
     // anchor: launcher.exe:0x443aa0 / vtable +0x00 = PacketBuilder_Destroy
     virtual ~PacketBuilder_0x4af2a4() = default;
     // anchor: launcher.exe:0x437b50 / vtable +0x04
-    virtual uint32_t VtableSlot04() { return 0; }
+    // Stub method returning 0 - inherited by all derived builders
+    virtual uint32_t StubReturn0() { return 0; }
     // anchor: launcher.exe:0x4af2ac / vtable +0x08
-    virtual const char* VtableSlot08() const { return nullptr; }
-    // anchor: launcher.exe:0x41baf0 / vtable +0x0c = virt_meth_0x41baf0
-    virtual void VtableSlot0c() {}
+    // Debug string method - builder-specific (e.g., "Certificate:..." output)
+    virtual const char* DebugString() const { return nullptr; }
+    // anchor: launcher.exe:0x41baf0 / vtable +0x0c
+    // Initialize payload size from message ref, calls helper at 0x41bb30
+    virtual void InitializePayloadSize() {}
     // anchor: launcher.exe:0x481760 / vtable +0x10
-    virtual void* VtableSlot10() { return payloadBegin10; }
+    // Returns payload base pointer (payloadBegin10 field)
+    virtual void* GetPayloadBase() { return payloadBegin10; }
 };
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
@@ -96,12 +100,12 @@ public:
     uint8_t status0b = 0;                                      // +0x3a
     uint16_t worldId0c = 0;                                   // +0x3c
 
-    // Virtual methods
+    // Virtual methods (override PacketBuilder_0x4af2a4)
     ~SlotRecordState_0x4b5328() = default;
-    uint32_t VtableSlot04() { return 0; }
-    const char* VtableSlot08() const { return nullptr; }
-    void VtableSlot0c() {}
-    void* VtableSlot10() { return payloadBegin10; }
+    uint32_t StubReturn0() { return 0; }
+    const char* DebugString() const { return nullptr; }
+    void InitializePayloadSize() {}
+    void* GetPayloadBase() { return payloadBegin10; }
 };
 
 // Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.

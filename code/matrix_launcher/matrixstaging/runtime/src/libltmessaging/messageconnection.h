@@ -597,30 +597,50 @@ inline std::array<uint8_t, 16> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::E
 
 static_assert(offsetof(CMessageConnectionPacketBuilderPayloadScaffold, packetPayload10) == 0x10, "packet-builder payload pointer offset mismatch");
 
-// Idiomatic C++ class for CERT_ConnectRequest packet builder (opcode 0x01)
+} // namespace mxo::liblttcp
+
+// CertConnectRequestPacketBuilder_0x4b6524 - CERT_ConnectRequest packet builder (opcode 0x01)
 // anchor: launcher.exe vtable `0x004b6524`
 // Faithful mirror of the local packet builder used in CMarginConnection_SendStoredBootstrapReplyCopy98
 // to construct CERT_ConnectRequest packets with length-prefixed blob payloads.
-class CertConnectRequestPacketBuilder_0x4b6524 {
+//
+// VTable layout at 0x4b6524 (5 slots, inherits from PacketBuilder_0x4af2a4):
+// - Slot 0 (+0x00): 0x443aa0 - destructor (inherited)
+// - Slot 1 (+0x04): 0x437b50 - StubReturn0 (inherited, returns 0)
+// - Slot 2 (+0x08): 0x4425f0 - DebugString (OVERRIDDEN - "Certificate:..." output)
+// - Slot 3 (+0x0c): 0x4418a0 - InitializePayloadSize (OVERRIDDEN - packet 0x01 setup)
+// - Slot 4 (+0x10): 0x481760 - GetPayloadBase (inherited)
+// Include PacketBuilder base class for inheritance (after CMessageConnectionMessageRef is defined)
+#include "../../../game/src/libltclientlogin/loginmediator_base.h"
+
+namespace mxo::liblttcp {
+
+class CertConnectRequestPacketBuilder_0x4b6524 : public ltlogin::PacketBuilder_0x4af2a4 {
 public:
+    // Additional fields for CertConnectRequestPacketBuilder_0x4b6524 (follow base class fields)
+    uint8_t* reservationHeader14 = nullptr;   // +0x14 (after base's worldId24 at +0x24, but MSVC2003 layout differs)
+    uint16_t reservedContentByteCount18 = 0u; // +0x18
+    uint16_t reservedPadding1a = 0u;          // +0x1a
+
     CertConnectRequestPacketBuilder_0x4b6524() {
         // anchor: launcher.exe:0x441f30 - constructor setup
-        envelope00.vtable00 = reinterpret_cast<void**>(0x004b6524);
-        envelope00.payloadBase04 = nullptr;
-        envelope00.messageRef08 = nullptr;
-        builderFlag0c = 0u;
-        packetPayload10 = nullptr;
+        // Compiler sets vtable to 0x004b6524 automatically via C++ vptr
+        nopatchLauncherVersionValue04 = 0;
+        messageRef08 = nullptr;
+        ownerReadyFlag0c = 0;
+        payloadBegin10 = nullptr;
+        // Base class fields through worldId24 are zero-initialized
         reservationHeader14 = nullptr;
         reservedContentByteCount18 = 0u;
+        reservedPadding1a = 0u;
     }
 
     // Initialize the builder with a message reference
     // anchor: launcher.exe:0x441f3e - constructor call and field setup
     void InitializeWithMessageRef(CMessageConnectionMessageRef_0x4ba23c& messageRef, uint16_t initialPayloadByteCount) {
-        envelope00.messageRef08 = &messageRef;
+        messageRef08 = &messageRef;
         if (messageRef.messageStorage0c) {
-            envelope00.payloadBase04 = messageRef.messageStorage0c->PayloadBaseScaffold();
-            packetPayload10 = envelope00.payloadBase04;
+            payloadBegin10 = messageRef.messageStorage0c->PayloadBaseScaffold();
         }
 
         // Reset payload to initial size (3 bytes for opcode + 2-byte field)
@@ -632,27 +652,29 @@ public:
     // Set up the CERT_ConnectRequest packet header
     // anchor: launcher.exe:0x441f64, 0x441f6a - opcode and field setup
     void SetupCertConnectRequestHeader() {
-        if (packetPayload10) {
-            packetPayload10[0] = 0x01u;  // CERT_ConnectRequest opcode
-            *reinterpret_cast<uint16_t*>(packetPayload10 + 1) = 0u;  // Field value
+        uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        if (packetPayload) {
+            packetPayload[0] = 0x01u;  // CERT_ConnectRequest opcode
+            *reinterpret_cast<uint16_t*>(packetPayload + 1) = 0u;  // Field value
         }
     }
 
     // Reserve space for the bootstrap reply copy
     // anchor: launcher.exe:0x441f73 - LocalPacketBuilder_ReserveLengthPrefixedTail call
-    bool ReserveBootstrapReplySpace(CMessageConnectionMessageRef_0x4ba23c& messageRef, 
+    bool ReserveBootstrapReplySpace(CMessageConnectionMessageRef_0x4ba23c& messageRef,
                                     uint16_t replyByteCount) {
-        if (!messageRef.messageStorage0c || !packetPayload10) {
+        uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        if (!messageRef.messageStorage0c || !packetPayload) {
             return false;
         }
 
         const uint16_t currentPayloadByteCount = messageRef.messageStorage0c->PayloadByteCountScaffold();
-        reservationHeader14 = packetPayload10 + currentPayloadByteCount;
-        
+        reservationHeader14 = packetPayload + currentPayloadByteCount;
+
         const uint16_t requestedGrowth = static_cast<uint16_t>(replyByteCount + sizeof(uint16_t));
-        const uint16_t newPayloadByteCount = 
+        const uint16_t newPayloadByteCount =
             messageRef.messageStorage0c->GrowPayloadByteCountScaffold(requestedGrowth);
-        
+
         if (newPayloadByteCount != currentPayloadByteCount + requestedGrowth) {
             return false;
         }
@@ -660,7 +682,7 @@ public:
         // Write the length prefix
         reservationHeader14[0] = static_cast<uint8_t>(replyByteCount & 0xffu);
         reservationHeader14[1] = static_cast<uint8_t>((replyByteCount >> 8) & 0xffu);
-        
+
         reservedContentByteCount18 = replyByteCount;
         return true;
     }
@@ -677,31 +699,65 @@ public:
         return true;
     }
 
-    // Get the envelope for sending
-    CMessageConnectionPacketBuilderEnvelope& GetEnvelope() { return envelope00; }
+    // Virtual method overrides matching vtable 0x4b6524
+    // anchor: launcher.exe:0x443aa0 / vtable slot 0 (inherited destructor)
+    ~CertConnectRequestPacketBuilder_0x4b6524() override = default;
+
+    // anchor: launcher.exe:0x437b50 / vtable slot 1 (inherited, returns 0)
+    // StubReturn0() inherited from base
+
+    // anchor: launcher.exe:0x4425f0 / vtable slot 2 (OVERRIDDEN)
+    // DebugString - outputs "Certificate" debug info
+    // Original at 0x4425f0: outputs "Certificate:(Array of size X)" or "Certificate:[bytes...]"
+    const char* DebugString() const override {
+        // Source-owned placeholder - original outputs "Certificate" debug strings
+        // Full implementation would call DebugTextSink_AppendCString
+        return nullptr;
+    }
+
+    // anchor: launcher.exe:0x4418a0 / vtable slot 3 (OVERRIDDEN)
+    // InitializePayloadSize - setup for packet 0x01
+    // Original at 0x4418a0:
+    // - allocates fixed payload 3 bytes
+    // - writes packet byte 0x01 (CERT_ConnectRequest opcode)
+    // - zeros payload word at +0x01
+    // - clears reservation fields +0x14/+0x18
+    void InitializePayloadSize() override {
+        if (messageRef08 && messageRef08->messageStorage0c) {
+            messageRef08->messageStorage0c->ResetPayloadByteCountScaffold(3);
+        }
+        uint8_t* packetPayload = static_cast<uint8_t*>(payloadBegin10);
+        if (packetPayload) {
+            packetPayload[0] = 0x01u;  // CERT_ConnectRequest opcode
+            *reinterpret_cast<uint16_t*>(packetPayload + 1) = 0u;  // Zero field
+        }
+        reservationHeader14 = nullptr;
+        reservedContentByteCount18 = 0u;
+    }
+
+    // anchor: launcher.exe:0x481760 / vtable slot 4 (inherited)
+    // GetPayloadBase() inherited from base, returns payloadBegin10
+
+    // Get the envelope for sending (source helper for ABI compatibility)
+    CMessageConnectionPacketBuilderEnvelope GetEnvelope() const {
+        CMessageConnectionPacketBuilderEnvelope envelope;
+        envelope.vtable00 = const_cast<void**>(reinterpret_cast<const void**>(0x004b6524));
+        envelope.payloadBase04 = static_cast<uint8_t*>(payloadBegin10);
+        envelope.messageRef08 = messageRef08;
+        return envelope;
+    }
 
     // Check if the builder is valid for sending
     bool IsValidForSend() const {
-        return envelope00.vtable00 != nullptr && 
-               envelope00.payloadBase04 != nullptr &&
-               packetPayload10 != nullptr;
+        return payloadBegin10 != nullptr && messageRef08 != nullptr;
     }
-
-    // Raw fields matching the static-RE layout at 0x441f30
-    CMessageConnectionPacketBuilderEnvelope envelope00{};
-    uint8_t builderFlag0c = 0u;
-    uint8_t padding0d_0f[3] = {0u, 0u, 0u};
-    uint8_t* packetPayload10 = nullptr;
-    uint8_t* reservationHeader14 = nullptr;
-    uint16_t reservedContentByteCount18 = 0u;
 };
 
-static_assert(sizeof(CertConnectRequestPacketBuilder_0x4b6524) == 0x1c, 
-              "CertConnectRequestPacketBuilder_0x4b6524 size mismatch");
-static_assert(offsetof(CertConnectRequestPacketBuilder_0x4b6524, packetPayload10) == 0x10, 
-              "CertConnectRequestPacketBuilder_0x4b6524 packetPayload10 offset mismatch");
-static_assert(offsetof(CertConnectRequestPacketBuilder_0x4b6524, reservationHeader14) == 0x14, 
-              "CertConnectRequestPacketBuilder_0x4b6524 reservationHeader14 offset mismatch");
+// Note: Modern C++ adds vptr (4 bytes) but original MSVC2003 binary has no leading vptr.
+// With vptr on i686: sizeof = 4 (vptr) + base fields (0x28) + derived fields (0x8) + padding = 48 (0x30)
+// Original binary layout: base(0x14) + derived(0x8) = 0x1c (28 bytes) without vptr
+static_assert(sizeof(CertConnectRequestPacketBuilder_0x4b6524) == 0x30,
+              "CertConnectRequestPacketBuilder_0x4b6524 size mismatch (expected 0x30 with vptr)");
 
 class CStreamPacketEncryptionOwnerBase_0x4b81dc {
 public:

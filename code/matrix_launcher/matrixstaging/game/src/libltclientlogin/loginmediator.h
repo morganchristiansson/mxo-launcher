@@ -703,11 +703,11 @@ public:
         // slot0: dtor (inherits)
         // slot1: stub returns 0
         // anchor: launcher.exe:0x43ded0 / vtable +0x08
-        const char* VtableSlot08() const override { return nullptr; }
+        const char* DebugString() const override { return nullptr; }
         // anchor: launcher.exe:0x439a70 / vtable +0x0c
-        void VtableSlot0c() override {}
+        void InitializePayloadSize() override {}
         // anchor: launcher.exe:0x481760 / vtable +0x10
-        void* VtableSlot10() override { return payloadBegin10; }
+        void* GetPayloadBase() override { return payloadBegin10; }
         // Additional slots from WorldDescriptorState vtable:
         // anchor: launcher.exe:0x43c350 / vtable +0x18
         void* VtableSlot18() { return nullptr; }

@@ -88,10 +88,10 @@ public:
 
 protected:
     // Implement pure virtual methods from PacketBuilder_0x4af2a4
-    uint32_t VtableSlot04() override { return 0; }
-    const char* VtableSlot08() const override { return nullptr; }
-    void VtableSlot0c() override {}
-    void* VtableSlot10() override { return payloadBegin10; }
+    uint32_t StubReturn0() override { return 0; }
+    const char* DebugString() const override { return nullptr; }
+    void InitializePayloadSize() override {}
+    void* GetPayloadBase() override { return payloadBegin10; }
 
     ::mxo::liblttcp::CMessageConnectionMessageStorage_0x4ba208* MessageStorage() {
         return messageRef_.messageStorage0c;
