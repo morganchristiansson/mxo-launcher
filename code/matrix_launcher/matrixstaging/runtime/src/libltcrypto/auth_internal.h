@@ -75,9 +75,16 @@ inline bool BuildPrivateKeyFromBytes(
 }
 
 inline bool BuildServerPublicKey(CryptoPP::RSA::PublicKey* outKey) {
-    // Use server config globals instead of hardcoded values
-    const std::vector<uint8_t> modulusBytes = Base64Decode(mxo::ltlogin::g_ServerPublicModulusB64);
-    const std::vector<uint8_t> exponentBytes = Base64Decode(mxo::ltlogin::g_ServerPublicExponentB64);
+    // Use server config globals (set by ApplySelectedServerConfigToMediator)
+    const char* modulusB64 = mxo::ltlogin::g_ServerPublicModulusB64;
+    const char* exponentB64 = mxo::ltlogin::g_ServerPublicExponentB64;
+
+    if (!modulusB64 || !exponentB64) {
+        return false;
+    }
+
+    const std::vector<uint8_t> modulusBytes = Base64Decode(modulusB64);
+    const std::vector<uint8_t> exponentBytes = Base64Decode(exponentB64);
     return BuildPublicKeyFromBytes(modulusBytes, exponentBytes, outKey);
 }
 

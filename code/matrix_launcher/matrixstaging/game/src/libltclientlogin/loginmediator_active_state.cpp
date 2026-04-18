@@ -44,11 +44,9 @@ uint32_t g_IgnoreHostsFileForAuth = 0;
 // anchor: launcher.exe:0x4f7a50 - auth server port used by BeginAuthConnection endpoint builder
 uint16_t g_AuthServerPort = 11000;
 // Server RSA public key (base64 encoded) - from selected server config
-const char* g_ServerPublicModulusB64 =
-    "qMIfEkrXWpRr44ecWMzJHV7Hjg9bnru2PZv3NydzOZ6uab52wET+RoHhIzv+zJb3"
-    "zBhmETAtsrmNnBXiW7tfqPK0xf6lb9RbvupfnfYSHO5WaEcWEi0JjQRBevg9d8ql"
-    "ETo9Hrfy9PEfpeK1T2WF+xxx73chvBTB12Paa7yT+Ik=";
-const char* g_ServerPublicExponentB64 = "EQ==";
+// Initialized by ApplySelectedServerConfigToMediator()
+const char* g_ServerPublicModulusB64 = nullptr;
+const char* g_ServerPublicExponentB64 = nullptr;
 
 
 
