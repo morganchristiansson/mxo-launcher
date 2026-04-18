@@ -67,7 +67,7 @@ void AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMedia
     for (size_t i = 0; i < characterCount; ++i) {
         mediator->SeedRecoveredCharacterSlotRecordFromAuthReply(static_cast<uint8_t>(i), mediator->lastAuthReply_.characters[i]);
         const SlotRecordState_0x4b5328& slotRecord = mediator->selectionRouteState684_.slotRecordTable04_[i];
-        const int matchedWorldIndex = mediator->FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId0c);
+        const int matchedWorldIndex = mediator->FindRecoveredWorldDescriptorIndexByWorldId(slotRecord.worldId3c);
         if (matchedWorldIndex >= 0) {
             // anchor: launcher.exe:0x43f74a
             // Original joins the just-built slot-record world id against the earlier +0xd84 table,
@@ -93,8 +93,8 @@ void AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMedia
     if (characterCount != 0) {
         const SlotRecordState_0x4b5328& currentSlotRecord =
             mediator->selectionRouteState684_.slotRecordTable04_[0];
-        mediator->marginRouteState_.pendingWorldId = currentSlotRecord.worldId0c;
-        mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(currentSlotRecord.worldId0c);
+        mediator->marginRouteState_.pendingWorldId = currentSlotRecord.worldId3c;
+        mediator->marginRouteState_.currentWorldId = static_cast<int32_t>(currentSlotRecord.worldId3c);
     } else if (worldCount != 0) {
         const mxo::auth::AuthWorldEntry& firstWorld = mediator->lastAuthReply_.worlds[0];
         mediator->marginRouteState_.pendingWorldId = firstWorld.worldId;
@@ -114,7 +114,7 @@ void AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMedia
     if (characterCount != 0) {
         const int matchedWorldIndex =
             mediator->FindRecoveredWorldDescriptorIndexByWorldId(
-                mediator->selectionRouteState684_.slotRecordTable04_[0].worldId0c);
+                mediator->selectionRouteState684_.slotRecordTable04_[0].worldId3c);
         if (matchedWorldIndex >= 0) {
             if (const char* name = mediator->GetDescriptorInlineNameByIndex(static_cast<uint8_t>(matchedWorldIndex))) {
                 currentDescriptorName = name;
@@ -133,7 +133,7 @@ void AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMedia
         static_cast<unsigned>(mediator->marginRouteState_.currentCharacterOrRouteIndex),
         characterCount == 0
             ? 0u
-            : static_cast<unsigned>(mediator->selectionRouteState684_.slotRecordTable04_[0].worldId0c),
+            : static_cast<unsigned>(mediator->selectionRouteState684_.slotRecordTable04_[0].worldId3c),
         mediator->marginRouteState_.routeHostPrefix.empty() ? "<empty>" : mediator->marginRouteState_.routeHostPrefix.c_str(),
         mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)
             ? mediator->LookupSlotRecordHeapStringByIndex(mediator->postAuthMarginLoadingState_0xf14.characterRouteIndexCc8)

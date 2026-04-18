@@ -70,7 +70,7 @@ public:
     uint32_t characterIdHigh20 = 0;                // +0x20
     uint16_t worldId24 = 0;                       // +0x24
 
-    // Virtual methods from vtable (5 slots at 0x004af2a4):
+    // Virtual methods from vtable (4 slots at 0x004af2a4, 16 bytes):
     // anchor: launcher.exe:0x443aa0 / vtable +0x00 = PacketBuilder_Destroy
     virtual ~PacketBuilder_0x4af2a4() = default;
     // anchor: launcher.exe:0x437b50 / vtable +0x04
@@ -91,16 +91,19 @@ public:
 // anchor: launcher.exe:0x004b5328 / vtable
 // anchor: launcher.exe:0x4398b0 / ctor
 // anchor: launcher.exe:0x439910 / dtor
-// Character slot record class. Same layout as PacketBuilder_0x4af2a4 at +0x00 (50 bytes).
-// Ghidra shows this as containing PacketBuilder at offset 0, meaning same memory layout.
-// Full object size: 0x32 (50 bytes)
-// VTable methods (5 slots):
-// - +0x00: dtor (0x439910)
-// - +0x04: stub returns 0 (0x437b50)
-// - +0x08: debug string (0x43dc80)
-// - +0x0c: reset/prepare (0x439940)
-// - +0x10: return payload base (0x481760)
-// Note: heapString14 is at +0x14 (same as PacketBuilder base layout)
+// Character slot record class. VTable at 0x4b5328 semantically inherits from
+// PacketBuilder_0x4af2a4's vtable at 0x4af2a4 (first 4 slots match, slot 4 is overridden).
+// Ghidra shows SlotRecord_0x4b5328 contains PacketBuilder component at offset 0.
+// Full object size: 0x32 (50 bytes) - verified against launcher.exe
+// VTable methods (5 slots at 0x4b5328):
+// - +0x00: dtor (0x439910) - overrides PacketBuilder dtor
+// - +0x04: stub returns 0 (0x437b50) - same as PacketBuilder
+// - +0x08: debug string (0x43dc80) - overrides with slot-specific output
+// - +0x0c: reset/prepare (0x439940) - overrides PacketBuilder reset
+// - +0x10: return payload base (0x481760) - same as PacketBuilder
+// Note: Uses explicit vtable pointer (void** vtable00) for MSVC2003 ABI compatibility.
+// Future: Could inherit from PacketBuilder_0x4af2a4 with C++ virtual, but would need
+// to verify object layout matches (vptr placement, field offsets, total size).
 class SlotRecordState_0x4b5328 {
 public:
     // PacketBuilder layout at +0x00:
@@ -114,11 +117,13 @@ public:
     uint8_t statusByte16 = 0;                                  // +0x18
     // ... rest of PacketBuilder fields through +0x31
 
-    // Slot-record specific fields at +0x32:
-    uint32_t globalCharacterIdLow03 = 0;                      // +0x32
-    uint32_t globalCharacterIdHigh07 = 0;                     // +0x36
-    uint8_t status0b = 0;                                      // +0x3a
-    uint16_t worldId0c = 0;                                   // +0x3c
+    // Slot-record specific fields at +0x32 (extend PacketBuilder layout):
+    // These fields semantically override PacketBuilder's characterId/worldId fields
+    // when accessed through the SlotRecord vtable methods
+    uint32_t characterIdLow32 = 0;                            // +0x32 (slot-record specific)
+    uint32_t characterIdHigh36 = 0;                           // +0x36 (slot-record specific)
+    uint8_t status3a = 0;                                     // +0x3a (slot-record specific)
+    uint16_t worldId3c = 0;                                   // +0x3c (slot-record specific)
 
     // Virtual methods (override PacketBuilder_0x4af2a4)
     ~SlotRecordState_0x4b5328() = default;
@@ -156,8 +161,8 @@ struct Arg6CurrentSlotRecord44ObjectSketch {
 // Offsets verified: SlotRecordState_0x4b5328 fields match payload access pattern:
 // - characterIdLow03 at +0x1c (client accesses as payload+0x03)
 // - characterIdHigh07 at +0x20 (client accesses as payload+0x07)
-// - status0b at +0x18 (client accesses as payload+0x0b)
-// - worldId0c at +0x24 (client accesses as payload+0x0c)
+// - status3a at +0x18 (client accesses as payload+0x0b)
+// - worldId3c at +0x24 (client accesses as payload+0x0c)
 static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, payload10) == 0x10);
 static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapString14) == 0x14);
 static_assert(offsetof(Arg6CurrentSlotRecord44ObjectSketch, heapStringLen18) == 0x18);

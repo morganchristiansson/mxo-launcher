@@ -240,8 +240,8 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     State8StructuredMarginPacketBuilder_0x4af2a4 packetBuilder;
     packetBuilder.ResetAndInitialize();
 
-    packetBuilder.SetFixedDword(0x01, currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u);
-    packetBuilder.SetFixedDword(0x05, currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u);
+    packetBuilder.SetFixedDword(0x01, currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u);
+    packetBuilder.SetFixedDword(0x05, currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u);
 
     // Keep block write order aligned with the original `0x43bd20` disassembly, not numeric order.
     // Newer client-side layout aliasing helps interpret the later blocks too:
@@ -303,8 +303,8 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
         "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
         State8StructuredMarginPacketFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
-        currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
-        currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
         nonZeroSnapshotBlockCount,
         mediator->SelectionContextBlockCd0()[0],
         mediator->SelectionContextBlockD70()[3],
@@ -436,12 +436,12 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
                     ownerState.characterNameBufferF1c + sizeof(ownerState.characterNameBufferF1c),
                     ownerState.state8PersistenceDataF1c.characterName00.begin());
             }
-            ownerState.characterReplyFieldF40 = currentSlotRecord->worldId0c;
-            ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId0c;
-            ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status0b;
-            ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId0c;
-            ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId0c;
-            ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status0b;
+            ownerState.characterReplyFieldF40 = currentSlotRecord->worldId3c;
+            ownerState.secondaryCharacterDataF68[0] = currentSlotRecord->worldId3c;
+            ownerState.secondaryCharacterDataF68[1] = currentSlotRecord->status3a;
+            ownerState.state8PersistenceDataF1c.selectedWorldField24 = currentSlotRecord->worldId3c;
+            ownerState.state8PersistenceDataF1c.secondary4c[0] = currentSlotRecord->worldId3c;
+            ownerState.state8PersistenceDataF1c.secondary4c[1] = currentSlotRecord->status3a;
             usedCurrentSlotRecord = true;
         } else {
             std::copy(

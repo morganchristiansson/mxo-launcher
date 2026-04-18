@@ -690,8 +690,8 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6SelectionDescripto
         static_cast<unsigned>(currentSlotIndex),
         currentSlotRecord->heapString14 ? currentSlotRecord->heapString14 : "<empty>",
         fmt::ptr(arg6SelectionDescriptor40_.vtable),
-        static_cast<unsigned>(currentSlotRecord->globalCharacterIdLow03),
-        static_cast<unsigned>(currentSlotRecord->globalCharacterIdHigh07));
+        static_cast<unsigned>(currentSlotRecord->characterIdLow32),
+        static_cast<unsigned>(currentSlotRecord->characterIdHigh36));
     return &arg6SelectionDescriptor40_;
 }
 
@@ -733,10 +733,10 @@ Arg6CurrentSlotRecord44ObjectSketch* CLTLoginMediator::GetArg6CurrentSlotRecordO
         "CLTLoginMediator::GetArg6CurrentSlotRecordObject44(+0x44) -> {} [name='{}' idLow=0x{:08x} idHigh=0x{:08x} status=0x{:02x} worldId=0x{:04x}]",
         fmt::ptr(&arg6CurrentSlotRecord44_),
         arg6CurrentSlotRecord44_.heapString14 ? arg6CurrentSlotRecord44_.heapString14 : "<empty>",
-        static_cast<unsigned>(currentSlotRecord->globalCharacterIdLow03),
-        static_cast<unsigned>(currentSlotRecord->globalCharacterIdHigh07),
-        static_cast<unsigned>(currentSlotRecord->status0b),
-        static_cast<unsigned>(currentSlotRecord->worldId0c));
+        static_cast<unsigned>(currentSlotRecord->characterIdLow32),
+        static_cast<unsigned>(currentSlotRecord->characterIdHigh36),
+        static_cast<unsigned>(currentSlotRecord->status3a),
+        static_cast<unsigned>(currentSlotRecord->worldId3c));
     return &arg6CurrentSlotRecord44_;
 }
 
@@ -2097,8 +2097,8 @@ uint32_t CLTLoginMediator::FillState9CallbackBlob18c(uint32_t* outDwords, uint32
         return 1u;
     }
 
-    outDwords[0] = currentSlotRecord->globalCharacterIdLow03;
-    outDwords[1] = currentSlotRecord->globalCharacterIdHigh07;
+    outDwords[0] = currentSlotRecord->characterIdLow32;
+    outDwords[1] = currentSlotRecord->characterIdHigh36;
     outDwords[2] = arg2;
     outDwords[3] = arg3;
 
@@ -3297,10 +3297,10 @@ void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
     SlotRecordState_0x4b5328& slotRecord = selectionRouteState684_.slotRecordTable04_[characterIndex];
     slotRecord = {};
     slotRecord.heapString14 = character.handle.text.c_str();
-    slotRecord.globalCharacterIdLow03 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
-    slotRecord.globalCharacterIdHigh07 = static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
-    slotRecord.status0b = normalizedStatus;
-    slotRecord.worldId0c = character.worldId;
+    slotRecord.characterIdLow32 = static_cast<uint32_t>(character.characterId & 0xffffffffull);
+    slotRecord.characterIdHigh36 = static_cast<uint32_t>((character.characterId >> 32) & 0xffffffffull);
+    slotRecord.status3a = normalizedStatus;
+    slotRecord.worldId3c = character.worldId;
     selectionRouteState684_.slotRecordValid04_[characterIndex] = true;
 }
 
@@ -3325,7 +3325,7 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
     //   and the paired selector/index dword at `+0x12c`
     //
     // Fresh tightening from `0x41c3c0` + `0x4401a0`:
-    // - owner `+0x12c` should not be backfilled from slot-record `worldId0c`
+    // - owner `+0x12c` should not be backfilled from slot-record `worldId3c`
     // - the active branch uses `+0x12c` as a world-descriptor index/selector
     const SlotRecordState_0x4b5328* currentSlotRecord = GetCurrentSlotRecord();
     if (currentSlotRecord != nullptr) {
@@ -3341,7 +3341,7 @@ void CLTLoginMediator::SeedPostAuthSourceBlockFromRecoveredAuthStateIfUnset() {
             postAuthMarginLoadingState_0xf14.createCharacterData108.characterName00[copyCount] = '\0';
         }
 
-        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(currentSlotRecord->worldId0c);
+        const int matchedWorldIndex = FindRecoveredWorldDescriptorIndexByWorldId(currentSlotRecord->worldId3c);
         if (matchedWorldIndex >= 0 &&
             (postAuthMarginLoadingState_0xf14.createCharacterData108.selectedWorldField24 >=
                  static_cast<uint32_t>(worldDescriptorCountD80_) ||

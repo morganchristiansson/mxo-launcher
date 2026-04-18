@@ -87,8 +87,8 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     packetBuilder.ResetAndInitialize();
     packetBuilder.SetCharacterName(sourceBlock94String60Begin);
     packetBuilder.SetCharacterIdPair(
-        currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
-        currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u);
+        currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u);
 
     const uint32_t sendResult = mediator->SendCurrentMarginPacket(packetBuilder.Envelope());
     mediator->PostEvent(0x07u);
@@ -98,8 +98,8 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
         State7Packet0x0dFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
         sourceBlock94String60Begin ? sourceBlock94String60Begin : "<null>",
-        currentSlotRecord ? currentSlotRecord->globalCharacterIdLow03 : 0u,
-        currentSlotRecord ? currentSlotRecord->globalCharacterIdHigh07 : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
+        currentSlotRecord ? currentSlotRecord->characterIdHigh36 : 0u,
         currentSlotRecord && currentSlotRecord->heapString14 ? currentSlotRecord->heapString14 : "<empty>",
         sendResult);
     return;

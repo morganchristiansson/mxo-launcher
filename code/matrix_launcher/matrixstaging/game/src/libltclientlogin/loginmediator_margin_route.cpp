@@ -258,7 +258,7 @@ uint8_t CLTLoginMediator::GetSlotRecordStatusByIndex(uint8_t slotIndex) const {
         return 7u;
     }
     const SlotRecordState_0x4b5328* record = GetSlotRecordByIndex(slotIndex);
-    return record ? record->status0b : 7u;
+    return record ? record->status3a : 7u;
 }
 
 // anchor: launcher.exe:0x41b2e0

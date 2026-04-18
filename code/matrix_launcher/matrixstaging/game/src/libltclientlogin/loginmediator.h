@@ -688,7 +688,7 @@ public:
         // Important broader-writer relation from `0x43f300`:
         // - this `+0xd84` world-descriptor table is built first from auth world data
         // - later `+0x688` character-slot records are built from auth character data
-        // - then `+0x818` route-host strings are seeded by joining character `worldId0c`
+        // - then `+0x818` route-host strings are seeded by joining character `worldId3c`
         //   against descriptor `worldId01` and copying descriptor `inlineNamePlus03`
         uint16_t worldId01 = 0;
         std::string inlineNamePlus03;

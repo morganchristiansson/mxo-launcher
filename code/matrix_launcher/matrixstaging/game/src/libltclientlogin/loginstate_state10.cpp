@@ -25,8 +25,8 @@ static uint32_t ReadU32LE(const uint8_t* p) {
 struct ParsedState10ClaimCharacterNameReplyScaffold {
     bool valid = false;
     uint32_t status = 0;
-    uint32_t globalCharacterIdLow03 = 0;
-    uint32_t globalCharacterIdHigh07 = 0;
+    uint32_t characterIdLow32 = 0;
+    uint32_t characterIdHigh36 = 0;
     uint16_t optionalTextOffset01 = 0;
     const char* optionalText = nullptr;
     uint16_t optionalTextLength = 0;
@@ -43,8 +43,8 @@ static ParsedState10ClaimCharacterNameReplyScaffold ParseState10ClaimCharacterNa
     out.valid = true;
     out.optionalTextOffset01 = ReadU16LE(bytes + 1u);
     out.status = ReadU32LE(bytes + 3u);
-    out.globalCharacterIdLow03 = ReadU32LE(bytes + 7u);
-    out.globalCharacterIdHigh07 = ReadU32LE(bytes + 0x0bu);
+    out.characterIdLow32 = ReadU32LE(bytes + 7u);
+    out.characterIdHigh36 = ReadU32LE(bytes + 0x0bu);
 
     if (out.optionalTextOffset01 != 0u) {
         const size_t stringLengthFieldOffset = static_cast<size_t>(out.optionalTextOffset01);
@@ -289,10 +289,10 @@ uint32_t CLTLoginState_State10::Slot6_HandleSecondaryMessage(
     // anchor: launcher.exe:0x440288-0x4402ab
     // Character ID writes: [EDI+0x10]+0x3 = parsed.+7, [EDI+0x10]+0x7 = parsed.+0xb,
     // [EDI+0x10]+0xb = 0 (status), [EDI+0x10]+0xc = worldId (word from descriptor)
-    appendedSlotRecord.globalCharacterIdLow03 = parsed.globalCharacterIdLow03;
-    appendedSlotRecord.globalCharacterIdHigh07 = parsed.globalCharacterIdHigh07;
-    appendedSlotRecord.status0b = 0u;
-    appendedSlotRecord.worldId0c = selectedWorldDescriptor.worldId01;
+    appendedSlotRecord.characterIdLow32 = parsed.characterIdLow32;
+    appendedSlotRecord.characterIdHigh36 = parsed.characterIdHigh36;
+    appendedSlotRecord.status3a = 0u;
+    appendedSlotRecord.worldId3c = selectedWorldDescriptor.worldId01;
 
     // anchor: launcher.exe:0x4402af-0x4402c4
     // Original: SetCurrentState(g_Mediator, 0xb) then PostEvent(g_Mediator, 0x14).
