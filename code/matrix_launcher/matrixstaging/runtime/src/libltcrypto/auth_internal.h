@@ -22,18 +22,17 @@
 #include "sha.h"
 #include "twofish.h"
 
+namespace mxo::ltlogin {
+extern const char* g_ServerPublicModulusB64;
+extern const char* g_ServerPublicExponentB64;
+} // namespace mxo::ltlogin
+
 namespace mxo::auth::internal {
 
 // Internal helper note:
 // - these helpers are transitional glue extracted from the earlier monolithic auth helper
 // - exact original one-to-one function ownership is still incomplete
 // - keep concrete caller/source anchors in the public .cpp files whenever known
-
-static const char kServerPublicModulusB64[] =
-    "qMIfEkrXWpRr44ecWMzJHV7Hjg9bnru2PZv3NydzOZ6uab52wET+RoHhIzv+zJb3"
-    "zBhmETAtsrmNnBXiW7tfqPK0xf6lb9RbvupfnfYSHO5WaEcWEi0JjQRBevg9d8ql"
-    "ETo9Hrfy9PEfpeK1T2WF+xxx73chvBTB12Paa7yT+Ik=";
-static const char kServerPublicExponentB64[] = "EQ==";
 
 inline std::vector<uint8_t> Base64Decode(const char* text) {
     std::string decoded;
@@ -76,8 +75,9 @@ inline bool BuildPrivateKeyFromBytes(
 }
 
 inline bool BuildServerPublicKey(CryptoPP::RSA::PublicKey* outKey) {
-    const std::vector<uint8_t> modulusBytes = Base64Decode(kServerPublicModulusB64);
-    const std::vector<uint8_t> exponentBytes = Base64Decode(kServerPublicExponentB64);
+    // Use server config globals instead of hardcoded values
+    const std::vector<uint8_t> modulusBytes = Base64Decode(mxo::ltlogin::g_ServerPublicModulusB64);
+    const std::vector<uint8_t> exponentBytes = Base64Decode(mxo::ltlogin::g_ServerPublicExponentB64);
     return BuildPublicKeyFromBytes(modulusBytes, exponentBytes, outKey);
 }
 

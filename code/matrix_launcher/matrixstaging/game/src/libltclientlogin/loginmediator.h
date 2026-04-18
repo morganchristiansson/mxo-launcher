@@ -1758,6 +1758,9 @@ extern const char* g_qsAuthServerDNSName;
 extern uint32_t g_IgnoreHostsFileForAuth;
 // anchor: launcher.exe:0x4f7a50
 extern uint16_t g_AuthServerPort;
+// Server RSA public key (base64 encoded) - from selected server config
+extern const char* g_ServerPublicModulusB64;
+extern const char* g_ServerPublicExponentB64;
 
 }  // namespace mxo::ltlogin
 

@@ -17,6 +17,8 @@ namespace mxo::ltlogin {
 extern const char* g_qsAuthServerDNSName;
 extern uint16_t g_AuthServerPort;
 extern uint32_t g_IgnoreHostsFileForAuth;
+extern const char* g_ServerPublicModulusB64;
+extern const char* g_ServerPublicExponentB64;
 } // namespace mxo::ltlogin
 
 namespace mxo::launcher {
@@ -292,11 +294,20 @@ void ApplySelectedServerConfigToMediator() {
     mxo::ltlogin::g_AuthServerPort = g_SelectedServerConfig->authServerPort;
     mxo::ltlogin::g_IgnoreHostsFileForAuth = 0u;
 
+    // Apply server RSA public key (used by auth crypto)
+    if (!g_SelectedServerConfig->kServerPublicModulusB64.empty()) {
+        mxo::ltlogin::g_ServerPublicModulusB64 = g_SelectedServerConfig->kServerPublicModulusB64.c_str();
+    }
+    if (!g_SelectedServerConfig->kServerPublicExponentB64.empty()) {
+        mxo::ltlogin::g_ServerPublicExponentB64 = g_SelectedServerConfig->kServerPublicExponentB64.c_str();
+    }
+
     spdlog::info(
-        "DIAGNOSTIC: applied server config '{}' to mediator globals: auth='{}' port={}",
+        "DIAGNOSTIC: applied server config '{}' to mediator globals: auth='{}' port={} modulus={}",
         g_SelectedServerConfig->name,
         g_SelectedServerConfig->authServerDnsName,
-        g_SelectedServerConfig->authServerPort);
+        g_SelectedServerConfig->authServerPort,
+        g_SelectedServerConfig->kServerPublicModulusB64.empty() ? "<default>" : "<custom>");
 }
 
 } // namespace mxo::launcher
