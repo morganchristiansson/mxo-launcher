@@ -703,7 +703,7 @@ public:
         // slot0: dtor (inherits)
         // slot1: stub returns 0
         // anchor: launcher.exe:0x43ded0 / vtable +0x08
-        const char* DebugString() const override { return nullptr; }
+        void DebugString(int /*formatType*/ = 2) override {}
         // anchor: launcher.exe:0x439a70 / vtable +0x0c
         void InitializePayloadSize() override {}
         // anchor: launcher.exe:0x481760 / vtable +0x10

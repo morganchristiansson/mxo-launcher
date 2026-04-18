@@ -60,7 +60,9 @@ public:
     virtual uint32_t StubReturn0() { return 0; }
     // anchor: launcher.exe:0x4af2ac / vtable +0x08
     // Debug string method - builder-specific (e.g., "Certificate:..." output)
-    virtual const char* DebugString() const { return nullptr; }
+    // formatType: 2 = array size format, 3 = byte array format
+    // Note: Original at 0x4425f0 returns void, not const char*
+    virtual void DebugString(int /*formatType*/ = 2) {}
     // anchor: launcher.exe:0x41baf0 / vtable +0x0c
     // Initialize payload size from message ref, calls helper at 0x41bb30
     virtual void InitializePayloadSize() {}

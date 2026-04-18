@@ -89,7 +89,7 @@ public:
 protected:
     // Implement pure virtual methods from PacketBuilder_0x4af2a4
     uint32_t StubReturn0() override { return 0; }
-    const char* DebugString() const override { return nullptr; }
+    void DebugString(int /*formatType*/ = 2) override {}
     void InitializePayloadSize() override {}
     void* GetPayloadBase() override { return payloadBegin10; }
 

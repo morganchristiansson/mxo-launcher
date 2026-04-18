@@ -707,12 +707,33 @@ public:
     // StubReturn0() inherited from base
 
     // anchor: launcher.exe:0x4425f0 / vtable slot 2 (OVERRIDDEN)
-    // DebugString - outputs "Certificate" debug info
-    // Original at 0x4425f0: outputs "Certificate:(Array of size X)" or "Certificate:[bytes...]"
-    const char* DebugString() const override {
-        // Source-owned placeholder - original outputs "Certificate" debug strings
-        // Full implementation would call DebugTextSink_AppendCString
-        return nullptr;
+    // DebugString - outputs "Certificate" debug info via spdlog
+    // Original at 0x4425f0: void function, outputs "Certificate:(Array of size X)" or "Certificate:[byte0,byte1,...]"
+    // param_2 == 2: array size format; param_2 == 3: byte array format
+    void DebugString(int formatType = 2) override {
+        if (!reservationHeader14) {
+            spdlog::debug("CertConnectRequestPacketBuilder: Certificate reservation not initialized");
+            return;
+        }
+        
+        if (formatType == 2) {
+            // Array size format: "Certificate:(Array of size X)"
+            spdlog::debug("CertConnectRequestPacketBuilder: Certificate:(Array of size 0x{:04x})",
+                         static_cast<unsigned>(reservedContentByteCount18));
+        } else if (formatType == 3) {
+            // Byte array format: "Certificate:[byte0,byte1,...,]"
+            if (reservationHeader14 && reservedContentByteCount18 > 0) {
+                std::string byteStr;
+                for (uint16_t i = 0; i < reservedContentByteCount18 && i < 32; ++i) {
+                    if (i > 0) byteStr += ",";
+                    byteStr += fmt::format("0x{:02x}", reservationHeader14[i]);
+                }
+                if (reservedContentByteCount18 > 32) byteStr += ",...";
+                spdlog::debug("CertConnectRequestPacketBuilder: Certificate:[{}]", byteStr);
+            } else {
+                spdlog::debug("CertConnectRequestPacketBuilder: Certificate:[]");
+            }
+        }
     }
 
     // anchor: launcher.exe:0x4418a0 / vtable slot 3 (OVERRIDDEN)
