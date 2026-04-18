@@ -125,13 +125,6 @@ bool DiagnosticInitializePreclientEnvironmentLike402EC0() {
         return false;
     }
 
-    spdlog::info(
-        "DIAGNOSTIC: pre-client environment scaffold active threadHandle={} threadId=0x{:08x} state44={} state45={} state48={}",
-        fmt::ptr(g_PreclientEnvironment.threadHandle),
-        g_PreclientEnvironment.threadId,
-        g_PreclientEnvironment.readyFlag44,
-        g_PreclientEnvironment.readyFlag45,
-        fmt::ptr(g_PreclientEnvironment.readyPointer48));
     return true;
 }
 
@@ -260,9 +253,7 @@ int main(int argc, char* argv[]) {
     g_CrtArgc = argc;
     g_CrtArgv = argv;
 
-    spdlog::info("Mode: original startup order, no client-memory injection");
-    spdlog::info("Default branch target: nopatch path");
-    spdlog::info("Installed diagnostic std::new_handler/std::terminate hooks");
+
 
     if (!PatchClientDllMxowrapImportToDbghelp()) {
         return FinishAndReturn(1);

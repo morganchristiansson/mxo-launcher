@@ -1282,13 +1282,6 @@ static DiagnosticMediatorResolverNode* DiagnosticLookupResolverNode(
     if (!registry || !serviceName) return NULL;
 
     for (DiagnosticMediatorResolverNode* node = registry->resolverList; node; node = node->next) {
-        spdlog::info(
-            "DIAGNOSTIC: registry node {} service='{}' object={} next={}",
-            fmt::ptr(node),
-            node->serviceName ? node->serviceName : "<null>",
-            fmt::ptr(node->resolvedObject),
-            fmt::ptr(node->next));
-
         if (node->serviceName && std::strcmp(node->serviceName, serviceName) == 0) {
             return node;
         }
@@ -1301,15 +1294,7 @@ static DiagnosticMediatorResolverNode* DiagnosticLookupResolverNode(
 static bool DiagnosticResolveBinderWrapper(DiagnosticBinderWrapper* wrapper) {
     if (!wrapper || !wrapper->outSlot || !wrapper->registry) return false;
 
-    spdlog::info(
-        "DIAGNOSTIC: binder wrapper lookup(service='{}', mode={:08x}, outSlot={})",
-        wrapper->serviceName ? wrapper->serviceName : "<null>",
-        (unsigned)wrapper->mode,
-        fmt::ptr(wrapper->outSlot));
-    spdlog::info(
-        "DIAGNOSTIC: binder registry={} resolverList(registry+0x18)={}",
-        fmt::ptr(wrapper->registry),
-        fmt::ptr(wrapper->registry->resolverList));
+
 
     DiagnosticMediatorResolverNode* node =
         DiagnosticLookupResolverNode(wrapper->registry, wrapper->serviceName);
@@ -1320,12 +1305,6 @@ static bool DiagnosticResolveBinderWrapper(DiagnosticBinderWrapper* wrapper) {
     }
 
     *wrapper->outSlot = node->resolvedObject;
-    spdlog::info(
-        "DIAGNOSTIC: binder resolved '{}' via node {} -> wrote {} to slot {}",
-        wrapper->serviceName ? wrapper->serviceName : "<null>",
-        fmt::ptr(node),
-        fmt::ptr(node->resolvedObject),
-        fmt::ptr(wrapper->outSlot));
     return true;
 }
 
@@ -1345,7 +1324,6 @@ void DiagnosticInstallMediatorViaBinderScaffold(void** outMediatorPtr) {
         return;
     }
 
-    spdlog::info("DIAGNOSTIC: binder scaffold materialized arg6 as {}", fmt::ptr(outMediatorPtr ? *outMediatorPtr : NULL));
 }
 
 // UNANCHORED: diagnostic selection configurator for the replacement arg6 sidecar model.
@@ -1543,8 +1521,6 @@ void DiagnosticApplyDefaultNopatchMediatorConfig(
     SetValueFn setValue2 = (SetValueFn)vtable[9];
 
     setValue1(mediatorPtr, &parsedNoPatchValue);
-    spdlog::info("DIAGNOSTIC: applied default nopatch mediator +0x1c with value 0x{:08x}", parsedNoPatchValue);
 
     setValue2(mediatorPtr, &clientVersionValue);
-    spdlog::info("DIAGNOSTIC: applied default nopatch mediator +0x24 with value 0x{:08x}", clientVersionValue);
 }

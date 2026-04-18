@@ -410,8 +410,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
 
     DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
 
-    spdlog::info("=== configuring arg6 / mediator state for InitClientDLL ===");
-
     const mxo::launcher::replacement::RecoveredLauncherSelectionRecord* recoveredSelection =
         mxo::launcher::replacement::FindRecoveredLauncherSelectionRecord(selectionName);
     const uint32_t selectedVariantState = recoveredSelection ? recoveredSelection->variantState : 0u;
@@ -652,15 +650,9 @@ bool CLauncher::InitInstance() {
     bool operationSucceeded = false;
     char selectionName[64] = {};
 
-    spdlog::info("NOTE: arg1/arg2 now follow the original ParseCommandLine -> CConsoleVar_ParseCommandLineAndConfig staging, but runtime console-variable registration/config-file fidelity is still scaffolded.");
-    spdlog::info("NOTE: this replacement intentionally supports only the effective nopatch branch; patch/update support remains out of scope even while startup behavior is kept close to launcher.exe.");
-    spdlog::info("NOTE: launcher-owned arg5 now enters through a dedicated 0x4d6304 ABI shell, but arg5/arg6/arg7/arg8 fidelity is still incomplete.");
     if (!ParseCommandLineStage()) {
         goto cleanup;
     }
-    spdlog::info("");
-
-    spdlog::info("DIAGNOSTIC: active launcher runtime path = binder-backed mediator + launcher-owned arg5 ABI shell + InitClientDLL/RunClientDLL + faithful launcher-style auth submit (+0x30)");
 
     // UNANCHORED within 0x40b430: replacement-only synthesis that seeds launcher-owned selection
     // and nopatch state before the later pre-client continuation corridor.
