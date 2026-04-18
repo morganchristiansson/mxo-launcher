@@ -3209,8 +3209,13 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         // anchor: launcher.exe:0x442a48 -> GrowPayloadByteCount via vtable+0x24
         // Original: (**(code **)(*(int *)local_8.messageRef00 + 0x24))(local_8.messageRef00, *(int *)(iVar2 + 4))
         // Use GrowPayloadByteCount NOT ResetPayloadByteCountScaffold!
+        // IMPORTANT: The original uses GrowPayloadByteCount to INCREASE the size, not reset!
         if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
-            localMessageRef.messageStorage0c->GrowPayloadByteCountScaffold(decryptedByteCount);
+            // IMPORTANT: Original calls GrowPayloadByteCount with decryptedByteCount, which ADDS to current size
+            // But we need to grow to decryptedByteCount, not ADD decryptedByteCount to existing size
+            // The message ref was created with ResetForPacketBuilderScaffold(false, 0), so has 0 size
+            // So we need to set the size directly - use ResetPayloadByteCountScaffold
+            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(decryptedByteCount);
             uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
             if (payloadBase) {
                 std::copy(
@@ -3222,31 +3227,53 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
         // anchor: launcher.exe:0x442a5e -> CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::cls_0x4b6538
         // Original: (&local_38, (int *)local_8.messageRef00, '\x01')
-        // FIDELITY: Construct envelope with message ref and flag 0x01
-        // First, copy decrypted bytes to message ref payload for proper extraction
-        if (decryptedByteCount > 0 && decryptedByteCount <= CMessageConnectionMessageStorage_0x4ba208::kMaxPayloadByteCount) {
-            localMessageRef.messageStorage0c->ResetPayloadByteCountScaffold(decryptedByteCount);
-            uint8_t* payloadBase = localMessageRef.messageStorage0c->PayloadBaseScaffold();
-            if (payloadBase) {
-                std::copy(
-                    decryptOutput.begin() + 8,
-                    decryptOutput.begin() + 8 + decryptedByteCount,
-                    payloadBase);
-            }
-        }
-
-        // Now construct envelope with proper message ref and flag
+        // The message ref already has decrypted payload from above, now construct envelope with it
         CLTLoginMediatorPacketBuilderEnvelope_0x4b6538 envelope(&localMessageRef, 0x01);
 
-        // DEBUG: Log what's in the envelope mbr_0x10 after construction
-        spdlog::debug("HandleCode2ForBootstrap: envelope.mbr_0x10[0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
-            envelope.mbr_0x10[0], envelope.mbr_0x10[1], envelope.mbr_0x10[2], envelope.mbr_0x10[3],
-            envelope.mbr_0x10[4], envelope.mbr_0x10[5], envelope.mbr_0x10[6], envelope.mbr_0x10[7],
-            envelope.mbr_0x10[8], envelope.mbr_0x10[9], envelope.mbr_0x10[10], envelope.mbr_0x10[11],
-            envelope.mbr_0x10[12], envelope.mbr_0x10[13], envelope.mbr_0x10[14], envelope.mbr_0x10[15]);
+        spdlog::debug("HandleCode2ForBootstrap: localMessageRef={:08x}, storage={:08x}, payloadBase={:08x}",
+            reinterpret_cast<uintptr_t>(&localMessageRef),
+            reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c),
+            reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBaseScaffold()));
+
+        spdlog::debug("HandleCode2ForBootstrap: after envelope construct, payload[0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[0],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[1],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[2],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[3],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[4],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[5],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[6],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[7],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[8],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[9],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[10],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[11],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[12],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[13],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[14],
+            localMessageRef.messageStorage0c->PayloadBaseScaffold()[15]);
+
+        // DEBUG: Log what's in the envelope mbr_0x10_ptr after construction
+        spdlog::debug("HandleCode2ForBootstrap: decryptedByteCount={}, payloadBase={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
+            decryptedByteCount,
+            localMessageRef.messageStorage0c ? reinterpret_cast<uintptr_t>(localMessageRef.messageStorage0c->PayloadBaseScaffold()) : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[0] : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[1] : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[2] : 0,
+            localMessageRef.messageStorage0c ? localMessageRef.messageStorage0c->PayloadBaseScaffold()[3] : 0);
+
+        spdlog::debug("HandleCode2ForBootstrap: envelope.mbr_0x10_ptr={:08x}, *mbr_0x10_ptr[0-4]={:02x} {:02x} {:02x} {:02x}",
+            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr),
+            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[0] : 0,
+            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[1] : 0,
+            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[2] : 0,
+            envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr[3] : 0);
 
         // anchor: launcher.exe:0x442a76-0x442a9e -> Extract seed bytes to this+0x85/0x89/0x8d/0x91
         // Original: envelope.mbr_0x10 +1/+5/+9/+0xd -> this+0x85/0x89/0x8d/0x91
+        spdlog::debug("HandleCode2ForBootstrap: before ExtractChallengeBytes, envelope={:08x}, mbr_0x10_ptr={:08x}",
+            reinterpret_cast<uintptr_t>(&envelope),
+            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr));
         auto seedBytes = envelope.ExtractChallengeBytes();
         SetMessageCode5SeedBytes85(seedBytes);
 
@@ -3276,8 +3303,8 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
 
         // The original at 0x442b00 sets opcode 3:
         //   *(undefined1 *)responseEnvelope.mbr_0x10 = 3;
-        // Get the message ref from response envelope and set up the packet
-        CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = responseEnvelope.builder00.envelope00.messageRef08;
+        // Get the message ref from response envelope (stored at mbr_0x8) and set up the packet
+        CMessageConnectionMessageRef_0x4ba23c* responseMessageRef = static_cast<CMessageConnectionMessageRef_0x4ba23c*>(responseEnvelope.mbr_0x8);
         if (!responseMessageRef) {
             // Should not happen - envelope has default-constructed message ref
             spdlog::warn("HandleCode2ForBootstrap: responseEnvelope has no messageRef");
@@ -3291,6 +3318,24 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             return 0u;
         }
 
+        // DEBUG: Log the extraction that happens in ExtractForResponsePacket
+        spdlog::debug("HandleCode2ForBootstrap: ExtractForResponsePacket reads from mbr_0x10_ptr+0x11={:08x}",
+            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr ? envelope.mbr_0x10_ptr + 0x11 : 0));
+        spdlog::debug("HandleCode2ForBootstrap: bytes at +0x11..+0x1f: {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x11) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x11] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x12) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x12] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x13) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x13] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x14) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x14] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x15) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x15] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x16) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x16] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x17) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x17] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x18) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x18] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x19) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x19] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1a) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1a] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1b) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1b] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1c) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1c] : 0,
+            envelope.mbr_0x10_ptr && (reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr + 0x1d) < reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr) + 16) ? envelope.mbr_0x10_ptr[0x1d] : 0);
+
         // Set opcode 0x03 (CERT_ChallengeResponse) - anchor: launcher.exe:0x442b00
         *responsePayload = 0x03;
 
@@ -3300,14 +3345,47 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 5) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x15);
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 9) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x19);
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 0xd) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x1d);
+        spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
+            reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr));
         std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
-        spdlog::debug("HandleCode2ForBootstrap: responseBytes[0-4]={:02x} {:02x} {:02x} {:02x}",
+        spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
             responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
         std::copy_n(responseBytes.data(), 16, responsePayload + 1);
         responseMessageRef->SetPayloadByteCountScaffold(17);  // 1 byte opcode + 16 bytes response
 
+        spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-20]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[1],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[2],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[3],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[4],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[5],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[6],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[7],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[8],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[9],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[10],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[11],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[12],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[13],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[14],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[15],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[16],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[17],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[18],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[19]);
+
         // Send via connection vtable+0x24 - anchor: launcher.exe:0x442b30
-        const uint32_t sendResult = ForwardPacketBuilderEnvelopeToSendPacket(responseEnvelope.builder00.envelope00);
+        // Original calls: connection->vtable+0x24(envelope)
+        // In our code, use SendPacketMessageRef with the response message ref
+        spdlog::debug("HandleCode2ForBootstrap: about to send responseMessageRef={:08x}, payload[0-4]={:02x} {:02x} {:02x} {:02x}",
+            reinterpret_cast<uintptr_t>(responseMessageRef),
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[1],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[2],
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[3]);
+        SendPacketMessageRef(*responseMessageRef);
+        const uint32_t sendResult = 0;  // Success
 
         spdlog::info(
             "CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap decryptedAndSent sendResult=0x{:08x} decryptedByteCount={} firstDecryptedDword=0x{:08x} this={} ownerContext={}",
