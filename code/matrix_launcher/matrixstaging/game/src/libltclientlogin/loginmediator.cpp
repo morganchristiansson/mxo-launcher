@@ -340,9 +340,9 @@ uint32_t CLTLoginMediator::Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine
     // anchor: launcher.exe:0x41b1ba - initialize helper dispatch table
     InitializeHelperDispatchTable();
 
-    // anchor: launcher.exe:0x41b1c0..0x41b1c7 - install state0 from global array
-    // g_LoginHelperState0[0] points to the state0 object at 0x4f7868
-    currentState_ = reinterpret_cast<CLTLoginState*>(g_LoginHelperState0[0]);
+    // anchor: launcher.exe:0x41b1c0..0x41b1c7 - install state0 into owner+0x10
+    // Helper dispatch table was just initialized, so slot 0 now points to g_State0
+    currentState_ = LoginHelperStateByIdScaffold(0u);
 
     // anchor: launcher.exe:0x41b1cd - set owner ready flag byte at +0x04
     ownerReadyFlag04_ = 1;

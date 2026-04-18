@@ -1752,8 +1752,6 @@ extern CLTLoginMediator* g_CurrentLoginMediator;
 // External globals from launcher.exe used by faithful Initialize implementation.
 // anchor: launcher.exe:0x4d6304
 extern void* g_pThreadPerClientTCPEngine;
-// anchor: launcher.exe:0x4f7868..0x4f78b4
-extern void* g_LoginHelperState0[20];
 // anchor: launcher.exe:0x4f7b14
 extern const char* g_qsAuthServerDNSName;
 // anchor: launcher.exe:0x4d6780

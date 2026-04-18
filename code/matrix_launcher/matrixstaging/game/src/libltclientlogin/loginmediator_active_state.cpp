@@ -37,8 +37,6 @@ CLTLoginMediator* g_CurrentLoginMediator = nullptr;
 // These are populated by the launcher.exe path; replacement uses SetAuthServerConfig.
 // anchor: launcher.exe:0x4d6304
 void* g_pThreadPerClientTCPEngine = nullptr;
-// anchor: launcher.exe:0x4f7868..0x4f78b4 - array of 20 state pointers
-void* g_LoginHelperState0[20] = {nullptr};
 // anchor: launcher.exe:0x4f7b14
 const char* g_qsAuthServerDNSName = "";
 // anchor: launcher.exe:0x4d6780
