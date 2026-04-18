@@ -1756,6 +1756,8 @@ extern void* g_pThreadPerClientTCPEngine;
 extern const char* g_qsAuthServerDNSName;
 // anchor: launcher.exe:0x4d6780
 extern uint32_t g_IgnoreHostsFileForAuth;
+// anchor: launcher.exe:0x4f7a50
+extern uint16_t g_AuthServerPort;
 
 }  // namespace mxo::ltlogin
 

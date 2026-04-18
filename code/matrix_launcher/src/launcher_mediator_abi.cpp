@@ -1500,7 +1500,7 @@ void DiagnosticConfigureLoginControllerNetwork(
     // anchor: launcher.exe:0x4f7b14 / 0x4d6780 / 0x4f7a50
     mxo::ltlogin::g_qsAuthServerDNSName = authDnsName ? authDnsName : "";
     mxo::ltlogin::g_IgnoreHostsFileForAuth = ignoreHostsFileForAuth ? 1u : 0u;
-    *reinterpret_cast<uint16_t*>(0x4f7a50) = authPortHostOrder;
+    mxo::ltlogin::g_AuthServerPort = authPortHostOrder;
     // Also mirror to instance fields for replacement code paths
     mediator->authServerDnsName_ = mxo::ltlogin::g_qsAuthServerDNSName;
     mediator->authServerPortHostOrder_ = authPortHostOrder;

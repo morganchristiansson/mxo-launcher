@@ -41,6 +41,8 @@ void* g_pThreadPerClientTCPEngine = nullptr;
 const char* g_qsAuthServerDNSName = "";
 // anchor: launcher.exe:0x4d6780
 uint32_t g_IgnoreHostsFileForAuth = 0;
+// anchor: launcher.exe:0x4f7a50 - auth server port used by BeginAuthConnection endpoint builder
+uint16_t g_AuthServerPort = 11000;
 
 
 
