@@ -560,21 +560,35 @@ bool CStreamPacketEncryptionModuleWriteTransformWorker_0x4b86a8::TryTransform(
 
     spdlog::debug("TryTransform: input payload[0]={:02x} count={}", payloadBytes[0], payloadByteCount);
 
-    mxo::auth::FramedPacket encryptedPacket;
-    if (!mxo::auth::EncryptMarginPayloadPacket(
-            payloadBytes,
-            payloadByteCount,
-            CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
-            mxo::auth::kFrameModeAuto,
-            &encryptedPacket)) {
-        spdlog::debug("TryTransform: EncryptMarginPayloadPacket failed");
-        return false;
-    }
+    // FIDELITY: CERT_ChallengeResponse SHOULD be encrypted
+    // Original launcher.exe sets up encryption module and sends through packet agenda
+    // Server expects encrypted packets with proper framing/headers
+    // Encrypt all packets by default (stream encryption module handles CERT exceptions if needed)
+    bool shouldEncrypt = true;
+    // Note: Original launcher.exe behavior suggests CERT_ChallengeResponse goes through normal
+    // encryption path. Server should decrypt and process the 17-byte [opcode][challenge] format
 
-    spdlog::debug("TryTransform: encrypted output size={}", encryptedPacket.payloadBytes.size());
-    return outputBuffer->SetPayloadBytes(
-        encryptedPacket.payloadBytes.data(),
-        encryptedPacket.payloadBytes.size());
+    if (shouldEncrypt) {
+        mxo::auth::FramedPacket encryptedPacket;
+        if (!mxo::auth::EncryptMarginPayloadPacket(
+                payloadBytes,
+                payloadByteCount,
+                CStreamPacketEncryptionWorker_KeyBytes(associatedSeedBytes),
+                mxo::auth::kFrameModeAuto,
+                &encryptedPacket)) {
+            spdlog::debug("TryTransform: EncryptMarginPayloadPacket failed");
+            return false;
+        }
+
+        spdlog::debug("TryTransform: encrypted output size={}", encryptedPacket.payloadBytes.size());
+        return outputBuffer->SetPayloadBytes(
+            encryptedPacket.payloadBytes.data(),
+            encryptedPacket.payloadBytes.size());
+    } else {
+        // Send unencrypted - copy payload directly
+        spdlog::debug("TryTransform: sending unencrypted, output size={}", payloadByteCount);
+        return outputBuffer->SetPayloadBytes(payloadBytes, payloadByteCount);
+    }
 }
 
 // UNANCHORED: source-owned helper forwarding through the recovered helper-family `nextHelper04`
@@ -3345,15 +3359,26 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 5) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x15);
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 9) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x19);
         //           *(undefined4 *)(responseEnvelope.mbr_0x10 + 0xd) = *(undefined4 *)(seedEnvelope.mbr_0x10 + 0x1d);
+        
+        // FIDELITY: Original launcher.exe format is [opcode=0x03][16 bytes challenge response] = 17 bytes
+        // Server reads first 3 bytes to determine encryption, expects opcode 0x03 for CERT_ChallengeResponse
+        // anchor: launcher.exe:0x442b00-0x442b28 - sets opcode byte, then copies 16 bytes from seed envelope
+        //   *(undefined1 *)responseEnvelope.packetPayloadPtr = 3;
+        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 1) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x11);
+        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 5) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x15);
+        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 9) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x19);
+        //   *(undefined4 *)(responseEnvelope.packetPayloadPtr + 0xd) = *(undefined4 *)(seedEnvelope.packetPayloadPtr + 0x1d);
+        *responsePayload = 0x03;  // opcode 3
+        
         spdlog::debug("HandleCode2ForBootstrap: calling ExtractForResponsePacket on seed envelope at {:08x}",
             reinterpret_cast<uintptr_t>(envelope.mbr_0x10_ptr));
         std::array<uint8_t, 16> responseBytes = envelope.ExtractForResponsePacket();
         spdlog::debug("HandleCode2ForBootstrap: responseBytes extracted[0-4]={:02x} {:02x} {:02x} {:02x}",
             responseBytes[0], responseBytes[1], responseBytes[2], responseBytes[3]);
-        std::copy_n(responseBytes.data(), 16, responsePayload + 1);
+        std::copy_n(responseBytes.data(), 16, responsePayload + 1);  // Copy after opcode
         responseMessageRef->SetPayloadByteCountScaffold(17);  // 1 byte opcode + 16 bytes response
 
-        spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-20]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+        spdlog::debug("HandleCode2ForBootstrap: after copy, response payload[0-17]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[0],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[1],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[2],
@@ -3370,10 +3395,14 @@ uint32_t CBaseMarginConnection_0x4b64a8::HandleCode2ForBootstrap(
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[13],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[14],
             responseMessageRef->messageStorage0c->PayloadBaseScaffold()[15],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[16],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[17],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[18],
-            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[19]);
+            responseMessageRef->messageStorage0c->PayloadBaseScaffold()[16]);
+        
+        // DEBUG: Log the expected challenge from the seed bytes (should match bytes 3-18 of response)
+        spdlog::debug("HandleCode2ForBootstrap: seed bytes (expected challenge) [0-16]={:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x} {:02x}",
+            messageCode5SeedBytes85_[0], messageCode5SeedBytes85_[1], messageCode5SeedBytes85_[2], messageCode5SeedBytes85_[3],
+            messageCode5SeedBytes85_[4], messageCode5SeedBytes85_[5], messageCode5SeedBytes85_[6], messageCode5SeedBytes85_[7],
+            messageCode5SeedBytes85_[8], messageCode5SeedBytes85_[9], messageCode5SeedBytes85_[10], messageCode5SeedBytes85_[11],
+            messageCode5SeedBytes85_[12], messageCode5SeedBytes85_[13], messageCode5SeedBytes85_[14], messageCode5SeedBytes85_[15]);
 
         // Send via connection vtable+0x24 - anchor: launcher.exe:0x442b30
         // Original calls: connection->vtable+0x24(envelope)
