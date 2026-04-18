@@ -107,8 +107,9 @@ public:
 class SlotRecordState_0x4b5328 {
 public:
     // PacketBuilder layout at +0x00:
-    void** vtable00 = nullptr;                                  // +0x00
-    uint32_t nopatchLauncherVersionValue04 = 0;                // +0x04
+    // Note: Removed explicit vtable00 field - C++ vptr is implicit with virtual methods
+    // This is a key step towards C++ inheritance from PacketBuilder_0x4af2a4
+    uint32_t nopatchLauncherVersionValue04 = 0;                // +0x04 (vptr is at +0x00, implicit)
     liblttcp::CMessageConnectionMessageRef_0x4ba23c* messageRef08 = nullptr;  // +0x08
     uint32_t ownerReadyFlag0c = 0;                             // +0x0c
     void* payloadBegin10 = nullptr;                            // +0x10
