@@ -463,10 +463,17 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         }
     }
 
-    const char authServerDnsName[] = "auth.lith.thematrixonline.net";
-    const uint16_t authServerPort = 11000;
-    const char marginServerSuffix[] = ".lith.thematrixonline.net";
+    // Read auth server config from mediator globals (set by ApplySelectedServerConfigToMediator)
+    // anchor: launcher.exe:0x4f7b14 / 0x4f7a50
+    const char* authServerDnsName = mxo::ltlogin::g_qsAuthServerDNSName;
+    const uint16_t authServerPort = mxo::ltlogin::g_AuthServerPort;
+    const bool ignoreHostsFileForAuth = (mxo::ltlogin::g_IgnoreHostsFileForAuth != 0);
+
+    // Margin config - for now use empty suffix to connect to same host as auth
+    // TODO: make this configurable per-server like auth
+    const char marginServerSuffix[] = "";
     const uint16_t marginServerPort = 10000;
+    const bool ignoreHostsFileForMargin = false;
 
     char marginRoutePrefix[256] = {0};
     if (recoveredSelection && recoveredSelection->routeHostPrefix && recoveredSelection->routeHostPrefix[0]) {
@@ -478,8 +485,6 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
     }
 
     const char exactMarginHostName[] = "";
-    const bool ignoreHostsFileForAuth = false;
-    const bool ignoreHostsFileForMargin = false;
     DiagnosticConfigureLoginControllerNetwork(
         authServerDnsName,
         authServerPort,
