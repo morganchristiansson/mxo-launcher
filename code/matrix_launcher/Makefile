@@ -27,6 +27,7 @@ LAUNCHER_OBJS = \
 	$(BUILD_DIR)/src/diagnostics.o \
 	$(BUILD_DIR)/src/launcher_replacement_support.o \
 	$(BUILD_DIR)/src/textmode_launcher_flow.o \
+	$(BUILD_DIR)/src/server_config.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/launchercommandline.o \
 	$(BUILD_DIR)/matrixstaging/runtime/src/libltbase/ltresult.o \
 	$(BUILD_DIR)/src/launcher_mediator_abi.o \

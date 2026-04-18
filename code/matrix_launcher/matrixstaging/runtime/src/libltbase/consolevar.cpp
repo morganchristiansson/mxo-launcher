@@ -234,28 +234,6 @@ void CloseIncludeFiles(ConsoleConfigParseState& state) {
     }
 }
 
-void RewindConfigState(ConsoleConfigParseState& state) {
-    CloseIncludeFiles(state);
-    state.activeFile = state.primaryFile;
-    state.foundSectionHeader = false;
-    state.reachedEndOfFile = false;
-    state.currentName.clear();
-    state.currentValue.clear();
-    state.workingLine.clear();
-    if (state.primaryFile) {
-        std::fseek(state.primaryFile, 0, SEEK_SET);
-    }
-}
-
-void CloseConfigState(ConsoleConfigParseState& state) {
-    CloseIncludeFiles(state);
-    if (state.primaryFile) {
-        std::fclose(state.primaryFile);
-    }
-    state.primaryFile = nullptr;
-    state.activeFile = nullptr;
-}
-
 bool EqualsIgnoreCase(const char* left, const char* right) {
     if (!left || !right) {
         return false;
@@ -294,6 +272,29 @@ std::vector<std::string> SplitExtrasCsv(const std::string& extrasCsv) {
 }
 
 } // namespace
+
+// Config state management helpers (for custom parsers)
+void CConsoleVar::RewindConfigState(ConsoleConfigParseState& state) {
+    CloseIncludeFiles(state);
+    state.activeFile = state.primaryFile;
+    state.foundSectionHeader = false;
+    state.reachedEndOfFile = false;
+    state.currentName.clear();
+    state.currentValue.clear();
+    state.workingLine.clear();
+    if (state.primaryFile) {
+        std::fseek(state.primaryFile, 0, SEEK_SET);
+    }
+}
+
+void CConsoleVar::CloseConfigState(ConsoleConfigParseState& state) {
+    CloseIncludeFiles(state);
+    if (state.primaryFile) {
+        std::fclose(state.primaryFile);
+    }
+    state.primaryFile = nullptr;
+    state.activeFile = nullptr;
+}
 
 CConsoleVar::~CConsoleVar() {
     UnregisterSelf();

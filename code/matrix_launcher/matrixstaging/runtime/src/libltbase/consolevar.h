@@ -74,6 +74,10 @@ public:
     static bool ParseConfigFile(ConsoleConfigParseState& state, ConsoleParseErrorSink* errors);
     static bool ParseCommandLineAndConfig(std::uint32_t argc, char** argv, ConsoleParseErrorSink* errors);
 
+    // Config state management helpers (for custom parsers)
+    static void CloseConfigState(ConsoleConfigParseState& state);
+    static void RewindConfigState(ConsoleConfigParseState& state);
+
 protected:
     // Scaffold-only storage for future reimplementation work.
     // This is not claimed as exact original memory layout.

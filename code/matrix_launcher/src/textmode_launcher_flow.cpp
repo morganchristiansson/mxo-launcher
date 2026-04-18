@@ -14,6 +14,7 @@
 
 #include "launcher_network_object_abi.h"
 #include "launcher_replacement_support.h"
+#include "server_config.h"
 #include "../matrixstaging/game/src/launcher/launcher.h"
 #include "../matrixstaging/game/src/libltclientlogin/loginmediator.h"
 #include "../matrixstaging/runtime/src/libltbase/launchercommandline.h"
@@ -21,6 +22,97 @@
 extern mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 extern void* g_pLauncherObject6304;
 extern char g_LastWorldName[256];
+
+namespace {
+
+using mxo::launcher::ServerConfig;
+using mxo::launcher::LoadServerConfigs;
+using mxo::launcher::SetServerConfigs;
+using mxo::launcher::GetAllServerConfigs;
+using mxo::launcher::SetSelectedServerConfig;
+
+// Forward declarations for helper functions defined later in this file
+void WriteMatrixConsoleText(const char* text, bool appendNewline);
+void WriteMatrixConsoleFormattedLine(const char* format, ...);
+bool ReadInteractiveLauncherIndex(const char* prompt, uint32_t upperBoundExclusive, uint32_t* outIndex);
+
+// Load server configurations from servers.cfg
+void LoadServerConfigurations() {
+    std::vector<ServerConfig> configs;
+    
+    // Try to load from game directory first
+    configs = LoadServerConfigs("servers.cfg");
+    
+    // If not found, try relative path from executable
+    if (configs.empty()) {
+        configs = LoadServerConfigs("../servers.cfg");
+    }
+    
+    // If still empty, use default production server
+    if (configs.empty()) {
+        ServerConfig defaultConfig;
+        defaultConfig.name = "production";
+        defaultConfig.authServerDnsName = "auth.lith.thematrixonline.net";
+        defaultConfig.authServerPort = 11000;
+        defaultConfig.marginServerSuffix = ".lith.thematrixonline.net";
+        defaultConfig.marginServerPort = 10000;
+        defaultConfig.kServerPublicModulusB64 = 
+            "qMIfEkrXWpRr44ecWMzJHV7Hjg9bnru2PZv3NydzOZ6uab52wET+RoHhIzv+zJb3"
+            "zBhmETAtsrmNnBXiW7tfqPK0xf6lb9RbvupfnfYSHO5WaEcWEi0JjQRBevg9d8ql"
+            "ETo9Hrfy9PEfpeK1T2WF+xxx73chvBTB12Paa7yT+Ik=";
+        defaultConfig.kServerPublicExponentB64 = "EQ==";
+        configs.push_back(std::move(defaultConfig));
+    }
+    
+    SetServerConfigs(std::move(configs));
+}
+
+// Interactive server selection menu
+bool SelectServerInteractive() {
+    const auto& configs = GetAllServerConfigs();
+    
+    if (configs.size() <= 1) {
+        // Only one server available, use it automatically
+        if (!configs.empty()) {
+            WriteMatrixConsoleFormattedLine(
+                "Using server: %s (%s)",
+                configs[0].name.c_str(),
+                configs[0].authServerDnsName.c_str());
+            SetSelectedServerConfig(&configs[0]);
+        }
+        return true;
+    }
+    
+    WriteMatrixConsoleText("Select server:", true);
+    for (size_t i = 0; i < configs.size(); ++i) {
+        const ServerConfig& config = configs[i];
+        WriteMatrixConsoleFormattedLine(
+            "  [%u] %s - %s:%u",
+            static_cast<unsigned>(i + 1),
+            config.name.c_str(),
+            config.authServerDnsName.c_str(),
+            config.authServerPort);
+    }
+    
+    uint32_t selectedIndex = 0;
+    while (!ReadInteractiveLauncherIndex(
+            "Server index: ",
+            static_cast<uint32_t>(configs.size()) + 1,
+            &selectedIndex) ||
+           selectedIndex == 0) {
+        WriteMatrixConsoleText("Invalid server index.", true);
+    }
+    
+    const ServerConfig* selected = &configs[selectedIndex - 1];
+    SetSelectedServerConfig(selected);
+    WriteMatrixConsoleFormattedLine(
+        "Selected: %s (%s)",
+        selected->name.c_str(),
+        selected->authServerDnsName.c_str());
+    return true;
+}
+
+} // namespace
 
 namespace {
 
@@ -796,6 +888,13 @@ character_selection_menu:
 // - this implementation intentionally lives under src/ so launcher.cpp can stay focused on
 //   recovered launcher-owned startup coordination and anchored method bodies.
 bool CLauncher::RunPreClientAuthAndCharacterSelectionStage() {
+    // Load and select server first (before credentials)
+    LoadServerConfigurations();
+    if (!SelectServerInteractive()) {
+        spdlog::error("ERROR: server selection failed");
+        return false;
+    }
+    
     if (!RunTextModeLoginRichEditSubmitCredentialsStage()) {
         return false;
     }
