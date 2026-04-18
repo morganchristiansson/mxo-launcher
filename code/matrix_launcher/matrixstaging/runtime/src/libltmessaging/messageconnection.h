@@ -1360,32 +1360,6 @@ public:
         return bits;
     }
 
-    // anchor: launcher.exe:0x45a400
-    // Returns the byte count of the BigInt value (not capacity)
-    uint32_t GetByteCount() const {
-        const auto* digits = static_cast<const uint32_t*>(mbr_0xc);
-        uint32_t cap = mbr_0x8;
-        if (cap == 0u || !digits) {
-            return 0u;
-        }
-        // Find highest non-zero word from capacity down
-        while (cap != 0u && digits[cap - 1u] == 0u) {
-            --cap;
-        }
-        if (cap == 0u) {
-            return 0u;
-        }
-        // Count bytes in highest non-zero word
-        uint32_t word = digits[cap - 1u];
-        uint32_t bytes = 0u;
-        while (word != 0u) {
-            word >>= 8u;
-            ++bytes;
-        }
-        // Add 4 bytes per full word below the highest
-        bytes += (cap - 1u) * 4u;
-        return bytes;
-    }
 };
 static_assert(sizeof(CMarginConnectionBootstrapPrepBigIntObject20_0x4ba50c) == 0x14, "bootstrap prep big-int object size mismatch");
 
