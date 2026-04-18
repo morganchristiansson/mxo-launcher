@@ -810,11 +810,6 @@ bool CLTLoginMediator::HasBootstrapRaw08AuxHandle54() const {
     return present;
 }
 
-const char* CLTLoginMediator::GetSourceBlock94SmallString60BeginScaffold() const {
-    // Fidelity: read from owner+0x94 block
-    return ownerAuthBootstrapSource94_.sessionToken60.begin;
-}
-
 // anchor: launcher.exe:0x41f390 / owner vtable +0x58
 uint8_t CLTLoginMediator::GetCrashReporterPromptForSecurId58() const {
     const uint8_t prompt = authBootstrapChild680_ ? authBootstrapChild680_->GetCrashReporterPromptForSecurId58() : 0u;

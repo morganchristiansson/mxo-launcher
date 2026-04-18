@@ -81,7 +81,7 @@ void CLTLoginState_State7::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     }
 
     const SlotRecordState_0x4b5328* currentSlotRecord = mediator->GetCurrentSlotRecord();
-    const char* sourceBlock94String60Begin = mediator->GetSourceBlock94SmallString60BeginScaffold();
+    const char* sourceBlock94String60Begin = mediator->ownerAuthBootstrapSource94_.sessionToken60.begin;
 
     State7Packet0x0dBuilder packetBuilder;
     packetBuilder.ResetAndInitialize();

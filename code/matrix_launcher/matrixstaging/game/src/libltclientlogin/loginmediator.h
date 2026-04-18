@@ -740,7 +740,7 @@ public:
     // - owner vtable `+0x38` returns `this+0x94`
     // - state7 slot3 then reads the first dword at `+0x60` and threads it into the raw-`0x0d`
     //   delete-character packet's optional string field via `0x43aa80`
-    const char* GetSourceBlock94SmallString60BeginScaffold() const;
+    
 
     // anchor: launcher.exe:0x41f090
     // Tiny owner getter paired with `0x41f080`; exact original body returns `owner + 0x0c`.
