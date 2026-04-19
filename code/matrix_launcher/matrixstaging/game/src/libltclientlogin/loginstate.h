@@ -314,10 +314,10 @@ public:
 // Provisional better-name suggestion: `CLTLoginState_MarginLoadCharacterPending`
 // Focused source home for the active state8 body:
 // - `loginstate_state8.cpp`
-class CLTLoginState_State8 : public CLTLoginState {
+class CLTLoginState_State8_0x4b5104 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x004396c0 (vtable 0x004b5104 slot 10 initializer)
-    CLTLoginState_State8() = default;
+    CLTLoginState_State8_0x4b5104() = default;
 
 private:
     // `0x43f930` uses byte-sized fields on the 8-byte state object at `this+4/+5` as

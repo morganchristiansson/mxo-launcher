@@ -124,7 +124,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     friend class CLTLoginState_State4_0x4b503c;
     friend class CLTLoginState_State6;
     friend class CLTLoginState_State7;
-    friend class CLTLoginState_State8;
+    friend class CLTLoginState_State8_0x4b5104;
     friend class CLTLoginState_State10;
     friend class CLTLoginState_State11;
     friend class mxo::liblttcp::CAuthStartupConnection_0x4afef0;

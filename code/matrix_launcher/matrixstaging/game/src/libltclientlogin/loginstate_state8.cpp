@@ -126,7 +126,7 @@ static void LogState8PersistenceFamilySnapshot(
     const uint32_t section11Length = static_cast<uint32_t>(ownerState.state8Section11String1460.size());
 
     spdlog::info(
-        "CLTLoginState_State8 persistence family [{}] completed={} section={} bytes={} f1c='{}' f3c=0x{:08x} f40=0x{:08x} f48[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] f68[0..1]=[0x{:08x} 0x{:08x}] f88_00=0x{:08x} f88_444=0x{:08x} f88_448=0x{:08x} overflow13f4=0x{:04x} gate1452={} sec11_145c=0x{:08x} sec11_len={}",
+        "CLTLoginState_State8_0x4b5104 persistence family [{}] completed={} section={} bytes={} f1c='{}' f3c=0x{:08x} f40=0x{:08x} f48[0..3]=[0x{:08x} 0x{:08x} 0x{:08x} 0x{:08x}] f68[0..1]=[0x{:08x} 0x{:08x}] f88_00=0x{:08x} f88_444=0x{:08x} f88_448=0x{:08x} overflow13f4=0x{:04x} gate1452={} sec11_145c=0x{:08x} sec11_len={}",
         reason ? reason : "<unknown>",
         completed ? 1u : 0u,
         static_cast<unsigned>(sectionSelectorMinus2),
@@ -152,12 +152,12 @@ static void LogState8PersistenceFamilySnapshot(
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b5104
-const char* CLTLoginState_State8::DebugName() const {
-    return "CLTLoginState_State8";
+const char* CLTLoginState_State8_0x4b5104::DebugName() const {
+    return "CLTLoginState_State8_0x4b5104";
 }
 
 // anchor: launcher.exe:0x0043bd20 (vtable 0x004b5104 slot 3)
-void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
@@ -165,7 +165,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     }
 
     // Ownership/fidelity correction:
-    // - `0x43bd20` is `CLTLoginState_State8` slot 3
+    // - `0x43bd20` is `CLTLoginState_State8_0x4b5104` slot 3
     // - it owns a structured packet-builder path, not a mediator slot body
     // - current best read from decompilation + disassembly:
     //   - precheck owner `+0x1c` through `0x41b4b0`
@@ -214,7 +214,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     if (!mediator->State10HasReadyConnectionState2()) {
         const uint32_t fallbackResult = mediator->SetCurrentState(4u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x} currentState={}",
+            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue blocked on owner+0x1c state!=2; switched/dispatched helper4 result=0x{:08x} currentState={}",
             static_cast<unsigned>(fallbackResult),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return;
@@ -222,7 +222,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     if (mediator->postAuthMarginLoadingState_0xf14.state10SendGateFlagF14 == 0) {
         const uint32_t fallbackResult = mediator->SetCurrentState(6u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
+            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue hit the 0x43bd48 owner+0xf14 gate; switched/dispatched helper6 result=0x{:08x} currentState={} (state8 sender stays gated until the later state6 slot6 writer at 0x440ab9..0x440ae5)",
             static_cast<unsigned>(fallbackResult),
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return;
@@ -272,7 +272,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     mediator->PostEvent(0x09u);
 
     spdlog::debug(
-        "CLTLoginState_State8::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0(il.cfg)={} d00(hl.cfg)={} d10(an.cfg)={} d20(rl.cfg)={} d30(cl.cfg)={} d40(pi.cfg)={} d50(ai.cfg)={} d60(bl/cs.cfg)={} d70(cui.cfg)={}",
+        "CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue state8 snapshot blocks cd0={} ce0={} cf0(il.cfg)={} d00(hl.cfg)={} d10(an.cfg)={} d20(rl.cfg)={} d30(cl.cfg)={} d40(pi.cfg)={} d50(ai.cfg)={} d60(bl/cs.cfg)={} d70(cui.cfg)={}",
         FormatU32x4Block(mediator->SelectionContextBlockCd0()),
         FormatU32x4Block(mediator->SelectionContextBlockCe0()),
         FormatU32x4Block(mediator->SelectionContextBlockCf0()),
@@ -300,7 +300,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     const char* gameSessionId = mediator->GetGameSessionId();
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State8::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
+        "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot3_BeginOrContinue built structured margin packet fixedBytes=0x{:02x} totalBytes=0x{:02x} gcidLow=0x{:08x} gcidHigh=0x{:08x} nonZeroSnapshotBlocks={}/11 blockCd0_0=0x{:08x} blockD70_3=0x{:08x} GameSessionID='{}' -> sendResult=0x{:08x} then posts event=9",
         State8StructuredMarginPacketFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
         currentSlotRecord ? currentSlotRecord->characterIdLow32 : 0u,
@@ -314,7 +314,7 @@ void CLTLoginState_State8::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x0043f930 (vtable 0x004b5104 slot 6)
-uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+uint32_t CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
     if (!mediator) {
@@ -335,25 +335,25 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         // Log only if we got a message ref but it couldn't be parsed
         if (messageRef != nullptr) {
             spdlog::info(
-                "CLTLoginState_State8::Slot6_HandleSecondaryMessage saw message ref but parse rejected currentState={} (expected MS_LoadCharacterReply layout)",
+                "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage saw message ref but parse rejected currentState={} (expected MS_LoadCharacterReply layout)",
                 mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         }
         const uint32_t fallbackResult = mediator->DispatchSecondaryMessageToOwnerCallback84(workItem);
         if (fallbackResult < 1u) {
             spdlog::info(
-                "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 -> dispatchResult=0x{:08x}",
+                "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage delegated non-0x10 fallback through owner callback84 -> dispatchResult=0x{:08x}",
                 fallbackResult);
             return 1u;
         }
         mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
+            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage non-0x10 fallback through owner callback84 returned 0x{:08x}; mirrored owner+0x80=0x12000005",
             fallbackResult);
         return 0u;
     }
 
     spdlog::info(
-        "CLTLoginState_State8::Slot6_HandleSecondaryMessage parsed MS_LoadCharacterReply status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} expectedSections={} seedExpected={} sectionSelector={} sectionOffset=0x{:04x} sectionBytes={} currentState={}",
+        "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage parsed MS_LoadCharacterReply status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} expectedSections={} seedExpected={} sectionSelector={} sectionOffset=0x{:04x} sectionBytes={} currentState={}",
         static_cast<unsigned>(loadCharacterReplyEnvelope.status),
         static_cast<unsigned>(loadCharacterReplyEnvelope.field05),
         static_cast<unsigned>(loadCharacterReplyEnvelope.handoffWord09),
@@ -370,7 +370,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         (void)mediator->SetCurrentState(3u);
         mediator->PostError(10u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would latch owner+0x80 to that raw server code, switch helper state to 3, and post generic OnLoginError error=10 currentState={}",
+            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage observed failure status=0x{:08x}; original would latch owner+0x80 to that raw server code, switch helper state to 3, and post generic OnLoginError error=10 currentState={}",
             loadCharacterReplyEnvelope.status,
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<unchanged>");
         return 1u;
@@ -536,7 +536,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
                 ownerState.section0Flag13f6 = 1u;
                 persistence.section0PresentFlag4da = 1u;
                 spdlog::info(
-                    "CLTLoginState_State8 section0 parsed name='{}' first='{}' last='{}' background='{}' ptr0=0x{:08x} extra13cc=0x{:08x} extra13d0=0x{:08x}",
+                    "CLTLoginState_State8_0x4b5104 section0 parsed name='{}' first='{}' last='{}' background='{}' ptr0=0x{:08x} extra13cc=0x{:08x} extra13d0=0x{:08x}",
                     ownerState.characterNameBufferF1c[0] ? std::string(ownerState.characterNameBufferF1c) : std::string("<empty>"),
                     ownerState.section0StringF8c[0] ? std::string(ownerState.section0StringF8c.data()) : std::string("<empty>"),
                     ownerState.section0StringFac[0] ? std::string(ownerState.section0StringFac.data()) : std::string("<empty>"),
@@ -758,7 +758,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
                     section11Begin + ownerState.state8Section11String1460.capacity();
             }
             spdlog::info(
-                "CLTLoginState_State8::Slot6_HandleSecondaryMessage applied section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
+                "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage applied section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
                 static_cast<unsigned>(ownerState.state8Section11Dword145c),
                 static_cast<unsigned>(ownerState.state8Section11String1460.size()));
             break;
@@ -831,7 +831,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         }
         const uint32_t slot3Result = mediator->SetCurrentState(9u);
         spdlog::info(
-            "CLTLoginState_State8::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x0b handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
+            "CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x0b handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
             loadCharacterReplyEnvelope.handoffWord09,
             static_cast<unsigned>(slot3Result));
         spdlog::info(
@@ -845,7 +845,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         mediator->PostEvent(0x0bu);
 
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} usedCurrentSlotRecord={} -> currentState=helper9 event=0x0b",
+            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage completed state8 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} usedCurrentSlotRecord={} -> currentState=helper9 event=0x0b",
             loadCharacterReplyEnvelope.status,
             loadCharacterReplyEnvelope.sectionSelectorMinus2,
             loadCharacterReplyEnvelope.sectionByteCount,
@@ -859,7 +859,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
         ownerState.state8Section10ChunkBitmap = 0u;
     } else {
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State8::Slot6_HandleSecondaryMessage routed state8 reply status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} seedCount={} firstFragment={} usedCurrentSlotRecord={}",
+            "DIAGNOSTIC: CLTLoginState_State8_0x4b5104::Slot6_HandleSecondaryMessage routed state8 reply status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} seedCount={} firstFragment={} usedCurrentSlotRecord={}",
             loadCharacterReplyEnvelope.status,
             loadCharacterReplyEnvelope.sectionSelectorMinus2,
             loadCharacterReplyEnvelope.sectionByteCount,
@@ -874,7 +874,7 @@ uint32_t CLTLoginState_State8::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMess
 }
 
 // anchor: launcher.exe:0x00438c90 (vtable 0x004b5104 slot 7)
-uint32_t CLTLoginState_State8::GetStateId() const {
+uint32_t CLTLoginState_State8_0x4b5104::GetStateId() const {
     return 8;
 }
 
