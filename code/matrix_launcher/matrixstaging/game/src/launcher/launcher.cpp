@@ -26,7 +26,7 @@ using InitClientDLLFunc = int (*)(
     HMODULE hClientDll,
     HMODULE hCresDll,
     void* launcherNetworkObject,
-    void* pILTLoginMediatorDefault,
+    void* pILTLoginMediator_0x4af2b8Default,
     uint32_t packedArg7Selection,
     uint32_t launcherInitClientFlagByte);
 using RunClientDLLFunc = int (*)();
@@ -42,7 +42,7 @@ char** g_LauncherFilteredArgv = NULL;       // original: [0x4d2c60]
 mxo::libltbase::CLauncherCommandLine g_LauncherCommandLine;
 CLauncher g_Launcher;
 void* g_pLauncherObject6304 = NULL;
-void* g_pILTLoginMediatorDefault = NULL;
+void* g_pILTLoginMediator_0x4af2b8Default = NULL;
 uint8_t g_LauncherInitClientFlagByte = 0;   // original byte: [0x4d2c69]
 char g_LastWorldName[256] = {0};
 
@@ -127,7 +127,7 @@ void LogKnownStartupState(const CLauncher& launcher) {
     spdlog::info("arg4 hCresDll                = {}", fmt::ptr(g_hCres));
     spdlog::info("arg5 launcherNetworkObject   = {}", fmt::ptr(g_pLauncherObject6304));
     LauncherLogNetworkEngineAbiShellDispatchState(g_pLauncherObject6304, "InitClientDLL-args");
-    spdlog::info("arg6 ILTLoginMediatorDefault = {}", fmt::ptr(g_pILTLoginMediatorDefault));
+    spdlog::info("arg6 ILTLoginMediator_0x4af2b8Default = {}", fmt::ptr(g_pILTLoginMediator_0x4af2b8Default));
     spdlog::info("CLauncher+0xa8 placeholder   = 0x{:08x}", launcher.m_FieldA8);
     spdlog::info("CLauncher+0xac placeholder   = 0x{:08x}", launcher.m_FieldAC);
     spdlog::info("Last_WorldName               = {}", g_LastWorldName[0] ? g_LastWorldName : "<unavailable>");
@@ -222,8 +222,8 @@ bool CLauncher::InitializeThreadPerClientTCPEngine() const {
     // - `CLauncher::InitInstance` reaches this through `mov ecx, ebx; call 0x40a380`
     // - current Ghidra still decompiles the body as if `this` were unused, but keeping the source
     //   as a `CLauncher` method preserves the original `InitInstance` ownership/call boundary
-    if (!g_pILTLoginMediatorDefault) {
-        spdlog::error("launcher.exe:0x40a380 requires ILTLoginMediator.Default before arg5 create/store/register");
+    if (!g_pILTLoginMediator_0x4af2b8Default) {
+        spdlog::error("launcher.exe:0x40a380 requires ILTLoginMediator_0x4af2b8.Default before arg5 create/store/register");
         return false;
     }
 
@@ -235,13 +235,13 @@ bool CLauncher::InitializeThreadPerClientTCPEngine() const {
     // - preserve the original `result < 1` success test
     g_pLauncherObject6304 = LauncherCreateNetworkEngineAbiShell();
 
-    void** vtable = *reinterpret_cast<void***>(g_pILTLoginMediatorDefault);
+    void** vtable = *reinterpret_cast<void***>(g_pILTLoginMediator_0x4af2b8Default);
     typedef int (__thiscall *RegisterEngineFn)(void*, void*);
     RegisterEngineFn registerEngine = (vtable && vtable[2])
         ? reinterpret_cast<RegisterEngineFn>(vtable[2])
         : nullptr;
     const int registerResult = registerEngine
-        ? registerEngine(g_pILTLoginMediatorDefault, g_pLauncherObject6304)
+        ? registerEngine(g_pILTLoginMediator_0x4af2b8Default, g_pLauncherObject6304)
         : 1;
 
     const bool operationSucceeded = (registerResult < 1);
@@ -398,7 +398,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         return false;
     }
 
-    DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediatorDefault);
+    DiagnosticInstallMediatorViaBinderScaffold(&g_pILTLoginMediator_0x4af2b8Default);
 
     const RecoveredLauncherSelectionRecord* recoveredSelection =
         FindRecoveredLauncherSelectionRecord(selectionName);
@@ -420,16 +420,16 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
         selectedHighByte,
         selectedVariantState);
     DiagnosticApplyDefaultNopatchMediatorConfig(
-        g_pILTLoginMediatorDefault,
+        g_pILTLoginMediator_0x4af2b8Default,
         nopatchLauncherVersionValue,
         nopatchClientVersionValue);
 
-    if (g_pILTLoginMediatorDefault) {
+    if (g_pILTLoginMediator_0x4af2b8Default) {
         uint32_t resolvedA8 = m_FieldA8;
         uint32_t resolvedAC = m_FieldAC;
         char resolvedSelectionName[sizeof(g_LastWorldName)] = {0};
         if (DiagnosticResolveLauncherSelectionFromMediator(
-                g_pILTLoginMediatorDefault,
+                g_pILTLoginMediator_0x4af2b8Default,
                 m_FieldAC,
                 m_FieldA8,
                 &resolvedA8,
@@ -445,7 +445,7 @@ bool CLauncher::MaterializeRecoveredInitClientStateFromSelectionName(const char*
                 StoreLastWorldNameInRegistry(g_LastWorldName);
             }
             spdlog::info(
-                "DIAGNOSTIC: arg7 rebuilt through ILTLoginMediator.Default selection path -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
+                "DIAGNOSTIC: arg7 rebuilt through ILTLoginMediator_0x4af2b8.Default selection path -> a8=0x{:08x} ac=0x{:08x} packed=0x{:08x} world='{}'",
                 m_FieldA8,
                 m_FieldAC,
                 packedArg7Selection,
@@ -543,14 +543,14 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
     spdlog::info("=== Original-path gaps still missing ===");
     spdlog::info("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
     spdlog::info("arg5 status: current launcher-owned 0x4d6304 ABI shell now mirrors the original create/register/pass and release/clear shape, but internal ctor state is still incomplete");
-    spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator.Default (not yet faithful launcher reconstruction)");
-    spdlog::info("arg7 status: current selection writeback reuses ILTLoginMediator.Default and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
+    spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator_0x4af2b8.Default (not yet faithful launcher reconstruction)");
+    spdlog::info("arg7 status: current selection writeback reuses ILTLoginMediator_0x4af2b8.Default and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
     if (IsRecoveredPreclientEnvironmentActive()) {
         spdlog::info("pre-client env status: current 0x402ec0-style launcher thread/message scaffold active (not yet faithful original class/import path)");
     } else {
         spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
     }
-    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented; the text-mode host now submits through ILTLoginMediator::Default->ProcessLoginRequest and waits through a blocking observer analogue instead of synthetic posted-event/error latches, but it still does not recreate the original rich-edit observer/prompt lifecycle exactly");
+    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented; the text-mode host now submits through ILTLoginMediator_0x4af2b8::Default->ProcessLoginRequest and waits through a blocking observer analogue instead of synthetic posted-event/error latches, but it still does not recreate the original rich-edit observer/prompt lifecycle exactly");
     spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
     spdlog::info("file/access gate status: original 0x40b790..0x40b7af _access(DAT_004d4cbc,0) / 0x41ab10(0) side path is still not modeled on the replacement path");
     spdlog::info("");
@@ -559,9 +559,9 @@ void CLauncher::LogInitInstanceFaithfulnessGaps() const {
 // anchor: launcher.exe:0x40a4d0
 void CLauncher::CleanupRecoveredInitClientState() const {
     if (g_pLauncherObject6304) {
-        LauncherReleaseNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediatorDefault);
+        LauncherReleaseNetworkEngineAbiShell(&g_pLauncherObject6304, g_pILTLoginMediator_0x4af2b8Default);
     }
-    g_pILTLoginMediatorDefault = NULL;
+    g_pILTLoginMediator_0x4af2b8Default = NULL;
 }
 
 // anchor: launcher.exe:0x40a4d0
@@ -589,7 +589,7 @@ bool CLauncher::RunClientDllLifecycle() const {
     }
 
     const bool allowInitWithCurrentStartupState =
-        g_pILTLoginMediatorDefault && g_pLauncherObject6304;
+        g_pILTLoginMediator_0x4af2b8Default && g_pLauncherObject6304;
     if (!allowInitWithCurrentStartupState) {
         spdlog::error("Refusing to call InitClientDLL with incomplete launcher state.");
         return false;
@@ -608,7 +608,7 @@ bool CLauncher::RunClientDllLifecycle() const {
         g_hClient,
         g_hCres,
         g_pLauncherObject6304,
-        g_pILTLoginMediatorDefault,
+        g_pILTLoginMediator_0x4af2b8Default,
         (m_FieldAC & 0x00ffffffu) | ((m_FieldA8 & 0xffu) << 24),
         g_LauncherInitClientFlagByte);
     spdlog::info("InitClientDLL returned: {}", initResult);

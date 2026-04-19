@@ -18,7 +18,7 @@
  * - prefer anchored comments at individual methods over repeating large project summaries here
  *
  * Canonical references:
- * - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+ * - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md`
  * - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
  * - `../../../../docs/launcher.exe/VTABLES/0x004b01c8.md`
  * - `../../../../docs/launcher.exe/VTABLES/0x004b517c.md`
@@ -46,7 +46,7 @@
 #include <spdlog/spdlog.h>
 
 namespace mxo::ltlogin {
-// ILTLoginMediator::~ILTLoginMediator() = default;
+// ILTLoginMediator_0x4af2b8::~ILTLoginMediator_0x4af2b8() = default;
 
 namespace {
 
@@ -423,7 +423,7 @@ uint32_t CLTLoginMediator::IsReady() {
 // +0x1c
 // anchor: launcher.exe:0x41f060
 // anchor: launcher.exe:0x409a73..0x409b5f explicit nopatch path
-// vtable: ILTLoginMediator.Default slot +0x1c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x1c
 void CLTLoginMediator::SetValue1(void* value) {
     nopatchLauncherVersionValue08_ = value ? *static_cast<const uint32_t*>(value) : 0u;
     spdlog::debug(
@@ -435,7 +435,7 @@ void CLTLoginMediator::SetValue1(void* value) {
 // +0x24
 // anchor: launcher.exe:0x41f080
 // anchor: launcher.exe:0x409a98..0x409c2d explicit nopatch path
-// vtable: ILTLoginMediator.Default slot +0x24
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x24
 void CLTLoginMediator::SetValue2(void* value) {
     nopatchClientVersionValue0c_ = value ? *static_cast<const uint32_t*>(value) : 0u;
     spdlog::debug(
@@ -457,7 +457,7 @@ static uint32_t CurrentHelperStateCodeOrZero(const mxo::ltlogin::CLTLoginMediato
 }
 
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
-// vtable: ILTLoginMediator.Default slot +0x2c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x2c
 uint32_t CLTLoginMediator::IsConnected() {
     static uint32_t s_IsConnectedCount = 0;
     ++s_IsConnectedCount;
@@ -1374,8 +1374,8 @@ const char* CLTLoginMediator::GetVariantWorldName(uint32_t variantIndex) {
     return worldName;
 }
 
-// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4
-// vtable: ILTLoginMediator.Default slot +0xe4
+// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator_0x4af2b8 sibling slot +0xe4
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xe4
 // Tighter launcher page-`7` read now makes this high-word consumer better fit the active
 // selection-entry / slot-record index on the auth-valid path.
 uint8_t CLTLoginMediator::GetVariantState(int32_t variantIndex) const {
@@ -1598,7 +1598,7 @@ const void* CLTLoginMediator::GetState8PersistenceF1c() const {
 }
 
 // anchor: launcher.exe:0x41af30 / launcher.exe:0x40e5b0
-// vtable: ILTLoginMediator.Default slot +0xf8
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xf8
 uint32_t CLTLoginMediator::GetWorldCount() const {
     const uint32_t worldCount = lastAuthReply_.valid && !lastAuthReply_.isErrorReply
         ? static_cast<uint32_t>(worldDescriptorCountD80_)
@@ -1612,7 +1612,7 @@ uint32_t CLTLoginMediator::GetWorldCount() const {
 }
 
 // anchor: launcher.exe:0x41b2e0 / launcher.exe:0x40cd10
-// vtable: ILTLoginMediator.Default slot +0xfc
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xfc
 // Active replacement path note:
 // - the text-mode launcher selection stage now runs only after auth success
 // - so this wrapper-facing getter can stay owner-table-backed without the older synthetic
@@ -1632,7 +1632,7 @@ const char* CLTLoginMediator::GetWorldNameByIndex(uint32_t index) {
 }
 
 // anchor: launcher.exe:0x41b320 / launcher.exe:0x4d3584 +0x100
-// vtable: ILTLoginMediator.Default slot +0x100
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x100
 // Active replacement path note:
 // - the current text-mode selection menu only reaches this after auth success
 // - so the wrapper-facing gate byte now comes only from the recovered owner descriptor Status byte
@@ -1651,7 +1651,7 @@ uint8_t CLTLoginMediator::GetWorldSelectionGateByteByIndex(uint32_t index) const
 }
 
 // anchor: launcher.exe:0x41b360
-// vtable: ILTLoginMediator.Default slot +0x104
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x104
 // Corrected off-by-one read from Ghidra/disassembly: this wrapper slot now surfaces owner
 // descriptor Type byte `+0x18`, not server-version low byte.
 uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
@@ -1669,7 +1669,7 @@ uint8_t CLTLoginMediator::GetWorldTypeByteByIndex(uint32_t index) const {
 }
 
 // anchor: launcher.exe:0x41b3a0
-// vtable: ILTLoginMediator.Default slot +0x108
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x108
 uint8_t CLTLoginMediator::GetWorldPopulationNibbleByIndex(uint32_t index) const {
     const bool useRecoveredDescriptorTable = lastAuthReply_.valid && !lastAuthReply_.isErrorReply;
     const uint8_t populationNibble = useRecoveredDescriptorTable
@@ -1961,7 +1961,7 @@ bool CLTLoginMediator::RequestMarginConnectionCloseWaitEvent0f() {
 
 // anchor: launcher.exe:0x41ddb0 slot +0x170
 bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
-    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
+    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator_0x4af2b8.Default` object now
     // identifies `+0x170` as insertion into the owner `+0x674` listener tree, not as a startup
     // context handoff.
     if (!observer) {
@@ -2000,7 +2000,7 @@ bool CLTLoginMediator::RegisterLoginObserver(void* observer) {
 
 // anchor: launcher.exe:0x41dde0 slot +0x174
 bool CLTLoginMediator::UnregisterLoginObserver(void* observer) {
-    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator.Default` object now
+    // Direct runtime/vtable proof on the client-resolved `ILTLoginMediator_0x4af2b8.Default` object now
     // identifies `+0x174` as removal from the owner `+0x674` listener tree.
     if (!observer) {
         return false;
@@ -2627,17 +2627,17 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 }
 
 // =============================================================================
-// ARG7 SELECTION RESOLUTION (ILTLoginMediator sibling object at 0x4d3584)
+// ARG7 SELECTION RESOLUTION (ILTLoginMediator_0x4af2b8 sibling object at 0x4d3584)
 // =============================================================================
 // Address anchors from Ghidra analysis:
-// - launcher.exe:0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl (vtable access)
-// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList (world list construction)
-// - launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex (fallback path)
-// - launcher.exe:0x40cd60 = ILTLoginMediator_GetWorldNameByIndex_Fallback
-// - launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
-// - launcher.exe:0x40e560 = ILTLoginMediator_GetWorldListCount_Active
-// - launcher.exe:0x40e670 = ILTLoginMediator_GetAvailableWorlds
-// - launcher.exe:0x40e480 = ILTLoginMediator_BuildWorldList / available-world list population
+// - launcher.exe:0x40d6f0 = ILTLoginMediator_0x4af2b8_ResolveSelectionFromListCtrl (vtable access)
+// - launcher.exe:0x40e480 = ILTLoginMediator_0x4af2b8_BuildWorldList (world list construction)
+// - launcher.exe:0x40cd10 = ILTLoginMediator_0x4af2b8_GetWorldNameByIndex (fallback path)
+// - launcher.exe:0x40cd60 = ILTLoginMediator_0x4af2b8_GetWorldNameByIndex_Fallback
+// - launcher.exe:0x40e5b0 = ILTLoginMediator_0x4af2b8_GetWorldListCount
+// - launcher.exe:0x40e560 = ILTLoginMediator_0x4af2b8_GetWorldListCount_Active
+// - launcher.exe:0x40e670 = ILTLoginMediator_0x4af2b8_GetAvailableWorlds
+// - launcher.exe:0x40e480 = ILTLoginMediator_0x4af2b8_BuildWorldList / available-world list population
 //
 // VTABLE METHODS (at offset +0xc from object pointer):
 // +0xfc = GetWorldNameByIndex(index) -> char* world name string
@@ -2657,10 +2657,10 @@ void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
 // =============================================================================
 
 // Focused arg6/selection split:
-// - keep `ILTLoginMediator.Default` world-list/selection scaffolding out of the main mediator TU
+// - keep `ILTLoginMediator_0x4af2b8.Default` world-list/selection scaffolding out of the main mediator TU
 // - this lets active auth/state8/state9 work avoid rereading arg6 startup-selection code
 // - canonical RE references:
-//   - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md`
+//   - `../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md`
 //   - late-login arg6 slots `+0xd4/+0x124/+0x18c` live separately under:
 //     `../../../../docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md`
 
@@ -3477,7 +3477,7 @@ mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::EnsureMarginConnec
 }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
-// ILTLoginMediator::Default - static member initialization (original: launcher.exe:0x4d2c58)
-ILTLoginMediator* ILTLoginMediator::Default = new mxo::ltlogin::CLTLoginMediator();
+// ILTLoginMediator_0x4af2b8::Default - static member initialization (original: launcher.exe:0x4d2c58)
+ILTLoginMediator_0x4af2b8* ILTLoginMediator_0x4af2b8::Default = new mxo::ltlogin::CLTLoginMediator();
 
 }  // namespace mxo::ltlogin

@@ -24,5 +24,5 @@ mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel();
 bool IsProfilePathBuilderCaller(void* returnAddress);
 const char* DescribeMediatorCaller(void* returnAddress);
 
-const char g_MediatorName[] = "ILTLoginMediator.Default";
+const char g_MediatorName[] = "ILTLoginMediator_0x4af2b8.Default";
 const char* MaskedSensitiveValue(const char* value);

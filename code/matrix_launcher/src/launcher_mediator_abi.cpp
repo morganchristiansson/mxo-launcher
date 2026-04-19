@@ -13,7 +13,7 @@
 
 extern void* g_pLauncherObject6304;
 
-// Broad ILTLoginMediator.Default ABI shell:
+// Broad ILTLoginMediator_0x4af2b8.Default ABI shell:
 // - keep startup-selection and general arg6 surface here
 
 struct DiagnosticMediatorResolverNode {
@@ -59,7 +59,7 @@ const char* MaskedSensitiveValue(const char* value) {
 
 // UNANCHORED: sidecar-model accessor for the replacement arg6 ABI shell.
 mxo::ltlogin::CLTLoginMediator* DiagnosticEnsureMediatorModel() {
-    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator::Default);
+    return dynamic_cast<mxo::ltlogin::CLTLoginMediator*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default);
 }
 
 bool IsProfilePathBuilderCaller(void* returnAddress) {
@@ -164,15 +164,15 @@ static void ResetMediatorObjectState() {
     g_LoginMediatorStub.vtable = g_LoginMediatorVtable;
 }
 
-// anchor: launcher.exe dynamic initializer uses the registration string at 0x4ab34c for ILTLoginMediator.Default
-// vtable: ILTLoginMediator.Default slot +0x00
+// anchor: launcher.exe dynamic initializer uses the registration string at 0x4ab34c for ILTLoginMediator_0x4af2b8.Default
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x00
 static const char* __thiscall Mediator_GetName(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetName();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetName();
 }
 
 // anchor: launcher.exe:0x40a3e9..0x40a3fe hands the freshly built 0x4d6304 object into arg6 before InitClientDLL
-// vtable: ILTLoginMediator.Default slot +0x08
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x08
 // Fidelity note:
 // - this resolved arg6 wrapper slot is the launcher-owned startup handoff used from `0x40a380`
 // - do not conflate it with owner vtable `0x004b01c8 +0x0c`; current Ghidra now assigns that owner
@@ -191,36 +191,36 @@ static int __thiscall Mediator_RegisterLauncherNetworkEngineObject08(
 
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* const engine =
         LauncherNetworkEngineFromAbiShell(object);
-    mxo::ltlogin::ILTLoginMediator::Default->Initialize(engine);
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->Initialize(engine);
     return object ? 0 : 1;
 }
 
 // anchor: client.dll early InitClientDLL readiness gate on arg6 +0x10
-// vtable: ILTLoginMediator.Default slot +0x10
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x10
 static uint32_t __thiscall Mediator_IsReady(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->IsReady();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->IsReady();
 }
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 clears the registered launcher object through arg6
-// vtable: ILTLoginMediator.Default slot +0x0c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x0c
 static void __thiscall Mediator_ClearEngine(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->ClearEngine();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->ClearEngine();
 }
 
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
-// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+// vtable: ILTLoginMediator_0x4af2b8.Default slots +0x1c and +0x24
 static void __thiscall Mediator_SetValue1(MinimalLoginMediatorStub* self, void* value) {
     (void)self;
-    mxo::ltlogin::ILTLoginMediator::Default->SetValue1(value);
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetValue1(value);
 }
 
 // anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures arg6 through +0x1c and +0x24
-// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+// vtable: ILTLoginMediator_0x4af2b8.Default slots +0x1c and +0x24
 static void __thiscall Mediator_SetValue2(MinimalLoginMediatorStub* self, void* value) {
     (void)self;
-    mxo::ltlogin::ILTLoginMediator::Default->SetValue2(value);
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->SetValue2(value);
 }
 
 // anchor: launcher.exe:0x408400 / sibling resolved slot 0x4d2734 vtable +0x30
@@ -229,36 +229,36 @@ static void __thiscall Mediator_SetValue2(MinimalLoginMediatorStub* self, void* 
 // - raw memory read of launcher mediator vtable family `0x004b01c8` shows `0x41ecd0` stored at
 //   `0x004b01f8`, i.e. the same raw virtual displacement
 // - practical consequence: the launcher dialog submit helper reaches
-//   `CLTLoginMediator::ProcessLoginRequest` through the resolved `ILTLoginMediator.Default`-style
+//   `CLTLoginMediator::ProcessLoginRequest` through the resolved `ILTLoginMediator_0x4af2b8.Default`-style
 //   surface rather than through a separate launcher-only credential API
 static uint32_t __thiscall Mediator_ProcessLoginRequest30(
     MinimalLoginMediatorStub* self,
     const mxo::ltlogin::ProcessLoginRequestInputSketch* input) {
     (void)self;
     return input
-        ? mxo::ltlogin::ILTLoginMediator::Default->ProcessLoginRequest(*input)
+        ? mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->ProcessLoginRequest(*input)
         : 0u;
 }
 
 // anchor: client.dll:0x62006cb1..0x62006cca polls arg6 before feeding arg5 into the runtime loop
-// vtable: ILTLoginMediator.Default slot +0x2c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x2c
 static uint32_t __thiscall Mediator_IsConnected(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->IsConnected();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->IsConnected();
 }
 
 // anchor: client.dll profile-root formatting path uses arg6 +0x38 for Profiles\%s\... construction
-// vtable: ILTLoginMediator.Default slot +0x38
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x38
 static const char* __thiscall Mediator_GetUsername38(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetUsername();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetUsername();
 }
 
 // anchor: client.dll fallback-selection path asks arg6 +0x3c for the default selection index when given 0xff
-// vtable: ILTLoginMediator.Default slot +0x3c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x3c
 static uint32_t __thiscall Mediator_GetDefaultSelectionIndex(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetDefaultSelectionIndex();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetDefaultSelectionIndex();
 }
 
 // UNANCHORED: C helper behind the recovered +0x40 ABI wrapper.
@@ -268,12 +268,12 @@ extern "C" void* Mediator_GetSelectionDescriptor40_Impl(
     void* returnAddress) {
     (void)self;
     (void)returnAddress;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetArg6SelectionDescriptorObject40(
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetArg6SelectionDescriptorObject40(
         selectionIndex);
 }
 
 // anchor: client.dll:0x62170dc1..0x62170e59 later asks arg6 +0x40 with the scratch-shaped arg7 request
-// vtable: ILTLoginMediator.Default slot +0x40
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x40
 // Keep this wrapper-facing selection-descriptor family explicit instead of forcing the owner-side
 // `0x004b01c8 +0x40/+0x44` slot-record accessor names onto it.
 __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
@@ -295,11 +295,11 @@ __attribute__((naked)) static void Mediator_GetSelectionDescriptor40() {
 // UNANCHORED: C helper behind the recovered +0x44 ABI wrapper.
 extern "C" void* Mediator_GetCurrentSlotRecordObject44_Impl(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetArg6CurrentSlotRecordObject44();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetArg6CurrentSlotRecordObject44();
 }
 
-// vtable: ILTLoginMediator.Default slot +0x44
-// Current wrapper-facing read from `0x4d2c58_ILTLoginMediator_Default.md`:
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x44
+// Current wrapper-facing read from `0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md`:
 // - returns a current-slot record object on the later profile/save path
 // - that wrapper-facing object shape now best matches the concrete `0x004b5328` slot-record outer
 //   layout
@@ -324,40 +324,40 @@ __attribute__((naked)) static void Mediator_GetCurrentSlotRecordObject44() {
 // - and the middle `%s` is sourced from client-global `DAT_629de48c`
 // - current replacement evidence points to the earlier +0x48-fed name path as the highest-value
 //   narrow source to keep character-shaped instead of world-shaped on the active route
-// vtable: ILTLoginMediator.Default slot +0x48
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x48
 static const char* __thiscall Mediator_GetWorldOrSelectionName(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldOrSelectionName();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldOrSelectionName();
 }
 
 // anchor: later client startup path calls arg6 +0x4c immediately after +0x48
-// vtable: ILTLoginMediator.Default slot +0x4c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x4c
 static const char* __thiscall Mediator_GetProfileOrSessionName(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetProfileOrSessionName();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetProfileOrSessionName();
 }
 
 // anchor: client.dll:0x625c86d0 later calls arg6 +0x50 and converts null/non-null into flag 0x30
-// vtable: ILTLoginMediator.Default slot +0x50
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x50
 static void* __thiscall Mediator_GetBootstrapRaw08AuxHandle50(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->BootstrapRaw08AuxHandle50();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->BootstrapRaw08AuxHandle50();
 }
 
 // anchor: launcher.exe:0x41f0b0 / owner vtable +0x54
-// vtable: ILTLoginMediator.Default slot +0x54
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x54
 static uint32_t __thiscall Mediator_HasBootstrapRaw08AuxHandle54(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasBootstrapRaw08AuxHandle54() ? 1u : 0u;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasBootstrapRaw08AuxHandle54() ? 1u : 0u;
 }
 
 // anchor: client.dll:0x62001325..0x62001362 passes the low byte from arg6 +0x58 into
 // `FUN_6236fa40(..., flag)`; launcher.exe:0x409250..0x409254 also stores that low byte into the
 // crashreporter `PromptForSecurId` global.
-// vtable: ILTLoginMediator.Default slot +0x58
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x58
 static uint32_t __thiscall Mediator_GetCrashReporterPromptForSecurId58(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetCrashReporterPromptForSecurId58();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterPromptForSecurId58();
 }
 
 // UNANCHORED: C helper behind the caller-clean +0x60 ABI wrapper.
@@ -368,11 +368,11 @@ extern "C" const char* Mediator_GetCrashReporterPassword60_Impl(
     MinimalLoginMediatorStub* self,
     const void* chainedValueToken) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetCrashReporterPassword60(chainedValueToken);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterPassword60(chainedValueToken);
 }
 
 // anchor: client.dll early auth-name chain proves arg6 +0x60 is caller-clean on this path
-// vtable: ILTLoginMediator.Default slot +0x60
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x60
 __attribute__((naked)) static void Mediator_GetCrashReporterPassword60() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
@@ -393,11 +393,11 @@ extern "C" const char* Mediator_GetCrashReporterUsername5c_Impl(
     MinimalLoginMediatorStub* self,
     const void* chainedValueToken) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetCrashReporterUsername5c(chainedValueToken);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetCrashReporterUsername5c(chainedValueToken);
 }
 
 // anchor: client.dll early auth-name chain proves arg6 +0x5c is caller-clean on this path
-// vtable: ILTLoginMediator.Default slot +0x5c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x5c
 __attribute__((naked)) static void Mediator_GetCrashReporterUsername5c() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
@@ -424,7 +424,7 @@ __attribute__((naked)) static void Mediator_GetCrashReporterUsername5c() {
 // - recovered state8 slot-6 producer writes that same owner family from section selector `6`
 static uint32_t __thiscall Mediator_HasLiveCorpus68(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveHlCfg68();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveHlCfg68();
 }
 
 // anchor: client.dll:0x62198770 / launcher.exe vtable +0x6c -> 0x41f0d0
@@ -435,7 +435,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus68(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `7`
 static uint32_t __thiscall Mediator_HasLiveCorpus6c(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveAnCfg6c();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveAnCfg6c();
 }
 
 // anchor: client.dll:0x62198870 / launcher.exe vtable +0x70
@@ -446,7 +446,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus6c(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `3`
 static uint32_t __thiscall Mediator_HasLiveCorpus70(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLivePiCfg70();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLivePiCfg70();
 }
 
 // anchor: client.dll:0x62198970 / launcher.exe vtable +0x74 -> raw bytes 0x41f0f0 = owner byte +0x1426
@@ -459,7 +459,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus70(MinimalLoginMediatorStub* se
 //   `param_1 + 0x6e0 + actionId*8`, making this pair materially closer to the missing Actions-window symptom
 static uint32_t __thiscall Mediator_HasLiveCorpus74(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveAiCfg74();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveAiCfg74();
 }
 
 // anchor: client.dll:0x62198a70 / launcher.exe vtable +0x78 -> raw bytes 0x41f100 = owner byte +0x142e
@@ -478,7 +478,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus74(MinimalLoginMediatorStub* se
 //   `+0x6e0 + actionId*8`
 static uint32_t __thiscall Mediator_HasLiveCorpus78(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveCsCfg78();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveCsCfg78();
 }
 
 // anchor: client.dll:0x62198b70 / launcher.exe vtable +0x7c -> raw bytes 0x41f110 = owner byte +0x13fe
@@ -489,7 +489,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus78(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `1`
 static uint32_t __thiscall Mediator_HasLiveCorpus7c(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveBlCfg7c();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveBlCfg7c();
 }
 
 // anchor: client.dll:0x62198c60 / launcher.exe vtable +0x80 -> raw bytes 0x41f120 = owner byte +0x1406
@@ -500,7 +500,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus7c(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `2`
 static uint32_t __thiscall Mediator_HasLiveCorpus80(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveIlCfg80();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveIlCfg80();
 }
 
 // anchor: client.dll:0x62198d50 / launcher.exe vtable +0x84 -> raw bytes 0x41f130 = owner byte +0x1448
@@ -511,7 +511,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus80(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `8`
 static uint32_t __thiscall Mediator_HasLiveCorpus84(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveRlCfg84();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveRlCfg84();
 }
 
 // anchor: client.dll:0x62198e50 / launcher.exe vtable +0x88 -> raw bytes 0x41f140 = owner byte +0x1452
@@ -522,7 +522,7 @@ static uint32_t __thiscall Mediator_HasLiveCorpus84(MinimalLoginMediatorStub* se
 // - recovered state8 slot-6 producer writes that same owner family from section selector `9`
 static uint32_t __thiscall Mediator_HasLiveCorpus88(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveClCfg88();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveClCfg88();
 }
 
 static_assert(
@@ -530,14 +530,14 @@ static_assert(
     "State3SelectionContextInputSketch must stay layout-compatible with the recovered arg6 +0xec 0xb4 snapshot");
 
 // anchor: launcher.exe:0x41f150
-// vtable: ILTLoginMediator.Default slot +0x8c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x8c
 // Live original `client.dll:0x62198fa0` mcd.cfg family uses this as the mediator-backed/live-data gate.
 // Exact corrected original getter proof from launcher disassembly:
 // - `0x41f150` returns owner byte `+0x13f6`
 // - `+0x1452` is instead the neighboring `cl.cfg` gate used by arg6 `+0x88`
 static uint32_t __thiscall Mediator_HasState8PersistenceData8c(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasState8PersistenceData8c();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasState8PersistenceData8c();
 }
 
 // anchor: client.dll:0x621993d0 / launcher.exe vtable +0x90 -> raw bytes 0x41f160 = owner byte +0x145a
@@ -554,69 +554,69 @@ static uint32_t __thiscall Mediator_HasState8PersistenceData8c(MinimalLoginMedia
 //     live mediator pair stays absent, while the bounded original route still omits the file
 static uint32_t __thiscall Mediator_HasLiveCorpus90(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasLiveCuiCfg90();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasLiveCuiCfg90();
 }
 
 static void* __thiscall Mediator_GetLiveCorpus94(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveHlCfg94(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveHlCfg94(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpus98(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveAnCfg98(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveAnCfg98(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpus9c(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLivePiCfg9c(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLivePiCfg9c(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusA0(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveAiCfgA0(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveAiCfgA0(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusA4(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveCsCfgA4(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveCsCfgA4(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusA8(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveBlCfgA8(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveBlCfgA8(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusAc(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveIlCfgAc(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveIlCfgAc(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusB0(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveRlCfgB0(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveRlCfgB0(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusB4(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveClCfgB4(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveClCfgB4(outLength);
 }
 
 static void* __thiscall Mediator_GetLiveCorpusB8(MinimalLoginMediatorStub* self, uint32_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLiveCuiCfgB8(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLiveCuiCfgB8(outLength);
 }
 
 // anchor: launcher.exe:0x41f170
-// vtable: ILTLoginMediator.Default slot +0xbc
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xbc
 // Live original `client.dll:0x62198fa0` copies 0x20 bytes from this pointer into DAT_629ea67c.
 static void* __thiscall Mediator_GetState8PersistenceHeaderBc(MinimalLoginMediatorStub* self) {
     (void)self;
-    return const_cast<void*>(mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceHeaderBc());
+    return const_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8PersistenceHeaderBc());
 }
 
 // anchor: launcher.exe:0x41f180
-// vtable: ILTLoginMediator.Default slot +0xc0
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xc0
 // Live original `client.dll:0x62198fa0` copies 0x465 bytes from this pointer into DAT_629ea648-backed state.
 // Post-event-0x18 continuation note:
 // - event `0x0b` later reads byte `+0x464` from this returned block into client global
@@ -626,7 +626,7 @@ static void* __thiscall Mediator_GetState8PersistenceHeaderBc(MinimalLoginMediat
 static void* __thiscall Mediator_GetState8PersistenceBodyC0(MinimalLoginMediatorStub* self) {
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
-    void* const body = const_cast<void*>(mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceBodyC0());
+    void* const body = const_cast<void*>(mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8PersistenceBodyC0());
     const uint8_t byte464 = body ? *(reinterpret_cast<const uint8_t*>(body) + 0x464u) : 0u;
     spdlog::info(
         "MediatorStub::GetState8PersistenceBodyC0 caller={} [{}] result={} byte464=0x{:02x}",
@@ -638,32 +638,32 @@ static void* __thiscall Mediator_GetState8PersistenceBodyC0(MinimalLoginMediator
 }
 
 // anchor: launcher.exe:0x41aec0
-// vtable: ILTLoginMediator.Default slot +0xc4
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xc4
 // Live original `client.dll:0x62198fa0` asks for the optional overflow tail pointer plus out-length.
 static void* __thiscall Mediator_GetState8PersistenceOverflowC4(MinimalLoginMediatorStub* self, uint16_t* outLength) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetState8PersistenceOverflowC4(outLength);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8PersistenceOverflowC4(outLength);
 }
 
 // anchor: launcher.exe:0x41f190
-// vtable: ILTLoginMediator.Default slot +0xc8
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xc8
 static uint32_t __thiscall Mediator_HasState8Section11DataC8(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->HasState8Section11Dword145c();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HasState8Section11Dword145c();
 }
 
 // anchor: launcher.exe:0x41f1a0
-// vtable: ILTLoginMediator.Default slot +0xcc
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xcc
 static uint32_t __thiscall Mediator_GetState8Section11DwordCc(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetState8Section11Dword145c();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11Dword145c();
 }
 
 // anchor: launcher.exe:0x41f1b0
-// vtable: ILTLoginMediator.Default slot +0xd0
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xd0
 static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator_GetState8Section11StringD0(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetState8Section11String1460();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState8Section11String1460();
 }
 
 // anchor: launcher.exe:0x41b4f0 / arg6 vtable +0xd4
@@ -672,86 +672,86 @@ static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator
 // - practical current read is the same launcher-owned Twofish key/seed family reused by `+0x18c`
 static const void* __thiscall Mediator_GetState9CallbackSeedPointer85D4(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetState9CallbackSeedPointer85D4();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetState9CallbackSeedPointer85D4();
 }
 
 // anchor: client.dll:0x62170b00 gates arg7 high-byte selection flow through arg6 +0xd8
-// vtable: ILTLoginMediator.Default slot +0xd8
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xd8
 // Tighter launcher page-`7` read now keeps this high byte aligned with the active selection-entry
 // count, and on the auth-valid path that is currently better modeled through owner slot records.
 static uint32_t __thiscall Mediator_GetArg7SelectionUpperBoundExclusive(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetArg7SelectionUpperBoundExclusive();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetArg7SelectionUpperBoundExclusive();
 }
 
 // anchor: deeper client init maps arg7-derived selection names through arg6 +0xdc
-// vtable: ILTLoginMediator.Default slot +0xdc
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xdc
 // Tighter launcher page-`7` read now keeps this closer to the active selection-entry display text
 // (auth-valid path: slot-record / character-entry name by selected-row high word).
 static const char* __thiscall Mediator_MapSelectionName(MinimalLoginMediatorStub* self, uint32_t selectionHighByte) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->MapSelectionName(selectionHighByte);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->MapSelectionName(selectionHighByte);
 }
 
 // launcher.exe arg7-selection resolution still reuses arg6 `+0x54` as a generic bool gate when
 // deciding whether to accept world-type values `2/5`, but the slot body itself is now anchored as
 // the tiny `+0x50` truthiness wrapper at launcher.exe:0x41f0b0.
 
-// anchor: arg7-selection resolution consults the sibling ILTLoginMediator surface through +0xe0
-// vtable: ILTLoginMediator.Default slot +0xe0
+// anchor: arg7-selection resolution consults the sibling ILTLoginMediator_0x4af2b8 surface through +0xe0
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xe0
 // Tighter launcher page-`7` read now keeps this closer to the active selection-entry world-match
 // string (auth-valid path: slot-record worldId -> world-descriptor inline name).
 static const char* __thiscall Mediator_GetVariantWorldName(MinimalLoginMediatorStub* self, uint32_t variantIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetVariantWorldName(variantIndex);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetVariantWorldName(variantIndex);
 }
 
-// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator sibling slot +0xe4
-// vtable: ILTLoginMediator.Default slot +0xe4
+// anchor: launcher.exe arg7-selection writer at 0x40d763..0x40d810 consults ILTLoginMediator_0x4af2b8 sibling slot +0xe4
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xe4
 // Tighter launcher page-`7` read now keeps this high-word consumer aligned with active
 // selection-entry status, i.e. slot-record status on the auth-valid path.
 static uint32_t __thiscall Mediator_GetVariantState(MinimalLoginMediatorStub* self, int32_t variantIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetVariantState(variantIndex);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetVariantState(variantIndex);
 }
 
 
-// anchor: launcher.exe:0x40e5b0 = ILTLoginMediator_GetWorldListCount
+// anchor: launcher.exe:0x40e5b0 = ILTLoginMediator_0x4af2b8_GetWorldListCount
 // vtable: launcher.exe:0x4d3584 slot +0xf8
 static uint32_t __thiscall Mediator_GetWorldCount(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldCount();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldCount();
 }
 
-// anchor: launcher.exe:0x40cd10 = ILTLoginMediator_GetWorldNameByIndex
+// anchor: launcher.exe:0x40cd10 = ILTLoginMediator_0x4af2b8_GetWorldNameByIndex
 // vtable: launcher.exe:0x4d3584 slot +0xfc
 static const char* __thiscall Mediator_GetWorldNameByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldNameByIndex(worldIndex);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldNameByIndex(worldIndex);
 }
 
 // anchor: launcher.exe:0x41b320 / launcher.exe arg7-selection writer at 0x40d763..0x40d810
 // vtable: launcher.exe:0x4d3584 slot +0x100
 static uint32_t __thiscall Mediator_GetWorldSelectionGateByteByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldSelectionGateByteByIndex(worldIndex);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldSelectionGateByteByIndex(worldIndex);
 }
 
 // anchor: launcher.exe:0x41b360
 // vtable: launcher.exe:0x4d3584 slot +0x104
 static uint32_t __thiscall Mediator_GetWorldTypeByteByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldTypeByteByIndex(worldIndex);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldTypeByteByIndex(worldIndex);
 }
 
 // anchor: launcher.exe:0x41b3a0
 // vtable: launcher.exe:0x4d3584 slot +0x108
 static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLoginMediatorStub* self, uint32_t worldIndex) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetWorldPopulationNibbleByIndex(worldIndex);
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetWorldPopulationNibbleByIndex(worldIndex);
 }
 
-// ILTLoginMediator.Default wrapper minimization:
+// ILTLoginMediator_0x4af2b8.Default wrapper minimization:
 // - keep `g_LoginMediatorVtable` in the ABI shell
 // - move wrapper-owned late-runtime state/scratch/logging into `CLTLoginMediator` when the owner
 //   can keep it
@@ -759,7 +759,7 @@ static uint32_t __thiscall Mediator_GetWorldPopulationNibbleByIndex(MinimalLogin
 //   higher-level owner-side helper semantics
 
 // anchor: launcher.exe:0x41f2c0
-// vtable: ILTLoginMediator.Default slot +0x10c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x10c
 // Current best late-runtime read from the event-0x18 observer callback:
 // - returns owner `+0x30`
 // - client immediately consumes the first two dwords there as a small-string begin/current pair
@@ -770,7 +770,7 @@ static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
     mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* const descriptor =
-        mxo::ltlogin::ILTLoginMediator::Default->GetRouteDescriptor30();
+        mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetRouteDescriptor30();
     const std::string descriptorText = DescribeRouteDescriptorText(descriptor);
     spdlog::info(
         "MediatorStub::GetRouteDescriptor10c caller={} [{}] result={} begin={} current={} text='{}'",
@@ -784,7 +784,7 @@ static mxo::ltlogin::RouteDescriptor30SmallStringLikeSketch* __thiscall Mediator
 }
 
 // anchor: launcher.exe:0x41af50
-// vtable: ILTLoginMediator.Default slot +0x118
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x118
 // Current best late-runtime read:
 // - returns owner `+0x1470`
 // - client reads it as a vector-like begin/current/capacity triple of 12-byte string-triple entries
@@ -795,7 +795,7 @@ static mxo::ltlogin::LateEntryList1470VectorLikeSketch* __thiscall Mediator_GetL
     (void)self;
     void* const returnAddress = __builtin_extract_return_addr(__builtin_return_address(0));
     mxo::ltlogin::LateEntryList1470VectorLikeSketch* const list =
-        mxo::ltlogin::ILTLoginMediator::Default->GetLateEntryList1470();
+        mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLateEntryList1470();
     size_t entryCount = 0u;
     const char* firstEntry = "<empty>";
     if (list && list->begin && list->current && list->current >= list->begin) {
@@ -859,7 +859,7 @@ extern "C" void Mediator_ConsumeSelectionContext_Impl(
 }
 
 // anchor: client.dll:0x62170f48 consumes the assembled 0xb4 selection/config handoff through arg6 +0xec
-// vtable: ILTLoginMediator.Default slot +0xec
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xec
 __attribute__((naked)) static void Mediator_ConsumeSelectionContext() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
@@ -914,7 +914,7 @@ extern "C" uint32_t Mediator_ProcessCreateCharacterInput120_Impl(
 
 // anchor: later loading-character path around client.dll:0x620547c0..0x62054eac passes the
 // post-auth create-character source block to arg6 +0x120
-// vtable: ILTLoginMediator.Default slot +0x120
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x120
 __attribute__((naked)) static void Mediator_ProcessCreateCharacterInput120() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
@@ -946,11 +946,11 @@ extern "C" void Mediator_ProvideStartupTriple_Impl(
 }
 
 // anchor: deeper client init hands netShell/netMgr/distrObjExecutive to arg6 +0x124
-// vtable: ILTLoginMediator.Default slot +0x124
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x124
 // Important later state9-submit tightening from newer client.dll + launcher evidence:
 // - the captured `netShell` object is not a self-contained callback84-side answer source
 // - `ClientNetShell` vtable `+0x38` / `0x62006580` later re-enters the client-side resolved
-//   `ILTLoginMediator.Default` global at `0x629df7f0`, calls its `+0x18c` writer, and only then
+//   `ILTLoginMediator_0x4af2b8.Default` global at `0x629df7f0`, calls its `+0x18c` writer, and only then
 //   returns pair `(&DAT_629e0284, 0x20)`
 // - but newer bounded original-launcher lifecycle proof now also shows owner `+0x84/+0x88/+0x8c`
 //   are really zero-init -> `0x41f1d0` startup store -> later submit-side reads, with owner
@@ -979,11 +979,11 @@ __attribute__((naked)) static void Mediator_ProvideStartupTriple() {
 }
 
 // anchor: launcher.exe:0x4202c0
-// vtable: ILTLoginMediator.Default slot +0x13c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x13c
 // WaitForEvent uses this repeatedly while blocked on registered observer notifications.
 static void __thiscall Mediator_InvokeSessionCallbackHelper13c(MinimalLoginMediatorStub* self) {
     (void)self;
-    mxo::ltlogin::ILTLoginMediator::Default->HelperSlot13c_InvokeSessionHelperVtable4();
+    mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->HelperSlot13c_InvokeSessionHelperVtable4();
 }
 
 // UNANCHORED: C helper behind the recovered +0x170 observer-registration ABI wrapper.
@@ -997,7 +997,7 @@ extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
     void* returnAddress) {
     (void)self;
 
-    const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->RegisterLoginObserver(observer);
+    const uint32_t result = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->RegisterLoginObserver(observer);
     spdlog::info(
         "MediatorStub::RegisterLoginObserver170 caller={} [{}] observer={} ({}) -> returnValue={}",
         fmt::ptr(returnAddress),
@@ -1009,7 +1009,7 @@ extern "C" uint32_t Mediator_RegisterLoginObserver170_Impl(
 }
 
 // anchor: launcher.exe:0x41ddb0
-// vtable: ILTLoginMediator.Default slot +0x170
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x170
 __attribute__((naked)) static void Mediator_RegisterLoginObserver170() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
@@ -1027,7 +1027,7 @@ __attribute__((naked)) static void Mediator_RegisterLoginObserver170() {
 }
 
 // anchor: launcher.exe:0x41f1c0
-// vtable: ILTLoginMediator.Default slot +0xf4
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0xf4
 static void* __thiscall Mediator_GetState8PersistenceF1c(MinimalLoginMediatorStub* self) {
     (void)self;
     mxo::ltlogin::CLTLoginMediator* mediator = DiagnosticEnsureMediatorModel();
@@ -1035,13 +1035,13 @@ static void* __thiscall Mediator_GetState8PersistenceF1c(MinimalLoginMediatorStu
 }
 
 // anchor: launcher.exe:0x41f320 / owner vtable +0x148
-// vtable: ILTLoginMediator.Default slot +0x148
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x148
 // Historical wrapper note:
 // - this wrapper slot used to carry the stale local name `Mediator_AttachRuntimeObject148`
 // - current source now aligns it with the concrete launcher-owned `GameSessionID` getter
 static const char* __thiscall Mediator_GetGameSessionId(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetGameSessionId();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetGameSessionId();
 }
 
 // UNANCHORED: C helper behind the recovered +0x174 observer-unregistration ABI wrapper.
@@ -1054,7 +1054,7 @@ extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
     void* returnAddress) {
     (void)self;
 
-    const uint32_t result = mxo::ltlogin::ILTLoginMediator::Default->UnregisterLoginObserver(observer);
+    const uint32_t result = mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->UnregisterLoginObserver(observer);
     spdlog::info(
         "MediatorStub::UnregisterLoginObserver174 caller={} [{}] observer={} ({}) -> returnValue={}",
         fmt::ptr(returnAddress),
@@ -1066,7 +1066,7 @@ extern "C" uint32_t Mediator_UnregisterLoginObserver174_Impl(
 }
 
 // anchor: launcher.exe:0x41dde0
-// vtable: ILTLoginMediator.Default slot +0x174
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x174
 __attribute__((naked)) static void Mediator_UnregisterLoginObserver174() {
     __asm__ volatile(
         "mov 4(%%esp), %%eax\n\t"
@@ -1084,10 +1084,10 @@ __attribute__((naked)) static void Mediator_UnregisterLoginObserver174() {
 }
 
 // anchor: launcher.exe:0x41f240
-// vtable: ILTLoginMediator.Default slot +0x178
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x178
 static uint32_t __thiscall Mediator_GetLastLoginStatus(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->GetLastLoginStatus();
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->GetLastLoginStatus();
 }
 
 // UNANCHORED: C helper behind the recovered +0x18c ABI wrapper.
@@ -1133,33 +1133,33 @@ __attribute__((naked)) static void Mediator_FillState9CallbackBlob18c() {
 }
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 conditionally checks arg6 +0x164
-// vtable: ILTLoginMediator.Default slot +0x164
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x164
 // Wrapper-minimization note:
 // - keep the wrapper-facing teardown meaning explicit here (`WaitForEvent(1)` predicate)
 // - owner-side state/logging lives on `CLTLoginMediator`
 static uint32_t __thiscall Mediator_RequestAuthConnectionCloseWaitEvent1(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->RequestAuthConnectionCloseWaitEvent1() ? 1u : 0u;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->RequestAuthConnectionCloseWaitEvent1() ? 1u : 0u;
 }
 
 // anchor: launcher.exe teardown path 0x40b360..0x40b409 conditionally checks arg6 +0x16c
-// vtable: ILTLoginMediator.Default slot +0x16c
+// vtable: ILTLoginMediator_0x4af2b8.Default slot +0x16c
 // Keep the wrapper-facing split explicit:
 // - teardown uses this as the `WaitForEvent(0x0f)` predicate
 // - owner-side state9 success still has its own method name on `CLTLoginMediator`
 static uint32_t __thiscall Mediator_RequestMarginConnectionCloseWaitEvent0f(MinimalLoginMediatorStub* self) {
     (void)self;
-    return mxo::ltlogin::ILTLoginMediator::Default->RequestMarginConnectionCloseWaitEvent0f() ? 1u : 0u;
+    return mxo::ltlogin::ILTLoginMediator_0x4af2b8::Default->RequestMarginConnectionCloseWaitEvent0f() ? 1u : 0u;
 }
 
-// UNANCHORED: seeds the replacement ILTLoginMediator.Default ABI vtable from recovered slot usage.
+// UNANCHORED: seeds the replacement ILTLoginMediator_0x4af2b8.Default ABI vtable from recovered slot usage.
 static void InitializeMediatorStub() {
     static bool initialized = false;
     if (initialized) return;
     initialized = true;
 
     std::memset(g_LoginMediatorVtable, 0, sizeof(g_LoginMediatorVtable));
-    // Forward to ILTLoginMediator::Default vtable slot 0 (original Mediator_GetName)
+    // Forward to ILTLoginMediator_0x4af2b8::Default vtable slot 0 (original Mediator_GetName)
     g_LoginMediatorVtable[0] = (void*)Mediator_GetName;          // +0x00
     // +0x04
     g_LoginMediatorVtable[2] = (void*)Mediator_RegisterLauncherNetworkEngineObject08; // +0x08
@@ -1506,8 +1506,8 @@ void DiagnosticConfigureLoginControllerNetwork(
         ignoreHostsFileForMargin ? 1u : 0u);
 }
 
-// anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures ILTLoginMediator.Default before InitClientDLL
-// vtable: ILTLoginMediator.Default slots +0x1c and +0x24
+// anchor: launcher.exe:0x409a73..0x409a98 nopatch path configures ILTLoginMediator_0x4af2b8.Default before InitClientDLL
+// vtable: ILTLoginMediator_0x4af2b8.Default slots +0x1c and +0x24
 void DiagnosticApplyDefaultNopatchMediatorConfig(
     void* mediatorPtr,
     uint32_t parsedNoPatchValue,

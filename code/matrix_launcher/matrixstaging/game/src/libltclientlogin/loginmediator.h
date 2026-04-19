@@ -61,7 +61,7 @@ struct LoginObserverTree674 {
 // Keep names stable where they are string-backed or strongly implied by surrounding code,
 // but keep uncertain field meanings clearly labeled in comments.
 // Canonical runtime/cross-component references remain:
-// - docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md
+// - docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md
 // - docs/launcher.exe/startup_objects/0x4d2c58_LATE_LOGIN_ARG6_SURFACE.md
 // - docs/launcher.exe/startup_objects/0x4d6304_network_engine.md
 // - docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md
@@ -76,7 +76,7 @@ struct LoginObserverTree674 {
 //   - `\matrixstaging\game\src\libltclientlogin\loginstate.cpp`
 //   - `\matrixstaging\game\src\libltclientlogin\launchpad.cpp`
 // - current best read: this object owns the launcher-side auth/margin connection flow,
-//   while `ILTLoginMediator.Default` remains the runtime interface slot passed into client.dll
+//   while `ILTLoginMediator_0x4af2b8.Default` remains the runtime interface slot passed into client.dll
 // - discovered helper dispatch structure from Ghidra analysis of 0x43b300:
 //   - `CLTLoginMediator_InitializeHelperDispatchTable` allocates / installs the mediator-owned
 //     `CLTLoginState_*` dispatch objects
@@ -93,7 +93,7 @@ struct LoginObserverTree674 {
 //   - do not collapse `LaunchPadClient`-style pre-game account/subscription handling into the
 //     direct auth TCP packet layer just because both live under `libltclientlogin`
 
-class CLTLoginMediator : public ILTLoginMediator {
+class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     // Source-ownership split note:
     // - the phase-2 auth/bootstrap child rooted at owner `+0x680` now has its own focused source
     //   home in `authbootstrap680.cpp`
@@ -753,7 +753,7 @@ public:
     // Return: 0x12000001 if auth address list is empty, 0 if it has entries
     uint32_t Initialize(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* networkEngineOverride) override;
     // UNANCHORED helper kept explicit from the real wrapper/owner vtable rows:
-    // - wrapper `ILTLoginMediator.Default +0x08` currently forwards into `Initialize(...)`
+    // - wrapper `ILTLoginMediator_0x4af2b8.Default +0x08` currently forwards into `Initialize(...)`
     // - owner `CLTLoginMediator +0x0c` is `0x41f510 = ResetOwnedRuntimeState`, not a direct engine setter
     void SetNetworkEngine(mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine);
     // +0x0c
@@ -948,7 +948,7 @@ public:
 
     // Anchored launcher.exe logging/event side effects at `0x41cfb0` / `0x41d090`.
     // Current implementation keeps lightweight event/error history together with the recovered
-    // observer registration bridge for arg6/`ILTLoginMediator.Default` slots `+0x170/+0x174`.
+    // observer registration bridge for arg6/`ILTLoginMediator_0x4af2b8.Default` slots `+0x170/+0x174`.
     void PostEvent(uint32_t eventId);
     void PostError(uint32_t errorId);
     bool RegisterLoginObserver(void* observer) override;
@@ -1014,7 +1014,7 @@ public:
     //   `0x41f1d0` writes it, and `0x41de40` later reads it
     // Important callback84 correction:
     // - `netShell +0x38` is not a self-contained answer source; it re-enters resolved
-    //   `ILTLoginMediator.Default +0x18c`
+    //   `ILTLoginMediator_0x4af2b8.Default +0x18c`
     // Wrapper-facing `+0x124` capture remains separate from the owner-side triple mirror.
     void ProvideStartupTriple(void* netShell, void* netMgr, void* distrObjExecutive) override;
     void SetState9CallbackObjectTriple84_88_8c(void* callback84, void* object88, void* object8c);
@@ -1071,7 +1071,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // launcher.exe:0x4f78b4 = slot 19 (`CLTLoginState_State19`, vtable `0x4b0c28`)
     // ==============================================================================
 
-    // launcher.exe:0x4d3584 = ILTLoginMediator_SiblingObject (world list data provider)
+    // launcher.exe:0x4d3584 = ILTLoginMediator_0x4af2b8_SiblingObject (world list data provider)
     // Active replacement note:
     // - the current no-GUI launcher path no longer keeps a synthetic pre-auth world-list sidecar
     // - selection now runs after auth success and consumes the recovered owner tables directly
@@ -1207,11 +1207,11 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     const char* ResolveMarginRouteFromDescriptorIndex(uint32_t descriptorIndex) const; // current best anchor: owner vtable +0xfc when fed owner `+0x12c`
     const char* ResolveMarginRouteFromWorldId(uint32_t worldId) const;         // provisional fallback helper for world-id keyed route recovery
     const char* ResolveMarginRouteDescriptor() const;                          // current best owner-side route-text resolver used to back arg6 `+0x10c`
-    // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator.Default slot +0x10c
+    // anchor: launcher.exe:0x41f2c0 / ILTLoginMediator_0x4af2b8.Default slot +0x10c
     // Keep the wrapper-facing small-string object explicit instead of collapsing it into the
     // owner-side route-text helper family.
     RouteDescriptor30SmallStringLikeSketch* GetRouteDescriptor30() override;
-    // anchor: launcher.exe:0x41af50 / ILTLoginMediator.Default slot +0x118
+    // anchor: launcher.exe:0x41af50 / ILTLoginMediator_0x4af2b8.Default slot +0x118
     // Keep the wrapper-facing late-entry vector-like object explicit; the ABI shape lives directly
     // on the owner at `+0x1470/+0x1474/+0x1478`, so this getter can stay close to the original
     // tiny `lea eax,[ecx+0x1470]; ret`.
@@ -1224,7 +1224,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     void AppendLateEntryStringTriple1470Scaffold(const LateEntryList1470EntrySketch* sourceEntry);
     // Wrapper-facing arg6 profile-path/current-slot ABI objects.
     // Keep this split explicit instead of forcing the owner-side `0x004b01c8 +0x40/+0x44`
-    // slot-record helpers onto the wrapper-facing `ILTLoginMediator.Default +0x40/+0x44` object
+    // slot-record helpers onto the wrapper-facing `ILTLoginMediator_0x4af2b8.Default +0x40/+0x44` object
     // shapes.
     // - arg6 `+0x40` = selection-descriptor object family
     // - arg6 `+0x44` = current-slot-record object family
@@ -1243,7 +1243,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     const SlotRecordState_0x4b5328* GetCurrentSlotRecord() const;
     // anchor: launcher.exe:0x41b220
     // Source-owned helper over the recovered slot-record table; do not treat this as the current
-    // `ILTLoginMediator` vtable slot `+0xdc` name.
+    // `ILTLoginMediator_0x4af2b8` vtable slot `+0xdc` name.
     const char* LookupSlotRecordHeapStringByIndex(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41f320 / owner vtable +0x148
     const char* GetGameSessionId() const override;
@@ -1264,7 +1264,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     void HelperSlot13c_InvokeSessionHelperVtable4() override;
     // anchor: launcher.exe:0x41b260
     // Source-owned helper over the recovered route-host string table; do not treat this as the
-    // current `ILTLoginMediator` vtable slot `+0xe0` name.
+    // current `ILTLoginMediator_0x4af2b8` vtable slot `+0xe0` name.
     const char* LookupRouteHostPrefixBySlot(uint8_t slotIndex) const;
     // anchor: launcher.exe:0x41b2a0 / owner vtable +0xe4? / current slot-record payload reader
     uint8_t GetSlotRecordStatusByIndex(uint8_t slotIndex) const;
@@ -1335,7 +1335,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     uint32_t ProcessCreateCharacterInput120(const ProcessCreateCharacterInput120Sketch& input) override;
     // wrapper-facing arg6 `+0x120` entry used by `client.dll:0x62054d1d`
     // Keep the instance-role split explicit in source:
-    // - the wrapper-facing `ILTLoginMediator.Default` mirror should capture the source block even
+    // - the wrapper-facing `ILTLoginMediator_0x4af2b8.Default` mirror should capture the source block even
     //   when it is not the live owner/controller instance
     // - the live owner/controller still applies the real `0x41c3c0` state gate and helper-state
     //   transition to `10`

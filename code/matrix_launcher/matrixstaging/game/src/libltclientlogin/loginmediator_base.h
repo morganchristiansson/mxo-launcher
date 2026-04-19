@@ -134,7 +134,7 @@ public:
     void* GetPayloadBase() { return payloadBegin10; }
 };
 
-// Wrapper-facing `ILTLoginMediator.Default` profile-path/current-slot ABI family.
+// Wrapper-facing `ILTLoginMediator_0x4af2b8.Default` profile-path/current-slot ABI family.
 // Keep this split explicit from the owner-side `CLTLoginMediator` helpers documented under
 // `0x004b01c8`:
 // - wrapper `+0x40` returns a selection-descriptor object consumed by client profile-path code
@@ -315,7 +315,7 @@ struct State3SelectionContextInputSketch {
     //     shadow information, not as proven `+0xec` input semantics
     // - newer launcher/client bridge tightening narrows the remaining producer split further:
     //   - launcher-side selection UI now closes concretely through
-    //     `0x40d6f0 = ILTLoginMediator_ResolveSelectionFromListCtrl`, which writes
+    //     `0x40d6f0 = ILTLoginMediator_0x4af2b8_ResolveSelectionFromListCtrl`, which writes
     //     `CLauncher+0xa8/+0xac` (`0x4d3410/0x4d3414`) and persists `Last_WorldName`
     //   - the direct success-side caller into owner `+0xec` is then best read as
     //     `client.dll:0x62170e2a..0x62170f48 = InitClientDLL_BeginLoadingCharacterFlow`
@@ -378,31 +378,31 @@ struct ProcessCreateCharacterInput120Sketch {
 };
 
 // =============================================================================
-// ILTLoginMediator - current source-owned arg6 surface
+// ILTLoginMediator_0x4af2b8 - current source-owned arg6 surface
 // =============================================================================
 // Important fidelity note:
-// - this header models the launcher-resolved `ILTLoginMediator.Default` surface consumed through
+// - this header models the launcher-resolved `ILTLoginMediator_0x4af2b8.Default` surface consumed through
 //   the runtime pointer slot at `0x4d2c58`
 // - many slots align with the concrete owner object documented under vtable `0x004b01c8`, but they
 //   should not be treated as a one-to-one synonym
 // - newer destructor/raw-vtable RE now gives the abstraction itself a better static anchor too:
 //   `0x004af2b8` is a purecall-backed abstract base candidate immediately above
-//   `0x004b01c8 = CLTLoginMediator`, which strongly fits the source-side `ILTLoginMediator` role
+//   `0x004b01c8 = CLTLoginMediator`, which strongly fits the source-side `ILTLoginMediator_0x4af2b8` role
 // - in particular, launcher startup `0x40a380` calls the resolved arg6 slot `+0x08`, while owner
 //   vtable `0x004b01c8 +0x0c` is currently recovered as `0x41f510` reset/clear logic rather than a
 //   simple engine setter
 //
 // Canonical references:
-// - ../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_Default.md
+// - ../../../../docs/launcher.exe/startup_objects/0x4d2c58_ILTLoginMediator_0x4af2b8_Default.md
 // - ../../../../docs/launcher.exe/VTABLES/0x004af2b8.md
 // - ../../../../docs/launcher.exe/VTABLES/0x004b01c8.md
 // =============================================================================
 
-class ILTLoginMediator {
+class ILTLoginMediator_0x4af2b8 {
 public:
-    static ILTLoginMediator* Default;
+    static ILTLoginMediator_0x4af2b8* Default;
     // Important wrapper/owner split correction:
-    // - this abstract base models the resolved `ILTLoginMediator.Default` arg6 surface
+    // - this abstract base models the resolved `ILTLoginMediator_0x4af2b8.Default` arg6 surface
     // - do not project owner-only `CLTLoginMediator` slots back onto this interface just because
     //   nearby concrete rows share related data
     // - in particular, owner `+0x40 = 0x41f2e0 = GetSlotRecordByIndex` is **not** the abstract
@@ -412,7 +412,7 @@ public:
     // +0x00
     virtual const char* GetName() = 0;
     // +0x04
-    // virtual ~ILTLoginMediator();
+    // virtual ~ILTLoginMediator_0x4af2b8();
     // +0x08
     // anchor: launcher.exe:0x41b160
     // Return: status dword (0x12000001 if auth address list empty, 0 if has entries)

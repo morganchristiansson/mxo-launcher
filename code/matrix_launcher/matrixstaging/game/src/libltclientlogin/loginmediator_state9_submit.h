@@ -97,7 +97,7 @@ inline bool TryCallback84FillPair(void* callback84, uint32_t* outLow, uint32_t* 
     // - natural original then queries callback84 vtable `+0x38` from `0x41de40`
     // - client cross-check tightens that callee as `ClientNetShell +0x38 / 0x62006580`
     // - that wrapper is not self-contained on the callback object:
-    //   it re-enters resolved client `ILTLoginMediator.Default`, calls `+0x18c(&blob, 900, 0)`,
+    //   it re-enters resolved client `ILTLoginMediator_0x4af2b8.Default`, calls `+0x18c(&blob, 900, 0)`,
     //   then returns pair `(&blob, 0x20)`
     // - launcher-side `+0x18c / 0x41e690` fills:
     //   - current slot id low/high
