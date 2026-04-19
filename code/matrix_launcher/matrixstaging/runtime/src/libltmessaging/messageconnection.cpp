@@ -1587,6 +1587,9 @@ static bool CBaseMarginConnection_0x4b64a8_OnMessageCode5Scaffold(
 // anchor: launcher.exe:0x442d00
 // Source-owned narrow predicate exposing the specific consumed-code gate inside
 // `CBaseMarginConnection_0x4b64a8::DispatchMessage`.
+// FIDELITY: Static-RE at 0x442d00 calls 0x41bc20, which handles BOTH headerless
+// and non-headerless cases internally via headerless10 check.
+// See launcher.exe:0x442d0e - CALL 0x41bc20
 static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outDecodedMessageCode,
@@ -1595,22 +1598,25 @@ static uint32_t CBaseMarginConnection_0x4b64a8_DispatchMessageFilterScaffold(
     if (outHadValidMessageCode) {
         *outHadValidMessageCode = false;
     }
+    if (outUsedHeaderlessLocatorDecode) {
+        *outUsedHeaderlessLocatorDecode = (messageRef.headerless10 != 0u);
+    }
 
-    uint16_t decodedMessageCode = 0u;
-    bool usedHeaderlessLocatorDecode = false;
-    const bool hadValidMessageCode = CMessageConnection_0x4b7928_DecodeMessageCode(
-        messageRef,
-        &decodedMessageCode,
-        &usedHeaderlessLocatorDecode);
+    // anchor: launcher.exe:0x442d0e - CALL 0x41bc20
+    // Static-RE uses single decode function for all cases
+    const uint16_t decodedMessageCode =
+        CMessageConnectionMessageRef_DecodeMessageCode(
+            const_cast<CMessageConnectionMessageRef_0x4ba23c*>(&messageRef));
+
     if (outDecodedMessageCode) {
         *outDecodedMessageCode = decodedMessageCode;
     }
-    if (outUsedHeaderlessLocatorDecode) {
-        *outUsedHeaderlessLocatorDecode = usedHeaderlessLocatorDecode;
-    }
+
+    const bool hadValidMessageCode = (decodedMessageCode != 0u);
     if (outHadValidMessageCode) {
         *outHadValidMessageCode = hadValidMessageCode;
     }
+
     if (!hadValidMessageCode) {
         return 0u;
     }
@@ -1708,56 +1714,20 @@ static bool CMessageConnection_0x4b7928_ResolvePacketizedProtocolIdScaffold(
 // anchor: launcher.exe:0x41bc20 / CMessageConnectionMessageRef_DecodeMessageCode
 // Exported decode helper for CLTLoginMediator::DispatchSecondaryMessageToOwnerCallback84
 // at launcher.exe:0x41c5c0. Decodes the message code from a message-ref payload.
+// FIDELITY: Static-RE function at 0x41bc20 handles BOTH headerless and non-headerless cases.
+// It checks headerless10 internally and uses locator-based offset lookup for headerless.
 bool CMessageConnection_0x4b7928_DecodeMessageCode(
     const CMessageConnectionMessageRef_0x4ba23c& messageRef,
     uint16_t* outMessageCode,
     bool* outUsedHeaderlessLocatorDecode) {
-    if (outMessageCode) {
-        *outMessageCode = 0u;
-    }
+    // anchor: launcher.exe:0x41bc20 - CMessageConnectionMessageRef_DecodeMessageCode
+    // Handles both non-headerless (payload[0]) and headerless (locator-based offset) internally
+    *outMessageCode = CMessageConnectionMessageRef_DecodeMessageCode(
+        const_cast<CMessageConnectionMessageRef_0x4ba23c*>(&messageRef));
     if (outUsedHeaderlessLocatorDecode) {
-        *outUsedHeaderlessLocatorDecode = false;
+        *outUsedHeaderlessLocatorDecode = (messageRef.headerless10 != 0u);
     }
-
-    const CMessageConnectionMessageStorage_0x4ba208* const messageStorage = messageRef.messageStorage0c;
-    if (!messageStorage) {
-        return false;
-    }
-
-    const uint16_t payloadByteCount = messageStorage->PayloadByteCount();
-    const uint8_t* const payloadBytes = messageStorage->PayloadBase();
-    if (!payloadBytes || payloadByteCount == 0u) {
-        return false;
-    }
-
-    const uint8_t* messageCodePointer = nullptr;
-    if (!CMessageConnection_0x4b7928_ResolveMessageCodePointer(
-            messageRef,
-            &messageCodePointer,
-            /*outTargetLocatorType=*/nullptr,
-            /*outSenderLocatorType=*/nullptr,
-            outUsedHeaderlessLocatorDecode)) {
-        return false;
-    }
-
-    const size_t messageCodeOffset =
-        static_cast<size_t>(messageCodePointer - payloadBytes);
-    const uint8_t firstByte = *messageCodePointer;
-    uint16_t messageCode = firstByte;
-    if ((firstByte & 0x80u) != 0u) {
-        if (messageCodeOffset + 1u >= payloadByteCount) {
-            return false;
-        }
-        messageCode = static_cast<uint16_t>(
-            ((static_cast<uint16_t>(firstByte) << 8) |
-             static_cast<uint16_t>(payloadBytes[messageCodeOffset + 1u])) &
-            0x7fffu);
-    }
-
-    if (outMessageCode) {
-        *outMessageCode = messageCode;
-    }
-    return true;
+    return (*outMessageCode != 0u);
 }
 
 // UNANCHORED: source-owned post-copy dispatch seam beneath `launcher.exe:0x4490c0`.
