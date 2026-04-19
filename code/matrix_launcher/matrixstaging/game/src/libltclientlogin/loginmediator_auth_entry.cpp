@@ -136,13 +136,13 @@ void CLTLoginMediator::RefreshAuthAddressListForCurrentHostScaffold() {
 //     }
 // }
 
-// UNANCHORED: source-owned route-text resolver for the reconstructed margin-host scaffold.
+// Faithful: use global directly (original doesn't have this helper - just uses StringTriple result)
 std::string CLTLoginMediator::ResolvedMarginHostName() const {
     if (!marginRouteState_.exactMarginHostName.empty()) {
         return marginRouteState_.exactMarginHostName;
     }
-    if (!marginRouteState_.routeHostPrefix.empty() && !marginServerDnsSuffix_.empty()) {
-        return marginRouteState_.routeHostPrefix + marginServerDnsSuffix_;
+    if (!marginRouteState_.routeHostPrefix.empty() && g_marginServerDNSName && g_marginServerDNSName[0]) {
+        return marginRouteState_.routeHostPrefix + g_marginServerDNSName;
     }
     return std::string();
 }
