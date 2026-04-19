@@ -247,10 +247,10 @@ public:
 
 // anchor: launcher.exe vtable 0x004b5064
 // docs: ../../docs/launcher.exe/VTABLES/0x004b5064.md
-class CLTLoginState_State5 : public CLTLoginState {
+class CLTLoginState_State5_0x4b5064 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x004394f0 (vtable 0x004b5064 slot 10 initializer)
-    CLTLoginState_State5() = default;
+    CLTLoginState_State5_0x4b5064() = default;
 
     // anchor: launcher.exe vtable 0x004b5064
     const char* DebugName() const override;
