@@ -239,7 +239,7 @@ public:
         void* helper789C = nullptr;  // slot 13 / phase-code 13
         void* helper78A0 = nullptr;  // slot 14 / phase-code 14
         void* helper78A4 = nullptr;  // slot 15 / phase-code 15 / CLTLoginState_State15_0x4b0b88
-        void* helper78A8 = nullptr;  // slot 16 / phase-code 16 / CLTLoginState_State16
+        void* helper78A8 = nullptr;  // slot 16 / phase-code 16 / CLTLoginState_State16_0x4b0bb0
         void* helper78AC = nullptr;  // slot 17 / phase-code 17 / CLTLoginState_State17
         void* helper78B0 = nullptr;  // slot 18 / phase-code 18 / CLTLoginState_State18
         void* helper78B4 = nullptr;  // slot 19 / phase-code 19 / CLTLoginState_State19
@@ -1051,7 +1051,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // launcher.exe:0x420640 = InitializeHelperDispatchSlot15 (slot at 0x4f78a4)
     //   Original: allocates 8 bytes, stores vtable 0x4b0b88 (`CLTLoginState_State15_0x4b0b88`)
     // launcher.exe:0x4206e0 = InitializeHelperDispatchSlot16 (slot at 0x4f78a8)
-    //   Original: allocates 4 bytes, stores vtable 0x4b0bb0 (`CLTLoginState_State16`)
+    //   Original: allocates 4 bytes, stores vtable 0x4b0bb0 (`CLTLoginState_State16_0x4b0bb0`)
     // launcher.exe:0x420850 = InitializeHelperDispatchSlot17 (slot at 0x4f78ac)
     //   Original: allocates 4 bytes, stores vtable 0x4b0bd8 (`CLTLoginState_State17`)
     // launcher.exe:0x420920 = InitializeHelperDispatchSlot18 (slot at 0x4f78b0)
@@ -1065,8 +1065,8 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // launcher.exe:0x4f7888 = slot 9, launcher.exe:0x4f7890 = slot 10, launcher.exe:0x4f7894 = slot 11,
     // launcher.exe:0x4f788c = slot 12, launcher.exe:0x4f7898 = slot 13, launcher.exe:0x4f789c = slot 14,
     // launcher.exe:0x4f78a4 = slot 15 (`CLTLoginState_State15_0x4b0b88`, vtable `0x4b0b88`)
-    // launcher.exe:0x4f78a8 = slot 16 (`CLTLoginState_State16`, vtable `0x4b0bb0`)
-    // launcher.exe:0x4f78ac = slot 17 (`CLTLoginState_State17`, vtable `0x4b0bd8`)
+    // launcher.exe:0x4f78a8 = slot 16 (`CLTLoginState_State16_0x4b0bb0`, vtable `0x4b0bb0`)
+    // launcher.exe:0x4f78ac = slot 17 (`CLTLoginState_State17_0x4b0bd8`, vtable `0x4b0bd8`)
     // launcher.exe:0x4f78b0 = slot 18 (`CLTLoginState_State18`, vtable `0x4b0c00`)
     // launcher.exe:0x4f78b4 = slot 19 (`CLTLoginState_State19`, vtable `0x4b0c28`)
     // ==============================================================================
