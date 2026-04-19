@@ -183,15 +183,17 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* ups
             fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(cachedUpstreamPhaseCode),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
-        const uint32_t connectResult = g_CurrentLoginMediator->BeginAuthConnectionViaState1Scaffold();
+        // Inline state switch
+        g_CurrentLoginMediator->authAddressListResolvedHostName4c_ = g_CurrentLoginMediator->authServerDnsName_;
+        g_CurrentLoginMediator->authAddressList4c_.Reset();
+        g_CurrentLoginMediator->authConnectAttemptCount28_ = 0u;
+        CLTLoginState* const upstreamState = g_CurrentLoginMediator->currentState_;
+        const uint32_t result = g_CurrentLoginMediator->SetCurrentState(1u);
+        (void)upstreamState; // suppress unused
+        (void)result;
         spdlog::info(
-            "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue auth transport not ready incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} -> BeginAuthConnectionViaState1Scaffold=0x{:08x}",
-            fmt::ptr(upstreamOrArg),
-            static_cast<unsigned>(incomingUpstreamPhaseCode),
-            fmt::ptr(cachedUpstreamOrArg_0x4),
-            static_cast<unsigned>(cachedUpstreamPhaseCode),
-            g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>",
-            static_cast<unsigned>(connectResult));
+            "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue auth transport not ready -> SetCurrentState(1) result=0x{:08x}",
+            static_cast<unsigned>(result));
         return;
     }
 

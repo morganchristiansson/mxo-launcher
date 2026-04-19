@@ -74,7 +74,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     // - If attempts remain: call slot3 with this+4, return 1 (NO increment in original!)
     // - If exhausted: reset count to 0, switch to state0, PostError(0)
     g_CurrentLoginMediator->authConnectionFlag2c_ = 1u;
-    const uint32_t candidateCount = g_CurrentLoginMediator->AuthConnectCandidateCountScaffold();
+    const uint32_t candidateCount = g_CurrentLoginMediator->authAddressList4c_.Count();
     const uint32_t attemptCount = g_CurrentLoginMediator->authConnectAttemptCount28_;
     // Original: if attempt count < candidate count, call slot3 with this+4 (retry)
     // NOTE: no increment of attemptCount in original - directly calls slot3
