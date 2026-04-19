@@ -3271,14 +3271,14 @@ void CLTLoginMediator::SeedRecoveredWorldDescriptorFromAuthReply(uint8_t worldIn
 
     if (normalizedStatus != rawStatus) {
         spdlog::info(
-            CLTLoginState_AuthenticatePending::kLogInvalidWorldStatus,
+            CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidWorldStatus,
             world.worldName.c_str(),
             static_cast<unsigned>(world.worldId),
             static_cast<unsigned>(rawStatus));
     }
     if (normalizedType != rawType) {
         spdlog::info(
-            CLTLoginState_AuthenticatePending::kLogInvalidWorldType,
+            CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidWorldType,
             world.worldName.c_str(),
             static_cast<unsigned>(world.worldId),
             static_cast<unsigned>(rawType));
@@ -3308,7 +3308,7 @@ void CLTLoginMediator::SeedRecoveredCharacterSlotRecordFromAuthReply(
     const uint8_t normalizedStatus = (rawStatus <= 6u) ? rawStatus : 7u;
     if (normalizedStatus != rawStatus) {
         spdlog::info(
-            CLTLoginState_AuthenticatePending::kLogInvalidCharacterStatus,
+            CLTLoginState_AuthenticatePending_0x4b5014::kLogInvalidCharacterStatus,
             character.handle.text.c_str(),
             static_cast<unsigned long long>(character.characterId),
             static_cast<unsigned>(rawStatus));

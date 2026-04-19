@@ -170,7 +170,7 @@ public:
 
 // anchor: launcher.exe vtable 0x004b5014
 // docs: ../../docs/launcher.exe/VTABLES/0x004b5014.md
-class CLTLoginState_AuthenticatePending : public CLTLoginState {
+class CLTLoginState_AuthenticatePending_0x4b5014 : public CLTLoginState {
 public:
     static constexpr const char* kLogInvalidCharacterStatus =
         "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): Character %s (gcid = %I64u) has an invalid status (%d)!  Forcing it to AUTHDBCHARSTATUS_INVALID.";
@@ -180,7 +180,7 @@ public:
         "CLTLoginState_AuthenticatePending::AuthMessageDispatch(): World %s (id = %d) has an invalid status (%d)!  Forcing it to WORLDSTATUS_INVALID.";
 
     // anchor: launcher.exe:0x004391e0 (vtable 0x004b5014 slot 10 initializer)
-    CLTLoginState_AuthenticatePending() = default;
+    CLTLoginState_AuthenticatePending_0x4b5014() = default;
 
     // anchor: launcher.exe vtable 0x004b5014
     const char* DebugName() const override;

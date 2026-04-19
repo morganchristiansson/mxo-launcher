@@ -144,7 +144,7 @@ void AdoptAuthReplyIntoRecoveredMediatorState_CharacterSlotRecords(CLTLoginMedia
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b5014
-const char* CLTLoginState_AuthenticatePending::DebugName() const {
+const char* CLTLoginState_AuthenticatePending_0x4b5014::DebugName() const {
     return "CLTLoginState_AuthenticatePending";
 }
 
@@ -164,7 +164,7 @@ const char* CLTLoginState_AuthenticatePending::DebugName() const {
 //   call 0x448050
 //
 // Source mirrors the exact call shape via PrepareAndDispatch on owner+0x680 child.
-void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     if (!g_CurrentLoginMediator) {
         return;
     }
@@ -192,7 +192,7 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* ups
         (void)upstreamState; // suppress unused
         (void)result;
         spdlog::info(
-            "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue auth transport not ready -> SetCurrentState(1) result=0x{:08x}",
+            "CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue auth transport not ready -> SetCurrentState(1) result=0x{:08x}",
             static_cast<unsigned>(result));
         return;
     }
@@ -216,7 +216,7 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* ups
         static_cast<unsigned>(cachedUpstreamPhaseCode));
     const uint32_t sendResult = child->PrepareAndDispatch(*g_CurrentLoginMediator, sendTarget, sessionToken);
     spdlog::info(
-        "CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch=0x{:08x}",
+        "CLTLoginState_AuthenticatePending_0x4b5014::Slot3_BeginOrContinue incomingUpstream={} incomingUpstreamPhaseCode={} cachedUpstream={} cachedUpstreamPhaseCode={} currentState={} authReadyState2={} -> owner+0x680::PrepareAndDispatch=0x{:08x}",
         fmt::ptr(upstreamOrArg),
         static_cast<unsigned>(incomingUpstreamPhaseCode),
         fmt::ptr(cachedUpstreamOrArg_0x4),
@@ -229,7 +229,7 @@ void CLTLoginState_AuthenticatePending::Slot3_BeginOrContinue(CLTLoginState* ups
 }
 
 // anchor: launcher.exe:0x0043f300 (string/file anchors: loginstate.cpp, CLTLoginState_AuthenticatePending::AuthMessageDispatch())
-uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) {
+uint32_t CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch(void* workItem) {
     if (!g_CurrentLoginMediator) {
         return 0u;
     }
@@ -253,7 +253,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
     if (childResult == kAuthBootstrap680InboundUnhandled) {
         g_CurrentLoginMediator->worldListCountOrStatus80 = 0x12000004u;
         spdlog::info(
-            "CLTLoginState_AuthenticatePending::AuthMessageDispatch rejected staged auth bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000004 and returned false-like",
+            "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch rejected staged auth bytes={} rawCode=0x{:02x}; mirrored original owner+0x80=0x12000004 and returned false-like",
             static_cast<unsigned>(stagedBytes.size()),
             static_cast<unsigned>(rawCode));
         return 0u;
@@ -261,7 +261,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
 
     if (childResult == kAuthBootstrap680InboundHandledContinueWaiting) {
         spdlog::info(
-            "CLTLoginState_AuthenticatePending::AuthMessageDispatch routed staged auth rawCode=0x{:02x} through owner+0x680 child and remained in the early wait path currentState={}",
+            "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch routed staged auth rawCode=0x{:02x} through owner+0x680 child and remained in the early wait path currentState={}",
             static_cast<unsigned>(rawCode),
             g_CurrentLoginMediator->currentState_ ? g_CurrentLoginMediator->currentState_->DebugName() : "<null>");
         return 1u;
@@ -347,7 +347,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             g_CurrentLoginMediator->PostEvent(5u);
 
             spdlog::info(
-                "CLTLoginState_AuthenticatePending::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05",
+                "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch adopted early auth-reply success rawCode=0x{:02x} owner+0x80=0x{:08x} cachedUpstream={} -> nextHelperState=0x{:02x} currentState={} switchDispatchResult=0x{:08x} event=0x05",
                 static_cast<unsigned>(rawCode),
                 static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80),
                 fmt::ptr(cachedUpstreamOrArg_0x4),
@@ -369,7 +369,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             (void)g_CurrentLoginMediator->SetCurrentState(0u);
             g_CurrentLoginMediator->PostError(2u);
             spdlog::info(
-                "CLTLoginState_AuthenticatePending::AuthMessageDispatch observed early raw-0x07 failure childResult={} owner+0x80=0x{:08x}; mirrored original state0 switch and error=2",
+                "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch observed early raw-0x07 failure childResult={} owner+0x80=0x{:08x}; mirrored original state0 switch and error=2",
                 static_cast<unsigned>(childResult),
                 static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80));
             return 1u;
@@ -380,7 +380,7 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
             (void)g_CurrentLoginMediator->SetCurrentState(0u);
             g_CurrentLoginMediator->PostError(0x0fu);
             spdlog::info(
-                "CLTLoginState_AuthenticatePending::AuthMessageDispatch rejected early raw-0x0b success-side adoption owner+0x80=0x{:08x}; mirrored original state0 switch and error=0x0f",
+                "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch rejected early raw-0x0b success-side adoption owner+0x80=0x{:08x}; mirrored original state0 switch and error=0x0f",
                 static_cast<unsigned>(g_CurrentLoginMediator->worldListCountOrStatus80));
             return 1u;
         }
@@ -392,14 +392,14 @@ uint32_t CLTLoginState_AuthenticatePending::AuthMessageDispatch(void* workItem) 
     (void)g_CurrentLoginMediator->SetCurrentState(0u);
     g_CurrentLoginMediator->PostError(4u);
     spdlog::warn(
-        "CLTLoginState_AuthenticatePending::AuthMessageDispatch reached unexpected childResult={} rawCode=0x{:02x}; mirrored fallback state0 switch and error=4",
+        "CLTLoginState_AuthenticatePending_0x4b5014::AuthMessageDispatch reached unexpected childResult={} rawCode=0x{:02x}; mirrored fallback state0 switch and error=4",
         static_cast<unsigned>(childResult),
         static_cast<unsigned>(rawCode));
     return 1u;
 }
 
 // anchor: launcher.exe:0x00418150 (vtable 0x004b5014 slot 7)
-uint32_t CLTLoginState_AuthenticatePending::GetStateId() const {
+uint32_t CLTLoginState_AuthenticatePending_0x4b5014::GetStateId() const {
     return 2;
 }
 

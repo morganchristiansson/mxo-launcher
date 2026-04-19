@@ -24,7 +24,7 @@ namespace ltlogin {
 
 class CLTLoginState;
 class CLTLoginState_State10;
-class CLTLoginState_AuthenticatePending;
+class CLTLoginState_AuthenticatePending_0x4b5014;
 class CLTLoginState_WorldListPending;
 class CLTLoginMediator;
 
@@ -120,7 +120,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
         AuthBootstrap680Child_0x441290& child,
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
-    friend class CLTLoginState_AuthenticatePending;
+    friend class CLTLoginState_AuthenticatePending_0x4b5014;
     friend class CLTLoginState_State4_0x4b503c;
     friend class CLTLoginState_State6;
     friend class CLTLoginState_State7;
@@ -209,7 +209,7 @@ public:
         //   - current best concrete state object: `CLTLoginState_State1_0x4b4fc4` / vtable `0x4b4fc4`
         //   - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection starts auth connect through launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
         // - slot 2 / `0x4f7870` / phase-code `2`
-        //   - current best concrete state object: `CLTLoginState_AuthenticatePending` / vtable `0x4b5014`
+        //   - current best concrete state object: `CLTLoginState_AuthenticatePending_0x4b5014` / vtable `0x4b5014`
         //   - launcher.exe:0x439210 is the strongest current earlier loginstate-owned handoff into
         //     the owner `+0x680` phase-2 auth/bootstrap child
         //   - on the connected branch it reaches launcher.exe:0x448050 = AuthBootstrap680_PrepareAndDispatch, which then branches to:
