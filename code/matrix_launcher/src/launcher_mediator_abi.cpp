@@ -1484,10 +1484,14 @@ void DiagnosticConfigureLoginControllerNetwork(
     mediator->authServerPortHostOrder_ = authPortHostOrder;
     mediator->ignoreHostsFileForAuth_ = ignoreHostsFileForAuth != 0;
 
-    mediator->SetMarginServerConfig(
-        marginDnsSuffix,
-        marginPortHostOrder,
-        ignoreHostsFileForMargin);
+    // Set margin globals - faithful to static-RE (original reads globals directly)
+    mxo::ltlogin::g_marginServerDNSName = marginDnsSuffix ? marginDnsSuffix : "";
+    mxo::ltlogin::g_marginServerPort = marginPortHostOrder;
+    // Also mirror to instance fields for replacement code paths
+    mediator->marginServerDnsSuffix_ = mxo::ltlogin::g_marginServerDNSName;
+    mediator->marginServerPortHostOrder_ = marginPortHostOrder;
+
+    // Set route state - these are still needed for the connection path
     mediator->SetMarginRouteHostPrefix(marginRouteHostPrefix);
     mediator->SetExactMarginHostName(exactMarginHostName);
     spdlog::info(

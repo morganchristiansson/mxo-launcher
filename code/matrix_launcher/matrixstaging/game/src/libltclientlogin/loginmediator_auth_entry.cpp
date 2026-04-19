@@ -80,16 +80,15 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
 
 
 
-// UNANCHORED: source-owned config setter for the auth host/port scaffold feeding owner `+0x4c/+0x5c`.
-// Replacement helper - original launcher uses globals directly.
-void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile) {
-    authServerDnsName_ = dnsName ? dnsName : "";
-    authServerPortHostOrder_ = portHostOrder;
-    ignoreHostsFileForAuth_ = ignoreHostsFile;
-
-    ResetAuthConnectRetryStateScaffold();
-    BuildAuthEndpoint();
-}
+/// INFIDEL - original launcher uses globals directly. Commented out for fidelity.
+// void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile) {
+//     authServerDnsName_ = dnsName ? dnsName : "";
+//     authServerPortHostOrder_ = portHostOrder;
+//     ignoreHostsFileForAuth_ = ignoreHostsFile;
+//
+//     ResetAuthConnectRetryStateScaffold();
+//     BuildAuthEndpoint();
+// }
 
 // UNANCHORED: source-owned reset for the auth-side owner `+0x28/+0x4c/+0x50/+0x58` retry/iterator family.
 void CLTLoginMediator::ResetAuthConnectRetryStateScaffold() {
@@ -142,17 +141,17 @@ void CLTLoginMediator::PrepareNextAuthEndpointForConnectAttemptScaffold() {
     ++authConnectAttemptCount28_;
 }
 
-// UNANCHORED: source-owned config setter for the margin suffix/port scaffold feeding owner `+0x30/+0x6c`.
-void CLTLoginMediator::SetMarginServerConfig(const char* dnsSuffix, uint16_t portHostOrder, bool ignoreHostsFile) {
-    marginServerDnsSuffix_ = dnsSuffix ? dnsSuffix : "";
-    marginServerPortHostOrder_ = portHostOrder;
-    ignoreHostsFileForMargin_ = ignoreHostsFile;
-    marginSelectedIpv4_7c_ = 0u;
-    BuildMarginEndpoint();
-    if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
-        BuildMarginEndpoint();
-    }
-}
+/// INFIDEL - original launcher uses globals directly. Commented out for fidelity.
+// void CLTLoginMediator::SetMarginServerConfig(const char* dnsSuffix, uint16_t portHostOrder, bool ignoreHostsFile) {
+//     marginServerDnsSuffix_ = dnsSuffix ? dnsSuffix : "";
+//     marginServerPortHostOrder_ = portHostOrder;
+//     ignoreHostsFileForMargin_ = ignoreHostsFile;
+//     marginSelectedIpv4_7c_ = 0u;
+//     BuildMarginEndpoint();
+//     if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
+//         BuildMarginEndpoint();
+//     }
+// }
 
 // UNANCHORED: source-owned route-text resolver for the reconstructed margin-host scaffold.
 std::string CLTLoginMediator::ResolvedMarginHostName() const {

@@ -20,8 +20,8 @@ extern uint32_t g_IgnoreHostsFileForAuth;
 extern const char* g_ServerPublicModulusB64;
 extern const char* g_ServerPublicExponentB64;
 extern uint32_t g_SkipAuthPublicKeyReplyValidation;
-extern const char* g_qsMarginServerDNSName;
-extern uint16_t g_MarginServerPort;
+extern const char* g_marginServerDNSName;
+extern uint16_t g_marginServerPort;
 } // namespace mxo::ltlogin
 
 
@@ -314,8 +314,8 @@ void ApplySelectedServerConfigToMediator() {
     // Apply margin server globals - faithful to static-RE
     // The original launcher reads these directly in BeginMarginConnection (no SetMarginServerConfig method exists)
     // anchor: launcher.exe:0x4f7b14 / same as auth server approach
-    mxo::ltlogin::g_qsMarginServerDNSName = g_SelectedServerConfig->marginServerSuffix.c_str();
-    mxo::ltlogin::g_MarginServerPort = g_SelectedServerConfig->marginServerPort;
+    mxo::ltlogin::g_marginServerDNSName = g_SelectedServerConfig->marginServerSuffix.c_str();
+    mxo::ltlogin::g_marginServerPort = g_SelectedServerConfig->marginServerPort;
 
     spdlog::info(
         "DIAGNOSTIC: applied server config '{}' to mediator globals: auth='{}' port={} margin='{}' marginPort={} skipValidation={}",

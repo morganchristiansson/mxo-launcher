@@ -105,11 +105,11 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     // Fidelity improvement: sync from globals when instance fields are empty
     // This removes need for infidel SetMarginServerConfig scaffold methods.
     // The original reads globals directly (anchor: launcher.exe:0x4f7b14 equivalent).
-    if (marginServerDnsSuffix_.empty() && g_qsMarginServerDNSName && g_qsMarginServerDNSName[0]) {
-        marginServerDnsSuffix_ = g_qsMarginServerDNSName;
+    if (marginServerDnsSuffix_.empty() && g_marginServerDNSName && g_marginServerDNSName[0]) {
+        marginServerDnsSuffix_ = g_marginServerDNSName;
     }
-    if (marginServerPortHostOrder_ == 0u && g_MarginServerPort != 0u) {
-        marginServerPortHostOrder_ = g_MarginServerPort;
+    if (marginServerPortHostOrder_ == 0u && g_marginServerPort != 0u) {
+        marginServerPortHostOrder_ = g_marginServerPort;
     }
 
     // Current bounded active-path correction:

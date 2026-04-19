@@ -53,9 +53,9 @@ uint32_t g_SkipAuthPublicKeyReplyValidation = 0u;
 
 // Margin server globals - analogous to auth globals, for faithful server-selection flow.
 // anchor: launcher.exe:0x4f7b14 / similar to auth
-const char* g_qsMarginServerDNSName = "";
+const char* g_marginServerDNSName = "";
 // anchor: launcher.exe:0x4f7a50 / similar to auth
-uint16_t g_MarginServerPort = 10000;
+uint16_t g_marginServerPort = 10000;
 
 
 

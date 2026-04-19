@@ -1027,10 +1027,6 @@ public:
     // - launcher `MarginServerDNSSuffix` / `MarginServerPort`
     // The replacement launcher should eventually populate these from the same launcher-owned
     // config path instead of treating connection setup as generic ad-hoc socket work.
-    //
-    // Replacement helper - does not affect launcher.exe globals.
-    void SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile = false);
-    void SetMarginServerConfig(const char* dnsSuffix, uint16_t portHostOrder, bool ignoreHostsFile = false);
 
     std::string ResolvedMarginHostName() const;
 
@@ -1764,8 +1760,8 @@ extern const char* g_ServerPublicExponentB64;
 // Skip AS_GetPublicKeyReply embedded key validation (for non-standard key sizes like 2048-bit)
 extern uint32_t g_SkipAuthPublicKeyReplyValidation;
 // Margin server globals - analogous to auth globals, for faithful server-selection flow.
-extern const char* g_qsMarginServerDNSName;
-extern uint16_t g_MarginServerPort;
+extern const char* g_marginServerDNSName;
+extern uint16_t g_marginServerPort;
 
 }  // namespace mxo::ltlogin
 
