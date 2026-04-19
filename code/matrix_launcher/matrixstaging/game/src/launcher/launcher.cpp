@@ -538,24 +538,6 @@ bool CLauncher::RunAutodetectDialogWithoutGui() const {
     return autodetectDialog.RunWithoutGui();
 }
 
-// UNANCHORED: replacement-only summary logger for current gaps within launcher.exe:0x40b430.
-void CLauncher::LogInitInstanceFaithfulnessGaps() const {
-    spdlog::info("=== Original-path gaps still missing ===");
-    spdlog::info("arg1/arg2 status: launcher-owned filtered argv storage now follows the original 0x409950 -> 0x4173d0 two-stage parse shape, but runtime console registry/config fidelity is still scaffold-level");
-    spdlog::info("arg5 status: current launcher-owned 0x4d6304 ABI shell now mirrors the original create/register/pass and release/clear shape, but internal ctor state is still incomplete");
-    spdlog::info("arg6 status: current binder-backed path materialized ILTLoginMediator_0x4af2b8.Default (not yet faithful launcher reconstruction)");
-    spdlog::info("arg7 status: current selection writeback reuses ILTLoginMediator_0x4af2b8.Default and rebuilds a8/ac through +0xfc/+0x100/+0xe4");
-    if (IsRecoveredPreclientEnvironmentActive()) {
-        spdlog::info("pre-client env status: current 0x402ec0-style launcher thread/message scaffold active (not yet faithful original class/import path)");
-    } else {
-        spdlog::info("missing: original pre-client environment setup at 0x402ec0 (launcher thread / message readiness path)");
-    }
-    spdlog::info("login dialog status: page2->command11->page6 rich-edit credential corridor (0x408ee0/0x408840/0x408400/0x4091d0) is now documented; the text-mode host now submits through ILTLoginMediator_0x4af2b8::Default->ProcessLoginRequest and waits through a blocking observer analogue instead of synthetic posted-event/error latches, but it still does not recreate the original rich-edit observer/prompt lifecycle exactly");
-    spdlog::info("autodetect status: 0x409f34 gate + 0x40b75a placement now modeled, but the current implementation intentionally skips real MFC dialog creation/controls and uses a no-GUI worker wrapper instead");
-    spdlog::info("file/access gate status: original 0x40b790..0x40b7af _access(DAT_004d4cbc,0) / 0x41ab10(0) side path is still not modeled on the replacement path");
-    spdlog::info("");
-}
-
 // anchor: launcher.exe:0x40a4d0
 void CLauncher::CleanupRecoveredInitClientState() const {
     if (g_pLauncherObject6304) {
@@ -685,8 +667,6 @@ bool CLauncher::InitInstance() {
     if (!RunRecoveredPreClientBringupStage()) {
         goto cleanup;
     }
-
-    LogInitInstanceFaithfulnessGaps();
 
     // Replacement-only console/UI orchestration lives in `src/textmode_launcher_flow.cpp` so this
     // recovered launcher-owned coordinator stays narrow around the 0x40b430 startup corridor.

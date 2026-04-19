@@ -70,12 +70,6 @@ static DWORD WINAPI DiagnosticPreclientThreadProc(LPVOID) {
     InterlockedExchange(&g_PreclientEnvironment.readyFlag44, 0);
     InterlockedExchange(&g_PreclientEnvironment.readyFlag45, 1);
     SetEvent(g_PreclientEnvironment.readyEvent);
-    spdlog::info(
-        "DIAGNOSTIC: pre-client launcher thread ready threadId=0x{:08x} state44={} state45={} state48={}",
-        GetCurrentThreadId(),
-        g_PreclientEnvironment.readyFlag44,
-        g_PreclientEnvironment.readyFlag45,
-        fmt::ptr(g_PreclientEnvironment.readyPointer48));
 
     while (WaitForSingleObject(g_PreclientEnvironment.stopEvent, 10) == WAIT_TIMEOUT) {
         while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {

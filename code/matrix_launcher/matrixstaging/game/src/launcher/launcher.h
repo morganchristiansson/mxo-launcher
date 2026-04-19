@@ -104,9 +104,6 @@ public:
     // launcher.cpp stays focused on launcher-owned startup coordination.
     bool RunPreClientAuthAndCharacterSelectionStage();
 
-    // UNANCHORED: recovered grouping inside launcher.exe:0x40b430
-    void LogInitInstanceFaithfulnessGaps() const;
-
     // UNANCHORED: no-GUI wrapper for the original 0x40b75a autodetect dialog consumption path.
     bool RunAutodetectDialogWithoutGui() const;
 
