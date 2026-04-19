@@ -25,7 +25,7 @@ CLTLoginMediator::ConnectionHelperFamily g_LoginHelperDispatchTableScaffold = {}
 
 // Inline state objects - replaces static BuiltinScaffoldStates singleton pattern
 // anchor: launcher.exe:0x43b300 / dispatch table seed
-static CLTLoginState_State0 g_State0 = {};
+static CLTLoginState_State0_0x4b51e0 g_State0 = {};
 static CLTLoginState_State1 g_State1 = {};
 static CLTLoginState_AuthenticatePending g_AuthenticatePending = {};
 static CLTLoginState_State3 g_State3 = {};

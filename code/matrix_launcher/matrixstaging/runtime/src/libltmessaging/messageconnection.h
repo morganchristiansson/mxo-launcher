@@ -1710,7 +1710,7 @@ public:
     // anchor: launcher.exe:0x443220 / object size `0xe0`
     // vtable layout (from cls_0x4b6778::vftable_4b6778):
     //   +0x00: ~cls_0x4b6e0c
-    //   +0x04: CLTLoginState_State0_Slot7_GetStateId
+    //   +0x04: CLTLoginState_State0_0x4b51e0_Slot7_GetStateId
     //   +0x08: AuthBootstrap680Field54Helper_ResetUnknownString
     //   +0x0c: virt_meth_0x4415d0
     //   +0x10: virt_meth_0x4415f0

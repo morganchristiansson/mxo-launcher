@@ -128,10 +128,10 @@ public:
 // - the first happy-path submit transition remains owner-owned
 //   (`CLTLoginMediator::ProcessLoginRequest`), which switches into helper/state `2`
 // So state0 is the startup helper, not the startup submit coordinator.
-class CLTLoginState_State0 : public CLTLoginState_AbstractFinalLeafBase {
+class CLTLoginState_State0_0x4b51e0 : public CLTLoginState_AbstractFinalLeafBase {
 public:
     // anchor: launcher.exe:0x00439d80 (vtable 0x004b51e0 slot 10 shared initializer)
-    CLTLoginState_State0() = default;
+    CLTLoginState_State0_0x4b51e0() = default;
 
     // Intentionally no Slot3 override here:
     // original slot 3 is the shared no-op stub, so submit ownership stays on the mediator/owner

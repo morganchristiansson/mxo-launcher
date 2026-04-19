@@ -14,12 +14,12 @@ namespace mxo::ltlogin {
 //   (`ProcessLoginRequest` clears owner `+0xf4`, then switches to helper/state `2`)
 // - that makes state0 the explicit initial idle/start helper, not the startup default submit
 //   coordinator
-const char* CLTLoginState_State0::DebugName() const {
-    return "CLTLoginState_State0";
+const char* CLTLoginState_State0_0x4b51e0::DebugName() const {
+    return "CLTLoginState_State0_0x4b51e0";
 }
 
 // anchor: launcher.exe:0x00437b50 (vtable 0x004b51e0 slot 7)
-uint32_t CLTLoginState_State0::GetStateId() const {
+uint32_t CLTLoginState_State0_0x4b51e0::GetStateId() const {
     return 0;
 }
 
