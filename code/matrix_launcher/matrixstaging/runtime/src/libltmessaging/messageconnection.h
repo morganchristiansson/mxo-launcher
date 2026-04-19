@@ -886,7 +886,7 @@ public:
 
 
 
-class CStreamPacketEncryptionModuleReadTransformWorker {
+class CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0 {
 public:
     // Source-owned real C++ mirror of the worker family inserted into the read-helper collection
     // by `0x44d910`.
@@ -1091,7 +1091,7 @@ public:
     // - repeated success on worker 0 can collapse that collection back down to just worker 0
     // - source now models that as a real worker collection rather than raw begin/end pointers
     uint32_t collectionControl0c = 0;
-    std::vector<CStreamPacketEncryptionModuleReadTransformWorker> transformWorkers;
+    std::vector<CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0> transformWorkers;
     CMessageConnectionMessageRefOutputBuffer transformedOutput;
 
     void HandleOpaqueMessageRef(void* opaqueMessageRef) override;

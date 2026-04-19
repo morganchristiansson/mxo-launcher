@@ -480,7 +480,7 @@ CMessageConnectionMessageRef_0x4ba23c* CMessageConnectionMessageRefOutputBuffer:
 
 
 // anchor: launcher.exe:0x44d910 / 0x44daf0
-void CStreamPacketEncryptionModuleReadTransformWorker::ResetForSeed(
+void CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::ResetForSeed(
     const std::array<uint8_t, 16>& seedBytes) {
     associatedSeedBytes = seedBytes;
     hasConfiguredFeedbackTransform =
@@ -492,7 +492,7 @@ void CStreamPacketEncryptionModuleReadTransformWorker::ResetForSeed(
 }
 
 // anchor: launcher.exe:0x44d500
-bool CStreamPacketEncryptionModuleReadTransformWorker::TryTransform(
+bool CStreamPacketEncryptionModuleReadTransformWorker_0x4b86f0::TryTransform(
     const CMessageConnectionMessageRef_0x4ba23c& inputMessageRef,
     CMessageConnectionMessageRefOutputBuffer* outputBuffer) {
     // Source still keeps the confirmed packet semantic at the worker boundary here, but the
