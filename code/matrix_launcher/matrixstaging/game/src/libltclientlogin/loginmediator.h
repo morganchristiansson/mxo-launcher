@@ -1036,8 +1036,6 @@ public:
     void SetAuthPeerCloseQueuedScaffold(bool value) { authPeerCloseQueuedScaffold_ = value; }
     void SetMarginPeerCloseQueuedScaffold(bool value) { marginPeerCloseQueuedScaffold_ = value; }
 
-    void SetMarginRouteHostPrefix(const char* routeHostPrefix);
-    void SetExactMarginHostName(const char* exactMarginHostName);
 void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
     // launcher.exe:0x43b300 / full helper-dispatch table seed
@@ -1482,11 +1480,7 @@ private:
     // - do not add those transient fields into the middle of `CLTLoginMediator`
     void FreeLateEntryList1470StorageScaffold();
 
-    void BuildAuthEndpoint();
-    void PrepareNextAuthEndpointForConnectAttemptScaffold();
-    void BuildMarginEndpoint();
-    bool RebuildMarginAddressList();
-    bool SelectMarginEndpointIpv4();
+    // Direct field access - no infidel methods
     mxo::liblttcp::CMessageConnection_0x4b7928* EnsureMarginConnectionObject();
 
     // Condensed `0x4f78b8` owner sketch for the active branch:

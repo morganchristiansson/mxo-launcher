@@ -1491,9 +1491,9 @@ void DiagnosticConfigureLoginControllerNetwork(
     mediator->marginServerDnsSuffix_ = mxo::ltlogin::g_marginServerDNSName;
     mediator->marginServerPortHostOrder_ = marginPortHostOrder;
 
-    // Set route state - these are still needed for the connection path
-    mediator->SetMarginRouteHostPrefix(marginRouteHostPrefix);
-    mediator->SetExactMarginHostName(exactMarginHostName);
+    // Set route state fields directly - no infidel methods
+    mediator->marginRouteState_.routeHostPrefix = marginRouteHostPrefix ? marginRouteHostPrefix : "";
+    mediator->marginRouteState_.exactMarginHostName = exactMarginHostName ? exactMarginHostName : "";
     spdlog::info(
         "DIAGNOSTIC: login controller network configured auth='{}' port={} marginSuffix='{}' marginPort={} marginRoutePrefix='{}' exactMarginHost='{}' ignoreAuthHosts={} ignoreMarginHosts={}",
         authDnsName && authDnsName[0] ? authDnsName : "<empty>",

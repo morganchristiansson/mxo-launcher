@@ -129,24 +129,7 @@ void CLTLoginMediator::RefreshAuthAddressListForCurrentHostScaffold() {
     (void)authAddressList4c_.Reinit(authServerDnsName_.c_str(), flags);
 }
 
-// UNANCHORED: source-owned iterator step mirroring the `0x440bb0/0x44b090` auth endpoint prep family.
-void CLTLoginMediator::PrepareNextAuthEndpointForConnectAttemptScaffold() {
-    RefreshAuthAddressListForCurrentHostScaffold();
-
-    const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
-    if (nextIpv4 != 0u) {
-        authEndpoint_.ipv4NetworkOrder = nextIpv4;
-    }
-
-    ++authConnectAttemptCount28_;
-}
-
-/// INFIDEL - original launcher uses globals directly. Commented out for fidelity.
-// void CLTLoginMediator::SetMarginServerConfig(const char* dnsSuffix, uint16_t portHostOrder, bool ignoreHostsFile) {
-//     marginServerDnsSuffix_ = dnsSuffix ? dnsSuffix : "";
-//     marginServerPortHostOrder_ = portHostOrder;
-//     ignoreHostsFileForMargin_ = ignoreHostsFile;
-//     marginSelectedIpv4_7c_ = 0u;
+// Auth endpoint iteration - anchor: launcher.exe:0x41d1e8-0x41d232
 //     BuildMarginEndpoint();
 //     if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
 //         BuildMarginEndpoint();
@@ -167,24 +150,6 @@ std::string CLTLoginMediator::ResolvedMarginHostName() const {
 // UNANCHORED: source-owned accessor for the margin `CMessageConnection_0x4b7928` child mirrored from owner `+0x1c`.
 mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::MarginConnection() const {
     return marginConnection_;
-}
-
-// UNANCHORED: source-owned setter for the reconstructed margin route-host prefix.
-void CLTLoginMediator::SetMarginRouteHostPrefix(const char* routeHostPrefix) {
-    marginRouteState_.routeHostPrefix = routeHostPrefix ? routeHostPrefix : "";
-    marginSelectedIpv4_7c_ = 0u;
-    if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
-        BuildMarginEndpoint();
-    }
-}
-
-// UNANCHORED: source-owned setter for the reconstructed exact margin host name.
-void CLTLoginMediator::SetExactMarginHostName(const char* exactMarginHostName) {
-    marginRouteState_.exactMarginHostName = exactMarginHostName ? exactMarginHostName : "";
-    marginSelectedIpv4_7c_ = 0u;
-    if (!ResolvedMarginHostName().empty() && RebuildMarginAddressList() && SelectMarginEndpointIpv4()) {
-        BuildMarginEndpoint();
-    }
 }
 
 // anchor: launcher.exe:0x41b490
@@ -252,11 +217,30 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d1ee / byte ptr [ESI + 0x2c] = 0
     authConnectionFlag2c_ = 0u;
 
-    // Get next IPv4 from address list - anchor: launcher.exe:0x41d1f2
+    // Inline: refresh address list and get next IPv4 - anchor: launcher.exe:0x41d1f2
     // anchor: launcher.exe:0x41d1f2 / call CLTIPAddressList_GetNextAddress(ESI+0x4c, 1)
-    // anchor: launcher.exe:0x41d1e8 / LEA ECX, [ESI+0x4c] - auth address list at +0x4c
-    // First refresh the address list (PrepareNextAuthEndpointForConnectAttemptScaffold does this)
-    PrepareNextAuthEndpointForConnectAttemptScaffold();
+    // First refresh the address list (original calls PrepareNextAuthEndpointForConnectAttemptScaffold)
+    const bool hostChanged = (authAddressListResolvedHostName4c_ != authServerDnsName_);
+    if (!hostChanged && !authAddressList4c_.Empty()) {
+        // skip refresh
+    } else {
+        authAddressListResolvedHostName4c_ = authServerDnsName_;
+        if (!authServerDnsName_.empty()) {
+            uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
+            if (ignoreHostsFileForAuth_) {
+                flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
+            }
+            (void)authAddressList4c_.Reinit(authServerDnsName_.c_str(), flags);
+        } else {
+            authAddressList4c_.Reset();
+        }
+    }
+    // Get next IPv4
+    const uint32_t nextIpv4 = authAddressList4c_.GetNextAddress(/*wrap=*/true);
+    if (nextIpv4 != 0u) {
+        authEndpoint_.ipv4NetworkOrder = nextIpv4;
+    }
+    ++authConnectAttemptCount28_;
 
     // Build endpoint at +0x5c using helper at 0x44b090 - anchor: launcher.exe:0x41d205
     // The helper takes the next IPv4 and port from DAT_004f7a50
@@ -266,16 +250,9 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     // anchor: launcher.exe:0x41d202 / LEA ECX, [EBP-0x14] - local endpoint
     // anchor: launcher.exe:0x41d205 / CALL 0x44b090
     // anchor: launcher.exe:0x41d20a-0x41d225 / copy endpoint fields to this+0x5c
-    // Note: authEndpoint_.ipv4NetworkOrder already set by PrepareNextAuthEndpointForConnectAttemptScaffold
     // Just ensure port is set correctly from config
     authEndpoint_.portNetworkOrder =
         static_cast<uint16_t>((authServerPortHostOrder_ << 8) | (authServerPortHostOrder_ >> 8));
-
-    // Increment attempt counter - anchor: launcher.exe:0x41d22b-0x41d22c
-    // anchor: launcher.exe:0x41d222 / MOV EDI, dword ptr [ESI+0x28]
-    // anchor: launcher.exe:0x41d22b / INC EDI
-    // anchor: launcher.exe:0x41d22c / MOV dword ptr [ESI+0x28], EDI
-    ++authConnectAttemptCount28_;
 
     // Set connection endpoint and call EnsureConnected - anchor: launcher.exe:0x41d228-0x41d232
     // anchor: launcher.exe:0x41d228 / MOV ECX, dword ptr [ESI+0x18] - load connection
@@ -288,8 +265,8 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnection host='{}' attemptCount28={} candidateCount={} selectedIpv4=0x{:08x} currentState={} authFlag2c={} -> EnsureConnected()",
         authServerDnsName_.empty() ? "<empty>" : authServerDnsName_.c_str(),
-        static_cast<unsigned>(AuthConnectAttemptCountScaffold()),
-        static_cast<unsigned>(AuthConnectCandidateCountScaffold()),
+        static_cast<unsigned>(authConnectAttemptCount28_),
+        static_cast<unsigned>(authAddressList4c_.Count()),
         static_cast<unsigned>(authEndpoint_.ipv4NetworkOrder),
         currentState_ ? currentState_->DebugName() : "<null>",
         static_cast<unsigned>(authConnectionFlag2c_));
@@ -347,27 +324,6 @@ uint32_t CLTLoginMediator::BeginMarginConnectionViaState4Scaffold() {
         marginHost.empty() ? "<unresolved>" : marginHost.c_str(),
         static_cast<unsigned>(result));
     return result;
-}
-
-// UNANCHORED: source-owned builder for the auth endpoint mirror rooted at owner `+0x5c`.
-void CLTLoginMediator::BuildAuthEndpoint() {
-    // Placeholder only.
-    // Original launcher currently appears to preserve host text in owner `+0x4c` and then
-    // build a sockaddr-like endpoint block at owner `+0x5c` using the current auth port.
-    authEndpoint_ = {};
-    authEndpoint_.family = 2;
-    authEndpoint_.portNetworkOrder =
-        static_cast<uint16_t>((authServerPortHostOrder_ << 8) | (authServerPortHostOrder_ >> 8));
-    authEndpoint_.ipv4NetworkOrder = 0;
-}
-
-// UNANCHORED: source-owned builder for the margin endpoint mirror rooted at owner `+0x6c`.
-void CLTLoginMediator::BuildMarginEndpoint() {
-    marginEndpoint_ = {};
-    marginEndpoint_.family = 2;
-    marginEndpoint_.portNetworkOrder =
-        static_cast<uint16_t>((marginServerPortHostOrder_ << 8) | (marginServerPortHostOrder_ >> 8));
-    marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
 }
 
 }  // namespace mxo::ltlogin

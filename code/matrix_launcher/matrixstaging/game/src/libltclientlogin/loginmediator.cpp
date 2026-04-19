@@ -3426,38 +3426,25 @@ const std::vector<uint8_t>& CLTLoginMediator::StagedIncomingMarginPacketBytes() 
     return stagedIncomingMarginPacketBytes_;
 }
 
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTLoginMediator::RebuildMarginAddressList() {
-    const std::string resolvedHostName = ResolvedMarginHostName();
-    marginAddressListResolvedHostName3c_ = resolvedHostName;
-
-    if (resolvedHostName.empty()) {
-        marginAddressList3c_.Reset();
-        spdlog::debug("CLTLoginMediator::BeginMarginConnection unresolved margin host");
-        return false;
-    }
-
-    uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
-    if (ignoreHostsFileForMargin_) {
-        flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
-    }
-
-    if (!marginAddressList3c_.Reinit(resolvedHostName.c_str(), flags)) {
-        spdlog::warn(
-            "CLTLoginMediator::BeginMarginConnection failed to resolve margin host '{}' flags=0x{:02x}",
-            resolvedHostName,
-            flags);
-        return false;
-    }
-
-    return true;
-}
-
-// UNANCHORED: no original launcher.exe anchor assigned yet.
-bool CLTLoginMediator::SelectMarginEndpointIpv4() {
-    marginSelectedIpv4_7c_ = marginAddressList3c_.GetNextAddress(/*wrap=*/true);
-    return marginSelectedIpv4_7c_ != 0u;
-}
+/// INFIDEL - original builds inline. Commented out.
+// bool CLTLoginMediator::RebuildMarginAddressList() {
+//     const std::string resolvedHostName = ResolvedMarginHostName();
+//     marginAddressListResolvedHostName3c_ = resolvedHostName;
+//     if (resolvedHostName.empty()) {
+//         marginAddressList3c_.Reset();
+//         return false;
+//     }
+//     uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
+//     if (ignoreHostsFileForMargin_) {
+//         flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
+//     }
+//     return marginAddressList3c_.Reinit(resolvedHostName.c_str(), flags);
+// }
+//
+// bool CLTLoginMediator::SelectMarginEndpointIpv4() {
+//     marginSelectedIpv4_7c_ = marginAddressList3c_.GetNextAddress(/*wrap=*/true);
+//     return marginSelectedIpv4_7c_ != 0u;
+// }
 
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::EnsureMarginConnectionObject() {

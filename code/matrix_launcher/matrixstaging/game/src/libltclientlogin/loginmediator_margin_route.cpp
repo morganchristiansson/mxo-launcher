@@ -151,21 +151,38 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
             return 0u;
         }
 
+        // Faithful: inline rebuild address list (original reads owner `+0x3c` directly)
         const bool routeChanged = (marginAddressListResolvedHostName3c_ != marginHost);
         if (routeChanged || marginAddressList3c_.Empty()) {
-            if (!RebuildMarginAddressList()) {
+            marginAddressListResolvedHostName3c_ = marginHost;
+            if (marginHost.empty()) {
+                marginAddressList3c_.Reset();
+                return 0u;
+            }
+            uint32_t flags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;
+            if (ignoreHostsFileForMargin_) {
+                flags |= mxo::liblttcp::CLTIPAddressList::kFlagIgnoreHostsFile;
+            }
+            if (!marginAddressList3c_.Reinit(marginHost.c_str(), flags)) {
                 return 0u;
             }
         }
 
-        if (marginSelectedIpv4_7c_ == 0u && !SelectMarginEndpointIpv4()) {
+        // Faithful: inline select and build (original reads owner `+0x7c` directly)
+        if (marginSelectedIpv4_7c_ == 0u) {
+            marginSelectedIpv4_7c_ = marginAddressList3c_.GetNextAddress(/*wrap=*/true);
+        }
+        if (marginSelectedIpv4_7c_ == 0u) {
             spdlog::warn(
                 "CLTLoginMediator::BeginMarginConnection found no IPv4 candidates for '{}'",
                 marginHost);
             return 0u;
         }
-
-        BuildMarginEndpoint();
+        // Faithful inline endpoint build (original writes to owner `+0x6c` directly)
+        marginEndpoint_.family = 2;
+        marginEndpoint_.portNetworkOrder =
+            static_cast<uint16_t>((marginServerPortHostOrder_ << 8) | (marginServerPortHostOrder_ >> 8));
+        marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
     }
 
     ++marginBeginCount24_;
