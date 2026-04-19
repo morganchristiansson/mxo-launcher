@@ -529,8 +529,8 @@ public:
     uint32_t SendAuthRequest(CLTLoginMediator& owner, const mxo::auth::GetPublicKeyReply& reply);
     // anchor: launcher.exe:0x447f50 / 0x447780 / 0x447260 / 0x447c10
     uint32_t HandleGetPublicKeyReply(CLTLoginMediator& owner, const mxo::auth::GetPublicKeyReply& reply);
-    // anchor: launcher.exe:0x44831c..0x448467
-    uint32_t SendAuthChallengeResponse(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
+    // Source-owned (NOT static-RE): inlined into HandleInboundAuthMessage case 0x09u at 0x44831c..0x448467
+    uint32_t SendAuthChallengeResponse_SOURCEOWNED_NO_RE(CLTLoginMediator& owner, const mxo::auth::AuthChallenge& challenge);
 
 private:
     // anchor: launcher.exe:0x445500

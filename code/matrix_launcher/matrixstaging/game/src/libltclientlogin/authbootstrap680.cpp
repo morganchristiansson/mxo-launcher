@@ -1570,14 +1570,87 @@ uint32_t AuthBootstrap680Child_0x441290::HandleInboundAuthMessage(
                 return kAuthBootstrap680InboundUnhandled;
             }
 
+            // anchor: launcher.exe:0x44831c..0x448467 (inlined raw 0x09 case building/sending raw 0x0a)
+            // NOT a separate function in static RE - fully inlined into HandleInboundAuthMessage
             mediator.lastAuthChallenge_ = challenge;
             spdlog::info(
                 "DIAGNOSTIC: launcher-owned auth parsed AS_AuthChallenge encryptedChallengeLen={}",
                 challenge.encryptedChallengeBytes.size());
             mediator.expectedAuthRequestName_ = "AS_AuthChallengeResponse";
-            return SendAuthChallengeResponse(mediator, challenge) != 0u
-                ? kAuthBootstrap680InboundHandledContinueWaiting
-                : kAuthBootstrap680InboundUnhandled;
+            {
+                // Inlined from former SendAuthChallengeResponse (source-owned, not static-RE separate function)
+                const char* password = SmallStringMirrorDataOrEmpty(child.string10);
+                const char* soePassword = SmallStringMirrorDataOrEmpty(child.string1C);
+                if (SmallStringMirrorLength(child.string10) == 0u) {
+                    spdlog::error(
+                        "launcher-owned auth received AS_AuthChallenge but child+0x10 password data is empty");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+                if (SmallStringMirrorLength(child.string1C) == 0u) {
+                    spdlog::warn(
+                        "launcher-owned auth raw0x0a using empty child+0x1c secondary password/station field while preserving the recovered 0x44831c field mapping");
+                }
+                if (mediator.lastAuthRequestBuildResult_.twofishKeyBytes.size() != 16u) {
+                    spdlog::error("launcher-owned auth missing Twofish key from AS_AuthRequest build result");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                mxo::auth::AuthChallengeResponseLayout layout;
+                mxo::auth::AuthChallengeResponseBuildResult buildResult;
+                if (!mxo::auth::BuildAuthChallengeResponsePacket(
+                        challenge.encryptedChallengeBytes,
+                        mediator.lastAuthRequestBuildResult_.twofishKeyBytes,
+                        password,
+                        soePassword,
+                        layout,
+                        mxo::auth::kFrameModeAuto,
+                        &buildResult)) {
+                    spdlog::error("launcher-owned auth failed to build AS_AuthChallengeResponse");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                if (!child.sendTarget50) {
+                    spdlog::warn(
+                        "AuthBootstrap680 raw0x0a challenge-response missing child+0x50 send target; refusing less-faithful fallback path");
+                    return kAuthBootstrap680InboundUnhandled;
+                }
+
+                auto* sendTarget = static_cast<mxo::liblttcp::CBaseConnection*>(child.sendTarget50);
+                const uint8_t rawCode =
+                    buildResult.packet.payloadBytes.empty() ? 0u : buildResult.packet.payloadBytes[0];
+                const uint32_t sendResult = sendTarget->SendPacket(
+                    buildResult.packet.bytes.data(),
+                    static_cast<uint32_t>(buildResult.packet.bytes.size()),
+                    nullptr);
+                spdlog::info(
+                    "DIAGNOSTIC: launcher-owned auth send via child+0x50 step='{}' rawCode=0x{:02x} message='{}' headerLen={} payloadLen={} byteCount={} sendTarget50={} -> sendResult=0x{:08x}",
+                    "AS_AuthChallengeResponse",
+                    rawCode,
+                    mxo::auth::AuthOpcodeName(rawCode),
+                    buildResult.packet.headerBytes.size(),
+                    buildResult.packet.payloadBytes.size(),
+                    buildResult.packet.bytes.size(),
+                    fmt::ptr(child.sendTarget50),
+                    static_cast<unsigned>(sendResult));
+                mediator.authChallengeResponseSent_ = (sendResult != 0u);
+                if (sendResult != 0u) {
+                    spdlog::debug(
+                        "AuthBootstrap680Child_0x441290::HandleInboundAuthMessage observed raw0x0a send without post-send child-state mutation decryptedChallengeBytes={} processedChallengeMd5Bytes={}",
+                        static_cast<unsigned>(buildResult.decryptedChallengeBytes.size()),
+                        static_cast<unsigned>(buildResult.processedChallengeMd5Bytes.size()));
+                    spdlog::info(
+                        "DIAGNOSTIC: launcher-owned auth built AS_AuthChallengeResponse passwordLengthField={} soePasswordLengthField={} plaintextLen={} ciphertextLen={} childString10Len={} childString1CLen={}",
+                        (unsigned)buildResult.passwordLengthField,
+                        (unsigned)buildResult.soePasswordLengthField,
+                        (unsigned)buildResult.plaintextBytes.size(),
+                        (unsigned)buildResult.ciphertextBytes.size(),
+                        static_cast<unsigned>(SmallStringMirrorLength(child.string10)),
+                        static_cast<unsigned>(SmallStringMirrorLength(child.string1C)));
+                }
+                return sendResult != 0u
+                    ? kAuthBootstrap680InboundHandledContinueWaiting
+                    : kAuthBootstrap680InboundUnhandled;
+            }
         }
 
         case 0x0bu: {
@@ -1979,8 +2052,9 @@ uint32_t AuthBootstrap680Child_0x441290::SendAuthRequest(
     return sendResult;
 }
 
-// anchor: launcher.exe:0x44831c..0x448467 (raw `0x09` inbound case building/sending raw `0x0a`)
-uint32_t AuthBootstrap680Child_0x441290::SendAuthChallengeResponse(
+// Source-owned (NOT static-RE anchored): former SendAuthChallengeResponse logic inlined above
+// into case 0x09u in HandleInboundAuthMessage (0x44831c..0x448467 in original)
+uint32_t AuthBootstrap680Child_0x441290::SendAuthChallengeResponse_SOURCEOWNED_NO_RE(
     CLTLoginMediator& mediator,
     const mxo::auth::AuthChallenge& challenge) {
     AuthBootstrap680Child_0x441290& child = *this;
