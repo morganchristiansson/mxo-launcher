@@ -122,7 +122,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
         const mxo::auth::AuthReply& reply);
     friend class CLTLoginState_AuthenticatePending_0x4b5014;
     friend class CLTLoginState_State4_0x4b503c;
-    friend class CLTLoginState_State6;
+    friend class CLTLoginState_State6_0x4b508c;
     friend class CLTLoginState_State7;
     friend class CLTLoginState_State8_0x4b5104;
     friend class CLTLoginState_State10;
