@@ -206,10 +206,10 @@ public:
 //   live `0x41c1f0` stop
 // So keep state3 as the waiting/helper-id leaf here rather than inventing a state3-local slot-3
 // body.
-class CLTLoginState_State3 : public CLTLoginState_AbstractFinalLeafBase {
+class CLTLoginState_State3_0x4b5208 : public CLTLoginState_AbstractFinalLeafBase {
 public:
     // anchor: launcher.exe:0x00439d80 (vtable 0x004b5208 slot 10 shared initializer)
-    CLTLoginState_State3() = default;
+    CLTLoginState_State3_0x4b5208() = default;
 
     // Intentionally no Slot3 override here:
     // the current practical advance out of state3 belongs to the owner-side mediator methods
