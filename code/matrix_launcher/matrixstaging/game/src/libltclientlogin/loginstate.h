@@ -416,10 +416,10 @@ public:
 // anchor: launcher.exe vtable 0x004b5154
 // docs: ../../docs/launcher.exe/VTABLES/0x004b5154.md
 // Provisional better-name suggestion: `CLTLoginState_CreateCharacterLoadPending`
-class CLTLoginState_State11 : public CLTLoginState {
+class CLTLoginState_State11_0x4b5154 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x00439720 (vtable 0x004b5154 slot 10 initializer)
-    CLTLoginState_State11() = default;
+    CLTLoginState_State11_0x4b5154() = default;
 
 private:
     // `0x440320` uses two byte-sized fields on the 8-byte helper11 object at `this+4/+5` as

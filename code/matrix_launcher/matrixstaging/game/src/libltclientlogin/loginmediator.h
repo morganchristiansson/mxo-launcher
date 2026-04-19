@@ -126,7 +126,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
     friend class CLTLoginState_State7;
     friend class CLTLoginState_State8_0x4b5104;
     friend class CLTLoginState_State10;
-    friend class CLTLoginState_State11;
+    friend class CLTLoginState_State11_0x4b5154;
     friend class mxo::liblttcp::CAuthStartupConnection_0x4afef0;
     friend class mxo::liblttcp::CBaseMarginConnection_0x4b64a8;
     friend class mxo::liblttcp::CMarginConnection_0x4aff38;
@@ -1301,9 +1301,9 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Post-Auth Margin/Loading State (launcher.exe:0x4f78b8)
     // =============================================================================
     // Recovered from Ghidra analysis of launcher.exe state10/state11-era functions:
-    // - 0x43c020 = CLTLoginState_State11 slot 3 send body
+    // - 0x43c020 = CLTLoginState_State11_0x4b5154 slot 3 send body
     //   Builds/sends margin packet with first payload byte 0x4d, posts event 0x15
-    // - 0x440320 = CLTLoginState_State11 slot 6 reply body
+    // - 0x440320 = CLTLoginState_State11_0x4b5154 slot 6 reply body
     //   Handles MS_LoadCharacterReply (0x10), accumulates fragments into +0xf1c,
     //   posts event 0x16 on completion
     // =============================================================================

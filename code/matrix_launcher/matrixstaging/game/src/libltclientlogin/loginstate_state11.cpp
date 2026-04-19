@@ -9,6 +9,12 @@
 #include "loginstate_packet_builder_scaffold.h"
 
 namespace mxo::ltlogin {
+
+// anchor: launcher.exe vtable 0x004b5154
+const char* CLTLoginState_State11_0x4b5154::DebugName() const {
+    return "CLTLoginState_State11";
+}
+
 namespace {
 
 static void CopyCStringIntoFixed(char* dest, size_t destSize, const uint8_t* src, size_t srcAvailable) {
@@ -49,13 +55,8 @@ static void ResetOwnedSectionBytes(void*& buffer, uint32_t& length, uint8_t& fla
 
 }  // namespace
 
-// anchor: launcher.exe vtable 0x004b5154
-const char* CLTLoginState_State11::DebugName() const {
-    return "CLTLoginState_State11";
-}
-
 // anchor: launcher.exe:0x0043c020 (vtable 0x004b5154 slot 3)
-void CLTLoginState_State11::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
@@ -63,7 +64,7 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
     }
 
     // Faithfulness correction:
-    // - `0x43c020` belongs to `CLTLoginState_State11` slot 3, so the packet build/send shape
+    // - `0x43c020` belongs to `CLTLoginState_State11_0x4b5154` slot 3, so the packet build/send shape
     //   should live here, not on the mediator
     // - original body:
     //   - sends raw margin opcode `0x0c`
@@ -134,7 +135,7 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
     mediator->PostEvent(0x15u);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_State11::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
+        "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue built fixed-0x4d margin payload payloadTag=0x{:02x} fixedBytes=0x{:02x} totalBytes=0x{:02x} SkinToneID=0x{:08x} BodyID=0x{:08x} HeadID=0x{:08x} HairID=0x{:08x} HairColorID=0x{:08x} TraitID=0x{:08x} RealFirstName='{}' RealLastName='{}' Background='{}' GameSessionID='{}' -> sendResult=0x{:08x} then posts event=0x15",
         State11Packet0x4dFixedPayload::kPayloadTag0c,
         State11Packet0x4dFixedPayload::kFixedByteCount,
         packetBuilder.PayloadByteCount(),
@@ -150,7 +151,7 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
         mediator->GetGameSessionId() ? mediator->GetGameSessionId() : "<empty>",
         sendResult);
     spdlog::info(
-        "CLTLoginState_State11::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
+        "CLTLoginState_State11_0x4b5154::Slot3_BeginOrContinue awaiting first helper11 reply; slot6 requires a later raw-0x10 that survives the base margin code-2/4/5 filter currentState={} marginReceiveCount={} filteredBeforeSlot6={} slot6DispatchCount={}",
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
         static_cast<unsigned>(mediator->MarginPacketReceiveCountScaffold()),
         static_cast<unsigned>(mediator->MarginPacketFilteredBeforeSlot6CountScaffold()),
@@ -159,7 +160,7 @@ void CLTLoginState_State11::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
 }
 
 // anchor: launcher.exe:0x00440320 (vtable 0x004b5154 slot 6)
-uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+uint32_t CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)workItem;
     if (!mediator) {
@@ -172,7 +173,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
     if (!loadCharacterReplyEnvelope.valid) {
         mediator->worldListCountOrStatus80 = 0x12000005u;
         spdlog::info(
-            "CLTLoginState_State11::Slot6_HandleSecondaryMessage rejected message ref; mirrored original owner+0x80=0x12000005 and returned false-like");
+            "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage rejected message ref; mirrored original owner+0x80=0x12000005 and returned false-like");
         return 0u;
     }
 
@@ -184,7 +185,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
         (void)mediator->SetCurrentState(3u);
         mediator->PostError(12u);
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage observed failure status=0x{:08x} handoffWord=0x{:04x}; mirrored original owner+0x108 clear, owner+0xcc8=0xff, state3 switch, and error=12",
+            "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage observed failure status=0x{:08x} handoffWord=0x{:04x}; mirrored original owner+0x108 clear, owner+0xcc8=0xff, state3 switch, and error=12",
             static_cast<unsigned>(loadCharacterReplyEnvelope.status),
             static_cast<unsigned>(loadCharacterReplyEnvelope.handoffWord09));
         return 1u;
@@ -410,7 +411,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
                     section11Begin + ownerState.state8Section11String1460.capacity();
             }
             spdlog::info(
-                "CLTLoginState_State11::Slot6_HandleSecondaryMessage applied shared section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
+                "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage applied shared section 0x0b side effect dword145c=0x{:08x} string1460Len={}",
                 static_cast<unsigned>(ownerState.state8Section11Dword145c),
                 static_cast<unsigned>(ownerState.state8Section11String1460.size()));
             break;
@@ -431,7 +432,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
         }
         const uint32_t slot3Result = mediator->SetCurrentState(9u);
         spdlog::info(
-            "CLTLoginState_State11::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
+            "CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage mirrored 0x41b450 helper9 handoff before event=0x16 handoffWord=0x{:04x} -> slot3Result=0x{:08x}",
             loadCharacterReplyEnvelope.handoffWord09,
             static_cast<unsigned>(slot3Result));
         // anchor: launcher.exe:0x440320 completion tail posts event 0x16 after switching to helper9.
@@ -442,7 +443,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
         mediator->PostEvent(0x16u);
 
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} name='{}' -> currentState=helper9 event=0x16",
+            "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage completed helper11 reply progression status=0x{:08x} section={} bytes={} handoffWord=0x{:04x} seen={} expected={} firstFragment={} name='{}' -> currentState=helper9 event=0x16",
             loadCharacterReplyEnvelope.status,
             loadCharacterReplyEnvelope.sectionSelectorMinus2,
             loadCharacterReplyEnvelope.sectionByteCount,
@@ -455,7 +456,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
         replySectionsExpected_ = 0;
     } else {
         spdlog::info(
-            "DIAGNOSTIC: CLTLoginState_State11::Slot6_HandleSecondaryMessage routed helper11 reply status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} section={} bytes={} seen={} expected={} seedCount={} firstFragment={} name='{}'",
+            "DIAGNOSTIC: CLTLoginState_State11_0x4b5154::Slot6_HandleSecondaryMessage routed helper11 reply status=0x{:08x} field05=0x{:08x} handoffWord=0x{:04x} section={} bytes={} seen={} expected={} seedCount={} firstFragment={} name='{}'",
             loadCharacterReplyEnvelope.status,
             loadCharacterReplyEnvelope.field05,
             loadCharacterReplyEnvelope.handoffWord09,
@@ -471,7 +472,7 @@ uint32_t CLTLoginState_State11::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMes
 }
 
 // anchor: launcher.exe:0x00438cb0 (vtable 0x004b5154 slot 7)
-uint32_t CLTLoginState_State11::GetStateId() const {
+uint32_t CLTLoginState_State11_0x4b5154::GetStateId() const {
     return 11;
 }
 
