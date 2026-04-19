@@ -119,12 +119,15 @@ mcp({ tool: "ghidra_annotate", args: '{"file_name":"launcher.exe","action":"crea
 mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"symbols","arguments":{"action":"update","current_name":"DAT_004d2c69","new_name":"g_LauncherNoPatchFlowFlagByte"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"Launcher_ParseCommandLine","variable_symbol_id":12345,"new_name":"stringCursor","new_data_type":"char *"}}]}' })
 
 // Variable renaming workflow (complete example):
-// 1. First list variables to discover the correct symbol_id
+// 1. First list variables to discover the symbol_id or high_symbol_id
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"list_variables","name":"FunctionName"}' })
-// 2. Then rename using the actual symbol_id from step 1
+// 2. Then rename using the symbol_id (small integers for parameters/USER_DEFINED locals)
 mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"FunctionName","variable_symbol_id":9621,"new_name":"betterName","new_data_type":"uint8_t *"}' })
-// 3. Or batch multiple renames together
-mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"functions","arguments":{"action":"rename_variable","name":"FunctionName","variable_symbol_id":9621,"new_name":"var1","new_data_type":"uint8_t *"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"FunctionName","variable_symbol_id":9622,"new_name":"var2","new_data_type":"uint16_t"}}]}' })
+// 3. For decompiler synthetics (pcVar*, uVar*, extraout_*), use high_symbol_id AS A STRING
+//    JSON truncates 64-bit integers, so "4614873502636310661" works but 4614873502636310661 fails
+mcp({ tool: "ghidra_functions", args: '{"file_name":"launcher.exe","action":"rename_variable","name":"CLTIPAddressList_Reinit","variable_symbol_id":"4614873502636310661","new_name":"tokenCursor","new_data_type":"char *"}' })
+// 4. Batch multiple renames (use string IDs for synthetics, integers for regular symbol_ids)
+mcp({ tool: "ghidra_batch_operations", args: '{"file_name":"launcher.exe","operations":[{"tool":"functions","arguments":{"action":"rename_variable","name":"FunctionName","variable_symbol_id":9621,"new_name":"var1","new_data_type":"uint8_t *"}},{"tool":"functions","arguments":{"action":"rename_variable","name":"CLTIPAddressList_Reinit","variable_symbol_id":"4614873502636310662","new_name":"resolveResult","new_data_type":"uint"}}]}' })
 
 // Oversized output
 mcp({ tool: "ghidra_read_tool_output", args: '{"action":"read","session_id":"ses_...","output_id":"out_...","offset":0,"max_chars":12000}' })
