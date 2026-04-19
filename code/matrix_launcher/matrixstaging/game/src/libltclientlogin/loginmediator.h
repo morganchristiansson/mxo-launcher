@@ -240,7 +240,7 @@ public:
         void* helper78A0 = nullptr;  // slot 14 / phase-code 14
         void* helper78A4 = nullptr;  // slot 15 / phase-code 15 / CLTLoginState_State15_0x4b0b88
         void* helper78A8 = nullptr;  // slot 16 / phase-code 16 / CLTLoginState_State16_0x4b0bb0
-        void* helper78AC = nullptr;  // slot 17 / phase-code 17 / CLTLoginState_State17
+        void* helper78AC = nullptr;  // slot 17 / phase-code 17 / CLTLoginState_State17_0x4b0bd8
         void* helper78B0 = nullptr;  // slot 18 / phase-code 18 / CLTLoginState_State18
         void* helper78B4 = nullptr;  // slot 19 / phase-code 19 / CLTLoginState_State19
     };

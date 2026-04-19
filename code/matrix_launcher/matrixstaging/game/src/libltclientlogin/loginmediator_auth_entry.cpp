@@ -42,7 +42,7 @@ static CLTLoginState_State13_0x4b50dc g_State13 = {};
 static CLTLoginState_WorldListPending_0x4b4fec g_WorldListPending = {};
 static CLTLoginState_State15_0x4b0b88 g_State15_0x4b0b88 = {};
 static CLTLoginState_State16_0x4b0bb0 g_State16_0x4b0bb0 = {};
-static CLTLoginState_State17 g_State17 = {};
+static CLTLoginState_State17_0x4b0bd8 g_State17_0x4b0bd8 = {};
 static CLTLoginState_State18 g_State18 = {};
 static CLTLoginState_State19 g_State19 = {};
 
@@ -73,7 +73,7 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
     g_LoginHelperDispatchTableScaffold.helper78A0 = &g_WorldListPending;
     g_LoginHelperDispatchTableScaffold.helper78A4 = &g_State15_0x4b0b88;
     g_LoginHelperDispatchTableScaffold.helper78A8 = &g_State16_0x4b0bb0;
-    g_LoginHelperDispatchTableScaffold.helper78AC = &g_State17;
+    g_LoginHelperDispatchTableScaffold.helper78AC = &g_State17_0x4b0bd8;
     g_LoginHelperDispatchTableScaffold.helper78B0 = &g_State18;
     g_LoginHelperDispatchTableScaffold.helper78B4 = &g_State19;
 }
