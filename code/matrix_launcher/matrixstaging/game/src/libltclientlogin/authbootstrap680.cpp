@@ -762,10 +762,7 @@ static void ResetAuthBootstrap680ReplyMaterialization(
         &ownedState.privateExponentBigIntD8OwnedDigits);
 }
 
-static const uint8_t* AuthBootstrap680BigIntObjectBytes(
-    const AuthBootstrap680BigIntObjects_0x4ba50c& object) {
-    return reinterpret_cast<const uint8_t*>(&object);
-}
+
 
 static bool BuildPositiveAuthBootstrap680BigIntFromBigEndianBytes(
     AuthBootstrap680BigIntObjects_0x4ba50c* outObject,
