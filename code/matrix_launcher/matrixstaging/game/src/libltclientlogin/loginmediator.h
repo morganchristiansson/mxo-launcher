@@ -1395,7 +1395,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Preserved call contract from the original body:
     // - arg1 = route/prefix text used to refresh owner `+0x30`
     // - arg2 = cached non-zero selector that skips the route-refresh / address-list rebuild path
-    uint32_t BeginMarginConnectionScaffold(const char* routeHostText, uint8_t cachedRouteSelector);
+    uint32_t BeginMarginConnection(const char* routeHostText, uint8_t cachedRouteSelector);
 
     // Post-Auth Margin/Loading State Accessors (launcher.exe:0x4f78b8)
     // =============================================================================
@@ -1763,6 +1763,9 @@ extern const char* g_ServerPublicModulusB64;
 extern const char* g_ServerPublicExponentB64;
 // Skip AS_GetPublicKeyReply embedded key validation (for non-standard key sizes like 2048-bit)
 extern uint32_t g_SkipAuthPublicKeyReplyValidation;
+// Margin server globals - analogous to auth globals, for faithful server-selection flow.
+extern const char* g_qsMarginServerDNSName;
+extern uint16_t g_MarginServerPort;
 
 }  // namespace mxo::ltlogin
 

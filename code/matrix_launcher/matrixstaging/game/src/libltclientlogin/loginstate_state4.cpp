@@ -32,7 +32,7 @@ static uint32_t BeginMarginConnectionForState4Case(
     if (!mediator) {
         return 0u;
     }
-    return mediator->BeginMarginConnectionScaffold(routeHostText, cachedRouteSelector);
+    return mediator->BeginMarginConnection(routeHostText, cachedRouteSelector);
 }
 
 }  // namespace

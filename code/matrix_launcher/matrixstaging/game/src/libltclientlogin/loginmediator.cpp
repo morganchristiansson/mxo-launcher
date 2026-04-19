@@ -3433,7 +3433,7 @@ bool CLTLoginMediator::RebuildMarginAddressList() {
 
     if (resolvedHostName.empty()) {
         marginAddressList3c_.Reset();
-        spdlog::debug("CLTLoginMediator::BeginMarginConnectionScaffold unresolved margin host");
+        spdlog::debug("CLTLoginMediator::BeginMarginConnection unresolved margin host");
         return false;
     }
 
@@ -3444,7 +3444,7 @@ bool CLTLoginMediator::RebuildMarginAddressList() {
 
     if (!marginAddressList3c_.Reinit(resolvedHostName.c_str(), flags)) {
         spdlog::warn(
-            "CLTLoginMediator::BeginMarginConnectionScaffold failed to resolve margin host '{}' flags=0x{:02x}",
+            "CLTLoginMediator::BeginMarginConnection failed to resolve margin host '{}' flags=0x{:02x}",
             resolvedHostName,
             flags);
         return false;

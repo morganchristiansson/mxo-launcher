@@ -89,7 +89,7 @@ const char* CLTLoginMediator::ResolveMarginRouteDescriptor() const {
 }
 
 // anchor: launcher.exe:0x41e500
-uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostText, uint8_t cachedRouteSelector) {
+uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint8_t cachedRouteSelector) {
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`
     // case split back into `CLTLoginState_State4::Slot3_BeginOrContinue`.
     //
@@ -101,6 +101,17 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     // - increment owner dword `+0x24`
     // - clear owner `+0x7c`
     // - call `connection->+0x1c(owner+0x6c)`
+    //
+    // Fidelity improvement: sync from globals when instance fields are empty
+    // This removes need for infidel SetMarginServerConfig scaffold methods.
+    // The original reads globals directly (anchor: launcher.exe:0x4f7b14 equivalent).
+    if (marginServerDnsSuffix_.empty() && g_qsMarginServerDNSName && g_qsMarginServerDNSName[0]) {
+        marginServerDnsSuffix_ = g_qsMarginServerDNSName;
+    }
+    if (marginServerPortHostOrder_ == 0u && g_MarginServerPort != 0u) {
+        marginServerPortHostOrder_ = g_MarginServerPort;
+    }
+
     // Current bounded active-path correction:
     // - the existing-character state8 -> state4 path reaches here directly
     // - keep that path connection-centric: `EnsureConnected()` re-enters the engine connect slot
@@ -109,7 +120,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 
     mxo::liblttcp::CMessageConnection_0x4b7928* connection = EnsureMarginConnectionObject();
     if (!connection) {
-        spdlog::warn("CLTLoginMediator::BeginMarginConnectionScaffold failed to allocate margin connection");
+        spdlog::warn("CLTLoginMediator::BeginMarginConnection failed to allocate margin connection");
         return 0u;
     }
 
@@ -121,7 +132,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
     if (shouldRefreshRouteState || needsBoundedNonZeroSelectorMaterialization) {
         if (!routeHostText || routeHostText[0] == '\0') {
             spdlog::debug(
-                "CLTLoginMediator::BeginMarginConnectionScaffold selector=0x{:02x} requires routeHostText but received <empty>",
+                "CLTLoginMediator::BeginMarginConnection selector=0x{:02x} requires routeHostText but received <empty>",
                 cachedRouteSelector);
             return 0u;
         }
@@ -136,7 +147,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 
         const std::string marginHost = ResolvedMarginHostName();
         if (marginHost.empty()) {
-            spdlog::debug("CLTLoginMediator::BeginMarginConnectionScaffold has no resolved margin host");
+            spdlog::debug("CLTLoginMediator::BeginMarginConnection has no resolved margin host");
             return 0u;
         }
 
@@ -149,7 +160,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 
         if (marginSelectedIpv4_7c_ == 0u && !SelectMarginEndpointIpv4()) {
             spdlog::warn(
-                "CLTLoginMediator::BeginMarginConnectionScaffold found no IPv4 candidates for '{}'",
+                "CLTLoginMediator::BeginMarginConnection found no IPv4 candidates for '{}'",
                 marginHost);
             return 0u;
         }
@@ -168,7 +179,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
 
     const uint32_t result = connection->EnsureConnected();
     spdlog::info(
-        "CLTLoginMediator::BeginMarginConnectionScaffold resolvedHost='{}' routeHostText='{}' selector=0x{:02x} beginCount={} selectedIpv4=0x{:08x} port={} ensureConnectedResult=0x{:08x}",
+        "CLTLoginMediator::BeginMarginConnection resolvedHost='{}' routeHostText='{}' selector=0x{:02x} beginCount={} selectedIpv4=0x{:08x} port={} ensureConnectedResult=0x{:08x}",
         marginHost.empty() ? std::string("<empty>") : marginHost,
         (routeHostText && routeHostText[0]) ? std::string(routeHostText) : std::string("<empty>"),
         cachedRouteSelector,
@@ -178,7 +189,7 @@ uint32_t CLTLoginMediator::BeginMarginConnectionScaffold(const char* routeHostTe
         result);
     if (result == 0u) {
         spdlog::debug(
-            "CLTLoginMediator::BeginMarginConnectionScaffold connect failed host='{}' port={} ip=0x{:08x} selector={} beginCount={}",
+            "CLTLoginMediator::BeginMarginConnection connect failed host='{}' port={} ip=0x{:08x} selector={} beginCount={}",
             marginHost.empty() ? std::string("<empty>") : marginHost,
             marginServerPortHostOrder_,
             marginEndpoint_.ipv4NetworkOrder,
