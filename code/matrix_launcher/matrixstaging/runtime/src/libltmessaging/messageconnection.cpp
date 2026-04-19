@@ -2093,36 +2093,83 @@ void MessageConnectionMessageRefHelper_0x4489d0::CMessageConnectionMessageRefHan
 }
 
 // anchor: launcher.exe:0x41bc20 - CMessageConnectionMessageRef_DecodeMessageCode
+// FIDELITY: Static-RE shows this function handles BOTH headerless and non-headerless cases.
+// When headerless10 != 0, uses locator-based offset lookup. Also sets headerless10=1 (redundant set).
 uint16_t CMessageConnectionMessageRef_DecodeMessageCode(
     CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || !messageRef->messageStorage0c) {
         return 0;
     }
 
-    // Non-headerless message code is at the start of the payload
+    messageRef->AddRef();  // FIDELITY: AddRef from static-RE at +0x04 vtable
+
     const uint8_t* payload = messageRef->messageStorage0c->PayloadBase();
     if (!payload) {
+        messageRef->Release();
         return 0;
     }
 
-    return static_cast<uint16_t>(payload[0]) | (static_cast<uint16_t>(payload[1]) << 8);
+    uint16_t messageCode = 0;
+    if (messageRef->headerless10 == 0u) {
+        // Non-headerless: message code at payload[0]
+        messageCode = static_cast<uint16_t>(payload[0]);
+    } else {
+        // Headerless: use locator-based offset lookup
+        // anchor: launcher.exe:0x41bbd5-0x41bbe6 - g_MessageOffsetLookupTable lookups
+        const uint8_t locatorByte = payload[1];
+        const uint8_t targetLocatorType = static_cast<uint8_t>((locatorByte >> 4) & 0x07u);
+        const uint8_t senderLocatorType = static_cast<uint8_t>(locatorByte & 0x07u);
+        static const uint8_t kMessageOffsetLookupTable[8] = {
+            0x00, 0x04, 0x08, 0x0c, 0x10, 0x14, 0x18, 0x1c
+        };
+        const size_t offset =
+            kMessageOffsetLookupTable[targetLocatorType] +
+            kMessageOffsetLookupTable[senderLocatorType] + 0x12;
+        messageRef->headerless10 = 1u;  // FIDELITY: redundant set from static-RE
+        messageCode = static_cast<uint16_t>(payload[offset]);
+    }
+
+    // Check for high-bit set (means 2-byte little-endian code)
+    if ((messageCode & 0x80u) != 0u) {
+        messageRef->Release();
+        return static_cast<uint16_t>(
+            (static_cast<uint16_t>(messageCode) << 8) |
+            static_cast<uint16_t>(payload[1])) & 0x7fffu;
+    }
+
+    messageRef->Release();
+    return messageCode;
 }
 
 // anchor: launcher.exe:0x41bbb0 - CMessageConnectionMessageRef_DecodeMessageCodeAlternate
+// FIDELITY: Separate function for headerless that doesn't check headerless10 flag.
+// Uses raw payload[2] directly (after locator bytes).
 uint16_t CMessageConnectionMessageRef_DecodeMessageCodeAlternate(
     CMessageConnectionMessageRef_0x4ba23c* messageRef) {
     if (!messageRef || !messageRef->messageStorage0c) {
         return 0;
     }
 
-    // Headerless message code decoding from locator-based format
+    messageRef->AddRef();  // FIDELITY: AddRef from static-RE
+
     const uint8_t* payload = messageRef->messageStorage0c->PayloadBase();
     if (!payload || messageRef->messageStorage0c->PayloadByteCount() < 2) {
+        messageRef->Release();
         return 0;
     }
 
     // Headerless format: message code is in bytes 2-3 (after locator bytes)
-    return static_cast<uint16_t>(payload[2]) | (static_cast<uint16_t>(payload[3]) << 8);
+    uint16_t messageCode = static_cast<uint16_t>(payload[2]);
+
+    if ((messageCode & 0x80u) != 0u) {
+        messageRef->Release();
+        return static_cast<uint16_t>(
+            (static_cast<uint16_t>(messageCode) << 8) |
+            static_cast<uint16_t>(payload[3])) & 0x7fffu;
+    }
+
+    messageRef->Release();
+    return messageCode;
 }
 
 
