@@ -4,12 +4,12 @@
 namespace mxo::ltlogin {
 
 // anchor: launcher.exe vtable 0x004b0c00
-const char* CLTLoginState_State18::DebugName() const {
-    return "CLTLoginState_State18";
+const char* CLTLoginState_State18_0x4b0c00::DebugName() const {
+    return "CLTLoginState_State18_0x4b0c00";
 }
 
 // anchor: launcher.exe:0x00421a50 (vtable 0x004b0c00 slot 3)
-void CLTLoginState_State18::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_State18_0x4b0c00::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Stronger current read from disassembly review:
     // - this is the later state18 session-helper path in the alternate
@@ -28,18 +28,18 @@ void CLTLoginState_State18::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) 
 }
 
 // anchor: launcher.exe:0x004208e0 (vtable 0x004b0c00 slot 6)
-uint32_t CLTLoginState_State18::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+uint32_t CLTLoginState_State18_0x4b0c00::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     (void)workItem;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x004208e0");
 }
 
 // anchor: launcher.exe:0x00420340 (vtable 0x004b0c00 slot 7)
-uint32_t CLTLoginState_State18::GetStateId() const {
+uint32_t CLTLoginState_State18_0x4b0c00::GetStateId() const {
     return 18;
 }
 
 // anchor: launcher.exe:0x00420960 (vtable 0x004b0c00 slot 8)
-uint32_t CLTLoginState_State18::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) {
+uint32_t CLTLoginState_State18_0x4b0c00::Slot8_HandleAuxiliaryEvent(uint32_t param1, void* context) {
     (void)param1;
     (void)context;
     return PlaceholderStateAction(DebugName(), "launcher.exe:0x00420960");

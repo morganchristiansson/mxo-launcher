@@ -2601,7 +2601,7 @@ void CLTLoginMediator::CommitSessionCallbackHelperGameSessionId664() {
     }
 }
 
-// source-owned shared helper for `CLTLoginState_State18` slot 3 / `0x421a50`
+// source-owned shared helper for `CLTLoginState_State18_0x4b0c00` slot 3 / `0x421a50`
 // UNANCHORED: no original launcher.exe anchor assigned yet.
 void CLTLoginMediator::RefreshSessionHelperGameSessionId664FromSourceBlock94() {
     // Current best source-owned mirror of the alternate state18 session-helper path:
