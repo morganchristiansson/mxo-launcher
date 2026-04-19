@@ -78,26 +78,6 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
     g_LoginHelperDispatchTableScaffold.helper78B4 = &g_State19;
 }
 
-
-
-/// INFIDEL - original launcher uses globals directly. Commented out for fidelity.
-// void CLTLoginMediator::SetAuthServerConfig(const char* dnsName, uint16_t portHostOrder, bool ignoreHostsFile) {
-//     authServerDnsName_ = dnsName ? dnsName : "";
-//     authServerPortHostOrder_ = portHostOrder;
-//     ignoreHostsFileForAuth_ = ignoreHostsFile;
-//
-//     ResetAuthConnectRetryStateScaffold();
-//     BuildAuthEndpoint();
-// }
-
-// UNANCHORED: source-owned reset for the auth-side owner `+0x28/+0x4c/+0x50/+0x58` retry/iterator family.
-void CLTLoginMediator::ResetAuthConnectRetryStateScaffold() {
-    authAddressListResolvedHostName4c_ = authServerDnsName_;
-    authAddressList4c_.Reset();
-    authConnectAttemptCount28_ = 0;
-}
-
-// UNANCHORED: source-owned getter for the mirrored auth connect-attempt counter at owner `+0x28`.
 uint32_t CLTLoginMediator::AuthConnectAttemptCountScaffold() const {
     return authConnectAttemptCount28_;
 }
@@ -286,7 +266,10 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
         return 0u;
     }
 
-    ResetAuthConnectRetryStateScaffold();
+    // Inline reset - original resets fields directly
+    authAddressListResolvedHostName4c_ = authServerDnsName_;
+    authAddressList4c_.Reset();
+    authConnectAttemptCount28_ = 0;
 
     CLTLoginState* const upstreamState = currentState_;
     spdlog::info(
