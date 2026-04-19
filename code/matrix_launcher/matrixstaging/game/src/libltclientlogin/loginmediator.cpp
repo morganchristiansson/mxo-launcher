@@ -2250,7 +2250,7 @@ bool CLTLoginMediator::State10HasReadyConnectionState2() const {
     // Exact recovered gate from `0x41b4b0`:
     // - owner `+0x1c` must be non-null
     // - connection state field `+0x34` must equal `2`
-    const mxo::liblttcp::CMessageConnection_0x4b7928* connection = MarginConnection();
+    const mxo::liblttcp::CMessageConnection_0x4b7928* connection = marginConnection_;
     return connection != nullptr &&
            connection->State() == mxo::liblttcp::LTTCPEngineConnectionState::kUdpMonitorActive;
 }
@@ -2529,7 +2529,7 @@ void CLTLoginMediator::AppendLateEntryStringTriple1470Scaffold(
 // Current source preserves envelope-based send bridge for packet-builder integration.
 uint32_t CLTLoginMediator::SendCurrentMarginPacket(
     mxo::liblttcp::CMessageConnectionPacketBuilderEnvelope& envelope) {
-    mxo::liblttcp::CMessageConnection_0x4b7928* const connection = MarginConnection();
+    mxo::liblttcp::CMessageConnection_0x4b7928* const connection = marginConnection_;
     if (!connection) {
         return 0u;
     }
@@ -2799,7 +2799,7 @@ uint32_t CLTLoginMediator::SendMarginFramedPacket(
     uint8_t plainRawCode,
     const char* stepLabel,
     bool encryptedTransport) {
-    mxo::liblttcp::CMessageConnection_0x4b7928* connection = MarginConnection();
+    mxo::liblttcp::CMessageConnection_0x4b7928* connection = marginConnection_;
     if (!connection) {
         connection = EnsureMarginConnectionObject();
     }
@@ -2892,7 +2892,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             // - writing that live `+0x85..+0x94` mirror on the margin connection now also triggers
             //   the lazy local `+0x9c = CStreamPacketEncryptionModule` scaffold install/refresh,
             //   matching the newly recovered agenda-module ownership point more closely.
-            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(MarginConnection());
+            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
                 marginConnection != nullptr && marginBootstrapState.marginTwofishKeyBytes.size() == 16u) {
                 std::array<uint8_t, 16> liveSeedBytes85 = {};
                 std::copy_n(
@@ -2906,7 +2906,7 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
             }
 
             uint32_t sendResult = 0u;
-            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(MarginConnection());
+            if (auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(marginConnection_);
                 marginConnection != nullptr &&
                 marginBootstrapState.marginTwofishKeyBytes.size() == 16u &&
                 marginBootstrapState.certChallengeBytes.size() == 16u) {
@@ -2947,13 +2947,13 @@ uint32_t CLTLoginMediator::ContinueMarginBootstrapHandshake(
                 expectedMarginRequestName_ = "CERT_ConnectReply";
 
                 // DEBUG: Log that we're now waiting for CERT_ConnectReply
-                const std::string remoteHost = MarginConnection()
-                    ? static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(MarginConnection())->RemoteHostName()
+                const std::string remoteHost = marginConnection_
+                    ? static_cast<mxo::liblttcp::CMessageConnection_0x4b7928*>(marginConnection_)->RemoteHostName()
                     : std::string("<no connection>");
                 spdlog::info(
                     "CLTLoginMediator::ContinueMarginBootstrapHandshake ADVANCED to phase kSentCertChallengeResponse, now waiting for CERT_ConnectReply (opcode 0x04) this={} marginConnection={} remoteHost='{}'",
                     fmt::ptr(this),
-                    fmt::ptr(MarginConnection()),
+                    fmt::ptr(marginConnection_),
                     remoteHost.empty() ? std::string("<empty>") : remoteHost);
             }
             return sendResult;

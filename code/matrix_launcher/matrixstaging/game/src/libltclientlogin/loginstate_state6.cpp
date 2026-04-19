@@ -185,7 +185,7 @@ void CLTLoginState_State6::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
         return;
     }
 
-    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(g_CurrentLoginMediator->MarginConnection());
+    auto* marginConnection = dynamic_cast<mxo::liblttcp::CMarginConnection_0x4aff38*>(g_CurrentLoginMediator->marginConnection_);
     const bool marginConnectionReady84 =
         marginConnection != nullptr && marginConnection->MessageCode4SuccessFlag84();
     // anchor: launcher.exe:0x43b94a..0x43b95e - no logging on fallback, just return void

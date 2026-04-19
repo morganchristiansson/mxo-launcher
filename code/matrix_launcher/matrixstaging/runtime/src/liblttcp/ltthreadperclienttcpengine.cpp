@@ -3230,7 +3230,7 @@ void CLTThreadPerClientTCPEngine_0x4b2768::PumpLauncherConnectionsFromArg5Helper
         /*isMarginConnection=*/false,
         "AuthReceivePacket");
     PumpLauncherConnectionContextScaffold(
-        mediator->MarginConnection(),
+        mediator->marginConnection_,
         mediator,
         /*isMarginConnection=*/true,
         "MarginReceivePacket");

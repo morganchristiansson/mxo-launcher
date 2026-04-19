@@ -1180,7 +1180,7 @@ static bool CMessageConnection_0x4b7928_IsMediatorAuthConnection(
 static bool CMessageConnection_0x4b7928_IsMediatorMarginConnection(
     CMessageConnection_0x4b7928* self,
     const mxo::ltlogin::CLTLoginMediator* mediator) {
-    return self != nullptr && mediator != nullptr && self == mediator->MarginConnection();
+    return self != nullptr && mediator != nullptr && self == mediator->marginConnection_;
 }
 
 // anchor: launcher.exe:0x4490c0 first dispatch on `workItem+0x04`

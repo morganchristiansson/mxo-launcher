@@ -1030,7 +1030,7 @@ public:
 
     std::string ResolvedMarginHostName() const;
 
-    mxo::liblttcp::CMessageConnection_0x4b7928* MarginConnection() const;
+
     bool AuthPeerCloseQueuedScaffold() const { return authPeerCloseQueuedScaffold_; }
     bool MarginPeerCloseQueuedScaffold() const { return marginPeerCloseQueuedScaffold_; }
     void SetAuthPeerCloseQueuedScaffold(bool value) { authPeerCloseQueuedScaffold_ = value; }
@@ -1174,8 +1174,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
     // Current source-owned mirror of owner `+0x4c` auth address-list reinit used by startup
     // helper `0x41b160` after launcher config has already seeded the auth host name.
     void RefreshAuthAddressListForCurrentHostScaffold();
-    uint32_t AuthConnectAttemptCountScaffold() const;
-    uint32_t AuthConnectCandidateCountScaffold() const;
+
     // Newer `0x44af20 / 0x442d00 / 0x41f260` tightening now makes the later post-auth receive
     // boundary explicit in source too:
     // - decoded margin codes `2`, `4`, and `5` are consumed by base margin dispatch

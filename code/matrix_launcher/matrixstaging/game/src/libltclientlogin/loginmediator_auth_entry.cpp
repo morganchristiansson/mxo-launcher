@@ -78,15 +78,6 @@ void CLTLoginMediator::InitializeHelperDispatchTable() {
     g_LoginHelperDispatchTableScaffold.helper78B4 = &g_State19;
 }
 
-uint32_t CLTLoginMediator::AuthConnectAttemptCountScaffold() const {
-    return authConnectAttemptCount28_;
-}
-
-// UNANCHORED: source-owned getter for the mirrored auth candidate count derived from owner `+0x4c/+0x50`.
-uint32_t CLTLoginMediator::AuthConnectCandidateCountScaffold() const {
-    return static_cast<uint32_t>(authAddressList4c_.Count());
-}
-
 // UNANCHORED: source-owned host-resolution mirror for the auth-side dword IPv4 list rooted at owner `+0x4c`.
 void CLTLoginMediator::RefreshAuthAddressListForCurrentHostScaffold() {
     const bool hostChanged = (authAddressListResolvedHostName4c_ != authServerDnsName_);
@@ -127,10 +118,7 @@ std::string CLTLoginMediator::ResolvedMarginHostName() const {
     return std::string();
 }
 
-// UNANCHORED: source-owned accessor for the margin `CMessageConnection_0x4b7928` child mirrored from owner `+0x1c`.
-mxo::liblttcp::CMessageConnection_0x4b7928* CLTLoginMediator::MarginConnection() const {
-    return marginConnection_;
-}
+
 
 // anchor: launcher.exe:0x41b490
 bool CLTLoginMediator::HasReadyAuthConnectionState2() const {
@@ -276,8 +264,8 @@ uint32_t CLTLoginMediator::BeginAuthConnectionViaState1Scaffold() {
         "ROUTE CHECKPOINT: early-auth entering state1 auth-connect upstreamState={} currentStateBeforeSwitch={} resetAuthRetryState=1 attemptCount28={} candidateCount={}",
         upstreamState ? upstreamState->DebugName() : "<null>",
         currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(AuthConnectAttemptCountScaffold()),
-        static_cast<unsigned>(AuthConnectCandidateCountScaffold()));
+        static_cast<unsigned>(authConnectAttemptCount28_),
+        static_cast<unsigned>(authAddressList4c_.Count()));
     const uint32_t result = SetCurrentState(1u);
     spdlog::info(
         "CLTLoginMediator::BeginAuthConnectionViaState1Scaffold upstreamState={} currentState={} -> result=0x{:08x}",
