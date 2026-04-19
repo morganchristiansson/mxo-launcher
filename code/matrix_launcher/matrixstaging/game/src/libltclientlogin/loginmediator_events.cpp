@@ -271,8 +271,6 @@ uint32_t CLTLoginMediator::SetCurrentState(uint32_t helperStateId) {
         (helperStateId < 20u)
             ? static_cast<CLTLoginState*>(reinterpret_cast<void* const*>(&g_LoginHelperDispatchTableScaffold.helper7868)[helperStateId])
             : nullptr;
-
-    lastSwitchedHelperStateScaffold_ = helperStateId;
     if (oldState != nullptr) {
         // Original: old helper vtable+0x0c(newHelper) NoOp
         oldState->Slot4_NoOp();
@@ -319,21 +317,15 @@ void CLTLoginMediator::PostEvent(uint32_t eventId) {
     //   source-own only the recovered std::_Tree-like owner `+0x674` observer walk here, while
     //   leaving balancing/color bits and original node-pool recycling only partially reconstructed.
     spdlog::info(
-        "{} Event# {} currentState={} lastSwitch=0x{:02x} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 observer walk active)",
+        "{} Event# {} currentState={} treeCount={} header={} root={} leftmost={} rightmost={} (source-owned std::_Tree-like owner+0x674 observer walk active)",
         kLogPrefixPostEvent,
         static_cast<unsigned>(eventId),
         currentState_ ? currentState_->DebugName() : "<null>",
-        static_cast<unsigned>(lastSwitchedHelperStateScaffold_ & 0xffu),
         static_cast<unsigned>(observerTree674_.nodeCount04),
         fmt::ptr(observerTree674_.header00),
         fmt::ptr(observerTreeHeader674_.parent04),
         fmt::ptr(observerTreeHeader674_.left08),
         fmt::ptr(observerTreeHeader674_.right0c));
-    spdlog::info(
-        "DIAGNOSTIC: CLTLoginMediator::PostEvent() Event# {} currentState={} lastSwitch=0x{:02x}",
-        (unsigned)eventId,
-        currentState_ ? currentState_->DebugName() : "<null>",
-        (unsigned)(lastSwitchedHelperStateScaffold_ & 0xffu));
 
     // Observer dispatch note:
     // - `0x41cfb0` itself walks the owner `+0x674` tree for whatever event number it is given;

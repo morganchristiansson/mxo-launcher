@@ -1506,7 +1506,7 @@ private:
     mxo::liblttcp::CLTThreadPerClientTCPEngine_0x4b2768* engine_;
     // anchor: launcher.exe:0x41b1cd - owner byte +0x04 set to 1 during Initialize()
     uint8_t ownerReadyFlag04_ = 0;
-    uint32_t lastSwitchedHelperStateScaffold_ = 0;
+
     uint32_t marginPacketReceiveCountScaffold_ = 0;
     uint32_t marginPacketFilteredBeforeSlot6CountScaffold_ = 0;
     uint32_t marginPacketSlot6DispatchCountScaffold_ = 0;
