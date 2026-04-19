@@ -8,6 +8,7 @@
 #include <bits/stl_tree.h>
 
 #include <winsock2.h>
+#include <system_error>
 
 #include <process.h>
 
@@ -2418,12 +2419,13 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
     if (socketHandle == kInvalidSocketHandle) {
         const uint32_t wsaError = static_cast<uint32_t>(WSAGetLastError());
         spdlog::info(
-            "CLTThreadPerClientTCPEngine_0x4b2768::Connect socket allocation failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
+            "CLTThreadPerClientTCPEngine_0x4b2768::Connect socket allocation failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={} ({})",
             fmt::ptr(connection),
             connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
             static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
             static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
-            static_cast<unsigned>(wsaError));
+            static_cast<unsigned>(wsaError),
+            std::system_category().message(wsaError));
 
         CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
@@ -2449,12 +2451,13 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
         CloseSocketHandle(&socketHandle);
         connection->SetSocketHandle(socketHandle);
         spdlog::info(
-            "CLTThreadPerClientTCPEngine_0x4b2768::Connect bind failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
+            "CLTThreadPerClientTCPEngine_0x4b2768::Connect bind failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={} ({})",
             fmt::ptr(connection),
             connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
             static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
             static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
-            static_cast<unsigned>(wsaError));
+            static_cast<unsigned>(wsaError),
+            std::system_category().message(wsaError));
 
         CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItemScaffold* connectionStatusWorkItem =
             CLTThreadPerClientTCPEngine_0x4b2768_ConnectionStatusWorkItem_ctor_withPayload(
@@ -2482,12 +2485,13 @@ uint32_t CLTThreadPerClientTCPEngine_0x4b2768::Connect(void* contextKey) {
             CloseSocketHandle(&socketHandle);
             connection->SetSocketHandle(socketHandle);
             spdlog::info(
-                "CLTThreadPerClientTCPEngine_0x4b2768::Connect connect failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={}",
+                "CLTThreadPerClientTCPEngine_0x4b2768::Connect connect failed connection={} remoteHost='{}' port={} ip=0x{:08x} wsaError={} ({})",
                 fmt::ptr(connection),
                 connection->RemoteHostName().empty() ? std::string("<empty>") : connection->RemoteHostName(),
                 static_cast<unsigned>(ntohs(remoteEndpoint.portNetworkOrder)),
                 static_cast<unsigned>(remoteEndpoint.ipv4NetworkOrder),
-                static_cast<unsigned>(wsaError));
+                static_cast<unsigned>(wsaError),
+                std::system_category().message(wsaError));
 
             CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItemScaffold* closeWorkItem =
                 CLTThreadPerClientTCPEngine_0x4b2768_CloseWorkItem_ctor(
