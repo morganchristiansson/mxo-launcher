@@ -17,13 +17,10 @@ static uint32_t LoginState1WorkItemPayloadScaffold(const void* workItem) {
 
 }  // namespace
 
-// UNANCHORED: source debug-name helper for launcher.exe vtable 0x004b4fc4.
-const char* CLTLoginState_State1::DebugName() const {
-    return "CLTLoginState_State1";
-}
+
 
 // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
-uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
+uint32_t CLTLoginState_State1_0x4b4fc4::Slot1_HandlePrimaryGate(void* workItem) {
     // Source-added null-check (original directly used inputs)
     if (!workItem || !g_CurrentLoginMediator) {
         return 0u;
@@ -81,7 +78,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     if (attemptCount < candidateCount) {
         Slot3_BeginOrContinue(cachedUpstreamOrArg_0x4);
         spdlog::info(
-            "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount28={} candidateCount={} -> retry state1 slot3",
+            "CLTLoginState_State1_0x4b4fc4::Slot1_HandlePrimaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount28={} candidateCount={} -> retry state1 slot3",
             static_cast<unsigned>(workResultCode),
             fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(attemptCount),
@@ -98,7 +95,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
     g_CurrentLoginMediator->SetCurrentState(0u);
     g_CurrentLoginMediator->PostError(0u);
     spdlog::info(
-        "CLTLoginState_State1::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
+        "CLTLoginState_State1_0x4b4fc4::Slot1_HandlePrimaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} attemptCount28={} candidateCount={} -> currentState={} then PostError(0x00)",
         static_cast<unsigned>(workResultCode),
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(attemptCount),
@@ -108,7 +105,7 @@ uint32_t CLTLoginState_State1::Slot1_HandlePrimaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439090 (vtable 0x004b4fc4 slot 3)
-void CLTLoginState_State1::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_State1_0x4b4fc4::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     cachedUpstreamOrArg_0x4 = upstreamOrArg;
     if (!mediator) {
@@ -117,7 +114,7 @@ void CLTLoginState_State1::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 
     const uint32_t connectResult = mediator->BeginAuthConnection();
     spdlog::info(
-        "CLTLoginState_State1::Slot3_BeginOrContinue cachedUpstream={} upstreamPhaseCode={} currentState={} -> BeginAuthConnection=0x{:08x}",
+        "CLTLoginState_State1_0x4b4fc4::Slot3_BeginOrContinue cachedUpstream={} upstreamPhaseCode={} currentState={} -> BeginAuthConnection=0x{:08x}",
         fmt::ptr(cachedUpstreamOrArg_0x4),
         static_cast<unsigned>(RecoverCachedUpstreamPhaseCode(cachedUpstreamOrArg_0x4)),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
@@ -126,19 +123,19 @@ void CLTLoginState_State1::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b4fc4 slot 6)
-uint32_t CLTLoginState_State1::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+uint32_t CLTLoginState_State1_0x4b4fc4::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (mediator != nullptr) {
         mediator->worldListCountOrStatus80 = 0x12000005u;
     }
     spdlog::info(
-        "CLTLoginState_State1::Slot6_HandleSecondaryMessage workItem={} set owner+0x80=0x12000005",
+        "CLTLoginState_State1_0x4b4fc4::Slot6_HandleSecondaryMessage workItem={} set owner+0x80=0x12000005",
         fmt::ptr(workItem));
     return 0u;
 }
 
 // anchor: launcher.exe:0x0044e360 (vtable 0x004b4fc4 slot 7)
-uint32_t CLTLoginState_State1::GetStateId() const {
+uint32_t CLTLoginState_State1_0x4b4fc4::GetStateId() const {
     return 1;
 }
 

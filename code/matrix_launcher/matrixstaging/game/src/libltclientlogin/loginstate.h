@@ -146,15 +146,14 @@ public:
 
 // anchor: launcher.exe vtable 0x004b4fc4
 // docs: ../../docs/launcher.exe/VTABLES/0x004b4fc4.md
-// Provisional better-name suggestion: `CLTLoginState_AuthConnectPending`
-class CLTLoginState_State1 : public CLTLoginState {
+class CLTLoginState_State1_0x4b4fc4 : public CLTLoginState {
 public:
     // anchor: launcher.exe:0x00439060 (vtable 0x004b4fc4 slot 10 initializer)
-    CLTLoginState_State1() = default;
+    CLTLoginState_State1_0x4b4fc4() = default;
 
 public:
     // anchor: launcher.exe vtable 0x004b4fc4
-    const char* DebugName() const override;
+    const char* DebugName() const override { return "CLTLoginState_State1_0x4b4fc4"; }
 
     // anchor: launcher.exe:0x004390b0 (vtable 0x004b4fc4 slot 1)
     uint32_t Slot1_HandlePrimaryGate(void* workItem) override;

@@ -206,7 +206,7 @@ public:
         //
         // Current highest-value slot anchors:
         // - slot 1 / `0x4f786c` / phase-code `1`
-        //   - current best concrete state object: `CLTLoginState_State1` / vtable `0x4b4fc4`
+        //   - current best concrete state object: `CLTLoginState_State1_0x4b4fc4` / vtable `0x4b4fc4`
         //   - launcher.exe:0x439090 = CLTLoginMediator_Helper1_StartAuthConnection starts auth connect through launcher.exe:0x41d170 = CLTLoginMediator_BeginAuthConnection
         // - slot 2 / `0x4f7870` / phase-code `2`
         //   - current best concrete state object: `CLTLoginState_AuthenticatePending` / vtable `0x4b5014`
