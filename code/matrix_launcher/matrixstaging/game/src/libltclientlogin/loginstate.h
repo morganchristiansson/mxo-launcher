@@ -487,15 +487,15 @@ public:
 
 // anchor: launcher.exe vtable 0x004b4fec
 // docs: ../../docs/launcher.exe/VTABLES/0x004b4fec.md
-class CLTLoginState_WorldListPending : public CLTLoginState {
+class CLTLoginState_WorldListPending_0x4b4fec : public CLTLoginState {
 public:
     static constexpr const char* kLogInvalidWorldType =
-        "CLTLoginState_WorldListPending::AuthMessageDispatch(): World %s (id = %d) has an invalid type (%d)!  Forcing it to WORLDTYPE_INVALID.";
+        "CLTLoginState_WorldListPending_0x4b4fec::AuthMessageDispatch(): World %s (id = %d) has an invalid type (%d)!  Forcing it to WORLDTYPE_INVALID.";
     static constexpr const char* kLogInvalidWorldStatus =
-        "CLTLoginState_WorldListPending::AuthMessageDispatch(): World %s (id = %d) has an invalid status (%d)!  Forcing it to WORLDSTATUS_INVALID.";
+        "CLTLoginState_WorldListPending_0x4b4fec::AuthMessageDispatch(): World %s (id = %d) has an invalid status (%d)!  Forcing it to WORLDSTATUS_INVALID.";
 
     // anchor: launcher.exe:0x004391b0 (vtable 0x004b4fec slot 10 initializer)
-    CLTLoginState_WorldListPending() = default;
+    CLTLoginState_WorldListPending_0x4b4fec() = default;
 
     // anchor: launcher.exe vtable 0x004b4fec
     const char* DebugName() const override;

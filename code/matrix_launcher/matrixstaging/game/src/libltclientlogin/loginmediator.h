@@ -25,7 +25,7 @@ namespace ltlogin {
 class CLTLoginState;
 class CLTLoginState_State10;
 class CLTLoginState_AuthenticatePending_0x4b5014;
-class CLTLoginState_WorldListPending;
+class CLTLoginState_WorldListPending_0x4b4fec;
 class CLTLoginMediator;
 
 // Fidelity note:
@@ -221,7 +221,7 @@ public:
         //   - current best concrete state object: `CLTLoginState_State10` / vtable `0x4b512c`
         //   - launcher.exe:0x4401a0 = later state-10 incoming `AS_AuthReply` handler
         // - slot 14 / `0x4f78a0` / phase-code `14`
-        //   - current best concrete state object: `CLTLoginState_WorldListPending` / vtable `0x4b4fec`
+        //   - current best concrete state object: `CLTLoginState_WorldListPending_0x4b4fec` / vtable `0x4b4fec`
         //   - launcher.exe:0x43b830 = later `AS_GetWorldListRequest` sender
         void* helper7868 = nullptr;  // slot 0 / phase-code 0
         void* helper786C = nullptr;  // slot 1 / phase-code 1

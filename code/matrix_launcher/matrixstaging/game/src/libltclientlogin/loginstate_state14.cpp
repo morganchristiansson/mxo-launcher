@@ -5,12 +5,12 @@
 namespace mxo::ltlogin {
 
 // anchor: launcher.exe vtable 0x004b4fec
-const char* CLTLoginState_WorldListPending::DebugName() const {
-    return "CLTLoginState_WorldListPending";
+const char* CLTLoginState_WorldListPending_0x4b4fec::DebugName() const {
+    return "CLTLoginState_WorldListPending_0x4b4fec";
 }
 
 // anchor: launcher.exe:0x0043b830 (vtable 0x004b4fec slot 3)
-void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     (void)upstreamOrArg;
     if (!mediator) {
@@ -26,7 +26,7 @@ void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(CLTLoginState* upstre
     // the broader `0x36` reply handling remains owned by AuthMessageDispatch().
     if (mediator->authConnectionFlag2c_ == 0u) {
         spdlog::info(
-            "CLTLoginState_WorldListPending::Slot3_BeginOrContinue blocked on owner+0x2c==0 currentState={}",
+            "CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue blocked on owner+0x2c==0 currentState={}",
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return;
     }
@@ -34,7 +34,7 @@ void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(CLTLoginState* upstre
     mxo::liblttcp::CMessageConnection_0x4b7928* connection = mediator->authConnection_;
     if (connection == nullptr) {
         spdlog::info(
-            "CLTLoginState_WorldListPending::Slot3_BeginOrContinue missing auth connection object currentState={}",
+            "CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue missing auth connection object currentState={}",
             mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>");
         return;
     }
@@ -46,7 +46,7 @@ void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(CLTLoginState* upstre
             sizeof(payload),
             mxo::auth::kFrameModeAuto,
             &packet)) {
-        spdlog::info("DIAGNOSTIC: CLTLoginState_WorldListPending::Slot3_BeginOrContinue failed to build AS_GetWorldListRequest");
+        spdlog::info("DIAGNOSTIC: CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue failed to build AS_GetWorldListRequest");
         return;
     }
 
@@ -57,7 +57,7 @@ void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(CLTLoginState* upstre
     mediator->PostEvent(0x1bu);
 
     spdlog::info(
-        "DIAGNOSTIC: CLTLoginState_WorldListPending::Slot3_BeginOrContinue built raw-0x35 packet headerLen={} payloadLen={} byteCount={} currentState={} -> sendResult=0x{:08x} then posts event=0x1b",
+        "DIAGNOSTIC: CLTLoginState_WorldListPending_0x4b4fec::Slot3_BeginOrContinue built raw-0x35 packet headerLen={} payloadLen={} byteCount={} currentState={} -> sendResult=0x{:08x} then posts event=0x1b",
         packet.headerBytes.size(),
         packet.payloadBytes.size(),
         packet.bytes.size(),
@@ -66,8 +66,8 @@ void CLTLoginState_WorldListPending::Slot3_BeginOrContinue(CLTLoginState* upstre
     return;
 }
 
-// anchor: launcher.exe:0x0043d4d0 (string/file anchors: loginstate.cpp, CLTLoginState_WorldListPending::AuthMessageDispatch())
-uint32_t CLTLoginState_WorldListPending::AuthMessageDispatch(void* workItem) {
+// anchor: launcher.exe:0x0043d4d0 (string/file anchors: loginstate.cpp, CLTLoginState_WorldListPending_0x4b4fec::AuthMessageDispatch())
+uint32_t CLTLoginState_WorldListPending_0x4b4fec::AuthMessageDispatch(void* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     // Current best contextual role from the vtable and string anchors:
     // - vtable 0x004b4fec / slot 5
@@ -78,7 +78,7 @@ uint32_t CLTLoginState_WorldListPending::AuthMessageDispatch(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00438ce0 (vtable 0x004b4fec slot 7)
-uint32_t CLTLoginState_WorldListPending::GetStateId() const {
+uint32_t CLTLoginState_WorldListPending_0x4b4fec::GetStateId() const {
     return 14;
 }
 
