@@ -449,10 +449,10 @@ public:
 // Focused source home for the current state-0x0c leaf identity:
 // - `loginstate_state12.cpp`
 // Provisional better-name suggestion: `CLTLoginState_FinalMarginLeaf12`
-class CLTLoginState_State12 : public CLTLoginState_AbstractFinalLeafBase {
+class CLTLoginState_State12_0x4b5230 : public CLTLoginState_AbstractFinalLeafBase {
 public:
     // anchor: launcher.exe:0x00439d80 (vtable 0x004b5230 slot 10 shared initializer)
-    CLTLoginState_State12();
+    CLTLoginState_State12_0x4b5230();
 
     // anchor: launcher.exe vtable 0x004b5230
     const char* DebugName() const override;

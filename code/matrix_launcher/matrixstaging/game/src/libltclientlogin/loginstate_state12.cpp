@@ -10,7 +10,7 @@ namespace mxo::ltlogin {
 //   - `../../../../docs/launcher.exe/VTABLES/0x004b5230.md`
 //   - `../../../../docs/launcher.exe/state_machine/POST_STATE9_CONTINUATION.md`
 
-CLTLoginState_State12::CLTLoginState_State12() {
+CLTLoginState_State12_0x4b5230::CLTLoginState_State12_0x4b5230() {
     // anchor: launcher.exe:0x00439d80 + helper-dispatch init at `0x43b300`
     // The dispatch table creates this final leaf with byte `this+4 = 1`, which is what makes the
     // shared slot-6 handler (`0x004397e0`) delegate into `0x41c5c0` instead of immediately
@@ -29,12 +29,12 @@ CLTLoginState_State12::CLTLoginState_State12() {
 }
 
 // anchor: launcher.exe vtable 0x004b5230
-const char* CLTLoginState_State12::DebugName() const {
-    return "CLTLoginState_State12";
+const char* CLTLoginState_State12_0x4b5230::DebugName() const {
+    return "CLTLoginState_State12_0x4b5230";
 }
 
 // anchor: launcher.exe:0x00438d00 (vtable 0x004b5230 slot 7)
-uint32_t CLTLoginState_State12::GetStateId() const {
+uint32_t CLTLoginState_State12_0x4b5230::GetStateId() const {
     return 12;
 }
 
