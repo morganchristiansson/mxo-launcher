@@ -102,11 +102,14 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
     // - clear owner `+0x7c`
     // - call `connection->+0x1c(owner++0x6c)`
 
-    // Current bounded active-path correction:
-    // - the existing-character state8 -> state4 path reaches here directly
-    // - keep that path connection-centric: `EnsureConnected()` re-enters the engine connect slot
-    //   with the direct margin connection object as the context key
-    marginPeerCloseQueuedScaffold_ = false;
+    // Fidelity: ALWAYS read from globals - original uses globals at 0x4f7b14 directly.
+    // This ensures reconnection works even after initial login.
+    // Use global as fallback if caller doesn't provide route host.
+    if (!routeHostText || routeHostText[0] == '\0') {
+        routeHostText = g_marginServerDNSName;
+    }
+    // Use global port for endpoint construction.
+    const uint16_t portHostOrder = g_marginServerPort != 0u ? g_marginServerPort : marginServerPortHostOrder_;
 
     mxo::liblttcp::CMessageConnection_0x4b7928* connection = EnsureMarginConnectionObject();
     if (!connection) {
@@ -171,7 +174,7 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         // Faithful inline endpoint build (original writes to owner `+0x6c` directly)
         marginEndpoint_.family = 2;
         marginEndpoint_.portNetworkOrder =
-            static_cast<uint16_t>((marginServerPortHostOrder_ << 8) | (marginServerPortHostOrder_ >> 8));
+            static_cast<uint16_t>((portHostOrder << 8) | (portHostOrder >> 8));
         marginEndpoint_.ipv4NetworkOrder = marginSelectedIpv4_7c_;
     }
 
@@ -192,7 +195,7 @@ uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint
         cachedRouteSelector,
         marginBeginCount24_,
         marginEndpoint_.ipv4NetworkOrder,
-        marginServerPortHostOrder_,
+        portHostOrder,
         result);
     if (result == 0u) {
         spdlog::debug(
