@@ -91,7 +91,7 @@ const char* CLTLoginMediator::ResolveMarginRouteDescriptor() const {
 // anchor: launcher.exe:0x41e500
 uint32_t CLTLoginMediator::BeginMarginConnection(const char* routeHostText, uint8_t cachedRouteSelector) {
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`
-    // case split back into `CLTLoginState_State4::Slot3_BeginOrContinue`.
+    // case split back into `CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue`.
     //
     // Current best recovered `0x41e500` shape:
     // - allocate/configure a margin-specific connection object at owner `+0x1c`

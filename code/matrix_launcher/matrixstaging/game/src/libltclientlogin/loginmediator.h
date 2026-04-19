@@ -121,7 +121,7 @@ class CLTLoginMediator : public ILTLoginMediator_0x4af2b8 {
         CLTLoginMediator& owner,
         const mxo::auth::AuthReply& reply);
     friend class CLTLoginState_AuthenticatePending;
-    friend class CLTLoginState_State4;
+    friend class CLTLoginState_State4_0x4b503c;
     friend class CLTLoginState_State6;
     friend class CLTLoginState_State7;
     friend class CLTLoginState_State8;
@@ -1385,7 +1385,7 @@ void ResetMarginConnectAttemptCountScaffold() { marginBeginCount24_ = 0u; }
 
     // anchor: launcher.exe:0x41e500
     // Narrow reusable transport/init helper kept on the mediator after moving the `0x439300`
-    // case split back into `CLTLoginState_State4::Slot3_BeginOrContinue`.
+    // case split back into `CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue`.
     // Preserved call contract from the original body:
     // - arg1 = route/prefix text used to refresh owner `+0x30`
     // - arg2 = cached non-zero selector that skips the route-refresh / address-list rebuild path

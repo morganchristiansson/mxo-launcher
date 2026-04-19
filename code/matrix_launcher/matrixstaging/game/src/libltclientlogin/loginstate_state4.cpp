@@ -38,12 +38,12 @@ static uint32_t BeginMarginConnectionForState4Case(
 }  // namespace
 
 // anchor: launcher.exe vtable 0x004b503c
-const char* CLTLoginState_State4::DebugName() const {
-    return "CLTLoginState_State4";
+const char* CLTLoginState_State4_0x4b503c::DebugName() const {
+    return "CLTLoginState_State4_0x4b503c";
 }
 
 // anchor: launcher.exe:0x004393f0 (vtable 0x004b503c slot 2)
-uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
+uint32_t CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate(void* workItem) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!workItem || !mediator) {
         return 0u;
@@ -62,7 +62,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
         if (mediator->marginBeginCount24_ < static_cast<uint32_t>(mediator->marginAddressList3c_.Count())) {
             Slot3_BeginOrContinue(cachedUpstreamOrArg_0x4);
             spdlog::info(
-                "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3",
+                "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate non-zero status=0x{:08x} cachedUpstream={} attemptCount24={} candidateCount={} owner+0x2d=1 -> retry slot3",
                 static_cast<unsigned>(status),
                 fmt::ptr(cachedUpstreamOrArg_0x4),
                 static_cast<unsigned>(mediator->marginBeginCount24_),
@@ -77,7 +77,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
         }
         mediator->PostError(6u);
         spdlog::info(
-            "CLTLoginState_State4::Slot2_HandleSecondaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostError(0x06)",
+            "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate non-zero status=0x{:08x} retry exhausted cachedUpstream={} upstreamPhaseCode={} -> currentState={} then PostError(0x06)",
             static_cast<unsigned>(status),
             fmt::ptr(cachedUpstreamOrArg_0x4),
             static_cast<unsigned>(nextHelperStateId),
@@ -98,7 +98,7 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
     const uint32_t switchDispatchResult = mediator->SetCurrentState(nextHelperStateId);
     mediator->PostEvent(0x0eu);
     spdlog::info(
-        "CLTLoginState_State4::Slot2_HandleSecondaryGate status=0x{:08x} cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",
+        "CLTLoginState_State4_0x4b503c::Slot2_HandleSecondaryGate status=0x{:08x} cachedUpstreamPhaseCode={} -> currentState={} switchDispatchResult=0x{:08x} owner+0x104=-1 then PostEvent(0x0e)",
         static_cast<unsigned>(status),
         static_cast<unsigned>(nextHelperStateId),
         mediator->currentState_ ? mediator->currentState_->DebugName() : "<null>",
@@ -107,14 +107,14 @@ uint32_t CLTLoginState_State4::Slot2_HandleSecondaryGate(void* workItem) {
 }
 
 // anchor: launcher.exe:0x00439300 (vtable 0x004b503c slot 3)
-void CLTLoginState_State4::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
+void CLTLoginState_State4_0x4b503c::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
     CLTLoginMediator* mediator = g_CurrentLoginMediator;
     if (!mediator) {
         return;
     }
 
     // Faithfulness/ownership correction from the fresh `0x439300` disassembly review:
-    // - `0x439300` belongs to `CLTLoginState_State4` vtable `0x004b503c` slot 3
+    // - `0x439300` belongs to `CLTLoginState_State4_0x4b503c` vtable `0x004b503c` slot 3
     // - this object caches the first incoming upstream/helper pointer at `this+4`
     // - it then calls that cached object's vtable `+0x18` and uses the returned phase/state code
     //   for the real case split
@@ -182,13 +182,13 @@ void CLTLoginState_State4::Slot3_BeginOrContinue(CLTLoginState* upstreamOrArg) {
 }
 
 // anchor: launcher.exe:0x00439190 (vtable 0x004b503c slot 6)
-uint32_t CLTLoginState_State4::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
+uint32_t CLTLoginState_State4_0x4b503c::Slot6_HandleSecondaryMessage(mxo::liblttcp::CMessageConnectionMessageRef_0x4ba23c* workItem) {
     (void)workItem;
     return 0;
 }
 
 // anchor: launcher.exe:0x004686b0 (vtable 0x004b503c slot 7)
-uint32_t CLTLoginState_State4::GetStateId() const {
+uint32_t CLTLoginState_State4_0x4b503c::GetStateId() const {
     return 4;
 }
 
