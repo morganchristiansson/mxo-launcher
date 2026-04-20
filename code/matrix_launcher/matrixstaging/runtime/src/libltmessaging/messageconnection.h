@@ -1356,7 +1356,7 @@ public:
     // anchor: launcher.exe:0x41f30
     // Source-owned mirror of the later raw type-1 send that now keeps the nearer original local
     // builder shape explicit too.
-    uint32_t SendStoredBootstrapReplyCopy98();
+    void SendStoredBootstrapReplyCopy98();
     // anchor: launcher.exe:0x4429b0 / 0x439840 / 0x41cf30
     // Source-owned mirror of the consumed decoded-code-2 CERT challenge-response send.
     uint32_t SendCertChallengeResponseFromChallengeBytes(
