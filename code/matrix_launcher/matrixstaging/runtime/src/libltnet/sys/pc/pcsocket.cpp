@@ -7,7 +7,6 @@
 #include <atomic>
 #include <spdlog/spdlog.h>
 
-namespace mxo::libltnet {
 namespace {
 
 static std::atomic<bool> g_socketLayerLoggedOnce{false};
@@ -95,5 +94,3 @@ bool CLTSocketLayer::Init() {
 
     return true;
 }
-
-}  // namespace mxo::libltnet

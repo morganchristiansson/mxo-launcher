@@ -7,7 +7,6 @@
 #include <cstring>
 #include <spdlog/spdlog.h>
 
-namespace mxo::libltnet {
 namespace {
 
 using DnsQueryAFn = DNS_STATUS (WINAPI*)(PCSTR, WORD, DWORD, PVOID, PDNS_RECORD*, PVOID*);
@@ -66,5 +65,3 @@ bool DNSResolveNameToIPList(
     }
     return resolvedAny;
 }
-
-}  // namespace mxo::libltnet

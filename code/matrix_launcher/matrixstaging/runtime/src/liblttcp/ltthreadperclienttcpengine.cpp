@@ -909,7 +909,7 @@ static CRITICAL_SECTION* CriticalSectionFromOpaqueStorage(void* storage) {
 
 // anchor: launcher.exe:0x452270 / 0x452300 / 0x452320 helper family shape
 static uint32_t CreateConnectedWakeupSocketHandle() {
-    if (!mxo::libltnet::CLTSocketLayer::Init()) {
+    if (!CLTSocketLayer::Init()) {
         return kInvalidSocketHandle;
     }
 
@@ -965,7 +965,7 @@ static uint32_t CLTIPSocket_StaticAllocateSocket(
     int socketType,
     int protocol,
     uint8_t flags) {
-    if (!mxo::libltnet::CLTSocketLayer::Init()) {
+    if (!CLTSocketLayer::Init()) {
         return kInvalidSocketHandle;
     }
 

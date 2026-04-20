@@ -165,7 +165,7 @@ uint32_t CLTLoginMediator::BeginAuthConnection() {
 
     // Refresh address list if empty (state2 may have called Reset() during retry)
     // Ensure Winsock is initialized before DNS resolution
-    (void)mxo::libltnet::CLTSocketLayer::Init();
+    CLTSocketLayer::Init();
     // anchor: launcher.exe:0x41b1e8..0x41b1ef / CLTIPAddressList_Reinit pattern
     if (authAddressList4c_.Empty()) {
         uint32_t reinitFlags = mxo::liblttcp::CLTIPAddressList::kFlagShuffle;

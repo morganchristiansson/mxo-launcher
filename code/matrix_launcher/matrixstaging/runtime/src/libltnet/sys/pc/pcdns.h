@@ -3,8 +3,6 @@
 #include <cstdint>
 #include <vector>
 
-namespace mxo::libltnet {
-
 static constexpr uint8_t kDNSResolveNameToIPListFlagNoHostsFile = 0x04;
 
 // Current best static read from launcher.exe `pcdns.cpp`:
@@ -16,5 +14,3 @@ bool DNSResolveNameToIPList(
     const char* hostName,
     std::vector<uint32_t>* outIpv4NetworkOrderList,
     uint8_t flags);
-
-}  // namespace mxo::libltnet

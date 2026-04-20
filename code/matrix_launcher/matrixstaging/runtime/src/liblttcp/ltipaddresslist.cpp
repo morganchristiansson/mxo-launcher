@@ -110,15 +110,15 @@ bool CLTIPAddressList::ResolveAndAppendToken(const char* token, uint32_t flags) 
     std::vector<uint32_t>& storage = BackingStorage(this);
 
     if ((flags & kFlagIgnoreHostsFile) != 0u) {
-        const bool resolved = mxo::libltnet::DNSResolveNameToIPList(
+        const bool resolved = DNSResolveNameToIPList(
             token,
             &storage,
-            mxo::libltnet::kDNSResolveNameToIPListFlagNoHostsFile);
+            kDNSResolveNameToIPListFlagNoHostsFile);
         SyncPointerFields(this, storage.size());
         return resolved;
     }
 
-    if (!mxo::libltnet::CLTSocketLayer::Init()) {
+    if (!CLTSocketLayer::Init()) {
         return false;
     }
 
