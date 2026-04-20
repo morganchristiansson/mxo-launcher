@@ -19,18 +19,44 @@ CLTReferenceCountedBase_0x4b42b0::CLTReferenceCountedBase_0x4b42b0(char initFlag
     (void)initFlag;
 }
 
+// anchor: launcher.exe:0x4b41e0 - CLTChildObjectBase_0x4b41e0 ctor
+CLTChildObjectBase_0x4b41e0::CLTChildObjectBase_0x4b41e0() {
+    // Original sets vtable to 0x4b41e0
+    // No fields to initialize - this is a dispatch-only base class
+}
+
+// anchor: launcher.exe:0x4372a0 / vtable+0x00
+uint32_t CLTChildObjectBase_0x4b41e0::GetOwnerContext() {
+    // Original: ((this-4)->vtable+0xa4)(), then indirect call through result+4
+    // FIDELITY: This is a child-to-parent dispatch pattern
+    // Stubbed - actual owner dispatch not implemented in source
+    return 0u;
+}
+
+// anchor: launcher.exe:0x4372c0 / vtable+0x04  
+void CLTChildObjectBase_0x4b41e0::NotifyOwner() {
+    // Original: ((this-4)->vtable+0xa8)(), then indirect call through result+4
+    // FIDELITY: This is a child-to-parent dispatch pattern
+    // Stubbed - actual owner dispatch not implemented in source
+}
+
 CryptoInitHelper_0x4b42bc::CryptoInitHelper_0x4b42bc(uint32_t param1)
-    : CLTReferenceCountedBase_0x4b42b0('\x01'),  // First base ctor with flag 1
+    : CLTReferenceCountedBase_0x4b42b0('\x01'),  // First base at offset 0
       mbr_0x10(param1),
       mbr_0x14(0),
       mbr_0x1c(0x40),
       mbr_0x20(nullptr),
       mbr_0x24(0),
       mbr_0x28(param1) {
-    // FIDELITY NOTE: Original calls cls_0x4b42b0 ctor twice (virtual inheritance):
-    //   1. cls_0x4b42b0::cls_0x4b42b0(&this->cls_0x4b42b0,'\x01');
-    //   2. cls_0x4b42b0::cls_0x4b42b0(this_00,'\0');
-    // It also installs multiple vtables during construction (0x4b42bc, 0x4b9fa0, 0x4bace0, etc.)
+    // FIDELITY NOTE: Original has complex multiple/virtual inheritance:
+    //   1. cls_0x4b42b0 at offset 0 (flag '\x01') - our CLTReferenceCountedBase_0x4b42b0
+    //   2. cls_0x4b42b0 at offset 4 (flag '\x0') - second subobject  
+    //   3. cls_0x4b41e0 at offset 8 - CLTChildObjectBase_0x4b41e0 dispatch base
+    //   
+    // Constructor installs multiple vtables during setup:
+    //   - 0x4b42bc (primary), 0x4b9fa0, 0x4bace0, 0x4bacbc, etc.
+    //   - Intermediate vtable 0x4b3e18 briefly installed at offset 8
+    //   - Final vtable 0x4b41e0 at offset 8
     
     // anchor: launcher.exe:0x4686e0 - constructor
     // Initialize memory blocks
