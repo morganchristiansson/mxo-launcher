@@ -449,7 +449,7 @@ public:
     // Allow default construction for stack-local envelope instances
     CLTLoginMediatorPacketBuilderEnvelope_0x4b6538();
 
-    // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
+    // anchor: launcher.exe:0x441920 -> PacketBuilder_CertChallengeResponse_FromMessageRef
     // Original signature: cls_0x4b6538::cls_0x4b6538(&local_38, (int *)messageRef, '\x01')
     // FIDELITY: Proper constructor matching original:
     //   this->messageRef08 = messageRef;
@@ -459,7 +459,7 @@ public:
         CMessageConnectionMessageRef_0x4ba23c* messageRef,
         uint8_t flag);
 
-    // anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
+    // REMOVED: No matching original ctor - this overload is source-only convenience
     explicit CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
         const std::array<uint8_t, 16>& decryptedBytes);
 
@@ -479,7 +479,8 @@ static_assert(sizeof(CLTLoginMediatorPacketBuilderEnvelope_0x4b6538) == 0x2c,
  * This mirrors the original cls_0x4b6538 constructor that takes messageRef and '\x01' flag,
  * but we use a simpler default-constructed version since we're using static helpers.
  *
- * anchor: launcher.exe:0x439840 - CLTLoginMediatorPacketBuilderEnvelope_ctor
+ * anchor: launcher.exe:0x439840 - PacketBuilder_0x4af2a4_DefaultCtor
+ * Note: This is the base PacketBuilder ctor, NOT specific to CLTLoginMediatorPacketBuilderEnvelope
  * Sets vftable to Packet_0x4af2a4__vftable, creates message ref at +0x8, sets +0x4
  */
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538() {
@@ -508,8 +509,8 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     }
 }
 
-// anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor with message ref and flag
-// anchor: launcher.exe:0x441920 -> cls_0x4b6538 with message ref and flag
+// anchor: launcher.exe:0x441920 -> PacketBuilder_CertChallengeResponse_FromMessageRef
+// PacketBuilder_CertChallengeResponse_0x4b6538 ctor with message ref and flag
 // Original uses different offset calculation based on flag:
 //   flag == 0: packetPayloadPtr = payloadBase + 0xc
 //   flag != 0: packetPayloadPtr uses lookup table (see Ghidra decompile 0x441959-0x44197d)
@@ -536,7 +537,8 @@ inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBui
     ownerReadyFlag0c = flag;
 }
 
-// anchor: launcher.exe:0x443220 -> cls_0x4b6538 constructor stores 16 bytes into mbr_0x10
+// anchor: launcher.exe:0x443aa0 -> PacketBuilder_CertChallengeResponse_Dtor (shared dtor)
+// UNUSED in main flow - array constructor would be at different address if it existed
 inline CLTLoginMediatorPacketBuilderEnvelope_0x4b6538::CLTLoginMediatorPacketBuilderEnvelope_0x4b6538(
     const std::array<uint8_t, 16>& decryptedBytes) {
     // Not used in main flow - the messageRef constructor is used instead
@@ -557,7 +559,7 @@ class Packet_CertChallengeResponse_0x4b6560 : public ltlogin::Packet_0x4af2a4 {
 public:
     // FIDELITY: Default constructor mirrors original at 0x439840
     // Creates new message ref, sets up payload base at +0xc offset
-    // anchor: launcher.exe:0x439840 - PacketBuilder_CertChallengeResponse_0x4b6538_DefaultCtor
+    // anchor: launcher.exe:0x439840 - PacketBuilder_0x4af2a4_DefaultCtor (base class ctor)
     Packet_CertChallengeResponse_0x4b6560();
     
     ~Packet_CertChallengeResponse_0x4b6560() override = default;
@@ -572,7 +574,7 @@ inline Packet_CertChallengeResponse_0x4b6560::Packet_CertChallengeResponse_0x4b6
     // The original sets base vtable (0x4af2a4), creates message ref, then later
     // manually overwrites with 0x4b6560 at 0x442afd.
     // We directly initialize with the correct vtable concept.
-    // anchor: launcher.exe:0x439840-0x439893: Default ctor creates message ref, sets field_0x4
+    // anchor: launcher.exe:0x439840-0x4398a4: PacketBuilder_0x4af2a4_DefaultCtor creates message ref, sets payload ptr
     
     CMessageConnectionMessageRef_0x4ba23c* newMessageRef = new CMessageConnectionMessageRef_0x4ba23c();
     if (newMessageRef) {
